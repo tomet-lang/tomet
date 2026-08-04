@@ -1,0 +1,6 @@
+[package]
+name = "typedmark-lsp"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

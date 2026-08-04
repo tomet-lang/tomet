@@ -1,0 +1,6 @@
+[package]
+name = "typedmark-validator"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
