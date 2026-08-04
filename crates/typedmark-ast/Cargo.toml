@@ -1,0 +1,6 @@
+[package]
+name = "typedmark-ast"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

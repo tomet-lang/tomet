@@ -2,7 +2,14 @@
 resolver = "3"
 
 members = [
-  "apps/typedmark-rs"
+  "apps/typedmark-rs",
+  "crates/tree-sitter-typedmark",
+  "crates/typedmark-ast",
+  "crates/typedmark-formatter",
+  "crates/typedmark-lsp",
+  "crates/typedmark-parser",
+  "crates/typedmark-renderer",
+  "crates/typedmark-validator"
 ]
 
 default-members = [
