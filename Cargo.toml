@@ -2,67 +2,11 @@
 resolver = "3"
 
 members = [
-  "apps/cli",
-  "apps/desktop-qml",
-  "apps/desktop-slint",
-
-  # === Tools ===
-  "tools/cargo-tomet",
-
-  # === Crates ===
-  "crates/api",
-  "crates/config",
-  "crates/core",
-  "crates/extension",
-  "crates/formatter",
-  "crates/script-python",
-  "crates/renderer",
-
-  # === Parser ===
-  "crates/parser/markdown",
-  "crates/parser/nix",
-  "crates/parser/rust",
-
-  # === Views ===
-  "crates/views/origami",
-  "crates/views/calendar",
-  "crates/views/explorer",
-  "crates/views/map",
-  "crates/views/preview",
-  "crates/views/properties",
-  "crates/views/qml-embed",
-  "crates/views/table",
-  "crates/views/terminal",
-  "crates/views/text-editor",
-  # === Painter ===
-  "crates/views/painter/core",
-  "crates/views/painter/brush",
-  # === Link Graph ===
-  "crates/views/link-graph/core",
-  "crates/views/link-graph/2d",
-  "crates/views/link-graph/3d",
-  "crates/views/link-graph/map",
-  # === Canvas (pan/zoom card & node editors) ===
-  "crates/views/canvas/core",
-  "crates/views/canvas/board",
-  "crates/views/canvas/node-graph",
-  "crates/views/canvas/timeline",
-
-  # === Extensions ===
-  "extensions/webview",
-
-  # === Integration ===
-  "crates/integration/sync",
-  "crates/integration/git",
-
-  # === tests ===
-  # "apps/tests/bin",
-  # "apps/tests/slint",
-  # "apps/tests/slint-minimal",
+  "apps/typedmark-rs"
 ]
 
 default-members = [
-  "apps/desktop-qml",
+  "apps/typedmark-rs"
 ]
 
 [workspace.package]
@@ -71,36 +15,15 @@ edition = "2024"
 
 [workspace.dependencies]
 anyhow = "1"
-ash = "0.38"
 clap = { version = "4.6", features = ["derive"] }
 cxx = "1"
-cxx-qt = "0.9"
-cxx-qt-lib = "0.9"
-cxx-qt-build = "0.9"
 directories = "6.0"
-image = "0.25"
-libloading = "0.8"
-naga = "29.0"
-notify = "8.2"
-portable-pty = "0.9"
-pyo3 = "0.29"
-qtbridge = { git = "https://github.com/qt/qtbridge-rust.git" }
 rayon = "1"
 regex = "1.12"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
-servo = "0.4.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
-slint = { version = "1.17", features = ["backend-winit"] }
-slint-build = "1.17"
-sysinfo = "0.39"
 time = "0.3"
 tokio = "1"
 uuid = { version = "1.23", features = ["v4"] }
-vte = "0.15"
 walkdir = "2"
-# Pin for bevy
-wgpu = "29.0.4"
-wgpu-hal = "29.0.4"
-wgpu-types = "29.0.4"
