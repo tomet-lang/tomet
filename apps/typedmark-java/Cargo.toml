@@ -1,0 +1,6 @@
+[package]
+name = "typedmark-java"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

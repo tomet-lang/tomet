@@ -1,0 +1,6 @@
+[package]
+name = "typedmark-js"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

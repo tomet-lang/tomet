@@ -1,8 +1,8 @@
 [workspace]
 resolver = "3"
 
-members = [
-  "apps/typedmark-rs",
+members = ["apps/typedmark-java", "apps/typedmark-js",
+  "apps/typedmark-rs", "apps/typedmark-vscode", "apps/typedmark-zed",
   "crates/tree-sitter-typedmark",
   "crates/typedmark-ast",
   "crates/typedmark-formatter",
