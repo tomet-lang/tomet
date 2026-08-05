@@ -1,0 +1,6 @@
+[package]
+name = "typedmark-vscode"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
