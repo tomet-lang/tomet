@@ -1,0 +1,49 @@
+@meta(yaml){
+  key: value
+}
+
+#[ What is typedmark? ]{ id:header1 }
+
+- 人間工学的見やすさ。
+- パーサーにも優しい。
+- 拡張性を担保
+- key:valueを重視
+- 私は、研究目的。
+
+##[
+ なぜtypedmarkを使用するのか？
+]
+{ id:header1.2 }
+
+非曖昧な構文
+リンクと変数に特化。
+統一された記法
+<T>(input)[area]{value}
+- (?)[ こっちのほうがいいか？ ]
+- <T>(input)"area"{value}
+
+#[ その他構想 ]
+{
+  id: header2
+  cssclass: card
+}
+
+@link(ref:anotation1)
+@link(url:http://)
+[Wiki](url:https://)
+@image(file:assets/image.png)
+Caution [
+  ネストは`[]`を使用する。と考えていたが、リストと被りうる可能性がある。`""`ももしかしたらありなのかもしれない。
+]
+
+#[ 問題。 ]
+
+リンクのフォーマットがまだ完全に決まっていない。
+リスト
+もともとMarkdown互換出会ったからtypedmarkなのだが、見ての通りもう関係ない。新たな名前がほしい。
+注釈
+
+@links {
+  (1)[ 注釈 ]
+  (anotation1)[ 注釈 ]
+}

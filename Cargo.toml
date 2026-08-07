@@ -1,15 +1,21 @@
 [workspace]
 resolver = "3"
 
-members = ["apps/typedmark-java", "apps/typedmark-js",
-  "apps/typedmark-rs", "apps/typedmark-vscode", "apps/typedmark-zed",
-  "crates/tree-sitter-typedmark",
+members = [
+  "apps/typedmark-java",
+  "apps/typedmark-js",
+  "apps/typedmark-rs",
+  "apps/typedmark-vscode",
+  "apps/typedmark-zed",
+
   "crates/typedmark-ast",
   "crates/typedmark-formatter",
+  "crates/typedmark-lexar",
   "crates/typedmark-lsp",
   "crates/typedmark-parser",
   "crates/typedmark-renderer",
-  "crates/typedmark-validator"
+  "crates/typedmark-validator",
+  "crates/tree-sitter-typedmark"
 ]
 
 default-members = [

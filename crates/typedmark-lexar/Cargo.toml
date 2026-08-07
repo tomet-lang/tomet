@@ -1,0 +1,6 @@
+[package]
+name = "typedmark-lexar"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
