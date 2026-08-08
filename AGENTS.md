@@ -1,4 +1,4 @@
-# Cettila
+# TypedMark
 
 ## Project overview
 
