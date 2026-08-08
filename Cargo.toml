@@ -2,9 +2,9 @@
 resolver = "3"
 
 members = [
+  "apps/typedmark",
   "apps/typedmark-java",
   "apps/typedmark-js",
-  "apps/typedmark-rs",
   "apps/typedmark-vscode",
   "apps/typedmark-zed",
 
@@ -15,11 +15,12 @@ members = [
   "crates/typedmark-parser",
   "crates/typedmark-renderer",
   "crates/typedmark-validator",
+  "crates/serde_typedmark",
   "crates/tree-sitter-typedmark"
 ]
 
 default-members = [
-  "apps/typedmark-rs"
+  "apps/typedmark"
 ]
 
 [workspace.package]
@@ -27,6 +28,12 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
+typedmark-ast = { path = "crates/typedmark-ast" }
+typedmark-lexar = { path = "crates/typedmark-lexar" }
+typedmark-parser = { path = "crates/typedmark-parser" }
+serde_typedmark = { path = "crates/serde_typedmark" }
+
+#[ Crates ]
 anyhow = "1"
 clap = { version = "4.6", features = ["derive"] }
 cxx = "1"
