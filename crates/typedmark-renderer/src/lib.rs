@@ -48,7 +48,7 @@ fn render_block(block: &Block, out: &mut String) {
             render_inlines(inlines, out);
             out.push_str("</p>\n");
         }
-        Block::List(items) => render_list(items, out),
+        Block::List { ordered, items } => render_list(items, *ordered, out),
         Block::Element(el) => render_element(el, out, false),
     }
 }
@@ -63,14 +63,15 @@ fn render_heading(h: &Heading, out: &mut String) {
     out.push_str(&format!("</h{level}>\n"));
 }
 
-fn render_list(items: &[ListItem], out: &mut String) {
-    out.push_str("<ul>\n");
+fn render_list(items: &[ListItem], ordered: bool, out: &mut String) {
+    let tag = if ordered { "ol" } else { "ul" };
+    out.push_str(&format!("<{tag}>\n"));
     for item in items {
         out.push_str("<li>");
         render_inlines(&item.content, out);
         out.push_str("</li>\n");
     }
-    out.push_str("</ul>\n");
+    out.push_str(&format!("</{tag}>\n"));
 }
 
 fn render_inlines(inlines: &[Inline], out: &mut String) {
@@ -109,8 +110,90 @@ fn render_element(el: &Element, out: &mut String, inline: bool) {
         "url" => render_href_element(el, "url", out, inline),
         "file" => render_href_element(el, "file", out, inline),
         "ref" => render_ref_element(el, out, inline),
+        "embed" => render_embed_element(el, out),
+        "hr" => out.push_str("<hr>\n"),
+        "em" | "strong" | "mark" => render_wrapped_inline(el, &kind, out),
+        "pre" => render_pre_element(el, out),
+        "blockquote" => render_blockquote_element(el, out, inline),
         _ => render_generic_element(el, &kind, out, inline),
     }
+}
+
+/// `em`/`strong`/`mark` all wrap their `area` in a same-named HTML tag --
+/// the `Sigil::Type` name doubles as the HTML tag name for these three.
+fn render_wrapped_inline(el: &Element, tag: &str, out: &mut String) {
+    out.push_str(&format!("<{tag}>"));
+    if let Some(area) = &el.area {
+        render_inlines(area, out);
+    }
+    out.push_str(&format!("</{tag}>"));
+}
+
+/// `<pre>(lang:xxx){code}` -- the Markdown importer's mapping for fenced
+/// (and indented) code blocks, since `typedmark_ast` has no dedicated
+/// code-block variant (see `docs/commonmark-support.md`).
+fn render_pre_element(el: &Element, out: &mut String) {
+    let lang = el
+        .input
+        .as_ref()
+        .and_then(as_map)
+        .and_then(|m| map_get(m, "lang"))
+        .map(value_to_plain)
+        .unwrap_or_default();
+    let code = match &el.value {
+        Some(ElementValue::Data(v)) => value_to_plain(v),
+        _ => String::new(),
+    };
+    out.push_str("<pre><code");
+    if !lang.is_empty() {
+        out.push_str(&format!(" class=\"language-{}\"", escape_attr(&lang)));
+    }
+    out.push('>');
+    out.push_str(&escape_html(&code));
+    out.push_str("</code></pre>\n");
+}
+
+/// `<blockquote>[...]` -- the Markdown importer's mapping for block
+/// quotes. Only single-block quotes round-trip cleanly; multi-block
+/// quotes are already flattened into one inline run on import.
+fn render_blockquote_element(el: &Element, out: &mut String, inline: bool) {
+    out.push_str("<blockquote>");
+    if let Some(area) = &el.area {
+        render_inlines(area, out);
+    }
+    out.push_str("</blockquote>");
+    if !inline {
+        out.push('\n');
+    }
+}
+
+fn render_embed_element(el: &Element, out: &mut String) {
+    let src = el
+        .input
+        .as_ref()
+        .and_then(as_map)
+        .and_then(|m| map_get(m, "file").or_else(|| map_get(m, "url")))
+        .map(value_to_plain)
+        .unwrap_or_default();
+    let alt = el.area.as_ref().map(|a| inlines_to_plain(a)).unwrap_or_default();
+    out.push_str(&format!("<img src=\"{}\" alt=\"{}\">\n", escape_attr(&src), escape_attr(&alt)));
+}
+
+/// Flattens inline content to plain text -- used for the `alt` attribute,
+/// which can't itself carry markup.
+fn inlines_to_plain(inlines: &[Inline]) -> String {
+    let mut s = String::new();
+    for inline in inlines {
+        match inline {
+            Inline::Text(t) => s.push_str(t),
+            Inline::Element(el) => {
+                if let Some(area) = &el.area {
+                    s.push_str(&inlines_to_plain(area));
+                }
+            }
+        }
+    }
+    s
 }
 
 fn render_href_element(el: &Element, key: &str, out: &mut String, inline: bool) {
@@ -383,5 +466,33 @@ mod tests {
             body,
             "<div class=\"tm-element tm-caution\">be careful</div>\n"
         );
+    }
+
+    #[test]
+    fn renders_ordered_list_as_ol() {
+        let doc = parse_document("-. one\n-. two\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(body, "<ol>\n<li>one</li>\n<li>two</li>\n</ol>\n");
+    }
+
+    #[test]
+    fn renders_thematic_break_as_hr() {
+        let doc = parse_document("---\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(body, "<hr>\n");
+    }
+
+    #[test]
+    fn renders_emphasis_strong_and_mark() {
+        let doc = parse_document("a *em* b **strong** c ==mark==\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(body, "<p>a <em>em</em> b <strong>strong</strong> c <mark>mark</mark></p>\n");
+    }
+
+    #[test]
+    fn renders_embed_as_img() {
+        let doc = parse_document("<embed>(file:assets/pic.png)[a cat]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(body, "<img src=\"assets/pic.png\" alt=\"a cat\">\n");
     }
 }

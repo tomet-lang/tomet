@@ -48,6 +48,15 @@ enum Command {
         #[arg(short, long)]
         out: Option<PathBuf>,
     },
+    /// Convert a `.tm` file to CommonMark. Lossy for constructs with no
+    /// Markdown equivalent (`@links{}`, generic `<T>` elements) -- see
+    /// `docs/commonmark-support.md`.
+    ToMd {
+        file: PathBuf,
+        /// Write to this path instead of stdout.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+    },
     /// Serve a `.tm` file as HTML over HTTP on 127.0.0.1, re-rendering it
     /// fresh on every request (just reload the page after editing).
     Serve {
@@ -64,6 +73,7 @@ fn main() -> ExitCode {
         Command::Ast { file, data } => ast(file, *data),
         Command::Roundtrip { file } => roundtrip(file),
         Command::Html { file, out } => html(file, out),
+        Command::ToMd { file, out } => to_md(file, out),
         Command::Serve { file, port } => serve(file, *port),
     };
     match result {
