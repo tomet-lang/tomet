@@ -6,8 +6,12 @@ file into `.tm`, and export a `.tm` document back out as CommonMark.
 Scope for the first pass is CommonMark only (no GFM tables, footnotes,
 strikethrough, task lists, autolinks-as-extension, etc.).
 
-This is a requirements/gap-analysis note, not a design decision -- nothing
-here has been implemented or committed to yet.
+This started as a requirements/gap-analysis note before any of it was
+implemented. The "Decided: native shorthand syntax" section below has
+since been implemented (`typedmark-ast`, `typedmark-parser`,
+`typedmark-renderer`, all tests green) -- everything else in this file
+(the importer/exporter crate itself, `pulldown-cmark` integration, CLI
+subcommands) is still just notes, not started.
 
 ## Current `typedmark_ast` shape
 
@@ -105,6 +109,71 @@ working bidirectional path quickly and learn from real `.tm` <-> `.md`
 samples, then decide whether specific constructs (most likely: code blocks
 and nested/ordered lists, since those are extremely common in real
 Markdown) are common enough to justify promoting to native AST support.
+
+## Decided and implemented: native shorthand syntax (2026-08-09)
+
+Human readability is a founding TypedMark goal, not just an interop
+concern -- forcing everyday formatting through `<strong>[..]`-style
+generic elements would fight that goal even before any Markdown importer
+exists. So before the importer/exporter crate itself, TypedMark's own
+`.tm` grammar gains dedicated shorthand for the constructs that are both
+extremely common in real prose *and* safe to add without colliding with
+existing sigils (`<`, `@`, `#`, `-`, `` ` ``, `(`, `[`, `{`). Each form
+below still desugars to the same `Element`/`Block` shapes the generic
+syntax already produced, so the renderer/exporter only need to understand
+one representation.
+
+| Shorthand | Meaning | Desugars to |
+|---|---|---|
+| `*text*`, `_text_` | emphasis | `Sigil::Type("em")`, `area` = inner inlines |
+| `**text**`, `__text__` | strong | `Sigil::Type("strong")`, `area` = inner inlines |
+| `==text==` | highlight/mark | `Sigil::Type("mark")`, `area` = inner inlines |
+| `---` (3+ dashes, alone on a line) | thematic break | `Sigil::Type("hr")`, no input/area/value |
+| `-. item` | ordered list item | `Block::List { ordered: true, .. }` |
+
+Rejected/adjusted from the earlier proposal:
+
+- **No `!` sigil for images.** `!` reads as negation in most programming
+  languages the target audience already knows; using it for "embed
+  something" was judged confusing rather than clever. Images (and other
+  embeddable references) use the existing generic `<T>(input)[area]`
+  grammar with an explicit type name instead: `<embed>(file:path)[alt]` or
+  `<embed>(url:..)[alt]`. This needed *zero* grammar changes -- `<embed>`
+  is just an ordinary `Sigil::Type` element, distinguished from
+  `@(file:..)` (a plain reference/attachment link, no particular render
+  intent) by actually meaning "render this inline".
+- **`1.[text]` rejected in favor of `-.`.** `1.[text]` looks like the
+  "wrap in a delimiter pair" family (`*..*`, `` `..` ``, `==..==`) but
+  behaves like the marker family (`- item`), which is an inconsistent
+  mix. `-.` stays in the marker family (consistent with plain `-` lists)
+  and sidesteps manually-typed numbers going stale when items are
+  reordered -- numbering is computed at render time, not authored.
+  Deliberately not offering both `-.` and `1.[text]` as equivalent
+  spellings: the project's own design notes already flag the
+  `@link(ref:..)` vs `[text](url:..)` dual-notation problem as a past
+  mistake worth avoiding a repeat of (see
+  `docs/impressions/impressions-2026-08-07.md`, point 3).
+- **List nesting is still out of scope for this pass.** Both `-` and `-.`
+  remain flat (`ListItem { content: Vec<Inline> }` has nowhere to hold a
+  nested sub-list). Adding it means giving `ListItem` room for child
+  blocks, which is a bigger structural change than anything else in this
+  batch -- deferred rather than rushed.
+- `Block::List(Vec<ListItem>)` became
+  `Block::List { ordered: bool, items: Vec<ListItem> }` -- the one actual
+  `typedmark_ast` change in this pass (small, additive, all 3 existing
+  match sites updated).
+- Emphasis/strong/mark delimiter matching is a simplified heuristic, not
+  full CommonMark flanking-delimiter-run rules: an opening delimiter must
+  not be immediately followed by whitespace, a closing one must not be
+  immediately preceded by whitespace, and for `_`/`__` specifically the
+  character *before* the opening delimiter must not be alphanumeric (so
+  `foo_bar_baz` doesn't misfire). Unmatched delimiters (no valid close
+  before EOF or a blank-line paragraph break) fall back to literal text,
+  same failure mode Markdown itself has.
+- Backtick code spans needed no changes -- they already survive as literal
+  text including the backtick characters (see `document.rs`'s existing
+  backtick handling), which happens to also be valid CommonMark on export
+  with no extra work.
 
 ## Implementation sketch (for whenever this resumes)
 

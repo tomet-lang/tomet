@@ -124,12 +124,95 @@ mod tests {
     fn parses_list() {
         let doc = parse_document("- one\n- two\n").unwrap();
         match &doc.blocks[0] {
-            Block::List(items) => {
+            Block::List { ordered, items } => {
+                assert!(!ordered);
                 assert_eq!(items.len(), 2);
                 assert_eq!(items[0].content, vec![Inline::Text("one".into())]);
                 assert_eq!(items[1].content, vec![Inline::Text("two".into())]);
             }
             other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_ordered_list() {
+        let doc = parse_document("-. one\n-. two\n").unwrap();
+        match &doc.blocks[0] {
+            Block::List { ordered, items } => {
+                assert!(ordered);
+                assert_eq!(items.len(), 2);
+                assert_eq!(items[0].content, vec![Inline::Text("one".into())]);
+                assert_eq!(items[1].content, vec![Inline::Text("two".into())]);
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn mixed_list_markers_split_into_separate_lists() {
+        let doc = parse_document("- one\n-. two\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        match (&doc.blocks[0], &doc.blocks[1]) {
+            (Block::List { ordered: false, .. }, Block::List { ordered: true, .. }) => {}
+            other => panic!("expected two separate lists, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_thematic_break() {
+        let doc = parse_document("---\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => assert_eq!(el.sigil, Sigil::Type("hr".into())),
+            other => panic!("expected hr element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_emphasis_and_strong_and_mark() {
+        let doc = parse_document("a *em* b **strong** c _em2_ d __strong2__ e ==mark==\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(inlines) => {
+                let kinds: Vec<_> = inlines
+                    .iter()
+                    .filter_map(|i| match i {
+                        Inline::Element(el) => Some((el.sigil.clone(), el.area.clone())),
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(
+                    kinds,
+                    vec![
+                        (Sigil::Type("em".into()), Some(vec![Inline::Text("em".into())])),
+                        (Sigil::Type("strong".into()), Some(vec![Inline::Text("strong".into())])),
+                        (Sigil::Type("em".into()), Some(vec![Inline::Text("em2".into())])),
+                        (Sigil::Type("strong".into()), Some(vec![Inline::Text("strong2".into())])),
+                        (Sigil::Type("mark".into()), Some(vec![Inline::Text("mark".into())])),
+                    ]
+                );
+            }
+            other => panic!("expected paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn underscore_does_not_trigger_inside_a_word() {
+        let doc = parse_document("foo_bar_baz\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(inlines) => {
+                assert_eq!(inlines, &vec![Inline::Text("foo_bar_baz".into())]);
+            }
+            other => panic!("expected paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unmatched_delimiter_falls_back_to_literal_text() {
+        let doc = parse_document("this *word never closes\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(inlines) => {
+                assert_eq!(inlines, &vec![Inline::Text("this *word never closes".into())]);
+            }
+            other => panic!("expected paragraph, got {other:?}"),
         }
     }
 
