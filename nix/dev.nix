@@ -10,7 +10,7 @@ mkShell rec {
     cmake
     ninja
 
-    # === Rust ===
+    #[ Rust ]
     (rust-bin.stable.latest.default.override {
       extensions = [
         "clippy"

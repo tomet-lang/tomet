@@ -4,7 +4,6 @@
   ...
 }@inputs:
 let
-  # https://github.com/numtide/go2nix/blob/main/flake.nix
   systems = [
     "x86_64-linux"
     "aarch64-linux"

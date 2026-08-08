@@ -1,0 +1,18 @@
+use std::fmt;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Error {
+    pub message: String,
+    pub line: usize,
+    pub column: usize,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}: {}", self.line, self.column, self.message)
+    }
+}
+
+impl std::error::Error for Error {}
+
+pub type Result<T> = std::result::Result<T, Error>;

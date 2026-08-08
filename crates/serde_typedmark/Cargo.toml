@@ -1,8 +1,9 @@
 [package]
-name = "typedmark-parser"
+name = "serde_typedmark"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
+serde = { workspace = true }
 typedmark-ast = { workspace = true }
-typedmark-lexar = { workspace = true }
+typedmark-parser = { workspace = true }
