@@ -1,0 +1,508 @@
+Document {
+    blocks: [
+        Element(
+            Element {
+                sigil: At(
+                    Some(
+                        "meta",
+                    ),
+                ),
+                input: Some(
+                    String(
+                        "yaml",
+                    ),
+                ),
+                area: None,
+                value: Some(
+                    Data(
+                        Map(
+                            [
+                                (
+                                    "key",
+                                    String(
+                                        "value",
+                                    ),
+                                ),
+                            ],
+                        ),
+                    ),
+                ),
+            },
+        ),
+        Heading(
+            Heading {
+                level: 1,
+                content: [
+                    Text(
+                        "What is typedmark?",
+                    ),
+                ],
+                attrs: Some(
+                    Map(
+                        [
+                            (
+                                "id",
+                                String(
+                                    "header1",
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            },
+        ),
+        List(
+            [
+                ListItem {
+                    content: [
+                        Text(
+                            "人間工学的見やすさ。",
+                        ),
+                    ],
+                },
+                ListItem {
+                    content: [
+                        Text(
+                            "パーサーにも優しい。",
+                        ),
+                    ],
+                },
+                ListItem {
+                    content: [
+                        Text(
+                            "拡張性を担保",
+                        ),
+                    ],
+                },
+                ListItem {
+                    content: [
+                        Text(
+                            "key:valueを重視",
+                        ),
+                    ],
+                },
+                ListItem {
+                    content: [
+                        Text(
+                            "私は、研究目的。",
+                        ),
+                    ],
+                },
+            ],
+        ),
+        Heading(
+            Heading {
+                level: 2,
+                content: [
+                    Text(
+                        "なぜtypedmarkを使用するのか？",
+                    ),
+                ],
+                attrs: Some(
+                    Map(
+                        [
+                            (
+                                "id",
+                                String(
+                                    "header1.2",
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            },
+        ),
+        Paragraph(
+            [
+                Text(
+                    "非曖昧な構文 リンクと変数に特化。 統一された記法",
+                ),
+            ],
+        ),
+        Paragraph(
+            [
+                Text(
+                    "<T> に (input) [area] {value} のうち必要なものを付ける。3つのグループは順序自由、同じ種類の括弧は1要素につき1回まで。",
+                ),
+            ],
+        ),
+        List(
+            [
+                ListItem {
+                    content: [
+                        Element(
+                            Element {
+                                sigil: Type(
+                                    "input",
+                                ),
+                                input: Some(
+                                    Map(
+                                        [
+                                            (
+                                                "name",
+                                                String(
+                                                    "email",
+                                                ),
+                                            ),
+                                            (
+                                                "type",
+                                                String(
+                                                    "email",
+                                                ),
+                                            ),
+                                        ],
+                                    ),
+                                ),
+                                area: None,
+                                value: Some(
+                                    Data(
+                                        String(
+                                            "required",
+                                        ),
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+                ListItem {
+                    content: [
+                        Element(
+                            Element {
+                                sigil: Type(
+                                    "caution",
+                                ),
+                                input: None,
+                                area: Some(
+                                    [
+                                        Text(
+                                            "ネストされた注意書き。",
+                                        ),
+                                    ],
+                                ),
+                                value: None,
+                            },
+                        ),
+                    ],
+                },
+            ],
+        ),
+        Paragraph(
+            [
+                Text(
+                    "組み込みの参照系は <T> の代わりに @ を使い、() の中のキー名（url / file / ref / meta など）から種別を推論する。名前を書かなくていい分、キーの意味は型ごとに一意に保つ。",
+                ),
+            ],
+        ),
+        List(
+            [
+                ListItem {
+                    content: [
+                        Element(
+                            Element {
+                                sigil: At(
+                                    None,
+                                ),
+                                input: Some(
+                                    Map(
+                                        [
+                                            (
+                                                "url",
+                                                String(
+                                                    "https://example.com",
+                                                ),
+                                            ),
+                                        ],
+                                    ),
+                                ),
+                                area: Some(
+                                    [
+                                        Text(
+                                            "Wiki",
+                                        ),
+                                    ],
+                                ),
+                                value: None,
+                            },
+                        ),
+                    ],
+                },
+                ListItem {
+                    content: [
+                        Element(
+                            Element {
+                                sigil: At(
+                                    None,
+                                ),
+                                input: Some(
+                                    Map(
+                                        [
+                                            (
+                                                "url",
+                                                String(
+                                                    "https://example.com",
+                                                ),
+                                            ),
+                                        ],
+                                    ),
+                                ),
+                                area: Some(
+                                    [
+                                        Text(
+                                            "Wiki",
+                                        ),
+                                    ],
+                                ),
+                                value: None,
+                            },
+                        ),
+                        Text(
+                            "※順序を変えても同じ意味",
+                        ),
+                    ],
+                },
+                ListItem {
+                    content: [
+                        Element(
+                            Element {
+                                sigil: At(
+                                    None,
+                                ),
+                                input: Some(
+                                    Map(
+                                        [
+                                            (
+                                                "file",
+                                                String(
+                                                    "assets/image.png",
+                                                ),
+                                            ),
+                                        ],
+                                    ),
+                                ),
+                                area: Some(
+                                    [
+                                        Text(
+                                            "Caption",
+                                        ),
+                                    ],
+                                ),
+                                value: None,
+                            },
+                        ),
+                    ],
+                },
+                ListItem {
+                    content: [
+                        Element(
+                            Element {
+                                sigil: At(
+                                    None,
+                                ),
+                                input: Some(
+                                    Map(
+                                        [
+                                            (
+                                                "ref",
+                                                String(
+                                                    "anotation1",
+                                                ),
+                                            ),
+                                        ],
+                                    ),
+                                ),
+                                area: None,
+                                value: None,
+                            },
+                        ),
+                    ],
+                },
+            ],
+        ),
+        Heading(
+            Heading {
+                level: 3,
+                content: [
+                    Text(
+                        "[",
+                    ),
+                ],
+                attrs: None,
+            },
+        ),
+        Paragraph(
+            [
+                Text(
+                    "のルール ]",
+                ),
+            ],
+        ),
+        List(
+            [
+                ListItem {
+                    content: [
+                        Text(
+                            "`[]`（content-span）は `<T>` / `@` / `#`(見出し) の直後に続くグループとしてのみ有効。単独で行頭に出てくる `[...]` は content-span ではなくただの文字列。",
+                        ),
+                    ],
+                },
+            ],
+        ),
+        Paragraph(
+            [
+                Text(
+                    "→ だから `Caution [ ... ]` のように裸の単語+`[]` は書かない。型を明示して `<caution>[ ... ]` にする。 → リストの `-` はそもそも `[`/`]` を使わないので衝突しない。",
+                ),
+            ],
+        ),
+        List(
+            [
+                ListItem {
+                    content: [
+                        Text(
+                            "`{value}` の中で `tags: [a, b]` のような配列リテラルを書くのは可、`{}`の内側は別ネストなのでcontent-spanの規則とは無関係。",
+                        ),
+                    ],
+                },
+            ],
+        ),
+        Heading(
+            Heading {
+                level: 3,
+                content: [
+                    Text(
+                        "vs json",
+                    ),
+                ],
+                attrs: None,
+            },
+        ),
+        Paragraph(
+            [
+                Text(
+                    "key:value構造で張り合える。 tmtは、人間ファーストであり、改行ありの長文を挿入するのに長けている。 深いネストには弱い。タイムライン形式は得意なんじゃないかと考える。",
+                ),
+            ],
+        ),
+        Heading(
+            Heading {
+                level: 1,
+                content: [
+                    Text(
+                        "その他構想",
+                    ),
+                ],
+                attrs: Some(
+                    Map(
+                        [
+                            (
+                                "id",
+                                String(
+                                    "header2",
+                                ),
+                            ),
+                            (
+                                "cssclass",
+                                String(
+                                    "card",
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            },
+        ),
+        Paragraph(
+            [
+                Element(
+                    Element {
+                        sigil: At(
+                            Some(
+                                "links",
+                            ),
+                        ),
+                        input: None,
+                        area: None,
+                        value: Some(
+                            Children(
+                                [
+                                    Element {
+                                        sigil: Bare,
+                                        input: Some(
+                                            Int(
+                                                1,
+                                            ),
+                                        ),
+                                        area: Some(
+                                            [
+                                                Text(
+                                                    "注釈",
+                                                ),
+                                            ],
+                                        ),
+                                        value: None,
+                                    },
+                                    Element {
+                                        sigil: Bare,
+                                        input: Some(
+                                            String(
+                                                "anotation1",
+                                            ),
+                                        ),
+                                        area: Some(
+                                            [
+                                                Text(
+                                                    "注釈",
+                                                ),
+                                            ],
+                                        ),
+                                        value: None,
+                                    },
+                                ],
+                            ),
+                        ),
+                    },
+                ),
+                Text(
+                    "※ `@links{}` の中の `(id)[content]` だけは型名省略OK。コンテナ自体が「これは注釈定義の並び」という型を与えているので、要素ごとに書く必要がない。",
+                ),
+            ],
+        ),
+        Heading(
+            Heading {
+                level: 1,
+                content: [
+                    Text(
+                        "残っている論点",
+                    ),
+                ],
+                attrs: None,
+            },
+        ),
+        List(
+            [
+                ListItem {
+                    content: [
+                        Text(
+                            "名前「TypedMark」を維持するか。当初はMarkdown互換の想定だったが、今の記法はもうMarkdownとほぼ関係ない。",
+                        ),
+                    ],
+                },
+                ListItem {
+                    content: [
+                        Text(
+                            "`@(meta:yaml){...}` の `meta:` というキー名がしっくりくるか（暫定）。",
+                        ),
+                    ],
+                },
+                ListItem {
+                    content: [
+                        Text(
+                            "`@` の推論キー（url / file / ref / meta）の一覧をどこかに正式なレジストリとして持つか。",
+                        ),
+                    ],
+                },
+            ],
+        ),
+    ],
+}
