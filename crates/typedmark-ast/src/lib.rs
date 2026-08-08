@@ -81,7 +81,12 @@ pub struct Element {
 
 impl Element {
     pub fn new(sigil: Sigil) -> Self {
-        Element { sigil, input: None, area: None, value: None }
+        Element {
+            sigil,
+            input: None,
+            area: None,
+            value: None,
+        }
     }
 }
 

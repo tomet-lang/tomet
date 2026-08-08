@@ -2,6 +2,12 @@
 ##[ typedmark ]
 
 - 拡張子
+  - tt
+    - TypedText
+  - tmt
+    - TypedMarkText
+  - tmd
+    - TypedMarkDoc
 - 拡張性
 
 ##[ typedmark command ]

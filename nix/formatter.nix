@@ -11,7 +11,7 @@ let
       shfmt.enable = true;
       shellcheck.enable = true;
 
-      rstfmt.enable = true;
+      rustfmt.enable = true;
       qmlformat.enable = true;
 
       # prettier.enable = true;

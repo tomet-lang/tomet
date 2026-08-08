@@ -61,7 +61,9 @@ impl ser::Serializer for ValueSerializer {
         Ok(Value::String(v.to_string()))
     }
     fn serialize_bytes(self, v: &[u8]) -> Result<Value> {
-        Ok(Value::Seq(v.iter().map(|b| Value::Int(*b as i64)).collect()))
+        Ok(Value::Seq(
+            v.iter().map(|b| Value::Int(*b as i64)).collect(),
+        ))
     }
     fn serialize_none(self) -> Result<Value> {
         Ok(Value::Null)
@@ -97,20 +99,28 @@ impl ser::Serializer for ValueSerializer {
         variant: &'static str,
         value: &T,
     ) -> Result<Value> {
-        Ok(Value::Map(vec![(variant.to_string(), value.serialize(ValueSerializer)?)]))
+        Ok(Value::Map(vec![(
+            variant.to_string(),
+            value.serialize(ValueSerializer)?,
+        )]))
     }
     fn serialize_seq(self, len: Option<usize>) -> Result<SeqSerializer> {
-        Ok(SeqSerializer { items: Vec::with_capacity(len.unwrap_or(0)), variant: None })
+        Ok(SeqSerializer {
+            items: Vec::with_capacity(len.unwrap_or(0)),
+            variant: None,
+        })
     }
     fn serialize_tuple(self, len: usize) -> Result<SeqSerializer> {
-        Ok(SeqSerializer { items: Vec::with_capacity(len), variant: None })
+        Ok(SeqSerializer {
+            items: Vec::with_capacity(len),
+            variant: None,
+        })
     }
-    fn serialize_tuple_struct(
-        self,
-        _name: &'static str,
-        len: usize,
-    ) -> Result<SeqSerializer> {
-        Ok(SeqSerializer { items: Vec::with_capacity(len), variant: None })
+    fn serialize_tuple_struct(self, _name: &'static str, len: usize) -> Result<SeqSerializer> {
+        Ok(SeqSerializer {
+            items: Vec::with_capacity(len),
+            variant: None,
+        })
     }
     fn serialize_tuple_variant(
         self,
@@ -119,13 +129,24 @@ impl ser::Serializer for ValueSerializer {
         variant: &'static str,
         len: usize,
     ) -> Result<SeqSerializer> {
-        Ok(SeqSerializer { items: Vec::with_capacity(len), variant: Some(variant.to_string()) })
+        Ok(SeqSerializer {
+            items: Vec::with_capacity(len),
+            variant: Some(variant.to_string()),
+        })
     }
     fn serialize_map(self, _len: Option<usize>) -> Result<MapSerializer> {
-        Ok(MapSerializer { entries: Vec::new(), next_key: None, variant: None })
+        Ok(MapSerializer {
+            entries: Vec::new(),
+            next_key: None,
+            variant: None,
+        })
     }
     fn serialize_struct(self, _name: &'static str, len: usize) -> Result<MapSerializer> {
-        Ok(MapSerializer { entries: Vec::with_capacity(len), next_key: None, variant: None })
+        Ok(MapSerializer {
+            entries: Vec::with_capacity(len),
+            next_key: None,
+            variant: None,
+        })
     }
     fn serialize_struct_variant(
         self,
@@ -134,7 +155,11 @@ impl ser::Serializer for ValueSerializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<MapSerializer> {
-        Ok(MapSerializer { entries: Vec::new(), next_key: None, variant: Some(variant.to_string()) })
+        Ok(MapSerializer {
+            entries: Vec::new(),
+            next_key: None,
+            variant: Some(variant.to_string()),
+        })
     }
 }
 
@@ -219,7 +244,9 @@ fn value_to_key_string(v: Value) -> Result<String> {
         Value::Int(i) => Ok(i.to_string()),
         Value::Bool(b) => Ok(b.to_string()),
         Value::Float(f) => Ok(f.to_string()),
-        other => Err(Error::msg(format!("map keys must be strings or simple scalars, got {other:?}"))),
+        other => Err(Error::msg(format!(
+            "map keys must be strings or simple scalars, got {other:?}"
+        ))),
     }
 }
 
@@ -252,7 +279,8 @@ impl ser::SerializeStruct for MapSerializer {
         key: &'static str,
         value: &T,
     ) -> Result<()> {
-        self.entries.push((key.to_string(), value.serialize(ValueSerializer)?));
+        self.entries
+            .push((key.to_string(), value.serialize(ValueSerializer)?));
         Ok(())
     }
     fn end(self) -> Result<Value> {
@@ -268,7 +296,8 @@ impl ser::SerializeStructVariant for MapSerializer {
         key: &'static str,
         value: &T,
     ) -> Result<()> {
-        self.entries.push((key.to_string(), value.serialize(ValueSerializer)?));
+        self.entries
+            .push((key.to_string(), value.serialize(ValueSerializer)?));
         Ok(())
     }
     fn end(self) -> Result<Value> {

@@ -4,3 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+typedmark-ast = { workspace = true }
+
+[dev-dependencies]
+typedmark-parser = { workspace = true }

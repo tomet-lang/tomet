@@ -21,7 +21,11 @@ pub fn parse_value(src: &str) -> Result<Value> {
 
 pub(crate) fn err(cur: &Cursor, pos: usize, message: impl Into<String>) -> Error {
     let (line, column) = cur.line_col(pos);
-    Error { message: message.into(), line, column }
+    Error {
+        message: message.into(),
+        line,
+        column,
+    }
 }
 
 pub(crate) fn is_ident_char(c: char) -> bool {
@@ -148,7 +152,13 @@ fn parse_map_body(cur: &mut Cursor) -> Result<Value> {
             }
             Some('\n') | Some('\r') => {}
             other if matches!(other, None | Some(')') | Some('}') | Some(']')) => break,
-            _ => return Err(err(cur, cur.pos(), "expected ',' or a newline between entries")),
+            _ => {
+                return Err(err(
+                    cur,
+                    cur.pos(),
+                    "expected ',' or a newline between entries",
+                ));
+            }
         }
     }
     Ok(Value::Map(entries))
