@@ -26,7 +26,7 @@ in
   packages = forAllSystems (
     _: pkgs: rec {
       default = typedmark;
-      typedmark = pkgs.callPackage ./pkgs/tomet.nix { };
+      typedmark = pkgs.callPackage ./pkgs/typedmark.nix { };
     }
   );
   devShells = forAllSystems (

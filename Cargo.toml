@@ -17,7 +17,7 @@ members = [
   "crates/typedmark-validator",
   "crates/serde_typedmark",
   "crates/tree-sitter-typedmark"
-]
+, "apps/typedmark-python"]
 
 default-members = [
   "apps/typedmark"
