@@ -5,8 +5,12 @@
 //! syntax this follows.
 
 use crate::error::Result;
-use crate::value::{eat_ident, err, is_ident_char, parse_value_at, skip_inline_ws, skip_ws_and_newlines};
-use typedmark_ast::{Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value};
+use crate::value::{
+    eat_ident, err, is_ident_char, parse_value_at, skip_inline_ws, skip_ws_and_newlines,
+};
+use typedmark_ast::{
+    Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
+};
 use typedmark_lexar::Cursor;
 
 pub fn parse_document(src: &str) -> Result<Document> {
@@ -74,7 +78,11 @@ fn parse_heading(cur: &mut Cursor) -> Result<Heading> {
     if matches!(cur.peek(), Some('\n') | Some('\r')) {
         cur.bump();
     }
-    Ok(Heading { level, content, attrs })
+    Ok(Heading {
+        level,
+        content,
+        attrs,
+    })
 }
 
 fn parse_braced_value(cur: &mut Cursor) -> Result<Value> {
@@ -207,7 +215,10 @@ fn normalize_text(raw: &str) -> String {
     let mut chars = raw.chars().peekable();
     while let Some(c) = chars.next() {
         if c == '\n' || c == '\r' {
-            while matches!(chars.peek(), Some(' ') | Some('\t') | Some('\n') | Some('\r')) {
+            while matches!(
+                chars.peek(),
+                Some(' ') | Some('\t') | Some('\n') | Some('\r')
+            ) {
                 chars.next();
             }
             out.push(' ');
@@ -278,7 +289,11 @@ fn parse_element(cur: &mut Cursor) -> Result<Element> {
             return Err(err(cur, cur.pos(), "expected '@'"));
         }
         let name = eat_ident(cur).to_string();
-        if name.is_empty() { Sigil::At(None) } else { Sigil::At(Some(name)) }
+        if name.is_empty() {
+            Sigil::At(None)
+        } else {
+            Sigil::At(Some(name))
+        }
     };
 
     let mut el = Element::new(sigil);

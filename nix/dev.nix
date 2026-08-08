@@ -1,6 +1,5 @@
 {
   mkShell,
-  lib,
   pkgs,
   ...
 }:

@@ -31,10 +31,12 @@ edition = "2024"
 typedmark-ast = { path = "crates/typedmark-ast" }
 typedmark-lexar = { path = "crates/typedmark-lexar" }
 typedmark-parser = { path = "crates/typedmark-parser" }
+typedmark-renderer = { path = "crates/typedmark-renderer" }
 serde_typedmark = { path = "crates/serde_typedmark" }
 
-#[ Crates ]
+#[ Crates.io ]
 anyhow = "1"
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
 clap = { version = "4.6", features = ["derive"] }
 cxx = "1"
 directories = "6.0"

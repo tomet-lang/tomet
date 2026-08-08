@@ -3,9 +3,14 @@
 //! only trusting `cargo test`'s unit tests.
 
 use std::fs;
-use std::path::PathBuf;
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use axum::Router;
+use axum::extract::State;
+use axum::response::Html;
+use axum::routing::get;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -36,6 +41,20 @@ enum Command {
     /// through `serde_typedmark` and reparse that -- confirms the
     /// save/load round trip is lossless.
     Roundtrip { file: PathBuf },
+    /// Convert a `.tm` file to a standalone HTML page.
+    Html {
+        file: PathBuf,
+        /// Write to this path instead of stdout.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+    },
+    /// Serve a `.tm` file as HTML over HTTP on 127.0.0.1, re-rendering it
+    /// fresh on every request (just reload the page after editing).
+    Serve {
+        file: PathBuf,
+        #[arg(short, long, default_value_t = 8787)]
+        port: u16,
+    },
 }
 
 fn main() -> ExitCode {
@@ -44,6 +63,8 @@ fn main() -> ExitCode {
         Command::Check { file, data } => check(file, *data),
         Command::Ast { file, data } => ast(file, *data),
         Command::Roundtrip { file } => roundtrip(file),
+        Command::Html { file, out } => html(file, out),
+        Command::Serve { file, port } => serve(file, *port),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -81,6 +102,58 @@ fn ast(file: &PathBuf, data: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn render_file(file: &Path) -> anyhow::Result<String> {
+    let src = fs::read_to_string(file)?;
+    let doc = typedmark_parser::parse_document(&src)?;
+    let title = file
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("TypedMark");
+    Ok(typedmark_renderer::render_page(&doc, title))
+}
+
+fn html(file: &PathBuf, out: &Option<PathBuf>) -> anyhow::Result<()> {
+    let page = render_file(file)?;
+    match out {
+        Some(path) => fs::write(path, page)?,
+        None => println!("{page}"),
+    }
+    Ok(())
+}
+
+fn serve(file: &PathBuf, port: u16) -> anyhow::Result<()> {
+    let file = file.clone();
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(async {
+        let app = Router::new()
+            .route("/", get(render_handler))
+            .with_state(file);
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+        println!("Serving at http://{addr} (Ctrl+C to stop)");
+        axum::serve(listener, app).await?;
+        Ok(())
+    })
+}
+
+async fn render_handler(State(file): State<PathBuf>) -> Html<String> {
+    Html(render_file(&file).unwrap_or_else(|e| error_page(&file, &e)))
+}
+
+fn error_page(file: &Path, err: &anyhow::Error) -> String {
+    format!(
+        "<!DOCTYPE html>\n<html lang=\"ja\">\n<head><meta charset=\"utf-8\"><title>error</title></head>\n<body>\n<h1>Parse error</h1>\n<p>{}</p>\n<pre>{}</pre>\n</body>\n</html>\n",
+        escape_html(&file.display().to_string()),
+        escape_html(&err.to_string()),
+    )
+}
+
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
 fn roundtrip(file: &PathBuf) -> anyhow::Result<()> {
     let src = read(file)?;
 
@@ -100,6 +173,8 @@ fn roundtrip(file: &PathBuf) -> anyhow::Result<()> {
         Ok(())
     } else {
         println!("\nround-trip MISMATCH");
-        Err(anyhow::anyhow!("re-parsing the rendered output produced a different value"))
+        Err(anyhow::anyhow!(
+            "re-parsing the rendered output produced a different value"
+        ))
     }
 }

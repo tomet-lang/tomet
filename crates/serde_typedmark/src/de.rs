@@ -22,8 +22,13 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
             Value::Int(i) => visitor.visit_i64(i),
             Value::Float(f) => visitor.visit_f64(f),
             Value::String(s) => visitor.visit_string(s),
-            Value::Seq(items) => visitor.visit_seq(SeqAccess { iter: items.into_iter() }),
-            Value::Map(entries) => visitor.visit_map(MapAccess { iter: entries.into_iter(), value: None }),
+            Value::Seq(items) => visitor.visit_seq(SeqAccess {
+                iter: items.into_iter(),
+            }),
+            Value::Map(entries) => visitor.visit_map(MapAccess {
+                iter: entries.into_iter(),
+                value: None,
+            }),
         }
     }
 
@@ -65,7 +70,10 @@ struct SeqAccess {
 
 impl<'de> de::SeqAccess<'de> for SeqAccess {
     type Error = Error;
-    fn next_element_seed<T: de::DeserializeSeed<'de>>(&mut self, seed: T) -> Result<Option<T::Value>> {
+    fn next_element_seed<T: de::DeserializeSeed<'de>>(
+        &mut self,
+        seed: T,
+    ) -> Result<Option<T::Value>> {
         match self.iter.next() {
             Some(v) => seed.deserialize(ValueDeserializer(v)).map(Some),
             None => Ok(None),
@@ -87,13 +95,17 @@ impl<'de> de::MapAccess<'de> for MapAccess {
         match self.iter.next() {
             Some((k, v)) => {
                 self.value = Some(v);
-                seed.deserialize(ValueDeserializer(Value::String(k))).map(Some)
+                seed.deserialize(ValueDeserializer(Value::String(k)))
+                    .map(Some)
             }
             None => Ok(None),
         }
     }
     fn next_value_seed<V: de::DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value> {
-        let v = self.value.take().ok_or_else(|| Error::msg("value requested before key"))?;
+        let v = self
+            .value
+            .take()
+            .ok_or_else(|| Error::msg("value requested before key"))?;
         seed.deserialize(ValueDeserializer(v))
     }
     fn size_hint(&self) -> Option<usize> {
@@ -109,7 +121,10 @@ struct EnumAccess {
 impl<'de> de::EnumAccess<'de> for EnumAccess {
     type Error = Error;
     type Variant = VariantAccess;
-    fn variant_seed<S: de::DeserializeSeed<'de>>(self, seed: S) -> Result<(S::Value, VariantAccess)> {
+    fn variant_seed<S: de::DeserializeSeed<'de>>(
+        self,
+        seed: S,
+    ) -> Result<(S::Value, VariantAccess)> {
         let v = seed.deserialize(ValueDeserializer(Value::String(self.variant)))?;
         Ok((v, VariantAccess { value: self.value }))
     }

@@ -18,7 +18,10 @@ mod tests {
             v,
             Value::Map(vec![
                 ("title".into(), Value::String("value".into())),
-                ("tags".into(), Value::Seq(vec![Value::String("a".into()), Value::String("b".into())])),
+                (
+                    "tags".into(),
+                    Value::Seq(vec![Value::String("a".into()), Value::String("b".into())])
+                ),
             ])
         );
     }
@@ -37,7 +40,10 @@ mod tests {
         let v = parse_value("url: https://example.com/path").unwrap();
         assert_eq!(
             v,
-            Value::Map(vec![("url".into(), Value::String("https://example.com/path".into()))])
+            Value::Map(vec![(
+                "url".into(),
+                Value::String("https://example.com/path".into())
+            )])
         );
     }
 
@@ -48,7 +54,13 @@ mod tests {
             Block::Heading(h) => {
                 assert_eq!(h.level, 1);
                 assert_eq!(h.content, vec![Inline::Text("Hello".into())]);
-                assert_eq!(h.attrs, Some(Value::Map(vec![("id".into(), Value::String("header1".into()))])));
+                assert_eq!(
+                    h.attrs,
+                    Some(Value::Map(vec![(
+                        "id".into(),
+                        Value::String("header1".into())
+                    )]))
+                );
             }
             other => panic!("expected heading, got {other:?}"),
         }
@@ -64,7 +76,10 @@ mod tests {
                 assert_eq!(el.sigil, Sigil::At(None));
                 assert_eq!(
                     el.input,
-                    Some(Value::Map(vec![("url".into(), Value::String("https://example.com".into()))]))
+                    Some(Value::Map(vec![(
+                        "url".into(),
+                        Value::String("https://example.com".into())
+                    )]))
                 );
                 assert_eq!(el.area, Some(vec![Inline::Text("Wiki".into())]));
             }
@@ -129,7 +144,10 @@ mod tests {
         let doc = parse_document("contact me@example.com please\n").unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(inlines) => {
-                assert_eq!(inlines, &vec![Inline::Text("contact me@example.com please".into())]);
+                assert_eq!(
+                    inlines,
+                    &vec![Inline::Text("contact me@example.com please".into())]
+                );
             }
             other => panic!("expected paragraph, got {other:?}"),
         }

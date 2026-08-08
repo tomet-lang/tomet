@@ -11,7 +11,7 @@
 - 私は、研究目的。
 
 ##[
- なぜtypedmarkを使用するのか？
+  なぜtypedmarkを使用するのか？
 ]
 { id:header1.2 }
 

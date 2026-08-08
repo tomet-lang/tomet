@@ -1,6 +1,4 @@
 {
-  lib,
-  stdenv,
   rustPlatform,
   # pkg-config,
   # makeWrapper
@@ -14,7 +12,10 @@ rustPlatform.buildRustPackage rec {
   version = "0.1.0";
 
   cargoLock.lockFile = "${src}/Cargo.lock";
-  cargoBuildFlags = [ "-p" "typedmark" ];
+  cargoBuildFlags = [
+    "-p"
+    "typedmark"
+  ];
   cargoTestFlags = cargoBuildFlags;
 
   nativeBuildInputs = [

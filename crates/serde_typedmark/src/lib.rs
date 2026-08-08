@@ -55,8 +55,14 @@ mod tests {
             refresh_ms: Some(500),
             font_size: Some(10.5),
             bookmarks: vec![
-                Bookmark { label: "Inbox".into(), path: "notes/inbox".into() },
-                Bookmark { label: "日誌".into(), path: "notes/journal".into() },
+                Bookmark {
+                    label: "Inbox".into(),
+                    path: "notes/inbox".into(),
+                },
+                Bookmark {
+                    label: "日誌".into(),
+                    path: "notes/journal".into(),
+                },
             ],
         };
 
@@ -88,8 +94,12 @@ mod tests {
             effect: Effect,
         }
 
-        let a = Wrapper { effect: Effect::None };
-        let b = Wrapper { effect: Effect::Blur(4) };
+        let a = Wrapper {
+            effect: Effect::None,
+        };
+        let b = Wrapper {
+            effect: Effect::Blur(4),
+        };
         assert_eq!(from_str::<Wrapper>(&to_string(&a).unwrap()).unwrap(), a);
         assert_eq!(from_str::<Wrapper>(&to_string(&b).unwrap()).unwrap(), b);
     }
