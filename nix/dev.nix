@@ -6,6 +6,8 @@
 }:
 mkShell rec {
   buildInputs = with pkgs; [
+    (pkgs.callPackage ./pkgs/typedmark.nix { })
+
     pkg-config
     cmake
     ninja
