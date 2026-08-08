@@ -5,13 +5,13 @@ members = [
   "apps/typedmark",
   "apps/typedmark-java",
   "apps/typedmark-js",
+  "apps/typedmark-lsp",
   "apps/typedmark-vscode",
   "apps/typedmark-zed",
 
   "crates/typedmark-ast",
   "crates/typedmark-formatter",
   "crates/typedmark-lexar",
-  "crates/typedmark-lsp",
   "crates/typedmark-markdown",
   "crates/typedmark-parser",
   "crates/typedmark-renderer",
@@ -42,6 +42,8 @@ axum = { version = "0.8", default-features = false, features = ["http1", "tokio"
 clap = { version = "4.6", features = ["derive"] }
 cxx = "1"
 directories = "6.0"
+lsp-server = "0.10"
+lsp-types = "0.97"
 pulldown-cmark = "0.13"
 rayon = "1"
 regex = "1.12"

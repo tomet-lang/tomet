@@ -131,6 +131,17 @@ fn html(file: &PathBuf, out: &Option<PathBuf>) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn to_md(file: &PathBuf, out: &Option<PathBuf>) -> anyhow::Result<()> {
+    let src = read(file)?;
+    let doc = typedmark_parser::parse_document(&src)?;
+    let markdown = typedmark_markdown::to_markdown(&doc);
+    match out {
+        Some(path) => fs::write(path, markdown)?,
+        None => println!("{markdown}"),
+    }
+    Ok(())
+}
+
 fn serve(file: &PathBuf, port: u16) -> anyhow::Result<()> {
     let file = file.clone();
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
