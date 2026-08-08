@@ -2,8 +2,8 @@
   lib,
   stdenv,
   rustPlatform,
-  pkg-config,
-  makeWrapper
+  # pkg-config,
+  # makeWrapper
 }:
 let
   src = ../..;
@@ -18,8 +18,8 @@ rustPlatform.buildRustPackage rec {
   cargoTestFlags = cargoBuildFlags;
 
   nativeBuildInputs = [
-    pkg-config
-    makeWrapper
+    # pkg-config
+    # makeWrapper
   ];
 
   buildInputs = [

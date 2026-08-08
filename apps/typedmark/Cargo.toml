@@ -3,4 +3,13 @@ name = "typedmark-rs"
 version.workspace = true
 edition.workspace = true
 
+[[bin]]
+name = "typedmark"
+path = "src/main.rs"
+
 [dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde_json = { workspace = true }
+serde_typedmark = { workspace = true }
+typedmark-parser = { workspace = true }
