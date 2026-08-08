@@ -1,4 +1,4 @@
-# Tomet
+# TypedMark
 
 ## Project overview
 
