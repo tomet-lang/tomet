@@ -7,11 +7,13 @@ Scope for the first pass is CommonMark only (no GFM tables, footnotes,
 strikethrough, task lists, autolinks-as-extension, etc.).
 
 This started as a requirements/gap-analysis note before any of it was
-implemented. The "Decided: native shorthand syntax" section below has
-since been implemented (`typedmark-ast`, `typedmark-parser`,
-`typedmark-renderer`, all tests green) -- everything else in this file
-(the importer/exporter crate itself, `pulldown-cmark` integration, CLI
-subcommands) is still just notes, not started.
+implemented. Two things have since landed (see the "Decided and
+implemented" sections below, in chronological order): TypedMark's own
+native shorthand syntax (`typedmark-ast`/`typedmark-parser`/
+`typedmark-renderer`), and the `typedmark-markdown` importer/exporter
+crate itself. Still not started: a `Document -> .tm source text`
+serializer (belongs in `typedmark-formatter`, currently an unstarted
+stub) and the `from-md` CLI subcommand that depends on it.
 
 ## Current `typedmark_ast` shape
 
@@ -175,23 +177,90 @@ Rejected/adjusted from the earlier proposal:
   backtick handling), which happens to also be valid CommonMark on export
   with no extra work.
 
-## Implementation sketch (for whenever this resumes)
+## Decided and implemented: `typedmark-markdown` crate (2026-08-09)
 
-- New crate `crates/typedmark-markdown`, added to the workspace members
-  list (note: `typedmark-renderer` already exists as a crate but was
-  *not* wired into `members` for a while -- double check `Cargo.toml`
-  members when adding this one, see git history around 2026-08-09).
-- Markdown -> TypedMark: parse with `pulldown-cmark` (confirmed available
-  on crates.io, v0.13.4 as of writing) and fold its event stream into
-  `typedmark_ast::Document`, rather than hand-rolling a CommonMark parser.
-- TypedMark -> Markdown: hand-written serializer walking `Document`
-  (no existing crate needed -- output space is much smaller than input).
-- CLI: likely new `typedmark` subcommands alongside `check`/`ast`/`html`/
-  `serve` (e.g. `from-md`/`to-md`, or `import`/`export`), following the
-  same `PathBuf` + optional `--out` pattern as the existing `html`
-  subcommand in `apps/typedmark/src/main.rs`.
-- Test strategy: round-trip a handful of real-world CommonMark files
-  (README-style prose, nested lists, fenced code, links, images) and
-  assert the *rendered HTML* is equivalent even where the intermediate
-  `.tm` representation is lossy, plus direct fixture tests for the clean
-  mappings (headings, paragraphs, links).
+The importer/exporter crate sketched below has been built:
+`typedmark_markdown::from_markdown(&str) -> Document` and
+`typedmark_markdown::to_markdown(&Document) -> String`, plus a `typedmark
+to-md <file>` CLI subcommand (mirrors `html`'s `PathBuf` + optional
+`--out` pattern). All existing tests plus 26 new ones in the crate are
+green (`cargo test --workspace`); `cargo clippy` is clean on the new/
+touched crates.
+
+- Markdown -> TypedMark: `pulldown-cmark` 0.13, `Options::empty()`
+  (CommonMark only, no GFM extensions -- matches this doc's stated
+  scope), event stream folded directly into `Document` with an explicit
+  per-open-tag frame stack (`crates/typedmark-markdown/src/import.rs`),
+  no intermediate tree.
+- TypedMark -> Markdown: hand-written serializer
+  (`crates/typedmark-markdown/src/export.rs`), as sketched.
+- Clean mappings, as predicted: ATX headings, paragraphs, flat lists
+  (ordered via `1.`/`2.`/.., unordered via `-`), links, and -- thanks to
+  the native shorthand added earlier the same day -- emphasis/strong
+  (`*`/`**`), thematic breaks (`---`), and code spans (backticks survive
+  as literal text either direction) needed no new AST work at all.
+- Autolinks (`<https://...>`) needed no disambiguation rule after all:
+  `pulldown-cmark` already resolves `<scheme:...>` to a `Link` event
+  (`LinkType::Autolink`) during parsing, so the collision this doc
+  originally worried about (`<` as both TypedMark's element sigil and
+  Markdown's autolink delimiter) never reaches `typedmark-markdown` --
+  it's resolved one layer down, before any TypedMark-shaped text exists.
+- Two new generic-element mappings (direction-1 escape hatch, no
+  `typedmark_ast` changes): `<pre>(lang:xxx){code}` for fenced/indented
+  code blocks, `<blockquote>[...]` for block quotes. Both also needed
+  new render cases in `typedmark-renderer` (`pre` -> `<pre><code
+  class="language-xxx">`, `blockquote` -> `<blockquote>`), since neither
+  kind existed before this pass.
+- Images -> `<embed>(file:..)[alt]` or `<embed>(url:..)[alt]` as decided
+  earlier; the key is picked by a `dest.contains("://")` heuristic since
+  Markdown's `![alt](dest)` doesn't distinguish local paths from URLs
+  itself.
+- Confirmed-lossy, as this doc predicted, with the fallback each takes:
+  - Nested lists flatten to sibling items in the same flat list (no
+    `ListItem` nesting slot). `- a\n  - b\n- c` imports as three
+    siblings `a`, `b`, `c`.
+  - Block quotes containing more than one block (e.g. two paragraphs, or
+    a paragraph plus a nested list) get their content joined into a
+    single inline run, space-separated (`Element::area` is `Vec<Inline>`,
+    not `Vec<Block>`). Single-paragraph quotes -- the common case --
+    round-trip cleanly.
+  - Hard line breaks collapse to a single space, same as soft breaks
+    (prose is already space-normalized elsewhere in this codebase).
+  - HTML blocks and inline HTML are dropped entirely on import (decided
+    out of scope, per the original gap analysis below).
+  - `mark` (`==text==`) has no CommonMark form; exports as raw inline
+    HTML `<mark>...</mark>` (valid CommonMark, round-trips through
+    `pulldown-cmark` back to the same `mark` element since raw HTML
+    survives parsing as `InlineHtml` -- but that's dropped on import per
+    the point above, so a `.tm` -> `.md` -> `.tm` round trip loses it;
+    only `.tm` -> `.md` -> HTML rendering is lossless here).
+  - Any other hand-authored `<T>`/`@name` element with no dedicated
+    mapping (`@links{}`, arbitrary generic elements) exports as raw
+    `<div data-tm-kind="...">`/`<span data-tm-kind="...">` HTML, same
+    reasoning.
+- Heading `id`/`cssclass` attrs have no CommonMark form and are dropped
+  on export (ATX headings can't carry them without an extension).
+- Test strategy, as sketched: direct fixture tests per construct in both
+  directions, plus round-trip tests in `crates/typedmark-markdown/src/
+  lib.rs` that go Markdown -> `Document` -> Markdown -> `Document` and
+  assert the *rendered HTML* (via `typedmark-renderer`) is equal, so the
+  intermediate `.tm` shape is free to be lossy as long as the second
+  parse produces something that renders identically to the first.
+
+### Still open: `from-md` (Markdown -> `.tm` source text)
+
+`typedmark-markdown` only goes as far as the in-memory `Document`; there
+is still no `Document -> .tm source text` serializer, so there's no
+`typedmark from-md` CLI subcommand yet (only `to-md`, the direction that
+was actually buildable this pass, since `.tm` parsing into `Document`
+already existed). That serializer is `typedmark-formatter`'s job by
+name, and that crate is still the unmodified `cargo new` stub in
+`crates/typedmark-formatter/src/lib.rs` -- writing a one-off serializer
+inside `typedmark-markdown` instead would duplicate that crate's stated
+purpose, and risks emitting `.tm` text that doesn't actually re-parse
+(e.g. how a fenced code block's raw multi-line string round-trips
+through `typedmark-parser`'s value grammar was never checked against the
+real parser). Whoever picks this back up should implement
+`typedmark-formatter` first (general `Document -> .tm` pretty-printer,
+useful on its own beyond Markdown interop), then wire `from-md` on top
+of it.

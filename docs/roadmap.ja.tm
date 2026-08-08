@@ -9,6 +9,8 @@
   - tmd
     - TypedMarkDoc
 - 拡張性
+- コメント
+-. ドキュメント
 
 ##[ typedmark command ]
 
