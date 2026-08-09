@@ -17,6 +17,7 @@ build
 result
 target
 dist
+out
 
 # Zed extension build artifacts (grammar .wasm + fetched grammar sources)
 apps/zed-extension/extension.wasm

@@ -7,7 +7,7 @@ mkShell rec {
   buildInputs = with pkgs; [
     (pkgs.callPackage ./pkgs/typedmark.nix { })
 
-    pkg-config
+    #[ C++ ]
     cmake
     ninja
 
@@ -28,6 +28,13 @@ mkShell rec {
     cargo-outdated
     rustc
     cargo-nextest
+
+    #[ VS Code extension (apps/vscode-extension) ]
+    bun
+    nodejs
+
+    #[ Misc ]
+    pkg-config
   ];
 
   PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";

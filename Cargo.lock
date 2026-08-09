@@ -1191,10 +1191,6 @@ name = "typedmark-validator"
 version = "0.1.0"
 
 [[package]]
-name = "typedmark-vscode"
-version = "0.1.0"
-
-[[package]]
 name = "typedmark-zed"
 version = "0.1.0"
 dependencies = [
