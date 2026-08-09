@@ -4,7 +4,7 @@
 //! the full initialize -> didOpen -> didChange -> didClose -> shutdown
 //! sequence and checks the diagnostics that come back at each step.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 
@@ -30,7 +30,12 @@ impl Server {
             .expect("failed to spawn typedmark-lsp");
         let stdin = child.stdin.take().unwrap();
         let stdout = BufReader::new(child.stdout.take().unwrap());
-        Server { child, stdin: Some(stdin), stdout, next_id: 1 }
+        Server {
+            child,
+            stdin: Some(stdin),
+            stdout,
+            next_id: 1,
+        }
     }
 
     fn write_message(&mut self, value: &Value) {
@@ -43,7 +48,9 @@ impl Server {
     fn send_request(&mut self, method: &str, params: Value) -> Value {
         let id = self.next_id;
         self.next_id += 1;
-        self.write_message(&json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params}));
+        self.write_message(
+            &json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params}),
+        );
         self.read_message()
     }
 
@@ -81,7 +88,10 @@ impl Server {
 }
 
 fn diagnostics_array(msg: &Value) -> &Vec<Value> {
-    assert_eq!(msg["method"], "textDocument/publishDiagnostics", "unexpected message: {msg:?}");
+    assert_eq!(
+        msg["method"], "textDocument/publishDiagnostics",
+        "unexpected message: {msg:?}"
+    );
     msg["params"]["diagnostics"].as_array().unwrap()
 }
 
@@ -109,7 +119,11 @@ fn diagnostics_lifecycle_over_stdio() {
     );
     let diags = server.read_message();
     let diags = diagnostics_array(&diags);
-    assert_eq!(diags.len(), 1, "expected one diagnostic for a broken document: {diags:?}");
+    assert_eq!(
+        diags.len(),
+        1,
+        "expected one diagnostic for a broken document: {diags:?}"
+    );
     assert_eq!(diags[0]["source"], "typedmark");
 
     server.send_notification(
@@ -120,14 +134,66 @@ fn diagnostics_lifecycle_over_stdio() {
         }),
     );
     let diags = server.read_message();
-    assert!(diagnostics_array(&diags).is_empty(), "expected no diagnostics once fixed");
+    assert!(
+        diagnostics_array(&diags).is_empty(),
+        "expected no diagnostics once fixed"
+    );
 
     server.send_notification(
         "textDocument/didClose",
         json!({"textDocument": {"uri": "file:///tmp/bad.tm"}}),
     );
     let diags = server.read_message();
-    assert!(diagnostics_array(&diags).is_empty(), "expected diagnostics cleared on close");
+    assert!(
+        diagnostics_array(&diags).is_empty(),
+        "expected diagnostics cleared on close"
+    );
+
+    server.shutdown();
+}
+
+#[test]
+fn formatting_request_returns_a_whole_document_edit() {
+    let mut server = Server::start();
+
+    let init = server.send_request(
+        "initialize",
+        json!({"processId": Value::Null, "rootUri": Value::Null, "capabilities": {}}),
+    );
+    assert!(init.get("error").is_none(), "initialize failed: {init:?}");
+    assert_eq!(
+        init["result"]["capabilities"]["documentFormattingProvider"], true,
+        "server should advertise formatting support"
+    );
+    server.send_notification("initialized", json!({}));
+
+    server.send_notification(
+        "textDocument/didOpen",
+        json!({
+            "textDocument": {
+                "uri": "file:///tmp/messy.tm",
+                "languageId": "typedmark",
+                "version": 1,
+                "text": "#[ Hello ]  \n\n\n\n- one\n",
+            }
+        }),
+    );
+    let _diags = server.read_message(); // valid doc, published unconditionally
+
+    let resp = server.send_request(
+        "textDocument/formatting",
+        json!({
+            "textDocument": {"uri": "file:///tmp/messy.tm"},
+            "options": {"tabSize": 2, "insertSpaces": true},
+        }),
+    );
+    assert!(
+        resp.get("error").is_none(),
+        "formatting request failed: {resp:?}"
+    );
+    let edits = resp["result"].as_array().expect("expected an edits array");
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0]["newText"], "#[ Hello ]\n\n- one\n");
 
     server.shutdown();
 }

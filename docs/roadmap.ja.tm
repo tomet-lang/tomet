@@ -1,3 +1,6 @@
+@meta(yaml){
+  key:value
+}
 
 ##[ typedmark ]
 
@@ -13,12 +16,10 @@
 -. ドキュメント
 - 曖昧なのでは？()と{}
 - meta(json, toml, yaml)
+- 置換
 
 ##[ typedmark command ]
 
-- zed extension
-  - nixでインストール
-  - lsp
 - formatter
 - markdownからの移行
 

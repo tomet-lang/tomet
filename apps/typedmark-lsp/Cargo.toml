@@ -12,4 +12,5 @@ anyhow = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
 serde_json = { workspace = true }
+typedmark-formatter = { workspace = true }
 typedmark-parser = { workspace = true }

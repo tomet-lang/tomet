@@ -1,0 +1,6 @@
+[package]
+name = "typedmark-helix"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

@@ -5,7 +5,7 @@
 //! `.agents/tasks/lsp-diagnostics.md` (or its history, once deleted) for
 //! the follow-up scope.
 
-use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
+use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range, TextEdit};
 
 /// Parse `text` and turn the result into the diagnostics list for one
 /// document. `typedmark-parser` reports at most one error per parse (it
@@ -46,6 +46,31 @@ fn error_range(err: &typedmark_parser::Error, text: &str) -> Range {
     Range::new(start, end)
 }
 
+/// `textDocument/formatting` result for one document: a single edit
+/// replacing the whole document with `typedmark_formatter::format_source`'s
+/// output, or no edits at all if it's already formatted (some clients
+/// apply an empty edit list as a visible no-op undo entry, so avoid that).
+pub fn format_edits(text: &str) -> Vec<TextEdit> {
+    let formatted = typedmark_formatter::format_source(text);
+    if formatted == text {
+        return Vec::new();
+    }
+    vec![TextEdit {
+        range: whole_document_range(text),
+        new_text: formatted,
+    }]
+}
+
+/// Same char-counting approximation as `error_range` above (see its doc
+/// comment for the UTF-16 caveat): a range from the start of the document
+/// to just past its last character, used to replace the entire buffer.
+fn whole_document_range(text: &str) -> Range {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let end_line = lines.len().saturating_sub(1) as u32;
+    let end_char = lines.last().map(|l| l.chars().count()).unwrap_or(0) as u32;
+    Range::new(Position::new(0, 0), Position::new(end_line, end_char))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -61,5 +86,22 @@ mod tests {
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].severity, Some(DiagnosticSeverity::ERROR));
         assert_eq!(diags[0].source.as_deref(), Some("typedmark"));
+    }
+
+    #[test]
+    fn already_formatted_document_has_no_edits() {
+        assert_eq!(format_edits("#[ Hello ]\n"), Vec::new());
+    }
+
+    #[test]
+    fn messy_document_gets_one_whole_document_edit() {
+        let text = "#[ Hello ]  \n\n\n\n- one\n";
+        let edits = format_edits(text);
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].new_text, "#[ Hello ]\n\n- one\n");
+        assert_eq!(
+            edits[0].range,
+            Range::new(Position::new(0, 0), Position::new(5, 0))
+        );
     }
 }

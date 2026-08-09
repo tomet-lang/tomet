@@ -2,12 +2,18 @@
 resolver = "3"
 
 members = [
+  #[ CLI ]
   "apps/typedmark",
+  #[ Language Support ]
   "apps/typedmark-java",
   "apps/typedmark-js",
   "apps/typedmark-lsp",
+  #[ Editor Support ]
   "apps/vscode-extension",
   "apps/zed-extension",
+  "apps/typedmark-python",
+  "apps/typedmark-helix",
+  "apps/typedmark-neovim",
 
   "crates/typedmark-ast",
   "crates/typedmark-formatter",
@@ -18,7 +24,7 @@ members = [
   "crates/typedmark-validator",
   "crates/serde_typedmark",
   "crates/tree-sitter-typedmark"
-, "apps/typedmark-python"]
+]
 
 default-members = [
   "apps/typedmark"
@@ -30,6 +36,7 @@ edition = "2024"
 
 [workspace.dependencies]
 typedmark-ast = { path = "crates/typedmark-ast" }
+typedmark-formatter = { path = "crates/typedmark-formatter" }
 typedmark-lexar = { path = "crates/typedmark-lexar" }
 typedmark-markdown = { path = "crates/typedmark-markdown" }
 typedmark-parser = { path = "crates/typedmark-parser" }

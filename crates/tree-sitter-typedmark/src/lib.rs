@@ -91,7 +91,9 @@ mod tests {
 
     fn parse(src: &str) -> tree_sitter::Tree {
         let mut parser = Parser::new();
-        parser.set_language(&LANGUAGE.into()).expect("failed to load the TypedMark grammar");
+        parser
+            .set_language(&LANGUAGE.into())
+            .expect("failed to load the TypedMark grammar");
         parser.parse(src, None).expect("parse returned None")
     }
 
@@ -103,7 +105,11 @@ mod tests {
         let mut cursor = tree.walk();
         let mut visit = |node: Node| {
             if node.is_error() || node.is_missing() {
-                out.insert(node.utf8_text(src.as_bytes()).unwrap_or_default().to_string());
+                out.insert(
+                    node.utf8_text(src.as_bytes())
+                        .unwrap_or_default()
+                        .to_string(),
+                );
             }
         };
         loop {
@@ -132,7 +138,10 @@ mod tests {
     fn parses_lists_ordered_and_unordered() {
         for src in ["- one\n- two\n- three\n", "-. one\n-. two\n"] {
             let tree = parse(src);
-            assert!(!tree.root_node().has_error(), "expected no errors for {src:?}");
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}"
+            );
         }
     }
 
@@ -160,7 +169,10 @@ mod tests {
             "<embed>(file:assets/pic.png)[alt text]\n",
         ] {
             let tree = parse(src);
-            assert!(!tree.root_node().has_error(), "expected no errors for {src:?}");
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}"
+            );
         }
     }
 
@@ -187,13 +199,17 @@ mod tests {
         let root = tree.root_node();
         let element = root.child(0).unwrap().child(0).unwrap();
         assert_eq!(element.kind(), "element");
-        let at_element = element.child(0).expect("expected element to wrap an at_element");
+        let at_element = element
+            .child(0)
+            .expect("expected element to wrap an at_element");
         assert_eq!(at_element.kind(), "at_element");
         let value_group = at_element
             .named_child(1)
             .expect("expected a value_group as the at_element's second named child");
         assert_eq!(value_group.kind(), "value_group");
-        let children = value_group.named_child(0).expect("expected a children node");
+        let children = value_group
+            .named_child(0)
+            .expect("expected a children node");
         assert_eq!(children.kind(), "children");
         assert_eq!(children.named_child_count(), 2);
     }
@@ -211,7 +227,14 @@ mod tests {
         // the `のうち.../のルール` snippets are the stray-`]`-in-prose and
         // the pre-existing `[]`-inside-`[...]` parser bug, both from
         // this file's self-referential grammar-explanation prose.
-        let known_markers = ["yaml", "required", "anotation1", "のうち必要なものを付ける", "のルール", "\n"];
+        let known_markers = [
+            "yaml",
+            "required",
+            "anotation1",
+            "のうち必要なものを付ける",
+            "のルール",
+            "\n",
+        ];
         for text in &errors {
             assert!(
                 known_markers.iter().any(|marker| text.contains(marker)),
@@ -229,7 +252,10 @@ mod tests {
         // module doc); an empty string is a zero-width `MISSING` node
         // from the same error's recovery, not a separate case.
         for text in &errors {
-            assert!(text.is_empty() || text.contains("yaml"), "unexpected error node text: {text:?}");
+            assert!(
+                text.is_empty() || text.contains("yaml"),
+                "unexpected error node text: {text:?}"
+            );
         }
     }
 
@@ -238,5 +264,19 @@ mod tests {
         let query_src = include_str!("../queries/highlights.scm");
         tree_sitter::Query::new(&LANGUAGE.into(), query_src)
             .expect("queries/highlights.scm should be a valid query against this grammar");
+    }
+
+    #[test]
+    fn indents_query_is_valid() {
+        let query_src = include_str!("../queries/indents.scm");
+        tree_sitter::Query::new(&LANGUAGE.into(), query_src)
+            .expect("queries/indents.scm should be a valid query against this grammar");
+    }
+
+    #[test]
+    fn brackets_query_is_valid() {
+        let query_src = include_str!("../queries/brackets.scm");
+        tree_sitter::Query::new(&LANGUAGE.into(), query_src)
+            .expect("queries/brackets.scm should be a valid query against this grammar");
     }
 }

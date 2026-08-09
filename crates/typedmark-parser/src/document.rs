@@ -144,7 +144,11 @@ fn parse_braced_value(cur: &mut Cursor) -> Result<Value> {
 /// so switching marker mid-stream stops this list rather than mixing.
 fn parse_list(cur: &mut Cursor, ordered: bool) -> Result<Vec<ListItem>> {
     let mut items = Vec::new();
-    while if ordered { is_ordered_list_marker(cur) } else { is_list_marker(cur) } {
+    while if ordered {
+        is_ordered_list_marker(cur)
+    } else {
+        is_list_marker(cur)
+    } {
         cur.bump();
         if ordered {
             cur.bump();
@@ -317,7 +321,13 @@ fn trim_edges(mut items: Vec<Inline>) -> Vec<Inline> {
 
 /// Delimiters tried longest-first (so `**`/`__` aren't read as two `*`/`_`
 /// spans) with the `Sigil::Type` name each desugars to.
-const DELIMITERS: [(&str, &str); 5] = [("**", "strong"), ("__", "strong"), ("==", "mark"), ("*", "em"), ("_", "em")];
+const DELIMITERS: [(&str, &str); 5] = [
+    ("**", "strong"),
+    ("__", "strong"),
+    ("==", "mark"),
+    ("*", "em"),
+    ("_", "em"),
+];
 
 fn char_before(cur: &Cursor) -> Option<char> {
     cur.src()[..cur.pos()].chars().next_back()

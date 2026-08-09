@@ -20,7 +20,11 @@ impl zed::Extension for TypedMarkExtension {
         let path = worktree
             .which("typedmark-lsp")
             .ok_or_else(|| "typedmark-lsp not found on $PATH".to_string())?;
-        Ok(zed::Command { command: path, args: Vec::new(), env: Default::default() })
+        Ok(zed::Command {
+            command: path,
+            args: Vec::new(),
+            env: Default::default(),
+        })
     }
 }
 
