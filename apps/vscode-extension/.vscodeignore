@@ -3,7 +3,7 @@ src/**
 out/**
 node_modules/**
 .gitignore
+esbuild.js
 tsconfig.json
-bun.lock
 **/*.map
 **/.eslintrc.json
