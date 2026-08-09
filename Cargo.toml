@@ -6,8 +6,8 @@ members = [
   "apps/typedmark-java",
   "apps/typedmark-js",
   "apps/typedmark-lsp",
-  "apps/typedmark-vscode",
-  "apps/typedmark-zed",
+  "apps/vscode-extension",
+  "apps/zed-extension",
 
   "crates/typedmark-ast",
   "crates/typedmark-formatter",
@@ -56,3 +56,4 @@ tree-sitter = "0.26"
 tree-sitter-language = "0.1"
 uuid = { version = "1.23", features = ["v4"] }
 walkdir = "2"
+zed_extension_api = "0.7"

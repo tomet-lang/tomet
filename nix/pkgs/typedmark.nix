@@ -15,6 +15,8 @@ rustPlatform.buildRustPackage rec {
   cargoBuildFlags = [
     "-p"
     "typedmark"
+    "-p"
+    "typedmark-lsp"
   ];
   cargoTestFlags = cargoBuildFlags;
 

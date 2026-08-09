@@ -1,8 +1,7 @@
 ; Syntax highlighting for TypedMark, using the standard capture names
 ; shared across tree-sitter-based editors (Zed, Neovim, Helix, ...).
-; Not consumed by anything in this repo yet -- the Zed extension that
-; will eventually load this doesn't exist yet either -- but it's cheap
-; to write alongside the grammar and needed as soon as that lands.
+; Loaded by `apps/zed-extension` via a symlink at
+; `apps/zed-extension/languages/typedmark/highlights.scm`.
 
 (heading_marker) @markup.heading.marker
 (heading) @markup.heading
