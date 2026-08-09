@@ -17,6 +17,11 @@ mkShell rec {
         "clippy"
         "rust-src"
       ];
+      # wasm32-wasip2: needed to build Zed extensions locally (e.g.
+      # apps/zed-extension in the typedmark repo) -- Zed shells out to
+      # `rustc`/`cargo` on $PATH to compile them and doesn't manage its own
+      # toolchain or targets.
+      targets = [ "wasm32-wasip2" ];
     })
     cargo
     cargo-edit
