@@ -30,7 +30,6 @@ mkShell rec {
     cargo-nextest
 
     #[ VS Code extension (apps/vscode-extension) ]
-    bun
     nodejs
 
     #[ Misc ]

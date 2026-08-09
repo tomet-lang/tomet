@@ -27,6 +27,7 @@ in
     _: pkgs: rec {
       default = typedmark;
       typedmark = pkgs.callPackage ./pkgs/typedmark.nix { };
+      vscodeExtension = pkgs.callPackage ./pkgs/vscode-extension.nix { };
     }
   );
   devShells = forAllSystems (

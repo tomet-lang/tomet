@@ -11,8 +11,8 @@ set in the `typedmark.serverPath` setting.
 ## Development
 
 ```sh
-bun install
-bun run compile   # or `bun run watch`
+npm install
+npm run compile   # or `npm run watch`
 ```
 
 Then open this directory in VS Code and press F5 to launch an Extension
