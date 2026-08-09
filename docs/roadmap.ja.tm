@@ -11,6 +11,8 @@
 - 拡張性
 - コメント
 -. ドキュメント
+- 曖昧なのでは？()と{}
+- meta(json, toml, yaml)
 
 ##[ typedmark command ]
 

@@ -3,4 +3,8 @@ name = "typedmark-zed"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
+zed_extension_api = { workspace = true }
