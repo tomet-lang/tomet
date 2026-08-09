@@ -1,28 +1,34 @@
 { buildNpmPackage }:
 let
   root = ../..;
-in buildNpmPackage {
+
+  # Matches `package.json`'s "publisher"/"name" fields. home-manager's
+  # `programs.vscode.extensions` (via nixpkgs' vscode-utils.nix,
+  # `toExtensionJsonEntry`) reads these three attributes directly off the
+  # extension derivation -- not just any output shape will do, it
+  # specifically expects `$out/share/vscode/extensions/${vscodeExtUniqueId}`
+  # to hold the extension's files.
+  vscodeExtPublisher = "tomet-lang";
+  vscodeExtName = "typedmark-vscode";
+  vscodeExtUniqueId = "${vscodeExtPublisher}.${vscodeExtName}";
+in
+buildNpmPackage {
   pname = "typedmark-vscode";
   version = "0.1.0";
   src = "${root}/apps/vscode-extension";
 
-  # Vendors `package-lock.json`'s deps into a fixed-output derivation (npm
-  # install happens there, with network access the sandbox otherwise
-  # denies); the actual build below runs offline against that. Update
-  # this whenever `apps/vscode-extension/package-lock.json` changes --
-  # `nix build` reports the correct hash on a mismatch.
   npmDepsHash = "sha256-JsXSQc8TeRokIUCy0BJpISQnkUUPXrBY3ZK3Aq08Kyw=";
-
   npmBuildScript = "compile";
 
-  # `buildNpmPackage`'s default installPhase assumes an npm library/CLI
-  # layout ($out/lib/node_modules/<name> + bin symlinks) -- a VS Code
-  # extension instead needs `$out` to *be* the extension directory
-  # (package.json/dist/syntaxes/language-configuration.json at the top
-  # level), which is what `programs.vscode.extensions` (home-manager)
-  # expects.
+  passthru = { inherit vscodeExtPublisher vscodeExtName vscodeExtUniqueId; };
+
   installPhase = ''
-    mkdir -p $out
-    cp -r package.json language-configuration.json syntaxes dist $out/
+    runHook preInstall
+
+    dir=$out/share/vscode/extensions/${vscodeExtUniqueId}
+    mkdir -p "$dir"
+    cp -r package.json language-configuration.json syntaxes dist "$dir/"
+
+    runHook postInstall
   '';
 }
