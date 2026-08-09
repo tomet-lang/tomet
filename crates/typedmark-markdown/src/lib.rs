@@ -22,12 +22,18 @@ mod roundtrip_tests {
         let doc = from_markdown(markdown);
         let re_markdown = to_markdown(&doc);
         let doc2 = from_markdown(&re_markdown);
-        assert_eq!(render_body(&doc), render_body(&doc2), "markdown was:\n{markdown}\nre-emitted as:\n{re_markdown}");
+        assert_eq!(
+            render_body(&doc),
+            render_body(&doc2),
+            "markdown was:\n{markdown}\nre-emitted as:\n{re_markdown}"
+        );
     }
 
     #[test]
     fn prose_with_inline_formatting_round_trips() {
-        assert_html_round_trips("# Title\n\nSome *emphasis* and **strong** and a [link](https://example.com/x).\n");
+        assert_html_round_trips(
+            "# Title\n\nSome *emphasis* and **strong** and a [link](https://example.com/x).\n",
+        );
     }
 
     #[test]

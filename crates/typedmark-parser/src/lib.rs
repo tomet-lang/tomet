@@ -182,11 +182,26 @@ mod tests {
                 assert_eq!(
                     kinds,
                     vec![
-                        (Sigil::Type("em".into()), Some(vec![Inline::Text("em".into())])),
-                        (Sigil::Type("strong".into()), Some(vec![Inline::Text("strong".into())])),
-                        (Sigil::Type("em".into()), Some(vec![Inline::Text("em2".into())])),
-                        (Sigil::Type("strong".into()), Some(vec![Inline::Text("strong2".into())])),
-                        (Sigil::Type("mark".into()), Some(vec![Inline::Text("mark".into())])),
+                        (
+                            Sigil::Type("em".into()),
+                            Some(vec![Inline::Text("em".into())])
+                        ),
+                        (
+                            Sigil::Type("strong".into()),
+                            Some(vec![Inline::Text("strong".into())])
+                        ),
+                        (
+                            Sigil::Type("em".into()),
+                            Some(vec![Inline::Text("em2".into())])
+                        ),
+                        (
+                            Sigil::Type("strong".into()),
+                            Some(vec![Inline::Text("strong2".into())])
+                        ),
+                        (
+                            Sigil::Type("mark".into()),
+                            Some(vec![Inline::Text("mark".into())])
+                        ),
                     ]
                 );
             }
@@ -210,7 +225,10 @@ mod tests {
         let doc = parse_document("this *word never closes\n").unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(inlines) => {
-                assert_eq!(inlines, &vec![Inline::Text("this *word never closes".into())]);
+                assert_eq!(
+                    inlines,
+                    &vec![Inline::Text("this *word never closes".into())]
+                );
             }
             other => panic!("expected paragraph, got {other:?}"),
         }

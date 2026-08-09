@@ -1108,6 +1108,7 @@ dependencies = [
  "serde_json",
  "serde_typedmark",
  "tokio",
+ "typedmark-formatter",
  "typedmark-markdown",
  "typedmark-parser",
  "typedmark-renderer",
@@ -1119,6 +1120,13 @@ version = "0.1.0"
 
 [[package]]
 name = "typedmark-formatter"
+version = "0.1.0"
+dependencies = [
+ "typedmark-parser",
+]
+
+[[package]]
+name = "typedmark-helix"
 version = "0.1.0"
 
 [[package]]
@@ -1141,6 +1149,7 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "serde_json",
+ "typedmark-formatter",
  "typedmark-parser",
 ]
 
@@ -1152,6 +1161,10 @@ dependencies = [
  "typedmark-ast",
  "typedmark-renderer",
 ]
+
+[[package]]
+name = "typedmark-neovim"
+version = "0.1.0"
 
 [[package]]
 name = "typedmark-parser"

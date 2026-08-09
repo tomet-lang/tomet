@@ -175,8 +175,16 @@ fn render_embed_element(el: &Element, out: &mut String) {
         .and_then(|m| map_get(m, "file").or_else(|| map_get(m, "url")))
         .map(value_to_plain)
         .unwrap_or_default();
-    let alt = el.area.as_ref().map(|a| inlines_to_plain(a)).unwrap_or_default();
-    out.push_str(&format!("<img src=\"{}\" alt=\"{}\">\n", escape_attr(&src), escape_attr(&alt)));
+    let alt = el
+        .area
+        .as_ref()
+        .map(|a| inlines_to_plain(a))
+        .unwrap_or_default();
+    out.push_str(&format!(
+        "<img src=\"{}\" alt=\"{}\">\n",
+        escape_attr(&src),
+        escape_attr(&alt)
+    ));
 }
 
 /// Flattens inline content to plain text -- used for the `alt` attribute,
@@ -486,7 +494,10 @@ mod tests {
     fn renders_emphasis_strong_and_mark() {
         let doc = parse_document("a *em* b **strong** c ==mark==\n").unwrap();
         let body = render_body(&doc);
-        assert_eq!(body, "<p>a <em>em</em> b <strong>strong</strong> c <mark>mark</mark></p>\n");
+        assert_eq!(
+            body,
+            "<p>a <em>em</em> b <strong>strong</strong> c <mark>mark</mark></p>\n"
+        );
     }
 
     #[test]

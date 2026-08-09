@@ -9,7 +9,9 @@
 //! valid CommonMark. Heading `id`/`cssclass` attrs have no CommonMark
 //! form and are dropped.
 
-use typedmark_ast::{Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value};
+use typedmark_ast::{
+    Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
+};
 
 pub fn to_markdown(doc: &Document) -> String {
     let mut out = String::new();
@@ -82,7 +84,10 @@ fn element_kind(el: &Element) -> String {
 
 fn infer_at_kind(input: Option<&Value>) -> Option<String> {
     let map = as_map(input?)?;
-    INFERRED_AT_KEYS.iter().find(|k| map_get(map, k).is_some()).map(|k| k.to_string())
+    INFERRED_AT_KEYS
+        .iter()
+        .find(|k| map_get(map, k).is_some())
+        .map(|k| k.to_string())
 }
 
 fn element_to_md(el: &Element, inline: bool) -> String {
@@ -104,7 +109,10 @@ fn element_to_md(el: &Element, inline: bool) -> String {
 }
 
 fn area_to_md(el: &Element) -> String {
-    el.area.as_ref().map(|a| inline_to_md(a)).unwrap_or_default()
+    el.area
+        .as_ref()
+        .map(|a| inline_to_md(a))
+        .unwrap_or_default()
 }
 
 fn render_code_block(el: &Element) -> String {
@@ -137,7 +145,10 @@ fn fence_for(code: &str) -> String {
 
 fn render_blockquote(el: &Element) -> String {
     let text = area_to_md(el);
-    text.lines().map(|line| format!("> {line}")).collect::<Vec<_>>().join("\n")
+    text.lines()
+        .map(|line| format!("> {line}"))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn render_link(el: &Element, key: &str) -> String {
@@ -178,7 +189,11 @@ fn render_embed(el: &Element) -> String {
         .and_then(|m| map_get(m, "file").or_else(|| map_get(m, "url")))
         .map(value_to_plain)
         .unwrap_or_default();
-    let alt = el.area.as_ref().map(|a| inlines_to_plain(a)).unwrap_or_default();
+    let alt = el
+        .area
+        .as_ref()
+        .map(|a| inlines_to_plain(a))
+        .unwrap_or_default();
     format!("![{alt}]({src})")
 }
 
@@ -205,7 +220,11 @@ fn render_links_container(el: &Element) -> String {
                 out.push('\n');
             }
             let id = child.input.as_ref().map(value_to_plain).unwrap_or_default();
-            let content = child.area.as_ref().map(|a| inline_to_md(a)).unwrap_or_default();
+            let content = child
+                .area
+                .as_ref()
+                .map(|a| inline_to_md(a))
+                .unwrap_or_default();
             out.push_str(&format!("**{id}**: {content}"));
         }
     }
@@ -233,7 +252,11 @@ fn render_generic(el: &Element, kind: &str, inline: bool) -> String {
 fn push_data_attrs(out: &mut String, input: &Value) {
     if let Some(map) = as_map(input) {
         for (k, v) in map {
-            out.push_str(&format!(" data-{}=\"{}\"", escape_attr(k), escape_attr(&value_to_plain(v))));
+            out.push_str(&format!(
+                " data-{}=\"{}\"",
+                escape_attr(k),
+                escape_attr(&value_to_plain(v))
+            ));
         }
     }
 }
@@ -252,7 +275,10 @@ fn escape_text(s: &str) -> String {
 }
 
 fn escape_attr(s: &str) -> String {
-    s.replace('&', "&amp;").replace('"', "&quot;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn value_to_plain(v: &Value) -> String {
@@ -262,7 +288,11 @@ fn value_to_plain(v: &Value) -> String {
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
         Value::String(s) => s.clone(),
-        Value::Seq(items) => items.iter().map(value_to_plain).collect::<Vec<_>>().join(", "),
+        Value::Seq(items) => items
+            .iter()
+            .map(value_to_plain)
+            .collect::<Vec<_>>()
+            .join(", "),
         Value::Map(_) => String::new(),
     }
 }
@@ -286,7 +316,11 @@ mod tests {
     fn heading_and_paragraph() {
         let doc = Document {
             blocks: vec![
-                Block::Heading(Heading { level: 2, content: vec![Inline::Text("Title".to_string())], attrs: None }),
+                Block::Heading(Heading {
+                    level: 2,
+                    content: vec![Inline::Text("Title".to_string())],
+                    attrs: None,
+                }),
                 Block::Paragraph(vec![Inline::Text("Hello.".to_string())]),
             ],
         };
@@ -299,8 +333,12 @@ mod tests {
             blocks: vec![Block::List {
                 ordered: true,
                 items: vec![
-                    ListItem { content: vec![Inline::Text("one".to_string())] },
-                    ListItem { content: vec![Inline::Text("two".to_string())] },
+                    ListItem {
+                        content: vec![Inline::Text("one".to_string())],
+                    },
+                    ListItem {
+                        content: vec![Inline::Text("two".to_string())],
+                    },
                 ],
             }],
         };
@@ -311,9 +349,19 @@ mod tests {
     fn emphasis_and_strong() {
         let doc = Document {
             blocks: vec![Block::Paragraph(vec![
-                Inline::Element(Element { sigil: Sigil::Type("em".to_string()), input: None, area: Some(vec![Inline::Text("a".to_string())]), value: None }),
+                Inline::Element(Element {
+                    sigil: Sigil::Type("em".to_string()),
+                    input: None,
+                    area: Some(vec![Inline::Text("a".to_string())]),
+                    value: None,
+                }),
                 Inline::Text(" ".to_string()),
-                Inline::Element(Element { sigil: Sigil::Type("strong".to_string()), input: None, area: Some(vec![Inline::Text("b".to_string())]), value: None }),
+                Inline::Element(Element {
+                    sigil: Sigil::Type("strong".to_string()),
+                    input: None,
+                    area: Some(vec![Inline::Text("b".to_string())]),
+                    value: None,
+                }),
             ])],
         };
         assert_eq!(to_markdown(&doc), "*a* **b**\n\n");
@@ -323,11 +371,16 @@ mod tests {
     fn link_round_trips() {
         let el = Element {
             sigil: Sigil::At(None),
-            input: Some(Value::Map(vec![("url".to_string(), Value::String("https://example.com".to_string()))])),
+            input: Some(Value::Map(vec![(
+                "url".to_string(),
+                Value::String("https://example.com".to_string()),
+            )])),
             area: Some(vec![Inline::Text("Wiki".to_string())]),
             value: None,
         };
-        let doc = Document { blocks: vec![Block::Paragraph(vec![Inline::Element(el)])] };
+        let doc = Document {
+            blocks: vec![Block::Paragraph(vec![Inline::Element(el)])],
+        };
         assert_eq!(to_markdown(&doc), "[Wiki](https://example.com)\n\n");
     }
 
@@ -335,11 +388,16 @@ mod tests {
     fn embed_becomes_image() {
         let el = Element {
             sigil: Sigil::Type("embed".to_string()),
-            input: Some(Value::Map(vec![("file".to_string(), Value::String("pic.png".to_string()))])),
+            input: Some(Value::Map(vec![(
+                "file".to_string(),
+                Value::String("pic.png".to_string()),
+            )])),
             area: Some(vec![Inline::Text("a cat".to_string())]),
             value: None,
         };
-        let doc = Document { blocks: vec![Block::Paragraph(vec![Inline::Element(el)])] };
+        let doc = Document {
+            blocks: vec![Block::Paragraph(vec![Inline::Element(el)])],
+        };
         assert_eq!(to_markdown(&doc), "![a cat](pic.png)\n\n");
     }
 
@@ -347,17 +405,26 @@ mod tests {
     fn code_block_uses_fence_and_lang() {
         let el = Element {
             sigil: Sigil::Type("pre".to_string()),
-            input: Some(Value::Map(vec![("lang".to_string(), Value::String("rust".to_string()))])),
+            input: Some(Value::Map(vec![(
+                "lang".to_string(),
+                Value::String("rust".to_string()),
+            )])),
             area: None,
-            value: Some(ElementValue::Data(Value::String("fn main() {}".to_string()))),
+            value: Some(ElementValue::Data(Value::String(
+                "fn main() {}".to_string(),
+            ))),
         };
-        let doc = Document { blocks: vec![Block::Element(el)] };
+        let doc = Document {
+            blocks: vec![Block::Element(el)],
+        };
         assert_eq!(to_markdown(&doc), "```rust\nfn main() {}\n```\n\n");
     }
 
     #[test]
     fn thematic_break() {
-        let doc = Document { blocks: vec![Block::Element(Element::new(Sigil::Type("hr".to_string())))] };
+        let doc = Document {
+            blocks: vec![Block::Element(Element::new(Sigil::Type("hr".to_string())))],
+        };
         assert_eq!(to_markdown(&doc), "---\n\n");
     }
 }

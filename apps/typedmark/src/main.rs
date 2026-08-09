@@ -64,6 +64,19 @@ enum Command {
         #[arg(short, long, default_value_t = 8787)]
         port: u16,
     },
+    /// Normalize a `.tm` file's whitespace (line endings, trailing
+    /// whitespace, blank lines, final newline). Prints to stdout by
+    /// default; see `--write`/`--check`.
+    Format {
+        file: PathBuf,
+        /// Overwrite the file in place instead of printing to stdout.
+        #[arg(short, long)]
+        write: bool,
+        /// Exit with a nonzero status if the file isn't already
+        /// formatted, without writing or printing anything.
+        #[arg(long, conflicts_with = "write")]
+        check: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -75,6 +88,7 @@ fn main() -> ExitCode {
         Command::Html { file, out } => html(file, out),
         Command::ToMd { file, out } => to_md(file, out),
         Command::Serve { file, port } => serve(file, *port),
+        Command::Format { file, write, check } => format_cmd(file, *write, *check),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -173,6 +187,26 @@ fn escape_html(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
+}
+
+fn format_cmd(file: &PathBuf, write: bool, check: bool) -> anyhow::Result<()> {
+    let src = read(file)?;
+    let formatted = typedmark_formatter::format_source(&src);
+    if check {
+        if formatted == src {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("{} is not formatted", file.display()))
+        }
+    } else if write {
+        if formatted != src {
+            fs::write(file, formatted)?;
+        }
+        Ok(())
+    } else {
+        print!("{formatted}");
+        Ok(())
+    }
 }
 
 fn roundtrip(file: &PathBuf) -> anyhow::Result<()> {

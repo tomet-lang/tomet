@@ -16,7 +16,9 @@
 //! and inline HTML are dropped; hard breaks collapse to a space.
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
-use typedmark_ast::{Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value};
+use typedmark_ast::{
+    Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
+};
 
 enum Frame {
     /// Top-level document, and the fallback container for anything that
@@ -30,13 +32,28 @@ enum Frame {
     /// A list item's content. `extra` collects items promoted out of a
     /// nested list (flattening) so `List`'s End handler can splice them
     /// in as siblings right after this item.
-    Item { content: Vec<Inline>, extra: Vec<ListItem> },
-    List { ordered: bool, items: Vec<ListItem> },
+    Item {
+        content: Vec<Inline>,
+        extra: Vec<ListItem>,
+    },
+    List {
+        ordered: bool,
+        items: Vec<ListItem>,
+    },
     Emphasis(Vec<Inline>),
     Strong(Vec<Inline>),
-    Link { dest: String, inlines: Vec<Inline> },
-    Image { dest: String, alt: Vec<Inline> },
-    CodeBlock { lang: String, text: String },
+    Link {
+        dest: String,
+        inlines: Vec<Inline>,
+    },
+    Image {
+        dest: String,
+        alt: Vec<Inline>,
+    },
+    CodeBlock {
+        lang: String,
+        text: String,
+    },
     /// HTML blocks/inline HTML -- swallow everything until the matching
     /// End, out of scope for v1 (see module docs).
     Discard,
@@ -63,7 +80,10 @@ pub fn from_markdown(src: &str) -> Document {
             Event::Html(_) | Event::InlineHtml(_) => {}
             Event::SoftBreak => push_inline(&mut stack, Inline::Text(" ".to_string())),
             Event::HardBreak => push_inline(&mut stack, Inline::Text(" ".to_string())),
-            Event::Rule => push_block(&mut stack, Block::Element(Element::new(Sigil::Type("hr".to_string())))),
+            Event::Rule => push_block(
+                &mut stack,
+                Block::Element(Element::new(Sigil::Type("hr".to_string()))),
+            ),
             // Footnotes/tables/strikethrough/tasklists/math are all gated
             // behind `Options` flags we don't enable, so these shouldn't
             // occur; ignore defensively rather than panic.
@@ -88,14 +108,29 @@ fn start_frame(tag: Tag) -> Frame {
                 CodeBlockKind::Fenced(lang) => lang.into_string(),
                 CodeBlockKind::Indented => String::new(),
             };
-            Frame::CodeBlock { lang, text: String::new() }
+            Frame::CodeBlock {
+                lang,
+                text: String::new(),
+            }
         }
-        Tag::List(start) => Frame::List { ordered: start.is_some(), items: Vec::new() },
-        Tag::Item => Frame::Item { content: Vec::new(), extra: Vec::new() },
+        Tag::List(start) => Frame::List {
+            ordered: start.is_some(),
+            items: Vec::new(),
+        },
+        Tag::Item => Frame::Item {
+            content: Vec::new(),
+            extra: Vec::new(),
+        },
         Tag::Emphasis => Frame::Emphasis(Vec::new()),
         Tag::Strong => Frame::Strong(Vec::new()),
-        Tag::Link { dest_url, .. } => Frame::Link { dest: dest_url.into_string(), inlines: Vec::new() },
-        Tag::Image { dest_url, .. } => Frame::Image { dest: dest_url.into_string(), alt: Vec::new() },
+        Tag::Link { dest_url, .. } => Frame::Link {
+            dest: dest_url.into_string(),
+            inlines: Vec::new(),
+        },
+        Tag::Image { dest_url, .. } => Frame::Image {
+            dest: dest_url.into_string(),
+            alt: Vec::new(),
+        },
         // HtmlBlock and anything gated behind unset Options (tables,
         // footnotes, strikethrough, definition lists, metadata blocks).
         _ => Frame::Discard,
@@ -105,13 +140,24 @@ fn start_frame(tag: Tag) -> Frame {
 fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
     let frame = stack.pop().expect("End without matching Start");
     match (frame, tag_end) {
-        (Frame::Paragraph(inlines), TagEnd::Paragraph) => push_block(stack, Block::Paragraph(inlines)),
+        (Frame::Paragraph(inlines), TagEnd::Paragraph) => {
+            push_block(stack, Block::Paragraph(inlines))
+        }
         (Frame::Heading(level, inlines), TagEnd::Heading(_)) => push_block(
             stack,
-            Block::Heading(Heading { level, content: inlines, attrs: None }),
+            Block::Heading(Heading {
+                level,
+                content: inlines,
+                attrs: None,
+            }),
         ),
         (Frame::BlockQuote(area), TagEnd::BlockQuote(_)) => {
-            let el = Element { sigil: Sigil::Type("blockquote".to_string()), input: None, area: Some(area), value: None };
+            let el = Element {
+                sigil: Sigil::Type("blockquote".to_string()),
+                input: None,
+                area: Some(area),
+                value: None,
+            };
             push_block(stack, Block::Element(el));
         }
         (Frame::CodeBlock { lang, mut text }, TagEnd::CodeBlock) => {
@@ -123,19 +169,24 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
             } else {
                 Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
             };
-            let el = Element { sigil: Sigil::Type("pre".to_string()), input, area: None, value: Some(ElementValue::Data(Value::String(text))) };
+            let el = Element {
+                sigil: Sigil::Type("pre".to_string()),
+                input,
+                area: None,
+                value: Some(ElementValue::Data(Value::String(text))),
+            };
             push_block(stack, Block::Element(el));
         }
-        (Frame::List { ordered, items }, TagEnd::List(_)) => push_block(stack, Block::List { ordered, items }),
-        (Frame::Item { content, extra }, TagEnd::Item) => {
-            match stack.last_mut() {
-                Some(Frame::List { items, .. }) => {
-                    items.push(ListItem { content });
-                    items.extend(extra);
-                }
-                _ => unreachable!("Item is always nested directly inside List"),
-            }
+        (Frame::List { ordered, items }, TagEnd::List(_)) => {
+            push_block(stack, Block::List { ordered, items })
         }
+        (Frame::Item { content, extra }, TagEnd::Item) => match stack.last_mut() {
+            Some(Frame::List { items, .. }) => {
+                items.push(ListItem { content });
+                items.extend(extra);
+            }
+            _ => unreachable!("Item is always nested directly inside List"),
+        },
         (Frame::Emphasis(inlines), TagEnd::Emphasis) => {
             push_inline(stack, wrap_inline("em", inlines));
         }
@@ -168,7 +219,12 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
 }
 
 fn wrap_inline(tag: &str, area: Vec<Inline>) -> Inline {
-    Inline::Element(Element { sigil: Sigil::Type(tag.to_string()), input: None, area: Some(area), value: None })
+    Inline::Element(Element {
+        sigil: Sigil::Type(tag.to_string()),
+        input: None,
+        area: Some(area),
+        value: None,
+    })
 }
 
 fn inline_target(stack: &mut [Frame]) -> Option<&mut Vec<Inline>> {
@@ -192,7 +248,9 @@ fn inline_target(stack: &mut [Frame]) -> Option<&mut Vec<Inline>> {
 /// Adjacent `Text` nodes are merged (e.g. plain text either side of an
 /// inline code span) rather than left as separate fragments.
 fn push_inline(stack: &mut [Frame], inline: Inline) {
-    let Some(target) = inline_target(stack) else { return };
+    let Some(target) = inline_target(stack) else {
+        return;
+    };
     if let (Inline::Text(new), Some(Inline::Text(prev))) = (&inline, target.last_mut()) {
         prev.push_str(new);
         return;
@@ -217,7 +275,11 @@ fn push_block(stack: &mut [Frame], block: Block) {
     }
 }
 
-fn merge_block_into(content: &mut Vec<Inline>, extra_items: Option<&mut Vec<ListItem>>, block: Block) {
+fn merge_block_into(
+    content: &mut Vec<Inline>,
+    extra_items: Option<&mut Vec<ListItem>>,
+    block: Block,
+) {
     match block {
         Block::Paragraph(inlines) => extend_spaced(content, inlines),
         Block::Heading(h) => extend_spaced(content, h.content),
@@ -260,7 +322,10 @@ mod tests {
             }
             other => panic!("expected heading, got {other:?}"),
         }
-        assert_eq!(doc.blocks[1], Block::Paragraph(vec![Inline::Text("Hello world.".to_string())]));
+        assert_eq!(
+            doc.blocks[1],
+            Block::Paragraph(vec![Inline::Text("Hello world.".to_string())])
+        );
     }
 
     #[test]
@@ -275,7 +340,13 @@ mod tests {
                         _ => None,
                     })
                     .collect();
-                assert_eq!(kinds, vec![Sigil::Type("em".to_string()), Sigil::Type("strong".to_string())]);
+                assert_eq!(
+                    kinds,
+                    vec![
+                        Sigil::Type("em".to_string()),
+                        Sigil::Type("strong".to_string())
+                    ]
+                );
             }
             other => panic!("expected paragraph, got {other:?}"),
         }
@@ -330,7 +401,10 @@ mod tests {
                     assert_eq!(el.sigil, Sigil::At(None));
                     assert_eq!(
                         el.input,
-                        Some(Value::Map(vec![("url".to_string(), Value::String("https://example.com".to_string()))]))
+                        Some(Value::Map(vec![(
+                            "url".to_string(),
+                            Value::String("https://example.com".to_string())
+                        )]))
                     );
                     assert_eq!(el.area, Some(vec![Inline::Text("Wiki".to_string())]));
                 }
@@ -361,7 +435,10 @@ mod tests {
                     assert_eq!(el.sigil, Sigil::Type("embed".to_string()));
                     assert_eq!(
                         el.input,
-                        Some(Value::Map(vec![("file".to_string(), Value::String("assets/pic.png".to_string()))]))
+                        Some(Value::Map(vec![(
+                            "file".to_string(),
+                            Value::String("assets/pic.png".to_string())
+                        )]))
                     );
                     assert_eq!(el.area, Some(vec![Inline::Text("a cat".to_string())]));
                 }
@@ -388,9 +465,17 @@ mod tests {
                 assert_eq!(el.sigil, Sigil::Type("pre".to_string()));
                 assert_eq!(
                     el.input,
-                    Some(Value::Map(vec![("lang".to_string(), Value::String("rust".to_string()))]))
+                    Some(Value::Map(vec![(
+                        "lang".to_string(),
+                        Value::String("rust".to_string())
+                    )]))
                 );
-                assert_eq!(el.value, Some(ElementValue::Data(Value::String("fn main() {}".to_string()))));
+                assert_eq!(
+                    el.value,
+                    Some(ElementValue::Data(Value::String(
+                        "fn main() {}".to_string()
+                    )))
+                );
             }
             other => panic!("expected pre element, got {other:?}"),
         }
@@ -421,6 +506,9 @@ mod tests {
     fn html_block_is_dropped() {
         let doc = from_markdown("<div>raw html</div>\n\nreal paragraph\n");
         assert_eq!(doc.blocks.len(), 1);
-        assert_eq!(doc.blocks[0], Block::Paragraph(vec![Inline::Text("real paragraph".to_string())]));
+        assert_eq!(
+            doc.blocks[0],
+            Block::Paragraph(vec![Inline::Text("real paragraph".to_string())])
+        );
     }
 }

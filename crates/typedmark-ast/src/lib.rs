@@ -33,7 +33,10 @@ pub enum Block {
     Paragraph(Vec<Inline>),
     /// `ordered` distinguishes `-.` (auto-numbered) from plain `-` lists;
     /// numbering itself isn't stored, it's computed at render time.
-    List { ordered: bool, items: Vec<ListItem> },
+    List {
+        ordered: bool,
+        items: Vec<ListItem>,
+    },
     Element(Element),
 }
 

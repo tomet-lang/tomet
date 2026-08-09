@@ -2,17 +2,35 @@
 ; shared across tree-sitter-based editors (Zed, Neovim, Helix, ...).
 ; Loaded by `apps/zed-extension` via a symlink at
 ; `apps/zed-extension/languages/typedmark/highlights.scm`.
+;
+; Zed's themes don't key off the `@markup.*` names at all -- Zed has its
+; own fixed capture vocabulary (`@title`, `@emphasis`, `@emphasis.strong`,
+; `@text.literal`, ...; see `zed.dev/docs/extensions/languages`), and an
+; unmatched capture just renders uncolored rather than falling back to
+; anything. Zed resolves multiple captures on one node right-to-left (first
+; capture it has theme styling for, tried from the right), so the Zed name
+; is appended after the standard one below rather than replacing it -- this
+; keeps the query working for both Zed and standard-capture editors.
 
-(heading_marker) @markup.heading.marker
-(heading) @markup.heading
+; The `[`/`]` wrapping a heading's content have no node of their own in
+; the grammar (unlike `input_group`/`area_group`/`value_group`'s
+; delimiters below), so without an explicit capture here they'd just
+; inherit `heading`'s own `@title` below -- same color as the content,
+; not as `heading_marker`. Capturing them to match `heading_marker`
+; instead keeps "structural" (`#`/`[`/`]`) and "content" visually
+; distinct, without touching the content's own color.
+(heading_marker) @markup.heading.marker @punctuation.special
+(heading "[" @punctuation.special)
+(heading "]" @punctuation.special)
+(heading) @markup.heading @title
 
 (thematic_break) @punctuation.special
 
-(emphasis) @markup.italic
-(strong) @markup.bold
+(emphasis) @markup.italic @emphasis
+(strong) @markup.bold @emphasis.strong
 (mark) @markup.strikethrough
 
-(code_span) @markup.raw.inline
+(code_span) @markup.raw.inline @text.literal
 
 (unordered_list_item) @markup.list.unnumbered
 (ordered_list_item) @markup.list.numbered
