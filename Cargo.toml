@@ -9,7 +9,6 @@ members = [
   "apps/typedmark-js",
   "apps/typedmark-lsp",
   #[ Editor Support ]
-  "apps/vscode-extension",
   "apps/zed-extension",
   "apps/typedmark-python",
   "apps/typedmark-helix",

@@ -1,0 +1,67 @@
+{
+  "name": "typedmark-vscode",
+  "displayName": "TypedMark",
+  "description": "Syntax highlighting and language server support for TypedMark (.tm) files.",
+  "version": "0.1.0",
+  "publisher": "tomet-lang",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tomet-lang/tomet.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:typedmark"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "typedmark",
+        "aliases": [
+          "TypedMark",
+          "typedmark"
+        ],
+        "extensions": [
+          ".tm"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "typedmark",
+        "scopeName": "source.typedmark",
+        "path": "./syntaxes/typedmark.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "TypedMark",
+      "properties": {
+        "typedmark.serverPath": {
+          "type": "string",
+          "default": "typedmark-lsp",
+          "description": "Path to the typedmark-lsp binary. Defaults to looking it up on $PATH (e.g. installed via the nix package)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "bun build ./src/extension.ts --outdir=dist --target=node --format=cjs --external vscode --sourcemap=linked",
+    "watch": "bun run compile --watch",
+    "typecheck": "tsc --noEmit",
+    "vscode:prepublish": "bun run compile --production"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.5.0"
+  }
+}

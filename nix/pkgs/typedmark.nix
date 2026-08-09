@@ -24,7 +24,4 @@ rustPlatform.buildRustPackage rec {
     # pkg-config
     # makeWrapper
   ];
-
-  buildInputs = [
-  ];
 }
