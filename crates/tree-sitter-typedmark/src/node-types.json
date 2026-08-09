@@ -1,769 +1,817 @@
 [
-	{
-		"type": "area_group",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": false,
-			"types": [
-				{
-					"type": "code_span",
-					"named": true
-				},
-				{
-					"type": "element",
-					"named": true
-				},
-				{
-					"type": "emphasis",
-					"named": true
-				},
-				{
-					"type": "mark",
-					"named": true
-				},
-				{
-					"type": "punctuation",
-					"named": true
-				},
-				{
-					"type": "strong",
-					"named": true
-				},
-				{
-					"type": "text",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "at_element",
-		"named": true,
-		"fields": {
-			"name": {
-				"multiple": false,
-				"required": false,
-				"types": [
-					{
-						"type": "identifier",
-						"named": true
-					}
-				]
-			}
-		},
-		"children": {
-			"multiple": true,
-			"required": false,
-			"types": [
-				{
-					"type": "area_group",
-					"named": true
-				},
-				{
-					"type": "input_group",
-					"named": true
-				},
-				{
-					"type": "value_group",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "bare_element",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": true,
-			"types": [
-				{
-					"type": "area_group",
-					"named": true
-				},
-				{
-					"type": "input_group",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "braced_map",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": false,
-			"required": false,
-			"types": [
-				{
-					"type": "map",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "children",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": true,
-			"types": [
-				{
-					"type": "bare_element",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "document",
-		"named": true,
-		"root": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": false,
-			"types": [
-				{
-					"type": "heading",
-					"named": true
-				},
-				{
-					"type": "list",
-					"named": true
-				},
-				{
-					"type": "paragraph",
-					"named": true
-				},
-				{
-					"type": "thematic_break",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "element",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": false,
-			"required": true,
-			"types": [
-				{
-					"type": "at_element",
-					"named": true
-				},
-				{
-					"type": "type_element",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "emphasis",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": false,
-			"types": [
-				{
-					"type": "code_span",
-					"named": true
-				},
-				{
-					"type": "element",
-					"named": true
-				},
-				{
-					"type": "mark",
-					"named": true
-				},
-				{
-					"type": "punctuation",
-					"named": true
-				},
-				{
-					"type": "text",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "heading",
-		"named": true,
-		"fields": {
-			"attrs": {
-				"multiple": false,
-				"required": false,
-				"types": [
-					{
-						"type": "value_group",
-						"named": true
-					}
-				]
-			},
-			"content": {
-				"multiple": true,
-				"required": false,
-				"types": [
-					{
-						"type": "code_span",
-						"named": true
-					},
-					{
-						"type": "element",
-						"named": true
-					},
-					{
-						"type": "emphasis",
-						"named": true
-					},
-					{
-						"type": "mark",
-						"named": true
-					},
-					{
-						"type": "punctuation",
-						"named": true
-					},
-					{
-						"type": "strong",
-						"named": true
-					},
-					{
-						"type": "text",
-						"named": true
-					}
-				]
-			},
-			"marker": {
-				"multiple": false,
-				"required": true,
-				"types": [
-					{
-						"type": "heading_marker",
-						"named": true
-					}
-				]
-			}
-		}
-	},
-	{
-		"type": "input_group",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": false,
-			"required": false,
-			"types": [
-				{
-					"type": "value",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "list",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": false,
-			"required": true,
-			"types": [
-				{
-					"type": "ordered_list",
-					"named": true
-				},
-				{
-					"type": "unordered_list",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "map",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": true,
-			"types": [
-				{
-					"type": "map_entry",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "map_entry",
-		"named": true,
-		"fields": {
-			"key": {
-				"multiple": false,
-				"required": true,
-				"types": [
-					{
-						"type": "identifier",
-						"named": true
-					}
-				]
-			},
-			"value": {
-				"multiple": false,
-				"required": true,
-				"types": [
-					{
-						"type": "braced_map",
-						"named": true
-					},
-					{
-						"type": "scalar",
-						"named": true
-					},
-					{
-						"type": "seq",
-						"named": true
-					},
-					{
-						"type": "string",
-						"named": true
-					}
-				]
-			}
-		}
-	},
-	{
-		"type": "mark",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": false,
-			"types": [
-				{
-					"type": "code_span",
-					"named": true
-				},
-				{
-					"type": "element",
-					"named": true
-				},
-				{
-					"type": "emphasis",
-					"named": true
-				},
-				{
-					"type": "punctuation",
-					"named": true
-				},
-				{
-					"type": "strong",
-					"named": true
-				},
-				{
-					"type": "text",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "ordered_list",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": true,
-			"types": [
-				{
-					"type": "ordered_list_item",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "ordered_list_item",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": false,
-			"types": [
-				{
-					"type": "code_span",
-					"named": true
-				},
-				{
-					"type": "element",
-					"named": true
-				},
-				{
-					"type": "emphasis",
-					"named": true
-				},
-				{
-					"type": "mark",
-					"named": true
-				},
-				{
-					"type": "punctuation",
-					"named": true
-				},
-				{
-					"type": "strong",
-					"named": true
-				},
-				{
-					"type": "text",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "paragraph",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": true,
-			"types": [
-				{
-					"type": "code_span",
-					"named": true
-				},
-				{
-					"type": "element",
-					"named": true
-				},
-				{
-					"type": "emphasis",
-					"named": true
-				},
-				{
-					"type": "mark",
-					"named": true
-				},
-				{
-					"type": "punctuation",
-					"named": true
-				},
-				{
-					"type": "strong",
-					"named": true
-				},
-				{
-					"type": "text",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "seq",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": false,
-			"types": [
-				{
-					"type": "braced_map",
-					"named": true
-				},
-				{
-					"type": "scalar",
-					"named": true
-				},
-				{
-					"type": "seq",
-					"named": true
-				},
-				{
-					"type": "string",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "strong",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": false,
-			"types": [
-				{
-					"type": "code_span",
-					"named": true
-				},
-				{
-					"type": "element",
-					"named": true
-				},
-				{
-					"type": "mark",
-					"named": true
-				},
-				{
-					"type": "punctuation",
-					"named": true
-				},
-				{
-					"type": "text",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "type_element",
-		"named": true,
-		"fields": {
-			"name": {
-				"multiple": false,
-				"required": true,
-				"types": [
-					{
-						"type": "identifier",
-						"named": true
-					}
-				]
-			}
-		},
-		"children": {
-			"multiple": true,
-			"required": false,
-			"types": [
-				{
-					"type": "area_group",
-					"named": true
-				},
-				{
-					"type": "input_group",
-					"named": true
-				},
-				{
-					"type": "value_group",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "unordered_list",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": true,
-			"types": [
-				{
-					"type": "unordered_list_item",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "unordered_list_item",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": true,
-			"required": false,
-			"types": [
-				{
-					"type": "code_span",
-					"named": true
-				},
-				{
-					"type": "element",
-					"named": true
-				},
-				{
-					"type": "emphasis",
-					"named": true
-				},
-				{
-					"type": "mark",
-					"named": true
-				},
-				{
-					"type": "punctuation",
-					"named": true
-				},
-				{
-					"type": "strong",
-					"named": true
-				},
-				{
-					"type": "text",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "value",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": false,
-			"required": true,
-			"types": [
-				{
-					"type": "map",
-					"named": true
-				},
-				{
-					"type": "scalar",
-					"named": true
-				},
-				{
-					"type": "seq",
-					"named": true
-				},
-				{
-					"type": "string",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "value_group",
-		"named": true,
-		"fields": {},
-		"children": {
-			"multiple": false,
-			"required": false,
-			"types": [
-				{
-					"type": "children",
-					"named": true
-				},
-				{
-					"type": "value",
-					"named": true
-				}
-			]
-		}
-	},
-	{
-		"type": "(",
-		"named": false
-	},
-	{
-		"type": ")",
-		"named": false
-	},
-	{
-		"type": "*",
-		"named": false
-	},
-	{
-		"type": "**",
-		"named": false
-	},
-	{
-		"type": ",",
-		"named": false
-	},
-	{
-		"type": "-.",
-		"named": false
-	},
-	{
-		"type": ":",
-		"named": false
-	},
-	{
-		"type": "<",
-		"named": false
-	},
-	{
-		"type": "==",
-		"named": false
-	},
-	{
-		"type": ">",
-		"named": false
-	},
-	{
-		"type": "@",
-		"named": false
-	},
-	{
-		"type": "[",
-		"named": false
-	},
-	{
-		"type": "]",
-		"named": false
-	},
-	{
-		"type": "_",
-		"named": false
-	},
-	{
-		"type": "__",
-		"named": false
-	},
-	{
-		"type": "code_span",
-		"named": true
-	},
-	{
-		"type": "heading_marker",
-		"named": true
-	},
-	{
-		"type": "identifier",
-		"named": true
-	},
-	{
-		"type": "punctuation",
-		"named": true
-	},
-	{
-		"type": "scalar",
-		"named": true
-	},
-	{
-		"type": "string",
-		"named": true
-	},
-	{
-		"type": "text",
-		"named": true
-	},
-	{
-		"type": "thematic_break",
-		"named": true
-	},
-	{
-		"type": "{",
-		"named": false
-	},
-	{
-		"type": "}",
-		"named": false
-	}
+  {
+    "type": "area_group",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "block_comment",
+          "named": true
+        },
+        {
+          "type": "code_span",
+          "named": true
+        },
+        {
+          "type": "element",
+          "named": true
+        },
+        {
+          "type": "emphasis",
+          "named": true
+        },
+        {
+          "type": "mark",
+          "named": true
+        },
+        {
+          "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "strong",
+          "named": true
+        },
+        {
+          "type": "text",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "at_element",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "area_group",
+          "named": true
+        },
+        {
+          "type": "input_group",
+          "named": true
+        },
+        {
+          "type": "value_group",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "bare_element",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "area_group",
+          "named": true
+        },
+        {
+          "type": "input_group",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "braced_map",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "map",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "children",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "bare_element",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "document",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "block_comment",
+          "named": true
+        },
+        {
+          "type": "heading",
+          "named": true
+        },
+        {
+          "type": "line_comment",
+          "named": true
+        },
+        {
+          "type": "list",
+          "named": true
+        },
+        {
+          "type": "paragraph",
+          "named": true
+        },
+        {
+          "type": "thematic_break",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "element",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "at_element",
+          "named": true
+        },
+        {
+          "type": "type_element",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "emphasis",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "block_comment",
+          "named": true
+        },
+        {
+          "type": "code_span",
+          "named": true
+        },
+        {
+          "type": "element",
+          "named": true
+        },
+        {
+          "type": "mark",
+          "named": true
+        },
+        {
+          "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "text",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "heading",
+    "named": true,
+    "fields": {
+      "attrs": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "value_group",
+            "named": true
+          }
+        ]
+      },
+      "content": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "block_comment",
+            "named": true
+          },
+          {
+            "type": "code_span",
+            "named": true
+          },
+          {
+            "type": "element",
+            "named": true
+          },
+          {
+            "type": "emphasis",
+            "named": true
+          },
+          {
+            "type": "mark",
+            "named": true
+          },
+          {
+            "type": "punctuation",
+            "named": true
+          },
+          {
+            "type": "strong",
+            "named": true
+          },
+          {
+            "type": "text",
+            "named": true
+          }
+        ]
+      },
+      "marker": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "heading_marker",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "input_group",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "value",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "ordered_list",
+          "named": true
+        },
+        {
+          "type": "unordered_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "map",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "map_entry",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "map_entry",
+    "named": true,
+    "fields": {
+      "key": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "braced_map",
+            "named": true
+          },
+          {
+            "type": "scalar",
+            "named": true
+          },
+          {
+            "type": "seq",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "mark",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "block_comment",
+          "named": true
+        },
+        {
+          "type": "code_span",
+          "named": true
+        },
+        {
+          "type": "element",
+          "named": true
+        },
+        {
+          "type": "emphasis",
+          "named": true
+        },
+        {
+          "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "strong",
+          "named": true
+        },
+        {
+          "type": "text",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "ordered_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "ordered_list_item",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "ordered_list_item",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "block_comment",
+          "named": true
+        },
+        {
+          "type": "code_span",
+          "named": true
+        },
+        {
+          "type": "element",
+          "named": true
+        },
+        {
+          "type": "emphasis",
+          "named": true
+        },
+        {
+          "type": "mark",
+          "named": true
+        },
+        {
+          "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "strong",
+          "named": true
+        },
+        {
+          "type": "text",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "paragraph",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "block_comment",
+          "named": true
+        },
+        {
+          "type": "code_span",
+          "named": true
+        },
+        {
+          "type": "element",
+          "named": true
+        },
+        {
+          "type": "emphasis",
+          "named": true
+        },
+        {
+          "type": "mark",
+          "named": true
+        },
+        {
+          "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "strong",
+          "named": true
+        },
+        {
+          "type": "text",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "seq",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "braced_map",
+          "named": true
+        },
+        {
+          "type": "scalar",
+          "named": true
+        },
+        {
+          "type": "seq",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "strong",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "block_comment",
+          "named": true
+        },
+        {
+          "type": "code_span",
+          "named": true
+        },
+        {
+          "type": "element",
+          "named": true
+        },
+        {
+          "type": "mark",
+          "named": true
+        },
+        {
+          "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "text",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "type_element",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "area_group",
+          "named": true
+        },
+        {
+          "type": "input_group",
+          "named": true
+        },
+        {
+          "type": "value_group",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "unordered_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "unordered_list_item",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "unordered_list_item",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "block_comment",
+          "named": true
+        },
+        {
+          "type": "code_span",
+          "named": true
+        },
+        {
+          "type": "element",
+          "named": true
+        },
+        {
+          "type": "emphasis",
+          "named": true
+        },
+        {
+          "type": "mark",
+          "named": true
+        },
+        {
+          "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "strong",
+          "named": true
+        },
+        {
+          "type": "text",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "value",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "map",
+          "named": true
+        },
+        {
+          "type": "scalar",
+          "named": true
+        },
+        {
+          "type": "seq",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "value_group",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "children",
+          "named": true
+        },
+        {
+          "type": "value",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "(",
+    "named": false
+  },
+  {
+    "type": ")",
+    "named": false
+  },
+  {
+    "type": "*",
+    "named": false
+  },
+  {
+    "type": "**",
+    "named": false
+  },
+  {
+    "type": ",",
+    "named": false
+  },
+  {
+    "type": "-.",
+    "named": false
+  },
+  {
+    "type": ":",
+    "named": false
+  },
+  {
+    "type": "<",
+    "named": false
+  },
+  {
+    "type": "==",
+    "named": false
+  },
+  {
+    "type": ">",
+    "named": false
+  },
+  {
+    "type": "@",
+    "named": false
+  },
+  {
+    "type": "[",
+    "named": false
+  },
+  {
+    "type": "]",
+    "named": false
+  },
+  {
+    "type": "_",
+    "named": false
+  },
+  {
+    "type": "__",
+    "named": false
+  },
+  {
+    "type": "block_comment",
+    "named": true
+  },
+  {
+    "type": "code_span",
+    "named": true
+  },
+  {
+    "type": "heading_marker",
+    "named": true
+  },
+  {
+    "type": "identifier",
+    "named": true
+  },
+  {
+    "type": "line_comment",
+    "named": true
+  },
+  {
+    "type": "punctuation",
+    "named": true
+  },
+  {
+    "type": "scalar",
+    "named": true
+  },
+  {
+    "type": "string",
+    "named": true
+  },
+  {
+    "type": "text",
+    "named": true
+  },
+  {
+    "type": "thematic_break",
+    "named": true
+  },
+  {
+    "type": "{",
+    "named": false
+  },
+  {
+    "type": "}",
+    "named": false
+  }
 ]

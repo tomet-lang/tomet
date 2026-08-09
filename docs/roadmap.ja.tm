@@ -12,16 +12,10 @@
   - tmd
     - TypedMarkDoc
 - 拡張性
-- コメント
 -. ドキュメント
 - 曖昧なのでは？()と{}
 - meta(json, toml, yaml)
 - 置換
-
-##[ typedmark command ]
-
-- formatter
-- markdownからの移行
 
 ###[ html server ]
 
