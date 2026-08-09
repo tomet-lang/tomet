@@ -32,7 +32,25 @@ module.exports = grammar({
 		// `document.rs::parse_paragraph`), but that's a post-parse
 		// reclassification, not a distinct grammar production -- so here a
 		// standalone `<caution>[...]` line is just a one-child `paragraph`.
-		_block: ($) => choice($.heading, $.thematic_break, $.list, $.paragraph),
+		// A `block_comment` reachable from both here and `_line_item` (so it
+		// also works inline) makes a comment-only line genuinely ambiguous:
+		// it could reduce as this rule's own `block_comment` alternative, or
+		// as a one-item `paragraph` wrapping a `block_comment` `_line_item`
+		// (the same "no separate block element rule" situation as `<T>[...]`
+		// below, but this one needs an explicit tie-break since the two
+		// interpretations don't even produce the same tree shape). The
+		// `prec(1, ...)` prefers the bare top-level reading, matching
+		// `document.rs`: comments are fully discarded, never paragraph
+		// content.
+		_block: ($) =>
+			choice(
+				$.heading,
+				$.thematic_break,
+				$.list,
+				$.paragraph,
+				$.line_comment,
+				prec(1, $.block_comment),
+			),
 
 		_newline: (_$) => /\r?\n/,
 		_blank_gap: ($) => repeat1($._newline),
@@ -51,6 +69,16 @@ module.exports = grammar({
 
 		// ---- thematic break -----------------------------------------------
 		thematic_break: (_$) => /-{3,}[ \t]*/,
+
+		// ---- comments -------------------------------------------------------
+		// Mirrors `document.rs::skip_line_comment`/`skip_block_comment`. `//`
+		// is block-level only: inline it would risk tree-sitter's
+		// longest-match lexer swallowing a bare URL's `//` (or the rest of a
+		// paragraph after it) as one giant comment token, so it's reachable
+		// only from `_block`, never from `_line_item`. `/* ... */` has an
+		// explicit closer, so it's safe in both positions.
+		line_comment: (_$) => /\/\/[^\n]*/,
+		block_comment: (_$) => /\/\*(?:[^*]|\*+[^*/])*\*+\//,
 
 		// ---- lists ----------------------------------------------------------
 		list: ($) => choice($.ordered_list, $.unordered_list),
@@ -75,6 +103,7 @@ module.exports = grammar({
 			choice(
 				$.text,
 				$.code_span,
+				$.block_comment,
 				$.emphasis,
 				$.strong,
 				$.mark,
@@ -100,8 +129,12 @@ module.exports = grammar({
 		// as a whole beats the 2-character marker token), so without this,
 		// list items and thematic breaks with plain-text content are never
 		// recognized as such at all -- they just silently become paragraphs.
-		text: (_$) => /[^\n`*_=<@()[{\]-]+/,
-		punctuation: (_$) => /[()[{-]/,
+		// `/` is excluded for the same reason again: `block_comment`'s
+		// `/* ... */` needs to win over a `text` run that would otherwise
+		// swallow it whole, so a bare `/` (not opening a comment) falls
+		// back to `punctuation` like the others.
+		text: (_$) => /[^\n`*_=<@()\[{\]/-]+/,
+		punctuation: (_$) => /[()\[{/-]/,
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -125,30 +158,33 @@ module.exports = grammar({
 		_bracket_item_no_star: ($) =>
 			choice(
 				$.code_span,
+				$.block_comment,
 				$.mark,
 				$.element,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*=<@()[{\]]+/, $.text),
+				alias(/[^\n`*=<@()\[{\]/]+/, $.text),
 			),
 		_bracket_item_no_underscore: ($) =>
 			choice(
 				$.code_span,
+				$.block_comment,
 				$.mark,
 				$.element,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`_=<@()[{\]]+/, $.text),
+				alias(/[^\n`_=<@()\[{\]/]+/, $.text),
 			),
 		_bracket_item_no_equals: ($) =>
 			choice(
 				$.code_span,
+				$.block_comment,
 				$.emphasis,
 				$.strong,
 				$.element,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*_=<@()[{\]]+/, $.text),
+				alias(/[^\n`*_=<@()\[{\]/]+/, $.text),
 			),
 
 		// ---- `<T>`/`@name` elements ---------------------------------------
@@ -284,12 +320,22 @@ module.exports = grammar({
 				"]",
 			),
 		string: (_$) => /"([^"\\]|\\.)*"/,
+		// The literal `[` in `_value_scalar`/`scalar`'s classes below (and
+		// in `text`/`punctuation`/the `_bracket_item_no_*` aliases above)
+		// has to stay escaped as `\[` even though it's unambiguous either
+		// way in real regex semantics -- `npx tree-sitter-cli@0.26.12
+		// generate`'s own regex parser mis-reads an *unescaped* `[` inside
+		// a character class as attempting to open a nested class, and
+		// fails the whole rule with "unclosed character class". Unrelated
+		// to the comment rules added alongside this; caught because
+		// regenerating for `line_comment`/`block_comment` below required
+		// running that command against the pre-existing rules too.
 		// Colon-inclusive raw scalar text (numbers, bools, urls, paths, ...)
 		// -- used for actual *value* positions (`_entry_value`, sequence
 		// items), where colons are common and never mean "this starts a
 		// nested key". Aliased to the same visible `scalar` node type as
 		// the top-level one below.
-		_value_scalar: ($) => alias(/[^,()[\]{}\n\r]+/, $.scalar),
+		_value_scalar: ($) => alias(/[^,()\[\]{}\n\r]+/, $.scalar),
 		// `value`'s own top-level bare-scalar fallback (no `key:` found) --
 		// deliberately colon-*excluded* so it ties in length with
 		// `map_entry`'s key token above instead of always outmatching it
@@ -298,6 +344,6 @@ module.exports = grammar({
 		// `key:` prefix at all) won't parse as one token. Not observed in
 		// any real `.tm` content so far -- every real example gives URLs an
 		// explicit key (`url:https://...`).
-		scalar: (_$) => /[^,():[\]{}\n\r]+/,
+		scalar: (_$) => /[^,():\[\]{}\n\r]+/,
 	},
 });

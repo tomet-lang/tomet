@@ -59,6 +59,12 @@
 //!   otherwise treats it as plain text. Considered an acceptable v1
 //!   trade-off: it doesn't error, and highlighting `<T>`-shaped text as
 //!   an element is a reasonable default regardless.
+//! - **Unterminated `/* ... */` doesn't produce an `ERROR`.** The real
+//!   parser (`document.rs::skip_block_comment`) hard-errors on a missing
+//!   `*/` -- silently swallowing the rest of the document is a much
+//!   worse failure mode for a comment than for e.g. a code span. Here an
+//!   unmatched `/*` just fails to lex as `block_comment` and falls back
+//!   to ordinary `text`/`punctuation` tokens instead.
 //!
 //! Verified against real content: `cargo test` in this crate parses
 //! `docs/tmt/typedmark.tm` and `docs/tmt/image_meta.tm` and checks that
@@ -186,6 +192,39 @@ mod tests {
         // not a silently wrong-but-clean parse.
         let tree = parse("@meta(yaml)\n");
         assert!(tree.root_node().has_error());
+    }
+
+    #[test]
+    fn parses_line_and_block_comments() {
+        for src in [
+            "// a line comment\n",
+            "before\n\n// a comment\n\nafter\n",
+            "/* a block\ncomment */\n",
+            "keep /* inline */ also keep\n",
+            "see https://example.com for more\n",
+        ] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn line_comment_is_its_own_top_level_node_not_paragraph_content() {
+        let tree = parse("// just a note\n");
+        let root = tree.root_node();
+        assert_eq!(root.child_count(), 1);
+        assert_eq!(root.child(0).unwrap().kind(), "line_comment");
+    }
+
+    #[test]
+    fn block_comment_is_its_own_top_level_node_not_paragraph_content() {
+        let tree = parse("/* just a note */\n");
+        let root = tree.root_node();
+        assert_eq!(root.child_count(), 1);
+        assert_eq!(root.child(0).unwrap().kind(), "block_comment");
     }
 
     #[test]

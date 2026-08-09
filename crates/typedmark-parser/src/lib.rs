@@ -253,4 +253,110 @@ mod tests {
             other => panic!("expected paragraph, got {other:?}"),
         }
     }
+
+    #[test]
+    fn line_comment_alone_produces_no_blocks() {
+        let doc = parse_document("// just a note\n").unwrap();
+        assert_eq!(doc.blocks, vec![]);
+    }
+
+    #[test]
+    fn line_comment_without_trailing_newline_is_not_an_error() {
+        let doc = parse_document("// trailing note, no newline").unwrap();
+        assert_eq!(doc.blocks, vec![]);
+    }
+
+    #[test]
+    fn line_comment_is_discarded_between_blocks() {
+        // A comment line splits adjacent block-level constructs exactly
+        // like a blank line already does (e.g. two `-` runs separated by a
+        // blank line are two `Block::List`s, not one) -- it doesn't merge
+        // into either neighbor, it just produces no block of its own.
+        let doc = parse_document("#[ one ]\n// skip this\n#[ two ]\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        match (&doc.blocks[0], &doc.blocks[1]) {
+            (Block::Heading(a), Block::Heading(b)) => {
+                assert_eq!(a.content, vec![Inline::Text("one".into())]);
+                assert_eq!(b.content, vec![Inline::Text("two".into())]);
+            }
+            other => panic!("expected two headings, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn block_comment_spans_multiple_lines_and_blank_lines() {
+        let doc = parse_document(
+            "before\n\n/* this whole\nchunk, including\n\na blank line and #[ not a heading ]\nis discarded */\n\nafter\n",
+        )
+        .unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        match (&doc.blocks[0], &doc.blocks[1]) {
+            (Block::Paragraph(a), Block::Paragraph(b)) => {
+                assert_eq!(a, &vec![Inline::Text("before".into())]);
+                assert_eq!(b, &vec![Inline::Text("after".into())]);
+            }
+            other => panic!("expected two paragraphs, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unterminated_block_comment_at_block_level_is_an_error() {
+        assert!(parse_document("/* never closed\n").is_err());
+    }
+
+    #[test]
+    fn inline_block_comment_is_removed_from_paragraph_text() {
+        let doc = parse_document("keep /* drop this */ also keep\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(inlines) => {
+                // The comment's source is excluded entirely, but the text
+                // flushed before it and after it stay as separate `Inline`
+                // chunks (flushing doesn't merge adjacent text runs).
+                assert_eq!(
+                    inlines,
+                    &vec![
+                        Inline::Text("keep ".into()),
+                        Inline::Text(" also keep".into())
+                    ]
+                );
+            }
+            other => panic!("expected paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn inline_block_comment_works_inside_area() {
+        let doc = parse_document("<caution>[ keep /* drop */ this ]\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(
+                    el.area,
+                    Some(vec![
+                        Inline::Text("keep ".into()),
+                        Inline::Text(" this".into())
+                    ])
+                );
+            }
+            other => panic!("expected element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unterminated_inline_block_comment_is_an_error() {
+        assert!(parse_document("keep /* never closes\n").is_err());
+    }
+
+    #[test]
+    fn double_slash_inside_a_url_is_not_treated_as_a_comment() {
+        let doc = parse_document("see https://example.com for more\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(inlines) => {
+                assert_eq!(
+                    inlines,
+                    &vec![Inline::Text("see https://example.com for more".into())]
+                );
+            }
+            other => panic!("expected paragraph, got {other:?}"),
+        }
+    }
 }

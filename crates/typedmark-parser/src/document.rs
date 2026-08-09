@@ -23,6 +23,10 @@ pub fn parse_document(src: &str) -> Result<Document> {
         }
         if cur.peek() == Some('#') {
             blocks.push(Block::Heading(parse_heading(&mut cur)?));
+        } else if cur.starts_with("//") {
+            skip_line_comment(&mut cur);
+        } else if cur.starts_with("/*") {
+            skip_block_comment(&mut cur)?;
         } else if is_thematic_break(&cur) {
             consume_thematic_break(&mut cur);
             blocks.push(Block::Element(Element::new(Sigil::Type("hr".to_string()))));
@@ -41,6 +45,34 @@ pub fn parse_document(src: &str) -> Result<Document> {
         }
     }
     Ok(Document { blocks })
+}
+
+/// `// ...` to end of line/EOF. Discarded entirely -- comments never enter
+/// the AST, same as blank lines. Unterminated (i.e. running to EOF with no
+/// trailing newline) isn't an error: "the rest of the file" is a visible,
+/// bounded consequence of a to-end-of-line comment, not a silent swallow.
+fn skip_line_comment(cur: &mut Cursor) {
+    cur.eat_str("//");
+    cur.eat_while(|c| c != '\n' && c != '\r');
+}
+
+/// `/* ... */`, block position: raw/unparsed content up to the first `*/`,
+/// possibly spanning multiple lines, blank lines, or paragraphs. No
+/// nesting (matches C). Also used from `parse_inline_seq` for the inline
+/// form. Unlike `skip_line_comment`, an unterminated comment here silently
+/// swallows everything after it with no visible trace, so it's a parse
+/// error instead of running quietly to EOF.
+fn skip_block_comment(cur: &mut Cursor) -> Result<()> {
+    let start = cur.pos();
+    cur.eat_str("/*");
+    loop {
+        if cur.eat_str("*/") {
+            return Ok(());
+        }
+        if cur.bump().is_none() {
+            return Err(err(cur, start, "unterminated block comment, expected '*/'"));
+        }
+    }
 }
 
 fn skip_blank_lines(cur: &mut Cursor) {
@@ -251,6 +283,16 @@ fn parse_inline_seq(cur: &mut Cursor, stop: Stop) -> Result<Vec<Inline>> {
                     break;
                 }
             }
+            continue;
+        }
+        if cur.starts_with("/*") {
+            // Inline comment: has an explicit closer (unlike `//`), so
+            // unlike that block-only form it's safe to recognize anywhere
+            // -- it can't be mistaken for a bare URL's `//` and can't run
+            // past a `]`/`)`/`}` it doesn't own without erroring first.
+            flush_text(&mut items, cur, &mut text_start);
+            skip_block_comment(cur)?;
+            text_start = cur.pos();
             continue;
         }
         if cur.peek() == Some('<') && is_type_element_start(cur) {

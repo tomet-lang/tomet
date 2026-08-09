@@ -26,6 +26,11 @@
 
 (thematic_break) @punctuation.special
 
+; `@comment` is shared vocabulary between the standard capture set and
+; Zed's own (unlike `@markup.*` above), so one capture covers both.
+(line_comment) @comment
+(block_comment) @comment
+
 (emphasis) @markup.italic @emphasis
 (strong) @markup.bold @emphasis.strong
 (mark) @markup.strikethrough

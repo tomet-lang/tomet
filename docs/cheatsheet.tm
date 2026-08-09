@@ -1,8 +1,31 @@
-@meta(json){}
-@meta(toml){}
-@meta(yaml){}
-
 @import(file:/)
+
+@meta(json){
+  key = {
+    value = 1,
+    value2 = 2
+  },
+  key2 = 2
+}
+@meta(yaml){
+  key:value
+}
+@meta(toml){
+  [ toml ]
+  version.workspace = true
+  [[ toml ]]
+  typedmark = "1"
+}
+
+@links()[
+  @(parent)[]
+  @(child)[]
+]
+
+@foot()[
+  :(id:asdf)[]
+  :(id:zxcv)[]
+]
 
 @link[](url:https://)
 @link[](file:/)
@@ -32,3 +55,6 @@ _aaaa_
 ---------
 ---[]---
 ---()---
+
+// line comment
+/* block comment */
