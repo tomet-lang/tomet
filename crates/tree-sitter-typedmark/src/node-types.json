@@ -157,6 +157,10 @@
         {
           "type": "thematic_break",
           "named": true
+        },
+        {
+          "type": "titled_thematic_break",
+          "named": true
         }
       ]
     }
@@ -507,6 +511,11 @@
     }
   },
   {
+    "type": "scalar",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "seq",
     "named": true,
     "fields": {},
@@ -566,6 +575,75 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "thematic_break",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "titled_thematic_break",
+    "named": true,
+    "fields": {
+      "close": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "thematic_break_marker",
+            "named": true
+          }
+        ]
+      },
+      "content": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "block_comment",
+            "named": true
+          },
+          {
+            "type": "code_span",
+            "named": true
+          },
+          {
+            "type": "element",
+            "named": true
+          },
+          {
+            "type": "emphasis",
+            "named": true
+          },
+          {
+            "type": "mark",
+            "named": true
+          },
+          {
+            "type": "punctuation",
+            "named": true
+          },
+          {
+            "type": "strong",
+            "named": true
+          },
+          {
+            "type": "text",
+            "named": true
+          }
+        ]
+      },
+      "open": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "thematic_break_marker",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -791,10 +869,6 @@
     "named": true
   },
   {
-    "type": "scalar",
-    "named": true
-  },
-  {
     "type": "string",
     "named": true
   },
@@ -803,7 +877,7 @@
     "named": true
   },
   {
-    "type": "thematic_break",
+    "type": "thematic_break_marker",
     "named": true
   },
   {

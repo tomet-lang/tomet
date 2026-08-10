@@ -5,6 +5,7 @@
 //! syntax this follows.
 
 use crate::error::Result;
+use crate::meta_format::{MetaFormat, parse_meta_format_value};
 use crate::value::{
     eat_ident, err, is_ident_char, parse_value_at, skip_inline_ws, skip_ws_and_newlines,
 };
@@ -27,6 +28,8 @@ pub fn parse_document(src: &str) -> Result<Document> {
             skip_line_comment(&mut cur);
         } else if cur.starts_with("/*") {
             skip_block_comment(&mut cur)?;
+        } else if is_titled_thematic_break_start(&cur) {
+            blocks.push(Block::Element(parse_titled_thematic_break(&mut cur)?));
         } else if is_thematic_break(&cur) {
             consume_thematic_break(&mut cur);
             blocks.push(Block::Element(Element::new(Sigil::Type("hr".to_string()))));
@@ -128,6 +131,68 @@ fn consume_thematic_break(cur: &mut Cursor) {
     if matches!(cur.peek(), Some('\n') | Some('\r')) {
         cur.bump();
     }
+}
+
+/// A line starting with a dash run of 3+ followed (after only inline
+/// whitespace) by `[` -- the titled sibling of the plain thematic break
+/// (`---[ Title ]---`). Checked as a cheap prefix predicate, same as `#[`
+/// committing to `parse_heading`: once this is true,
+/// `parse_titled_thematic_break` hard-errors on anything malformed rather
+/// than falling back to plain text, since the `---[` prefix is
+/// unambiguous enough to commit to. A dash run *not* followed by `[`
+/// (e.g. `---<embed>---`) doesn't commit here, and doesn't match the
+/// plain `is_thematic_break` either (trailing content isn't just
+/// whitespace), so it falls through to ordinary paragraph text unchanged.
+fn is_titled_thematic_break_start(cur: &Cursor) -> bool {
+    let mut look = *cur;
+    if look.eat_while(|c| c == '-').len() < 3 {
+        return false;
+    }
+    skip_inline_ws(&mut look);
+    look.peek() == Some('[')
+}
+
+/// `---[ Title ]---` -- a thematic break with an inline title. Both dash
+/// runs independently need only 3+ (matching the plain break's already-
+/// flexible count; the two runs don't have to be equal length). The title
+/// reuses the same bracket-content grammar as a heading's `[...]`
+/// (`parse_inline_seq(cur, Stop::Bracket(']'))`), so it can in principle
+/// span multiple lines the same way a heading's can. Produces a plain
+/// `hr`-sigil element with the title as its `area` -- `[area]` already
+/// means exactly this on every other element, so no new `Value`/`Element`
+/// shape is needed.
+fn parse_titled_thematic_break(cur: &mut Cursor) -> Result<Element> {
+    cur.eat_while(|c| c == '-');
+    skip_inline_ws(cur);
+    if !cur.eat_str("[") {
+        return Err(err(cur, cur.pos(), "expected '['"));
+    }
+    let title = parse_inline_seq(cur, Stop::Bracket(']'))?;
+    if !cur.eat_str("]") {
+        return Err(err(cur, cur.pos(), "expected ']'"));
+    }
+    skip_inline_ws(cur);
+    if cur.eat_while(|c| c == '-').len() < 3 {
+        return Err(err(
+            cur,
+            cur.pos(),
+            "expected 3 or more '-' to close the titled thematic break",
+        ));
+    }
+    skip_inline_ws(cur);
+    if !matches!(cur.peek(), None | Some('\n') | Some('\r')) {
+        return Err(err(
+            cur,
+            cur.pos(),
+            "unexpected trailing content after titled thematic break",
+        ));
+    }
+    if matches!(cur.peek(), Some('\n') | Some('\r')) {
+        cur.bump();
+    }
+    let mut el = Element::new(Sigil::Type("hr".to_string()));
+    el.area = Some(title);
+    Ok(el)
 }
 
 fn parse_heading(cur: &mut Cursor) -> Result<Heading> {
@@ -569,7 +634,10 @@ fn parse_element(cur: &mut Cursor) -> Result<Element> {
                     continue;
                 }
                 Some('{') if el.value.is_none() => {
-                    el.value = Some(parse_value_group(cur)?);
+                    el.value = Some(match meta_format_for(&el) {
+                        Some(format) => ElementValue::Data(parse_meta_format_value(cur, format)?),
+                        None => parse_value_group(cur)?,
+                    });
                     continue;
                 }
                 _ => {}
@@ -602,6 +670,25 @@ fn parse_area(cur: &mut Cursor) -> Result<Vec<Inline>> {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }
     Ok(content)
+}
+
+/// `@meta(json|yaml|toml){...}`'s `{...}` body is real JSON/YAML/TOML
+/// source, not TypedMark's own `Value` grammar -- but only when both the
+/// sigil is exactly `@meta` and the `(input)` tag names one of those three
+/// formats. `@meta{...}` (no `(...)` group at all) and any other element
+/// (including `@meta(someOtherTag){...}`) keep using the lightweight
+/// grammar via `parse_value_group`.
+fn meta_format_for(el: &Element) -> Option<MetaFormat> {
+    let Sigil::At(Some(name)) = &el.sigil else {
+        return None;
+    };
+    if name != "meta" {
+        return None;
+    }
+    match &el.input {
+        Some(Value::String(tag)) => MetaFormat::from_tag(tag),
+        _ => None,
+    }
 }
 
 fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {

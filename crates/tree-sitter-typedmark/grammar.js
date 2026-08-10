@@ -13,6 +13,13 @@ module.exports = grammar({
 
 	word: ($) => $.identifier,
 
+	// `scalar` (see its own comment below) is entirely produced by
+	// `scanner.c` rather than an internal regex -- see that file's module
+	// doc for why a plain regex (with or without an extra external
+	// alternative next to it) can't resolve `@meta(yaml)`'s `yaml`/
+	// `{required}`'s `required` against `map_entry`'s key token.
+	externals: ($) => [$._scalar_token],
+
 	// `heading`'s optional `{attrs}` can follow `]` either on the same
 	// line or after exactly one newline (see the real fixture examples in
 	// `docs/tmt/typedmark.tm`) -- with only one token of lookahead, a lone
@@ -45,6 +52,7 @@ module.exports = grammar({
 		_block: ($) =>
 			choice(
 				$.heading,
+				$.titled_thematic_break,
 				$.thematic_break,
 				$.list,
 				$.paragraph,
@@ -68,7 +76,35 @@ module.exports = grammar({
 		heading_marker: (_$) => /#+/,
 
 		// ---- thematic break -----------------------------------------------
-		thematic_break: (_$) => /-{3,}[ \t]*/,
+		// `_dash_run` is shared with `titled_thematic_break` below so the
+		// lexer only ever has one candidate token for a run of 3+ `-` at a
+		// block boundary -- each rule's own next-token lookahead (`[` vs.
+		// anything else) then decides which one it belongs to, rather than
+		// fighting a same-length regex tie between two separate tokens.
+		// Trailing inline whitespace isn't baked into the token itself
+		// (unlike an earlier revision of this rule) since `extras` already
+		// skips it between any two tokens.
+		_dash_run: (_$) => /-{3,}/,
+		thematic_break: ($) => $._dash_run,
+
+		// `---[ Title ]---` -- a thematic break with an inline title,
+		// mirroring `heading`'s `marker [content] newline` shape but with a
+		// dash run playing the marker's role on *both* sides (the two runs
+		// don't have to match in length, same as `typedmark-parser`'s real
+		// grammar -- see `document.rs::parse_titled_thematic_break`).
+		// Unlike the bare `thematic_break` above, this rule consumes its
+		// own trailing newline, same as `heading` does, since it's a
+		// full-line construct with content of its own rather than a bare
+		// marker.
+		titled_thematic_break: ($) =>
+			seq(
+				field("open", alias($._dash_run, $.thematic_break_marker)),
+				"[",
+				field("content", repeat($._bracket_item)),
+				"]",
+				field("close", alias($._dash_run, $.thematic_break_marker)),
+				$._newline,
+			),
 
 		// ---- comments -------------------------------------------------------
 		// Mirrors `document.rs::skip_line_comment`/`skip_block_comment`. `//`
@@ -337,13 +373,27 @@ module.exports = grammar({
 		// the top-level one below.
 		_value_scalar: ($) => alias(/[^,()\[\]{}\n\r]+/, $.scalar),
 		// `value`'s own top-level bare-scalar fallback (no `key:` found) --
-		// deliberately colon-*excluded* so it ties in length with
-		// `map_entry`'s key token above instead of always outmatching it
-		// (see that comment); the trade-off is that a bare, keyless scalar
-		// at this position that itself contains a colon (e.g. a URL with no
-		// `key:` prefix at all) won't parse as one token. Not observed in
-		// any real `.tm` content so far -- every real example gives URLs an
-		// explicit key (`url:https://...`).
-		scalar: (_$) => /[^,():\[\]{}\n\r]+/,
+		// deliberately colon-*excluded* (matching the old regex this
+		// replaced), so a bare, keyless scalar at this position that itself
+		// contains a colon (e.g. a URL with no `key:` prefix at all) won't
+		// parse as one token. Not observed in any real `.tm` content so far
+		// -- every real example gives URLs an explicit key
+		// (`url:https://...`).
+		//
+		// Produced entirely by `scanner.c` (see its module doc): the old
+		// plain-regex version of this rule had an exact length-tie against
+		// `map_entry`'s key token whenever the whole bare scalar happened
+		// to be identifier-shaped end to end (e.g. `@meta(yaml)`'s `yaml`,
+		// `{required}`'s `required`), which `token(prec(1, ...))` on that
+		// key token would always win regardless of whether a `:` actually
+		// followed -- one token of lookahead precedence alone can't
+		// provide. The external scanner replicates the regex's own
+		// greedy-match behavior for every other case (multi-word bare
+		// scalars like `{hello world}`, non-identifier-shaped ones like
+		// `{42}`), so this is a drop-in replacement, not just an
+		// alternative alongside the regex -- see the scanner's module doc
+		// for why keeping the regex as a second alternative here instead
+		// doesn't work.
+		scalar: ($) => $._scalar_token,
 	},
 });

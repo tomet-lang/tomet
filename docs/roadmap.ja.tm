@@ -13,13 +13,7 @@
     - TypedMarkDoc
 - 拡張性
 -. ドキュメント
-- 曖昧なのでは？()と{}
-- meta(json, toml, yaml)
 - 置換
-
-###[ html server ]
-
-- `###`を数字に。
 
 ##[ Cettila ]
 

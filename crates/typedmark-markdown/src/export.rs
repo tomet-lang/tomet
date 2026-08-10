@@ -25,8 +25,15 @@ fn render_block(block: &Block, out: &mut String) {
     match block {
         Block::Heading(h) => render_heading(h, out),
         Block::Paragraph(inlines) => {
-            out.push_str(&inline_to_md(inlines));
-            out.push_str("\n\n");
+            // Same reasoning as `typedmark-renderer`'s `render_block`: an
+            // all-invisible-element paragraph (e.g. adjacent `@meta(...)`
+            // lines with no blank line between them) must not leave a
+            // stray blank paragraph behind.
+            let text = inline_to_md(inlines);
+            if !text.trim().is_empty() {
+                out.push_str(&text);
+                out.push_str("\n\n");
+            }
         }
         Block::List { ordered, items } => render_list(items, *ordered, out),
         Block::Element(el) => {
@@ -71,30 +78,22 @@ fn inline_to_md(inlines: &[Inline]) -> String {
     out
 }
 
-const INFERRED_AT_KEYS: [&str; 4] = ["url", "file", "ref", "meta"];
-
 fn element_kind(el: &Element) -> String {
     match &el.sigil {
         Sigil::Type(name) => name.clone(),
         Sigil::At(Some(name)) => name.clone(),
-        Sigil::At(None) => infer_at_kind(el.input.as_ref()).unwrap_or_else(|| "at".to_string()),
+        Sigil::At(None) => typedmark_ast::infer_at_kind(el.input.as_ref())
+            .unwrap_or("at")
+            .to_string(),
         Sigil::Bare => "bare".to_string(),
     }
-}
-
-fn infer_at_kind(input: Option<&Value>) -> Option<String> {
-    let map = as_map(input?)?;
-    INFERRED_AT_KEYS
-        .iter()
-        .find(|k| map_get(map, k).is_some())
-        .map(|k| k.to_string())
 }
 
 fn element_to_md(el: &Element, inline: bool) -> String {
     let kind = element_kind(el);
     match kind.as_str() {
         "meta" => String::new(),
-        "hr" => "---".to_string(),
+        "hr" => render_hr(el),
         "em" => format!("*{}*", area_to_md(el)),
         "strong" => format!("**{}**", area_to_md(el)),
         "mark" => format!("<mark>{}</mark>", area_to_md(el)),
@@ -113,6 +112,16 @@ fn area_to_md(el: &Element) -> String {
         .as_ref()
         .map(|a| inline_to_md(a))
         .unwrap_or_default()
+}
+
+/// A bare `---` break exports as-is; a titled one (`---[ Title ]---`) has
+/// no CommonMark equivalent, so it's lossy: a bold line followed by a
+/// plain rule.
+fn render_hr(el: &Element) -> String {
+    match &el.area {
+        Some(title) if !title.is_empty() => format!("**{}**\n\n---", inline_to_md(title)),
+        _ => "---".to_string(),
+    }
 }
 
 fn render_code_block(el: &Element) -> String {
@@ -313,6 +322,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn adjacent_meta_blocks_have_no_visible_output() {
+        // Regression test: three `@meta(...)` blocks stacked with no blank
+        // line between them (as `typedmark-parser`'s lazy paragraph
+        // continuation produces for `docs/cheatsheet.tm`-style input) merge
+        // into one `Block::Paragraph` of meta elements plus inter-element
+        // whitespace text -- that paragraph must not leave a stray blank
+        // line behind in the exported Markdown.
+        fn meta_element(tag: &str) -> Element {
+            Element {
+                sigil: Sigil::At(Some("meta".to_string())),
+                input: Some(Value::String(tag.to_string())),
+                area: None,
+                value: Some(ElementValue::Data(Value::Map(vec![(
+                    "key".to_string(),
+                    Value::String("value".to_string()),
+                )]))),
+            }
+        }
+        let doc = Document {
+            blocks: vec![
+                Block::Paragraph(vec![
+                    Inline::Element(meta_element("json")),
+                    Inline::Text(" ".to_string()),
+                    Inline::Element(meta_element("yaml")),
+                    Inline::Text(" ".to_string()),
+                    Inline::Element(meta_element("toml")),
+                ]),
+                Block::Heading(Heading {
+                    level: 1,
+                    content: vec![Inline::Text("next".to_string())],
+                    attrs: None,
+                }),
+            ],
+        };
+        assert_eq!(to_markdown(&doc), "# next\n\n");
+    }
+
+    #[test]
     fn heading_and_paragraph() {
         let doc = Document {
             blocks: vec![
@@ -426,5 +473,36 @@ mod tests {
             blocks: vec![Block::Element(Element::new(Sigil::Type("hr".to_string())))],
         };
         assert_eq!(to_markdown(&doc), "---\n\n");
+    }
+
+    #[test]
+    fn bare_at_meta_is_not_inferred_only_the_explicit_name_is() {
+        // `meta` is deliberately not in `typedmark_ast::INFERRED_AT_KEYS`
+        // (see its doc comment) -- a bare `@` with a `meta` key falls back
+        // to the generic "at" element export, unlike `@meta(...)`
+        // (`Sigil::At(Some("meta".into()))`), which exports as nothing.
+        let mut el = Element::new(Sigil::At(None));
+        el.input = Some(Value::Map(vec![(
+            "meta".to_string(),
+            Value::String("yaml".to_string()),
+        )]));
+        let doc = Document {
+            blocks: vec![Block::Element(el)],
+        };
+        assert!(
+            to_markdown(&doc).contains("data-tm-kind=\"at\""),
+            "expected generic 'at' kind, got: {}",
+            to_markdown(&doc)
+        );
+    }
+
+    #[test]
+    fn titled_thematic_break() {
+        let mut el = Element::new(Sigil::Type("hr".to_string()));
+        el.area = Some(vec![Inline::Text("Title".to_string())]);
+        let doc = Document {
+            blocks: vec![Block::Element(el)],
+        };
+        assert_eq!(to_markdown(&doc), "**Title**\n\n---\n\n");
     }
 }

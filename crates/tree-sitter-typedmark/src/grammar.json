@@ -28,6 +28,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "titled_thematic_break"
+        },
+        {
+          "type": "SYMBOL",
           "name": "thematic_break"
         },
         {
@@ -136,9 +140,67 @@
       "type": "PATTERN",
       "value": "#+"
     },
-    "thematic_break": {
+    "_dash_run": {
       "type": "PATTERN",
-      "value": "-{3,}[ \\t]*"
+      "value": "-{3,}"
+    },
+    "thematic_break": {
+      "type": "SYMBOL",
+      "name": "_dash_run"
+    },
+    "titled_thematic_break": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "open",
+          "content": {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_dash_run"
+            },
+            "named": true,
+            "value": "thematic_break_marker"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "["
+        },
+        {
+          "type": "FIELD",
+          "name": "content",
+          "content": {
+            "type": "REPEAT",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_bracket_item"
+            }
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "]"
+        },
+        {
+          "type": "FIELD",
+          "name": "close",
+          "content": {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_dash_run"
+            },
+            "named": true,
+            "value": "thematic_break_marker"
+          }
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_newline"
+        }
+      ]
     },
     "line_comment": {
       "type": "PATTERN",
@@ -1165,8 +1227,8 @@
       "value": "scalar"
     },
     "scalar": {
-      "type": "PATTERN",
-      "value": "[^,():\\[\\]{}\\n\\r]+"
+      "type": "SYMBOL",
+      "name": "_scalar_token"
     }
   },
   "extras": [
@@ -1181,7 +1243,12 @@
     ]
   ],
   "precedences": [],
-  "externals": [],
+  "externals": [
+    {
+      "type": "SYMBOL",
+      "name": "_scalar_token"
+    }
+  ],
   "inline": [],
   "supertypes": [],
   "reserved": {}

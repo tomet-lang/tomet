@@ -19,46 +19,131 @@ body { font-family: sans-serif; line-height: 1.6; max-width: 48rem; margin: 2rem
 .tm-caution { border-left-color: #d9822b; background: #fff8ee; padding: 0.5rem; }
 .tm-links dt { font-weight: bold; }
 .tm-value { color: #666; font-family: monospace; }
+.tm-hr-titled { display: flex; align-items: center; gap: 0.75rem; margin: 1.5rem 0; }
+.tm-hr-titled hr { flex: 1; margin: 0; }
+.tm-heading-number { color: #888; margin-right: 0.5em; }
 ";
 
-/// Render a full standalone HTML document.
+/// Output shape choices for [`render_page_with`]/[`render_body_with`]. The
+/// zero-value (`Default`) is the plain, unnumbered rendering `render_page`/
+/// `render_body` already produced before this existed -- opting into
+/// anything here is always an explicit choice, never a behavior change for
+/// existing callers of those two functions.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RenderOptions {
+    /// Number headings by nesting level (`1`, `1.1`, `1.2`, `2`, ...),
+    /// restarting a deeper level's counter whenever a shallower one
+    /// advances -- the "advanced" output pattern, as opposed to the plain
+    /// default.
+    pub number_headings: bool,
+}
+
+/// Render a full standalone HTML document with the plain (unnumbered)
+/// heading style. See [`render_page_with`] for the numbered variant.
 pub fn render_page(doc: &Document, title: &str) -> String {
+    render_page_with(doc, title, &RenderOptions::default())
+}
+
+/// Render a full standalone HTML document, applying `options` (e.g.
+/// `RenderOptions { number_headings: true }` for the "advanced",
+/// sequentially-numbered heading style).
+pub fn render_page_with(doc: &Document, title: &str, options: &RenderOptions) -> String {
     format!(
         "<!DOCTYPE html>\n<html lang=\"ja\">\n<head>\n<meta charset=\"utf-8\">\n<title>{title}</title>\n<style>{style}</style>\n</head>\n<body>\n{body}</body>\n</html>\n",
         title = escape_html(title),
         style = DEFAULT_STYLE,
-        body = render_body(doc),
+        body = render_body_with(doc, options),
     )
 }
 
-/// Render just the body content, without the surrounding `<html>` shell.
+/// Render just the body content, without the surrounding `<html>` shell,
+/// with the plain (unnumbered) heading style.
 pub fn render_body(doc: &Document) -> String {
+    render_body_with(doc, &RenderOptions::default())
+}
+
+/// Render just the body content, applying `options`.
+pub fn render_body_with(doc: &Document, options: &RenderOptions) -> String {
     let mut out = String::new();
+    let mut counters = HeadingCounters::default();
     for block in &doc.blocks {
-        render_block(block, &mut out);
+        render_block(block, &mut out, options, &mut counters);
     }
     out
 }
 
-fn render_block(block: &Block, out: &mut String) {
+/// Running per-level counters for `RenderOptions::number_headings`, e.g.
+/// `[1, 2]` mid-document means "currently under section 1.2". Index `i`
+/// holds the count for heading level `i + 1`.
+#[derive(Default)]
+struct HeadingCounters(Vec<u32>);
+
+impl HeadingCounters {
+    /// Advances to the next heading at `level`, resetting any deeper
+    /// levels' counters (a new "1.2" starts a fresh "1.2.1" for whatever
+    /// level-3 heading comes next), and returns the dotted label (`"1.2"`).
+    fn advance(&mut self, level: u8) -> String {
+        let level = level.clamp(1, 6) as usize;
+        if self.0.len() < level {
+            self.0.resize(level, 0);
+        } else {
+            self.0.truncate(level);
+        }
+        self.0[level - 1] += 1;
+        self.0
+            .iter()
+            .map(u32::to_string)
+            .collect::<Vec<_>>()
+            .join(".")
+    }
+}
+
+fn render_block(
+    block: &Block,
+    out: &mut String,
+    options: &RenderOptions,
+    counters: &mut HeadingCounters,
+) {
     match block {
-        Block::Heading(h) => render_heading(h, out),
+        Block::Heading(h) => render_heading(h, out, options, counters),
         Block::Paragraph(inlines) => {
-            out.push_str("<p>");
-            render_inlines(inlines, out);
-            out.push_str("</p>\n");
+            // Elements with no visible output (`@meta`, ...) placed on
+            // adjacent lines with no blank line between them lazily
+            // continue into one paragraph together with the inter-element
+            // whitespace text (see `document.rs::parse_paragraph`) -- if
+            // every one of them is invisible, skip the wrapper entirely
+            // rather than emitting a stray whitespace-only `<p>`.
+            let mut inner = String::new();
+            render_inlines(inlines, &mut inner);
+            if !inner.trim().is_empty() {
+                out.push_str("<p>");
+                out.push_str(&inner);
+                out.push_str("</p>\n");
+            }
         }
         Block::List { ordered, items } => render_list(items, *ordered, out),
         Block::Element(el) => render_element(el, out, false),
     }
 }
 
-fn render_heading(h: &Heading, out: &mut String) {
+fn render_heading(
+    h: &Heading,
+    out: &mut String,
+    options: &RenderOptions,
+    counters: &mut HeadingCounters,
+) {
     let level = h.level.clamp(1, 6);
     let (id, class, data) = split_attrs(h.attrs.as_ref());
     out.push_str(&format!("<h{level}"));
     push_named_attrs(out, &id, &class, &data);
     out.push('>');
+    if options.number_headings {
+        let label = counters.advance(h.level);
+        // No literal space after `</span>` -- spacing is `.tm-heading-number`'s
+        // `margin-right` in `DEFAULT_STYLE`, not baked into the content, so
+        // e.g. copy-pasting the heading text doesn't pick up a stray space.
+        out.push_str(&format!("<span class=\"tm-heading-number\">{label}</span>"));
+    }
     render_inlines(&h.content, out);
     out.push_str(&format!("</h{level}>\n"));
 }
@@ -83,23 +168,15 @@ fn render_inlines(inlines: &[Inline], out: &mut String) {
     }
 }
 
-const INFERRED_AT_KEYS: [&str; 4] = ["url", "file", "ref", "meta"];
-
 fn element_kind(el: &Element) -> String {
     match &el.sigil {
         Sigil::Type(name) => name.clone(),
         Sigil::At(Some(name)) => name.clone(),
-        Sigil::At(None) => infer_at_kind(el.input.as_ref()).unwrap_or_else(|| "at".to_string()),
+        Sigil::At(None) => typedmark_ast::infer_at_kind(el.input.as_ref())
+            .unwrap_or("at")
+            .to_string(),
         Sigil::Bare => "bare".to_string(),
     }
-}
-
-fn infer_at_kind(input: Option<&Value>) -> Option<String> {
-    let map = as_map(input?)?;
-    INFERRED_AT_KEYS
-        .iter()
-        .find(|k| map_get(map, k).is_some())
-        .map(|k| k.to_string())
 }
 
 fn render_element(el: &Element, out: &mut String, inline: bool) {
@@ -111,11 +188,26 @@ fn render_element(el: &Element, out: &mut String, inline: bool) {
         "file" => render_href_element(el, "file", out, inline),
         "ref" => render_ref_element(el, out, inline),
         "embed" => render_embed_element(el, out),
-        "hr" => out.push_str("<hr>\n"),
+        "hr" => render_hr_element(el, out),
         "em" | "strong" | "mark" => render_wrapped_inline(el, &kind, out),
         "pre" => render_pre_element(el, out),
         "blockquote" => render_blockquote_element(el, out, inline),
         _ => render_generic_element(el, &kind, out, inline),
+    }
+}
+
+/// A bare `---` break is a plain `<hr>`; a titled one (`---[ Title ]---`,
+/// `document.rs::parse_titled_thematic_break`'s `area`) wraps two `<hr>`s
+/// around the title, visually reproducing the source's symmetric
+/// dashes-title-dashes shape (styled via `.tm-hr-titled` in `DEFAULT_STYLE`).
+fn render_hr_element(el: &Element, out: &mut String) {
+    match &el.area {
+        Some(title) if !title.is_empty() => {
+            out.push_str("<div class=\"tm-hr-titled\"><hr><span>");
+            render_inlines(title, out);
+            out.push_str("</span><hr></div>\n");
+        }
+        _ => out.push_str("<hr>\n"),
     }
 }
 
@@ -426,6 +518,39 @@ mod tests {
     }
 
     #[test]
+    fn default_options_leave_headings_unnumbered() {
+        let doc = parse_document("#[ One ]\n").unwrap();
+        assert_eq!(
+            render_body_with(&doc, &RenderOptions::default()),
+            render_body(&doc),
+        );
+        assert_eq!(render_body(&doc), "<h1>One</h1>\n");
+    }
+
+    #[test]
+    fn numbers_headings_by_nesting_level() {
+        let doc = parse_document(
+            "#[ One ]\n##[ One One ]\n##[ One Two ]\n#[ Two ]\n##[ Two One ]\n###[ Two One One ]\n",
+        )
+        .unwrap();
+        let body = render_body_with(
+            &doc,
+            &RenderOptions {
+                number_headings: true,
+            },
+        );
+        assert_eq!(
+            body,
+            "<h1><span class=\"tm-heading-number\">1</span>One</h1>\n\
+             <h2><span class=\"tm-heading-number\">1.1</span>One One</h2>\n\
+             <h2><span class=\"tm-heading-number\">1.2</span>One Two</h2>\n\
+             <h1><span class=\"tm-heading-number\">2</span>Two</h1>\n\
+             <h2><span class=\"tm-heading-number\">2.1</span>Two One</h2>\n\
+             <h3><span class=\"tm-heading-number\">2.1.1</span>Two One One</h3>\n"
+        );
+    }
+
+    #[test]
     fn escapes_paragraph_text() {
         let doc = parse_document("a < b & c\n").unwrap();
         let body = render_body(&doc);
@@ -467,6 +592,33 @@ mod tests {
     }
 
     #[test]
+    fn bare_at_meta_is_not_inferred_only_the_explicit_name_is() {
+        // `meta` is deliberately not in `typedmark_ast::INFERRED_AT_KEYS`
+        // (see its doc comment) -- a bare `@(meta:yaml)` falls back to the
+        // generic "at" element rendering, unlike `@meta(yaml){...}` above.
+        let doc = parse_document("@(meta:yaml)[]\n").unwrap();
+        let body = render_body(&doc);
+        assert!(
+            body.contains("tm-at"),
+            "expected generic 'at' kind, got: {body}"
+        );
+    }
+
+    #[test]
+    fn adjacent_meta_blocks_have_no_visible_output() {
+        // Regression test: three `@meta(...)` blocks stacked with no blank
+        // line between them (as in `docs/cheatsheet.tm`) lazily continue
+        // into one `Block::Paragraph` at the parser level; that paragraph
+        // must not leak a stray whitespace-only `<p>` into the output.
+        let doc = parse_document(
+            "@meta(json){\n  {\"key\":\"value\"}\n}\n@meta(yaml){\n  key:value\n}\n@meta(toml){\n  key = \"value\"\n}\n\n#[ next ]\n",
+        )
+        .unwrap();
+        let body = render_body(&doc);
+        assert_eq!(body, "<h1>next</h1>\n");
+    }
+
+    #[test]
     fn renders_typed_element_generically() {
         let doc = parse_document("<caution>[ be careful ]\n").unwrap();
         let body = render_body(&doc);
@@ -488,6 +640,16 @@ mod tests {
         let doc = parse_document("---\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "<hr>\n");
+    }
+
+    #[test]
+    fn renders_titled_thematic_break() {
+        let doc = parse_document("---[ Title ]---\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<div class=\"tm-hr-titled\"><hr><span>Title</span><hr></div>\n"
+        );
     }
 
     #[test]

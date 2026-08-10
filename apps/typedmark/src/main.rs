@@ -47,6 +47,10 @@ enum Command {
         /// Write to this path instead of stdout.
         #[arg(short, long)]
         out: Option<PathBuf>,
+        /// Number headings sequentially by nesting level (1, 1.1, 1.2, 2,
+        /// ...) instead of the plain, unnumbered default.
+        #[arg(long)]
+        advanced: bool,
     },
     /// Convert a `.tm` file to CommonMark. Lossy for constructs with no
     /// Markdown equivalent (`@links{}`, generic `<T>` elements) -- see
@@ -63,6 +67,10 @@ enum Command {
         file: PathBuf,
         #[arg(short, long, default_value_t = 8787)]
         port: u16,
+        /// Number headings sequentially by nesting level (1, 1.1, 1.2, 2,
+        /// ...) instead of the plain, unnumbered default.
+        #[arg(long)]
+        advanced: bool,
     },
     /// Normalize a `.tm` file's whitespace (line endings, trailing
     /// whitespace, blank lines, final newline). Prints to stdout by
@@ -85,9 +93,17 @@ fn main() -> ExitCode {
         Command::Check { file, data } => check(file, *data),
         Command::Ast { file, data } => ast(file, *data),
         Command::Roundtrip { file } => roundtrip(file),
-        Command::Html { file, out } => html(file, out),
+        Command::Html {
+            file,
+            out,
+            advanced,
+        } => html(file, out, *advanced),
         Command::ToMd { file, out } => to_md(file, out),
-        Command::Serve { file, port } => serve(file, *port),
+        Command::Serve {
+            file,
+            port,
+            advanced,
+        } => serve(file, *port, *advanced),
         Command::Format { file, write, check } => format_cmd(file, *write, *check),
     };
     match result {
@@ -126,18 +142,21 @@ fn ast(file: &PathBuf, data: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn render_file(file: &Path) -> anyhow::Result<String> {
+fn render_file(file: &Path, advanced: bool) -> anyhow::Result<String> {
     let src = fs::read_to_string(file)?;
     let doc = typedmark_parser::parse_document(&src)?;
     let title = file
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("TypedMark");
-    Ok(typedmark_renderer::render_page(&doc, title))
+    let options = typedmark_renderer::RenderOptions {
+        number_headings: advanced,
+    };
+    Ok(typedmark_renderer::render_page_with(&doc, title, &options))
 }
 
-fn html(file: &PathBuf, out: &Option<PathBuf>) -> anyhow::Result<()> {
-    let page = render_file(file)?;
+fn html(file: &PathBuf, out: &Option<PathBuf>, advanced: bool) -> anyhow::Result<()> {
+    let page = render_file(file, advanced)?;
     match out {
         Some(path) => fs::write(path, page)?,
         None => println!("{page}"),
@@ -156,14 +175,23 @@ fn to_md(file: &PathBuf, out: &Option<PathBuf>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn serve(file: &PathBuf, port: u16) -> anyhow::Result<()> {
-    let file = file.clone();
+#[derive(Clone)]
+struct ServeState {
+    file: PathBuf,
+    advanced: bool,
+}
+
+fn serve(file: &PathBuf, port: u16, advanced: bool) -> anyhow::Result<()> {
+    let state = ServeState {
+        file: file.clone(),
+        advanced,
+    };
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
         let app = Router::new()
             .route("/", get(render_handler))
-            .with_state(file);
+            .with_state(state);
         let listener = tokio::net::TcpListener::bind(addr).await?;
         println!("Serving at http://{addr} (Ctrl+C to stop)");
         axum::serve(listener, app).await?;
@@ -171,8 +199,8 @@ fn serve(file: &PathBuf, port: u16) -> anyhow::Result<()> {
     })
 }
 
-async fn render_handler(State(file): State<PathBuf>) -> Html<String> {
-    Html(render_file(&file).unwrap_or_else(|e| error_page(&file, &e)))
+async fn render_handler(State(state): State<ServeState>) -> Html<String> {
+    Html(render_file(&state.file, state.advanced).unwrap_or_else(|e| error_page(&state.file, &e)))
 }
 
 fn error_page(file: &Path, err: &anyhow::Error) -> String {
