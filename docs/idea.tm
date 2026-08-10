@@ -9,3 +9,9 @@
 - @tag(unko)
   - @{unko}省略できるのでは？
 - <index>(){}
+- <template>
+- <time>
+- 後方互換性
+  - 知らない @xxx を見ても、パーサー全体を壊さない
+- 「とりあえずdivで包める」みたいな汎用コンテナをTypedMarkに大量導入すると、せっかくの@linkや@codeの意味が薄くなる。
+- Markdownの簡潔さ + HTMLのsemantic structure + ASTとしての厳格さ

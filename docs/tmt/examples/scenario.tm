@@ -1,3 +1,4 @@
+@meta{type:scenario}
 <line>
 (天音かなた)[ セリフ　]
 <line>

@@ -1,5 +1,5 @@
 @meta(format:yaml) {
-  title: value
+  type: image
   tags: [a, b]
 }
 
