@@ -20,5 +20,5 @@ dist
 out
 
 # Zed extension build artifacts (grammar .wasm + fetched grammar sources)
-apps/zed-extension/extension.wasm
-apps/zed-extension/grammars/
+apps/integrations/zed/extension.wasm
+apps/integrations/zed/grammars/

@@ -4,16 +4,16 @@ resolver = "3"
 members = [
   #[ CLI ]
   "apps/typedmark",
-  #[ Language Support ]
-  "apps/typedmark-java",
-  "apps/typedmark-js",
   "apps/typedmark-lsp",
-  "apps/typedmark-python",
+  #[ Bindings ]
+  "apps/bindings/java",
+  "apps/bindings/js",
+  "apps/bindings/python",
   #[ Editor Support ]
-  "apps/zed-extension",
-  "apps/vscode-extension",
-  "apps/neovim-plugin",
-  "apps/helix-plugin",
+  "apps/integrations/zed",
+  "apps/integrations/vscode",
+  "apps/integrations/neovim",
+  "apps/integrations/helix",
 
   "crates/typedmark-ast",
   "crates/typedmark-lexar",
