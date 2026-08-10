@@ -26,26 +26,27 @@
 //!   share a delimiter character, and letting them nest is the classic
 //!   Markdown emphasis/strong ambiguity that needs real flanking-rule
 //!   lookahead (or an external scanner) to resolve properly.
-//! - **A bare (keyless, colon-less) scalar directly inside `(...)`/
-//!   `{...}`** -- e.g. `@meta(yaml)`'s `yaml`, or `{required}` -- parses
-//!   as an `ERROR`-wrapped node instead of a clean `scalar`. Root cause:
-//!   tree-sitter's lexer only uses declared precedence to break *equal-
-//!   length* token ties, so an identifier-shaped bare word (which could
-//!   be either a `map_entry` key or a standalone `scalar`) can't be
-//!   disambiguated without knowing whether a `:` follows -- one token of
-//!   lookahead this grammar doesn't have without an external scanner.
-//!   `map_entry`'s key still correctly wins over `scalar` whenever a
-//!   `:` genuinely follows (the common, important case), since
-//!   `scalar`'s own colon-inclusive value-position variant makes that a
-//!   longest-match win rather than a tie. See `grammar.js`'s comments on
-//!   `scalar`/`_value_scalar`/`map_entry` for the full mechanism.
-//! - **A trailing blank line right before the closing `}` of a multi-
-//!   entry, newline-separated `map`/`children` block** (no comma on the
-//!   last line) can produce a small, locally-contained `ERROR` node
-//!   right at the closing brace, even though every entry before it
-//!   parses correctly. Same one-token-lookahead limitation as above,
-//!   applied to "is this blank line another entry, or the group's own
-//!   trailing gap?".
+//! - **A bare newline (no comma) right before the closing `}` of a
+//!   newline-separated `map`/`children` block** can produce a small,
+//!   locally-contained `ERROR` node right at the closing brace, even
+//!   though every entry before it -- there can be just the one -- parses
+//!   correctly. Affects the ordinary, idiomatic multi-line shape (each
+//!   entry own its own line, `}` on the next), not just an actual blank
+//!   line before `}`.
+//! - **A `key: [seq]` map entry, when it's the map's last entry with no
+//!   trailing comma** (e.g. `{ title: ..., tags: [a, b] }` on one line, as
+//!   in `docs/tmt/image_meta.tm`'s `@meta(yaml){...}`), gets GLR-merged
+//!   with a second, spurious top-level `seq` reading of the same `[a, b]`
+//!   text, wrapping the whole map in an `ERROR`. Overlaps with the bare-
+//!   newline-before-`}` case above (same "is this the map's own trailing
+//!   gap, or more content" one-token-lookahead limitation) but shows up
+//!   even without a newline there, as long as a `[...]`-valued entry is
+//!   last. Pre-existing and independent of `scanner.c`'s bare-scalar fix
+//!   (confirmed against the grammar from before that fix existed -- same
+//!   misparse shape either way, modulo exactly which node the `ERROR`
+//!   lands on). Not investigated further here -- `typedmark-parser`'s real
+//!   grammar has no such issue (`parses_flat_map` covers exactly this
+//!   shape).
 //! - **Stray/unmatched `]`** (e.g. literal `[area]` written as prose,
 //!   not as a real `area_group`) has no fallback token and produces a
 //!   small `ERROR` -- unlike `(`/`[`/`{`/`-`, which all fall back to a
@@ -65,6 +66,32 @@
 //!   worse failure mode for a comment than for e.g. a code span. Here an
 //!   unmatched `/*` just fails to lex as `block_comment` and falls back
 //!   to ordinary `text`/`punctuation` tokens instead.
+//! - **A real embedded JSON/YAML/TOML body inside `@meta(json|yaml|toml){...}`
+//!   isn't understood as such.** `typedmark-parser` hands that body as-is
+//!   to `serde_json`/`serde_yaml`/`toml` (see `typedmark-parser::meta_format`),
+//!   but this grammar has no idea a `{value}` group's content might be a
+//!   different language -- it still tries its own `map`/`seq`/`scalar`
+//!   rules. A quoted JSON key (`{ "key": "value" }`, needed since JSON has
+//!   no bare-identifier keys -- see `docs/tmt/typedmark.tm`'s
+//!   `@meta(json)` block) doesn't match `map_entry`'s bare-identifier
+//!   `key` field, so the nested `{...}` becomes an `ERROR`. Not worth a
+//!   real per-format sub-grammar here -- this crate is for editor
+//!   highlighting, not validation.
+//! - **`thematic_break`'s dash run only ever consumes exactly 3 `-`,
+//!   even when the source has more** (`-----` -> a 3-dash `thematic_break`
+//!   plus the leftover 2 dashes falling back to `punctuation` inside a
+//!   `paragraph`) -- discovered while adding `titled_thematic_break`
+//!   (`---[ Title ]---`, which shares its dash-run token with the plain
+//!   break), but present before that addition too. Not an `ERROR`, just a
+//!   shape mismatch: the real parser (`document.rs::is_thematic_break`)
+//!   correctly accepts any run of 3+. See
+//!   `more_than_three_dashes_are_only_partially_consumed_by_thematic_break`
+//!   below for the pinned exact shape.
+//!
+//! `scanner.c` (see its own module doc) resolves what used to be listed
+//! here as a known limitation: a bare, colon-less, identifier-shaped
+//! scalar directly inside `(...)`/`{...}` (`@meta(yaml)`'s `yaml`,
+//! `{required}`) now parses as a clean `scalar` instead of an `ERROR`.
 //!
 //! Verified against real content: `cargo test` in this crate parses
 //! `docs/tmt/typedmark.tm` and `docs/tmt/image_meta.tm` and checks that
@@ -141,6 +168,59 @@ mod tests {
     }
 
     #[test]
+    fn parses_a_titled_thematic_break() {
+        let tree = parse("---[ Title ]---\n");
+        let root = tree.root_node();
+        assert!(!root.has_error());
+        assert_eq!(root.named_child(0).unwrap().kind(), "titled_thematic_break");
+    }
+
+    #[test]
+    fn plain_and_titled_thematic_breaks_are_distinct_adjacent_blocks() {
+        // A dash-run token is shared between `thematic_break` and
+        // `titled_thematic_break` (see `grammar.js`'s `_dash_run`) -- this
+        // exercises that the lexer/parser still cleanly tell them apart
+        // when they're right next to each other, not just in isolation.
+        // Exactly 3 dashes each, deliberately -- more than 3 hits the
+        // separate, pre-existing `thematic_break` truncation quirk covered
+        // by `more_than_three_dashes_are_only_partially_consumed` below.
+        let tree = parse("---\n---\n---[ Title ]---\n");
+        let root = tree.root_node();
+        assert!(!root.has_error());
+        let kinds: Vec<_> = (0..root.named_child_count() as u32)
+            .map(|i| root.named_child(i).unwrap().kind())
+            .collect();
+        assert_eq!(
+            kinds,
+            ["thematic_break", "thematic_break", "titled_thematic_break"]
+        );
+    }
+
+    #[test]
+    fn more_than_three_dashes_are_only_partially_consumed_by_thematic_break() {
+        // Pre-existing, discovered while adding `titled_thematic_break`
+        // (confirmed present before that change too, by testing against
+        // the grammar without it): `thematic_break`'s `-{3,}` token only
+        // ever consumes exactly 3 dashes here, even though the real parser
+        // (`typedmark-parser::document.rs::is_thematic_break`) happily
+        // accepts any run of 3+ (see `parses_thematic_break_with_more_than_three_dashes`
+        // in that crate). The leftover dashes fall back to `punctuation`
+        // inside a `paragraph`, same as any other unmatched `-` -- not an
+        // `ERROR`, just a shape mismatch with the real grammar. Root cause
+        // not fully understood (an unbounded `{3,}` quantifier stopping at
+        // its own minimum rather than matching maximally in this lexer
+        // state); pinning the current behavior here rather than leaving it
+        // silently uncovered.
+        let tree = parse("-----\n");
+        let root = tree.root_node();
+        assert!(!root.has_error());
+        let kinds: Vec<_> = (0..root.named_child_count() as u32)
+            .map(|i| root.named_child(i).unwrap().kind())
+            .collect();
+        assert_eq!(kinds, ["thematic_break", "paragraph"]);
+    }
+
+    #[test]
     fn parses_lists_ordered_and_unordered() {
         for src in ["- one\n- two\n- three\n", "-. one\n-. two\n"] {
             let tree = parse(src);
@@ -183,15 +263,70 @@ mod tests {
     }
 
     #[test]
-    fn bare_non_colon_scalar_is_a_known_limitation_not_silent_data_loss() {
-        // Documented in this module's doc comment: `scalar`/`map_entry`'s
-        // key both being identifier-shaped, equal-length matches at this
-        // position means precedence can't disambiguate without knowing
-        // whether a `:` follows -- this asserts the failure mode is a
-        // visible `ERROR` node (so a caller can tell something's off),
-        // not a silently wrong-but-clean parse.
-        let tree = parse("@meta(yaml)\n");
-        assert!(tree.root_node().has_error());
+    fn bare_non_colon_scalar_parses_cleanly() {
+        // Used to be a known limitation (see `scanner.c`'s module doc for
+        // the mechanism `$._bare_word_no_colon` fixes): `scalar`/
+        // `map_entry`'s key are equal-length, identifier-shaped matches at
+        // this position, and precedence alone can't disambiguate without
+        // knowing whether a `:` follows. The external scanner supplies that
+        // one token of lookahead.
+        for src in [
+            "@meta(yaml)\n",
+            "@meta(json)\n",
+            "@meta(toml)\n",
+            "<input>{required}\n",
+        ] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}"
+            );
+        }
+    }
+
+    /// Depth-first search for the first descendant of `node` with the given
+    /// `kind`, `node` itself included.
+    fn find_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
+        if node.kind() == kind {
+            return Some(node);
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if let Some(found) = find_kind(child, kind) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn bare_scalar_still_wins_longest_match_when_not_identifier_shaped() {
+        // Regression guard for `$._bare_word_no_colon`'s own doc comment:
+        // it must decline (not truncate the match) whenever the internal
+        // `scalar` regex would keep matching past the identifier-shaped
+        // run, e.g. a space -- a multi-word bare scalar must still parse as
+        // one whole `scalar` node, not just its first word. No leading
+        // space before `hello` on purpose -- see `scanner.c`'s comment on
+        // why this scanner only engages when the identifier-shaped run
+        // starts immediately at the current lex position.
+        let src = "<input>{hello world}\n";
+        let tree = parse(src);
+        assert!(!tree.root_node().has_error());
+        let scalar = find_kind(tree.root_node(), "scalar").expect("expected a scalar node");
+        assert_eq!(scalar.utf8_text(src.as_bytes()).unwrap(), "hello world");
+    }
+
+    #[test]
+    fn map_entry_key_still_wins_when_a_colon_follows() {
+        // The other half of the same regression guard: an identifier-
+        // shaped bare word immediately followed by `:` must still become a
+        // `map_entry` key, not the new bare-scalar token. All on one line,
+        // on purpose -- a newline directly before the closing `}` hits a
+        // different, pre-existing limitation unrelated to this one (see
+        // this module's doc comment), confirmed to already reproduce with
+        // this exact source on the grammar from before `scanner.c` existed.
+        let tree = parse("@meta(json){key:value}\n");
+        assert!(!tree.root_node().has_error());
     }
 
     #[test]
@@ -260,20 +395,15 @@ mod tests {
         let errors = error_texts(src, &tree);
         // Every error node's text contains (or exactly is) one of these
         // markers, each tied to one documented case in this module's
-        // doc comment: `yaml`/`required` are bare non-colon scalars,
-        // `anotation1` is the same inside `@links{}`'s bare_element,
-        // a bare `"\n"` is the trailing-blank-line-before-`}` case, and
-        // the `のうち.../のルール` snippets are the stray-`]`-in-prose and
-        // the pre-existing `[]`-inside-`[...]` parser bug, both from
-        // this file's self-referential grammar-explanation prose.
-        let known_markers = [
-            "yaml",
-            "required",
-            "anotation1",
-            "のうち必要なものを付ける",
-            "のルール",
-            "\n",
-        ];
+        // doc comment: a bare `"\n"` is the trailing-blank-line-before-`}`
+        // case, the `のうち.../のルール` snippets are the
+        // stray-`]`-in-prose and the pre-existing `[]`-inside-`[...]`
+        // parser bug, both from this file's self-referential
+        // grammar-explanation prose, and `"key":` is the embedded-JSON
+        // quoted-key case (`@meta(json){ { "key": "value" } }`).
+        // (`yaml`/`required`/`anotation1`, the old bare-non-colon-scalar
+        // cases, no longer error -- see `scanner.c`.)
+        let known_markers = ["のうち必要なものを付ける", "のルール", "\n", "\"key\":"];
         for text in &errors {
             assert!(
                 known_markers.iter().any(|marker| text.contains(marker)),
@@ -287,12 +417,13 @@ mod tests {
         let src = include_str!("../../../docs/tmt/image_meta.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);
-        // "yaml" is `@meta(yaml)`'s bare non-colon scalar (see the
-        // module doc); an empty string is a zero-width `MISSING` node
-        // from the same error's recovery, not a separate case.
+        // The lone remaining error wraps `title: value` and `tags: ` --
+        // the `key: [seq]`-map-entry-value misparse documented in this
+        // module's doc comment (`tags: [a, b]`), unrelated to `@meta`'s
+        // own `(yaml)` tag, which no longer errors (see `scanner.c`).
         for text in &errors {
             assert!(
-                text.is_empty() || text.contains("yaml"),
+                text.contains("tags:"),
                 "unexpected error node text: {text:?}"
             );
         }
@@ -317,5 +448,24 @@ mod tests {
         let query_src = include_str!("../queries/brackets.scm");
         tree_sitter::Query::new(&LANGUAGE.into(), query_src)
             .expect("queries/brackets.scm should be a valid query against this grammar");
+    }
+
+    #[test]
+    fn cheatsheet_tm_fixture_has_only_the_bare_newline_before_brace_error() {
+        // `docs/cheatsheet.tm`'s three `@meta(json|yaml|toml){...}` blocks
+        // no longer produce the old bare-non-colon-scalar `ERROR` for their
+        // `json`/`yaml`/`toml` tag -- but each one's `key:value` body is a
+        // single entry with a bare newline right before the closing `}`,
+        // which is the *other*, unrelated, still-open limitation documented
+        // in this module's doc comment (independent of `scanner.c`).
+        let src = include_str!("../../../docs/cheatsheet.tm");
+        let tree = parse(src);
+        let errors = error_texts(src, &tree);
+        for text in &errors {
+            assert!(
+                !text.contains("json") && !text.contains("yaml") && !text.contains("toml"),
+                "unexpected error node text touching @meta's format tag: {text:?}"
+            );
+        }
     }
 }

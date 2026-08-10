@@ -1,60 +1,80 @@
 @import(file:/)
-
 @meta(json){
-  key = {
-    value = 1,
-    value2 = 2
-  },
-  key2 = 2
+  { 
+    "key": "value" 
+  }
 }
 @meta(yaml){
-  key:value
+  key: value
+  date: time
 }
 @meta(toml){
-  [ toml ]
-  version.workspace = true
-  [[ toml ]]
-  typedmark = "1"
+  key = "value"
 }
 
-@links()[
-  @(parent)[]
-  @(child)[]
-]
+// @links()[
+//   @(parent)[]
+//   @(child)[]
+// ]
 
-@foot()[
-  :(id:asdf)[]
-  :(id:zxcv)[]
-]
+// @foot()[
+//   :(id:asdf)[]
+//   :(id:zxcv)[]
+// ]
+
+// @tag[]
 
 @link[](url:https://)
-@link[](file:/)
-@link[](ref:)
+@link[](file:/readme.md)
+@link[](ref:1)
 
 @[](url:https://)
-@[](file:/)
-@[](ref:)
+@[](file:/readme.md)
+@[](ref:2)
+
+#[ heading ]{ id:1 }
+##[ heading ]{ id:2 }
+###[ heading ]{ id:3 }
 
 <embed>[](url:https://)
-<embed>[](file:/)
-<embed>[](ref:)
+<embed>[](file:/readme.md)
+<embed>[](ref:3)
 
-#[ heading ]{}
-##[ heading ]{}
-###[ heading ]{}
+// <code>(lang:sh)[]
+// <codeblock>
+// <execute>(lang)[]
+<pre>(lang:json){
+{sdfsdf}
+}
+
+<myfunc>()[]{}
+<foo>()[]{}
 
 - aaaa
 -. aaaa
+-. aaaa
+
 1. aaaa
+
 **aaaa**
 *aaaa*
 ==aaaa==
 _aaaa_
 `aaaa`
+
+```sh
+
+```
+
 ---
 -----
 ---[ Title ]---
----()---
+----(💫)----
+
+---<icon>()---
 
 // line comment
 /* block comment */
+
+| table | ----- |
+|     1 |     2 |

@@ -26,6 +26,14 @@
 
 (thematic_break) @punctuation.special
 
+; Same reasoning as the heading brackets above: `titled_thematic_break`'s
+; `[`/`]` have no node of their own, so without an explicit capture they'd
+; just inherit the whole node's `@title` below.
+(thematic_break_marker) @punctuation.special
+(titled_thematic_break "[" @punctuation.special)
+(titled_thematic_break "]" @punctuation.special)
+(titled_thematic_break) @markup.heading @title
+
 ; `@comment` is shared vocabulary between the standard capture set and
 ; Zed's own (unlike `@markup.*` above), so one capture covers both.
 (line_comment) @comment
