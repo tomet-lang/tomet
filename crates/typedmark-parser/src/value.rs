@@ -48,6 +48,77 @@ pub(crate) fn eat_ident<'a>(cur: &mut Cursor<'a>) -> &'a str {
     cur.eat_while(is_ident_char)
 }
 
+/// Advances `cur` to the position of the `close` that matches the `open`
+/// already consumed just before `cur`'s current position, tracking nested
+/// `open`/`close` pairs and skipping over `"`/`'`-quoted runs (so a quoted
+/// `close`/`open` character -- e.g. a `"}"` inside a JSON string, or a
+/// `"]"` inside a codeblock's string literal -- can't miscount). Doesn't
+/// consume the closing delimiter. Used where a group's *body* is opaque to
+/// TypedMark itself (an embedded JSON/YAML/TOML value, or a codeblock's
+/// raw source text) and only the matching bracket/brace needs finding.
+pub(crate) fn find_matching_delimiter(
+    cur: &mut Cursor,
+    open: char,
+    close: char,
+    group_start: usize,
+) -> Result<usize> {
+    let mut depth: u32 = 0;
+    loop {
+        match cur.peek() {
+            None => {
+                return Err(err(
+                    cur,
+                    group_start,
+                    format!("unterminated '{open}', expected matching '{close}'"),
+                ));
+            }
+            Some('"') => skip_quoted(cur, '"'),
+            Some('\'') => skip_quoted(cur, '\''),
+            Some(c) if c == open => {
+                depth += 1;
+                cur.bump();
+            }
+            Some(c) if c == close => {
+                if depth == 0 {
+                    return Ok(cur.pos());
+                }
+                depth -= 1;
+                cur.bump();
+            }
+            Some(_) => {
+                cur.bump();
+            }
+        }
+    }
+}
+
+/// Skips a `quote`-delimited run starting at the opening quote. Backslash
+/// escapes are only honored for `"` (JSON/TOML basic strings, and the
+/// common convention in most C-like source) -- `'` strings (TOML literal
+/// strings, YAML single-quoted scalars, and many languages' char literals)
+/// have no backslash escaping in either format, so `\` there is just a
+/// literal character. Runs to EOF harmlessly if unterminated; the caller's
+/// own EOF check reports that as "unterminated '<open>'" once the outer
+/// loop sees it.
+pub(crate) fn skip_quoted(cur: &mut Cursor, quote: char) {
+    cur.bump();
+    loop {
+        match cur.peek() {
+            None => break,
+            Some('\\') if quote == '"' => {
+                cur.bump();
+                cur.bump();
+            }
+            Some(c) => {
+                cur.bump();
+                if c == quote {
+                    break;
+                }
+            }
+        }
+    }
+}
+
 /// Raw scalar text stops at any character that could plausibly end an
 /// entry/element/sequence item. Not part of `is_ident_char` because scalar
 /// values (URLs, file paths) routinely contain `:`, `/`, etc.

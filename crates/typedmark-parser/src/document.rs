@@ -4,10 +4,11 @@
 //! `@links{}`). See `docs/tmt/typedmark.tm` in the repo root for the
 //! syntax this follows.
 
+use crate::embedded_format::{EmbeddedFormat, parse_embedded_format_value};
 use crate::error::Result;
-use crate::meta_format::{MetaFormat, parse_meta_format_value};
 use crate::value::{
-    eat_ident, err, is_ident_char, parse_value_at, skip_inline_ws, skip_ws_and_newlines,
+    eat_ident, err, find_matching_delimiter, is_ident_char, parse_value_at, skip_inline_ws,
+    skip_ws_and_newlines,
 };
 use typedmark_ast::{
     Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
@@ -630,12 +631,18 @@ fn parse_element(cur: &mut Cursor) -> Result<Element> {
                     continue;
                 }
                 Some('[') if el.area.is_none() => {
-                    el.area = Some(parse_area(cur)?);
+                    el.area = Some(if is_codeblock(&el) {
+                        parse_raw_area(cur)?
+                    } else {
+                        parse_area(cur)?
+                    });
                     continue;
                 }
                 Some('{') if el.value.is_none() => {
-                    el.value = Some(match meta_format_for(&el) {
-                        Some(format) => ElementValue::Data(parse_meta_format_value(cur, format)?),
+                    el.value = Some(match embedded_format_for(&el) {
+                        Some(format) => {
+                            ElementValue::Data(parse_embedded_format_value(cur, format)?)
+                        }
                         None => parse_value_group(cur)?,
                     });
                     continue;
@@ -672,23 +679,51 @@ fn parse_area(cur: &mut Cursor) -> Result<Vec<Inline>> {
     Ok(content)
 }
 
-/// `@meta(json|yaml|toml){...}`'s `{...}` body is real JSON/YAML/TOML
-/// source, not TypedMark's own `Value` grammar -- but only when both the
-/// sigil is exactly `@meta` and the `(input)` tag names one of those three
-/// formats. `@meta{...}` (no `(...)` group at all) and any other element
-/// (including `@meta(someOtherTag){...}`) keep using the lightweight
-/// grammar via `parse_value_group`.
-fn meta_format_for(el: &Element) -> Option<MetaFormat> {
-    let Sigil::At(Some(name)) = &el.sigil else {
+/// `<codeblock>(lang:xxx)[code]` -- unlike every other element's `[area]`,
+/// which goes through the full inline grammar (`parse_inline_seq`: em/
+/// strong/mark, element triggers, ...), a codeblock's `[...]` is raw
+/// verbatim text: real source code containing `*`/`<`/`@`/backticks must
+/// stay literal, not get reinterpreted as TypedMark markup. Bracket-depth
+/// and quote-aware (`find_matching_delimiter`), so a nested `[...]` in the
+/// code (e.g. an array literal) doesn't miscount the closing `]`. This is
+/// a deliberate, sole exception -- see `is_codeblock`'s caller.
+fn parse_raw_area(cur: &mut Cursor) -> Result<Vec<Inline>> {
+    let group_start = cur.pos();
+    if !cur.eat_str("[") {
+        return Err(err(cur, cur.pos(), "expected '['"));
+    }
+    let body_start = cur.pos();
+    let body_end = find_matching_delimiter(cur, '[', ']', group_start)?;
+    let raw = cur.src()[body_start..body_end].to_string();
+    cur.set_pos(body_end);
+    if !cur.eat_str("]") {
+        return Err(err(cur, cur.pos(), "expected ']'"));
+    }
+    Ok(vec![Inline::Text(raw)])
+}
+
+fn is_codeblock(el: &Element) -> bool {
+    matches!(&el.sigil, Sigil::Type(name) if name == "codeblock")
+}
+
+/// `{...}`'s body is real JSON/YAML/TOML source, not TypedMark's own
+/// `Value` grammar, whenever `(input)` has a `format` key naming one of
+/// those three -- for any element, not just `@meta`. No `format` key, or
+/// an unrecognized value, falls back to the lightweight grammar via
+/// `parse_value_group`.
+fn embedded_format_for(el: &Element) -> Option<EmbeddedFormat> {
+    let Some(Value::Map(entries)) = &el.input else {
         return None;
     };
-    if name != "meta" {
-        return None;
-    }
-    match &el.input {
-        Some(Value::String(tag)) => MetaFormat::from_tag(tag),
-        _ => None,
-    }
+    entries.iter().find_map(|(key, v)| {
+        if key != "format" {
+            return None;
+        }
+        match v {
+            Value::String(tag) => EmbeddedFormat::from_tag(tag),
+            _ => None,
+        }
+    })
 }
 
 fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {

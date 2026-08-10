@@ -81,11 +81,13 @@ pub enum Sigil {
 /// This exists only for `url`/`file`/`ref`, which need to work *inline* in
 /// running prose where every character counts -- it's not a general
 /// "authors may omit the name" convenience. `meta` is deliberately **not**
-/// here: `@meta(tag){...}` is always block-level, never needs to be terse,
-/// so it always takes the explicit name. (A bare `@(meta:yaml){...}` would
-/// otherwise look like it means the same thing as `@meta(yaml){...}` but
-/// silently not be: only the explicit-name form gets real JSON/YAML/TOML
-/// parsing, see `typedmark_parser`'s `meta_format` module.) `links` is
+/// here: `@meta(format:tag){...}` is always block-level, never needs to be
+/// terse, so it always takes the explicit name. (A bare `@(meta:yaml){...}`
+/// would otherwise look like it means the same thing as
+/// `@meta(format:yaml){...}` but silently not be: real JSON/YAML/TOML
+/// parsing is driven by a `format` key in `input`, checked independently of
+/// the sigil/name -- see `typedmark_parser`'s `embedded_format` module --
+/// and a bare `@(meta:yaml)`'s `input` has no such key.) `links` is
 /// explicit-name-only for the same reason `meta` now is -- it was never in
 /// this list.
 pub const INFERRED_AT_KEYS: [&str; 3] = ["url", "file", "ref"];

@@ -28,7 +28,7 @@ From `crates/typedmark-ast/src/lib.rs`:
   There is no AST-level "this is a code span" marker.
 - `Element` (`<T>(input)[area]{value}`, `@name...`): generic enough to
   represent arbitrary typed content, but nothing today gives specific
-  elements (e.g. `<strong>`, `<em>`, `<pre>`) built-in rendering behavior
+  elements (e.g. `<strong>`, `<em>`, `<codeblock>`) built-in rendering behavior
   beyond what `typedmark-renderer`'s HTML mapping already does ad hoc.
 
 ## CommonMark constructs with no direct `typedmark_ast` equivalent
@@ -88,7 +88,7 @@ prerequisite for implementation:
 1. **Lossy-but-lossless-via-escape-hatch, no AST changes.** Map every
    CommonMark construct without a native `typedmark_ast` equivalent onto
    the existing generic `<T>[area]{value}` element grammar (e.g.
-   `<strong>[text]`, `<em>[text]`, `<pre>{...}` for code blocks,
+   `<strong>[text]`, `<em>[text]`, `<codeblock>[...]` for code blocks,
    `<blockquote>[...]`). Ordered-list numbering could survive as a `data-*`
    -style attribute on each item even though the list itself renders flat.
    Confined entirely to a new crate (e.g. `typedmark-markdown`); no changes
@@ -206,11 +206,16 @@ touched crates.
   Markdown's autolink delimiter) never reaches `typedmark-markdown` --
   it's resolved one layer down, before any TypedMark-shaped text exists.
 - Two new generic-element mappings (direction-1 escape hatch, no
-  `typedmark_ast` changes): `<pre>(lang:xxx){code}` for fenced/indented
-  code blocks, `<blockquote>[...]` for block quotes. Both also needed
-  new render cases in `typedmark-renderer` (`pre` -> `<pre><code
+  `typedmark_ast` changes): `<codeblock>(lang:xxx)[code]` for fenced/
+  indented code blocks, `<blockquote>[...]` for block quotes. Both also
+  needed new render cases in `typedmark-renderer` (`codeblock` -> `<pre><code
   class="language-xxx">`, `blockquote` -> `<blockquote>`), since neither
-  kind existed before this pass.
+  kind existed before this pass. `codeblock`'s code lives in `[area]`, not
+  `{value}` (`{value}` is reserved for `id`/`cssclass` metadata, same
+  convention as a heading's `{ id:x, cssclass:y }`) -- and unlike every
+  other element's `[area]`, it's parsed as raw verbatim text, not run
+  through the inline grammar, so real source code isn't misread as
+  TypedMark markup.
 - Images -> `<embed>(file:..)[alt]` or `<embed>(url:..)[alt]` as decided
   earlier; the key is picked by a `dest.contains("://")` heuristic since
   Markdown's `![alt](dest)` doesn't distinguish local paths from URLs

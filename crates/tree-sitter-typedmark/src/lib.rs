@@ -35,7 +35,7 @@
 //!   line before `}`.
 //! - **A `key: [seq]` map entry, when it's the map's last entry with no
 //!   trailing comma** (e.g. `{ title: ..., tags: [a, b] }` on one line, as
-//!   in `docs/tmt/image_meta.tm`'s `@meta(yaml){...}`), gets GLR-merged
+//!   in `docs/tmt/examples/image_meta.tm`'s `@meta(format:yaml){...}`), gets GLR-merged
 //!   with a second, spurious top-level `seq` reading of the same `[a, b]`
 //!   text, wrapping the whole map in an `ERROR`. Overlaps with the bare-
 //!   newline-before-`}` case above (same "is this the map's own trailing
@@ -66,17 +66,18 @@
 //!   worse failure mode for a comment than for e.g. a code span. Here an
 //!   unmatched `/*` just fails to lex as `block_comment` and falls back
 //!   to ordinary `text`/`punctuation` tokens instead.
-//! - **A real embedded JSON/YAML/TOML body inside `@meta(json|yaml|toml){...}`
-//!   isn't understood as such.** `typedmark-parser` hands that body as-is
-//!   to `serde_json`/`serde_yaml`/`toml` (see `typedmark-parser::meta_format`),
-//!   but this grammar has no idea a `{value}` group's content might be a
-//!   different language -- it still tries its own `map`/`seq`/`scalar`
-//!   rules. A quoted JSON key (`{ "key": "value" }`, needed since JSON has
-//!   no bare-identifier keys -- see `docs/tmt/typedmark.tm`'s
-//!   `@meta(json)` block) doesn't match `map_entry`'s bare-identifier
-//!   `key` field, so the nested `{...}` becomes an `ERROR`. Not worth a
-//!   real per-format sub-grammar here -- this crate is for editor
-//!   highlighting, not validation.
+//! - **A real embedded JSON/YAML/TOML body inside an element's `{...}`
+//!   (any element whose `(input)` has a `format:json|yaml|toml` key, not
+//!   just `@meta`) isn't understood as such.** `typedmark-parser` hands
+//!   that body as-is to `serde_json`/`serde_yaml`/`toml` (see
+//!   `typedmark-parser::embedded_format`), but this grammar has no idea a
+//!   `{value}` group's content might be a different language -- it still
+//!   tries its own `map`/`seq`/`scalar` rules. A quoted JSON key
+//!   (`{ "key": "value" }`, needed since JSON has no bare-identifier keys
+//!   -- see `docs/tmt/typedmark.tm`'s `@meta(format:json)` block) doesn't
+//!   match `map_entry`'s bare-identifier `key` field, so the nested
+//!   `{...}` becomes an `ERROR`. Not worth a real per-format sub-grammar
+//!   here -- this crate is for editor highlighting, not validation.
 //! - **`thematic_break`'s dash run only ever consumes exactly 3 `-`,
 //!   even when the source has more** (`-----` -> a 3-dash `thematic_break`
 //!   plus the leftover 2 dashes falling back to `punctuation` inside a
@@ -90,11 +91,11 @@
 //!
 //! `scanner.c` (see its own module doc) resolves what used to be listed
 //! here as a known limitation: a bare, colon-less, identifier-shaped
-//! scalar directly inside `(...)`/`{...}` (`@meta(yaml)`'s `yaml`,
-//! `{required}`) now parses as a clean `scalar` instead of an `ERROR`.
+//! scalar directly inside `(...)`/`{...}` (e.g. a bare tag like `@foo(yaml)`,
+//! or `{required}`) now parses as a clean `scalar` instead of an `ERROR`.
 //!
 //! Verified against real content: `cargo test` in this crate parses
-//! `docs/tmt/typedmark.tm` and `docs/tmt/image_meta.tm` and checks that
+//! `docs/tmt/typedmark.tm` and `docs/tmt/examples/image_meta.tm` and checks that
 //! the only `ERROR`/`MISSING` nodes are the known, narrow cases above --
 //! not that there are none. `docs/tmt/typedmark.tm` also has one
 //! pre-existing case (`###[ [] のルール ]`, a `[]` immediately inside a
@@ -271,9 +272,9 @@ mod tests {
         // knowing whether a `:` follows. The external scanner supplies that
         // one token of lookahead.
         for src in [
-            "@meta(yaml)\n",
-            "@meta(json)\n",
-            "@meta(toml)\n",
+            "@foo(yaml)\n",
+            "@foo(json)\n",
+            "@foo(toml)\n",
             "<input>{required}\n",
         ] {
             let tree = parse(src);
@@ -325,7 +326,7 @@ mod tests {
         // different, pre-existing limitation unrelated to this one (see
         // this module's doc comment), confirmed to already reproduce with
         // this exact source on the grammar from before `scanner.c` existed.
-        let tree = parse("@meta(json){key:value}\n");
+        let tree = parse("@meta(format:json){key:value}\n");
         assert!(!tree.root_node().has_error());
     }
 
@@ -400,9 +401,9 @@ mod tests {
         // stray-`]`-in-prose and the pre-existing `[]`-inside-`[...]`
         // parser bug, both from this file's self-referential
         // grammar-explanation prose, and `"key":` is the embedded-JSON
-        // quoted-key case (`@meta(json){ { "key": "value" } }`).
-        // (`yaml`/`required`/`anotation1`, the old bare-non-colon-scalar
-        // cases, no longer error -- see `scanner.c`.)
+        // quoted-key case (`@meta(format:json){ { "key": "value" } }`).
+        // (`required`/`anotation1`, the old bare-non-colon-scalar cases,
+        // no longer error -- see `scanner.c`.)
         let known_markers = ["のうち必要なものを付ける", "のルール", "\n", "\"key\":"];
         for text in &errors {
             assert!(
@@ -414,13 +415,15 @@ mod tests {
 
     #[test]
     fn image_meta_tm_fixture_has_only_known_error_cases() {
-        let src = include_str!("../../../docs/tmt/image_meta.tm");
+        let src = include_str!("../../../docs/tmt/examples/image_meta.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);
         // The lone remaining error wraps `title: value` and `tags: ` --
         // the `key: [seq]`-map-entry-value misparse documented in this
         // module's doc comment (`tags: [a, b]`), unrelated to `@meta`'s
-        // own `(yaml)` tag, which no longer errors (see `scanner.c`).
+        // own `(format:yaml)` tag, which parses cleanly (an ordinary
+        // `key:value` map entry, not the bare-scalar case `scanner.c`
+        // exists for).
         for text in &errors {
             assert!(
                 text.contains("tags:"),
@@ -452,12 +455,12 @@ mod tests {
 
     #[test]
     fn cheatsheet_tm_fixture_has_only_the_bare_newline_before_brace_error() {
-        // `docs/cheatsheet.tm`'s three `@meta(json|yaml|toml){...}` blocks
-        // no longer produce the old bare-non-colon-scalar `ERROR` for their
-        // `json`/`yaml`/`toml` tag -- but each one's `key:value` body is a
-        // single entry with a bare newline right before the closing `}`,
-        // which is the *other*, unrelated, still-open limitation documented
-        // in this module's doc comment (independent of `scanner.c`).
+        // `docs/cheatsheet.tm`'s three `@meta(format:json|yaml|toml){...}`
+        // blocks don't hit the old bare-non-colon-scalar case at all
+        // anymore (`format:json` etc. is an ordinary `key:value` map entry)
+        // -- but each one's body is a single entry with a bare newline
+        // right before the closing `}`, which is the *other*, unrelated,
+        // still-open limitation documented in this module's doc comment.
         let src = include_str!("../../../docs/cheatsheet.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);
