@@ -13,6 +13,10 @@
 -. 拡張性を担保
 -. key:valueを重視
 -. @link[私は、研究目的。](url:https://example.com)
+-. 後方互換性
+  - 知らない @xxx を見ても、パーサー全体を壊さない
+-. 「とりあえずdivで包める」みたいな汎用コンテナをTypedMarkに大量導入すると、せっかくの@linkや@codeの意味が薄くなる。
+-. Markdownの簡潔さ + HTMLのsemantic structure + ASTとしての厳格さ
 
 ##[
   なぜtypedmarkを使用するのか？
