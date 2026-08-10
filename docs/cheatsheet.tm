@@ -1,22 +1,40 @@
-// [ special-casing exists for "import" anywhere. Renders as a generic
-//   element (`<div class="tm-element tm-import" data-file="...">`), same as
-//   any other unrecognized `<T>`/`@name`. Kept commented so this file
-//   doesn't look like a working example. ]
+/// [ special-casing exists for "import" anywhere. Renders as a generic
+///   element (`<div class="tm-element tm-import" data-file="...">`), same as
+///   any other unrecognized `<T>`/`@name`. Kept commented so this file
+///   doesn't look like a working example. ]
 // @import(file:/settings.tm)
-@config(format:json)
+@config(
+  format:json
+  /// [ (意図)[formatterが見る。視覚に長けたフォーマットであるために、
+  ///   @[一行ずつ](file:tmt/examples/bookmark.tm)]や、@[エリアだけ改行](file:tmt/examples/scenario.tm)などをフォーマッタや出力が合わせるために記入したい。
+  ///   だが、確かに、毎ファイル書くのはどうかとも思う。其の場合は、type(あるいは拡張子)で、別ファイルに宣言された設定を自動的に読み込むようにしたいかもしれない。 ]
+  // style:structural // one_per_line 
+
+  // export_type:[ commonmark, @import(file:path) ]
+  // export_path:/readme.md
+)
 
 @meta(format:json){
   {
-    "key": "value"
+    "key": "value",
+    "type": "person"
   }
 }
 @meta(format:yaml){
   key: value
   date: time
+  type: character
 }
 @meta(format:toml){
   key = "value"
+  type = "location"
 }
+// @meta(format:ini){
+//   key = "value"
+// }
+// @meta(format:kdl){
+//   key = "value"
+// }
 
 // @links{}: real, implemented (`typedmark-renderer`'s `render_links_container`
 // / `typedmark-markdown`'s `render_links_container`). Bare `(id)[content]`
@@ -32,8 +50,24 @@
 // @foot()[ 
 //   :(id:asdf)[]
 // ] 
-// [ NOT implemented]
+
+// [ NOT implemented ]
 // @tag[]
+// @[ ここには、英語しか入れれないということになる。 ]
+
+// [ NOT implemented ]
+// @(lang:sh, area:raw)[
+//   sudo whoami
+//   ls --help
+// ]
+
+// [ これは、見にくくなるのでやりたくない。 ]
+// @vars(foo:bool,a:int,b:int){foo:true, a:1, b:2}
+// @var(foo:bool,a:int,b:int){foo:true, a:1, b:2}[ a + b ]
+// @(foo:bool){foo:true}
+
+// [ NOT implemented ]
+// $(a.a) 変数で置換する。
 
 @link[](url:https://)
 @link[](file:/readme.md)
@@ -47,12 +81,16 @@
 ##[ heading ]{ id:2 }
 ###[ heading ]{ id:3 }
 
-<embed>[](url:https://)
-<embed>[](file:/readme.md)
-<embed>[](ref:3)
+// <index>(){}
+// <icon>()
 
-<codeblock>(lang:json)[
-{sdfsdf}
+<embed>[alt](url:https://)
+<embed>[alt](file:/readme.md)
+<embed>[alt](ref:3)
+
+<codeblock>(lang:sh)[
+sudo whoami
+ls --help
 ]
 
 // area:raw: opts any element's [area] into raw/verbatim text, same
@@ -98,9 +136,6 @@ _aaaa_
 ----(💫)----
 
 ----[💫]----
-
-// ---<icon>()---
-// ===
 
 // line comment
 /* block comment */

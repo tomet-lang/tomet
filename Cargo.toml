@@ -8,19 +8,20 @@ members = [
   "apps/typedmark-java",
   "apps/typedmark-js",
   "apps/typedmark-lsp",
+  "apps/typedmark-python",
   #[ Editor Support ]
   "apps/zed-extension",
-  "apps/typedmark-python",
-  "apps/typedmark-helix",
-  "apps/typedmark-neovim",
+  "apps/vscode-extension",
+  "apps/neovim-plugin",
+  "apps/helix-plugin",
 
   "crates/typedmark-ast",
-  "crates/typedmark-formatter",
   "crates/typedmark-lexar",
-  "crates/typedmark-markdown",
   "crates/typedmark-parser",
-  "crates/typedmark-renderer",
   "crates/typedmark-validator",
+  "crates/typedmark-markdown",
+  "crates/typedmark-renderer",
+  "crates/typedmark-formatter",
   "crates/serde_typedmark",
   "crates/tree-sitter-typedmark"
 ]
