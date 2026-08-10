@@ -97,7 +97,7 @@ fn element_to_md(el: &Element, inline: bool) -> String {
         "em" => format!("*{}*", area_to_md(el)),
         "strong" => format!("**{}**", area_to_md(el)),
         "mark" => format!("<mark>{}</mark>", area_to_md(el)),
-        "pre" => render_code_block(el),
+        "codeblock" => render_code_block(el),
         "blockquote" => render_blockquote(el),
         "url" | "file" => render_link(el, &kind),
         "ref" => render_ref(el),
@@ -124,6 +124,9 @@ fn render_hr(el: &Element) -> String {
     }
 }
 
+/// `codeblock`'s `{value}` (`id`/`cssclass` metadata, if present -- see
+/// `typedmark-renderer`'s `render_codeblock_element`) has no CommonMark
+/// form, same as a heading's attrs, so it's dropped on export.
 fn render_code_block(el: &Element) -> String {
     let lang = el
         .input
@@ -132,10 +135,11 @@ fn render_code_block(el: &Element) -> String {
         .and_then(|m| map_get(m, "lang"))
         .map(value_to_plain)
         .unwrap_or_default();
-    let code = match &el.value {
-        Some(ElementValue::Data(Value::String(s))) => s.clone(),
-        _ => String::new(),
-    };
+    let code = el
+        .area
+        .as_ref()
+        .map(|a| inlines_to_plain(a))
+        .unwrap_or_default();
     let fence = fence_for(&code);
     format!("{fence}{lang}\n{code}\n{fence}")
 }
@@ -451,15 +455,13 @@ mod tests {
     #[test]
     fn code_block_uses_fence_and_lang() {
         let el = Element {
-            sigil: Sigil::Type("pre".to_string()),
+            sigil: Sigil::Type("codeblock".to_string()),
             input: Some(Value::Map(vec![(
                 "lang".to_string(),
                 Value::String("rust".to_string()),
             )])),
-            area: None,
-            value: Some(ElementValue::Data(Value::String(
-                "fn main() {}".to_string(),
-            ))),
+            area: Some(vec![Inline::Text("fn main() {}".to_string())]),
+            value: None,
         };
         let doc = Document {
             blocks: vec![Block::Element(el)],

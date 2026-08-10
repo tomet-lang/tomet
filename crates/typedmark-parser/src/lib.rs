@@ -1,6 +1,6 @@
 mod document;
+mod embedded_format;
 mod error;
-mod meta_format;
 mod value;
 
 pub use document::parse_document;
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn parses_the_repo_spec_examples() {
         parse_document(include_str!("../../../docs/tmt/typedmark.tm")).unwrap();
-        parse_document(include_str!("../../../docs/tmt/image_meta.tm")).unwrap();
+        parse_document(include_str!("../../../docs/tmt/examples/image_meta.tm")).unwrap();
     }
 
     #[test]

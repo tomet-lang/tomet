@@ -16,9 +16,7 @@
 //! and inline HTML are dropped; hard breaks collapse to a space.
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
-use typedmark_ast::{
-    Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
-};
+use typedmark_ast::{Block, Document, Element, Heading, Inline, ListItem, Sigil, Value};
 
 enum Frame {
     /// Top-level document, and the fallback container for anything that
@@ -170,10 +168,10 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
                 Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
             };
             let el = Element {
-                sigil: Sigil::Type("pre".to_string()),
+                sigil: Sigil::Type("codeblock".to_string()),
                 input,
-                area: None,
-                value: Some(ElementValue::Data(Value::String(text))),
+                area: Some(vec![Inline::Text(text)]),
+                value: None,
             };
             push_block(stack, Block::Element(el));
         }
@@ -462,7 +460,7 @@ mod tests {
         let doc = from_markdown("```rust\nfn main() {}\n```\n");
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("pre".to_string()));
+                assert_eq!(el.sigil, Sigil::Type("codeblock".to_string()));
                 assert_eq!(
                     el.input,
                     Some(Value::Map(vec![(
@@ -471,10 +469,8 @@ mod tests {
                     )]))
                 );
                 assert_eq!(
-                    el.value,
-                    Some(ElementValue::Data(Value::String(
-                        "fn main() {}".to_string()
-                    )))
+                    el.area,
+                    Some(vec![Inline::Text("fn main() {}".to_string())])
                 );
             }
             other => panic!("expected pre element, got {other:?}"),

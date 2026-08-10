@@ -1,27 +1,39 @@
-@import(file:/)
-@meta(json){
-  { 
-    "key": "value" 
+// [ NOT implemented ]
+// @import(file:/settings.json)
+// [ special-casing exists for "import" anywhere. Renders as a generic
+//   element (`<div class="tm-element tm-import" data-file="...">`), same as
+//   any other unrecognized `<T>`/`@name`. Kept commented so this file
+//   doesn't look like a working example. ]
+// @settings(format:json)
+
+@meta(format:json){
+  {
+    "key": "value"
   }
 }
-@meta(yaml){
+@meta(format:yaml){
   key: value
   date: time
 }
-@meta(toml){
+@meta(format:toml){
   key = "value"
 }
 
-// @links()[
-//   @(parent)[]
-//   @(child)[]
-// ]
+// @links{}: real, implemented (`typedmark-renderer`'s `render_links_container`
+// / `typedmark-markdown`'s `render_links_container`). Bare `(id)[content]`
+// children only -- no type name needed, the container already supplies it.
+// Renders as a `<dl>` definition list, each id becoming an `#link-<id>`
+// anchor target other elements can `@(ref:<id>)` to.
+@links {
+  (1)[ 注釈その1 ]
+  (anotation2)[ 注釈その2 ]
+}
 
-// @foot()[
+// [ NOT implemented ]
+// @foot()[ 
 //   :(id:asdf)[]
-//   :(id:zxcv)[]
-// ]
-
+// ] 
+// [ NOT implemented]
 // @tag[]
 
 @link[](url:https://)
@@ -40,15 +52,18 @@
 <embed>[](file:/readme.md)
 <embed>[](ref:3)
 
-// <code>(lang:sh)[]
-// <codeblock>
-// <execute>(lang)[]
-<pre>(lang:json){
+<codeblock>(lang:json)[
 {sdfsdf}
-}
+]
 
-<myfunc>()[]{}
-<foo>()[]{}
+<blockquote>[ 引用文 ]
+
+// <callout>(caution)[
+//
+// ]
+
+// <myfunc>()[]{}
+// <foo>()[]{}
 
 - aaaa
 -. aaaa
@@ -67,11 +82,19 @@ _aaaa_
 ```
 
 ---
+
 -----
+
 ---[ Title ]---
+
+---Title---
+
 ----(💫)----
 
----<icon>()---
+----[💫]----
+
+// ---<icon>()---
+// ===
 
 // line comment
 /* block comment */

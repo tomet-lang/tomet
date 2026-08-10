@@ -94,11 +94,11 @@ mod tests {
     fn does_not_change_the_parsed_document() {
         // Only fixtures that already parse under the current grammar --
         // `docs/cheatsheet.tm` has placeholder empty groups (e.g.
-        // `@meta(json){}`) the parser doesn't accept yet, which is a
+        // `<myfunc>()[]{}`) the parser doesn't accept yet, which is a
         // pre-existing grammar gap unrelated to formatting.
         for src in [
             include_str!("../../../docs/tmt/typedmark.tm"),
-            include_str!("../../../docs/tmt/image_meta.tm"),
+            include_str!("../../../docs/tmt/examples/image_meta.tm"),
             include_str!("../../../docs/roadmap.ja.tm"),
         ] {
             let before = typedmark_parser::parse_document(src)
@@ -113,7 +113,7 @@ mod tests {
     fn repo_examples() -> Vec<&'static str> {
         vec![
             include_str!("../../../docs/tmt/typedmark.tm"),
-            include_str!("../../../docs/tmt/image_meta.tm"),
+            include_str!("../../../docs/tmt/examples/image_meta.tm"),
             include_str!("../../../docs/cheatsheet.tm"),
             include_str!("../../../docs/roadmap.ja.tm"),
         ]

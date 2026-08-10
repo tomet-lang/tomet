@@ -1,4 +1,4 @@
-@meta(yaml) {
+@meta(format:yaml) {
   title: value
   tags: [a, b]
 }

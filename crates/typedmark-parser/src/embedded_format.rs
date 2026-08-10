@@ -8,7 +8,7 @@
 //! and its caller in `document.rs`.
 
 use crate::error::Result;
-use crate::value::err;
+use crate::value::{err, find_matching_delimiter};
 use typedmark_ast::Value;
 use typedmark_lexar::Cursor;
 
@@ -44,7 +44,7 @@ pub(crate) fn parse_embedded_format_value(
         return Err(err(cur, cur.pos(), "expected '{'"));
     }
     let body_start = cur.pos();
-    let body_end = find_matching_brace(cur, group_start)?;
+    let body_end = find_matching_delimiter(cur, '{', '}', group_start)?;
     let raw = &cur.src()[body_start..body_end];
     cur.set_pos(body_end);
     if !cur.eat_str("}") {
@@ -53,72 +53,7 @@ pub(crate) fn parse_embedded_format_value(
     parse_raw(cur, format, body_start, raw)
 }
 
-/// Advances `cur` to the position of the `}` that matches the `{` already
-/// consumed just before `cur`'s current position, tracking nested braces
-/// and skipping over quoted strings (so a `"{"` in a JSON string, or a `'`
-/// flow scalar in YAML, can't miscount). Doesn't consume the closing `}`.
-fn find_matching_brace(cur: &mut Cursor, group_start: usize) -> Result<usize> {
-    let mut depth: u32 = 0;
-    loop {
-        match cur.peek() {
-            None => {
-                return Err(err(
-                    cur,
-                    group_start,
-                    "unterminated '{', expected matching '}'",
-                ));
-            }
-            Some('"') => skip_quoted(cur, '"'),
-            Some('\'') => skip_quoted(cur, '\''),
-            Some('{') => {
-                depth += 1;
-                cur.bump();
-            }
-            Some('}') => {
-                if depth == 0 {
-                    return Ok(cur.pos());
-                }
-                depth -= 1;
-                cur.bump();
-            }
-            Some(_) => {
-                cur.bump();
-            }
-        }
-    }
-}
-
-/// Skips a `quote`-delimited run starting at the opening quote. Backslash
-/// escapes are only honored for `"` (JSON/TOML basic strings) -- `'`
-/// strings (TOML literal strings, YAML single-quoted scalars) have no
-/// backslash escaping in either format, so `\` there is just a literal
-/// character. Runs to EOF harmlessly if unterminated; the caller's own
-/// EOF check reports that as "unterminated '{'" once the outer loop sees it.
-fn skip_quoted(cur: &mut Cursor, quote: char) {
-    cur.bump();
-    loop {
-        match cur.peek() {
-            None => break,
-            Some('\\') if quote == '"' => {
-                cur.bump();
-                cur.bump();
-            }
-            Some(c) => {
-                cur.bump();
-                if c == quote {
-                    break;
-                }
-            }
-        }
-    }
-}
-
-fn parse_raw(
-    cur: &Cursor,
-    format: EmbeddedFormat,
-    body_start: usize,
-    raw: &str,
-) -> Result<Value> {
+fn parse_raw(cur: &Cursor, format: EmbeddedFormat, body_start: usize, raw: &str) -> Result<Value> {
     match format {
         EmbeddedFormat::Json => {
             let v: serde_json::Value =

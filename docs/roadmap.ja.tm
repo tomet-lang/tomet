@@ -1,4 +1,4 @@
-@meta(yaml){
+@meta(format:yaml){
   key:value
 }
 
@@ -14,6 +14,8 @@
 - 拡張性
 -. ドキュメント
 - 置換
+- アイコン、ロゴ
+- IDEサポート
 
 ##[ Cettila ]
 

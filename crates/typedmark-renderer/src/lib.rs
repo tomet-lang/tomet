@@ -190,7 +190,7 @@ fn render_element(el: &Element, out: &mut String, inline: bool) {
         "embed" => render_embed_element(el, out),
         "hr" => render_hr_element(el, out),
         "em" | "strong" | "mark" => render_wrapped_inline(el, &kind, out),
-        "pre" => render_pre_element(el, out),
+        "codeblock" => render_codeblock_element(el, out),
         "blockquote" => render_blockquote_element(el, out, inline),
         _ => render_generic_element(el, &kind, out, inline),
     }
@@ -221,10 +221,17 @@ fn render_wrapped_inline(el: &Element, tag: &str, out: &mut String) {
     out.push_str(&format!("</{tag}>"));
 }
 
-/// `<pre>(lang:xxx){code}` -- the Markdown importer's mapping for fenced
-/// (and indented) code blocks, since `typedmark_ast` has no dedicated
-/// code-block variant (see `docs/commonmark-support.md`).
-fn render_pre_element(el: &Element, out: &mut String) {
+/// `<codeblock>(lang:xxx)[code]` -- the Markdown importer's mapping for
+/// fenced (and indented) code blocks, since `typedmark_ast` has no
+/// dedicated code-block variant (see `docs/commonmark-support.md`). `lang`
+/// is a display-only syntax-highlighting hint, never a parse-mode switch
+/// (unrelated to the generic `format` key other elements use for their
+/// `{value}`). Code lives in `[area]`, parsed as raw verbatim text (see
+/// `document.rs::parse_raw_area`) rather than the usual inline grammar, so
+/// real source containing `*`/`<`/`@`/backticks stays literal. `{value}`,
+/// if present, is `id`/`cssclass` metadata -- same convention as a
+/// heading's `{ id:x, cssclass:y }`, not code content.
+fn render_codeblock_element(el: &Element, out: &mut String) {
     let lang = el
         .input
         .as_ref()
@@ -232,11 +239,19 @@ fn render_pre_element(el: &Element, out: &mut String) {
         .and_then(|m| map_get(m, "lang"))
         .map(value_to_plain)
         .unwrap_or_default();
-    let code = match &el.value {
-        Some(ElementValue::Data(v)) => value_to_plain(v),
-        _ => String::new(),
+    let code = el
+        .area
+        .as_ref()
+        .map(|a| inlines_to_plain(a))
+        .unwrap_or_default();
+    let attrs = match &el.value {
+        Some(ElementValue::Data(v)) => Some(v),
+        _ => None,
     };
-    out.push_str("<pre><code");
+    let (id, class, data) = split_attrs(attrs);
+    out.push_str("<pre");
+    push_named_attrs(out, &id, &class, &data);
+    out.push_str("><code");
     if !lang.is_empty() {
         out.push_str(&format!(" class=\"language-{}\"", escape_attr(&lang)));
     }
@@ -586,7 +601,7 @@ mod tests {
 
     #[test]
     fn meta_element_has_no_visible_output() {
-        let doc = parse_document("@meta(yaml){\n  key: value\n}\n").unwrap();
+        let doc = parse_document("@meta(format:yaml){\n  key: value\n}\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "");
     }
@@ -595,7 +610,8 @@ mod tests {
     fn bare_at_meta_is_not_inferred_only_the_explicit_name_is() {
         // `meta` is deliberately not in `typedmark_ast::INFERRED_AT_KEYS`
         // (see its doc comment) -- a bare `@(meta:yaml)` falls back to the
-        // generic "at" element rendering, unlike `@meta(yaml){...}` above.
+        // generic "at" element rendering, unlike `@meta(format:yaml){...}`
+        // above.
         let doc = parse_document("@(meta:yaml)[]\n").unwrap();
         let body = render_body(&doc);
         assert!(
@@ -611,7 +627,7 @@ mod tests {
         // into one `Block::Paragraph` at the parser level; that paragraph
         // must not leak a stray whitespace-only `<p>` into the output.
         let doc = parse_document(
-            "@meta(json){\n  {\"key\":\"value\"}\n}\n@meta(yaml){\n  key:value\n}\n@meta(toml){\n  key = \"value\"\n}\n\n#[ next ]\n",
+            "@meta(format:json){\n  {\"key\":\"value\"}\n}\n@meta(format:yaml){\n  key:value\n}\n@meta(format:toml){\n  key = \"value\"\n}\n\n#[ next ]\n",
         )
         .unwrap();
         let body = render_body(&doc);
@@ -667,5 +683,51 @@ mod tests {
         let doc = parse_document("<embed>(file:assets/pic.png)[a cat]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "<img src=\"assets/pic.png\" alt=\"a cat\">\n");
+    }
+
+    #[test]
+    fn renders_codeblock_with_lang() {
+        let doc = parse_document("<codeblock>(lang:rust)[fn main() {}]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<pre><code class=\"language-rust\">fn main() {}</code></pre>\n"
+        );
+    }
+
+    #[test]
+    fn codeblock_content_stays_literal_not_interpreted_as_markup() {
+        // `codeblock`'s `[area]` is the one exception to the usual inline
+        // grammar -- real code containing `*`/`<T>`/`@`/backticks must not
+        // be reinterpreted as em/strong/element triggers/code spans.
+        let doc = parse_document("<codeblock>(lang:rust)[let x = *ptr; let y = <T>; @deco `q`]\n")
+            .unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<pre><code class=\"language-rust\">let x = *ptr; let y = &lt;T&gt;; @deco `q`</code></pre>\n"
+        );
+    }
+
+    #[test]
+    fn codeblock_with_a_nested_bracket_is_not_truncated_early() {
+        let doc = parse_document("<codeblock>(lang:rust)[let v = [1, 2, 3];]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<pre><code class=\"language-rust\">let v = [1, 2, 3];</code></pre>\n"
+        );
+    }
+
+    #[test]
+    fn codeblock_value_group_is_id_cssclass_metadata_not_code() {
+        let doc =
+            parse_document("<codeblock>(lang:rust){id:snippet1, cssclass:card}[fn main() {}]\n")
+                .unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<pre id=\"snippet1\" class=\"card\"><code class=\"language-rust\">fn main() {}</code></pre>\n"
+        );
     }
 }
