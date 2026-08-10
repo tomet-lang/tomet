@@ -7,8 +7,8 @@
 use crate::embedded_format::{EmbeddedFormat, parse_embedded_format_value};
 use crate::error::Result;
 use crate::value::{
-    eat_ident, err, find_matching_delimiter, is_ident_char, parse_value_at, skip_inline_ws,
-    skip_ws_and_newlines,
+    eat_ident, err, find_matching_bracket, find_matching_delimiter, is_ident_char,
+    parse_value_at, skip_inline_ws, skip_ws_and_newlines, skip_ws_newlines_and_comments,
 };
 use typedmark_ast::{
     Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
@@ -18,34 +18,53 @@ use typedmark_lexar::Cursor;
 pub fn parse_document(src: &str) -> Result<Document> {
     let mut cur = Cursor::new(src);
     let mut blocks = Vec::new();
+    // Running default for the `{...}` embedded-format mechanism, set by a
+    // `@config(format:...)` block and applied to every element parsed after
+    // it -- order-dependent, single-pass (see `config_format_update`).
+    let mut default_format: Option<EmbeddedFormat> = None;
     loop {
         skip_blank_lines(&mut cur);
         if cur.is_eof() {
             break;
         }
-        if cur.peek() == Some('#') {
-            blocks.push(Block::Heading(parse_heading(&mut cur)?));
-        } else if cur.starts_with("//") {
+        let block = if cur.peek() == Some('#') {
+            Some(Block::Heading(parse_heading(&mut cur, default_format)?))
+        } else if is_line_comment_start(&cur) {
+            skip_inline_ws(&mut cur);
             skip_line_comment(&mut cur);
-        } else if cur.starts_with("/*") {
+            None
+        } else if is_block_comment_start(&cur) {
+            skip_inline_ws(&mut cur);
             skip_block_comment(&mut cur)?;
+            None
         } else if is_titled_thematic_break_start(&cur) {
-            blocks.push(Block::Element(parse_titled_thematic_break(&mut cur)?));
+            Some(Block::Element(parse_titled_thematic_break(
+                &mut cur,
+                default_format,
+            )?))
         } else if is_thematic_break(&cur) {
             consume_thematic_break(&mut cur);
-            blocks.push(Block::Element(Element::new(Sigil::Type("hr".to_string()))));
+            Some(Block::Element(Element::new(Sigil::Type("hr".to_string()))))
         } else if is_ordered_list_marker(&cur) {
-            blocks.push(Block::List {
+            Some(Block::List {
                 ordered: true,
-                items: parse_list(&mut cur, true)?,
-            });
+                items: parse_list(&mut cur, true, default_format)?,
+            })
         } else if is_list_marker(&cur) {
-            blocks.push(Block::List {
+            Some(Block::List {
                 ordered: false,
-                items: parse_list(&mut cur, false)?,
-            });
+                items: parse_list(&mut cur, false, default_format)?,
+            })
         } else {
-            blocks.push(parse_paragraph(&mut cur)?);
+            Some(parse_paragraph(&mut cur, default_format)?)
+        };
+        if let Some(block) = block {
+            if let Block::Element(el) = &block {
+                if let Some(new_default) = config_format_update(el) {
+                    default_format = new_default;
+                }
+            }
+            blocks.push(block);
         }
     }
     Ok(Document { blocks })
@@ -93,6 +112,26 @@ fn skip_blank_lines(cur: &mut Cursor) {
             }
         }
     }
+}
+
+/// Whether the current line, after any leading inline whitespace, starts a
+/// `//` line comment. Unlike block markers (`#`/list markers/thematic
+/// breaks), a comment carries no structural meaning of its own, so
+/// tolerating indentation costs nothing -- callers that find this `true`
+/// still need to consume that leading whitespace themselves before
+/// `skip_line_comment`.
+fn is_line_comment_start(cur: &Cursor) -> bool {
+    let mut look = *cur;
+    skip_inline_ws(&mut look);
+    look.starts_with("//")
+}
+
+/// Same idea as `is_line_comment_start`, for the block-position `/* ... */`
+/// form.
+fn is_block_comment_start(cur: &Cursor) -> bool {
+    let mut look = *cur;
+    skip_inline_ws(&mut look);
+    look.starts_with("/*")
 }
 
 fn is_list_marker(cur: &Cursor) -> bool {
@@ -162,13 +201,16 @@ fn is_titled_thematic_break_start(cur: &Cursor) -> bool {
 /// `hr`-sigil element with the title as its `area` -- `[area]` already
 /// means exactly this on every other element, so no new `Value`/`Element`
 /// shape is needed.
-fn parse_titled_thematic_break(cur: &mut Cursor) -> Result<Element> {
+fn parse_titled_thematic_break(
+    cur: &mut Cursor,
+    default_format: Option<EmbeddedFormat>,
+) -> Result<Element> {
     cur.eat_while(|c| c == '-');
     skip_inline_ws(cur);
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '['"));
     }
-    let title = parse_inline_seq(cur, Stop::Bracket(']'))?;
+    let title = parse_inline_seq(cur, Stop::Bracket(']'), default_format)?;
     if !cur.eat_str("]") {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }
@@ -196,13 +238,13 @@ fn parse_titled_thematic_break(cur: &mut Cursor) -> Result<Element> {
     Ok(el)
 }
 
-fn parse_heading(cur: &mut Cursor) -> Result<Heading> {
+fn parse_heading(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Heading> {
     let level = cur.eat_while(|c| c == '#').len() as u8;
     skip_inline_ws(cur);
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '[' after '#'"));
     }
-    let content = parse_inline_seq(cur, Stop::Bracket(']'))?;
+    let content = parse_inline_seq(cur, Stop::Bracket(']'), default_format)?;
     if !cur.eat_str("]") {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }
@@ -230,7 +272,7 @@ fn parse_braced_value(cur: &mut Cursor) -> Result<Value> {
         return Err(err(cur, cur.pos(), "expected '{'"));
     }
     let v = parse_value_at(cur)?;
-    skip_ws_and_newlines(cur);
+    skip_ws_newlines_and_comments(cur);
     if !cur.eat_str("}") {
         return Err(err(cur, cur.pos(), "expected '}'"));
     }
@@ -240,7 +282,11 @@ fn parse_braced_value(cur: &mut Cursor) -> Result<Value> {
 /// `ordered` selects which marker continues the list -- a run of `- `
 /// lines and a run of `-. ` lines are two separate lists even if adjacent,
 /// so switching marker mid-stream stops this list rather than mixing.
-fn parse_list(cur: &mut Cursor, ordered: bool) -> Result<Vec<ListItem>> {
+fn parse_list(
+    cur: &mut Cursor,
+    ordered: bool,
+    default_format: Option<EmbeddedFormat>,
+) -> Result<Vec<ListItem>> {
     let mut items = Vec::new();
     while if ordered {
         is_ordered_list_marker(cur)
@@ -252,7 +298,7 @@ fn parse_list(cur: &mut Cursor, ordered: bool) -> Result<Vec<ListItem>> {
             cur.bump();
         }
         skip_inline_ws(cur);
-        let content = parse_inline_seq(cur, Stop::Line)?;
+        let content = parse_inline_seq(cur, Stop::Line, default_format)?;
         items.push(ListItem { content });
         if cur.peek() == Some('\n') {
             cur.bump();
@@ -261,8 +307,8 @@ fn parse_list(cur: &mut Cursor, ordered: bool) -> Result<Vec<ListItem>> {
     Ok(items)
 }
 
-fn parse_paragraph(cur: &mut Cursor) -> Result<Block> {
-    let mut content = parse_inline_seq(cur, Stop::Paragraph)?;
+fn parse_paragraph(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Block> {
+    let mut content = parse_inline_seq(cur, Stop::Paragraph, default_format)?;
     if content.len() == 1 && matches!(content[0], Inline::Element(_)) {
         if let Inline::Element(el) = content.pop().unwrap() {
             return Ok(Block::Element(el));
@@ -281,9 +327,21 @@ enum Stop {
     Delim(&'static str),
 }
 
-fn parse_inline_seq(cur: &mut Cursor, stop: Stop) -> Result<Vec<Inline>> {
+fn parse_inline_seq(
+    cur: &mut Cursor,
+    stop: Stop,
+    default_format: Option<EmbeddedFormat>,
+) -> Result<Vec<Inline>> {
     let mut items = Vec::new();
     let mut text_start = cur.pos();
+    // Only meaningful for `Stop::Bracket`, whose closer is always `]`: an
+    // unowned literal `[`/`]` reaching this loop's plain-text fallback
+    // (one belonging to a nested element/`*em*`/backtick span is fully
+    // consumed by its own recursive call and never reaches here, so it
+    // can't double-count) nests instead of ending the area at the first
+    // `]`, e.g. a bare "[brackets]" or "[ ]" inside otherwise-ordinary
+    // text.
+    let mut bracket_depth: u32 = 0;
     loop {
         match stop {
             Stop::Bracket(c) => {
@@ -291,7 +349,12 @@ fn parse_inline_seq(cur: &mut Cursor, stop: Stop) -> Result<Vec<Inline>> {
                     return Err(err(cur, cur.pos(), format!("unterminated, expected '{c}'")));
                 }
                 if cur.peek() == Some(c) {
-                    break;
+                    if bracket_depth == 0 {
+                        break;
+                    }
+                    bracket_depth -= 1;
+                } else if cur.peek() == Some('[') {
+                    bracket_depth += 1;
                 }
             }
             Stop::Line => {
@@ -311,6 +374,8 @@ fn parse_inline_seq(cur: &mut Cursor, stop: Stop) -> Result<Vec<Inline>> {
                         || look.peek() == Some('\n')
                         || look.peek() == Some('#')
                         || is_list_marker(&look)
+                        || look.starts_with("//")
+                        || look.starts_with("/*")
                     {
                         break;
                     }
@@ -352,24 +417,38 @@ fn parse_inline_seq(cur: &mut Cursor, stop: Stop) -> Result<Vec<Inline>> {
             continue;
         }
         if cur.starts_with("/*") {
-            // Inline comment: has an explicit closer (unlike `//`), so
-            // unlike that block-only form it's safe to recognize anywhere
-            // -- it can't be mistaken for a bare URL's `//` and can't run
-            // past a `]`/`)`/`}` it doesn't own without erroring first.
+            // Inline `/* ... */`: has an explicit closer, so it's safe to
+            // recognize anywhere -- it can't run past a `]`/`)`/`}` it
+            // doesn't own without erroring first.
             flush_text(&mut items, cur, &mut text_start);
             skip_block_comment(cur)?;
             text_start = cur.pos();
             continue;
         }
+        if cur.starts_with("//") && is_boundary(char_before(cur)) {
+            // Inline `//`, to end of line: only recognized when it isn't
+            // glued to preceding text -- a `//` right after whitespace,
+            // a newline, or the very start of the text is a comment, but
+            // `https://example.com` (no whitespace before `//`) stays
+            // literal. Same boundary rule `eat_scalar_raw`
+            // (`value.rs`) uses for a trailing comment inside `(...)`/
+            // `{...}`. Doesn't consume the trailing newline itself, so
+            // `Stop::Paragraph`'s lazy-continuation check still runs
+            // normally on whatever follows.
+            flush_text(&mut items, cur, &mut text_start);
+            skip_line_comment(cur);
+            text_start = cur.pos();
+            continue;
+        }
         if cur.peek() == Some('<') && is_type_element_start(cur) {
             flush_text(&mut items, cur, &mut text_start);
-            items.push(Inline::Element(parse_element(cur)?));
+            items.push(Inline::Element(parse_element(cur, default_format)?));
             text_start = cur.pos();
             continue;
         }
         if cur.peek() == Some('@') && is_at_element_start(cur) {
             flush_text(&mut items, cur, &mut text_start);
-            items.push(Inline::Element(parse_element(cur)?));
+            items.push(Inline::Element(parse_element(cur, default_format)?));
             text_start = cur.pos();
             continue;
         }
@@ -380,7 +459,7 @@ fn parse_inline_seq(cur: &mut Cursor, stop: Stop) -> Result<Vec<Inline>> {
             // the raw delimiter text gets flushed as literal text on top
             // of the parsed element.
             let before = cur.pos();
-            if let Some(el) = try_delimited(cur)? {
+            if let Some(el) = try_delimited(cur, default_format)? {
                 flush_text_upto(&mut items, cur, &mut text_start, before);
                 items.push(Inline::Element(el));
                 text_start = cur.pos();
@@ -448,16 +527,24 @@ fn is_boundary(c: Option<char>) -> bool {
     matches!(c, None | Some(' ') | Some('\t') | Some('\n') | Some('\r'))
 }
 
-fn try_delimited(cur: &mut Cursor) -> Result<Option<Element>> {
+fn try_delimited(
+    cur: &mut Cursor,
+    default_format: Option<EmbeddedFormat>,
+) -> Result<Option<Element>> {
     for (delim, kind) in DELIMITERS {
-        if let Some(el) = try_one_delimited(cur, delim, kind)? {
+        if let Some(el) = try_one_delimited(cur, delim, kind, default_format)? {
             return Ok(Some(el));
         }
     }
     Ok(None)
 }
 
-fn try_one_delimited(cur: &mut Cursor, delim: &'static str, kind: &str) -> Result<Option<Element>> {
+fn try_one_delimited(
+    cur: &mut Cursor,
+    delim: &'static str,
+    kind: &str,
+    default_format: Option<EmbeddedFormat>,
+) -> Result<Option<Element>> {
     if !cur.starts_with(delim) {
         return Ok(None);
     }
@@ -494,7 +581,7 @@ fn try_one_delimited(cur: &mut Cursor, delim: &'static str, kind: &str) -> Resul
     }
 
     cur.set_pos(open.pos());
-    let inner = parse_inline_seq(cur, Stop::Delim(delim))?;
+    let inner = parse_inline_seq(cur, Stop::Delim(delim), default_format)?;
     if !cur.eat_str(delim) {
         return Err(err(cur, cur.pos(), format!("expected '{delim}'")));
     }
@@ -588,7 +675,7 @@ fn is_at_element_start(cur: &Cursor) -> bool {
     matches!(look.peek(), Some('(') | Some('[') | Some('{'))
 }
 
-fn parse_element(cur: &mut Cursor) -> Result<Element> {
+fn parse_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Element> {
     let sigil = if cur.peek() == Some('<') {
         cur.bump();
         let name = eat_ident(cur).to_string();
@@ -633,17 +720,27 @@ fn parse_element(cur: &mut Cursor) -> Result<Element> {
                 Some('[') if el.area.is_none() => {
                     el.area = Some(if is_codeblock(&el) {
                         parse_raw_area(cur)?
+                    } else if is_verbatim_area(&el) {
+                        parse_verbatim_area(cur)?
                     } else {
-                        parse_area(cur)?
+                        parse_area(cur, default_format)?
                     });
                     continue;
                 }
                 Some('{') if el.value.is_none() => {
-                    el.value = Some(match embedded_format_for(&el) {
+                    // An explicit local `format` key always wins (including
+                    // an unrecognized value opting out of an active document
+                    // default); with no local key, inherit the document's
+                    // running default, if any.
+                    let format = match local_format_key(&el) {
+                        Some(explicit) => explicit,
+                        None => default_format,
+                    };
+                    el.value = Some(match format {
                         Some(format) => {
                             ElementValue::Data(parse_embedded_format_value(cur, format)?)
                         }
-                        None => parse_value_group(cur)?,
+                        None => parse_value_group(cur, default_format)?,
                     });
                     continue;
                 }
@@ -661,39 +758,46 @@ fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
         return Err(err(cur, cur.pos(), "expected '('"));
     }
     let v = parse_value_at(cur)?;
-    skip_ws_and_newlines(cur);
+    skip_ws_newlines_and_comments(cur);
     if !cur.eat_str(")") {
         return Err(err(cur, cur.pos(), "expected ')'"));
     }
     Ok(v)
 }
 
-fn parse_area(cur: &mut Cursor) -> Result<Vec<Inline>> {
+fn parse_area(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Vec<Inline>> {
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '['"));
     }
-    let content = parse_inline_seq(cur, Stop::Bracket(']'))?;
+    let content = parse_inline_seq(cur, Stop::Bracket(']'), default_format)?;
     if !cur.eat_str("]") {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }
     Ok(content)
 }
 
-/// `<codeblock>(lang:xxx)[code]` -- unlike every other element's `[area]`,
-/// which goes through the full inline grammar (`parse_inline_seq`: em/
-/// strong/mark, element triggers, ...), a codeblock's `[...]` is raw
-/// verbatim text: real source code containing `*`/`<`/`@`/backticks must
-/// stay literal, not get reinterpreted as TypedMark markup. Bracket-depth
-/// and quote-aware (`find_matching_delimiter`), so a nested `[...]` in the
-/// code (e.g. an array literal) doesn't miscount the closing `]`. This is
-/// a deliberate, sole exception -- see `is_codeblock`'s caller.
-fn parse_raw_area(cur: &mut Cursor) -> Result<Vec<Inline>> {
+/// `<codeblock>(lang:xxx)[code]` and any element opting in via
+/// `area:raw` (see `is_verbatim_area`) both need a `[...]` that's raw
+/// verbatim text rather than going through the full inline grammar
+/// (`parse_inline_seq`: em/strong/mark, element triggers, ...) --
+/// real source code, and free-form prose that must round-trip byte-for-
+/// byte (a memo/notes field), both need `*`/`<`/`@`/backticks and
+/// embedded newlines to stay literal instead of being reinterpreted as
+/// TypedMark markup or collapsed by `normalize_text`'s lazy-continuation
+/// folding. `find_close` supplies the bracket-depth matcher: codeblock
+/// uses the quote-aware one (real source code doesn't have unmatched
+/// quotes), the generic `area:raw` path uses the quote-agnostic one (see
+/// `find_matching_bracket`'s doc comment for why that split exists).
+fn parse_raw_area_with(
+    cur: &mut Cursor,
+    find_close: fn(&mut Cursor, char, char, usize) -> Result<usize>,
+) -> Result<Vec<Inline>> {
     let group_start = cur.pos();
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '['"));
     }
     let body_start = cur.pos();
-    let body_end = find_matching_delimiter(cur, '[', ']', group_start)?;
+    let body_end = find_close(cur, '[', ']', group_start)?;
     let raw = cur.src()[body_start..body_end].to_string();
     cur.set_pos(body_end);
     if !cur.eat_str("]") {
@@ -702,63 +806,117 @@ fn parse_raw_area(cur: &mut Cursor) -> Result<Vec<Inline>> {
     Ok(vec![Inline::Text(raw)])
 }
 
+fn parse_raw_area(cur: &mut Cursor) -> Result<Vec<Inline>> {
+    parse_raw_area_with(cur, find_matching_delimiter)
+}
+
+/// The `area:raw` opt-in's raw area -- see `is_verbatim_area`.
+fn parse_verbatim_area(cur: &mut Cursor) -> Result<Vec<Inline>> {
+    parse_raw_area_with(cur, find_matching_bracket)
+}
+
 fn is_codeblock(el: &Element) -> bool {
     matches!(&el.sigil, Sigil::Type(name) if name == "codeblock")
 }
 
-/// `{...}`'s body is real JSON/YAML/TOML source, not TypedMark's own
-/// `Value` grammar, whenever `(input)` has a `format` key naming one of
-/// those three -- for any element, not just `@meta`. No `format` key, or
-/// an unrecognized value, falls back to the lightweight grammar via
-/// `parse_value_group`.
-fn embedded_format_for(el: &Element) -> Option<EmbeddedFormat> {
-    let Some(Value::Map(entries)) = &el.input else {
+/// Whether `(input)` carries an `area:raw` key, opting *any* element
+/// (not just the built-in `codeblock`) into the same raw/verbatim `[area]`
+/// treatment codeblock gets -- e.g. `<memo>(area:raw)[ ... ]`. Unlike
+/// `format`/`local_format_key`, this is local-only with no document-wide
+/// default and no opt-out state to represent: it's either present with
+/// the recognized value or it isn't, so a plain bool is enough. An
+/// unrecognized `area:` value (or no `area` key at all) falls back to
+/// ordinary prose parsing, same fallback shape as an unrecognized
+/// `format:` value.
+fn is_verbatim_area(el: &Element) -> bool {
+    let Some(Value::Map(entries)) = el.input.as_ref() else {
+        return false;
+    };
+    entries
+        .iter()
+        .any(|(key, v)| key == "area" && matches!(v, Value::String(tag) if tag == "raw"))
+}
+
+/// Tri-state read of `(input)`'s `format` key, shared by a regular
+/// element's local override and by `@config`'s own `format` key (see
+/// `config_format_update`):
+/// - `None`: no `format` key at all (or no `(input)` map) -- inherit the
+///   document's running default, if any.
+/// - `Some(None)`: `format` key present but its value isn't a recognized
+///   format (e.g. `format:none`, `format:xml`) -- an explicit opt-out to
+///   the lightweight grammar, even over an active document default.
+/// - `Some(Some(fmt))`: `format` key present and recognized.
+fn local_format_key(el: &Element) -> Option<Option<EmbeddedFormat>> {
+    let Value::Map(entries) = el.input.as_ref()? else {
         return None;
     };
     entries.iter().find_map(|(key, v)| {
         if key != "format" {
             return None;
         }
-        match v {
+        Some(match v {
             Value::String(tag) => EmbeddedFormat::from_tag(tag),
             _ => None,
-        }
+        })
     })
 }
 
-fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
+fn is_config(el: &Element) -> bool {
+    matches!(&el.sigil, Sigil::At(Some(name)) if name == "config")
+}
+
+/// If `el` is a `@config` block that touches the `format` key, returns the
+/// new running default to install for every element parsed after it
+/// (`Some(None)` resets it, e.g. via `@config(format:none)`). `None` means
+/// "not `@config`, or `@config` with no `format` key at all" -- leave the
+/// running default as-is, so a future `@config` key unrelated to `format`
+/// doesn't clobber it.
+fn config_format_update(el: &Element) -> Option<Option<EmbeddedFormat>> {
+    if !is_config(el) {
+        return None;
+    }
+    local_format_key(el)
+}
+
+fn parse_value_group(
+    cur: &mut Cursor,
+    default_format: Option<EmbeddedFormat>,
+) -> Result<ElementValue> {
     if !cur.eat_str("{") {
         return Err(err(cur, cur.pos(), "expected '{'"));
     }
-    skip_ws_and_newlines(cur);
+    skip_ws_newlines_and_comments(cur);
     let result = if cur.peek() == Some('(') {
         let mut children = Vec::new();
         loop {
-            skip_ws_and_newlines(cur);
+            skip_ws_newlines_and_comments(cur);
             if cur.peek() != Some('(') {
                 break;
             }
-            children.push(parse_bare_element(cur)?);
+            children.push(parse_bare_element(cur, default_format)?);
         }
         ElementValue::Children(children)
     } else {
         ElementValue::Data(parse_value_at(cur)?)
     };
-    skip_ws_and_newlines(cur);
+    skip_ws_newlines_and_comments(cur);
     if !cur.eat_str("}") {
         return Err(err(cur, cur.pos(), "expected '}'"));
     }
     Ok(result)
 }
 
-fn parse_bare_element(cur: &mut Cursor) -> Result<Element> {
+fn parse_bare_element(
+    cur: &mut Cursor,
+    default_format: Option<EmbeddedFormat>,
+) -> Result<Element> {
     let input = parse_paren_value(cur)?;
     let mut el = Element::new(Sigil::Bare);
     el.input = Some(input);
     let checkpoint = cur.pos();
     skip_inline_ws(cur);
     if cur.peek() == Some('[') {
-        el.area = Some(parse_area(cur)?);
+        el.area = Some(parse_area(cur, default_format)?);
     } else {
         cur.set_pos(checkpoint);
     }

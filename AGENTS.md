@@ -3,10 +3,12 @@
 ## Project overview
 
 Read the root `README.md` first (what the project is, directory layout,
-build/run commands). Read `docs/architecture.md` before making any
-non-trivial change (view-crate pattern, pane/workspace system, rendering
-tiers, config/persistence, the CLI). Do not restate either file's content
-here — extend them instead, and keep this pointer short.
+build/run commands) -- it's currently sparse, fill it in as you learn
+things worth putting there. Read `docs/architecture.md` before making any
+non-trivial change (the crate pipeline and its consumers, why the grammar
+has two independent implementations, the apps/editor integrations, known
+gaps like the AST carrying no span info). Do not restate either file's
+content here — extend them instead, and keep this pointer short.
 
 ## Language
 
@@ -14,9 +16,20 @@ Write all comments and documentation in English. Do not use Japanese.
 
 ## Verifying changes
 
-Do not debug or verify changes by taking screenshots (e.g. via Xvfb/Wayland screenshot tools). This environment does not reliably support it. Verify with `cargo build`/`cargo check` and by reading the code instead.
+There's no standalone GUI app here to screenshot or click through — this
+is a parser/CLI/LSP/editor-extensions project. Verify with `cargo build`/
+`cargo test`/`cargo check` and by reading the code. For the editor
+extensions (`apps/vscode-extension`, `apps/zed-extension`), this
+environment can't reliably launch a real VS Code/Zed window either, so
+verify those the same way: reading the code and their own tests, not by
+launching the actual editor to click around.
 
-Do not use X11 (xdotool, wmctrl, xwininfo, forcing `QT_QPA_PLATFORM=xcb`, or any other X11-based automation/inspection) to drive, resize, or inspect the running app. Do not launch the actual GUI app to click around or simulate input.
+For grammar changes specifically, also run
+`cargo test -p tree-sitter-typedmark`. `typedmark-parser` is the source of
+truth for the grammar; `tree-sitter-typedmark`'s `grammar.js` is a
+separate, hand-maintained approximation used only for editor syntax
+highlighting, and it does not update itself when `typedmark-parser`
+changes — that test is how drift between the two gets caught.
 
 ## Task tracking
 

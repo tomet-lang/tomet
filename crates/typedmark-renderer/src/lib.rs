@@ -183,6 +183,7 @@ fn render_element(el: &Element, out: &mut String, inline: bool) {
     let kind = element_kind(el);
     match kind.as_str() {
         "meta" => {}
+        "config" => {}
         "links" => render_links_container(el, out),
         "url" => render_href_element(el, "url", out, inline),
         "file" => render_href_element(el, "file", out, inline),
@@ -602,6 +603,13 @@ mod tests {
     #[test]
     fn meta_element_has_no_visible_output() {
         let doc = parse_document("@meta(format:yaml){\n  key: value\n}\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(body, "");
+    }
+
+    #[test]
+    fn config_element_has_no_visible_output() {
+        let doc = parse_document("@config(format:json)\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "");
     }

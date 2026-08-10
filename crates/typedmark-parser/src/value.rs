@@ -12,7 +12,7 @@ use typedmark_lexar::Cursor;
 pub fn parse_value(src: &str) -> Result<Value> {
     let mut cur = Cursor::new(src);
     let value = parse_value_at(&mut cur)?;
-    skip_ws_and_newlines(&mut cur);
+    skip_ws_newlines_and_comments(&mut cur);
     if !cur.is_eof() {
         return Err(err(&cur, cur.pos(), "unexpected trailing content"));
     }
@@ -44,6 +44,33 @@ pub(crate) fn skip_ws_and_newlines(cur: &mut Cursor) {
     cur.eat_while(|c| is_inline_ws(c) || c == '\n' || c == '\r');
 }
 
+/// `// ...` to end of line/EOF -- the value-grammar sibling of
+/// `document.rs`'s block-level `skip_line_comment`.
+fn skip_line_comment(cur: &mut Cursor) {
+    cur.eat_str("//");
+    cur.eat_while(|c| c != '\n' && c != '\r');
+}
+
+/// Like `skip_ws_and_newlines`, but also consumes `//` line comments.
+/// Safe to use anywhere within `(...)`/`{...}`/`[...]` because it only
+/// ever runs at a "gap" position -- the start of a fresh value, between
+/// map entries, between sequence items -- never mid-scalar, so it can't
+/// misfire on a bare scalar that happens to contain `//` (a URL like
+/// `https://example.com` is consumed as one token by `eat_scalar_raw`
+/// before this could run again). A bare scalar that must start with a
+/// literal `//` (e.g. a protocol-relative URL) needs to be quoted, same
+/// trade-off as other special characters in bare scalars.
+pub(crate) fn skip_ws_newlines_and_comments(cur: &mut Cursor) {
+    loop {
+        skip_ws_and_newlines(cur);
+        if cur.starts_with("//") {
+            skip_line_comment(cur);
+            continue;
+        }
+        break;
+    }
+}
+
 pub(crate) fn eat_ident<'a>(cur: &mut Cursor<'a>) -> &'a str {
     cur.eat_while(is_ident_char)
 }
@@ -53,9 +80,15 @@ pub(crate) fn eat_ident<'a>(cur: &mut Cursor<'a>) -> &'a str {
 /// `open`/`close` pairs and skipping over `"`/`'`-quoted runs (so a quoted
 /// `close`/`open` character -- e.g. a `"}"` inside a JSON string, or a
 /// `"]"` inside a codeblock's string literal -- can't miscount). Doesn't
-/// consume the closing delimiter. Used where a group's *body* is opaque to
-/// TypedMark itself (an embedded JSON/YAML/TOML value, or a codeblock's
-/// raw source text) and only the matching bracket/brace needs finding.
+/// consume the closing delimiter. Used where a group's body is real
+/// source in some *other* language (embedded JSON/YAML/TOML, or a
+/// codeblock's source code) and only the matching bracket/brace needs
+/// finding -- quote-awareness matters there because unmatched quotes
+/// don't happen in valid source. For a body that's free-form prose
+/// instead (no language guarantees balanced quotes -- an apostrophe like
+/// `don't` would otherwise be misread as opening a quoted run and swallow
+/// the rest of the text), see the quote-agnostic
+/// [`find_matching_bracket`].
 pub(crate) fn find_matching_delimiter(
     cur: &mut Cursor,
     open: char,
@@ -74,6 +107,46 @@ pub(crate) fn find_matching_delimiter(
             }
             Some('"') => skip_quoted(cur, '"'),
             Some('\'') => skip_quoted(cur, '\''),
+            Some(c) if c == open => {
+                depth += 1;
+                cur.bump();
+            }
+            Some(c) if c == close => {
+                if depth == 0 {
+                    return Ok(cur.pos());
+                }
+                depth -= 1;
+                cur.bump();
+            }
+            Some(_) => {
+                cur.bump();
+            }
+        }
+    }
+}
+
+/// Same contract as [`find_matching_delimiter`] (nested `open`/`close`
+/// depth, doesn't consume the closing delimiter), but deliberately does
+/// *not* skip quoted runs -- a free-form-prose raw body (e.g. `area:raw`)
+/// has no guarantee its `"`/`'` occurrences are balanced the way real
+/// source code's are, so quote-skipping there would misfire on an
+/// ordinary apostrophe.
+pub(crate) fn find_matching_bracket(
+    cur: &mut Cursor,
+    open: char,
+    close: char,
+    group_start: usize,
+) -> Result<usize> {
+    let mut depth: u32 = 0;
+    loop {
+        match cur.peek() {
+            None => {
+                return Err(err(
+                    cur,
+                    group_start,
+                    format!("unterminated '{open}', expected matching '{close}'"),
+                ));
+            }
             Some(c) if c == open => {
                 depth += 1;
                 cur.bump();
@@ -121,9 +194,32 @@ pub(crate) fn skip_quoted(cur: &mut Cursor, quote: char) {
 
 /// Raw scalar text stops at any character that could plausibly end an
 /// entry/element/sequence item. Not part of `is_ident_char` because scalar
-/// values (URLs, file paths) routinely contain `:`, `/`, etc.
+/// values (URLs, file paths) routinely contain `:`, `/`, etc. Also stops
+/// early at a `//` immediately preceded by whitespace -- the start of a
+/// trailing comment -- leaving it for the caller's subsequent gap-skip to
+/// consume. A `//` with no whitespace before it (`https://example.com`)
+/// stays literal: same boundary rule `is_boundary` already uses for
+/// `*em*`/`_em_` delimiters, just applied to comments.
 fn eat_scalar_raw<'a>(cur: &mut Cursor<'a>) -> &'a str {
-    cur.eat_while(|c| !matches!(c, ',' | ')' | ']' | '}' | '\n' | '\r'))
+    let start = cur.pos();
+    loop {
+        match cur.peek() {
+            None => break,
+            Some(c) if matches!(c, ',' | ')' | ']' | '}' | '\n' | '\r') => break,
+            Some(c) if is_inline_ws(c) => {
+                let mut look = *cur;
+                look.eat_while(is_inline_ws);
+                if look.starts_with("//") {
+                    break;
+                }
+                cur.bump();
+            }
+            Some(_) => {
+                cur.bump();
+            }
+        }
+    }
+    &cur.src()[start..cur.pos()]
 }
 
 fn scalar_from_text(s: &str) -> Value {
@@ -173,12 +269,12 @@ fn parse_seq(cur: &mut Cursor) -> Result<Value> {
     }
     let mut items = Vec::new();
     loop {
-        skip_ws_and_newlines(cur);
+        skip_ws_newlines_and_comments(cur);
         if cur.peek() == Some(']') {
             break;
         }
         items.push(parse_value_at(cur)?);
-        skip_ws_and_newlines(cur);
+        skip_ws_newlines_and_comments(cur);
         match cur.peek() {
             Some(',') => {
                 cur.bump();
@@ -200,7 +296,7 @@ fn parse_seq(cur: &mut Cursor) -> Result<Value> {
 fn parse_map_body(cur: &mut Cursor) -> Result<Value> {
     let mut entries = Vec::new();
     loop {
-        skip_ws_and_newlines(cur);
+        skip_ws_newlines_and_comments(cur);
         if matches!(cur.peek(), None | Some(')') | Some('}') | Some(']')) {
             break;
         }
@@ -217,6 +313,12 @@ fn parse_map_body(cur: &mut Cursor) -> Result<Value> {
         let value = parse_entry_value(cur)?;
         entries.push((key, value));
         skip_inline_ws(cur);
+        // A trailing `// comment` on the same line as the value: `eat_scalar_raw`
+        // already stopped short of it (boundary rule), so it's still here to
+        // consume before checking for the `,`/newline/close that separates entries.
+        if cur.starts_with("//") {
+            skip_line_comment(cur);
+        }
         match cur.peek() {
             Some(',') => {
                 cur.bump();
@@ -241,14 +343,14 @@ fn parse_map_body(cur: &mut Cursor) -> Result<Value> {
 /// that themselves contain a colon (URLs, `12:34` timestamps, ...) would
 /// be misread as a nested key.
 fn parse_entry_value(cur: &mut Cursor) -> Result<Value> {
-    skip_ws_and_newlines(cur);
+    skip_ws_newlines_and_comments(cur);
     match cur.peek() {
         Some('[') => parse_seq(cur),
         Some('"') => Ok(Value::String(parse_quoted(cur)?)),
         Some('{') => {
             cur.bump();
             let v = parse_map_body(cur)?;
-            skip_ws_and_newlines(cur);
+            skip_ws_newlines_and_comments(cur);
             if !cur.eat_str("}") {
                 return Err(err(cur, cur.pos(), "expected '}'"));
             }
@@ -268,14 +370,14 @@ fn parse_entry_value(cur: &mut Cursor) -> Result<Value> {
 /// data, a sequence item, or the entire data-only document. May itself be
 /// a map body, so a bare leading word is checked for a following `:`.
 pub(crate) fn parse_value_at(cur: &mut Cursor) -> Result<Value> {
-    skip_ws_and_newlines(cur);
+    skip_ws_newlines_and_comments(cur);
     match cur.peek() {
         Some('[') => parse_seq(cur),
         Some('"') => Ok(Value::String(parse_quoted(cur)?)),
         Some('{') => {
             cur.bump();
             let v = parse_map_body(cur)?;
-            skip_ws_and_newlines(cur);
+            skip_ws_newlines_and_comments(cur);
             if !cur.eat_str("}") {
                 return Err(err(cur, cur.pos(), "expected '}'"));
             }

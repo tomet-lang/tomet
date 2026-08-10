@@ -1,10 +1,9 @@
-// [ NOT implemented ]
-// @import(file:/settings.json)
 // [ special-casing exists for "import" anywhere. Renders as a generic
 //   element (`<div class="tm-element tm-import" data-file="...">`), same as
 //   any other unrecognized `<T>`/`@name`. Kept commented so this file
 //   doesn't look like a working example. ]
-// @settings(format:json)
+// @import(file:/settings.tm)
+@config(format:json)
 
 @meta(format:json){
   {
@@ -24,10 +23,10 @@
 // children only -- no type name needed, the container already supplies it.
 // Renders as a `<dl>` definition list, each id becoming an `#link-<id>`
 // anchor target other elements can `@(ref:<id>)` to.
-@links {
-  (1)[ 注釈その1 ]
-  (anotation2)[ 注釈その2 ]
-}
+// @links {
+//  (1)[ 注釈その1 ]
+//  (anotation2)[ 注釈その2 ]
+// }
 
 // [ NOT implemented ]
 // @foot()[ 
@@ -54,6 +53,13 @@
 
 <codeblock>(lang:json)[
 {sdfsdf}
+]
+
+// area:raw: opts any element's [area] into raw/verbatim text, same
+// treatment as codeblock -- byte-safe against an embedded "]" and
+// newline-preserving (no inline markup, no lazy-continuation folding).
+<memo>(area:raw)[
+  don't forget: check [this] and [that]
 ]
 
 <blockquote>[ 引用文 ]
