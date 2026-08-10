@@ -8,7 +8,7 @@ repository = "https://github.com/tomet-lang/tomet.git"
 
 [grammars.typedmark]
 repository = "https://github.com/tomet-lang/tomet.git"
-rev = "0b369bff805e783f60cfc1d5ebbaeb8f6b3f78b2"
+rev = "b96390eef1ff4aeccf687b86f152e46ad8229af2"
 path = "crates/tree-sitter-typedmark"
 
 [language_servers.typedmark-lsp]

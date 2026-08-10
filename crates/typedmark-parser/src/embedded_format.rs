@@ -301,11 +301,15 @@ mod tests {
     #[test]
     fn a_non_meta_element_gets_the_same_treatment() {
         // The mechanism is keyed purely on `(input)` having a `format` key
-        // -- it isn't specific to `@meta` at all.
-        let doc = parse_document(r#"<config>(format:json){ {"key": "value"} }"#).unwrap();
+        // -- it isn't specific to `@meta` at all. (Named `<box>` rather than
+        // `<config>` to avoid reader confusion with the `@config` document
+        // pragma tested below -- they're unrelated sigils, `Sigil::Type` vs
+        // `Sigil::At(Some("config"))`, but the name overlap would be
+        // needlessly confusing in a file about the `format` mechanism.)
+        let doc = parse_document(r#"<box>(format:json){ {"key": "value"} }"#).unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("config".into()));
+                assert_eq!(el.sigil, Sigil::Type("box".into()));
                 assert_eq!(
                     el.value,
                     Some(ElementValue::Data(Value::Map(vec![(
@@ -337,5 +341,121 @@ mod tests {
             v,
             ElementValue::Data(Value::Map(vec![("a".into(), Value::String("}".into()))]))
         );
+    }
+
+    fn element_value_at(src: &str, index: usize) -> ElementValue {
+        let doc = parse_document(src).unwrap();
+        match &doc.blocks[index] {
+            Block::Element(el) => el.value.clone().expect("expected a {value} group"),
+            other => panic!("expected an element at index {index}, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn config_sets_the_default_format_for_later_elements() {
+        // No local `format` key on this `@meta` -- it inherits the
+        // `@config(format:json)` default declared above it, so its body is
+        // parsed as real JSON (invalid as TypedMark's lightweight grammar).
+        let v = element_value_at(
+            "@config(format:json)\n\n@meta{ {\"key\": \"value\"} }\n",
+            1,
+        );
+        assert_eq!(
+            v,
+            ElementValue::Data(Value::Map(vec![("key".into(), Value::String("value".into()))]))
+        );
+    }
+
+    #[test]
+    fn elements_before_config_are_unaffected() {
+        // Order-dependent: this `@meta` comes before the `@config` block, so
+        // it still uses the lightweight grammar.
+        let v = element_value_at("@meta{ key: value }\n\n@config(format:json)\n", 0);
+        assert_eq!(
+            v,
+            ElementValue::Data(Value::Map(vec![("key".into(), Value::String("value".into()))]))
+        );
+    }
+
+    #[test]
+    fn a_local_format_key_overrides_the_document_default() {
+        // The document default is `json`, but this element's own
+        // `format:yaml` wins -- its body (`key: value`) is valid YAML but
+        // not valid JSON, so this only parses if the local key took effect.
+        let v = element_value_at(
+            "@config(format:json)\n\n@meta(format:yaml){\n  key: value\n}\n",
+            1,
+        );
+        assert_eq!(
+            v,
+            ElementValue::Data(Value::Map(vec![("key".into(), Value::String("value".into()))]))
+        );
+    }
+
+    #[test]
+    fn an_unrecognized_local_format_key_opts_out_of_the_document_default() {
+        // `format:none` isn't a recognized tag, so (as before this feature
+        // existed) it falls back to the lightweight grammar -- and that
+        // fallback now doubles as the escape hatch out of an active
+        // document default. Its body (`key: value`) isn't valid JSON, so
+        // this only parses if the opt-out took effect.
+        let v = element_value_at(
+            "@config(format:json)\n\n@meta(format:none){ key: value }\n",
+            1,
+        );
+        assert_eq!(
+            v,
+            ElementValue::Data(Value::Map(vec![("key".into(), Value::String("value".into()))]))
+        );
+    }
+
+    #[test]
+    fn config_format_none_resets_a_previously_set_default() {
+        let v = element_value_at(
+            "@config(format:json)\n\n@config(format:none)\n\n@meta{ key: value }\n",
+            2,
+        );
+        assert_eq!(
+            v,
+            ElementValue::Data(Value::Map(vec![("key".into(), Value::String("value".into()))]))
+        );
+    }
+
+    #[test]
+    fn a_second_config_changes_the_default_for_what_follows() {
+        let doc = parse_document(
+            "@config(format:json)\n\n@meta{ {\"a\": 1} }\n\n@config(format:yaml)\n\n@meta{\n  b: 2\n}\n",
+        )
+        .unwrap();
+        assert_eq!(
+            doc.blocks[1],
+            Block::Element({
+                let mut el = typedmark_ast::Element::new(Sigil::At(Some("meta".into())));
+                el.value = Some(ElementValue::Data(Value::Map(vec![("a".into(), Value::Int(1))])));
+                el
+            })
+        );
+        assert_eq!(
+            doc.blocks[3],
+            Block::Element({
+                let mut el = typedmark_ast::Element::new(Sigil::At(Some("meta".into())));
+                el.value = Some(ElementValue::Data(Value::Map(vec![("b".into(), Value::Int(2))])));
+                el
+            })
+        );
+    }
+
+    #[test]
+    fn config_itself_carries_no_value_and_is_never_the_lightweight_grammar() {
+        // `@config(format:json)` has no `{value}` group at all -- it's
+        // consumed purely for its `(input)` map.
+        let doc = parse_document("@config(format:json)\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.sigil, Sigil::At(Some("config".into())));
+                assert_eq!(el.value, None);
+            }
+            other => panic!("expected an element, got {other:?}"),
+        }
     }
 }

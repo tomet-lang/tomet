@@ -93,6 +93,7 @@ fn element_to_md(el: &Element, inline: bool) -> String {
     let kind = element_kind(el);
     match kind.as_str() {
         "meta" => String::new(),
+        "config" => String::new(),
         "hr" => render_hr(el),
         "em" => format!("*{}*", area_to_md(el)),
         "strong" => format!("**{}**", area_to_md(el)),
@@ -496,6 +497,19 @@ mod tests {
             "expected generic 'at' kind, got: {}",
             to_markdown(&doc)
         );
+    }
+
+    #[test]
+    fn config_element_exports_as_nothing() {
+        let mut el = Element::new(Sigil::At(Some("config".to_string())));
+        el.input = Some(Value::Map(vec![(
+            "format".to_string(),
+            Value::String("json".to_string()),
+        )]));
+        let doc = Document {
+            blocks: vec![Block::Element(el)],
+        };
+        assert_eq!(to_markdown(&doc), "");
     }
 
     #[test]

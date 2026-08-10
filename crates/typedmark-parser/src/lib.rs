@@ -344,6 +344,52 @@ mod tests {
     }
 
     #[test]
+    fn indented_line_comment_is_recognized_at_block_level() {
+        let doc = parse_document("#[ one ]\n\n  // indented note\n\n#[ two ]\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        assert!(matches!(&doc.blocks[0], Block::Heading(_)));
+        assert!(matches!(&doc.blocks[1], Block::Heading(_)));
+    }
+
+    #[test]
+    fn indented_block_comment_is_recognized_at_block_level() {
+        let doc = parse_document("#[ one ]\n\n  /* indented note */\n\n#[ two ]\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        assert!(matches!(&doc.blocks[0], Block::Heading(_)));
+        assert!(matches!(&doc.blocks[1], Block::Heading(_)));
+    }
+
+    #[test]
+    fn line_comment_interrupts_a_paragraph_with_no_blank_line_before_it() {
+        // Same as `#`/list markers already do in the lazy-continuation
+        // check -- a comment line ends the paragraph even with no blank
+        // line separating them, rather than being swallowed as running
+        // text.
+        let doc = parse_document("text\n// a comment, not more paragraph text\nmore\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        match (&doc.blocks[0], &doc.blocks[1]) {
+            (Block::Paragraph(a), Block::Paragraph(b)) => {
+                assert_eq!(a, &vec![Inline::Text("text".into())]);
+                assert_eq!(b, &vec![Inline::Text("more".into())]);
+            }
+            other => panic!("expected two paragraphs, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn indented_line_comment_interrupts_a_paragraph_with_no_blank_line_before_it() {
+        let doc = parse_document("text\n  // indented, still interrupts\nmore\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        match (&doc.blocks[0], &doc.blocks[1]) {
+            (Block::Paragraph(a), Block::Paragraph(b)) => {
+                assert_eq!(a, &vec![Inline::Text("text".into())]);
+                assert_eq!(b, &vec![Inline::Text("more".into())]);
+            }
+            other => panic!("expected two paragraphs, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn block_comment_spans_multiple_lines_and_blank_lines() {
         let doc = parse_document(
             "before\n\n/* this whole\nchunk, including\n\na blank line and #[ not a heading ]\nis discarded */\n\nafter\n",
@@ -417,6 +463,215 @@ mod tests {
                 );
             }
             other => panic!("expected paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn inline_double_slash_comment_is_stripped_when_preceded_by_whitespace() {
+        let doc = parse_document("aaa // asdasd\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(inlines) => {
+                assert_eq!(inlines, &vec![Inline::Text("aaa".into())]);
+            }
+            other => panic!("expected paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn inline_double_slash_comment_works_inside_area() {
+        let doc = parse_document("<caution>[ keep // drop this\n]\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.area, Some(vec![Inline::Text("keep ".into())]));
+            }
+            other => panic!("expected element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_double_slash_line_inside_a_multiline_area_is_a_comment() {
+        // Unlike a top-level paragraph, `[area]` content has no block-level
+        // dispatch of its own -- a `//` starting a line inside it is only
+        // recognized because the preceding newline counts as a boundary,
+        // same rule as a same-line trailing comment.
+        let doc = parse_document("<caution>[\n  keep\n  // drop this line\n  keep2\n]\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(
+                    el.area,
+                    Some(vec![
+                        Inline::Text("keep ".into()),
+                        Inline::Text(" keep2".into())
+                    ])
+                );
+            }
+            other => panic!("expected element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn own_line_comment_works_inside_a_paren_group() {
+        // The original trigger case: a `//` comment on its own line between
+        // entries in `@config(...)`'s `(input)` map.
+        let doc = parse_document("@config(\n  format:json\n  // a note\n)\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.sigil, Sigil::At(Some("config".into())));
+                assert_eq!(
+                    el.input,
+                    Some(Value::Map(vec![(
+                        "format".into(),
+                        Value::String("json".into())
+                    )]))
+                );
+            }
+            other => panic!("expected an element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn own_line_comment_works_inside_a_lightweight_value_group() {
+        let doc = parse_document("@meta{\n  key: value\n  // a note\n}\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(
+                    el.value,
+                    Some(ElementValue::Data(Value::Map(vec![(
+                        "key".into(),
+                        Value::String("value".into())
+                    )])))
+                );
+            }
+            other => panic!("expected an element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn own_line_comment_works_inside_a_sequence() {
+        let v = parse_value("[\n  a,\n  // a note\n  b,\n]").unwrap();
+        assert_eq!(
+            v,
+            Value::Seq(vec![Value::String("a".into()), Value::String("b".into())])
+        );
+    }
+
+    #[test]
+    fn trailing_same_line_comment_after_a_scalar_value_is_stripped() {
+        let v = parse_value("key: value // trailing note").unwrap();
+        assert_eq!(
+            v,
+            Value::Map(vec![("key".into(), Value::String("value".into()))])
+        );
+    }
+
+    #[test]
+    fn bare_url_values_are_unaffected_by_trailing_comment_support() {
+        // `//` glued directly to preceding text (no whitespace before it)
+        // stays literal -- the boundary rule that makes trailing comments
+        // safe also protects `https://...`.
+        let v = parse_value("url: https://example.com/path").unwrap();
+        assert_eq!(
+            v,
+            Value::Map(vec![(
+                "url".into(),
+                Value::String("https://example.com/path".into())
+            )])
+        );
+    }
+
+    #[test]
+    fn a_bare_scalar_starting_with_double_slash_needs_quoting() {
+        // A bare scalar meant to start with a literal `//` (e.g. a
+        // protocol-relative URL) is indistinguishable from a comment at
+        // that position -- it's read as a (now-empty) value followed by a
+        // comment, so it must be quoted instead.
+        let quoted = parse_value(r#"path: "//example.com/x""#).unwrap();
+        assert_eq!(
+            quoted,
+            Value::Map(vec![(
+                "path".into(),
+                Value::String("//example.com/x".into())
+            )])
+        );
+        assert!(parse_value("path: //example.com/x").is_err());
+    }
+
+    #[test]
+    fn a_bare_bracket_pair_inside_an_area_no_longer_truncates_it() {
+        // Regression for the memo-content-fidelity fix: `Stop::Bracket`
+        // used to break at the *first* literal `]`, corrupting the rest
+        // of the area as stray trailing text. Applies to every ordinary
+        // (non-raw) `[area]`, not just an opt-in one.
+        let doc =
+            parse_document("<caution>[\nline one\nline two with * and [brackets] inside\n]\n")
+                .unwrap();
+        assert_eq!(doc.blocks.len(), 1);
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(
+                    el.area,
+                    Some(vec![Inline::Text(
+                        "line one line two with * and [brackets] inside".into()
+                    )])
+                );
+            }
+            other => panic!("expected an element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_unbalanced_bracket_inside_an_area_still_errors() {
+        assert!(parse_document("<caution>[ has an [ that never closes\n]\n").is_err());
+    }
+
+    #[test]
+    fn area_raw_preserves_brackets_and_newlines_losslessly() {
+        let doc = parse_document(
+            "<memo>(area:raw)[\nline one\nline two with * and [brackets] inside\n]\n",
+        )
+        .unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(
+                    el.area,
+                    Some(vec![Inline::Text(
+                        "\nline one\nline two with * and [brackets] inside\n".into()
+                    )])
+                );
+            }
+            other => panic!("expected an element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn area_raw_is_not_confused_by_an_apostrophe() {
+        // The reason `area:raw` can't reuse codeblock's quote-aware
+        // matcher as-is: free-form prose has no guarantee its `'`/`"`
+        // occurrences are balanced the way real source code's are.
+        let doc = parse_document("<memo>(area:raw)[don't forget [this]]\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(
+                    el.area,
+                    Some(vec![Inline::Text("don't forget [this]".into())])
+                );
+            }
+            other => panic!("expected an element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_unrecognized_area_value_falls_back_to_ordinary_prose() {
+        // Mirrors `format`'s unknown-value fallback: `area:raw` is the
+        // only recognized value, anything else (or no `area` key at all)
+        // parses as normal prose, so line breaks still collapse per the
+        // usual lazy-continuation rule.
+        let doc = parse_document("<memo>(area:literal)[\nline one\nline two\n]\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.area, Some(vec![Inline::Text("line one line two".into())]));
+            }
+            other => panic!("expected an element, got {other:?}"),
         }
     }
 }
