@@ -4,8 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-typedmark-ast = { workspace = true }
-typedmark-lexar = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 toml = { workspace = true }
+typedmark-ast = { workspace = true }
+typedmark-lexar = { workspace = true }

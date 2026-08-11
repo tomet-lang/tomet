@@ -1,27 +1,25 @@
 {
-  rustPlatform,
-  # pkg-config,
-  # makeWrapper
+  craneLib,
 }:
 let
   src = ../..;
+
+  commonArgs = {
+    inherit src;
+
+    pname = "typedmark";
+    version = "0.1.0";
+  };
+
+  cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 in
-rustPlatform.buildRustPackage rec {
-  inherit src;
-  pname = "typedmark";
-  version = "0.1.0";
+craneLib.buildPackage (
+  commonArgs
+  // {
+    inherit cargoArtifacts;
 
-  cargoLock.lockFile = "${src}/Cargo.lock";
-  cargoBuildFlags = [
-    "-p"
-    "typedmark"
-    "-p"
-    "typedmark-lsp"
-  ];
-  cargoTestFlags = cargoBuildFlags;
+    cargoExtraArgs = "-p typedmark -p typedmark-lsp";
 
-  nativeBuildInputs = [
-    # pkg-config
-    # makeWrapper
-  ];
-}
+    doCheck = true;
+  }
+)

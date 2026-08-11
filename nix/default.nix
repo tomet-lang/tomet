@@ -1,6 +1,5 @@
 {
   nixpkgs,
-  rust-overlay,
   ...
 }@inputs:
 let
@@ -16,29 +15,35 @@ let
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ (import rust-overlay) ];
         };
+        craneLib = inputs.crane.mkLib pkgs;
       in
-      f system pkgs
+      f {
+        inherit system pkgs craneLib;
+      }
     );
 in
 {
   packages = forAllSystems (
-    _: pkgs: rec {
+    { pkgs, craneLib, ... }: rec {
       default = typedmark;
-      typedmark = pkgs.callPackage ./pkgs/typedmark.nix { };
+      typedmark = pkgs.callPackage ./pkgs/typedmark.nix { inherit craneLib; };
       vscodeExtension = pkgs.callPackage ./pkgs/vscode-extension.nix { };
     }
   );
+
   devShells = forAllSystems (
-    _: pkgs: {
-      default = pkgs.callPackage ./dev.nix { };
+    { pkgs, craneLib, ... }: {
+      default = pkgs.callPackage ./dev.nix { inherit inputs craneLib; };
     }
   );
+
   formatter = forAllSystems (
-    _: pkgs:
+    { pkgs, ... }:
     let
-      treefmt = import ./formatter.nix { inherit pkgs inputs; };
+      treefmt = import ./formatter.nix {
+        inherit pkgs inputs;
+      };
     in
     treefmt.wrapper
   );
