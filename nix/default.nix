@@ -1,50 +1,35 @@
 {
-  nixpkgs,
+  flake-parts,
   ...
 }@inputs:
-let
+flake-parts.lib.mkFlake { inherit inputs; } {
   systems = [
     "x86_64-linux"
     "aarch64-linux"
     "aarch64-darwin"
   ];
-  forAllSystems =
-    f:
-    nixpkgs.lib.genAttrs systems (
-      system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-        };
-        craneLib = inputs.crane.mkLib pkgs;
-      in
-      f {
-        inherit system pkgs craneLib;
-      }
-    );
-in
-{
-  packages = forAllSystems (
-    { pkgs, craneLib, ... }: rec {
-      default = typedmark;
-      typedmark = pkgs.callPackage ./pkgs/typedmark.nix { inherit craneLib; };
-      vscodeExtension = pkgs.callPackage ./pkgs/vscode-extension.nix { };
-    }
-  );
+  imports = [
+    inputs.treefmt-nix.flakeModule
+  ];
 
-  devShells = forAllSystems (
-    { pkgs, craneLib, ... }: {
-      default = pkgs.callPackage ./dev.nix { inherit inputs craneLib; };
-    }
-  );
-
-  formatter = forAllSystems (
+  perSystem =
     { pkgs, ... }:
     let
-      treefmt = import ./formatter.nix {
-        inherit pkgs inputs;
-      };
+      craneLib = inputs.crane.mkLib pkgs;
     in
-    treefmt.wrapper
-  );
+    {
+      packages = rec {
+        default = typedmark;
+        typedmark = pkgs.callPackage ./pkgs/typedmark.nix { inherit craneLib; };
+        vscodeExtension = pkgs.callPackage ./pkgs/vscode-extension.nix { };
+      };
+
+      devShells.default = pkgs.callPackage ./dev.nix { inherit inputs craneLib; };
+
+      # formatter = let
+      #   treefmt = import ./formatter.nix;
+      # in treefmt.wrapper;
+
+      treefmt = import ./formatter.nix;
+    };
 }
