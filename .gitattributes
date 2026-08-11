@@ -1,3 +1,6 @@
+docs/ linguist-documentation=true
 *.md linguist-language=Markdown
+*.tm linguist-language=Typedmark
+
 *.png filter=lfs diff=lfs merge=lfs -text
 *.jpg filter=lfs diff=lfs merge=lfs -text
