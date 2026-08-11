@@ -26,10 +26,6 @@ flake-parts.lib.mkFlake { inherit inputs; } {
 
       devShells.default = pkgs.callPackage ./dev.nix { inherit inputs craneLib; };
 
-      # formatter = let
-      #   treefmt = import ./formatter.nix;
-      # in treefmt.wrapper;
-
       treefmt = import ./formatter.nix;
     };
 }
