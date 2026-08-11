@@ -14,7 +14,7 @@ let
       "clippy"
       "rustc"
       "rust-src"
-      "rust-analyzer"
+      # "rust-analyzer"
     ])
     fenix.targets.wasm32-wasip2.stable.rust-std
   ];
