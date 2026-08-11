@@ -356,13 +356,13 @@ mod tests {
         // No local `format` key on this `@meta` -- it inherits the
         // `@config(format:json)` default declared above it, so its body is
         // parsed as real JSON (invalid as TypedMark's lightweight grammar).
-        let v = element_value_at(
-            "@config(format:json)\n\n@meta{ {\"key\": \"value\"} }\n",
-            1,
-        );
+        let v = element_value_at("@config(format:json)\n\n@meta{ {\"key\": \"value\"} }\n", 1);
         assert_eq!(
             v,
-            ElementValue::Data(Value::Map(vec![("key".into(), Value::String("value".into()))]))
+            ElementValue::Data(Value::Map(vec![(
+                "key".into(),
+                Value::String("value".into())
+            )]))
         );
     }
 
@@ -373,7 +373,10 @@ mod tests {
         let v = element_value_at("@meta{ key: value }\n\n@config(format:json)\n", 0);
         assert_eq!(
             v,
-            ElementValue::Data(Value::Map(vec![("key".into(), Value::String("value".into()))]))
+            ElementValue::Data(Value::Map(vec![(
+                "key".into(),
+                Value::String("value".into())
+            )]))
         );
     }
 
@@ -388,7 +391,10 @@ mod tests {
         );
         assert_eq!(
             v,
-            ElementValue::Data(Value::Map(vec![("key".into(), Value::String("value".into()))]))
+            ElementValue::Data(Value::Map(vec![(
+                "key".into(),
+                Value::String("value".into())
+            )]))
         );
     }
 
@@ -405,7 +411,10 @@ mod tests {
         );
         assert_eq!(
             v,
-            ElementValue::Data(Value::Map(vec![("key".into(), Value::String("value".into()))]))
+            ElementValue::Data(Value::Map(vec![(
+                "key".into(),
+                Value::String("value".into())
+            )]))
         );
     }
 
@@ -417,7 +426,10 @@ mod tests {
         );
         assert_eq!(
             v,
-            ElementValue::Data(Value::Map(vec![("key".into(), Value::String("value".into()))]))
+            ElementValue::Data(Value::Map(vec![(
+                "key".into(),
+                Value::String("value".into())
+            )]))
         );
     }
 
@@ -431,7 +443,10 @@ mod tests {
             doc.blocks[1],
             Block::Element({
                 let mut el = typedmark_ast::Element::new(Sigil::At(Some("meta".into())));
-                el.value = Some(ElementValue::Data(Value::Map(vec![("a".into(), Value::Int(1))])));
+                el.value = Some(ElementValue::Data(Value::Map(vec![(
+                    "a".into(),
+                    Value::Int(1),
+                )])));
                 el
             })
         );
@@ -439,7 +454,10 @@ mod tests {
             doc.blocks[3],
             Block::Element({
                 let mut el = typedmark_ast::Element::new(Sigil::At(Some("meta".into())));
-                el.value = Some(ElementValue::Data(Value::Map(vec![("b".into(), Value::Int(2))])));
+                el.value = Some(ElementValue::Data(Value::Map(vec![(
+                    "b".into(),
+                    Value::Int(2),
+                )])));
                 el
             })
         );

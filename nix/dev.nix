@@ -1,32 +1,36 @@
 {
-  mkShell,
+  inputs,
   pkgs,
+  stdenv,
+  mkShell,
+  craneLib,
   ...
 }:
+let
+  fenix = inputs.fenix.packages.${stdenv.hostPlatform.system};
+  rust-toolchain = fenix.combine [
+    (fenix.stable.withComponents [
+      "cargo"
+      "clippy"
+      "rustc"
+      "rust-src"
+      "rust-analyzer"
+    ])
+    fenix.targets.wasm32-wasip2.stable.rust-std
+  ];
+in
 mkShell rec {
   buildInputs = with pkgs; [
-    (pkgs.callPackage ./pkgs/typedmark.nix { })
+    (pkgs.callPackage ./pkgs/typedmark.nix { inherit craneLib; })
 
-    #[ C++ ]
+    #[ CMake ]
     cmake
     ninja
 
     #[ Rust ]
-    (rust-bin.stable.latest.default.override {
-      extensions = [
-        "clippy"
-        "rust-src"
-      ];
-      # wasm32-wasip2: needed to build Zed extensions locally (e.g.
-      # apps/zed-extension in the typedmark repo) -- Zed shells out to
-      # `rustc`/`cargo` on $PATH to compile them and doesn't manage its own
-      # toolchain or targets.
-      targets = [ "wasm32-wasip2" ];
-    })
-    cargo
+    rust-toolchain
     cargo-edit
     cargo-outdated
-    rustc
     cargo-nextest
 
     #[ VS Code extension (apps/vscode-extension) ]

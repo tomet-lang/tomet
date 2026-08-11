@@ -4,8 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-typedmark-ast = { workspace = true }
 pulldown-cmark = { workspace = true }
+typedmark-ast = { workspace = true }
 
 [dev-dependencies]
 typedmark-renderer = { workspace = true }

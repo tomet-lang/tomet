@@ -7,8 +7,8 @@
 use crate::embedded_format::{EmbeddedFormat, parse_embedded_format_value};
 use crate::error::Result;
 use crate::value::{
-    eat_ident, err, find_matching_bracket, find_matching_delimiter, is_ident_char,
-    parse_value_at, skip_inline_ws, skip_ws_and_newlines, skip_ws_newlines_and_comments,
+    eat_ident, err, find_matching_bracket, find_matching_delimiter, is_ident_char, parse_value_at,
+    skip_inline_ws, skip_ws_and_newlines, skip_ws_newlines_and_comments,
 };
 use typedmark_ast::{
     Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
@@ -906,10 +906,7 @@ fn parse_value_group(
     Ok(result)
 }
 
-fn parse_bare_element(
-    cur: &mut Cursor,
-    default_format: Option<EmbeddedFormat>,
-) -> Result<Element> {
+fn parse_bare_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Element> {
     let input = parse_paren_value(cur)?;
     let mut el = Element::new(Sigil::Bare);
     el.input = Some(input);

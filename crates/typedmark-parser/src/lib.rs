@@ -669,7 +669,10 @@ mod tests {
         let doc = parse_document("<memo>(area:literal)[\nline one\nline two\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.area, Some(vec![Inline::Text("line one line two".into())]));
+                assert_eq!(
+                    el.area,
+                    Some(vec![Inline::Text("line one line two".into())])
+                );
             }
             other => panic!("expected an element, got {other:?}"),
         }

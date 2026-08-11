@@ -5,16 +5,18 @@ members = [
   #[ CLI ]
   "apps/typedmark",
   "apps/typedmark-lsp",
+
   #[ Bindings ]
   "apps/bindings/java",
   "apps/bindings/js",
   "apps/bindings/python",
+
   #[ Editor Support ]
   "apps/integrations/zed",
-  "apps/integrations/vscode",
   "apps/integrations/neovim",
   "apps/integrations/helix",
 
+  #[ Library ]
   "crates/typedmark-ast",
   "crates/typedmark-lexar",
   "crates/typedmark-parser",
@@ -23,12 +25,10 @@ members = [
   "crates/typedmark-renderer",
   "crates/typedmark-formatter",
   "crates/serde_typedmark",
-  "crates/tree-sitter-typedmark"
+  "crates/tree-sitter-typedmark",
 ]
 
-default-members = [
-  "apps/typedmark"
-]
+default-members = ["apps/typedmark"]
 
 [workspace.package]
 version = "0.1.0"
@@ -45,7 +45,10 @@ serde_typedmark = { path = "crates/serde_typedmark" }
 
 #[ Crates.io ]
 anyhow = "1"
-axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+axum = { version = "0.8", default-features = false, features = [
+  "http1",
+  "tokio",
+] }
 clap = { version = "4.6", features = ["derive"] }
 cxx = "1"
 directories = "6.0"

@@ -3,32 +3,24 @@ let
   treefmtModule = inputs.treefmt-nix.lib.evalModule pkgs {
     projectRootFile = "flake.nix";
     programs = {
-      # [ Nix ]
+      #[ Nix ]
       nixfmt.enable = true;
       statix.enable = true;
       deadnix.enable = true;
-      # [ Shell ]
+      #[ Shell ]
       shfmt.enable = true;
       shellcheck.enable = true;
 
-      rustfmt.enable = true;
-      qmlformat.enable = true;
+      #[ Main ]
+      rustfmt.enable = true; # Rust
+      taplo.enable = true; # Toml
 
+      #[ Sub ]
       # prettier.enable = true;
       biome.enable = true;
     };
     settings = {
       global.excludes = [ ]; # https://github.com/numtide/treefmt-nix/issues/171
-      prettier = {
-        includes = [
-          # "*.js"
-          # "*.ts"
-          "*.svelte"
-          # "*.json"
-          # "*.md"
-          # "*.css"
-        ];
-      };
       biome = {
         includes = [
           "*.js"

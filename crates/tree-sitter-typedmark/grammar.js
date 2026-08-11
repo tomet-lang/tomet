@@ -169,8 +169,8 @@ module.exports = grammar({
 		// `/* ... */` needs to win over a `text` run that would otherwise
 		// swallow it whole, so a bare `/` (not opening a comment) falls
 		// back to `punctuation` like the others.
-		text: (_$) => /[^\n`*_=<@()\[{\]/-]+/,
-		punctuation: (_$) => /[()\[{/-]/,
+		text: (_$) => /[^\n`*_=<@()[{\]/-]+/,
+		punctuation: (_$) => /[()[{/-]/,
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -199,7 +199,7 @@ module.exports = grammar({
 				$.element,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*=<@()\[{\]/]+/, $.text),
+				alias(/[^\n`*=<@()[{\]/]+/, $.text),
 			),
 		_bracket_item_no_underscore: ($) =>
 			choice(
@@ -209,7 +209,7 @@ module.exports = grammar({
 				$.element,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`_=<@()\[{\]/]+/, $.text),
+				alias(/[^\n`_=<@()[{\]/]+/, $.text),
 			),
 		_bracket_item_no_equals: ($) =>
 			choice(
@@ -220,7 +220,7 @@ module.exports = grammar({
 				$.element,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*_=<@()\[{\]/]+/, $.text),
+				alias(/[^\n`*_=<@()[{\]/]+/, $.text),
 			),
 
 		// ---- `<T>`/`@name` elements ---------------------------------------
@@ -371,7 +371,7 @@ module.exports = grammar({
 		// items), where colons are common and never mean "this starts a
 		// nested key". Aliased to the same visible `scalar` node type as
 		// the top-level one below.
-		_value_scalar: ($) => alias(/[^,()\[\]{}\n\r]+/, $.scalar),
+		_value_scalar: ($) => alias(/[^,()[\]{}\n\r]+/, $.scalar),
 		// `value`'s own top-level bare-scalar fallback (no `key:` found) --
 		// deliberately colon-*excluded* (matching the old regex this
 		// replaced), so a bare, keyless scalar at this position that itself

@@ -1,200 +1,214 @@
 {
-  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  "name": "TypedMark",
-  "scopeName": "source.typedmark",
-  "fileTypes": ["tm"],
-  "patterns": [
-    { "include": "#comments" },
-    { "include": "#heading" },
-    { "include": "#thematic-break" },
-    { "include": "#list-marker" },
-    { "include": "#inline" }
-  ],
-  "repository": {
-    "comments": {
-      "patterns": [
-        {
-          "name": "comment.line.double-slash.typedmark",
-          "match": "//.*$"
-        },
-        {
-          "name": "comment.block.typedmark",
-          "begin": "/\\*",
-          "end": "\\*/"
-        }
-      ]
-    },
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "TypedMark",
+	"scopeName": "source.typedmark",
+	"fileTypes": ["tm"],
+	"patterns": [
+		{ "include": "#comments" },
+		{ "include": "#heading" },
+		{ "include": "#thematic-break" },
+		{ "include": "#list-marker" },
+		{ "include": "#inline" }
+	],
+	"repository": {
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.line.double-slash.typedmark",
+					"match": "//.*$"
+				},
+				{
+					"name": "comment.block.typedmark",
+					"begin": "/\\*",
+					"end": "\\*/"
+				}
+			]
+		},
 
-    "heading": {
-      "begin": "^\\s*(#+)(\\[)",
-      "beginCaptures": {
-        "1": { "name": "punctuation.definition.heading.typedmark" },
-        "2": { "name": "punctuation.section.brackets.begin.typedmark" }
-      },
-      "end": "\\]",
-      "endCaptures": {
-        "0": { "name": "punctuation.section.brackets.end.typedmark" }
-      },
-      "name": "markup.heading.typedmark",
-      "patterns": [{ "include": "#inline" }]
-    },
+		"heading": {
+			"begin": "^\\s*(#+)(\\[)",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.heading.typedmark" },
+				"2": { "name": "punctuation.section.brackets.begin.typedmark" }
+			},
+			"end": "\\]",
+			"endCaptures": {
+				"0": { "name": "punctuation.section.brackets.end.typedmark" }
+			},
+			"name": "markup.heading.typedmark",
+			"patterns": [{ "include": "#inline" }]
+		},
 
-    "thematic-break": {
-      "match": "^\\s*-{3,}\\s*$",
-      "name": "punctuation.definition.thematic-break.typedmark"
-    },
+		"thematic-break": {
+			"match": "^\\s*-{3,}\\s*$",
+			"name": "punctuation.definition.thematic-break.typedmark"
+		},
 
-    "list-marker": {
-      "match": "^\\s*(-\\.|-)(?=[ \\t])",
-      "name": "punctuation.definition.list.marker.typedmark markup.list.typedmark"
-    },
+		"list-marker": {
+			"match": "^\\s*(-\\.|-)(?=[ \\t])",
+			"name": "punctuation.definition.list.marker.typedmark markup.list.typedmark"
+		},
 
-    "inline": {
-      "patterns": [
-        { "include": "#comments" },
-        { "include": "#code-span" },
-        { "include": "#strong" },
-        { "include": "#emphasis" },
-        { "include": "#mark" },
-        { "include": "#element" },
-        { "include": "#groups" }
-      ]
-    },
+		"inline": {
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#code-span" },
+				{ "include": "#strong" },
+				{ "include": "#emphasis" },
+				{ "include": "#mark" },
+				{ "include": "#element" },
+				{ "include": "#groups" }
+			]
+		},
 
-    "inline-basic": {
-      "patterns": [
-        { "include": "#comments" },
-        { "include": "#code-span" },
-        { "include": "#element" },
-        { "include": "#groups" }
-      ]
-    },
+		"inline-basic": {
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#code-span" },
+				{ "include": "#element" },
+				{ "include": "#groups" }
+			]
+		},
 
-    "code-span": {
-      "name": "markup.inline.raw.typedmark",
-      "match": "`[^`\\n]*`"
-    },
+		"code-span": {
+			"name": "markup.inline.raw.typedmark",
+			"match": "`[^`\\n]*`"
+		},
 
-    "strong": {
-      "patterns": [
-        {
-          "begin": "\\*\\*(?=\\S)",
-          "end": "\\*\\*",
-          "name": "markup.bold.typedmark",
-          "patterns": [{ "include": "#inline-basic" }]
-        },
-        {
-          "begin": "__(?=\\S)",
-          "end": "__",
-          "name": "markup.bold.typedmark",
-          "patterns": [{ "include": "#inline-basic" }]
-        }
-      ]
-    },
+		"strong": {
+			"patterns": [
+				{
+					"begin": "\\*\\*(?=\\S)",
+					"end": "\\*\\*",
+					"name": "markup.bold.typedmark",
+					"patterns": [{ "include": "#inline-basic" }]
+				},
+				{
+					"begin": "__(?=\\S)",
+					"end": "__",
+					"name": "markup.bold.typedmark",
+					"patterns": [{ "include": "#inline-basic" }]
+				}
+			]
+		},
 
-    "emphasis": {
-      "patterns": [
-        {
-          "begin": "\\*(?=\\S)",
-          "end": "\\*",
-          "name": "markup.italic.typedmark",
-          "patterns": [{ "include": "#inline-basic" }]
-        },
-        {
-          "begin": "_(?=\\S)",
-          "end": "_",
-          "name": "markup.italic.typedmark",
-          "patterns": [{ "include": "#inline-basic" }]
-        }
-      ]
-    },
+		"emphasis": {
+			"patterns": [
+				{
+					"begin": "\\*(?=\\S)",
+					"end": "\\*",
+					"name": "markup.italic.typedmark",
+					"patterns": [{ "include": "#inline-basic" }]
+				},
+				{
+					"begin": "_(?=\\S)",
+					"end": "_",
+					"name": "markup.italic.typedmark",
+					"patterns": [{ "include": "#inline-basic" }]
+				}
+			]
+		},
 
-    "mark": {
-      "begin": "==(?=\\S)",
-      "end": "==",
-      "name": "markup.strikethrough.typedmark",
-      "patterns": [{ "include": "#inline-basic" }]
-    },
+		"mark": {
+			"begin": "==(?=\\S)",
+			"end": "==",
+			"name": "markup.strikethrough.typedmark",
+			"patterns": [{ "include": "#inline-basic" }]
+		},
 
-    "element": {
-      "patterns": [
-        {
-          "comment": "<Type> element sigil",
-          "match": "(<)([A-Za-z_][A-Za-z0-9_.-]*)(>)",
-          "captures": {
-            "1": { "name": "punctuation.definition.tag.begin.typedmark" },
-            "2": { "name": "entity.name.tag.typedmark" },
-            "3": { "name": "punctuation.definition.tag.end.typedmark" }
-          }
-        },
-        {
-          "comment": "@name element sigil, name optional (e.g. @(parent)[])",
-          "match": "(@)([A-Za-z_][A-Za-z0-9_.-]*)?",
-          "captures": {
-            "1": { "name": "punctuation.definition.tag.typedmark" },
-            "2": { "name": "entity.name.tag.typedmark" }
-          }
-        }
-      ]
-    },
+		"element": {
+			"patterns": [
+				{
+					"comment": "<Type> element sigil",
+					"match": "(<)([A-Za-z_][A-Za-z0-9_.-]*)(>)",
+					"captures": {
+						"1": { "name": "punctuation.definition.tag.begin.typedmark" },
+						"2": { "name": "entity.name.tag.typedmark" },
+						"3": { "name": "punctuation.definition.tag.end.typedmark" }
+					}
+				},
+				{
+					"comment": "@name element sigil, name optional (e.g. @(parent)[])",
+					"match": "(@)([A-Za-z_][A-Za-z0-9_.-]*)?",
+					"captures": {
+						"1": { "name": "punctuation.definition.tag.typedmark" },
+						"2": { "name": "entity.name.tag.typedmark" }
+					}
+				}
+			]
+		},
 
-    "groups": {
-      "patterns": [
-        { "include": "#round-group" },
-        { "include": "#square-group" },
-        { "include": "#curly-group" }
-      ]
-    },
+		"groups": {
+			"patterns": [
+				{ "include": "#round-group" },
+				{ "include": "#square-group" },
+				{ "include": "#curly-group" }
+			]
+		},
 
-    "round-group": {
-      "begin": "\\(",
-      "beginCaptures": { "0": { "name": "punctuation.section.group.round.begin.typedmark" } },
-      "end": "\\)",
-      "endCaptures": { "0": { "name": "punctuation.section.group.round.end.typedmark" } },
-      "name": "meta.group.round.typedmark",
-      "patterns": [{ "include": "#value" }]
-    },
+		"round-group": {
+			"begin": "\\(",
+			"beginCaptures": {
+				"0": { "name": "punctuation.section.group.round.begin.typedmark" }
+			},
+			"end": "\\)",
+			"endCaptures": {
+				"0": { "name": "punctuation.section.group.round.end.typedmark" }
+			},
+			"name": "meta.group.round.typedmark",
+			"patterns": [{ "include": "#value" }]
+		},
 
-    "square-group": {
-      "begin": "\\[",
-      "beginCaptures": { "0": { "name": "punctuation.section.group.square.begin.typedmark" } },
-      "end": "\\]",
-      "endCaptures": { "0": { "name": "punctuation.section.group.square.end.typedmark" } },
-      "name": "meta.group.square.typedmark",
-      "patterns": [{ "include": "#value" }, { "include": "#inline" }]
-    },
+		"square-group": {
+			"begin": "\\[",
+			"beginCaptures": {
+				"0": { "name": "punctuation.section.group.square.begin.typedmark" }
+			},
+			"end": "\\]",
+			"endCaptures": {
+				"0": { "name": "punctuation.section.group.square.end.typedmark" }
+			},
+			"name": "meta.group.square.typedmark",
+			"patterns": [{ "include": "#value" }, { "include": "#inline" }]
+		},
 
-    "curly-group": {
-      "begin": "\\{",
-      "beginCaptures": { "0": { "name": "punctuation.section.group.curly.begin.typedmark" } },
-      "end": "\\}",
-      "endCaptures": { "0": { "name": "punctuation.section.group.curly.end.typedmark" } },
-      "name": "meta.group.curly.typedmark",
-      "patterns": [{ "include": "#value" }, { "include": "#element" }]
-    },
+		"curly-group": {
+			"begin": "\\{",
+			"beginCaptures": {
+				"0": { "name": "punctuation.section.group.curly.begin.typedmark" }
+			},
+			"end": "\\}",
+			"endCaptures": {
+				"0": { "name": "punctuation.section.group.curly.end.typedmark" }
+			},
+			"name": "meta.group.curly.typedmark",
+			"patterns": [{ "include": "#value" }, { "include": "#element" }]
+		},
 
-    "value": {
-      "patterns": [
-        { "include": "#comments" },
-        { "include": "#map-entry" },
-        { "include": "#string" },
-        { "include": "#groups" }
-      ]
-    },
+		"value": {
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#map-entry" },
+				{ "include": "#string" },
+				{ "include": "#groups" }
+			]
+		},
 
-    "map-entry": {
-      "match": "([A-Za-z_][A-Za-z0-9_.-]*)(:)",
-      "captures": {
-        "1": { "name": "variable.other.property.typedmark" },
-        "2": { "name": "punctuation.separator.key-value.typedmark" }
-      }
-    },
+		"map-entry": {
+			"match": "([A-Za-z_][A-Za-z0-9_.-]*)(:)",
+			"captures": {
+				"1": { "name": "variable.other.property.typedmark" },
+				"2": { "name": "punctuation.separator.key-value.typedmark" }
+			}
+		},
 
-    "string": {
-      "name": "string.quoted.double.typedmark",
-      "begin": "\"",
-      "end": "\"",
-      "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.typedmark" }]
-    }
-  }
+		"string": {
+			"name": "string.quoted.double.typedmark",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{ "match": "\\\\.", "name": "constant.character.escape.typedmark" }
+			]
+		}
+	}
 }
