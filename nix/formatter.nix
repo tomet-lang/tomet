@@ -17,10 +17,14 @@ let
 
       #[ Sub ]
       # prettier.enable = true;
-      biome.enable = true;
+      # biome.enable = true;
     };
     settings = {
       global.excludes = [ ]; # https://github.com/numtide/treefmt-nix/issues/171
+
+      shfmt = {
+        includes = [ "*.sh" ];
+      };
       biome = {
         includes = [
           "*.js"
@@ -33,10 +37,6 @@ let
 
       rustfmt = {
         includes = [ "*.rs" ];
-      };
-
-      shfmt = {
-        includes = [ "*.sh" ];
       };
     };
   };
