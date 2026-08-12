@@ -31,10 +31,10 @@ typedmark-parser (recursive-descent parser: &str -> Document/Value)
   sequences, scalars) -- it's what fills an element's `(input)` or
   `{value}` group, and it's the entire result of parsing a data-only `.tm`
   file. `Document`/`Block`/`Inline`/`Element` are the full markup AST
-  (headings, paragraphs, lists, typed elements), in source order. No
-  span/position info is carried on these types today -- that's why
-  `typedmark-formatter` can't do a lossless AST reprint (see below) and
-  has to fall back to a text-level pass instead.
+  (headings, paragraphs, lists, typed elements), in source order. Every AST
+  node carries a source `Span` (line, column, byte offset), allowing downstream
+  consumers like `typedmark-formatter` and `typedmark-lsp` to perform AST-aware
+  formatting and exact diagnostic range mapping.
 - **`typedmark-parser`**: the actual grammar implementation, and the one
   place that gets to decide what `.tm` source means. Recursive-descent,
   built directly on `typedmark-lexar`'s cursor (see `document.rs`'s module
@@ -46,6 +46,11 @@ typedmark-parser (recursive-descent parser: &str -> Document/Value)
   real JSON/YAML/TOML source instead of TypedMark's own lightweight
   grammar, driven by a `format` key (locally, or document-wide via
   `@config(format:...)`).
+
+  **Deterministic Static Parser Boundary**:
+  `typedmark-parser` is strictly a pure, side-effect-free, deterministic static
+  parser. It performs zero I/O, external file resolution, or dynamic code execution.
+  Given identical input text, it produces identical AST output with guaranteed linear/predictable time complexity.
 
 Everything downstream of `typedmark-ast`/`typedmark-parser` is a
 *consumer* -- it reads the AST (or, for `typedmark-markdown`, produces
@@ -72,29 +77,21 @@ one) and does not get to redefine what the grammar means:
   grammar with a direct struct mapping, the same role `serde_json`/
   `serde_yaml` play for their formats. Headings/prose/links have no serde
   equivalent and aren't handled here.
-- **`typedmark-formatter`**: *not* AST-based. `typedmark_ast::Document`
-  carries no span info, so a lossless gofmt/prettier-style reprint isn't
-  possible today, and hand-duplicating the parser's grammar walk just to
-  preserve incidental spacing wasn't judged worth the maintenance cost.
-  Instead it's a blind text-level pass that normalizes whitespace policy
-  (LF line endings, no trailing whitespace, one final newline, collapsed
-  blank-line runs) and claims to be a no-op as far as `parse_document` is
-  concerned. That claim does **not** hold inside a raw/verbatim area
-  (`<codeblock>[...]`, or any element using the `area:raw` opt-in --
-  see `docs/tmt/typedmark.tm`'s `[area]` content-fidelity entry) where
-  blank lines and trailing whitespace are literal, preserved content, not
-  formatting noise -- a known, currently-unaddressed gap.
+- **`typedmark-formatter`**: AST-aware whitespace and raw-area preserving formatter.
+  Normalizes whitespace policy (LF line endings, no trailing whitespace, one final
+  newline, collapsed blank-line runs) while using AST `Span` metadata to losslessly
+  preserve literal spacing and line breaks inside verbatim areas (`<codeblock>[...]`
+  or elements with `area:raw`).
 - **`typedmark-validator`**: not implemented yet -- currently just the
   `cargo new` boilerplate (`add(left, right)` + its test). Reserved in the
   workspace for future `.tm` schema/lint validation.
 
-`typedmark_ast::Document` carrying no position/span info is a deliberate,
-recurring constraint worth remembering: it's why the formatter can't
-reprint losslessly, and it's why any future tool that needs to map an AST
-node back to a source range (e.g. LSP go-to-definition, precise
-diagnostics ranges beyond `typedmark_parser::Error`'s line/column) would
-need to either add span tracking to the AST or re-derive positions by
-re-scanning source text.
+
+Source `Span` tracking (line, column, byte offset) is fully integrated across
+all AST nodes (`Document`, `Block`, `Inline`, `Element`). This enables precise
+source-location queries for tooling such as LSP diagnostics, hover ranges, and
+lossless verbatim area formatting.
+
 
 ## The grammar has two independent implementations
 

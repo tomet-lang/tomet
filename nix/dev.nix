@@ -3,7 +3,10 @@
   pkgs,
   stdenv,
   mkShell,
-  craneLib,
+
+  typedmark,
+  typedmark-lsp,
+  typedmark-web,
   ...
 }:
 let
@@ -21,7 +24,9 @@ let
 in
 mkShell rec {
   buildInputs = with pkgs; [
-    (pkgs.callPackage ./pkgs/typedmark.nix { inherit craneLib; })
+    typedmark
+    typedmark-lsp
+    typedmark-web
 
     #[ CMake ]
     cmake

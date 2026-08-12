@@ -120,12 +120,27 @@ module.exports = grammar({
 		list: ($) => choice($.ordered_list, $.unordered_list),
 		ordered_list: ($) => prec.right(repeat1($.ordered_list_item)),
 		unordered_list: ($) => prec.right(repeat1($.unordered_list_item)),
+		_list_checkbox: (_$) => choice(/\[[^\]\n]*\]/, /\([^)\n]*\)/),
+
 		ordered_list_item: ($) =>
-			seq("-.", /[ \t]+/, repeat($._line_item), $._newline),
+			seq(
+				"-.",
+				optional($._list_checkbox),
+				/[ \t]+/,
+				repeat($._line_item),
+				optional(field("attrs", $.value_group)),
+				$._newline,
+			),
 		unordered_list_item: ($) =>
-			// A single `-` not immediately followed by another `-` or `.`
-			// (those are `thematic_break`/`ordered_list_item` instead).
-			seq(token(seq("-", /[ \t]/)), repeat($._line_item), $._newline),
+			seq(
+				"-",
+				optional($._list_checkbox),
+				/[ \t]+/,
+				repeat($._line_item),
+				optional(field("attrs", $.value_group)),
+				$._newline,
+			),
+
 
 		// ---- paragraphs -----------------------------------------------------
 		// Simplification: ends only at a blank line or EOF, not at the next

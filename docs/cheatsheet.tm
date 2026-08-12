@@ -73,7 +73,7 @@
 @link[](file:/readme.md)
 @link[](ref:1)
 
-@[](url:https://)
+@[](url:https://) 
 @[](file:/readme.md)
 @[](ref:2)
 
@@ -109,9 +109,12 @@ ls --help
 // <myfunc>()[]{}
 // <foo>()[]{}
 
-- aaaa
--. aaaa
--. aaaa
+- outline/list
+-. number1
+-. number2
+- (x) check          {id:aaaaaa}
+- ( ) none
+- ( ) custom?
 
 1. aaaa
 

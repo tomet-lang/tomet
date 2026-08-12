@@ -1,1 +1,1 @@
-../../../../crates/tree-sitter-typedmark/queries/brackets.scm
+../../../../../crates/tree-sitter-typedmark/queries/brackets.scm

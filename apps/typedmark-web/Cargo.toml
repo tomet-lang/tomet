@@ -1,0 +1,19 @@
+[package]
+name = "typedmark-web"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "typedmark-web"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+axum = { workspace = true, features = ["json"] }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net"] }
+typedmark-markdown = { workspace = true }
+typedmark-parser = { workspace = true }
+typedmark-renderer = { workspace = true }

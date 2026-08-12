@@ -106,7 +106,7 @@ fn render_block(
 ) {
     match block {
         Block::Heading(h) => render_heading(h, out, options, counters),
-        Block::Paragraph(inlines) => {
+        Block::Paragraph(p) => {
             // Elements with no visible output (`@meta`, ...) placed on
             // adjacent lines with no blank line between them lazily
             // continue into one paragraph together with the inter-element
@@ -114,14 +114,14 @@ fn render_block(
             // every one of them is invisible, skip the wrapper entirely
             // rather than emitting a stray whitespace-only `<p>`.
             let mut inner = String::new();
-            render_inlines(inlines, &mut inner);
+            render_inlines(&p.content, &mut inner);
             if !inner.trim().is_empty() {
                 out.push_str("<p>");
                 out.push_str(&inner);
                 out.push_str("</p>\n");
             }
         }
-        Block::List { ordered, items } => render_list(items, *ordered, out),
+        Block::List(list) => render_list(&list.items, list.ordered, out),
         Block::Element(el) => render_element(el, out, false),
     }
 }
@@ -152,7 +152,21 @@ fn render_list(items: &[ListItem], ordered: bool, out: &mut String) {
     let tag = if ordered { "ol" } else { "ul" };
     out.push_str(&format!("<{tag}>\n"));
     for item in items {
-        out.push_str("<li>");
+        let (id, class, data) = split_attrs(item.attrs.as_ref());
+        out.push_str("<li");
+        push_named_attrs(out, &id, &class, &data);
+        out.push('>');
+        if let Some(m) = &item.marker {
+            match m.as_str() {
+                " " => out.push_str("<input type=\"checkbox\" disabled /> "),
+                "x" | "X" => out.push_str("<input type=\"checkbox\" checked disabled /> "),
+                other => out.push_str(&format!(
+                    "<span class=\"tm-list-marker\" data-marker=\"{}\">[{}]</span> ",
+                    escape_html(other),
+                    escape_html(other)
+                )),
+            }
+        }
         render_inlines(&item.content, out);
         out.push_str("</li>\n");
     }
@@ -162,7 +176,7 @@ fn render_list(items: &[ListItem], ordered: bool, out: &mut String) {
 fn render_inlines(inlines: &[Inline], out: &mut String) {
     for inline in inlines {
         match inline {
-            Inline::Text(t) => out.push_str(&escape_html(t)),
+            Inline::Text(t) => out.push_str(&escape_html(&t.value)),
             Inline::Element(el) => render_element(el, out, true),
         }
     }
@@ -301,7 +315,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
     let mut s = String::new();
     for inline in inlines {
         match inline {
-            Inline::Text(t) => s.push_str(t),
+            Inline::Text(t) => s.push_str(&t.value),
             Inline::Element(el) => {
                 if let Some(area) = &el.area {
                     s.push_str(&inlines_to_plain(area));
@@ -724,6 +738,19 @@ mod tests {
         assert_eq!(
             body,
             "<pre><code class=\"language-rust\">let v = [1, 2, 3];</code></pre>\n"
+        );
+    }
+
+    #[test]
+    fn renders_list_with_generic_markers_and_attrs() {
+        let doc = parse_document(
+            "- ( ) todo {tag: dev}\n- [x] done {id: task1}\n- (T) in-progress\n- (?) question\n",
+        )
+        .unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<ul>\n<li data-tag=\"dev\"><input type=\"checkbox\" disabled /> todo</li>\n<li id=\"task1\"><input type=\"checkbox\" checked disabled /> done</li>\n<li><span class=\"tm-list-marker\" data-marker=\"T\">[T]</span> in-progress</li>\n<li><span class=\"tm-list-marker\" data-marker=\"?\">[?]</span> question</li>\n</ul>\n"
         );
     }
 

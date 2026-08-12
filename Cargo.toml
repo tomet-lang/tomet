@@ -2,9 +2,11 @@
 resolver = "3"
 
 members = [
-  #[ CLI ]
+  #[ CLI & Web ]
   "apps/typedmark",
+  "apps/typedmark-web",
   "apps/typedmark-lsp",
+
 
   #[ Bindings ]
   "apps/bindings/java",
@@ -51,10 +53,12 @@ axum = { version = "0.8", default-features = false, features = [
 ] }
 clap = { version = "4.6", features = ["derive"] }
 cxx = "1"
+crossterm = "0.28"
 directories = "6.0"
 lsp-server = "0.10"
 lsp-types = "0.97"
 pulldown-cmark = "0.13"
+ratatui = "0.29"
 rayon = "1"
 regex = "1.12"
 serde = { version = "1", features = ["derive"] }

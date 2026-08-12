@@ -11,13 +11,15 @@ use crate::value::{
     skip_inline_ws, skip_ws_and_newlines, skip_ws_newlines_and_comments,
 };
 use typedmark_ast::{
-    Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
+    Block, Document, Element, ElementValue, Heading, Inline, List, ListItem, Paragraph, Sigil,
+    Text, Value,
 };
 use typedmark_lexar::Cursor;
 
 pub fn parse_document(src: &str) -> Result<Document> {
     let mut cur = Cursor::new(src);
     let mut blocks = Vec::new();
+    let doc_start = cur.pos();
     // Running default for the `{...}` embedded-format mechanism, set by a
     // `@config(format:...)` block and applied to every element parsed after
     // it -- order-dependent, single-pass (see `config_format_update`).
@@ -27,6 +29,7 @@ pub fn parse_document(src: &str) -> Result<Document> {
         if cur.is_eof() {
             break;
         }
+        let block_start = cur.pos();
         let block = if cur.peek() == Some('#') {
             Some(Block::Heading(parse_heading(&mut cur, default_format)?))
         } else if is_line_comment_start(&cur) {
@@ -44,20 +47,18 @@ pub fn parse_document(src: &str) -> Result<Document> {
             )?))
         } else if is_thematic_break(&cur) {
             consume_thematic_break(&mut cur);
-            Some(Block::Element(Element::new(Sigil::Type("hr".to_string()))))
-        } else if is_ordered_list_marker(&cur) {
-            Some(Block::List {
-                ordered: true,
-                items: parse_list(&mut cur, true, default_format)?,
-            })
-        } else if is_list_marker(&cur) {
-            Some(Block::List {
-                ordered: false,
-                items: parse_list(&mut cur, false, default_format)?,
-            })
+            let span = cur.span_from(block_start);
+            Some(Block::Element(
+                Element::new(Sigil::Type("hr".to_string())).with_span(span),
+            ))
+        } else if let Some((ordered, _)) = peek_list_marker(&cur) {
+            let items = parse_list(&mut cur, ordered, default_format)?;
+            let span = cur.span_from(block_start);
+            Some(Block::List(List::new(ordered, items, span)))
         } else {
             Some(parse_paragraph(&mut cur, default_format)?)
         };
+
         if let Some(block) = block {
             if let Block::Element(el) = &block {
                 if let Some(new_default) = config_format_update(el) {
@@ -67,7 +68,8 @@ pub fn parse_document(src: &str) -> Result<Document> {
             blocks.push(block);
         }
     }
-    Ok(Document { blocks })
+    let doc_span = cur.span_from(doc_start);
+    Ok(Document::new(blocks, doc_span))
 }
 
 /// `// ...` to end of line/EOF. Discarded entirely -- comments never enter
@@ -134,29 +136,59 @@ fn is_block_comment_start(cur: &Cursor) -> bool {
     look.starts_with("/*")
 }
 
-fn is_list_marker(cur: &Cursor) -> bool {
+fn eat_list_marker(cur: &mut Cursor) -> Option<(bool, Option<String>)> {
     let mut look = *cur;
     if look.bump() != Some('-') {
-        return false;
+        return None;
     }
-    matches!(look.peek(), Some(' ') | Some('\t'))
+    let ordered = if look.peek() == Some('.') {
+        look.bump();
+        true
+    } else {
+        false
+    };
+
+    let has_ws = matches!(look.peek(), Some(' ') | Some('\t'));
+    skip_inline_ws(&mut look);
+
+    let marker = if look.peek() == Some('[') || look.peek() == Some('(') {
+        let open_char = look.bump().unwrap();
+        let close_char = if open_char == '[' { ']' } else { ')' };
+        let mut inner = String::new();
+        while let Some(c) = look.peek() {
+            if c == close_char {
+                look.bump();
+                break;
+            }
+            if c == '\n' || c == '\r' {
+                break;
+            }
+            inner.push(c);
+            look.bump();
+        }
+        if look.peek() == Some(' ') || look.peek() == Some('\t') {
+            Some(inner)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    if marker.is_none() && !has_ws {
+        return None;
+    }
+
+    skip_inline_ws(&mut look);
+    cur.set_pos(look.pos());
+    Some((ordered, marker))
 }
 
-/// `-. item` -- the ordered-list sibling of `- item`. Kept in the same
-/// "marker" family (rather than e.g. `1.[item]`) so numbering is always
-/// computed at render time instead of authored and going stale on reorder.
-fn is_ordered_list_marker(cur: &Cursor) -> bool {
+fn peek_list_marker(cur: &Cursor) -> Option<(bool, Option<String>)> {
     let mut look = *cur;
-    if look.bump() != Some('-') {
-        return false;
-    }
-    if look.bump() != Some('.') {
-        return false;
-    }
-    matches!(look.peek(), Some(' ') | Some('\t'))
+    eat_list_marker(&mut look)
 }
 
-/// A line of 3+ `-` and nothing else (trailing inline whitespace aside).
 fn is_thematic_break(cur: &Cursor) -> bool {
     let mut look = *cur;
     if look.eat_while(|c| c == '-').len() < 3 {
@@ -173,16 +205,6 @@ fn consume_thematic_break(cur: &mut Cursor) {
     }
 }
 
-/// A line starting with a dash run of 3+ followed (after only inline
-/// whitespace) by `[` -- the titled sibling of the plain thematic break
-/// (`---[ Title ]---`). Checked as a cheap prefix predicate, same as `#[`
-/// committing to `parse_heading`: once this is true,
-/// `parse_titled_thematic_break` hard-errors on anything malformed rather
-/// than falling back to plain text, since the `---[` prefix is
-/// unambiguous enough to commit to. A dash run *not* followed by `[`
-/// (e.g. `---<embed>---`) doesn't commit here, and doesn't match the
-/// plain `is_thematic_break` either (trailing content isn't just
-/// whitespace), so it falls through to ordinary paragraph text unchanged.
 fn is_titled_thematic_break_start(cur: &Cursor) -> bool {
     let mut look = *cur;
     if look.eat_while(|c| c == '-').len() < 3 {
@@ -192,19 +214,11 @@ fn is_titled_thematic_break_start(cur: &Cursor) -> bool {
     look.peek() == Some('[')
 }
 
-/// `---[ Title ]---` -- a thematic break with an inline title. Both dash
-/// runs independently need only 3+ (matching the plain break's already-
-/// flexible count; the two runs don't have to be equal length). The title
-/// reuses the same bracket-content grammar as a heading's `[...]`
-/// (`parse_inline_seq(cur, Stop::Bracket(']'))`), so it can in principle
-/// span multiple lines the same way a heading's can. Produces a plain
-/// `hr`-sigil element with the title as its `area` -- `[area]` already
-/// means exactly this on every other element, so no new `Value`/`Element`
-/// shape is needed.
 fn parse_titled_thematic_break(
     cur: &mut Cursor,
     default_format: Option<EmbeddedFormat>,
 ) -> Result<Element> {
+    let start_pos = cur.pos();
     cur.eat_while(|c| c == '-');
     skip_inline_ws(cur);
     if !cur.eat_str("[") {
@@ -233,12 +247,13 @@ fn parse_titled_thematic_break(
     if matches!(cur.peek(), Some('\n') | Some('\r')) {
         cur.bump();
     }
-    let mut el = Element::new(Sigil::Type("hr".to_string()));
+    let mut el = Element::new(Sigil::Type("hr".to_string())).with_span(cur.span_from(start_pos));
     el.area = Some(title);
     Ok(el)
 }
 
 fn parse_heading(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Heading> {
+    let start_pos = cur.pos();
     let level = cur.eat_while(|c| c == '#').len() as u8;
     skip_inline_ws(cur);
     if !cur.eat_str("[") {
@@ -260,11 +275,8 @@ fn parse_heading(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Re
     if matches!(cur.peek(), Some('\n') | Some('\r')) {
         cur.bump();
     }
-    Ok(Heading {
-        level,
-        content,
-        attrs,
-    })
+    let span = cur.span_from(start_pos);
+    Ok(Heading::new(level, content, attrs, span))
 }
 
 fn parse_braced_value(cur: &mut Cursor) -> Result<Value> {
@@ -279,6 +291,28 @@ fn parse_braced_value(cur: &mut Cursor) -> Result<Value> {
     Ok(v)
 }
 
+fn peek_trailing_attrs(cur: &Cursor) -> Option<usize> {
+    let mut look = *cur;
+    let mut last_brace_pos = None;
+    while !look.is_eof() && look.peek() != Some('\n') && look.peek() != Some('\r') {
+        if look.peek() == Some('{') {
+            last_brace_pos = Some(look.pos());
+        }
+        look.bump();
+    }
+    if let Some(pos) = last_brace_pos {
+        let mut test_cur = *cur;
+        test_cur.set_pos(pos);
+        if parse_braced_value(&mut test_cur).is_ok() {
+            skip_inline_ws(&mut test_cur);
+            if matches!(test_cur.peek(), None | Some('\n') | Some('\r')) {
+                return Some(pos);
+            }
+        }
+    }
+    None
+}
+
 /// `ordered` selects which marker continues the list -- a run of `- `
 /// lines and a run of `-. ` lines are two separate lists even if adjacent,
 /// so switching marker mid-stream stops this list rather than mixing.
@@ -288,33 +322,44 @@ fn parse_list(
     default_format: Option<EmbeddedFormat>,
 ) -> Result<Vec<ListItem>> {
     let mut items = Vec::new();
-    while if ordered {
-        is_ordered_list_marker(cur)
-    } else {
-        is_list_marker(cur)
-    } {
-        cur.bump();
-        if ordered {
-            cur.bump();
+    while let Some((item_ordered, marker)) = peek_list_marker(cur) {
+        if item_ordered != ordered {
+            break;
         }
-        skip_inline_ws(cur);
-        let content = parse_inline_seq(cur, Stop::Line, default_format)?;
-        items.push(ListItem { content });
+        let item_start = cur.pos();
+        eat_list_marker(cur);
+
+        let (content, attrs) = if let Some(brace_pos) = peek_trailing_attrs(cur) {
+            let content = parse_inline_seq(cur, Stop::Offset(brace_pos), default_format)?;
+            let attrs = parse_braced_value(cur)?;
+            (content, Some(attrs))
+        } else {
+            let content = parse_inline_seq(cur, Stop::Line, default_format)?;
+            (content, None)
+        };
+
         if cur.peek() == Some('\n') {
             cur.bump();
         }
+        let span = cur.span_from(item_start);
+        items.push(ListItem::new(content, marker, attrs, span));
     }
     Ok(items)
 }
 
 fn parse_paragraph(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Block> {
+    let start_pos = cur.pos();
     let mut content = parse_inline_seq(cur, Stop::Paragraph, default_format)?;
+    let span = cur.span_from(start_pos);
     if content.len() == 1 && matches!(content[0], Inline::Element(_)) {
-        if let Inline::Element(el) = content.pop().unwrap() {
+        if let Inline::Element(mut el) = content.pop().unwrap() {
+            if el.span == typedmark_ast::Span::default() {
+                el.span = span;
+            }
             return Ok(Block::Element(el));
         }
     }
-    Ok(Block::Paragraph(content))
+    Ok(Block::Paragraph(Paragraph::new(content, span)))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -322,6 +367,7 @@ enum Stop {
     Bracket(char),
     Paragraph,
     Line,
+    Offset(usize),
     /// Closing delimiter of a `*em*`/`**strong**`/`==mark==` span; mirrors
     /// `Bracket` but the terminator is a short string instead of one char.
     Delim(&'static str),
@@ -362,6 +408,11 @@ fn parse_inline_seq(
                     break;
                 }
             }
+            Stop::Offset(target_pos) => {
+                if cur.pos() >= target_pos || cur.is_eof() {
+                    break;
+                }
+            }
             Stop::Paragraph => {
                 if cur.is_eof() {
                     break;
@@ -373,7 +424,7 @@ fn parse_inline_seq(
                     if look.is_eof()
                         || look.peek() == Some('\n')
                         || look.peek() == Some('#')
-                        || is_list_marker(&look)
+                        || peek_list_marker(&look).is_some()
                         || look.starts_with("//")
                         || look.starts_with("/*")
                     {
@@ -482,24 +533,24 @@ fn parse_inline_seq(
 /// ate the space around inline elements embedded mid-paragraph.)
 fn trim_edges(mut items: Vec<Inline>) -> Vec<Inline> {
     if let Some(Inline::Text(t)) = items.first() {
-        let trimmed = t.trim_start();
+        let trimmed = t.value.trim_start();
         if trimmed.is_empty() {
             items.remove(0);
-        } else if trimmed.len() != t.len() {
+        } else if trimmed.len() != t.value.len() {
             let trimmed = trimmed.to_string();
             if let Some(Inline::Text(t)) = items.first_mut() {
-                *t = trimmed;
+                t.value = trimmed;
             }
         }
     }
     if let Some(Inline::Text(t)) = items.last() {
-        let trimmed = t.trim_end();
+        let trimmed = t.value.trim_end();
         if trimmed.is_empty() {
             items.pop();
-        } else if trimmed.len() != t.len() {
+        } else if trimmed.len() != t.value.len() {
             let trimmed = trimmed.to_string();
             if let Some(Inline::Text(t)) = items.last_mut() {
-                *t = trimmed;
+                t.value = trimmed;
             }
         }
     }
@@ -545,6 +596,7 @@ fn try_one_delimited(
     kind: &str,
     default_format: Option<EmbeddedFormat>,
 ) -> Result<Option<Element>> {
+    let start_pos = cur.pos();
     if !cur.starts_with(delim) {
         return Ok(None);
     }
@@ -585,7 +637,8 @@ fn try_one_delimited(
     if !cur.eat_str(delim) {
         return Err(err(cur, cur.pos(), format!("expected '{delim}'")));
     }
-    let mut el = Element::new(Sigil::Type(kind.to_string()));
+    let span = cur.span_from(start_pos);
+    let mut el = Element::new(Sigil::Type(kind.to_string())).with_span(span);
     el.area = Some(inner);
     Ok(Some(el))
 }
@@ -600,10 +653,11 @@ fn flush_text(items: &mut Vec<Inline>, cur: &Cursor, text_start: &mut usize) {
 /// must NOT be included in the flush.
 fn flush_text_upto(items: &mut Vec<Inline>, cur: &Cursor, text_start: &mut usize, end: usize) {
     let raw = &cur.src()[*text_start..end];
+    let span = typedmark_ast::Span::new(cur.position_at(*text_start), cur.position_at(end));
     *text_start = end;
     let normalized = normalize_text(raw);
     if !normalized.is_empty() {
-        items.push(Inline::Text(normalized));
+        items.push(Inline::Text(Text::new(normalized, span)));
     }
 }
 
@@ -676,6 +730,7 @@ fn is_at_element_start(cur: &Cursor) -> bool {
 }
 
 fn parse_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Element> {
+    let start_pos = cur.pos();
     let sigil = if cur.peek() == Some('<') {
         cur.bump();
         let name = eat_ident(cur).to_string();
@@ -750,6 +805,7 @@ fn parse_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Re
         cur.set_pos(checkpoint);
         break;
     }
+    el.span = cur.span_from(start_pos);
     Ok(el)
 }
 
@@ -799,11 +855,12 @@ fn parse_raw_area_with(
     let body_start = cur.pos();
     let body_end = find_close(cur, '[', ']', group_start)?;
     let raw = cur.src()[body_start..body_end].to_string();
+    let span = typedmark_ast::Span::new(cur.position_at(body_start), cur.position_at(body_end));
     cur.set_pos(body_end);
     if !cur.eat_str("]") {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }
-    Ok(vec![Inline::Text(raw)])
+    Ok(vec![Inline::Text(Text::new(raw, span))])
 }
 
 fn parse_raw_area(cur: &mut Cursor) -> Result<Vec<Inline>> {
@@ -907,6 +964,7 @@ fn parse_value_group(
 }
 
 fn parse_bare_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Element> {
+    let start_pos = cur.pos();
     let input = parse_paren_value(cur)?;
     let mut el = Element::new(Sigil::Bare);
     el.input = Some(input);
@@ -917,5 +975,6 @@ fn parse_bare_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) 
     } else {
         cur.set_pos(checkpoint);
     }
+    el.span = cur.span_from(start_pos);
     Ok(el)
 }

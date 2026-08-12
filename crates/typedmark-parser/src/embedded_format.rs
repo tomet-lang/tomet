@@ -476,4 +476,88 @@ mod tests {
             other => panic!("expected an element, got {other:?}"),
         }
     }
+
+    #[test]
+    fn json_body_supports_escapes_unicode_and_complex_nesting() {
+        let src = r#"@meta(format:json){
+            {
+                "escaped": "line1\nline2\t\"quoted\"",
+                "unicode": "\u3042\u3044",
+                "nested": {
+                    "seq": [1, true, null, {"key": "val"}]
+                }
+            }
+        }"#;
+        let v = meta_value(src);
+        assert_eq!(
+            v,
+            ElementValue::Data(Value::Map(vec![
+                (
+                    "escaped".into(),
+                    Value::String("line1\nline2\t\"quoted\"".into())
+                ),
+                ("unicode".into(), Value::String("あい".into())),
+                (
+                    "nested".into(),
+                    Value::Map(vec![(
+                        "seq".into(),
+                        Value::Seq(vec![
+                            Value::Int(1),
+                            Value::Bool(true),
+                            Value::Null,
+                            Value::Map(vec![("key".into(), Value::String("val".into()))]),
+                        ])
+                    )])
+                ),
+            ]))
+        );
+    }
+
+    #[test]
+    fn yaml_body_supports_comments_multiline_strings_and_lists() {
+        let src =
+            "@meta(format:yaml){\n# a comment\ntitle: hello\nlist:\n  - item1\n  - item2\n}\n";
+        let v = meta_value(src);
+        assert_eq!(
+            v,
+            ElementValue::Data(Value::Map(vec![
+                ("title".into(), Value::String("hello".into())),
+                (
+                    "list".into(),
+                    Value::Seq(vec![
+                        Value::String("item1".into()),
+                        Value::String("item2".into()),
+                    ])
+                ),
+            ]))
+        );
+    }
+
+    #[test]
+    fn toml_body_supports_tables_and_arrays() {
+        let src =
+            "@meta(format:toml){\n[owner]\nname = \"Alice\"\nage = 30\nitems = [\"a\", \"b\"]\n}\n";
+        let v = meta_value(src);
+        assert_eq!(
+            v,
+            ElementValue::Data(Value::Map(vec![(
+                "owner".into(),
+                Value::Map(vec![
+                    ("name".into(), Value::String("Alice".into())),
+                    ("age".into(), Value::Int(30)),
+                    (
+                        "items".into(),
+                        Value::Seq(vec![Value::String("a".into()), Value::String("b".into()),])
+                    ),
+                ])
+            )]))
+        );
+    }
+
+    #[test]
+    fn malformed_embedded_formats_return_descriptive_errors() {
+        assert!(parse_document(r#"@meta(format:json){ { invalid json } }"#).is_err());
+        assert!(parse_document(r#"@meta(format:yaml){ : : invalid yaml }"#).is_err());
+        assert!(parse_document(r#"@meta(format:toml){ [unclosed table }"#).is_err());
+    }
 }

@@ -9,12 +9,20 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
-axum = { workspace = true }
+axum = { workspace = true, features = ["json"] }
+
 clap = { workspace = true }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
+
 serde_typedmark = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net"] }
+typedmark-ast = { workspace = true }
 typedmark-formatter = { workspace = true }
 typedmark-markdown = { workspace = true }
 typedmark-parser = { workspace = true }
 typedmark-renderer = { workspace = true }
+uuid = { workspace = true }
+walkdir = { workspace = true }
