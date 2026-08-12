@@ -21,10 +21,17 @@ flake-parts.lib.mkFlake { inherit inputs; } {
       packages = rec {
         default = typedmark;
         typedmark = pkgs.callPackage ./pkgs/typedmark.nix { inherit craneLib; };
+        typedmark-lsp = pkgs.callPackage ./pkgs/typedmark-lsp.nix { inherit craneLib; };
+        typedmark-web = pkgs.callPackage ./pkgs/typedmark-web.nix { inherit craneLib; };
         vscodeExtension = pkgs.callPackage ./pkgs/vscode-extension.nix { };
       };
 
-      devShells.default = pkgs.callPackage ./dev.nix { inherit inputs craneLib; };
+      devShells.default = pkgs.callPackage ./dev.nix {
+        inherit inputs craneLib;
+        typedmark = pkgs.callPackage ./pkgs/typedmark.nix { inherit craneLib; };
+        typedmark-lsp = pkgs.callPackage ./pkgs/typedmark-lsp.nix { inherit craneLib; };
+        typedmark-web = pkgs.callPackage ./pkgs/typedmark-web.nix { inherit craneLib; };
+      };
 
       treefmt = import ./formatter.nix;
     };

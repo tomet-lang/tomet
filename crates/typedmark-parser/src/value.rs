@@ -25,6 +25,7 @@ pub(crate) fn err(cur: &Cursor, pos: usize, message: impl Into<String>) -> Error
         message: message.into(),
         line,
         column,
+        offset: pos,
     }
 }
 

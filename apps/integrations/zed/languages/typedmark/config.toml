@@ -1,3 +1,30 @@
 name = "TypedMark"
 grammar = "typedmark"
 path_suffixes = ["tm"]
+line_comment = "//"
+block_comment = ["/*", "*/"]
+
+[[bracket_pairs]]
+start = "{"
+end = "}"
+close = true
+newline = true
+
+[[bracket_pairs]]
+start = "["
+end = "]"
+close = true
+newline = true
+
+[[bracket_pairs]]
+start = "("
+end = ")"
+close = true
+newline = true
+
+[[bracket_pairs]]
+start = "<"
+end = ">"
+close = true
+newline = false
+

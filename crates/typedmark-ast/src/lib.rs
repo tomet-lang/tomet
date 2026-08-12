@@ -1,11 +1,53 @@
-//! AST types shared by `typedmark-parser` and its consumers.
-//!
-//! `Value` is the pure-data subset (maps onto serde's data model 1:1) --
-//! it's what fills a `(input)` or `{value}` group, and it's also the whole
-//! result of parsing a data-only `.tm` file (see `typedmark-serde`).
-//!
-//! `Document`/`Block`/`Inline`/`Element` are the full markup AST: headings,
-//! paragraphs, lists, and typed elements, in source order.
+/// A 0-indexed byte offset and 1-indexed line/column position in source text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+pub struct Position {
+    pub line: usize,
+    pub column: usize,
+    pub offset: usize,
+}
+
+impl Position {
+    pub fn new(line: usize, column: usize, offset: usize) -> Self {
+        Self {
+            line,
+            column,
+            offset,
+        }
+    }
+}
+
+/// A source span bounded by start and end [`Position`]s.
+///
+/// Note: [`PartialEq`] is implemented to always return `true` so that AST
+/// structural equality checks (e.g. `assert_eq!(doc1, doc2)`) compare node
+/// content and semantics without failing on source location differences.
+/// Use [`exact_eq`](Self::exact_eq) or direct field comparison when exact
+/// byte offsets need to be validated.
+#[derive(Debug, Clone, Copy, Eq, Default, Hash)]
+pub struct Span {
+    pub start: Position,
+    pub end: Position,
+}
+
+impl Span {
+    pub fn new(start: Position, end: Position) -> Self {
+        Self { start, end }
+    }
+
+    pub fn dummy() -> Self {
+        Self::default()
+    }
+
+    pub fn exact_eq(&self, other: &Self) -> bool {
+        self.start == other.start && self.end == other.end
+    }
+}
+
+impl PartialEq for Span {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
 
 /// A pure data value: the subset of TypedMark with a direct serde
 /// equivalent (no headings, prose, or links).
@@ -25,19 +67,63 @@ pub enum Value {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Document {
     pub blocks: Vec<Block>,
+    pub span: Span,
+}
+
+impl Document {
+    pub fn new(blocks: Vec<Block>, span: Span) -> Self {
+        Self { blocks, span }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
     Heading(Heading),
-    Paragraph(Vec<Inline>),
+    Paragraph(Paragraph),
     /// `ordered` distinguishes `-.` (auto-numbered) from plain `-` lists;
     /// numbering itself isn't stored, it's computed at render time.
-    List {
-        ordered: bool,
-        items: Vec<ListItem>,
-    },
+    List(List),
     Element(Element),
+}
+
+impl Block {
+    pub fn span(&self) -> Span {
+        match self {
+            Block::Heading(h) => h.span,
+            Block::Paragraph(p) => p.span,
+            Block::List(l) => l.span,
+            Block::Element(e) => e.span,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Paragraph {
+    pub content: Vec<Inline>,
+    pub span: Span,
+}
+
+impl Paragraph {
+    pub fn new(content: Vec<Inline>, span: Span) -> Self {
+        Self { content, span }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct List {
+    pub ordered: bool,
+    pub items: Vec<ListItem>,
+    pub span: Span,
+}
+
+impl List {
+    pub fn new(ordered: bool, items: Vec<ListItem>, span: Span) -> Self {
+        Self {
+            ordered,
+            items,
+            span,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -46,17 +132,106 @@ pub struct Heading {
     pub level: u8,
     pub content: Vec<Inline>,
     pub attrs: Option<Value>,
+    pub span: Span,
+}
+
+impl Heading {
+    pub fn new(level: u8, content: Vec<Inline>, attrs: Option<Value>, span: Span) -> Self {
+        Self {
+            level,
+            content,
+            attrs,
+            span,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListItem {
     pub content: Vec<Inline>,
+    /// Optional status marker inside `[...]` or `(...)` (e.g. `" "` for `( )`, `"x"` for `(x)`, `"T"` for `(T)`, `"?"` for `(?)`).
+    /// `None` for plain items without bracket/paren status markers.
+    pub marker: Option<String>,
+    /// Optional attributes attached via trailing `{value}` group (e.g. `{tag: dev}`).
+    pub attrs: Option<Value>,
+    pub span: Span,
+}
+
+impl ListItem {
+    pub fn new(
+        content: Vec<Inline>,
+        marker: Option<String>,
+        attrs: Option<Value>,
+        span: Span,
+    ) -> Self {
+        Self {
+            content,
+            marker,
+            attrs,
+            span,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Inline {
-    Text(String),
+    Text(Text),
     Element(Element),
+}
+
+impl Inline {
+    pub fn span(&self) -> Span {
+        match self {
+            Inline::Text(t) => t.span,
+            Inline::Element(e) => e.span,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Text {
+    pub value: String,
+    pub span: Span,
+}
+
+impl Text {
+    pub fn new(value: impl Into<String>, span: Span) -> Self {
+        Self {
+            value: value.into(),
+            span,
+        }
+    }
+}
+
+impl From<String> for Text {
+    fn from(value: String) -> Self {
+        Self {
+            value,
+            span: Span::dummy(),
+        }
+    }
+}
+
+impl From<&str> for Text {
+    fn from(value: &str) -> Self {
+        Self {
+            value: value.to_string(),
+            span: Span::dummy(),
+        }
+    }
+}
+
+impl std::ops::Deref for Text {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl std::ops::DerefMut for Text {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
 }
 
 /// Which sigil introduced a typed element, and its name if any.
@@ -114,6 +289,7 @@ pub struct Element {
     pub input: Option<Value>,
     pub area: Option<Vec<Inline>>,
     pub value: Option<ElementValue>,
+    pub span: Span,
 }
 
 impl Element {
@@ -123,7 +299,13 @@ impl Element {
             input: None,
             area: None,
             value: None,
+            span: Span::default(),
         }
+    }
+
+    pub fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
+        self
     }
 }
 

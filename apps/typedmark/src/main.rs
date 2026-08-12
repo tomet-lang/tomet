@@ -11,6 +11,8 @@ use axum::Router;
 use axum::extract::State;
 use axum::response::Html;
 use axum::routing::get;
+mod tui;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -22,14 +24,20 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Parse a file and report whether it's valid (prints "OK" or an error
-    /// with its line:column), without dumping the AST.
+    /// Parse a file and report whether it's valid (prints "OK" or a detailed
+    /// snippet error with its line:column), without dumping the AST.
     Check {
         file: PathBuf,
         /// Parse as a data-only document (key: value / seq / scalar)
         /// instead of the full document grammar.
         #[arg(long)]
         data: bool,
+        /// Do not print "OK" when parse succeeds.
+        #[arg(short, long)]
+        quiet: bool,
+        /// Output parse diagnostic error as JSON format.
+        #[arg(long)]
+        json: bool,
     },
     /// Parse a file and pretty-print the resulting AST.
     Ast {
@@ -72,25 +80,39 @@ enum Command {
         #[arg(long)]
         advanced: bool,
     },
+
     /// Normalize a `.tm` file's whitespace (line endings, trailing
     /// whitespace, blank lines, final newline). Prints to stdout by
-    /// default; see `--write`/`--check`.
+    /// default; see `--in-place`/`--check`.
     Format {
         file: PathBuf,
         /// Overwrite the file in place instead of printing to stdout.
-        #[arg(short, long)]
-        write: bool,
+        #[arg(short = 'i', long, alias = "write")]
+        in_place: bool,
         /// Exit with a nonzero status if the file isn't already
         /// formatted, without writing or printing anything.
-        #[arg(long, conflicts_with = "write")]
+        #[arg(long, conflicts_with = "in_place")]
         check: bool,
+    },
+
+    /// Launch the interactive TUI workbench for Markdown migration,
+    /// batch metadata editing, and structural AST refactoring.
+    Tui {
+        /// Target directory or file path (defaults to current directory ".").
+        #[arg(default_value = ".")]
+        path: PathBuf,
     },
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let result = match &cli.command {
-        Command::Check { file, data } => check(file, *data),
+        Command::Check {
+            file,
+            data,
+            quiet,
+            json,
+        } => check(file, *data, *quiet, *json),
         Command::Ast { file, data } => ast(file, *data),
         Command::Roundtrip { file } => roundtrip(file),
         Command::Html {
@@ -104,39 +126,95 @@ fn main() -> ExitCode {
             port,
             advanced,
         } => serve(file, *port, *advanced),
-        Command::Format { file, write, check } => format_cmd(file, *write, *check),
+        Command::Format {
+            file,
+            in_place,
+            check,
+        } => format_cmd(file, *in_place, *check),
+        Command::Tui { path } => tui::run_tui(path.clone()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!("error: {e}");
+            eprintln!("{e}");
             ExitCode::FAILURE
         }
     }
+}
+
+fn format_parse_error(path: &Path, src: &str, err: &typedmark_parser::Error) -> String {
+    let line_num = err.line;
+    let col_num = err.column;
+
+    let line_text = src.lines().nth(line_num.saturating_sub(1)).unwrap_or("");
+
+    let indent = " ".repeat(col_num.saturating_sub(1));
+    let line_str = line_num.to_string();
+    let padding = " ".repeat(line_str.len());
+
+    format!(
+        "error: {}\n  --> {}:{}:{}\n   {}\n {} | {}\n   {}| {}^ {}",
+        err.message,
+        path.display(),
+        line_num,
+        col_num,
+        "|",
+        line_str,
+        line_text,
+        padding,
+        indent,
+        err.message
+    )
 }
 
 fn read(file: &PathBuf) -> anyhow::Result<String> {
     Ok(fs::read_to_string(file)?)
 }
 
-fn check(file: &PathBuf, data: bool) -> anyhow::Result<()> {
+fn check(file: &PathBuf, data: bool, quiet: bool, json: bool) -> anyhow::Result<()> {
     let src = read(file)?;
-    if data {
-        typedmark_parser::parse_value(&src)?;
+    let res = if data {
+        typedmark_parser::parse_value(&src).map(|_| ())
     } else {
-        typedmark_parser::parse_document(&src)?;
+        typedmark_parser::parse_document(&src).map(|_| ())
+    };
+
+    match res {
+        Ok(()) => {
+            if !quiet {
+                println!("OK");
+            }
+            Ok(())
+        }
+        Err(err) => {
+            if json {
+                let json_err = serde_json::json!({
+                    "file": file.display().to_string(),
+                    "error": {
+                        "message": err.message,
+                        "line": err.line,
+                        "column": err.column,
+                        "offset": err.offset,
+                    }
+                });
+                println!("{}", serde_json::to_string_pretty(&json_err)?);
+            } else {
+                eprintln!("{}", format_parse_error(file, &src, &err));
+            }
+            Err(anyhow::anyhow!("check failed"))
+        }
     }
-    println!("OK");
-    Ok(())
 }
 
 fn ast(file: &PathBuf, data: bool) -> anyhow::Result<()> {
     let src = read(file)?;
     if data {
-        let value = typedmark_parser::parse_value(&src)?;
+        let value = typedmark_parser::parse_value(&src)
+            .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
         println!("{value:#?}");
     } else {
-        let doc = typedmark_parser::parse_document(&src)?;
+        let doc = typedmark_parser::parse_document(&src)
+            .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
         println!("{doc:#?}");
     }
     Ok(())
@@ -144,7 +222,8 @@ fn ast(file: &PathBuf, data: bool) -> anyhow::Result<()> {
 
 fn render_file(file: &Path, advanced: bool) -> anyhow::Result<String> {
     let src = fs::read_to_string(file)?;
-    let doc = typedmark_parser::parse_document(&src)?;
+    let doc = typedmark_parser::parse_document(&src)
+        .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
     let title = file
         .file_stem()
         .and_then(|s| s.to_str())
@@ -166,7 +245,8 @@ fn html(file: &PathBuf, out: &Option<PathBuf>, advanced: bool) -> anyhow::Result
 
 fn to_md(file: &PathBuf, out: &Option<PathBuf>) -> anyhow::Result<()> {
     let src = read(file)?;
-    let doc = typedmark_parser::parse_document(&src)?;
+    let doc = typedmark_parser::parse_document(&src)
+        .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
     let markdown = typedmark_markdown::to_markdown(&doc);
     match out {
         Some(path) => fs::write(path, markdown)?,
@@ -259,5 +339,26 @@ fn roundtrip(file: &PathBuf) -> anyhow::Result<()> {
         Err(anyhow::anyhow!(
             "re-parsing the rendered output produced a different value"
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn formats_parse_error_with_source_context() {
+        let err = typedmark_parser::Error {
+            message: "expected ']'".into(),
+            line: 1,
+            column: 11,
+            offset: 10,
+        };
+        let src = "<caution>[ unterminated";
+        let formatted = format_parse_error(Path::new("test.tm"), src, &err);
+        assert!(formatted.contains("error: expected ']'"));
+        assert!(formatted.contains("--> test.tm:1:11"));
+        assert!(formatted.contains("<caution>[ unterminated"));
+        assert!(formatted.contains("^ expected ']'"));
     }
 }

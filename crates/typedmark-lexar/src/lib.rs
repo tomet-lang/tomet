@@ -7,6 +7,8 @@
 //! `typedmark-parser` builds its recursive-descent parser straight on top
 //! of this rather than going through a separate token pass.
 
+use typedmark_ast::{Position, Span};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cursor<'a> {
     src: &'a str,
@@ -98,5 +100,21 @@ impl<'a> Cursor<'a> {
             }
         }
         (line, col)
+    }
+
+    /// Returns a [`Position`] for a given byte offset.
+    pub fn position_at(&self, pos: usize) -> Position {
+        let (line, column) = self.line_col(pos);
+        Position::new(line, column, pos)
+    }
+
+    /// Returns the current [`Position`] of the cursor.
+    pub fn current_position(&self) -> Position {
+        self.position_at(self.pos)
+    }
+
+    /// Returns a [`Span`] from `start_pos` byte offset to the current cursor position.
+    pub fn span_from(&self, start_pos: usize) -> Span {
+        Span::new(self.position_at(start_pos), self.current_position())
     }
 }

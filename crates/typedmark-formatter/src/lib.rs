@@ -1,41 +1,147 @@
 //! Whitespace-hygiene formatter for `.tm` source text.
 //!
-//! This is intentionally *not* a full AST-reprint (gofmt/prettier style):
-//! `typedmark_ast::Document` carries no span/position info, so a lossless
-//! reprint isn't possible today, and a hand-rolled duplicate of the parser's
-//! grammar walk just to preserve incidental spacing isn't worth the
-//! maintenance cost yet. Instead this only normalizes the whitespace policy
-//! the repo's own `.editorconfig` already declares for every file (`[*]`:
-//! LF line endings, no trailing whitespace, exactly one final newline), plus
-//! collapsing excess blank lines. All of these are no-ops as far as
-//! `typedmark_parser::parse_document` is concerned -- see the crate tests.
+//! Upgraded to be AST-aware using source [`typedmark_ast::Span`] metadata.
+//! Normalizes whitespace policy (LF line endings, no trailing whitespace,
+//! collapsed excess blank lines, exactly one final newline) while losslessly
+//! preserving literal whitespace and blank lines inside raw/verbatim areas
+//! (`<codeblock>[...]` and elements opting in via `area:raw`).
+
+use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
+use typedmark_parser::parse_document;
 
 /// Format `src` in place (returns a new `String`). Idempotent:
 /// `format_source(&format_source(src)) == format_source(src)`.
 pub fn format_source(src: &str) -> String {
     let normalized = src.replace("\r\n", "\n").replace('\r', "\n");
+    if normalized.trim().is_empty() {
+        return String::new();
+    }
 
-    let mut out_lines: Vec<&str> = Vec::new();
+    let mut raw_spans = Vec::new();
+    if let Ok(doc) = parse_document(&normalized) {
+        collect_raw_spans(&doc, &mut raw_spans);
+    }
+
+    let is_offset_raw = |offset: usize| -> bool {
+        raw_spans
+            .iter()
+            .any(|&(start, end)| offset >= start && offset < end)
+    };
+
+    let mut out_lines: Vec<String> = Vec::new();
     let mut pending_blank = false;
+    let mut current_offset = 0;
+
     for line in normalized.split('\n') {
-        let trimmed = line.trim_end_matches([' ', '\t']);
-        if trimmed.is_empty() {
-            pending_blank = true;
-            continue;
+        let line_len = line.len();
+        let line_end_offset = current_offset + line_len;
+
+        // Check if any byte in this line falls inside a raw area.
+        let is_raw_line = (current_offset..=line_end_offset).any(is_offset_raw);
+
+        if is_raw_line {
+            if pending_blank && !out_lines.is_empty() {
+                out_lines.push(String::new());
+            }
+            pending_blank = false;
+            out_lines.push(line.to_string());
+        } else {
+            let trimmed = line.trim_end_matches([' ', '\t']);
+            if trimmed.is_empty() {
+                pending_blank = true;
+            } else {
+                if pending_blank && !out_lines.is_empty() {
+                    out_lines.push(String::new());
+                }
+                pending_blank = false;
+                out_lines.push(trimmed.to_string());
+            }
         }
-        if pending_blank && !out_lines.is_empty() {
-            out_lines.push("");
-        }
-        pending_blank = false;
-        out_lines.push(trimmed);
+
+        // +1 accounts for the newline character in the normalized string
+        current_offset += line_len + 1;
     }
 
     if out_lines.is_empty() {
         return String::new();
     }
+
     let mut out = out_lines.join("\n");
     out.push('\n');
     out
+}
+
+fn is_raw_element(el: &Element) -> bool {
+    if matches!(&el.sigil, Sigil::Type(name) if name == "codeblock") {
+        return true;
+    }
+    if let Some(Value::Map(entries)) = &el.input {
+        if entries
+            .iter()
+            .any(|(k, v)| k == "area" && matches!(v, Value::String(s) if s == "raw"))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
+    fn walk_element(el: &Element, out: &mut Vec<(usize, usize)>) {
+        if is_raw_element(el) {
+            if let Some(inlines) = &el.area {
+                for inline in inlines {
+                    let span = inline.span();
+                    if span.start.offset < span.end.offset {
+                        out.push((span.start.offset, span.end.offset));
+                    }
+                }
+            }
+        }
+        if let Some(inlines) = &el.area {
+            for inline in inlines {
+                if let Inline::Element(child_el) = inline {
+                    walk_element(child_el, out);
+                }
+            }
+        }
+        if let Some(ElementValue::Children(children)) = &el.value {
+            for child in children {
+                walk_element(child, out);
+            }
+        }
+    }
+
+    for block in &doc.blocks {
+        match block {
+            Block::Paragraph(p) => {
+                for inline in &p.content {
+                    if let Inline::Element(el) = inline {
+                        walk_element(el, out);
+                    }
+                }
+            }
+            Block::Heading(h) => {
+                for inline in &h.content {
+                    if let Inline::Element(el) = inline {
+                        walk_element(el, out);
+                    }
+                }
+            }
+            Block::List(list) => {
+                for item in &list.items {
+                    for inline in &item.content {
+                        if let Inline::Element(el) = inline {
+                            walk_element(el, out);
+                        }
+                    }
+                }
+            }
+            Block::Element(el) => {
+                walk_element(el, out);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -82,6 +188,18 @@ mod tests {
     }
 
     #[test]
+    fn raw_area_content_is_preserved_losslessly() {
+        let src = "<memo>(area:raw)[\nline one  \n\nline two\n]\n";
+        assert_eq!(format_source(src), src);
+    }
+
+    #[test]
+    fn codeblock_content_is_preserved_losslessly() {
+        let src = "<codeblock>(lang:rust)[\nfn foo() {\n    let a = 1;  \n\n    let b = 2;\n}\n]\n";
+        assert_eq!(format_source(src), src);
+    }
+
+    #[test]
     fn is_idempotent_on_repo_spec_examples() {
         for src in repo_examples() {
             let once = format_source(src);
@@ -92,12 +210,8 @@ mod tests {
 
     #[test]
     fn does_not_change_the_parsed_document() {
-        // Only fixtures that already parse under the current grammar --
-        // `docs/cheatsheet.tm` has placeholder empty groups (e.g.
-        // `<myfunc>()[]{}`) the parser doesn't accept yet, which is a
-        // pre-existing grammar gap unrelated to formatting.
         for src in [
-            include_str!("../../../docs/tmt/typedmark.tm"),
+            include_str!("../../../docs/readme.ja.tm"),
             include_str!("../../../docs/tmt/examples/image_meta.tm"),
             include_str!("../../../docs/roadmap.ja.tm"),
         ] {
@@ -112,7 +226,7 @@ mod tests {
 
     fn repo_examples() -> Vec<&'static str> {
         vec![
-            include_str!("../../../docs/tmt/typedmark.tm"),
+            include_str!("../../../docs/readme.ja.tm"),
             include_str!("../../../docs/tmt/examples/image_meta.tm"),
             include_str!("../../../docs/cheatsheet.tm"),
             include_str!("../../../docs/roadmap.ja.tm"),

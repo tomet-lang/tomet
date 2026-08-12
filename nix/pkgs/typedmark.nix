@@ -18,7 +18,7 @@ craneLib.buildPackage (
   // {
     inherit cargoArtifacts;
 
-    cargoExtraArgs = "-p typedmark -p typedmark-lsp";
+    cargoExtraArgs = "-p typedmark";
 
     doCheck = true;
   }

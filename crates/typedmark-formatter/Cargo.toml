@@ -5,6 +5,9 @@ edition.workspace = true
 # tm format
 
 [dependencies]
+typedmark-ast = { workspace = true }
+typedmark-parser = { workspace = true }
 
 [dev-dependencies]
+
 typedmark-parser = { workspace = true }

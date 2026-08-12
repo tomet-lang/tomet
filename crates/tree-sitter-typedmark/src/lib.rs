@@ -391,7 +391,7 @@ mod tests {
 
     #[test]
     fn typedmark_tm_fixture_has_only_known_error_cases() {
-        let src = include_str!("../../../docs/tmt/typedmark.tm");
+        let src = include_str!("../../../docs/readme.ja.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);
         // Every error node's text contains (or exactly is) one of these

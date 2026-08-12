@@ -125,11 +125,45 @@ mod tests {
     fn parses_list() {
         let doc = parse_document("- one\n- two\n").unwrap();
         match &doc.blocks[0] {
-            Block::List { ordered, items } => {
-                assert!(!ordered);
-                assert_eq!(items.len(), 2);
-                assert_eq!(items[0].content, vec![Inline::Text("one".into())]);
-                assert_eq!(items[1].content, vec![Inline::Text("two".into())]);
+            Block::List(list) => {
+                assert!(!list.ordered);
+                assert_eq!(list.items.len(), 2);
+                assert_eq!(list.items[0].content, vec![Inline::Text("one".into())]);
+                assert_eq!(list.items[1].content, vec![Inline::Text("two".into())]);
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_list_generic_markers_and_trailing_attrs() {
+        let doc = parse_document(
+            "- ( ) item {tag: dev}\n- [x] done {id: task1}\n- (T) todo\n- (?) question\n",
+        )
+        .unwrap();
+        match &doc.blocks[0] {
+            Block::List(list) => {
+                assert!(!list.ordered);
+                assert_eq!(list.items.len(), 4);
+
+                assert_eq!(list.items[0].content, vec![Inline::Text("item".into())]);
+                assert_eq!(list.items[0].marker, Some(" ".to_string()));
+                assert_eq!(
+                    list.items[0].attrs,
+                    Some(Value::Map(vec![(
+                        "tag".into(),
+                        Value::String("dev".into())
+                    )]))
+                );
+
+                assert_eq!(list.items[1].content, vec![Inline::Text("done".into())]);
+                assert_eq!(list.items[1].marker, Some("x".to_string()));
+
+                assert_eq!(list.items[2].content, vec![Inline::Text("todo".into())]);
+                assert_eq!(list.items[2].marker, Some("T".to_string()));
+
+                assert_eq!(list.items[3].content, vec![Inline::Text("question".into())]);
+                assert_eq!(list.items[3].marker, Some("?".to_string()));
             }
             other => panic!("expected list, got {other:?}"),
         }
@@ -139,11 +173,11 @@ mod tests {
     fn parses_ordered_list() {
         let doc = parse_document("-. one\n-. two\n").unwrap();
         match &doc.blocks[0] {
-            Block::List { ordered, items } => {
-                assert!(ordered);
-                assert_eq!(items.len(), 2);
-                assert_eq!(items[0].content, vec![Inline::Text("one".into())]);
-                assert_eq!(items[1].content, vec![Inline::Text("two".into())]);
+            Block::List(list) => {
+                assert!(list.ordered);
+                assert_eq!(list.items.len(), 2);
+                assert_eq!(list.items[0].content, vec![Inline::Text("one".into())]);
+                assert_eq!(list.items[1].content, vec![Inline::Text("two".into())]);
             }
             other => panic!("expected list, got {other:?}"),
         }
@@ -154,7 +188,7 @@ mod tests {
         let doc = parse_document("- one\n-. two\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
-            (Block::List { ordered: false, .. }, Block::List { ordered: true, .. }) => {}
+            (Block::List(l1), Block::List(l2)) if !l1.ordered && l2.ordered => {}
             other => panic!("expected two separate lists, got {other:?}"),
         }
     }
@@ -220,8 +254,8 @@ mod tests {
         // content isn't just whitespace) -- it's ordinary paragraph text.
         let doc = parse_document("---<embed>---\n").unwrap();
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => {
-                assert_eq!(inlines, &vec![Inline::Text("---<embed>---".into())]);
+            Block::Paragraph(p) => {
+                assert_eq!(&p.content, &vec![Inline::Text("---<embed>---".into())]);
             }
             other => panic!("expected paragraph, got {other:?}"),
         }
@@ -231,8 +265,9 @@ mod tests {
     fn parses_emphasis_and_strong_and_mark() {
         let doc = parse_document("a *em* b **strong** c _em2_ d __strong2__ e ==mark==\n").unwrap();
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => {
-                let kinds: Vec<_> = inlines
+            Block::Paragraph(p) => {
+                let kinds: Vec<_> = p
+                    .content
                     .iter()
                     .filter_map(|i| match i {
                         Inline::Element(el) => Some((el.sigil.clone(), el.area.clone())),
@@ -273,8 +308,8 @@ mod tests {
     fn underscore_does_not_trigger_inside_a_word() {
         let doc = parse_document("foo_bar_baz\n").unwrap();
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => {
-                assert_eq!(inlines, &vec![Inline::Text("foo_bar_baz".into())]);
+            Block::Paragraph(p) => {
+                assert_eq!(&p.content, &vec![Inline::Text("foo_bar_baz".into())]);
             }
             other => panic!("expected paragraph, got {other:?}"),
         }
@@ -284,9 +319,9 @@ mod tests {
     fn unmatched_delimiter_falls_back_to_literal_text() {
         let doc = parse_document("this *word never closes\n").unwrap();
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => {
+            Block::Paragraph(p) => {
                 assert_eq!(
-                    inlines,
+                    &p.content,
                     &vec![Inline::Text("this *word never closes".into())]
                 );
             }
@@ -296,7 +331,7 @@ mod tests {
 
     #[test]
     fn parses_the_repo_spec_examples() {
-        parse_document(include_str!("../../../docs/tmt/typedmark.tm")).unwrap();
+        parse_document(include_str!("../../../docs/readme.ja.tm")).unwrap();
         parse_document(include_str!("../../../docs/tmt/examples/image_meta.tm")).unwrap();
     }
 
@@ -304,9 +339,9 @@ mod tests {
     fn bare_at_is_plain_text_when_not_an_element() {
         let doc = parse_document("contact me@example.com please\n").unwrap();
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => {
+            Block::Paragraph(p) => {
                 assert_eq!(
-                    inlines,
+                    &p.content,
                     &vec![Inline::Text("contact me@example.com please".into())]
                 );
             }
@@ -369,8 +404,8 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Paragraph(a), Block::Paragraph(b)) => {
-                assert_eq!(a, &vec![Inline::Text("text".into())]);
-                assert_eq!(b, &vec![Inline::Text("more".into())]);
+                assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
+                assert_eq!(&b.content, &vec![Inline::Text("more".into())]);
             }
             other => panic!("expected two paragraphs, got {other:?}"),
         }
@@ -382,8 +417,8 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Paragraph(a), Block::Paragraph(b)) => {
-                assert_eq!(a, &vec![Inline::Text("text".into())]);
-                assert_eq!(b, &vec![Inline::Text("more".into())]);
+                assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
+                assert_eq!(&b.content, &vec![Inline::Text("more".into())]);
             }
             other => panic!("expected two paragraphs, got {other:?}"),
         }
@@ -398,8 +433,8 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Paragraph(a), Block::Paragraph(b)) => {
-                assert_eq!(a, &vec![Inline::Text("before".into())]);
-                assert_eq!(b, &vec![Inline::Text("after".into())]);
+                assert_eq!(&a.content, &vec![Inline::Text("before".into())]);
+                assert_eq!(&b.content, &vec![Inline::Text("after".into())]);
             }
             other => panic!("expected two paragraphs, got {other:?}"),
         }
@@ -414,12 +449,12 @@ mod tests {
     fn inline_block_comment_is_removed_from_paragraph_text() {
         let doc = parse_document("keep /* drop this */ also keep\n").unwrap();
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => {
+            Block::Paragraph(p) => {
                 // The comment's source is excluded entirely, but the text
                 // flushed before it and after it stay as separate `Inline`
                 // chunks (flushing doesn't merge adjacent text runs).
                 assert_eq!(
-                    inlines,
+                    &p.content,
                     &vec![
                         Inline::Text("keep ".into()),
                         Inline::Text(" also keep".into())
@@ -456,9 +491,9 @@ mod tests {
     fn double_slash_inside_a_url_is_not_treated_as_a_comment() {
         let doc = parse_document("see https://example.com for more\n").unwrap();
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => {
+            Block::Paragraph(p) => {
                 assert_eq!(
-                    inlines,
+                    &p.content,
                     &vec![Inline::Text("see https://example.com for more".into())]
                 );
             }
@@ -470,8 +505,8 @@ mod tests {
     fn inline_double_slash_comment_is_stripped_when_preceded_by_whitespace() {
         let doc = parse_document("aaa // asdasd\n").unwrap();
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => {
-                assert_eq!(inlines, &vec![Inline::Text("aaa".into())]);
+            Block::Paragraph(p) => {
+                assert_eq!(&p.content, &vec![Inline::Text("aaa".into())]);
             }
             other => panic!("expected paragraph, got {other:?}"),
         }

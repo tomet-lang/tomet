@@ -1,1 +1,1 @@
-../../../../crates/tree-sitter-typedmark/queries/highlights.scm
+../../../../../crates/tree-sitter-typedmark/queries/highlights.scm

@@ -24,18 +24,18 @@ pub fn to_markdown(doc: &Document) -> String {
 fn render_block(block: &Block, out: &mut String) {
     match block {
         Block::Heading(h) => render_heading(h, out),
-        Block::Paragraph(inlines) => {
+        Block::Paragraph(p) => {
             // Same reasoning as `typedmark-renderer`'s `render_block`: an
             // all-invisible-element paragraph (e.g. adjacent `@meta(...)`
             // lines with no blank line between them) must not leave a
             // stray blank paragraph behind.
-            let text = inline_to_md(inlines);
+            let text = inline_to_md(&p.content);
             if !text.trim().is_empty() {
                 out.push_str(&text);
                 out.push_str("\n\n");
             }
         }
-        Block::List { ordered, items } => render_list(items, *ordered, out),
+        Block::List(list) => render_list(&list.items, list.ordered, out),
         Block::Element(el) => {
             let text = element_to_md(el, false);
             if !text.is_empty() {
@@ -56,10 +56,14 @@ fn render_heading(h: &Heading, out: &mut String) {
 
 fn render_list(items: &[ListItem], ordered: bool, out: &mut String) {
     for (i, item) in items.iter().enumerate() {
-        if ordered {
-            out.push_str(&format!("{}. ", i + 1));
+        let marker = if ordered {
+            format!("{}. ", i + 1)
         } else {
-            out.push_str("- ");
+            "- ".to_string()
+        };
+        out.push_str(&marker);
+        if let Some(m) = &item.marker {
+            out.push_str(&format!("[{m}] "));
         }
         out.push_str(&inline_to_md(&item.content));
         out.push('\n');
@@ -71,7 +75,7 @@ fn inline_to_md(inlines: &[Inline]) -> String {
     let mut out = String::new();
     for inline in inlines {
         match inline {
-            Inline::Text(t) => out.push_str(&escape_text(t)),
+            Inline::Text(t) => out.push_str(&escape_text(&t.value)),
             Inline::Element(el) => out.push_str(&element_to_md(el, true)),
         }
     }
@@ -215,7 +219,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
     let mut s = String::new();
     for inline in inlines {
         match inline {
-            Inline::Text(t) => s.push_str(t),
+            Inline::Text(t) => s.push_str(&t.value),
             Inline::Element(el) => {
                 if let Some(area) = &el.area {
                     s.push_str(&inlines_to_plain(area));
@@ -325,6 +329,7 @@ fn map_get<'a>(map: &'a [(String, Value)], key: &str) -> Option<&'a Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use typedmark_ast::{List, Paragraph, Span, Text};
 
     #[test]
     fn adjacent_meta_blocks_have_no_visible_output() {
@@ -343,23 +348,29 @@ mod tests {
                     "key".to_string(),
                     Value::String("value".to_string()),
                 )]))),
+                span: Span::dummy(),
             }
         }
         let doc = Document {
             blocks: vec![
-                Block::Paragraph(vec![
-                    Inline::Element(meta_element("json")),
-                    Inline::Text(" ".to_string()),
-                    Inline::Element(meta_element("yaml")),
-                    Inline::Text(" ".to_string()),
-                    Inline::Element(meta_element("toml")),
-                ]),
+                Block::Paragraph(Paragraph::new(
+                    vec![
+                        Inline::Element(meta_element("json")),
+                        Inline::Text(Text::new(" ", Span::dummy())),
+                        Inline::Element(meta_element("yaml")),
+                        Inline::Text(Text::new(" ", Span::dummy())),
+                        Inline::Element(meta_element("toml")),
+                    ],
+                    Span::dummy(),
+                )),
                 Block::Heading(Heading {
                     level: 1,
-                    content: vec![Inline::Text("next".to_string())],
+                    content: vec![Inline::Text(Text::new("next", Span::dummy()))],
                     attrs: None,
+                    span: Span::dummy(),
                 }),
             ],
+            span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "# next\n\n");
     }
@@ -370,11 +381,16 @@ mod tests {
             blocks: vec![
                 Block::Heading(Heading {
                     level: 2,
-                    content: vec![Inline::Text("Title".to_string())],
+                    content: vec![Inline::Text(Text::new("Title", Span::dummy()))],
                     attrs: None,
+                    span: Span::dummy(),
                 }),
-                Block::Paragraph(vec![Inline::Text("Hello.".to_string())]),
+                Block::Paragraph(Paragraph::new(
+                    vec![Inline::Text(Text::new("Hello.", Span::dummy()))],
+                    Span::dummy(),
+                )),
             ],
+            span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "## Title\n\nHello.\n\n");
     }
@@ -382,17 +398,25 @@ mod tests {
     #[test]
     fn bullet_and_ordered_list() {
         let doc = Document {
-            blocks: vec![Block::List {
-                ordered: true,
-                items: vec![
-                    ListItem {
-                        content: vec![Inline::Text("one".to_string())],
-                    },
-                    ListItem {
-                        content: vec![Inline::Text("two".to_string())],
-                    },
+            blocks: vec![Block::List(List::new(
+                true,
+                vec![
+                    ListItem::new(
+                        vec![Inline::Text(Text::new("one", Span::dummy()))],
+                        None,
+                        None,
+                        Span::dummy(),
+                    ),
+                    ListItem::new(
+                        vec![Inline::Text(Text::new("two", Span::dummy()))],
+                        None,
+                        None,
+                        Span::dummy(),
+                    ),
                 ],
-            }],
+                Span::dummy(),
+            ))],
+            span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "1. one\n2. two\n\n");
     }
@@ -400,21 +424,27 @@ mod tests {
     #[test]
     fn emphasis_and_strong() {
         let doc = Document {
-            blocks: vec![Block::Paragraph(vec![
-                Inline::Element(Element {
-                    sigil: Sigil::Type("em".to_string()),
-                    input: None,
-                    area: Some(vec![Inline::Text("a".to_string())]),
-                    value: None,
-                }),
-                Inline::Text(" ".to_string()),
-                Inline::Element(Element {
-                    sigil: Sigil::Type("strong".to_string()),
-                    input: None,
-                    area: Some(vec![Inline::Text("b".to_string())]),
-                    value: None,
-                }),
-            ])],
+            blocks: vec![Block::Paragraph(Paragraph::new(
+                vec![
+                    Inline::Element(Element {
+                        sigil: Sigil::Type("em".to_string()),
+                        input: None,
+                        area: Some(vec![Inline::Text(Text::new("a", Span::dummy()))]),
+                        value: None,
+                        span: Span::dummy(),
+                    }),
+                    Inline::Text(Text::new(" ", Span::dummy())),
+                    Inline::Element(Element {
+                        sigil: Sigil::Type("strong".to_string()),
+                        input: None,
+                        area: Some(vec![Inline::Text(Text::new("b", Span::dummy()))]),
+                        value: None,
+                        span: Span::dummy(),
+                    }),
+                ],
+                Span::dummy(),
+            ))],
+            span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "*a* **b**\n\n");
     }
@@ -427,11 +457,16 @@ mod tests {
                 "url".to_string(),
                 Value::String("https://example.com".to_string()),
             )])),
-            area: Some(vec![Inline::Text("Wiki".to_string())]),
+            area: Some(vec![Inline::Text(Text::new("Wiki", Span::dummy()))]),
             value: None,
+            span: Span::dummy(),
         };
         let doc = Document {
-            blocks: vec![Block::Paragraph(vec![Inline::Element(el)])],
+            blocks: vec![Block::Paragraph(Paragraph::new(
+                vec![Inline::Element(el)],
+                Span::dummy(),
+            ))],
+            span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "[Wiki](https://example.com)\n\n");
     }
@@ -444,11 +479,16 @@ mod tests {
                 "file".to_string(),
                 Value::String("pic.png".to_string()),
             )])),
-            area: Some(vec![Inline::Text("a cat".to_string())]),
+            area: Some(vec![Inline::Text(Text::new("a cat", Span::dummy()))]),
             value: None,
+            span: Span::dummy(),
         };
         let doc = Document {
-            blocks: vec![Block::Paragraph(vec![Inline::Element(el)])],
+            blocks: vec![Block::Paragraph(Paragraph::new(
+                vec![Inline::Element(el)],
+                Span::dummy(),
+            ))],
+            span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "![a cat](pic.png)\n\n");
     }
@@ -461,11 +501,13 @@ mod tests {
                 "lang".to_string(),
                 Value::String("rust".to_string()),
             )])),
-            area: Some(vec![Inline::Text("fn main() {}".to_string())]),
+            area: Some(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))]),
             value: None,
+            span: Span::dummy(),
         };
         let doc = Document {
             blocks: vec![Block::Element(el)],
+            span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "```rust\nfn main() {}\n```\n\n");
     }
@@ -474,6 +516,7 @@ mod tests {
     fn thematic_break() {
         let doc = Document {
             blocks: vec![Block::Element(Element::new(Sigil::Type("hr".to_string())))],
+            span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "---\n\n");
     }
@@ -491,6 +534,7 @@ mod tests {
         )]));
         let doc = Document {
             blocks: vec![Block::Element(el)],
+            span: Span::dummy(),
         };
         assert!(
             to_markdown(&doc).contains("data-tm-kind=\"at\""),
@@ -508,6 +552,7 @@ mod tests {
         )]));
         let doc = Document {
             blocks: vec![Block::Element(el)],
+            span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "");
     }
@@ -515,9 +560,10 @@ mod tests {
     #[test]
     fn titled_thematic_break() {
         let mut el = Element::new(Sigil::Type("hr".to_string()));
-        el.area = Some(vec![Inline::Text("Title".to_string())]);
+        el.area = Some(vec![Inline::Text(Text::new("Title", Span::dummy()))]);
         let doc = Document {
             blocks: vec![Block::Element(el)],
+            span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "**Title**\n\n---\n\n");
     }

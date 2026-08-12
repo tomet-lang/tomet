@@ -16,7 +16,9 @@
 //! and inline HTML are dropped; hard breaks collapse to a space.
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
-use typedmark_ast::{Block, Document, Element, Heading, Inline, ListItem, Sigil, Value};
+use typedmark_ast::{
+    Block, Document, Element, Heading, Inline, List, ListItem, Paragraph, Sigil, Span, Text, Value,
+};
 
 enum Frame {
     /// Top-level document, and the fallback container for anything that
@@ -68,16 +70,26 @@ pub fn from_markdown(src: &str) -> Document {
             Event::Text(text) => match stack.last_mut() {
                 Some(Frame::CodeBlock { text: buf, .. }) => buf.push_str(&text),
                 Some(Frame::Discard) => {}
-                _ => push_inline(&mut stack, Inline::Text(text.into_string())),
+                _ => push_inline(
+                    &mut stack,
+                    Inline::Text(Text::new(text.into_string(), Span::dummy())),
+                ),
             },
             Event::Code(code) => {
                 if !matches!(stack.last(), Some(Frame::Discard)) {
-                    push_inline(&mut stack, Inline::Text(format!("`{code}`")));
+                    push_inline(
+                        &mut stack,
+                        Inline::Text(Text::new(format!("`{code}`"), Span::dummy())),
+                    );
                 }
             }
             Event::Html(_) | Event::InlineHtml(_) => {}
-            Event::SoftBreak => push_inline(&mut stack, Inline::Text(" ".to_string())),
-            Event::HardBreak => push_inline(&mut stack, Inline::Text(" ".to_string())),
+            Event::SoftBreak => {
+                push_inline(&mut stack, Inline::Text(Text::new(" ", Span::dummy())))
+            }
+            Event::HardBreak => {
+                push_inline(&mut stack, Inline::Text(Text::new(" ", Span::dummy())))
+            }
             Event::Rule => push_block(
                 &mut stack,
                 Block::Element(Element::new(Sigil::Type("hr".to_string()))),
@@ -91,7 +103,7 @@ pub fn from_markdown(src: &str) -> Document {
 
     let root = stack.pop().expect("root frame always present");
     match root {
-        Frame::Blocks(blocks) => Document { blocks },
+        Frame::Blocks(blocks) => Document::new(blocks, Span::dummy()),
         _ => Document::default(),
     }
 }
@@ -138,16 +150,13 @@ fn start_frame(tag: Tag) -> Frame {
 fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
     let frame = stack.pop().expect("End without matching Start");
     match (frame, tag_end) {
-        (Frame::Paragraph(inlines), TagEnd::Paragraph) => {
-            push_block(stack, Block::Paragraph(inlines))
-        }
+        (Frame::Paragraph(inlines), TagEnd::Paragraph) => push_block(
+            stack,
+            Block::Paragraph(Paragraph::new(inlines, Span::dummy())),
+        ),
         (Frame::Heading(level, inlines), TagEnd::Heading(_)) => push_block(
             stack,
-            Block::Heading(Heading {
-                level,
-                content: inlines,
-                attrs: None,
-            }),
+            Block::Heading(Heading::new(level, inlines, None, Span::dummy())),
         ),
         (Frame::BlockQuote(area), TagEnd::BlockQuote(_)) => {
             let el = Element {
@@ -155,6 +164,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
                 input: None,
                 area: Some(area),
                 value: None,
+                span: Span::dummy(),
             };
             push_block(stack, Block::Element(el));
         }
@@ -170,17 +180,18 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
             let el = Element {
                 sigil: Sigil::Type("codeblock".to_string()),
                 input,
-                area: Some(vec![Inline::Text(text)]),
+                area: Some(vec![Inline::Text(Text::new(text, Span::dummy()))]),
                 value: None,
+                span: Span::dummy(),
             };
             push_block(stack, Block::Element(el));
         }
         (Frame::List { ordered, items }, TagEnd::List(_)) => {
-            push_block(stack, Block::List { ordered, items })
+            push_block(stack, Block::List(List::new(ordered, items, Span::dummy())))
         }
         (Frame::Item { content, extra }, TagEnd::Item) => match stack.last_mut() {
             Some(Frame::List { items, .. }) => {
-                items.push(ListItem { content });
+                items.push(ListItem::new(content, None, None, Span::dummy()));
                 items.extend(extra);
             }
             _ => unreachable!("Item is always nested directly inside List"),
@@ -197,6 +208,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
                 input: Some(Value::Map(vec![("url".to_string(), Value::String(dest))])),
                 area: Some(inlines),
                 value: None,
+                span: Span::dummy(),
             };
             push_inline(stack, Inline::Element(el));
         }
@@ -207,6 +219,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
                 input: Some(Value::Map(vec![(key.to_string(), Value::String(dest))])),
                 area: Some(alt),
                 value: None,
+                span: Span::dummy(),
             };
             push_inline(stack, Inline::Element(el));
         }
@@ -222,6 +235,7 @@ fn wrap_inline(tag: &str, area: Vec<Inline>) -> Inline {
         input: None,
         area: Some(area),
         value: None,
+        span: Span::dummy(),
     })
 }
 
@@ -250,7 +264,7 @@ fn push_inline(stack: &mut [Frame], inline: Inline) {
         return;
     };
     if let (Inline::Text(new), Some(Inline::Text(prev))) = (&inline, target.last_mut()) {
-        prev.push_str(new);
+        prev.value.push_str(&new.value);
         return;
     }
     target.push(inline);
@@ -279,18 +293,18 @@ fn merge_block_into(
     block: Block,
 ) {
     match block {
-        Block::Paragraph(inlines) => extend_spaced(content, inlines),
+        Block::Paragraph(p) => extend_spaced(content, p.content),
         Block::Heading(h) => extend_spaced(content, h.content),
         Block::Element(el) => {
             if !content.is_empty() {
-                content.push(Inline::Text(" ".to_string()));
+                content.push(Inline::Text(Text::new(" ", Span::dummy())));
             }
             content.push(Inline::Element(el));
         }
-        Block::List { items, .. } => match extra_items {
-            Some(extra) => extra.extend(items),
+        Block::List(list) => match extra_items {
+            Some(extra) => extra.extend(list.items),
             None => {
-                for item in items {
+                for item in list.items {
                     extend_spaced(content, item.content);
                 }
             }
@@ -300,7 +314,7 @@ fn merge_block_into(
 
 fn extend_spaced(content: &mut Vec<Inline>, more: Vec<Inline>) {
     if !content.is_empty() && !more.is_empty() {
-        content.push(Inline::Text(" ".to_string()));
+        content.push(Inline::Text(Text::new(" ", Span::dummy())));
     }
     content.extend(more);
 }
@@ -316,13 +330,19 @@ mod tests {
         match &doc.blocks[0] {
             Block::Heading(h) => {
                 assert_eq!(h.level, 1);
-                assert_eq!(h.content, vec![Inline::Text("Title".to_string())]);
+                assert_eq!(
+                    h.content,
+                    vec![Inline::Text(Text::new("Title", Span::dummy()))]
+                );
             }
             other => panic!("expected heading, got {other:?}"),
         }
         assert_eq!(
             doc.blocks[1],
-            Block::Paragraph(vec![Inline::Text("Hello world.".to_string())])
+            Block::Paragraph(Paragraph::new(
+                vec![Inline::Text(Text::new("Hello world.", Span::dummy()))],
+                Span::dummy()
+            ))
         );
     }
 
@@ -330,8 +350,9 @@ mod tests {
     fn emphasis_and_strong() {
         let doc = from_markdown("a *em* b **strong** c\n");
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => {
-                let kinds: Vec<_> = inlines
+            Block::Paragraph(p) => {
+                let kinds: Vec<_> = p
+                    .content
                     .iter()
                     .filter_map(|i| match i {
                         Inline::Element(el) => Some(el.sigil.clone()),
@@ -354,10 +375,16 @@ mod tests {
     fn flat_bullet_list() {
         let doc = from_markdown("- one\n- two\n");
         match &doc.blocks[0] {
-            Block::List { ordered, items } => {
-                assert!(!ordered);
-                assert_eq!(items[0].content, vec![Inline::Text("one".to_string())]);
-                assert_eq!(items[1].content, vec![Inline::Text("two".to_string())]);
+            Block::List(list) => {
+                assert!(!list.ordered);
+                assert_eq!(
+                    list.items[0].content,
+                    vec![Inline::Text(Text::new("one", Span::dummy()))]
+                );
+                assert_eq!(
+                    list.items[1].content,
+                    vec![Inline::Text(Text::new("two", Span::dummy()))]
+                );
             }
             other => panic!("expected list, got {other:?}"),
         }
@@ -367,7 +394,7 @@ mod tests {
     fn ordered_list() {
         let doc = from_markdown("1. one\n2. two\n");
         match &doc.blocks[0] {
-            Block::List { ordered, .. } => assert!(ordered),
+            Block::List(list) => assert!(list.ordered),
             other => panic!("expected list, got {other:?}"),
         }
     }
@@ -376,11 +403,12 @@ mod tests {
     fn nested_list_flattens_to_sibling_items() {
         let doc = from_markdown("- a\n  - b\n- c\n");
         match &doc.blocks[0] {
-            Block::List { items, .. } => {
-                let texts: Vec<_> = items
+            Block::List(list) => {
+                let texts: Vec<_> = list
+                    .items
                     .iter()
                     .map(|i| match i.content.as_slice() {
-                        [Inline::Text(t)] => t.clone(),
+                        [Inline::Text(t)] => t.value.clone(),
                         other => panic!("unexpected item content {other:?}"),
                     })
                     .collect();
@@ -394,7 +422,7 @@ mod tests {
     fn link() {
         let doc = from_markdown("[Wiki](https://example.com)\n");
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => match &inlines[0] {
+            Block::Paragraph(p) => match &p.content[0] {
                 Inline::Element(el) => {
                     assert_eq!(el.sigil, Sigil::At(None));
                     assert_eq!(
@@ -404,7 +432,10 @@ mod tests {
                             Value::String("https://example.com".to_string())
                         )]))
                     );
-                    assert_eq!(el.area, Some(vec![Inline::Text("Wiki".to_string())]));
+                    assert_eq!(
+                        el.area,
+                        Some(vec![Inline::Text(Text::new("Wiki", Span::dummy()))])
+                    );
                 }
                 other => panic!("expected element, got {other:?}"),
             },
@@ -416,7 +447,7 @@ mod tests {
     fn autolink_is_a_plain_link_element() {
         let doc = from_markdown("<https://example.com>\n");
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => match &inlines[0] {
+            Block::Paragraph(p) => match &p.content[0] {
                 Inline::Element(el) => assert_eq!(el.sigil, Sigil::At(None)),
                 other => panic!("expected element, got {other:?}"),
             },
@@ -428,7 +459,7 @@ mod tests {
     fn image_becomes_embed_element() {
         let doc = from_markdown("![a cat](assets/pic.png)\n");
         match &doc.blocks[0] {
-            Block::Paragraph(inlines) => match &inlines[0] {
+            Block::Paragraph(p) => match &p.content[0] {
                 Inline::Element(el) => {
                     assert_eq!(el.sigil, Sigil::Type("embed".to_string()));
                     assert_eq!(
@@ -438,7 +469,10 @@ mod tests {
                             Value::String("assets/pic.png".to_string())
                         )]))
                     );
-                    assert_eq!(el.area, Some(vec![Inline::Text("a cat".to_string())]));
+                    assert_eq!(
+                        el.area,
+                        Some(vec![Inline::Text(Text::new("a cat", Span::dummy()))])
+                    );
                 }
                 other => panic!("expected element, got {other:?}"),
             },
@@ -470,7 +504,7 @@ mod tests {
                 );
                 assert_eq!(
                     el.area,
-                    Some(vec![Inline::Text("fn main() {}".to_string())])
+                    Some(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))])
                 );
             }
             other => panic!("expected pre element, got {other:?}"),
@@ -483,7 +517,10 @@ mod tests {
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::Type("blockquote".to_string()));
-                assert_eq!(el.area, Some(vec![Inline::Text("quoted text".to_string())]));
+                assert_eq!(
+                    el.area,
+                    Some(vec![Inline::Text(Text::new("quoted text", Span::dummy()))])
+                );
             }
             other => panic!("expected blockquote element, got {other:?}"),
         }
@@ -494,7 +531,10 @@ mod tests {
         let doc = from_markdown("call `foo()` now\n");
         assert_eq!(
             doc.blocks[0],
-            Block::Paragraph(vec![Inline::Text("call `foo()` now".to_string())])
+            Block::Paragraph(Paragraph::new(
+                vec![Inline::Text(Text::new("call `foo()` now", Span::dummy()))],
+                Span::dummy()
+            ))
         );
     }
 
@@ -504,7 +544,10 @@ mod tests {
         assert_eq!(doc.blocks.len(), 1);
         assert_eq!(
             doc.blocks[0],
-            Block::Paragraph(vec![Inline::Text("real paragraph".to_string())])
+            Block::Paragraph(Paragraph::new(
+                vec![Inline::Text(Text::new("real paragraph", Span::dummy()))],
+                Span::dummy()
+            ))
         );
     }
 }
