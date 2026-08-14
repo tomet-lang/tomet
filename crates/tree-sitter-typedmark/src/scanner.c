@@ -19,10 +19,39 @@
 // this scanner exists to fix. Replacing the regex outright avoids that: this
 // scanner is the *only* way `scalar` ever matches, so there is no competing
 // internal alternative left for tree-sitter to under-resolve.
+// `LIST_CHECKBOX_TOKEN`/`LIST_MARKER_GAP` (see `grammar.js`'s `list_checkbox`
+// comment) exist for a related but distinct reason: `document.rs::eat_list_marker`
+// skips inline whitespace *before* checking for a `[`/`(` marker, so
+// deciding whether the whitespace right after a list's `-`/`-.` belongs to
+// an optional checkbox or is just the item's own mandatory content gap
+// needs to look *past* that whitespace before committing to either
+// reading. Tree-sitter's internal lexer builds one shared DFA across all
+// tokens valid at a given parser state and can't backtrack out of it: a
+// real space character matches the mandatory-gap token outright and wins
+// immediately, before ever getting a chance to look further ahead for a
+// bracket. This scanner instead gets one call per position with *all* the
+// externals valid there (`valid_symbols`) and picks whichever one actually
+// fits after looking as far ahead as it needs to.
+//
+// Not a byte-for-byte port of `eat_list_marker`: that function operates on
+// a *copy* of the cursor and only commits (`cur.set_pos`) on success, so a
+// marker that starts looking like `[...]`/`(...)` but turns out not to
+// close-and-then-have-trailing-whitespace costs it nothing -- the whole
+// line falls back to being reparsed as plain content from the original
+// `-`. `TSLexer` has no such rewind (advancing is one-directional even on
+// a `false` return), so the same malformed input here just characters
+// already stepped over while probing for a closing bracket are lost to
+// any other candidate token, typically surfacing as an `ERROR` node
+// instead of gracefully degrading to `punctuation`/`text`. Judged an
+// acceptable gap for this approximation grammar: well-formed checkbox
+// markers (`- (T)`, `- [x]`, ...) are the real-world case that matters,
+// per `docs/cheatsheet.tm`.
 #include "tree_sitter/parser.h"
 
 enum TokenType {
   SCALAR,
+  LIST_CHECKBOX_TOKEN,
+  LIST_MARKER_GAP,
 };
 
 void *tree_sitter_typedmark_external_scanner_create(void) { return NULL; }
@@ -66,9 +95,63 @@ static bool is_scalar_terminator(int32_t c) {
   }
 }
 
+// Handles both `LIST_CHECKBOX_TOKEN` and `LIST_MARKER_GAP` in one pass --
+// see this file's module doc for why they can't be two independent
+// lookahead-free tokens.
+static bool scan_list_marker_gap(TSLexer *lexer, const bool *valid_symbols) {
+  bool want_checkbox = valid_symbols[LIST_CHECKBOX_TOKEN];
+  bool want_gap = valid_symbols[LIST_MARKER_GAP];
+  if (!want_checkbox && !want_gap) {
+    return false;
+  }
+
+  bool consumed_ws = false;
+  while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+    lexer->advance(lexer, true);
+    consumed_ws = true;
+  }
+
+  if (want_checkbox && (lexer->lookahead == '[' || lexer->lookahead == '(')) {
+    int32_t close = (lexer->lookahead == '[') ? ']' : ')';
+    lexer->advance(lexer, false);
+    while (!lexer->eof(lexer) && lexer->lookahead != close &&
+           lexer->lookahead != '\n' && lexer->lookahead != '\r') {
+      lexer->advance(lexer, false);
+    }
+    if (lexer->lookahead == close) {
+      lexer->advance(lexer, false);
+      // A marker only counts as a checkbox if followed by whitespace,
+      // mirroring `document.rs::eat_list_marker` -- otherwise it's just
+      // ordinary line content (e.g. `-(x)text`, no `list_checkbox` node).
+      if (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+        lexer->mark_end(lexer);
+        lexer->result_symbol = LIST_CHECKBOX_TOKEN;
+        return true;
+      }
+    }
+    // Not a valid checkbox after all -- see the "not a byte-for-byte
+    // port" note above; falling through to the plain-gap check below
+    // only helps if no bracket-probing characters were consumed yet,
+    // which is no longer the case once execution reaches here.
+  }
+
+  if (want_gap && consumed_ws) {
+    lexer->mark_end(lexer);
+    lexer->result_symbol = LIST_MARKER_GAP;
+    return true;
+  }
+
+  return false;
+}
+
 bool tree_sitter_typedmark_external_scanner_scan(void *payload, TSLexer *lexer,
                                                    const bool *valid_symbols) {
   (void)payload;
+
+  if (valid_symbols[LIST_CHECKBOX_TOKEN] || valid_symbols[LIST_MARKER_GAP]) {
+    return scan_list_marker_gap(lexer, valid_symbols);
+  }
+
   if (!valid_symbols[SCALAR]) {
     return false;
   }

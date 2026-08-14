@@ -1,6 +1,4 @@
-@meta{
-  type:video
-}
+@meta{type:video}
 
 #[ Memo ]
 

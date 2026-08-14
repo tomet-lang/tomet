@@ -245,18 +245,9 @@
         }
       }
     },
-    "_list_checkbox": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "PATTERN",
-          "value": "\\[[^\\]\\n]*\\]"
-        },
-        {
-          "type": "PATTERN",
-          "value": "\\([^)\\n]*\\)"
-        }
-      ]
+    "list_checkbox": {
+      "type": "SYMBOL",
+      "name": "_list_checkbox_token"
     },
     "ordered_list_item": {
       "type": "SEQ",
@@ -269,17 +260,27 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "SYMBOL",
-              "name": "_list_checkbox"
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "FIELD",
+                  "name": "checkbox",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "list_checkbox"
+                  }
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_list_marker_gap"
+                }
+              ]
             },
             {
-              "type": "BLANK"
+              "type": "SYMBOL",
+              "name": "_list_marker_gap"
             }
           ]
-        },
-        {
-          "type": "PATTERN",
-          "value": "[ \\t]+"
         },
         {
           "type": "REPEAT",
@@ -321,17 +322,27 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "SYMBOL",
-              "name": "_list_checkbox"
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "FIELD",
+                  "name": "checkbox",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "list_checkbox"
+                  }
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_list_marker_gap"
+                }
+              ]
             },
             {
-              "type": "BLANK"
+              "type": "SYMBOL",
+              "name": "_list_marker_gap"
             }
           ]
-        },
-        {
-          "type": "PATTERN",
-          "value": "[ \\t]+"
         },
         {
           "type": "REPEAT",
@@ -437,11 +448,11 @@
     },
     "text": {
       "type": "PATTERN",
-      "value": "[^\\n\\`*_=<@\\(\\)\\[\\{\\]\\/\\-]+"
+      "value": "[^\\n`*_=<@()\\[{\\]/-]+"
     },
     "punctuation": {
       "type": "PATTERN",
-      "value": "[\\(\\)\\[\\{\\/\\-]"
+      "value": "[()\\[{/-]"
     },
     "code_span": {
       "type": "PATTERN",
@@ -588,7 +599,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n\\`*=<@\\(\\)\\[\\{\\]\\/]+"
+            "value": "[^\\n`*=<@()\\[{\\]/]+"
           },
           "named": true,
           "value": "text"
@@ -626,7 +637,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n\\`_=<@\\(\\)\\[\\{\\]\\/]+"
+            "value": "[^\\n`_=<@()\\[{\\]/]+"
           },
           "named": true,
           "value": "text"
@@ -668,7 +679,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n\\`*_=<@\\(\\)\\[\\{\\]\\/]+"
+            "value": "[^\\n`*_=<@()\\[{\\]/]+"
           },
           "named": true,
           "value": "text"
@@ -689,72 +700,72 @@
       ]
     },
     "type_element": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "<"
-        },
-        {
-          "type": "FIELD",
-          "name": "name",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_element_name"
-          }
-        },
-        {
-          "type": "STRING",
-          "value": ">"
-        },
-        {
-          "type": "PREC_RIGHT",
-          "value": 2,
-          "content": {
+      "type": "PREC_RIGHT",
+      "value": 3,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "<"
+          },
+          {
+            "type": "FIELD",
+            "name": "name",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_element_name"
+            }
+          },
+          {
+            "type": "STRING",
+            "value": ">"
+          },
+          {
             "type": "REPEAT",
             "content": {
               "type": "SYMBOL",
               "name": "_element_group"
             }
           }
-        }
-      ]
+        ]
+      }
     },
     "at_element": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "@"
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "FIELD",
-              "name": "name",
-              "content": {
-                "type": "SYMBOL",
-                "name": "_element_name"
+      "type": "PREC_RIGHT",
+      "value": 3,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "@"
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "FIELD",
+                "name": "name",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_element_name"
+                }
+              },
+              {
+                "type": "BLANK"
               }
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
-          "type": "PREC_RIGHT",
-          "value": 2,
-          "content": {
+            ]
+          },
+          {
             "type": "REPEAT",
             "content": {
               "type": "SYMBOL",
               "name": "_element_group"
             }
           }
-        }
-      ]
+        ]
+      }
     },
     "_element_group": {
       "type": "CHOICE",
@@ -1301,12 +1312,6 @@
   "conflicts": [
     [
       "heading"
-    ],
-    [
-      "at_element"
-    ],
-    [
-      "type_element"
     ]
   ],
   "precedences": [],
@@ -1314,6 +1319,14 @@
     {
       "type": "SYMBOL",
       "name": "_scalar_token"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_list_checkbox_token"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_list_marker_gap"
     }
   ],
   "inline": [],

@@ -1,5 +1,5 @@
 @meta{type:bookmark}
-<bookmark>(url:https://example.com, area:raw)｛ id:uuid-asld-lask-sdff, tags:[ a, a ] ｝
+<bookmark(https://example.com)>(title:"aaa", area:raw)｛ id:uuid-asld-lask-sdff, tags:[ a, a ] ｝
 [ 
   ブックマークの
   メモ

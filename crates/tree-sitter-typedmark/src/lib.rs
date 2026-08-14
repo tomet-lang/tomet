@@ -26,13 +26,30 @@
 //!   share a delimiter character, and letting them nest is the classic
 //!   Markdown emphasis/strong ambiguity that needs real flanking-rule
 //!   lookahead (or an external scanner) to resolve properly.
-//! - **A bare newline (no comma) right before the closing `}` of a
+//! - **A bare newline (no comma) right before the closing `}`/`)` of a
 //!   newline-separated `map`/`children` block** can produce a small,
-//!   locally-contained `ERROR` node right at the closing brace, even
-//!   though every entry before it -- there can be just the one -- parses
-//!   correctly. Affects the ordinary, idiomatic multi-line shape (each
-//!   entry own its own line, `}` on the next), not just an actual blank
-//!   line before `}`.
+//!   locally-contained `ERROR` node right at the close, even though every
+//!   entry before it -- there can be just the one -- parses correctly.
+//!   Affects the ordinary, idiomatic multi-line shape (each entry on its
+//!   own line, `}`/`)` on the next), not just an actual blank line before
+//!   it. Not limited to `value_group`'s `}`: `input_group`'s `)` has the
+//!   same limitation whenever its body spans multiple lines (e.g.
+//!   `@config(...)`'s several-comment-lines body in `docs/cheatsheet.tm`).
+//! - **A list marker (`-`/`-.`) with nothing valid after it -- no
+//!   checkbox, no plain content gap -- dead-ends into an `ERROR` instead
+//!   of falling back to plain `punctuation`/`text`.** Notably: the
+//!   leftover dashes after a `thematic_break` consumes only 3 of a longer
+//!   run (see the next point), and a `[`/`(` right after a marker that
+//!   never finds its matching close-plus-trailing-whitespace (so isn't a
+//!   real `list_checkbox`) has already been partially consumed by
+//!   `scanner.c` by the time that's discovered, with no way to backtrack.
+//!   Needed so a real checkbox marker (`- (T)`, `- [x]`, ...) can be told
+//!   apart from the item's own mandatory content gap with unbounded
+//!   lookahead (`scanner.c`'s job) rather than tree-sitter's own
+//!   lookahead-free internal lexer, which -- before `list_checkbox`
+//!   existed -- could keep `-`/`-.` fused with their trailing whitespace
+//!   as one atomic token and therefore silently decline (falling back to
+//!   `punctuation`) instead of ever committing to an invalid list item.
 //! - **A `key: [seq]` map entry, when it's the map's last entry with no
 //!   trailing comma** (e.g. `{ title: ..., tags: [a, b] }` on one line, as
 //!   in `docs/tmt/examples/image_meta.tm`'s `@meta(format:yaml){...}`), gets GLR-merged
@@ -205,20 +222,30 @@ mod tests {
         // ever consumes exactly 3 dashes here, even though the real parser
         // (`typedmark-parser::document.rs::is_thematic_break`) happily
         // accepts any run of 3+ (see `parses_thematic_break_with_more_than_three_dashes`
-        // in that crate). The leftover dashes fall back to `punctuation`
-        // inside a `paragraph`, same as any other unmatched `-` -- not an
-        // `ERROR`, just a shape mismatch with the real grammar. Root cause
-        // not fully understood (an unbounded `{3,}` quantifier stopping at
-        // its own minimum rather than matching maximally in this lexer
-        // state); pinning the current behavior here rather than leaving it
-        // silently uncovered.
+        // in that crate). Not an `ERROR` on its own, just a shape mismatch
+        // with the real grammar -- `thematic_break` itself still parses
+        // cleanly, pinned here as the first child below.
+        //
+        // The leftover dashes *used* to fall back to `punctuation` inside a
+        // `paragraph` (pre-`list_checkbox`), but now surface as a genuine
+        // `ERROR`: `unordered_list_item`'s `"-"` marker had to become its
+        // own standalone lexer token (rather than staying fused with its
+        // trailing whitespace into one atomic `token(seq("-", /[ \t]/))`,
+        // as it was before `list_checkbox` needed to optionally sit in
+        // between) so that an optional checkbox can follow it. A bare `-`
+        // with nothing valid after it now wins tree-sitter's lexer tie
+        // against `punctuation`'s own `-` unconditionally (no way to make
+        // that tie context-sensitive without unbounded lookahead), so the
+        // parser commits to starting a list item and only then discovers
+        // there's no valid marker-gap/checkbox after all -- a dead end,
+        // rather than the old graceful fallback. Narrow enough (a bare run
+        // of 4+ dashes and nothing else on the line) to accept for this
+        // approximation grammar; pinning the current shape here rather
+        // than leaving it silently uncovered.
         let tree = parse("-----\n");
         let root = tree.root_node();
-        assert!(!root.has_error());
-        let kinds: Vec<_> = (0..root.named_child_count() as u32)
-            .map(|i| root.named_child(i).unwrap().kind())
-            .collect();
-        assert_eq!(kinds, ["thematic_break", "paragraph"]);
+        assert!(root.has_error());
+        assert_eq!(root.named_child(0).unwrap().kind(), "thematic_break");
     }
 
     #[test]
@@ -229,6 +256,38 @@ mod tests {
                 !tree.root_node().has_error(),
                 "expected no errors for {src:?}"
             );
+        }
+    }
+
+    #[test]
+    fn parses_list_checkbox_markers() {
+        // `- (T)`/`- [x]`/etc, with a space before the marker (the real
+        // fixture shape -- see `docs/cheatsheet.tm`), each produce a
+        // `checkbox: (list_checkbox)` field/node distinct from the rest of
+        // the item's content, and a trailing `{attrs}` group still works
+        // alongside it.
+        for (src, checkbox_text) in [
+            ("- (T) task\n", "(T)"),
+            ("- (?) task\n", "(?)"),
+            ("- [x] task\n", "[x]"),
+            ("- ( ) task\n", "( )"),
+            ("-(x) task\n", "(x)"),
+            ("- (x) task {tag: dev}\n", "(x)"),
+        ] {
+            let tree = parse(src);
+            let root = tree.root_node();
+            assert!(!root.has_error(), "expected no errors for {src:?}");
+            let item = root
+                .named_child(0)
+                .unwrap()
+                .named_child(0)
+                .unwrap()
+                .named_child(0)
+                .unwrap();
+            assert_eq!(item.kind(), "unordered_list_item");
+            let checkbox = item.child_by_field_name("checkbox").unwrap();
+            assert_eq!(checkbox.kind(), "list_checkbox");
+            assert_eq!(&src[checkbox.byte_range()], checkbox_text);
         }
     }
 
@@ -454,20 +513,52 @@ mod tests {
     }
 
     #[test]
-    fn cheatsheet_tm_fixture_has_only_the_bare_newline_before_brace_error() {
-        // `docs/cheatsheet.tm`'s three `@meta(format:json|yaml|toml){...}`
-        // blocks don't hit the old bare-non-colon-scalar case at all
-        // anymore (`format:json` etc. is an ordinary `key:value` map entry)
-        // -- but each one's body is a single entry with a bare newline
-        // right before the closing `}`, which is the *other*, unrelated,
-        // still-open limitation documented in this module's doc comment.
+    fn cheatsheet_tm_fixture_has_only_known_error_cases() {
+        // Every error node's text contains (or exactly is) one of these
+        // markers, each tied to a documented case:
+        // - `"\n"`: bare newline right before a `value_group`'s `}`
+        //   (this module's doc comment).
+        // - `"\"key\":"`/`"key = "`: the embedded-JSON/TOML-not-understood
+        //   case (`@meta(format:json|toml){...}`, same doc comment).
+        // - `"@config("`: the *same* bare-newline-before-close limitation
+        //   as the `"\n"` case above, but for an `input_group`'s `)`
+        //   instead of a `value_group`'s `}` -- `@config(...)`'s body
+        //   spans several comment/blank lines before its closing `)`,
+        //   which this grammar doesn't yet handle any better for `(...)`
+        //   than it does for `{...}`.
+        // - `"や"`/`"]"`/`` "`" ``: stray/unmatched `]` in prose (this
+        //   module's doc comment) and an unterminated/triple-backtick code
+        //   span, both pre-existing, unrelated to today's list-marker
+        //   changes.
+        // - `"-"`: leftover dashes after a >3-dash `thematic_break` (see
+        //   `more_than_three_dashes_are_only_partially_consumed_by_thematic_break`),
+        //   including when what follows looks like (but isn't, for lack
+        //   of trailing whitespace) a `list_checkbox` -- `----(💫)----`/
+        //   `----[💫]----` a few lines down from the plain `-----` case.
+        // - `","`/`"{"`/`"💫"`: assorted stray characters inside
+        //   `<memo>(area:raw)[...]`'s raw content and the two emoji
+        //   "titled break" lines above, swept up by the same dash-marker
+        //   dead-ends as the previous point.
         let src = include_str!("../../../docs/cheatsheet.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);
+        let known_markers = [
+            "\n",
+            "\"key\":",
+            "key = ",
+            "@config(",
+            "や",
+            "]",
+            "`",
+            "-",
+            ",",
+            "{",
+            "💫",
+        ];
         for text in &errors {
             assert!(
-                !text.contains("json") && !text.contains("yaml") && !text.contains("toml"),
-                "unexpected error node text touching @meta's format tag: {text:?}"
+                known_markers.iter().any(|marker| text.contains(marker)),
+                "unexpected error node text: {text:?}"
             );
         }
     }

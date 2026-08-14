@@ -18,7 +18,15 @@ module.exports = grammar({
 	// doc for why a plain regex (with or without an extra external
 	// alternative next to it) can't resolve `@meta(yaml)`'s `yaml`/
 	// `{required}`'s `required` against `map_entry`'s key token.
-	externals: ($) => [$._scalar_token],
+	//
+	// `_list_checkbox_token`/`_list_marker_gap` (see `list_checkbox`'s own
+	// comment below) are external for the same class of reason: deciding
+	// whether the whitespace right after a list marker belongs to an
+	// optional checkbox or is just the item's own mandatory gap needs
+	// unbounded lookahead past that whitespace, which a `token()` regex
+	// can't backtrack out of once `extras`/precedence has already
+	// committed to one interpretation.
+	externals: ($) => [$._scalar_token, $._list_checkbox_token, $._list_marker_gap],
 
 	// `heading`'s optional `{attrs}` can follow `]` either on the same
 	// line or after exactly one newline (see the real fixture examples in
@@ -120,13 +128,39 @@ module.exports = grammar({
 		list: ($) => choice($.ordered_list, $.unordered_list),
 		ordered_list: ($) => prec.right(repeat1($.ordered_list_item)),
 		unordered_list: ($) => prec.right(repeat1($.unordered_list_item)),
-		_list_checkbox: (_$) => choice(/\[[^\]\n]*\]/, /\([^)\n]*\)/),
+		// Named wrapper around the external `_list_checkbox_token` so it
+		// shows up as its own node for `highlights.scm` to target -- e.g.
+		// `- (T)`/`- (?)` outliner status markers and `- [x]` checkboxes
+		// need their own color, distinct from the list item's other inline
+		// content.
+		//
+		// Both this and `_list_marker_gap` (used directly below, no visible
+		// node needed for plain whitespace) are external rather than plain
+		// regexes: `document.rs::eat_list_marker` skips inline whitespace
+		// *before* checking for `[`/`(` -- real fixtures write `- (T)`,
+		// with a space between the dash and the marker (see
+		// `docs/cheatsheet.tm`) -- so deciding whether that whitespace
+		// belongs to an optional checkbox or is just the item's own
+		// mandatory gap needs to look *past* the whitespace before
+		// committing to either interpretation. Tree-sitter's internal
+		// lexer can't do that: once it's built a combined DFA for
+		// `optional($.list_checkbox)` next to a mandatory `/[ \t]+/`, a
+		// real space character matches the mandatory-gap token immediately
+		// and wins outright, before ever getting a chance to look further
+		// ahead for a `[`/`(`. `scanner.c` (see its module doc) instead
+		// gets one external-scanner call per position with *all* the
+		// externals that are valid there, and picks whichever one actually
+		// fits after looking as far ahead as it needs to -- no premature
+		// commitment, no backtracking required.
+		list_checkbox: ($) => $._list_checkbox_token,
 
 		ordered_list_item: ($) =>
 			seq(
 				"-.",
-				optional($._list_checkbox),
-				/[ \t]+/,
+				choice(
+					seq(field("checkbox", $.list_checkbox), $._list_marker_gap),
+					$._list_marker_gap,
+				),
 				repeat($._line_item),
 				optional(field("attrs", $.value_group)),
 				$._newline,
@@ -134,8 +168,10 @@ module.exports = grammar({
 		unordered_list_item: ($) =>
 			seq(
 				"-",
-				optional($._list_checkbox),
-				/[ \t]+/,
+				choice(
+					seq(field("checkbox", $.list_checkbox), $._list_marker_gap),
+					$._list_marker_gap,
+				),
 				repeat($._line_item),
 				optional(field("attrs", $.value_group)),
 				$._newline,
@@ -184,8 +220,8 @@ module.exports = grammar({
 		// `/* ... */` needs to win over a `text` run that would otherwise
 		// swallow it whole, so a bare `/` (not opening a comment) falls
 		// back to `punctuation` like the others.
-		text: (_$) => /[^\n`*_=<@()[{\]/-]+/,
-		punctuation: (_$) => /[()[{/-]/,
+		text: (_$) => /[^\n`*_=<@()\[{\]/-]+/,
+		punctuation: (_$) => /[()\[{/-]/,
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -214,7 +250,7 @@ module.exports = grammar({
 				$.element,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*=<@()[{\]/]+/, $.text),
+				alias(/[^\n`*=<@()\[{\]/]+/, $.text),
 			),
 		_bracket_item_no_underscore: ($) =>
 			choice(
@@ -224,7 +260,7 @@ module.exports = grammar({
 				$.element,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`_=<@()[{\]/]+/, $.text),
+				alias(/[^\n`_=<@()\[{\]/]+/, $.text),
 			),
 		_bracket_item_no_equals: ($) =>
 			choice(
@@ -235,23 +271,41 @@ module.exports = grammar({
 				$.element,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*_=<@()[{\]/]+/, $.text),
+				alias(/[^\n`*_=<@()\[{\]/]+/, $.text),
 			),
 
 		// ---- `<T>`/`@name` elements ---------------------------------------
 		element: ($) => choice($.type_element, $.at_element),
+		// `prec.right(3, ...)` wraps the *whole* rule (not just the trailing
+		// `repeat($._element_group)`, unlike an earlier revision) --
+		// `ordered_list_item`/`unordered_list_item`'s own trailing `{attrs}`
+		// (added alongside `list_checkbox` above) and an element's own
+		// trailing value group are genuinely ambiguous with one token of
+		// lookahead: both can start with a bare `{` right after the line's
+		// last element. The real parser (`document.rs::parse_element`)
+		// always lets an open element claim an adjacent `{` as its own
+		// value before ever considering the list item's own attrs, so
+		// this rule-level precedence (higher than `value_group`'s own
+		// `token(prec(1, "{"))`) statically resolves the shift/reduce
+		// conflict in that same direction, without needing GLR.
 		type_element: ($) =>
-			seq(
-				"<",
-				field("name", $._element_name),
-				">",
-				prec.right(2, repeat($._element_group)),
+			prec.right(
+				3,
+				seq(
+					"<",
+					field("name", $._element_name),
+					">",
+					repeat($._element_group),
+				),
 			),
 		at_element: ($) =>
-			seq(
-				"@",
-				optional(field("name", $._element_name)),
-				prec.right(2, repeat($._element_group)),
+			prec.right(
+				3,
+				seq(
+					"@",
+					optional(field("name", $._element_name)),
+					repeat($._element_group),
+				),
 			),
 		_element_group: ($) => choice($.input_group, $.area_group, $.value_group),
 
@@ -386,7 +440,7 @@ module.exports = grammar({
 		// items), where colons are common and never mean "this starts a
 		// nested key". Aliased to the same visible `scalar` node type as
 		// the top-level one below.
-		_value_scalar: ($) => alias(/[^,()[\]{}\n\r]+/, $.scalar),
+		_value_scalar: ($) => alias(/[^,()\[\]{}\n\r]+/, $.scalar),
 		// `value`'s own top-level bare-scalar fallback (no `key:` found) --
 		// deliberately colon-*excluded* (matching the old regex this
 		// replaced), so a bare, keyless scalar at this position that itself
