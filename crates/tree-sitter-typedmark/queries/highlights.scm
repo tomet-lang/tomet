@@ -48,6 +48,11 @@
 (unordered_list_item) @markup.list.unnumbered
 (ordered_list_item) @markup.list.numbered
 
+; Outliner status markers (`- (T)`, `- (?)`, `- [x]`, `- ( )`) -- a
+; distinct color from the rest of the item's content, same idea as
+; `heading_marker` above.
+(list_checkbox) @markup.list.checked @constant
+
 ; `<T>`/`@name` element sigils and their name.
 "<" @tag
 ">" @tag
