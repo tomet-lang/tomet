@@ -1,3 +1,4 @@
+@settings(path:../../docs.settings.tm)
 @meta{
 
 }

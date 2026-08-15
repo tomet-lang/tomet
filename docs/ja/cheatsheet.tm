@@ -1,8 +1,4 @@
-/// [ special-casing exists for "import" anywhere. Renders as a generic
-///   element (`<div class="tm-element tm-import" data-file="...">`), same as
-///   any other unrecognized `<T>`/`@name`. Kept commented so this file
-///   doesn't look like a working example. ]
-// @import(file:/settings.tm)
+@settings(import:../docs.settings.tm)
 @config(
   format:json
   /// [ (意図)[formatterが見る。視覚に長けたフォーマットであるために、
@@ -35,6 +31,12 @@
 // @meta(format:kdl){
 //   key = "value"
 // }
+
+/// [ special-casing exists for "import" anywhere. Renders as a generic
+///   element (`<div class="tm-element tm-import" data-file="...">`), same as
+///   any other unrecognized `<T>`/`@name`. Kept commented so this file
+///   doesn't look like a working example. ]
+// @import(file:/settings.tm)
 
 // @links{}: real, implemented (`typedmark-renderer`'s `render_links_container`
 // / `typedmark-markdown`'s `render_links_container`). Bare `(id)[content]`
