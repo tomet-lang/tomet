@@ -451,8 +451,17 @@
       "value": "[^\\n`*_=<@()\\[{\\]/-]+"
     },
     "punctuation": {
-      "type": "PATTERN",
-      "value": "[()\\[{/-]"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "PATTERN",
+          "value": "[()\\[{/]"
+        },
+        {
+          "type": "STRING",
+          "value": "-"
+        }
+      ]
     },
     "code_span": {
       "type": "PATTERN",
@@ -943,31 +952,27 @@
       ]
     },
     "children": {
-      "type": "PREC_RIGHT",
-      "value": 0,
+      "type": "REPEAT1",
       "content": {
-        "type": "REPEAT1",
-        "content": {
-          "type": "SEQ",
-          "members": [
-            {
-              "type": "CHOICE",
-              "members": [
-                {
-                  "type": "SYMBOL",
-                  "name": "_blank_gap"
-                },
-                {
-                  "type": "BLANK"
-                }
-              ]
-            },
-            {
-              "type": "SYMBOL",
-              "name": "bare_element"
-            }
-          ]
-        }
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_blank_gap"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
+            "type": "SYMBOL",
+            "name": "bare_element"
+          }
+        ]
       }
     },
     "bare_element": {
@@ -1033,33 +1038,29 @@
       ]
     },
     "map": {
-      "type": "PREC_RIGHT",
-      "value": 0,
-      "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "SYMBOL",
-            "name": "map_entry"
-          },
-          {
-            "type": "REPEAT",
-            "content": {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "SYMBOL",
-                  "name": "_entry_sep"
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "map_entry"
-                }
-              ]
-            }
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "map_entry"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_entry_sep"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "map_entry"
+              }
+            ]
           }
-        ]
-      }
+        }
+      ]
     },
     "_entry_sep": {
       "type": "CHOICE",
@@ -1312,6 +1313,12 @@
   "conflicts": [
     [
       "heading"
+    ],
+    [
+      "map"
+    ],
+    [
+      "children"
     ]
   ],
   "precedences": [],

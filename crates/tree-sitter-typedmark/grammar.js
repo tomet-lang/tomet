@@ -36,7 +36,7 @@ module.exports = grammar({
 	// so this needs GLR resolution rather than a lookahead-free CFG
 	// rewrite (there isn't one: the ambiguity is in the language, not the
 	// grammar's phrasing).
-	conflicts: ($) => [[$.heading]],
+	conflicts: ($) => [[$.heading], [$.map], [$.children]],
 
 	rules: {
 		document: ($) => repeat(choice($._block, $._newline)),
@@ -221,7 +221,25 @@ module.exports = grammar({
 		// swallow it whole, so a bare `/` (not opening a comment) falls
 		// back to `punctuation` like the others.
 		text: (_$) => /[^\n`*_=<@()\[{\]/-]+/,
-		punctuation: (_$) => /[()\[{/-]/,
+		// `-` is a bare string literal alternative here, not folded into
+		// the character class like the others, so it's the *same* grammar
+		// symbol as the literal `"-"` used to start `unordered_list_item`
+		// (tree-sitter interns identical string literals as one shared
+		// token everywhere they appear, same trick `_dash_run` already
+		// uses to stay a single token between `thematic_break`/
+		// `titled_thematic_break`). Without this, `-` existed as two
+		// *different* token definitions that happened to match the same
+		// text, and choosing between them was a lexer-level tie tree-
+		// sitter resolves deterministically with no runtime choice point
+		// -- see `unordered_list_item`'s own comment for why that
+		// mattered. Sharing the token instead resolves it via ordinary
+		// reduce logic once the parser tries to continue past `-` and
+		// finds no valid `list_checkbox`/gap: it backs out to this
+		// `punctuation` reading instead of the dead end an unshared
+		// marker token forced it into, with no `conflicts`/GLR needed
+		// (confirmed by `npx tree-sitter-cli generate` itself flagging a
+		// `[$.list, $.paragraph]` conflicts entry as unnecessary).
+		punctuation: (_$) => choice(/[()\[{/]/, "-"),
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -348,8 +366,7 @@ module.exports = grammar({
 		// `@links { (1)[...] (id2)[...] }`-style bare children: a container
 		// whose `{value}` holds a list of `(input)[area]` entries with no
 		// sigil of their own (the container already supplies the type).
-		children: ($) =>
-			prec.right(repeat1(seq(optional($._blank_gap), $.bare_element))),
+		children: ($) => repeat1(seq(optional($._blank_gap), $.bare_element)),
 		// Simplification: unlike `input_group`/`value_group`'s own internal
 		// gaps, `area_group` here must immediately follow (inline whitespace
 		// only, no blank-line tolerance) -- avoids an LR conflict where a
@@ -382,8 +399,7 @@ module.exports = grammar({
 		// after the *last* entry, which belongs to whatever encloses the
 		// map and is genuinely ambiguous to attribute here with only one
 		// token of lookahead).
-		map: ($) =>
-			prec.right(seq($.map_entry, repeat(seq($._entry_sep, $.map_entry)))),
+		map: ($) => seq($.map_entry, repeat(seq($._entry_sep, $.map_entry))),
 		_entry_sep: ($) => choice($._blank_gap, seq(",", optional($._blank_gap))),
 		// `key:` needs a scoped, higher-precedence identifier token here --
 		// `scalar` (colon-inclusive, since values routinely contain one,
