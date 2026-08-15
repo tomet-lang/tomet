@@ -1,4 +1,4 @@
-@meta{ type:settings }
+@meta{ type:@settings }
 @settings{
   functions: {
     bookmark: {

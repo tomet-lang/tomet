@@ -1,6 +1,5 @@
-@meta{
-  aaaa
-}
+@settings(path:../../docs.settings.tm)
+@meta{}
 
 #[ 雛形 ] 
 
