@@ -528,19 +528,25 @@ fn parse_inline_seq(
                         || look.starts_with("/*")
                         || (look.peek() == Some('<') && is_type_element_start(&look))
                         || (look.peek() == Some('@') && is_at_element_start(&look))
+                        || is_titled_thematic_break_start(&look)
+                        || is_thematic_break(&look)
+                        || is_fenced_code_block_start(&look)
                     {
                         break;
                     }
                     // Lazy continuation: no blank line and no new block marker
-                    // (heading/list/comment/element trigger), so this newline
-                    // is just part of the running text. An element trigger on
-                    // the next line always ends the paragraph rather than
-                    // continuing it -- `<T>`/`@name` are block-shaped
-                    // constructs in their own right, not prose, so
-                    // `@meta{...}` immediately followed by `@settings{...}`
-                    // (no blank line between them) becomes two separate
-                    // `Block::Element`s rather than one `Block::Paragraph`
-                    // with both folded into it.
+                    // (heading/list/comment/element trigger/thematic break/
+                    // fenced code block), so this newline is just part of the
+                    // running text. An element trigger on the next line
+                    // always ends the paragraph rather than continuing it --
+                    // `<T>`/`@name` are block-shaped constructs in their own
+                    // right, not prose, so `@meta{...}` immediately followed
+                    // by `@settings{...}` (no blank line between them)
+                    // becomes two separate `Block::Element`s rather than one
+                    // `Block::Paragraph` with both folded into it. Same
+                    // reasoning for `---`/`---[title]---`/fenced ` ``` `
+                    // blocks: they're block-shaped, not prose, even directly
+                    // after a paragraph line with no blank line between.
                 }
             }
             Stop::Delim(d) => {
@@ -817,22 +823,53 @@ fn normalize_text(raw: &str) -> String {
     out
 }
 
-/// Between a sigil's name and its first `(`/`[`/`{` group, `parse_element`
-/// tolerates inline whitespace and up to one newline (so e.g. `@links {`
-/// or a heading's attrs on their own line still parse) -- the lookahead
-/// here has to tolerate exactly the same gap, or it'll disagree with
-/// `parse_element` about whether a trigger is even present.
-fn skip_lookahead_gap(cur: &mut Cursor) {
-    skip_inline_ws(cur);
+/// Between a sigil's name and its first `(`/`[`/`{` group, and between
+/// consecutive groups, `parse_element` tolerates inline whitespace,
+/// `//`/`/* */` comments, and up to one bare newline (so e.g. `@links {`,
+/// a heading's attrs on their own line, or a trailing `// note` between
+/// two groups all still parse) -- the lookahead here has to tolerate
+/// exactly the same gap, or it'll disagree with `parse_element` about
+/// whether a trigger is even present. A comment is consumed in full
+/// regardless of how many newlines it itself spans (a multi-line `/*
+/// ... */` doesn't count against the budget); only bare newlines outside
+/// a comment do. An unterminated `/*` is left untouched here (not
+/// consumed, not an error) -- this is a best-effort lookahead/gap-skip,
+/// not the real parse; the caller's own comment handling, reached once
+/// this gap tolerance gives up, is what reports it properly. Returns the
+/// number of bare newlines seen (capped at 2, where 2 means "budget
+/// exceeded").
+fn skip_element_gap(cur: &mut Cursor) -> u8 {
     let mut newlines = 0u8;
-    while matches!(cur.peek(), Some('\n') | Some('\r')) {
-        cur.bump();
-        newlines += 1;
+    loop {
         skip_inline_ws(cur);
-        if newlines > 1 {
+        if cur.starts_with("//") {
+            skip_line_comment(cur);
+            continue;
+        }
+        if cur.starts_with("/*") {
+            let mut look = *cur;
+            if skip_block_comment(&mut look).is_ok() {
+                *cur = look;
+                continue;
+            }
             break;
         }
+        match cur.peek() {
+            Some('\n') | Some('\r') => {
+                cur.bump();
+                newlines += 1;
+                if newlines > 1 {
+                    break;
+                }
+            }
+            _ => break,
+        }
     }
+    newlines
+}
+
+fn skip_lookahead_gap(cur: &mut Cursor) {
+    skip_element_gap(cur);
 }
 
 fn is_type_element_start(cur: &Cursor) -> bool {
@@ -888,21 +925,20 @@ fn parse_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Re
     let mut el = Element::new(sigil);
     loop {
         let checkpoint = cur.pos();
-        skip_inline_ws(cur);
-        let mut newlines = 0u8;
-        while matches!(cur.peek(), Some('\n') | Some('\r')) {
-            cur.bump();
-            newlines += 1;
-            skip_inline_ws(cur);
-            if newlines > 1 {
-                break;
-            }
-        }
+        let newlines = skip_element_gap(cur);
         if newlines <= 1 {
             match cur.peek() {
                 Some('(') if el.args.is_none() => {
                     el.args = Some(parse_paren_value(cur)?);
                     continue;
+                }
+                // A second `(args)`/`[content]`/`{value}` group of a kind
+                // already seen is invalid (each group at most once) --
+                // distinct from an unrelated `(`/`[`/`{` starting fresh
+                // text after the element's groups end, which the `_` arm
+                // below still lets through to `break`.
+                Some('(') => {
+                    return Err(err(cur, cur.pos(), "duplicate '(' group"));
                 }
                 Some('[') if el.content.is_none() => {
                     el.content = Some(if is_codeblock(&el) {
@@ -913,6 +949,9 @@ fn parse_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Re
                         parse_content(cur, default_format)?
                     });
                     continue;
+                }
+                Some('[') => {
+                    return Err(err(cur, cur.pos(), "duplicate '[' group"));
                 }
                 Some('{') if el.value.is_none() => {
                     // An explicit local `format` key always wins (including
@@ -931,6 +970,9 @@ fn parse_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Re
                     });
                     continue;
                 }
+                Some('{') => {
+                    return Err(err(cur, cur.pos(), "duplicate '{' group"));
+                }
                 _ => {}
             }
         }
@@ -945,7 +987,15 @@ fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
     if !cur.eat_str("(") {
         return Err(err(cur, cur.pos(), "expected '('"));
     }
-    let v = parse_value_at(cur)?;
+    skip_ws_newlines_and_comments(cur);
+    // `()` (possibly with only whitespace/comments inside) is a valid,
+    // deliberately-empty args map -- distinct from omitting `(...)`
+    // entirely (`el.args` stays `None` in that case).
+    let v = if cur.peek() == Some(')') {
+        Value::Map(Vec::new())
+    } else {
+        parse_value_at(cur)?
+    };
     skip_ws_newlines_and_comments(cur);
     if !cur.eat_str(")") {
         return Err(err(cur, cur.pos(), "expected ')'"));
@@ -1088,6 +1138,9 @@ fn parse_value_group(
             children.push(parse_bare_element(cur, default_format)?);
         }
         ElementValue::Children(children)
+    } else if cur.peek() == Some('}') {
+        // Same "deliberately empty" case as `parse_paren_value`'s `()`.
+        ElementValue::Data(Value::Map(Vec::new()))
     } else {
         ElementValue::Data(parse_value_at(cur)?)
     };

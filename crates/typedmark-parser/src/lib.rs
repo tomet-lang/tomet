@@ -891,4 +891,84 @@ mod tests {
             other => panic!("expected a paragraph, got {other:?}"),
         }
     }
+
+    #[test]
+    fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
+        // `()`/`{}` written out (as opposed to the group being omitted
+        // entirely, which leaves `args`/`value` as `None`) is a valid,
+        // deliberately-empty map -- matches the spec's own `@meta{}` etc.
+        let doc = parse_document("<T>()\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.args, Some(Value::Map(vec![])));
+                assert_eq!(el.content, None);
+            }
+            other => panic!("expected an element, got {other:?}"),
+        }
+
+        let doc = parse_document("@meta{}\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.value, Some(ElementValue::Data(Value::Map(vec![]))));
+            }
+            other => panic!("expected an element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_second_args_group_is_a_duplicate_group_error() {
+        let err = parse_document("<T>(a:1)(b:2)\n").unwrap_err();
+        assert!(err.message.contains("duplicate"), "got: {err:?}");
+    }
+
+    #[test]
+    fn a_comment_between_groups_does_not_detach_the_next_group() {
+        // Regression: a `//`/`/* */` comment between an element's groups
+        // used to fall outside the whitespace/newline gap tolerance,
+        // ending the element early and leaving the next group as
+        // unrelated trailing text.
+        let doc = parse_document("<T>(a:1) // note\n[content]\n").unwrap();
+        assert_eq!(doc.blocks.len(), 1);
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(
+                    el.args,
+                    Some(Value::Map(vec![("a".into(), Value::Int(1))]))
+                );
+                assert_eq!(el.content, Some(vec![Inline::Text("content".into())]));
+            }
+            other => panic!("expected an element with both groups, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_paragraph_does_not_swallow_a_following_fenced_code_block() {
+        // Regression: a fenced code block (or thematic break) directly
+        // after a paragraph line, with no blank line between them, used to
+        // be absorbed as lazy-continuation paragraph text instead of
+        // starting its own block.
+        let doc = parse_document("text\n```js\ncode\n```\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        match (&doc.blocks[0], &doc.blocks[1]) {
+            (Block::Paragraph(p), Block::Element(el)) => {
+                assert_eq!(&p.content, &vec![Inline::Text("text".into())]);
+                assert_eq!(el.sigil, Sigil::Type("codeblock".into()));
+            }
+            other => panic!("expected paragraph then codeblock, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_paragraph_does_not_swallow_a_following_thematic_break() {
+        let doc = parse_document("text\n---\nmore\n").unwrap();
+        assert_eq!(doc.blocks.len(), 3);
+        match (&doc.blocks[0], &doc.blocks[1], &doc.blocks[2]) {
+            (Block::Paragraph(a), Block::Element(hr), Block::Paragraph(b)) => {
+                assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
+                assert_eq!(hr.sigil, Sigil::Type("hr".into()));
+                assert_eq!(&b.content, &vec![Inline::Text("more".into())]);
+            }
+            other => panic!("expected paragraph, hr, paragraph, got {other:?}"),
+        }
+    }
 }
