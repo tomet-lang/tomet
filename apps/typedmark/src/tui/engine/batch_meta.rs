@@ -9,6 +9,7 @@ use typedmark_ast::{
     Block, Document, Element, ElementValue, Inline, Sigil, Value,
 };
 use typedmark_parser::parse_document;
+use typedmark_semantics::classify;
 
 use super::printer::document_to_tm;
 
@@ -106,7 +107,8 @@ pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
     if let Ok(doc) = parse_document(src) {
         walk_elements(&doc, |el| {
-            let kind = get_element_kind(el);
+            let kind = classify(el);
+            let kind = kind.as_str();
             if kind == "meta" || kind == "config" {
                 if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
                     for (k, v) in entries {
@@ -129,8 +131,8 @@ fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_val:
     let mut found = false;
 
     walk_elements_mut(doc, |el| {
-        let kind = get_element_kind(el);
-        if kind == target_element {
+        let kind = classify(el);
+        if kind.as_str() == target_element {
             found = true;
             match &mut el.value {
                 Some(ElementValue::Data(Value::Map(entries))) => {
@@ -170,17 +172,6 @@ fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_val:
     }
 
     updated
-}
-
-pub fn get_element_kind(el: &Element) -> String {
-    match &el.sigil {
-        Sigil::Type(name) => name.clone(),
-        Sigil::At(Some(name)) => name.clone(),
-        Sigil::At(None) => typedmark_ast::infer_at_kind(el.args.as_ref())
-            .unwrap_or("at")
-            .to_string(),
-        Sigil::Bare => "bare".to_string(),
-    }
 }
 
 fn value_to_string(v: &Value) -> String {

@@ -24,5 +24,6 @@ typedmark-formatter = { workspace = true }
 typedmark-markdown = { workspace = true }
 typedmark-parser = { workspace = true }
 typedmark-renderer = { workspace = true }
+typedmark-semantics = { workspace = true }
 uuid = { workspace = true }
 walkdir = { workspace = true }

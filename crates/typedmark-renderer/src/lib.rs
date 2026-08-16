@@ -9,9 +9,8 @@
 //! `@meta` carries no visible content, and `@links{}` containers render
 //! their bare children as a definition list of anchors.
 
-use typedmark_ast::{
-    Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
-};
+use typedmark_ast::{Block, Document, Element, ElementValue, Heading, Inline, ListItem, Value};
+use typedmark_semantics::classify;
 
 const DEFAULT_STYLE: &str = "\
 body { font-family: sans-serif; line-height: 1.6; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; }
@@ -182,19 +181,8 @@ fn render_inlines(inlines: &[Inline], out: &mut String) {
     }
 }
 
-fn element_kind(el: &Element) -> String {
-    match &el.sigil {
-        Sigil::Type(name) => name.clone(),
-        Sigil::At(Some(name)) => name.clone(),
-        Sigil::At(None) => typedmark_ast::infer_at_kind(el.args.as_ref())
-            .unwrap_or("at")
-            .to_string(),
-        Sigil::Bare => "bare".to_string(),
-    }
-}
-
 fn render_element(el: &Element, out: &mut String, inline: bool) {
-    let kind = element_kind(el);
+    let kind = classify(el);
     match kind.as_str() {
         "meta" => {}
         "config" => {}
@@ -204,10 +192,10 @@ fn render_element(el: &Element, out: &mut String, inline: bool) {
         "ref" => render_ref_element(el, out, inline),
         "embed" => render_embed_element(el, out),
         "hr" => render_hr_element(el, out),
-        "em" | "strong" | "mark" => render_wrapped_inline(el, &kind, out),
+        "em" | "strong" | "mark" => render_wrapped_inline(el, kind.as_str(), out),
         "codeblock" => render_codeblock_element(el, out),
         "blockquote" => render_blockquote_element(el, out, inline),
-        _ => render_generic_element(el, &kind, out, inline),
+        _ => render_generic_element(el, kind.as_str(), out, inline),
     }
 }
 
@@ -630,7 +618,7 @@ mod tests {
 
     #[test]
     fn bare_at_meta_is_not_inferred_only_the_explicit_name_is() {
-        // `meta` is deliberately not in `typedmark_ast::INFERRED_AT_KEYS`
+        // `meta` is deliberately not in `typedmark_semantics::INFERRED_AT_KEYS`
         // (see its doc comment) -- a bare `@(meta:yaml)` falls back to the
         // generic "at" element rendering, unlike `@meta(format:yaml){...}`
         // above.
@@ -644,10 +632,18 @@ mod tests {
 
     #[test]
     fn adjacent_meta_blocks_have_no_visible_output() {
-        // Regression test: three `@meta(...)` blocks stacked with no blank
-        // line between them (as in `docs/cheatsheet.tm`) lazily continue
-        // into one `Block::Paragraph` at the parser level; that paragraph
-        // must not leak a stray whitespace-only `<p>` into the output.
+        // `@meta` is documented as `placement: head` / `singleton: true`
+        // (see `docs/ja/specifications/builtin.settings.tm`) -- three of
+        // them in one file, as used below, is not actually valid TypedMark
+        // and would eventually be rejected by `typedmark-validator`. But
+        // `typedmark-parser` itself no longer folds them into one
+        // `Block::Paragraph` (each `@meta(...)` on its own line, with no
+        // blank line before the next, now parses as its own
+        // `Block::Element` -- see `document.rs`'s `Stop::Paragraph`), and
+        // `typedmark-renderer` has no validation layer of its own, so this
+        // just confirms it still renders each one as empty output rather
+        // than leaking a stray whitespace-only `<p>` -- garbage in,
+        // harmless out.
         let doc = parse_document(
             "@meta(format:json){\n  {\"key\":\"value\"}\n}\n@meta(format:yaml){\n  key:value\n}\n@meta(format:toml){\n  key = \"value\"\n}\n\n#[ next ]\n",
         )
@@ -710,6 +706,16 @@ mod tests {
     #[test]
     fn renders_codeblock_with_lang() {
         let doc = parse_document("<codeblock>(lang:rust)[fn main() {}]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<pre><code class=\"language-rust\">fn main() {}</code></pre>\n"
+        );
+    }
+
+    #[test]
+    fn fenced_code_block_renders_the_same_as_bracket_codeblock() {
+        let doc = parse_document("```rust\nfn main() {}\n```\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,

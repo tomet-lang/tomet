@@ -51,6 +51,8 @@ pub fn parse_document(src: &str) -> Result<Document> {
             Some(Block::Element(
                 Element::new(Sigil::Type("hr".to_string())).with_span(span),
             ))
+        } else if is_fenced_code_block_start(&cur) {
+            Some(Block::Element(parse_fenced_code_block(&mut cur)?))
         } else if let Some((ordered, _)) = peek_list_marker(&cur) {
             let items = parse_list(&mut cur, ordered, default_format)?;
             let span = cur.span_from(block_start);
@@ -252,6 +254,103 @@ fn parse_titled_thematic_break(
     Ok(el)
 }
 
+/// Whether the current position starts a fenced code block: 3 or more
+/// consecutive backticks at the start of a line. TypedMark's grammar is
+/// indentation-independent throughout (headings/list markers/thematic
+/// breaks all only fire at column 1 too), so no leading-whitespace
+/// tolerance is offered here either.
+fn is_fenced_code_block_start(cur: &Cursor) -> bool {
+    let mut look = *cur;
+    look.eat_while(|c| c == '`').len() >= 3
+}
+
+/// ```` ```lang\ncode\n``` ```` -- sugar for `<codeblock>(lang:xxx)[code]`.
+/// Builds the exact same `Element` shape the bracket form does
+/// (`Sigil::Type("codeblock")`, `args` holding `lang`, `content` holding
+/// the body as a single raw `Inline::Text`), so every downstream consumer
+/// (`typedmark_semantics::classify`, `typedmark-renderer`,
+/// `typedmark-markdown`, `typedmark-formatter`'s raw-span detection) needs
+/// no changes -- they all key off the sigil name, not which syntax
+/// produced it.
+fn parse_fenced_code_block(cur: &mut Cursor) -> Result<Element> {
+    let start_pos = cur.pos();
+    let fence_len = cur.eat_while(|c| c == '`').len();
+
+    // Info string: everything to end of line; only its first
+    // whitespace-separated word becomes `lang`, matching
+    // `typedmark_markdown::import`'s `CodeBlockKind::Fenced(lang)` handling.
+    skip_inline_ws(cur);
+    let info_start = cur.pos();
+    cur.eat_while(|c| c != '\n' && c != '\r');
+    let lang = cur
+        .slice_from(info_start)
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .to_string();
+    if matches!(cur.peek(), Some('\n') | Some('\r')) {
+        cur.bump();
+    }
+
+    let body_start = cur.pos();
+    let body_end;
+    loop {
+        if cur.is_eof() {
+            // Unterminated is not an error -- same reasoning
+            // `skip_line_comment` uses (running to EOF is a visible,
+            // bounded consequence, not a silent swallow), and it matches
+            // CommonMark's own fenced-code-block spec (an unclosed fence
+            // just runs to the end of the document). Deliberately
+            // asymmetric with `<codeblock>[...]`'s `find_matching_delimiter`,
+            // which hard-errors on EOF -- that form has an explicit `]`
+            // closer, this one's closer is a variable-length marker with
+            // no single required character to fail on.
+            body_end = cur.pos();
+            break;
+        }
+        let line_start = cur.pos();
+        let mut look = *cur;
+        let run = look.eat_while(|c| c == '`').len();
+        if run >= fence_len {
+            skip_inline_ws(&mut look);
+            if matches!(look.peek(), None | Some('\n') | Some('\r')) {
+                // A valid closing fence: a line made of nothing but
+                // backticks (>= the opening count) plus trailing
+                // whitespace.
+                body_end = line_start;
+                cur.set_pos(look.pos());
+                if matches!(cur.peek(), Some('\n') | Some('\r')) {
+                    cur.bump();
+                }
+                break;
+            }
+        }
+        // Not a closing fence -- consume this whole source line as body.
+        cur.eat_while(|c| c != '\n' && c != '\r');
+        if matches!(cur.peek(), Some('\n') | Some('\r')) {
+            cur.bump();
+        }
+    }
+
+    let mut code = cur.src()[body_start..body_end].to_string();
+    if code.ends_with('\n') {
+        code.pop();
+    }
+
+    let args = if lang.is_empty() {
+        None
+    } else {
+        Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
+    };
+    let content_span =
+        typedmark_ast::Span::new(cur.position_at(body_start), cur.position_at(body_end));
+    let mut el = Element::new(Sigil::Type("codeblock".to_string()));
+    el.args = args;
+    el.content = Some(vec![Inline::Text(Text::new(code, content_span))]);
+    el.span = cur.span_from(start_pos);
+    Ok(el)
+}
+
 fn parse_heading(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Heading> {
     let start_pos = cur.pos();
     let level = cur.eat_while(|c| c == '#').len() as u8;
@@ -427,11 +526,21 @@ fn parse_inline_seq(
                         || peek_list_marker(&look).is_some()
                         || look.starts_with("//")
                         || look.starts_with("/*")
+                        || (look.peek() == Some('<') && is_type_element_start(&look))
+                        || (look.peek() == Some('@') && is_at_element_start(&look))
                     {
                         break;
                     }
-                    // Lazy continuation: no blank line and no new block marker,
-                    // so this newline is just part of the running text.
+                    // Lazy continuation: no blank line and no new block marker
+                    // (heading/list/comment/element trigger), so this newline
+                    // is just part of the running text. An element trigger on
+                    // the next line always ends the paragraph rather than
+                    // continuing it -- `<T>`/`@name` are block-shaped
+                    // constructs in their own right, not prose, so
+                    // `@meta{...}` immediately followed by `@settings{...}`
+                    // (no blank line between them) becomes two separate
+                    // `Block::Element`s rather than one `Block::Paragraph`
+                    // with both folded into it.
                 }
             }
             Stop::Delim(d) => {
@@ -457,15 +566,38 @@ fn parse_inline_seq(
         if cur.peek() == Some('`') {
             // A backtick span is verbatim, Markdown-code-span style -- lets
             // prose mention `@links{}`/`<caution>[...]` etc. literally
-            // without it being parsed as a real trigger.
-            cur.bump();
-            while let Some(c) = cur.peek() {
-                cur.bump();
-                if c == '`' {
-                    break;
+            // without it being parsed as a real trigger. Dry-run first
+            // (same idea as `try_one_delimited`'s dry run for
+            // `*em*`/`**strong**`): only commit to treating this as a code
+            // span if a closing '`' exists on the *same line*. Without
+            // this, an unterminated '`' would otherwise swallow everything
+            // up to the next stray backtick anywhere later in the source,
+            // across paragraph/block boundaries -- restricting the search
+            // to the current line keeps a missing closer a local, visible
+            // failure (falls back to a literal '`' below) instead of a
+            // silent runaway one.
+            let mut probe = *cur;
+            probe.bump();
+            let mut closed = false;
+            while let Some(c) = probe.peek() {
+                match c {
+                    '`' => {
+                        probe.bump();
+                        closed = true;
+                        break;
+                    }
+                    '\n' | '\r' => break,
+                    _ => {
+                        probe.bump();
+                    }
                 }
             }
-            continue;
+            if closed {
+                cur.set_pos(probe.pos());
+                continue;
+            }
+            // No closing '`' on this line -- fall through and treat this
+            // '`' as an ordinary character.
         }
         if cur.starts_with("/*") {
             // Inline `/* ... */`: has an explicit closer, so it's safe to

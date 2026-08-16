@@ -412,6 +412,44 @@ mod tests {
     }
 
     #[test]
+    fn an_element_trigger_ends_a_paragraph_with_no_blank_line_before_it() {
+        // Same as `#`/list markers/comments already do in the lazy-continuation
+        // check -- a `<T>`/`@name` element trigger on the next line ends the
+        // paragraph even with no blank line separating them, rather than
+        // being folded into one `Block::Paragraph` together with the
+        // previous line. (An element trigger followed by *more* running
+        // text on its own next line is a separate case, unaffected here --
+        // that's still ordinary lazy continuation, since only a following
+        // element trigger ends a paragraph early, not a preceding one.)
+        let doc = parse_document("text\n@meta{key:value}\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        match (&doc.blocks[0], &doc.blocks[1]) {
+            (Block::Paragraph(a), Block::Element(el)) => {
+                assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
+                assert_eq!(el.sigil, Sigil::At(Some("meta".into())));
+            }
+            other => panic!("expected paragraph then element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn adjacent_elements_with_no_blank_line_become_separate_blocks() {
+        // Regression: `@meta{...}` immediately followed by `@settings{...}`
+        // (no blank line between them, as `docs/docs.settings.tm` itself is
+        // written) used to lazily continue into one `Block::Paragraph` --
+        // it must now become two independent `Block::Element`s instead.
+        let doc = parse_document("@meta{ type:@settings }\n@settings{ key:value }\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        match (&doc.blocks[0], &doc.blocks[1]) {
+            (Block::Element(a), Block::Element(b)) => {
+                assert_eq!(a.sigil, Sigil::At(Some("meta".into())));
+                assert_eq!(b.sigil, Sigil::At(Some("settings".into())));
+            }
+            other => panic!("expected two elements, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn indented_line_comment_interrupts_a_paragraph_with_no_blank_line_before_it() {
         let doc = parse_document("text\n  // indented, still interrupts\nmore\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
@@ -710,6 +748,147 @@ mod tests {
                 );
             }
             other => panic!("expected an element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_a_fenced_code_block_with_lang() {
+        let doc = parse_document("```rust\nfn main() {}\n```\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.sigil, Sigil::Type("codeblock".into()));
+                assert_eq!(
+                    el.args,
+                    Some(Value::Map(vec![(
+                        "lang".to_string(),
+                        Value::String("rust".to_string())
+                    )]))
+                );
+                assert_eq!(
+                    el.content,
+                    Some(vec![Inline::Text("fn main() {}".into())])
+                );
+            }
+            other => panic!("expected a codeblock element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_a_fenced_code_block_without_lang() {
+        let doc = parse_document("```\nplain\n```\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.sigil, Sigil::Type("codeblock".into()));
+                assert_eq!(el.args, None);
+                assert_eq!(el.content, Some(vec![Inline::Text("plain".into())]));
+            }
+            other => panic!("expected a codeblock element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fenced_code_block_and_bracket_codeblock_produce_the_same_ast() {
+        let fenced = parse_document("```rust\nfn main() {}\n```\n").unwrap();
+        let bracket = parse_document("<codeblock>(lang:rust)[fn main() {}]\n").unwrap();
+        match (&fenced.blocks[0], &bracket.blocks[0]) {
+            (Block::Element(a), Block::Element(b)) => {
+                assert_eq!(a.sigil, b.sigil);
+                assert_eq!(a.args, b.args);
+                assert_eq!(a.content, b.content);
+                assert_eq!(a.value, b.value);
+            }
+            other => panic!("expected two codeblock elements, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fenced_code_block_closing_fence_needs_at_least_the_opening_backtick_count() {
+        // A closing fence with fewer backticks than the opening one doesn't
+        // close it -- it's just consumed as ordinary body content, same as
+        // CommonMark.
+        let doc = parse_document("````\ncode\n```\nmore code\n````\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(
+                    el.content,
+                    Some(vec![Inline::Text("code\n```\nmore code".into())])
+                );
+            }
+            other => panic!("expected a codeblock element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fenced_code_block_closing_fence_can_have_more_backticks_than_opening() {
+        let doc = parse_document("```\ncode\n`````\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.content, Some(vec![Inline::Text("code".into())]));
+            }
+            other => panic!("expected a codeblock element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fenced_code_block_body_can_contain_short_backtick_runs() {
+        let doc = parse_document("```\nsee `foo` and ``bar``\n```\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(
+                    el.content,
+                    Some(vec![Inline::Text("see `foo` and ``bar``".into())])
+                );
+            }
+            other => panic!("expected a codeblock element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unterminated_fenced_code_block_runs_to_eof_without_error() {
+        // Deliberately asymmetric with `<codeblock>[...]`'s hard EOF error
+        // (see `parse_fenced_code_block`'s doc comment) -- matches
+        // CommonMark's own spec for an unclosed fence.
+        let doc = parse_document("```\nline one\nline two").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(
+                    el.content,
+                    Some(vec![Inline::Text("line one\nline two".into())])
+                );
+            }
+            other => panic!("expected a codeblock element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unterminated_inline_backtick_falls_back_to_literal_text() {
+        // Regression: a single unterminated '`' used to swallow everything
+        // up to the next stray backtick anywhere later in the source,
+        // across paragraph boundaries, collapsing newlines to spaces along
+        // the way. It must now fall back to a literal '`' and let the
+        // paragraph end normally at the blank line.
+        let doc = parse_document("keep `this open\n\nnext paragraph\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        match (&doc.blocks[0], &doc.blocks[1]) {
+            (Block::Paragraph(a), Block::Paragraph(b)) => {
+                assert_eq!(&a.content, &vec![Inline::Text("keep `this open".into())]);
+                assert_eq!(&b.content, &vec![Inline::Text("next paragraph".into())]);
+            }
+            other => panic!("expected two paragraphs, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn backtick_span_still_closes_normally_on_the_same_line() {
+        let doc = parse_document("call `foo()` now\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(p) => {
+                assert_eq!(
+                    &p.content,
+                    &vec![Inline::Text("call `foo()` now".into())]
+                );
+            }
+            other => panic!("expected a paragraph, got {other:?}"),
         }
     }
 }

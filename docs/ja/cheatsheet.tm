@@ -1,4 +1,4 @@
-@settings(import:../docs.settings.tm)
+@settings(file:docs/docs.settings.tm)
 @config(
   format:json
   /// [ (意図)[formatterが見る。視覚に長けたフォーマットであるために、
@@ -10,6 +10,7 @@
   // export_path:/readme.md
 )
 
+```
 @meta(format:json){
   {
     "key": "value",
@@ -31,6 +32,7 @@
 // @meta(format:kdl){
 //   key = "value"
 // }
+```
 
 /// [ special-casing exists for "import" anywhere. Renders as a generic
 ///   element (`<div class="tm-element tm-import" data-file="...">`), same as
@@ -58,7 +60,7 @@
 // @[ ここには、英語しか入れれないということになる。 ]
 
 // [ NOT implemented ]
-// @(lang:sh, content:raw)[
+// @(lang:sh)[
 //   sudo whoami
 //   ls --help
 // ]

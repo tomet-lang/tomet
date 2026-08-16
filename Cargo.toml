@@ -7,7 +7,6 @@ members = [
   "apps/typedmark-web",
   "apps/typedmark-lsp",
 
-
   #[ Bindings ]
   "apps/bindings/java",
   "apps/bindings/js",
@@ -18,11 +17,15 @@ members = [
   "apps/integrations/neovim",
   "apps/integrations/helix",
 
-  #[ Library ]
+  #[ Core ]
   "crates/typedmark-ast",
   "crates/typedmark-lexar",
   "crates/typedmark-parser",
+  "crates/typedmark-semantics",
+  "crates/typedmark-resolve",
   "crates/typedmark-validator",
+
+  #[ Consumer ]
   "crates/typedmark-markdown",
   "crates/typedmark-renderer",
   "crates/typedmark-formatter",
@@ -43,6 +46,7 @@ typedmark-lexar = { path = "crates/typedmark-lexar" }
 typedmark-markdown = { path = "crates/typedmark-markdown" }
 typedmark-parser = { path = "crates/typedmark-parser" }
 typedmark-renderer = { path = "crates/typedmark-renderer" }
+typedmark-semantics = { path = "crates/typedmark-semantics" }
 serde_typedmark = { path = "crates/serde_typedmark" }
 
 #[ Crates.io ]

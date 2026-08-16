@@ -1,11 +1,8 @@
 [package]
-name = "typedmark-renderer"
+name = "typedmark-resolve"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 typedmark-ast = { workspace = true }
-typedmark-semantics = { workspace = true }
-
-[dev-dependencies]
 typedmark-parser = { workspace = true }

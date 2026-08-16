@@ -9,9 +9,8 @@
 //! valid CommonMark. Heading `id`/`cssclass` attrs have no CommonMark
 //! form and are dropped.
 
-use typedmark_ast::{
-    Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
-};
+use typedmark_ast::{Block, Document, Element, ElementValue, Heading, Inline, ListItem, Value};
+use typedmark_semantics::classify;
 
 pub fn to_markdown(doc: &Document) -> String {
     let mut out = String::new();
@@ -82,19 +81,8 @@ fn inline_to_md(inlines: &[Inline]) -> String {
     out
 }
 
-fn element_kind(el: &Element) -> String {
-    match &el.sigil {
-        Sigil::Type(name) => name.clone(),
-        Sigil::At(Some(name)) => name.clone(),
-        Sigil::At(None) => typedmark_ast::infer_at_kind(el.args.as_ref())
-            .unwrap_or("at")
-            .to_string(),
-        Sigil::Bare => "bare".to_string(),
-    }
-}
-
 fn element_to_md(el: &Element, inline: bool) -> String {
-    let kind = element_kind(el);
+    let kind = classify(el);
     match kind.as_str() {
         "meta" => String::new(),
         "config" => String::new(),
@@ -104,11 +92,11 @@ fn element_to_md(el: &Element, inline: bool) -> String {
         "mark" => format!("<mark>{}</mark>", content_to_md(el)),
         "codeblock" => render_code_block(el),
         "blockquote" => render_blockquote(el),
-        "url" | "file" => render_link(el, &kind),
+        "url" | "file" => render_link(el, kind.as_str()),
         "ref" => render_ref(el),
         "embed" => render_embed(el),
         "links" => render_links_container(el),
-        _ => render_generic(el, &kind, inline),
+        _ => render_generic(el, kind.as_str(), inline),
     }
 }
 
@@ -329,16 +317,22 @@ fn map_get<'a>(map: &'a [(String, Value)], key: &str) -> Option<&'a Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use typedmark_ast::{List, Paragraph, Span, Text};
+    use typedmark_ast::{List, Paragraph, Sigil, Span, Text};
 
     #[test]
     fn adjacent_meta_blocks_have_no_visible_output() {
-        // Regression test: three `@meta(...)` blocks stacked with no blank
-        // line between them (as `typedmark-parser`'s lazy paragraph
-        // continuation produces for `docs/cheatsheet.tm`-style input) merge
-        // into one `Block::Paragraph` of meta elements plus inter-element
-        // whitespace text -- that paragraph must not leave a stray blank
-        // line behind in the exported Markdown.
+        // Hand-built `Document` (doesn't go through `typedmark_parser::
+        // parse_document`, so it's independent of the parser's own
+        // paragraph-continuation rules -- `typedmark-parser` no longer
+        // folds adjacent `@meta(...)` elements with no blank line between
+        // them into one `Block::Paragraph`; each becomes its own
+        // `Block::Element` now, see `document.rs`'s `Stop::Paragraph`).
+        // Kept as a regression test for the shape this crate must still
+        // handle correctly if it ever *does* show up (e.g. a
+        // hand-authored `Document`, or a future grammar change): a
+        // `Block::Paragraph` containing only no-output elements plus
+        // inter-element whitespace text must not leave a stray blank line
+        // behind in the exported Markdown.
         fn meta_element(tag: &str) -> Element {
             Element {
                 sigil: Sigil::At(Some("meta".to_string())),
@@ -523,7 +517,7 @@ mod tests {
 
     #[test]
     fn bare_at_meta_is_not_inferred_only_the_explicit_name_is() {
-        // `meta` is deliberately not in `typedmark_ast::INFERRED_AT_KEYS`
+        // `meta` is deliberately not in `typedmark_semantics::INFERRED_AT_KEYS`
         // (see its doc comment) -- a bare `@` with a `meta` key falls back
         // to the generic "at" element export, unlike `@meta(...)`
         // (`Sigil::At(Some("meta".into()))`), which exports as nothing.

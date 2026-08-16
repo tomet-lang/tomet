@@ -12,6 +12,12 @@
   // global value
   format:(json, toml, yaml, kdl)
 )
+@config(
+  format:json
+  style:structural // one_per_line 
+  export_type:[ commonmark, @import(file:path) ]
+  export_path:/readme.md
+)
 
 @link(url:<url>, path:<path>, file:<file>, ref:<ref>)[ display_name ]
 @tag{}

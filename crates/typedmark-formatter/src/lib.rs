@@ -200,6 +200,12 @@ mod tests {
     }
 
     #[test]
+    fn fenced_code_block_content_is_preserved_losslessly() {
+        let src = "```rust\nfn foo() {\n    let a = 1;  \n\n    let b = 2;\n}\n```\n";
+        assert_eq!(format_source(src), src);
+    }
+
+    #[test]
     fn is_idempotent_on_repo_spec_examples() {
         for src in repo_examples() {
             let once = format_source(src);

@@ -1,0 +1,7 @@
+[package]
+name = "typedmark-semantics"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+typedmark-ast = { workspace = true }

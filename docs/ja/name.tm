@@ -1,5 +1,11 @@
 @settings(file:docs/docs.settings.tm)
-@meta{}
+@config(
+  format:json
+)
+
+(
+  aa
+)
 
 #[ 雛形 ] 
 

@@ -15,9 +15,23 @@
 //!   character" check.
 //! - **No lazy paragraph continuation.** A paragraph ends at a blank
 //!   line or EOF only, not at the next line merely *looking* like a new
-//!   block. Every real fixture this grammar was tested against already
-//!   puts a blank line between blocks, so this hasn't been observed to
-//!   matter in practice.
+//!   block. `typedmark-parser`'s own lazy-continuation check also ends a
+//!   paragraph early when the next line is an element trigger (`<T>`/
+//!   `@name`, see `document.rs`'s `Stop::Paragraph`) -- e.g. `@meta{...}`
+//!   immediately followed by `@settings{...}` with no blank line between
+//!   them becomes two separate top-level elements in the real parser.
+//!   This grammar doesn't simulate that either, so it still merges such
+//!   adjacent elements into one `paragraph` node.
+//! - **Fenced code blocks only recognize exactly 3 backticks, not 3-or-
+//!   more with the closer tracking the opener's length.** Same
+//!   "known-narrow" simplification as `thematic_break`'s fixed dash-run
+//!   handling. The real parser
+//!   (`document.rs::parse_fenced_code_block`) accepts any run of 3+ and
+//!   requires the closer to have at least as many backticks as the
+//!   opener; matching that here would need a stateful external scanner
+//!   to remember the opening run's length across the body, which this
+//!   grammar doesn't have (see `fenced_code_block`'s own comment in
+//!   `grammar.js`).
 //! - **`(args)`/`[content]`/`{value}` aren't capped at one each, in any
 //!   order.** The real grammar allows each group at most once, in any
 //!   order; here they're just `repeat(choice(...))`, so e.g. two
@@ -208,6 +222,22 @@ mod tests {
         let root = tree.root_node();
         assert!(!root.has_error());
         assert_eq!(root.named_child(0).unwrap().kind(), "titled_thematic_break");
+    }
+
+    #[test]
+    fn parses_a_fenced_code_block() {
+        let tree = parse("```rust\nfn main() {}\n```\n");
+        let root = tree.root_node();
+        assert!(!root.has_error());
+        assert_eq!(root.named_child(0).unwrap().kind(), "fenced_code_block");
+    }
+
+    #[test]
+    fn fenced_code_block_body_can_contain_short_backtick_runs() {
+        let tree = parse("```\nsee `foo` and ``bar``\n```\n");
+        let root = tree.root_node();
+        assert!(!root.has_error());
+        assert_eq!(root.named_child(0).unwrap().kind(), "fenced_code_block");
     }
 
     #[test]
@@ -537,8 +567,6 @@ mod tests {
     fn cheatsheet_tm_fixture_has_only_known_error_cases() {
         // Every error node's text contains (or exactly is) one of these
         // markers, each tied to a documented case:
-        // - `"\"key\":"`/`"key = "`: the embedded-JSON/TOML-not-understood
-        //   case (this module's doc comment).
         // - `"@config("`: *not* the bare-newline-before-`)` case (that's
         //   fixed now, see the doc comment's `map`/`conflicts` note) --
         //   `@config(...)`'s body has `///`/`//` line comments embedded
@@ -546,13 +574,19 @@ mod tests {
         //   supports (`value.rs::skip_line_comment`) but this grammar's
         //   `map`/`_entry_sep` has no rule for at all, a separate,
         //   larger, still-open gap (see the doc comment).
-        // - `"や"`/`"]"`/`` "`" ``: stray/unmatched `]` in prose (this
-        //   module's doc comment, also covers `----[💫]----`'s residual
-        //   `]---` error a bit further down -- see the next paragraph) and
-        //   an unterminated/triple-backtick code span, both pre-existing,
-        //   unrelated to today's list-marker changes.
-        // - `","`/`"{"`: assorted stray characters inside
-        //   `<memo>(content:raw)[...]`'s raw content, pre-existing.
+        // - `"や"`/`"]"`: stray/unmatched `]` in prose (this module's doc
+        //   comment, also covers `----[💫]----`'s residual `]---` error a
+        //   bit further down -- see the next paragraph).
+        //
+        // The embedded-JSON/TOML case, the triple-backtick/unterminated
+        // code-span case, and the `<memo>(content:raw)[...]` stray-
+        // character case (`"\"key\":"`/`"key = "`/`` "`" ``/`","`/`"{"`)
+        // all used to need markers here too, but no longer error at all
+        // now that `@meta(format:json){...}`/`@meta(format:toml){...}`/
+        // `<memo>(content:raw)[...]` all live inside `docs/ja/cheatsheet.tm`'s
+        // ``` fenced code block, which this grammar's own `fenced_code_block`
+        // rule (see the doc comment above) now consumes as one opaque
+        // text run rather than trying to parse its contents as markup.
         //
         // The leftover dashes after a >3-dash `thematic_break`, and
         // `----(💫)----` a bit further down, used to also need markers
@@ -569,9 +603,7 @@ mod tests {
         let src = include_str!("../../../docs/ja/cheatsheet.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);
-        let known_markers = [
-            "\"key\":", "key = ", "@config(", "や", "]", "`", ",", "{",
-        ];
+        let known_markers = ["@config(", "や", "]"];
         for text in &errors {
             assert!(
                 known_markers.iter().any(|marker| text.contains(marker)),
