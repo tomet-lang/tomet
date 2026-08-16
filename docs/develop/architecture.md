@@ -5,9 +5,12 @@ around it: a parser, an AST, consumers that turn that AST into other
 things (HTML, CommonMark, formatted source, serialized data), and a set of
 apps/editor integrations built on top. This doc is a map of how those
 pieces fit together and depend on each other -- not a spec of the
-language itself. For the grammar, `docs/tmt/typedmark.tm` is the running
-design-notes doc and closest thing to a source of truth; `docs/cheatsheet.tm`
-is a live example file exercised by tests.
+language itself. For the grammar, `docs/ja/specifications/*.tm` are the
+spec docs (constructs marked `// 未実装` aren't implemented yet);
+`docs/ja/cheatsheet.tm` is a live example file exercised by tests. The
+core grammar they document is frozen as of `docs/develop/
+grammar-freeze.md` -- breaking changes to already-decided syntax go
+through that doc's process, not a silent parser diff.
 
 ## The pipeline
 

@@ -55,4 +55,4 @@ cargo test -p tree-sitter-typedmark
 
 ## Architecture
 
-For a detailed overview of the crate pipeline, parser design, tree-sitter grammar synchronization, and AST constraints, see [docs/architecture.md](docs/architecture.md).
+For a detailed overview of the crate pipeline, parser design, tree-sitter grammar synchronization, and AST constraints, see [docs/develop/architecture.md](docs/develop/architecture.md).
