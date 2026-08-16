@@ -19,6 +19,9 @@ typedmark-ast    (Value / Document / Block / Inline / Element types)
       ^
       |  builds
 typedmark-parser (recursive-descent parser: &str -> Document/Value)
+      |
+      v
+typedmark-semantics (I/O-free classification of what an Element means)
 ```
 
 - **`typedmark-lexar`**: a minimal cursor over `&str`, nothing more. Exists
@@ -51,6 +54,24 @@ typedmark-parser (recursive-descent parser: &str -> Document/Value)
   `typedmark-parser` is strictly a pure, side-effect-free, deterministic static
   parser. It performs zero I/O, external file resolution, or dynamic code execution.
   Given identical input text, it produces identical AST output with guaranteed linear/predictable time complexity.
+- **`typedmark-semantics`**: I/O-free classification of what a parsed
+  `Element` officially means -- `url`/`file`/`ref` inference from a bare
+  `@(key:...)`, and recognizing TypedMark's own built-in vocabulary
+  (`@meta`, `@config`, `@links`, `em`/`strong`/`mark`, ...) via an
+  `ElementKind` enum and a `classify(el: &Element) -> ElementKind`
+  function. Depends only on `typedmark-ast` (not `typedmark-parser` --
+  the diagram above shows the pipeline's logical ordering, not a Cargo
+  dependency edge), so any consumer holding an `Element` can classify it
+  without pulling in the parser. Exists so `typedmark-renderer` and
+  `typedmark-markdown` don't each carry their own copy of this
+  recognition logic, which is what "what does this kind mean" would
+  otherwise silently drift into being (both used to independently
+  reimplement it as a `Sigil` match returning a stringly-typed `kind:
+  String`) -- the CLI/TUI's structural-search engine
+  (`apps/typedmark/src/tui/engine`) uses it the same way. Only expresses
+  *recognition*, not *action*: whether a given kind's output is empty
+  (`@meta`/`@config`) is still each consumer's own call, since the same
+  kind can mean different things for different output formats.
 
 Everything downstream of `typedmark-ast`/`typedmark-parser` is a
 *consumer* -- it reads the AST (or, for `typedmark-markdown`, produces
@@ -85,6 +106,22 @@ one) and does not get to redefine what the grammar means:
 - **`typedmark-validator`**: not implemented yet -- currently just the
   `cargo new` boilerplate (`add(left, right)` + its test). Reserved in the
   workspace for future `.tm` schema/lint validation.
+- **`typedmark-resolve`**: not a pipeline stage in the same sense as the
+  above -- an independent "preprocessor/linker" layer (the closest
+  analogy is C's `#include`) for TypedMark's own file-referencing
+  constructs, today just `@settings(file:...)`: given a `@settings(file:
+  "path/to/other.tm")` reference element and a project root, it reads
+  and parses the referenced file (recursively invoking
+  `typedmark_parser::parse_document`) and returns the `Value` held by
+  that file's own top-level `@settings{ ... }` block. This is exactly
+  the I/O `typedmark-parser` is constitutionally barred from doing (see
+  the Deterministic Static Parser Boundary above), so it has to live
+  outside it; depends on `typedmark-ast` and `typedmark-parser`, but
+  deliberately not `typedmark-semantics` (recognizing a `@settings(
+  file:...)` reference only needs a direct `Sigil` match, not full
+  classification). `@import` is anticipated but not yet designed --
+  see the module doc in `crates/typedmark-resolve/src/lib.rs` for the
+  open questions.
 
 
 Source `Span` tracking (line, column, byte offset) is fully integrated across

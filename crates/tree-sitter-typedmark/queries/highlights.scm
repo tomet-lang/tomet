@@ -45,6 +45,12 @@
 
 (code_span) @markup.raw.inline @text.literal
 
+; ``` fence sugar for `<codeblock>(lang:xxx)[code]` -- same raw/literal
+; treatment as `code_span` above, plus its own marker color so the
+; ``` delimiters read as structural, not as part of the code.
+(fenced_code_block) @markup.raw.block @text.literal
+(fence_marker) @punctuation.special
+
 (unordered_list_item) @markup.list.unnumbered
 (ordered_list_item) @markup.list.numbered
 

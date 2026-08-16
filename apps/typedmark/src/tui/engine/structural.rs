@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 
 use typedmark_ast::{Document, Element, ElementValue, Sigil, Value};
 use typedmark_parser::parse_document;
+use typedmark_semantics::classify;
 
-use super::batch_meta::{collect_tm_files, get_element_kind};
+use super::batch_meta::collect_tm_files;
 use super::printer::document_to_tm;
 
 #[derive(Debug, Clone, Default)]
@@ -101,9 +102,9 @@ fn count_matches(doc: &Document, query: &StructuralQuery) -> usize {
 }
 
 fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
-    let kind = get_element_kind(el);
+    let kind = classify(el);
     if let Some(target_tag) = &query.tag {
-        if !target_tag.is_empty() && !kind.eq_ignore_ascii_case(target_tag) {
+        if !target_tag.is_empty() && !kind.as_str().eq_ignore_ascii_case(target_tag) {
             return false;
         }
     }
@@ -140,8 +141,8 @@ fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
 fn transform_doc(doc: &mut Document, action: &StructuralAction, count: &mut usize) {
     walk_doc_elements_mut(doc, &mut |el| match action {
         StructuralAction::RenameTag { from, to } => {
-            let kind = get_element_kind(el);
-            if kind.eq_ignore_ascii_case(from) {
+            let kind = classify(el);
+            if kind.as_str().eq_ignore_ascii_case(from) {
                 match &mut el.sigil {
                     Sigil::Type(name) => *name = to.clone(),
                     Sigil::At(Some(name)) => *name = to.clone(),

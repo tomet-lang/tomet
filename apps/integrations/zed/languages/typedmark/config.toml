@@ -4,25 +4,25 @@ path_suffixes = ["tm"]
 line_comment = "//"
 block_comment = ["/*", "*/"]
 
-[[bracket_pairs]]
+[[brackets]]
 start = "{"
 end = "}"
 close = true
 newline = true
 
-[[bracket_pairs]]
+[[brackets]]
 start = "["
 end = "]"
 close = true
 newline = true
 
-[[bracket_pairs]]
+[[brackets]]
 start = "("
 end = ")"
 close = true
 newline = true
 
-[[bracket_pairs]]
+[[brackets]]
 start = "<"
 end = ">"
 close = true

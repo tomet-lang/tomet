@@ -1,0 +1,16 @@
+@meta{ type:@settings }
+@settings{
+  elements: {
+    bookmark: {
+      args: { name: string, count: 0 },
+      content: raw,
+      placement: block,
+      singleton: false
+    }
+  },
+  types: {
+    bookmark: {
+      style: one_line
+    }
+  }
+}

@@ -6,7 +6,7 @@
 
 <node>(type:textarea)
 {id:dsaf-asdf, x:123, y:456}
-[ 
+[
   開幕。 
 ]
 <node>(type:textarea)

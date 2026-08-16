@@ -1556,6 +1556,7 @@ dependencies = [
  "typedmark-markdown",
  "typedmark-parser",
  "typedmark-renderer",
+ "typedmark-semantics",
  "uuid",
  "walkdir",
 ]
@@ -1610,6 +1611,7 @@ dependencies = [
  "pulldown-cmark",
  "typedmark-ast",
  "typedmark-renderer",
+ "typedmark-semantics",
 ]
 
 [[package]]
@@ -1637,6 +1639,22 @@ version = "0.1.0"
 dependencies = [
  "typedmark-ast",
  "typedmark-parser",
+ "typedmark-semantics",
+]
+
+[[package]]
+name = "typedmark-resolve"
+version = "0.1.0"
+dependencies = [
+ "typedmark-ast",
+ "typedmark-parser",
+]
+
+[[package]]
+name = "typedmark-semantics"
+version = "0.1.0"
+dependencies = [
+ "typedmark-ast",
 ]
 
 [[package]]

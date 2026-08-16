@@ -154,6 +154,10 @@
           "named": true
         },
         {
+          "type": "fenced_code_block",
+          "named": true
+        },
+        {
           "type": "heading",
           "named": true
         },
@@ -229,6 +233,42 @@
         },
         {
           "type": "text",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "fenced_code_block",
+    "named": true,
+    "fields": {
+      "content": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "text",
+            "named": true
+          }
+        ]
+      },
+      "lang": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "text",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "fence_marker",
           "named": true
         }
       ]
@@ -906,6 +946,10 @@
   },
   {
     "type": "code_span",
+    "named": true
+  },
+  {
+    "type": "fence_marker",
     "named": true
   },
   {
