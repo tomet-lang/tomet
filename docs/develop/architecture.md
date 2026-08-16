@@ -28,7 +28,7 @@ typedmark-parser (recursive-descent parser: &str -> Document/Value)
   pre-tokenizing into a context-free stream.
 - **`typedmark-ast`**: the shared types every other crate speaks.
   `Value` is the pure-data subset (maps 1:1 onto serde's data model: maps,
-  sequences, scalars) -- it's what fills an element's `(input)` or
+  sequences, scalars) -- it's what fills an element's `(args)` or
   `{value}` group, and it's the entire result of parsing a data-only `.tm`
   file. `Document`/`Block`/`Inline`/`Element` are the full markup AST
   (headings, paragraphs, lists, typed elements), in source order. Every AST
@@ -38,10 +38,10 @@ typedmark-parser (recursive-descent parser: &str -> Document/Value)
 - **`typedmark-parser`**: the actual grammar implementation, and the one
   place that gets to decide what `.tm` source means. Recursive-descent,
   built directly on `typedmark-lexar`'s cursor (see `document.rs`'s module
-  doc for the grammar it covers: `<T>(input)[area]{value}`, `@name...`,
+  doc for the grammar it covers: `<T>(args)[content]{value}`, `@name...`,
   bare `@(key:...)`, and the bare-element children of containers like
   `@links{}`). `value.rs` handles the `Value`-only grammar shared by
-  `(input)`/`{value}` bodies and by whole data-only documents.
+  `(args)`/`{value}` bodies and by whole data-only documents.
   `embedded_format.rs` is the escape hatch that lets a `{value}` body be
   real JSON/YAML/TOML source instead of TypedMark's own lightweight
   grammar, driven by a `format` key (locally, or document-wide via
@@ -58,8 +58,8 @@ one) and does not get to redefine what the grammar means:
 
 - **`typedmark-renderer`**: `Document` -> HTML. Generic and data-driven,
   not a full semantic engine: most `<T>`/`@name` elements become a
-  `<div>`/`<span>` carrying their `input` map as `data-*` attributes and
-  `area` as inner content. A handful of kinds get special-cased rendering
+  `<div>`/`<span>` carrying their `args` map as `data-*` attributes and
+  `content` as inner content. A handful of kinds get special-cased rendering
   because the spec gives them fixed meaning (`@(url:..)`/`@(file:..)` as
   links, `@(ref:..)` as an anchor reference, `@meta`/`@config` as
   invisible, `@links{}` as a definition list, `codeblock`/`blockquote`/
@@ -77,11 +77,11 @@ one) and does not get to redefine what the grammar means:
   grammar with a direct struct mapping, the same role `serde_json`/
   `serde_yaml` play for their formats. Headings/prose/links have no serde
   equivalent and aren't handled here.
-- **`typedmark-formatter`**: AST-aware whitespace and raw-area preserving formatter.
+- **`typedmark-formatter`**: AST-aware whitespace and raw-content preserving formatter.
   Normalizes whitespace policy (LF line endings, no trailing whitespace, one final
   newline, collapsed blank-line runs) while using AST `Span` metadata to losslessly
-  preserve literal spacing and line breaks inside verbatim areas (`<codeblock>[...]`
-  or elements with `area:raw`).
+  preserve literal spacing and line breaks inside verbatim content (`<codeblock>[...]`
+  or elements with `content:raw`).
 - **`typedmark-validator`**: not implemented yet -- currently just the
   `cargo new` boilerplate (`add(left, right)` + its test). Reserved in the
   workspace for future `.tm` schema/lint validation.
@@ -90,7 +90,7 @@ one) and does not get to redefine what the grammar means:
 Source `Span` tracking (line, column, byte offset) is fully integrated across
 all AST nodes (`Document`, `Block`, `Inline`, `Element`). This enables precise
 source-location queries for tooling such as LSP diagnostics, hover ranges, and
-lossless verbatim area formatting.
+lossless verbatim content formatting.
 
 
 ## The grammar has two independent implementations

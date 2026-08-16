@@ -3,7 +3,7 @@
 // `crates/typedmark-parser/src/{document,value}.rs`, not a byte-for-byte
 // match: things a context-free grammar can't cheaply express (flanking-
 // delimiter whitespace rules, lazy paragraph continuation, "each of
-// (input)/[area]/{value} at most once in any order") are simplified.
+// (args)/[content]/{value} at most once in any order") are simplified.
 // See `src/lib.rs` for the full list of known simplifications.
 
 module.exports = grammar({
@@ -325,7 +325,7 @@ module.exports = grammar({
 					repeat($._element_group),
 				),
 			),
-		_element_group: ($) => choice($.input_group, $.area_group, $.value_group),
+		_element_group: ($) => choice($.args_group, $.content_group, $.value_group),
 
 		// Two adjacent `optional($._blank_gap)` around an optional middle
 		// piece is ambiguous (nothing forces how a run of blank lines splits
@@ -344,14 +344,14 @@ module.exports = grammar({
 		// unmarked literal). Without this, any element with a space before
 		// its group silently gets zero groups and the group's own text
 		// becomes stray paragraph content instead.
-		input_group: ($) =>
+		args_group: ($) =>
 			seq(
 				token(prec(1, "(")),
 				optional(seq(optional($._blank_gap), $.value)),
 				optional($._blank_gap),
 				")",
 			),
-		area_group: ($) => seq(token(prec(1, "[")), repeat($._bracket_item), "]"),
+		content_group: ($) => seq(token(prec(1, "[")), repeat($._bracket_item), "]"),
 		value_group: ($) =>
 			seq(
 				token(prec(1, "{")),
@@ -364,15 +364,15 @@ module.exports = grammar({
 				"}",
 			),
 		// `@links { (1)[...] (id2)[...] }`-style bare children: a container
-		// whose `{value}` holds a list of `(input)[area]` entries with no
+		// whose `{value}` holds a list of `(args)[content]` entries with no
 		// sigil of their own (the container already supplies the type).
 		children: ($) => repeat1(seq(optional($._blank_gap), $.bare_element)),
-		// Simplification: unlike `input_group`/`value_group`'s own internal
-		// gaps, `area_group` here must immediately follow (inline whitespace
+		// Simplification: unlike `args_group`/`value_group`'s own internal
+		// gaps, `content_group` here must immediately follow (inline whitespace
 		// only, no blank-line tolerance) -- avoids an LR conflict where a
-		// lone newline can't be told apart from "no area_group at all" with
+		// lone newline can't be told apart from "no content_group at all" with
 		// only one token of lookahead.
-		bare_element: ($) => seq($.input_group, optional($.area_group)),
+		bare_element: ($) => seq($.args_group, optional($.content_group)),
 
 		identifier: (_$) => /[A-Za-z_][A-Za-z0-9_.-]*/,
 		// `type_element`/`at_element`'s name field specifically: needs

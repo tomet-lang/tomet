@@ -2,7 +2,7 @@
 //!
 //! This is a generic, data-driven mapping (not a full semantic engine):
 //! most `<T>`/`@name` elements become a `<div>`/`<span>` carrying their
-//! `input` map as `data-*` attributes, with `area` as inner content. A
+//! `args` map as `data-*` attributes, with `content` as inner content. A
 //! handful of element kinds get special handling because the spec (see
 //! `docs/tmt/typedmark.tm`) gives them fixed meaning: `@(url:..)` /
 //! `@(file:..)` become links, `@(ref:..)` becomes an anchor reference,
@@ -186,7 +186,7 @@ fn element_kind(el: &Element) -> String {
     match &el.sigil {
         Sigil::Type(name) => name.clone(),
         Sigil::At(Some(name)) => name.clone(),
-        Sigil::At(None) => typedmark_ast::infer_at_kind(el.input.as_ref())
+        Sigil::At(None) => typedmark_ast::infer_at_kind(el.args.as_ref())
             .unwrap_or("at")
             .to_string(),
         Sigil::Bare => "bare".to_string(),
@@ -212,11 +212,11 @@ fn render_element(el: &Element, out: &mut String, inline: bool) {
 }
 
 /// A bare `---` break is a plain `<hr>`; a titled one (`---[ Title ]---`,
-/// `document.rs::parse_titled_thematic_break`'s `area`) wraps two `<hr>`s
+/// `document.rs::parse_titled_thematic_break`'s `content`) wraps two `<hr>`s
 /// around the title, visually reproducing the source's symmetric
 /// dashes-title-dashes shape (styled via `.tm-hr-titled` in `DEFAULT_STYLE`).
 fn render_hr_element(el: &Element, out: &mut String) {
-    match &el.area {
+    match &el.content {
         Some(title) if !title.is_empty() => {
             out.push_str("<div class=\"tm-hr-titled\"><hr><span>");
             render_inlines(title, out);
@@ -226,12 +226,12 @@ fn render_hr_element(el: &Element, out: &mut String) {
     }
 }
 
-/// `em`/`strong`/`mark` all wrap their `area` in a same-named HTML tag --
+/// `em`/`strong`/`mark` all wrap their `content` in a same-named HTML tag --
 /// the `Sigil::Type` name doubles as the HTML tag name for these three.
 fn render_wrapped_inline(el: &Element, tag: &str, out: &mut String) {
     out.push_str(&format!("<{tag}>"));
-    if let Some(area) = &el.area {
-        render_inlines(area, out);
+    if let Some(content) = &el.content {
+        render_inlines(content, out);
     }
     out.push_str(&format!("</{tag}>"));
 }
@@ -241,21 +241,21 @@ fn render_wrapped_inline(el: &Element, tag: &str, out: &mut String) {
 /// dedicated code-block variant (see `docs/commonmark-support.md`). `lang`
 /// is a display-only syntax-highlighting hint, never a parse-mode switch
 /// (unrelated to the generic `format` key other elements use for their
-/// `{value}`). Code lives in `[area]`, parsed as raw verbatim text (see
-/// `document.rs::parse_raw_area`) rather than the usual inline grammar, so
+/// `{value}`). Code lives in `[content]`, parsed as raw verbatim text (see
+/// `document.rs::parse_raw_content`) rather than the usual inline grammar, so
 /// real source containing `*`/`<`/`@`/backticks stays literal. `{value}`,
 /// if present, is `id`/`cssclass` metadata -- same convention as a
 /// heading's `{ id:x, cssclass:y }`, not code content.
 fn render_codeblock_element(el: &Element, out: &mut String) {
     let lang = el
-        .input
+        .args
         .as_ref()
         .and_then(as_map)
         .and_then(|m| map_get(m, "lang"))
         .map(value_to_plain)
         .unwrap_or_default();
     let code = el
-        .area
+        .content
         .as_ref()
         .map(|a| inlines_to_plain(a))
         .unwrap_or_default();
@@ -280,8 +280,8 @@ fn render_codeblock_element(el: &Element, out: &mut String) {
 /// quotes are already flattened into one inline run on import.
 fn render_blockquote_element(el: &Element, out: &mut String, inline: bool) {
     out.push_str("<blockquote>");
-    if let Some(area) = &el.area {
-        render_inlines(area, out);
+    if let Some(content) = &el.content {
+        render_inlines(content, out);
     }
     out.push_str("</blockquote>");
     if !inline {
@@ -291,14 +291,14 @@ fn render_blockquote_element(el: &Element, out: &mut String, inline: bool) {
 
 fn render_embed_element(el: &Element, out: &mut String) {
     let src = el
-        .input
+        .args
         .as_ref()
         .and_then(as_map)
         .and_then(|m| map_get(m, "file").or_else(|| map_get(m, "url")))
         .map(value_to_plain)
         .unwrap_or_default();
     let alt = el
-        .area
+        .content
         .as_ref()
         .map(|a| inlines_to_plain(a))
         .unwrap_or_default();
@@ -317,8 +317,8 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
         match inline {
             Inline::Text(t) => s.push_str(&t.value),
             Inline::Element(el) => {
-                if let Some(area) = &el.area {
-                    s.push_str(&inlines_to_plain(area));
+                if let Some(content) = &el.content {
+                    s.push_str(&inlines_to_plain(content));
                 }
             }
         }
@@ -328,7 +328,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
 
 fn render_href_element(el: &Element, key: &str, out: &mut String, inline: bool) {
     let href = el
-        .input
+        .args
         .as_ref()
         .and_then(as_map)
         .and_then(|m| map_get(m, key))
@@ -338,9 +338,9 @@ fn render_href_element(el: &Element, key: &str, out: &mut String, inline: bool) 
         "<a class=\"tm-{key}\" href=\"{}\"",
         escape_attr(&href)
     ));
-    push_data_attrs(out, el.input.as_ref(), &[key]);
+    push_data_attrs(out, el.args.as_ref(), &[key]);
     out.push('>');
-    render_area_or_fallback(el, &href, out);
+    render_content_or_fallback(el, &href, out);
     out.push_str("</a>");
     if !inline {
         out.push('\n');
@@ -349,7 +349,7 @@ fn render_href_element(el: &Element, key: &str, out: &mut String, inline: bool) 
 
 fn render_ref_element(el: &Element, out: &mut String, inline: bool) {
     let target = el
-        .input
+        .args
         .as_ref()
         .and_then(as_map)
         .and_then(|m| map_get(m, "ref"))
@@ -359,18 +359,18 @@ fn render_ref_element(el: &Element, out: &mut String, inline: bool) {
         "<a class=\"tm-ref\" href=\"#link-{}\"",
         escape_attr(&target)
     ));
-    push_data_attrs(out, el.input.as_ref(), &["ref"]);
+    push_data_attrs(out, el.args.as_ref(), &["ref"]);
     out.push('>');
-    render_area_or_fallback(el, &target, out);
+    render_content_or_fallback(el, &target, out);
     out.push_str("</a>");
     if !inline {
         out.push('\n');
     }
 }
 
-fn render_area_or_fallback(el: &Element, fallback: &str, out: &mut String) {
-    match &el.area {
-        Some(area) if !area.is_empty() => render_inlines(area, out),
+fn render_content_or_fallback(el: &Element, fallback: &str, out: &mut String) {
+    match &el.content {
+        Some(content) if !content.is_empty() => render_inlines(content, out),
         _ => out.push_str(&escape_html(fallback)),
     }
 }
@@ -378,10 +378,10 @@ fn render_area_or_fallback(el: &Element, fallback: &str, out: &mut String) {
 fn render_generic_element(el: &Element, kind: &str, out: &mut String, inline: bool) {
     let tag = if inline { "span" } else { "div" };
     out.push_str(&format!("<{tag} class=\"tm-element tm-{kind}\""));
-    push_data_attrs(out, el.input.as_ref(), &[]);
+    push_data_attrs(out, el.args.as_ref(), &[]);
     out.push('>');
-    if let Some(area) = &el.area {
-        render_inlines(area, out);
+    if let Some(content) = &el.content {
+        render_inlines(content, out);
     }
     if let Some(value) = &el.value {
         render_element_value(value, out);
@@ -416,15 +416,15 @@ fn render_links_container(el: &Element, out: &mut String) {
     out.push_str("<dl class=\"tm-links\">\n");
     if let Some(ElementValue::Children(children)) = &el.value {
         for child in children {
-            let id = child.input.as_ref().map(value_to_plain).unwrap_or_default();
+            let id = child.args.as_ref().map(value_to_plain).unwrap_or_default();
             out.push_str(&format!(
                 "<dt id=\"link-{}\">{}</dt>\n",
                 escape_attr(&id),
                 escape_html(&id)
             ));
             out.push_str("<dd>");
-            if let Some(area) = &child.area {
-                render_inlines(area, out);
+            if let Some(content) = &child.content {
+                render_inlines(content, out);
             }
             out.push_str("</dd>\n");
         }
@@ -465,8 +465,8 @@ fn push_named_attrs(
     }
 }
 
-fn push_data_attrs(out: &mut String, input: Option<&Value>, skip: &[&str]) {
-    match input {
+fn push_data_attrs(out: &mut String, args: Option<&Value>, skip: &[&str]) {
+    match args {
         Some(Value::Map(map)) => {
             for (k, v) in map {
                 if skip.contains(&k.as_str()) {
@@ -719,7 +719,7 @@ mod tests {
 
     #[test]
     fn codeblock_content_stays_literal_not_interpreted_as_markup() {
-        // `codeblock`'s `[area]` is the one exception to the usual inline
+        // `codeblock`'s `[content]` is the one exception to the usual inline
         // grammar -- real code containing `*`/`<T>`/`@`/backticks must not
         // be reinterpreted as em/strong/element triggers/code spans.
         let doc = parse_document("<codeblock>(lang:rust)[let x = *ptr; let y = <T>; @deco `q`]\n")

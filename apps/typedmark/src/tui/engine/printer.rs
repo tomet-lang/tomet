@@ -78,7 +78,7 @@ fn render_inlines(inlines: &[Inline]) -> String {
     s
 }
 
-/// Render an [`Element`] AST node into TypedMark syntax: `<sigil>(input)[area]{value}`
+/// Render an [`Element`] AST node into TypedMark syntax: `<sigil>(args)[content]{value}`
 pub fn render_element(el: &Element) -> String {
     let mut out = String::new();
 
@@ -98,15 +98,15 @@ pub fn render_element(el: &Element) -> String {
         Sigil::Bare => {}
     }
 
-    if let Some(input) = &el.input {
+    if let Some(args) = &el.args {
         out.push('(');
-        out.push_str(&render_value_inner(input));
+        out.push_str(&render_value_inner(args));
         out.push(')');
     }
 
-    if let Some(area) = &el.area {
+    if let Some(content) = &el.content {
         out.push('[');
-        out.push_str(&render_inlines(area));
+        out.push_str(&render_inlines(content));
         out.push(']');
     }
 

@@ -12,7 +12,7 @@
 //! nested lists are flattened into the enclosing list as sibling items
 //! (`ListItem` has no slot for children), and block quotes containing
 //! more than one block get their content joined into a single inline
-//! run (`Element::area` is `Vec<Inline>`, not `Vec<Block>`). HTML blocks
+//! run (`Element::content` is `Vec<Inline>`, not `Vec<Block>`). HTML blocks
 //! and inline HTML are dropped; hard breaks collapse to a space.
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
@@ -158,11 +158,11 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
             stack,
             Block::Heading(Heading::new(level, inlines, None, Span::dummy())),
         ),
-        (Frame::BlockQuote(area), TagEnd::BlockQuote(_)) => {
+        (Frame::BlockQuote(content), TagEnd::BlockQuote(_)) => {
             let el = Element {
                 sigil: Sigil::Type("blockquote".to_string()),
-                input: None,
-                area: Some(area),
+                args: None,
+                content: Some(content),
                 value: None,
                 span: Span::dummy(),
             };
@@ -172,15 +172,15 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
             if text.ends_with('\n') {
                 text.pop();
             }
-            let input = if lang.is_empty() {
+            let args = if lang.is_empty() {
                 None
             } else {
                 Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
             };
             let el = Element {
                 sigil: Sigil::Type("codeblock".to_string()),
-                input,
-                area: Some(vec![Inline::Text(Text::new(text, Span::dummy()))]),
+                args,
+                content: Some(vec![Inline::Text(Text::new(text, Span::dummy()))]),
                 value: None,
                 span: Span::dummy(),
             };
@@ -205,8 +205,8 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
         (Frame::Link { dest, inlines }, TagEnd::Link) => {
             let el = Element {
                 sigil: Sigil::At(None),
-                input: Some(Value::Map(vec![("url".to_string(), Value::String(dest))])),
-                area: Some(inlines),
+                args: Some(Value::Map(vec![("url".to_string(), Value::String(dest))])),
+                content: Some(inlines),
                 value: None,
                 span: Span::dummy(),
             };
@@ -216,8 +216,8 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
             let key = if dest.contains("://") { "url" } else { "file" };
             let el = Element {
                 sigil: Sigil::Type("embed".to_string()),
-                input: Some(Value::Map(vec![(key.to_string(), Value::String(dest))])),
-                area: Some(alt),
+                args: Some(Value::Map(vec![(key.to_string(), Value::String(dest))])),
+                content: Some(alt),
                 value: None,
                 span: Span::dummy(),
             };
@@ -229,11 +229,11 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
     }
 }
 
-fn wrap_inline(tag: &str, area: Vec<Inline>) -> Inline {
+fn wrap_inline(tag: &str, content: Vec<Inline>) -> Inline {
     Inline::Element(Element {
         sigil: Sigil::Type(tag.to_string()),
-        input: None,
-        area: Some(area),
+        args: None,
+        content: Some(content),
         value: None,
         span: Span::dummy(),
     })
@@ -248,7 +248,7 @@ fn inline_target(stack: &mut [Frame]) -> Option<&mut Vec<Inline>> {
         Frame::Link { inlines, .. } => Some(inlines),
         Frame::Image { alt, .. } => Some(alt),
         Frame::Item { content, .. } => Some(content),
-        Frame::BlockQuote(area) => Some(area),
+        Frame::BlockQuote(content) => Some(content),
         _ => None,
     }
 }
@@ -281,7 +281,7 @@ fn push_inline(stack: &mut [Frame], inline: Inline) {
 fn push_block(stack: &mut [Frame], block: Block) {
     match stack.last_mut() {
         Some(Frame::Blocks(v)) => v.push(block),
-        Some(Frame::BlockQuote(area)) => merge_block_into(area, None, block),
+        Some(Frame::BlockQuote(content)) => merge_block_into(content, None, block),
         Some(Frame::Item { content, extra }) => merge_block_into(content, Some(extra), block),
         _ => {}
     }
@@ -426,14 +426,14 @@ mod tests {
                 Inline::Element(el) => {
                     assert_eq!(el.sigil, Sigil::At(None));
                     assert_eq!(
-                        el.input,
+                        el.args,
                         Some(Value::Map(vec![(
                             "url".to_string(),
                             Value::String("https://example.com".to_string())
                         )]))
                     );
                     assert_eq!(
-                        el.area,
+                        el.content,
                         Some(vec![Inline::Text(Text::new("Wiki", Span::dummy()))])
                     );
                 }
@@ -463,14 +463,14 @@ mod tests {
                 Inline::Element(el) => {
                     assert_eq!(el.sigil, Sigil::Type("embed".to_string()));
                     assert_eq!(
-                        el.input,
+                        el.args,
                         Some(Value::Map(vec![(
                             "file".to_string(),
                             Value::String("assets/pic.png".to_string())
                         )]))
                     );
                     assert_eq!(
-                        el.area,
+                        el.content,
                         Some(vec![Inline::Text(Text::new("a cat", Span::dummy()))])
                     );
                 }
@@ -496,14 +496,14 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::Type("codeblock".to_string()));
                 assert_eq!(
-                    el.input,
+                    el.args,
                     Some(Value::Map(vec![(
                         "lang".to_string(),
                         Value::String("rust".to_string())
                     )]))
                 );
                 assert_eq!(
-                    el.area,
+                    el.content,
                     Some(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))])
                 );
             }
@@ -518,7 +518,7 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::Type("blockquote".to_string()));
                 assert_eq!(
-                    el.area,
+                    el.content,
                     Some(vec![Inline::Text(Text::new("quoted text", Span::dummy()))])
                 );
             }

@@ -5,10 +5,10 @@
 ; `crates/editor/src/fold.rs` and e.g. `crates/grammars/src/json/indents.scm`
 ; upstream in zed-industries/zed for the pattern this follows.
 
-(input_group
+(args_group
   ")" @end) @indent
 
-(area_group
+(content_group
   "]" @end) @indent
 
 (value_group

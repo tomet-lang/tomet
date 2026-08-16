@@ -781,11 +781,11 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "input_group"
+          "name": "args_group"
         },
         {
           "type": "SYMBOL",
-          "name": "area_group"
+          "name": "content_group"
         },
         {
           "type": "SYMBOL",
@@ -793,7 +793,7 @@
         }
       ]
     },
-    "input_group": {
+    "args_group": {
       "type": "SEQ",
       "members": [
         {
@@ -854,7 +854,7 @@
         }
       ]
     },
-    "area_group": {
+    "content_group": {
       "type": "SEQ",
       "members": [
         {
@@ -980,14 +980,14 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "input_group"
+          "name": "args_group"
         },
         {
           "type": "CHOICE",
           "members": [
             {
               "type": "SYMBOL",
-              "name": "area_group"
+              "name": "content_group"
             },
             {
               "type": "BLANK"

@@ -113,9 +113,9 @@ pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
                         map.insert(format!("{kind}.{k}"), value_to_string(v));
                     }
                 }
-                if let Some(Value::Map(entries)) = &el.input {
+                if let Some(Value::Map(entries)) = &el.args {
                     for (k, v) in entries {
-                        map.insert(format!("{kind}.(input).{k}"), value_to_string(v));
+                        map.insert(format!("{kind}.(args).{k}"), value_to_string(v));
                     }
                 }
             }
@@ -157,8 +157,8 @@ fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_val:
         // Add new @meta block at the beginning of the document
         let new_el = Element {
             sigil: Sigil::At(Some(target_element.to_string())),
-            input: None,
-            area: None,
+            args: None,
+            content: None,
             value: Some(ElementValue::Data(Value::Map(vec![(
                 key.to_string(),
                 Value::String(new_val.to_string()),
@@ -176,7 +176,7 @@ pub fn get_element_kind(el: &Element) -> String {
     match &el.sigil {
         Sigil::Type(name) => name.clone(),
         Sigil::At(Some(name)) => name.clone(),
-        Sigil::At(None) => typedmark_ast::infer_at_kind(el.input.as_ref())
+        Sigil::At(None) => typedmark_ast::infer_at_kind(el.args.as_ref())
             .unwrap_or("at")
             .to_string(),
         Sigil::Bare => "bare".to_string(),
@@ -247,7 +247,7 @@ where
     F: FnMut(&Element),
 {
     f(el);
-    if let Some(inlines) = &el.area {
+    if let Some(inlines) = &el.content {
         for inline in inlines {
             if let Inline::Element(child_el) = inline {
                 walk_element(child_el, f);
@@ -307,7 +307,7 @@ where
     F: FnMut(&mut Element),
 {
     f(el);
-    if let Some(inlines) = &mut el.area {
+    if let Some(inlines) = &mut el.content {
         for inline in inlines {
             if let Inline::Element(child_el) = inline {
                 walk_element_mut(child_el, f);
