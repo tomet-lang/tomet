@@ -24,12 +24,15 @@ typedmark/
 │   ├── typedmark-ast/        # Shared AST & Value data models
 │   ├── typedmark-lexar/      # Cursor lexer over &str
 │   ├── typedmark-parser/     # Recursive-descent parser (source of truth for grammar)
-│   ├── typedmark-renderer/   # HTML renderer
-│   ├── typedmark-markdown/   # CommonMark <-> TypedMark converter
+│   ├── typedmark-semantics/  # I/O-free classification of what an Element means
+│   ├── typedmark-resolve/    # File-referencing preprocessor (@settings(file:...))
+│   ├── typedmark-validator/  # Schema & lint validation (in progress)
+│   ├── converters/
+│   │   ├── html/             # typedmark-html: Document -> HTML
+│   │   └── markdown/         # typedmark-markdown: CommonMark <-> Document
 │   ├── typedmark-formatter/  # Code formatting & whitespace normalization
 │   ├── serde_typedmark/      # Serde deserializer/serializer for TypedMark Value model
-│   ├── tree-sitter-typedmark/# Tree-sitter grammar for editor syntax highlighting
-│   └── typedmark-validator/  # Schema & lint validation (in progress)
+│   └── tree-sitter-typedmark/# Tree-sitter grammar for editor syntax highlighting
 └── docs/                     # Architecture notes, spec, and cheat sheet
 ```
 

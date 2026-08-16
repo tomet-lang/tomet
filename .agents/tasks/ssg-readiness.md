@@ -1,4 +1,4 @@
-# Task: Make typedmark-renderer output SSG-ready
+# Task: Make typedmark-html output SSG-ready
 
 ## Context
 
@@ -10,7 +10,7 @@ top of TypedMark. Table syntax (`| a | b |` not being understood) is
 Four real gaps found, in priority order:
 
 1. **`@meta` is invisible to the renderer.** `render_element` in
-   `crates/typedmark-renderer/src/lib.rs` does `"meta" => {}` and drops
+   `crates/converters/html/src/lib.rs` does `"meta" => {}` and drops
    the data entirely. `render_page`/CLI `html` derives `<title>` purely
    from the filename (`apps/typedmark/src/main.rs::render_file`,
    `file.file_stem()`), never from `@meta`. Anyone building an index
@@ -23,7 +23,7 @@ Four real gaps found, in priority order:
    permalink/TOC-target has to be hand-authored (see
    `docs/cheatsheet.tm`'s `#[ heading ]{ id:1 }`).
 3. **`<html lang="ja">` is hardcoded** in `render_page_with`
-   (`crates/typedmark-renderer/src/lib.rs`). No way to override it via
+   (`crates/converters/html/src/lib.rs`). No way to override it via
    `RenderOptions` or otherwise; anyone not writing Japanese content
    can't use `render_page`/`render_page_with` as-is.
 4. **Naming an inferable `@` element opts it out of inference, silently.**
@@ -41,7 +41,7 @@ Four real gaps found, in priority order:
 
 - [ ] **Step 1**: Design and add a `@meta` extraction API. Likely a
   function in `typedmark-ast` or a new small helper (maybe
-  `typedmark-renderer` or a new `typedmark-frontmatter`-style module)
+  `typedmark-html` or a new `typedmark-frontmatter`-style module)
   that scans `Document::blocks` for `@meta`/`@config` elements and
   returns their parsed `Value` (title, date, tags, etc.) as something
   callers can consume before/alongside rendering. Wire it into
@@ -54,7 +54,7 @@ Four real gaps found, in priority order:
   heading has no explicit `{id:...}`. Needs a `RenderOptions` flag
   (default probably *on*, since it's almost always wanted) so it stays
   opt-out rather than silently changing existing golden-output tests --
-  check `crates/typedmark-renderer/src/lib.rs`'s existing heading tests
+  check `crates/converters/html/src/lib.rs`'s existing heading tests
   before deciding the default.
 - [ ] **Step 3**: Make the page shell's language configurable. Add a
   `lang: &str` (or `Option<&str>` defaulting to `"ja"` for backward
@@ -74,11 +74,11 @@ Four real gaps found, in priority order:
   `render_href_element`'s `render_area_or_fallback` pattern), or (c)
   leave the behavior but make it discoverable (lint/warning in `check`,
   or a doc callout). Investigate `render_element`/`element_kind` in
-  `crates/typedmark-renderer/src/lib.rs` before picking an approach --
+  `crates/converters/html/src/lib.rs` before picking an approach --
   don't assume (a) is right without re-reading `infer_at_kind` in
   `typedmark-ast`.
 - [ ] **Step 5**: Add/update tests in
-  `crates/typedmark-renderer/src/lib.rs`'s `#[cfg(test)] mod tests` for
+  `crates/converters/html/src/lib.rs`'s `#[cfg(test)] mod tests` for
   each fix (frontmatter extraction, slug generation incl. collisions,
   `lang` override, whichever fix Step 4 lands on). Run
   `cargo test --workspace`.

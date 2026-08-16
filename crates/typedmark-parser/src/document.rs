@@ -268,7 +268,7 @@ fn is_fenced_code_block_start(cur: &Cursor) -> bool {
 /// Builds the exact same `Element` shape the bracket form does
 /// (`Sigil::Type("codeblock")`, `args` holding `lang`, `content` holding
 /// the body as a single raw `Inline::Text`), so every downstream consumer
-/// (`typedmark_semantics::classify`, `typedmark-renderer`,
+/// (`typedmark_semantics::classify`, `typedmark-html`,
 /// `typedmark-markdown`, `typedmark-formatter`'s raw-span detection) needs
 /// no changes -- they all key off the sigil name, not which syntax
 /// produced it.

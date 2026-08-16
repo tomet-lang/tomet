@@ -1,5 +1,5 @@
 [package]
-name = "typedmark-renderer"
+name = "typedmark-html"
 version.workspace = true
 edition.workspace = true
 

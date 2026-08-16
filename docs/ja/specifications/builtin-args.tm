@@ -1,6 +1,6 @@
 ---[ `(args)` ]---
 
-```
+```(lang:tm)
 format: (json, toml, yaml, kdl)
 url:(<url>,<url>#<var>),                        // https://
 path:(<path>,<path>#<var>),                     // 相対パス

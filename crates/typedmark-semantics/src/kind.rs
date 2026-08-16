@@ -3,7 +3,7 @@ use typedmark_ast::{Element, Sigil};
 use crate::infer_at_kind;
 
 /// What a parsed `Element` officially means, replacing the ad-hoc
-/// stringly-typed `kind: String` that `typedmark-renderer` and
+/// stringly-typed `kind: String` that `typedmark-html` and
 /// `typedmark-markdown/export.rs` each used to compute independently.
 ///
 /// This only expresses *recognition* ("this element is `@meta`"), not
@@ -41,7 +41,7 @@ pub enum ElementKind {
 }
 
 impl ElementKind {
-    /// The kind's name as `typedmark-renderer`/`typedmark-markdown` (and
+    /// The kind's name as `typedmark-html`/`typedmark-markdown` (and
     /// the TUI's structural search) use it: as a `data-*`/CSS-class
     /// fragment, or to match against `match kind.as_str() { "hr" => ..., ...
     /// }`. `Custom(name)` returns `name` itself.

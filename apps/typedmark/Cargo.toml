@@ -23,7 +23,7 @@ typedmark-ast = { workspace = true }
 typedmark-formatter = { workspace = true }
 typedmark-markdown = { workspace = true }
 typedmark-parser = { workspace = true }
-typedmark-renderer = { workspace = true }
+typedmark-html = { workspace = true }
 typedmark-semantics = { workspace = true }
 uuid = { workspace = true }
 walkdir = { workspace = true }
