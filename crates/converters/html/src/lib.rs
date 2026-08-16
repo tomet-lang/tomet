@@ -28,13 +28,25 @@ body { font-family: sans-serif; line-height: 1.6; max-width: 48rem; margin: 2rem
 /// `render_body` already produced before this existed -- opting into
 /// anything here is always an explicit choice, never a behavior change for
 /// existing callers of those two functions.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct RenderOptions {
     /// Number headings by nesting level (`1`, `1.1`, `1.2`, `2`, ...),
     /// restarting a deeper level's counter whenever a shallower one
     /// advances -- the "advanced" output pattern, as opposed to the plain
     /// default.
     pub number_headings: bool,
+    /// Give every heading with no explicit `{id:...}` an `id` slugified
+    /// from its text (lowercased, runs of whitespace/punctuation collapsed
+    /// to `-`), the way Markdown processors generate anchors -- duplicate
+    /// slugs within one document get `-2`/`-3`/... suffixes. An explicit
+    /// `{id:...}` always wins and is never touched.
+    pub auto_slug_headings: bool,
+    /// `<html lang="...">` for [`render_page`]/[`render_page_with`]'s page
+    /// shell. Ignored by [`render_body`]/[`render_body_with`], which never
+    /// emit an `<html>` tag at all. `None` keeps the historical `"ja"`
+    /// default so nothing changes for existing callers; `Some(lang)`
+    /// overrides it (e.g. `Some("en".to_string())`).
+    pub lang: Option<String>,
 }
 
 /// Render a full standalone HTML document with the plain (unnumbered)
@@ -47,8 +59,10 @@ pub fn render_page(doc: &Document, title: &str) -> String {
 /// `RenderOptions { number_headings: true }` for the "advanced",
 /// sequentially-numbered heading style).
 pub fn render_page_with(doc: &Document, title: &str, options: &RenderOptions) -> String {
+    let lang = options.lang.as_deref().unwrap_or("ja");
     format!(
-        "<!DOCTYPE html>\n<html lang=\"ja\">\n<head>\n<meta charset=\"utf-8\">\n<title>{title}</title>\n<style>{style}</style>\n</head>\n<body>\n{body}</body>\n</html>\n",
+        "<!DOCTYPE html>\n<html lang=\"{lang}\">\n<head>\n<meta charset=\"utf-8\">\n<title>{title}</title>\n<style>{style}</style>\n</head>\n<body>\n{body}</body>\n</html>\n",
+        lang = escape_attr(lang),
         title = escape_html(title),
         style = DEFAULT_STYLE,
         body = render_body_with(doc, options),
@@ -64,11 +78,21 @@ pub fn render_body(doc: &Document) -> String {
 /// Render just the body content, applying `options`.
 pub fn render_body_with(doc: &Document, options: &RenderOptions) -> String {
     let mut out = String::new();
-    let mut counters = HeadingCounters::default();
+    let mut state = HeadingState::default();
     for block in &doc.blocks {
-        render_block(block, &mut out, options, &mut counters);
+        render_block(block, &mut out, options, &mut state);
     }
     out
+}
+
+/// Per-document state threaded through heading rendering: the nesting
+/// counters for `RenderOptions::number_headings` and the slug registry for
+/// `RenderOptions::auto_slug_headings`, kept together since both are
+/// "remember what came before while walking the same heading sequence".
+#[derive(Default)]
+struct HeadingState {
+    counters: HeadingCounters,
+    slugs: SlugTracker,
 }
 
 /// Running per-level counters for `RenderOptions::number_headings`, e.g.
@@ -97,14 +121,58 @@ impl HeadingCounters {
     }
 }
 
+/// Hands out unique slugs for `RenderOptions::auto_slug_headings`: the
+/// first heading with a given base text keeps the bare slug, each further
+/// one with the same base gets `-2`, `-3`, ... appended. Only tracks slugs
+/// it generated itself -- an explicit `{id:...}` elsewhere in the document
+/// is never consulted or reserved, matching the "explicit id always wins,
+/// auto-slugging only fills gaps" rule in `RenderOptions::auto_slug_headings`.
+#[derive(Default)]
+struct SlugTracker(std::collections::HashMap<String, u32>);
+
+impl SlugTracker {
+    fn slug_for(&mut self, text: &str) -> String {
+        let base = slugify(text);
+        let count = self.0.entry(base.clone()).or_insert(0);
+        *count += 1;
+        if *count == 1 {
+            base
+        } else {
+            format!("{base}-{count}")
+        }
+    }
+}
+
+/// Lowercases and collapses runs of whitespace/punctuation into a single
+/// `-`, trimming leading/trailing `-`. Keeps non-ASCII letters (e.g.
+/// Japanese kanji/kana) as-is rather than stripping them -- most of this
+/// project's own docs are Japanese, so an ASCII-only slugifier would
+/// produce empty or near-empty ids for them.
+fn slugify(text: &str) -> String {
+    let mut slug = String::with_capacity(text.len());
+    let mut pending_dash = false;
+    for c in text.chars() {
+        if c.is_alphanumeric() {
+            if pending_dash && !slug.is_empty() {
+                slug.push('-');
+            }
+            pending_dash = false;
+            slug.extend(c.to_lowercase());
+        } else {
+            pending_dash = true;
+        }
+    }
+    slug
+}
+
 fn render_block(
     block: &Block,
     out: &mut String,
     options: &RenderOptions,
-    counters: &mut HeadingCounters,
+    state: &mut HeadingState,
 ) {
     match block {
-        Block::Heading(h) => render_heading(h, out, options, counters),
+        Block::Heading(h) => render_heading(h, out, options, state),
         Block::Paragraph(p) => {
             // Elements with no visible output (`@meta`, ...) placed on
             // adjacent lines with no blank line between them lazily
@@ -129,15 +197,22 @@ fn render_heading(
     h: &Heading,
     out: &mut String,
     options: &RenderOptions,
-    counters: &mut HeadingCounters,
+    state: &mut HeadingState,
 ) {
     let level = h.level.clamp(1, 6);
-    let (id, class, data) = split_attrs(h.attrs.as_ref());
+    let (mut id, class, data) = split_attrs(h.attrs.as_ref());
+    if id.is_none() && options.auto_slug_headings {
+        let text = inlines_to_plain(&h.content);
+        let slug = state.slugs.slug_for(&text);
+        if !slug.is_empty() {
+            id = Some(slug);
+        }
+    }
     out.push_str(&format!("<h{level}"));
     push_named_attrs(out, &id, &class, &data);
     out.push('>');
     if options.number_headings {
-        let label = counters.advance(h.level);
+        let label = state.counters.advance(h.level);
         // No literal space after `</span>` -- spacing is `.tm-heading-number`'s
         // `margin-right` in `DEFAULT_STYLE`, not baked into the content, so
         // e.g. copy-pasting the heading text doesn't pick up a stray space.
@@ -546,6 +621,90 @@ mod tests {
     }
 
     #[test]
+    fn auto_slug_headings_generates_ids_from_text() {
+        let doc = parse_document("#[ Hello World ]\n").unwrap();
+        let body = render_body_with(
+            &doc,
+            &RenderOptions {
+                auto_slug_headings: true,
+                ..RenderOptions::default()
+            },
+        );
+        assert_eq!(body, "<h1 id=\"hello-world\">Hello World</h1>\n");
+    }
+
+    #[test]
+    fn auto_slug_headings_keeps_non_ascii_letters() {
+        let doc = parse_document("#[ 見出し テスト ]\n").unwrap();
+        let body = render_body_with(
+            &doc,
+            &RenderOptions {
+                auto_slug_headings: true,
+                ..RenderOptions::default()
+            },
+        );
+        assert_eq!(body, "<h1 id=\"見出し-テスト\">見出し テスト</h1>\n");
+    }
+
+    #[test]
+    fn auto_slug_headings_disambiguates_duplicates() {
+        let doc = parse_document("#[ Intro ]\n##[ Intro ]\n##[ Intro ]\n").unwrap();
+        let body = render_body_with(
+            &doc,
+            &RenderOptions {
+                auto_slug_headings: true,
+                ..RenderOptions::default()
+            },
+        );
+        assert_eq!(
+            body,
+            "<h1 id=\"intro\">Intro</h1>\n\
+             <h2 id=\"intro-2\">Intro</h2>\n\
+             <h2 id=\"intro-3\">Intro</h2>\n"
+        );
+    }
+
+    #[test]
+    fn auto_slug_headings_never_overrides_an_explicit_id() {
+        let doc = parse_document("#[ Hello World ]{ id:custom }\n").unwrap();
+        let body = render_body_with(
+            &doc,
+            &RenderOptions {
+                auto_slug_headings: true,
+                ..RenderOptions::default()
+            },
+        );
+        assert_eq!(body, "<h1 id=\"custom\">Hello World</h1>\n");
+    }
+
+    #[test]
+    fn render_page_defaults_to_japanese_lang() {
+        let doc = parse_document("#[ One ]\n").unwrap();
+        let page = render_page(&doc, "Title");
+        assert!(
+            page.contains("<html lang=\"ja\">"),
+            "expected default lang=\"ja\", got: {page}"
+        );
+    }
+
+    #[test]
+    fn render_page_with_honors_lang_override() {
+        let doc = parse_document("#[ One ]\n").unwrap();
+        let page = render_page_with(
+            &doc,
+            "Title",
+            &RenderOptions {
+                lang: Some("en".to_string()),
+                ..RenderOptions::default()
+            },
+        );
+        assert!(
+            page.contains("<html lang=\"en\">"),
+            "expected lang=\"en\", got: {page}"
+        );
+    }
+
+    #[test]
     fn numbers_headings_by_nesting_level() {
         let doc = parse_document(
             "#[ One ]\n##[ One One ]\n##[ One Two ]\n#[ Two ]\n##[ Two One ]\n###[ Two One One ]\n",
@@ -555,6 +714,7 @@ mod tests {
             &doc,
             &RenderOptions {
                 number_headings: true,
+                ..RenderOptions::default()
             },
         );
         assert_eq!(
@@ -595,6 +755,22 @@ mod tests {
     #[test]
     fn infers_url_link_from_at_element() {
         let doc = parse_document("@(url:https://example.com)[Wiki]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<a class=\"tm-url\" href=\"https://example.com\">Wiki</a>\n"
+        );
+    }
+
+    #[test]
+    fn naming_a_url_element_still_renders_a_real_link() {
+        // Regression test for the footgun in `.agents/tasks/ssg-readiness.md`
+        // step 4: `@link(url:...)` used to fall through to
+        // `render_generic_element` (an empty, non-clickable `<div>`)
+        // because an explicit name opted the element out of `url`/`file`/
+        // `ref` inference entirely. It must render the same real `<a>` a
+        // bare `@(url:...)` does.
+        let doc = parse_document("@link(url:https://example.com)[Wiki]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,

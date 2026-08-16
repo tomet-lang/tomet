@@ -23,7 +23,13 @@ impl Position {
 /// content and semantics without failing on source location differences.
 /// Use [`exact_eq`](Self::exact_eq) or direct field comparison when exact
 /// byte offsets need to be validated.
-#[derive(Debug, Clone, Copy, Eq, Default, Hash)]
+///
+/// `Hash` is deliberately *not* derived: a derived impl would hash the real
+/// `start`/`end` offsets while `PartialEq` above always returns `true`,
+/// so two "equal" `Span`s could hash differently -- a Hash/Eq contract
+/// violation that breaks `HashMap`/`HashSet` lookups. Don't re-add it
+/// without also reconciling it with the custom equality above.
+#[derive(Debug, Clone, Copy, Eq, Default)]
 pub struct Span {
     pub start: Position,
     pub end: Position,
