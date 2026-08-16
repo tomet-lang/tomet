@@ -3,10 +3,6 @@
   format:json
 )
 
-(
-  aa
-)
-
 #[ 雛形 ] 
 
 ```tm

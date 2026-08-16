@@ -105,6 +105,8 @@ async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
         Ok(doc) => {
             let options = typedmark_html::RenderOptions {
                 number_headings: advanced,
+                auto_slug_headings: advanced,
+                lang: None,
             };
             let html = typedmark_html::render_page_with(&doc, "TypedMark Web", &options);
             let ast = format!("{doc:#?}");

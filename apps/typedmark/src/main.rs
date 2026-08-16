@@ -59,6 +59,9 @@ enum Command {
         /// ...) instead of the plain, unnumbered default.
         #[arg(long)]
         advanced: bool,
+        /// `<html lang="...">` for the page shell. Defaults to "ja".
+        #[arg(long)]
+        lang: Option<String>,
     },
     /// Convert a `.tm` file to CommonMark. Lossy for constructs with no
     /// Markdown equivalent (`@links{}`, generic `<T>` elements) -- see
@@ -79,6 +82,9 @@ enum Command {
         /// ...) instead of the plain, unnumbered default.
         #[arg(long)]
         advanced: bool,
+        /// `<html lang="...">` for the page shell. Defaults to "ja".
+        #[arg(long)]
+        lang: Option<String>,
     },
 
     /// Normalize a `.tm` file's whitespace (line endings, trailing
@@ -119,13 +125,15 @@ fn main() -> ExitCode {
             file,
             out,
             advanced,
-        } => html(file, out, *advanced),
+            lang,
+        } => html(file, out, *advanced, lang.clone()),
         Command::ToMd { file, out } => to_md(file, out),
         Command::Serve {
             file,
             port,
             advanced,
-        } => serve(file, *port, *advanced),
+            lang,
+        } => serve(file, *port, *advanced, lang.clone()),
         Command::Format {
             file,
             in_place,
@@ -220,22 +228,49 @@ fn ast(file: &PathBuf, data: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn render_file(file: &Path, advanced: bool) -> anyhow::Result<String> {
+fn render_file(file: &Path, advanced: bool, lang: Option<String>) -> anyhow::Result<String> {
     let src = fs::read_to_string(file)?;
     let doc = typedmark_parser::parse_document(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
-    let title = file
+    let filename_title = file
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("TypedMark");
+    let title = meta_title(&doc).unwrap_or_else(|| filename_title.to_string());
     let options = typedmark_html::RenderOptions {
         number_headings: advanced,
+        auto_slug_headings: advanced,
+        lang,
     };
-    Ok(typedmark_html::render_page_with(&doc, title, &options))
+    Ok(typedmark_html::render_page_with(&doc, &title, &options))
 }
 
-fn html(file: &PathBuf, out: &Option<PathBuf>, advanced: bool) -> anyhow::Result<()> {
-    let page = render_file(file, advanced)?;
+/// Pulls a `title` string out of the document's `@meta` block, if it has
+/// one -- `<title>`/`html`/`serve` prefer this over the filename when
+/// present (see `.agents/tasks/ssg-readiness.md` step 1).
+fn meta_title(doc: &typedmark_ast::Document) -> Option<String> {
+    let meta = typedmark_semantics::document_meta(doc)?;
+    let typedmark_ast::Value::Map(map) = meta else {
+        return None;
+    };
+    map.iter().find_map(|(k, v)| {
+        if k != "title" {
+            return None;
+        }
+        match v {
+            typedmark_ast::Value::String(s) => Some(s.clone()),
+            _ => None,
+        }
+    })
+}
+
+fn html(
+    file: &PathBuf,
+    out: &Option<PathBuf>,
+    advanced: bool,
+    lang: Option<String>,
+) -> anyhow::Result<()> {
+    let page = render_file(file, advanced, lang)?;
     match out {
         Some(path) => fs::write(path, page)?,
         None => println!("{page}"),
@@ -259,12 +294,14 @@ fn to_md(file: &PathBuf, out: &Option<PathBuf>) -> anyhow::Result<()> {
 struct ServeState {
     file: PathBuf,
     advanced: bool,
+    lang: Option<String>,
 }
 
-fn serve(file: &PathBuf, port: u16, advanced: bool) -> anyhow::Result<()> {
+fn serve(file: &PathBuf, port: u16, advanced: bool, lang: Option<String>) -> anyhow::Result<()> {
     let state = ServeState {
         file: file.clone(),
         advanced,
+        lang,
     };
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let rt = tokio::runtime::Runtime::new()?;
@@ -280,7 +317,10 @@ fn serve(file: &PathBuf, port: u16, advanced: bool) -> anyhow::Result<()> {
 }
 
 async fn render_handler(State(state): State<ServeState>) -> Html<String> {
-    Html(render_file(&state.file, state.advanced).unwrap_or_else(|e| error_page(&state.file, &e)))
+    Html(
+        render_file(&state.file, state.advanced, state.lang.clone())
+            .unwrap_or_else(|e| error_page(&state.file, &e)),
+    )
 }
 
 fn error_page(file: &Path, err: &anyhow::Error) -> String {

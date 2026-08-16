@@ -129,7 +129,7 @@ ls --help
 _aaaa_
 `aaaa`
 
-```sh
+```(lang:sh)
 
 ```
 
@@ -139,14 +139,15 @@ _aaaa_
 
 ---[ Title ]---
 
----Title---
-
-----(💫)----
-
 ----[💫]----
 
 // line comment
 /* block comment */
 
-| table | ----- |
-|     1 |     2 |
+/*
+@table()[
+[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]
+[ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]
+[ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]
+]{}
+*/
