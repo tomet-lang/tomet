@@ -16,4 +16,4 @@ serde_json = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net"] }
 typedmark-markdown = { workspace = true }
 typedmark-parser = { workspace = true }
-typedmark-renderer = { workspace = true }
+typedmark-html = { workspace = true }

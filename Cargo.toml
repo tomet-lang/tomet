@@ -25,9 +25,11 @@ members = [
   "crates/typedmark-resolve",
   "crates/typedmark-validator",
 
+  #[ Converter ]
+  "crates/converters/markdown",
+  "crates/converters/html",
+
   #[ Consumer ]
-  "crates/typedmark-markdown",
-  "crates/typedmark-renderer",
   "crates/typedmark-formatter",
   "crates/serde_typedmark",
   "crates/tree-sitter-typedmark",
@@ -41,13 +43,14 @@ edition = "2024"
 
 [workspace.dependencies]
 typedmark-ast = { path = "crates/typedmark-ast" }
-typedmark-formatter = { path = "crates/typedmark-formatter" }
 typedmark-lexar = { path = "crates/typedmark-lexar" }
-typedmark-markdown = { path = "crates/typedmark-markdown" }
 typedmark-parser = { path = "crates/typedmark-parser" }
-typedmark-renderer = { path = "crates/typedmark-renderer" }
 typedmark-semantics = { path = "crates/typedmark-semantics" }
+typedmark-formatter = { path = "crates/typedmark-formatter" }
 serde_typedmark = { path = "crates/serde_typedmark" }
+#[ Converter ]
+typedmark-markdown = { path = "crates/converters/markdown" }
+typedmark-html = { path = "crates/converters/html" }
 
 #[ Crates.io ]
 anyhow = "1"

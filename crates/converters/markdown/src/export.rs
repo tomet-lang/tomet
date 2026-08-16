@@ -24,7 +24,7 @@ fn render_block(block: &Block, out: &mut String) {
     match block {
         Block::Heading(h) => render_heading(h, out),
         Block::Paragraph(p) => {
-            // Same reasoning as `typedmark-renderer`'s `render_block`: an
+            // Same reasoning as `typedmark-html`'s `render_block`: an
             // all-invisible-element paragraph (e.g. adjacent `@meta(...)`
             // lines with no blank line between them) must not leave a
             // stray blank paragraph behind.
@@ -118,7 +118,7 @@ fn render_hr(el: &Element) -> String {
 }
 
 /// `codeblock`'s `{value}` (`id`/`cssclass` metadata, if present -- see
-/// `typedmark-renderer`'s `render_codeblock_element`) has no CommonMark
+/// `typedmark-html`'s `render_codeblock_element`) has no CommonMark
 /// form, same as a heading's attrs, so it's dropped on export.
 fn render_code_block(el: &Element) -> String {
     let lang = el
@@ -239,7 +239,7 @@ fn render_links_container(el: &Element) -> String {
 
 /// Anything with no dedicated CommonMark mapping (a hand-authored `<T>`
 /// or `@name` element the importer never produces) passes through as raw
-/// HTML -- valid CommonMark, and matches `typedmark-renderer`'s own
+/// HTML -- valid CommonMark, and matches `typedmark-html`'s own
 /// generic div/span fallback in spirit.
 fn render_generic(el: &Element, kind: &str, inline: bool) -> String {
     let tag = if inline { "span" } else { "div" };

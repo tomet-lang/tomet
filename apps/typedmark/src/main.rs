@@ -228,10 +228,10 @@ fn render_file(file: &Path, advanced: bool) -> anyhow::Result<String> {
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("TypedMark");
-    let options = typedmark_renderer::RenderOptions {
+    let options = typedmark_html::RenderOptions {
         number_headings: advanced,
     };
-    Ok(typedmark_renderer::render_page_with(&doc, title, &options))
+    Ok(typedmark_html::render_page_with(&doc, title, &options))
 }
 
 fn html(file: &PathBuf, out: &Option<PathBuf>, advanced: bool) -> anyhow::Result<()> {

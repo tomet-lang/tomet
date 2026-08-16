@@ -76,7 +76,7 @@
 
 ; well-known `@(url:..)`/`@(file:..)`/`@(ref:..)` link-shaped elements
 ; render as links even though the grammar doesn't special-case them
-; structurally (that inference is `typedmark-renderer`'s job, not the
+; structurally (that inference is `typedmark-html`'s job, not the
 ; grammar's) -- highlighting the `map_entry` key is close enough here.
 (map_entry key: (identifier) @property)
 

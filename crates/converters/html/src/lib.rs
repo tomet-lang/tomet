@@ -640,7 +640,7 @@ mod tests {
         // `Block::Paragraph` (each `@meta(...)` on its own line, with no
         // blank line before the next, now parses as its own
         // `Block::Element` -- see `document.rs`'s `Stop::Paragraph`), and
-        // `typedmark-renderer` has no validation layer of its own, so this
+        // `typedmark-html` has no validation layer of its own, so this
         // just confirms it still renders each one as empty output rather
         // than leaking a stray whitespace-only `<p>` -- garbage in,
         // harmless out.

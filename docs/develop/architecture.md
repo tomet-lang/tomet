@@ -62,7 +62,7 @@ typedmark-semantics (I/O-free classification of what an Element means)
   function. Depends only on `typedmark-ast` (not `typedmark-parser` --
   the diagram above shows the pipeline's logical ordering, not a Cargo
   dependency edge), so any consumer holding an `Element` can classify it
-  without pulling in the parser. Exists so `typedmark-renderer` and
+  without pulling in the parser. Exists so `typedmark-html` and
   `typedmark-markdown` don't each carry their own copy of this
   recognition logic, which is what "what does this kind mean" would
   otherwise silently drift into being (both used to independently
@@ -75,9 +75,13 @@ typedmark-semantics (I/O-free classification of what an Element means)
 
 Everything downstream of `typedmark-ast`/`typedmark-parser` is a
 *consumer* -- it reads the AST (or, for `typedmark-markdown`, produces
-one) and does not get to redefine what the grammar means:
+one) and does not get to redefine what the grammar means. `typedmark-html`
+and `typedmark-markdown` live under `crates/converters/` specifically
+because both convert a `Document` to/from an *external* format (HTML,
+CommonMark); `typedmark-formatter` stays outside that group since it
+converts `Document` back into TypedMark's own source, not another format.
 
-- **`typedmark-renderer`**: `Document` -> HTML. Generic and data-driven,
+- **`typedmark-html`** (`crates/converters/html`): `Document` -> HTML. Generic and data-driven,
   not a full semantic engine: most `<T>`/`@name` elements become a
   `<div>`/`<span>` carrying their `args` map as `data-*` attributes and
   `content` as inner content. A handful of kinds get special-cased rendering
@@ -85,7 +89,7 @@ one) and does not get to redefine what the grammar means:
   links, `@(ref:..)` as an anchor reference, `@meta`/`@config` as
   invisible, `@links{}` as a definition list, `codeblock`/`blockquote`/
   `hr`/`em`/`strong`/`mark` with their obvious HTML mapping).
-- **`typedmark-markdown`**: bidirectional CommonMark <-> `Document`
+- **`typedmark-markdown`** (`crates/converters/markdown`): bidirectional CommonMark <-> `Document`
   conversion (`import.rs`/`export.rs`), lossy in both directions for
   constructs with no equivalent on the other side -- see
   `docs/feature/commonmark-support.md` for the mapping and its known-lossy
@@ -152,7 +156,7 @@ crate's own test (`*_fixture_has_only_known_error_cases` tests against
   `check` (parse, report OK/error), `ast` (pretty-print the parsed AST),
   `roundtrip` (parse a data file -> `serde_typedmark` render -> reparse,
   to confirm the save/load round trip is lossless), `html`/`serve`
-  (render via `typedmark-renderer`, `serve` re-renders fresh on every HTTP
+  (render via `typedmark-html`, `serve` re-renders fresh on every HTTP
   request), `to-md` (via `typedmark-markdown`), `format` (via
   `typedmark-formatter`, with `--write`/`--check`).
 - **`apps/typedmark-lsp`**: a diagnostics-and-formatting-only language

@@ -12,7 +12,7 @@ pub use import::from_markdown;
 #[cfg(test)]
 mod roundtrip_tests {
     use super::*;
-    use typedmark_renderer::render_body;
+    use typedmark_html::render_body;
 
     /// Round-trip through both directions and assert the *rendered HTML*
     /// is equivalent, which is the fidelity bar this crate targets (per

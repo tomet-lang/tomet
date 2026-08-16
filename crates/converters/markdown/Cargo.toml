@@ -9,4 +9,4 @@ typedmark-ast = { workspace = true }
 typedmark-semantics = { workspace = true }
 
 [dev-dependencies]
-typedmark-renderer = { workspace = true }
+typedmark-html = { workspace = true }
