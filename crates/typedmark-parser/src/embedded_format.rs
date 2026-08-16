@@ -1,7 +1,7 @@
 //! Any element's `{...}` body is real JSON/YAML/TOML source, handed as-is
 //! to the corresponding crate's own parser rather than TypedMark's
 //! lightweight `Value` grammar (`crate::value::parse_value_at`), whenever
-//! its `(input)` map has a `format` key naming a recognized format (e.g.
+//! its `(args)` map has a `format` key naming a recognized format (e.g.
 //! `@meta(format:json){...}`, but this isn't specific to `@meta` -- any
 //! element works the same way). No `format` key, or an unrecognized value,
 //! falls back to that lightweight grammar -- see `EmbeddedFormat::from_tag`
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn no_format_key_still_uses_the_lightweight_grammar() {
-        // No `(...)` group at all -- `el.input` is `None`, not a map with
+        // No `(...)` group at all -- `el.args` is `None`, not a map with
         // a `format` key. No format-specific quoting needed here either --
         // this would be invalid JSON and invalid TOML (bare `value`),
         // confirming the real parsers aren't in play.
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn a_non_meta_element_gets_the_same_treatment() {
-        // The mechanism is keyed purely on `(input)` having a `format` key
+        // The mechanism is keyed purely on `(args)` having a `format` key
         // -- it isn't specific to `@meta` at all. (Named `<box>` rather than
         // `<config>` to avoid reader confusion with the `@config` document
         // pragma tested below -- they're unrelated sigils, `Sigil::Type` vs
@@ -466,7 +466,7 @@ mod tests {
     #[test]
     fn config_itself_carries_no_value_and_is_never_the_lightweight_grammar() {
         // `@config(format:json)` has no `{value}` group at all -- it's
-        // consumed purely for its `(input)` map.
+        // consumed purely for its `(args)` map.
         let doc = parse_document("@config(format:json)\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {

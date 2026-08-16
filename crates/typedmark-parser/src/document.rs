@@ -1,5 +1,5 @@
 //! Parsing for the full markup grammar: headings, lists, paragraphs, and
-//! typed inline/block elements (`<T>(input)[area]{value}`, `@name...`,
+//! typed inline/block elements (`<T>(args)[content]{value}`, `@name...`,
 //! bare `@(key:...)`, and the bare-element children of containers like
 //! `@links{}`). See `docs/tmt/typedmark.tm` in the repo root for the
 //! syntax this follows.
@@ -248,7 +248,7 @@ fn parse_titled_thematic_break(
         cur.bump();
     }
     let mut el = Element::new(Sigil::Type("hr".to_string())).with_span(cur.span_from(start_pos));
-    el.area = Some(title);
+    el.content = Some(title);
     Ok(el)
 }
 
@@ -384,7 +384,7 @@ fn parse_inline_seq(
     // unowned literal `[`/`]` reaching this loop's plain-text fallback
     // (one belonging to a nested element/`*em*`/backtick span is fully
     // consumed by its own recursive call and never reaches here, so it
-    // can't double-count) nests instead of ending the area at the first
+    // can't double-count) nests instead of ending the content at the first
     // `]`, e.g. a bare "[brackets]" or "[ ]" inside otherwise-ordinary
     // text.
     let mut bracket_depth: u32 = 0;
@@ -639,7 +639,7 @@ fn try_one_delimited(
     }
     let span = cur.span_from(start_pos);
     let mut el = Element::new(Sigil::Type(kind.to_string())).with_span(span);
-    el.area = Some(inner);
+    el.content = Some(inner);
     Ok(Some(el))
 }
 
@@ -768,17 +768,17 @@ fn parse_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Re
         }
         if newlines <= 1 {
             match cur.peek() {
-                Some('(') if el.input.is_none() => {
-                    el.input = Some(parse_paren_value(cur)?);
+                Some('(') if el.args.is_none() => {
+                    el.args = Some(parse_paren_value(cur)?);
                     continue;
                 }
-                Some('[') if el.area.is_none() => {
-                    el.area = Some(if is_codeblock(&el) {
-                        parse_raw_area(cur)?
-                    } else if is_verbatim_area(&el) {
-                        parse_verbatim_area(cur)?
+                Some('[') if el.content.is_none() => {
+                    el.content = Some(if is_codeblock(&el) {
+                        parse_raw_content(cur)?
+                    } else if is_verbatim_content(&el) {
+                        parse_verbatim_content(cur)?
                     } else {
-                        parse_area(cur, default_format)?
+                        parse_content(cur, default_format)?
                     });
                     continue;
                 }
@@ -821,7 +821,10 @@ fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
     Ok(v)
 }
 
-fn parse_area(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Vec<Inline>> {
+fn parse_content(
+    cur: &mut Cursor,
+    default_format: Option<EmbeddedFormat>,
+) -> Result<Vec<Inline>> {
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '['"));
     }
@@ -833,7 +836,7 @@ fn parse_area(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Resul
 }
 
 /// `<codeblock>(lang:xxx)[code]` and any element opting in via
-/// `area:raw` (see `is_verbatim_area`) both need a `[...]` that's raw
+/// `content:raw` (see `is_verbatim_content`) both need a `[...]` that's raw
 /// verbatim text rather than going through the full inline grammar
 /// (`parse_inline_seq`: em/strong/mark, element triggers, ...) --
 /// real source code, and free-form prose that must round-trip byte-for-
@@ -842,9 +845,9 @@ fn parse_area(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Resul
 /// TypedMark markup or collapsed by `normalize_text`'s lazy-continuation
 /// folding. `find_close` supplies the bracket-depth matcher: codeblock
 /// uses the quote-aware one (real source code doesn't have unmatched
-/// quotes), the generic `area:raw` path uses the quote-agnostic one (see
+/// quotes), the generic `content:raw` path uses the quote-agnostic one (see
 /// `find_matching_bracket`'s doc comment for why that split exists).
-fn parse_raw_area_with(
+fn parse_raw_content_with(
     cur: &mut Cursor,
     find_close: fn(&mut Cursor, char, char, usize) -> Result<usize>,
 ) -> Result<Vec<Inline>> {
@@ -863,48 +866,48 @@ fn parse_raw_area_with(
     Ok(vec![Inline::Text(Text::new(raw, span))])
 }
 
-fn parse_raw_area(cur: &mut Cursor) -> Result<Vec<Inline>> {
-    parse_raw_area_with(cur, find_matching_delimiter)
+fn parse_raw_content(cur: &mut Cursor) -> Result<Vec<Inline>> {
+    parse_raw_content_with(cur, find_matching_delimiter)
 }
 
-/// The `area:raw` opt-in's raw area -- see `is_verbatim_area`.
-fn parse_verbatim_area(cur: &mut Cursor) -> Result<Vec<Inline>> {
-    parse_raw_area_with(cur, find_matching_bracket)
+/// The `content:raw` opt-in's raw content -- see `is_verbatim_content`.
+fn parse_verbatim_content(cur: &mut Cursor) -> Result<Vec<Inline>> {
+    parse_raw_content_with(cur, find_matching_bracket)
 }
 
 fn is_codeblock(el: &Element) -> bool {
     matches!(&el.sigil, Sigil::Type(name) if name == "codeblock")
 }
 
-/// Whether `(input)` carries an `area:raw` key, opting *any* element
-/// (not just the built-in `codeblock`) into the same raw/verbatim `[area]`
-/// treatment codeblock gets -- e.g. `<memo>(area:raw)[ ... ]`. Unlike
-/// `format`/`local_format_key`, this is local-only with no document-wide
-/// default and no opt-out state to represent: it's either present with
-/// the recognized value or it isn't, so a plain bool is enough. An
-/// unrecognized `area:` value (or no `area` key at all) falls back to
-/// ordinary prose parsing, same fallback shape as an unrecognized
-/// `format:` value.
-fn is_verbatim_area(el: &Element) -> bool {
-    let Some(Value::Map(entries)) = el.input.as_ref() else {
+/// Whether `(args)` carries a `content:raw` key, opting *any* element
+/// (not just the built-in `codeblock`) into the same raw/verbatim
+/// `[content]` treatment codeblock gets -- e.g.
+/// `<memo>(content:raw)[ ... ]`. Unlike `format`/`local_format_key`, this
+/// is local-only with no document-wide default and no opt-out state to
+/// represent: it's either present with the recognized value or it isn't,
+/// so a plain bool is enough. An unrecognized `content:` value (or no
+/// `content` key at all) falls back to ordinary prose parsing, same
+/// fallback shape as an unrecognized `format:` value.
+fn is_verbatim_content(el: &Element) -> bool {
+    let Some(Value::Map(entries)) = el.args.as_ref() else {
         return false;
     };
     entries
         .iter()
-        .any(|(key, v)| key == "area" && matches!(v, Value::String(tag) if tag == "raw"))
+        .any(|(key, v)| key == "content" && matches!(v, Value::String(tag) if tag == "raw"))
 }
 
-/// Tri-state read of `(input)`'s `format` key, shared by a regular
+/// Tri-state read of `(args)`'s `format` key, shared by a regular
 /// element's local override and by `@config`'s own `format` key (see
 /// `config_format_update`):
-/// - `None`: no `format` key at all (or no `(input)` map) -- inherit the
+/// - `None`: no `format` key at all (or no `(args)` map) -- inherit the
 ///   document's running default, if any.
 /// - `Some(None)`: `format` key present but its value isn't a recognized
 ///   format (e.g. `format:none`, `format:xml`) -- an explicit opt-out to
 ///   the lightweight grammar, even over an active document default.
 /// - `Some(Some(fmt))`: `format` key present and recognized.
 fn local_format_key(el: &Element) -> Option<Option<EmbeddedFormat>> {
-    let Value::Map(entries) = el.input.as_ref()? else {
+    let Value::Map(entries) = el.args.as_ref()? else {
         return None;
     };
     entries.iter().find_map(|(key, v)| {
@@ -965,13 +968,13 @@ fn parse_value_group(
 
 fn parse_bare_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Element> {
     let start_pos = cur.pos();
-    let input = parse_paren_value(cur)?;
+    let args = parse_paren_value(cur)?;
     let mut el = Element::new(Sigil::Bare);
-    el.input = Some(input);
+    el.args = Some(args);
     let checkpoint = cur.pos();
     skip_inline_ws(cur);
     if cur.peek() == Some('[') {
-        el.area = Some(parse_area(cur, default_format)?);
+        el.content = Some(parse_content(cur, default_format)?);
     } else {
         cur.set_pos(checkpoint);
     }

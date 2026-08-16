@@ -1,10 +1,10 @@
-#[ `<area>` ]
+#[ `<content>` ]
 
----[ `<area:default>` ]---
+---[ `<content:default>` ]---
 
 全てのブロックを入れることができる。
 
----[ `<area:raw>` ]---
+---[ `<content:raw>` ]---
 
 改行やスペースを保持
 ```
@@ -12,22 +12,22 @@
 あ
 ```
 
----[ `<area:nest>` ]---
+---[ `<content:nest>` ]---
 
 @foot[
-  (id:<string>):[ <area> ]
-  (id:<string>):[ <area> ]
-  (id:<string>):[ <area> ]
-  (id:<string>):[ <area> ]
-  (id:<string>):[ <area> ]
-  (id:<string>):[ <area> ]
+  (id:<string>):[ <content> ]
+  (id:<string>):[ <content> ]
+  (id:<string>):[ <content> ]
+  (id:<string>):[ <content> ]
+  (id:<string>):[ <content> ]
+  (id:<string>):[ <content> ]
 ]
 
 #[ `<value>` ]
 
 json、yaml、toml、kdlの中から選択可能。
 
-#[ `<input>` ]
+#[ `<args>` ]
 
 独自軽量言語のみ。
 

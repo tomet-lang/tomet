@@ -6,9 +6,9 @@ into the rest of the pipeline.
 
 ## Intended role
 
-- **Schema validation**: check `<T>(input)[area]{value}` usages against a
-  project's `@settings{}` type declarations (input arg names/types/required-
-  ness, allowed `area` kind, placement, singleton-ness, etc.).
+- **Schema validation**: check `<T>(args)[content]{value}` usages against a
+  project's `@settings{}` type declarations (arg names/types/required-
+  ness, allowed `content` kind, placement, singleton-ness, etc.).
 - **Cross-document reference resolution**: resolve targets like `file:`,
   `path:`, `wiki:`, `ref:` (e.g. `wiki:file_name#id`) against the actual
   filesystem/project and report broken links, ambiguous `wiki:` matches, etc.

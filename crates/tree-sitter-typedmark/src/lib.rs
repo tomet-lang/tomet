@@ -18,10 +18,10 @@
 //!   block. Every real fixture this grammar was tested against already
 //!   puts a blank line between blocks, so this hasn't been observed to
 //!   matter in practice.
-//! - **`(input)`/`[area]`/`{value}` aren't capped at one each, in any
+//! - **`(args)`/`[content]`/`{value}` aren't capped at one each, in any
 //!   order.** The real grammar allows each group at most once, in any
 //!   order; here they're just `repeat(choice(...))`, so e.g. two
-//!   `(input)` groups back to back would (harmlessly) both parse.
+//!   `(args)` groups back to back would (harmlessly) both parse.
 //! - **`em`/`strong` don't nest in each other.** `*`/`**`/`_`/`__` all
 //!   share a delimiter character, and letting them nest is the classic
 //!   Markdown emphasis/strong ambiguity that needs real flanking-rule
@@ -43,11 +43,11 @@
 //!   by the time that's discovered, with no way to backtrack** -- surfaces
 //!   as a small, locally-contained `ERROR` instead of gracefully falling
 //!   back to `punctuation`/`text`. The matching `(` case *does* fall back
-//!   cleanly: `punctuation`'s `(` is a shared token with `input_group`'s
+//!   cleanly: `punctuation`'s `(` is a shared token with `args_group`'s
 //!   own opener the same way `-` is shared between `punctuation` and the
 //!   list markers (see `punctuation`'s own comment in `grammar.js`), but
 //!   `[` has more independent, unshared definitions competing for it
-//!   (`heading`'s own content-opening `[`, `area_group`'s,
+//!   (`heading`'s own content-opening `[`, `content_group`'s,
 //!   `list_checkbox`'s, and `punctuation`'s) and unifying all of those
 //!   was judged too large/risky a change for this narrow a case. A bare
 //!   `-`/`-.` with *no* bracket at all (just no checkbox, no plain
@@ -67,8 +67,8 @@
 //!   `ERROR` lands on). Not investigated further here --
 //!   `typedmark-parser`'s real grammar has no such issue
 //!   (`parses_flat_map` covers exactly this shape).
-//! - **Stray/unmatched `]`** (e.g. literal `[area]` written as prose,
-//!   not as a real `area_group`) has no fallback token and produces a
+//! - **Stray/unmatched `]`** (e.g. literal `[content]` written as prose,
+//!   not as a real `content_group`) has no fallback token and produces a
 //!   small `ERROR` -- unlike `(`/`[`/`{`/`-`, which all fall back to a
 //!   `punctuation` node when nothing opens with them.
 //! - **`<T>`/`@name` written with no group at all** (e.g. `<T>` used as
@@ -87,7 +87,7 @@
 //!   unmatched `/*` just fails to lex as `block_comment` and falls back
 //!   to ordinary `text`/`punctuation` tokens instead.
 //! - **A real embedded JSON/YAML/TOML body inside an element's `{...}`
-//!   (any element whose `(input)` has a `format:json|yaml|toml` key, not
+//!   (any element whose `(args)` has a `format:json|yaml|toml` key, not
 //!   just `@meta`) isn't understood as such.** `typedmark-parser` hands
 //!   that body as-is to `serde_json`/`serde_yaml`/`toml` (see
 //!   `typedmark-parser::embedded_format`), but this grammar has no idea a
@@ -552,7 +552,7 @@ mod tests {
         //   an unterminated/triple-backtick code span, both pre-existing,
         //   unrelated to today's list-marker changes.
         // - `","`/`"{"`: assorted stray characters inside
-        //   `<memo>(area:raw)[...]`'s raw content, pre-existing.
+        //   `<memo>(content:raw)[...]`'s raw content, pre-existing.
         //
         // The leftover dashes after a >3-dash `thematic_break`, and
         // `----(💫)----` a bit further down, used to also need markers
@@ -566,7 +566,7 @@ mod tests {
         // ever meant "start a list" or "plain punctuation"), so
         // `scanner.c`'s malformed-checkbox trade-off (see its module doc)
         // still applies here -- covered by the `"]"` marker above.
-        let src = include_str!("../../../docs/cheatsheet.tm");
+        let src = include_str!("../../../docs/ja/cheatsheet.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);
         let known_markers = [

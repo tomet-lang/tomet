@@ -1,6 +1,6 @@
 //! Parsing for `Value`: map bodies (`key: value`), `[..]` sequences,
 //! `"..."` strings, and bare scalars. Shared by the data-only entry point
-//! (`parse_value`) and by `document.rs` for `(input)` groups and
+//! (`parse_value`) and by `document.rs` for `(args)` groups and
 //! data-shaped `{value}` groups.
 
 use crate::error::{Error, Result};
@@ -128,7 +128,7 @@ pub(crate) fn find_matching_delimiter(
 
 /// Same contract as [`find_matching_delimiter`] (nested `open`/`close`
 /// depth, doesn't consume the closing delimiter), but deliberately does
-/// *not* skip quoted runs -- a free-form-prose raw body (e.g. `area:raw`)
+/// *not* skip quoted runs -- a free-form-prose raw body (e.g. `content:raw`)
 /// has no guarantee its `"`/`'` occurrences are balanced the way real
 /// source code's are, so quote-skipping there would misfire on an
 /// ordinary apostrophe.

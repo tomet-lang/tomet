@@ -13,7 +13,7 @@
 ; keeps the query working for both Zed and standard-capture editors.
 
 ; The `[`/`]` wrapping a heading's content have no node of their own in
-; the grammar (unlike `input_group`/`area_group`/`value_group`'s
+; the grammar (unlike `args_group`/`content_group`/`value_group`'s
 ; delimiters below), so without an explicit capture here they'd just
 ; inherit `heading`'s own `@title` below -- same color as the content,
 ; not as `heading_marker`. Capturing them to match `heading_marker`
@@ -60,11 +60,11 @@
 (type_element name: (identifier) @tag)
 (at_element name: (identifier) @tag)
 
-; `(input)`/`[area]`/`{value}` group delimiters.
-(input_group "(" @punctuation.bracket)
-(input_group ")" @punctuation.bracket)
-(area_group "[" @punctuation.bracket)
-(area_group "]" @punctuation.bracket)
+; `(args)`/`[content]`/`{value}` group delimiters.
+(args_group "(" @punctuation.bracket)
+(args_group ")" @punctuation.bracket)
+(content_group "[" @punctuation.bracket)
+(content_group "]" @punctuation.bracket)
 (value_group "{" @punctuation.bracket)
 (value_group "}" @punctuation.bracket)
 

@@ -3,8 +3,8 @@
 //! Upgraded to be AST-aware using source [`typedmark_ast::Span`] metadata.
 //! Normalizes whitespace policy (LF line endings, no trailing whitespace,
 //! collapsed excess blank lines, exactly one final newline) while losslessly
-//! preserving literal whitespace and blank lines inside raw/verbatim areas
-//! (`<codeblock>[...]` and elements opting in via `area:raw`).
+//! preserving literal whitespace and blank lines inside raw/verbatim content
+//! (`<codeblock>[...]` and elements opting in via `content:raw`).
 
 use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
 use typedmark_parser::parse_document;
@@ -36,7 +36,7 @@ pub fn format_source(src: &str) -> String {
         let line_len = line.len();
         let line_end_offset = current_offset + line_len;
 
-        // Check if any byte in this line falls inside a raw area.
+        // Check if any byte in this line falls inside raw content.
         let is_raw_line = (current_offset..=line_end_offset).any(is_offset_raw);
 
         if is_raw_line {
@@ -75,10 +75,10 @@ fn is_raw_element(el: &Element) -> bool {
     if matches!(&el.sigil, Sigil::Type(name) if name == "codeblock") {
         return true;
     }
-    if let Some(Value::Map(entries)) = &el.input {
+    if let Some(Value::Map(entries)) = &el.args {
         if entries
             .iter()
-            .any(|(k, v)| k == "area" && matches!(v, Value::String(s) if s == "raw"))
+            .any(|(k, v)| k == "content" && matches!(v, Value::String(s) if s == "raw"))
         {
             return true;
         }
@@ -89,7 +89,7 @@ fn is_raw_element(el: &Element) -> bool {
 fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
     fn walk_element(el: &Element, out: &mut Vec<(usize, usize)>) {
         if is_raw_element(el) {
-            if let Some(inlines) = &el.area {
+            if let Some(inlines) = &el.content {
                 for inline in inlines {
                     let span = inline.span();
                     if span.start.offset < span.end.offset {
@@ -98,7 +98,7 @@ fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                 }
             }
         }
-        if let Some(inlines) = &el.area {
+        if let Some(inlines) = &el.content {
             for inline in inlines {
                 if let Inline::Element(child_el) = inline {
                     walk_element(child_el, out);
@@ -188,8 +188,8 @@ mod tests {
     }
 
     #[test]
-    fn raw_area_content_is_preserved_losslessly() {
-        let src = "<memo>(area:raw)[\nline one  \n\nline two\n]\n";
+    fn raw_content_is_preserved_losslessly() {
+        let src = "<memo>(content:raw)[\nline one  \n\nline two\n]\n";
         assert_eq!(format_source(src), src);
     }
 
@@ -213,7 +213,7 @@ mod tests {
         for src in [
             include_str!("../../../docs/readme.ja.tm"),
             include_str!("../../../docs/tmt/examples/image_meta.tm"),
-            include_str!("../../../docs/roadmap.ja.tm"),
+            include_str!("../../../docs/develop/roadmap.ja.tm"),
         ] {
             let before = typedmark_parser::parse_document(src)
                 .unwrap_or_else(|e| panic!("fixture failed to parse: {e}"));
@@ -228,8 +228,8 @@ mod tests {
         vec![
             include_str!("../../../docs/readme.ja.tm"),
             include_str!("../../../docs/tmt/examples/image_meta.tm"),
-            include_str!("../../../docs/cheatsheet.tm"),
-            include_str!("../../../docs/roadmap.ja.tm"),
+            include_str!("../../../docs/ja/cheatsheet.tm"),
+            include_str!("../../../docs/develop/roadmap.ja.tm"),
         ]
     }
 }

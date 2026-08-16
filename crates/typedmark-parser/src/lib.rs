@@ -76,13 +76,13 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::At(None));
                 assert_eq!(
-                    el.input,
+                    el.args,
                     Some(Value::Map(vec![(
                         "url".into(),
                         Value::String("https://example.com".into())
                     )]))
                 );
-                assert_eq!(el.area, Some(vec![Inline::Text("Wiki".into())]));
+                assert_eq!(el.content, Some(vec![Inline::Text("Wiki".into())]));
             }
             other => panic!("expected element, got {other:?}"),
         }
@@ -98,9 +98,9 @@ mod tests {
                     Some(ElementValue::Children(children)) => {
                         assert_eq!(children.len(), 2);
                         assert_eq!(children[0].sigil, Sigil::Bare);
-                        assert_eq!(children[0].input, Some(Value::Int(1)));
-                        assert_eq!(children[0].area, Some(vec![Inline::Text("note".into())]));
-                        assert_eq!(children[1].input, Some(Value::String("anotation1".into())));
+                        assert_eq!(children[0].args, Some(Value::Int(1)));
+                        assert_eq!(children[0].content, Some(vec![Inline::Text("note".into())]));
+                        assert_eq!(children[1].args, Some(Value::String("anotation1".into())));
                     }
                     other => panic!("expected children, got {other:?}"),
                 }
@@ -115,7 +115,7 @@ mod tests {
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::Type("caution".into()));
-                assert_eq!(el.area, Some(vec![Inline::Text("be careful".into())]));
+                assert_eq!(el.content, Some(vec![Inline::Text("be careful".into())]));
             }
             other => panic!("expected element, got {other:?}"),
         }
@@ -199,7 +199,7 @@ mod tests {
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::Type("hr".into()));
-                assert_eq!(el.area, None);
+                assert_eq!(el.content, None);
             }
             other => panic!("expected hr element, got {other:?}"),
         }
@@ -220,7 +220,7 @@ mod tests {
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::Type("hr".into()));
-                assert_eq!(el.area, Some(vec![Inline::Text("Title".into())]));
+                assert_eq!(el.content, Some(vec![Inline::Text("Title".into())]));
             }
             other => panic!("expected hr element, got {other:?}"),
         }
@@ -231,7 +231,7 @@ mod tests {
         let doc = parse_document("-----[ Title ]---\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.area, Some(vec![Inline::Text("Title".into())]));
+                assert_eq!(el.content, Some(vec![Inline::Text("Title".into())]));
             }
             other => panic!("expected hr element, got {other:?}"),
         }
@@ -270,7 +270,7 @@ mod tests {
                     .content
                     .iter()
                     .filter_map(|i| match i {
-                        Inline::Element(el) => Some((el.sigil.clone(), el.area.clone())),
+                        Inline::Element(el) => Some((el.sigil.clone(), el.content.clone())),
                         _ => None,
                     })
                     .collect();
@@ -466,12 +466,12 @@ mod tests {
     }
 
     #[test]
-    fn inline_block_comment_works_inside_area() {
+    fn inline_block_comment_works_inside_content() {
         let doc = parse_document("<caution>[ keep /* drop */ this ]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
-                    el.area,
+                    el.content,
                     Some(vec![
                         Inline::Text("keep ".into()),
                         Inline::Text(" this".into())
@@ -513,19 +513,19 @@ mod tests {
     }
 
     #[test]
-    fn inline_double_slash_comment_works_inside_area() {
+    fn inline_double_slash_comment_works_inside_content() {
         let doc = parse_document("<caution>[ keep // drop this\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.area, Some(vec![Inline::Text("keep ".into())]));
+                assert_eq!(el.content, Some(vec![Inline::Text("keep ".into())]));
             }
             other => panic!("expected element, got {other:?}"),
         }
     }
 
     #[test]
-    fn a_double_slash_line_inside_a_multiline_area_is_a_comment() {
-        // Unlike a top-level paragraph, `[area]` content has no block-level
+    fn a_double_slash_line_inside_a_multiline_content_is_a_comment() {
+        // Unlike a top-level paragraph, `[content]` content has no block-level
         // dispatch of its own -- a `//` starting a line inside it is only
         // recognized because the preceding newline counts as a boundary,
         // same rule as a same-line trailing comment.
@@ -533,7 +533,7 @@ mod tests {
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
-                    el.area,
+                    el.content,
                     Some(vec![
                         Inline::Text("keep ".into()),
                         Inline::Text(" keep2".into())
@@ -547,13 +547,13 @@ mod tests {
     #[test]
     fn own_line_comment_works_inside_a_paren_group() {
         // The original trigger case: a `//` comment on its own line between
-        // entries in `@config(...)`'s `(input)` map.
+        // entries in `@config(...)`'s `(args)` map.
         let doc = parse_document("@config(\n  format:json\n  // a note\n)\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::At(Some("config".into())));
                 assert_eq!(
-                    el.input,
+                    el.args,
                     Some(Value::Map(vec![(
                         "format".into(),
                         Value::String("json".into())
@@ -632,11 +632,11 @@ mod tests {
     }
 
     #[test]
-    fn a_bare_bracket_pair_inside_an_area_no_longer_truncates_it() {
+    fn a_bare_bracket_pair_inside_a_content_no_longer_truncates_it() {
         // Regression for the memo-content-fidelity fix: `Stop::Bracket`
         // used to break at the *first* literal `]`, corrupting the rest
-        // of the area as stray trailing text. Applies to every ordinary
-        // (non-raw) `[area]`, not just an opt-in one.
+        // of the content as stray trailing text. Applies to every ordinary
+        // (non-raw) `[content]`, not just an opt-in one.
         let doc =
             parse_document("<caution>[\nline one\nline two with * and [brackets] inside\n]\n")
                 .unwrap();
@@ -644,7 +644,7 @@ mod tests {
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
-                    el.area,
+                    el.content,
                     Some(vec![Inline::Text(
                         "line one line two with * and [brackets] inside".into()
                     )])
@@ -655,20 +655,20 @@ mod tests {
     }
 
     #[test]
-    fn an_unbalanced_bracket_inside_an_area_still_errors() {
+    fn an_unbalanced_bracket_inside_a_content_still_errors() {
         assert!(parse_document("<caution>[ has an [ that never closes\n]\n").is_err());
     }
 
     #[test]
-    fn area_raw_preserves_brackets_and_newlines_losslessly() {
+    fn content_raw_preserves_brackets_and_newlines_losslessly() {
         let doc = parse_document(
-            "<memo>(area:raw)[\nline one\nline two with * and [brackets] inside\n]\n",
+            "<memo>(content:raw)[\nline one\nline two with * and [brackets] inside\n]\n",
         )
         .unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
-                    el.area,
+                    el.content,
                     Some(vec![Inline::Text(
                         "\nline one\nline two with * and [brackets] inside\n".into()
                     )])
@@ -679,15 +679,15 @@ mod tests {
     }
 
     #[test]
-    fn area_raw_is_not_confused_by_an_apostrophe() {
-        // The reason `area:raw` can't reuse codeblock's quote-aware
+    fn content_raw_is_not_confused_by_an_apostrophe() {
+        // The reason `content:raw` can't reuse codeblock's quote-aware
         // matcher as-is: free-form prose has no guarantee its `'`/`"`
         // occurrences are balanced the way real source code's are.
-        let doc = parse_document("<memo>(area:raw)[don't forget [this]]\n").unwrap();
+        let doc = parse_document("<memo>(content:raw)[don't forget [this]]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
-                    el.area,
+                    el.content,
                     Some(vec![Inline::Text("don't forget [this]".into())])
                 );
             }
@@ -696,16 +696,16 @@ mod tests {
     }
 
     #[test]
-    fn an_unrecognized_area_value_falls_back_to_ordinary_prose() {
-        // Mirrors `format`'s unknown-value fallback: `area:raw` is the
-        // only recognized value, anything else (or no `area` key at all)
+    fn an_unrecognized_content_value_falls_back_to_ordinary_prose() {
+        // Mirrors `format`'s unknown-value fallback: `content:raw` is the
+        // only recognized value, anything else (or no `content` key at all)
         // parses as normal prose, so line breaks still collapse per the
         // usual lazy-continuation rule.
-        let doc = parse_document("<memo>(area:literal)[\nline one\nline two\n]\n").unwrap();
+        let doc = parse_document("<memo>(content:literal)[\nline one\nline two\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
-                    el.area,
+                    el.content,
                     Some(vec![Inline::Text("line one line two".into())])
                 );
             }

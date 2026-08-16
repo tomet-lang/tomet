@@ -4,7 +4,7 @@ TypedMark (`.tm` / `.tmt`) is a human-readable, strongly-typed markup language a
 
 ## Features
 
-- **Unified Element Syntax**: Standardized element format `<T>(input)[area]{value}` for attributes, raw/rendered content areas, and structured data.
+- **Unified Element Syntax**: Standardized element format `<T>(args)[content]{value}` for attributes, raw/rendered content areas, and structured data.
 - **Embedded Formats**: Seamlessly embed JSON, YAML, or TOML inside `{value}` blocks via `format: json|yaml|toml`.
 - **Inferred References**: Compact `@` syntax for URLs (`@(url:...)`), files (`@(file:...)`), and reference links.
 - **Bidirectional CommonMark Support**: Import from and export to CommonMark.

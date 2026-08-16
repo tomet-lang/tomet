@@ -58,7 +58,7 @@
 // @[ ここには、英語しか入れれないということになる。 ]
 
 // [ NOT implemented ]
-// @(lang:sh, area:raw)[
+// @(lang:sh, content:raw)[
 //   sudo whoami
 //   ls --help
 // ]
@@ -95,10 +95,10 @@ sudo whoami
 ls --help
 ]
 
-// area:raw: opts any element's [area] into raw/verbatim text, same
+// content:raw: opts any element's [content] into raw/verbatim text, same
 // treatment as codeblock -- byte-safe against an embedded "]" and
 // newline-preserving (no inline markup, no lazy-continuation folding).
-<memo>(area:raw)[
+<memo>(content:raw)[
   don't forget: check [this] and [that]
 ]
 

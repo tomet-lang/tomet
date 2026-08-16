@@ -63,19 +63,3 @@ _xxx_
 | table | ----- | // テーブル
 |     1 |     2 | // テーブル
 ```
-
-#[ DSL/軽量変数言語 ]
-
-```tm
-key:value,
-group.key:value
-group{key:value, key:value}
-```
-
-#[ 駄目な構文 ]
-
-```
-@xxx()(){}{}[][]    // 複数括弧
-
-@xxx()[]{}          // 値なし(null)
-```

@@ -1,6 +1,104 @@
 [
   {
-    "type": "area_group",
+    "type": "args_group",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "value",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "at_element",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "args_group",
+          "named": true
+        },
+        {
+          "type": "content_group",
+          "named": true
+        },
+        {
+          "type": "value_group",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "bare_element",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "args_group",
+          "named": true
+        },
+        {
+          "type": "content_group",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "braced_map",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "map",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "children",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "bare_element",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "content_group",
     "named": true,
     "fields": {},
     "children": {
@@ -37,89 +135,6 @@
         },
         {
           "type": "text",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "at_element",
-    "named": true,
-    "fields": {
-      "name": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      }
-    },
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "area_group",
-          "named": true
-        },
-        {
-          "type": "input_group",
-          "named": true
-        },
-        {
-          "type": "value_group",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "bare_element",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "area_group",
-          "named": true
-        },
-        {
-          "type": "input_group",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "braced_map",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": false,
-      "types": [
-        {
-          "type": "map",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "children",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "bare_element",
           "named": true
         }
       ]
@@ -281,21 +296,6 @@
           }
         ]
       }
-    }
-  },
-  {
-    "type": "input_group",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": false,
-      "types": [
-        {
-          "type": "value",
-          "named": true
-        }
-      ]
     }
   },
   {
@@ -697,11 +697,11 @@
       "required": false,
       "types": [
         {
-          "type": "area_group",
+          "type": "args_group",
           "named": true
         },
         {
-          "type": "input_group",
+          "type": "content_group",
           "named": true
         },
         {

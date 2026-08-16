@@ -86,7 +86,7 @@ fn element_kind(el: &Element) -> String {
     match &el.sigil {
         Sigil::Type(name) => name.clone(),
         Sigil::At(Some(name)) => name.clone(),
-        Sigil::At(None) => typedmark_ast::infer_at_kind(el.input.as_ref())
+        Sigil::At(None) => typedmark_ast::infer_at_kind(el.args.as_ref())
             .unwrap_or("at")
             .to_string(),
         Sigil::Bare => "bare".to_string(),
@@ -99,9 +99,9 @@ fn element_to_md(el: &Element, inline: bool) -> String {
         "meta" => String::new(),
         "config" => String::new(),
         "hr" => render_hr(el),
-        "em" => format!("*{}*", area_to_md(el)),
-        "strong" => format!("**{}**", area_to_md(el)),
-        "mark" => format!("<mark>{}</mark>", area_to_md(el)),
+        "em" => format!("*{}*", content_to_md(el)),
+        "strong" => format!("**{}**", content_to_md(el)),
+        "mark" => format!("<mark>{}</mark>", content_to_md(el)),
         "codeblock" => render_code_block(el),
         "blockquote" => render_blockquote(el),
         "url" | "file" => render_link(el, &kind),
@@ -112,8 +112,8 @@ fn element_to_md(el: &Element, inline: bool) -> String {
     }
 }
 
-fn area_to_md(el: &Element) -> String {
-    el.area
+fn content_to_md(el: &Element) -> String {
+    el.content
         .as_ref()
         .map(|a| inline_to_md(a))
         .unwrap_or_default()
@@ -123,7 +123,7 @@ fn area_to_md(el: &Element) -> String {
 /// no CommonMark equivalent, so it's lossy: a bold line followed by a
 /// plain rule.
 fn render_hr(el: &Element) -> String {
-    match &el.area {
+    match &el.content {
         Some(title) if !title.is_empty() => format!("**{}**\n\n---", inline_to_md(title)),
         _ => "---".to_string(),
     }
@@ -134,14 +134,14 @@ fn render_hr(el: &Element) -> String {
 /// form, same as a heading's attrs, so it's dropped on export.
 fn render_code_block(el: &Element) -> String {
     let lang = el
-        .input
+        .args
         .as_ref()
         .and_then(as_map)
         .and_then(|m| map_get(m, "lang"))
         .map(value_to_plain)
         .unwrap_or_default();
     let code = el
-        .area
+        .content
         .as_ref()
         .map(|a| inlines_to_plain(a))
         .unwrap_or_default();
@@ -162,7 +162,7 @@ fn fence_for(code: &str) -> String {
 }
 
 fn render_blockquote(el: &Element) -> String {
-    let text = area_to_md(el);
+    let text = content_to_md(el);
     text.lines()
         .map(|line| format!("> {line}"))
         .collect::<Vec<_>>()
@@ -171,14 +171,14 @@ fn render_blockquote(el: &Element) -> String {
 
 fn render_link(el: &Element, key: &str) -> String {
     let href = el
-        .input
+        .args
         .as_ref()
         .and_then(as_map)
         .and_then(|m| map_get(m, key))
         .map(value_to_plain)
         .unwrap_or_default();
-    let text = match &el.area {
-        Some(area) if !area.is_empty() => inline_to_md(area),
+    let text = match &el.content {
+        Some(content) if !content.is_empty() => inline_to_md(content),
         _ => href.clone(),
     };
     format!("[{text}]({href})")
@@ -186,14 +186,14 @@ fn render_link(el: &Element, key: &str) -> String {
 
 fn render_ref(el: &Element) -> String {
     let target = el
-        .input
+        .args
         .as_ref()
         .and_then(as_map)
         .and_then(|m| map_get(m, "ref"))
         .map(value_to_plain)
         .unwrap_or_default();
-    let text = match &el.area {
-        Some(area) if !area.is_empty() => inline_to_md(area),
+    let text = match &el.content {
+        Some(content) if !content.is_empty() => inline_to_md(content),
         _ => target.clone(),
     };
     format!("[{text}](#link-{target})")
@@ -201,14 +201,14 @@ fn render_ref(el: &Element) -> String {
 
 fn render_embed(el: &Element) -> String {
     let src = el
-        .input
+        .args
         .as_ref()
         .and_then(as_map)
         .and_then(|m| map_get(m, "file").or_else(|| map_get(m, "url")))
         .map(value_to_plain)
         .unwrap_or_default();
     let alt = el
-        .area
+        .content
         .as_ref()
         .map(|a| inlines_to_plain(a))
         .unwrap_or_default();
@@ -221,8 +221,8 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
         match inline {
             Inline::Text(t) => s.push_str(&t.value),
             Inline::Element(el) => {
-                if let Some(area) = &el.area {
-                    s.push_str(&inlines_to_plain(area));
+                if let Some(content) = &el.content {
+                    s.push_str(&inlines_to_plain(content));
                 }
             }
         }
@@ -237,9 +237,9 @@ fn render_links_container(el: &Element) -> String {
             if i > 0 {
                 out.push('\n');
             }
-            let id = child.input.as_ref().map(value_to_plain).unwrap_or_default();
+            let id = child.args.as_ref().map(value_to_plain).unwrap_or_default();
             let content = child
-                .area
+                .content
                 .as_ref()
                 .map(|a| inline_to_md(a))
                 .unwrap_or_default();
@@ -256,19 +256,19 @@ fn render_links_container(el: &Element) -> String {
 fn render_generic(el: &Element, kind: &str, inline: bool) -> String {
     let tag = if inline { "span" } else { "div" };
     let mut out = format!("<{tag} data-tm-kind=\"{}\"", escape_attr(kind));
-    if let Some(input) = &el.input {
-        push_data_attrs(&mut out, input);
+    if let Some(args) = &el.args {
+        push_data_attrs(&mut out, args);
     }
     out.push('>');
-    if let Some(area) = &el.area {
-        out.push_str(&inline_to_md(area));
+    if let Some(content) = &el.content {
+        out.push_str(&inline_to_md(content));
     }
     out.push_str(&format!("</{tag}>"));
     out
 }
 
-fn push_data_attrs(out: &mut String, input: &Value) {
-    if let Some(map) = as_map(input) {
+fn push_data_attrs(out: &mut String, args: &Value) {
+    if let Some(map) = as_map(args) {
         for (k, v) in map {
             out.push_str(&format!(
                 " data-{}=\"{}\"",
@@ -342,8 +342,8 @@ mod tests {
         fn meta_element(tag: &str) -> Element {
             Element {
                 sigil: Sigil::At(Some("meta".to_string())),
-                input: Some(Value::String(tag.to_string())),
-                area: None,
+                args: Some(Value::String(tag.to_string())),
+                content: None,
                 value: Some(ElementValue::Data(Value::Map(vec![(
                     "key".to_string(),
                     Value::String("value".to_string()),
@@ -428,16 +428,16 @@ mod tests {
                 vec![
                     Inline::Element(Element {
                         sigil: Sigil::Type("em".to_string()),
-                        input: None,
-                        area: Some(vec![Inline::Text(Text::new("a", Span::dummy()))]),
+                        args: None,
+                        content: Some(vec![Inline::Text(Text::new("a", Span::dummy()))]),
                         value: None,
                         span: Span::dummy(),
                     }),
                     Inline::Text(Text::new(" ", Span::dummy())),
                     Inline::Element(Element {
                         sigil: Sigil::Type("strong".to_string()),
-                        input: None,
-                        area: Some(vec![Inline::Text(Text::new("b", Span::dummy()))]),
+                        args: None,
+                        content: Some(vec![Inline::Text(Text::new("b", Span::dummy()))]),
                         value: None,
                         span: Span::dummy(),
                     }),
@@ -453,11 +453,11 @@ mod tests {
     fn link_round_trips() {
         let el = Element {
             sigil: Sigil::At(None),
-            input: Some(Value::Map(vec![(
+            args: Some(Value::Map(vec![(
                 "url".to_string(),
                 Value::String("https://example.com".to_string()),
             )])),
-            area: Some(vec![Inline::Text(Text::new("Wiki", Span::dummy()))]),
+            content: Some(vec![Inline::Text(Text::new("Wiki", Span::dummy()))]),
             value: None,
             span: Span::dummy(),
         };
@@ -475,11 +475,11 @@ mod tests {
     fn embed_becomes_image() {
         let el = Element {
             sigil: Sigil::Type("embed".to_string()),
-            input: Some(Value::Map(vec![(
+            args: Some(Value::Map(vec![(
                 "file".to_string(),
                 Value::String("pic.png".to_string()),
             )])),
-            area: Some(vec![Inline::Text(Text::new("a cat", Span::dummy()))]),
+            content: Some(vec![Inline::Text(Text::new("a cat", Span::dummy()))]),
             value: None,
             span: Span::dummy(),
         };
@@ -497,11 +497,11 @@ mod tests {
     fn code_block_uses_fence_and_lang() {
         let el = Element {
             sigil: Sigil::Type("codeblock".to_string()),
-            input: Some(Value::Map(vec![(
+            args: Some(Value::Map(vec![(
                 "lang".to_string(),
                 Value::String("rust".to_string()),
             )])),
-            area: Some(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))]),
+            content: Some(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))]),
             value: None,
             span: Span::dummy(),
         };
@@ -528,7 +528,7 @@ mod tests {
         // to the generic "at" element export, unlike `@meta(...)`
         // (`Sigil::At(Some("meta".into()))`), which exports as nothing.
         let mut el = Element::new(Sigil::At(None));
-        el.input = Some(Value::Map(vec![(
+        el.args = Some(Value::Map(vec![(
             "meta".to_string(),
             Value::String("yaml".to_string()),
         )]));
@@ -546,7 +546,7 @@ mod tests {
     #[test]
     fn config_element_exports_as_nothing() {
         let mut el = Element::new(Sigil::At(Some("config".to_string())));
-        el.input = Some(Value::Map(vec![(
+        el.args = Some(Value::Map(vec![(
             "format".to_string(),
             Value::String("json".to_string()),
         )]));
@@ -560,7 +560,7 @@ mod tests {
     #[test]
     fn titled_thematic_break() {
         let mut el = Element::new(Sigil::Type("hr".to_string()));
-        el.area = Some(vec![Inline::Text(Text::new("Title", Span::dummy()))]);
+        el.content = Some(vec![Inline::Text(Text::new("Title", Span::dummy()))]);
         let doc = Document {
             blocks: vec![Block::Element(el)],
             span: Span::dummy(),
