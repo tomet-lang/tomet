@@ -12,8 +12,8 @@
 - (marker) content   // marker は key:value の args ではなく () や [] で囲んだ自由文字列
 -. (marker) content
 ---[]---
-// ${}             // 未実装
-// $()              // 未実装
+// ${}               // 未実装
+// $()               // 未実装
 // xxx
 /*  */
 ```

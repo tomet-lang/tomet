@@ -1566,6 +1566,10 @@ name = "typedmark-ast"
 version = "0.1.0"
 
 [[package]]
+name = "typedmark-compute"
+version = "0.1.0"
+
+[[package]]
 name = "typedmark-formatter"
 version = "0.1.0"
 dependencies = [

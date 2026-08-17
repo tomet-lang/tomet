@@ -32,7 +32,7 @@ members = [
   #[ Consumer ]
   "crates/typedmark-formatter",
   "crates/serde_typedmark",
-  "crates/tree-sitter-typedmark",
+  "crates/tree-sitter-typedmark", "crates/typedmark-compute",
 ]
 
 default-members = ["apps/typedmark"]

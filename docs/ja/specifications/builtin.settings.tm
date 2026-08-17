@@ -21,9 +21,11 @@
   // 実際に Sigil を持つ「要素」(typedmark_semantics::ElementKind)の一覧。
   // 名前で識別できるものだけがここに乗る -- <T>/@name で誰でも増やせる。
   elements: {
-    settings: {　　　　　　　　　　　　　　　　　　　　// あとで、@を付けれるようにする。
+    settings: { // あとで、@を付けれるようにする。
       args: { target: { required: true } },
-      values: "settings document",
+      // settingsの中身はプロジェクト固有で決まった形が無いので、
+      // CUEのtop type `_` (制約なしの任意のValue) を借りて表す。
+      values: _,
       placement: head,
       singleton: true
     },
