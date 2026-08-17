@@ -221,6 +221,7 @@ module.exports = grammar({
 				$.strong,
 				$.mark,
 				$.element,
+				$.interpolation,
 				$.punctuation,
 			),
 		_bracket_item: ($) => choice($._line_item, $._newline),
@@ -246,7 +247,7 @@ module.exports = grammar({
 		// `/* ... */` needs to win over a `text` run that would otherwise
 		// swallow it whole, so a bare `/` (not opening a comment) falls
 		// back to `punctuation` like the others.
-		text: (_$) => /[^\n`*_=<@()\[{\]/-]+/,
+		text: (_$) => /[^\n`*_=<@$()\[{\]/-]+/,
 		// `-` is a bare string literal alternative here, not folded into
 		// the character class like the others, so it's the *same* grammar
 		// symbol as the literal `"-"` used to start `unordered_list_item`
@@ -265,7 +266,12 @@ module.exports = grammar({
 		// marker token forced it into, with no `conflicts`/GLR needed
 		// (confirmed by `npx tree-sitter-cli generate` itself flagging a
 		// `[$.list, $.paragraph]` conflicts entry as unnecessary).
-		punctuation: (_$) => choice(/[()\[{/]/, "-"),
+		// `$` is included here (not folded into `text`'s character class)
+		// for the same reason `-`/`/` are: a bare `$` not immediately
+		// followed by `{` (so `interpolation`'s higher-precedence `${`
+		// token doesn't win) has nothing else to reduce to and would
+		// otherwise dead-end into `ERROR` once excluded from `text`.
+		punctuation: (_$) => choice(/[()\[{/]/, "-", "$"),
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -292,9 +298,10 @@ module.exports = grammar({
 				$.block_comment,
 				$.mark,
 				$.element,
+				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*=<@()\[{\]/]+/, $.text),
+				alias(/[^\n`*=<@$()\[{\]/]+/, $.text),
 			),
 		_bracket_item_no_underscore: ($) =>
 			choice(
@@ -302,9 +309,10 @@ module.exports = grammar({
 				$.block_comment,
 				$.mark,
 				$.element,
+				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`_=<@()\[{\]/]+/, $.text),
+				alias(/[^\n`_=<@$()\[{\]/]+/, $.text),
 			),
 		_bracket_item_no_equals: ($) =>
 			choice(
@@ -313,10 +321,30 @@ module.exports = grammar({
 				$.emphasis,
 				$.strong,
 				$.element,
+				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*_=<@()\[{\]/]+/, $.text),
+				alias(/[^\n`*_=<@$()\[{\]/]+/, $.text),
 			),
+
+		// ---- `${...}` interpolation ---------------------------------------
+		// Grammar-only recognition of `typedmark-parser::document.rs`'s
+		// `parse_interp` -- see `docs/reviews/2026-08-17-interpolation-syntax.md`
+		// for the decided v1 grammar (Path/Call/literal, no infix operators).
+		// `Path` (`a.b.c`) reuses the existing `identifier` token as one
+		// opaque span rather than exposing dot-separated segments -- this
+		// grammar is highlighting-only and doesn't need a structured `Path`
+		// AST, just to recognize the whole span and not fall into `ERROR`.
+		interpolation: ($) => seq(token(prec(1, "${")), $._interp_expr, "}"),
+		_interp_expr: ($) => choice($.interp_call, $.identifier, $.number, $.string),
+		interp_call: ($) =>
+			seq(
+				field("name", $.identifier),
+				"(",
+				optional(seq($._interp_expr, repeat(seq(",", $._interp_expr)))),
+				")",
+			),
+		number: (_$) => /-?[0-9]+(\.[0-9]+)?/,
 
 		// ---- `<T>`/`@name` elements ---------------------------------------
 		element: ($) => choice($.type_element, $.at_element),

@@ -70,8 +70,10 @@
 // @var(foo:bool,a:int,b:int){foo:true, a:1, b:2}[ a + b ]
 // @(foo:bool){foo:true}
 
-// [ NOT implemented ]
-// $(a.a) 変数で置換する。
+// ${...} は構文解析のみ実装済み。評価(参照解決・関数計算)はtypedmark-resolve/
+// typedmark-computeの未実装分。詳細: docs/reviews/2026-08-17-interpolation-syntax.md
+${some_id}
+${sum(a, b)}
 
 @link[](url:https://)
 @link[](file:/readme.md)

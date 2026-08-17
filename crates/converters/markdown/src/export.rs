@@ -9,7 +9,10 @@
 //! valid CommonMark. Heading `id`/`cssclass` attrs have no CommonMark
 //! form and are dropped.
 
-use typedmark_ast::{Block, Document, Element, ElementValue, Heading, Inline, ListItem, Value};
+use typedmark_ast::{
+    Block, Document, Element, ElementValue, Heading, Inline, InterpExpr, InterpExprKind, ListItem,
+    Literal, Value,
+};
 use typedmark_semantics::classify;
 
 pub fn to_markdown(doc: &Document) -> String {
@@ -96,7 +99,41 @@ fn element_to_md(el: &Element, inline: bool) -> String {
         "ref" => render_ref(el),
         "embed" => render_embed(el),
         "links" => render_links_container(el),
+        // No CommonMark equivalent for `${...}` -- round-trips as literal
+        // source text, same lossy-but-faithful treatment `render_generic`'s
+        // fallback gives other unrecognized constructs. Given its own
+        // dedicated case (not falling to `render_generic`) because that
+        // fallback only looks at `args`/`content`, never `value`, and
+        // `${...}`'s entire payload lives in `value`.
+        "interp" => render_interp(el),
         _ => render_generic(el, kind.as_str(), inline),
+    }
+}
+
+/// Re-renders an `InterpExpr` back to `${...}`-shaped source text. Not
+/// shared via `typedmark-ast`: rendering back to text is each consumer's
+/// own job here, same as `render_value_inner`-equivalent helpers already
+/// are for `Value` elsewhere in this file.
+fn render_interp(el: &Element) -> String {
+    match &el.value {
+        Some(ElementValue::Interp(expr)) => format!("${{{}}}", render_interp_expr(expr)),
+        _ => String::new(),
+    }
+}
+
+fn render_interp_expr(expr: &InterpExpr) -> String {
+    match &expr.kind {
+        InterpExprKind::Identifier(name) => name.clone(),
+        InterpExprKind::Literal(Literal::Int(i)) => i.to_string(),
+        InterpExprKind::Literal(Literal::Float(x)) => x.to_string(),
+        InterpExprKind::Literal(Literal::String(s)) => format!("{s:?}"),
+        InterpExprKind::Call { callee, args } => {
+            let args = args.iter().map(render_interp_expr).collect::<Vec<_>>();
+            format!("{}({})", render_interp_expr(callee), args.join(", "))
+        }
+        InterpExprKind::Member { object, member } => {
+            format!("{}.{member}", render_interp_expr(object))
+        }
     }
 }
 

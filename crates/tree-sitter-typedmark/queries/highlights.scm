@@ -66,6 +66,14 @@
 (type_element name: (identifier) @tag)
 (at_element name: (identifier) @tag)
 
+; `${...}` interpolation -- sigil/brace treated like other structural
+; delimiters (`@punctuation.special`, matching `heading_marker`/
+; `fence_marker` above), the call name colored like a function call.
+"${" @punctuation.special
+(interpolation "}" @punctuation.special)
+(interp_call name: (identifier) @function)
+(number) @number
+
 ; `(args)`/`[content]`/`{value}` group delimiters.
 (args_group "(" @punctuation.bracket)
 (args_group ")" @punctuation.bracket)

@@ -19,6 +19,7 @@ members = [
 
   #[ Core ]
   "crates/typedmark-ast",
+  "crates/typedmark-walk",
   "crates/typedmark-lexar",
   "crates/typedmark-parser",
   "crates/typedmark-semantics",
@@ -43,9 +44,11 @@ edition = "2024"
 
 [workspace.dependencies]
 typedmark-ast = { path = "crates/typedmark-ast" }
+typedmark-walk = { path = "crates/typedmark-walk" }
 typedmark-lexar = { path = "crates/typedmark-lexar" }
 typedmark-parser = { path = "crates/typedmark-parser" }
 typedmark-semantics = { path = "crates/typedmark-semantics" }
+typedmark-resolve = { path = "crates/typedmark-resolve" }
 typedmark-formatter = { path = "crates/typedmark-formatter" }
 serde_typedmark = { path = "crates/serde_typedmark" }
 #[ Converter ]

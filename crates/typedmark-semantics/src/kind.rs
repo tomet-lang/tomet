@@ -38,6 +38,11 @@ pub enum ElementKind {
     /// ambiguity the old stringly-typed `element_kind()` already had --
     /// not a regression.
     Bare,
+    /// `Sigil::Dollar` -- `${...}` interpolation. A dedicated kind (not
+    /// `Custom`) since, like `Em`/`Hr`/`Ref`, it's built-in recognized
+    /// syntax with fixed grammar-level meaning, not an arbitrary
+    /// user-chosen element name.
+    Interp,
 }
 
 impl ElementKind {
@@ -62,6 +67,7 @@ impl ElementKind {
             ElementKind::Blockquote => "blockquote",
             ElementKind::Custom(name) => name,
             ElementKind::Bare => "bare",
+            ElementKind::Interp => "interp",
         }
     }
 }
@@ -135,6 +141,7 @@ pub fn classify(el: &Element) -> ElementKind {
             None => ElementKind::Custom("at".to_string()),
         },
         Sigil::Bare => ElementKind::Bare,
+        Sigil::Dollar => ElementKind::Interp,
     }
 }
 
@@ -226,5 +233,11 @@ mod tests {
     fn bare_sigil_is_always_bare() {
         let el = Element::new(Sigil::Bare);
         assert_eq!(classify(&el), ElementKind::Bare);
+    }
+
+    #[test]
+    fn dollar_sigil_is_always_interp() {
+        let el = Element::new(Sigil::Dollar);
+        assert_eq!(classify(&el), ElementKind::Interp);
     }
 }

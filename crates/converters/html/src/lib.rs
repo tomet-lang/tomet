@@ -9,7 +9,10 @@
 //! `@meta` carries no visible content, and `@links{}` containers render
 //! their bare children as a definition list of anchors.
 
-use typedmark_ast::{Block, Document, Element, ElementValue, Heading, Inline, ListItem, Value};
+use typedmark_ast::{
+    Block, Document, Element, ElementValue, Heading, Inline, InterpExpr, InterpExprKind, ListItem,
+    Literal, Value,
+};
 use typedmark_semantics::classify;
 
 const DEFAULT_STYLE: &str = "\
@@ -471,6 +474,33 @@ fn render_element_value(value: &ElementValue, out: &mut String) {
                 render_element(child, out, false);
             }
             out.push_str("</div>\n");
+        }
+        ElementValue::Interp(expr) => {
+            out.push_str("<span class=\"tm-value\">");
+            out.push_str(&escape_html(&render_interp_expr(expr)));
+            out.push_str("</span>");
+        }
+    }
+}
+
+/// Re-renders an `InterpExpr` back to `${...}`-shaped source text --
+/// evaluation (resolving an `Identifier`/`Member`, calling a `Call`)
+/// isn't implemented yet, so this is display-only, same treatment an
+/// unrecognized element gets. Not shared via `typedmark-ast`: rendering
+/// back to text is each consumer's own job here, same as
+/// `render_value_inner`/`value_to_plain` already are for `Value`.
+fn render_interp_expr(expr: &InterpExpr) -> String {
+    match &expr.kind {
+        InterpExprKind::Identifier(name) => name.clone(),
+        InterpExprKind::Literal(Literal::Int(i)) => i.to_string(),
+        InterpExprKind::Literal(Literal::Float(x)) => x.to_string(),
+        InterpExprKind::Literal(Literal::String(s)) => format!("{s:?}"),
+        InterpExprKind::Call { callee, args } => {
+            let args = args.iter().map(render_interp_expr).collect::<Vec<_>>();
+            format!("{}({})", render_interp_expr(callee), args.join(", "))
+        }
+        InterpExprKind::Member { object, member } => {
+            format!("{}.{member}", render_interp_expr(object))
         }
     }
 }

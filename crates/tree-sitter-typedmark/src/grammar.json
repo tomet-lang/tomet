@@ -502,6 +502,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "interpolation"
+        },
+        {
+          "type": "SYMBOL",
           "name": "punctuation"
         }
       ]
@@ -521,7 +525,7 @@
     },
     "text": {
       "type": "PATTERN",
-      "value": "[^\\n`*_=<@()\\[{\\]/-]+"
+      "value": "[^\\n`*_=<@$()\\[{\\]/-]+"
     },
     "punctuation": {
       "type": "CHOICE",
@@ -533,6 +537,10 @@
         {
           "type": "STRING",
           "value": "-"
+        },
+        {
+          "type": "STRING",
+          "value": "$"
         }
       ]
     },
@@ -671,6 +679,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "interpolation"
+        },
+        {
+          "type": "SYMBOL",
           "name": "_newline"
         },
         {
@@ -681,7 +693,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`*=<@()\\[{\\]/]+"
+            "value": "[^\\n`*=<@$()\\[{\\]/]+"
           },
           "named": true,
           "value": "text"
@@ -709,6 +721,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "interpolation"
+        },
+        {
+          "type": "SYMBOL",
           "name": "_newline"
         },
         {
@@ -719,7 +735,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`_=<@()\\[{\\]/]+"
+            "value": "[^\\n`_=<@$()\\[{\\]/]+"
           },
           "named": true,
           "value": "text"
@@ -751,6 +767,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "interpolation"
+        },
+        {
+          "type": "SYMBOL",
           "name": "_newline"
         },
         {
@@ -761,12 +781,115 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`*_=<@()\\[{\\]/]+"
+            "value": "[^\\n`*_=<@$()\\[{\\]/]+"
           },
           "named": true,
           "value": "text"
         }
       ]
+    },
+    "interpolation": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "TOKEN",
+          "content": {
+            "type": "PREC",
+            "value": 1,
+            "content": {
+              "type": "STRING",
+              "value": "${"
+            }
+          }
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_interp_expr"
+        },
+        {
+          "type": "STRING",
+          "value": "}"
+        }
+      ]
+    },
+    "_interp_expr": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "interp_call"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "number"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "string"
+        }
+      ]
+    },
+    "interp_call": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_interp_expr"
+                },
+                {
+                  "type": "REPEAT",
+                  "content": {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": ","
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "_interp_expr"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        }
+      ]
+    },
+    "number": {
+      "type": "PATTERN",
+      "value": "-?[0-9]+(\\.[0-9]+)?"
     },
     "element": {
       "type": "CHOICE",

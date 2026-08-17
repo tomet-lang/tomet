@@ -111,8 +111,7 @@ mod tests {
     use typedmark_ast::Element;
 
     fn fixture(name: &str) -> std::path::PathBuf {
-        std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures"))
-            .join(name)
+        std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures")).join(name)
     }
 
     #[test]

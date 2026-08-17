@@ -254,6 +254,13 @@ pub enum Sigil {
     /// `ElementValue::Children` (e.g. the `(1)[...]` entries inside
     /// `@links{ ... }`), where the container already supplies the type.
     Bare,
+    /// `${...}` interpolation -- structurally just a sigil with a
+    /// mandatory `{value}` group, same shape as `@name{value}`, so it
+    /// reuses `Element`/`Inline::Element` rather than being a separate
+    /// `Inline` variant. No name of its own (unlike `Type`/`At`): the
+    /// `InterpExpr` inside the `ElementValue::Interp` value group carries
+    /// its own path/call name.
+    Dollar,
 }
 
 /// `(args)` / `[content]` / `{value}`, each optional and at most one of each,
@@ -285,9 +292,55 @@ impl Element {
 }
 
 /// The contents of an element's `{value}` group: either plain data, or (for
-/// container elements like `@links{}`) a list of nested elements.
+/// container elements like `@links{}`) a list of nested elements, or (for
+/// `Sigil::Dollar`'s `${...}` only) an unresolved interpolation expression.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ElementValue {
     Data(Value),
     Children(Vec<Element>),
+    Interp(InterpExpr),
+}
+
+/// One node of a `${...}` interpolation's parsed expression tree.
+/// Grammar-only: this is an unresolved syntax tree -- looking up an
+/// `Identifier`/`Member`'s referenced element or calling a `Call`'s
+/// function is `typedmark-resolve`/`typedmark-compute`'s job, not this
+/// crate's. Deliberately not `Value`-shaped: `Value` can't distinguish a
+/// bare identifier reference from a quoted string literal (both collapse
+/// to the same `Value::String` once parsed), and can't represent a
+/// nested `Call`/`Member` as an argument or object.
+///
+/// No infix operators yet (`${a + b}` stays an open idea, not parsed).
+#[derive(Debug, Clone, PartialEq)]
+pub struct InterpExpr {
+    pub kind: InterpExprKind,
+    pub span: Span,
+}
+
+/// `Call`'s `callee` and `Member`'s `object` are boxed sub-expressions
+/// (not a bare `String` name), so postfix chains compose freely:
+/// `a.b(x)` (call a member) and `b(x).id` (access a member of a call's
+/// result) are both just nested `Member`/`Call` wrapping, not two
+/// separate mechanisms. A plain dotted path like `a.b.c` is the same
+/// `Member` recursion with no `Call` in the chain -- there's no separate
+/// flat `Path` variant, since `Member` alone already covers it.
+#[derive(Debug, Clone, PartialEq)]
+pub enum InterpExprKind {
+    Identifier(String),
+    Literal(Literal),
+    Call {
+        callee: Box<InterpExpr>,
+        args: Vec<InterpExpr>,
+    },
+    Member {
+        object: Box<InterpExpr>,
+        member: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal {
+    Int(i64),
+    Float(f64),
+    String(String),
 }

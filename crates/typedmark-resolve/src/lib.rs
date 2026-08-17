@@ -33,7 +33,9 @@
 //! leftover/draft content, not a settled design.
 
 mod error;
+mod interp;
 mod settings;
 
 pub use error::ResolveError;
+pub use interp::resolve_reference;
 pub use settings::{resolve_settings_file, resolve_settings_ref, settings_file_ref};
