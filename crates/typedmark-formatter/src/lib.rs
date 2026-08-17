@@ -218,7 +218,7 @@ mod tests {
     fn does_not_change_the_parsed_document() {
         for src in [
             include_str!("../../../docs/readme.ja.tm"),
-            include_str!("../../../docs/tmt/examples/image_meta.tm"),
+            include_str!("../../../docs/tmt/examples/image.meta.tm"),
             include_str!("../../../docs/develop/roadmap.ja.tm"),
         ] {
             let before = typedmark_parser::parse_document(src)
@@ -233,7 +233,7 @@ mod tests {
     fn repo_examples() -> Vec<&'static str> {
         vec![
             include_str!("../../../docs/readme.ja.tm"),
-            include_str!("../../../docs/tmt/examples/image_meta.tm"),
+            include_str!("../../../docs/tmt/examples/image.meta.tm"),
             include_str!("../../../docs/ja/cheatsheet.tm"),
             include_str!("../../../docs/develop/roadmap.ja.tm"),
         ]

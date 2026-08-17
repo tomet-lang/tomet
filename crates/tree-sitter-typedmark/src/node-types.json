@@ -122,6 +122,10 @@
           "named": true
         },
         {
+          "type": "interpolation",
+          "named": true
+        },
+        {
           "type": "mark",
           "named": true
         },
@@ -224,6 +228,10 @@
           "named": true
         },
         {
+          "type": "interpolation",
+          "named": true
+        },
+        {
           "type": "mark",
           "named": true
         },
@@ -309,6 +317,10 @@
             "named": true
           },
           {
+            "type": "interpolation",
+            "named": true
+          },
+          {
             "type": "mark",
             "named": true
           },
@@ -336,6 +348,71 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "interp_call",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "interp_call",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "interpolation",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "interp_call",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -440,6 +517,10 @@
           "named": true
         },
         {
+          "type": "interpolation",
+          "named": true
+        },
+        {
           "type": "punctuation",
           "named": true
         },
@@ -515,6 +596,10 @@
           "named": true
         },
         {
+          "type": "interpolation",
+          "named": true
+        },
+        {
           "type": "mark",
           "named": true
         },
@@ -555,6 +640,10 @@
         },
         {
           "type": "emphasis",
+          "named": true
+        },
+        {
+          "type": "interpolation",
           "named": true
         },
         {
@@ -634,6 +723,10 @@
           "named": true
         },
         {
+          "type": "interpolation",
+          "named": true
+        },
+        {
           "type": "mark",
           "named": true
         },
@@ -685,6 +778,10 @@
           },
           {
             "type": "emphasis",
+            "named": true
+          },
+          {
+            "type": "interpolation",
             "named": true
           },
           {
@@ -812,6 +909,10 @@
           "named": true
         },
         {
+          "type": "interpolation",
+          "named": true
+        },
+        {
           "type": "mark",
           "named": true
         },
@@ -875,6 +976,14 @@
         }
       ]
     }
+  },
+  {
+    "type": "$",
+    "named": false
+  },
+  {
+    "type": "${",
+    "named": false
   },
   {
     "type": "(",
@@ -962,6 +1071,10 @@
   },
   {
     "type": "line_comment",
+    "named": true
+  },
+  {
+    "type": "number",
     "named": true
   },
   {

@@ -114,7 +114,7 @@ fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
             let key_exists_in_args = el.args.as_ref().map_or(false, |v| value_has_key(v, target_key));
             let key_exists_in_val = el.value.as_ref().map_or(false, |v| match v {
                 ElementValue::Data(data_val) => value_has_key(data_val, target_key),
-                ElementValue::Children(_) => false,
+                ElementValue::Children(_) | ElementValue::Interp(_) => false,
             });
             if !key_exists_in_args && !key_exists_in_val {
                 return false;
@@ -127,7 +127,7 @@ fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
             let in_args = el.args.as_ref().map_or(false, |v| value_contains_str(v, sub));
             let in_val = el.value.as_ref().map_or(false, |v| match v {
                 ElementValue::Data(data_val) => value_contains_str(data_val, sub),
-                ElementValue::Children(_) => false,
+                ElementValue::Children(_) | ElementValue::Interp(_) => false,
             });
             if !in_args && !in_val {
                 return false;

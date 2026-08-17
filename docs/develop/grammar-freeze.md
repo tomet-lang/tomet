@@ -24,11 +24,13 @@ parses, what it means, or what's an error requires:
 
 This is a freeze on *breaking* changes to already-decided syntax, not a
 promise that the language stops growing. Constructs marked `// 未実装`
-throughout `docs/ja/specifications/*.tm` (variable expansion `$()`/
-`${}`, dotted-key nesting shorthand `group.key:value`, `@import`, the
-`kdl` embedded format, `@this`, and the `<icon>`/`<index>`/`<callout>`
-built-ins) don't exist yet and remain open to design -- adding one of
-them is new surface, not a break of frozen surface.
+throughout `docs/ja/specifications/*.tm` (dotted-key nesting shorthand
+`group.key:value`, `@import`, the `kdl` embedded format, `@this`, and
+the `<icon>`/`<index>`/`<callout>` built-ins) don't exist yet and remain
+open to design -- adding one of them is new surface, not a break of
+frozen surface. `${...}` interpolation (`$()` was considered and
+rejected as a competing sigil, not merely deferred) is no longer on this
+open list -- see "What's frozen" below.
 
 ## What's frozen
 
@@ -61,6 +63,11 @@ them is new surface, not a break of frozen surface.
 - **Embedded formats stay an escape hatch, not a `Value` syntax
   expansion**: `format: json|yaml|toml` inside `{value}`, not new
   `Value` grammar competing with dedicated serialization formats.
+- **`${...}` interpolation, v1 grammar**: `${Path}` (`${a.b.c}`) and
+  `${Call}` (`${sum(a, b)}`, args recursively `Expr`), no infix
+  operators yet -- grammar/AST only, evaluation is still
+  `typedmark-resolve`/`typedmark-compute`'s unimplemented job. See
+  `docs/reviews/2026-08-17-interpolation-syntax.md`.
 
 ## What this unblocks
 

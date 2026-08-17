@@ -110,9 +110,22 @@ converts `Document` back into TypedMark's own source, not another format.
   newline, collapsed blank-line runs) while using AST `Span` metadata to losslessly
   preserve literal spacing and line breaks inside verbatim content (`<codeblock>[...]`
   or elements with `content:raw`).
-- **`typedmark-validator`**: not implemented yet -- currently just the
-  `cargo new` boilerplate (`add(left, right)` + its test). Reserved in the
-  workspace for future `.tm` schema/lint validation.
+- **`typedmark-walk`**: generic recursive traversal of a `Document`'s
+  tree (`Heading`/`ListItem`/`Element`, including ones nested inside an
+  element's `[content]` and `ElementValue::Children`), depending on
+  nothing but `typedmark-ast`. Exists because `typedmark-validator` and
+  `typedmark-resolve` each independently hand-rolled the same tree-walk
+  shape for unrelated reasons (duplicate-id collection vs. `${id}`
+  lookup) -- the same "don't let two consumers silently reimplement the
+  same thing" motivation `typedmark-semantics` was extracted for.
+  Consumers implement a `Visitor<B>` (one `visit(Node) ->
+  ControlFlow<B>` method) and get to either collect everything
+  (`Continue` always) or stop at the first match and carry a result out
+  through `Break(b)`.
+- **`typedmark-validator`**: `.tm` schema/lint validation. Currently one
+  rule -- duplicate `{id:...}`/`(id:...)` detection across a `Document`,
+  built on `typedmark-walk`. Read-only: no I/O, no reference resolution
+  (that's `typedmark-resolve`), no computation (`typedmark-compute`).
 - **`typedmark-resolve`**: not a pipeline stage in the same sense as the
   above -- an independent "preprocessor/linker" layer (the closest
   analogy is C's `#include`) for TypedMark's own file-referencing

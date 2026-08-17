@@ -7,12 +7,12 @@
 use crate::embedded_format::{EmbeddedFormat, parse_embedded_format_value};
 use crate::error::Result;
 use crate::value::{
-    eat_ident, err, find_matching_bracket, find_matching_delimiter, is_ident_char, parse_value_at,
-    skip_inline_ws, skip_ws_and_newlines, skip_ws_newlines_and_comments,
+    eat_ident, err, find_matching_bracket, find_matching_delimiter, is_ident_char, parse_quoted,
+    parse_value_at, skip_inline_ws, skip_ws_and_newlines, skip_ws_newlines_and_comments,
 };
 use typedmark_ast::{
-    Block, Document, Element, ElementValue, Heading, Inline, List, ListItem, Paragraph, Sigil,
-    Text, Value,
+    Block, Document, Element, ElementValue, Heading, Inline, InterpExpr, InterpExprKind, List,
+    ListItem, Literal, Paragraph, Sigil, Text, Value,
 };
 use typedmark_lexar::Cursor;
 
@@ -641,6 +641,12 @@ fn parse_inline_seq(
             text_start = cur.pos();
             continue;
         }
+        if cur.peek() == Some('$') && is_interp_start(cur) {
+            flush_text(&mut items, cur, &mut text_start);
+            items.push(Inline::Element(parse_dollar_element(cur)?));
+            text_start = cur.pos();
+            continue;
+        }
         if matches!(cur.peek(), Some('*') | Some('_') | Some('=')) {
             // `try_delimited` mutates `cur` past the whole span on success,
             // so the pending-text flush has to use the position from
@@ -981,6 +987,206 @@ fn parse_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Re
     }
     el.span = cur.span_from(start_pos);
     Ok(el)
+}
+
+/// `$` immediately followed by `{` -- unlike `@name`, `$` never takes an
+/// identifier of its own before its brace group, so no gap/name lookahead
+/// is needed. A `$` not immediately followed by `{` (`$5`, `$ {x}`) isn't
+/// recognized at all and falls through to plain text, same as an `@` that
+/// doesn't resolve to a real element.
+fn is_interp_start(cur: &Cursor) -> bool {
+    let mut look = *cur;
+    look.bump() == Some('$') && look.peek() == Some('{')
+}
+
+/// `${ Expr }` -- structurally just `Sigil::Dollar` with a mandatory
+/// `{value}` group, the same shape as `@name{value}` (no `name` of its
+/// own, no `(args)`/`[content]` groups in v1), so it produces a real
+/// `Element` rather than a bespoke node -- `parse_inline_seq`'s caller
+/// wraps it in `Inline::Element` exactly like `@`/`<T>`. Grammar-only:
+/// the `InterpExpr` inside doesn't look anything up. Inline whitespace is
+/// allowed around the expression; newlines are not (there's no
+/// `skip_ws_and_newlines` call anywhere in this function), which
+/// deliberately keeps `${...}` a single-line construct with no
+/// interaction with `Stop::Paragraph`'s lazy-continuation logic.
+fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
+    let start_pos = cur.pos();
+    cur.eat_str("$");
+    cur.eat_str("{");
+    skip_inline_ws(cur);
+    if cur.peek() == Some('}') {
+        return Err(err(
+            cur,
+            cur.pos(),
+            "empty interpolation, expected an expression",
+        ));
+    }
+    let expr = parse_interp_expr(cur)?;
+    skip_inline_ws(cur);
+    if !cur.eat_str("}") {
+        return Err(err(cur, cur.pos(), "unterminated '${', expected '}'"));
+    }
+    let mut el = Element::new(Sigil::Dollar);
+    el.value = Some(ElementValue::Interp(expr));
+    el.span = cur.span_from(start_pos);
+    Ok(el)
+}
+
+/// `primary (. Ident | ( Args ))*` -- a standard postfix-chain parser.
+/// `primary` is an identifier or a literal; each trailing `.member` wraps
+/// the expression-so-far in `Member`, each trailing `(args)` wraps it in
+/// `Call`. So `a.b.c` (a pure dotted chain), `sum(a, b)` (a call), and
+/// `b(x).id` (member access on a call's result) all fall out of the same
+/// loop -- there's no separate flat "path" grammar; `Member` alone covers
+/// a dotted chain when no `Call` appears in it.
+fn parse_interp_expr(cur: &mut Cursor) -> Result<InterpExpr> {
+    skip_inline_ws(cur);
+    let start_pos = cur.pos();
+    let mut expr = parse_interp_primary(cur, start_pos)?;
+    loop {
+        let mut look = *cur;
+        skip_inline_ws(&mut look);
+        match look.peek() {
+            Some('.') => {
+                look.bump();
+                skip_inline_ws(&mut look);
+                *cur = look;
+                let member = eat_interp_ident(cur)?.to_string();
+                expr = InterpExpr {
+                    kind: InterpExprKind::Member {
+                        object: Box::new(expr),
+                        member,
+                    },
+                    span: cur.span_from(start_pos),
+                };
+            }
+            Some('(') => {
+                *cur = look;
+                let args = parse_interp_call_args(cur)?;
+                expr = InterpExpr {
+                    kind: InterpExprKind::Call {
+                        callee: Box::new(expr),
+                        args,
+                    },
+                    span: cur.span_from(start_pos),
+                };
+            }
+            _ => break,
+        }
+    }
+    Ok(expr)
+}
+
+/// An identifier or a literal (string/number). `start_pos` is the
+/// caller's already-whitespace-skipped position, shared so the returned
+/// node's span starts exactly at the token, not before any leading gap.
+fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr> {
+    match cur.peek() {
+        Some('"') => {
+            let s = parse_quoted(cur)?;
+            Ok(InterpExpr {
+                kind: InterpExprKind::Literal(Literal::String(s)),
+                span: cur.span_from(start_pos),
+            })
+        }
+        Some(c) if c.is_ascii_digit() => parse_interp_number(cur, start_pos),
+        Some('-') if cur.peek_at(1).is_some_and(|c| c.is_ascii_digit()) => {
+            parse_interp_number(cur, start_pos)
+        }
+        Some(c) if is_interp_ident_start(c) => {
+            let name = eat_interp_ident(cur)?.to_string();
+            Ok(InterpExpr {
+                kind: InterpExprKind::Identifier(name),
+                span: cur.span_from(start_pos),
+            })
+        }
+        _ => Err(err(
+            cur,
+            cur.pos(),
+            "expected a value, identifier, or call in '${...}'",
+        )),
+    }
+}
+
+fn parse_interp_call_args(cur: &mut Cursor) -> Result<Vec<InterpExpr>> {
+    cur.eat_str("(");
+    skip_inline_ws(cur);
+    let mut args = Vec::new();
+    if cur.peek() != Some(')') {
+        loop {
+            args.push(parse_interp_expr(cur)?);
+            skip_inline_ws(cur);
+            match cur.peek() {
+                Some(',') => {
+                    cur.bump();
+                    skip_inline_ws(cur);
+                }
+                Some(')') => break,
+                _ => return Err(err(cur, cur.pos(), "expected ',' or ')' in call arguments")),
+            }
+        }
+    }
+    if !cur.eat_str(")") {
+        return Err(err(cur, cur.pos(), "expected ')'"));
+    }
+    Ok(args)
+}
+
+/// Deliberately its own scanner, not `value.rs`'s `eat_scalar_raw`/
+/// `scalar_from_text`: those can't tell a float's `.` apart from a
+/// following `.member` access's separator. Requires a digit right after
+/// `.` to commit to a float, so `${1.foo}` parses `Literal::Int(1)` and
+/// leaves `.foo` for `parse_interp_expr`'s postfix loop to read as a
+/// (semantically odd, but not a parse error) `Member` access, rather than
+/// silently swallowing it.
+fn parse_interp_number(cur: &mut Cursor, start: usize) -> Result<InterpExpr> {
+    if cur.peek() == Some('-') {
+        cur.bump();
+    }
+    let digits = cur.eat_while(|c| c.is_ascii_digit());
+    if digits.is_empty() {
+        return Err(err(cur, cur.pos(), "expected digits"));
+    }
+    let mut is_float = false;
+    if cur.peek() == Some('.') && cur.peek_at(1).is_some_and(|c| c.is_ascii_digit()) {
+        is_float = true;
+        cur.bump();
+        cur.eat_while(|c| c.is_ascii_digit());
+    }
+    let text = cur.slice_from(start);
+    let literal = if is_float {
+        text.parse::<f64>()
+            .map(Literal::Float)
+            .map_err(|_| err(cur, start, "invalid float literal"))?
+    } else {
+        text.parse::<i64>()
+            .map(Literal::Int)
+            .map_err(|_| err(cur, start, "invalid integer literal"))?
+    };
+    Ok(InterpExpr {
+        kind: InterpExprKind::Literal(literal),
+        span: cur.span_from(start),
+    })
+}
+
+/// Deliberately its own predicate, not `value.rs`'s `is_ident_char`: that
+/// one treats both `.` and `-` as ident characters (map keys/bare scalars
+/// like `file-name.ext`), which would swallow a `Path`'s `a.b.c` into one
+/// opaque token instead of three dot-separated segments.
+fn is_interp_ident_start(c: char) -> bool {
+    c.is_alphabetic() || c == '_'
+}
+
+fn is_interp_ident_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
+fn eat_interp_ident<'a>(cur: &mut Cursor<'a>) -> Result<&'a str> {
+    let start = cur.pos();
+    if !cur.peek().is_some_and(is_interp_ident_start) {
+        return Err(err(cur, start, "expected an identifier"));
+    }
+    Ok(cur.eat_while(is_interp_ident_char))
 }
 
 fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {

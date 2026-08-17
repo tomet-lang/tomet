@@ -1,7 +1,8 @@
 //! Printer module to serialize `typedmark_ast::Document` back to `.tm` text syntax.
 
 use typedmark_ast::{
-    Block, Document, Element, ElementValue, Heading, Inline, List, Sigil, Value,
+    Block, Document, Element, ElementValue, Heading, Inline, InterpExpr, InterpExprKind, List,
+    Literal, Sigil, Value,
 };
 
 /// Serialize a [`Document`] AST into TypedMark (`.tm`) source string.
@@ -96,6 +97,9 @@ pub fn render_element(el: &Element) -> String {
             out.push('@');
         }
         Sigil::Bare => {}
+        Sigil::Dollar => {
+            out.push('$');
+        }
     }
 
     if let Some(args) = &el.args {
@@ -122,11 +126,36 @@ pub fn render_element(el: &Element) -> String {
                     out.push_str(&render_element(child));
                 }
             }
+            ElementValue::Interp(expr) => out.push_str(&render_interp_expr(expr)),
         }
         out.push('}');
     }
 
     out
+}
+
+/// Re-renders an `InterpExpr` back to source text for round-tripping
+/// (the interior of `${...}`, no surrounding braces -- the caller already
+/// adds those as part of `Sigil::Dollar`'s generic `{value}` rendering).
+/// `String` is always quoted, unlike `render_value_inner`'s conditional
+/// quoting: unlike a `Value::String`, an `InterpExprKind::Literal(Literal::String(_))`
+/// only ever comes from an explicitly `"..."`-quoted source token
+/// (`document.rs::parse_interp_primary`), never a bare identifier, so it
+/// always needs the quotes back.
+pub fn render_interp_expr(expr: &InterpExpr) -> String {
+    match &expr.kind {
+        InterpExprKind::Identifier(name) => name.clone(),
+        InterpExprKind::Literal(Literal::Int(i)) => i.to_string(),
+        InterpExprKind::Literal(Literal::Float(f)) => f.to_string(),
+        InterpExprKind::Literal(Literal::String(s)) => format!("\"{s}\""),
+        InterpExprKind::Call { callee, args } => {
+            let rendered: Vec<_> = args.iter().map(render_interp_expr).collect();
+            format!("{}({})", render_interp_expr(callee), rendered.join(", "))
+        }
+        InterpExprKind::Member { object, member } => {
+            format!("{}.{member}", render_interp_expr(object))
+        }
+    }
 }
 
 pub fn render_value(v: &Value) -> String {

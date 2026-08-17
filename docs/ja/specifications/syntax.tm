@@ -12,8 +12,9 @@
 - (marker) content   // marker は key:value の args ではなく () や [] で囲んだ自由文字列
 -. (marker) content
 ---[]---
-// ${}               // 未実装
-// $()               // 未実装
+${xxx}               // 実装済み: `${id}` / `${a.b}` / `${sum(a, b)}` の構文解析のみ。
+                      // 参照解決/関数評価はtypedmark-resolve/typedmark-computeの未実装分。
+                      // 詳細: docs/reviews/2026-08-17-interpolation-syntax.md
 // xxx
 /*  */
 ```

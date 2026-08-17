@@ -1568,6 +1568,11 @@ version = "0.1.0"
 [[package]]
 name = "typedmark-compute"
 version = "0.1.0"
+dependencies = [
+ "typedmark-ast",
+ "typedmark-parser",
+ "typedmark-resolve",
+]
 
 [[package]]
 name = "typedmark-formatter"
@@ -1652,6 +1657,7 @@ version = "0.1.0"
 dependencies = [
  "typedmark-ast",
  "typedmark-parser",
+ "typedmark-walk",
 ]
 
 [[package]]
@@ -1665,6 +1671,19 @@ dependencies = [
 [[package]]
 name = "typedmark-validator"
 version = "0.1.0"
+dependencies = [
+ "typedmark-ast",
+ "typedmark-parser",
+ "typedmark-walk",
+]
+
+[[package]]
+name = "typedmark-walk"
+version = "0.1.0"
+dependencies = [
+ "typedmark-ast",
+ "typedmark-parser",
+]
 
 [[package]]
 name = "typedmark-web"

@@ -69,7 +69,7 @@
 //!   `more_than_three_dashes_are_only_partially_consumed_by_thematic_break`.
 //! - **A `key: [seq]` map entry, when it's the map's last entry with no
 //!   trailing comma** (e.g. `{ title: ..., tags: [a, b] }` on one line, as
-//!   in `docs/tmt/examples/image_meta.tm`'s `@meta(format:yaml){...}`), gets GLR-merged
+//!   in `docs/tmt/examples/image.meta.tm`'s `@meta(format:yaml){...}`), gets GLR-merged
 //!   with a second, spurious top-level `seq` reading of the same `[a, b]`
 //!   text, wrapping the whole map in an `ERROR`. Same family as `map`'s
 //!   own trailing-gap-vs-more-entries ambiguity below (`conflicts:
@@ -143,7 +143,7 @@
 //! of what (if anything) validly followed.
 //!
 //! Verified against real content: `cargo test` in this crate parses
-//! `docs/tmt/typedmark.tm` and `docs/tmt/examples/image_meta.tm` and checks that
+//! `docs/tmt/typedmark.tm` and `docs/tmt/examples/image.meta.tm` and checks that
 //! the only `ERROR`/`MISSING` nodes are the known, narrow cases above --
 //! not that there are none. `docs/tmt/typedmark.tm` also has one
 //! pre-existing case (`###[ [] のルール ]`, a `[]` immediately inside a
@@ -373,6 +373,20 @@ mod tests {
     }
 
     #[test]
+    fn parses_interpolation_path_and_call() {
+        for src in ["${id}\n", "${a.b.c}\n", "${sum(a, mul(b, c))}\n", "${ 1.5 }\n"] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}"
+            );
+        }
+        let tree = parse("${sum(a, b)}\n");
+        assert!(find_kind(tree.root_node(), "interpolation").is_some());
+        assert!(find_kind(tree.root_node(), "interp_call").is_some());
+    }
+
+    #[test]
     fn bare_non_colon_scalar_parses_cleanly() {
         // Used to be a known limitation (see `scanner.c`'s module doc for
         // the mechanism `$._bare_word_no_colon` fixes): `scalar`/
@@ -525,7 +539,7 @@ mod tests {
 
     #[test]
     fn image_meta_tm_fixture_has_only_known_error_cases() {
-        let src = include_str!("../../../docs/tmt/examples/image_meta.tm");
+        let src = include_str!("../../../docs/tmt/examples/image.meta.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);
         // The lone remaining error wraps `title: value` and `tags: ` --
