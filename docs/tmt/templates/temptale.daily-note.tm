@@ -1,3 +1,4 @@
+@settings(file:docs/docs.settings.tm)
 @meta{
   type: daily-note
   uuid: ${uuid}

@@ -12,6 +12,7 @@
     bookmark: {
       style: one_line
     },
+    todo: {},
     daily-note: {
       template: "path:ja/features/templates/template.daily-note.tm"
     }
