@@ -374,7 +374,12 @@ mod tests {
 
     #[test]
     fn parses_interpolation_path_and_call() {
-        for src in ["${id}\n", "${a.b.c}\n", "${sum(a, mul(b, c))}\n", "${ 1.5 }\n"] {
+        for src in [
+            "${id}\n",
+            "${a.b.c}\n",
+            "${sum(a, mul(b, c))}\n",
+            "${ 1.5 }\n",
+        ] {
             let tree = parse(src);
             assert!(
                 !tree.root_node().has_error(),
