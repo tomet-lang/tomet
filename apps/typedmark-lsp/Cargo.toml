@@ -8,9 +8,11 @@ name = "typedmark-lsp"
 path = "src/main.rs"
 
 [dependencies]
+typedmark-formatter = { workspace = true }
+typedmark-parser = { workspace = true }
+
+#[ Crates.io ]
 anyhow = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
 serde_json = { workspace = true }
-typedmark-formatter = { workspace = true }
-typedmark-parser = { workspace = true }

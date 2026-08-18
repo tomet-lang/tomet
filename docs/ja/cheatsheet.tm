@@ -93,6 +93,7 @@ ${sum(a, b)}
 <embed>[alt](url:https://)
 <embed>[alt](file:/readme.md)
 <embed>[alt](ref:3)
+// 現在のコードでは、src:になってしまっているので、要変更
 
 <codeblock>(lang:sh)[
 sudo whoami

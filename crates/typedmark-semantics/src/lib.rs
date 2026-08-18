@@ -11,7 +11,10 @@
 mod infer;
 mod kind;
 mod meta;
+mod positional;
 
 pub use infer::{INFERRED_AT_KEYS, infer_at_kind};
 pub use kind::{ElementKind, classify};
 pub use meta::document_meta;
+pub use positional::{builtin_positional_arg_key, normalized_element_args};
+

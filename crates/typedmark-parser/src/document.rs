@@ -1291,19 +1291,27 @@ fn is_verbatim_content(el: &Element) -> bool {
 ///   format (e.g. `format:none`, `format:xml`) -- an explicit opt-out to
 ///   the lightweight grammar, even over an active document default.
 /// - `Some(Some(fmt))`: `format` key present and recognized.
+fn is_format_target_element(el: &Element) -> bool {
+    matches!(&el.sigil, Sigil::At(Some(name)) | Sigil::Type(name) if name == "meta" || name == "config")
+}
+
 fn local_format_key(el: &Element) -> Option<Option<EmbeddedFormat>> {
-    let Value::Map(entries) = el.args.as_ref()? else {
-        return None;
-    };
-    entries.iter().find_map(|(key, v)| {
-        if key != "format" {
-            return None;
+    let args = el.args.as_ref()?;
+    match args {
+        Value::Map(entries) => entries.iter().find_map(|(key, v)| {
+            if key != "format" {
+                return None;
+            }
+            Some(match v {
+                Value::String(tag) => EmbeddedFormat::from_tag(tag),
+                _ => None,
+            })
+        }),
+        Value::String(tag) if is_format_target_element(el) => {
+            Some(EmbeddedFormat::from_tag(tag))
         }
-        Some(match v {
-            Value::String(tag) => EmbeddedFormat::from_tag(tag),
-            _ => None,
-        })
-    })
+        _ => None,
+    }
 }
 
 fn is_config(el: &Element) -> bool {
