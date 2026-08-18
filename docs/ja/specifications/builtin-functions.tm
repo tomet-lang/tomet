@@ -4,4 +4,4 @@
 // docs/develop/idea.tm の「必要か？な関数」節にある構想メモ($regex, $add, $math, $summary)は
 // まだ候補段階。
 
-// ${function(args)}
+${sum(1, 4)}

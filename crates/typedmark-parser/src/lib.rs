@@ -367,7 +367,9 @@ mod tests {
                     other => panic!("expected ElementValue::Interp, got {other:?}"),
                 }
             }
-            other => panic!("expected a standalone ${{...}} to collapse to Block::Element, got {other:?}"),
+            other => panic!(
+                "expected a standalone ${{...}} to collapse to Block::Element, got {other:?}"
+            ),
         }
     }
 
@@ -450,7 +452,11 @@ mod tests {
         ];
         for (src, expected) in cases {
             let doc = parse_document(&format!("{src}\n")).unwrap();
-            assert_eq!(describe(interp_expr(&doc.blocks[0])), expected, "source: {src}");
+            assert_eq!(
+                describe(interp_expr(&doc.blocks[0])),
+                expected,
+                "source: {src}"
+            );
         }
     }
 
@@ -958,10 +964,7 @@ mod tests {
                         Value::String("rust".to_string())
                     )]))
                 );
-                assert_eq!(
-                    el.content,
-                    Some(vec![Inline::Text("fn main() {}".into())])
-                );
+                assert_eq!(el.content, Some(vec![Inline::Text("fn main() {}".into())]));
             }
             other => panic!("expected a codeblock element, got {other:?}"),
         }
@@ -1077,10 +1080,7 @@ mod tests {
         let doc = parse_document("call `foo()` now\n").unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
-                assert_eq!(
-                    &p.content,
-                    &vec![Inline::Text("call `foo()` now".into())]
-                );
+                assert_eq!(&p.content, &vec![Inline::Text("call `foo()` now".into())]);
             }
             other => panic!("expected a paragraph, got {other:?}"),
         }
@@ -1125,10 +1125,7 @@ mod tests {
         assert_eq!(doc.blocks.len(), 1);
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(
-                    el.args,
-                    Some(Value::Map(vec![("a".into(), Value::Int(1))]))
-                );
+                assert_eq!(el.args, Some(Value::Map(vec![("a".into(), Value::Int(1))])));
                 assert_eq!(el.content, Some(vec![Inline::Text("content".into())]));
             }
             other => panic!("expected an element with both groups, got {other:?}"),

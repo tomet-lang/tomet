@@ -5,9 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-use typedmark_ast::{
-    Block, Document, Element, ElementValue, Inline, Sigil, Value,
-};
+use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
 use typedmark_parser::parse_document;
 use typedmark_semantics::classify;
 
@@ -45,7 +43,12 @@ impl BatchMetaEngine {
     }
 
     /// Set or update a key-value pair in `@meta` across all selected files.
-    pub fn update_meta_key(entries: &mut [MetaFileEntry], target_element: &str, key: &str, new_value: &str) {
+    pub fn update_meta_key(
+        entries: &mut [MetaFileEntry],
+        target_element: &str,
+        key: &str,
+        new_value: &str,
+    ) {
         for entry in entries.iter_mut() {
             if !entry.selected {
                 continue;
@@ -186,7 +189,10 @@ fn value_to_string(v: &Value) -> String {
             format!("[{}]", s.join(", "))
         }
         Value::Map(entries) => {
-            let s: Vec<_> = entries.iter().map(|(k, v)| format!("{k}: {}", value_to_string(v))).collect();
+            let s: Vec<_> = entries
+                .iter()
+                .map(|(k, v)| format!("{k}: {}", value_to_string(v)))
+                .collect();
             format!("{{{}}}", s.join(", "))
         }
     }

@@ -1,11 +1,11 @@
 //! Ratatui UI Layout and widget rendering for TypedMark Workbench TUI.
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Wrap},
-    Frame,
 };
 
 use super::app::{ActiveTab, App, MetaEditTarget};

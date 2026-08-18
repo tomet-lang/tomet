@@ -1209,10 +1209,7 @@ fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
     Ok(v)
 }
 
-fn parse_content(
-    cur: &mut Cursor,
-    default_format: Option<EmbeddedFormat>,
-) -> Result<Vec<Inline>> {
+fn parse_content(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Vec<Inline>> {
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '['"));
     }

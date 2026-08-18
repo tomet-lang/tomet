@@ -4,7 +4,9 @@ use std::path::PathBuf;
 
 use super::engine::batch_meta::{BatchMetaEngine, MetaFileEntry};
 use super::engine::migration::{MigrationEngine, MigrationItem};
-use super::engine::structural::{StructuralAction, StructuralEngine, StructuralMatch, StructuralQuery};
+use super::engine::structural::{
+    StructuralAction, StructuralEngine, StructuralMatch, StructuralQuery,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveTab {
@@ -63,7 +65,8 @@ impl App {
         let mut app = Self {
             dir_path,
             active_tab: ActiveTab::Migration,
-            status_message: "Welcome to TypedMark Workbench! Press Tab/1/2/3 to switch views.".to_string(),
+            status_message: "Welcome to TypedMark Workbench! Press Tab/1/2/3 to switch views."
+                .to_string(),
             should_quit: false,
 
             migration_items,
@@ -221,7 +224,8 @@ impl App {
             ActiveTab::Migration => {
                 match MigrationEngine::execute(&mut self.migration_items, false) {
                     Ok(count) => {
-                        self.status_message = format!("Successfully converted {count} Markdown file(s) to .tm!");
+                        self.status_message =
+                            format!("Successfully converted {count} Markdown file(s) to .tm!");
                         // Re-scan meta entries to reflect newly generated .tm files
                         self.meta_entries = BatchMetaEngine::scan(&self.dir_path);
                     }
@@ -283,9 +287,21 @@ impl App {
 
     pub fn run_structural_query(&mut self) {
         let query = StructuralQuery {
-            tag: if self.query_tag_input.is_empty() { None } else { Some(self.query_tag_input.clone()) },
-            key: if self.query_key_input.is_empty() { None } else { Some(self.query_key_input.clone()) },
-            value_contains: if self.query_val_input.is_empty() { None } else { Some(self.query_val_input.clone()) },
+            tag: if self.query_tag_input.is_empty() {
+                None
+            } else {
+                Some(self.query_tag_input.clone())
+            },
+            key: if self.query_key_input.is_empty() {
+                None
+            } else {
+                Some(self.query_key_input.clone())
+            },
+            value_contains: if self.query_val_input.is_empty() {
+                None
+            } else {
+                Some(self.query_val_input.clone())
+            },
         };
         self.structural_matches = StructuralEngine::search(&self.dir_path, &query);
         self.structural_index = 0;
