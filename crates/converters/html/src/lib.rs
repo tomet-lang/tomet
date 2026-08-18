@@ -13,7 +13,7 @@ use typedmark_ast::{
     Block, Document, Element, ElementValue, Heading, Inline, InterpExpr, InterpExprKind, ListItem,
     Literal, Value,
 };
-use typedmark_semantics::classify;
+use typedmark_semantics::{classify, normalized_element_args};
 
 const DEFAULT_STYLE: &str = "\
 body { font-family: sans-serif; line-height: 1.6; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; }
@@ -313,8 +313,8 @@ fn render_wrapped_inline(el: &Element, tag: &str, out: &mut String) {
 /// if present, is `id`/`cssclass` metadata -- same convention as a
 /// heading's `{ id:x, cssclass:y }`, not code content.
 fn render_codeblock_element(el: &Element, out: &mut String) {
-    let lang = el
-        .args
+    let args = normalized_element_args(el);
+    let lang = args
         .as_ref()
         .and_then(as_map)
         .and_then(|m| map_get(m, "lang"))
@@ -356,11 +356,11 @@ fn render_blockquote_element(el: &Element, out: &mut String, inline: bool) {
 }
 
 fn render_embed_element(el: &Element, out: &mut String) {
-    let src = el
-        .args
+    let args = normalized_element_args(el);
+    let src = args
         .as_ref()
         .and_then(as_map)
-        .and_then(|m| map_get(m, "file").or_else(|| map_get(m, "url")))
+        .and_then(|m| map_get(m, "src").or_else(|| map_get(m, "file")).or_else(|| map_get(m, "url")))
         .map(value_to_plain)
         .unwrap_or_default();
     let alt = el
@@ -976,5 +976,29 @@ mod tests {
             body,
             "<pre id=\"snippet1\" class=\"card\"><code class=\"language-rust\">fn main() {}</code></pre>\n"
         );
+    }
+
+    #[test]
+    fn renders_codeblock_with_positional_lang_arg() {
+        let doc = parse_document("<codeblock>(\"rust\")[fn main() {}]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<pre><code class=\"language-rust\">fn main() {}</code></pre>\n"
+        );
+    }
+
+    #[test]
+    fn renders_embed_with_positional_src_arg() {
+        let doc = parse_document("<embed>(\"assets/pic.png\")[a cat]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(body, "<img src=\"assets/pic.png\" alt=\"a cat\">\n");
+    }
+
+    #[test]
+    fn meta_and_config_with_positional_format_arg_have_no_visible_output() {
+        let doc = parse_document("@meta(\"json\"){\n  {\"key\": \"value\"}\n}\n@config(\"json\")\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(body, "");
     }
 }
