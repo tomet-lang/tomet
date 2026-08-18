@@ -47,9 +47,29 @@ pub(crate) fn skip_ws_and_newlines(cur: &mut Cursor) {
 
 /// `// ...` to end of line/EOF -- the value-grammar sibling of
 /// `document.rs`'s block-level `skip_line_comment`.
-fn skip_line_comment(cur: &mut Cursor) {
+pub(crate) fn skip_line_comment(cur: &mut Cursor) {
     cur.eat_str("//");
     cur.eat_while(|c| c != '\n' && c != '\r');
+}
+
+pub(crate) fn skip_block_comment(cur: &mut Cursor) -> Result<()> {
+    let group_start = cur.pos();
+    cur.eat_str("/*");
+    loop {
+        if cur.is_eof() {
+            return Err(err(
+                cur,
+                group_start,
+                "unterminated block comment '/*', expected '*/'",
+            ));
+        }
+        if cur.starts_with("*/") {
+            cur.eat_str("*/");
+            break;
+        }
+        cur.bump();
+    }
+    Ok(())
 }
 
 /// Like `skip_ws_and_newlines`, but also consumes `//` line comments.

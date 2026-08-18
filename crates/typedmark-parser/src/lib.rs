@@ -1,6 +1,12 @@
+mod codeblock;
 mod document;
+mod element;
 mod embedded_format;
 mod error;
+mod heading;
+mod inline;
+mod interp;
+mod list;
 mod value;
 
 pub use document::parse_document;
@@ -1160,6 +1166,59 @@ mod tests {
                 assert_eq!(&b.content, &vec![Inline::Text("more".into())]);
             }
             other => panic!("expected paragraph, hr, paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn heading_supports_inline_colon_connection() {
+        let doc = parse_document("#[ Overview ]:{ id: intro, tag: main }\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Heading(h) => {
+                assert_eq!(
+                    h.attrs,
+                    Some(Value::Map(vec![
+                        ("id".into(), Value::String("intro".into())),
+                        ("tag".into(), Value::String("main".into())),
+                    ]))
+                );
+            }
+            other => panic!("expected heading, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn element_supports_inline_colon_connection() {
+        let doc = parse_document("<task>[ Task A ]:{ id: taskA, priority: high }\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.sigil, Sigil::Type("task".into()));
+                assert_eq!(
+                    el.value,
+                    Some(ElementValue::Data(Value::Map(vec![
+                        ("id".into(), Value::String("taskA".into())),
+                        ("priority".into(), Value::String("high".into())),
+                    ])))
+                );
+            }
+            other => panic!("expected element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn remote_id_target_element_supports_colon_connection() {
+        let doc = parse_document("<id:taskA>:{ priority: high, tag: dev }\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.sigil, Sigil::Type("id:taskA".into()));
+                assert_eq!(
+                    el.value,
+                    Some(ElementValue::Data(Value::Map(vec![
+                        ("priority".into(), Value::String("high".into())),
+                        ("tag".into(), Value::String("dev".into())),
+                    ])))
+                );
+            }
+            other => panic!("expected remote id element, got {other:?}"),
         }
     }
 }
