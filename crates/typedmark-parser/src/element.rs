@@ -17,7 +17,7 @@ pub(crate) fn is_type_element_start(cur: &Cursor) -> bool {
     if look.bump() != Some('<') {
         return false;
     }
-    let ident = look.eat_while(|c| is_ident_char(c) || c == ':');
+    let ident = look.eat_while(|c| c != '>' && c != '\n' && c != '\r');
     if ident.is_empty() {
         return false;
     }
@@ -76,7 +76,7 @@ pub(crate) fn parse_element(cur: &mut Cursor, default_format: Option<EmbeddedFor
     let start_pos = cur.pos();
     let sigil = if cur.peek() == Some('<') {
         cur.bump();
-        let name = cur.eat_while(|c| is_ident_char(c) || c == ':').to_string();
+        let name = cur.eat_while(|c| c != '>' && c != '\n' && c != '\r').to_string();
         if name.is_empty() {
             return Err(err(cur, cur.pos(), "expected a type name after '<'"));
         }

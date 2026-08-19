@@ -3,6 +3,7 @@
   elements: {
     bookmark: {
       args: { name: string!, count: uint = 0, variant: "a"|"b"|"c" },
+      positional: [ name ],
       content: nested(allow: [callout, codeblock]),
       placement: block,
       singleton: false

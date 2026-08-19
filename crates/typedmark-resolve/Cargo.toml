@@ -6,4 +6,5 @@ edition.workspace = true
 [dependencies]
 typedmark-ast = { workspace = true }
 typedmark-parser = { workspace = true }
+typedmark-semantics = { workspace = true }
 typedmark-walk = { workspace = true }
