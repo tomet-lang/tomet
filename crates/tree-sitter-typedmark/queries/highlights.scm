@@ -60,16 +60,16 @@
 (list_checkbox) @markup.list.checked @constant
 
 ; `<T>`/`@name` element sigils and their name.
-"<" @tag
-">" @tag
-"@" @tag
+(type_element "<" @tag)
+(type_element ">" @tag)
+(at_element "@" @tag)
 (type_element name: (identifier) @tag)
 (at_element name: (identifier) @tag)
 
 ; `${...}` interpolation -- sigil/brace treated like other structural
 ; delimiters (`@punctuation.special`, matching `heading_marker`/
 ; `fence_marker` above), the call name colored like a function call.
-"${" @punctuation.special
+(interpolation "${" @punctuation.special)
 (interpolation "}" @punctuation.special)
 (interp_call name: (identifier) @function)
 (number) @number

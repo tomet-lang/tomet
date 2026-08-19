@@ -19,13 +19,13 @@
 という考えはどうだろうか？
 
 ```(tm)
-@reference[
-  :(asdf-asdf, description: "詳しい説明を記入する？でも、データ内に改行アリで文章を書けるのが、Typedmarkの一つの特徴であるから、要検討。追加概念が必要かもしれない。")
-  :(asdf-asdf)[
+@references[
+  <id:asdf-asdf>:(description: "詳しい説明を記入する？でも、データ内に改行アリで文章を書けるのが、Typedmarkの一つの特徴であるから、要検討。追加概念が必要かもしれない。")
+  <id:asdf-asdf>:[
     <description>[ やるならおそらくこう。 ]
   ]
-  :(asdf-asd2){tag: important}
-  :(ids:[asdf-asdf, asdf-asd2])[ `:`は、新たなElementという認識が可能なため、idに複数値を設定して複数に同じものを共有させることが可能なのではなかろうか？ ]
+  <id:asdf-asd2>:{tag: important}
+  <ids:[asdf-asdf, asdf-asd2]>:[ `:`は、新たなElementという認識が可能なため、idに複数値を設定して複数に同じものを共有させることが可能なのではなかろうか？ ]
 ]
 ```
 

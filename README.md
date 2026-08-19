@@ -16,7 +16,7 @@ TypedMark (`.tm` / `.tmt`) is a human-readable, strongly-typed markup language a
 ```
 typedmark/
 ├── apps/
-│   ├── typedmark/            # Main CLI tool (check, ast, html, serve, to-md, format)
+│   ├── typedmark/            # Main CLI tool (check, ast, html, serve, playground, to-md, format)
 │   ├── typedmark-lsp/        # Language Server Protocol implementation
 │   ├── bindings/             # Language bindings (Java, JS, Python)
 │   └── integrations/         # Editor extensions (VS Code, Zed, Helix, Neovim)

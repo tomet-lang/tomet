@@ -5,16 +5,13 @@
 - ( ) 設定DSL
 - ( ) ValueDSL
 - ( ) 要素設定
-- ( ) `@footnote`
 - ( ) `ref`構文                      // `@this`
 - ( ) Table記法                      // `[]`
-- ( ) コネクト構文2                    // `:(){}[]`
 - ( ) エスケープ構文                  // `\`が有力。
 - ( ) Template構文
 - ( ) `[]`のkey
+- ( ) コネクト構文2                    // `:(){}[]`
 ---[ 構文を実装する ]---
-- ( ) `args`推論                    // `key:`がない場合に、要素の必須argの順番と解釈する。
-                                   // 公式関数は一度実装済み。米`<embed>(src)` 
 - ( ) ビルトイン関数の強化             // `@link`,`@`, `<index>`, `<callout>`, `@tag`
 - ( ) Elementの挙動を一般化           // 設定で決める
 - ( ) `@meta`にkdlを追加
@@ -41,10 +38,12 @@
 #[ Archive ]
 ---[ 構文 ]---
 - (x) コネクト構文 (`:(){}`)
+- (x) `args`推論 (基本要素対応, カスタム要素対応, positional: [ title, priority ])         // `<embed>(src)` 
 - (x) `@`推論
 - (x) 代入、関数構文 (`${var}` `compute`,`resolve`)
 - (x) 構文エラー (重複)
 - (x) コメントアウト
+- (x) 公式構文 (`@settings`, `@config`, `@meta`, `@references`)
 - (x) 基本構文 (空白可, 改行可, 順不同)
 - (x) 基本Markdown記法 (`*`, `**`, `==`, `__`, ``)
 - (x) 基本要素 (heading, list, horizontal line)
