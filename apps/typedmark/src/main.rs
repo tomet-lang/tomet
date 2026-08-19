@@ -108,6 +108,12 @@ enum Command {
         #[arg(default_value = ".")]
         path: PathBuf,
     },
+
+    /// Launch the interactive Web Real-Time Playground for TypedMark (.tm).
+    Playground {
+        #[arg(short, long, default_value_t = 8787)]
+        port: u16,
+    },
 }
 
 fn main() -> ExitCode {
@@ -140,6 +146,7 @@ fn main() -> ExitCode {
             check,
         } => format_cmd(file, *in_place, *check),
         Command::Tui { path } => tui::run_tui(path.clone()),
+        Command::Playground { port } => playground(*port),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -382,6 +389,98 @@ fn roundtrip(file: &PathBuf) -> anyhow::Result<()> {
     }
 }
 
+#[derive(serde::Deserialize)]
+struct ParseRequest {
+    source: String,
+}
+
+#[derive(serde::Serialize)]
+struct ParseResponse {
+    ok: bool,
+    html: String,
+    ast: String,
+    markdown: String,
+    error: Option<ParseErrorInfo>,
+}
+
+#[derive(serde::Serialize)]
+struct ParseErrorInfo {
+    message: String,
+    line: usize,
+    column: usize,
+    formatted: String,
+}
+
+#[derive(serde::Deserialize)]
+struct FormatRequest {
+    source: String,
+}
+
+#[derive(serde::Serialize)]
+struct FormatResponse {
+    formatted: String,
+}
+
+async fn playground_index_handler() -> Html<&'static str> {
+    Html(include_str!("playground.html"))
+}
+
+async fn parse_handler(
+    axum::Json(req): axum::Json<ParseRequest>,
+) -> axum::Json<ParseResponse> {
+    match typedmark_parser::parse_document(&req.source) {
+        Ok(doc) => {
+            let html = typedmark_html::render_body(&doc);
+            let ast = format!("{doc:#?}");
+            let markdown = typedmark_markdown::to_markdown(&doc);
+            axum::Json(ParseResponse {
+                ok: true,
+                html,
+                ast,
+                markdown,
+                error: None,
+            })
+        }
+        Err(err) => {
+            let formatted = format_parse_error(Path::new("playground.tm"), &req.source, &err);
+            axum::Json(ParseResponse {
+                ok: false,
+                html: String::new(),
+                ast: String::new(),
+                markdown: String::new(),
+                error: Some(ParseErrorInfo {
+                    message: err.message,
+                    line: err.line,
+                    column: err.column,
+                    formatted,
+                }),
+            })
+        }
+    }
+}
+
+async fn format_handler(
+    axum::Json(req): axum::Json<FormatRequest>,
+) -> axum::Json<FormatResponse> {
+    let formatted = typedmark_formatter::format_source(&req.source);
+    axum::Json(FormatResponse { formatted })
+}
+
+fn playground(port: u16) -> anyhow::Result<()> {
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(async {
+        let app = Router::new()
+            .route("/", get(playground_index_handler))
+            .route("/api/parse", axum::routing::post(parse_handler))
+            .route("/api/format", axum::routing::post(format_handler));
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+        println!("TypedMark Web Playground running at http://{addr} (Ctrl+C to stop)");
+        axum::serve(listener, app).await?;
+        Ok(())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -400,5 +499,18 @@ mod tests {
         assert!(formatted.contains("--> test.tm:1:11"));
         assert!(formatted.contains("<caution>[ unterminated"));
         assert!(formatted.contains("^ expected ']'"));
+    }
+
+    #[tokio::test]
+    async fn parse_handler_parses_valid_doc() {
+        let req = ParseRequest {
+            source: "#[ Test Heading ]\n<caution>[ Warning text ]".to_string(),
+        };
+        let res = parse_handler(axum::Json(req)).await.0;
+        assert!(res.ok);
+        assert!(res.html.contains("Test Heading"));
+        assert!(res.html.contains("Warning text"));
+        assert!(res.markdown.contains("Test Heading"));
+        assert!(res.error.is_none());
     }
 }

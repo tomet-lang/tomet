@@ -79,7 +79,13 @@ module.exports = grammar({
 				"[",
 				field("content", repeat($._bracket_item)),
 				"]",
-				optional(seq(optional($._blank_gap), field("attrs", $.value_group))),
+				optional(
+					seq(
+						optional($._blank_gap),
+						optional(":"),
+						field("attrs", $.value_group),
+					),
+				),
 				$._newline,
 			),
 		heading_marker: (_$) => /#+/,
@@ -379,8 +385,6 @@ module.exports = grammar({
 					repeat($._element_group),
 				),
 			),
-		_element_group: ($) => choice($.args_group, $.content_group, $.value_group),
-
 		// Two adjacent `optional($._blank_gap)` around an optional middle
 		// piece is ambiguous (nothing forces how a run of blank lines splits
 		// between "leading" and "trailing" when the middle is absent), so
@@ -427,6 +431,11 @@ module.exports = grammar({
 		// lone newline can't be told apart from "no content_group at all" with
 		// only one token of lookahead.
 		bare_element: ($) => seq($.args_group, optional($.content_group)),
+		_element_group: ($) =>
+			seq(
+				optional(":"),
+				choice($.args_group, $.content_group, $.value_group),
+			),
 
 		identifier: (_$) => /[A-Za-z_][A-Za-z0-9_.-]*/,
 		// `type_element`/`at_element`'s name field specifically: needs
@@ -440,13 +449,11 @@ module.exports = grammar({
 		// (referencing the rule, not a bare string) so it still shows up as
 		// a normal, visible `identifier` node in the tree.
 		_element_name: ($) =>
-			alias(token(prec(1, /[A-Za-z_][A-Za-z0-9_.-]*/)), $.identifier),
+			alias(token(prec(1, /[A-Za-z_][A-Za-z0-9_.:\[\], -]*/)), $.identifier),
 
 		// ---- data value grammar (mirrors `value.rs`, simplified) --------
 		// Newlines aren't in `extras` (they're structurally significant at
 		// the block level), so groups that tolerate embedded blank lines
-		// have to skip them explicitly via `_gap` instead.
-
 		value: ($) => choice($.map, $.seq, $.string, $.scalar),
 		// Entries are separated by a comma, one-or-more newlines, or both --
 		// but never consumed by `map_entry` itself (unlike a trailing comma

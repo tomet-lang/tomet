@@ -144,10 +144,8 @@ pub fn normalized_element_args_with_schema(el: &Element, schema: &SettingsSchema
     }
 
     // 2. Fall back to built-in positional key mapping
-    if let scalar = args {
-        if let Some(key) = builtin_positional_arg_key(&el.sigil) {
-            return Some(Value::Map(vec![(key.to_string(), scalar.clone())]));
-        }
+    if let Some(key) = builtin_positional_arg_key(&el.sigil) {
+        return Some(Value::Map(vec![(key.to_string(), args.clone())]));
     }
 
     Some(args.clone())

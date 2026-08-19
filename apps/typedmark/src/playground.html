@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypedMark Web Real-Time Playground</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #0b0f19;
+      --bg-card: rgba(22, 30, 49, 0.75);
+      --bg-card-border: rgba(255, 255, 255, 0.08);
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --accent-glow: rgba(99, 102, 241, 0.35);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border-color: #1f293d;
+      --error-bg: rgba(239, 68, 68, 0.15);
+      --error-border: #ef4444;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(168, 85, 247, 0.08) 0%, transparent 40%);
+    }
+
+    /* Header */
+    header {
+      height: 56px;
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1.15rem;
+      background: linear-gradient(135deg, #a855f7, #6366f1, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.02em;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    select, button {
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      border-radius: 6px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    select {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+
+    select:hover {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      box-shadow: 0 0 18px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: #334155;
+      border-color: #475569;
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      padding: 0.75rem;
+      gap: 0.75rem;
+    }
+
+    .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-card);
+      border: 1px solid var(--bg-card-border);
+      border-radius: 12px;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-header {
+      height: 42px;
+      padding: 0 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(15, 23, 42, 0.6);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .panel-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .tab {
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      color: #fff;
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+    }
+
+    /* Editor */
+    .editor-container {
+      flex: 1;
+      position: relative;
+      display: flex;
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      color: #e2e8f0;
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      padding: 1rem;
+      border: none;
+      outline: none;
+      resize: none;
+      tab-size: 2;
+    }
+
+    /* Output View */
+    .output-content {
+      flex: 1;
+      overflow: auto;
+      padding: 1.25rem;
+    }
+
+    /* Preview HTML styling */
+    .preview-body {
+      color: #e2e8f0;
+      line-height: 1.7;
+    }
+
+    .preview-body h1, .preview-body h2, .preview-body h3 {
+      color: #f8fafc;
+      margin-top: 1.25rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .preview-body p { margin-bottom: 1rem; }
+    .preview-body ul, .preview-body ol { margin-left: 1.5rem; margin-bottom: 1rem; }
+
+    .preview-body .tm-element {
+      border-left: 3px solid var(--accent);
+      background: rgba(99, 102, 241, 0.05);
+      padding: 0.75rem 1rem;
+      margin: 0.75rem 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .preview-body .tm-caution {
+      border-left-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.08);
+      padding: 0.75rem 1rem;
+      margin: 0.75rem 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .preview-body pre {
+      background: #0f172a;
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      border: 1px solid var(--border-color);
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+
+    .code-view {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: #a5b4fc;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Error Box */
+    .error-box {
+      display: none;
+      background: var(--error-bg);
+      border: 1px solid var(--error-border);
+      border-radius: 8px;
+      padding: 1rem;
+      color: #fca5a5;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      margin-bottom: 1rem;
+    }
+
+    /* Footer / Status Bar */
+    footer {
+      height: 32px;
+      padding: 0 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #090d16;
+      border-top: 1px solid var(--border-color);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+    }
+
+    .dot.error {
+      background: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="logo">TypedMark</span>
+      <span class="badge">Playground</span>
+    </div>
+    <div class="controls">
+      <select id="preset-select" onchange="loadPreset(this.value)">
+        <option value="basic">Preset: Overview & Connect Syntax</option>
+        <option value="connect">Preset: Remote Connection (@references)</option>
+        <option value="embedded">Preset: Embedded Data (JSON/YAML)</option>
+        <option value="tasklist">Preset: Task List & Checkboxes</option>
+      </select>
+      <button class="btn btn-secondary" onclick="formatSource()">⚡ Format</button>
+      <button class="btn btn-primary" onclick="copyMarkdown()">📋 Copy MD</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Pane: Editor -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">TypedMark Source (.tm)</span>
+        <span id="editor-stats" style="font-size: 0.75rem; color: var(--text-muted);">Lines: 1 | Chars: 0</span>
+      </div>
+      <div class="editor-container">
+        <textarea id="editor" spellcheck="false" placeholder="Type TypedMark markup here..."></textarea>
+      </div>
+    </div>
+
+    <!-- Right Pane: Preview / AST / Markdown -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('html')">HTML Preview</button>
+          <button class="tab" onclick="switchTab('ast')">AST Inspector</button>
+          <button class="tab" onclick="switchTab('md')">CommonMark</button>
+        </div>
+        <span id="latency-stat" style="font-size: 0.75rem; color: var(--text-muted);">0 ms</span>
+      </div>
+      <div class="output-content">
+        <div id="error-display" class="error-box"></div>
+        <div id="tab-html" class="preview-body"></div>
+        <div id="tab-ast" class="code-view" style="display: none;"></div>
+        <div id="tab-md" class="code-view" style="display: none;"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="status-indicator">
+      <span id="status-dot" class="dot"></span>
+      <span id="status-text">Ready</span>
+    </div>
+    <div>TypedMark Toolchain v0.1</div>
+  </footer>
+
+  <script>
+    const PRESETS = {
+      basic: `#[ Overview ]:{ id: intro, tag: main }
+
+TypedMark is a strongly-typed markup language.
+
+<caution>[ Be careful when parsing untrusted input ]
+
+- (x) Support Connect Syntax \`:{ id: intro }\`
+- ( ) Interactive AST & Web Preview
+- ( ) High performance Rust parser`,
+
+      connect: `// Document body with list items
+- ( ) Implement parser AST { id: task1 }
+- ( ) Design Web Playground { id: task2, priority: low }
+
+// Remote connection container
+@references[
+  <id:task1>:{ status: completed, tag: core }
+  <id:[task1, task2]>:{ assignee: "Dev Team" }
+]`,
+
+      embedded: `@meta(format: json){
+  "title": "TypedMark Documentation",
+  "version": "0.1.0",
+  "features": ["AST", "CommonMark", "Serde"]
+}
+
+#[ Embedded Data Demo ]
+
+Data blocks seamlessly parse raw JSON or YAML content.`,
+
+      tasklist: `#[ Project Backlog ]
+
+- (x) Initial Grammar Freeze
+- (x) Language Server Protocol
+- ( ) Web Real-time Playground
+- (?) Performance Benchmark`
+    };
+
+    let activeTab = 'html';
+    let parseTimer = null;
+    let lastParsedResponse = null;
+
+    const editor = document.getElementById('editor');
+    const editorStats = document.getElementById('editor-stats');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const errorDisplay = document.getElementById('error-display');
+    const latencyStat = document.getElementById('latency-stat');
+
+    function loadPreset(key) {
+      if (PRESETS[key]) {
+        editor.value = PRESETS[key];
+        triggerParse();
+      }
+    }
+
+    function switchTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      document.getElementById('tab-html').style.display = tab === 'html' ? 'block' : 'none';
+      document.getElementById('tab-ast').style.display = tab === 'ast' ? 'block' : 'none';
+      document.getElementById('tab-md').style.display = tab === 'md' ? 'block' : 'none';
+    }
+
+    async function triggerParse() {
+      const source = editor.value;
+      const lines = source.split('\n').length;
+      editorStats.textContent = \`Lines: \${lines} | Chars: \${source.length}\`;
+
+      const startTime = performance.now();
+      try {
+        const res = await fetch('/api/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source })
+        });
+        const data = await res.json();
+        const elapsed = Math.round(performance.now() - startTime);
+        latencyStat.textContent = \`\${elapsed} ms\`;
+
+        lastParsedResponse = data;
+
+        if (data.ok) {
+          statusDot.className = 'dot';
+          statusText.textContent = 'Parsed OK';
+          errorDisplay.style.display = 'none';
+
+          document.getElementById('tab-html').innerHTML = data.html || '<em>Empty document</em>';
+          document.getElementById('tab-ast').textContent = data.ast || '';
+          document.getElementById('tab-md').textContent = data.markdown || '';
+        } else {
+          statusDot.className = 'dot error';
+          statusText.textContent = 'Parse Error';
+          errorDisplay.style.display = 'block';
+          errorDisplay.textContent = data.error?.formatted || data.error?.message || 'Parse error';
+        }
+      } catch (e) {
+        statusDot.className = 'dot error';
+        statusText.textContent = 'Network Error';
+      }
+    }
+
+    async function formatSource() {
+      try {
+        const res = await fetch('/api/format', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: editor.value })
+        });
+        const data = await res.json();
+        if (data.formatted) {
+          editor.value = data.formatted;
+          triggerParse();
+        }
+      } catch (e) {}
+    }
+
+    function copyMarkdown() {
+      if (lastParsedResponse && lastParsedResponse.markdown) {
+        navigator.clipboard.writeText(lastParsedResponse.markdown);
+        alert('Copied CommonMark to clipboard!');
+      }
+    }
+
+    editor.addEventListener('input', () => {
+      clearTimeout(parseTimer);
+      parseTimer = setTimeout(triggerParse, 150);
+    });
+
+    // Initial load
+    editor.value = PRESETS.basic;
+    triggerParse();
+  </script>
+</body>
+</html>

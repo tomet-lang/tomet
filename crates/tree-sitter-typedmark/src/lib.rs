@@ -373,6 +373,22 @@ mod tests {
     }
 
     #[test]
+    fn parses_colon_connect_syntax() {
+        for src in [
+            "#[ Title ]:{ id: intro, tag: main }\n",
+            "<task>[ Task A ]:{ id: taskA, priority: high }\n",
+            "<id:taskA>:{ priority: high, tag: dev }\n",
+            "<id:[taskA, taskB]>:{ tag: house }\n",
+        ] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}"
+            );
+        }
+    }
+
+    #[test]
     fn parses_interpolation_path_and_call() {
         for src in [
             "${id}\n",
@@ -627,6 +643,43 @@ mod tests {
             assert!(
                 known_markers.iter().any(|marker| text.contains(marker)),
                 "unexpected error node text: {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn all_tmt_docs_parse_without_unexpected_errors() {
+        fn collect_tm_files(dir: &std::path::Path, acc: &mut Vec<std::path::PathBuf>) {
+            if let Ok(entries) = std::fs::read_dir(dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        collect_tm_files(&path, acc);
+                    } else if let Some(ext) = path.extension() {
+                        if ext == "tm" || ext == "tmt" {
+                            acc.push(path);
+                        }
+                    }
+                }
+            }
+        }
+
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let repo_root = manifest_dir.parent().unwrap().parent().unwrap();
+        let tmt_dir = repo_root.join("docs").join("tmt");
+        let mut files = Vec::new();
+        collect_tm_files(&tmt_dir, &mut files);
+        assert!(!files.is_empty(), "expected to find .tm/.tmt files under docs/tmt/");
+
+        for file in files {
+            let src = std::fs::read_to_string(&file)
+                .unwrap_or_else(|e| panic!("failed to read {file:?}: {e}"));
+            let tree = parse(&src);
+            let root = tree.root_node();
+            assert_eq!(
+                root.kind(),
+                "document",
+                "file {file:?} failed to produce document root node"
             );
         }
     }
