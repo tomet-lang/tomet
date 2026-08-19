@@ -22,20 +22,20 @@ Connects attributes or data immediately to the preceding block/inline element or
 - ( ) Task 1 :{ id: task1, priority: high }
 ```
 
-### 2.2 Remote Connection (`<id:target_id>:(){}`)
+### 2.2 Remote Connection inside `@references[...]`
 
-Targets a specific element by ID using the explicit `<id:target_id>` sigil followed by a colon `:` and the connected `(args)` / `{value}` groups.
+Targets specific elements by ID using the explicit `<id:target_id>` sigil inside an `@references[...]` block.
 
 ```tm
 // Document body
 - ( ) Task A { id: taskA }
 - ( ) Task B { id: taskB, priority: low }
 
-// Remote connection block (or standalone lines)
-<id:taskA>:{ priority: high, tag: dev }
-
-// Multi-target remote connection (future array support)
-<id:[taskA, taskB]>:{ status: pending }
+// Remote connection container block
+@references[
+  <id:taskA>:{ priority: high, tag: dev }
+  <id:[taskA, taskB]>:{ status: pending }
+]
 ```
 
 *Note on `:[]` (content connection)*: Connecting `[content]` is explicitly deferred/deferred for post-1.0 to preserve syntax stability. Connect syntax in v1 strictly operates on `(args)` and `{value}`.

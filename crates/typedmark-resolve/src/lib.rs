@@ -32,10 +32,12 @@
 //! Don't treat that line as the spec for `@import`; it looks like
 //! leftover/draft content, not a settled design.
 
+mod connect;
 mod error;
 mod interp;
 mod settings;
 
+pub use connect::{RemoteConnection, resolve_connect_targets};
 pub use error::ResolveError;
 pub use interp::resolve_reference;
 pub use settings::{resolve_settings_file, resolve_settings_ref, settings_file_ref};
