@@ -19,12 +19,6 @@
   <id(asdf-asdf)>:(){}[]
 ]
 
-@links{
-  (id1)[ note ]
-  (id2)[ note ]
-}
-
-<embed>(url:<url>)[alt]          // src には url か file のみ使われる
 <embed>(file:<file>)[alt]
 <codeblock>(lang:<language>)[ <code> ]
 <blockquote>[ <content> ]

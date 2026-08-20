@@ -15,7 +15,7 @@ in
 buildNpmPackage {
   pname = "typedmark-vscode";
   version = "0.1.0";
-  src = "${root}/apps/vscode-extension";
+  src = "${root}/apps/integrations/vscode";
 
   npmDepsHash = "sha256-JsXSQc8TeRokIUCy0BJpISQnkUUPXrBY3ZK3Aq08Kyw=";
   npmBuildScript = "compile";

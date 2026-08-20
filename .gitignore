@@ -25,7 +25,6 @@ target/
 .direnv/
 .claude/
 .idea/
-.vscode/
 .zed/
 
 #[ User's variable ]

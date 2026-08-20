@@ -19,7 +19,7 @@ Write all comments and documentation in English. Do not use Japanese.
 There's no standalone GUI app here to screenshot or click through — this
 is a parser/CLI/LSP/editor-extensions project. Verify with `cargo build`/
 `cargo test`/`cargo check` and by reading the code. For the editor
-extensions (`apps/vscode-extension`, `apps/zed-extension`), this
+extensions (`apps/integrations/vscode`, `apps/integrations/zed`), this
 environment can't reliably launch a real VS Code/Zed window either, so
 verify those the same way: reading the code and their own tests, not by
 launching the actual editor to click around.

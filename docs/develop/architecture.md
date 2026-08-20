@@ -175,17 +175,15 @@ crate's own test (`*_fixture_has_only_known_error_cases` tests against
   (render via `typedmark-html`, `serve` re-renders fresh on every HTTP
   request), `to-md` (via `typedmark-markdown`), `format` (via
   `typedmark-formatter`, with `--write`/`--check`).
-- **`apps/typedmark-lsp`**: a diagnostics-and-formatting-only language
-  server (`lsp-server`/`lsp-types` over stdio, full-document sync). Parses
-  the buffer with `typedmark-parser` on every open/change and republishes
-  whatever parse error comes back (or clears diagnostics on a clean
-  parse); `textDocument/formatting` delegates to `typedmark-formatter`.
-  No hover/completion/goto-definition yet.
-- **`apps/zed-extension`**: a Zed editor extension. Doesn't link any
+- **`apps/typedmark-lsp`**: a diagnostics, formatting, hover, document symbol, goto definition,
+  and completion language server (`lsp-server`/`lsp-types` over stdio, full-document sync).
+  Parses the buffer with `typedmark-parser` on open/change, validates AST rules with `typedmark-validator`,
+  and delegates formatting to `typedmark-formatter`.
+- **`apps/integrations/zed`**: a Zed editor extension. Doesn't link any
   `typedmark-*` crate directly -- it shells out to a `typedmark-lsp`
   binary expected on `$PATH` (e.g. via the Nix package), since
   `typedmark-lsp` has no published release binary yet.
-- **`apps/vscode-extension`** (TypeScript, not part of the Cargo
+- **`apps/integrations/vscode`** (TypeScript, not part of the Cargo
   workspace): syntax highlighting via a TextMate grammar
   (`syntaxes/typedmark.tmLanguage.json`) plus an LSP client
   (`vscode-languageclient`) that spawns `typedmark-lsp` the same way the

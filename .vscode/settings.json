@@ -1,0 +1,3 @@
+{
+  "typedmark.serverPath": "${workspaceFolder}/target/debug/typedmark-lsp"
+}

@@ -14,9 +14,6 @@
 	"categories": [
 		"Programming Languages"
 	],
-	"activationEvents": [
-		"onLanguage:typedmark"
-	],
 	"main": "./dist/extension.js",
 	"contributes": {
 		"languages": [
@@ -27,7 +24,8 @@
 					"typedmark"
 				],
 				"extensions": [
-					".tm"
+					".tm",
+					".tmt"
 				],
 				"configuration": "./language-configuration.json"
 			}
@@ -39,6 +37,12 @@
 				"path": "./syntaxes/typedmark.tmLanguage.json"
 			}
 		],
+		"commands": [
+			{
+				"command": "typedmark.restartServer",
+				"title": "TypedMark: Restart Language Server"
+			}
+		],
 		"configuration": {
 			"title": "TypedMark",
 			"properties": {
@@ -46,6 +50,16 @@
 					"type": "string",
 					"default": "typedmark-lsp",
 					"description": "Path to the typedmark-lsp binary. Defaults to looking it up on $PATH (e.g. installed via the nix package)."
+				},
+				"typedmark.trace.server": {
+					"type": "string",
+					"enum": [
+						"off",
+						"messages",
+						"verbose"
+					],
+					"default": "off",
+					"description": "Traces the communication between VS Code and the TypedMark language server."
 				}
 			}
 		}
