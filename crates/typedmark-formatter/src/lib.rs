@@ -219,7 +219,7 @@ mod tests {
         for src in [
             include_str!("../../../docs/readme.ja.tm"),
             include_str!("../../../docs/tmt/examples/image.meta.tm"),
-            include_str!("../../../docs/develop/roadmap.ja.tm"),
+            include_str!("../../../docs/roadmap.ja.tm"),
         ] {
             let before = typedmark_parser::parse_document(src)
                 .unwrap_or_else(|e| panic!("fixture failed to parse: {e}"));
@@ -235,7 +235,7 @@ mod tests {
             include_str!("../../../docs/readme.ja.tm"),
             include_str!("../../../docs/tmt/examples/image.meta.tm"),
             include_str!("../../../docs/ja/cheatsheet.tm"),
-            include_str!("../../../docs/develop/roadmap.ja.tm"),
+            include_str!("../../../docs/roadmap.ja.tm"),
         ]
     }
 }

@@ -5,3 +5,4 @@
 // まだ候補段階。
 
 ${sum(1, 4)}
+${ref(id(asdf-asdfa).contents(dafault))}
