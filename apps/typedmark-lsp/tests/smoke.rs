@@ -235,7 +235,12 @@ fn hover_symbols_definition_completion_over_stdio() {
             "position": {"line": 2, "character": 2},
         }),
     );
-    assert!(hover_resp["result"]["contents"]["value"].as_str().unwrap().contains("callout"));
+    assert!(
+        hover_resp["result"]["contents"]["value"]
+            .as_str()
+            .unwrap()
+            .contains("callout")
+    );
 
     // Document Symbols
     let symbols_resp = server.send_request(

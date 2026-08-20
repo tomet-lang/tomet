@@ -360,7 +360,11 @@ fn render_embed_element(el: &Element, out: &mut String) {
     let src = args
         .as_ref()
         .and_then(as_map)
-        .and_then(|m| map_get(m, "src").or_else(|| map_get(m, "file")).or_else(|| map_get(m, "url")))
+        .and_then(|m| {
+            map_get(m, "src")
+                .or_else(|| map_get(m, "file"))
+                .or_else(|| map_get(m, "url"))
+        })
         .map(value_to_plain)
         .unwrap_or_default();
     let alt = el
@@ -997,7 +1001,9 @@ mod tests {
 
     #[test]
     fn meta_and_config_with_positional_format_arg_have_no_visible_output() {
-        let doc = parse_document("@meta(\"json\"){\n  {\"key\": \"value\"}\n}\n@config(\"json\")\n").unwrap();
+        let doc =
+            parse_document("@meta(\"json\"){\n  {\"key\": \"value\"}\n}\n@config(\"json\")\n")
+                .unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "");
     }

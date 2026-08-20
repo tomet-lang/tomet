@@ -86,7 +86,11 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                 } else if req.method == GotoDefinition::METHOD {
                     let params: lsp_types::GotoDefinitionParams =
                         serde_json::from_value(req.params)?;
-                    let uri = params.text_document_position_params.text_document.uri.clone();
+                    let uri = params
+                        .text_document_position_params
+                        .text_document
+                        .uri
+                        .clone();
                     let def = documents.get(&uri).and_then(|text| {
                         typedmark_lsp::definition_for(
                             text,

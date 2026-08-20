@@ -1,6 +1,8 @@
 //! Parsing for typed elements (`<T>`, `@name`, bare elements, colon connect syntax).
 
-use crate::codeblock::{is_codeblock, is_verbatim_content, parse_raw_content, parse_verbatim_content};
+use crate::codeblock::{
+    is_codeblock, is_verbatim_content, parse_raw_content, parse_verbatim_content,
+};
 use crate::embedded_format::{EmbeddedFormat, parse_embedded_format_value};
 use crate::error::Result;
 use crate::heading::merge_values;
@@ -72,11 +74,16 @@ fn skip_lookahead_gap(cur: &mut Cursor) {
     skip_element_gap(cur);
 }
 
-pub(crate) fn parse_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Element> {
+pub(crate) fn parse_element(
+    cur: &mut Cursor,
+    default_format: Option<EmbeddedFormat>,
+) -> Result<Element> {
     let start_pos = cur.pos();
     let sigil = if cur.peek() == Some('<') {
         cur.bump();
-        let name = cur.eat_while(|c| c != '>' && c != '\n' && c != '\r').to_string();
+        let name = cur
+            .eat_while(|c| c != '>' && c != '\n' && c != '\r')
+            .to_string();
         if name.is_empty() {
             return Err(err(cur, cur.pos(), "expected a type name after '<'"));
         }
@@ -115,7 +122,9 @@ pub(crate) fn parse_element(cur: &mut Cursor, default_format: Option<EmbeddedFor
                             None => default_format,
                         };
                         let conn_val = match format {
-                            Some(format) => ElementValue::Data(parse_embedded_format_value(cur, format)?),
+                            Some(format) => {
+                                ElementValue::Data(parse_embedded_format_value(cur, format)?)
+                            }
                             None => parse_value_group(cur, default_format)?,
                         };
                         if let ElementValue::Data(conn_v) = conn_val {
@@ -225,9 +234,7 @@ pub(crate) fn local_format_key(el: &Element) -> Option<Option<EmbeddedFormat>> {
                 _ => None,
             })
         }),
-        Value::String(tag) if is_format_target_element(el) => {
-            Some(EmbeddedFormat::from_tag(tag))
-        }
+        Value::String(tag) if is_format_target_element(el) => Some(EmbeddedFormat::from_tag(tag)),
         _ => None,
     }
 }

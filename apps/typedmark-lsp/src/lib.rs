@@ -125,7 +125,8 @@ pub fn hover_for(text: &str, pos: Position) -> Option<Hover> {
                     Node::Element(el) => {
                         let kind = classify(el);
                         let inferred = infer_at_kind(el.args.as_ref());
-                        let mut desc = format!("**Element**: `{}`\n", sigil_display_name(&el.sigil));
+                        let mut desc =
+                            format!("**Element**: `{}`\n", sigil_display_name(&el.sigil));
                         desc.push_str(&format!("- **Classification**: `{}`\n", kind.as_str()));
                         if let Some(inf) = inferred {
                             desc.push_str(&format!("- **Inferred Kind**: `{inf}`\n"));

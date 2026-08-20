@@ -1,6 +1,8 @@
 //! Resolution for remote attribute connections declared inside `@references[...]` blocks.
 
-use typedmark_ast::{Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value};
+use typedmark_ast::{
+    Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
+};
 use typedmark_semantics::merge_connected_values;
 
 /// A remote attribute connection definition targeting one or more element IDs.
@@ -137,12 +139,18 @@ fn apply_connection_to_blocks(blocks: &mut [Block], target_id: &str, conn: &Remo
 
 fn element_has_id(el: &Element, target_id: &str) -> bool {
     if let Some(Value::Map(entries)) = &el.args {
-        if entries.iter().any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id)) {
+        if entries
+            .iter()
+            .any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id))
+        {
             return true;
         }
     }
     if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
-        if entries.iter().any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id)) {
+        if entries
+            .iter()
+            .any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id))
+        {
             return true;
         }
     }
@@ -174,7 +182,9 @@ fn apply_connection_to_element(el: &mut Element, target_id: &str, conn: &RemoteC
 
 fn apply_connection_to_heading(h: &mut Heading, target_id: &str, conn: &RemoteConnection) {
     let has_id = match &h.attrs {
-        Some(Value::Map(entries)) => entries.iter().any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id)),
+        Some(Value::Map(entries)) => entries
+            .iter()
+            .any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id)),
         _ => false,
     };
     if has_id {
@@ -187,7 +197,9 @@ fn apply_connection_to_heading(h: &mut Heading, target_id: &str, conn: &RemoteCo
 
 fn apply_connection_to_list_item(item: &mut ListItem, target_id: &str, conn: &RemoteConnection) {
     let has_id = match &item.attrs {
-        Some(Value::Map(entries)) => entries.iter().any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id)),
+        Some(Value::Map(entries)) => entries
+            .iter()
+            .any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id)),
         _ => false,
     };
     if has_id {
