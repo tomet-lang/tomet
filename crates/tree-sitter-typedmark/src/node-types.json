@@ -703,6 +703,11 @@
     }
   },
   {
+    "type": "string",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "strong",
     "named": true,
     "fields": {},
@@ -1075,10 +1080,6 @@
   },
   {
     "type": "number",
-    "named": true
-  },
-  {
-    "type": "string",
     "named": true
   },
   {

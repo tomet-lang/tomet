@@ -477,13 +477,15 @@ module.exports = grammar({
 					"key",
 					alias(token(prec(1, /[A-Za-z_][A-Za-z0-9_.-]*/)), $.identifier),
 				),
-				":",
-				field("value", $._entry_value),
+				choice(
+					seq(":", field("value", $._entry_value)),
+					field("value", $.braced_map),
+				),
 			),
 		_entry_value: ($) => choice($.seq, $.string, $.braced_map, $._value_scalar),
 		braced_map: ($) =>
 			seq(
-				"{",
+				token(prec(1, "{")),
 				optional(seq(optional($._blank_gap), $.map)),
 				optional($._blank_gap),
 				"}",
@@ -501,7 +503,7 @@ module.exports = grammar({
 				optional($._blank_gap),
 				"]",
 			),
-		string: (_$) => /"([^"\\]|\\.)*"/,
+		string: (_$) => choice(/"([^"\\]|\\.)*"/, /'[^'\n]*'/),
 		// The literal `[` in `_value_scalar`/`scalar`'s classes below (and
 		// in `text`/`punctuation`/the `_bracket_item_no_*` aliases above)
 		// has to stay escaped as `\[` even though it's unambiguous either
