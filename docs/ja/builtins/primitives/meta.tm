@@ -1,0 +1,14 @@
+
+#[ 全容 ]
+
+```tm
+@meta(yaml){
+  id: <id>
+  type: "string"
+}
+
+```
+
+#[ 未実装 ]
+
+- kdl

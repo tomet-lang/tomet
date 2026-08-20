@@ -1,7 +1,12 @@
-@meta{ type: settings }
+
+#[ 全容 ]
+
+```tm
+@settings(import:<target>)
+
 @settings(format:json){
   elements = {
-    bookmark = {
+    example = {
       args = {
         name = { type = string },
         count = { type = uint, default = 0 },
@@ -15,12 +20,14 @@
     }
   },
   types = {
-    bookmark = {
+    example = {
       style = one_line
-    },
-    todo = {},
-    daily-note = {
       template = "path:ja/features/templates/template.daily-note.tm"
     }
   }
 }
+```
+
+#[ 未実装 ]
+
+- 独自言語

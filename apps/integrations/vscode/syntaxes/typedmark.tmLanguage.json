@@ -2,9 +2,10 @@
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
 	"name": "TypedMark",
 	"scopeName": "source.typedmark",
-	"fileTypes": ["tm"],
+	"fileTypes": ["tm", "tmt"],
 	"patterns": [
 		{ "include": "#comments" },
+		{ "include": "#fenced-code-block" },
 		{ "include": "#heading" },
 		{ "include": "#thematic-break" },
 		{ "include": "#list-marker" },
@@ -25,6 +26,19 @@
 			]
 		},
 
+		"fenced-code-block": {
+			"begin": "^\\s*(```)(?:([a-zA-Z0-9_+-]+))?\\s*$",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.markdown" },
+				"2": { "name": "fenced_code.block.language.typedmark" }
+			},
+			"end": "^\\s*(```)\\s*$",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.markdown" }
+			},
+			"name": "markup.raw.block.fenced.typedmark"
+		},
+
 		"heading": {
 			"begin": "^\\s*(#+)(\\[)",
 			"beginCaptures": {
@@ -40,13 +54,40 @@
 		},
 
 		"thematic-break": {
-			"match": "^\\s*-{3,}\\s*$",
-			"name": "punctuation.definition.thematic-break.typedmark"
+			"patterns": [
+				{
+					"begin": "^\\s*(-{3,})\\s*(\\[)",
+					"beginCaptures": {
+						"1": { "name": "punctuation.definition.thematic-break.typedmark" },
+						"2": { "name": "punctuation.section.brackets.begin.typedmark" }
+					},
+					"end": "(\\])\\s*(-{3,})\\s*$",
+					"endCaptures": {
+						"1": { "name": "punctuation.section.brackets.end.typedmark" },
+						"2": { "name": "punctuation.definition.thematic-break.typedmark" }
+					},
+					"name": "markup.heading.thematic-break.typedmark",
+					"patterns": [{ "include": "#inline" }]
+				},
+				{
+					"match": "^\\s*-{3,}\\s*$",
+					"name": "punctuation.definition.thematic-break.typedmark"
+				}
+			]
 		},
 
 		"list-marker": {
-			"match": "^\\s*(-\\.|-)(?=[ \\t])",
-			"name": "punctuation.definition.list.marker.typedmark markup.list.typedmark"
+			"patterns": [
+				{
+					"match": "^\\s*(-\\.|-)(?=[ \\t])(?:\\s*(\\(|\\[)([xX \\-T\\?]?|[a-zA-Z0-9_.-]+)(\\)|\\]))?",
+					"captures": {
+						"1": { "name": "punctuation.definition.list.marker.typedmark markup.list.typedmark" },
+						"2": { "name": "punctuation.definition.checkbox.begin.typedmark" },
+						"3": { "name": "keyword.operator.checkbox.typedmark markup.list.checkbox.typedmark" },
+						"4": { "name": "punctuation.definition.checkbox.end.typedmark" }
+					}
+				}
+			]
 		},
 
 		"inline": {
@@ -56,6 +97,8 @@
 				{ "include": "#strong" },
 				{ "include": "#emphasis" },
 				{ "include": "#mark" },
+				{ "include": "#interpolation" },
+				{ "include": "#connect" },
 				{ "include": "#element" },
 				{ "include": "#groups" }
 			]
@@ -65,6 +108,8 @@
 			"patterns": [
 				{ "include": "#comments" },
 				{ "include": "#code-span" },
+				{ "include": "#interpolation" },
+				{ "include": "#connect" },
 				{ "include": "#element" },
 				{ "include": "#groups" }
 			]
@@ -114,6 +159,45 @@
 			"end": "==",
 			"name": "markup.strikethrough.typedmark",
 			"patterns": [{ "include": "#inline-basic" }]
+		},
+
+		"connect": {
+			"match": "(<->|->|<-|==>|--)",
+			"name": "keyword.operator.connect.typedmark"
+		},
+
+		"interpolation": {
+			"begin": "\\$\\{",
+			"beginCaptures": {
+				"0": { "name": "punctuation.definition.template-expression.begin.typedmark" }
+			},
+			"end": "\\}",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.template-expression.end.typedmark" }
+			},
+			"name": "meta.template.expression.typedmark",
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#string" },
+				{
+					"match": "\\b[0-9]+(\\.[0-9]+)?\\b",
+					"name": "constant.numeric.typedmark"
+				},
+				{
+					"match": "([A-Za-z_][A-Za-z0-9_.-]*)\\s*(?=\\()",
+					"captures": {
+						"1": { "name": "entity.name.function.typedmark" }
+					}
+				},
+				{
+					"match": "\\b[A-Za-z_][A-Za-z0-9_.-]*\\b",
+					"name": "variable.other.readwrite.typedmark"
+				},
+				{
+					"match": "[,()]",
+					"name": "punctuation.separator.typedmark"
+				}
+			]
 		},
 
 		"element": {
@@ -190,6 +274,7 @@
 				{ "include": "#comments" },
 				{ "include": "#map-entry" },
 				{ "include": "#string" },
+				{ "include": "#interpolation" },
 				{ "include": "#groups" }
 			]
 		},

@@ -7,12 +7,12 @@
 @xxx(args)[content]{value}
 @()[]{}
 <T>()[]{}
-// #[]{}
-// ##[]{}
-- (marker) content   // marker は key:value の args ではなく () や [] で囲んだ自由文字列
+#[]{}
+##[]{}
+- (marker) content    // marker は key:value の args ではなく () や [] で囲んだ自由文字列
 -. (marker) content
 ---[]---
-${xxx}               // 実装済み: `${id}` / `${a.b}` / `${sum(a, b)}` の構文解析のみ。
+${xxx}                // 実装済み: `${id}` / `${a.b}` / `${sum(a, b)}` の構文解析のみ。
                       // 参照解決/関数評価はtypedmark-resolve/typedmark-computeの未実装分。
                       // 詳細: docs/reviews/2026-08-17-interpolation-syntax.md
 // xxx

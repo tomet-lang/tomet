@@ -1,0 +1,36 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "compile",
+			"path": "apps/integrations/vscode",
+			"group": "build",
+			"problemMatcher": [],
+			"label": "npm: compile (apps/integrations/vscode)",
+			"detail": "Compile VS Code extension using esbuild"
+		},
+		{
+			"type": "shell",
+			"command": "cargo build -p typedmark-lsp",
+			"group": "build",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "cargo build (typedmark-lsp)",
+			"detail": "Build typedmark-lsp binary in target/debug"
+		},
+		{
+			"label": "build extension and lsp",
+			"dependsOn": [
+				"npm: compile (apps/integrations/vscode)",
+				"cargo build (typedmark-lsp)"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": []
+		}
+	]
+}
