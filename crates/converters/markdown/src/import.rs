@@ -60,8 +60,16 @@ enum Frame {
 }
 
 pub fn from_markdown(src: &str) -> Document {
-    let parser = Parser::new_ext(src, Options::empty());
+    let (frontmatter, markdown_body) = extract_yaml_frontmatter(src);
+
+    let parser = Parser::new_ext(markdown_body, Options::empty());
     let mut stack: Vec<Frame> = vec![Frame::Blocks(Vec::new())];
+
+    if let Some(entries) = frontmatter {
+        let mut meta_el = Element::new(Sigil::At(Some("meta".to_string())));
+        meta_el.value = Some(typedmark_ast::ElementValue::Data(Value::Map(entries)));
+        push_block(&mut stack, Block::Element(meta_el));
+    }
 
     for event in parser {
         match event {
@@ -102,10 +110,192 @@ pub fn from_markdown(src: &str) -> Document {
     }
 
     let root = stack.pop().expect("root frame always present");
-    match root {
+    let mut doc = match root {
         Frame::Blocks(blocks) => Document::new(blocks, Span::dummy()),
         _ => Document::default(),
+    };
+    post_process_document_wikilinks(&mut doc);
+    doc
+}
+
+fn extract_yaml_frontmatter(src: &str) -> (Option<Vec<(String, Value)>>, &str) {
+    let trimmed = src.trim_start();
+    if !trimmed.starts_with("---") {
+        return (None, src);
     }
+
+    let rest = &trimmed[3..];
+    if !rest.starts_with('\n') && !rest.starts_with("\r\n") {
+        return (None, src);
+    }
+
+    let end_pos = if let Some(pos) = rest.find("\n---") {
+        pos
+    } else if let Some(pos) = rest.find("\n...") {
+        pos
+    } else {
+        return (None, src);
+    };
+
+    let yaml_text = &rest[..end_pos];
+    let closing_slice = &rest[end_pos..];
+    let after_closing_idx = if closing_slice.starts_with("\n---") || closing_slice.starts_with("\n...") {
+        end_pos + 4
+    } else if closing_slice.starts_with("\r\n---") || closing_slice.starts_with("\r\n...") {
+        end_pos + 5
+    } else {
+        return (None, src);
+    };
+
+    let remaining_src = rest[after_closing_idx..].trim_start_matches(|c| c == '\r' || c == '\n');
+
+    if let Ok(serde_yaml::Value::Mapping(map)) = serde_yaml::from_str::<serde_yaml::Value>(yaml_text) {
+        let entries: Vec<(String, Value)> = map
+            .into_iter()
+            .map(|(k, v)| (yaml_key_to_string(k), yaml_to_value(v)))
+            .collect();
+        if !entries.is_empty() {
+            return (Some(entries), remaining_src);
+        }
+    }
+
+    (None, remaining_src)
+}
+
+fn yaml_to_value(v: serde_yaml::Value) -> Value {
+    match v {
+        serde_yaml::Value::Null => Value::Null,
+        serde_yaml::Value::Bool(b) => Value::Bool(b),
+        serde_yaml::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Value::Int(i)
+            } else {
+                Value::Float(n.as_f64().unwrap_or_default())
+            }
+        }
+        serde_yaml::Value::String(s) => Value::String(s),
+        serde_yaml::Value::Sequence(items) => {
+            Value::Seq(items.into_iter().map(yaml_to_value).collect())
+        }
+        serde_yaml::Value::Mapping(map) => Value::Map(
+            map.into_iter()
+                .map(|(k, v)| (yaml_key_to_string(k), yaml_to_value(v)))
+                .collect(),
+        ),
+        serde_yaml::Value::Tagged(tagged) => yaml_to_value(tagged.value),
+    }
+}
+
+fn yaml_key_to_string(k: serde_yaml::Value) -> String {
+    match k {
+        serde_yaml::Value::String(s) => s,
+        serde_yaml::Value::Bool(b) => b.to_string(),
+        serde_yaml::Value::Number(n) => n.to_string(),
+        serde_yaml::Value::Null => "null".to_string(),
+        other => format!("{other:?}"),
+    }
+}
+
+fn parse_wikilinks(text: &str) -> Vec<Inline> {
+    let mut result = Vec::new();
+    let mut remaining = text;
+
+    while let Some(start_idx) = remaining.find("[[") {
+        if let Some(end_idx) = remaining[start_idx + 2..].find("]]") {
+            let actual_end_idx = start_idx + 2 + end_idx;
+            if start_idx > 0 {
+                result.push(Inline::Text(Text::new(
+                    remaining[..start_idx].to_string(),
+                    Span::dummy(),
+                )));
+            }
+
+            let inner = &remaining[start_idx + 2..actual_end_idx];
+            let wikilink_el = if let Some((target, display)) = inner.split_once('|') {
+                let target = target.trim();
+                let display = display.trim();
+                let mut el = Element::new(Sigil::At(None));
+                el.args = Some(Value::Map(vec![(
+                    "wiki".to_string(),
+                    Value::String(target.to_string()),
+                )]));
+                el.content = Some(vec![Inline::Text(Text::new(
+                    display.to_string(),
+                    Span::dummy(),
+                ))]);
+                el
+            } else {
+                let target = inner.trim();
+                let mut el = Element::new(Sigil::At(None));
+                el.args = Some(Value::Map(vec![(
+                    "wiki".to_string(),
+                    Value::String(target.to_string()),
+                )]));
+                el
+            };
+
+            result.push(Inline::Element(wikilink_el));
+            remaining = &remaining[actual_end_idx + 2..];
+        } else {
+            break;
+        }
+    }
+
+    if !remaining.is_empty() {
+        result.push(Inline::Text(Text::new(
+            remaining.to_string(),
+            Span::dummy(),
+        )));
+    }
+
+    result
+}
+
+fn post_process_document_wikilinks(doc: &mut Document) {
+    for block in &mut doc.blocks {
+        post_process_block_wikilinks(block);
+    }
+}
+
+fn post_process_block_wikilinks(block: &mut Block) {
+    match block {
+        Block::Paragraph(p) => {
+            p.content = post_process_inlines_wikilinks(std::mem::take(&mut p.content));
+        }
+        Block::Heading(h) => {
+            h.content = post_process_inlines_wikilinks(std::mem::take(&mut h.content));
+        }
+        Block::List(list) => {
+            for item in &mut list.items {
+                item.content = post_process_inlines_wikilinks(std::mem::take(&mut item.content));
+            }
+        }
+        Block::Element(el) => {
+            post_process_element_wikilinks(el);
+        }
+    }
+}
+
+fn post_process_element_wikilinks(el: &mut Element) {
+    if let Some(content) = el.content.take() {
+        el.content = Some(post_process_inlines_wikilinks(content));
+    }
+}
+
+fn post_process_inlines_wikilinks(inlines: Vec<Inline>) -> Vec<Inline> {
+    let mut new_inlines = Vec::new();
+    for inline in inlines {
+        match inline {
+            Inline::Text(t) => {
+                new_inlines.extend(parse_wikilinks(&t.value));
+            }
+            Inline::Element(mut el) => {
+                post_process_element_wikilinks(&mut el);
+                new_inlines.push(Inline::Element(el));
+            }
+        }
+    }
+    new_inlines
 }
 
 fn start_frame(tag: Tag) -> Frame {
@@ -161,7 +351,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd) {
         (Frame::BlockQuote(content), TagEnd::BlockQuote(_)) => {
             let el = Element {
                 sigil: Sigil::Type("blockquote".to_string()),
-                args: None,
+                args: Some(Value::String("note".to_string())),
                 content: Some(content),
                 value: None,
                 span: Span::dummy(),
@@ -517,12 +707,60 @@ mod tests {
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::Type("blockquote".to_string()));
+                assert_eq!(el.args, Some(Value::String("note".to_string())));
                 assert_eq!(
                     el.content,
                     Some(vec![Inline::Text(Text::new("quoted text", Span::dummy()))])
                 );
             }
             other => panic!("expected blockquote element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn yaml_frontmatter_converts_to_meta() {
+        let src = "---\ntitle: \"Hello\"\nauthor: Alice\ndraft: false\n---\n\n# Main Title\n";
+        let doc = from_markdown(src);
+        assert_eq!(doc.blocks.len(), 2);
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.sigil, Sigil::At(Some("meta".to_string())));
+                assert_eq!(
+                    el.value,
+                    Some(typedmark_ast::ElementValue::Data(Value::Map(vec![
+                        ("title".to_string(), Value::String("Hello".to_string())),
+                        ("author".to_string(), Value::String("Alice".to_string())),
+                        ("draft".to_string(), Value::Bool(false)),
+                    ])))
+                );
+            }
+            other => panic!("expected meta element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn yaml_frontmatter_with_arrays_converts_to_meta() {
+        let src = "---\ntitle: \"Doc\"\ntags:\n  - rust\n  - typedmark\n---\n\n# Main\n";
+        let doc = from_markdown(src);
+        assert_eq!(doc.blocks.len(), 2);
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.sigil, Sigil::At(Some("meta".to_string())));
+                assert_eq!(
+                    el.value,
+                    Some(typedmark_ast::ElementValue::Data(Value::Map(vec![
+                        ("title".to_string(), Value::String("Doc".to_string())),
+                        (
+                            "tags".to_string(),
+                            Value::Seq(vec![
+                                Value::String("rust".to_string()),
+                                Value::String("typedmark".to_string()),
+                            ])
+                        ),
+                    ])))
+                );
+            }
+            other => panic!("expected meta element, got {other:?}"),
         }
     }
 
@@ -549,5 +787,31 @@ mod tests {
                 Span::dummy()
             ))
         );
+    }
+
+    #[test]
+    fn wikilink_converts_to_typedmark_element() {
+        let src = "Check [[name]] and [[name|display]] here.\n";
+        let doc = from_markdown(src);
+        assert_eq!(doc.blocks.len(), 1);
+        let Block::Paragraph(p) = &doc.blocks[0] else { panic!("expected paragraph"); };
+        assert_eq!(p.content.len(), 5);
+        assert_eq!(p.content[0], Inline::Text(Text::new("Check ", Span::dummy())));
+
+        // [[name]] -> @(wiki:name)
+        let Inline::Element(el1) = &p.content[1] else { panic!("expected element 1"); };
+        assert_eq!(el1.sigil, Sigil::At(None));
+        assert_eq!(el1.args, Some(Value::Map(vec![("wiki".to_string(), Value::String("name".to_string()))])));
+        assert_eq!(el1.content, None);
+
+        assert_eq!(p.content[2], Inline::Text(Text::new(" and ", Span::dummy())));
+
+        // [[name|display]] -> @[display](wiki:name)
+        let Inline::Element(el2) = &p.content[3] else { panic!("expected element 2"); };
+        assert_eq!(el2.sigil, Sigil::At(None));
+        assert_eq!(el2.args, Some(Value::Map(vec![("wiki".to_string(), Value::String("name".to_string()))])));
+        assert_eq!(el2.content, Some(vec![Inline::Text(Text::new("display", Span::dummy()))]));
+
+        assert_eq!(p.content[4], Inline::Text(Text::new(" here.", Span::dummy())));
     }
 }

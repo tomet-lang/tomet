@@ -165,6 +165,9 @@ pub const LANGUAGE: LanguageFn = unsafe { LanguageFn::from_raw(tree_sitter_typed
 /// inspect the node type set without parsing anything.
 pub const NODE_TYPES: &str = include_str!("node-types.json");
 
+/// The grammar's `highlights.scm` query string for syntax highlighting.
+pub const HIGHLIGHTS_QUERY: &str = include_str!("../queries/highlights.scm");
+
 #[cfg(test)]
 mod tests {
     use super::*;

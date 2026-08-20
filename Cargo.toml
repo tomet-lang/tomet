@@ -56,6 +56,7 @@ serde_typedmark = { path = "crates/serde_typedmark" }
 #[ Converter ]
 typedmark-markdown = { path = "crates/converters/markdown" }
 typedmark-html = { path = "crates/converters/html" }
+tree-sitter-typedmark = { path = "crates/tree-sitter-typedmark" }
 
 #[ Crates.io ]
 anyhow = "1"
@@ -67,6 +68,7 @@ clap = { version = "4.6", features = ["derive"] }
 cxx = "1"
 crossterm = "0.28"
 directories = "6.0"
+ignore = "0.4"
 lsp-server = "0.10"
 lsp-types = "0.97"
 pulldown-cmark = "0.13"

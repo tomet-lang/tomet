@@ -97,6 +97,7 @@ fn element_to_md(el: &Element, inline: bool) -> String {
         "blockquote" => render_blockquote(el),
         "url" | "file" => render_link(el, kind.as_str()),
         "ref" => render_ref(el),
+        "wiki" => render_wiki(el),
         "embed" => render_embed(el),
         "links" => render_links_container(el),
         // No CommonMark equivalent for `${...}` -- round-trips as literal
@@ -149,7 +150,7 @@ fn content_to_md(el: &Element) -> String {
 /// plain rule.
 fn render_hr(el: &Element) -> String {
     match &el.content {
-        Some(title) if !title.is_empty() => format!("**{}**\n\n---", inline_to_md(title)),
+        Some(title) if !title.is_empty() => format!("{}\n---", inline_to_md(title)),
         _ => "---".to_string(),
     }
 }
@@ -222,6 +223,26 @@ fn render_ref(el: &Element) -> String {
         _ => target.clone(),
     };
     format!("[{text}](#link-{target})")
+}
+
+fn render_wiki(el: &Element) -> String {
+    let target = el
+        .args
+        .as_ref()
+        .and_then(as_map)
+        .and_then(|m| map_get(m, "wiki"))
+        .map(value_to_plain)
+        .unwrap_or_default();
+    let display = match &el.content {
+        Some(content) if !content.is_empty() => inline_to_md(content),
+        _ => String::new(),
+    };
+
+    if display.is_empty() || display == target {
+        format!("[[{target}]]")
+    } else {
+        format!("[[{target}|{display}]]")
+    }
 }
 
 fn render_embed(el: &Element) -> String {
@@ -596,6 +617,29 @@ mod tests {
             blocks: vec![Block::Element(el)],
             span: Span::dummy(),
         };
-        assert_eq!(to_markdown(&doc), "**Title**\n\n---\n\n");
+        assert_eq!(to_markdown(&doc), "Title\n---\n\n");
+    }
+
+    #[test]
+    fn wikilink_exports_to_markdown() {
+        let mut el1 = Element::new(Sigil::At(None));
+        el1.args = Some(Value::Map(vec![("wiki".to_string(), Value::String("name".to_string()))]));
+
+        let mut el2 = Element::new(Sigil::At(None));
+        el2.args = Some(Value::Map(vec![("wiki".to_string(), Value::String("name".to_string()))]));
+        el2.content = Some(vec![Inline::Text(Text::new("display", Span::dummy()))]);
+
+        let doc = Document {
+            blocks: vec![Block::Paragraph(Paragraph::new(
+                vec![
+                    Inline::Element(el1),
+                    Inline::Text(Text::new(" and ", Span::dummy())),
+                    Inline::Element(el2),
+                ],
+                Span::dummy(),
+            ))],
+            span: Span::dummy(),
+        };
+        assert_eq!(to_markdown(&doc), "[[name]] and [[name|display]]\n\n");
     }
 }

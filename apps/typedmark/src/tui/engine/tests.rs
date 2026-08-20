@@ -30,11 +30,13 @@ fn test_markdown_migration_conversion() {
     let md_path = dir_path.join("doc.md");
     fs::write(&md_path, "# Migration Test\n\n- item 1\n- item 2\n").unwrap();
 
-    let items = MigrationEngine::scan(&dir_path);
+    let mut items = MigrationEngine::scan(&dir_path);
     assert_eq!(items.len(), 1);
+    items[0].ensure_loaded();
     assert!(items[0].typedmark_src.contains("#[Migration Test]"));
 
     let mut items_to_exec = items;
+    items_to_exec[0].selected = true;
     let count = MigrationEngine::execute(&mut items_to_exec, false).unwrap();
     assert_eq!(count, 1);
     assert!(dir_path.join("doc.tm").exists());
