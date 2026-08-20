@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 pulldown-cmark = { workspace = true }
+serde_yaml = { workspace = true }
 typedmark-ast = { workspace = true }
 typedmark-semantics = { workspace = true }
 

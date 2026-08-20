@@ -108,6 +108,9 @@ enum Command {
         /// Target directory or file path (defaults to current directory ".").
         #[arg(default_value = ".")]
         path: PathBuf,
+        /// Optional path to custom formatting configuration file (.tm).
+        #[arg(short, long)]
+        config: Option<PathBuf>,
     },
 
     /// Launch the interactive Web Real-Time Playground for TypedMark (.tm).
@@ -162,7 +165,7 @@ fn main() -> ExitCode {
             in_place,
             check,
         } => format_cmd(file, *in_place, *check),
-        Command::Tui { path } => tui::run_tui(path.clone()),
+        Command::Tui { path, config } => tui::run_tui(path.clone(), config.clone()),
         Command::Playground { port } => playground(*port),
         Command::Export {
             path,

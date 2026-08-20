@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
+use ignore::WalkBuilder;
 
 use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
 use typedmark_parser::parse_document;
@@ -20,6 +20,18 @@ pub struct MetaFileEntry {
     pub selected: bool,
 }
 
+impl MetaFileEntry {
+    pub fn ensure_loaded(&mut self) {
+        if self.original_src.is_empty() {
+            if let Ok(src) = fs::read_to_string(&self.path) {
+                self.metadata = extract_metadata(&src);
+                self.modified_src = src.clone();
+                self.original_src = src;
+            }
+        }
+    }
+}
+
 pub struct BatchMetaEngine;
 
 impl BatchMetaEngine {
@@ -28,16 +40,13 @@ impl BatchMetaEngine {
         let mut entries = Vec::new();
         let paths = collect_tm_files(dir);
         for path in paths {
-            if let Ok(src) = fs::read_to_string(&path) {
-                let metadata = extract_metadata(&src);
-                entries.push(MetaFileEntry {
-                    path,
-                    original_src: src.clone(),
-                    modified_src: src,
-                    metadata,
-                    selected: true,
-                });
-            }
+            entries.push(MetaFileEntry {
+                path,
+                original_src: String::new(),
+                modified_src: String::new(),
+                metadata: BTreeMap::new(),
+                selected: true,
+            });
         }
         entries
     }
@@ -53,6 +62,7 @@ impl BatchMetaEngine {
             if !entry.selected {
                 continue;
             }
+            entry.ensure_loaded();
             if let Ok(mut doc) = parse_document(&entry.original_src) {
                 if set_meta_in_doc(&mut doc, target_element, key, new_value) {
                     entry.modified_src = document_to_tm(&doc);
@@ -83,10 +93,12 @@ pub fn collect_tm_files(path: &Path) -> Vec<PathBuf> {
             files.push(path.to_path_buf());
         }
     } else if path.is_dir() {
-        for entry in WalkDir::new(path)
-            .into_iter()
+        for entry in WalkBuilder::new(path)
+            .hidden(true)
+            .git_ignore(true)
+            .build()
             .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
+            .filter(|e| e.file_type().map_or(false, |ft| ft.is_file()))
         {
             let p = entry.path();
             if is_tm_file(p) {
@@ -183,7 +195,7 @@ fn value_to_string(v: &Value) -> String {
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
         Value::Bool(b) => b.to_string(),
-        Value::Null => "null".to_string(),
+        Value::Null => String::new(),
         Value::Seq(items) => {
             let s: Vec<_> = items.iter().map(value_to_string).collect();
             format!("[{}]", s.join(", "))

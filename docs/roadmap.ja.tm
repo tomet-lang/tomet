@@ -1,6 +1,9 @@
 @settings(file:docs/docs.settings.tm)
 @meta(type:todo)
 
+
+- testファイルを別途用意しろ。
+- ちゃんと分割しろ
 ---[ 構文を決定する ]---
 - ( ) `ref`構文                      // `@this`
 - ( ) エスケープ構文                  // `\`が有力。

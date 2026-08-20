@@ -20,6 +20,7 @@ pub enum ElementKind {
     Url,
     File,
     Ref,
+    Wiki,
     Embed,
     Hr,
     Em,
@@ -58,6 +59,7 @@ impl ElementKind {
             ElementKind::Url => "url",
             ElementKind::File => "file",
             ElementKind::Ref => "ref",
+            ElementKind::Wiki => "wiki",
             ElementKind::Embed => "embed",
             ElementKind::Hr => "hr",
             ElementKind::Em => "em",
@@ -77,13 +79,14 @@ impl ElementKind {
 /// `ElementKind::as_str`'s variant -> name match can't silently drift
 /// apart (see `builtin_kind_round_trips_through_as_str` below, which
 /// checks every entry here).
-const BUILTIN_KINDS: [(&str, ElementKind); 13] = [
+const BUILTIN_KINDS: [(&str, ElementKind); 14] = [
     ("meta", ElementKind::Meta),
     ("config", ElementKind::Config),
     ("links", ElementKind::Links),
     ("url", ElementKind::Url),
     ("file", ElementKind::File),
     ("ref", ElementKind::Ref),
+    ("wiki", ElementKind::Wiki),
     ("embed", ElementKind::Embed),
     ("hr", ElementKind::Hr),
     ("em", ElementKind::Em),
