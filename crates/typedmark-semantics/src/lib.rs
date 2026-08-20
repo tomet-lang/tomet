@@ -24,5 +24,3 @@ pub use positional::{
     ElementSchema, SettingsSchema, builtin_positional_arg_key, normalized_element_args,
     normalized_element_args_with_schema,
 };
-
-

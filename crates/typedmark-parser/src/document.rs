@@ -4,7 +4,9 @@
 //! elements, thematic breaks) into a [`Document`].
 
 use crate::codeblock::{is_fenced_code_block_start, parse_fenced_code_block};
-use crate::element::{config_format_update, is_at_element_start, is_type_element_start, parse_element};
+use crate::element::{
+    config_format_update, is_at_element_start, is_type_element_start, parse_element,
+};
 use crate::embedded_format::EmbeddedFormat;
 use crate::error::Result;
 use crate::heading::{
@@ -13,7 +15,7 @@ use crate::heading::{
 };
 use crate::inline::{Stop, parse_inline_seq};
 use crate::interp::{is_interp_start, parse_dollar_element};
-use crate::list::{peek_list_marker, parse_list};
+use crate::list::{parse_list, peek_list_marker};
 use crate::value::{skip_inline_ws, skip_ws_and_newlines};
 use typedmark_ast::{Block, Document, Inline, Paragraph};
 use typedmark_lexar::Cursor;
@@ -44,7 +46,10 @@ pub fn parse_document(src: &str) -> Result<Document> {
             continue;
         }
         if is_titled_thematic_break_start(&cur) {
-            blocks.push(Block::Element(parse_titled_thematic_break(&mut cur, running_format)?));
+            blocks.push(Block::Element(parse_titled_thematic_break(
+                &mut cur,
+                running_format,
+            )?));
             continue;
         }
         if is_thematic_break(&cur) {
@@ -66,7 +71,9 @@ pub fn parse_document(src: &str) -> Result<Document> {
                     items.first().unwrap().span.start,
                     items.last().unwrap().span.end,
                 );
-                blocks.push(Block::List(typedmark_ast::List::new(ordered, items, list_span)));
+                blocks.push(Block::List(typedmark_ast::List::new(
+                    ordered, items, list_span,
+                )));
             }
             continue;
         }

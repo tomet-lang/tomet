@@ -165,6 +165,9 @@ fn run_app<B: ratatui::backend::Backend>(
                     KeyCode::Char('k') if app.active_tab == app::ActiveTab::StructuralGrep => {
                         app.structural_input_target = Some(StructuralInputTarget::QueryKey);
                     }
+                    KeyCode::Char('v') if app.active_tab == app::ActiveTab::StructuralGrep => {
+                        app.structural_input_target = Some(StructuralInputTarget::QueryVal);
+                    }
                     KeyCode::Char('s') if app.active_tab == app::ActiveTab::StructuralGrep => {
                         app.run_structural_query();
                     }

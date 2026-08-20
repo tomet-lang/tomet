@@ -107,7 +107,7 @@ impl App {
             }
             ActiveTab::StructuralGrep => {
                 self.status_message = format!(
-                    "Matched {} file(s). Press [t]ag/[k]ey/[s]earch/[r]eplace field, [e] to refactor.",
+                    "Matched {} file(s). Press [t]ag/[k]ey/[v]al/[r]eplace field, [s]earch, [e] to refactor.",
                     self.structural_matches.len()
                 );
             }
@@ -257,13 +257,18 @@ impl App {
             }
             ActiveTab::StructuralGrep => {
                 if !self.query_key_input.is_empty() && !self.replace_to_input.is_empty() {
-                    StructuralEngine::apply_action(
-                        &mut self.structural_matches,
-                        &StructuralAction::RenameKey {
+                    let action = if !self.query_val_input.is_empty() {
+                        StructuralAction::ReplaceValue {
+                            key: self.query_key_input.clone(),
+                            new_value: self.replace_to_input.clone(),
+                        }
+                    } else {
+                        StructuralAction::RenameKey {
                             old_key: self.query_key_input.clone(),
                             new_key: self.replace_to_input.clone(),
-                        },
-                    );
+                        }
+                    };
+                    StructuralEngine::apply_action(&mut self.structural_matches, &action);
                 } else if !self.query_tag_input.is_empty() && !self.replace_to_input.is_empty() {
                     StructuralEngine::apply_action(
                         &mut self.structural_matches,

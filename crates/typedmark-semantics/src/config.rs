@@ -163,9 +163,7 @@ fn process_export_path(v: &Value, config: &mut DocumentConfig) {
             } else {
                 for (fk, fv) in map {
                     if let Some(path_str) = clean_path_value(fv) {
-                        config
-                            .export_paths
-                            .insert(ExportType::parse(fk), path_str);
+                        config.export_paths.insert(ExportType::parse(fk), path_str);
                     }
                 }
             }

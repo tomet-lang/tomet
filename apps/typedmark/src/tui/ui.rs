@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Wrap},
 };
 
-use super::app::{ActiveTab, App, MetaEditTarget};
+use super::app::{ActiveTab, App, MetaEditTarget, StructuralInputTarget};
 
 pub fn draw(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
@@ -292,8 +292,32 @@ fn render_controls(f: &mut Frame, app: &App, area: Rect) {
             )
         }
         ActiveTab::StructuralGrep => {
+            let tag_style = if app.structural_input_target == Some(StructuralInputTarget::QueryTag)
+            {
+                "> TAG: "
+            } else {
+                "TAG: "
+            };
+            let key_style = if app.structural_input_target == Some(StructuralInputTarget::QueryKey)
+            {
+                "> KEY: "
+            } else {
+                "KEY: "
+            };
+            let val_style = if app.structural_input_target == Some(StructuralInputTarget::QueryVal)
+            {
+                "> VAL: "
+            } else {
+                "VAL: "
+            };
+            let rep_style = if app.structural_input_target == Some(StructuralInputTarget::ReplaceTo)
+            {
+                "> REPLACE: "
+            } else {
+                "REPLACE: "
+            };
             format!(
-                "TAG: {} | KEY: {} | SEARCH: {} | REPLACE: {}  ([s]earch, [e] Apply Refactor)",
+                "{tag_style}{} | {key_style}{} | {val_style}{} | {rep_style}{}  ([t]ag/[k]ey/[v]al/[r]eplace edit, [s]earch, [e] Apply Refactor)",
                 app.query_tag_input, app.query_key_input, app.query_val_input, app.replace_to_input
             )
         }

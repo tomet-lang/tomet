@@ -449,9 +449,7 @@ async fn playground_index_handler() -> Html<&'static str> {
     Html(include_str!("playground.html"))
 }
 
-async fn parse_handler(
-    axum::Json(req): axum::Json<ParseRequest>,
-) -> axum::Json<ParseResponse> {
+async fn parse_handler(axum::Json(req): axum::Json<ParseRequest>) -> axum::Json<ParseResponse> {
     match typedmark_parser::parse_document(&req.source) {
         Ok(doc) => {
             let html = typedmark_html::render_body(&doc);
@@ -483,9 +481,7 @@ async fn parse_handler(
     }
 }
 
-async fn format_handler(
-    axum::Json(req): axum::Json<FormatRequest>,
-) -> axum::Json<FormatResponse> {
+async fn format_handler(axum::Json(req): axum::Json<FormatRequest>) -> axum::Json<FormatResponse> {
     let formatted = typedmark_formatter::format_source(&req.source);
     axum::Json(FormatResponse { formatted })
 }
@@ -516,7 +512,10 @@ fn export_cmd(
     } else if target_path.is_dir() {
         export_directory(target_path, override_type, override_out, advanced)
     } else {
-        Err(anyhow::anyhow!("path '{}' does not exist", target_path.display()))
+        Err(anyhow::anyhow!(
+            "path '{}' does not exist",
+            target_path.display()
+        ))
     }
 }
 
@@ -557,7 +556,8 @@ fn export_single_file(
         };
 
         let out_path = if let Some(out) = override_out {
-            if out.is_dir() || (override_out.is_some() && (targets.len() > 1 || file_path.is_dir())) {
+            if out.is_dir() || (override_out.is_some() && (targets.len() > 1 || file_path.is_dir()))
+            {
                 let stem = file_path
                     .file_stem()
                     .and_then(|s| s.to_str())
@@ -647,7 +647,6 @@ fn export_directory(
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -703,4 +702,3 @@ mod tests {
         let _ = fs::remove_dir_all(&temp_dir);
     }
 }
-

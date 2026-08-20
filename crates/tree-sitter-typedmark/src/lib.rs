@@ -669,7 +669,10 @@ mod tests {
         let tmt_dir = repo_root.join("docs").join("tmt");
         let mut files = Vec::new();
         collect_tm_files(&tmt_dir, &mut files);
-        assert!(!files.is_empty(), "expected to find .tm/.tmt files under docs/tmt/");
+        assert!(
+            !files.is_empty(),
+            "expected to find .tm/.tmt files under docs/tmt/"
+        );
 
         for file in files {
             let src = std::fs::read_to_string(&file)

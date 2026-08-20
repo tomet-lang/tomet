@@ -102,3 +102,26 @@ fn test_structural_rename_tag() {
 
     assert!(matches[0].modified_src.contains("<caution>[Pay attention]"));
 }
+
+#[test]
+fn test_structural_replace_value() {
+    let src = "@meta{author: Charlie}\n\n<note>[Check this]\n";
+    let item = StructuralMatch {
+        path: "test.tm".into(),
+        original_src: src.to_string(),
+        modified_src: src.to_string(),
+        match_count: 1,
+        selected: true,
+    };
+
+    let mut matches = vec![item];
+    StructuralEngine::apply_action(
+        &mut matches,
+        &StructuralAction::ReplaceValue {
+            key: "author".into(),
+            new_value: "Alice".into(),
+        },
+    );
+
+    assert!(matches[0].modified_src.contains("author: Alice"));
+}

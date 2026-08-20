@@ -9,7 +9,10 @@ use crate::value::{
 use typedmark_ast::{Element, Heading, Sigil, Value};
 use typedmark_lexar::Cursor;
 
-pub(crate) fn parse_heading(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Heading> {
+pub(crate) fn parse_heading(
+    cur: &mut Cursor,
+    default_format: Option<EmbeddedFormat>,
+) -> Result<Heading> {
     let start_pos = cur.pos();
     let level = cur.eat_while(|c| c == '#').len() as u8;
     skip_inline_ws(cur);

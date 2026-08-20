@@ -17,7 +17,8 @@ pub struct SettingsSchema {
 impl SettingsSchema {
     /// Parses a [`SettingsSchema`] from an `@settings` element.
     pub fn from_element(el: &Element) -> Self {
-        let is_settings = matches!(&el.sigil, Sigil::At(Some(name)) | Sigil::Type(name) if name == "settings");
+        let is_settings =
+            matches!(&el.sigil, Sigil::At(Some(name)) | Sigil::Type(name) if name == "settings");
         if !is_settings {
             return Self::default();
         }
@@ -59,7 +60,9 @@ impl SettingsSchema {
 
     /// Returns the positional arg key list for an element name, if defined in schema.
     pub fn positional_keys(&self, elem_name: &str) -> Option<&[String]> {
-        self.elements.get(elem_name).map(|s| s.positional.as_slice())
+        self.elements
+            .get(elem_name)
+            .map(|s| s.positional.as_slice())
     }
 }
 
@@ -197,7 +200,10 @@ mod tests {
     #[test]
     fn leaves_map_args_unchanged() {
         let mut el = Element::new(Sigil::Type("codeblock".to_string()));
-        let map_val = Value::Map(vec![("lang".to_string(), Value::String("rust".to_string()))]);
+        let map_val = Value::Map(vec![(
+            "lang".to_string(),
+            Value::String("rust".to_string()),
+        )]);
         el.args = Some(map_val.clone());
         assert_eq!(normalized_element_args(&el), Some(map_val));
     }
