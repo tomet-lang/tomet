@@ -197,3 +197,75 @@ fn formatting_request_returns_a_whole_document_edit() {
 
     server.shutdown();
 }
+
+#[test]
+fn hover_symbols_definition_completion_over_stdio() {
+    let mut server = Server::start();
+
+    let init = server.send_request(
+        "initialize",
+        json!({"processId": Value::Null, "rootUri": Value::Null, "capabilities": {}}),
+    );
+    assert!(init.get("error").is_none(), "initialize failed: {init:?}");
+    let caps = &init["result"]["capabilities"];
+    assert_eq!(caps["hoverProvider"], true);
+    assert_eq!(caps["documentSymbolProvider"], true);
+    assert_eq!(caps["definitionProvider"], true);
+    assert!(caps["completionProvider"].is_object());
+    server.send_notification("initialized", json!({}));
+
+    server.send_notification(
+        "textDocument/didOpen",
+        json!({
+            "textDocument": {
+                "uri": "file:///tmp/doc.tm",
+                "languageId": "typedmark",
+                "version": 1,
+                "text": "#[ Header ]{id: h1}\n\n<callout>(type: info)[ Message ]\n\n@(ref: h1)\n",
+            }
+        }),
+    );
+    let _diags = server.read_message();
+
+    // Hover
+    let hover_resp = server.send_request(
+        "textDocument/hover",
+        json!({
+            "textDocument": {"uri": "file:///tmp/doc.tm"},
+            "position": {"line": 2, "character": 2},
+        }),
+    );
+    assert!(hover_resp["result"]["contents"]["value"].as_str().unwrap().contains("callout"));
+
+    // Document Symbols
+    let symbols_resp = server.send_request(
+        "textDocument/documentSymbol",
+        json!({
+            "textDocument": {"uri": "file:///tmp/doc.tm"},
+        }),
+    );
+    let symbols = symbols_resp["result"].as_array().unwrap();
+    assert_eq!(symbols.len(), 3);
+
+    // Goto Definition
+    let def_resp = server.send_request(
+        "textDocument/definition",
+        json!({
+            "textDocument": {"uri": "file:///tmp/doc.tm"},
+            "position": {"line": 4, "character": 4},
+        }),
+    );
+    assert!(def_resp["result"].is_object());
+
+    // Completion
+    let comp_resp = server.send_request(
+        "textDocument/completion",
+        json!({
+            "textDocument": {"uri": "file:///tmp/doc.tm"},
+            "position": {"line": 0, "character": 0},
+        }),
+    );
+    assert!(!comp_resp["result"].as_array().unwrap().is_empty());
+
+    server.shutdown();
+}

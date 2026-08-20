@@ -50,6 +50,7 @@ typedmark-lexar = { path = "crates/typedmark-lexar" }
 typedmark-parser = { path = "crates/typedmark-parser" }
 typedmark-semantics = { path = "crates/typedmark-semantics" }
 typedmark-resolve = { path = "crates/typedmark-resolve" }
+typedmark-validator = { path = "crates/typedmark-validator" }
 typedmark-formatter = { path = "crates/typedmark-formatter" }
 serde_typedmark = { path = "crates/serde_typedmark" }
 #[ Converter ]

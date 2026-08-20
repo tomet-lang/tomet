@@ -1618,8 +1618,12 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "serde_json",
+ "typedmark-ast",
  "typedmark-formatter",
  "typedmark-parser",
+ "typedmark-semantics",
+ "typedmark-validator",
+ "typedmark-walk",
 ]
 
 [[package]]

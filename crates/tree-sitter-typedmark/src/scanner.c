@@ -190,6 +190,12 @@ bool tree_sitter_typedmark_external_scanner_scan(void *payload, TSLexer *lexer,
     if (lexer->lookahead == ':') {
       return false;
     }
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+      lexer->advance(lexer, false);
+    }
+    if (lexer->lookahead == '{') {
+      return false;
+    }
   }
 
   // Not a `key:` after all (or never looked like one to begin with) --

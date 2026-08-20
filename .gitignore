@@ -26,6 +26,7 @@ target/
 .claude/
 .idea/
 .vscode/
+.zed/
 
 #[ User's variable ]
 .env

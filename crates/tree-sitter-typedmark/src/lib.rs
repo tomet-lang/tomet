@@ -683,4 +683,19 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn parses_single_quoted_strings() {
+        let src = "@settings(title: 'my title') { path: 'foo/bar' }\n";
+        let tree = parse(src);
+        assert!(!tree.root_node().has_error());
+        assert!(find_kind(tree.root_node(), "string").is_some());
+    }
+
+    #[test]
+    fn parses_colon_less_braced_maps() {
+        let src = "@settings {\n  elements {\n    bookmark {\n      title: { type: string }\n    }\n  }\n}\n";
+        let tree = parse(src);
+        assert!(!tree.root_node().has_error());
+    }
 }

@@ -5,10 +5,12 @@ use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
     PublishDiagnostics,
 };
-use lsp_types::request::{Formatting, Request as _};
+use lsp_types::request::{
+    Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest, Request as _,
+};
 use lsp_types::{
-    InitializeParams, OneOf, PublishDiagnosticsParams, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
+    CompletionOptions, HoverProviderCapability, InitializeParams, OneOf, PublishDiagnosticsParams,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -17,6 +19,16 @@ fn main() -> anyhow::Result<()> {
     let capabilities = ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         document_formatting_provider: Some(OneOf::Left(true)),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
+        document_symbol_provider: Some(OneOf::Left(true)),
+        definition_provider: Some(OneOf::Left(true)),
+        completion_provider: Some(CompletionOptions {
+            resolve_provider: Some(false),
+            trigger_characters: Some(vec!["<".to_string(), "@".to_string(), "$".to_string()]),
+            work_done_progress_options: Default::default(),
+            all_commit_characters: None,
+            completion_item: None,
+        }),
         ..Default::default()
     };
     let init_params = connection.initialize(serde_json::to_value(capabilities)?)?;
@@ -27,17 +39,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Takes `connection` by value so it (and its `sender`) is dropped when
-/// this returns -- `io_threads.join()` waits on the writer thread's
-/// channel hanging up, which only happens once every `Sender` is gone,
-/// so a version of this that kept `connection` alive in `main` (e.g. by
-/// taking `&Connection` here) would deadlock on shutdown.
 fn main_loop(connection: Connection) -> anyhow::Result<()> {
-    // Full-sync mode sends the whole new text on every open/change, so
-    // diagnostics are re-derived from scratch each time -- no cache
-    // needed for those. Formatting, though, is request-driven and only
-    // gets a URI in its params, not the text, so open buffers have to be
-    // cached somewhere to answer it; this map is that cache.
     let mut documents: HashMap<Uri, String> = HashMap::new();
     for msg in &connection.receiver {
         match msg {
@@ -56,10 +58,62 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                     connection
                         .sender
                         .send(Message::Response(Response::new_ok(req.id, result)))?;
+                } else if req.method == HoverRequest::METHOD {
+                    let params: lsp_types::HoverParams = serde_json::from_value(req.params)?;
+                    let hover = documents
+                        .get(&params.text_document_position_params.text_document.uri)
+                        .and_then(|text| {
+                            typedmark_lsp::hover_for(
+                                text,
+                                params.text_document_position_params.position,
+                            )
+                        });
+                    let result = serde_json::to_value(hover)?;
+                    connection
+                        .sender
+                        .send(Message::Response(Response::new_ok(req.id, result)))?;
+                } else if req.method == DocumentSymbolRequest::METHOD {
+                    let params: lsp_types::DocumentSymbolParams =
+                        serde_json::from_value(req.params)?;
+                    let symbols = documents
+                        .get(&params.text_document.uri)
+                        .map(|text| typedmark_lsp::document_symbols_for(text))
+                        .unwrap_or_default();
+                    let result = serde_json::to_value(symbols)?;
+                    connection
+                        .sender
+                        .send(Message::Response(Response::new_ok(req.id, result)))?;
+                } else if req.method == GotoDefinition::METHOD {
+                    let params: lsp_types::GotoDefinitionParams =
+                        serde_json::from_value(req.params)?;
+                    let uri = params.text_document_position_params.text_document.uri.clone();
+                    let def = documents.get(&uri).and_then(|text| {
+                        typedmark_lsp::definition_for(
+                            text,
+                            params.text_document_position_params.position,
+                            &uri,
+                        )
+                    });
+                    let result = serde_json::to_value(def)?;
+                    connection
+                        .sender
+                        .send(Message::Response(Response::new_ok(req.id, result)))?;
+                } else if req.method == Completion::METHOD {
+                    let params: lsp_types::CompletionParams = serde_json::from_value(req.params)?;
+                    let items = documents
+                        .get(&params.text_document_position.text_document.uri)
+                        .map(|text| {
+                            typedmark_lsp::completions_for(
+                                text,
+                                params.text_document_position.position,
+                            )
+                        })
+                        .unwrap_or_default();
+                    let result = serde_json::to_value(items)?;
+                    connection
+                        .sender
+                        .send(Message::Response(Response::new_ok(req.id, result)))?;
                 }
-                // Everything else falls through unanswered by design (the
-                // client won't send a request we didn't advertise support
-                // for in `ServerCapabilities`).
             }
             Message::Notification(note) => match note.method.as_str() {
                 DidOpenTextDocument::METHOD => {

@@ -8,8 +8,12 @@ name = "typedmark-lsp"
 path = "src/main.rs"
 
 [dependencies]
+typedmark-ast = { workspace = true }
 typedmark-formatter = { workspace = true }
 typedmark-parser = { workspace = true }
+typedmark-semantics = { workspace = true }
+typedmark-validator = { workspace = true }
+typedmark-walk = { workspace = true }
 
 #[ Crates.io ]
 anyhow = { workspace = true }
