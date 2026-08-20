@@ -1,12 +1,10 @@
 @meta{type:bookmark}
-<bookmark(https://example.com)>(title:"aaa", content:raw)｛ id:uuid-asld-lask-sdff, tags:[ a, a ] ｝
+<bookmark>(url:https://example.com, content:raw)｛ id:uuid-asld-lask-sdff, tags:[ a, a ] ｝
 [ 
   ブックマークの
   メモ
   改行を保持できる
 ]
-<bookmark>(url:https://example.com, content:raw)｛ id:uuid-asld-lask-sdff, tags:[ a, a ] ｝
-[ メモ　]
 <bookmark>(url:https://example.com, content:raw)｛ id:uuid-asld-lask-sdff, tags:[ a, a ] ｝
 [ メモ　]
 <bookmark>(url:https://example.com, content:raw)｛ id:uuid-asld-lask-sdff, tags:[ a, a ] ｝

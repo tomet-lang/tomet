@@ -2,15 +2,14 @@
 @meta(type:todo)
 
 ---[ 構文を決定する ]---
-- ( ) 設定DSL
-- ( ) ValueDSL
-- ( ) 要素設定
 - ( ) `ref`構文                      // `@this`
-- ( ) Table記法                      // `[]`
 - ( ) エスケープ構文                  // `\`が有力。
 - ( ) Template構文
 - ( ) `[]`のkey
 - ( ) コネクト構文2                    // `:(){}[]`
+- (!) Table記法                      // `[]` まだ決まってない
+- (!) 独自DSL Settings               // 難しいから、json,yamlに逃がした。
+- (!) 独自DSL Value                  //
 ---[ 構文を実装する ]---
 - ( ) ビルトイン関数の強化             // `@link`,`@`, `<index>`, `<callout>`, `@tag`
 - ( ) Elementの挙動を一般化           // 設定で決める
@@ -37,6 +36,7 @@
 
 #[ Archive ]
 ---[ 構文 ]---
+- (x) 要素設定 (.settings.tm, json, yaml)
 - (x) コネクト構文 (`:(){}`)
 - (x) `args`推論 (基本要素対応, カスタム要素対応, positional: [ title, priority ])         // `<embed>(src)` 
 - (x) `@`推論
@@ -49,3 +49,5 @@
 - (x) 基本要素 (heading, list, horizontal line)
 - (x) 名前 (element, arg, content, value)
 - (x) 基本AST (`<T>()[]{}`)
+---[ 機能 ]---
+- (x) export (`export:{type: commonmark, path: ...}`)

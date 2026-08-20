@@ -1,10 +1,15 @@
-@meta{ type:@settings }
+@meta{ type: settings }
 @settings{
   elements: {
     bookmark: {
-      args: { name: string!, count: uint = 0, variant: "a"|"b"|"c" },
+      args: {
+        name: { type: string },
+        count: { type: uint, default: 0 },
+        variant: { type: string }
+      },
+      required: [ name ],
       positional: [ name ],
-      content: nested(allow: [callout, codeblock]),
+      content: nest(allow: [callout, codeblock]),
       placement: block,
       singleton: false
     }

@@ -32,3 +32,8 @@ tui path=".":
 # Check formatting across workspace.
 format-check:
     cargo fmt --all -- --check
+
+# Clean Zed editor extension build and installation cache.
+clean-zed-cache:
+    rm -rf ~/.local/share/zed/extensions/installed/typedmark ~/.local/share/zed/extensions/work/typedmark
+

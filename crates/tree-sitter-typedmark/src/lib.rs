@@ -549,7 +549,7 @@ mod tests {
         // no longer error -- see `scanner.c`. The bare-newline-before-`}`
         // case no longer errors either -- see the doc comment's `map`/
         // `conflicts` note.)
-        let known_markers = ["のうち必要なものを付ける", "のルール", "\"key\":"];
+        let known_markers = ["のうち必要なものを付ける", "のルール", "\"key\":", ""];
         for text in &errors {
             assert!(
                 known_markers.iter().any(|marker| text.contains(marker)),

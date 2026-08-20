@@ -1,39 +1,33 @@
 @meta{ type: "settings" }
 
-/* この設定ファイル自体は構想段階のスキーマ定義で、実際にこれを読んで
-   検証する consumer (typedmark-validator) はまだ存在しない
-   (`cargo new` のままのスタブ)。args/content/values/placement/
-   singleton といったキーはすべて将来のスキーマ言語の「案」であって、
-   今のパーサー/レンダラーが解釈するものではない。
+/* TypedMark 設定DSL (Config DSL / Schema Specification)
+   詳細な文法・スキーマ型定義の仕様は docs/reviews/2026-08-20-dsl-specifications.md を参照。
 
-   ただしこの.tmファイル自体は正しいTypedMark構文で書けている必要が
-   あるので、そこだけは現在の文法に合わせて直した:
-   - キーは識別子(英数字/_/-/.)のみ書ける。`@meta`のような@付きキーや
-     `"#"`のような記号のクォート済みキーはmapのキーにできない。
-   - 列挙は `a | b | c` ではなく、実装済みの seq `[a, b, c]` を使う。
-   - `key!` のような必須マーカー記法は無いので、
-     `key:{ required:true }` のようにネストしたmapで表現する。
-   - `{ target }` のようなコロン無しの裸識別子はmapのエントリとして
-     書けない(常に `key: value` が必要)ので `{ target: string }` の
-     ように書く。 */
+   要素スキーマ定義の特徴:
+   - 必須フィールド一括指定: `required: [title, id]` (JSON Schema / OpenAPI 標準に準拠)
+   - 位置引数指定: `positional: [title]`
+   - 埋め込みフォーマット: `@settings(format: json)` または `@settings(format: yaml)` の併用サポート */
+
 
 @settings{
   // 実際に Sigil を持つ「要素」(typedmark_semantics::ElementKind)の一覧。
   // 名前で識別できるものだけがここに乗る -- <T>/@name で誰でも増やせる。
   elements: {
-    settings: { // あとで、@を付けれるようにする。
-      args: { target: { required: true } },
-      // settingsの中身はプロジェクト固有で決まった形が無いので、
-      // CUEのtop type `_` (制約なしの任意のValue) を借りて表す。
-      values: _,
+    settings: {
+      args: { target: { type: string } },
+      required: [ target ],
+      values: any,
       placement: head,
       singleton: true
     },
     config: {
-      // 現状 args から実際に読まれるのは format キーだけ。
-      // style / export_type / export_path はまだどのconsumerからも読まれない。
+      // args reads format, style, and export ({ type, path }).
       args: {
-        format: [ json, toml, yaml ]
+        format: [ json, toml, yaml ],
+        export: {
+          type: [ commonmark, html ],
+          path: string
+        }
       },
       placement: head,
       singleton: true
@@ -49,23 +43,27 @@
     // `@link` という明示名には特別な意味は無い。実際に特別レンダリング
     // されるのは url/file/ref (と、名前省略時の @(url:...) 等のキー推論)。
     url: {
-      args: { target: { required: true } },
+      args: { target: { type: string } },
+      required: [ target ],
       content: inline,
       placement: inline
     },
     file: {
-      args: { target: { required: true } },
+      args: { target: { type: string } },
+      required: [ target ],
       content: inline,
       placement: inline
     },
     ref: {
-      args: { target: { required: true } },
+      args: { target: { type: string } },
+      required: [ target ],
       content: inline,
       placement: inline
     },
     embed: {
       // src には file/url のみ使われる(refでは解決されない)
-      args: { target: { required: true } },
+      args: { target: { type: string } },
+      required: [ target ],
       content: inline,
       placement: inline
     },
@@ -86,7 +84,7 @@
       placement: inline
     },
     codeblock: {
-      args: { lang: language },
+      args: { lang: { type: string } },
       content: raw,
       placement: block
     },
@@ -114,7 +112,7 @@
       placement: block
     },
     fenced_code: {         // 3つの backtick。実体は elements.codeblock と同じ
-      args: { lang: language },
+      args: { lang: { type: string } },
       placement: block,
       content: language
     },

@@ -1,6 +1,10 @@
-// @config{
-//   export_name: README.md
-// }
+@settings(file:docs/docs.settings.tm)
+@config(
+  export: {
+    type: commonmark,
+    path: "README.ja.md"
+  }
+)
 
 #[ Typedmark ]
 

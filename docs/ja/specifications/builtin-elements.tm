@@ -12,6 +12,13 @@
 @(file:<file>)[ display_name ]
 @(ref:<ref>)
 
+@references[
+  <id:asdf-asdf>:()
+  <id:asdf-asdf>:[]
+  <id:asdf-asd2>:{tag: important}
+  <id(asdf-asdf)>:(){}[]
+]
+
 @links{
   (id1)[ note ]
   (id2)[ note ]
@@ -33,11 +40,10 @@
 
 ```tm
 // @config(
-//   style:structural,           // 未実装: styleキーは読まれない
-//   export_type:[ commonmark ], // 未実装: export_type/export_pathキーは読まれない
-//   export_path:/readme.md
+//   style: structural,
+//   export: { type: commonmark, path: "README.md" }
 // )
-// @import(file:path)            // 未実装: @importは未設計(docs/develop/architecture.mdの@import節を参照)
+// @import(file:path)            // Unimplemented: @import is not yet designed (see docs/develop/architecture.md)
 
 // @link(url:<url>)[ display_name ]  // 未実装: `@link`という明示名には特別な意味がない
                                       // (url/file/refとして特別扱いされるのは @url/@file/@ref か
