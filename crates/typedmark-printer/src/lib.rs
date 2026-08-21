@@ -1,4 +1,12 @@
-//! Printer module to serialize `typedmark_ast::Document` back to `.tm` text syntax.
+//! Serializes a `typedmark_ast::Document` back to `.tm` source text
+//! (no span info required, unlike `typedmark-formatter`, which
+//! re-formats existing `.tm` text losslessly using spans -- this crate
+//! is for documents that never had `.tm` source to begin with, e.g.
+//! ones built from Markdown or edited purely at the AST level). Also
+//! owns `PrinterConfig` (loaded from a `default.config.tm`/
+//! `typedmark.config.tm`) and the config-driven formatting choices it
+//! controls: meta format (yaml/json/toml), wikilink/link spacing,
+//! callout/list style, and `@meta` id auto-generation.
 
 use typedmark_ast::{
     Block, Document, Element, ElementValue, Heading, Inline, InterpExpr, InterpExprKind, List,
@@ -28,42 +36,6 @@ pub struct PrinterConfig {
     pub ignore_files: Vec<String>,
     pub callout_content_style: Option<String>,
     pub list_multiline_style_content: Option<String>,
-}
-
-pub fn is_path_ignored(
-    path: &std::path::Path,
-    root: Option<&std::path::Path>,
-    ignore_patterns: &[String],
-) -> bool {
-    if ignore_patterns.is_empty() {
-        return false;
-    }
-    let path_str = path.to_string_lossy().replace('\\', "/");
-    let rel_str = if let Some(r) = root {
-        path.strip_prefix(r)
-            .map(|p| p.to_string_lossy().replace('\\', "/"))
-            .unwrap_or_else(|_| path_str.clone())
-    } else {
-        path_str.clone()
-    };
-    let rel_clean = rel_str.trim_start_matches('/');
-
-    for pat in ignore_patterns {
-        let pat_clean = pat.trim().replace('\\', "/");
-        let pat_clean = pat_clean.trim_matches('/');
-        if pat_clean.is_empty() {
-            continue;
-        }
-        if rel_clean == pat_clean
-            || rel_clean.starts_with(&format!("{pat_clean}/"))
-            || path_str.ends_with(&format!("/{pat_clean}"))
-            || path_str.ends_with(pat_clean)
-            || path_str.contains(&format!("/{pat_clean}/"))
-        {
-            return true;
-        }
-    }
-    false
 }
 
 impl PrinterConfig {
@@ -1513,7 +1485,10 @@ mod tests {
     }
 
     #[test]
-    fn test_ignore_files_parsing_and_path_matching() {
+    fn test_ignore_files_config_parsing() {
+        // `is_path_ignored`'s own matching behavior is covered by
+        // `typedmark-indexer`'s tests now -- this only checks that
+        // `ignore.files` parses into `PrinterConfig.ignore_files`.
         let settings_src = r#"@settings(format:json){
   {
     "ignore": {
@@ -1529,21 +1504,6 @@ mod tests {
             cfg.ignore_files,
             vec!["00-09 System/01 Apps/obsidian".to_string()]
         );
-
-        let root = std::path::Path::new("/workspace");
-        let ignored_file = root.join("00-09 System/01 Apps/obsidian/note.md");
-        let normal_file = root.join("00-09 System/01 Apps/other/note.md");
-
-        assert!(is_path_ignored(
-            &ignored_file,
-            Some(root),
-            &cfg.ignore_files
-        ));
-        assert!(!is_path_ignored(
-            &normal_file,
-            Some(root),
-            &cfg.ignore_files
-        ));
     }
 
     #[test]

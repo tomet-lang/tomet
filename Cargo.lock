@@ -1670,6 +1670,7 @@ dependencies = [
  "typedmark-ast",
  "typedmark-formatter",
  "typedmark-html",
+ "typedmark-indexer",
  "typedmark-markdown",
  "typedmark-parser",
  "typedmark-semantics",
@@ -1688,7 +1689,7 @@ version = "0.1.0"
 dependencies = [
  "typedmark-ast",
  "typedmark-parser",
- "typedmark-resolve",
+ "typedmark-resolver",
 ]
 
 [[package]]
@@ -1710,6 +1711,18 @@ dependencies = [
  "typedmark-ast",
  "typedmark-parser",
  "typedmark-semantics",
+]
+
+[[package]]
+name = "typedmark-indexer"
+version = "0.1.0"
+dependencies = [
+ "ignore",
+ "typedmark-ast",
+ "typedmark-parser",
+ "typedmark-printer",
+ "typedmark-semantics",
+ "typedmark-walker",
 ]
 
 [[package]]
@@ -1740,7 +1753,7 @@ dependencies = [
  "typedmark-parser",
  "typedmark-semantics",
  "typedmark-validator",
- "typedmark-walk",
+ "typedmark-walker",
 ]
 
 [[package]]
@@ -1771,17 +1784,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "typedmark-printer"
+version = "0.1.0"
+dependencies = [
+ "nanoid",
+ "typedmark-ast",
+ "typedmark-formatter",
+ "typedmark-markdown",
+ "typedmark-parser",
+ "typedmark-semantics",
+ "uuid",
+]
+
+[[package]]
 name = "typedmark-python"
 version = "0.1.0"
 
 [[package]]
-name = "typedmark-resolve"
+name = "typedmark-resolver"
 version = "0.1.0"
 dependencies = [
  "typedmark-ast",
  "typedmark-parser",
  "typedmark-semantics",
- "typedmark-walk",
+ "typedmark-walker",
 ]
 
 [[package]]
@@ -1799,16 +1825,16 @@ dependencies = [
  "anyhow",
  "crossterm",
  "ignore",
- "nanoid",
  "ratatui",
  "tree-sitter",
  "tree-sitter-typedmark",
  "typedmark-ast",
- "typedmark-formatter",
+ "typedmark-indexer",
  "typedmark-markdown",
  "typedmark-parser",
+ "typedmark-printer",
  "typedmark-semantics",
- "typedmark-walk",
+ "typedmark-walker",
  "uuid",
 ]
 
@@ -1818,11 +1844,11 @@ version = "0.1.0"
 dependencies = [
  "typedmark-ast",
  "typedmark-parser",
- "typedmark-walk",
+ "typedmark-walker",
 ]
 
 [[package]]
-name = "typedmark-walk"
+name = "typedmark-walker"
 version = "0.1.0"
 dependencies = [
  "typedmark-ast",

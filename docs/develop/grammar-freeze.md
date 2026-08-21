@@ -55,7 +55,7 @@ open list -- see "What's frozen" below.
 - **The parser stays pure**: `typedmark-parser` performs zero I/O and no
   dynamic evaluation (the "Deterministic Static Parser Boundary" in
   `docs/develop/architecture.md`). File-referencing constructs
-  (`@settings(file:...)`) resolve in `typedmark-resolve`, not the parser.
+  (`@settings(file:...)`) resolve in `typedmark-resolver`, not the parser.
   Resolves Pillar 2.
 - **Every AST node carries a `Span`** (line, column, byte offset) --
   already fully integrated per `docs/develop/architecture.md`, closing
@@ -66,7 +66,7 @@ open list -- see "What's frozen" below.
 - **`${...}` interpolation, v1 grammar**: `${Path}` (`${a.b.c}`) and
   `${Call}` (`${sum(a, b)}`, args recursively `Expr`), no infix
   operators yet -- grammar/AST only, evaluation is still
-  `typedmark-resolve`/`typedmark-compute`'s unimplemented job. See
+  `typedmark-resolver`/`typedmark-compute`'s unimplemented job. See
   `docs/reviews/2026-08-17-interpolation-syntax.md`.
 
 ## What this unblocks

@@ -2,7 +2,7 @@
 
 use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
 use typedmark_semantics::merge_connected_values;
-use typedmark_walk::{NodeMut, VisitorMut, walk_document_mut};
+use typedmark_walker::{NodeMut, VisitorMut, walk_document_mut};
 
 /// A remote attribute connection definition targeting one or more element IDs.
 #[derive(Debug, Clone)]
@@ -111,7 +111,7 @@ fn parse_target_ids_from_str(s: &str) -> Vec<String> {
     }
 }
 
-/// Walks `doc` via `typedmark-walk`'s generic mutable tree walk and
+/// Walks `doc` via `typedmark-walker`'s generic mutable tree walk and
 /// merges `conn`'s attrs/value into every id-bearing node (`Element`/
 /// `Heading`/`ListItem`) whose id matches `target_id` -- see that
 /// crate's module doc for why the traversal itself lives there rather
@@ -174,7 +174,7 @@ fn element_has_id(el: &Element, target_id: &str) -> bool {
 }
 
 /// The `Element` half of [`ConnectionApplier`]'s merge -- recursion into
-/// nested content/children is `typedmark_walk::walk_document_mut`'s job
+/// nested content/children is `typedmark_walker::walk_document_mut`'s job
 /// now, not this function's.
 fn apply_connection_to_element(el: &mut Element, target_id: &str, conn: &RemoteConnection) {
     if element_has_id(el, target_id) {

@@ -11,7 +11,7 @@
 
 use std::ops::ControlFlow;
 use typedmark_ast::{Document, Element, ElementValue, InterpExpr, InterpExprKind, Value};
-use typedmark_walk::{Node, Visitor, walk_document};
+use typedmark_walker::{Node, Visitor, walk_document};
 
 use crate::ResolveError;
 
@@ -36,7 +36,7 @@ pub fn resolve_reference(doc: &Document, expr: &InterpExpr) -> Result<Value, Res
     }
 }
 
-/// Depth-first search (via `typedmark-walk`) for the first node anywhere
+/// Depth-first search (via `typedmark-walker`) for the first node anywhere
 /// in `doc` tagged `{id:...}`/`(id:...)` with `id`, returning its
 /// [`node_value`]. Not shared with `typedmark-validator/src/id.rs`'s use
 /// of the same walker: that one collects *every* id for
@@ -44,7 +44,7 @@ pub fn resolve_reference(doc: &Document, expr: &InterpExpr) -> Result<Value, Res
 /// node's own data beyond its `Span`), while this one *stops* at the
 /// first match to one specific id and needs the matched node's actual
 /// data -- the shared part is only the tree-walk itself
-/// (`typedmark_walk::walk_document`), not this search's own logic.
+/// (`typedmark_walker::walk_document`), not this search's own logic.
 fn find_by_id(doc: &Document, id: &str) -> Option<Value> {
     struct FindById<'a> {
         id: &'a str,

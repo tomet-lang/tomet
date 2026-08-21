@@ -1,7 +1,7 @@
 //! Evaluates a `${...}` interpolation's parsed `InterpExpr` --
 //! `typedmark-parser`/`typedmark-ast` own the grammar and syntax tree;
 //! this crate adds evaluation semantics on top. `Identifier`/`Member`
-//! sub-expressions resolve via `typedmark-resolve` (this crate has no id
+//! sub-expressions resolve via `typedmark-resolver` (this crate has no id
 //! lookup of its own); a `Call` dispatches to a builtin function
 //! (`functions.rs`) after recursively evaluating its args.
 
@@ -14,7 +14,7 @@ use typedmark_ast::{Document, InterpExpr, InterpExprKind, Literal, Value};
 
 /// Evaluates `expr` against `doc`. `Literal`s evaluate to themselves;
 /// `Identifier`/`Member` chains resolve via
-/// `typedmark_resolve::resolve_reference`; a `Call`'s `args` are
+/// `typedmark_resolver::resolve_reference`; a `Call`'s `args` are
 /// evaluated recursively (left to right) before the named function runs.
 pub fn evaluate(doc: &Document, expr: &InterpExpr) -> Result<Value, ComputeError> {
     match &expr.kind {
@@ -22,7 +22,7 @@ pub fn evaluate(doc: &Document, expr: &InterpExpr) -> Result<Value, ComputeError
         InterpExprKind::Literal(Literal::Float(f)) => Ok(Value::Float(*f)),
         InterpExprKind::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
         InterpExprKind::Identifier(_) | InterpExprKind::Member { .. } => {
-            typedmark_resolve::resolve_reference(doc, expr).map_err(ComputeError::Resolve)
+            typedmark_resolver::resolve_reference(doc, expr).map_err(ComputeError::Resolve)
         }
         InterpExprKind::Call { callee, args } => evaluate_call(doc, callee, args),
     }

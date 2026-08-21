@@ -2,7 +2,6 @@
 
 pub mod batch_meta;
 pub mod migration;
-pub mod printer;
 pub mod structural;
 
 #[cfg(test)]

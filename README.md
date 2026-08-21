@@ -25,7 +25,7 @@ typedmark/
 │   ├── typedmark-lexar/      # Cursor lexer over &str
 │   ├── typedmark-parser/     # Recursive-descent parser (source of truth for grammar)
 │   ├── typedmark-semantics/  # I/O-free classification of what an Element means
-│   ├── typedmark-resolve/    # File-referencing preprocessor (@settings(file:...))
+│   ├── typedmark-resolver/    # File-referencing preprocessor (@settings(file:...))
 │   ├── typedmark-validator/  # Schema & lint validation (in progress)
 │   ├── converters/
 │   │   ├── html/             # typedmark-html: Document -> HTML

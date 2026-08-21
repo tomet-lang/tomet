@@ -19,11 +19,11 @@ members = [
 
   #[ Core ]
   "crates/typedmark-ast",
-  "crates/typedmark-walk",
+  "crates/typedmark-walker",
   "crates/typedmark-lexar",
   "crates/typedmark-parser",
   "crates/typedmark-semantics",
-  "crates/typedmark-resolve",
+  "crates/typedmark-resolver",
   "crates/typedmark-validator",
 
   #[ Converter ]
@@ -32,6 +32,8 @@ members = [
 
   #[ TUI ]
   "crates/typedmark-tui",
+  "crates/typedmark-printer",
+  "crates/typedmark-indexer",
 
   #[ Consumer ]
   "crates/typedmark-formatter",
@@ -48,11 +50,11 @@ edition = "2024"
 
 [workspace.dependencies]
 typedmark-ast = { path = "crates/typedmark-ast" }
-typedmark-walk = { path = "crates/typedmark-walk" }
+typedmark-walker = { path = "crates/typedmark-walker" }
 typedmark-lexar = { path = "crates/typedmark-lexar" }
 typedmark-parser = { path = "crates/typedmark-parser" }
 typedmark-semantics = { path = "crates/typedmark-semantics" }
-typedmark-resolve = { path = "crates/typedmark-resolve" }
+typedmark-resolver = { path = "crates/typedmark-resolver" }
 typedmark-validator = { path = "crates/typedmark-validator" }
 typedmark-formatter = { path = "crates/typedmark-formatter" }
 serde_typedmark = { path = "crates/serde_typedmark" }
@@ -62,6 +64,8 @@ typedmark-html = { path = "crates/converters/html" }
 tree-sitter-typedmark = { path = "crates/tree-sitter-typedmark" }
 #[ TUI ]
 typedmark-tui = { path = "crates/typedmark-tui" }
+typedmark-printer = { path = "crates/typedmark-printer" }
+typedmark-indexer = { path = "crates/typedmark-indexer" }
 
 #[ Crates.io ]
 anyhow = "1"

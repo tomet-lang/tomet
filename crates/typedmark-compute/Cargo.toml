@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 typedmark-ast = { workspace = true }
-typedmark-resolve = { workspace = true }
+typedmark-resolver = { workspace = true }
 
 [dev-dependencies]
 typedmark-parser = { workspace = true }

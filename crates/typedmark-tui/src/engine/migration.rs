@@ -4,7 +4,7 @@ use ignore::WalkBuilder;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::printer::document_to_tm_with_config;
+use typedmark_printer::document_to_tm_with_config;
 
 #[derive(Debug, Clone)]
 pub struct MigrationItem {
@@ -29,14 +29,14 @@ pub struct FileTreeNode {
 
 impl MigrationItem {
     pub fn ensure_loaded(&mut self) {
-        self.ensure_loaded_with_config(&crate::engine::printer::PrinterConfig::default());
+        self.ensure_loaded_with_config(&typedmark_printer::PrinterConfig::default());
     }
 
-    pub fn ensure_loaded_with_config(&mut self, config: &crate::engine::printer::PrinterConfig) {
+    pub fn ensure_loaded_with_config(&mut self, config: &typedmark_printer::PrinterConfig) {
         if self.markdown_src.is_empty() {
             if let Ok(src) = fs::read_to_string(&self.source_path) {
                 let mut doc = typedmark_markdown::from_markdown(&src);
-                super::printer::ensure_document_id_with_config(&mut doc, config);
+                typedmark_printer::ensure_document_id_with_config(&mut doc, config);
                 self.typedmark_src = document_to_tm_with_config(&doc, config);
                 self.markdown_src = src;
             }
@@ -50,9 +50,9 @@ impl MigrationEngine {
     /// Scan workspace directory tree for relevant files (.md/.tm), compacting single-child directory chains.
     pub fn scan_tree(root: &Path) -> Vec<FileTreeNode> {
         let (config, _, config_root) =
-            super::printer::find_config_file(root).unwrap_or_else(|| {
+            typedmark_printer::find_config_file(root).unwrap_or_else(|| {
                 (
-                    super::printer::PrinterConfig::default(),
+                    typedmark_printer::PrinterConfig::default(),
                     root.to_path_buf(),
                     root.to_path_buf(),
                 )
@@ -62,7 +62,7 @@ impl MigrationEngine {
 
     pub fn scan_tree_with_config(
         root: &Path,
-        config: &super::printer::PrinterConfig,
+        config: &typedmark_printer::PrinterConfig,
         config_root: &Path,
     ) -> Vec<FileTreeNode> {
         let mut raw_tree = build_raw_tree_with_config(root, config, config_root);
@@ -75,9 +75,9 @@ impl MigrationEngine {
     #[allow(dead_code)]
     pub fn scan(path: &Path) -> Vec<MigrationItem> {
         let (config, _, config_root) =
-            super::printer::find_config_file(path).unwrap_or_else(|| {
+            typedmark_printer::find_config_file(path).unwrap_or_else(|| {
                 (
-                    super::printer::PrinterConfig::default(),
+                    typedmark_printer::PrinterConfig::default(),
                     path.to_path_buf(),
                     path.to_path_buf(),
                 )
@@ -87,7 +87,7 @@ impl MigrationEngine {
 
     pub fn scan_with_config(
         path: &Path,
-        config: &super::printer::PrinterConfig,
+        config: &typedmark_printer::PrinterConfig,
         config_root: &Path,
     ) -> Vec<MigrationItem> {
         let mut items = Vec::new();
@@ -106,7 +106,7 @@ impl MigrationEngine {
                 .filter(|e| e.file_type().map_or(false, |ft| ft.is_file()))
             {
                 let p = entry.path();
-                if super::printer::is_path_ignored(p, Some(config_root), &config.ignore_files) {
+                if typedmark_indexer::is_path_ignored(p, Some(config_root), &config.ignore_files) {
                     continue;
                 }
                 if is_markdown_file(p) {
@@ -136,7 +136,7 @@ impl MigrationEngine {
     pub fn execute_with_config(
         items: &mut [MigrationItem],
         remove_original: bool,
-        config: &crate::engine::printer::PrinterConfig,
+        config: &typedmark_printer::PrinterConfig,
     ) -> anyhow::Result<usize> {
         let mut count = 0;
         for item in items.iter_mut() {
@@ -159,7 +159,7 @@ impl MigrationEngine {
         Self::execute_with_config(
             items,
             remove_original,
-            &crate::engine::printer::PrinterConfig::default(),
+            &typedmark_printer::PrinterConfig::default(),
         )
     }
 }
@@ -193,7 +193,7 @@ struct RawNode {
 
 fn build_raw_tree_with_config(
     root: &Path,
-    config: &super::printer::PrinterConfig,
+    config: &typedmark_printer::PrinterConfig,
     config_root: &Path,
 ) -> Vec<RawNode> {
     use std::collections::BTreeMap;
@@ -207,7 +207,7 @@ fn build_raw_tree_with_config(
         if p == root {
             continue;
         }
-        if super::printer::is_path_ignored(p, Some(config_root), &config.ignore_files) {
+        if typedmark_indexer::is_path_ignored(p, Some(config_root), &config.ignore_files) {
             continue;
         }
         let is_dir = entry.file_type().map_or(false, |ft| ft.is_dir());

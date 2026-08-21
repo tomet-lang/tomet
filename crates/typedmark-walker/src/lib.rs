@@ -1,6 +1,6 @@
 //! Generic recursive traversal of a `typedmark_ast::Document`'s tree.
 //! Exists so consumers that need to visit every id-bearing node
-//! (`typedmark-validator`'s duplicate-id check, `typedmark-resolve`'s
+//! (`typedmark-validator`'s duplicate-id check, `typedmark-resolver`'s
 //! `${...}` id lookup, and future ones) don't each hand-roll their own
 //! copy of "how do I recurse through `Block`/`Inline`/
 //! `ElementValue::Children`" -- that shape is tied to `typedmark-ast`'s
@@ -10,7 +10,7 @@
 //! "what does this element mean" (see `docs/develop/architecture.md`).
 //! Deliberately not part of `typedmark-ast` itself -- that crate is pure
 //! type definitions with no traversal logic of its own, and deliberately
-//! not part of `typedmark-resolve` -- validator explicitly does not want
+//! not part of `typedmark-resolver` -- validator explicitly does not want
 //! resolve's I/O-and-`typedmark-parser` baggage as a transitive
 //! dependency just to reuse a tree walk.
 
@@ -54,7 +54,7 @@ impl<'a> Node<'a> {
 /// `ControlFlow::Break(b)` to stop immediately -- `b` propagates all the
 /// way back out of `walk_document` as its return value, so a "find the
 /// first match" caller can carry its result out through `Break` (see
-/// `typedmark-resolve`'s id lookup) while a "collect everything" caller
+/// `typedmark-resolver`'s id lookup) while a "collect everything" caller
 /// just always returns `Continue` and reads back whatever it accumulated
 /// on `self` (see `typedmark-validator`'s duplicate-id check).
 pub trait Visitor<B> {

@@ -1,6 +1,6 @@
 Documentの木構造を辿る処理だけを提供する
 
-typedmark-astは型定義だけ、typedmark-semanticsは「1つのElementが何を意味するか」の判定だけ、で、どちらも「Document全体をどう再帰的に辿るか」というロジックは持っていない。typedmark-validator(重複id検出)とtypedmark-resolve(`${id}`参照解決)が、それぞれ独立に同じ形の木構造ウォーカーを書いていたのを見つけて、ここに切り出した。typedmark-astにしか依存しないので、どのconsumerも余計な依存(I/Oなど)を引きずらずに使える。
+typedmark-astは型定義だけ、typedmark-semanticsは「1つのElementが何を意味するか」の判定だけ、で、どちらも「Document全体をどう再帰的に辿るか」というロジックは持っていない。typedmark-validator(重複id検出)とtypedmark-resolver(`${id}`参照解決)が、それぞれ独立に同じ形の木構造ウォーカーを書いていたのを見つけて、ここに切り出した。typedmark-astにしか依存しないので、どのconsumerも余計な依存(I/Oなど)を引きずらずに使える。
 
 #[ 実装済み ]
 

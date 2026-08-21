@@ -1,5 +1,5 @@
 [package]
-name = "typedmark-walk"
+name = "typedmark-walker"
 version.workspace = true
 edition.workspace = true
 
