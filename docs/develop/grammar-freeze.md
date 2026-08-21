@@ -41,7 +41,7 @@ open list -- see "What's frozen" below.
 - **`[]` is reserved for element content spans only** (`[content]`,
   `#[ Heading ]`). It is not overloaded onto list items. List items are
   `- (marker) content` / `-. (marker) content`, single-line
-  (`Stop::Line` in `crates/typedmark-parser/src/document.rs::parse_list`);
+  (`Stop::Line` in `crates/typedmark-syntax-parser/src/document.rs::parse_list`);
   multi-line or nested content under a list item is written as a nested
   `<T>()[...]` element, not by wrapping the item in `[]`. Resolves
   `2026-08-07-impressions.md` item 2 and `2026-08-12-impressions.md`
