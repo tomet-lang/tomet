@@ -28,6 +28,7 @@ pub enum ElementKind {
     Mark,
     Codeblock,
     Blockquote,
+    Table,
     /// A `<T>`/`@name` (or an unnamed `@` with no inferred key) that
     /// doesn't match any of the built-in kinds above -- consumers fall
     /// back to their own generic rendering, keyed on the name.
@@ -67,6 +68,7 @@ impl ElementKind {
             ElementKind::Mark => "mark",
             ElementKind::Codeblock => "codeblock",
             ElementKind::Blockquote => "blockquote",
+            ElementKind::Table => "table",
             ElementKind::Custom(name) => name,
             ElementKind::Bare => "bare",
             ElementKind::Interp => "interp",
@@ -79,7 +81,7 @@ impl ElementKind {
 /// `ElementKind::as_str`'s variant -> name match can't silently drift
 /// apart (see `builtin_kind_round_trips_through_as_str` below, which
 /// checks every entry here).
-const BUILTIN_KINDS: [(&str, ElementKind); 14] = [
+const BUILTIN_KINDS: [(&str, ElementKind); 15] = [
     ("meta", ElementKind::Meta),
     ("config", ElementKind::Config),
     ("links", ElementKind::Links),
@@ -94,6 +96,7 @@ const BUILTIN_KINDS: [(&str, ElementKind); 14] = [
     ("mark", ElementKind::Mark),
     ("codeblock", ElementKind::Codeblock),
     ("blockquote", ElementKind::Blockquote),
+    ("table", ElementKind::Table),
 ];
 
 fn builtin_kind(name: &str) -> Option<ElementKind> {

@@ -52,7 +52,52 @@ function resolveServerPath(configuredPath: string): string {
 	return resolved;
 }
 
+const codeSpanDecorationType = vscode.window.createTextEditorDecorationType({
+	backgroundColor: "transparent",
+	border: "1px solid #4fc1ff",
+	borderRadius: "3px",
+});
+
+function updateDecorations(editor: vscode.TextEditor | undefined): void {
+	if (!editor) {
+		return;
+	}
+	const langId = editor.document.languageId;
+	if (langId !== "typedmark" && langId !== "markdown") {
+		return;
+	}
+
+	const text = editor.document.getText();
+	const regex = /`[^`\r\n]+`/g;
+	const decorations: vscode.DecorationOptions[] = [];
+	let match: RegExpExecArray | null;
+
+	while ((match = regex.exec(text)) !== null) {
+		const startPos = editor.document.positionAt(match.index);
+		const endPos = editor.document.positionAt(match.index + match[0].length);
+		decorations.push({ range: new vscode.Range(startPos, endPos) });
+	}
+
+	editor.setDecorations(codeSpanDecorationType, decorations);
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+	context.subscriptions.push(codeSpanDecorationType);
+
+	vscode.window.onDidChangeActiveTextEditor((editor) => {
+		updateDecorations(editor);
+	}, null, context.subscriptions);
+
+	vscode.workspace.onDidChangeTextDocument((event) => {
+		if (vscode.window.activeTextEditor && event.document === vscode.window.activeTextEditor.document) {
+			updateDecorations(vscode.window.activeTextEditor);
+		}
+	}, null, context.subscriptions);
+
+	if (vscode.window.activeTextEditor) {
+		updateDecorations(vscode.window.activeTextEditor);
+	}
+
 	context.subscriptions.push(
 		vscode.commands.registerCommand("typedmark.restartServer", async () => {
 			if (client) {

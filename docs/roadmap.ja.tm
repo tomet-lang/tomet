@@ -4,6 +4,7 @@
 
 - testファイルを別途用意しろ。
 - ちゃんと分割しろ
+- 読み込みロード画面
 ---[ 構文を決定する ]---
 - ( ) `ref`構文                      // `@this`
 - ( ) エスケープ構文                  // `\`が有力。
@@ -53,4 +54,5 @@
 - (x) 名前 (element, arg, content, value)
 - (x) 基本AST (`<T>()[]{}`)
 ---[ 機能 ]---
+- (x) to_from_markdown ()
 - (x) export (`export:{type: commonmark, path: ...}`)

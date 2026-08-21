@@ -245,6 +245,14 @@ fn render_list(items: &[ListItem], ordered: bool, out: &mut String) {
             }
         }
         render_inlines(&item.content, out);
+        if !item.children.is_empty() {
+            out.push('\n');
+            for child in &item.children {
+                if let Block::List(sub) = child {
+                    render_list(&sub.items, sub.ordered, out);
+                }
+            }
+        }
         out.push_str("</li>\n");
     }
     out.push_str(&format!("</{tag}>\n"));
@@ -273,8 +281,78 @@ fn render_element(el: &Element, out: &mut String, inline: bool) {
         "em" | "strong" | "mark" => render_wrapped_inline(el, kind.as_str(), out),
         "codeblock" => render_codeblock_element(el, out),
         "blockquote" => render_blockquote_element(el, out, inline),
+        "table" => render_table_element(el, out),
         _ => render_generic_element(el, kind.as_str(), out, inline),
     }
+}
+
+fn render_table_element(el: &Element, out: &mut String) {
+    let inlines = match &el.content {
+        Some(content) => content,
+        None => {
+            out.push_str("<table class=\"tm-element tm-table\"></table>\n");
+            return;
+        }
+    };
+    let rows = typedmark_semantics::parse_table_rows(inlines);
+    if rows.is_empty() {
+        out.push_str("<table class=\"tm-element tm-table\"></table>\n");
+        return;
+    }
+
+    let args = normalized_element_args(el);
+    let has_header = args
+        .as_ref()
+        .and_then(as_map)
+        .and_then(|m| map_get(m, "header"))
+        .map(|v| match v {
+            Value::Bool(b) => *b,
+            _ => true,
+        })
+        .unwrap_or(true);
+
+    let attrs = match &el.value {
+        Some(ElementValue::Data(v)) => Some(v),
+        _ => None,
+    };
+    let (id, class, data) = split_attrs(attrs);
+    let class = class.or_else(|| Some("tm-element tm-table".to_string()));
+
+    out.push_str("<table");
+    push_named_attrs(out, &id, &class, &data);
+    out.push_str(">\n");
+
+    let (header_row, body_rows) = if has_header && !rows.is_empty() {
+        (Some(&rows[0]), &rows[1..])
+    } else {
+        (None, &rows[..])
+    };
+
+    if let Some(hrow) = header_row {
+        out.push_str("<thead>\n<tr>\n");
+        for cell in &hrow.cells {
+            out.push_str("<th>");
+            render_inlines(&cell.content, out);
+            out.push_str("</th>\n");
+        }
+        out.push_str("</tr>\n</thead>\n");
+    }
+
+    if !body_rows.is_empty() {
+        out.push_str("<tbody>\n");
+        for row in body_rows {
+            out.push_str("<tr>\n");
+            for cell in &row.cells {
+                out.push_str("<td>");
+                render_inlines(&cell.content, out);
+                out.push_str("</td>\n");
+            }
+            out.push_str("</tr>\n");
+        }
+        out.push_str("</tbody>\n");
+    }
+
+    out.push_str("</table>\n");
 }
 
 /// A bare `---` break is a plain `<hr>`; a titled one (`---[ Title ]---`,
@@ -362,8 +440,10 @@ fn render_embed_element(el: &Element, out: &mut String) {
         .and_then(as_map)
         .and_then(|m| {
             map_get(m, "src")
+                .or_else(|| map_get(m, "path"))
                 .or_else(|| map_get(m, "file"))
                 .or_else(|| map_get(m, "url"))
+                .or_else(|| map_get(m, "wiki"))
         })
         .map(value_to_plain)
         .unwrap_or_default();
@@ -1006,5 +1086,39 @@ mod tests {
                 .unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "");
+    }
+
+    #[test]
+    fn renders_table_element_to_html() {
+        let src = "@table()[\n[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]\n[ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]\n[ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]\n]{}\n";
+        let doc = parse_document(src).unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<table class=\"tm-element tm-table\">\n\
+<thead>\n\
+<tr>\n\
+<th>title</th>\n\
+<th>sdfasdf</th>\n\
+<th>fasdf</th>\n\
+<th>sdffdsf</th>\n\
+</tr>\n\
+</thead>\n\
+<tbody>\n\
+<tr>\n\
+<td>title</td>\n\
+<td>sdfddfasdf</td>\n\
+<td>fasddfdfdff</td>\n\
+<td>sdffdsf</td>\n\
+</tr>\n\
+<tr>\n\
+<td>title</td>\n\
+<td>sdfasdf</td>\n\
+<td>fasdf</td>\n\
+<td>sdffdsf</td>\n\
+</tr>\n\
+</tbody>\n\
+</table>\n"
+        );
     }
 }

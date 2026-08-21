@@ -45,6 +45,8 @@ pub struct DocumentConfig {
     pub export_paths: HashMap<ExportType, String>,
     /// Formatting/export style specified by `style`.
     pub style: Option<String>,
+    /// Table column width alignment setting (`table.adjust_width`).
+    pub table_adjust_width: bool,
     /// Raw key-value entries collected from `@config` element args and value groups.
     pub entries: Vec<(String, Value)>,
 }
@@ -59,13 +61,14 @@ impl DocumentConfig {
     }
 }
 
-/// Returns this document's `@config` settings merged from all `@config` elements in the document.
+/// Returns this document's `@config` and `@settings` settings merged from all configuration elements in the document.
 pub fn document_config(doc: &Document) -> DocumentConfig {
     let mut config = DocumentConfig::default();
 
     for block in &doc.blocks {
         if let Block::Element(el) = block {
-            if classify(el) == ElementKind::Config {
+            let kind = classify(el);
+            if kind == ElementKind::Config || kind.as_str() == "settings" {
                 extract_config_from_element(el, &mut config);
             }
         }
@@ -94,6 +97,15 @@ fn extract_config_from_element(el: &Element, config: &mut DocumentConfig) {
     }
 }
 
+fn is_truthy(v: &Value) -> bool {
+    match v {
+        Value::Bool(b) => *b,
+        Value::String(s) => matches!(s.trim().to_lowercase().as_str(), "true" | "1" | "yes"),
+        Value::Int(i) => *i != 0,
+        _ => false,
+    }
+}
+
 fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
     config.entries.push((k.to_string(), v.clone()));
 
@@ -101,12 +113,36 @@ fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
         "format" => {
             if let Value::String(s) = v {
                 config.format = Some(s.clone());
+            } else if let Value::Map(format_map) = v {
+                for (fk, fv) in format_map {
+                    if fk == "table" {
+                        if let Value::Map(table_map) = fv {
+                            for (tk, tv) in table_map {
+                                if tk == "adjust_width" {
+                                    config.table_adjust_width = is_truthy(tv);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         "style" => {
             if let Value::String(s) = v {
                 config.style = Some(s.clone());
             }
+        }
+        "table" => {
+            if let Value::Map(table_map) = v {
+                for (tk, tv) in table_map {
+                    if tk == "adjust_width" {
+                        config.table_adjust_width = is_truthy(tv);
+                    }
+                }
+            }
+        }
+        "table.adjust_width" | "table_adjust_width" => {
+            config.table_adjust_width = is_truthy(v);
         }
         "export" => {
             if let Value::Map(export_map) = v {
@@ -270,5 +306,12 @@ mod tests {
         let doc = parse_document("#[ Hello ]\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(config, DocumentConfig::default());
+    }
+
+    #[test]
+    fn parses_table_adjust_width_config() {
+        let doc = parse_document("@settings(format:json){\n  {\n    \"table\": {\n      \"adjust_width\": \"true\"\n    }\n  }\n}\n").unwrap();
+        let config = document_config(&doc);
+        assert!(config.table_adjust_width);
     }
 }

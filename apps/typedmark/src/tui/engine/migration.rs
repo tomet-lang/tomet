@@ -1,8 +1,8 @@
 //! Markdown -> TypedMark Migration Engine.
 
+use ignore::WalkBuilder;
 use std::fs;
 use std::path::{Path, PathBuf};
-use ignore::WalkBuilder;
 
 use super::printer::document_to_tm_with_config;
 
@@ -32,10 +32,14 @@ impl MigrationItem {
         self.ensure_loaded_with_config(&crate::tui::engine::printer::PrinterConfig::default());
     }
 
-    pub fn ensure_loaded_with_config(&mut self, config: &crate::tui::engine::printer::PrinterConfig) {
+    pub fn ensure_loaded_with_config(
+        &mut self,
+        config: &crate::tui::engine::printer::PrinterConfig,
+    ) {
         if self.markdown_src.is_empty() {
             if let Ok(src) = fs::read_to_string(&self.source_path) {
-                let doc = typedmark_markdown::from_markdown(&src);
+                let mut doc = typedmark_markdown::from_markdown(&src);
+                super::printer::ensure_document_id_with_config(&mut doc, config);
                 self.typedmark_src = document_to_tm_with_config(&doc, config);
                 self.markdown_src = src;
             }
@@ -48,7 +52,17 @@ pub struct MigrationEngine;
 impl MigrationEngine {
     /// Scan workspace directory tree for relevant files (.md/.tm), compacting single-child directory chains.
     pub fn scan_tree(root: &Path) -> Vec<FileTreeNode> {
-        let mut raw_tree = build_raw_tree(root);
+        let (config, _, config_root) = super::printer::find_config_file(root)
+            .unwrap_or_else(|| (super::printer::PrinterConfig::default(), root.to_path_buf(), root.to_path_buf()));
+        Self::scan_tree_with_config(root, &config, &config_root)
+    }
+
+    pub fn scan_tree_with_config(
+        root: &Path,
+        config: &super::printer::PrinterConfig,
+        config_root: &Path,
+    ) -> Vec<FileTreeNode> {
+        let mut raw_tree = build_raw_tree_with_config(root, config, config_root);
         compact_raw_nodes(&mut raw_tree);
         let mut nodes = Vec::new();
         flatten_raw_nodes(&raw_tree, 0, &mut nodes);
@@ -57,6 +71,16 @@ impl MigrationEngine {
     /// Scan a directory or single file path for Markdown files (`.md`), respecting `.gitignore`.
     #[allow(dead_code)]
     pub fn scan(path: &Path) -> Vec<MigrationItem> {
+        let (config, _, config_root) = super::printer::find_config_file(path)
+            .unwrap_or_else(|| (super::printer::PrinterConfig::default(), path.to_path_buf(), path.to_path_buf()));
+        Self::scan_with_config(path, &config, &config_root)
+    }
+
+    pub fn scan_with_config(
+        path: &Path,
+        config: &super::printer::PrinterConfig,
+        config_root: &Path,
+    ) -> Vec<MigrationItem> {
         let mut items = Vec::new();
         if path.is_file() {
             if is_markdown_file(path) {
@@ -73,6 +97,9 @@ impl MigrationEngine {
                 .filter(|e| e.file_type().map_or(false, |ft| ft.is_file()))
             {
                 let p = entry.path();
+                if super::printer::is_path_ignored(p, Some(config_root), &config.ignore_files) {
+                    continue;
+                }
                 if is_markdown_file(p) {
                     if let Some(item) = Self::load_item(p) {
                         items.push(item);
@@ -120,7 +147,11 @@ impl MigrationEngine {
 
     /// Convert selected items and write `.tm` files with default config.
     pub fn execute(items: &mut [MigrationItem], remove_original: bool) -> anyhow::Result<usize> {
-        Self::execute_with_config(items, remove_original, &crate::tui::engine::printer::PrinterConfig::default())
+        Self::execute_with_config(
+            items,
+            remove_original,
+            &crate::tui::engine::printer::PrinterConfig::default(),
+        )
     }
 }
 
@@ -152,18 +183,28 @@ struct RawNode {
 }
 
 fn build_raw_tree(root: &Path) -> Vec<RawNode> {
+    let (config, _, config_root) = super::printer::find_config_file(root)
+        .unwrap_or_else(|| (super::printer::PrinterConfig::default(), root.to_path_buf(), root.to_path_buf()));
+    build_raw_tree_with_config(root, &config, &config_root)
+}
+
+fn build_raw_tree_with_config(
+    root: &Path,
+    config: &super::printer::PrinterConfig,
+    config_root: &Path,
+) -> Vec<RawNode> {
     use std::collections::BTreeMap;
 
     let mut children_map: BTreeMap<PathBuf, Vec<RawNode>> = BTreeMap::new();
 
-    let walker = WalkBuilder::new(root)
-        .hidden(true)
-        .git_ignore(true)
-        .build();
+    let walker = WalkBuilder::new(root).hidden(true).git_ignore(true).build();
 
     for entry in walker.filter_map(|e| e.ok()) {
         let p = entry.path();
         if p == root {
+            continue;
+        }
+        if super::printer::is_path_ignored(p, Some(config_root), &config.ignore_files) {
             continue;
         }
         let is_dir = entry.file_type().map_or(false, |ft| ft.is_dir());

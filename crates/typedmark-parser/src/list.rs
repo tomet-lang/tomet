@@ -8,11 +8,23 @@ use crate::value::skip_inline_ws;
 use typedmark_ast::ListItem;
 use typedmark_lexar::Cursor;
 
-pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Option<(bool, Option<String>)> {
+pub(crate) fn eat_list_marker_with_indent(
+    cur: &mut Cursor,
+) -> Option<(usize, bool, Option<String>)> {
     let mut look = *cur;
-    if look.bump() != Some('-') {
+    let mut indent = 0;
+    while matches!(look.peek(), Some(' ') | Some('\t')) {
+        if look.peek() == Some('\t') {
+            indent += 4;
+        } else {
+            indent += 1;
+        }
+        look.bump();
+    }
+    if look.peek() != Some('-') {
         return None;
     }
+    look.bump();
     let ordered = if look.peek() == Some('.') {
         look.bump();
         true
@@ -53,7 +65,16 @@ pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Option<(bool, Option<String>)
 
     skip_inline_ws(&mut look);
     cur.set_pos(look.pos());
-    Some((ordered, marker))
+    Some((indent, ordered, marker))
+}
+
+pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Option<(bool, Option<String>)> {
+    eat_list_marker_with_indent(cur).map(|(_, ordered, marker)| (ordered, marker))
+}
+
+pub(crate) fn peek_list_marker_with_indent(cur: &Cursor) -> Option<(usize, bool, Option<String>)> {
+    let mut look = *cur;
+    eat_list_marker_with_indent(&mut look)
 }
 
 pub(crate) fn peek_list_marker(cur: &Cursor) -> Option<(bool, Option<String>)> {
@@ -88,13 +109,22 @@ pub(crate) fn parse_list(
     ordered: bool,
     default_format: Option<EmbeddedFormat>,
 ) -> Result<Vec<ListItem>> {
+    parse_list_internal(cur, ordered, 0, default_format)
+}
+
+fn parse_list_internal(
+    cur: &mut Cursor,
+    ordered: bool,
+    min_indent: usize,
+    default_format: Option<EmbeddedFormat>,
+) -> Result<Vec<ListItem>> {
     let mut items = Vec::new();
-    while let Some((item_ordered, marker)) = peek_list_marker(cur) {
-        if item_ordered != ordered {
+    while let Some((indent, item_ordered, marker)) = peek_list_marker_with_indent(cur) {
+        if indent < min_indent || item_ordered != ordered {
             break;
         }
         let item_start = cur.pos();
-        eat_list_marker(cur);
+        eat_list_marker_with_indent(cur);
 
         let (content, attrs) = if let Some(brace_pos) = peek_trailing_attrs(cur) {
             let content = parse_inline_seq(cur, Stop::Offset(brace_pos), default_format)?;
@@ -108,8 +138,32 @@ pub(crate) fn parse_list(
         if cur.peek() == Some('\n') {
             cur.bump();
         }
+
+        let mut children = Vec::new();
+        while let Some((next_indent, next_ordered, _)) = peek_list_marker_with_indent(cur) {
+            if next_indent > indent {
+                let sub_items =
+                    parse_list_internal(cur, next_ordered, next_indent, default_format)?;
+                if !sub_items.is_empty() {
+                    let list_span = typedmark_ast::Span::new(
+                        sub_items.first().unwrap().span.start,
+                        sub_items.last().unwrap().span.end,
+                    );
+                    children.push(typedmark_ast::Block::List(typedmark_ast::List::new(
+                        next_ordered,
+                        sub_items,
+                        list_span,
+                    )));
+                }
+            } else {
+                break;
+            }
+        }
+
         let span = cur.span_from(item_start);
-        items.push(ListItem::new(content, marker, attrs, span));
+        items.push(ListItem::with_children(
+            content, marker, attrs, children, span,
+        ));
     }
     Ok(items)
 }

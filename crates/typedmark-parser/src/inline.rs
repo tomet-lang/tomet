@@ -8,7 +8,7 @@ use crate::heading::{is_thematic_break, is_titled_thematic_break_start};
 use crate::interp::{is_interp_start, parse_dollar_element};
 use crate::list::peek_list_marker;
 use crate::value::{err, skip_block_comment, skip_inline_ws, skip_line_comment};
-use typedmark_ast::{Element, Inline, Sigil, Span, Text};
+use typedmark_ast::{Element, Inline, Sigil, Span, Text, Value};
 use typedmark_lexar::Cursor;
 
 #[derive(Debug, Clone, Copy)]
@@ -113,6 +113,15 @@ pub(crate) fn parse_inline_seq(
             }
             if closed {
                 cur.set_pos(probe.pos());
+                continue;
+            }
+        }
+        if is_autolink_start(cur) {
+            let before = cur.pos();
+            if let Some(el) = try_autolink(cur, stop)? {
+                flush_text_upto(&mut items, cur, &mut text_start, before);
+                items.push(Inline::Element(el));
+                text_start = cur.pos();
                 continue;
             }
         }
@@ -296,4 +305,131 @@ fn normalize_text(raw: &str) -> String {
         }
     }
     out
+}
+
+fn is_autolink_start(cur: &Cursor) -> bool {
+    if char_before(cur).is_some_and(|c| c.is_alphanumeric()) {
+        return false;
+    }
+    cur.starts_with("https://") || cur.starts_with("http://") || cur.starts_with("mailto:")
+}
+
+fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
+    let start_pos = cur.pos();
+    let scheme_len = if cur.starts_with("https://") {
+        8
+    } else if cur.starts_with("http://") || cur.starts_with("mailto:") {
+        7
+    } else {
+        return Ok(None);
+    };
+
+    let mut probe = *cur;
+    let mut bracket_depth: u32 = 0;
+
+    loop {
+        if probe.is_eof() {
+            break;
+        }
+        match stop {
+            Stop::Bracket(c) => {
+                if probe.peek() == Some(c) && bracket_depth == 0 {
+                    break;
+                }
+                if probe.peek() == Some('[') {
+                    bracket_depth += 1;
+                } else if probe.peek() == Some(']') && bracket_depth > 0 {
+                    bracket_depth -= 1;
+                }
+            }
+            Stop::Line | Stop::Paragraph => {
+                if probe.peek() == Some('\n') || probe.peek() == Some('\r') {
+                    break;
+                }
+            }
+            Stop::Offset(target_pos) => {
+                if probe.pos() >= target_pos {
+                    break;
+                }
+            }
+            Stop::Delim(d) => {
+                if probe.starts_with(d) && !is_boundary(char_before(&probe)) {
+                    break;
+                }
+                if probe.peek() == Some('\n') || probe.peek() == Some('\r') {
+                    break;
+                }
+            }
+        }
+
+        let ch = probe.peek().unwrap();
+        if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch < ' ' {
+            break;
+        }
+        probe.bump();
+    }
+
+    let scanned_end = probe.pos();
+    let raw_len = scanned_end - start_pos;
+    if raw_len <= scheme_len {
+        return Ok(None);
+    }
+
+    let src = cur.src();
+    let mut end_pos = scanned_end;
+
+    while end_pos > start_pos + scheme_len {
+        let slice = &src[start_pos..end_pos];
+        let last_char = slice.chars().next_back().unwrap();
+        if matches!(last_char, '.' | ',' | ';' | ':' | '!' | '?' | '"' | '\'') {
+            end_pos -= last_char.len_utf8();
+        } else if last_char == '>' {
+            let open_count = slice.chars().filter(|&c| c == '<').count();
+            let close_count = slice.chars().filter(|&c| c == '>').count();
+            if close_count > open_count {
+                end_pos -= 1;
+            } else {
+                break;
+            }
+        } else if last_char == ')' {
+            let open_count = slice.chars().filter(|&c| c == '(').count();
+            let close_count = slice.chars().filter(|&c| c == ')').count();
+            if close_count > open_count {
+                end_pos -= 1;
+            } else {
+                break;
+            }
+        } else if last_char == ']' {
+            let open_count = slice.chars().filter(|&c| c == '[').count();
+            let close_count = slice.chars().filter(|&c| c == ']').count();
+            if close_count > open_count {
+                end_pos -= 1;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    if end_pos <= start_pos + scheme_len {
+        return Ok(None);
+    }
+
+    let url_str = src[start_pos..end_pos].to_string();
+    cur.set_pos(end_pos);
+    let span = cur.span_from(start_pos);
+
+    let el = Element {
+        sigil: Sigil::At(None),
+        args: Some(Value::Map(vec![(
+            "url".to_string(),
+            Value::String(url_str),
+        )])),
+        content: None,
+        value: None,
+        span,
+    };
+
+    Ok(Some(el))
 }

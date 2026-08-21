@@ -101,7 +101,11 @@ fn walk_heading<B>(heading: &Heading, visitor: &mut impl Visitor<B>) -> ControlF
 
 fn walk_list_item<B>(item: &ListItem, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
     propagate!(visitor.visit(Node::ListItem(item)));
-    walk_inlines(&item.content, visitor)
+    propagate!(walk_inlines(&item.content, visitor));
+    for child in &item.children {
+        propagate!(walk_block(child, visitor));
+    }
+    ControlFlow::Continue(())
 }
 
 fn walk_inlines<B>(inlines: &[Inline], visitor: &mut impl Visitor<B>) -> ControlFlow<B> {

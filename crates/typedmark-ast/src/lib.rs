@@ -160,6 +160,8 @@ pub struct ListItem {
     pub marker: Option<String>,
     /// Optional attributes attached via trailing `{value}` group (e.g. `{tag: dev}`).
     pub attrs: Option<Value>,
+    /// Child blocks nested under this item (e.g., sub-lists or indented blocks).
+    pub children: Vec<Block>,
     pub span: Span,
 }
 
@@ -174,6 +176,23 @@ impl ListItem {
             content,
             marker,
             attrs,
+            children: Vec::new(),
+            span,
+        }
+    }
+
+    pub fn with_children(
+        content: Vec<Inline>,
+        marker: Option<String>,
+        attrs: Option<Value>,
+        children: Vec<Block>,
+        span: Span,
+    ) -> Self {
+        Self {
+            content,
+            marker,
+            attrs,
+            children,
             span,
         }
     }

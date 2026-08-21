@@ -91,6 +91,7 @@ pub struct App {
     // Printer Formatting Config
     pub printer_config_path: Option<PathBuf>,
     pub printer_config: super::engine::printer::PrinterConfig,
+    pub config_root: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -250,61 +251,19 @@ impl InlineEditor {
 
 impl App {
     pub fn new(dir_path: PathBuf, config_path: Option<PathBuf>) -> Self {
-        let tree_nodes = MigrationEngine::scan_tree(&dir_path);
-        let mut migration_items = Vec::new();
-        let mut meta_entries = Vec::new();
-
-        for node in &tree_nodes {
-            if !node.is_dir {
-                if is_markdown_file(&node.path) {
-                    migration_items.push(MigrationItem {
-                        source_path: node.path.clone(),
-                        target_path: node.path.with_extension("tm"),
-                        markdown_src: String::new(),
-                        typedmark_src: String::new(),
-                        selected: false,
-                        converted: false,
-                    });
-                } else if is_typedmark_file(&node.path) {
-                    meta_entries.push(MetaFileEntry {
-                        path: node.path.clone(),
-                        original_src: String::new(),
-                        modified_src: String::new(),
-                        metadata: std::collections::BTreeMap::new(),
-                        selected: true,
-                    });
-                }
-            }
-        }
-        let structural_matches = Vec::new();
-
-        let (resolved_config_path, printer_config) = if let Some(ref path) = config_path {
+        let (resolved_config_path, printer_config, config_root) = if let Some(ref path) = config_path {
             let cfg = super::engine::printer::load_config_from_file(path).unwrap_or_default();
-            (Some(path.clone()), cfg)
+            (Some(path.clone()), cfg, dir_path.clone())
+        } else if let Some((cfg, found_path, root)) = super::engine::printer::find_config_file(&dir_path) {
+            (Some(found_path), cfg, root)
         } else {
-            let candidates = [
-                dir_path.join("default.config.tm"),
-                dir_path.join("typedmark.config.tm"),
-                PathBuf::from("default.config.tm"),
-                PathBuf::from("typedmark.config.tm"),
-            ];
-
-            let mut found = None;
-            for candidate in candidates {
-                if candidate.exists() {
-                    if let Ok(cfg) = super::engine::printer::load_config_from_file(&candidate) {
-                        found = Some((candidate, cfg));
-                        break;
-                    }
-                }
-            }
-
-            if let Some((path, cfg)) = found {
-                (Some(path), cfg)
-            } else {
-                (None, super::engine::printer::PrinterConfig::default())
-            }
+            (None, super::engine::printer::PrinterConfig::default(), dir_path.clone())
         };
+
+        let tree_nodes = MigrationEngine::scan_tree_with_config(&dir_path, &printer_config, &config_root);
+        let migration_items = MigrationEngine::scan_with_config(&dir_path, &printer_config, &config_root);
+        let meta_entries = BatchMetaEngine::scan_with_config(&dir_path, &printer_config, &config_root);
+        let structural_matches = Vec::new();
 
         let mut app = Self {
             dir_path,
@@ -346,6 +305,7 @@ impl App {
             pending_confirm: None,
             printer_config_path: resolved_config_path,
             printer_config,
+            config_root,
         };
 
         app.refresh_status();
@@ -367,7 +327,12 @@ impl App {
                 }
             } else {
                 if node.name.to_lowercase().contains(&filter)
-                    || node.path.display().to_string().to_lowercase().contains(&filter)
+                    || node
+                        .path
+                        .display()
+                        .to_string()
+                        .to_lowercase()
+                        .contains(&filter)
                 {
                     visible.push(i);
                 }
@@ -515,7 +480,11 @@ impl App {
                 );
             }
             ActiveTab::StructuralGrep => {
-                let selected_count = self.structural_matches.iter().filter(|m| m.selected).count();
+                let selected_count = self
+                    .structural_matches
+                    .iter()
+                    .filter(|m| m.selected)
+                    .count();
                 self.status_message = format!(
                     "Matched {} file(s) ({} selected). Press [t]/[k]/[v]/[r] field, [s]earch, [e] to refactor.",
                     self.structural_matches.len(),
@@ -878,7 +847,11 @@ impl App {
                 }
             }
             ActiveTab::StructuralGrep => {
-                let count = self.structural_matches.iter().filter(|m| m.selected).count();
+                let count = self
+                    .structural_matches
+                    .iter()
+                    .filter(|m| m.selected)
+                    .count();
                 if count == 0 {
                     self.status_message =
                         "No matches selected! Press [Space] to select or [a] to select all."
@@ -909,12 +882,16 @@ impl App {
         match self.active_tab {
             ActiveTab::Explorer => {}
             ActiveTab::Migration => {
-                match MigrationEngine::execute_with_config(&mut self.migration_items, false, &self.printer_config) {
+                match MigrationEngine::execute_with_config(
+                    &mut self.migration_items,
+                    false,
+                    &self.printer_config,
+                ) {
                     Ok(count) => {
                         self.status_message =
                             format!("Successfully converted {count} Markdown file(s) to .tm!");
-                        self.tree_nodes = MigrationEngine::scan_tree(&self.dir_path);
-                        self.meta_entries = BatchMetaEngine::scan(&self.dir_path);
+                        self.tree_nodes = MigrationEngine::scan_tree_with_config(&self.dir_path, &self.printer_config, &self.config_root);
+                        self.meta_entries = BatchMetaEngine::scan_with_config(&self.dir_path, &self.printer_config, &self.config_root);
                     }
                     Err(e) => {
                         self.status_message = format!("Migration error: {e}");
@@ -995,7 +972,7 @@ impl App {
                 Some(self.query_val_input.clone())
             },
         };
-        self.structural_matches = StructuralEngine::search(&self.dir_path, &query);
+        self.structural_matches = StructuralEngine::search_with_config(&self.dir_path, &query, &self.printer_config, &self.config_root);
         self.structural_index = 0;
         self.status_message = format!("Found {} matching file(s).", self.structural_matches.len());
     }
@@ -1040,9 +1017,9 @@ impl App {
                 editor.is_dirty = false;
                 let path_display = editor.file_path.display().to_string();
                 self.status_message = format!("Saved {path_display} successfully!");
-                self.tree_nodes = MigrationEngine::scan_tree(&self.dir_path);
-                self.migration_items = MigrationEngine::scan(&self.dir_path);
-                self.meta_entries = BatchMetaEngine::scan(&self.dir_path);
+                self.tree_nodes = MigrationEngine::scan_tree_with_config(&self.dir_path, &self.printer_config, &self.config_root);
+                self.migration_items = MigrationEngine::scan_with_config(&self.dir_path, &self.printer_config, &self.config_root);
+                self.meta_entries = BatchMetaEngine::scan_with_config(&self.dir_path, &self.printer_config, &self.config_root);
             } else {
                 self.status_message = format!("Failed to write to {}", editor.file_path.display());
             }
@@ -1080,32 +1057,9 @@ impl App {
     }
 
     pub fn reload_workspace(&mut self) {
-        self.tree_nodes = MigrationEngine::scan_tree(&self.dir_path);
-        self.migration_items.clear();
-        self.meta_entries.clear();
-
-        for node in &self.tree_nodes {
-            if !node.is_dir {
-                if is_markdown_file(&node.path) {
-                    self.migration_items.push(MigrationItem {
-                        source_path: node.path.clone(),
-                        target_path: node.path.with_extension("tm"),
-                        markdown_src: String::new(),
-                        typedmark_src: String::new(),
-                        selected: false,
-                        converted: false,
-                    });
-                } else if is_typedmark_file(&node.path) {
-                    self.meta_entries.push(MetaFileEntry {
-                        path: node.path.clone(),
-                        original_src: String::new(),
-                        modified_src: String::new(),
-                        metadata: std::collections::BTreeMap::new(),
-                        selected: true,
-                    });
-                }
-            }
-        }
+        self.tree_nodes = MigrationEngine::scan_tree_with_config(&self.dir_path, &self.printer_config, &self.config_root);
+        self.migration_items = MigrationEngine::scan_with_config(&self.dir_path, &self.printer_config, &self.config_root);
+        self.meta_entries = BatchMetaEngine::scan_with_config(&self.dir_path, &self.printer_config, &self.config_root);
         self.refresh_status();
     }
 }
@@ -1122,4 +1076,64 @@ fn is_typedmark_file(p: &Path) -> bool {
         .and_then(|ext| ext.to_str())
         .map(|ext| ext.eq_ignore_ascii_case("tm") || ext.eq_ignore_ascii_case("tmt"))
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_app_new_with_explicit_config_ignore_rules() {
+        let temp_dir = std::env::temp_dir().join(format!("tm_test_tui_ignore_{}", std::process::id()));
+        let config_dir = temp_dir.join("config");
+        let vault_dir = temp_dir.join("obsidian-main");
+        let ignored_dir = vault_dir.join("00-09 System/01 Apps/obsidian");
+        let normal_dir = vault_dir.join("10 Notes");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::create_dir_all(&ignored_dir).unwrap();
+        std::fs::create_dir_all(&normal_dir).unwrap();
+
+        let config_file = config_dir.join("default.config.tm");
+        std::fs::write(
+            &config_file,
+            r#"@settings(format:json){
+  {
+    "ignore": {
+      "files": [
+        "00-09 System/01 Apps/obsidian"
+      ]
+    }
+  }
+}
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(ignored_dir.join("ignored_note.md"), "# Ignored").unwrap();
+        std::fs::write(normal_dir.join("kept_note.md"), "# Kept").unwrap();
+
+        let app = App::new(vault_dir.clone(), Some(config_file));
+
+        let migration_paths: Vec<_> = app.migration_items.iter().map(|item| item.source_path.clone()).collect();
+        assert!(
+            migration_paths.iter().all(|p| !p.contains_std_path(&ignored_dir)),
+            "ignored_dir files should not be in migration_items: {migration_paths:?}"
+        );
+        assert_eq!(app.migration_items.len(), 1);
+        assert_eq!(app.migration_items[0].source_path, normal_dir.join("kept_note.md"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+}
+
+trait ContainsStdPath {
+    fn contains_std_path(&self, other: &Path) -> bool;
+}
+
+impl ContainsStdPath for PathBuf {
+    fn contains_std_path(&self, other: &Path) -> bool {
+        self.starts_with(other)
+    }
 }

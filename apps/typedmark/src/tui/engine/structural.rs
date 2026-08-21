@@ -7,7 +7,6 @@ use typedmark_ast::{Document, Element, ElementValue, Sigil, Value};
 use typedmark_parser::parse_document;
 use typedmark_semantics::classify;
 
-use super::batch_meta::collect_tm_files;
 use super::printer::document_to_tm;
 
 #[derive(Debug, Clone, Default)]
@@ -38,8 +37,19 @@ pub struct StructuralEngine;
 impl StructuralEngine {
     /// Perform structural query search across `.tm` files.
     pub fn search(dir: &Path, query: &StructuralQuery) -> Vec<StructuralMatch> {
+        let (config, _, config_root) = super::printer::find_config_file(dir)
+            .unwrap_or_else(|| (super::printer::PrinterConfig::default(), dir.to_path_buf(), dir.to_path_buf()));
+        Self::search_with_config(dir, query, &config, &config_root)
+    }
+
+    pub fn search_with_config(
+        dir: &Path,
+        query: &StructuralQuery,
+        config: &super::printer::PrinterConfig,
+        config_root: &Path,
+    ) -> Vec<StructuralMatch> {
         let mut matches = Vec::new();
-        let paths = collect_tm_files(dir);
+        let paths = super::batch_meta::collect_tm_files_with_config(dir, config, config_root);
 
         for path in paths {
             if let Ok(src) = fs::read_to_string(&path) {
