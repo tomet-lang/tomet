@@ -4,10 +4,10 @@
 		{
 			"type": "npm",
 			"script": "compile",
-			"path": "apps/integrations/vscode",
+			"path": "editors/vscode",
 			"group": "build",
 			"problemMatcher": [],
-			"label": "npm: compile (apps/integrations/vscode)",
+			"label": "npm: compile (editors/vscode)",
 			"detail": "Compile VS Code extension using esbuild"
 		},
 		{
@@ -23,7 +23,7 @@
 		{
 			"label": "build extension and lsp",
 			"dependsOn": [
-				"npm: compile (apps/integrations/vscode)",
+				"npm: compile (editors/vscode)",
 				"cargo build (typedmark-lsp)"
 			],
 			"group": {

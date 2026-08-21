@@ -6,11 +6,11 @@
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}/apps/integrations/vscode",
+				"--extensionDevelopmentPath=${workspaceFolder}/editors/vscode",
 				"${workspaceFolder}"
 			],
 			"outFiles": [
-				"${workspaceFolder}/apps/integrations/vscode/dist/**/*.js"
+				"${workspaceFolder}/editors/vscode/dist/**/*.js"
 			],
 			"preLaunchTask": "build extension and lsp"
 		},
@@ -19,13 +19,13 @@
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}/apps/integrations/vscode",
+				"--extensionDevelopmentPath=${workspaceFolder}/editors/vscode",
 				"${workspaceFolder}"
 			],
 			"outFiles": [
-				"${workspaceFolder}/apps/integrations/vscode/dist/**/*.js"
+				"${workspaceFolder}/editors/vscode/dist/**/*.js"
 			],
-			"preLaunchTask": "npm: compile (apps/integrations/vscode)"
+			"preLaunchTask": "npm: compile (editors/vscode)"
 		}
 	]
 }
