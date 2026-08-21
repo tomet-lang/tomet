@@ -108,8 +108,7 @@ impl App {
             .count();
         if count == 0 {
             self.status_message =
-                "No matches selected! Press [Space] to select or [a] to select all."
-                    .to_string();
+                "No matches selected! Press [Space] to select or [a] to select all.".to_string();
         } else if self.replace_to_input.is_empty() {
             self.status_message = "Please specify a REPLACE target value.".to_string();
         } else {

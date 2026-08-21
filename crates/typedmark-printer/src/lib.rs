@@ -540,7 +540,7 @@ pub fn render_interp_expr(expr: &InterpExpr) -> String {
 mod tests {
     use super::*;
     use typedmark_ast::{Heading, Inline, Span, Text};
-    use typedmark_config::{load_config_from_str, FieldConfig};
+    use typedmark_config::{FieldConfig, load_config_from_str};
     use typedmark_style::render_value_inner;
 
     #[test]

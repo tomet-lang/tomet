@@ -121,7 +121,11 @@ pub fn render_args_with_config(v: &Value, config: &PrinterConfig) -> String {
     render_value_inner_with_config(v, config)
 }
 
-fn render_meta_field_value(v: &Value, field_cfg: Option<&FieldConfig>, config: &PrinterConfig) -> String {
+fn render_meta_field_value(
+    v: &Value,
+    field_cfg: Option<&FieldConfig>,
+    config: &PrinterConfig,
+) -> String {
     if let Value::Null = v {
         return String::new();
     }
@@ -225,7 +229,10 @@ mod tests {
 
     #[test]
     fn render_value_inner_quotes_strings_needing_it() {
-        assert_eq!(render_value_inner(&Value::String("plain".to_string())), "plain");
+        assert_eq!(
+            render_value_inner(&Value::String("plain".to_string())),
+            "plain"
+        );
         assert_eq!(
             render_value_inner(&Value::String("has space".to_string())),
             "\"has space\""
@@ -236,7 +243,10 @@ mod tests {
     #[test]
     fn render_args_with_config_handles_wiki_and_link() {
         let cfg = PrinterConfig::default();
-        let wiki = Value::Map(vec![("wiki".to_string(), Value::String("target".to_string()))]);
+        let wiki = Value::Map(vec![(
+            "wiki".to_string(),
+            Value::String("target".to_string()),
+        )]);
         assert_eq!(render_args_with_config(&wiki, &cfg), "wiki: target");
 
         let mut cfg_no_space = PrinterConfig::default();

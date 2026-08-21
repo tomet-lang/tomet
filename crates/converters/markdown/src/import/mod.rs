@@ -14,11 +14,20 @@
 //! more than one block get their content joined into a single inline
 //! run (`Element::content` is `Vec<Inline>`, not `Vec<Block>`). HTML blocks
 //! and inline HTML are dropped; hard breaks collapse to a space.
+//!
+//! YAML frontmatter extraction lives in `frontmatter`; `[[wiki]]`/bare-URL
+//! detection and sigil-escaping (both post-processing passes over
+//! already-imported inline text) live in `wikilink`. This file keeps the
+//! core pulldown-cmark event-stream state machine (the part that's
+//! genuinely one cohesive piece -- frame push/pop per event).
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use typedmark_ast::{
     Block, Document, Element, Heading, Inline, List, ListItem, Paragraph, Sigil, Span, Text, Value,
 };
+
+mod frontmatter;
+mod wikilink;
 
 enum Frame {
     /// Top-level document, and the fallback container for anything that
@@ -83,7 +92,7 @@ pub fn from_markdown(src: &str) -> Document {
 }
 
 pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Document {
-    let (frontmatter, markdown_body) = extract_yaml_frontmatter(src);
+    let (frontmatter, markdown_body) = frontmatter::extract_yaml_frontmatter(src);
 
     let mut options_flags = Options::empty();
     options_flags.insert(Options::ENABLE_TABLES);
@@ -155,389 +164,8 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
         Frame::Blocks(blocks) => Document::new(blocks, Span::dummy()),
         _ => Document::default(),
     };
-    post_process_document_wikilinks(&mut doc);
+    wikilink::post_process_document_wikilinks(&mut doc);
     doc
-}
-
-fn enclose_sigils_in_backticks(text: &str) -> String {
-    if !text.contains('@')
-        && !text.contains('<')
-        && !text.contains('$')
-        && !text.contains('^')
-        && !text.contains('/')
-        && !text.contains('*')
-    {
-        return text.to_string();
-    }
-    let mut out = String::with_capacity(text.len() + 8);
-    let mut chars = text.chars().peekable();
-    while let Some(ch) = chars.next() {
-        match ch {
-            '@' => out.push_str("`@`"),
-            '$' => out.push_str("`$`"),
-            '^' => out.push_str("`^`"),
-            '<' => {
-                if chars.peek() == Some(&'>') {
-                    chars.next();
-                    out.push_str("`<>`");
-                } else {
-                    let mut look = chars.clone();
-                    let ident = eat_ident_str(&mut look);
-                    if !ident.is_empty()
-                        && look.next() == Some('>')
-                        && matches!(
-                            look.peek(),
-                            Some(&'(') | Some(&'[') | Some(&'{') | Some(&':')
-                        )
-                    {
-                        out.push_str("`<`");
-                    } else {
-                        out.push('<');
-                    }
-                }
-            }
-            '>' => out.push('>'),
-            '/' => {
-                if chars.peek() == Some(&'/') && !out.ends_with(':') {
-                    let mut slashes = String::from("/");
-                    while chars.peek() == Some(&'/') {
-                        slashes.push(chars.next().unwrap());
-                    }
-                    out.push('`');
-                    out.push_str(&slashes);
-                    out.push('`');
-                } else if chars.peek() == Some(&'*') {
-                    chars.next();
-                    out.push_str("`/*`");
-                } else {
-                    out.push('/');
-                }
-            }
-            '*' => {
-                if chars.peek() == Some(&'/') {
-                    chars.next();
-                    out.push_str("`*/`");
-                } else {
-                    out.push('*');
-                }
-            }
-            c => out.push(c),
-        }
-    }
-    out
-}
-
-fn eat_ident_str(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String {
-    let mut s = String::new();
-    while let Some(&c) = chars.peek() {
-        if c.is_alphanumeric() || c == '_' || c == '-' {
-            s.push(c);
-            chars.next();
-        } else {
-            break;
-        }
-    }
-    s
-}
-
-fn extract_yaml_frontmatter(src: &str) -> (Option<Vec<(String, Value)>>, &str) {
-    let trimmed = src.trim_start();
-    if !trimmed.starts_with("---") {
-        return (None, src);
-    }
-
-    let rest = &trimmed[3..];
-    if !rest.starts_with('\n') && !rest.starts_with("\r\n") {
-        return (None, src);
-    }
-
-    let end_pos = if let Some(pos) = rest.find("\n---") {
-        pos
-    } else if let Some(pos) = rest.find("\n...") {
-        pos
-    } else {
-        return (None, src);
-    };
-
-    let yaml_text = &rest[..end_pos];
-    let closing_slice = &rest[end_pos..];
-    let after_closing_idx =
-        if closing_slice.starts_with("\n---") || closing_slice.starts_with("\n...") {
-            end_pos + 4
-        } else if closing_slice.starts_with("\r\n---") || closing_slice.starts_with("\r\n...") {
-            end_pos + 5
-        } else {
-            return (None, src);
-        };
-
-    let remaining_src = rest[after_closing_idx..].trim_start_matches(|c| c == '\r' || c == '\n');
-
-    if let Ok(serde_yaml::Value::Mapping(map)) =
-        serde_yaml::from_str::<serde_yaml::Value>(yaml_text)
-    {
-        let entries: Vec<(String, Value)> = map
-            .into_iter()
-            .map(|(k, v)| (yaml_key_to_string(k), yaml_to_value(v)))
-            .collect();
-        if !entries.is_empty() {
-            return (Some(entries), remaining_src);
-        }
-    }
-
-    (None, remaining_src)
-}
-
-fn yaml_to_value(v: serde_yaml::Value) -> Value {
-    match v {
-        serde_yaml::Value::Null => Value::Null,
-        serde_yaml::Value::Bool(b) => Value::Bool(b),
-        serde_yaml::Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                Value::Int(i)
-            } else {
-                Value::Float(n.as_f64().unwrap_or_default())
-            }
-        }
-        serde_yaml::Value::String(s) => {
-            let trimmed = s.trim();
-            if trimmed.starts_with("[[") && trimmed.ends_with("]]") && trimmed.len() > 4 {
-                let inner = &trimmed[2..trimmed.len() - 2];
-                let target = if let Some((t, _)) = inner.split_once('|') {
-                    t.trim()
-                } else {
-                    inner.trim()
-                };
-                Value::Map(vec![(
-                    "wiki".to_string(),
-                    Value::String(target.to_string()),
-                )])
-            } else {
-                Value::String(s)
-            }
-        }
-        serde_yaml::Value::Sequence(items) => {
-            Value::Seq(items.into_iter().map(yaml_to_value).collect())
-        }
-        serde_yaml::Value::Mapping(map) => Value::Map(
-            map.into_iter()
-                .map(|(k, v)| (yaml_key_to_string(k), yaml_to_value(v)))
-                .collect(),
-        ),
-        serde_yaml::Value::Tagged(tagged) => yaml_to_value(tagged.value),
-    }
-}
-
-fn yaml_key_to_string(k: serde_yaml::Value) -> String {
-    match k {
-        serde_yaml::Value::String(s) => s,
-        serde_yaml::Value::Bool(b) => b.to_string(),
-        serde_yaml::Value::Number(n) => n.to_string(),
-        serde_yaml::Value::Null => "null".to_string(),
-        other => format!("{other:?}"),
-    }
-}
-
-fn find_next_url(text: &str) -> Option<(usize, usize)> {
-    let mut search_from = 0;
-    while search_from < text.len() {
-        let rest = &text[search_from..];
-        let rel_http = rest.find("http://");
-        let rel_https = rest.find("https://");
-        let rel_mailto = rest.find("mailto:");
-
-        let first_rel = match (rel_http, rel_https, rel_mailto) {
-            (None, None, None) => return None,
-            (a, b, c) => [a, b, c].into_iter().flatten().min().unwrap(),
-        };
-
-        let idx = search_from + first_rel;
-
-        if idx > 0 {
-            let prev_char = text[..idx].chars().next_back().unwrap();
-            if prev_char.is_alphanumeric() {
-                search_from = idx + 1;
-                continue;
-            }
-        }
-
-        let url_sub = &text[idx..];
-        let end_rel = url_sub
-            .find(|c: char| c.is_whitespace() || c < ' ')
-            .unwrap_or(url_sub.len());
-
-        let url_end = idx + end_rel;
-        return Some((idx, url_end));
-    }
-    None
-}
-
-fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
-    let mut result = Vec::new();
-    let mut remaining = text;
-
-    while !remaining.is_empty() {
-        let url_match = find_next_url(remaining);
-        let wiki_start = remaining.find("[[");
-
-        match (url_match, wiki_start) {
-            (Some((u_start, u_end)), None) => {
-                if u_start > 0 {
-                    let seg = enclose_sigils_in_backticks(&remaining[..u_start]);
-                    if !seg.is_empty() {
-                        result.push(Inline::Text(Text::new(seg, Span::dummy())));
-                    }
-                }
-                let url_str = &remaining[u_start..u_end];
-                let mut el = Element::new(Sigil::At(None));
-                el.args = Some(Value::Map(vec![(
-                    "url".to_string(),
-                    Value::String(url_str.to_string()),
-                )]));
-                result.push(Inline::Element(el));
-                remaining = &remaining[u_end..];
-            }
-            (None, Some(start_idx)) => {
-                parse_one_wikilink(&mut result, &mut remaining, start_idx);
-            }
-            (Some((u_start, u_end)), Some(start_idx)) => {
-                if u_start < start_idx {
-                    if u_start > 0 {
-                        let seg = enclose_sigils_in_backticks(&remaining[..u_start]);
-                        if !seg.is_empty() {
-                            result.push(Inline::Text(Text::new(seg, Span::dummy())));
-                        }
-                    }
-                    let url_str = &remaining[u_start..u_end];
-                    let mut el = Element::new(Sigil::At(None));
-                    el.args = Some(Value::Map(vec![(
-                        "url".to_string(),
-                        Value::String(url_str.to_string()),
-                    )]));
-                    result.push(Inline::Element(el));
-                    remaining = &remaining[u_end..];
-                } else {
-                    parse_one_wikilink(&mut result, &mut remaining, start_idx);
-                }
-            }
-            (None, None) => {
-                let seg = enclose_sigils_in_backticks(remaining);
-                if !seg.is_empty() {
-                    result.push(Inline::Text(Text::new(seg, Span::dummy())));
-                }
-                break;
-            }
-        }
-    }
-
-    result
-}
-
-fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx: usize) {
-    if let Some(end_idx) = remaining[start_idx + 2..].find("]]") {
-        let actual_end_idx = start_idx + 2 + end_idx;
-
-        let is_embed = start_idx > 0 && remaining.as_bytes()[start_idx - 1] == b'!';
-        let text_end_idx = if is_embed { start_idx - 1 } else { start_idx };
-
-        if text_end_idx > 0 {
-            let segment = enclose_sigils_in_backticks(&remaining[..text_end_idx]);
-            if !segment.is_empty() {
-                result.push(Inline::Text(Text::new(segment, Span::dummy())));
-            }
-        }
-
-        let sigil = if is_embed {
-            Sigil::Type("embed".to_string())
-        } else {
-            Sigil::At(None)
-        };
-
-        let inner = &remaining[start_idx + 2..actual_end_idx];
-        let wikilink_el = if let Some((target, display)) = inner.split_once('|') {
-            let target = target.trim();
-            let display = display.trim();
-            let mut el = Element::new(sigil);
-            el.args = Some(Value::Map(vec![(
-                "wiki".to_string(),
-                Value::String(target.to_string()),
-            )]));
-            el.content = Some(vec![Inline::Text(Text::new(
-                enclose_sigils_in_backticks(display),
-                Span::dummy(),
-            ))]);
-            el
-        } else {
-            let target = inner.trim();
-            let mut el = Element::new(sigil);
-            el.args = Some(Value::Map(vec![(
-                "wiki".to_string(),
-                Value::String(target.to_string()),
-            )]));
-            el
-        };
-
-        result.push(Inline::Element(wikilink_el));
-        *remaining = &remaining[actual_end_idx + 2..];
-    } else {
-        let segment = enclose_sigils_in_backticks(&remaining[..start_idx + 2]);
-        if !segment.is_empty() {
-            result.push(Inline::Text(Text::new(segment, Span::dummy())));
-        }
-        *remaining = &remaining[start_idx + 2..];
-    }
-}
-
-fn post_process_document_wikilinks(doc: &mut Document) {
-    for block in &mut doc.blocks {
-        post_process_block_wikilinks(block);
-    }
-}
-
-fn post_process_block_wikilinks(block: &mut Block) {
-    match block {
-        Block::Paragraph(p) => {
-            p.content = post_process_inlines_wikilinks(std::mem::take(&mut p.content));
-        }
-        Block::Heading(h) => {
-            h.content = post_process_inlines_wikilinks(std::mem::take(&mut h.content));
-        }
-        Block::List(list) => {
-            for item in &mut list.items {
-                item.content = post_process_inlines_wikilinks(std::mem::take(&mut item.content));
-                for child in &mut item.children {
-                    post_process_block_wikilinks(child);
-                }
-            }
-        }
-        Block::Element(el) => {
-            post_process_element_wikilinks(el);
-        }
-    }
-}
-
-fn post_process_element_wikilinks(el: &mut Element) {
-    if matches!(&el.sigil, Sigil::Type(name) if name == "codeblock") {
-        return;
-    }
-    if let Some(content) = el.content.take() {
-        el.content = Some(post_process_inlines_wikilinks(content));
-    }
-}
-
-fn post_process_inlines_wikilinks(inlines: Vec<Inline>) -> Vec<Inline> {
-    let mut new_inlines = Vec::new();
-    for inline in inlines {
-        match inline {
-            Inline::Text(t) => {
-                new_inlines.extend(parse_urls_and_wikilinks(&t.value));
-            }
-            Inline::Element(mut el) => {
-                post_process_element_wikilinks(&mut el);
-                new_inlines.push(Inline::Element(el));
-            }
-        }
-    }
-    new_inlines
 }
 
 fn start_frame(tag: Tag) -> Frame {
@@ -1186,53 +814,6 @@ mod tests {
     }
 
     #[test]
-    fn yaml_frontmatter_converts_to_meta() {
-        let src = "---\ntitle: \"Hello\"\nauthor: Alice\ndraft: false\n---\n\n# Main Title\n";
-        let doc = from_markdown(src);
-        assert_eq!(doc.blocks.len(), 2);
-        match &doc.blocks[0] {
-            Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::At(Some("meta".to_string())));
-                assert_eq!(
-                    el.value,
-                    Some(typedmark_ast::ElementValue::Data(Value::Map(vec![
-                        ("title".to_string(), Value::String("Hello".to_string())),
-                        ("author".to_string(), Value::String("Alice".to_string())),
-                        ("draft".to_string(), Value::Bool(false)),
-                    ])))
-                );
-            }
-            other => panic!("expected meta element, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn yaml_frontmatter_with_arrays_converts_to_meta() {
-        let src = "---\ntitle: \"Doc\"\ntags:\n  - rust\n  - typedmark\n---\n\n# Main\n";
-        let doc = from_markdown(src);
-        assert_eq!(doc.blocks.len(), 2);
-        match &doc.blocks[0] {
-            Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::At(Some("meta".to_string())));
-                assert_eq!(
-                    el.value,
-                    Some(typedmark_ast::ElementValue::Data(Value::Map(vec![
-                        ("title".to_string(), Value::String("Doc".to_string())),
-                        (
-                            "tags".to_string(),
-                            Value::Seq(vec![
-                                Value::String("rust".to_string()),
-                                Value::String("typedmark".to_string()),
-                            ])
-                        ),
-                    ])))
-                );
-            }
-            other => panic!("expected meta element, got {other:?}"),
-        }
-    }
-
-    #[test]
     fn inline_code_span_survives_as_backticked_text() {
         let doc = from_markdown("call `foo()` now\n");
         assert_eq!(
@@ -1425,32 +1006,6 @@ mod tests {
         assert_eq!(
             list.items[2].content,
             vec![Inline::Text(Text::new("task3", Span::dummy()))]
-        );
-    }
-
-    #[test]
-    fn frontmatter_wikilinks_convert_to_wiki_maps() {
-        let src = "---\ntopics:\n  - \"[[@Templater]]\"\n  - \"[[@QuickAdd]]\"\n---\n\n# Title\n";
-        let doc = from_markdown(src);
-        assert_eq!(doc.blocks.len(), 2);
-        let Block::Element(el) = &doc.blocks[0] else {
-            panic!("expected meta element");
-        };
-        assert_eq!(
-            el.value,
-            Some(typedmark_ast::ElementValue::Data(Value::Map(vec![(
-                "topics".to_string(),
-                Value::Seq(vec![
-                    Value::Map(vec![(
-                        "wiki".to_string(),
-                        Value::String("@Templater".to_string())
-                    )]),
-                    Value::Map(vec![(
-                        "wiki".to_string(),
-                        Value::String("@QuickAdd".to_string())
-                    )]),
-                ])
-            )])))
         );
     }
 

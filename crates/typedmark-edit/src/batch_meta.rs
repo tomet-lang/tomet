@@ -36,13 +36,14 @@ pub struct BatchMetaEngine;
 impl BatchMetaEngine {
     /// Scan directory for `.tm` / `.tmt` files and extract `@meta` and `@config` key-value maps.
     pub fn scan(dir: &Path) -> Vec<MetaFileEntry> {
-        let (config, _, config_root) = typedmark_config::find_config_file(dir).unwrap_or_else(|| {
-            (
-                typedmark_config::PrinterConfig::default(),
-                dir.to_path_buf(),
-                dir.to_path_buf(),
-            )
-        });
+        let (config, _, config_root) =
+            typedmark_config::find_config_file(dir).unwrap_or_else(|| {
+                (
+                    typedmark_config::PrinterConfig::default(),
+                    dir.to_path_buf(),
+                    dir.to_path_buf(),
+                )
+            });
         Self::scan_with_config(dir, &config, &config_root)
     }
 

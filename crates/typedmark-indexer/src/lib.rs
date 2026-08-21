@@ -193,11 +193,15 @@ mod tests {
   }
 }
 "#;
-        let cfg = typedmark_config::load_config_from_str(settings_src)
-            .expect("failed to parse settings");
+        let cfg =
+            typedmark_config::load_config_from_str(settings_src).expect("failed to parse settings");
         let root = Path::new("/workspace");
         let ignored_file = root.join("00-09 System/01 Apps/obsidian/note.md");
-        assert!(is_path_ignored(&ignored_file, Some(root), &cfg.ignore_files));
+        assert!(is_path_ignored(
+            &ignored_file,
+            Some(root),
+            &cfg.ignore_files
+        ));
     }
 
     #[test]
