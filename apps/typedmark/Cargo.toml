@@ -12,22 +12,18 @@ anyhow = { workspace = true }
 axum = { workspace = true, features = ["json"] }
 
 clap = { workspace = true }
-crossterm = { workspace = true }
-ignore = { workspace = true }
-ratatui = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
 serde_typedmark = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net"] }
-tree-sitter = { workspace = true }
-tree-sitter-typedmark = { workspace = true }
 typedmark-ast = { workspace = true }
 typedmark-formatter = { workspace = true }
 typedmark-markdown = { workspace = true }
 typedmark-parser = { workspace = true }
 typedmark-html = { workspace = true }
 typedmark-semantics = { workspace = true }
+typedmark-tui = { workspace = true }
 nanoid = { workspace = true }
 uuid = { workspace = true }
 walkdir = { workspace = true }

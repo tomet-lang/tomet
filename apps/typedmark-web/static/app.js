@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const editor = document.getElementById('editor');
   const presetSelect = document.getElementById('preset-select');
   const advancedCheck = document.getElementById('advanced-check');
+  const formatBtn = document.getElementById('format-btn');
   const statusText = document.getElementById('status-text');
   const statusDot = document.querySelector('.status-dot');
 
@@ -94,6 +95,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   advancedCheck.addEventListener('change', triggerParse);
 
+  formatBtn.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/format', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: editor.value })
+      });
+      const data = await res.json();
+      if (data.formatted) {
+        editor.value = data.formatted;
+        triggerParse();
+      }
+    } catch (e) {
+      statusDot.className = 'status-dot err';
+      statusText.textContent = 'Server connection error';
+    }
+  });
+
   let debounceTimer;
   editor.addEventListener('input', () => {
     clearTimeout(debounceTimer);
@@ -120,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         statusDot.className = 'status-dot err';
         statusText.textContent = `Parse Error line ${data.error.line}:${data.error.column} - ${data.error.message}`;
+        statusText.title = data.error.formatted;
       }
     } catch (e) {
       statusDot.className = 'status-dot err';

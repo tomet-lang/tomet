@@ -1,4 +1,4 @@
-//! TypedMark Workbench TUI module.
+//! TypedMark Workbench TUI.
 
 pub mod app;
 pub mod engine;

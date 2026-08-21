@@ -217,9 +217,9 @@ mod tests {
     #[test]
     fn does_not_change_the_parsed_document() {
         for src in [
-            include_str!("../../../docs/readme.ja.tm"),
-            include_str!("../../../docs/tmt/examples/image.meta.tm"),
-            include_str!("../../../docs/roadmap.ja.tm"),
+            include_str!("../../../docs/tests/readme.ja.tm"),
+            include_str!("../../../docs/tests/tmt/examples/image.meta.tm"),
+            include_str!("../../../docs/tests/roadmap.ja.tm"),
         ] {
             let before = typedmark_parser::parse_document(src)
                 .unwrap_or_else(|e| panic!("fixture failed to parse: {e}"));
@@ -232,10 +232,10 @@ mod tests {
 
     fn repo_examples() -> Vec<&'static str> {
         vec![
-            include_str!("../../../docs/readme.ja.tm"),
-            include_str!("../../../docs/tmt/examples/image.meta.tm"),
-            include_str!("../../../docs/ja/cheatsheet.tm"),
-            include_str!("../../../docs/roadmap.ja.tm"),
+            include_str!("../../../docs/tests/readme.ja.tm"),
+            include_str!("../../../docs/tests/tmt/examples/image.meta.tm"),
+            include_str!("../../../docs/tests/ja/cheatsheet.tm"),
+            include_str!("../../../docs/tests/roadmap.ja.tm"),
         ]
     }
 }

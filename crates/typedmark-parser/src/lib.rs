@@ -339,8 +339,8 @@ mod tests {
 
     #[test]
     fn parses_the_repo_spec_examples() {
-        parse_document(include_str!("../../../docs/readme.ja.tm")).unwrap();
-        parse_document(include_str!("../../../docs/tmt/examples/image.meta.tm")).unwrap();
+        parse_document(include_str!("../../../docs/tests/readme.ja.tm")).unwrap();
+        parse_document(include_str!("../../../docs/tests/tmt/examples/image.meta.tm")).unwrap();
     }
 
     #[test]

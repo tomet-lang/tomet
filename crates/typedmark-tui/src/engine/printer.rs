@@ -1408,8 +1408,8 @@ mod tests {
             vec!["00-09 System/01 Apps/obsidian".to_string()]
         );
 
-        let default_config_path = path.parent().unwrap().parent().unwrap().join("default.config.tm");
-        let cfg_default = load_config_from_file(&default_config_path).expect("failed to load docs/default.config.tm");
+        let default_config_path = path.parent().unwrap().join("default.config.tm");
+        let cfg_default = load_config_from_file(&default_config_path).expect("failed to load docs/tests/default.config.tm");
         assert_eq!(cfg_default.callout_content_style.as_deref(), Some("block"));
         assert_eq!(cfg_default.list_multiline_style_content.as_deref(), Some("box"));
     }

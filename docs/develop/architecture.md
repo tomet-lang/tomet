@@ -70,8 +70,8 @@ typedmark-semantics (I/O-free classification of what an Element means)
   recognition logic, which is what "what does this kind mean" would
   otherwise silently drift into being (both used to independently
   reimplement it as a `Sigil` match returning a stringly-typed `kind:
-  String`) -- the CLI/TUI's structural-search engine
-  (`apps/typedmark/src/tui/engine`) uses it the same way. Only expresses
+  String`) -- the TUI's structural-search engine
+  (`crates/typedmark-tui/src/engine`) uses it the same way. Only expresses
   *recognition*, not *action*: whether a given kind's output is empty
   (`@meta`/`@config`) is still each consumer's own call, since the same
   kind can mean different things for different output formats.
@@ -110,6 +110,13 @@ converts `Document` back into TypedMark's own source, not another format.
   newline, collapsed blank-line runs) while using AST `Span` metadata to losslessly
   preserve literal spacing and line breaks inside verbatim content (`<codeblock>[...]`
   or elements with `content:raw`).
+- **`typedmark-tui`**: the interactive TUI workbench (ratatui/crossterm) for
+  Markdown migration, batch metadata editing, and structural AST refactoring
+  across a directory of `.tm` files. A standalone library crate (single
+  entry point `run_tui(dir_path, config_path)`) so it's independently
+  buildable/testable rather than living inside the `apps/typedmark` bin;
+  `apps/typedmark`'s `tui` subcommand just calls into it, and the `export`
+  subcommand also reuses its `engine::batch_meta::collect_tm_files` helper.
 - **`typedmark-walk`**: generic recursive traversal of a `Document`'s
   tree (`Heading`/`ListItem`/`Element`, including ones nested inside an
   element's `[content]` and `ElementValue::Children`), depending on
@@ -174,7 +181,8 @@ crate's own test (`*_fixture_has_only_known_error_cases` tests against
   to confirm the save/load round trip is lossless), `html`/`serve`
   (render via `typedmark-html`, `serve` re-renders fresh on every HTTP
   request), `to-md` (via `typedmark-markdown`), `format` (via
-  `typedmark-formatter`, with `--write`/`--check`).
+  `typedmark-formatter`, with `--write`/`--check`), `tui` (launches
+  `typedmark-tui`'s workbench).
 - **`apps/typedmark-lsp`**: a diagnostics, formatting, hover, document symbol, goto definition,
   and completion language server (`lsp-server`/`lsp-types` over stdio, full-document sync).
   Parses the buffer with `typedmark-parser` on open/change, validates AST rules with `typedmark-validator`,
