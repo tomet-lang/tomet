@@ -5,8 +5,8 @@
 # -----------------------------------------------------------------------
 
 #[ Zed extension build ]
-apps/integrations/zed/extension.wasm
-apps/integrations/zed/grammars/
+editors/zed/extension.wasm
+editors/zed/grammars/
 
 #[ npm ]
 node_modules/

@@ -71,7 +71,7 @@ typedmark-semantics (I/O-free classification of what an Element means)
   otherwise silently drift into being (both used to independently
   reimplement it as a `Sigil` match returning a stringly-typed `kind:
   String`) -- the TUI's structural-search engine
-  (`crates/typedmark-tui/src/engine`) uses it the same way. Only expresses
+  (`apps/tui/src/engine`) uses it the same way. Only expresses
   *recognition*, not *action*: whether a given kind's output is empty
   (`@meta`/`@config`) is still each consumer's own call, since the same
   kind can mean different things for different output formats.
@@ -79,12 +79,12 @@ typedmark-semantics (I/O-free classification of what an Element means)
 Everything downstream of `typedmark-ast`/`typedmark-parser` is a
 *consumer* -- it reads the AST (or, for `typedmark-markdown`, produces
 one) and does not get to redefine what the grammar means. `typedmark-html`
-and `typedmark-markdown` live under `crates/converters/` specifically
+and `typedmark-markdown` live under crate names sharing a `typedmark-codegen-` prefix specifically
 because both convert a `Document` to/from an *external* format (HTML,
 CommonMark); `typedmark-formatter` stays outside that group since it
 converts `Document` back into TypedMark's own source, not another format.
 
-- **`typedmark-html`** (`crates/converters/html`): `Document` -> HTML. Generic and data-driven,
+- **`typedmark-html`** (`crates/typedmark-codegen-html`): `Document` -> HTML. Generic and data-driven,
   not a full semantic engine: most `<T>`/`@name` elements become a
   `<div>`/`<span>` carrying their `args` map as `data-*` attributes and
   `content` as inner content. A handful of kinds get special-cased rendering
@@ -92,7 +92,7 @@ converts `Document` back into TypedMark's own source, not another format.
   links, `@(ref:..)` as an anchor reference, `@meta`/`@config` as
   invisible, `@links{}` as a definition list, `codeblock`/`blockquote`/
   `hr`/`em`/`strong`/`mark` with their obvious HTML mapping).
-- **`typedmark-markdown`** (`crates/converters/markdown`): bidirectional CommonMark <-> `Document`
+- **`typedmark-markdown`** (`crates/typedmark-codegen-markdown`): bidirectional CommonMark <-> `Document`
   conversion (`import.rs`/`export.rs`), lossy in both directions for
   constructs with no equivalent on the other side -- see
   `docs/feature/commonmark-support.md` for the mapping and its known-lossy
@@ -207,7 +207,7 @@ converts `Document` back into TypedMark's own source, not another format.
   search/browse feature, e.g.). Depends on `typedmark-config` for
   `PrinterConfig`/`find_config_file` (the config-auto-discovering
   `collect_tm_files` wrapper needs them), not on `typedmark-printer`
-  itself; `apps/typedmark`'s `export` subcommand uses it directly.
+  itself; `apps/cli`'s `export` subcommand uses it directly.
 - **`typedmark-edit`**: editing operations over a directory of `.tm`
   files -- batch `@meta`/`@config` key updates (`batch_meta`) and
   AST-aware structural search & replace: rename tag, rename key, replace
@@ -223,8 +223,8 @@ converts `Document` back into TypedMark's own source, not another format.
   Markdown migration, batch metadata editing, and structural AST refactoring
   across a directory of `.tm` files. A standalone library crate (single
   entry point `run_tui(dir_path, config_path)`) so it's independently
-  buildable/testable rather than living inside the `apps/typedmark` bin;
-  `apps/typedmark`'s `tui` subcommand just calls into it. All the AST-level
+  buildable/testable rather than living inside the `apps/cli` bin;
+  `apps/cli`'s `tui` subcommand just calls into it. All the AST-level
   work (serialization, scanning, editing) now lives in `typedmark-printer`/
   `typedmark-indexer`/`typedmark-edit`; what's left in this crate's own
   `engine` module is just `migration` (the Markdown-vault-migration
@@ -261,7 +261,7 @@ converts `Document` back into TypedMark's own source, not another format.
   deliberately not `typedmark-semantics` (recognizing a `@settings(
   file:...)` reference only needs a direct `Sigil` match, not full
   classification). `@import` is anticipated but not yet designed --
-  see the module doc in `crates/typedmark-resolver/src/lib.rs` for the
+  see the module doc in `crates/typedmark-doc-resolver/src/lib.rs` for the
   open questions.
 
 
@@ -289,7 +289,7 @@ crate's own test (`*_fixture_has_only_known_error_cases` tests against
 
 ## Apps
 
-- **`apps/typedmark`** (workspace default member): the CLI. Subcommands:
+- **`apps/cli`** (package `typedmark`, workspace default member): the CLI. Subcommands:
   `check` (parse, report OK/error), `ast` (pretty-print the parsed AST),
   `roundtrip` (parse a data file -> `serde_typedmark` render -> reparse,
   to confirm the save/load round trip is lossless), `html`/`serve`
@@ -297,23 +297,23 @@ crate's own test (`*_fixture_has_only_known_error_cases` tests against
   request), `to-md` (via `typedmark-markdown`), `format` (via
   `typedmark-formatter`, with `--write`/`--check`), `tui` (launches
   `typedmark-tui`'s workbench).
-- **`apps/typedmark-lsp`**: a diagnostics, formatting, hover, document symbol, goto definition,
+- **`apps/lsp`** (package `typedmark-lsp`): a diagnostics, formatting, hover, document symbol, goto definition,
   and completion language server (`lsp-server`/`lsp-types` over stdio, full-document sync).
   Parses the buffer with `typedmark-parser` on open/change, validates AST rules with `typedmark-validator`,
   and delegates formatting to `typedmark-formatter`.
-- **`apps/integrations/zed`**: a Zed editor extension. Doesn't link any
+- **`editors/zed`**: a Zed editor extension. Doesn't link any
   `typedmark-*` crate directly -- it shells out to a `typedmark-lsp`
   binary expected on `$PATH` (e.g. via the Nix package), since
   `typedmark-lsp` has no published release binary yet.
-- **`apps/integrations/vscode`** (TypeScript, not part of the Cargo
+- **`editors/vscode`** (TypeScript, not part of the Cargo
   workspace): syntax highlighting via a TextMate grammar
   (`syntaxes/typedmark.tmLanguage.json`) plus an LSP client
   (`vscode-languageclient`) that spawns `typedmark-lsp` the same way the
   Zed extension does (configurable `serverPath`, defaults to expecting it
   on `$PATH`).
-- **`apps/typedmark-helix`, `typedmark-java`, `typedmark-js`,
-  `typedmark-neovim`, `typedmark-python`**: workspace members reserved for
-  future editor/language-binding support, currently all unimplemented
+- **`editors/helix`, `editors/neovim`, `bindings/java`, `bindings/js`,
+  `bindings/python`**: workspace members reserved for future
+  editor/language-binding support, currently all unimplemented
   `cargo new` stubs (just the generated `add(left, right)` function and
   its test) with no `typedmark-*` dependencies wired up yet.
 

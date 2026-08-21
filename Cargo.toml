@@ -3,77 +3,89 @@ resolver = "3"
 
 members = [
   #[ CLI & Web ]
-  "apps/typedmark",
-  "apps/typedmark-web",
-  "apps/typedmark-lsp",
+  "apps/cli",
+  "apps/web",
+  "apps/lsp",
 
   #[ Bindings ]
-  "apps/bindings/java",
-  "apps/bindings/js",
-  "apps/bindings/python",
+  "bindings/java",
+  "bindings/js",
+  "bindings/python",
 
   #[ Editor Support ]
-  "apps/integrations/zed",
-  "apps/integrations/neovim",
-  "apps/integrations/helix",
+  "editors/zed",
+  "editors/neovim",
+  "editors/helix",
 
-  #[ Core ]
-  "crates/typedmark-ast",
-  "crates/typedmark-walker",
-  "crates/typedmark-lexar",
-  "crates/typedmark-parser",
+  #[ Syntax -- grammar/parsing ]
+  "crates/typedmark-syntax-ast",
+  "crates/typedmark-syntax-lexar",
+  "crates/typedmark-syntax-parser",
+
+  #[ Semantics -- classification/validation ]
   "crates/typedmark-semantics",
-  "crates/typedmark-resolver",
-  "crates/typedmark-validator",
+  "crates/typedmark-semantics-validator",
 
-  #[ Converter ]
-  "crates/converters/markdown",
-  "crates/converters/html",
+  #[ Doc -- whole-Document/workspace operations ]
+  "crates/typedmark-doc-walker",
+  "crates/typedmark-doc-resolver",
+  "crates/typedmark-doc-compute",
+  "crates/typedmark-doc-config",
+  "crates/typedmark-doc-edit",
+  "crates/typedmark-doc-indexer",
 
-  #[ TUI ]
-  "crates/typedmark-tui",
-  "crates/typedmark-config",
-  "crates/typedmark-field-utils",
-  "crates/typedmark-style",
-  "crates/typedmark-printer",
-  "crates/typedmark-indexer",
-  "crates/typedmark-edit",
+  #[ Codegen -- conversion to/from external formats ]
+  "crates/typedmark-codegen-markdown",
+  "crates/typedmark-codegen-html",
 
-  #[ Consumer ]
-  "crates/typedmark-formatter",
+  #[ Emit -- .tm text production ]
+  "crates/typedmark-emit-field-utils",
+  "crates/typedmark-emit-style",
+  "crates/typedmark-emit-printer",
+  "crates/typedmark-emit-formatter",
+
+  #[ Public -- external ecosystem adapters ]
   "crates/serde_typedmark",
   "crates/tree-sitter-typedmark",
-  "crates/typedmark-compute",
+
+  #[ Apps ]
+  "apps/tui",
 ]
 
-default-members = ["apps/typedmark"]
+default-members = ["apps/cli"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
-typedmark-ast = { path = "crates/typedmark-ast" }
-typedmark-walker = { path = "crates/typedmark-walker" }
-typedmark-lexar = { path = "crates/typedmark-lexar" }
-typedmark-parser = { path = "crates/typedmark-parser" }
+#[ Syntax ]
+typedmark-ast = { path = "crates/typedmark-syntax-ast" }
+typedmark-lexar = { path = "crates/typedmark-syntax-lexar" }
+typedmark-parser = { path = "crates/typedmark-syntax-parser" }
+#[ Semantics ]
 typedmark-semantics = { path = "crates/typedmark-semantics" }
-typedmark-resolver = { path = "crates/typedmark-resolver" }
-typedmark-validator = { path = "crates/typedmark-validator" }
-typedmark-formatter = { path = "crates/typedmark-formatter" }
+typedmark-validator = { path = "crates/typedmark-semantics-validator" }
+#[ Doc ]
+typedmark-walker = { path = "crates/typedmark-doc-walker" }
+typedmark-resolver = { path = "crates/typedmark-doc-resolver" }
+typedmark-compute = { path = "crates/typedmark-doc-compute" }
+typedmark-config = { path = "crates/typedmark-doc-config" }
+typedmark-edit = { path = "crates/typedmark-doc-edit" }
+typedmark-indexer = { path = "crates/typedmark-doc-indexer" }
+#[ Codegen ]
+typedmark-markdown = { path = "crates/typedmark-codegen-markdown" }
+typedmark-html = { path = "crates/typedmark-codegen-html" }
+#[ Emit ]
+typedmark-field-utils = { path = "crates/typedmark-emit-field-utils" }
+typedmark-style = { path = "crates/typedmark-emit-style" }
+typedmark-printer = { path = "crates/typedmark-emit-printer" }
+typedmark-formatter = { path = "crates/typedmark-emit-formatter" }
+#[ Public ]
 serde_typedmark = { path = "crates/serde_typedmark" }
-#[ Converter ]
-typedmark-markdown = { path = "crates/converters/markdown" }
-typedmark-html = { path = "crates/converters/html" }
 tree-sitter-typedmark = { path = "crates/tree-sitter-typedmark" }
-#[ TUI ]
-typedmark-tui = { path = "crates/typedmark-tui" }
-typedmark-config = { path = "crates/typedmark-config" }
-typedmark-field-utils = { path = "crates/typedmark-field-utils" }
-typedmark-style = { path = "crates/typedmark-style" }
-typedmark-printer = { path = "crates/typedmark-printer" }
-typedmark-indexer = { path = "crates/typedmark-indexer" }
-typedmark-edit = { path = "crates/typedmark-edit" }
+#[ Apps ]
+typedmark-tui = { path = "apps/tui" }
 
 #[ Crates.io ]
 anyhow = "1"
