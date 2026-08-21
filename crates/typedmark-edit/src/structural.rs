@@ -36,13 +36,14 @@ pub struct StructuralEngine;
 impl StructuralEngine {
     /// Perform structural query search across `.tm` files.
     pub fn search(dir: &Path, query: &StructuralQuery) -> Vec<StructuralMatch> {
-        let (config, _, config_root) = typedmark_config::find_config_file(dir).unwrap_or_else(|| {
-            (
-                typedmark_config::PrinterConfig::default(),
-                dir.to_path_buf(),
-                dir.to_path_buf(),
-            )
-        });
+        let (config, _, config_root) =
+            typedmark_config::find_config_file(dir).unwrap_or_else(|| {
+                (
+                    typedmark_config::PrinterConfig::default(),
+                    dir.to_path_buf(),
+                    dir.to_path_buf(),
+                )
+            });
         Self::search_with_config(dir, query, &config, &config_root)
     }
 

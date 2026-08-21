@@ -110,21 +110,21 @@ pub struct App {
 
 impl App {
     pub fn new(dir_path: PathBuf, config_path: Option<PathBuf>) -> Self {
-        let (resolved_config_path, printer_config, config_root) =
-            if let Some(ref path) = config_path {
-                let cfg = typedmark_config::load_config_from_file(path).unwrap_or_default();
-                (Some(path.clone()), cfg, dir_path.clone())
-            } else if let Some((cfg, found_path, root)) =
-                typedmark_config::find_config_file(&dir_path)
-            {
-                (Some(found_path), cfg, root)
-            } else {
-                (
-                    None,
-                    typedmark_config::PrinterConfig::default(),
-                    dir_path.clone(),
-                )
-            };
+        let (resolved_config_path, printer_config, config_root) = if let Some(ref path) =
+            config_path
+        {
+            let cfg = typedmark_config::load_config_from_file(path).unwrap_or_default();
+            (Some(path.clone()), cfg, dir_path.clone())
+        } else if let Some((cfg, found_path, root)) = typedmark_config::find_config_file(&dir_path)
+        {
+            (Some(found_path), cfg, root)
+        } else {
+            (
+                None,
+                typedmark_config::PrinterConfig::default(),
+                dir_path.clone(),
+            )
+        };
 
         let tree_nodes =
             MigrationEngine::scan_tree_with_config(&dir_path, &printer_config, &config_root);

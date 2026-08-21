@@ -157,11 +157,7 @@ impl MigrationEngine {
 
     /// Convert selected items and write `.tm` files with default config.
     pub fn execute(items: &mut [MigrationItem], remove_original: bool) -> anyhow::Result<usize> {
-        Self::execute_with_config(
-            items,
-            remove_original,
-            &PrinterConfig::default(),
-        )
+        Self::execute_with_config(items, remove_original, &PrinterConfig::default())
     }
 }
 

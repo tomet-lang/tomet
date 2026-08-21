@@ -9,8 +9,8 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
 };
 
-use crate::app::{App, FocusedPane};
 use super::diff::generate_colored_diff;
+use crate::app::{App, FocusedPane};
 
 pub(super) fn render_migration_view(f: &mut Frame, app: &mut App, area: Rect) {
     let chunks = Layout::default()

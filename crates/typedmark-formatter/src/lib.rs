@@ -192,7 +192,10 @@ fn patch_existing_meta(
         None => {
             entries.insert(
                 0,
-                ("id".to_string(), Value::String(generate_id_for_field(id_cfg))),
+                (
+                    "id".to_string(),
+                    Value::String(generate_id_for_field(id_cfg)),
+                ),
             );
             true
         }
@@ -325,10 +328,7 @@ mod tests {
             },
         );
 
-        assert_eq!(
-            format_source_with_config(src, &config),
-            format_source(src)
-        );
+        assert_eq!(format_source_with_config(src, &config), format_source(src));
     }
 
     #[test]
@@ -412,10 +412,7 @@ mod tests {
         let src = "@meta{id: not-valid, title: Hello}\n\n#[ Hello ]\n";
         let config = id_config(); // overwrite defaults to false
 
-        assert_eq!(
-            format_source_with_config(src, &config),
-            format_source(src)
-        );
+        assert_eq!(format_source_with_config(src, &config), format_source(src));
     }
 
     #[test]

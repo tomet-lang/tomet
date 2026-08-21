@@ -64,8 +64,7 @@ impl App {
         let count = self.meta_entries.iter().filter(|e| e.selected).count();
         if count == 0 {
             self.status_message =
-                "No .tm files selected! Press [Space] to select or [a] to select all."
-                    .to_string();
+                "No .tm files selected! Press [Space] to select or [a] to select all.".to_string();
         } else if self.meta_key_input.is_empty() {
             self.status_message = "Please specify a metadata KEY to update.".to_string();
         } else {
