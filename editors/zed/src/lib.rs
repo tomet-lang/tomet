@@ -8,7 +8,7 @@ impl zed::Extension for TypedMarkExtension {
     }
 
     // `typedmark-lsp` has no published release binary yet (see
-    // `apps/typedmark-lsp`), so unlike most extensions this doesn't
+    // `apps/lsp`, package `typedmark-lsp`), so unlike most extensions this doesn't
     // download one -- it expects the binary already on `$PATH` (e.g. via
     // the nix package), matching the "zed extension: nixでインストール /
     // lsp" roadmap bullets in `docs/roadmap.ja.tm`.
