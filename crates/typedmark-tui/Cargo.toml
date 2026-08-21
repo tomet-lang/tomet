@@ -9,6 +9,7 @@ typedmark-formatter = { workspace = true }
 typedmark-markdown = { workspace = true }
 typedmark-parser = { workspace = true }
 typedmark-semantics = { workspace = true }
+typedmark-walk = { workspace = true }
 tree-sitter-typedmark = { workspace = true }
 
 #[ Crates.io ]

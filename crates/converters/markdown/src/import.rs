@@ -104,7 +104,11 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
             Event::End(tag_end) => end_frame(&mut stack, tag_end, options.adjust_table_width),
             Event::TaskListMarker(checked) => {
                 if let Some(Frame::Item { marker, .. }) = stack.last_mut() {
-                    *marker = Some(if checked { "x".to_string() } else { " ".to_string() });
+                    *marker = Some(if checked {
+                        "x".to_string()
+                    } else {
+                        " ".to_string()
+                    });
                 }
             }
             Event::Text(text) => match stack.last_mut() {
@@ -181,7 +185,10 @@ fn enclose_sigils_in_backticks(text: &str) -> String {
                     let ident = eat_ident_str(&mut look);
                     if !ident.is_empty()
                         && look.next() == Some('>')
-                        && matches!(look.peek(), Some(&'(') | Some(&'[') | Some(&'{') | Some(&':'))
+                        && matches!(
+                            look.peek(),
+                            Some(&'(') | Some(&'[') | Some(&'{') | Some(&':')
+                        )
                     {
                         out.push_str("`<`");
                     } else {
@@ -232,7 +239,6 @@ fn eat_ident_str(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String
     }
     s
 }
-
 
 fn extract_yaml_frontmatter(src: &str) -> (Option<Vec<(String, Value)>>, &str) {
     let trimmed = src.trim_start();
@@ -301,7 +307,10 @@ fn yaml_to_value(v: serde_yaml::Value) -> Value {
                 } else {
                     inner.trim()
                 };
-                Value::Map(vec![("wiki".to_string(), Value::String(target.to_string()))])
+                Value::Map(vec![(
+                    "wiki".to_string(),
+                    Value::String(target.to_string()),
+                )])
             } else {
                 Value::String(s)
             }
@@ -607,7 +616,9 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
                                     None => (after_bracket, ""),
                                 };
                                 let clean_title = first_line
-                                    .trim_start_matches(|c| c == ' ' || c == '-' || c == '+' || c == '|')
+                                    .trim_start_matches(|c| {
+                                        c == ' ' || c == '-' || c == '+' || c == '|'
+                                    })
                                     .trim();
                                 if !clean_title.is_empty() {
                                     title = Some(clean_title.to_string());
@@ -697,7 +708,8 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
                         if s.starts_with('[') || s.starts_with('(') {
                             let close = if s.starts_with('[') { ']' } else { ')' };
                             if let Some(close_idx) = s.find(close) {
-                                if close_idx > 1 && s[close_idx..].starts_with(&format!("{close} ")) {
+                                if close_idx > 1 && s[close_idx..].starts_with(&format!("{close} "))
+                                {
                                     marker = Some(s[1..close_idx].to_string());
                                     let remainder = s[close_idx + 2..].to_string();
                                     t.value = remainder;
@@ -829,9 +841,15 @@ fn build_table_element(rows: Vec<Vec<Vec<Inline>>>, adjust_width: bool) -> Eleme
             let left_str = " ".repeat(left_spaces);
             let right_str = " ".repeat(right_spaces);
 
-            content_inlines.push(Inline::Text(Text::new(format!("[{left_str}"), Span::dummy())));
+            content_inlines.push(Inline::Text(Text::new(
+                format!("[{left_str}"),
+                Span::dummy(),
+            )));
             content_inlines.extend(cell_inlines);
-            content_inlines.push(Inline::Text(Text::new(format!("{right_str}]"), Span::dummy())));
+            content_inlines.push(Inline::Text(Text::new(
+                format!("{right_str}]"),
+                Span::dummy(),
+            )));
         }
         content_inlines.push(Inline::Text(Text::new("\n", Span::dummy())));
     }
@@ -912,7 +930,9 @@ fn push_block(stack: &mut [Frame], block: Block) {
     match stack.last_mut() {
         Some(Frame::Blocks(v)) => v.push(block),
         Some(Frame::BlockQuote(content)) => merge_block_into(content, block),
-        Some(Frame::Item { content, children, .. }) => {
+        Some(Frame::Item {
+            content, children, ..
+        }) => {
             if let Block::List(list) = block {
                 children.push(Block::List(list));
             } else {
@@ -1421,8 +1441,14 @@ mod tests {
             Some(typedmark_ast::ElementValue::Data(Value::Map(vec![(
                 "topics".to_string(),
                 Value::Seq(vec![
-                    Value::Map(vec![("wiki".to_string(), Value::String("@Templater".to_string()))]),
-                    Value::Map(vec![("wiki".to_string(), Value::String("@QuickAdd".to_string()))]),
+                    Value::Map(vec![(
+                        "wiki".to_string(),
+                        Value::String("@Templater".to_string())
+                    )]),
+                    Value::Map(vec![(
+                        "wiki".to_string(),
+                        Value::String("@QuickAdd".to_string())
+                    )]),
                 ])
             )])))
         );
@@ -1442,7 +1468,10 @@ mod tests {
         assert_eq!(embed1.sigil, Sigil::Type("embed".to_string()));
         assert_eq!(
             embed1.args,
-            Some(Value::Map(vec![("wiki".to_string(), Value::String("name".to_string()))]))
+            Some(Value::Map(vec![(
+                "wiki".to_string(),
+                Value::String("name".to_string())
+            )]))
         );
         assert_eq!(
             embed1.content,
@@ -1455,7 +1484,10 @@ mod tests {
         assert_eq!(embed2.sigil, Sigil::Type("embed".to_string()));
         assert_eq!(
             embed2.args,
-            Some(Value::Map(vec![("path".to_string(), Value::String("_path".to_string()))]))
+            Some(Value::Map(vec![(
+                "path".to_string(),
+                Value::String("_path".to_string())
+            )]))
         );
         assert_eq!(
             embed2.content,
@@ -1478,7 +1510,10 @@ mod tests {
         assert_eq!(el1.sigil, Sigil::At(None));
         assert_eq!(
             el1.args,
-            Some(Value::Map(vec![("wiki".to_string(), Value::String("@file_name".to_string()))]))
+            Some(Value::Map(vec![(
+                "wiki".to_string(),
+                Value::String("@file_name".to_string())
+            )]))
         );
 
         let Inline::Element(el2) = &p.content[3] else {
@@ -1487,7 +1522,10 @@ mod tests {
         assert_eq!(el2.sigil, Sigil::At(None));
         assert_eq!(
             el2.args,
-            Some(Value::Map(vec![("wiki".to_string(), Value::String("@Templater".to_string()))]))
+            Some(Value::Map(vec![(
+                "wiki".to_string(),
+                Value::String("@Templater".to_string())
+            )]))
         );
     }
 
@@ -1501,7 +1539,10 @@ mod tests {
         };
         assert_eq!(
             p.content,
-            vec![Inline::Text(Text::new("Line 1\nLine 2\nLine 3", Span::dummy()))]
+            vec![Inline::Text(Text::new(
+                "Line 1\nLine 2\nLine 3",
+                Span::dummy()
+            ))]
         );
     }
 
@@ -1518,7 +1559,10 @@ mod tests {
             el.args,
             Some(Value::Map(vec![
                 ("variant".to_string(), Value::String("info".to_string())),
-                ("title".to_string(), Value::String("2025/04/29 11:09".to_string())),
+                (
+                    "title".to_string(),
+                    Value::String("2025/04/29 11:09".to_string())
+                ),
             ]))
         );
 
@@ -1578,8 +1622,14 @@ mod tests {
         let md = "asdfasdfdsf>\n<foo>\n";
         let doc = from_markdown(md);
         let exported = crate::export::to_markdown(&doc);
-        assert!(!exported.contains("`>`"), "should never wrap > in backticks: {exported}");
-        assert!(!exported.contains("`<`"), "should not wrap < in backticks when not element: {exported}");
+        assert!(
+            !exported.contains("`>`"),
+            "should never wrap > in backticks: {exported}"
+        );
+        assert!(
+            !exported.contains("`<`"),
+            "should not wrap < in backticks when not element: {exported}"
+        );
         assert_eq!(exported.trim(), md.trim());
     }
 }

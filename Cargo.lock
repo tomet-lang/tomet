@@ -1808,6 +1808,7 @@ dependencies = [
  "typedmark-markdown",
  "typedmark-parser",
  "typedmark-semantics",
+ "typedmark-walk",
  "uuid",
 ]
 

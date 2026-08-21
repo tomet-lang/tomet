@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-serde = { workspace = true }
 typedmark-ast = { workspace = true }
 typedmark-parser = { workspace = true }
+
+#[ Crates.io ]
+serde = { workspace = true }
