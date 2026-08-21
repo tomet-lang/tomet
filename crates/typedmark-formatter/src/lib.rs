@@ -1,12 +1,39 @@
-//! Whitespace-hygiene formatter for `.tm` source text.
+//! Whitespace-hygiene formatter for `.tm` source text, plus an opt-in,
+//! config-gated pass for small structural additions.
 //!
-//! Upgraded to be AST-aware using source [`typedmark_ast::Span`] metadata.
-//! Normalizes whitespace policy (LF line endings, no trailing whitespace,
-//! collapsed excess blank lines, exactly one final newline) while losslessly
-//! preserving literal whitespace and blank lines inside raw/verbatim content
-//! (`<codeblock>[...]` and elements opting in via `content:raw`).
+//! [`format_source`] is AST-aware using source [`typedmark_ast::Span`]
+//! metadata. Normalizes whitespace policy (LF line endings, no trailing
+//! whitespace, collapsed excess blank lines, exactly one final newline)
+//! while losslessly preserving literal whitespace and blank lines inside
+//! raw/verbatim content (`<codeblock>[...]` and elements opting in via
+//! `content:raw`). It never changes the parsed `Document` (see the
+//! `does_not_change_the_parsed_document` test).
+//!
+//! [`format_source_with_config`] adds a config-driven patch pass in
+//! front of [`format_source`]: if the given `typedmark_config::PrinterConfig`
+//! has no relevant rule for a document, it degrades to exactly
+//! [`format_source`]'s behavior (no semantic change). Only when config
+//! opts in does it make a deliberate, structural change, mirroring
+//! `typedmark-printer`'s `ensure_document_id_with_config` -- inserting a
+//! brand-new `@meta{id: ...}` block into documents that don't have one
+//! yet, or patching an `id` into/onto an existing one -- but by
+//! splicing plain text into the original source (via
+//! `typedmark-style`'s single-element `render_meta_element`, at the
+//! target element's `Span`) rather than rebuilding the whole document
+//! from the AST (that full-rebuild approach is `typedmark-printer`'s
+//! job, not this crate's -- see `docs/develop/architecture.md`'s
+//! `typedmark-formatter` bullet for why). Note: when config *is*
+//! relevant, the patched meta block is rendered exactly like printer
+//! would -- e.g. it can turn a hand-written single-line `@meta{id: ...}`
+//! into a multi-line `@meta(format:yaml){...}` if `config.meta_format`
+//! says so, even though nothing else about that decision changed. This
+//! is intentional, not a lossiness bug: the "don't change what wasn't
+//! asked for" guarantee is about the *absence* of a matching config
+//! rule, not about preserving a touched element's original shape.
 
 use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
+use typedmark_config::{FieldConfig, PrinterConfig};
+use typedmark_field_utils::{generate_id_for_field, is_valid_id_format};
 use typedmark_parser::parse_document;
 
 /// Format `src` in place (returns a new `String`). Idempotent:
@@ -69,6 +96,113 @@ pub fn format_source(src: &str) -> String {
     let mut out = out_lines.join("\n");
     out.push('\n');
     out
+}
+
+/// Like [`format_source`], but first runs a config-gated patch pass --
+/// see the module doc comment and `docs/develop/architecture.md`'s
+/// `typedmark-formatter` bullet for the design.
+pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
+    let Some(id_cfg) = config.meta_fields.get("id") else {
+        return format_source(src);
+    };
+    if id_cfg.field_type.is_none() {
+        return format_source(src);
+    }
+    let force = id_cfg.force.unwrap_or(true);
+    let overwrite = id_cfg.overwrite.unwrap_or(false);
+    if !(force || overwrite) {
+        return format_source(src);
+    }
+
+    let Ok(doc) = parse_document(src) else {
+        return format_source(src);
+    };
+
+    let meta_el = doc.blocks.iter().find_map(|block| {
+        if let Block::Element(el) = block {
+            if typedmark_semantics::classify(el) == typedmark_semantics::ElementKind::Meta
+                || matches!(&el.sigil, Sigil::At(Some(name)) if name == "meta")
+            {
+                return Some(el);
+            }
+        }
+        None
+    });
+
+    let combined = match meta_el {
+        Some(el) => match patch_existing_meta(el, id_cfg, overwrite, config) {
+            Some(rendered) => {
+                let start = el.span.start.offset;
+                let end = el.span.end.offset;
+                format!("{}{}{}", &src[..start], rendered, &src[end..])
+            }
+            None => return format_source(src),
+        },
+        None => {
+            let id = generate_id_for_field(id_cfg);
+            let mut new_el = Element::new(Sigil::At(Some("meta".to_string())));
+            new_el.value = Some(ElementValue::Data(Value::Map(vec![(
+                "id".to_string(),
+                Value::String(id),
+            )])));
+            let rendered = typedmark_style::render_meta_element(&new_el, config);
+            format!("{rendered}\n\n{src}")
+        }
+    };
+
+    format_source(&combined)
+}
+
+/// Decides whether `el` (an existing `@meta` element) needs its `id`
+/// field inserted or replaced, mirroring the per-case gating in
+/// `typedmark-printer`'s `ensure_document_id_with_config` (existing
+/// valid id -> untouched; existing invalid id -> replaced only if
+/// `overwrite`; no id field -> inserted, since the caller already
+/// checked `force || overwrite` before calling this). Returns the
+/// freshly rendered `@meta{...}` text if a change is needed, `None` if
+/// nothing needs to change (caller should leave `src` untouched).
+fn patch_existing_meta(
+    el: &Element,
+    id_cfg: &FieldConfig,
+    overwrite: bool,
+    config: &PrinterConfig,
+) -> Option<String> {
+    let Some(ElementValue::Data(Value::Map(entries))) = &el.value else {
+        return None;
+    };
+    let mut entries = entries.clone();
+    let existing_idx = entries.iter().position(|(k, _)| k == "id");
+    let changed = match existing_idx {
+        Some(idx) => {
+            if overwrite {
+                let existing_str = match &entries[idx].1 {
+                    Value::String(s) => s.as_str(),
+                    _ => "",
+                };
+                if !is_valid_id_format(existing_str, id_cfg) {
+                    entries[idx].1 = Value::String(generate_id_for_field(id_cfg));
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
+        None => {
+            entries.insert(
+                0,
+                ("id".to_string(), Value::String(generate_id_for_field(id_cfg))),
+            );
+            true
+        }
+    };
+    if !changed {
+        return None;
+    }
+    let mut modified = el.clone();
+    modified.value = Some(ElementValue::Data(Value::Map(entries)));
+    Some(typedmark_style::render_meta_element(&modified, config))
 }
 
 fn is_raw_element(el: &Element) -> bool {
@@ -147,6 +281,164 @@ fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use typedmark_config::FieldConfig;
+
+    #[test]
+    fn format_source_with_config_is_noop_without_id_rule() {
+        let src = "#[ Hello ]\n\n- one\n- two\n";
+        let config = PrinterConfig::default();
+        assert_eq!(format_source_with_config(src, &config), format_source(src));
+    }
+
+    #[test]
+    fn format_source_with_config_inserts_new_meta_block_with_id() {
+        let src = "#[ Hello ]\n\nSome body text.\n";
+        let mut config = PrinterConfig::default();
+        config.meta_fields.insert(
+            "id".to_string(),
+            FieldConfig {
+                field_type: Some("nanoid".to_string()),
+                length: Some(8),
+                prefix: Some("doc-".to_string()),
+                ..Default::default()
+            },
+        );
+
+        let out = format_source_with_config(src, &config);
+        assert!(out.contains("@meta{id: doc-"));
+        assert!(out.contains("#[ Hello ]"));
+        assert!(out.contains("Some body text."));
+    }
+
+    #[test]
+    fn format_source_with_config_skips_insertion_without_force_or_overwrite() {
+        let src = "#[ Hello ]\n\nSome body text.\n";
+        let mut config = PrinterConfig::default();
+        config.meta_fields.insert(
+            "id".to_string(),
+            FieldConfig {
+                field_type: Some("nanoid".to_string()),
+                length: Some(8),
+                force: Some(false),
+                overwrite: Some(false),
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(
+            format_source_with_config(src, &config),
+            format_source(src)
+        );
+    }
+
+    #[test]
+    fn format_source_with_config_respects_meta_format() {
+        let src = "#[ Hello ]\n\nSome body text.\n";
+        let mut config = PrinterConfig::default();
+        config.meta_format = Some("yaml".to_string());
+        config.meta_fields.insert(
+            "id".to_string(),
+            FieldConfig {
+                field_type: Some("nanoid".to_string()),
+                length: Some(8),
+                ..Default::default()
+            },
+        );
+
+        let out = format_source_with_config(src, &config);
+        assert!(out.contains("@meta(format:yaml){\n  id: "));
+    }
+
+    #[test]
+    fn format_source_with_config_is_idempotent() {
+        let src = "#[ Hello ]\n\nSome body text.\n";
+        let mut config = PrinterConfig::default();
+        config.meta_fields.insert(
+            "id".to_string(),
+            FieldConfig {
+                field_type: Some("nanoid".to_string()),
+                length: Some(8),
+                ..Default::default()
+            },
+        );
+
+        let once = format_source_with_config(src, &config);
+        let twice = format_source_with_config(&once, &config);
+        assert_eq!(once, twice);
+    }
+
+    fn id_config() -> PrinterConfig {
+        let mut config = PrinterConfig::default();
+        config.meta_fields.insert(
+            "id".to_string(),
+            FieldConfig {
+                field_type: Some("nanoid".to_string()),
+                length: Some(8),
+                prefix: Some("doc-".to_string()),
+                ..Default::default()
+            },
+        );
+        config
+    }
+
+    #[test]
+    fn format_source_with_config_inserts_id_into_existing_meta_block() {
+        let src = "@meta{title: Hello}\n\n#[ Hello ]\n\nSome body text.\n";
+        let config = id_config();
+
+        let out = format_source_with_config(src, &config);
+        assert!(out.contains("title: Hello"));
+        assert!(out.contains("id: doc-"));
+        assert!(out.contains("#[ Hello ]"));
+        assert!(out.contains("Some body text."));
+    }
+
+    #[test]
+    fn format_source_with_config_replaces_invalid_id_when_overwrite() {
+        let src = "@meta{id: not-valid, title: Hello}\n\n#[ Hello ]\n";
+        let mut config = id_config();
+        if let Some(id_cfg) = config.meta_fields.get_mut("id") {
+            id_cfg.overwrite = Some(true);
+        }
+
+        let out = format_source_with_config(src, &config);
+        assert!(!out.contains("id: not-valid"));
+        assert!(out.contains("id: doc-"));
+        assert!(out.contains("title: Hello"));
+    }
+
+    #[test]
+    fn format_source_with_config_leaves_invalid_id_without_overwrite() {
+        let src = "@meta{id: not-valid, title: Hello}\n\n#[ Hello ]\n";
+        let config = id_config(); // overwrite defaults to false
+
+        assert_eq!(
+            format_source_with_config(src, &config),
+            format_source(src)
+        );
+    }
+
+    #[test]
+    fn format_source_with_config_reformats_existing_block_to_multiline_per_config() {
+        let src = "@meta{title: Hello}\n\n#[ Hello ]\n";
+        let mut config = id_config();
+        config.meta_format = Some("yaml".to_string());
+
+        let out = format_source_with_config(src, &config);
+        assert!(out.contains("@meta(format:yaml){\n"));
+        assert!(out.contains("  title: Hello\n"));
+        assert!(out.contains("  id: doc-"));
+    }
+
+    #[test]
+    fn format_source_with_config_existing_block_patch_is_idempotent() {
+        let src = "@meta{title: Hello}\n\n#[ Hello ]\n";
+        let config = id_config();
+
+        let once = format_source_with_config(src, &config);
+        let twice = format_source_with_config(&once, &config);
+        assert_eq!(once, twice);
+    }
 
     #[test]
     fn strips_trailing_whitespace() {

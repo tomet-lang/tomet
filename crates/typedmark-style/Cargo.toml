@@ -1,0 +1,9 @@
+[package]
+name = "typedmark-style"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+typedmark-ast = { workspace = true }
+typedmark-config = { workspace = true }
+typedmark-field-utils = { workspace = true }

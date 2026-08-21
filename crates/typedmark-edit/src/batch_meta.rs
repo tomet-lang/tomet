@@ -1,4 +1,4 @@
-//! Batch Metadata (`@meta` / `@config`) Editor Engine.
+//! Batch `@meta`/`@config` key-value editing across a directory.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -36,9 +36,9 @@ pub struct BatchMetaEngine;
 impl BatchMetaEngine {
     /// Scan directory for `.tm` / `.tmt` files and extract `@meta` and `@config` key-value maps.
     pub fn scan(dir: &Path) -> Vec<MetaFileEntry> {
-        let (config, _, config_root) = typedmark_printer::find_config_file(dir).unwrap_or_else(|| {
+        let (config, _, config_root) = typedmark_config::find_config_file(dir).unwrap_or_else(|| {
             (
-                typedmark_printer::PrinterConfig::default(),
+                typedmark_config::PrinterConfig::default(),
                 dir.to_path_buf(),
                 dir.to_path_buf(),
             )
@@ -48,7 +48,7 @@ impl BatchMetaEngine {
 
     pub fn scan_with_config(
         dir: &Path,
-        config: &typedmark_printer::PrinterConfig,
+        config: &typedmark_config::PrinterConfig,
         config_root: &Path,
     ) -> Vec<MetaFileEntry> {
         let mut entries = Vec::new();
@@ -167,4 +167,25 @@ where
         }
     }
     let _ = typedmark_walker::walk_document_mut(doc, &mut ElementVisitorMut(&mut f));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_batch_meta_update() {
+        let src = "@meta{author: Bob}\n\n#[Document]\n";
+        let entry = MetaFileEntry {
+            path: "test.tm".into(),
+            original_src: src.to_string(),
+            modified_src: src.to_string(),
+            metadata: extract_metadata(src),
+            selected: true,
+        };
+
+        let mut entries = vec![entry];
+        BatchMetaEngine::update_meta_key(&mut entries, "meta", "author", "Alice");
+        assert!(entries[0].modified_src.contains("author: Alice"));
+    }
 }

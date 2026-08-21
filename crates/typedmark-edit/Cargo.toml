@@ -1,26 +1,16 @@
 [package]
-name = "typedmark-tui"
+name = "typedmark-edit"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 typedmark-ast = { workspace = true }
 typedmark-config = { workspace = true }
-typedmark-edit = { workspace = true }
 typedmark-indexer = { workspace = true }
-typedmark-markdown = { workspace = true }
 typedmark-parser = { workspace = true }
 typedmark-printer = { workspace = true }
 typedmark-semantics = { workspace = true }
 typedmark-walker = { workspace = true }
-tree-sitter-typedmark = { workspace = true }
 
 #[ Crates.io ]
 anyhow = { workspace = true }
-crossterm = { workspace = true }
-ignore = { workspace = true }
-ratatui = { workspace = true }
-tree-sitter = { workspace = true }
-
-[dev-dependencies]
-uuid = { workspace = true }

@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 
 use ignore::WalkBuilder;
 use typedmark_ast::{Document, Element, ElementValue, Value};
+use typedmark_config::PrinterConfig;
 use typedmark_parser::parse_document;
-use typedmark_printer::PrinterConfig;
 use typedmark_semantics::classify;
 
 /// Whether `path` matches one of `ignore_patterns` (each pattern
@@ -51,7 +51,7 @@ pub fn is_path_ignored(path: &Path, root: Option<&Path>, ignore_patterns: &[Stri
 /// if it's a single file), auto-discovering the nearest
 /// `default.config.tm`/`typedmark.config.tm` for `ignore_files` rules.
 pub fn collect_tm_files(path: &Path) -> Vec<PathBuf> {
-    let (config, _, config_root) = typedmark_printer::find_config_file(path).unwrap_or_else(|| {
+    let (config, _, config_root) = typedmark_config::find_config_file(path).unwrap_or_else(|| {
         (
             PrinterConfig::default(),
             path.to_path_buf(),
@@ -193,7 +193,7 @@ mod tests {
   }
 }
 "#;
-        let cfg = typedmark_printer::load_config_from_str(settings_src)
+        let cfg = typedmark_config::load_config_from_str(settings_src)
             .expect("failed to parse settings");
         let root = Path::new("/workspace");
         let ignored_file = root.join("00-09 System/01 Apps/obsidian/note.md");

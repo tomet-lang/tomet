@@ -5,13 +5,11 @@ edition.workspace = true
 
 [dependencies]
 typedmark-ast = { workspace = true }
+typedmark-config = { workspace = true }
+typedmark-field-utils = { workspace = true }
 typedmark-formatter = { workspace = true }
-typedmark-parser = { workspace = true }
 typedmark-semantics = { workspace = true }
-
-#[ Crates.io ]
-nanoid = { workspace = true }
-uuid = { workspace = true }
+typedmark-style = { workspace = true }
 
 [dev-dependencies]
 typedmark-markdown = { workspace = true }

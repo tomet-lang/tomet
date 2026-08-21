@@ -1,8 +1,4 @@
-//! Core logic engines for Migration, Batch Metadata Editing, and Structural Refactoring.
+//! Core logic engine for Markdown migration. Batch metadata editing and
+//! structural refactoring live in `typedmark-edit` now.
 
-pub mod batch_meta;
 pub mod migration;
-pub mod structural;
-
-#[cfg(test)]
-mod tests;
