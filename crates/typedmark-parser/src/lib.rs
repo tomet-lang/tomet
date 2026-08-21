@@ -340,7 +340,10 @@ mod tests {
     #[test]
     fn parses_the_repo_spec_examples() {
         parse_document(include_str!("../../../docs/tests/readme.ja.tm")).unwrap();
-        parse_document(include_str!("../../../docs/tests/tmt/examples/image.meta.tm")).unwrap();
+        parse_document(include_str!(
+            "../../../docs/tests/tmt/examples/image.meta.tm"
+        ))
+        .unwrap();
     }
 
     #[test]
@@ -1235,19 +1238,32 @@ mod tests {
 
     #[test]
     fn bare_url_autolink_strips_trailing_punctuation() {
-        let doc = parse_document("Check https://example.com/foo! and https://example.com/bar.\n").unwrap();
+        let doc = parse_document("Check https://example.com/foo! and https://example.com/bar.\n")
+            .unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
                 assert_eq!(p.content.len(), 5);
                 assert_eq!(p.content[0], Inline::Text("Check ".into()));
                 if let Inline::Element(el) = &p.content[1] {
-                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("https://example.com/foo".into()))])));
+                    assert_eq!(
+                        el.args,
+                        Some(Value::Map(vec![(
+                            "url".into(),
+                            Value::String("https://example.com/foo".into())
+                        )]))
+                    );
                 } else {
                     panic!("expected url element");
                 }
                 assert_eq!(p.content[2], Inline::Text("! and ".into()));
                 if let Inline::Element(el) = &p.content[3] {
-                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("https://example.com/bar".into()))])));
+                    assert_eq!(
+                        el.args,
+                        Some(Value::Map(vec![(
+                            "url".into(),
+                            Value::String("https://example.com/bar".into())
+                        )]))
+                    );
                 } else {
                     panic!("expected url element");
                 }
@@ -1259,18 +1275,32 @@ mod tests {
 
     #[test]
     fn bare_url_autolink_handles_parentheses() {
-        let doc = parse_document("Visit (https://example.com/foo) or https://example.com/path(bar)\n").unwrap();
+        let doc =
+            parse_document("Visit (https://example.com/foo) or https://example.com/path(bar)\n")
+                .unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
                 assert_eq!(p.content[0], Inline::Text("Visit (".into()));
                 if let Inline::Element(el) = &p.content[1] {
-                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("https://example.com/foo".into()))])));
+                    assert_eq!(
+                        el.args,
+                        Some(Value::Map(vec![(
+                            "url".into(),
+                            Value::String("https://example.com/foo".into())
+                        )]))
+                    );
                 } else {
                     panic!("expected url element");
                 }
                 assert_eq!(p.content[2], Inline::Text(") or ".into()));
                 if let Inline::Element(el) = &p.content[3] {
-                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("https://example.com/path(bar)".into()))])));
+                    assert_eq!(
+                        el.args,
+                        Some(Value::Map(vec![(
+                            "url".into(),
+                            Value::String("https://example.com/path(bar)".into())
+                        )]))
+                    );
                 } else {
                     panic!("expected url element");
                 }
@@ -1286,15 +1316,33 @@ mod tests {
             Block::Paragraph(p) => {
                 assert_eq!(p.content.len(), 5);
                 if let Inline::Element(el) = &p.content[0] {
-                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("http://a.com".into()))])));
+                    assert_eq!(
+                        el.args,
+                        Some(Value::Map(vec![(
+                            "url".into(),
+                            Value::String("http://a.com".into())
+                        )]))
+                    );
                 }
                 assert_eq!(p.content[1], Inline::Text(" ".into()));
                 if let Inline::Element(el) = &p.content[2] {
-                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("https://b.com".into()))])));
+                    assert_eq!(
+                        el.args,
+                        Some(Value::Map(vec![(
+                            "url".into(),
+                            Value::String("https://b.com".into())
+                        )]))
+                    );
                 }
                 assert_eq!(p.content[3], Inline::Text(" ".into()));
                 if let Inline::Element(el) = &p.content[4] {
-                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("mailto:user@example.com".into()))])));
+                    assert_eq!(
+                        el.args,
+                        Some(Value::Map(vec![(
+                            "url".into(),
+                            Value::String("mailto:user@example.com".into())
+                        )]))
+                    );
                 }
             }
             other => panic!("expected paragraph, got {other:?}"),
@@ -1306,7 +1354,10 @@ mod tests {
         let doc = parse_document("`https://example.com`\n").unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
-                assert_eq!(p.content, vec![Inline::Text("`https://example.com`".into())]);
+                assert_eq!(
+                    p.content,
+                    vec![Inline::Text("`https://example.com`".into())]
+                );
             }
             other => panic!("expected paragraph, got {other:?}"),
         }

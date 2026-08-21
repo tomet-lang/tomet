@@ -1,9 +1,8 @@
 //! Resolution for remote attribute connections declared inside `@references[...]` blocks.
 
-use typedmark_ast::{
-    Block, Document, Element, ElementValue, Heading, Inline, ListItem, Sigil, Value,
-};
+use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
 use typedmark_semantics::merge_connected_values;
+use typedmark_walk::{NodeMut, VisitorMut, walk_document_mut};
 
 /// A remote attribute connection definition targeting one or more element IDs.
 #[derive(Debug, Clone)]
@@ -26,7 +25,7 @@ pub fn resolve_connect_targets(mut doc: Document) -> Document {
 
     for conn in &connections {
         for target_id in &conn.target_ids {
-            apply_connection_to_blocks(&mut doc.blocks, target_id, conn);
+            let _ = walk_document_mut(&mut doc, &mut ConnectionApplier { target_id, conn });
         }
     }
 
@@ -112,29 +111,46 @@ fn parse_target_ids_from_str(s: &str) -> Vec<String> {
     }
 }
 
-fn apply_connection_to_blocks(blocks: &mut [Block], target_id: &str, conn: &RemoteConnection) {
-    for block in blocks {
-        match block {
-            Block::Element(el) => {
-                apply_connection_to_element(el, target_id, conn);
-            }
-            Block::Heading(h) => {
-                apply_connection_to_heading(h, target_id, conn);
-            }
-            Block::List(l) => {
-                for item in &mut l.items {
-                    apply_connection_to_list_item(item, target_id, conn);
+/// Walks `doc` via `typedmark-walk`'s generic mutable tree walk and
+/// merges `conn`'s attrs/value into every id-bearing node (`Element`/
+/// `Heading`/`ListItem`) whose id matches `target_id` -- see that
+/// crate's module doc for why the traversal itself lives there rather
+/// than being hand-rolled here.
+struct ConnectionApplier<'a> {
+    target_id: &'a str,
+    conn: &'a RemoteConnection,
+}
+
+impl VisitorMut<()> for ConnectionApplier<'_> {
+    fn visit_mut(&mut self, node: NodeMut<'_>) -> std::ops::ControlFlow<()> {
+        match node {
+            NodeMut::Element(el) => apply_connection_to_element(el, self.target_id, self.conn),
+            NodeMut::Heading(h) => {
+                let has_id = attrs_has_id(h.attrs.as_ref(), self.target_id);
+                if has_id {
+                    let conn_data = self.conn.value.as_ref().or(self.conn.args.as_ref());
+                    if let Some(conn_val) = conn_data {
+                        h.attrs = merge_connected_values(h.attrs.as_ref(), Some(conn_val));
+                    }
                 }
             }
-            Block::Paragraph(p) => {
-                for inline in &mut p.content {
-                    if let Inline::Element(el) = inline {
-                        apply_connection_to_element(el, target_id, conn);
+            NodeMut::ListItem(item) => {
+                let has_id = attrs_has_id(item.attrs.as_ref(), self.target_id);
+                if has_id {
+                    let conn_data = self.conn.value.as_ref().or(self.conn.args.as_ref());
+                    if let Some(conn_val) = conn_data {
+                        item.attrs = merge_connected_values(item.attrs.as_ref(), Some(conn_val));
                     }
                 }
             }
         }
+        std::ops::ControlFlow::Continue(())
     }
+}
+
+fn attrs_has_id(attrs: Option<&Value>, target_id: &str) -> bool {
+    matches!(attrs, Some(Value::Map(entries))
+        if entries.iter().any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id)))
 }
 
 fn element_has_id(el: &Element, target_id: &str) -> bool {
@@ -157,6 +173,9 @@ fn element_has_id(el: &Element, target_id: &str) -> bool {
     false
 }
 
+/// The `Element` half of [`ConnectionApplier`]'s merge -- recursion into
+/// nested content/children is `typedmark_walk::walk_document_mut`'s job
+/// now, not this function's.
 fn apply_connection_to_element(el: &mut Element, target_id: &str, conn: &RemoteConnection) {
     if element_has_id(el, target_id) {
         if let Some(conn_args) = &conn.args {
@@ -170,42 +189,6 @@ fn apply_connection_to_element(el: &mut Element, target_id: &str, conn: &RemoteC
             if let Some(merged) = merge_connected_values(direct_v, Some(conn_val)) {
                 el.value = Some(ElementValue::Data(merged));
             }
-        }
-    }
-
-    if let Some(ElementValue::Children(children)) = &mut el.value {
-        for child in children {
-            apply_connection_to_element(child, target_id, conn);
-        }
-    }
-}
-
-fn apply_connection_to_heading(h: &mut Heading, target_id: &str, conn: &RemoteConnection) {
-    let has_id = match &h.attrs {
-        Some(Value::Map(entries)) => entries
-            .iter()
-            .any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id)),
-        _ => false,
-    };
-    if has_id {
-        let conn_data = conn.value.as_ref().or(conn.args.as_ref());
-        if let Some(conn_val) = conn_data {
-            h.attrs = merge_connected_values(h.attrs.as_ref(), Some(conn_val));
-        }
-    }
-}
-
-fn apply_connection_to_list_item(item: &mut ListItem, target_id: &str, conn: &RemoteConnection) {
-    let has_id = match &item.attrs {
-        Some(Value::Map(entries)) => entries
-            .iter()
-            .any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id)),
-        _ => false,
-    };
-    if has_id {
-        let conn_data = conn.value.as_ref().or(conn.args.as_ref());
-        if let Some(conn_val) = conn_data {
-            item.attrs = merge_connected_values(item.attrs.as_ref(), Some(conn_val));
         }
     }
 }

@@ -251,18 +251,28 @@ impl InlineEditor {
 
 impl App {
     pub fn new(dir_path: PathBuf, config_path: Option<PathBuf>) -> Self {
-        let (resolved_config_path, printer_config, config_root) = if let Some(ref path) = config_path {
-            let cfg = super::engine::printer::load_config_from_file(path).unwrap_or_default();
-            (Some(path.clone()), cfg, dir_path.clone())
-        } else if let Some((cfg, found_path, root)) = super::engine::printer::find_config_file(&dir_path) {
-            (Some(found_path), cfg, root)
-        } else {
-            (None, super::engine::printer::PrinterConfig::default(), dir_path.clone())
-        };
+        let (resolved_config_path, printer_config, config_root) =
+            if let Some(ref path) = config_path {
+                let cfg = super::engine::printer::load_config_from_file(path).unwrap_or_default();
+                (Some(path.clone()), cfg, dir_path.clone())
+            } else if let Some((cfg, found_path, root)) =
+                super::engine::printer::find_config_file(&dir_path)
+            {
+                (Some(found_path), cfg, root)
+            } else {
+                (
+                    None,
+                    super::engine::printer::PrinterConfig::default(),
+                    dir_path.clone(),
+                )
+            };
 
-        let tree_nodes = MigrationEngine::scan_tree_with_config(&dir_path, &printer_config, &config_root);
-        let migration_items = MigrationEngine::scan_with_config(&dir_path, &printer_config, &config_root);
-        let meta_entries = BatchMetaEngine::scan_with_config(&dir_path, &printer_config, &config_root);
+        let tree_nodes =
+            MigrationEngine::scan_tree_with_config(&dir_path, &printer_config, &config_root);
+        let migration_items =
+            MigrationEngine::scan_with_config(&dir_path, &printer_config, &config_root);
+        let meta_entries =
+            BatchMetaEngine::scan_with_config(&dir_path, &printer_config, &config_root);
         let structural_matches = Vec::new();
 
         let mut app = Self {
@@ -890,8 +900,16 @@ impl App {
                     Ok(count) => {
                         self.status_message =
                             format!("Successfully converted {count} Markdown file(s) to .tm!");
-                        self.tree_nodes = MigrationEngine::scan_tree_with_config(&self.dir_path, &self.printer_config, &self.config_root);
-                        self.meta_entries = BatchMetaEngine::scan_with_config(&self.dir_path, &self.printer_config, &self.config_root);
+                        self.tree_nodes = MigrationEngine::scan_tree_with_config(
+                            &self.dir_path,
+                            &self.printer_config,
+                            &self.config_root,
+                        );
+                        self.meta_entries = BatchMetaEngine::scan_with_config(
+                            &self.dir_path,
+                            &self.printer_config,
+                            &self.config_root,
+                        );
                     }
                     Err(e) => {
                         self.status_message = format!("Migration error: {e}");
@@ -972,7 +990,12 @@ impl App {
                 Some(self.query_val_input.clone())
             },
         };
-        self.structural_matches = StructuralEngine::search_with_config(&self.dir_path, &query, &self.printer_config, &self.config_root);
+        self.structural_matches = StructuralEngine::search_with_config(
+            &self.dir_path,
+            &query,
+            &self.printer_config,
+            &self.config_root,
+        );
         self.structural_index = 0;
         self.status_message = format!("Found {} matching file(s).", self.structural_matches.len());
     }
@@ -1017,9 +1040,21 @@ impl App {
                 editor.is_dirty = false;
                 let path_display = editor.file_path.display().to_string();
                 self.status_message = format!("Saved {path_display} successfully!");
-                self.tree_nodes = MigrationEngine::scan_tree_with_config(&self.dir_path, &self.printer_config, &self.config_root);
-                self.migration_items = MigrationEngine::scan_with_config(&self.dir_path, &self.printer_config, &self.config_root);
-                self.meta_entries = BatchMetaEngine::scan_with_config(&self.dir_path, &self.printer_config, &self.config_root);
+                self.tree_nodes = MigrationEngine::scan_tree_with_config(
+                    &self.dir_path,
+                    &self.printer_config,
+                    &self.config_root,
+                );
+                self.migration_items = MigrationEngine::scan_with_config(
+                    &self.dir_path,
+                    &self.printer_config,
+                    &self.config_root,
+                );
+                self.meta_entries = BatchMetaEngine::scan_with_config(
+                    &self.dir_path,
+                    &self.printer_config,
+                    &self.config_root,
+                );
             } else {
                 self.status_message = format!("Failed to write to {}", editor.file_path.display());
             }
@@ -1057,9 +1092,21 @@ impl App {
     }
 
     pub fn reload_workspace(&mut self) {
-        self.tree_nodes = MigrationEngine::scan_tree_with_config(&self.dir_path, &self.printer_config, &self.config_root);
-        self.migration_items = MigrationEngine::scan_with_config(&self.dir_path, &self.printer_config, &self.config_root);
-        self.meta_entries = BatchMetaEngine::scan_with_config(&self.dir_path, &self.printer_config, &self.config_root);
+        self.tree_nodes = MigrationEngine::scan_tree_with_config(
+            &self.dir_path,
+            &self.printer_config,
+            &self.config_root,
+        );
+        self.migration_items = MigrationEngine::scan_with_config(
+            &self.dir_path,
+            &self.printer_config,
+            &self.config_root,
+        );
+        self.meta_entries = BatchMetaEngine::scan_with_config(
+            &self.dir_path,
+            &self.printer_config,
+            &self.config_root,
+        );
         self.refresh_status();
     }
 }
@@ -1070,7 +1117,8 @@ mod tests {
 
     #[test]
     fn test_app_new_with_explicit_config_ignore_rules() {
-        let temp_dir = std::env::temp_dir().join(format!("tm_test_tui_ignore_{}", std::process::id()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("tm_test_tui_ignore_{}", std::process::id()));
         let config_dir = temp_dir.join("config");
         let vault_dir = temp_dir.join("obsidian-main");
         let ignored_dir = vault_dir.join("00-09 System/01 Apps/obsidian");
@@ -1102,13 +1150,22 @@ mod tests {
 
         let app = App::new(vault_dir.clone(), Some(config_file));
 
-        let migration_paths: Vec<_> = app.migration_items.iter().map(|item| item.source_path.clone()).collect();
+        let migration_paths: Vec<_> = app
+            .migration_items
+            .iter()
+            .map(|item| item.source_path.clone())
+            .collect();
         assert!(
-            migration_paths.iter().all(|p| !p.contains_std_path(&ignored_dir)),
+            migration_paths
+                .iter()
+                .all(|p| !p.contains_std_path(&ignored_dir)),
             "ignored_dir files should not be in migration_items: {migration_paths:?}"
         );
         assert_eq!(app.migration_items.len(), 1);
-        assert_eq!(app.migration_items[0].source_path, normal_dir.join("kept_note.md"));
+        assert_eq!(
+            app.migration_items[0].source_path,
+            normal_dir.join("kept_note.md")
+        );
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

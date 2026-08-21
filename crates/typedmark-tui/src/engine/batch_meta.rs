@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
+use typedmark_ast::{Block, Document, Element, ElementValue, Sigil, Value};
 use typedmark_parser::parse_document;
 use typedmark_semantics::classify;
 
@@ -37,8 +37,13 @@ pub struct BatchMetaEngine;
 impl BatchMetaEngine {
     /// Scan directory for `.tm` / `.tmt` files and extract `@meta` and `@config` key-value maps.
     pub fn scan(dir: &Path) -> Vec<MetaFileEntry> {
-        let (config, _, config_root) = super::printer::find_config_file(dir)
-            .unwrap_or_else(|| (super::printer::PrinterConfig::default(), dir.to_path_buf(), dir.to_path_buf()));
+        let (config, _, config_root) = super::printer::find_config_file(dir).unwrap_or_else(|| {
+            (
+                super::printer::PrinterConfig::default(),
+                dir.to_path_buf(),
+                dir.to_path_buf(),
+            )
+        });
         Self::scan_with_config(dir, &config, &config_root)
     }
 
@@ -97,8 +102,13 @@ impl BatchMetaEngine {
 }
 
 pub fn collect_tm_files(path: &Path) -> Vec<PathBuf> {
-    let (config, _, config_root) = super::printer::find_config_file(path)
-        .unwrap_or_else(|| (super::printer::PrinterConfig::default(), path.to_path_buf(), path.to_path_buf()));
+    let (config, _, config_root) = super::printer::find_config_file(path).unwrap_or_else(|| {
+        (
+            super::printer::PrinterConfig::default(),
+            path.to_path_buf(),
+            path.to_path_buf(),
+        )
+    });
     collect_tm_files_with_config(path, &config, &config_root)
 }
 
@@ -233,122 +243,43 @@ fn value_to_string(v: &Value) -> String {
     }
 }
 
-fn walk_elements<F>(doc: &Document, mut f: F)
+/// Visits every `Element` in `doc` (document order, including ones
+/// nested inside an element's `[content]` and `ElementValue::Children`)
+/// via `typedmark-walk`'s generic tree walk -- see that crate's module
+/// doc for why this shape lives there instead of being hand-rolled here.
+pub(crate) fn walk_elements<F>(doc: &Document, mut f: F)
 where
     F: FnMut(&Element),
 {
-    for block in &doc.blocks {
-        walk_block(block, &mut f);
+    struct ElementVisitor<F>(F);
+    impl<F: FnMut(&Element)> typedmark_walk::Visitor<()> for ElementVisitor<F> {
+        fn visit(&mut self, node: typedmark_walk::Node<'_>) -> std::ops::ControlFlow<()> {
+            if let typedmark_walk::Node::Element(el) = node {
+                (self.0)(el);
+            }
+            std::ops::ControlFlow::Continue(())
+        }
     }
+    let _ = typedmark_walk::walk_document(doc, &mut ElementVisitor(&mut f));
 }
 
-pub(crate) fn walk_block<F>(block: &Block, f: &mut F)
-where
-    F: FnMut(&Element),
-{
-    match block {
-        Block::Element(el) => walk_element(el, f),
-        Block::Paragraph(p) => {
-            for inline in &p.content {
-                if let Inline::Element(el) = inline {
-                    walk_element(el, f);
-                }
-            }
-        }
-        Block::Heading(h) => {
-            for inline in &h.content {
-                if let Inline::Element(el) = inline {
-                    walk_element(el, f);
-                }
-            }
-        }
-        Block::List(list) => {
-            for item in &list.items {
-                for inline in &item.content {
-                    if let Inline::Element(el) = inline {
-                        walk_element(el, f);
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn walk_element<F>(el: &Element, f: &mut F)
-where
-    F: FnMut(&Element),
-{
-    f(el);
-    if let Some(inlines) = &el.content {
-        for inline in inlines {
-            if let Inline::Element(child_el) = inline {
-                walk_element(child_el, f);
-            }
-        }
-    }
-    if let Some(ElementValue::Children(children)) = &el.value {
-        for child in children {
-            walk_element(child, f);
-        }
-    }
-}
-
-fn walk_elements_mut<F>(doc: &mut Document, mut f: F)
+/// Visits every `Element` in `doc` with mutable access (document order,
+/// including ones nested inside an element's `[content]` and
+/// `ElementValue::Children`) via `typedmark-walk`'s generic mutable tree
+/// walk -- see that crate's module doc for why this shape lives there
+/// instead of being hand-rolled here.
+pub(crate) fn walk_elements_mut<F>(doc: &mut Document, mut f: F)
 where
     F: FnMut(&mut Element),
 {
-    for block in &mut doc.blocks {
-        walk_block_mut(block, &mut f);
-    }
-}
-
-pub(crate) fn walk_block_mut<F>(block: &mut Block, f: &mut F)
-where
-    F: FnMut(&mut Element),
-{
-    match block {
-        Block::Element(el) => walk_element_mut(el, f),
-        Block::Paragraph(p) => {
-            for inline in &mut p.content {
-                if let Inline::Element(el) = inline {
-                    walk_element_mut(el, f);
-                }
+    struct ElementVisitorMut<F>(F);
+    impl<F: FnMut(&mut Element)> typedmark_walk::VisitorMut<()> for ElementVisitorMut<F> {
+        fn visit_mut(&mut self, node: typedmark_walk::NodeMut<'_>) -> std::ops::ControlFlow<()> {
+            if let typedmark_walk::NodeMut::Element(el) = node {
+                (self.0)(el);
             }
-        }
-        Block::Heading(h) => {
-            for inline in &mut h.content {
-                if let Inline::Element(el) = inline {
-                    walk_element_mut(el, f);
-                }
-            }
-        }
-        Block::List(list) => {
-            for item in &mut list.items {
-                for inline in &mut item.content {
-                    if let Inline::Element(el) = inline {
-                        walk_element_mut(el, f);
-                    }
-                }
-            }
+            std::ops::ControlFlow::Continue(())
         }
     }
-}
-
-fn walk_element_mut<F>(el: &mut Element, f: &mut F)
-where
-    F: FnMut(&mut Element),
-{
-    f(el);
-    if let Some(inlines) = &mut el.content {
-        for inline in inlines {
-            if let Inline::Element(child_el) = inline {
-                walk_element_mut(child_el, f);
-            }
-        }
-    }
-    if let Some(ElementValue::Children(children)) = &mut el.value {
-        for child in children {
-            walk_element_mut(child, f);
-        }
-    }
+    let _ = typedmark_walk::walk_document_mut(doc, &mut ElementVisitorMut(&mut f));
 }

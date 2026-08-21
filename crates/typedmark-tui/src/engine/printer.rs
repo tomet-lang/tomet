@@ -30,7 +30,11 @@ pub struct PrinterConfig {
     pub list_multiline_style_content: Option<String>,
 }
 
-pub fn is_path_ignored(path: &std::path::Path, root: Option<&std::path::Path>, ignore_patterns: &[String]) -> bool {
+pub fn is_path_ignored(
+    path: &std::path::Path,
+    root: Option<&std::path::Path>,
+    ignore_patterns: &[String],
+) -> bool {
     if ignore_patterns.is_empty() {
         return false;
     }
@@ -472,7 +476,8 @@ pub fn is_valid_id_format(existing: &str, cfg: &FieldConfig) -> bool {
     if rest.len() != expected_len {
         return false;
     }
-    rest.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    rest.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig) {
@@ -546,7 +551,9 @@ pub fn load_config_from_str(src: &str) -> Result<PrinterConfig, String> {
 
 /// Searches `start` and its parent directories for `default.config.tm` or `typedmark.config.tm`.
 /// Returns `(PrinterConfig, config_file_path, config_directory_path)`.
-pub fn find_config_file(start: &std::path::Path) -> Option<(PrinterConfig, std::path::PathBuf, std::path::PathBuf)> {
+pub fn find_config_file(
+    start: &std::path::Path,
+) -> Option<(PrinterConfig, std::path::PathBuf, std::path::PathBuf)> {
     let mut current = if start.is_file() {
         start.parent()?.to_path_buf()
     } else {
@@ -869,7 +876,9 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 if let Some(value) = &el.value {
                     out.push('{');
                     match value {
-                        ElementValue::Data(v) => out.push_str(&render_value_inner_with_config(v, config)),
+                        ElementValue::Data(v) => {
+                            out.push_str(&render_value_inner_with_config(v, config))
+                        }
                         ElementValue::Children(children) => {
                             for (i, child) in children.iter().enumerate() {
                                 if i > 0 {
@@ -918,7 +927,9 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 if let Some(value) = &el.value {
                     out.push('{');
                     match value {
-                        ElementValue::Data(v) => out.push_str(&render_value_inner_with_config(v, config)),
+                        ElementValue::Data(v) => {
+                            out.push_str(&render_value_inner_with_config(v, config))
+                        }
                         ElementValue::Children(children) => {
                             for (i, child) in children.iter().enumerate() {
                                 if i > 0 {
@@ -970,7 +981,9 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 if let Some(value) = &el.value {
                     out.push('{');
                     match value {
-                        ElementValue::Data(v) => out.push_str(&render_value_inner_with_config(v, config)),
+                        ElementValue::Data(v) => {
+                            out.push_str(&render_value_inner_with_config(v, config))
+                        }
                         ElementValue::Children(children) => {
                             for (i, child) in children.iter().enumerate() {
                                 if i > 0 {
@@ -1143,10 +1156,16 @@ fn render_args_with_config(v: &Value, config: &PrinterConfig) -> String {
             let key = &entries[0].0;
             if key == "wiki" {
                 let space = if config.wikilink_no_space { "" } else { " " };
-                return format!("wiki:{space}{}", render_value_inner_with_config(&entries[0].1, config));
+                return format!(
+                    "wiki:{space}{}",
+                    render_value_inner_with_config(&entries[0].1, config)
+                );
             } else if key == "url" || key == "link" {
                 let space = if config.link_no_space { "" } else { " " };
-                return format!("{key}:{space}{}", render_value_inner_with_config(&entries[0].1, config));
+                return format!(
+                    "{key}:{space}{}",
+                    render_value_inner_with_config(&entries[0].1, config)
+                );
             }
         }
     }
@@ -1170,7 +1189,13 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
         Value::String(s) => {
             if is_iso8601(s) {
                 s.clone()
-            } else if s.contains(' ') || s.contains(':') || s.contains(',') || s.contains('[') || s.contains(']') || s.is_empty() {
+            } else if s.contains(' ')
+                || s.contains(':')
+                || s.contains(',')
+                || s.contains('[')
+                || s.contains(']')
+                || s.is_empty()
+            {
                 format!("\"{s}\"")
             } else {
                 s.clone()
@@ -1188,15 +1213,23 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                 let key = &entries[0].0;
                 if key == "wiki" {
                     let space = if config.wikilink_no_space { "" } else { " " };
-                    format!("@(wiki:{space}{})", render_value_inner_with_config(&entries[0].1, config))
+                    format!(
+                        "@(wiki:{space}{})",
+                        render_value_inner_with_config(&entries[0].1, config)
+                    )
                 } else if key == "url" || key == "link" {
                     let space = if config.link_no_space { "" } else { " " };
-                    format!("@({key}:{space}{})", render_value_inner_with_config(&entries[0].1, config))
+                    format!(
+                        "@({key}:{space}{})",
+                        render_value_inner_with_config(&entries[0].1, config)
+                    )
                 } else {
                     let mut parts = Vec::new();
                     for (idx, (k, val)) in entries.iter().enumerate() {
                         let val_str = render_value_inner_with_config(val, config);
-                        if idx == 0 && (k == "variant" || k == "lang" || k == "src" || k == "format") {
+                        if idx == 0
+                            && (k == "variant" || k == "lang" || k == "src" || k == "format")
+                        {
                             parts.push(val_str);
                         } else {
                             parts.push(format!("{k}: {val_str}"));
@@ -1409,9 +1442,13 @@ mod tests {
         );
 
         let default_config_path = path.parent().unwrap().join("default.config.tm");
-        let cfg_default = load_config_from_file(&default_config_path).expect("failed to load docs/tests/default.config.tm");
+        let cfg_default = load_config_from_file(&default_config_path)
+            .expect("failed to load docs/tests/default.config.tm");
         assert_eq!(cfg_default.callout_content_style.as_deref(), Some("block"));
-        assert_eq!(cfg_default.list_multiline_style_content.as_deref(), Some("box"));
+        assert_eq!(
+            cfg_default.list_multiline_style_content.as_deref(),
+            Some("box")
+        );
     }
 
     #[test]
@@ -1497,8 +1534,16 @@ mod tests {
         let ignored_file = root.join("00-09 System/01 Apps/obsidian/note.md");
         let normal_file = root.join("00-09 System/01 Apps/other/note.md");
 
-        assert!(is_path_ignored(&ignored_file, Some(root), &cfg.ignore_files));
-        assert!(!is_path_ignored(&normal_file, Some(root), &cfg.ignore_files));
+        assert!(is_path_ignored(
+            &ignored_file,
+            Some(root),
+            &cfg.ignore_files
+        ));
+        assert!(!is_path_ignored(
+            &normal_file,
+            Some(root),
+            &cfg.ignore_files
+        ));
     }
 
     #[test]

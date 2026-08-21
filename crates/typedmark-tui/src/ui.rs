@@ -710,17 +710,25 @@ fn compute_char_diff(old_line: &str, new_line: &str) -> (Vec<Span<'static>>, Vec
         }
     }
 
-    let mut old_spans: Vec<Span<'static>> = vec![Span::styled("- ", Style::default().fg(Color::Red))];
-    let mut new_spans: Vec<Span<'static>> = vec![Span::styled("+ ", Style::default().fg(Color::Green))];
+    let mut old_spans: Vec<Span<'static>> =
+        vec![Span::styled("- ", Style::default().fg(Color::Red))];
+    let mut new_spans: Vec<Span<'static>> =
+        vec![Span::styled("+ ", Style::default().fg(Color::Green))];
 
     let mut i = 0;
     let mut j = 0;
 
     let normal_red = Style::default().fg(Color::Red);
-    let highlight_red = Style::default().fg(Color::White).bg(Color::Red).add_modifier(Modifier::BOLD);
+    let highlight_red = Style::default()
+        .fg(Color::White)
+        .bg(Color::Red)
+        .add_modifier(Modifier::BOLD);
 
     let normal_green = Style::default().fg(Color::Green);
-    let highlight_green = Style::default().fg(Color::White).bg(Color::Green).add_modifier(Modifier::BOLD);
+    let highlight_green = Style::default()
+        .fg(Color::White)
+        .bg(Color::Green)
+        .add_modifier(Modifier::BOLD);
 
     let mut cur_old_text = String::new();
     let mut cur_old_hi = false;
@@ -731,13 +739,19 @@ fn compute_char_diff(old_line: &str, new_line: &str) -> (Vec<Span<'static>>, Vec
     while i < n && j < m {
         if old_chars[i] == new_chars[j] {
             if cur_old_hi {
-                old_spans.push(Span::styled(std::mem::take(&mut cur_old_text), highlight_red));
+                old_spans.push(Span::styled(
+                    std::mem::take(&mut cur_old_text),
+                    highlight_red,
+                ));
                 cur_old_hi = false;
             }
             cur_old_text.push(old_chars[i]);
 
             if cur_new_hi {
-                new_spans.push(Span::styled(std::mem::take(&mut cur_new_text), highlight_green));
+                new_spans.push(Span::styled(
+                    std::mem::take(&mut cur_new_text),
+                    highlight_green,
+                ));
                 cur_new_hi = false;
             }
             cur_new_text.push(new_chars[j]);
@@ -753,7 +767,10 @@ fn compute_char_diff(old_line: &str, new_line: &str) -> (Vec<Span<'static>>, Vec
             i += 1;
         } else {
             if !cur_new_hi && !cur_new_text.is_empty() {
-                new_spans.push(Span::styled(std::mem::take(&mut cur_new_text), normal_green));
+                new_spans.push(Span::styled(
+                    std::mem::take(&mut cur_new_text),
+                    normal_green,
+                ));
             }
             cur_new_hi = true;
             cur_new_text.push(new_chars[j]);
@@ -772,7 +789,10 @@ fn compute_char_diff(old_line: &str, new_line: &str) -> (Vec<Span<'static>>, Vec
 
     while j < m {
         if !cur_new_hi && !cur_new_text.is_empty() {
-            new_spans.push(Span::styled(std::mem::take(&mut cur_new_text), normal_green));
+            new_spans.push(Span::styled(
+                std::mem::take(&mut cur_new_text),
+                normal_green,
+            ));
         }
         cur_new_hi = true;
         cur_new_text.push(new_chars[j]);
@@ -780,12 +800,20 @@ fn compute_char_diff(old_line: &str, new_line: &str) -> (Vec<Span<'static>>, Vec
     }
 
     if !cur_old_text.is_empty() {
-        let style = if cur_old_hi { highlight_red } else { normal_red };
+        let style = if cur_old_hi {
+            highlight_red
+        } else {
+            normal_red
+        };
         old_spans.push(Span::styled(cur_old_text, style));
     }
 
     if !cur_new_text.is_empty() {
-        let style = if cur_new_hi { highlight_green } else { normal_green };
+        let style = if cur_new_hi {
+            highlight_green
+        } else {
+            normal_green
+        };
         new_spans.push(Span::styled(cur_new_text, style));
     }
 

@@ -37,8 +37,13 @@ pub struct StructuralEngine;
 impl StructuralEngine {
     /// Perform structural query search across `.tm` files.
     pub fn search(dir: &Path, query: &StructuralQuery) -> Vec<StructuralMatch> {
-        let (config, _, config_root) = super::printer::find_config_file(dir)
-            .unwrap_or_else(|| (super::printer::PrinterConfig::default(), dir.to_path_buf(), dir.to_path_buf()));
+        let (config, _, config_root) = super::printer::find_config_file(dir).unwrap_or_else(|| {
+            (
+                super::printer::PrinterConfig::default(),
+                dir.to_path_buf(),
+                dir.to_path_buf(),
+            )
+        });
         Self::search_with_config(dir, query, &config, &config_root)
     }
 
@@ -255,16 +260,12 @@ fn walk_doc_elements<F>(doc: &Document, f: &mut F)
 where
     F: FnMut(&Element),
 {
-    for block in &doc.blocks {
-        super::batch_meta::walk_block(block, f);
-    }
+    super::batch_meta::walk_elements(doc, f);
 }
 
 fn walk_doc_elements_mut<F>(doc: &mut Document, f: &mut F)
 where
     F: FnMut(&mut Element),
 {
-    for block in &mut doc.blocks {
-        super::batch_meta::walk_block_mut(block, f);
-    }
+    super::batch_meta::walk_elements_mut(doc, f);
 }

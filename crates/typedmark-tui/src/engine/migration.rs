@@ -32,10 +32,7 @@ impl MigrationItem {
         self.ensure_loaded_with_config(&crate::engine::printer::PrinterConfig::default());
     }
 
-    pub fn ensure_loaded_with_config(
-        &mut self,
-        config: &crate::engine::printer::PrinterConfig,
-    ) {
+    pub fn ensure_loaded_with_config(&mut self, config: &crate::engine::printer::PrinterConfig) {
         if self.markdown_src.is_empty() {
             if let Ok(src) = fs::read_to_string(&self.source_path) {
                 let mut doc = typedmark_markdown::from_markdown(&src);
@@ -52,8 +49,14 @@ pub struct MigrationEngine;
 impl MigrationEngine {
     /// Scan workspace directory tree for relevant files (.md/.tm), compacting single-child directory chains.
     pub fn scan_tree(root: &Path) -> Vec<FileTreeNode> {
-        let (config, _, config_root) = super::printer::find_config_file(root)
-            .unwrap_or_else(|| (super::printer::PrinterConfig::default(), root.to_path_buf(), root.to_path_buf()));
+        let (config, _, config_root) =
+            super::printer::find_config_file(root).unwrap_or_else(|| {
+                (
+                    super::printer::PrinterConfig::default(),
+                    root.to_path_buf(),
+                    root.to_path_buf(),
+                )
+            });
         Self::scan_tree_with_config(root, &config, &config_root)
     }
 
@@ -71,8 +74,14 @@ impl MigrationEngine {
     /// Scan a directory or single file path for Markdown files (`.md`), respecting `.gitignore`.
     #[allow(dead_code)]
     pub fn scan(path: &Path) -> Vec<MigrationItem> {
-        let (config, _, config_root) = super::printer::find_config_file(path)
-            .unwrap_or_else(|| (super::printer::PrinterConfig::default(), path.to_path_buf(), path.to_path_buf()));
+        let (config, _, config_root) =
+            super::printer::find_config_file(path).unwrap_or_else(|| {
+                (
+                    super::printer::PrinterConfig::default(),
+                    path.to_path_buf(),
+                    path.to_path_buf(),
+                )
+            });
         Self::scan_with_config(path, &config, &config_root)
     }
 
