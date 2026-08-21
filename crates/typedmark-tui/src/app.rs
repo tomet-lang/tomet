@@ -1064,20 +1064,6 @@ impl App {
     }
 }
 
-fn is_markdown_file(p: &Path) -> bool {
-    p.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown"))
-        .unwrap_or(false)
-}
-
-fn is_typedmark_file(p: &Path) -> bool {
-    p.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| ext.eq_ignore_ascii_case("tm") || ext.eq_ignore_ascii_case("tmt"))
-        .unwrap_or(false)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1128,10 +1114,12 @@ mod tests {
     }
 }
 
+#[cfg(test)]
 trait ContainsStdPath {
     fn contains_std_path(&self, other: &Path) -> bool;
 }
 
+#[cfg(test)]
 impl ContainsStdPath for PathBuf {
     fn contains_std_path(&self, other: &Path) -> bool {
         self.starts_with(other)

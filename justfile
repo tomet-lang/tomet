@@ -33,6 +33,23 @@ tui path=".":
 format-check:
     cargo fmt --all -- --check
 
+# Validate that every .tm/.tmt file under docs/ parses cleanly and is
+# correctly formatted. Not part of `cargo test` on purpose -- these are
+# the repo's real, evolving documentation, not fixed fixtures, so a run
+# here is meant to be triggered manually (or from CI) rather than
+# failing unrelated code changes.
+docs-check:
+    cargo build -p typedmark
+    fail=0; \
+    tmp=$(mktemp); \
+    find docs -type f \( -name '*.tm' -o -name '*.tmt' \) > "$tmp"; \
+    while IFS= read -r f; do \
+        if ! ./target/debug/typedmark check -q "$f"; then echo "PARSE FAIL: $f"; fail=1; fi; \
+        if ! ./target/debug/typedmark format --check "$f" >/dev/null 2>&1; then echo "FORMAT FAIL: $f"; fail=1; fi; \
+    done < "$tmp"; \
+    rm -f "$tmp"; \
+    exit $fail
+
 # Clean Zed editor extension build and installation cache.
 clean-zed-cache:
     rm -rf ~/.local/share/zed/extensions/installed/typedmark ~/.local/share/zed/extensions/work/typedmark

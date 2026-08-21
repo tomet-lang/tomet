@@ -29,12 +29,12 @@ pub struct FileTreeNode {
 
 impl MigrationItem {
     pub fn ensure_loaded(&mut self) {
-        self.ensure_loaded_with_config(&crate::tui::engine::printer::PrinterConfig::default());
+        self.ensure_loaded_with_config(&crate::engine::printer::PrinterConfig::default());
     }
 
     pub fn ensure_loaded_with_config(
         &mut self,
-        config: &crate::tui::engine::printer::PrinterConfig,
+        config: &crate::engine::printer::PrinterConfig,
     ) {
         if self.markdown_src.is_empty() {
             if let Ok(src) = fs::read_to_string(&self.source_path) {
@@ -127,7 +127,7 @@ impl MigrationEngine {
     pub fn execute_with_config(
         items: &mut [MigrationItem],
         remove_original: bool,
-        config: &crate::tui::engine::printer::PrinterConfig,
+        config: &crate::engine::printer::PrinterConfig,
     ) -> anyhow::Result<usize> {
         let mut count = 0;
         for item in items.iter_mut() {
@@ -150,7 +150,7 @@ impl MigrationEngine {
         Self::execute_with_config(
             items,
             remove_original,
-            &crate::tui::engine::printer::PrinterConfig::default(),
+            &crate::engine::printer::PrinterConfig::default(),
         )
     }
 }
@@ -180,12 +180,6 @@ struct RawNode {
     is_dir: bool,
     children: Vec<RawNode>,
     has_md: bool,
-}
-
-fn build_raw_tree(root: &Path) -> Vec<RawNode> {
-    let (config, _, config_root) = super::printer::find_config_file(root)
-        .unwrap_or_else(|| (super::printer::PrinterConfig::default(), root.to_path_buf(), root.to_path_buf()));
-    build_raw_tree_with_config(root, &config, &config_root)
 }
 
 fn build_raw_tree_with_config(

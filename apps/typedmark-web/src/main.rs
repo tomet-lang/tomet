@@ -1,6 +1,7 @@
 //! Interactive Web Editor for TypedMark (`typedmark-web`).
 
 use std::net::SocketAddr;
+use std::path::Path;
 use std::process::ExitCode;
 
 use axum::Json;
@@ -56,7 +57,8 @@ fn main() -> ExitCode {
                         .unwrap()
                 }),
             )
-            .route("/api/parse", post(parse_handler));
+            .route("/api/parse", post(parse_handler))
+            .route("/api/format", post(format_handler));
 
         let listener = match tokio::net::TcpListener::bind(addr).await {
             Ok(l) => l,
@@ -97,6 +99,7 @@ struct ApiParseError {
     line: usize,
     column: usize,
     offset: usize,
+    formatted: String,
 }
 
 async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
@@ -119,19 +122,65 @@ async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
                 error: None,
             })
         }
-        Err(err) => Json(ApiParseResponse {
-            ok: false,
-            html: String::new(),
-            ast: String::new(),
-            markdown: String::new(),
-            error: Some(ApiParseError {
-                message: err.message,
-                line: err.line,
-                column: err.column,
-                offset: err.offset,
-            }),
-        }),
+        Err(err) => {
+            let formatted = format_parse_error(Path::new("playground.tm"), &req.source, &err);
+            Json(ApiParseResponse {
+                ok: false,
+                html: String::new(),
+                ast: String::new(),
+                markdown: String::new(),
+                error: Some(ApiParseError {
+                    message: err.message,
+                    line: err.line,
+                    column: err.column,
+                    offset: err.offset,
+                    formatted,
+                }),
+            })
+        }
     }
+}
+
+/// rustc-style single-error snippet: message, `--> file:line:col`, the
+/// offending source line, and a `^` caret under the error column.
+fn format_parse_error(path: &Path, src: &str, err: &typedmark_parser::Error) -> String {
+    let line_num = err.line;
+    let col_num = err.column;
+
+    let line_text = src.lines().nth(line_num.saturating_sub(1)).unwrap_or("");
+
+    let indent = " ".repeat(col_num.saturating_sub(1));
+    let line_str = line_num.to_string();
+    let padding = " ".repeat(line_str.len());
+
+    format!(
+        "error: {}\n  --> {}:{}:{}\n   {}\n {} | {}\n   {}| {}^ {}",
+        err.message,
+        path.display(),
+        line_num,
+        col_num,
+        "|",
+        line_str,
+        line_text,
+        padding,
+        indent,
+        err.message
+    )
+}
+
+#[derive(Deserialize)]
+struct ApiFormatRequest {
+    source: String,
+}
+
+#[derive(Serialize)]
+struct ApiFormatResponse {
+    formatted: String,
+}
+
+async fn format_handler(Json(req): Json<ApiFormatRequest>) -> impl IntoResponse {
+    let formatted = typedmark_formatter::format_source(&req.source);
+    Json(ApiFormatResponse { formatted })
 }
 
 #[cfg(test)]

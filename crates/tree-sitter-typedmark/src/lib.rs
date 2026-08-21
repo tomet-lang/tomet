@@ -69,7 +69,7 @@
 //!   `more_than_three_dashes_are_only_partially_consumed_by_thematic_break`.
 //! - **A `key: [seq]` map entry, when it's the map's last entry with no
 //!   trailing comma** (e.g. `{ title: ..., tags: [a, b] }` on one line, as
-//!   in `docs/tmt/examples/image.meta.tm`'s `@meta(format:yaml){...}`), gets GLR-merged
+//!   in `docs/tests/tmt/examples/image.meta.tm`'s `@meta(format:yaml){...}`), gets GLR-merged
 //!   with a second, spurious top-level `seq` reading of the same `[a, b]`
 //!   text, wrapping the whole map in an `ERROR`. Same family as `map`'s
 //!   own trailing-gap-vs-more-entries ambiguity below (`conflicts:
@@ -143,7 +143,7 @@
 //! of what (if anything) validly followed.
 //!
 //! Verified against real content: `cargo test` in this crate parses
-//! `docs/tmt/typedmark.tm` and `docs/tmt/examples/image.meta.tm` and checks that
+//! `docs/tmt/typedmark.tm` and `docs/tests/tmt/examples/image.meta.tm` and checks that
 //! the only `ERROR`/`MISSING` nodes are the known, narrow cases above --
 //! not that there are none. `docs/tmt/typedmark.tm` also has one
 //! pre-existing case (`###[ [] のルール ]`, a `[]` immediately inside a
@@ -538,7 +538,7 @@ mod tests {
 
     #[test]
     fn typedmark_tm_fixture_has_only_known_error_cases() {
-        let src = include_str!("../../../docs/readme.ja.tm");
+        let src = include_str!("../../../docs/tests/readme.ja.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);
         // Every error node's text contains (or exactly is) one of these
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn image_meta_tm_fixture_has_only_known_error_cases() {
-        let src = include_str!("../../../docs/tmt/examples/image.meta.tm");
+        let src = include_str!("../../../docs/tests/tmt/examples/image.meta.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);
         // The lone remaining error wraps `title: value` and `tags: ` --
@@ -638,7 +638,7 @@ mod tests {
         // ever meant "start a list" or "plain punctuation"), so
         // `scanner.c`'s malformed-checkbox trade-off (see its module doc)
         // still applies here -- covered by the `"]"` marker above.
-        let src = include_str!("../../../docs/ja/cheatsheet.tm");
+        let src = include_str!("../../../docs/tests/ja/cheatsheet.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);
         let known_markers = ["@config(", "や", "]"];
@@ -669,12 +669,12 @@ mod tests {
 
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let repo_root = manifest_dir.parent().unwrap().parent().unwrap();
-        let tmt_dir = repo_root.join("docs").join("tmt");
+        let tmt_dir = repo_root.join("docs").join("tests").join("tmt");
         let mut files = Vec::new();
         collect_tm_files(&tmt_dir, &mut files);
         assert!(
             !files.is_empty(),
-            "expected to find .tm/.tmt files under docs/tmt/"
+            "expected to find .tm/.tmt files under docs/tests/tmt/"
         );
 
         for file in files {

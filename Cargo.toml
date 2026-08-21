@@ -30,6 +30,9 @@ members = [
   "crates/converters/markdown",
   "crates/converters/html",
 
+  #[ TUI ]
+  "crates/typedmark-tui",
+
   #[ Consumer ]
   "crates/typedmark-formatter",
   "crates/serde_typedmark",
@@ -57,6 +60,8 @@ serde_typedmark = { path = "crates/serde_typedmark" }
 typedmark-markdown = { path = "crates/converters/markdown" }
 typedmark-html = { path = "crates/converters/html" }
 tree-sitter-typedmark = { path = "crates/tree-sitter-typedmark" }
+#[ TUI ]
+typedmark-tui = { path = "crates/typedmark-tui" }
 
 #[ Crates.io ]
 anyhow = "1"

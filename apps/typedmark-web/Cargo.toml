@@ -14,6 +14,7 @@ clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net"] }
+typedmark-formatter = { workspace = true }
 typedmark-markdown = { workspace = true }
 typedmark-parser = { workspace = true }
 typedmark-html = { workspace = true }

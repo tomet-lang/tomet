@@ -1662,22 +1662,18 @@ dependencies = [
  "anyhow",
  "axum",
  "clap",
- "crossterm",
- "ignore",
  "nanoid",
- "ratatui",
  "serde",
  "serde_json",
  "serde_typedmark",
  "tokio",
- "tree-sitter",
- "tree-sitter-typedmark",
  "typedmark-ast",
  "typedmark-formatter",
  "typedmark-html",
  "typedmark-markdown",
  "typedmark-parser",
  "typedmark-semantics",
+ "typedmark-tui",
  "uuid",
  "walkdir",
 ]
@@ -1797,6 +1793,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "typedmark-tui"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossterm",
+ "ignore",
+ "nanoid",
+ "ratatui",
+ "tree-sitter",
+ "tree-sitter-typedmark",
+ "typedmark-ast",
+ "typedmark-formatter",
+ "typedmark-markdown",
+ "typedmark-parser",
+ "typedmark-semantics",
+ "uuid",
+]
+
+[[package]]
 name = "typedmark-validator"
 version = "0.1.0"
 dependencies = [
@@ -1823,6 +1838,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "typedmark-formatter",
  "typedmark-html",
  "typedmark-markdown",
  "typedmark-parser",
