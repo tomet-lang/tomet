@@ -1,0 +1,14 @@
+[package]
+name = "typedmark-indexer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+typedmark-ast = { workspace = true }
+typedmark-parser = { workspace = true }
+typedmark-printer = { workspace = true }
+typedmark-semantics = { workspace = true }
+typedmark-walker = { workspace = true }
+
+#[ Crates.io ]
+ignore = { workspace = true }

@@ -525,7 +525,7 @@ fn export_directory(
     override_out: Option<&Path>,
     advanced: bool,
 ) -> anyhow::Result<()> {
-    let files = typedmark_tui::engine::batch_meta::collect_tm_files(dir_path);
+    let files = typedmark_indexer::collect_tm_files(dir_path);
     if files.is_empty() {
         println!("No .tm or .tmt files found in {}", dir_path.display());
         return Ok(());

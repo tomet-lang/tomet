@@ -5,9 +5,8 @@ use std::path::{Path, PathBuf};
 
 use typedmark_ast::{Document, Element, ElementValue, Sigil, Value};
 use typedmark_parser::parse_document;
+use typedmark_printer::document_to_tm;
 use typedmark_semantics::classify;
-
-use super::printer::document_to_tm;
 
 #[derive(Debug, Clone, Default)]
 pub struct StructuralQuery {
@@ -37,9 +36,9 @@ pub struct StructuralEngine;
 impl StructuralEngine {
     /// Perform structural query search across `.tm` files.
     pub fn search(dir: &Path, query: &StructuralQuery) -> Vec<StructuralMatch> {
-        let (config, _, config_root) = super::printer::find_config_file(dir).unwrap_or_else(|| {
+        let (config, _, config_root) = typedmark_printer::find_config_file(dir).unwrap_or_else(|| {
             (
-                super::printer::PrinterConfig::default(),
+                typedmark_printer::PrinterConfig::default(),
                 dir.to_path_buf(),
                 dir.to_path_buf(),
             )
@@ -50,11 +49,11 @@ impl StructuralEngine {
     pub fn search_with_config(
         dir: &Path,
         query: &StructuralQuery,
-        config: &super::printer::PrinterConfig,
+        config: &typedmark_printer::PrinterConfig,
         config_root: &Path,
     ) -> Vec<StructuralMatch> {
         let mut matches = Vec::new();
-        let paths = super::batch_meta::collect_tm_files_with_config(dir, config, config_root);
+        let paths = typedmark_indexer::collect_tm_files_with_config(dir, config, config_root);
 
         for path in paths {
             if let Ok(src) = fs::read_to_string(&path) {
@@ -256,11 +255,24 @@ fn value_contains_str(v: &Value, sub: &str) -> bool {
     }
 }
 
+/// Visits every `Element` in `doc` (document order, including ones
+/// nested inside an element's `[content]` and `ElementValue::Children`)
+/// via `typedmark-walker`'s generic tree walk -- see that crate's module
+/// doc for why this shape lives there instead of being hand-rolled here.
 fn walk_doc_elements<F>(doc: &Document, f: &mut F)
 where
     F: FnMut(&Element),
 {
-    super::batch_meta::walk_elements(doc, f);
+    struct ElementVisitor<'a, F>(&'a mut F);
+    impl<F: FnMut(&Element)> typedmark_walker::Visitor<()> for ElementVisitor<'_, F> {
+        fn visit(&mut self, node: typedmark_walker::Node<'_>) -> std::ops::ControlFlow<()> {
+            if let typedmark_walker::Node::Element(el) = node {
+                (self.0)(el);
+            }
+            std::ops::ControlFlow::Continue(())
+        }
+    }
+    let _ = typedmark_walker::walk_document(doc, &mut ElementVisitor(f));
 }
 
 fn walk_doc_elements_mut<F>(doc: &mut Document, f: &mut F)

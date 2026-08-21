@@ -1,5 +1,5 @@
 [package]
-name = "typedmark-resolve"
+name = "typedmark-resolver"
 version.workspace = true
 edition.workspace = true
 
@@ -7,4 +7,4 @@ edition.workspace = true
 typedmark-ast = { workspace = true }
 typedmark-parser = { workspace = true }
 typedmark-semantics = { workspace = true }
-typedmark-walk = { workspace = true }
+typedmark-walker = { workspace = true }

@@ -1,6 +1,6 @@
 use std::fmt;
 use typedmark_ast::Value;
-use typedmark_resolve::ResolveError;
+use typedmark_resolver::ResolveError;
 
 #[derive(Debug)]
 pub enum ComputeError {

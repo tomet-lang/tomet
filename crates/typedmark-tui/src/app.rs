@@ -90,7 +90,7 @@ pub struct App {
 
     // Printer Formatting Config
     pub printer_config_path: Option<PathBuf>,
-    pub printer_config: super::engine::printer::PrinterConfig,
+    pub printer_config: typedmark_printer::PrinterConfig,
     pub config_root: PathBuf,
 }
 
@@ -253,16 +253,16 @@ impl App {
     pub fn new(dir_path: PathBuf, config_path: Option<PathBuf>) -> Self {
         let (resolved_config_path, printer_config, config_root) =
             if let Some(ref path) = config_path {
-                let cfg = super::engine::printer::load_config_from_file(path).unwrap_or_default();
+                let cfg = typedmark_printer::load_config_from_file(path).unwrap_or_default();
                 (Some(path.clone()), cfg, dir_path.clone())
             } else if let Some((cfg, found_path, root)) =
-                super::engine::printer::find_config_file(&dir_path)
+                typedmark_printer::find_config_file(&dir_path)
             {
                 (Some(found_path), cfg, root)
             } else {
                 (
                     None,
-                    super::engine::printer::PrinterConfig::default(),
+                    typedmark_printer::PrinterConfig::default(),
                     dir_path.clone(),
                 )
             };

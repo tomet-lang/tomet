@@ -323,7 +323,7 @@ pub enum ElementValue {
 /// One node of a `${...}` interpolation's parsed expression tree.
 /// Grammar-only: this is an unresolved syntax tree -- looking up an
 /// `Identifier`/`Member`'s referenced element or calling a `Call`'s
-/// function is `typedmark-resolve`/`typedmark-compute`'s job, not this
+/// function is `typedmark-resolver`/`typedmark-compute`'s job, not this
 /// crate's. Deliberately not `Value`-shaped: `Value` can't distinguish a
 /// bare identifier reference from a quoted string literal (both collapse
 /// to the same `Value::String` once parsed), and can't represent a

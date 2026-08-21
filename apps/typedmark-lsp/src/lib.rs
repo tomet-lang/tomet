@@ -10,7 +10,7 @@ use lsp_types::{
 use std::ops::ControlFlow;
 use typedmark_ast::{ElementValue, Inline, InterpExprKind, Sigil, Span, Value};
 use typedmark_semantics::{classify, infer_at_kind, normalized_element_args};
-use typedmark_walk::{Node, Visitor, walk_document};
+use typedmark_walker::{Node, Visitor, walk_document};
 
 /// Converts an AST [`Span`] to an LSP [`Range`].
 pub fn span_to_range(span: &Span) -> Range {

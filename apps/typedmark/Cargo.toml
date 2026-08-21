@@ -11,6 +11,7 @@ path = "src/main.rs"
 serde_typedmark = { workspace = true }
 typedmark-ast = { workspace = true }
 typedmark-formatter = { workspace = true }
+typedmark-indexer = { workspace = true }
 typedmark-markdown = { workspace = true }
 typedmark-parser = { workspace = true }
 typedmark-html = { workspace = true }

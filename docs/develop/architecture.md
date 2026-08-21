@@ -110,18 +110,41 @@ converts `Document` back into TypedMark's own source, not another format.
   newline, collapsed blank-line runs) while using AST `Span` metadata to losslessly
   preserve literal spacing and line breaks inside verbatim content (`<codeblock>[...]`
   or elements with `content:raw`).
+- **`typedmark-printer`**: serializes a `Document` back to `.tm` source
+  text (`document_to_tm`/`document_to_tm_with_config`), no span info
+  required -- unlike `typedmark-formatter`, which re-formats *existing*
+  `.tm` text losslessly using spans, this is for documents that never
+  had `.tm` source to begin with (built from Markdown, or edited purely
+  at the AST level). Also owns `PrinterConfig` (loaded from a
+  `default.config.tm`/`typedmark.config.tm`) and everything it drives:
+  meta format (yaml/json/toml), wikilink/link spacing, callout/list
+  style, and `@meta` id auto-generation. Split out of `typedmark-tui`'s
+  `engine::printer` module so it's usable outside the TUI.
+- **`typedmark-indexer`**: directory scanning and read-only `.tm`/`.tmt`
+  metadata cataloging (`collect_tm_files`, `extract_metadata`,
+  `is_path_ignored`). Split out of `typedmark-tui`'s
+  `engine::batch_meta` module (`is_path_ignored` had been misplaced in
+  `engine::printer` -- it's a file filter, not a print concern) for the
+  same reason as `typedmark-printer`: TUI-independent reuse (a future
+  search/browse feature, e.g.). Depends on `typedmark-printer` for
+  `PrinterConfig`/`find_config_file` (the config-auto-discovering
+  `collect_tm_files` wrapper needs them); `apps/typedmark`'s `export`
+  subcommand uses it directly.
 - **`typedmark-tui`**: the interactive TUI workbench (ratatui/crossterm) for
   Markdown migration, batch metadata editing, and structural AST refactoring
   across a directory of `.tm` files. A standalone library crate (single
   entry point `run_tui(dir_path, config_path)`) so it's independently
   buildable/testable rather than living inside the `apps/typedmark` bin;
-  `apps/typedmark`'s `tui` subcommand just calls into it, and the `export`
-  subcommand also reuses its `engine::batch_meta::collect_tm_files` helper.
-- **`typedmark-walk`**: generic recursive traversal of a `Document`'s
+  `apps/typedmark`'s `tui` subcommand just calls into it. Built on
+  `typedmark-printer`/`typedmark-indexer` for serialization/scanning;
+  what's left in `engine::batch_meta`/`engine::structural` is the
+  *editing* half (renaming tags/keys, replacing values, updating `@meta`
+  keys) -- a future `typedmark-edit` extraction candidate, not done yet.
+- **`typedmark-walker`**: generic recursive traversal of a `Document`'s
   tree (`Heading`/`ListItem`/`Element`, including ones nested inside an
   element's `[content]` and `ElementValue::Children`), depending on
   nothing but `typedmark-ast`. Exists because `typedmark-validator` and
-  `typedmark-resolve` each independently hand-rolled the same tree-walk
+  `typedmark-resolver` each independently hand-rolled the same tree-walk
   shape for unrelated reasons (duplicate-id collection vs. `${id}`
   lookup) -- the same "don't let two consumers silently reimplement the
   same thing" motivation `typedmark-semantics` was extracted for.
@@ -131,9 +154,9 @@ converts `Document` back into TypedMark's own source, not another format.
   through `Break(b)`.
 - **`typedmark-validator`**: `.tm` schema/lint validation. Currently one
   rule -- duplicate `{id:...}`/`(id:...)` detection across a `Document`,
-  built on `typedmark-walk`. Read-only: no I/O, no reference resolution
-  (that's `typedmark-resolve`), no computation (`typedmark-compute`).
-- **`typedmark-resolve`**: not a pipeline stage in the same sense as the
+  built on `typedmark-walker`. Read-only: no I/O, no reference resolution
+  (that's `typedmark-resolver`), no computation (`typedmark-compute`).
+- **`typedmark-resolver`**: not a pipeline stage in the same sense as the
   above -- an independent "preprocessor/linker" layer (the closest
   analogy is C's `#include`) for TypedMark's own file-referencing
   constructs, today just `@settings(file:...)`: given a `@settings(file:
@@ -147,7 +170,7 @@ converts `Document` back into TypedMark's own source, not another format.
   deliberately not `typedmark-semantics` (recognizing a `@settings(
   file:...)` reference only needs a direct `Sigil` match, not full
   classification). `@import` is anticipated but not yet designed --
-  see the module doc in `crates/typedmark-resolve/src/lib.rs` for the
+  see the module doc in `crates/typedmark-resolver/src/lib.rs` for the
   open questions.
 
 

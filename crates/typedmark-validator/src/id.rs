@@ -1,9 +1,9 @@
 use std::ops::ControlFlow;
 use typedmark_ast::{Document, Span, Value};
-use typedmark_walk::{Node, Visitor, walk_document};
+use typedmark_walker::{Node, Visitor, walk_document};
 
 /// Walks every node in `doc` and returns `(id, span)` for each `id` key
-/// found in an attached `Value::Map` (see `typedmark-walk::Node::attrs`),
+/// found in an attached `Value::Map` (see `typedmark-walker::Node::attrs`),
 /// in document order.
 pub(crate) fn collect_ids(doc: &Document) -> Vec<(String, Span)> {
     let mut collector = Collector { ids: Vec::new() };

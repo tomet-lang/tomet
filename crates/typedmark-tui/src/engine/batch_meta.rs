@@ -1,15 +1,14 @@
 //! Batch Metadata (`@meta` / `@config`) Editor Engine.
 
-use ignore::WalkBuilder;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use typedmark_ast::{Block, Document, Element, ElementValue, Sigil, Value};
+use typedmark_indexer::{collect_tm_files_with_config, extract_metadata};
 use typedmark_parser::parse_document;
+use typedmark_printer::document_to_tm;
 use typedmark_semantics::classify;
-
-use super::printer::document_to_tm;
 
 #[derive(Debug, Clone)]
 pub struct MetaFileEntry {
@@ -37,9 +36,9 @@ pub struct BatchMetaEngine;
 impl BatchMetaEngine {
     /// Scan directory for `.tm` / `.tmt` files and extract `@meta` and `@config` key-value maps.
     pub fn scan(dir: &Path) -> Vec<MetaFileEntry> {
-        let (config, _, config_root) = super::printer::find_config_file(dir).unwrap_or_else(|| {
+        let (config, _, config_root) = typedmark_printer::find_config_file(dir).unwrap_or_else(|| {
             (
-                super::printer::PrinterConfig::default(),
+                typedmark_printer::PrinterConfig::default(),
                 dir.to_path_buf(),
                 dir.to_path_buf(),
             )
@@ -49,7 +48,7 @@ impl BatchMetaEngine {
 
     pub fn scan_with_config(
         dir: &Path,
-        config: &super::printer::PrinterConfig,
+        config: &typedmark_printer::PrinterConfig,
         config_root: &Path,
     ) -> Vec<MetaFileEntry> {
         let mut entries = Vec::new();
@@ -101,79 +100,6 @@ impl BatchMetaEngine {
     }
 }
 
-pub fn collect_tm_files(path: &Path) -> Vec<PathBuf> {
-    let (config, _, config_root) = super::printer::find_config_file(path).unwrap_or_else(|| {
-        (
-            super::printer::PrinterConfig::default(),
-            path.to_path_buf(),
-            path.to_path_buf(),
-        )
-    });
-    collect_tm_files_with_config(path, &config, &config_root)
-}
-
-pub fn collect_tm_files_with_config(
-    path: &Path,
-    config: &super::printer::PrinterConfig,
-    config_root: &Path,
-) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    if path.is_file() {
-        if is_tm_file(path) {
-            files.push(path.to_path_buf());
-        }
-    } else if path.is_dir() {
-        for entry in WalkBuilder::new(path)
-            .hidden(true)
-            .git_ignore(true)
-            .build()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().map_or(false, |ft| ft.is_file()))
-        {
-            let p = entry.path();
-            if super::printer::is_path_ignored(p, Some(config_root), &config.ignore_files) {
-                continue;
-            }
-            if is_tm_file(p) {
-                files.push(p.to_path_buf());
-            }
-        }
-    }
-    files.sort();
-    files
-}
-
-fn is_tm_file(p: &Path) -> bool {
-    p.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| ext.eq_ignore_ascii_case("tm") || ext.eq_ignore_ascii_case("tmt"))
-        .unwrap_or(false)
-}
-
-/// Extract all `@meta` and `@config` metadata fields from document text.
-pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
-    let mut map = BTreeMap::new();
-    if let Ok(doc) = parse_document(src) {
-        walk_elements(&doc, |el| {
-            let kind = classify(el);
-            let kind = kind.as_str();
-            if kind == "meta" || kind == "config" {
-                if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
-                    for (k, v) in entries {
-                        map.insert(format!("{kind}.{k}"), value_to_string(v));
-                    }
-                }
-                if let Some(Value::Map(entries)) = &el.args {
-                    for (k, v) in entries {
-                        map.insert(format!("{kind}.(args).{k}"), value_to_string(v));
-                    }
-                }
-            }
-        });
-    }
-    map
-}
-
 fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_val: &str) -> bool {
     let mut updated = false;
     let mut found = false;
@@ -222,50 +148,9 @@ fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_val:
     updated
 }
 
-fn value_to_string(v: &Value) -> String {
-    match v {
-        Value::String(s) => s.clone(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => f.to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Null => String::new(),
-        Value::Seq(items) => {
-            let s: Vec<_> = items.iter().map(value_to_string).collect();
-            format!("[{}]", s.join(", "))
-        }
-        Value::Map(entries) => {
-            let s: Vec<_> = entries
-                .iter()
-                .map(|(k, v)| format!("{k}: {}", value_to_string(v)))
-                .collect();
-            format!("{{{}}}", s.join(", "))
-        }
-    }
-}
-
-/// Visits every `Element` in `doc` (document order, including ones
-/// nested inside an element's `[content]` and `ElementValue::Children`)
-/// via `typedmark-walk`'s generic tree walk -- see that crate's module
-/// doc for why this shape lives there instead of being hand-rolled here.
-pub(crate) fn walk_elements<F>(doc: &Document, mut f: F)
-where
-    F: FnMut(&Element),
-{
-    struct ElementVisitor<F>(F);
-    impl<F: FnMut(&Element)> typedmark_walk::Visitor<()> for ElementVisitor<F> {
-        fn visit(&mut self, node: typedmark_walk::Node<'_>) -> std::ops::ControlFlow<()> {
-            if let typedmark_walk::Node::Element(el) = node {
-                (self.0)(el);
-            }
-            std::ops::ControlFlow::Continue(())
-        }
-    }
-    let _ = typedmark_walk::walk_document(doc, &mut ElementVisitor(&mut f));
-}
-
 /// Visits every `Element` in `doc` with mutable access (document order,
 /// including ones nested inside an element's `[content]` and
-/// `ElementValue::Children`) via `typedmark-walk`'s generic mutable tree
+/// `ElementValue::Children`) via `typedmark-walker`'s generic mutable tree
 /// walk -- see that crate's module doc for why this shape lives there
 /// instead of being hand-rolled here.
 pub(crate) fn walk_elements_mut<F>(doc: &mut Document, mut f: F)
@@ -273,13 +158,13 @@ where
     F: FnMut(&mut Element),
 {
     struct ElementVisitorMut<F>(F);
-    impl<F: FnMut(&mut Element)> typedmark_walk::VisitorMut<()> for ElementVisitorMut<F> {
-        fn visit_mut(&mut self, node: typedmark_walk::NodeMut<'_>) -> std::ops::ControlFlow<()> {
-            if let typedmark_walk::NodeMut::Element(el) = node {
+    impl<F: FnMut(&mut Element)> typedmark_walker::VisitorMut<()> for ElementVisitorMut<F> {
+        fn visit_mut(&mut self, node: typedmark_walker::NodeMut<'_>) -> std::ops::ControlFlow<()> {
+            if let typedmark_walker::NodeMut::Element(el) = node {
                 (self.0)(el);
             }
             std::ops::ControlFlow::Continue(())
         }
     }
-    let _ = typedmark_walk::walk_document_mut(doc, &mut ElementVisitorMut(&mut f));
+    let _ = typedmark_walker::walk_document_mut(doc, &mut ElementVisitorMut(&mut f));
 }

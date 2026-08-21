@@ -2,26 +2,8 @@
 
 use super::batch_meta::{BatchMetaEngine, MetaFileEntry};
 use super::migration::MigrationEngine;
-use super::printer::document_to_tm;
 use super::structural::{StructuralAction, StructuralEngine, StructuralMatch};
 use std::fs;
-use typedmark_parser::parse_document;
-
-#[test]
-fn test_printer_roundtrips_heading_and_paragraph() {
-    let src = "#[Welcome]\n\nHello world.\n";
-    let doc = parse_document(src).unwrap();
-    let printed = document_to_tm(&doc);
-    assert_eq!(printed, src);
-}
-
-#[test]
-fn test_printer_roundtrips_typed_elements() {
-    let src = "@meta{author: Alice, version: 1}\n\n<note>[Important notice]\n";
-    let doc = parse_document(src).unwrap();
-    let printed = document_to_tm(&doc);
-    assert_eq!(printed, src);
-}
 
 #[test]
 fn test_markdown_migration_conversion() {
@@ -50,7 +32,7 @@ fn test_batch_meta_update() {
         path: "test.tm".into(),
         original_src: src.to_string(),
         modified_src: src.to_string(),
-        metadata: super::batch_meta::extract_metadata(src),
+        metadata: typedmark_indexer::extract_metadata(src),
         selected: true,
     };
 
