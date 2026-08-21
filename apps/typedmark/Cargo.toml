@@ -28,5 +28,6 @@ typedmark-markdown = { workspace = true }
 typedmark-parser = { workspace = true }
 typedmark-html = { workspace = true }
 typedmark-semantics = { workspace = true }
+nanoid = { workspace = true }
 uuid = { workspace = true }
 walkdir = { workspace = true }

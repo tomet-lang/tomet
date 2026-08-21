@@ -13,10 +13,10 @@ use crossterm::{
         MouseEventKind,
     },
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
 
 use app::{App, FocusedPane, MetaEditTarget, StructuralInputTarget};
 
@@ -344,7 +344,9 @@ fn run_app<B: ratatui::backend::Backend>(
                                 let vis_idx = if app.active_tab == app::ActiveTab::Explorer {
                                     app.visible_tree_indices().get(app.tree_index).copied()
                                 } else if app.active_tab == app::ActiveTab::Migration {
-                                    app.visible_migration_tree_indices().get(app.migration_index).copied()
+                                    app.visible_migration_tree_indices()
+                                        .get(app.migration_index)
+                                        .copied()
                                 } else {
                                     None
                                 };
@@ -367,7 +369,9 @@ fn run_app<B: ratatui::backend::Backend>(
                                 let vis_idx = if app.active_tab == app::ActiveTab::Explorer {
                                     app.visible_tree_indices().get(app.tree_index).copied()
                                 } else if app.active_tab == app::ActiveTab::Migration {
-                                    app.visible_migration_tree_indices().get(app.migration_index).copied()
+                                    app.visible_migration_tree_indices()
+                                        .get(app.migration_index)
+                                        .copied()
                                 } else {
                                     None
                                 };
@@ -443,9 +447,7 @@ fn run_app<B: ratatui::backend::Backend>(
                                     disable_raw_mode()?;
                                     execute!(stdout, LeaveAlternateScreen, DisableMouseCapture)?;
 
-                                    let _ = std::process::Command::new(&editor)
-                                        .arg(&path)
-                                        .status();
+                                    let _ = std::process::Command::new(&editor).arg(&path).status();
 
                                     enable_raw_mode()?;
                                     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;

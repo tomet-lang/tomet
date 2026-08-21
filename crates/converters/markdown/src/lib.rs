@@ -7,7 +7,7 @@ mod export;
 mod import;
 
 pub use export::to_markdown;
-pub use import::from_markdown;
+pub use import::{ImportOptions, from_markdown, from_markdown_with_options};
 
 #[cfg(test)]
 mod roundtrip_tests {
@@ -60,5 +60,10 @@ mod roundtrip_tests {
     #[test]
     fn single_paragraph_blockquote_round_trips() {
         assert_html_round_trips("> quoted text\n");
+    }
+
+    #[test]
+    fn table_round_trips() {
+        assert_html_round_trips("| col1 | col2 |\n| --- | --- |\n| val1 | val2 |\n");
     }
 }

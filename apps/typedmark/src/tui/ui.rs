@@ -45,7 +45,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
 fn get_border_style(is_focused: bool) -> Style {
     if is_focused {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::DarkGray)
     }
@@ -66,11 +68,7 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
     };
 
     let tabs = Tabs::new(titles)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(config_title),
-        )
+        .block(Block::default().borders(Borders::ALL).title(config_title))
         .select(app.active_tab as usize)
         .style(Style::default().fg(Color::Cyan))
         .highlight_style(
@@ -107,7 +105,11 @@ fn render_explorer_view(f: &mut Frame, app: &mut App, area: Rect) {
             let indent = "  ".repeat(node.depth);
 
             let line_spans = if node.is_dir {
-                let icon = if node.expanded { "[-] 📁 " } else { "[+] 📁 " };
+                let icon = if node.expanded {
+                    "[-] 📁 "
+                } else {
+                    "[+] 📁 "
+                };
                 vec![
                     Span::raw(indent),
                     Span::styled(icon, Style::default().fg(Color::Yellow)),
@@ -256,14 +258,18 @@ fn render_explorer_view(f: &mut Frame, app: &mut App, area: Rect) {
             if node.is_dir {
                 preview_lines.push(Line::from(Span::styled(
                     format!("--- DIRECTORY ({}) ---", node.path.display()),
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
                 )));
                 preview_lines.push(Line::from("Directory contents visible in workspace tree."));
                 preview_lines.push(Line::from("Press [Enter] / [Space] to expand or collapse."));
             } else {
                 preview_lines.push(Line::from(Span::styled(
                     format!("--- FILE PREVIEW ({}) ---", node.path.display()),
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
                 )));
                 if let Ok(src) = std::fs::read_to_string(&node.path) {
                     preview_lines.extend(highlight_source_file(&node.path, &src));
@@ -387,7 +393,9 @@ fn render_migration_view(f: &mut Frame, app: &mut App, area: Rect) {
             let (sel_count, total_count) = app.get_dir_migration_status(&node.path);
             preview_lines.push(Line::from(Span::styled(
                 format!("--- DIRECTORY SUMMARY: {} ---", node.path.display()),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             )));
             preview_lines.push(Line::from(format!(
                 "Selected Markdown files: {} / {}",
@@ -411,9 +419,14 @@ fn render_migration_view(f: &mut Frame, app: &mut App, area: Rect) {
                     item.source_path.display(),
                     item.target_path.display()
                 ),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             )));
-            preview_lines.extend(generate_colored_diff(&item.markdown_src, &item.typedmark_src));
+            preview_lines.extend(generate_colored_diff(
+                &item.markdown_src,
+                &item.typedmark_src,
+            ));
         }
     } else {
         preview_lines.push(Line::from(
@@ -498,7 +511,9 @@ fn render_batch_meta_view(f: &mut Frame, app: &mut App, area: Rect) {
         entry.ensure_loaded();
         lines.push(Line::from(Span::styled(
             format!("--- METADATA FIELDS ({}) ---", entry.path.display()),
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         )));
         if entry.metadata.is_empty() {
             lines.push(Line::from(Span::styled(
@@ -521,9 +536,14 @@ fn render_batch_meta_view(f: &mut Frame, app: &mut App, area: Rect) {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "--- MODIFIED DIFF PREVIEW ---",
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
         )));
-        lines.extend(generate_colored_diff(&entry.original_src, &entry.modified_src));
+        lines.extend(generate_colored_diff(
+            &entry.original_src,
+            &entry.modified_src,
+        ));
     } else {
         lines.push(Line::from("No .tm files found in directory."));
     }
@@ -603,7 +623,9 @@ fn render_structural_view(f: &mut Frame, app: &mut App, area: Rect) {
     if let Some(m) = app.structural_matches.get(app.structural_index) {
         diff_lines.push(Line::from(Span::styled(
             format!("--- REFACTORED DIFF PREVIEW ({}) ---", m.path.display()),
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         )));
         diff_lines.extend(generate_colored_diff(&m.original_src, &m.modified_src));
     } else {
@@ -636,29 +658,138 @@ fn generate_colored_diff(original: &str, modified: &str) -> Vec<Line<'static>> {
     }
 
     let ops = compute_line_diff(original, modified);
-    for op in ops {
-        match op {
-            DiffOp::Keep(line) => {
-                lines.push(Line::from(Span::styled(
-                    format!("  {line}"),
-                    Style::default().fg(Color::DarkGray),
-                )));
+    let mut idx = 0;
+    while idx < ops.len() {
+        match (&ops[idx], ops.get(idx + 1)) {
+            (DiffOp::Delete(old_line), Some(DiffOp::Insert(new_line))) => {
+                let (old_spans, new_spans) = compute_char_diff(old_line, new_line);
+                lines.push(Line::from(old_spans));
+                lines.push(Line::from(new_spans));
+                idx += 2;
             }
-            DiffOp::Delete(line) => {
+            (DiffOp::Delete(line), _) => {
                 lines.push(Line::from(Span::styled(
                     format!("- {line}"),
                     Style::default().fg(Color::Red),
                 )));
+                idx += 1;
             }
-            DiffOp::Insert(line) => {
+            (DiffOp::Insert(line), _) => {
                 lines.push(Line::from(Span::styled(
                     format!("+ {line}"),
                     Style::default().fg(Color::Green),
                 )));
+                idx += 1;
+            }
+            (DiffOp::Keep(line), _) => {
+                lines.push(Line::from(Span::styled(
+                    format!("  {line}"),
+                    Style::default().fg(Color::DarkGray),
+                )));
+                idx += 1;
             }
         }
     }
     lines
+}
+
+fn compute_char_diff(old_line: &str, new_line: &str) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
+    let old_chars: Vec<char> = old_line.chars().collect();
+    let new_chars: Vec<char> = new_line.chars().collect();
+    let n = old_chars.len();
+    let m = new_chars.len();
+
+    let mut table = vec![vec![0usize; m + 1]; n + 1];
+    for i in (0..n).rev() {
+        for j in (0..m).rev() {
+            if old_chars[i] == new_chars[j] {
+                table[i][j] = table[i + 1][j + 1] + 1;
+            } else {
+                table[i][j] = table[i + 1][j].max(table[i][j + 1]);
+            }
+        }
+    }
+
+    let mut old_spans: Vec<Span<'static>> = vec![Span::styled("- ", Style::default().fg(Color::Red))];
+    let mut new_spans: Vec<Span<'static>> = vec![Span::styled("+ ", Style::default().fg(Color::Green))];
+
+    let mut i = 0;
+    let mut j = 0;
+
+    let normal_red = Style::default().fg(Color::Red);
+    let highlight_red = Style::default().fg(Color::White).bg(Color::Red).add_modifier(Modifier::BOLD);
+
+    let normal_green = Style::default().fg(Color::Green);
+    let highlight_green = Style::default().fg(Color::White).bg(Color::Green).add_modifier(Modifier::BOLD);
+
+    let mut cur_old_text = String::new();
+    let mut cur_old_hi = false;
+
+    let mut cur_new_text = String::new();
+    let mut cur_new_hi = false;
+
+    while i < n && j < m {
+        if old_chars[i] == new_chars[j] {
+            if cur_old_hi {
+                old_spans.push(Span::styled(std::mem::take(&mut cur_old_text), highlight_red));
+                cur_old_hi = false;
+            }
+            cur_old_text.push(old_chars[i]);
+
+            if cur_new_hi {
+                new_spans.push(Span::styled(std::mem::take(&mut cur_new_text), highlight_green));
+                cur_new_hi = false;
+            }
+            cur_new_text.push(new_chars[j]);
+
+            i += 1;
+            j += 1;
+        } else if table[i + 1][j] >= table[i][j + 1] {
+            if !cur_old_hi && !cur_old_text.is_empty() {
+                old_spans.push(Span::styled(std::mem::take(&mut cur_old_text), normal_red));
+            }
+            cur_old_hi = true;
+            cur_old_text.push(old_chars[i]);
+            i += 1;
+        } else {
+            if !cur_new_hi && !cur_new_text.is_empty() {
+                new_spans.push(Span::styled(std::mem::take(&mut cur_new_text), normal_green));
+            }
+            cur_new_hi = true;
+            cur_new_text.push(new_chars[j]);
+            j += 1;
+        }
+    }
+
+    while i < n {
+        if !cur_old_hi && !cur_old_text.is_empty() {
+            old_spans.push(Span::styled(std::mem::take(&mut cur_old_text), normal_red));
+        }
+        cur_old_hi = true;
+        cur_old_text.push(old_chars[i]);
+        i += 1;
+    }
+
+    while j < m {
+        if !cur_new_hi && !cur_new_text.is_empty() {
+            new_spans.push(Span::styled(std::mem::take(&mut cur_new_text), normal_green));
+        }
+        cur_new_hi = true;
+        cur_new_text.push(new_chars[j]);
+        j += 1;
+    }
+
+    if !cur_old_text.is_empty() {
+        let style = if cur_old_hi { highlight_red } else { normal_red };
+        old_spans.push(Span::styled(cur_old_text, style));
+    }
+
+    if !cur_new_text.is_empty() {
+        let style = if cur_new_hi { highlight_green } else { normal_green };
+        new_spans.push(Span::styled(cur_new_text, style));
+    }
+
+    (old_spans, new_spans)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -893,20 +1024,24 @@ fn highlight_typedmark_tree_sitter(src: &str) -> Vec<Line<'static>> {
         let capture = m.captures[*cap_idx];
         let cap_name = query.capture_names()[capture.index as usize];
         let style = match cap_name {
-            "comment" => Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
-            "tag" => Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-            "title" | "markup.heading" => {
-                Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)
-            }
+            "comment" => Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
+            "tag" => Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+            "title" | "markup.heading" => Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
             "string" | "string.special" => Style::default().fg(Color::Green),
             "punctuation.special" | "punctuation.bracket" | "punctuation.delimiter" => {
                 Style::default().fg(Color::Yellow)
             }
-            "property" => Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            "property" => Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
             "constant" | "markup.list.checked" => Style::default().fg(Color::Green),
-            "markup.list.unnumbered" | "markup.list.numbered" => {
-                Style::default().fg(Color::Blue)
-            }
+            "markup.list.unnumbered" | "markup.list.numbered" => Style::default().fg(Color::Blue),
             "text.literal" => Style::default().fg(Color::Gray),
             _ => Style::default(),
         };
@@ -1181,4 +1316,18 @@ fn highlight_typedmark_line(line: &str) -> Line<'static> {
     }
 
     Line::from(spans)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_char_diff_highlights_changes() {
+        let (old_spans, new_spans) = compute_char_diff("hello world", "hello brave world");
+        assert!(!old_spans.is_empty());
+        assert!(!new_spans.is_empty());
+        let new_text: String = new_spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(new_text, "+ hello brave world");
+    }
 }

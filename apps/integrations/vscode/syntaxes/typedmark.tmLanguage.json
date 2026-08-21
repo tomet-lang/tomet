@@ -81,7 +81,7 @@
 				{
 					"match": "^\\s*(-\\.|-)(?=[ \\t])(?:\\s*(\\(|\\[)([xX \\-T\\?]?|[a-zA-Z0-9_.-]+)(\\)|\\]))?",
 					"captures": {
-						"1": { "name": "punctuation.definition.list.marker.typedmark markup.list.typedmark" },
+						"1": { "name": "punctuation.definition.list.begin.markdown markup.list.typedmark keyword.control.list.typedmark" },
 						"2": { "name": "punctuation.definition.checkbox.begin.typedmark" },
 						"3": { "name": "keyword.operator.checkbox.typedmark markup.list.checkbox.typedmark" },
 						"4": { "name": "punctuation.definition.checkbox.end.typedmark" }
@@ -93,6 +93,7 @@
 		"inline": {
 			"patterns": [
 				{ "include": "#comments" },
+				{ "include": "#string" },
 				{ "include": "#code-span" },
 				{ "include": "#strong" },
 				{ "include": "#emphasis" },
@@ -107,6 +108,7 @@
 		"inline-basic": {
 			"patterns": [
 				{ "include": "#comments" },
+				{ "include": "#string" },
 				{ "include": "#code-span" },
 				{ "include": "#interpolation" },
 				{ "include": "#connect" },
@@ -252,7 +254,7 @@
 			"endCaptures": {
 				"0": { "name": "punctuation.section.group.square.end.typedmark" }
 			},
-			"name": "meta.group.square.typedmark",
+			"name": "meta.group.square.typedmark variable.parameter.content.typedmark",
 			"patterns": [{ "include": "#value" }, { "include": "#inline" }]
 		},
 

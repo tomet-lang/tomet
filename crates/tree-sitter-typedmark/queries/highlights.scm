@@ -51,8 +51,8 @@
 (fenced_code_block) @markup.raw.block @text.literal
 (fence_marker) @punctuation.special
 
-(unordered_list_item) @markup.list.unnumbered
-(ordered_list_item) @markup.list.numbered
+(unordered_list_item) @markup.list.unnumbered @keyword.control
+(ordered_list_item) @markup.list.numbered @keyword.control
 
 ; Outliner status markers (`- (T)`, `- (?)`, `- [x]`, `- ( )`) -- a
 ; distinct color from the rest of the item's content, same idea as
@@ -79,6 +79,7 @@
 (args_group ")" @punctuation.bracket)
 (content_group "[" @punctuation.bracket)
 (content_group "]" @punctuation.bracket)
+(content_group) @variable.parameter @variable.other
 (value_group "{" @punctuation.bracket)
 (value_group "}" @punctuation.bracket)
 

@@ -95,6 +95,7 @@ pub fn builtin_positional_arg_key(sigil: &Sigil) -> Option<&'static str> {
         Sigil::Type(name) => match name.as_str() {
             "codeblock" => Some("lang"),
             "embed" => Some("src"),
+            "callout" => Some("variant"),
             "meta" | "config" => Some("format"),
             _ => None,
         },

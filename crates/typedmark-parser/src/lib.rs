@@ -736,10 +736,21 @@ mod tests {
         let doc = parse_document("see https://example.com for more\n").unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
-                assert_eq!(
-                    &p.content,
-                    &vec![Inline::Text("see https://example.com for more".into())]
-                );
+                assert_eq!(p.content.len(), 3);
+                assert_eq!(p.content[0], Inline::Text("see ".into()));
+                if let Inline::Element(el) = &p.content[1] {
+                    assert_eq!(el.sigil, Sigil::At(None));
+                    assert_eq!(
+                        el.args,
+                        Some(Value::Map(vec![(
+                            "url".to_string(),
+                            Value::String("https://example.com".to_string())
+                        )]))
+                    );
+                } else {
+                    panic!("expected autolink element, got {:?}", p.content[1]);
+                }
+                assert_eq!(p.content[2], Inline::Text(" for more".into()));
             }
             other => panic!("expected paragraph, got {other:?}"),
         }
@@ -1219,6 +1230,102 @@ mod tests {
                 );
             }
             other => panic!("expected remote id element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bare_url_autolink_strips_trailing_punctuation() {
+        let doc = parse_document("Check https://example.com/foo! and https://example.com/bar.\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(p) => {
+                assert_eq!(p.content.len(), 5);
+                assert_eq!(p.content[0], Inline::Text("Check ".into()));
+                if let Inline::Element(el) = &p.content[1] {
+                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("https://example.com/foo".into()))])));
+                } else {
+                    panic!("expected url element");
+                }
+                assert_eq!(p.content[2], Inline::Text("! and ".into()));
+                if let Inline::Element(el) = &p.content[3] {
+                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("https://example.com/bar".into()))])));
+                } else {
+                    panic!("expected url element");
+                }
+                assert_eq!(p.content[4], Inline::Text(".".into()));
+            }
+            other => panic!("expected paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bare_url_autolink_handles_parentheses() {
+        let doc = parse_document("Visit (https://example.com/foo) or https://example.com/path(bar)\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(p) => {
+                assert_eq!(p.content[0], Inline::Text("Visit (".into()));
+                if let Inline::Element(el) = &p.content[1] {
+                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("https://example.com/foo".into()))])));
+                } else {
+                    panic!("expected url element");
+                }
+                assert_eq!(p.content[2], Inline::Text(") or ".into()));
+                if let Inline::Element(el) = &p.content[3] {
+                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("https://example.com/path(bar)".into()))])));
+                } else {
+                    panic!("expected url element");
+                }
+            }
+            other => panic!("expected paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bare_url_autolink_supports_http_https_mailto() {
+        let doc = parse_document("http://a.com https://b.com mailto:user@example.com\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(p) => {
+                assert_eq!(p.content.len(), 5);
+                if let Inline::Element(el) = &p.content[0] {
+                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("http://a.com".into()))])));
+                }
+                assert_eq!(p.content[1], Inline::Text(" ".into()));
+                if let Inline::Element(el) = &p.content[2] {
+                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("https://b.com".into()))])));
+                }
+                assert_eq!(p.content[3], Inline::Text(" ".into()));
+                if let Inline::Element(el) = &p.content[4] {
+                    assert_eq!(el.args, Some(Value::Map(vec![("url".into(), Value::String("mailto:user@example.com".into()))])));
+                }
+            }
+            other => panic!("expected paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn code_span_does_not_autolink_bare_url() {
+        let doc = parse_document("`https://example.com`\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(p) => {
+                assert_eq!(p.content, vec![Inline::Text("`https://example.com`".into())]);
+            }
+            other => panic!("expected paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bare_url_autolink_preserves_query_param_placeholder() {
+        let doc = parse_document("http://127.0.0.1:8888/search?lang=ja&q=<query>\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(
+                    el.args,
+                    Some(Value::Map(vec![(
+                        "url".into(),
+                        Value::String("http://127.0.0.1:8888/search?lang=ja&q=<query>".into())
+                    )]))
+                );
+            }
+            other => panic!("expected element, got {other:?}"),
         }
     }
 }

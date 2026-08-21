@@ -87,24 +87,15 @@
       }
     },
     "migration": {
-      "meta": {
-        "created": {
-          "type": "datetime",
-          "format": "iso8601"
-        },
-        "updated": {
-          "type": "datetime",
-          "format": "iso8601",
-          "merge": "modified"
-        }
+      "created": {
+        "type": "datetime",
+        "format": "iso8601"
       },
-      "url": {
-        "args": {
-          "display": "force"
-        },
-        "style": "link"
+      "updated": {
+        "type": "datetime",
+        "format": "iso8601",
+        "merge": "modified"
       }
     }
   }
 }
-

@@ -1,9 +1,9 @@
 //! Batch Metadata (`@meta` / `@config`) Editor Engine.
 
+use ignore::WalkBuilder;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use ignore::WalkBuilder;
 
 use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
 use typedmark_parser::parse_document;
@@ -37,8 +37,18 @@ pub struct BatchMetaEngine;
 impl BatchMetaEngine {
     /// Scan directory for `.tm` / `.tmt` files and extract `@meta` and `@config` key-value maps.
     pub fn scan(dir: &Path) -> Vec<MetaFileEntry> {
+        let (config, _, config_root) = super::printer::find_config_file(dir)
+            .unwrap_or_else(|| (super::printer::PrinterConfig::default(), dir.to_path_buf(), dir.to_path_buf()));
+        Self::scan_with_config(dir, &config, &config_root)
+    }
+
+    pub fn scan_with_config(
+        dir: &Path,
+        config: &super::printer::PrinterConfig,
+        config_root: &Path,
+    ) -> Vec<MetaFileEntry> {
         let mut entries = Vec::new();
-        let paths = collect_tm_files(dir);
+        let paths = collect_tm_files_with_config(dir, config, config_root);
         for path in paths {
             entries.push(MetaFileEntry {
                 path,
@@ -87,6 +97,16 @@ impl BatchMetaEngine {
 }
 
 pub fn collect_tm_files(path: &Path) -> Vec<PathBuf> {
+    let (config, _, config_root) = super::printer::find_config_file(path)
+        .unwrap_or_else(|| (super::printer::PrinterConfig::default(), path.to_path_buf(), path.to_path_buf()));
+    collect_tm_files_with_config(path, &config, &config_root)
+}
+
+pub fn collect_tm_files_with_config(
+    path: &Path,
+    config: &super::printer::PrinterConfig,
+    config_root: &Path,
+) -> Vec<PathBuf> {
     let mut files = Vec::new();
     if path.is_file() {
         if is_tm_file(path) {
@@ -101,6 +121,9 @@ pub fn collect_tm_files(path: &Path) -> Vec<PathBuf> {
             .filter(|e| e.file_type().map_or(false, |ft| ft.is_file()))
         {
             let p = entry.path();
+            if super::printer::is_path_ignored(p, Some(config_root), &config.ignore_files) {
+                continue;
+            }
             if is_tm_file(p) {
                 files.push(p.to_path_buf());
             }

@@ -6,7 +6,6 @@
 
   typedmark,
   typedmark-lsp,
-  typedmark-web,
   ...
 }:
 let

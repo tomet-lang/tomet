@@ -6,6 +6,9 @@
       },
       "heading": {
         "space_inside_brackets": true
+      },
+      "table": {
+        "adjust_width": "false"
       }
     }
   }

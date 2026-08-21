@@ -37,6 +37,11 @@
 				"path": "./syntaxes/typedmark.tmLanguage.json"
 			}
 		],
+		"configurationDefaults": {
+			"[typedmark]": {
+				"editor.wordWrap": "on"
+			}
+		},
 		"commands": [
 			{
 				"command": "typedmark.restartServer",

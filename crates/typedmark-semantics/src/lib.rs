@@ -14,6 +14,7 @@ mod infer;
 mod kind;
 mod meta;
 mod positional;
+mod table;
 
 pub use config::{DocumentConfig, ExportType, document_config};
 pub use connect::merge_connected_values;
@@ -24,3 +25,4 @@ pub use positional::{
     ElementSchema, SettingsSchema, builtin_positional_arg_key, normalized_element_args,
     normalized_element_args_with_schema,
 };
+pub use table::{TableCell, TableRow, parse_table_rows};

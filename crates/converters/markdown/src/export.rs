@@ -57,7 +57,14 @@ fn render_heading(h: &Heading, out: &mut String) {
 }
 
 fn render_list(items: &[ListItem], ordered: bool, out: &mut String) {
+    render_list_with_indent(items, ordered, 0, out);
+    out.push('\n');
+}
+
+fn render_list_with_indent(items: &[ListItem], ordered: bool, indent: usize, out: &mut String) {
+    let indent_str = "  ".repeat(indent);
     for (i, item) in items.iter().enumerate() {
+        out.push_str(&indent_str);
         let marker = if ordered {
             format!("{}. ", i + 1)
         } else {
@@ -69,8 +76,12 @@ fn render_list(items: &[ListItem], ordered: bool, out: &mut String) {
         }
         out.push_str(&inline_to_md(&item.content));
         out.push('\n');
+        for child in &item.children {
+            if let Block::List(sub) = child {
+                render_list_with_indent(&sub.items, sub.ordered, indent + 1, out);
+            }
+        }
     }
-    out.push('\n');
 }
 
 fn inline_to_md(inlines: &[Inline]) -> String {
@@ -95,6 +106,8 @@ fn element_to_md(el: &Element, inline: bool) -> String {
         "mark" => format!("<mark>{}</mark>", content_to_md(el)),
         "codeblock" => render_code_block(el),
         "blockquote" => render_blockquote(el),
+        "callout" => render_callout(el),
+        "table" => render_table(el),
         "url" | "file" => render_link(el, kind.as_str()),
         "ref" => render_ref(el),
         "wiki" => render_wiki(el),
@@ -109,6 +122,63 @@ fn element_to_md(el: &Element, inline: bool) -> String {
         "interp" => render_interp(el),
         _ => render_generic(el, kind.as_str(), inline),
     }
+}
+
+fn render_table(el: &Element) -> String {
+    let inlines = match &el.content {
+        Some(content) => content,
+        None => return String::new(),
+    };
+    let rows = typedmark_semantics::parse_table_rows(inlines);
+    if rows.is_empty() {
+        return String::new();
+    }
+
+    let mut col_count = 0;
+    for row in &rows {
+        col_count = col_count.max(row.cells.len());
+    }
+    if col_count == 0 {
+        return String::new();
+    }
+
+    let mut lines = Vec::new();
+
+    // Row 0 (Header)
+    let header_cells = &rows[0].cells;
+    let mut header_line = String::from("|");
+    for i in 0..col_count {
+        let cell_md = if i < header_cells.len() {
+            inline_to_md(&header_cells[i].content).replace('|', "\\|")
+        } else {
+            String::new()
+        };
+        header_line.push_str(&format!(" {cell_md} |"));
+    }
+    lines.push(header_line);
+
+    // Delimiter row
+    let mut delim_line = String::from("|");
+    for _ in 0..col_count {
+        delim_line.push_str(" --- |");
+    }
+    lines.push(delim_line);
+
+    // Body rows
+    for row in rows.iter().skip(1) {
+        let mut row_line = String::from("|");
+        for i in 0..col_count {
+            let cell_md = if i < row.cells.len() {
+                inline_to_md(&row.cells[i].content).replace('|', "\\|")
+            } else {
+                String::new()
+            };
+            row_line.push_str(&format!(" {cell_md} |"));
+        }
+        lines.push(row_line);
+    }
+
+    lines.join("\n")
 }
 
 /// Re-renders an `InterpExpr` back to `${...}`-shaped source text. Not
@@ -195,6 +265,57 @@ fn render_blockquote(el: &Element) -> String {
         .join("\n")
 }
 
+fn render_callout(el: &Element) -> String {
+    let mut variant = None;
+    let mut title = None;
+
+    if let Some(args) = &el.args {
+        match args {
+            Value::String(s) => variant = Some(s.clone()),
+            Value::Map(entries) => {
+                for (k, v) in entries {
+                    if k == "variant" {
+                        if let Value::String(s) = v {
+                            variant = Some(s.clone());
+                        }
+                    } else if k == "title" {
+                        if let Value::String(s) = v {
+                            title = Some(s.clone());
+                        }
+                    }
+                }
+                if variant.is_none() && !entries.is_empty() {
+                    if let Value::String(s) = &entries[0].1 {
+                        variant = Some(s.clone());
+                    }
+                }
+            }
+            Value::Seq(items) => {
+                if let Some(Value::String(s)) = items.first() {
+                    variant = Some(s.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let v = variant.unwrap_or_else(|| "note".to_string());
+    let body = content_to_md(el);
+    let mut lines = Vec::new();
+
+    if let Some(t) = title {
+        lines.push(format!("> [!{v}] {t}"));
+    } else {
+        lines.push(format!("> [!{v}]"));
+    }
+
+    for line in body.lines() {
+        lines.push(format!("> {line}"));
+    }
+
+    lines.join("\n")
+}
+
 fn render_link(el: &Element, key: &str) -> String {
     let href = el
         .args
@@ -205,9 +326,13 @@ fn render_link(el: &Element, key: &str) -> String {
         .unwrap_or_default();
     let text = match &el.content {
         Some(content) if !content.is_empty() => inline_to_md(content),
-        _ => href.clone(),
+        _ => String::new(),
     };
-    format!("[{text}]({href})")
+    if text.is_empty() || text == href {
+        href
+    } else {
+        format!("[{text}]({href})")
+    }
 }
 
 fn render_ref(el: &Element) -> String {
@@ -250,7 +375,12 @@ fn render_embed(el: &Element) -> String {
         .args
         .as_ref()
         .and_then(as_map)
-        .and_then(|m| map_get(m, "file").or_else(|| map_get(m, "url")))
+        .and_then(|m| {
+            map_get(m, "path")
+                .or_else(|| map_get(m, "file"))
+                .or_else(|| map_get(m, "url"))
+                .or_else(|| map_get(m, "wiki"))
+        })
         .map(value_to_plain)
         .unwrap_or_default();
     let alt = el
@@ -325,17 +455,50 @@ fn push_data_attrs(out: &mut String, args: &Value) {
     }
 }
 
-/// Escape characters that would otherwise be read back as CommonMark
-/// syntax (our own emitted delimiters chief among them).
 fn escape_text(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        if matches!(c, '\\' | '`' | '*' | '_' | '[' | ']' | '<') {
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if matches!(c, '\\' | '`' | '*' | '_' | '[' | ']') {
             out.push('\\');
+        } else if c == '<' {
+            let mut look = chars.clone();
+            let mut tag_name = String::new();
+            while let Some(&ch) = look.peek() {
+                if ch.is_alphanumeric() || ch == '_' || ch == '-' {
+                    tag_name.push(ch);
+                    look.next();
+                } else {
+                    break;
+                }
+            }
+            if is_common_html_tag(&tag_name) {
+                out.push('\\');
+            }
         }
         out.push(c);
     }
     out
+}
+
+fn is_common_html_tag(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "a" | "abbr" | "address" | "article" | "aside" | "audio" | "b" | "base" | "bdi"
+            | "bdo" | "blockquote" | "body" | "br" | "button" | "canvas" | "caption" | "cite"
+            | "code" | "col" | "colgroup" | "data" | "datalist" | "dd" | "del" | "details"
+            | "dfn" | "dialog" | "div" | "dl" | "dt" | "em" | "embed" | "fieldset"
+            | "figcaption" | "figure" | "footer" | "form" | "h1" | "h2" | "h3" | "h4"
+            | "h5" | "h6" | "head" | "header" | "hgroup" | "hr" | "html" | "i" | "iframe"
+            | "img" | "input" | "ins" | "kbd" | "label" | "legend" | "li" | "link" | "main"
+            | "map" | "mark" | "menu" | "meta" | "meter" | "nav" | "noscript" | "object"
+            | "ol" | "optgroup" | "option" | "output" | "p" | "param" | "picture" | "pre"
+            | "progress" | "q" | "rp" | "rt" | "ruby" | "s" | "samp" | "script" | "section"
+            | "select" | "small" | "source" | "span" | "strong" | "style" | "sub" | "summary"
+            | "sup" | "svg" | "table" | "tbody" | "td" | "template" | "textarea" | "tfoot"
+            | "th" | "thead" | "time" | "title" | "tr" | "track" | "u" | "ul" | "var"
+            | "video" | "wbr"
+    )
 }
 
 fn escape_attr(s: &str) -> String {
@@ -623,10 +786,16 @@ mod tests {
     #[test]
     fn wikilink_exports_to_markdown() {
         let mut el1 = Element::new(Sigil::At(None));
-        el1.args = Some(Value::Map(vec![("wiki".to_string(), Value::String("name".to_string()))]));
+        el1.args = Some(Value::Map(vec![(
+            "wiki".to_string(),
+            Value::String("name".to_string()),
+        )]));
 
         let mut el2 = Element::new(Sigil::At(None));
-        el2.args = Some(Value::Map(vec![("wiki".to_string(), Value::String("name".to_string()))]));
+        el2.args = Some(Value::Map(vec![(
+            "wiki".to_string(),
+            Value::String("name".to_string()),
+        )]));
         el2.content = Some(vec![Inline::Text(Text::new("display", Span::dummy()))]);
 
         let doc = Document {
@@ -641,5 +810,22 @@ mod tests {
             span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "[[name]] and [[name|display]]\n\n");
+    }
+
+    #[test]
+    fn table_exports_to_markdown() {
+        let mut el = Element::new(Sigil::At(Some("table".to_string())));
+        el.content = Some(vec![Inline::Text(Text::new(
+            "[ col1 ][ col2 ]\n[ val1 ][ val2 ]",
+            Span::dummy(),
+        ))]);
+        let doc = Document {
+            blocks: vec![Block::Element(el)],
+            span: Span::dummy(),
+        };
+        assert_eq!(
+            to_markdown(&doc),
+            "| col1 | col2 |\n| --- | --- |\n| val1 | val2 |\n\n"
+        );
     }
 }
