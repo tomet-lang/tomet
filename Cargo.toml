@@ -32,8 +32,12 @@ members = [
 
   #[ TUI ]
   "crates/typedmark-tui",
+  "crates/typedmark-config",
+  "crates/typedmark-field-utils",
+  "crates/typedmark-style",
   "crates/typedmark-printer",
   "crates/typedmark-indexer",
+  "crates/typedmark-edit",
 
   #[ Consumer ]
   "crates/typedmark-formatter",
@@ -64,8 +68,12 @@ typedmark-html = { path = "crates/converters/html" }
 tree-sitter-typedmark = { path = "crates/tree-sitter-typedmark" }
 #[ TUI ]
 typedmark-tui = { path = "crates/typedmark-tui" }
+typedmark-config = { path = "crates/typedmark-config" }
+typedmark-field-utils = { path = "crates/typedmark-field-utils" }
+typedmark-style = { path = "crates/typedmark-style" }
 typedmark-printer = { path = "crates/typedmark-printer" }
 typedmark-indexer = { path = "crates/typedmark-indexer" }
+typedmark-edit = { path = "crates/typedmark-edit" }
 
 #[ Crates.io ]
 anyhow = "1"

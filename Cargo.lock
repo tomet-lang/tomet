@@ -1693,11 +1693,47 @@ dependencies = [
 ]
 
 [[package]]
-name = "typedmark-formatter"
+name = "typedmark-config"
 version = "0.1.0"
 dependencies = [
  "typedmark-ast",
  "typedmark-parser",
+ "typedmark-semantics",
+]
+
+[[package]]
+name = "typedmark-edit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "typedmark-ast",
+ "typedmark-config",
+ "typedmark-indexer",
+ "typedmark-parser",
+ "typedmark-printer",
+ "typedmark-semantics",
+ "typedmark-walker",
+]
+
+[[package]]
+name = "typedmark-field-utils"
+version = "0.1.0"
+dependencies = [
+ "nanoid",
+ "typedmark-config",
+ "uuid",
+]
+
+[[package]]
+name = "typedmark-formatter"
+version = "0.1.0"
+dependencies = [
+ "typedmark-ast",
+ "typedmark-config",
+ "typedmark-field-utils",
+ "typedmark-parser",
+ "typedmark-semantics",
+ "typedmark-style",
 ]
 
 [[package]]
@@ -1719,8 +1755,8 @@ version = "0.1.0"
 dependencies = [
  "ignore",
  "typedmark-ast",
+ "typedmark-config",
  "typedmark-parser",
- "typedmark-printer",
  "typedmark-semantics",
  "typedmark-walker",
 ]
@@ -1787,13 +1823,13 @@ dependencies = [
 name = "typedmark-printer"
 version = "0.1.0"
 dependencies = [
- "nanoid",
  "typedmark-ast",
+ "typedmark-config",
+ "typedmark-field-utils",
  "typedmark-formatter",
  "typedmark-markdown",
- "typedmark-parser",
  "typedmark-semantics",
- "uuid",
+ "typedmark-style",
 ]
 
 [[package]]
@@ -1819,6 +1855,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "typedmark-style"
+version = "0.1.0"
+dependencies = [
+ "typedmark-ast",
+ "typedmark-config",
+ "typedmark-field-utils",
+]
+
+[[package]]
 name = "typedmark-tui"
 version = "0.1.0"
 dependencies = [
@@ -1829,6 +1874,8 @@ dependencies = [
  "tree-sitter",
  "tree-sitter-typedmark",
  "typedmark-ast",
+ "typedmark-config",
+ "typedmark-edit",
  "typedmark-indexer",
  "typedmark-markdown",
  "typedmark-parser",

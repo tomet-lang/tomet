@@ -1,0 +1,272 @@
+//! Applies `typedmark_config::PrinterConfig`'s style rules (meta format,
+//! wikilink/link spacing, per-field `@meta` formatting) to a single
+//! `typedmark_ast::Value` or `Element`, returning `.tm`-syntax text.
+//! Deliberately scoped to single nodes -- no `Document`, no tree
+//! position, no recursion into sibling/child elements of other kinds --
+//! so both `typedmark-printer` (rebuilds a whole `Document`) and
+//! `typedmark-formatter` (patches specific spans of existing `.tm` text)
+//! can depend on this without a circular dependency (`typedmark-printer`
+//! already depends on `typedmark-formatter`). `render_meta_element`
+//! specifically covers only `@meta` elements' actual shape per the
+//! grammar (`args` an optional format map, `value` always
+//! `ElementValue::Data(Value::Map(...))`) -- not the general
+//! element-rendering logic for every other sigil/kind, which stays in
+//! `typedmark-printer` since it recurses into inline/child content and
+//! is genuinely part of rebuilding a whole document from its AST.
+
+use typedmark_ast::{Element, ElementValue, Value};
+use typedmark_config::{FieldConfig, PrinterConfig};
+use typedmark_field_utils::is_iso8601;
+
+pub fn render_value(v: &Value) -> String {
+    format!("{{{}}}", render_value_inner(v))
+}
+
+pub fn render_value_inner(v: &Value) -> String {
+    render_value_inner_with_config(v, &PrinterConfig::default())
+}
+
+pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> String {
+    match v {
+        Value::Null => String::new(),
+        Value::Bool(b) => b.to_string(),
+        Value::Int(i) => i.to_string(),
+        Value::Float(f) => f.to_string(),
+        Value::String(s) => {
+            if is_iso8601(s) {
+                s.clone()
+            } else if s.contains(' ')
+                || s.contains(':')
+                || s.contains(',')
+                || s.contains('[')
+                || s.contains(']')
+                || s.is_empty()
+            {
+                format!("\"{s}\"")
+            } else {
+                s.clone()
+            }
+        }
+        Value::Seq(items) => {
+            let rendered: Vec<_> = items
+                .iter()
+                .map(|item| render_value_inner_with_config(item, config))
+                .collect();
+            format!("[{}]", rendered.join(", "))
+        }
+        Value::Map(entries) => {
+            if entries.len() == 1 {
+                let key = &entries[0].0;
+                if key == "wiki" {
+                    let space = if config.wikilink_no_space { "" } else { " " };
+                    format!(
+                        "@(wiki:{space}{})",
+                        render_value_inner_with_config(&entries[0].1, config)
+                    )
+                } else if key == "url" || key == "link" {
+                    let space = if config.link_no_space { "" } else { " " };
+                    format!(
+                        "@({key}:{space}{})",
+                        render_value_inner_with_config(&entries[0].1, config)
+                    )
+                } else {
+                    let mut parts = Vec::new();
+                    for (idx, (k, val)) in entries.iter().enumerate() {
+                        let val_str = render_value_inner_with_config(val, config);
+                        if idx == 0
+                            && (k == "variant" || k == "lang" || k == "src" || k == "format")
+                        {
+                            parts.push(val_str);
+                        } else {
+                            parts.push(format!("{k}: {val_str}"));
+                        }
+                    }
+                    parts.join(", ")
+                }
+            } else {
+                let mut parts = Vec::new();
+                for (idx, (k, val)) in entries.iter().enumerate() {
+                    let val_str = render_value_inner_with_config(val, config);
+                    if idx == 0 && (k == "variant" || k == "lang" || k == "src" || k == "format") {
+                        parts.push(val_str);
+                    } else {
+                        parts.push(format!("{k}: {val_str}"));
+                    }
+                }
+                parts.join(", ")
+            }
+        }
+    }
+}
+
+pub fn render_args_with_config(v: &Value, config: &PrinterConfig) -> String {
+    if let Value::Map(entries) = v {
+        if entries.len() == 1 {
+            let key = &entries[0].0;
+            if key == "wiki" {
+                let space = if config.wikilink_no_space { "" } else { " " };
+                return format!(
+                    "wiki:{space}{}",
+                    render_value_inner_with_config(&entries[0].1, config)
+                );
+            } else if key == "url" || key == "link" {
+                let space = if config.link_no_space { "" } else { " " };
+                return format!(
+                    "{key}:{space}{}",
+                    render_value_inner_with_config(&entries[0].1, config)
+                );
+            }
+        }
+    }
+    render_value_inner_with_config(v, config)
+}
+
+fn render_meta_field_value(v: &Value, field_cfg: Option<&FieldConfig>, config: &PrinterConfig) -> String {
+    if let Value::Null = v {
+        return String::new();
+    }
+    if let Some(cfg) = field_cfg {
+        if cfg.format.as_deref() == Some("rfc3339") || cfg.field_type.as_deref() == Some("datetime")
+        {
+            if let Value::String(s) = v {
+                return typedmark_field_utils::format_rfc3339(s, cfg.offset.as_deref());
+            }
+        }
+        if cfg.always_newline {
+            if let Value::Seq(items) = v {
+                if items.is_empty() {
+                    return "[]".to_string();
+                }
+                let mut s = String::new();
+                for item in items {
+                    s.push_str("\n    - ");
+                    s.push_str(&render_value_inner_with_config(item, config));
+                }
+                return s;
+            }
+        }
+    }
+    match v {
+        Value::String(s) if is_iso8601(s) => s.clone(),
+        _ => render_value_inner_with_config(v, config),
+    }
+}
+
+/// Renders an `@meta(...){...}` element per `config`'s meta format
+/// settings (element-local `format:` arg takes priority over
+/// `config.meta_format`; multi-line if `config.meta_always_newline` or a
+/// format is set, else a single `@meta{k: v, ...}` line). Scoped to
+/// `@meta`'s actual shape -- `value` must be `ElementValue::Data(Value::Map(...))`,
+/// which is all the grammar ever produces for `@meta`; anything else
+/// renders as a bare `@meta` (with args, if any).
+pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
+    let effective_format = el
+        .args
+        .as_ref()
+        .and_then(|args| {
+            if let Value::Map(entries) = args {
+                entries.iter().find_map(|(k, v)| {
+                    if k == "format" {
+                        if let Value::String(fmt) = v {
+                            return Some(fmt.clone());
+                        }
+                    }
+                    None
+                })
+            } else {
+                None
+            }
+        })
+        .or_else(|| config.meta_format.clone());
+
+    if config.meta_always_newline || effective_format.is_some() {
+        if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
+            let mut out = if let Some(ref fmt) = effective_format {
+                format!("@meta(format:{fmt}){{\n")
+            } else {
+                String::from("@meta{\n")
+            };
+            for (k, v) in entries {
+                let field_cfg = config.meta_fields.get(k);
+                let val_str = render_meta_field_value(v, field_cfg, config);
+                out.push_str("  ");
+                out.push_str(k);
+                if val_str.starts_with('\n') || val_str.is_empty() {
+                    out.push(':');
+                } else {
+                    out.push_str(": ");
+                }
+                out.push_str(&val_str);
+                out.push('\n');
+            }
+            out.push('}');
+            return out;
+        }
+    }
+
+    let mut out = String::from("@meta");
+    if let Some(args) = &el.args {
+        out.push('(');
+        out.push_str(&render_args_with_config(args, config));
+        out.push(')');
+    }
+    if let Some(ElementValue::Data(v)) = &el.value {
+        out.push('{');
+        out.push_str(&render_value_inner_with_config(v, config));
+        out.push('}');
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use typedmark_ast::Sigil;
+
+    #[test]
+    fn render_value_inner_quotes_strings_needing_it() {
+        assert_eq!(render_value_inner(&Value::String("plain".to_string())), "plain");
+        assert_eq!(
+            render_value_inner(&Value::String("has space".to_string())),
+            "\"has space\""
+        );
+        assert_eq!(render_value_inner(&Value::Null), "");
+    }
+
+    #[test]
+    fn render_args_with_config_handles_wiki_and_link() {
+        let cfg = PrinterConfig::default();
+        let wiki = Value::Map(vec![("wiki".to_string(), Value::String("target".to_string()))]);
+        assert_eq!(render_args_with_config(&wiki, &cfg), "wiki: target");
+
+        let mut cfg_no_space = PrinterConfig::default();
+        cfg_no_space.wikilink_no_space = true;
+        assert_eq!(render_args_with_config(&wiki, &cfg_no_space), "wiki:target");
+    }
+
+    #[test]
+    fn render_meta_element_single_line_by_default() {
+        let mut el = Element::new(Sigil::At(Some("meta".to_string())));
+        el.value = Some(ElementValue::Data(Value::Map(vec![(
+            "id".to_string(),
+            Value::String("doc-12345678".to_string()),
+        )])));
+        let cfg = PrinterConfig::default();
+        assert_eq!(render_meta_element(&el, &cfg), "@meta{id: doc-12345678}");
+    }
+
+    #[test]
+    fn render_meta_element_multiline_when_format_configured() {
+        let mut el = Element::new(Sigil::At(Some("meta".to_string())));
+        el.value = Some(ElementValue::Data(Value::Map(vec![(
+            "id".to_string(),
+            Value::String("doc-12345678".to_string()),
+        )])));
+        let mut cfg = PrinterConfig::default();
+        cfg.meta_format = Some("yaml".to_string());
+        assert_eq!(
+            render_meta_element(&el, &cfg),
+            "@meta(format:yaml){\n  id: doc-12345678\n}"
+        );
+    }
+}

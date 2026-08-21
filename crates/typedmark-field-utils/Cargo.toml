@@ -1,0 +1,11 @@
+[package]
+name = "typedmark-field-utils"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+typedmark-config = { workspace = true }
+
+#[ Crates.io ]
+nanoid = { workspace = true }
+uuid = { workspace = true }

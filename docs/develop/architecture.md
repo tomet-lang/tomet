@@ -105,41 +105,132 @@ converts `Document` back into TypedMark's own source, not another format.
   grammar with a direct struct mapping, the same role `serde_json`/
   `serde_yaml` play for their formats. Headings/prose/links have no serde
   equivalent and aren't handled here.
-- **`typedmark-formatter`**: AST-aware whitespace and raw-content preserving formatter.
-  Normalizes whitespace policy (LF line endings, no trailing whitespace, one final
-  newline, collapsed blank-line runs) while using AST `Span` metadata to losslessly
-  preserve literal spacing and line breaks inside verbatim content (`<codeblock>[...]`
-  or elements with `content:raw`).
+- **`typedmark-formatter`**: AST-aware whitespace and raw-content preserving formatter,
+  plus (as of `format_source_with_config`) an opt-in, config-gated pass that makes
+  small structural additions. Two-stage, config-gated pipeline:
+  1. **Config-driven patch pass** (only runs if the relevant
+     `typedmark-config` rule is set on the document -- e.g.
+     `meta_fields.id`; a document with no such config is untouched by
+     this stage, so `format_source_with_config` degrades to exactly
+     `format_source`'s behavior). Walks the parsed `Document` to find
+     the target `@meta` element (or decide none exists), builds the new
+     `id` state (insert if missing and `force`/`overwrite`; replace an
+     invalid one only if `overwrite`; leave a valid one alone -- the
+     same per-case gating as `typedmark-printer`'s
+     `ensure_document_id_with_config`), renders that one element via
+     `typedmark-style`'s `render_meta_element`, then splices the result
+     into the *original* source at that element's `Span` (or prepends a
+     freshly rendered block if there was no `@meta` element at all) --
+     never rebuilds the whole document from the AST (that's
+     `typedmark-printer`'s job, and doing it here would defeat the
+     reason this crate exists: not touching content it wasn't told to
+     change). Note: when this pass *is* triggered, the touched element
+     is rendered exactly as `typedmark-printer` would render it -- e.g.
+     a hand-written single-line `@meta{id: ...}` can come out multi-line
+     as `@meta(format:yaml){...}` if `config.meta_format` says so. This
+     is intentional: the losslessness guarantee is about *not touching*
+     elements/documents with no matching config rule, not about
+     preserving a touched element's original shape once config *does*
+     apply to it.
+  2. **Whitespace-hygiene pass** (`format_source`, unconditional, always
+     runs last): normalizes whitespace policy (LF line endings, no
+     trailing whitespace, one final newline, collapsed blank-line runs)
+     while using AST `Span` metadata to losslessly preserve literal
+     spacing and line breaks inside verbatim content (`<codeblock>[...]`
+     or elements with `content:raw`). This stage alone still guarantees
+     `does_not_change_the_parsed_document` (its own invariant test) --
+     that invariant does not extend to stage 1, which exists precisely
+     to make deliberate, config-authorized changes.
+- **`typedmark-config`**: owns `PrinterConfig`/`FieldConfig` (loaded
+  from a `default.config.tm`/`typedmark.config.tm`, or an
+  `@settings`/`@config` element in a document) and everything they
+  drive: meta format (yaml/json/toml), wikilink/link spacing,
+  callout/list style, and per-field `@meta` rules. Also owns discovery
+  (`find_config_file`, `load_config_from_file`, `load_config_from_str`).
+  Split out of `typedmark-printer` because finding/loading this config
+  is a concern shared by every consumer that needs it
+  (`typedmark-tui`/`typedmark-edit`/`typedmark-indexer` all call
+  `find_config_file` directly), not something specific to serializing a
+  `Document` back to `.tm` text -- those crates depend on
+  `typedmark-config` directly rather than going through
+  `typedmark-printer` re-exports. `@meta` id auto-generation stayed
+  behind in `typedmark-printer` despite being config-driven, since it
+  mutates the AST directly rather than being a config-loading concern.
+- **`typedmark-field-utils`**: small pure helpers for `@meta` field
+  values, driven by `typedmark-config`'s `FieldConfig`: id
+  generation/validation (`generate_id_for_field`/`is_valid_id_format`)
+  and ISO8601/RFC3339 timestamp conversion
+  (`is_iso8601`/`format_rfc3339`). None of these touch `Document`/AST --
+  a deliberately plain "utils" name rather than an invented abstraction
+  like "rules", since it's a grab bag of generate/convert helpers with
+  no shared engine behind them (contrast `typedmark-style` below, which
+  *is* one cohesive family). Split out of `typedmark-printer` so
+  `typedmark-formatter` could reuse the same generate/validate/convert
+  logic without depending on printer's whole-document-rebuild model.
+- **`typedmark-style`**: applies `typedmark-config`'s `PrinterConfig`
+  style rules (meta format, wikilink/link spacing, per-field `@meta`
+  formatting) to a single `typedmark_ast::Value` or `Element`, returning
+  `.tm`-syntax text -- `render_value`/`render_value_inner_with_config`/
+  `render_args_with_config` (take only `&Value` + config) and
+  `render_meta_element` (takes one `&Element`, renders a whole
+  `@meta(...){...}` -- format-arg detection, multi-line vs single-line
+  switching, per-field formatting via `typedmark-field-utils`).
+  Deliberately scoped to single nodes with no `Document`/tree-position
+  context and no recursion into other element kinds (that general
+  element-tree recursion -- `render_block`/`render_inlines`/the rest of
+  `render_element` -- stays in `typedmark-printer`, since it's genuinely
+  shaped by "rebuild a whole document"). This scoping is what lets both
+  `typedmark-printer` *and* `typedmark-formatter` depend on it without a
+  cycle (`typedmark-printer` already depends on `typedmark-formatter`,
+  calling `format_source` at the end of `document_to_tm_with_config`).
 - **`typedmark-printer`**: serializes a `Document` back to `.tm` source
   text (`document_to_tm`/`document_to_tm_with_config`), no span info
   required -- unlike `typedmark-formatter`, which re-formats *existing*
   `.tm` text losslessly using spans, this is for documents that never
   had `.tm` source to begin with (built from Markdown, or edited purely
-  at the AST level). Also owns `PrinterConfig` (loaded from a
-  `default.config.tm`/`typedmark.config.tm`) and everything it drives:
-  meta format (yaml/json/toml), wikilink/link spacing, callout/list
-  style, and `@meta` id auto-generation. Split out of `typedmark-tui`'s
-  `engine::printer` module so it's usable outside the TUI.
+  at the AST level). Uses `typedmark-style` for `@meta` rendering and
+  all `Value` rendering; keeps the element-tree-recursive rendering
+  (`render_block`/`render_heading`/`render_list*`/`render_inlines`/the
+  rest of `render_element`) that's specific to rebuilding a whole
+  document. Also owns `@meta` id auto-generation
+  (`ensure_document_id_with_config`), which mutates the AST using
+  `typedmark-config`'s `PrinterConfig`/`FieldConfig` rules and
+  `typedmark-field-utils`'s pure generate/validate functions. Split out
+  of `typedmark-tui`'s `engine::printer` module so it's usable outside
+  the TUI.
 - **`typedmark-indexer`**: directory scanning and read-only `.tm`/`.tmt`
   metadata cataloging (`collect_tm_files`, `extract_metadata`,
   `is_path_ignored`). Split out of `typedmark-tui`'s
   `engine::batch_meta` module (`is_path_ignored` had been misplaced in
   `engine::printer` -- it's a file filter, not a print concern) for the
   same reason as `typedmark-printer`: TUI-independent reuse (a future
-  search/browse feature, e.g.). Depends on `typedmark-printer` for
+  search/browse feature, e.g.). Depends on `typedmark-config` for
   `PrinterConfig`/`find_config_file` (the config-auto-discovering
-  `collect_tm_files` wrapper needs them); `apps/typedmark`'s `export`
-  subcommand uses it directly.
+  `collect_tm_files` wrapper needs them), not on `typedmark-printer`
+  itself; `apps/typedmark`'s `export` subcommand uses it directly.
+- **`typedmark-edit`**: editing operations over a directory of `.tm`
+  files -- batch `@meta`/`@config` key updates (`batch_meta`) and
+  AST-aware structural search & replace: rename tag, rename key, replace
+  value (`structural`). Both follow the same shape: scan (via
+  `typedmark-indexer`, config via `typedmark-config`) -> mutate the
+  parsed `Document` in place (via `typedmark-walker`'s mutable walk) ->
+  re-serialize (via `typedmark-printer`) -> `save()` writes changed
+  files to disk. Split out of `typedmark-tui`'s
+  `engine::batch_meta`/`engine::structural` modules, same
+  TUI-independent-reuse motivation as `typedmark-printer`/
+  `typedmark-indexer`.
 - **`typedmark-tui`**: the interactive TUI workbench (ratatui/crossterm) for
   Markdown migration, batch metadata editing, and structural AST refactoring
   across a directory of `.tm` files. A standalone library crate (single
   entry point `run_tui(dir_path, config_path)`) so it's independently
   buildable/testable rather than living inside the `apps/typedmark` bin;
-  `apps/typedmark`'s `tui` subcommand just calls into it. Built on
-  `typedmark-printer`/`typedmark-indexer` for serialization/scanning;
-  what's left in `engine::batch_meta`/`engine::structural` is the
-  *editing* half (renaming tags/keys, replacing values, updating `@meta`
-  keys) -- a future `typedmark-edit` extraction candidate, not done yet.
+  `apps/typedmark`'s `tui` subcommand just calls into it. All the AST-level
+  work (serialization, scanning, editing) now lives in `typedmark-printer`/
+  `typedmark-indexer`/`typedmark-edit`; what's left in this crate's own
+  `engine` module is just `migration` (the Markdown-vault-migration
+  workflow -- a specific workflow feature rather than a generic library
+  primitive, so left here instead of extracted) plus the ratatui UI
+  layer (`app`/`ui`) that ties it all together.
 - **`typedmark-walker`**: generic recursive traversal of a `Document`'s
   tree (`Heading`/`ListItem`/`Element`, including ones nested inside an
   element's `[content]` and `ElementValue::Children`), depending on

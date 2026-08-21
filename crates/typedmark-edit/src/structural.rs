@@ -36,9 +36,9 @@ pub struct StructuralEngine;
 impl StructuralEngine {
     /// Perform structural query search across `.tm` files.
     pub fn search(dir: &Path, query: &StructuralQuery) -> Vec<StructuralMatch> {
-        let (config, _, config_root) = typedmark_printer::find_config_file(dir).unwrap_or_else(|| {
+        let (config, _, config_root) = typedmark_config::find_config_file(dir).unwrap_or_else(|| {
             (
-                typedmark_printer::PrinterConfig::default(),
+                typedmark_config::PrinterConfig::default(),
                 dir.to_path_buf(),
                 dir.to_path_buf(),
             )
@@ -49,7 +49,7 @@ impl StructuralEngine {
     pub fn search_with_config(
         dir: &Path,
         query: &StructuralQuery,
-        config: &typedmark_printer::PrinterConfig,
+        config: &typedmark_config::PrinterConfig,
         config_root: &Path,
     ) -> Vec<StructuralMatch> {
         let mut matches = Vec::new();
@@ -280,4 +280,78 @@ where
     F: FnMut(&mut Element),
 {
     super::batch_meta::walk_elements_mut(doc, f);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_structural_search_and_rename_key() {
+        let src = "@meta{author: Charlie}\n\n<note>[Check this]\n";
+        let item = StructuralMatch {
+            path: "test.tm".into(),
+            original_src: src.to_string(),
+            modified_src: src.to_string(),
+            match_count: 1,
+            selected: true,
+        };
+
+        let mut matches = vec![item];
+        StructuralEngine::apply_action(
+            &mut matches,
+            &StructuralAction::RenameKey {
+                old_key: "author".into(),
+                new_key: "creator".into(),
+            },
+        );
+
+        assert!(matches[0].modified_src.contains("creator: Charlie"));
+    }
+
+    #[test]
+    fn test_structural_rename_tag() {
+        let src = "<note>[Pay attention]\n";
+        let item = StructuralMatch {
+            path: "test.tm".into(),
+            original_src: src.to_string(),
+            modified_src: src.to_string(),
+            match_count: 1,
+            selected: true,
+        };
+
+        let mut matches = vec![item];
+        StructuralEngine::apply_action(
+            &mut matches,
+            &StructuralAction::RenameTag {
+                from: "note".into(),
+                to: "caution".into(),
+            },
+        );
+
+        assert!(matches[0].modified_src.contains("<caution>[Pay attention]"));
+    }
+
+    #[test]
+    fn test_structural_replace_value() {
+        let src = "@meta{author: Charlie}\n\n<note>[Check this]\n";
+        let item = StructuralMatch {
+            path: "test.tm".into(),
+            original_src: src.to_string(),
+            modified_src: src.to_string(),
+            match_count: 1,
+            selected: true,
+        };
+
+        let mut matches = vec![item];
+        StructuralEngine::apply_action(
+            &mut matches,
+            &StructuralAction::ReplaceValue {
+                key: "author".into(),
+                new_value: "Alice".into(),
+            },
+        );
+
+        assert!(matches[0].modified_src.contains("author: Alice"));
+    }
 }
