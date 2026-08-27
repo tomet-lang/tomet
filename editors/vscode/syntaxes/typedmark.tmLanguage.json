@@ -294,7 +294,7 @@
 				{ "include": "#interpolation" },
 				{ "include": "#groups" },
 				{
-					"match": "[^,()\\[\\]{}\\n]+",
+					"match": "[^,()\\[\\]{}\\n\"\\s][^,()\\[\\]{}\\n\"]*",
 					"name": "string.unquoted.plain.typedmark"
 				}
 			]

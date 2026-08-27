@@ -8,8 +8,9 @@ import {
 } from "vscode-languageclient/node";
 
 let client: LanguageClient | undefined;
+let activeExtensionPath: string | undefined;
 
-function resolveServerPath(configuredPath: string): string {
+function resolveServerPath(configuredPath: string, extensionPath: string): string {
 	const workspaceFolders = vscode.workspace.workspaceFolders;
 	const workspaceFolder = workspaceFolders && workspaceFolders.length > 0
 		? workspaceFolders[0].uri.fsPath
@@ -43,10 +44,27 @@ function resolveServerPath(configuredPath: string): string {
 		if (fs.existsSync(releasePath)) {
 			return releasePath;
 		}
-		const parentDebugPath = path.resolve(workspaceFolder, "..", "..", "..", "target", "debug", "typedmark-lsp");
+		const parentDebugPath = path.resolve(workspaceFolder, "..", "..", "target", "debug", "typedmark-lsp");
 		if (fs.existsSync(parentDebugPath)) {
 			return parentDebugPath;
 		}
+		const parentReleasePath = path.resolve(workspaceFolder, "..", "..", "target", "release", "typedmark-lsp");
+		if (fs.existsSync(parentReleasePath)) {
+			return parentReleasePath;
+		}
+	}
+
+	// 5. Fallback: locate the repo checkout this extension itself was loaded from
+	// (handles running via F5 with no folder open in the Extension Development Host).
+	// extensionPath is .../editors/vscode; the repo root is two levels up.
+	const repoRoot = path.resolve(extensionPath, "..", "..");
+	const extDebugPath = path.join(repoRoot, "target", "debug", "typedmark-lsp");
+	if (fs.existsSync(extDebugPath)) {
+		return extDebugPath;
+	}
+	const extReleasePath = path.join(repoRoot, "target", "release", "typedmark-lsp");
+	if (fs.existsSync(extReleasePath)) {
+		return extReleasePath;
 	}
 
 	return resolved;
@@ -82,6 +100,7 @@ function updateDecorations(editor: vscode.TextEditor | undefined): void {
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+	activeExtensionPath = context.extensionPath;
 	context.subscriptions.push(codeSpanDecorationType);
 
 	vscode.window.onDidChangeActiveTextEditor((editor) => {
@@ -114,7 +133,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 async function startClient(): Promise<void> {
 	const config = vscode.workspace.getConfiguration("typedmark");
 	const rawCommand = config.get<string>("serverPath", "typedmark-lsp");
-	const command = resolveServerPath(rawCommand);
+	const command = resolveServerPath(rawCommand, activeExtensionPath as string);
 
 	const serverOptions: ServerOptions = {
 		command,

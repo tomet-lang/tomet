@@ -470,6 +470,25 @@ module.exports = grammar({
 		// override a *strictly* longer competing token (precedence only
 		// breaks ties between equal-length matches). See `scalar`'s own
 		// comment for the matching half of this fix.
+		//
+		// The value after `:` is optional -- an embedded YAML body (see
+		// `embedded_format.rs`) routinely has bare `key:` entries (YAML's
+		// null shorthand, e.g. `flags:`/`rating:` in real frontmatter
+		// like `@meta(format:yaml){...}`), and with a *mandatory* value
+		// this rule flatly fails to match at all there -- unlike every
+		// other "known gap" in this grammar's module doc, that one
+		// derails into an `ERROR` that swallows the rest of the
+		// enclosing block (and beyond: without a closing `value_group`,
+		// later `{`/`}`/`@name` tokens keep getting reinterpreted from a
+		// completely wrong parser state), not just a narrow shape
+		// mismatch local to the one entry. The real native
+		// (non-`format:`) map grammar (`value.rs::parse_entry_value`)
+		// does *not* accept an empty value the same way -- this is a
+		// deliberate over-acceptance for a highlighting-only grammar:
+		// `apps/lsp` (backed by the real parser) is what surfaces actual
+		// `.tm` mistakes, so silently tolerating a shape only valid in
+		// embedded YAML costs nothing here, whereas erroring on valid
+		// YAML costs the entire surrounding block's highlighting.
 		map_entry: ($) =>
 			seq(
 				field(
@@ -477,7 +496,7 @@ module.exports = grammar({
 					alias(token(prec(1, /[A-Za-z_][A-Za-z0-9_.-]*/)), $.identifier),
 				),
 				choice(
-					seq(":", field("value", $._entry_value)),
+					seq(":", optional(field("value", $._entry_value))),
 					field("value", $.braced_map),
 				),
 			),
@@ -518,7 +537,25 @@ module.exports = grammar({
 		// items), where colons are common and never mean "this starts a
 		// nested key". Aliased to the same visible `scalar` node type as
 		// the top-level one below.
-		_value_scalar: ($) => alias(/[^,()\[\]{}\n\r]+/, $.scalar),
+		//
+		// The *first* character additionally excludes space/tab (the tail
+		// doesn't, so multi-word values like `{hello world}` keep working)
+		// -- otherwise this regex happily matches a lone leading space as a
+		// complete one-character token in its own right (nothing here stops
+		// it, since inline whitespace was never excluded from the class),
+		// and tree-sitter's lexer takes that real, complete token match
+		// over skipping the space as `extras` first. That's exactly the
+		// class of bug `scanner.c`'s `SCALAR`/`LIST_MARKER_GAP` externals
+		// already exist to route around (see that file's module doc) --
+		// `_value_scalar` was never migrated and still had the plain-regex
+		// version of the same flaw. Concretely, `key: [a, b]` (a colon,
+		// then a space, then a value that starts with `[`) let this regex
+		// swallow just the space as a bogus scalar `key`'s value, leaving
+		// the real `[a, b]` to be reparsed from scratch as an unrelated,
+		// orphaned top-level `value`/`seq` -- see this crate's module doc
+		// for the `ERROR` shape that produced.
+		_value_scalar: ($) =>
+			alias(/[^,()\[\]{}\n\r \t][^,()\[\]{}\n\r]*/, $.scalar),
 		// `value`'s own top-level bare-scalar fallback (no `key:` found) --
 		// deliberately colon-*excluded* (matching the old regex this
 		// replaced), so a bare, keyless scalar at this position that itself

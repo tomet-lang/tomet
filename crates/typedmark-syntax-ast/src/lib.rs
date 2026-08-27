@@ -209,13 +209,6 @@ pub struct Element {
     pub sigil: Sigil,
     pub args: Option<Value>,
     pub content: Option<Vec<Inline>>,
-    /// Nested block-level content (e.g. a list item's sub-list or indented
-    /// blocks). A block-level counterpart to `content` (which is
-    /// inline-only): kept as its own field, symmetric with `content`,
-    /// rather than folded into `value`, so consumers keep a
-    /// compiler-checked guarantee of which shape they're holding instead
-    /// of matching on an `ElementValue` variant that could in principle be
-    /// paired with the wrong key.
     pub children: Option<Vec<Block>>,
     pub value: Option<ElementValue>,
     pub span: Span,

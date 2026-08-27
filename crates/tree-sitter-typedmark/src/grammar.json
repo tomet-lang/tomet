@@ -1351,12 +1351,20 @@
                   "value": ":"
                 },
                 {
-                  "type": "FIELD",
-                  "name": "value",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "_entry_value"
-                  }
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "FIELD",
+                      "name": "value",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "_entry_value"
+                      }
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
                 }
               ]
             },
@@ -1553,7 +1561,7 @@
       "type": "ALIAS",
       "content": {
         "type": "PATTERN",
-        "value": "[^,()\\[\\]{}\\n\\r]+"
+        "value": "[^,()\\[\\]{}\\n\\r \\t][^,()\\[\\]{}\\n\\r]*"
       },
       "named": true,
       "value": "scalar"

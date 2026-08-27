@@ -39,7 +39,8 @@
 		],
 		"configurationDefaults": {
 			"[typedmark]": {
-				"editor.wordWrap": "on"
+				"editor.wordWrap": "on",
+				"editor.formatOnSave": true
 			}
 		},
 		"commands": [

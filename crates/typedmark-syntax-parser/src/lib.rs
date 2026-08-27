@@ -193,6 +193,111 @@ mod tests {
     }
 
     #[test]
+    fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
+        // `element.rs::parse_element`'s main loop always lets an element
+        // claim an adjacent *bare*, colon-less `{value}` group as its
+        // own -- just whitespace/one blank line, no colon needed --
+        // *before* the list item's own trailing-attrs guess
+        // (`list.rs::peek_trailing_attrs`) ever gets a say. Previously
+        // (before `allow_colon_connect` existed) this shape failed
+        // outright with "expected '{'" regardless of whether a colon was
+        // present: the attrs guess found the line's one `{`, assumed it
+        // belonged to the item, told inline parsing to stop right before
+        // it, but the element inside kept going and swallowed straight
+        // past that point anyway, leaving nothing at the assumed
+        // position to re-parse as the item's own attrs.
+        //
+        // Now the two shapes mean different things, on purpose (see
+        // `element::parse_element`'s `allow_colon_connect` doc comment,
+        // and `docs/ja/specifications/syntax.tm`'s `##[ コネクト ]`,
+        // which had flagged exactly this as an unimplemented idea): a
+        // *bare* `{...}` still always belongs to the element (matches
+        // how the same input already behaves with no list item involved
+        // at all), but a *colon-prefixed* `:{...}` is reserved for the
+        // item itself, specifically so `id:breakfast` here can be the
+        // item's own metadata rather than forced onto `@link`.
+        let bare = "- @link(ref:x) {id:breakfast}\n";
+        let doc = parse_document(bare).unwrap_or_else(|e| panic!("{bare:?} failed: {e}"));
+        match &doc.blocks[0] {
+            Block::Element(list) => {
+                let items = list_items(list);
+                assert_eq!(items.len(), 1, "{bare:?}");
+                assert_eq!(item_attrs(&items[0]), None, "{bare:?}");
+                match items[0].content.as_deref() {
+                    Some([Inline::Element(link)]) => {
+                        assert_eq!(link.sigil, Sigil::At(Some("link".into())), "{bare:?}");
+                        assert_eq!(
+                            link.value,
+                            Some(ElementValue::Data(Value::Map(vec![(
+                                "id".into(),
+                                Value::String("breakfast".into())
+                            )]))),
+                            "{bare:?}"
+                        );
+                    }
+                    other => panic!("{bare:?}: expected a single @link element, got {other:?}"),
+                }
+            }
+            other => panic!("{bare:?}: expected list, got {other:?}"),
+        }
+
+        for src in [
+            "- @link(ref:x) :{id:breakfast}\n",
+            "- @link(ref:@other) :{id:breakfast}\n",
+        ] {
+            let doc = parse_document(src).unwrap_or_else(|e| panic!("{src:?} failed: {e}"));
+            match &doc.blocks[0] {
+                Block::Element(list) => {
+                    let items = list_items(list);
+                    assert_eq!(items.len(), 1, "{src:?}");
+                    assert_eq!(
+                        item_attrs(&items[0]),
+                        Some(Value::Map(vec![(
+                            "id".into(),
+                            Value::String("breakfast".into())
+                        )])),
+                        "{src:?}"
+                    );
+                    // The connector (` :`) left no trace in the item's
+                    // own content -- just the `@link` element, nothing
+                    // else.
+                    match items[0].content.as_deref() {
+                        Some([Inline::Element(link)]) => {
+                            assert_eq!(link.sigil, Sigil::At(Some("link".into())), "{src:?}");
+                            assert_eq!(link.value, None, "{src:?}");
+                        }
+                        other => panic!("{src:?}: expected a single @link element, got {other:?}"),
+                    }
+                }
+                other => panic!("{src:?}: expected list, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn list_item_colon_connect_supports_an_empty_braced_value() {
+        // The `docs/ja/specifications/syntax.tm` `##[ コネクト ]` example
+        // this feature implements (`- () xxxxxx :{}`) uses an *empty*
+        // `{}` for its item-level attrs -- `heading::parse_braced_value`
+        // (shared by heading and list-item attrs) used to have no
+        // special case for that, unlike `parse_paren_value`/
+        // `element.rs::parse_value_group` right next to it, and errored
+        // ("expected a value") instead of producing an empty map,
+        // silently falling through to treating the whole line as
+        // ordinary text with no attrs at all.
+        let doc = parse_document("- () xxxxxx :{}\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(list) => {
+                let items = list_items(list);
+                assert_eq!(items.len(), 1);
+                assert_eq!(items[0].content, Some(vec![Inline::Text("xxxxxx".into())]));
+                assert_eq!(item_attrs(&items[0]), Some(Value::Map(vec![])));
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn list_marker_supports_explicit_key_value() {
         let doc = parse_document("- (color: red, priority: high) content\n").unwrap();
         match &doc.blocks[0] {

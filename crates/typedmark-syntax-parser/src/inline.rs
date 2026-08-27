@@ -20,10 +20,18 @@ pub(crate) enum Stop {
     Delim(&'static str),
 }
 
+/// `allow_colon_connect` is threaded straight through to every element
+/// parsed here (including recursively, inside `**em**`/`__strong__`/
+/// `==mark==` spans) -- see `element::parse_element`'s own doc comment
+/// for what it gates and why. Only `list.rs::parse_list_internal`'s two
+/// top-level calls (a list item's own inline content) pass `false`;
+/// every other caller passes `true`, unchanged from before this
+/// parameter existed.
 pub(crate) fn parse_inline_seq(
     cur: &mut Cursor,
     stop: Stop,
     default_format: Option<EmbeddedFormat>,
+    allow_colon_connect: bool,
 ) -> Result<Vec<Inline>> {
     let mut items = Vec::new();
     let mut text_start = cur.pos();
@@ -139,13 +147,21 @@ pub(crate) fn parse_inline_seq(
         }
         if cur.peek() == Some('<') && is_type_element_start(cur) {
             flush_text(&mut items, cur, &mut text_start);
-            items.push(Inline::Element(parse_element(cur, default_format)?));
+            items.push(Inline::Element(parse_element(
+                cur,
+                default_format,
+                allow_colon_connect,
+            )?));
             text_start = cur.pos();
             continue;
         }
         if cur.peek() == Some('@') && is_at_element_start(cur) {
             flush_text(&mut items, cur, &mut text_start);
-            items.push(Inline::Element(parse_element(cur, default_format)?));
+            items.push(Inline::Element(parse_element(
+                cur,
+                default_format,
+                allow_colon_connect,
+            )?));
             text_start = cur.pos();
             continue;
         }
@@ -157,7 +173,7 @@ pub(crate) fn parse_inline_seq(
         }
         if matches!(cur.peek(), Some('*') | Some('_') | Some('=')) {
             let before = cur.pos();
-            if let Some(el) = try_delimited(cur, default_format)? {
+            if let Some(el) = try_delimited(cur, default_format, allow_colon_connect)? {
                 flush_text_upto(&mut items, cur, &mut text_start, before);
                 items.push(Inline::Element(el));
                 text_start = cur.pos();
@@ -217,9 +233,11 @@ fn is_boundary(c: Option<char>) -> bool {
 fn try_delimited(
     cur: &mut Cursor,
     default_format: Option<EmbeddedFormat>,
+    allow_colon_connect: bool,
 ) -> Result<Option<Element>> {
     for (delim, kind) in DELIMITERS {
-        if let Some(el) = try_one_delimited(cur, delim, kind, default_format)? {
+        if let Some(el) = try_one_delimited(cur, delim, kind, default_format, allow_colon_connect)?
+        {
             return Ok(Some(el));
         }
     }
@@ -231,6 +249,7 @@ fn try_one_delimited(
     delim: &'static str,
     kind: &str,
     default_format: Option<EmbeddedFormat>,
+    allow_colon_connect: bool,
 ) -> Result<Option<Element>> {
     let start_pos = cur.pos();
     if !cur.starts_with(delim) {
@@ -264,7 +283,7 @@ fn try_one_delimited(
     }
 
     cur.set_pos(open.pos());
-    let inner = parse_inline_seq(cur, Stop::Delim(delim), default_format)?;
+    let inner = parse_inline_seq(cur, Stop::Delim(delim), default_format, allow_colon_connect)?;
     if !cur.eat_str(delim) {
         return Err(err(cur, cur.pos(), format!("expected '{delim}'")));
     }

@@ -19,7 +19,7 @@ pub(crate) fn parse_heading(
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '[' after '#'"));
     }
-    let content = parse_inline_seq(cur, Stop::Bracket(']'), default_format)?;
+    let content = parse_inline_seq(cur, Stop::Bracket(']'), default_format, true)?;
     if !cur.eat_str("]") {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }
@@ -61,7 +61,22 @@ pub(crate) fn parse_braced_value(cur: &mut Cursor) -> Result<Value> {
     if !cur.eat_str("{") {
         return Err(err(cur, cur.pos(), "expected '{'"));
     }
-    let v = parse_value_at(cur)?;
+    skip_ws_newlines_and_comments(cur);
+    // `parse_value_at`'s own fallback (`parse_map_body_or_scalar`)
+    // deliberately errors ("expected a value") on an immediately-
+    // closing bracket, since *that* function is also used for sequence
+    // items and single-value positions where an empty body is never
+    // valid. A whole `{}`/`()` *group*, though, is: `element.rs`'s own
+    // `parse_value_group` and `parse_paren_value` right below both
+    // special-case it into an empty `Value::Map` before ever calling
+    // `parse_value_at` -- this mirrors that (this function's callers,
+    // heading/list-item attrs, are exactly that same "whole group"
+    // position, not a sequence item).
+    let v = if cur.peek() == Some('}') {
+        Value::Map(Vec::new())
+    } else {
+        parse_value_at(cur)?
+    };
     skip_ws_newlines_and_comments(cur);
     if !cur.eat_str("}") {
         return Err(err(cur, cur.pos(), "expected '}'"));
@@ -121,7 +136,7 @@ pub(crate) fn parse_titled_thematic_break(
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '['"));
     }
-    let title = parse_inline_seq(cur, Stop::Bracket(']'), default_format)?;
+    let title = parse_inline_seq(cur, Stop::Bracket(']'), default_format, true)?;
     if !cur.eat_str("]") {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }
