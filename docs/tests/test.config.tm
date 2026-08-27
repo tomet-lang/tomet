@@ -62,9 +62,6 @@
         "always_newline": true
       }
     },
-    "wikilink": {
-      "no_space": "true"
-    },
     "link": {
       "no_space": "true"
     },

@@ -12,7 +12,7 @@ TypedMark maintains a clear division of responsibility between editor integratio
 ## Structure
 
 - `grammar.js`: Hand-maintained Tree-sitter grammar specification.
-- `src/scanner.c`: Hand-written external C scanner for token lookaheads (list markers, scalar tokens, checkboxes).
+- `src/scanner.c`: Hand-written external C scanner for token lookaheads (list markers, scalar tokens).
 - `queries/`: Tree-sitter query definitions (`highlights.scm`, `indents.scm`, `brackets.scm`).
 
 ## Testing

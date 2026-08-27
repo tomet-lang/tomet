@@ -59,6 +59,21 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_id_between_heading_and_element_is_reported() {
+        // A heading's `{id:...}` lives in `Element.value`, not
+        // `Element.args` -- regression coverage for `Node::attrs()`'s
+        // args+value merge (`typedmark-doc-walker`'s `element_attrs_view`)
+        // making it visible here at all.
+        let doc = parse("#[ one ]{id:a}\n\n<task>(id:a)\n");
+        let errors = validate_document(&doc);
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(
+            &errors[0],
+            ValidationError::DuplicateId { id, .. } if id == "a"
+        ));
+    }
+
+    #[test]
     fn duplicate_id_nested_inline_is_reported() {
         // The second `id:a` is on an element embedded inline inside a
         // paragraph's content, not a top-level block -- exercises the

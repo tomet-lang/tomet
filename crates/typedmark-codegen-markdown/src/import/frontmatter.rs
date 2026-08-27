@@ -70,10 +70,7 @@ fn yaml_to_value(v: serde_yaml::Value) -> Value {
                 } else {
                     inner.trim()
                 };
-                Value::Map(vec![(
-                    "wiki".to_string(),
-                    Value::String(target.to_string()),
-                )])
+                Value::Map(vec![("ref".to_string(), Value::String(target.to_string()))])
             } else {
                 Value::String(s)
             }
@@ -153,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn frontmatter_wikilinks_convert_to_wiki_maps() {
+    fn frontmatter_wikilinks_convert_to_ref_maps() {
         let src = "---\ntopics:\n  - \"[[@Templater]]\"\n  - \"[[@QuickAdd]]\"\n---\n\n# Title\n";
         let doc = from_markdown(src);
         assert_eq!(doc.blocks.len(), 2);
@@ -166,11 +163,11 @@ mod tests {
                 "topics".to_string(),
                 Value::Seq(vec![
                     Value::Map(vec![(
-                        "wiki".to_string(),
+                        "ref".to_string(),
                         Value::String("@Templater".to_string())
                     )]),
                     Value::Map(vec![(
-                        "wiki".to_string(),
+                        "ref".to_string(),
                         Value::String("@QuickAdd".to_string())
                     )]),
                 ])

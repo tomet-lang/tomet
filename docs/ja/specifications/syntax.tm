@@ -9,8 +9,14 @@
 <T>()[]{}
 #[]{}
 ##[]{}
-- (marker) content    // marker は key:value の args ではなく () や [] で囲んだ自由文字列
--. (marker) content
+- (marker) content    // () は <T>(args) と同じ Value 文法。key:value も、
+-. (marker) content   // positional(builtinキー "marker")によるキー省略も可能。
+                      // 例: - (12:01) ... は {marker: "12:01"} に正規化される
+                      // (typedmark-semantics::positional)。コロンを含む値は
+                      // ("12:01") のように quote するとkey:value誤読を避けられる。
+                      // - [x]/- [ ] のチェックボックス記法は廃止された。[] は
+                      // リストマーカー直後で特別な意味を持たず、単なる地の文
+                      // として扱われる。
 ---[]---
 ${xxx}                // 実装済み: `${id}` / `${a.b}` / `${sum(a, b)}` の構文解析のみ。
                       // 参照解決/関数評価はtypedmark-resolve/typedmark-computeの未実装分。
@@ -46,7 +52,7 @@ ${xxx}                // 実装済み: `${id}` / `${a.b}` / `${sum(a, b)}` の�
 ##[ コネクト ]
 
 // 未実装のアイデア。`- () xxxxxx :{}` 自体は構文としては通るが、
-// `:{}` に特別な意味は一切なく、単に marker が空文字でその後ろが
+// `:{}` に特別な意味は一切なく、単に marker が空map({})でその後ろが
 // ただの地の文になっているだけ。
 
 ```tm

@@ -3,17 +3,19 @@
 //! stack, one frame per currently-open tag.
 //!
 //! Constructs that map cleanly reuse `typedmark_ast` shapes that already
-//! exist for TypedMark's own native shorthand (`em`/`strong`/`hr`, flat
-//! `List`). Constructs with no native equivalent (fenced/indented code,
-//! block quotes) go through the generic `<T>` element escape hatch
-//! (`pre`, `blockquote`) documented in `docs/commonmark-support.md`.
+//! exist for TypedMark's own native shorthand (`em`/`strong`/`hr`, list
+//! elements -- see `Element::list`/`Element::list_item`). Constructs with
+//! no native equivalent (fenced/indented code, block quotes) go through
+//! the generic `<T>` element escape hatch (`pre`, `blockquote`)
+//! documented in `docs/commonmark-support.md`.
 //!
-//! Two things are structurally lossy on import, both documented there:
-//! nested lists are flattened into the enclosing list as sibling items
-//! (`ListItem` has no slot for children), and block quotes containing
-//! more than one block get their content joined into a single inline
-//! run (`Element::content` is `Vec<Inline>`, not `Vec<Block>`). HTML blocks
-//! and inline HTML are dropped; hard breaks collapse to a space.
+//! One thing is structurally lossy on import, documented there: a block
+//! quote containing more than one block gets its content joined into a
+//! single inline run (`Element::content` is `Vec<Inline>`, not
+//! `Vec<Block>`), so a list inside a quote has its items' content
+//! flattened into that run too. A nested list under a plain (non-quote)
+//! list item is not lossy -- it's kept as that item's own `children`. HTML
+//! blocks and inline HTML are dropped; hard breaks collapse to a space.
 //!
 //! YAML frontmatter extraction lives in `frontmatter`; `[[wiki]]`/bare-URL
 //! detection and sigil-escaping (both post-processing passes over
@@ -22,9 +24,8 @@
 //! genuinely one cohesive piece -- frame push/pop per event).
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
-use typedmark_ast::{
-    Block, Document, Element, Heading, Inline, List, ListItem, Paragraph, Sigil, Span, Text, Value,
-};
+use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Paragraph, Sigil, Span, Text, Value};
+use typedmark_semantics::{ElementKind, classify, list_ordered};
 
 mod frontmatter;
 mod wikilink;
@@ -44,11 +45,11 @@ enum Frame {
     Item {
         content: Vec<Inline>,
         children: Vec<Block>,
-        marker: Option<String>,
+        marker: Option<Value>,
     },
     List {
         ordered: bool,
-        items: Vec<ListItem>,
+        items: Vec<Element>,
     },
     Emphasis(Vec<Inline>),
     Strong(Vec<Inline>),
@@ -111,14 +112,15 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
         match event {
             Event::Start(tag) => stack.push(start_frame(tag)),
             Event::End(tag_end) => end_frame(&mut stack, tag_end, options.adjust_table_width),
-            Event::TaskListMarker(checked) => {
-                if let Some(Frame::Item { marker, .. }) = stack.last_mut() {
-                    *marker = Some(if checked {
-                        "x".to_string()
-                    } else {
-                        " ".to_string()
-                    });
-                }
+            Event::TaskListMarker(is_checked) => {
+                // TypedMark has no checkbox construct anymore -- fall back
+                // to the same "not a recognized construct, keep it as
+                // literal text" treatment `[...]`/unrecognized brackets get
+                // everywhere else in this crate and in `typedmark-parser`,
+                // rather than silently dropping the marker (this importer
+                // is also what drives real-world Markdown migration).
+                let text = if is_checked { "[x] " } else { "[ ] " };
+                push_inline(&mut stack, Inline::Text(Text::new(text, Span::dummy())));
             }
             Event::Text(text) => match stack.last_mut() {
                 Some(Frame::CodeBlock { text: buf, .. }) => buf.push_str(&text),
@@ -222,7 +224,16 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
         ),
         (Frame::Heading(level, inlines), TagEnd::Heading(_)) => push_block(
             stack,
-            Block::Heading(Heading::new(level, inlines, None, Span::dummy())),
+            Block::Element(Element {
+                sigil: Sigil::At(Some("heading".to_string())),
+                // Imported headings never carry `id`/`cssclass` -- CommonMark
+                // has nothing to import them from.
+                args: Some(Value::Int(level as i64)),
+                content: Some(inlines),
+                children: None,
+                value: None,
+                span: Span::dummy(),
+            }),
         ),
         (Frame::BlockQuote(mut content), TagEnd::BlockQuote(_)) => {
             let mut is_callout = false;
@@ -285,6 +296,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
                     sigil: Sigil::Type("callout".to_string()),
                     args: Some(args),
                     content: Some(content),
+                    children: None,
                     value: None,
                     span: Span::dummy(),
                 };
@@ -294,6 +306,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
                     sigil: Sigil::Type("blockquote".to_string()),
                     args: None,
                     content: Some(content),
+                    children: None,
                     value: None,
                     span: Span::dummy(),
                 };
@@ -313,13 +326,14 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
                 sigil: Sigil::Type("codeblock".to_string()),
                 args,
                 content: Some(vec![Inline::Text(Text::new(text, Span::dummy()))]),
+                children: None,
                 value: None,
                 span: Span::dummy(),
             };
             push_block(stack, Block::Element(el));
         }
         (Frame::List { ordered, items }, TagEnd::List(_)) => {
-            push_block(stack, Block::List(List::new(ordered, items, Span::dummy())))
+            push_block(stack, Block::Element(Element::list(ordered, items, Span::dummy())))
         }
         (
             Frame::Item {
@@ -330,15 +344,20 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
             TagEnd::Item,
         ) => match stack.last_mut() {
             Some(Frame::List { items, .. }) => {
+                // Not a real CommonMark construct -- sniff leading `(...)`
+                // text for TypedMark's own marker shorthand. No grammar
+                // available here (this crate deliberately depends on
+                // `typedmark-ast` only, not `typedmark-parser`), so its
+                // inner text becomes a bare string marker rather than a
+                // fully parsed `Value`.
                 if marker.is_none() {
                     if let Some(Inline::Text(t)) = content.first_mut() {
                         let s = t.value.trim_start();
-                        if s.starts_with('[') || s.starts_with('(') {
-                            let close = if s.starts_with('[') { ']' } else { ')' };
-                            if let Some(close_idx) = s.find(close) {
-                                if close_idx > 1 && s[close_idx..].starts_with(&format!("{close} "))
-                                {
-                                    marker = Some(s[1..close_idx].to_string());
+                        if s.starts_with('(') {
+                            if let Some(close_idx) = s.find(')') {
+                                if close_idx >= 1 && s[close_idx..].starts_with(") ") {
+                                    let inner = &s[1..close_idx];
+                                    marker = Some(Value::String(inner.to_string()));
                                     let remainder = s[close_idx + 2..].to_string();
                                     t.value = remainder;
                                 }
@@ -346,7 +365,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
                         }
                     }
                 }
-                items.push(ListItem::with_children(
+                items.push(Element::list_item(
                     content,
                     marker,
                     None,
@@ -363,22 +382,33 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
             push_inline(stack, wrap_inline("strong", inlines));
         }
         (Frame::Link { dest, inlines }, TagEnd::Link) => {
+            // `target_scheme` (downstream, in `typedmark-semantics`)
+            // classifies `dest` by its own shape (`scheme://...` -> url,
+            // otherwise -> file) once this is rendered/queried -- no key
+            // choice needed here, unlike the old per-kind key scheme.
             let el = Element {
-                sigil: Sigil::At(None),
-                args: Some(Value::Map(vec![("url".to_string(), Value::String(dest))])),
+                sigil: Sigil::At(Some("link".to_string())),
+                args: Some(Value::Map(vec![(
+                    "target".to_string(),
+                    Value::String(dest),
+                )])),
                 content: Some(inlines),
+                children: None,
                 value: None,
                 span: Span::dummy(),
             };
             push_inline(stack, Inline::Element(el));
         }
         (Frame::Image { dest, alt }, TagEnd::Image) => {
-            let key = if dest.contains("://") { "url" } else { "path" };
             let content = if alt.is_empty() { None } else { Some(alt) };
             let el = Element {
                 sigil: Sigil::Type("embed".to_string()),
-                args: Some(Value::Map(vec![(key.to_string(), Value::String(dest))])),
+                args: Some(Value::Map(vec![(
+                    "target".to_string(),
+                    Value::String(dest),
+                )])),
                 content,
+                children: None,
                 value: None,
                 span: Span::dummy(),
             };
@@ -509,6 +539,7 @@ fn wrap_inline(tag: &str, content: Vec<Inline>) -> Inline {
         sigil: Sigil::Type(tag.to_string()),
         args: None,
         content: Some(content),
+        children: None,
         value: None,
         span: Span::dummy(),
     })
@@ -561,8 +592,9 @@ fn push_block(stack: &mut [Frame], block: Block) {
         Some(Frame::Item {
             content, children, ..
         }) => {
-            if let Block::List(list) = block {
-                children.push(Block::List(list));
+            let is_list = matches!(&block, Block::Element(el) if list_ordered(el).is_some());
+            if is_list {
+                children.push(block);
             } else {
                 merge_block_into(content, block);
             }
@@ -574,17 +606,28 @@ fn push_block(stack: &mut [Frame], block: Block) {
 fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
     match block {
         Block::Paragraph(p) => extend_spaced(content, p.content),
-        Block::Heading(h) => extend_spaced(content, h.content),
+        // A heading merged into flattened blockquote/item content splices
+        // its title text directly in, same as a paragraph -- not wrapped
+        // as a nested `Inline::Element`, which is what the generic
+        // `Block::Element` arm below would do.
+        Block::Element(el) if classify(&el) == ElementKind::Heading => {
+            extend_spaced(content, el.content.unwrap_or_default())
+        }
+        // A list merged into flattened blockquote content (blockquotes
+        // have no sibling-`children` concept, unlike `Item`) has each of
+        // its items' content joined in the same way -- see the module doc.
+        Block::Element(mut el) if list_ordered(&el).is_some() => {
+            if let Some(ElementValue::Children(items)) = el.value.take() {
+                for item in items {
+                    extend_spaced(content, item.content.unwrap_or_default());
+                }
+            }
+        }
         Block::Element(el) => {
             if !content.is_empty() {
                 content.push(Inline::Text(Text::new(" ", Span::dummy())));
             }
             content.push(Inline::Element(el));
-        }
-        Block::List(list) => {
-            for item in list.items {
-                extend_spaced(content, item.content);
-            }
         }
     }
 }
@@ -599,17 +642,19 @@ fn extend_spaced(content: &mut Vec<Inline>, more: Vec<Inline>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use typedmark_semantics::list_items;
 
     #[test]
     fn heading_and_paragraph() {
         let doc = from_markdown("# Title\n\nHello world.\n");
         assert_eq!(doc.blocks.len(), 2);
         match &doc.blocks[0] {
-            Block::Heading(h) => {
-                assert_eq!(h.level, 1);
+            Block::Element(el) => {
+                assert_eq!(classify(el), ElementKind::Heading);
+                assert_eq!(typedmark_semantics::heading_level(el), Some(1));
                 assert_eq!(
-                    h.content,
-                    vec![Inline::Text(Text::new("Title", Span::dummy()))]
+                    el.content,
+                    Some(vec![Inline::Text(Text::new("Title", Span::dummy()))])
                 );
             }
             other => panic!("expected heading, got {other:?}"),
@@ -652,15 +697,16 @@ mod tests {
     fn flat_bullet_list() {
         let doc = from_markdown("- one\n- two\n");
         match &doc.blocks[0] {
-            Block::List(list) => {
-                assert!(!list.ordered);
+            Block::Element(list) => {
+                assert_eq!(list_ordered(list), Some(false));
+                let items = list_items(list);
                 assert_eq!(
-                    list.items[0].content,
-                    vec![Inline::Text(Text::new("one", Span::dummy()))]
+                    items[0].content,
+                    Some(vec![Inline::Text(Text::new("one", Span::dummy()))])
                 );
                 assert_eq!(
-                    list.items[1].content,
-                    vec![Inline::Text(Text::new("two", Span::dummy()))]
+                    items[1].content,
+                    Some(vec![Inline::Text(Text::new("two", Span::dummy()))])
                 );
             }
             other => panic!("expected list, got {other:?}"),
@@ -671,7 +717,7 @@ mod tests {
     fn ordered_list() {
         let doc = from_markdown("1. one\n2. two\n");
         match &doc.blocks[0] {
-            Block::List(list) => assert!(list.ordered),
+            Block::Element(list) => assert_eq!(list_ordered(list), Some(true)),
             other => panic!("expected list, got {other:?}"),
         }
     }
@@ -680,24 +726,27 @@ mod tests {
     fn nested_list_preserves_children_hierarchy() {
         let doc = from_markdown("- a\n  - b\n- c\n");
         match &doc.blocks[0] {
-            Block::List(list) => {
-                assert_eq!(list.items.len(), 2);
+            Block::Element(list) => {
+                let items = list_items(list);
+                assert_eq!(items.len(), 2);
                 assert_eq!(
-                    list.items[0].content,
-                    vec![Inline::Text(Text::new("a", Span::dummy()))]
+                    items[0].content,
+                    Some(vec![Inline::Text(Text::new("a", Span::dummy()))])
                 );
-                assert_eq!(list.items[0].children.len(), 1);
-                let Block::List(sub) = &list.items[0].children[0] else {
+                let children = items[0].children.as_ref().expect("nested sub-list");
+                assert_eq!(children.len(), 1);
+                let Block::Element(sub) = &children[0] else {
                     panic!("expected sub-list");
                 };
-                assert_eq!(sub.items.len(), 1);
+                let sub_items = list_items(sub);
+                assert_eq!(sub_items.len(), 1);
                 assert_eq!(
-                    sub.items[0].content,
-                    vec![Inline::Text(Text::new("b", Span::dummy()))]
+                    sub_items[0].content,
+                    Some(vec![Inline::Text(Text::new("b", Span::dummy()))])
                 );
                 assert_eq!(
-                    list.items[1].content,
-                    vec![Inline::Text(Text::new("c", Span::dummy()))]
+                    items[1].content,
+                    Some(vec![Inline::Text(Text::new("c", Span::dummy()))])
                 );
             }
             other => panic!("expected list, got {other:?}"),
@@ -710,11 +759,11 @@ mod tests {
         match &doc.blocks[0] {
             Block::Paragraph(p) => match &p.content[0] {
                 Inline::Element(el) => {
-                    assert_eq!(el.sigil, Sigil::At(None));
+                    assert_eq!(el.sigil, Sigil::At(Some("link".to_string())));
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
-                            "url".to_string(),
+                            "target".to_string(),
                             Value::String("https://example.com".to_string())
                         )]))
                     );
@@ -734,7 +783,7 @@ mod tests {
         let doc = from_markdown("<https://example.com>\n");
         match &doc.blocks[0] {
             Block::Paragraph(p) => match &p.content[0] {
-                Inline::Element(el) => assert_eq!(el.sigil, Sigil::At(None)),
+                Inline::Element(el) => assert_eq!(el.sigil, Sigil::At(Some("link".to_string()))),
                 other => panic!("expected element, got {other:?}"),
             },
             other => panic!("expected paragraph, got {other:?}"),
@@ -751,7 +800,7 @@ mod tests {
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
-                            "path".to_string(),
+                            "target".to_string(),
                             Value::String("assets/pic.png".to_string())
                         )]))
                     );
@@ -814,6 +863,36 @@ mod tests {
     }
 
     #[test]
+    fn heading_nested_inside_a_block_quote_splices_its_title_text_in() {
+        // A multi-block quote's content is already flattened into one
+        // inline run on import (module doc). A heading block hitting
+        // `merge_block_into`'s dedicated `Heading` arm must splice its
+        // title text directly in, the same way a paragraph does -- not
+        // end up wrapped as a nested `Inline::Element(@heading(...))`,
+        // which is what the generic `Block::Element` arm would produce.
+        let doc = from_markdown("> # Quoted Title\n>\n> more text\n");
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.sigil, Sigil::Type("blockquote".to_string()));
+                let content = el.content.as_ref().expect("content");
+                assert!(
+                    !content
+                        .iter()
+                        .any(|i| matches!(i, Inline::Element(inner) if classify(inner) == ElementKind::Heading)),
+                    "heading should have been spliced as text, not nested as an element: {content:?}"
+                );
+                assert!(
+                    content
+                        .iter()
+                        .any(|i| matches!(i, Inline::Text(t) if t.value.contains("Quoted Title"))),
+                    "expected the heading's title text to appear in the flattened content: {content:?}"
+                );
+            }
+            other => panic!("expected blockquote element, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn inline_code_span_survives_as_backticked_text() {
         let doc = from_markdown("call `foo()` now\n");
         assert_eq!(
@@ -852,16 +931,16 @@ mod tests {
             Inline::Text(Text::new("Check ", Span::dummy()))
         );
 
-        // [[name]] -> @(wiki:name)
+        // [[name]] -> @link(target:ref:name)
         let Inline::Element(el1) = &p.content[1] else {
             panic!("expected element 1");
         };
-        assert_eq!(el1.sigil, Sigil::At(None));
+        assert_eq!(el1.sigil, Sigil::At(Some("link".to_string())));
         assert_eq!(
             el1.args,
             Some(Value::Map(vec![(
-                "wiki".to_string(),
-                Value::String("name".to_string())
+                "target".to_string(),
+                Value::String("ref:name".to_string())
             )]))
         );
         assert_eq!(el1.content, None);
@@ -871,16 +950,16 @@ mod tests {
             Inline::Text(Text::new(" and ", Span::dummy()))
         );
 
-        // [[name|display]] -> @[display](wiki:name)
+        // [[name|display]] -> @link[display](target:ref:name)
         let Inline::Element(el2) = &p.content[3] else {
             panic!("expected element 2");
         };
-        assert_eq!(el2.sigil, Sigil::At(None));
+        assert_eq!(el2.sigil, Sigil::At(Some("link".to_string())));
         assert_eq!(
             el2.args,
             Some(Value::Map(vec![(
-                "wiki".to_string(),
-                Value::String("name".to_string())
+                "target".to_string(),
+                Value::String("ref:name".to_string())
             )]))
         );
         assert_eq!(
@@ -913,22 +992,25 @@ mod tests {
         let md = "- a\n  - b\n";
         let doc = from_markdown(md);
         assert_eq!(doc.blocks.len(), 1);
-        let Block::List(list) = &doc.blocks[0] else {
+        let Block::Element(list) = &doc.blocks[0] else {
             panic!("expected list");
         };
-        assert_eq!(list.items.len(), 1);
+        let items = list_items(list);
+        assert_eq!(items.len(), 1);
         assert_eq!(
-            list.items[0].content,
-            vec![Inline::Text(Text::new("a", Span::dummy()))]
+            items[0].content,
+            Some(vec![Inline::Text(Text::new("a", Span::dummy()))])
         );
-        assert_eq!(list.items[0].children.len(), 1);
-        let Block::List(sub_list) = &list.items[0].children[0] else {
+        let children = items[0].children.as_ref().expect("nested sub-list");
+        assert_eq!(children.len(), 1);
+        let Block::Element(sub_list) = &children[0] else {
             panic!("expected sub-list");
         };
-        assert_eq!(sub_list.items.len(), 1);
+        let sub_items = list_items(sub_list);
+        assert_eq!(sub_items.len(), 1);
         assert_eq!(
-            sub_list.items[0].content,
-            vec![Inline::Text(Text::new("b", Span::dummy()))]
+            sub_items[0].content,
+            Some(vec![Inline::Text(Text::new("b", Span::dummy()))])
         );
     }
 
@@ -984,28 +1066,33 @@ mod tests {
     }
 
     #[test]
-    fn task_list_markers_convert_to_item_markers() {
+    fn checkbox_task_list_markers_import_as_plain_text_value_markers_stay_typed() {
+        // TypedMark has no checkbox construct anymore, so CommonMark task
+        // lists come through as literal `[x] `/`[ ] ` text (no silent data
+        // loss on migration) -- `(...)` value-marker shorthand still parses
+        // into a real typed `marker`.
         let md = "- [x] task1\n- [ ] task2\n- (x) task3\n";
         let doc = from_markdown(md);
         assert_eq!(doc.blocks.len(), 1);
-        let Block::List(list) = &doc.blocks[0] else {
+        let Block::Element(list) = &doc.blocks[0] else {
             panic!("expected list");
         };
-        assert_eq!(list.items.len(), 3);
-        assert_eq!(list.items[0].marker, Some("x".to_string()));
+        let items = list_items(list);
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].args, None);
         assert_eq!(
-            list.items[0].content,
-            vec![Inline::Text(Text::new("task1", Span::dummy()))]
+            items[0].content,
+            Some(vec![Inline::Text(Text::new("[x] task1", Span::dummy()))])
         );
-        assert_eq!(list.items[1].marker, Some(" ".to_string()));
+        assert_eq!(items[1].args, None);
         assert_eq!(
-            list.items[1].content,
-            vec![Inline::Text(Text::new("task2", Span::dummy()))]
+            items[1].content,
+            Some(vec![Inline::Text(Text::new("[ ] task2", Span::dummy()))])
         );
-        assert_eq!(list.items[2].marker, Some("x".to_string()));
+        assert_eq!(items[2].args, Some(Value::String("x".to_string())));
         assert_eq!(
-            list.items[2].content,
-            vec![Inline::Text(Text::new("task3", Span::dummy()))]
+            items[2].content,
+            Some(vec![Inline::Text(Text::new("task3", Span::dummy()))])
         );
     }
 
@@ -1024,7 +1111,7 @@ mod tests {
         assert_eq!(
             embed1.args,
             Some(Value::Map(vec![(
-                "wiki".to_string(),
+                "target".to_string(),
                 Value::String("name".to_string())
             )]))
         );
@@ -1040,7 +1127,7 @@ mod tests {
         assert_eq!(
             embed2.args,
             Some(Value::Map(vec![(
-                "path".to_string(),
+                "target".to_string(),
                 Value::String("_path".to_string())
             )]))
         );
@@ -1062,24 +1149,24 @@ mod tests {
         let Inline::Element(el1) = &p.content[1] else {
             panic!("expected element 1");
         };
-        assert_eq!(el1.sigil, Sigil::At(None));
+        assert_eq!(el1.sigil, Sigil::At(Some("link".to_string())));
         assert_eq!(
             el1.args,
             Some(Value::Map(vec![(
-                "wiki".to_string(),
-                Value::String("@file_name".to_string())
+                "target".to_string(),
+                Value::String("ref:@file_name".to_string())
             )]))
         );
 
         let Inline::Element(el2) = &p.content[3] else {
             panic!("expected element 2");
         };
-        assert_eq!(el2.sigil, Sigil::At(None));
+        assert_eq!(el2.sigil, Sigil::At(Some("link".to_string())));
         assert_eq!(
             el2.args,
             Some(Value::Map(vec![(
-                "wiki".to_string(),
-                Value::String("@Templater".to_string())
+                "target".to_string(),
+                Value::String("ref:@Templater".to_string())
             )]))
         );
     }

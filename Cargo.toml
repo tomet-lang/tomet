@@ -33,6 +33,7 @@ members = [
   "crates/typedmark-doc-config",
   "crates/typedmark-doc-edit",
   "crates/typedmark-doc-indexer",
+  "crates/typedmark-doc-links",
 
   #[ Codegen -- conversion to/from external formats ]
   "crates/typedmark-codegen-markdown",
@@ -73,6 +74,7 @@ typedmark-compute = { path = "crates/typedmark-doc-compute" }
 typedmark-config = { path = "crates/typedmark-doc-config" }
 typedmark-edit = { path = "crates/typedmark-doc-edit" }
 typedmark-indexer = { path = "crates/typedmark-doc-indexer" }
+typedmark-links = { path = "crates/typedmark-doc-links" }
 #[ Codegen ]
 typedmark-markdown = { path = "crates/typedmark-codegen-markdown" }
 typedmark-html = { path = "crates/typedmark-codegen-html" }
@@ -104,6 +106,7 @@ pulldown-cmark = "0.13"
 ratatui = "0.29"
 rayon = "1"
 regex = "1.12"
+rusqlite = { version = "0.31", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml = "0.9"

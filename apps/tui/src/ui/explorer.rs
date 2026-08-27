@@ -52,8 +52,13 @@ pub(super) fn render_explorer_view(f: &mut Frame, app: &mut App, area: Rect) {
                             .add_modifier(Modifier::BOLD),
                     ),
                 ]
-            } else if let Some(item) = &node.migration_item {
-                let status = if item.converted { " (DONE)" } else { "" };
+            } else if node.migration_item.is_some() {
+                let converted = app
+                    .migration_items
+                    .iter()
+                    .find(|i| i.source_path == node.path)
+                    .map_or(false, |i| i.converted);
+                let status = if converted { " (DONE)" } else { "" };
                 vec![
                     Span::raw(indent),
                     Span::styled("📝 ", Style::default()),

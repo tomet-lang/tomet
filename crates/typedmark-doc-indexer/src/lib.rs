@@ -12,6 +12,8 @@ use typedmark_config::PrinterConfig;
 use typedmark_parser::parse_document;
 use typedmark_semantics::classify;
 
+pub mod workspace_scan;
+
 /// Whether `path` matches one of `ignore_patterns` (each pattern
 /// matched against the path both as given and relative to `root`, with
 /// a directory-prefix or exact-segment match).
@@ -94,6 +96,40 @@ pub fn collect_tm_files_with_config(
     files
 }
 
+/// Every non-ignored path under `path` (or just `path` itself if it's a
+/// single file) -- no extension filtering at all, unlike
+/// `collect_tm_files`/`WorkspaceIndex`. The shared, lowest-level walk
+/// primitive other extension-filtered scans (this crate's own
+/// `collect_tm_files_with_config`, `workspace_scan`'s `WorkspaceIndex`,
+/// and `typedmark-links`'s existence checks) can build on, so
+/// `.hidden(true)`/`.git_ignore(true)`/`is_path_ignored` semantics can't
+/// drift between independently-configured `WalkBuilder`s.
+pub fn collect_all_paths_with_config(
+    path: &Path,
+    config: &PrinterConfig,
+    config_root: &Path,
+) -> std::collections::HashSet<PathBuf> {
+    let mut paths = std::collections::HashSet::new();
+    if path.is_file() {
+        paths.insert(path.to_path_buf());
+    } else if path.is_dir() {
+        for entry in WalkBuilder::new(path)
+            .hidden(true)
+            .git_ignore(true)
+            .build()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().map_or(false, |ft| ft.is_file()))
+        {
+            let p = entry.path();
+            if is_path_ignored(p, Some(config_root), &config.ignore_files) {
+                continue;
+            }
+            paths.insert(p.to_path_buf());
+        }
+    }
+    paths
+}
+
 fn is_tm_file(p: &Path) -> bool {
     p.extension()
         .and_then(|ext| ext.to_str())
@@ -156,10 +192,8 @@ where
 {
     struct ElementVisitor<F>(F);
     impl<F: FnMut(&Element)> typedmark_walker::Visitor<()> for ElementVisitor<F> {
-        fn visit(&mut self, node: typedmark_walker::Node<'_>) -> std::ops::ControlFlow<()> {
-            if let typedmark_walker::Node::Element(el) = node {
-                (self.0)(el);
-            }
+        fn visit(&mut self, el: &Element) -> std::ops::ControlFlow<()> {
+            (self.0)(el);
             std::ops::ControlFlow::Continue(())
         }
     }

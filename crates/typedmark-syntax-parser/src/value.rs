@@ -294,7 +294,7 @@ fn parse_seq(cur: &mut Cursor) -> Result<Value> {
         if cur.peek() == Some(']') {
             break;
         }
-        items.push(parse_value_at(cur)?);
+        items.push(parse_seq_item(cur)?);
         skip_ws_newlines_and_comments(cur);
         match cur.peek() {
             Some(',') => {
@@ -310,10 +310,49 @@ fn parse_seq(cur: &mut Cursor) -> Result<Value> {
     Ok(Value::Seq(items))
 }
 
-/// A map body is one or more `key: value` entries, separated by commas
-/// and/or newlines. Stops at EOF or at a closing bracket it doesn't own
-/// (`)`/`}`/`]`) without consuming it -- the caller (an outer `(`/`{`
-/// parser, or the top-level `parse_value`) owns that bracket/EOF.
+/// Sentinel key for a positional (unkeyed) entry inside a map body --
+/// never producible as a real user-written key (a real key always needs
+/// at least one identifier character; `eat_ident` never matches empty).
+/// `typedmark-semantics::positional` folds entries under this key into
+/// whichever element-specific positional slot they belong to (e.g.
+/// `@link`'s `target`, or a `@settings`-defined custom element's own
+/// `positional:[...]` list).
+pub(crate) const POSITIONAL_ENTRY_KEY: &str = "";
+
+/// One entry inside a map body: an explicit `key: value` (Group A's
+/// `identifier:` rule, `://` as the sole exception -- see
+/// `is_scheme_uri_colon` -- and a leading `/` as the sole
+/// always-bare-scalar exception, see `starts_absolute_path`), or, if
+/// neither of those shapes matches, a bare value with no key at all,
+/// tagged with [`POSITIONAL_ENTRY_KEY`].
+fn parse_one_entry(cur: &mut Cursor) -> Result<(String, Value)> {
+    let checkpoint = cur.pos();
+    if !starts_absolute_path(cur) {
+        let key = eat_ident(cur);
+        if !key.is_empty() {
+            skip_inline_ws(cur);
+            if !is_scheme_uri_colon(cur) && cur.peek() == Some(':') {
+                let key = key.to_string();
+                cur.bump();
+                skip_inline_ws(cur);
+                let value = parse_entry_value(cur)?;
+                return Ok((key, value));
+            }
+        }
+    }
+    cur.set_pos(checkpoint);
+    let raw = eat_scalar_raw(cur).trim();
+    if raw.is_empty() {
+        return Err(err(cur, checkpoint, "expected a value"));
+    }
+    Ok((POSITIONAL_ENTRY_KEY.to_string(), scalar_from_text(raw)))
+}
+
+/// A map body is one or more entries, separated by commas and/or
+/// newlines -- each entry either `key: value` or a bare positional value
+/// (see [`parse_one_entry`]). Stops at EOF or at a closing bracket it
+/// doesn't own (`)`/`}`/`]`) without consuming it -- the caller (an outer
+/// `(`/`{` parser, or the top-level `parse_value`) owns that bracket/EOF.
 fn parse_map_body(cur: &mut Cursor) -> Result<Value> {
     let mut entries = Vec::new();
     loop {
@@ -321,18 +360,7 @@ fn parse_map_body(cur: &mut Cursor) -> Result<Value> {
         if matches!(cur.peek(), None | Some(')') | Some('}') | Some(']')) {
             break;
         }
-        let key = eat_ident(cur);
-        if key.is_empty() {
-            return Err(err(cur, cur.pos(), "expected a key"));
-        }
-        let key = key.to_string();
-        skip_inline_ws(cur);
-        if !cur.eat_str(":") {
-            return Err(err(cur, cur.pos(), "expected ':' after key"));
-        }
-        skip_inline_ws(cur);
-        let value = parse_entry_value(cur)?;
-        entries.push((key, value));
+        entries.push(parse_one_entry(cur)?);
         skip_inline_ws(cur);
         // A trailing `// comment` on the same line as the value: `eat_scalar_raw`
         // already stopped short of it (boundary rule), so it's still here to
@@ -387,10 +415,19 @@ fn parse_entry_value(cur: &mut Cursor) -> Result<Value> {
     }
 }
 
-/// A "fresh" value position: the whole content of `(...)`/top-level `{...}`
-/// data, a sequence item, or the entire data-only document. May itself be
-/// a map body, so a bare leading word is checked for a following `:`.
-pub(crate) fn parse_value_at(cur: &mut Cursor) -> Result<Value> {
+/// Shared prefix for both group-body and single-item value parsing: the
+/// three self-delimiting shapes (`[...]` seq, `"..."` quoted string,
+/// `{...}` nested map) are handled identically either way. `fallback`
+/// covers everything else, where the two contexts genuinely differ: a
+/// group body ([`parse_value_at`]) may collect several comma-separated
+/// entries into one `Value::Map`, but a single sequence item
+/// ([`parse_seq_item`]) must parse *exactly* one value and leave any
+/// following `,` for `parse_seq`'s own loop to see -- otherwise `[a, b]`
+/// would collapse into one two-entry map instead of two separate items.
+fn parse_value_shape(
+    cur: &mut Cursor,
+    fallback: impl FnOnce(&mut Cursor) -> Result<Value>,
+) -> Result<Value> {
     skip_ws_newlines_and_comments(cur);
     match cur.peek() {
         Some('[') => parse_seq(cur),
@@ -404,23 +441,86 @@ pub(crate) fn parse_value_at(cur: &mut Cursor) -> Result<Value> {
             }
             Ok(v)
         }
-        _ => parse_map_body_or_scalar(cur),
+        _ => fallback(cur),
     }
 }
 
+/// A "fresh" value position: the whole content of `(...)`/top-level
+/// `{...}` data, or the entire data-only document -- may collect several
+/// comma-separated entries (`key: value` pairs and/or bare positional
+/// values) into one `Value::Map`. Not used for sequence items -- see
+/// [`parse_seq_item`].
+pub(crate) fn parse_value_at(cur: &mut Cursor) -> Result<Value> {
+    parse_value_shape(cur, parse_map_body_or_scalar)
+}
+
+/// A single item inside `[...]`: exactly one value (a `key: value` pair
+/// wrapped in a one-entry map, or a bare positional value returned
+/// as-is), never consuming a following `,` -- that belongs to
+/// `parse_seq`'s own loop, not this function.
+fn parse_seq_item(cur: &mut Cursor) -> Result<Value> {
+    parse_value_shape(cur, |cur| {
+        let (key, value) = parse_one_entry(cur)?;
+        if key == POSITIONAL_ENTRY_KEY {
+            Ok(value)
+        } else {
+            Ok(Value::Map(vec![(key, value)]))
+        }
+    })
+}
+
+/// A leading `/` can never start a map key (`is_ident_char` excludes it),
+/// so a value here is unambiguously a bare scalar -- an OS-absolute path
+/// like `/readme.md`. Skipped straight to `eat_scalar_raw` rather than
+/// falling through `eat_ident` (which would just read an empty key and
+/// error).
+fn starts_absolute_path(cur: &Cursor) -> bool {
+    cur.peek() == Some('/')
+}
+
+/// Whether `cur`, positioned right after an identifier and its trailing
+/// inline whitespace, sits at a `://` -- i.e. the identifier just read is
+/// a URI scheme (`https`, `file`, ...) and the whole `scheme://...` is one
+/// bare external-URL scalar, not a `key: value` map entry. No real map
+/// value can start with a literal `//` (per `skip_ws_newlines_and_comments`'s
+/// doc comment: an unquoted leading `//` is always read as a comment, so a
+/// `key: //...` entry can never carry an actual value), so this check
+/// can't misfire on a legitimate map whose value happens to start that
+/// way.
+fn is_scheme_uri_colon(cur: &Cursor) -> bool {
+    if cur.peek() != Some(':') {
+        return false;
+    }
+    let mut look = *cur;
+    look.bump();
+    look.starts_with("//")
+}
+
+/// A "fresh" value position that might be a single bare scalar, one
+/// `key: value` pair, several `key: value` pairs, or several bare
+/// positional values with no keys at all (`(a, b)` -- previously a parse
+/// error, now valid; see [`parse_one_entry`]). Parses the same entry loop
+/// [`parse_map_body`] does; if that produced exactly one entry and it's
+/// tagged with [`POSITIONAL_ENTRY_KEY`] (no real key), collapses to that
+/// entry's bare value instead of wrapping it in a one-entry `Value::Map`
+/// -- this is what keeps every existing single-scalar case
+/// (`https://example.com`, `/etc/hosts`, `hello`, ...) parsing to exactly
+/// the same `Value` as before this generalization.
 fn parse_map_body_or_scalar(cur: &mut Cursor) -> Result<Value> {
     let checkpoint = cur.pos();
-    let key = eat_ident(cur);
-    if key.is_empty() {
+    skip_ws_newlines_and_comments(cur);
+    if matches!(cur.peek(), None | Some(')') | Some('}') | Some(']')) {
         return Err(err(cur, checkpoint, "expected a value"));
     }
-    skip_inline_ws(cur);
-    let is_map = cur.peek() == Some(':');
     cur.set_pos(checkpoint);
-    if is_map {
-        parse_map_body(cur)
-    } else {
-        let raw = eat_scalar_raw(cur).trim();
-        Ok(scalar_from_text(raw))
+    let value = parse_map_body(cur)?;
+    let Value::Map(entries) = &value else {
+        unreachable!("parse_map_body always returns Value::Map")
+    };
+    if let [(key, v)] = &entries[..]
+        && key == POSITIONAL_ENTRY_KEY
+    {
+        return Ok(v.clone());
     }
+    Ok(value)
 }

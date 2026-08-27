@@ -330,9 +330,9 @@
         }
       }
     },
-    "list_checkbox": {
+    "list_marker": {
       "type": "SYMBOL",
-      "name": "_list_checkbox_token"
+      "name": "_list_marker_token"
     },
     "ordered_list_item": {
       "type": "SEQ",
@@ -349,10 +349,10 @@
               "members": [
                 {
                   "type": "FIELD",
-                  "name": "checkbox",
+                  "name": "marker",
                   "content": {
                     "type": "SYMBOL",
-                    "name": "list_checkbox"
+                    "name": "list_marker"
                   }
                 },
                 {
@@ -411,10 +411,10 @@
               "members": [
                 {
                   "type": "FIELD",
-                  "name": "checkbox",
+                  "name": "marker",
                   "content": {
                     "type": "SYMBOL",
-                    "name": "list_checkbox"
+                    "name": "list_marker"
                   }
                 },
                 {
@@ -1588,7 +1588,7 @@
     },
     {
       "type": "SYMBOL",
-      "name": "_list_checkbox_token"
+      "name": "_list_marker_token"
     },
     {
       "type": "SYMBOL",

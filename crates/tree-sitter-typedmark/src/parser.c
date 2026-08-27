@@ -13,7 +13,7 @@
 #define ALIAS_COUNT 1
 #define TOKEN_COUNT 47
 #define EXTERNAL_TOKEN_COUNT 3
-#define FIELD_COUNT 10
+#define FIELD_COUNT 9
 #define MAX_ALIAS_SEQUENCE_LENGTH 8
 #define MAX_RESERVED_WORD_SET_SIZE 0
 #define PRODUCTION_ID_COUNT 23
@@ -64,7 +64,7 @@ enum ts_symbol_identifiers {
   aux_sym_string_token2 = 42,
   aux_sym__value_scalar_token1 = 43,
   sym__scalar_token = 44,
-  sym__list_checkbox_token = 45,
+  sym__list_marker_token = 45,
   sym__list_marker_gap = 46,
   sym_document = 47,
   sym__block = 48,
@@ -76,7 +76,7 @@ enum ts_symbol_identifiers {
   sym_list = 54,
   sym_ordered_list = 55,
   sym_unordered_list = 56,
-  sym_list_checkbox = 57,
+  sym_list_marker = 57,
   sym_ordered_list_item = 58,
   sym_unordered_list_item = 59,
   sym_paragraph = 60,
@@ -175,7 +175,7 @@ static const char * const ts_symbol_names[] = {
   [aux_sym_string_token2] = "string_token2",
   [aux_sym__value_scalar_token1] = "scalar",
   [sym__scalar_token] = "_scalar_token",
-  [sym__list_checkbox_token] = "_list_checkbox_token",
+  [sym__list_marker_token] = "_list_marker_token",
   [sym__list_marker_gap] = "_list_marker_gap",
   [sym_document] = "document",
   [sym__block] = "_block",
@@ -187,7 +187,7 @@ static const char * const ts_symbol_names[] = {
   [sym_list] = "list",
   [sym_ordered_list] = "ordered_list",
   [sym_unordered_list] = "unordered_list",
-  [sym_list_checkbox] = "list_checkbox",
+  [sym_list_marker] = "list_marker",
   [sym_ordered_list_item] = "ordered_list_item",
   [sym_unordered_list_item] = "unordered_list_item",
   [sym_paragraph] = "paragraph",
@@ -286,7 +286,7 @@ static const TSSymbol ts_symbol_map[] = {
   [aux_sym_string_token2] = aux_sym_string_token2,
   [aux_sym__value_scalar_token1] = sym_scalar,
   [sym__scalar_token] = sym__scalar_token,
-  [sym__list_checkbox_token] = sym__list_checkbox_token,
+  [sym__list_marker_token] = sym__list_marker_token,
   [sym__list_marker_gap] = sym__list_marker_gap,
   [sym_document] = sym_document,
   [sym__block] = sym__block,
@@ -298,7 +298,7 @@ static const TSSymbol ts_symbol_map[] = {
   [sym_list] = sym_list,
   [sym_ordered_list] = sym_ordered_list,
   [sym_unordered_list] = sym_unordered_list,
-  [sym_list_checkbox] = sym_list_checkbox,
+  [sym_list_marker] = sym_list_marker,
   [sym_ordered_list_item] = sym_ordered_list_item,
   [sym_unordered_list_item] = sym_unordered_list_item,
   [sym_paragraph] = sym_paragraph,
@@ -532,7 +532,7 @@ static const TSSymbolMetadata ts_symbol_metadata[] = {
     .visible = false,
     .named = true,
   },
-  [sym__list_checkbox_token] = {
+  [sym__list_marker_token] = {
     .visible = false,
     .named = true,
   },
@@ -580,7 +580,7 @@ static const TSSymbolMetadata ts_symbol_metadata[] = {
     .visible = true,
     .named = true,
   },
-  [sym_list_checkbox] = {
+  [sym_list_marker] = {
     .visible = true,
     .named = true,
   },
@@ -788,21 +788,19 @@ static const TSSymbolMetadata ts_symbol_metadata[] = {
 
 enum ts_field_identifiers {
   field_attrs = 1,
-  field_checkbox = 2,
-  field_close = 3,
-  field_content = 4,
-  field_key = 5,
-  field_lang = 6,
-  field_marker = 7,
-  field_name = 8,
-  field_open = 9,
-  field_value = 10,
+  field_close = 2,
+  field_content = 3,
+  field_key = 4,
+  field_lang = 5,
+  field_marker = 6,
+  field_name = 7,
+  field_open = 8,
+  field_value = 9,
 };
 
 static const char * const ts_field_names[] = {
   [0] = NULL,
   [field_attrs] = "attrs",
-  [field_checkbox] = "checkbox",
   [field_close] = "close",
   [field_content] = "content",
   [field_key] = "key",
@@ -850,7 +848,7 @@ static const TSFieldMapEntry ts_field_map_entries[] = {
   [4] =
     {field_attrs, 2},
   [5] =
-    {field_checkbox, 1},
+    {field_marker, 1},
   [6] =
     {field_name, 0},
   [7] =
@@ -872,7 +870,7 @@ static const TSFieldMapEntry ts_field_map_entries[] = {
     {field_attrs, 3},
   [18] =
     {field_attrs, 3},
-    {field_checkbox, 1},
+    {field_marker, 1},
   [20] =
     {field_key, 0},
     {field_value, 2},
@@ -889,7 +887,7 @@ static const TSFieldMapEntry ts_field_map_entries[] = {
     {field_open, 0},
   [30] =
     {field_attrs, 4},
-    {field_checkbox, 1},
+    {field_marker, 1},
   [32] =
     {field_attrs, 5},
     {field_marker, 0},
@@ -3316,7 +3314,7 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [aux_sym_string_token1] = ACTIONS(1),
     [aux_sym_string_token2] = ACTIONS(1),
     [sym__scalar_token] = ACTIONS(1),
-    [sym__list_checkbox_token] = ACTIONS(1),
+    [sym__list_marker_token] = ACTIONS(1),
     [sym__list_marker_gap] = ACTIONS(1),
   },
   [STATE(1)] = {
@@ -9191,11 +9189,11 @@ static const uint16_t ts_small_parse_table[] = {
       aux_sym_emphasis_repeat1,
   [7191] = 4,
     ACTIONS(932), 1,
-      sym__list_checkbox_token,
+      sym__list_marker_token,
     ACTIONS(934), 1,
       sym__list_marker_gap,
     STATE(463), 1,
-      sym_list_checkbox,
+      sym_list_marker,
     ACTIONS(930), 15,
       sym__newline,
       sym_block_comment,
@@ -11791,11 +11789,11 @@ static const uint16_t ts_small_parse_table[] = {
       aux_sym__blank_gap,
   [10339] = 3,
     ACTIONS(932), 1,
-      sym__list_checkbox_token,
+      sym__list_marker_token,
     ACTIONS(1229), 1,
       sym__list_marker_gap,
     STATE(480), 1,
-      sym_list_checkbox,
+      sym_list_marker,
   [10349] = 3,
     ACTIONS(1231), 1,
       sym__newline,
@@ -11955,11 +11953,11 @@ static const uint16_t ts_small_parse_table[] = {
       aux_sym__blank_gap,
   [10571] = 3,
     ACTIONS(932), 1,
-      sym__list_checkbox_token,
+      sym__list_marker_token,
     ACTIONS(934), 1,
       sym__list_marker_gap,
     STATE(463), 1,
-      sym_list_checkbox,
+      sym_list_marker,
   [10581] = 1,
     ACTIONS(1273), 3,
       anon_sym_RBRACE,
@@ -13658,7 +13656,7 @@ static const TSParseActionEntry ts_parse_actions[] = {
   [1422] = {.entry = {.count = 1, .reusable = true}}, SHIFT(125),
   [1424] = {.entry = {.count = 1, .reusable = true}}, SHIFT(108),
   [1426] = {.entry = {.count = 1, .reusable = true}},  ACCEPT_INPUT(),
-  [1428] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_list_checkbox, 1, 0, 0),
+  [1428] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_list_marker, 1, 0, 0),
   [1430] = {.entry = {.count = 1, .reusable = true}}, SHIFT(290),
   [1432] = {.entry = {.count = 1, .reusable = true}}, SHIFT(93),
   [1434] = {.entry = {.count = 1, .reusable = true}}, SHIFT(6),
@@ -13694,27 +13692,27 @@ static const TSParseActionEntry ts_parse_actions[] = {
 
 enum ts_external_scanner_symbol_identifiers {
   ts_external_token__scalar_token = 0,
-  ts_external_token__list_checkbox_token = 1,
+  ts_external_token__list_marker_token = 1,
   ts_external_token__list_marker_gap = 2,
 };
 
 static const TSSymbol ts_external_scanner_symbol_map[EXTERNAL_TOKEN_COUNT] = {
   [ts_external_token__scalar_token] = sym__scalar_token,
-  [ts_external_token__list_checkbox_token] = sym__list_checkbox_token,
+  [ts_external_token__list_marker_token] = sym__list_marker_token,
   [ts_external_token__list_marker_gap] = sym__list_marker_gap,
 };
 
 static const bool ts_external_scanner_states[5][EXTERNAL_TOKEN_COUNT] = {
   [1] = {
     [ts_external_token__scalar_token] = true,
-    [ts_external_token__list_checkbox_token] = true,
+    [ts_external_token__list_marker_token] = true,
     [ts_external_token__list_marker_gap] = true,
   },
   [2] = {
     [ts_external_token__scalar_token] = true,
   },
   [3] = {
-    [ts_external_token__list_checkbox_token] = true,
+    [ts_external_token__list_marker_token] = true,
     [ts_external_token__list_marker_gap] = true,
   },
   [4] = {

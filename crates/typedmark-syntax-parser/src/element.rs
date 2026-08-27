@@ -190,7 +190,7 @@ pub(crate) fn parse_element(
     Ok(el)
 }
 
-fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
+pub(crate) fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
     if !cur.eat_str("(") {
         return Err(err(cur, cur.pos(), "expected '('"));
     }

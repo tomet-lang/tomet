@@ -64,7 +64,7 @@ pub(crate) fn parse_inline_seq(
                     if look.is_eof()
                         || look.peek() == Some('\n')
                         || look.peek() == Some('#')
-                        || peek_list_marker(&look).is_some()
+                        || matches!(peek_list_marker(&look), Ok(Some(_)))
                         || look.starts_with("//")
                         || look.starts_with("/*")
                         || (look.peek() == Some('<') && is_type_element_start(&look))
@@ -427,6 +427,7 @@ fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
             Value::String(url_str),
         )])),
         content: None,
+        children: None,
         value: None,
         span,
     };

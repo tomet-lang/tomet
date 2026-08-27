@@ -1,8 +1,8 @@
 //! I/O-free classification of what a parsed `Element` officially means --
-//! `url`/`file`/`ref` inference, and recognizing TypedMark's own built-in
-//! vocabulary (`@meta`, `@config`, `@links`, ...) -- plus small
-//! `Document`-level lookups (`document_meta`) built directly on top of that
-//! classification. Depends only on `typedmark-ast`; consumers
+//! recognizing TypedMark's own built-in vocabulary (`@meta`, `@config`,
+//! `@links`, `@link`, ...) by name only (no inference from `args`) -- plus
+//! small `Document`-level lookups (`document_meta`) built directly on top
+//! of that classification. Depends only on `typedmark-ast`; consumers
 //! (`typedmark-html`, `typedmark-markdown`, the CLI/TUI) use this instead
 //! of each carrying their own copy of this logic. See
 //! `docs/develop/architecture.md` for how this crate fits into the rest of
@@ -10,19 +10,23 @@
 
 mod config;
 mod connect;
-mod infer;
+mod heading;
 mod kind;
+mod list;
 mod meta;
 mod positional;
 mod table;
+mod target;
 
 pub use config::{DocumentConfig, ExportType, document_config};
 pub use connect::merge_connected_values;
-pub use infer::{INFERRED_AT_KEYS, infer_at_kind};
+pub use heading::heading_level;
 pub use kind::{ElementKind, classify};
+pub use list::{list_items, list_ordered};
 pub use meta::document_meta;
 pub use positional::{
-    ElementSchema, SettingsSchema, builtin_positional_arg_key, normalized_element_args,
-    normalized_element_args_with_schema,
+    ElementSchema, LIST_MARKER_POSITIONAL_KEY, SettingsSchema, builtin_positional_arg_keys,
+    normalized_element_args, normalized_element_args_with_schema, normalized_list_marker,
 };
 pub use table::{TableCell, TableRow, parse_table_rows};
+pub use target::{TargetScheme, link_target, link_target_of, target_scheme};

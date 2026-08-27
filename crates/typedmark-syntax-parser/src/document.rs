@@ -42,7 +42,7 @@ pub fn parse_document(src: &str) -> Result<Document> {
         }
 
         if cur.peek() == Some('#') && is_heading_start(&cur) {
-            blocks.push(Block::Heading(parse_heading(&mut cur, running_format)?));
+            blocks.push(Block::Element(parse_heading(&mut cur, running_format)?));
             continue;
         }
         if is_titled_thematic_break_start(&cur) {
@@ -64,14 +64,14 @@ pub fn parse_document(src: &str) -> Result<Document> {
             blocks.push(Block::Element(parse_fenced_code_block(&mut cur)?));
             continue;
         }
-        if let Some((ordered, _)) = peek_list_marker(&cur) {
+        if let Some((ordered, ..)) = peek_list_marker(&cur)? {
             let items = parse_list(&mut cur, ordered, running_format)?;
             if !items.is_empty() {
                 let list_span = typedmark_ast::Span::new(
                     items.first().unwrap().span.start,
                     items.last().unwrap().span.end,
                 );
-                blocks.push(Block::List(typedmark_ast::List::new(
+                blocks.push(Block::Element(typedmark_ast::Element::list(
                     ordered, items, list_span,
                 )));
             }

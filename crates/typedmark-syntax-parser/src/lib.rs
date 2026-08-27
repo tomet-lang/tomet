@@ -17,8 +17,9 @@ pub use value::parse_value;
 mod tests {
     use super::*;
     use typedmark_ast::{
-        Block, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Sigil, Value,
+        Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Sigil, Value,
     };
+    use typedmark_semantics::{ElementKind, classify, heading_level, list_items, list_ordered};
 
     #[test]
     fn parses_flat_map() {
@@ -60,15 +61,16 @@ mod tests {
     fn parses_heading_with_attrs() {
         let doc = parse_document("#[ Hello ]{ id:header1 }\n").unwrap();
         match &doc.blocks[0] {
-            Block::Heading(h) => {
-                assert_eq!(h.level, 1);
-                assert_eq!(h.content, vec![Inline::Text("Hello".into())]);
+            Block::Element(el) => {
+                assert_eq!(classify(el), ElementKind::Heading);
+                assert_eq!(heading_level(el), Some(1));
+                assert_eq!(el.content, Some(vec![Inline::Text("Hello".into())]));
                 assert_eq!(
-                    h.attrs,
-                    Some(Value::Map(vec![(
+                    el.value,
+                    Some(ElementValue::Data(Value::Map(vec![(
                         "id".into(),
                         Value::String("header1".into())
-                    )]))
+                    )])))
                 );
             }
             other => panic!("expected heading, got {other:?}"),
@@ -129,49 +131,108 @@ mod tests {
         }
     }
 
+    /// A list item's trailing `{value}` attrs, if any -- mirrors how
+    /// `Element::list_item` stores them under `value` as `ElementValue::Data`.
+    fn item_attrs(item: &Element) -> Option<Value> {
+        match &item.value {
+            Some(ElementValue::Data(v)) => Some(v.clone()),
+            _ => None,
+        }
+    }
+
     #[test]
     fn parses_list() {
         let doc = parse_document("- one\n- two\n").unwrap();
         match &doc.blocks[0] {
-            Block::List(list) => {
-                assert!(!list.ordered);
-                assert_eq!(list.items.len(), 2);
-                assert_eq!(list.items[0].content, vec![Inline::Text("one".into())]);
-                assert_eq!(list.items[1].content, vec![Inline::Text("two".into())]);
+            Block::Element(list) => {
+                assert_eq!(list_ordered(list), Some(false));
+                let items = list_items(list);
+                assert_eq!(items.len(), 2);
+                assert_eq!(items[0].content, Some(vec![Inline::Text("one".into())]));
+                assert_eq!(items[1].content, Some(vec![Inline::Text("two".into())]));
             }
             other => panic!("expected list, got {other:?}"),
         }
     }
 
     #[test]
-    fn parses_list_generic_markers_and_trailing_attrs() {
-        let doc = parse_document(
-            "- ( ) item {tag: dev}\n- [x] done {id: task1}\n- (T) todo\n- (?) question\n",
-        )
-        .unwrap();
+    fn parses_list_value_markers_and_trailing_attrs() {
+        let doc =
+            parse_document("- (T) todo {tag: dev}\n- (\"?\") question {id: task1}\n").unwrap();
         match &doc.blocks[0] {
-            Block::List(list) => {
-                assert!(!list.ordered);
-                assert_eq!(list.items.len(), 4);
+            Block::Element(list) => {
+                assert_eq!(list_ordered(list), Some(false));
+                let items = list_items(list);
+                assert_eq!(items.len(), 2);
 
-                assert_eq!(list.items[0].content, vec![Inline::Text("item".into())]);
-                assert_eq!(list.items[0].marker, Some(" ".to_string()));
+                assert_eq!(items[0].content, Some(vec![Inline::Text("todo".into())]));
+                assert_eq!(items[0].args, Some(Value::String("T".into())));
                 assert_eq!(
-                    list.items[0].attrs,
+                    item_attrs(&items[0]),
                     Some(Value::Map(vec![(
                         "tag".into(),
                         Value::String("dev".into())
                     )]))
                 );
 
-                assert_eq!(list.items[1].content, vec![Inline::Text("done".into())]);
-                assert_eq!(list.items[1].marker, Some("x".to_string()));
+                assert_eq!(items[1].content, Some(vec![Inline::Text("question".into())]));
+                assert_eq!(items[1].args, Some(Value::String("?".into())));
+                assert_eq!(
+                    item_attrs(&items[1]),
+                    Some(Value::Map(vec![(
+                        "id".into(),
+                        Value::String("task1".into())
+                    )]))
+                );
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
 
-                assert_eq!(list.items[2].content, vec![Inline::Text("todo".into())]);
-                assert_eq!(list.items[2].marker, Some("T".to_string()));
+    #[test]
+    fn list_marker_supports_explicit_key_value() {
+        let doc = parse_document("- (color: red, priority: high) content\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(list) => {
+                assert_eq!(
+                    list_items(list)[0].args,
+                    Some(Value::Map(vec![
+                        ("color".into(), Value::String("red".into())),
+                        ("priority".into(), Value::String("high".into())),
+                    ]))
+                );
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
 
-                assert_eq!(list.items[3].content, vec![Inline::Text("question".into())]);
-                assert_eq!(list.items[3].marker, Some("?".to_string()));
+    #[test]
+    fn list_marker_quoted_scalar_avoids_colon_misparse() {
+        let doc = parse_document("- (\"12:01\") woke up\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(list) => {
+                assert_eq!(
+                    list_items(list)[0].args,
+                    Some(Value::String("12:01".into()))
+                );
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bracket_content_is_never_a_marker() {
+        // `[...]` after a list marker has no special meaning at all (the
+        // checkbox form is gone) -- it's just literal text.
+        let doc = parse_document("- [T] content\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(list) => {
+                let items = list_items(list);
+                assert_eq!(items[0].args, None);
+                assert_eq!(
+                    items[0].content,
+                    Some(vec![Inline::Text("[T] content".into())])
+                );
             }
             other => panic!("expected list, got {other:?}"),
         }
@@ -181,11 +242,12 @@ mod tests {
     fn parses_ordered_list() {
         let doc = parse_document("-. one\n-. two\n").unwrap();
         match &doc.blocks[0] {
-            Block::List(list) => {
-                assert!(list.ordered);
-                assert_eq!(list.items.len(), 2);
-                assert_eq!(list.items[0].content, vec![Inline::Text("one".into())]);
-                assert_eq!(list.items[1].content, vec![Inline::Text("two".into())]);
+            Block::Element(list) => {
+                assert_eq!(list_ordered(list), Some(true));
+                let items = list_items(list);
+                assert_eq!(items.len(), 2);
+                assert_eq!(items[0].content, Some(vec![Inline::Text("one".into())]));
+                assert_eq!(items[1].content, Some(vec![Inline::Text("two".into())]));
             }
             other => panic!("expected list, got {other:?}"),
         }
@@ -196,7 +258,8 @@ mod tests {
         let doc = parse_document("- one\n-. two\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
-            (Block::List(l1), Block::List(l2)) if !l1.ordered && l2.ordered => {}
+            (Block::Element(l1), Block::Element(l2))
+                if list_ordered(l1) == Some(false) && list_ordered(l2) == Some(true) => {}
             other => panic!("expected two separate lists, got {other:?}"),
         }
     }
@@ -548,8 +611,10 @@ mod tests {
             other => panic!("expected element, got {other:?}"),
         }
         match &doc.blocks[1] {
-            Block::Heading(h) => {
-                assert!(h.content.iter().any(|i| matches!(
+            Block::Element(el) => {
+                assert_eq!(classify(el), ElementKind::Heading);
+                let content = el.content.as_ref().expect("content");
+                assert!(content.iter().any(|i| matches!(
                     i,
                     Inline::Element(e) if e.sigil == Sigil::Dollar
                 )));
@@ -579,9 +644,11 @@ mod tests {
         let doc = parse_document("#[ one ]\n// skip this\n#[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
-            (Block::Heading(a), Block::Heading(b)) => {
-                assert_eq!(a.content, vec![Inline::Text("one".into())]);
-                assert_eq!(b.content, vec![Inline::Text("two".into())]);
+            (Block::Element(a), Block::Element(b))
+                if classify(a) == ElementKind::Heading && classify(b) == ElementKind::Heading =>
+            {
+                assert_eq!(a.content, Some(vec![Inline::Text("one".into())]));
+                assert_eq!(b.content, Some(vec![Inline::Text("two".into())]));
             }
             other => panic!("expected two headings, got {other:?}"),
         }
@@ -591,16 +658,16 @@ mod tests {
     fn indented_line_comment_is_recognized_at_block_level() {
         let doc = parse_document("#[ one ]\n\n  // indented note\n\n#[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
-        assert!(matches!(&doc.blocks[0], Block::Heading(_)));
-        assert!(matches!(&doc.blocks[1], Block::Heading(_)));
+        assert!(matches!(&doc.blocks[0], Block::Element(el) if classify(el) == ElementKind::Heading));
+        assert!(matches!(&doc.blocks[1], Block::Element(el) if classify(el) == ElementKind::Heading));
     }
 
     #[test]
     fn indented_block_comment_is_recognized_at_block_level() {
         let doc = parse_document("#[ one ]\n\n  /* indented note */\n\n#[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
-        assert!(matches!(&doc.blocks[0], Block::Heading(_)));
-        assert!(matches!(&doc.blocks[1], Block::Heading(_)));
+        assert!(matches!(&doc.blocks[0], Block::Element(el) if classify(el) == ElementKind::Heading));
+        assert!(matches!(&doc.blocks[1], Block::Element(el) if classify(el) == ElementKind::Heading));
     }
 
     #[test]
@@ -1187,13 +1254,14 @@ mod tests {
     fn heading_supports_inline_colon_connection() {
         let doc = parse_document("#[ Overview ]:{ id: intro, tag: main }\n").unwrap();
         match &doc.blocks[0] {
-            Block::Heading(h) => {
+            Block::Element(el) => {
+                assert_eq!(classify(el), ElementKind::Heading);
                 assert_eq!(
-                    h.attrs,
-                    Some(Value::Map(vec![
+                    el.value,
+                    Some(ElementValue::Data(Value::Map(vec![
                         ("id".into(), Value::String("intro".into())),
                         ("tag".into(), Value::String("main".into())),
-                    ]))
+                    ])))
                 );
             }
             other => panic!("expected heading, got {other:?}"),
@@ -1361,6 +1429,61 @@ mod tests {
             }
             other => panic!("expected paragraph, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn bare_absolute_path_parses_as_a_plain_scalar() {
+        // Group B of docs/reviews/2026-08-22-link-reference-uri-schemes.md:
+        // a leading `/` can never start a map key, so this is unambiguous.
+        assert_eq!(
+            parse_value("/readme.md").unwrap(),
+            Value::String("/readme.md".into())
+        );
+        let doc = parse_document("@(/etc/hosts)[Hosts]\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.args, Some(Value::String("/etc/hosts".into())));
+            }
+            other => panic!("expected element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bare_scheme_uri_parses_as_one_scalar_not_a_map() {
+        // Group B: `scheme://...` at a "fresh value" position (no `key:`
+        // wrapper) used to be misread as `Map([(scheme, "//...")])` --
+        // `://` immediately after the identifier now forces the whole
+        // thing to be read as one scalar instead.
+        assert_eq!(
+            parse_value("https://example.com/path").unwrap(),
+            Value::String("https://example.com/path".into())
+        );
+        assert_eq!(
+            parse_value("file://some/where").unwrap(),
+            Value::String("file://some/where".into())
+        );
+        let doc = parse_document("@(https://example.com)[Site]\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.args, Some(Value::String("https://example.com".into())));
+            }
+            other => panic!("expected element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn explicit_key_colon_scheme_uri_is_still_a_map() {
+        // The disambiguation only fires at a fresh-value position -- a
+        // real `key: value` entry (e.g. `url: https://...`, tested above
+        // in `preserves_colon_in_url_values`) is unaffected since it never
+        // goes through `parse_map_body_or_scalar` for its value half.
+        assert_eq!(
+            parse_value("url:https://example.com").unwrap(),
+            Value::Map(vec![(
+                "url".into(),
+                Value::String("https://example.com".into())
+            )])
+        );
     }
 
     #[test]

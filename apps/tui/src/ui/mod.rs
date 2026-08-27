@@ -54,6 +54,65 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
 }
 
+/// Animated placeholder screen shown while the workspace scan (`App::new`)
+/// runs on a background thread. `tick` is a monotonically increasing frame
+/// counter driven by the caller's poll loop -- there's no real progress
+/// percentage to report (the scan doesn't know the file count up front),
+/// so this renders a spinner plus a sweeping indeterminate bar instead.
+pub fn draw_loading(f: &mut Frame, tick: usize, message: &str) {
+    let area = f.area();
+
+    let width = 54.min(area.width.saturating_sub(4)).max(20);
+    let height = 5.min(area.height.saturating_sub(2)).max(4);
+    let popup_area = Rect {
+        x: area.x + (area.width.saturating_sub(width)) / 2,
+        y: area.y + (area.height.saturating_sub(height)) / 2,
+        width,
+        height,
+    };
+
+    f.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" TypedMark Workbench TUI ")
+        .border_style(Style::default().fg(Color::Cyan));
+
+    const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    let spinner = SPINNER[tick % SPINNER.len()];
+
+    let bar_width = (width as usize).saturating_sub(4).max(6);
+    let segment_len = (bar_width / 4).max(1);
+    let period = bar_width + segment_len;
+    let pos = tick % period;
+
+    let bar: String = (0..bar_width)
+        .map(|i| {
+            if i >= pos.saturating_sub(segment_len) && i < pos {
+                '█'
+            } else {
+                '░'
+            }
+        })
+        .collect();
+
+    let text = vec![
+        Line::from(Span::styled(
+            format!("  {spinner} {message}"),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            format!("  {bar}"),
+            Style::default().fg(Color::Cyan),
+        )),
+    ];
+
+    let p = Paragraph::new(text).block(block);
+    f.render_widget(p, popup_area);
+}
+
 fn get_border_style(is_focused: bool) -> Style {
     if is_focused {
         Style::default()

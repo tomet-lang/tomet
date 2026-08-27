@@ -1,5 +1,6 @@
 //! Applies `typedmark_config::PrinterConfig`'s style rules (meta format,
-//! wikilink/link spacing, per-field `@meta` formatting) to a single
+//! link-key spacing (`target`, `@link`/`<embed>`'s one shared key), per-field
+//! `@meta` formatting) to a single
 //! `typedmark_ast::Value` or `Element`, returning `.tm`-syntax text.
 //! Deliberately scoped to single nodes -- no `Document`, no tree
 //! position, no recursion into sibling/child elements of other kinds --
@@ -57,13 +58,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
         Value::Map(entries) => {
             if entries.len() == 1 {
                 let key = &entries[0].0;
-                if key == "wiki" {
-                    let space = if config.wikilink_no_space { "" } else { " " };
-                    format!(
-                        "@(wiki:{space}{})",
-                        render_value_inner_with_config(&entries[0].1, config)
-                    )
-                } else if key == "url" || key == "link" {
+                if key == "target" {
                     let space = if config.link_no_space { "" } else { " " };
                     format!(
                         "@({key}:{space}{})",
@@ -74,7 +69,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                     for (idx, (k, val)) in entries.iter().enumerate() {
                         let val_str = render_value_inner_with_config(val, config);
                         if idx == 0
-                            && (k == "variant" || k == "lang" || k == "src" || k == "format")
+                            && (k == "variant" || k == "lang" || k == "format")
                         {
                             parts.push(val_str);
                         } else {
@@ -87,7 +82,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                 let mut parts = Vec::new();
                 for (idx, (k, val)) in entries.iter().enumerate() {
                     let val_str = render_value_inner_with_config(val, config);
-                    if idx == 0 && (k == "variant" || k == "lang" || k == "src" || k == "format") {
+                    if idx == 0 && (k == "variant" || k == "lang" || k == "format") {
                         parts.push(val_str);
                     } else {
                         parts.push(format!("{k}: {val_str}"));
@@ -103,13 +98,7 @@ pub fn render_args_with_config(v: &Value, config: &PrinterConfig) -> String {
     if let Value::Map(entries) = v {
         if entries.len() == 1 {
             let key = &entries[0].0;
-            if key == "wiki" {
-                let space = if config.wikilink_no_space { "" } else { " " };
-                return format!(
-                    "wiki:{space}{}",
-                    render_value_inner_with_config(&entries[0].1, config)
-                );
-            } else if key == "url" || key == "link" {
+            if key == "target" {
                 let space = if config.link_no_space { "" } else { " " };
                 return format!(
                     "{key}:{space}{}",
@@ -241,17 +230,23 @@ mod tests {
     }
 
     #[test]
-    fn render_args_with_config_handles_wiki_and_link() {
+    fn render_args_with_config_handles_target() {
         let cfg = PrinterConfig::default();
-        let wiki = Value::Map(vec![(
-            "wiki".to_string(),
-            Value::String("target".to_string()),
+        let reference = Value::Map(vec![(
+            "target".to_string(),
+            Value::String("ref:name".to_string()),
         )]);
-        assert_eq!(render_args_with_config(&wiki, &cfg), "wiki: target");
+        assert_eq!(
+            render_args_with_config(&reference, &cfg),
+            "target: \"ref:name\""
+        );
 
         let mut cfg_no_space = PrinterConfig::default();
-        cfg_no_space.wikilink_no_space = true;
-        assert_eq!(render_args_with_config(&wiki, &cfg_no_space), "wiki:target");
+        cfg_no_space.link_no_space = true;
+        assert_eq!(
+            render_args_with_config(&reference, &cfg_no_space),
+            "target:\"ref:name\""
+        );
     }
 
     #[test]

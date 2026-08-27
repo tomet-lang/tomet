@@ -435,7 +435,7 @@
     }
   },
   {
-    "type": "list_checkbox",
+    "type": "list_marker",
     "named": true,
     "fields": {}
   },
@@ -564,12 +564,12 @@
           }
         ]
       },
-      "checkbox": {
+      "marker": {
         "multiple": false,
         "required": false,
         "types": [
           {
-            "type": "list_checkbox",
+            "type": "list_marker",
             "named": true
           }
         ]
@@ -882,12 +882,12 @@
           }
         ]
       },
-      "checkbox": {
+      "marker": {
         "multiple": false,
         "required": false,
         "types": [
           {
-            "type": "list_checkbox",
+            "type": "list_marker",
             "named": true
           }
         ]

@@ -5,8 +5,6 @@
 use std::path::PathBuf;
 
 use super::{App, FocusedPane, PendingConfirm};
-use crate::engine::migration::MigrationEngine;
-use typedmark_edit::batch_meta::BatchMetaEngine;
 
 #[derive(Debug, Clone)]
 pub struct InlineEditor {
@@ -235,21 +233,26 @@ impl App {
                 editor.is_dirty = false;
                 let path_display = editor.file_path.display().to_string();
                 self.status_message = format!("Saved {path_display} successfully!");
-                self.tree_nodes = MigrationEngine::scan_tree_with_config(
-                    &self.dir_path,
-                    &self.printer_config,
-                    &self.config_root,
-                );
-                self.migration_items = MigrationEngine::scan_with_config(
-                    &self.dir_path,
-                    &self.printer_config,
-                    &self.config_root,
-                );
-                self.meta_entries = BatchMetaEngine::scan_with_config(
-                    &self.dir_path,
-                    &self.printer_config,
-                    &self.config_root,
-                );
+                let saved_path = editor.file_path.clone();
+                // The saved path already existed and isn't renamed by this
+                // write, so its catalog entry can't change -- no need to
+                // touch `self.index`/`sync_workspace_views`. Only the
+                // lazily-loaded preview caches for *this* path need
+                // invalidating, since they'd otherwise keep serving
+                // pre-edit content.
+                if let Some(item) = self
+                    .migration_items
+                    .iter_mut()
+                    .find(|i| i.source_path == saved_path)
+                {
+                    item.markdown_src.clear();
+                    item.typedmark_src.clear();
+                }
+                if let Some(entry) = self.meta_entries.iter_mut().find(|e| e.path == saved_path) {
+                    entry.original_src.clear();
+                    entry.modified_src.clear();
+                    entry.metadata.clear();
+                }
             } else {
                 self.status_message = format!("Failed to write to {}", editor.file_path.display());
             }

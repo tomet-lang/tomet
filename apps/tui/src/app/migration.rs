@@ -5,7 +5,6 @@ use std::path::Path;
 
 use super::{App, PendingConfirm};
 use crate::engine::migration::MigrationEngine;
-use typedmark_edit::batch_meta::BatchMetaEngine;
 
 impl App {
     pub fn visible_migration_tree_indices(&self) -> Vec<usize> {
@@ -31,73 +30,27 @@ impl App {
         if real_index >= self.tree_nodes.len() {
             return;
         }
-        let dir_depth = self.tree_nodes[real_index].depth;
-        let is_dir = self.tree_nodes[real_index].is_dir;
+        let node_path = self.tree_nodes[real_index].path.clone();
 
-        if is_dir {
-            let mut all_selected = true;
-            let mut count = 0;
-
-            for desc in &self.tree_nodes[(real_index + 1)..] {
-                if desc.depth <= dir_depth {
-                    break;
-                }
-                if let Some(item) = &desc.migration_item {
-                    count += 1;
-                    if !item.selected {
-                        all_selected = false;
-                    }
-                }
-            }
-
-            let new_state = if count > 0 { !all_selected } else { true };
-            let node_path = self.tree_nodes[real_index].path.clone();
-
-            for desc in &mut self.tree_nodes[real_index..] {
-                if desc.depth <= dir_depth && desc.path != node_path {
-                    break;
-                }
-                if let Some(item) = desc.migration_item.as_mut() {
-                    item.selected = new_state;
-                }
-            }
+        if self.tree_nodes[real_index].is_dir {
+            let (selected, total) = self.get_dir_migration_status(&node_path);
+            let new_state = if total > 0 { selected < total } else { true };
             for item in &mut self.migration_items {
                 if item.source_path.starts_with(&node_path) {
                     item.selected = new_state;
                 }
             }
-        } else {
-            let node_path = self.tree_nodes[real_index].path.clone();
-            if let Some(item) = self.tree_nodes[real_index].migration_item.as_mut() {
-                item.selected = !item.selected;
-            }
-            if let Some(item) = self
-                .migration_items
-                .iter_mut()
-                .find(|i| i.source_path == node_path)
-            {
-                item.selected = !item.selected;
-            }
+        } else if let Some(item) = self
+            .migration_items
+            .iter_mut()
+            .find(|i| i.source_path == node_path)
+        {
+            item.selected = !item.selected;
         }
     }
 
     pub fn get_dir_migration_status_for_node(&self, real_index: usize) -> (usize, usize) {
-        let dir_node = &self.tree_nodes[real_index];
-        let mut total = 0;
-        let mut selected = 0;
-
-        for desc in &self.tree_nodes[(real_index + 1)..] {
-            if desc.depth <= dir_node.depth {
-                break;
-            }
-            if let Some(item) = &desc.migration_item {
-                total += 1;
-                if item.selected {
-                    selected += 1;
-                }
-            }
-        }
-        (selected, total)
+        self.get_dir_migration_status(&self.tree_nodes[real_index].path)
     }
 
     pub fn get_dir_migration_status(&self, dir_path: &Path) -> (usize, usize) {
@@ -200,6 +153,13 @@ impl App {
     }
 
     pub(super) fn migration_execute_action(&mut self) {
+        let touched: Vec<(std::path::PathBuf, std::path::PathBuf)> = self
+            .migration_items
+            .iter()
+            .filter(|i| i.selected && !i.converted)
+            .map(|i| (i.source_path.clone(), i.target_path.clone()))
+            .collect();
+
         match MigrationEngine::execute_with_config(
             &mut self.migration_items,
             false,
@@ -208,16 +168,11 @@ impl App {
             Ok(count) => {
                 self.status_message =
                     format!("Successfully converted {count} Markdown file(s) to .tm!");
-                self.tree_nodes = MigrationEngine::scan_tree_with_config(
-                    &self.dir_path,
-                    &self.printer_config,
-                    &self.config_root,
-                );
-                self.meta_entries = BatchMetaEngine::scan_with_config(
-                    &self.dir_path,
-                    &self.printer_config,
-                    &self.config_root,
-                );
+                for (source, target) in &touched {
+                    self.index.refresh_path(source);
+                    self.index.refresh_path(target);
+                }
+                self.sync_workspace_views();
             }
             Err(e) => {
                 self.status_message = format!("Migration error: {e}");

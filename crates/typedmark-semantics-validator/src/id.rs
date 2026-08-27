@@ -1,10 +1,10 @@
 use std::ops::ControlFlow;
-use typedmark_ast::{Document, Span, Value};
-use typedmark_walker::{Node, Visitor, walk_document};
+use typedmark_ast::{Document, Element, Span, Value};
+use typedmark_walker::{Visitor, element_attrs_view, walk_document};
 
 /// Walks every node in `doc` and returns `(id, span)` for each `id` key
-/// found in an attached `Value::Map` (see `typedmark-walker::Node::attrs`),
-/// in document order.
+/// found in an attached `Value::Map` (see
+/// `typedmark-walker::element_attrs_view`), in document order.
 pub(crate) fn collect_ids(doc: &Document) -> Vec<(String, Span)> {
     let mut collector = Collector { ids: Vec::new() };
     let _ = walk_document(doc, &mut collector);
@@ -16,9 +16,9 @@ struct Collector {
 }
 
 impl Visitor<()> for Collector {
-    fn visit(&mut self, node: Node<'_>) -> ControlFlow<()> {
-        if let Some(id) = id_from_value(node.attrs()) {
-            self.ids.push((id, node.span()));
+    fn visit(&mut self, el: &Element) -> ControlFlow<()> {
+        if let Some(id) = id_from_value(element_attrs_view(el)) {
+            self.ids.push((id, el.span));
         }
         ControlFlow::Continue(())
     }
@@ -27,7 +27,7 @@ impl Visitor<()> for Collector {
 /// Looks up an `id` key in a `Value::Map` and renders it to a comparable
 /// string (`Value::String` as-is, `Value::Int` via `to_string`; any other
 /// shape isn't treated as an id).
-fn id_from_value(value: Option<&Value>) -> Option<String> {
+fn id_from_value(value: Option<Value>) -> Option<String> {
     let Value::Map(entries) = value? else {
         return None;
     };

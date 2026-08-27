@@ -3,17 +3,20 @@
 //! This is a generic, data-driven mapping (not a full semantic engine):
 //! most `<T>`/`@name` elements become a `<div>`/`<span>` carrying their
 //! `args` map as `data-*` attributes, with `content` as inner content. A
-//! handful of element kinds get special handling because the spec (see
-//! `docs/tmt/typedmark.tm`) gives them fixed meaning: `@(url:..)` /
-//! `@(file:..)` become links, `@(ref:..)` becomes an anchor reference,
-//! `@meta` carries no visible content, and `@links{}` containers render
-//! their bare children as a definition list of anchors.
+//! handful of element kinds get special handling because the spec gives
+//! them fixed meaning: `@link(target:..)` becomes a link -- an `<a href>`
+//! for most target schemes, or a same-document anchor reference (`<a
+//! href="#link-...">`) when the target's scheme is `id:` -- `@meta`
+//! carries no visible content, and `@links{}` containers render their bare
+//! children as a definition list of anchors.
 
 use typedmark_ast::{
-    Block, Document, Element, ElementValue, Heading, Inline, InterpExpr, InterpExprKind, ListItem,
-    Literal, Value,
+    Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
-use typedmark_semantics::{classify, normalized_element_args};
+use typedmark_semantics::{
+    ElementKind, TargetScheme, classify, heading_level, link_target, list_items, list_ordered,
+    normalized_element_args, target_scheme,
+};
 
 const DEFAULT_STYLE: &str = "\
 body { font-family: sans-serif; line-height: 1.6; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; }
@@ -175,7 +178,6 @@ fn render_block(
     state: &mut HeadingState,
 ) {
     match block {
-        Block::Heading(h) => render_heading(h, out, options, state),
         Block::Paragraph(p) => {
             // Elements with no visible output (`@meta`, ...) placed on
             // adjacent lines with no blank line between them lazily
@@ -191,21 +193,34 @@ fn render_block(
                 out.push_str("</p>\n");
             }
         }
-        Block::List(list) => render_list(&list.items, list.ordered, out),
+        Block::Element(el) if list_ordered(el).is_some() => render_list(el, out),
+        Block::Element(el) if classify(el) == ElementKind::Heading => {
+            render_heading_element(el, out, options, state)
+        }
         Block::Element(el) => render_element(el, out, false),
     }
 }
 
-fn render_heading(
-    h: &Heading,
+/// Called only from `render_block`'s top-level dispatch, never from
+/// `render_element`'s recursive `kind.as_str()` match -- a nested/inline
+/// `@heading(...)` (e.g. inside a blockquote's content, or `${...}`-free
+/// prose) falls through to `render_generic_element` instead, since
+/// CommonMark/TypedMark headings are both block-position-only by grammar.
+fn render_heading_element(
+    el: &Element,
     out: &mut String,
     options: &RenderOptions,
     state: &mut HeadingState,
 ) {
-    let level = h.level.clamp(1, 6);
-    let (mut id, class, data) = split_attrs(h.attrs.as_ref());
+    let level = heading_level(el).unwrap_or(1);
+    let content = el.content.as_deref().unwrap_or(&[]);
+    let value_data = match &el.value {
+        Some(ElementValue::Data(v)) => Some(v),
+        _ => None,
+    };
+    let (mut id, class, data) = split_attrs(value_data);
     if id.is_none() && options.auto_slug_headings {
-        let text = inlines_to_plain(&h.content);
+        let text = inlines_to_plain(content);
         let slug = state.slugs.slug_for(&text);
         if !slug.is_empty() {
             id = Some(slug);
@@ -215,41 +230,64 @@ fn render_heading(
     push_named_attrs(out, &id, &class, &data);
     out.push('>');
     if options.number_headings {
-        let label = state.counters.advance(h.level);
+        let label = state.counters.advance(level);
         // No literal space after `</span>` -- spacing is `.tm-heading-number`'s
         // `margin-right` in `DEFAULT_STYLE`, not baked into the content, so
         // e.g. copy-pasting the heading text doesn't pick up a stray space.
         out.push_str(&format!("<span class=\"tm-heading-number\">{label}</span>"));
     }
-    render_inlines(&h.content, out);
+    render_inlines(content, out);
     out.push_str(&format!("</h{level}>\n"));
 }
 
-fn render_list(items: &[ListItem], ordered: bool, out: &mut String) {
-    let tag = if ordered { "ol" } else { "ul" };
+fn render_list(el: &Element, out: &mut String) {
+    let tag = if list_ordered(el) == Some(true) {
+        "ol"
+    } else {
+        "ul"
+    };
     out.push_str(&format!("<{tag}>\n"));
-    for item in items {
-        let (id, class, data) = split_attrs(item.attrs.as_ref());
+    for item in list_items(el) {
+        let attrs = match &item.value {
+            Some(ElementValue::Data(v)) => Some(v),
+            _ => None,
+        };
+        let (id, class, data) = split_attrs(attrs);
         out.push_str("<li");
         push_named_attrs(out, &id, &class, &data);
         out.push('>');
-        if let Some(m) = &item.marker {
-            match m.as_str() {
-                " " => out.push_str("<input type=\"checkbox\" disabled /> "),
-                "x" | "X" => out.push_str("<input type=\"checkbox\" checked disabled /> "),
+        if let Some(marker) = &item.args {
+            out.push_str("<span class=\"tm-list-marker\"");
+            match marker {
+                Value::Map(map) => {
+                    for (k, v) in map {
+                        out.push_str(&format!(
+                            " data-{}=\"{}\"",
+                            escape_attr(k),
+                            escape_attr(&value_to_plain(v))
+                        ));
+                    }
+                }
                 other => out.push_str(&format!(
-                    "<span class=\"tm-list-marker\" data-marker=\"{}\">[{}]</span> ",
-                    escape_html(other),
-                    escape_html(other)
+                    " data-marker=\"{}\"",
+                    escape_attr(&value_to_plain(other))
                 )),
             }
+            out.push('>');
+            let text = value_to_plain(marker);
+            if !text.is_empty() {
+                out.push_str(&format!("[{}]", escape_html(&text)));
+            }
+            out.push_str("</span> ");
         }
-        render_inlines(&item.content, out);
-        if !item.children.is_empty() {
+        render_inlines(item.content.as_deref().unwrap_or(&[]), out);
+        if let Some(children) = &item.children {
             out.push('\n');
-            for child in &item.children {
-                if let Block::List(sub) = child {
-                    render_list(&sub.items, sub.ordered, out);
+            for child in children {
+                if let Block::Element(sub) = child {
+                    if list_ordered(sub).is_some() {
+                        render_list(sub, out);
+                    }
                 }
             }
         }
@@ -273,9 +311,7 @@ fn render_element(el: &Element, out: &mut String, inline: bool) {
         "meta" => {}
         "config" => {}
         "links" => render_links_container(el, out),
-        "url" => render_href_element(el, "url", out, inline),
-        "file" => render_href_element(el, "file", out, inline),
-        "ref" => render_ref_element(el, out, inline),
+        "link" => render_link_element(el, out, inline),
         "embed" => render_embed_element(el, out),
         "hr" => render_hr_element(el, out),
         "em" | "strong" | "mark" => render_wrapped_inline(el, kind.as_str(), out),
@@ -433,20 +469,17 @@ fn render_blockquote_element(el: &Element, out: &mut String, inline: bool) {
     }
 }
 
+/// Strips `target`'s scheme prefix the same way `render_link_element`
+/// does -- e.g. `<embed>(ref:name)` (recovered from the parser's
+/// `identifier:` key split, see `normalized_element_args`) must render
+/// `src="name"`, not the literal `"ref:name"`. Under the old per-scheme-key
+/// design this stripping was implicit (the scheme was a separate key,
+/// never part of the value string); now that both `@link` and `<embed>`
+/// share one `target` key with the scheme embedded in the string, `<embed>`
+/// needs the same treatment `@link` gets, not just a raw passthrough.
 fn render_embed_element(el: &Element, out: &mut String) {
-    let args = normalized_element_args(el);
-    let src = args
-        .as_ref()
-        .and_then(as_map)
-        .and_then(|m| {
-            map_get(m, "src")
-                .or_else(|| map_get(m, "path"))
-                .or_else(|| map_get(m, "file"))
-                .or_else(|| map_get(m, "url"))
-                .or_else(|| map_get(m, "wiki"))
-        })
-        .map(value_to_plain)
-        .unwrap_or_default();
+    let raw_target = link_target(el, &classify(el)).unwrap_or_default();
+    let (_, src) = target_scheme(&raw_target);
     let alt = el
         .content
         .as_ref()
@@ -454,7 +487,7 @@ fn render_embed_element(el: &Element, out: &mut String) {
         .unwrap_or_default();
     out.push_str(&format!(
         "<img src=\"{}\" alt=\"{}\">\n",
-        escape_attr(&src),
+        escape_attr(src),
         escape_attr(&alt)
     ));
 }
@@ -476,40 +509,33 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
     s
 }
 
-fn render_href_element(el: &Element, key: &str, out: &mut String, inline: bool) {
-    let href = el
-        .args
-        .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, key))
-        .map(value_to_plain)
-        .unwrap_or_default();
-    out.push_str(&format!(
-        "<a class=\"tm-{key}\" href=\"{}\"",
-        escape_attr(&href)
-    ));
-    push_data_attrs(out, el.args.as_ref(), &[key]);
-    out.push('>');
-    render_content_or_fallback(el, &href, out);
-    out.push_str("</a>");
-    if !inline {
-        out.push('\n');
-    }
-}
+/// `@link(target:..)` -- the target string's own scheme prefix (see
+/// `typedmark_semantics::target_scheme`) decides whether this is a
+/// same-document anchor reference (`id:`) or a real `href` (everything
+/// else: url/file/tm/ref). The scheme prefix itself is stripped before
+/// rendering -- it's addressing metadata, not part of the visible target.
+fn render_link_element(el: &Element, out: &mut String, inline: bool) {
+    let normalized_args = normalized_element_args(el);
+    let raw_target = link_target(el, &classify(el)).unwrap_or_default();
+    let (scheme, target) = target_scheme(&raw_target);
+    let target = target.to_string();
 
-fn render_ref_element(el: &Element, out: &mut String, inline: bool) {
-    let target = el
-        .args
-        .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, "ref"))
-        .map(value_to_plain)
-        .unwrap_or_default();
-    out.push_str(&format!(
-        "<a class=\"tm-ref\" href=\"#link-{}\"",
-        escape_attr(&target)
-    ));
-    push_data_attrs(out, el.args.as_ref(), &["ref"]);
+    let (class, href) = match scheme {
+        TargetScheme::Id => ("tm-id".to_string(), format!("#link-{}", escape_attr(&target))),
+        other => (format!("tm-{}", other.as_str()), escape_attr(&target)),
+    };
+    out.push_str(&format!("<a class=\"{class}\" href=\"{href}\""));
+    // Bare-scalar args (`@link(readme.md)`, `@link(https://example.com)`,
+    // ...) are already fully captured by `target` above --
+    // `push_data_attrs`'s non-map fallback would otherwise duplicate that
+    // same value as a redundant `data-value` attribute. Uses the
+    // *normalized* args (not raw `el.args`) so a recovered scheme key
+    // (`@link(tm:foo, predicate:x)`'s `tm` entry, folded into `target` by
+    // `normalized_element_args`) doesn't also leak out as a stray
+    // `data-tm` attribute alongside the real `target`-derived `href`.
+    if matches!(normalized_args, Some(Value::Map(_))) {
+        push_data_attrs(out, normalized_args.as_ref(), &["target"]);
+    }
     out.push('>');
     render_content_or_fallback(el, &target, out);
     out.push_str("</a>");
@@ -725,6 +751,21 @@ mod tests {
     }
 
     #[test]
+    fn nested_inline_heading_falls_back_to_generic_rendering() {
+        // `@heading(2)[...]` outside block-top-level position (nested
+        // inside a blockquote's content here) never renders as a real
+        // `<h2>` -- only `render_block`'s top-level dispatch special-cases
+        // headings (D5); `render_element`'s generic `kind.as_str()` match
+        // has no `"heading"` arm at all.
+        let doc = parse_document("<blockquote>[ @heading(2)[Nested] ]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<blockquote><span class=\"tm-element tm-heading\" data-value=\"2\">Nested</span></blockquote>\n"
+        );
+    }
+
+    #[test]
     fn default_options_leave_headings_unnumbered() {
         let doc = parse_document("#[ One ]\n").unwrap();
         assert_eq!(
@@ -867,8 +908,8 @@ mod tests {
     }
 
     #[test]
-    fn infers_url_link_from_at_element() {
-        let doc = parse_document("@(url:https://example.com)[Wiki]\n").unwrap();
+    fn renders_link_with_explicit_target_key() {
+        let doc = parse_document("@link(target:https://example.com)[Wiki]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -877,18 +918,37 @@ mod tests {
     }
 
     #[test]
-    fn naming_a_url_element_still_renders_a_real_link() {
-        // Regression test for the footgun in `.agents/tasks/ssg-readiness.md`
-        // step 4: `@link(url:...)` used to fall through to
-        // `render_generic_element` (an empty, non-clickable `<div>`)
-        // because an explicit name opted the element out of `url`/`file`/
-        // `ref` inference entirely. It must render the same real `<a>` a
-        // bare `@(url:...)` does.
-        let doc = parse_document("@link(url:https://example.com)[Wiki]\n").unwrap();
+    fn renders_link_from_bare_scheme_uri_positional_target() {
+        // `https://...` is shape-unambiguous, so the positional shorthand
+        // (no `target:` key at all) works: `builtin_positional_arg_key`
+        // normalizes it under `target` before `link_target` sees it.
+        let doc = parse_document("@link(https://example.com)[Wiki]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
             "<a class=\"tm-url\" href=\"https://example.com\">Wiki</a>\n"
+        );
+    }
+
+    #[test]
+    fn renders_link_from_bare_absolute_path_positional_target() {
+        // Same positional mechanism, other shape: a leading `/` is also
+        // shape-unambiguous (`target_scheme` defaults it to `File`).
+        let doc = parse_document("@link(/readme.md)[Readme]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<a class=\"tm-file\" href=\"/readme.md\">Readme</a>\n"
+        );
+    }
+
+    #[test]
+    fn renders_id_link_as_a_same_document_anchor() {
+        let doc = parse_document("@link(target:id:greeting)[Hello]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<a class=\"tm-id\" href=\"#link-greeting\">Hello</a>\n"
         );
     }
 
@@ -988,7 +1048,7 @@ mod tests {
 
     #[test]
     fn renders_embed_as_img() {
-        let doc = parse_document("<embed>(file:assets/pic.png)[a cat]\n").unwrap();
+        let doc = parse_document("<embed>(target:assets/pic.png)[a cat]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "<img src=\"assets/pic.png\" alt=\"a cat\">\n");
     }
@@ -1038,15 +1098,32 @@ mod tests {
     }
 
     #[test]
-    fn renders_list_with_generic_markers_and_attrs() {
+    fn renders_list_with_value_markers_and_attrs() {
         let doc = parse_document(
-            "- ( ) todo {tag: dev}\n- [x] done {id: task1}\n- (T) in-progress\n- (?) question\n",
+            "- (T) in-progress {tag: dev}\n- (\"?\") question {id: task1}\n",
         )
         .unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
-            "<ul>\n<li data-tag=\"dev\"><input type=\"checkbox\" disabled /> todo</li>\n<li id=\"task1\"><input type=\"checkbox\" checked disabled /> done</li>\n<li><span class=\"tm-list-marker\" data-marker=\"T\">[T]</span> in-progress</li>\n<li><span class=\"tm-list-marker\" data-marker=\"?\">[?]</span> question</li>\n</ul>\n"
+            "<ul>\n<li data-tag=\"dev\"><span class=\"tm-list-marker\" data-marker=\"T\">[T]</span> in-progress</li>\n<li id=\"task1\"><span class=\"tm-list-marker\" data-marker=\"?\">[?]</span> question</li>\n</ul>\n"
+        );
+    }
+
+    #[test]
+    fn bracket_content_is_plain_text_in_html() {
+        let doc = parse_document("- [T] content\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(body, "<ul>\n<li>[T] content</li>\n</ul>\n");
+    }
+
+    #[test]
+    fn renders_key_value_list_marker_as_multiple_data_attrs() {
+        let doc = parse_document("- (color: red, priority: high) content\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<ul>\n<li><span class=\"tm-list-marker\" data-color=\"red\" data-priority=\"high\"></span> content</li>\n</ul>\n"
         );
     }
 
