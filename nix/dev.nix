@@ -6,6 +6,7 @@
 
   typedmark,
   typedmark-lsp,
+  typedmark-web,
   ...
 }:
 let
@@ -25,7 +26,7 @@ mkShell rec {
   buildInputs = with pkgs; [
     typedmark
     typedmark-lsp
-    # typedmark-web
+    typedmark-web
 
     #[ CMake ]
     cmake

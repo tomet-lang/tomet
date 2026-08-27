@@ -1,0 +1,24 @@
+{
+	"name": "typedmark-web-frontend",
+	"private": true,
+	"version": "0.1.0",
+	"description": "CodeMirror 6 editor + app logic for the typedmark-web playground, bundled to dist/app.js",
+	"scripts": {
+		"build": "node esbuild.js",
+		"build:local": "node esbuild.js && cp dist/app.js ../static/app.js",
+		"watch": "node esbuild.js --watch",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@codemirror/commands": "^6.7.0",
+		"@codemirror/language": "^6.10.0",
+		"@codemirror/lint": "^6.8.0",
+		"@codemirror/state": "^6.4.0",
+		"@codemirror/view": "^6.34.0",
+		"@lezer/highlight": "^1.2.0"
+	},
+	"devDependencies": {
+		"esbuild": "^0.24.0",
+		"typescript": "^5.5.0"
+	}
+}
