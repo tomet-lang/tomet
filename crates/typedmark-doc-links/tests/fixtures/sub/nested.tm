@@ -1,0 +1,19 @@
+@meta{}
+
+@link(./sibling.txt)
+[ Source-relative: resolves next to this file, in sub/. ]
+
+@link(real.txt)
+[ Bare relative: resolves against the project root, not sub/. ]
+
+@link(target:ref:real)
+[ Ref: resolved by filename/stem search across the whole vault. ]
+
+@link(target:ref:no-such-note)
+[ Ref target that doesn't match anything. ]
+
+@link(target:tm:good.tm#anchor)
+[ Tm: project-root-relative like file:, fragment stripped before resolving. ]
+
+@link(target:tm:missing.tm#anchor)
+[ Tm target whose path portion doesn't exist. ]

@@ -6,6 +6,8 @@ pub mod ui;
 
 use std::io;
 use std::path::PathBuf;
+use std::sync::mpsc;
+use std::time::Duration;
 
 use crossterm::{
     event::{
@@ -28,8 +30,10 @@ pub fn run_tui(dir_path: PathBuf, config_path: Option<PathBuf>) -> anyhow::Resul
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(dir_path, config_path);
-    let res = run_app(&mut terminal, &mut app);
+    let res = match load_app_with_progress(&mut terminal, dir_path, config_path)? {
+        Some(mut app) => run_app(&mut terminal, &mut app),
+        None => Ok(()), // user quit while the workspace scan was still loading
+    };
 
     disable_raw_mode()?;
     execute!(
@@ -40,6 +44,48 @@ pub fn run_tui(dir_path: PathBuf, config_path: Option<PathBuf>) -> anyhow::Resul
     terminal.show_cursor()?;
 
     res
+}
+
+/// Runs `App::new` (which walks the whole workspace, parsing every file it
+/// finds) on a background thread, drawing an animated loading screen until
+/// it finishes. Without this, the alternate screen stays blank for however
+/// long the scan takes -- there's no other feedback that the app started.
+/// Returns `Ok(None)` if the user quits (Ctrl+C/Esc) before the scan completes.
+fn load_app_with_progress<B: ratatui::backend::Backend>(
+    terminal: &mut Terminal<B>,
+    dir_path: PathBuf,
+    config_path: Option<PathBuf>,
+) -> anyhow::Result<Option<App>> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let app = App::new(dir_path, config_path);
+        let _ = tx.send(app);
+    });
+
+    let mut tick: usize = 0;
+    loop {
+        terminal.draw(|f| ui::draw_loading(f, tick, "Scanning workspace..."))?;
+
+        if event::poll(Duration::from_millis(0))? {
+            if let Event::Key(key) = event::read()? {
+                let is_ctrl_c = key.modifiers.contains(KeyModifiers::CONTROL)
+                    && matches!(key.code, KeyCode::Char('c') | KeyCode::Char('C'));
+                if is_ctrl_c || key.code == KeyCode::Esc {
+                    return Ok(None);
+                }
+            }
+        }
+
+        match rx.recv_timeout(Duration::from_millis(80)) {
+            Ok(app) => return Ok(Some(app)),
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                anyhow::bail!("workspace scan thread panicked before finishing")
+            }
+        }
+
+        tick = tick.wrapping_add(1);
+    }
 }
 
 fn run_app<B: ratatui::backend::Backend>(

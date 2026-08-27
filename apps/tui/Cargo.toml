@@ -18,7 +18,6 @@ tree-sitter-typedmark = { workspace = true }
 #[ Crates.io ]
 anyhow = { workspace = true }
 crossterm = { workspace = true }
-ignore = { workspace = true }
 ratatui = { workspace = true }
 tree-sitter = { workspace = true }
 

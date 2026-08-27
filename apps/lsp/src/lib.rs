@@ -8,9 +8,9 @@ use lsp_types::{
     Range, SymbolKind, TextEdit, Uri,
 };
 use std::ops::ControlFlow;
-use typedmark_ast::{ElementValue, Inline, InterpExprKind, Sigil, Span, Value};
-use typedmark_semantics::{classify, infer_at_kind, normalized_element_args};
-use typedmark_walker::{Node, Visitor, walk_document};
+use typedmark_ast::{Element, ElementValue, Inline, InterpExprKind, Sigil, Span, Value};
+use typedmark_semantics::{ElementKind, classify, heading_level, normalized_element_args};
+use typedmark_walker::{Visitor, element_attrs_view, walk_document};
 
 /// Converts an AST [`Span`] to an LSP [`Range`].
 pub fn span_to_range(span: &Span) -> Range {
@@ -109,33 +109,21 @@ pub fn hover_for(text: &str, pos: Position) -> Option<Hover> {
     }
 
     impl Visitor<()> for HoverFinder {
-        fn visit(&mut self, node: Node<'_>) -> ControlFlow<()> {
-            let span = node.span();
+        fn visit(&mut self, el: &Element) -> ControlFlow<()> {
+            let span = el.span;
             if span_contains(&span, self.line, self.col) {
-                let hover_text = match node {
-                    Node::Heading(h) => {
-                        format!("**Heading Level {}**", h.level)
+                let kind = classify(el);
+                let hover_text = if kind == ElementKind::Bare {
+                    format!("**List Item** (marker: `{}`)", list_item_marker_text(el))
+                } else if kind == ElementKind::Heading {
+                    format!("**Heading Level {}**", heading_level(el).unwrap_or(1))
+                } else {
+                    let mut desc = format!("**Element**: `{}`\n", sigil_display_name(&el.sigil));
+                    desc.push_str(&format!("- **Classification**: `{}`\n", kind.as_str()));
+                    if let Some(norm_args) = normalized_element_args(el) {
+                        desc.push_str(&format!("- **Normalized Args**: `{norm_args:?}`\n"));
                     }
-                    Node::ListItem(item) => {
-                        format!(
-                            "**List Item** (marker: `{}`)",
-                            item.marker.as_deref().unwrap_or("-")
-                        )
-                    }
-                    Node::Element(el) => {
-                        let kind = classify(el);
-                        let inferred = infer_at_kind(el.args.as_ref());
-                        let mut desc =
-                            format!("**Element**: `{}`\n", sigil_display_name(&el.sigil));
-                        desc.push_str(&format!("- **Classification**: `{}`\n", kind.as_str()));
-                        if let Some(inf) = inferred {
-                            desc.push_str(&format!("- **Inferred Kind**: `{inf}`\n"));
-                        }
-                        if let Some(norm_args) = normalized_element_args(el) {
-                            desc.push_str(&format!("- **Normalized Args**: `{norm_args:?}`\n"));
-                        }
-                        desc
-                    }
+                    desc
                 };
                 self.best_match = Some((span, hover_text));
             }
@@ -178,53 +166,50 @@ pub fn document_symbols_for(text: &str) -> Vec<DocumentSymbol> {
     struct SymbolCollector(Vec<DocumentSymbol>);
 
     impl Visitor<()> for SymbolCollector {
-        fn visit(&mut self, node: Node<'_>) -> ControlFlow<()> {
-            let span = node.span();
-            let range = span_to_range(&span);
-            let symbol = match node {
-                Node::Heading(h) => {
-                    let title = extract_inlines_text(&h.content);
-                    let name = format!("{} {}", "#".repeat(h.level as usize), title);
-                    #[allow(deprecated)]
-                    DocumentSymbol {
-                        name,
-                        detail: Some(format!("Heading Level {}", h.level)),
-                        kind: SymbolKind::STRING,
-                        tags: None,
-                        deprecated: None,
-                        range,
-                        selection_range: range,
-                        children: None,
-                    }
+        fn visit(&mut self, el: &Element) -> ControlFlow<()> {
+            let range = span_to_range(&el.span);
+            let kind = classify(el);
+            let symbol = if kind == ElementKind::Heading {
+                let level = heading_level(el).unwrap_or(1);
+                let title = extract_inlines_text(el.content.as_deref().unwrap_or(&[]));
+                let name = format!("{} {}", "#".repeat(level as usize), title);
+                #[allow(deprecated)]
+                DocumentSymbol {
+                    name,
+                    detail: Some(format!("Heading Level {level}")),
+                    kind: SymbolKind::STRING,
+                    tags: None,
+                    deprecated: None,
+                    range,
+                    selection_range: range,
+                    children: None,
                 }
-                Node::Element(el) => {
-                    let name = sigil_display_name(&el.sigil);
-                    #[allow(deprecated)]
-                    DocumentSymbol {
-                        name,
-                        detail: el.args.as_ref().map(|a| format!("{a:?}")),
-                        kind: SymbolKind::OBJECT,
-                        tags: None,
-                        deprecated: None,
-                        range,
-                        selection_range: range,
-                        children: None,
-                    }
+            } else if kind == ElementKind::Bare {
+                let text = extract_inlines_text(el.content.as_deref().unwrap_or(&[]));
+                let marker = list_item_marker_text(el);
+                #[allow(deprecated)]
+                DocumentSymbol {
+                    name: format!("{} {}", marker, text),
+                    detail: None,
+                    kind: SymbolKind::ENUM_MEMBER,
+                    tags: None,
+                    deprecated: None,
+                    range,
+                    selection_range: range,
+                    children: None,
                 }
-                Node::ListItem(item) => {
-                    let text = extract_inlines_text(&item.content);
-                    let marker = item.marker.as_deref().unwrap_or("-");
-                    #[allow(deprecated)]
-                    DocumentSymbol {
-                        name: format!("{} {}", marker, text),
-                        detail: None,
-                        kind: SymbolKind::ENUM_MEMBER,
-                        tags: None,
-                        deprecated: None,
-                        range,
-                        selection_range: range,
-                        children: None,
-                    }
+            } else {
+                let name = sigil_display_name(&el.sigil);
+                #[allow(deprecated)]
+                DocumentSymbol {
+                    name,
+                    detail: el.args.as_ref().map(|a| format!("{a:?}")),
+                    kind: SymbolKind::OBJECT,
+                    tags: None,
+                    deprecated: None,
+                    range,
+                    selection_range: range,
+                    children: None,
                 }
             };
             self.0.push(symbol);
@@ -235,6 +220,13 @@ pub fn document_symbols_for(text: &str) -> Vec<DocumentSymbol> {
     let mut collector = SymbolCollector(Vec::new());
     let _ = walk_document(&doc, &mut collector);
     collector.0
+}
+
+fn list_item_marker_text(item: &Element) -> String {
+    if let Some(marker) = &item.args {
+        return format!("({marker:?})");
+    }
+    "-".to_string()
 }
 
 fn extract_inlines_text(inlines: &[Inline]) -> String {
@@ -262,25 +254,22 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
     }
 
     impl Visitor<()> for TargetIdFinder {
-        fn visit(&mut self, node: Node<'_>) -> ControlFlow<()> {
-            let span = node.span();
-            if span_contains(&span, self.line, self.col) {
-                if let Node::Element(el) = node {
-                    // Check if it's an @(ref: "some_id") or has a ref arg
-                    if let Some(Value::Map(entries)) = &el.args {
-                        for (k, v) in entries {
-                            if k == "ref" {
-                                if let Value::String(s) = v {
-                                    self.ref_id = Some(s.clone());
-                                }
+        fn visit(&mut self, el: &Element) -> ControlFlow<()> {
+            if span_contains(&el.span, self.line, self.col) {
+                // Check if it's an @(id: "some_id") or has an id arg
+                if let Some(Value::Map(entries)) = &el.args {
+                    for (k, v) in entries {
+                        if k == "id" {
+                            if let Value::String(s) = v {
+                                self.ref_id = Some(s.clone());
                             }
                         }
                     }
-                    // Or if it's an interpolation expression ${id}
-                    if let Some(ElementValue::Interp(expr)) = &el.value {
-                        if let InterpExprKind::Identifier(id) = &expr.kind {
-                            self.ref_id = Some(id.clone());
-                        }
+                }
+                // Or if it's an interpolation expression ${id}
+                if let Some(ElementValue::Interp(expr)) = &el.value {
+                    if let InterpExprKind::Identifier(id) = &expr.kind {
+                        self.ref_id = Some(id.clone());
                     }
                 }
             }
@@ -304,13 +293,13 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
     }
 
     impl Visitor<()> for DefFinder {
-        fn visit(&mut self, node: Node<'_>) -> ControlFlow<()> {
-            if let Some(Value::Map(entries)) = node.attrs() {
+        fn visit(&mut self, el: &Element) -> ControlFlow<()> {
+            if let Some(Value::Map(entries)) = element_attrs_view(el) {
                 for (k, v) in entries {
                     if k == "id" {
                         if let Value::String(s) = v {
-                            if s == &self.target_id {
-                                self.found_span = Some(node.span());
+                            if s == self.target_id {
+                                self.found_span = Some(el.span);
                                 return ControlFlow::Break(());
                             }
                         }
@@ -375,8 +364,12 @@ pub fn completions_for(_text: &str, _pos: Position) -> Vec<CompletionItem> {
     let inferred_keys = [
         ("url", "URL link reference"),
         ("file", "File reference path"),
-        ("ref", "Internal element ID reference"),
-        ("id", "Element unique identifier"),
+        ("tm", "Reference to another TypedMark document"),
+        (
+            "id",
+            "Element id (definition attribute, or a same-document reference key)",
+        ),
+        ("ref", "Search project by filename/title"),
         ("tag", "Tag classification"),
         ("format", "Embedded format (json, yaml, toml)"),
     ];
@@ -459,7 +452,7 @@ mod tests {
 
     #[test]
     fn definition_finds_matching_id() {
-        let text = "#[ Target ]{id: target1}\n\n@(ref: target1)\n";
+        let text = "#[ Target ]{id: target1}\n\n@(id: target1)\n";
         let uri = Uri::from_str("file:///test.tm").unwrap();
         let def = definition_for(text, Position::new(2, 4), &uri);
         assert!(def.is_some());

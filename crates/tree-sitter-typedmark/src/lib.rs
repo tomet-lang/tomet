@@ -51,22 +51,6 @@
 //!   investigated further here -- a real fix means teaching `map`'s
 //!   entry-separator logic about comments specifically, not just the
 //!   `map`/`children` vs. their own trailing gap ambiguity below.
-//! - **A `[` right after an unordered `-` marker that never finds its
-//!   matching `]`-plus-trailing-whitespace (so isn't a real
-//!   `list_checkbox`) has already been partially consumed by `scanner.c`
-//!   by the time that's discovered, with no way to backtrack** -- surfaces
-//!   as a small, locally-contained `ERROR` instead of gracefully falling
-//!   back to `punctuation`/`text`. The matching `(` case *does* fall back
-//!   cleanly: `punctuation`'s `(` is a shared token with `args_group`'s
-//!   own opener the same way `-` is shared between `punctuation` and the
-//!   list markers (see `punctuation`'s own comment in `grammar.js`), but
-//!   `[` has more independent, unshared definitions competing for it
-//!   (`heading`'s own content-opening `[`, `content_group`'s,
-//!   `list_checkbox`'s, and `punctuation`'s) and unifying all of those
-//!   was judged too large/risky a change for this narrow a case. A bare
-//!   `-`/`-.` with *no* bracket at all (just no checkbox, no plain
-//!   content gap either) does *not* have this problem -- see
-//!   `more_than_three_dashes_are_only_partially_consumed_by_thematic_break`.
 //! - **A `key: [seq]` map entry, when it's the map's last entry with no
 //!   trailing comma** (e.g. `{ title: ..., tags: [a, b] }` on one line, as
 //!   in `docs/tests/tmt/examples/image.meta.tm`'s `@meta(format:yaml){...}`), gets GLR-merged
@@ -276,11 +260,11 @@ mod tests {
         // inside a `paragraph`, same as any other unmatched `-` -- not an
         // `ERROR`, just a shape mismatch with the real grammar.
         //
-        // `list_checkbox` briefly turned this into a genuine `ERROR`
+        // `list_marker` briefly turned this into a genuine `ERROR`
         // instead: `unordered_list_item`'s `"-"` had to become its own
         // standalone lexer token (rather than staying fused with its
         // trailing whitespace into one atomic `token(seq("-", /[ \t]/))`)
-        // so an optional checkbox could sit after it, and a bare `-` with
+        // so an optional marker could sit after it, and a bare `-` with
         // nothing valid after it then won tree-sitter's lexer tie against
         // `punctuation`'s own `-` unconditionally, dead-ending instead of
         // falling back. Fixed by making `punctuation`'s `-` a bare string
@@ -291,7 +275,7 @@ mod tests {
         // token definitions competing for the same text, and became one
         // shared token whose eventual reduction (list item vs bare
         // `punctuation`) ordinary LALR lookahead can decide once it's
-        // clear no valid checkbox/gap follows.
+        // clear no valid marker/gap follows.
         let tree = parse("-----\n");
         let root = tree.root_node();
         assert!(!root.has_error());
@@ -313,16 +297,15 @@ mod tests {
     }
 
     #[test]
-    fn parses_list_checkbox_markers() {
-        // `- (T)`/`- [x]`/etc, with a space before the marker (the real
+    fn parses_list_value_markers() {
+        // `- (T)`/`- (?)`/etc, with a space before the marker (the real
         // fixture shape -- see `docs/cheatsheet.tm`), each produce a
-        // `checkbox: (list_checkbox)` field/node distinct from the rest of
+        // `marker: (list_marker)` field/node distinct from the rest of
         // the item's content, and a trailing `{attrs}` group still works
         // alongside it.
-        for (src, checkbox_text) in [
+        for (src, marker_text) in [
             ("- (T) task\n", "(T)"),
             ("- (?) task\n", "(?)"),
-            ("- [x] task\n", "[x]"),
             ("- ( ) task\n", "( )"),
             ("-(x) task\n", "(x)"),
             ("- (x) task {tag: dev}\n", "(x)"),
@@ -338,9 +321,9 @@ mod tests {
                 .named_child(0)
                 .unwrap();
             assert_eq!(item.kind(), "unordered_list_item");
-            let checkbox = item.child_by_field_name("checkbox").unwrap();
-            assert_eq!(checkbox.kind(), "list_checkbox");
-            assert_eq!(&src[checkbox.byte_range()], checkbox_text);
+            let marker = item.child_by_field_name("marker").unwrap();
+            assert_eq!(marker.kind(), "list_marker");
+            assert_eq!(&src[marker.byte_range()], marker_text);
         }
     }
 
@@ -633,11 +616,10 @@ mod tests {
         // for why they don't error anymore. `----[💫]----` (bracket, not
         // paren) is the one case that *doesn't* fully clear: `[` has more
         // competing token definitions than `(` does (`heading`'s own
-        // content-opening `[`, `area_group`'s, `list_checkbox`'s, and
-        // `punctuation`'s all coexist unshared, unlike `-`, which only
-        // ever meant "start a list" or "plain punctuation"), so
-        // `scanner.c`'s malformed-checkbox trade-off (see its module doc)
-        // still applies here -- covered by the `"]"` marker above.
+        // content-opening `[`, `area_group`'s, and `punctuation`'s all
+        // coexist unshared, unlike `-`, which only ever meant "start a
+        // list" or "plain punctuation") -- covered by the `"]"` marker
+        // above.
         let src = include_str!("../../../docs/tests/ja/cheatsheet.tm");
         let tree = parse(src);
         let errors = error_texts(src, &tree);

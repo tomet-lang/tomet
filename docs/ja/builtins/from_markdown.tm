@@ -13,7 +13,7 @@
 
 ```tm
 - outline
-- [x] checked
+- (x) checked
 1. sorted
 
 - outline
@@ -30,7 +30,7 @@
 [[wikilink]]
 
 @[display](path:path)
-@(wiki:file_name)
+@(ref:file_name)
 ```
 
 ##[ Embed ]
@@ -40,7 +40,7 @@
 ![[embed]]
 
 <embed>[embed](path:path)
-<embed>(wiki:file_name)
+<embed>(ref:file_name)
 ```
 
 ##[ Blockquote ]

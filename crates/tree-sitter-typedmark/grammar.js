@@ -19,14 +19,14 @@ module.exports = grammar({
 	// alternative next to it) can't resolve `@meta(yaml)`'s `yaml`/
 	// `{required}`'s `required` against `map_entry`'s key token.
 	//
-	// `_list_checkbox_token`/`_list_marker_gap` (see `list_checkbox`'s own
+	// `_list_marker_token`/`_list_marker_gap` (see `list_marker`'s own
 	// comment below) are external for the same class of reason: deciding
 	// whether the whitespace right after a list marker belongs to an
-	// optional checkbox or is just the item's own mandatory gap needs
+	// optional value marker or is just the item's own mandatory gap needs
 	// unbounded lookahead past that whitespace, which a `token()` regex
 	// can't backtrack out of once `extras`/precedence has already
 	// committed to one interpretation.
-	externals: ($) => [$._scalar_token, $._list_checkbox_token, $._list_marker_gap],
+	externals: ($) => [$._scalar_token, $._list_marker_token, $._list_marker_gap],
 
 	// `heading`'s optional `{attrs}` can follow `]` either on the same
 	// line or after exactly one newline (see the real fixture examples in
@@ -160,37 +160,36 @@ module.exports = grammar({
 		list: ($) => choice($.ordered_list, $.unordered_list),
 		ordered_list: ($) => prec.right(repeat1($.ordered_list_item)),
 		unordered_list: ($) => prec.right(repeat1($.unordered_list_item)),
-		// Named wrapper around the external `_list_checkbox_token` so it
+		// Named wrapper around the external `_list_marker_token` so it
 		// shows up as its own node for `highlights.scm` to target -- e.g.
-		// `- (T)`/`- (?)` outliner status markers and `- [x]` checkboxes
-		// need their own color, distinct from the list item's other inline
-		// content.
+		// `- (T)`/`- (?)` outliner status markers need their own color,
+		// distinct from the list item's other inline content.
 		//
 		// Both this and `_list_marker_gap` (used directly below, no visible
 		// node needed for plain whitespace) are external rather than plain
 		// regexes: `document.rs::eat_list_marker` skips inline whitespace
-		// *before* checking for `[`/`(` -- real fixtures write `- (T)`,
+		// *before* checking for `(` -- real fixtures write `- (T)`,
 		// with a space between the dash and the marker (see
 		// `docs/cheatsheet.tm`) -- so deciding whether that whitespace
-		// belongs to an optional checkbox or is just the item's own
+		// belongs to an optional marker or is just the item's own
 		// mandatory gap needs to look *past* the whitespace before
 		// committing to either interpretation. Tree-sitter's internal
 		// lexer can't do that: once it's built a combined DFA for
-		// `optional($.list_checkbox)` next to a mandatory `/[ \t]+/`, a
+		// `optional($.list_marker)` next to a mandatory `/[ \t]+/`, a
 		// real space character matches the mandatory-gap token immediately
 		// and wins outright, before ever getting a chance to look further
-		// ahead for a `[`/`(`. `scanner.c` (see its module doc) instead
+		// ahead for a `(`. `scanner.c` (see its module doc) instead
 		// gets one external-scanner call per position with *all* the
 		// externals that are valid there, and picks whichever one actually
 		// fits after looking as far ahead as it needs to -- no premature
 		// commitment, no backtracking required.
-		list_checkbox: ($) => $._list_checkbox_token,
+		list_marker: ($) => $._list_marker_token,
 
 		ordered_list_item: ($) =>
 			seq(
 				"-.",
 				choice(
-					seq(field("checkbox", $.list_checkbox), $._list_marker_gap),
+					seq(field("marker", $.list_marker), $._list_marker_gap),
 					$._list_marker_gap,
 				),
 				repeat($._line_item),
@@ -201,7 +200,7 @@ module.exports = grammar({
 			seq(
 				"-",
 				choice(
-					seq(field("checkbox", $.list_checkbox), $._list_marker_gap),
+					seq(field("marker", $.list_marker), $._list_marker_gap),
 					$._list_marker_gap,
 				),
 				repeat($._line_item),
@@ -267,7 +266,7 @@ module.exports = grammar({
 		// -- see `unordered_list_item`'s own comment for why that
 		// mattered. Sharing the token instead resolves it via ordinary
 		// reduce logic once the parser tries to continue past `-` and
-		// finds no valid `list_checkbox`/gap: it backs out to this
+		// finds no valid `list_marker`/gap: it backs out to this
 		// `punctuation` reading instead of the dead end an unshared
 		// marker token forced it into, with no `conflicts`/GLR needed
 		// (confirmed by `npx tree-sitter-cli generate` itself flagging a
@@ -357,7 +356,7 @@ module.exports = grammar({
 		// `prec.right(3, ...)` wraps the *whole* rule (not just the trailing
 		// `repeat($._element_group)`, unlike an earlier revision) --
 		// `ordered_list_item`/`unordered_list_item`'s own trailing `{attrs}`
-		// (added alongside `list_checkbox` above) and an element's own
+		// (added alongside `list_marker` above) and an element's own
 		// trailing value group are genuinely ambiguous with one token of
 		// lookahead: both can start with a bare `{` right after the line's
 		// last element. The real parser (`document.rs::parse_element`)
@@ -524,9 +523,22 @@ module.exports = grammar({
 		// deliberately colon-*excluded* (matching the old regex this
 		// replaced), so a bare, keyless scalar at this position that itself
 		// contains a colon (e.g. a URL with no `key:` prefix at all) won't
-		// parse as one token. Not observed in any real `.tm` content so far
-		// -- every real example gives URLs an explicit key
-		// (`url:https://...`).
+		// parse as one token.
+		//
+		// KNOWN DRIFT from `typedmark_parser` (see this crate's own module
+		// doc, and `docs/reviews/2026-08-22-link-reference-uri-schemes.md`
+		// section 5's "Group B"): the real parser's `value.rs` now
+		// special-cases `identifier://...` to read as one bare scalar
+		// (`@(https://example.com)` is valid `.tm` today), but this
+		// grammar still has no equivalent disambiguation -- `map_entry`'s
+		// `identifier` key token happily matches `https` + `:` here before
+		// `scalar` ever gets a chance, so this still (mis)highlights as
+		// `map_entry(key: "https", value: "//example.com")`. Not yet fixed
+		// here because it would need the same kind of lookahead-driven
+		// exception `map_entry`'s key token can't express in plain regex
+		// (a job for the external scanner, like `_scalar_token` already
+		// is) -- left as a follow-up since this only affects editor syntax
+		// highlighting, not `.tm` semantics.
 		//
 		// Produced entirely by `scanner.c` (see its module doc): the old
 		// plain-regex version of this rule had an exact length-tie against

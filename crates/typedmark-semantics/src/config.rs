@@ -188,19 +188,14 @@ fn process_export_type(v: &Value, config: &mut DocumentConfig) {
 
 fn process_export_path(v: &Value, config: &mut DocumentConfig) {
     match v {
+        // A map under `export.path` is always a format -> path table
+        // (e.g. `{ commonmark: "README.md", html: "index.html" }") -- an
+        // export destination is always just a filesystem path, never a
+        // "kind of reference" needing a `file:`/`path:`-style key wrapper.
         Value::Map(map) => {
-            // Check if this map represents path for formats (e.g. commonmark: "README.md")
-            // vs a file object (e.g. { file: "README.md" })
-            let is_file_obj = map.iter().any(|(fk, _)| fk == "file" || fk == "path");
-            if is_file_obj {
-                if let Some(path_str) = clean_path_value(v) {
-                    config.export_path = Some(path_str);
-                }
-            } else {
-                for (fk, fv) in map {
-                    if let Some(path_str) = clean_path_value(fv) {
-                        config.export_paths.insert(ExportType::parse(fk), path_str);
-                    }
+            for (fk, fv) in map {
+                if let Some(path_str) = clean_path_value(fv) {
+                    config.export_paths.insert(ExportType::parse(fk), path_str);
                 }
             }
         }
@@ -212,28 +207,12 @@ fn process_export_path(v: &Value, config: &mut DocumentConfig) {
     }
 }
 
-/// Unwraps path strings from plain string literals, `file(...)`, `path(...)`, or `{ file: ... }` objects.
+/// Trims a plain path string. Non-string values (and the old
+/// `file(...)`/`path(...)`/`{ file: ... }` wrapper forms) aren't
+/// meaningful here and return `None`.
 fn clean_path_value(v: &Value) -> Option<String> {
     match v {
-        Value::String(s) => {
-            let trimmed = s.trim();
-            if (trimmed.starts_with("file(") || trimmed.starts_with("path("))
-                && trimmed.ends_with(')')
-            {
-                let idx = trimmed.find('(')?;
-                Some(trimmed[idx + 1..trimmed.len() - 1].trim().to_string())
-            } else {
-                Some(trimmed.to_string())
-            }
-        }
-        Value::Map(map) => {
-            for (k, sub_v) in map {
-                if k == "file" || k == "path" || k == "target" || k == "src" {
-                    return clean_path_value(sub_v);
-                }
-            }
-            None
-        }
+        Value::String(s) => Some(s.trim().to_string()),
         _ => None,
     }
 }
@@ -280,25 +259,6 @@ mod tests {
             config.export_path_for(&ExportType::Html),
             Some("index.html")
         );
-    }
-
-    #[test]
-    fn unwraps_file_and_path_function_wrappers() {
-        let doc = parse_document(
-            "@config(\n  export: {\n    type: commonmark\n    path: \"file(README.md)\"\n  }\n)\n",
-        )
-        .unwrap();
-
-        let config = document_config(&doc);
-        assert_eq!(config.export_path.as_deref(), Some("README.md"));
-
-        let doc2 = parse_document(
-            "@config(\n  export: {\n    type: html\n    path: \"path(docs/index.html)\"\n  }\n)\n",
-        )
-        .unwrap();
-
-        let config2 = document_config(&doc2);
-        assert_eq!(config2.export_path.as_deref(), Some("docs/index.html"));
     }
 
     #[test]

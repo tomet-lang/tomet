@@ -58,10 +58,15 @@ typedmark-semantics (I/O-free classification of what an Element means)
   parser. It performs zero I/O, external file resolution, or dynamic code execution.
   Given identical input text, it produces identical AST output with guaranteed linear/predictable time complexity.
 - **`typedmark-semantics`**: I/O-free classification of what a parsed
-  `Element` officially means -- `url`/`file`/`ref` inference from a bare
-  `@(key:...)`, and recognizing TypedMark's own built-in vocabulary
-  (`@meta`, `@config`, `@links`, `em`/`strong`/`mark`, ...) via an
-  `ElementKind` enum and a `classify(el: &Element) -> ElementKind`
+  `Element` officially means -- `url`/`file`/`tm`/`id`/`ref` inference
+  from a bare `@(key:...)` (`infer_at_kind`), plus shape-based inference
+  for the two forms that carry no `key:` at all, `@(/some/path)` and
+  `@(https://example.com)` (`infer_at_kind_from_scalar`; the grammar
+  work that makes these parse at all lives in `typedmark-parser`'s
+  `value.rs` -- see `docs/reviews/2026-08-22-link-reference-uri-schemes.md`
+  section 5's "Group B"), and recognizing TypedMark's own built-in
+  vocabulary (`@meta`, `@config`, `@links`, `em`/`strong`/`mark`, ...) via
+  an `ElementKind` enum and a `classify(el: &Element) -> ElementKind`
   function. Depends only on `typedmark-ast` (not `typedmark-parser` --
   the diagram above shows the pipeline's logical ordering, not a Cargo
   dependency edge), so any consumer holding an `Element` can classify it
@@ -74,7 +79,15 @@ typedmark-semantics (I/O-free classification of what an Element means)
   (`apps/tui/src/engine`) uses it the same way. Only expresses
   *recognition*, not *action*: whether a given kind's output is empty
   (`@meta`/`@config`) is still each consumer's own call, since the same
-  kind can mean different things for different output formats.
+  kind can mean different things for different output formats. Also owns
+  `target::link_target`/`link_target_of`: the single canonical extraction
+  of a link-shaped element's raw target string (`Url`/`File`/`Embed`/
+  `Tm`/`Id`/`Ref`, per each kind's own fallback-key list), which
+  `typedmark-html`, `typedmark-markdown`, and `typedmark-links` all
+  route through instead of each reading `el.args` (and disagreeing on
+  fallback order) independently -- see
+  `docs/reviews/2026-08-22-link-reference-uri-schemes.md` for the design
+  history behind unifying this.
 
 Everything downstream of `typedmark-ast`/`typedmark-parser` is a
 *consumer* -- it reads the AST (or, for `typedmark-markdown`, produces
@@ -88,10 +101,12 @@ converts `Document` back into TypedMark's own source, not another format.
   not a full semantic engine: most `<T>`/`@name` elements become a
   `<div>`/`<span>` carrying their `args` map as `data-*` attributes and
   `content` as inner content. A handful of kinds get special-cased rendering
-  because the spec gives them fixed meaning (`@(url:..)`/`@(file:..)` as
-  links, `@(ref:..)` as an anchor reference, `@meta`/`@config` as
-  invisible, `@links{}` as a definition list, `codeblock`/`blockquote`/
-  `hr`/`em`/`strong`/`mark` with their obvious HTML mapping).
+  because the spec gives them fixed meaning (`@(url:..)`/`@(file:..)`/
+  `@(tm:..)` as links, `@(id:..)` as a same-document anchor reference,
+  `@meta`/`@config` as invisible, `@links{}` as a definition list,
+  `codeblock`/`blockquote`/`hr`/`em`/`strong`/`mark` with their obvious
+  HTML mapping. `@(ref:..)` -- project-wide search by filename/title --
+  has no dedicated HTML rendering yet, falling to the generic fallback).
 - **`typedmark-markdown`** (`crates/typedmark-codegen-markdown`): bidirectional CommonMark <-> `Document`
   conversion (`import.rs`/`export.rs`), lossy in both directions for
   constructs with no equivalent on the other side -- see
@@ -144,8 +159,8 @@ converts `Document` back into TypedMark's own source, not another format.
 - **`typedmark-config`**: owns `PrinterConfig`/`FieldConfig` (loaded
   from a `default.config.tm`/`typedmark.config.tm`, or an
   `@settings`/`@config` element in a document) and everything they
-  drive: meta format (yaml/json/toml), wikilink/link spacing,
-  callout/list style, and per-field `@meta` rules. Also owns discovery
+  drive: meta format (yaml/json/toml), link-key spacing (`url`/`link`/
+  `ref`), callout/list style, and per-field `@meta` rules. Also owns discovery
   (`find_config_file`, `load_config_from_file`, `load_config_from_str`).
   Split out of `typedmark-printer` because finding/loading this config
   is a concern shared by every consumer that needs it
@@ -168,7 +183,7 @@ converts `Document` back into TypedMark's own source, not another format.
   `typedmark-formatter` could reuse the same generate/validate/convert
   logic without depending on printer's whole-document-rebuild model.
 - **`typedmark-style`**: applies `typedmark-config`'s `PrinterConfig`
-  style rules (meta format, wikilink/link spacing, per-field `@meta`
+  style rules (meta format, link-key spacing, per-field `@meta`
   formatting) to a single `typedmark_ast::Value` or `Element`, returning
   `.tm`-syntax text -- `render_value`/`render_value_inner_with_config`/
   `render_args_with_config` (take only `&Value` + config) and
@@ -207,7 +222,14 @@ converts `Document` back into TypedMark's own source, not another format.
   search/browse feature, e.g.). Depends on `typedmark-config` for
   `PrinterConfig`/`find_config_file` (the config-auto-discovering
   `collect_tm_files` wrapper needs them), not on `typedmark-printer`
-  itself; `apps/cli`'s `export` subcommand uses it directly.
+  itself; `apps/cli`'s `export` subcommand uses it directly. Also hosts
+  `workspace_scan` (`WorkspaceScan`/`scan_workspace_with_config`, plus the
+  `FileTreeNode`/`MigrationItem` types it produces): a single-pass
+  directory walk that builds `typedmark-tui`'s Explorer tree, Migration
+  candidate list, and BatchMeta path list together from one `WalkBuilder`
+  traversal instead of three. Kept content-free (`MigrationItem.markdown_src`/
+  `typedmark_src` start empty, loaded lazily) so this module needs no
+  `typedmark-markdown`/`typedmark-printer` dependency.
 - **`typedmark-edit`**: editing operations over a directory of `.tm`
   files -- batch `@meta`/`@config` key updates (`batch_meta`) and
   AST-aware structural search & replace: rename tag, rename key, replace
@@ -226,23 +248,32 @@ converts `Document` back into TypedMark's own source, not another format.
   buildable/testable rather than living inside the `apps/cli` bin;
   `apps/cli`'s `tui` subcommand just calls into it. All the AST-level
   work (serialization, scanning, editing) now lives in `typedmark-printer`/
-  `typedmark-indexer`/`typedmark-edit`; what's left in this crate's own
-  `engine` module is just `migration` (the Markdown-vault-migration
-  workflow -- a specific workflow feature rather than a generic library
-  primitive, so left here instead of extracted) plus the ratatui UI
-  layer (`app`/`ui`) that ties it all together.
+  `typedmark-indexer`/`typedmark-edit` -- including the workspace-wide
+  directory scan itself, which lives in `typedmark-indexer::workspace_scan`.
+  What's left in this crate's own `engine::migration` module is only the
+  Markdown->`.tm` conversion step (`MigrationEngine::execute`/
+  `execute_with_config`, plus `ensure_item_loaded`/`ensure_item_loaded_with_config`
+  since `MigrationItem` is now a foreign type and can't gain new inherent
+  methods here) -- it needs `typedmark-markdown`/`typedmark-printer`,
+  dependencies the scan itself doesn't, which is why conversion stays
+  app-side while scanning moved out. The ratatui UI layer (`app`/`ui`)
+  ties it all together.
 - **`typedmark-walker`**: generic recursive traversal of a `Document`'s
-  tree (`Heading`/`ListItem`/`Element`, including ones nested inside an
-  element's `[content]` and `ElementValue::Children`), depending on
-  nothing but `typedmark-ast`. Exists because `typedmark-validator` and
-  `typedmark-resolver` each independently hand-rolled the same tree-walk
-  shape for unrelated reasons (duplicate-id collection vs. `${id}`
-  lookup) -- the same "don't let two consumers silently reimplement the
-  same thing" motivation `typedmark-semantics` was extracted for.
-  Consumers implement a `Visitor<B>` (one `visit(Node) ->
-  ControlFlow<B>` method) and get to either collect everything
-  (`Continue` always) or stop at the first match and carry a result out
-  through `Break(b)`.
+  tree of `Element`s -- a heading is an `Element` classified `"heading"`
+  by `typedmark-semantics::classify`, and a list item is an
+  `Element{ sigil: Sigil::Bare, .. }` nested inside its list's
+  `ElementValue::Children` (see `typedmark_ast::Element::list`/
+  `Element::list_item`), neither a dedicated node kind, including ones
+  nested inside an element's `[content]`, `children`, and
+  `ElementValue::Children`), depending on nothing but `typedmark-ast`.
+  Exists because `typedmark-validator` and `typedmark-resolver` each
+  independently hand-rolled the same tree-walk shape for unrelated reasons
+  (duplicate-id collection vs. `${id}` lookup) -- the same "don't let two
+  consumers silently reimplement the same thing" motivation
+  `typedmark-semantics` was extracted for. Consumers implement a
+  `Visitor<B>` (one `visit(&Element) -> ControlFlow<B>` method) and get to
+  either collect everything (`Continue` always) or stop at the first match
+  and carry a result out through `Break(b)`.
 - **`typedmark-validator`**: `.tm` schema/lint validation. Currently one
   rule -- duplicate `{id:...}`/`(id:...)` detection across a `Document`,
   built on `typedmark-walker`. Read-only: no I/O, no reference resolution
@@ -263,6 +294,17 @@ converts `Document` back into TypedMark's own source, not another format.
   classification). `@import` is anticipated but not yet designed --
   see the module doc in `crates/typedmark-doc-resolver/src/lib.rs` for the
   open questions.
+- **`typedmark-links`** (`crates/typedmark-doc-links`): broken-link
+  checking for a vault of `.tm`/`.tmt` files. Extracts every `File`/
+  `Embed`/`Tm`/`Ref` link (via `typedmark-semantics`'s `link_target`,
+  see below; `Url`/`Id` are out of scope -- external URLs need network
+  requests, and `id:` is a same-document lookup with no cross-file
+  aspect, better suited to `typedmark-validator` as a future lint),
+  caches the extraction per source file keyed by mtime (`LinkCache`,
+  SQLite-backed, so re-checking a large vault doesn't re-parse every
+  unchanged file), and resolves every target against what actually
+  exists on disk. Like `typedmark-resolver`, this is I/O the parser is
+  constitutionally barred from doing, so it lives in its own crate.
 
 
 Source `Span` tracking (line, column, byte offset) is fully integrated across

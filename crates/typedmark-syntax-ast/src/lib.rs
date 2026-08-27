@@ -84,20 +84,23 @@ impl Document {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
-    Heading(Heading),
     Paragraph(Paragraph),
-    /// `ordered` distinguishes `-.` (auto-numbered) from plain `-` lists;
-    /// numbering itself isn't stored, it's computed at render time.
-    List(List),
+    /// A list is `Element { sigil: Sigil::Type("ol"|"ul"), value:
+    /// Some(ElementValue::Children(items)), .. }`. `"ol"` vs `"ul"`
+    /// distinguishes `-.` (auto-numbered) from plain `-` lists; numbering
+    /// itself isn't stored, it's computed at render time. Each item is an
+    /// `Element { sigil: Sigil::Bare, .. }` (legal only here, as an entry
+    /// of `ElementValue::Children`); its `(...)` marker and trailing
+    /// `{value}` attrs both use the ordinary `Value` grammar and are
+    /// merged into that item `Element`'s `args`, and any nested sub-lists
+    /// or indented blocks live in that item `Element`'s `children`.
     Element(Element),
 }
 
 impl Block {
     pub fn span(&self) -> Span {
         match self {
-            Block::Heading(h) => h.span,
             Block::Paragraph(p) => p.span,
-            Block::List(l) => l.span,
             Block::Element(e) => e.span,
         }
     }
@@ -112,89 +115,6 @@ pub struct Paragraph {
 impl Paragraph {
     pub fn new(content: Vec<Inline>, span: Span) -> Self {
         Self { content, span }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct List {
-    pub ordered: bool,
-    pub items: Vec<ListItem>,
-    pub span: Span,
-}
-
-impl List {
-    pub fn new(ordered: bool, items: Vec<ListItem>, span: Span) -> Self {
-        Self {
-            ordered,
-            items,
-            span,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Heading {
-    /// Number of leading `#` characters.
-    pub level: u8,
-    pub content: Vec<Inline>,
-    pub attrs: Option<Value>,
-    pub span: Span,
-}
-
-impl Heading {
-    pub fn new(level: u8, content: Vec<Inline>, attrs: Option<Value>, span: Span) -> Self {
-        Self {
-            level,
-            content,
-            attrs,
-            span,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ListItem {
-    pub content: Vec<Inline>,
-    /// Optional status marker inside `[...]` or `(...)` (e.g. `" "` for `( )`, `"x"` for `(x)`, `"T"` for `(T)`, `"?"` for `(?)`).
-    /// `None` for plain items without bracket/paren status markers.
-    pub marker: Option<String>,
-    /// Optional attributes attached via trailing `{value}` group (e.g. `{tag: dev}`).
-    pub attrs: Option<Value>,
-    /// Child blocks nested under this item (e.g., sub-lists or indented blocks).
-    pub children: Vec<Block>,
-    pub span: Span,
-}
-
-impl ListItem {
-    pub fn new(
-        content: Vec<Inline>,
-        marker: Option<String>,
-        attrs: Option<Value>,
-        span: Span,
-    ) -> Self {
-        Self {
-            content,
-            marker,
-            attrs,
-            children: Vec::new(),
-            span,
-        }
-    }
-
-    pub fn with_children(
-        content: Vec<Inline>,
-        marker: Option<String>,
-        attrs: Option<Value>,
-        children: Vec<Block>,
-        span: Span,
-    ) -> Self {
-        Self {
-            content,
-            marker,
-            attrs,
-            children,
-            span,
-        }
     }
 }
 
@@ -289,6 +209,14 @@ pub struct Element {
     pub sigil: Sigil,
     pub args: Option<Value>,
     pub content: Option<Vec<Inline>>,
+    /// Nested block-level content (e.g. a list item's sub-list or indented
+    /// blocks). A block-level counterpart to `content` (which is
+    /// inline-only): kept as its own field, symmetric with `content`,
+    /// rather than folded into `value`, so consumers keep a
+    /// compiler-checked guarantee of which shape they're holding instead
+    /// of matching on an `ElementValue` variant that could in principle be
+    /// paired with the wrong key.
+    pub children: Option<Vec<Block>>,
     pub value: Option<ElementValue>,
     pub span: Span,
 }
@@ -299,6 +227,7 @@ impl Element {
             sigil,
             args: None,
             content: None,
+            children: None,
             value: None,
             span: Span::default(),
         }
@@ -307,6 +236,50 @@ impl Element {
     pub fn with_span(mut self, span: Span) -> Self {
         self.span = span;
         self
+    }
+
+    /// A list: `sigil` is `Type("ol")` if `ordered`, else `Type("ul")`;
+    /// `items` become `ElementValue::Children`. `ordered` distinguishes
+    /// `-.` (auto-numbered) from plain `-` lists -- numbering itself isn't
+    /// stored, it's computed at render time.
+    pub fn list(ordered: bool, items: Vec<Element>, span: Span) -> Self {
+        Element {
+            sigil: Sigil::Type(if ordered { "ol" } else { "ul" }.to_string()),
+            args: None,
+            content: None,
+            children: None,
+            value: Some(ElementValue::Children(items)),
+            span,
+        }
+    }
+
+    /// A list item: legal only as an entry of a [`Element::list`]'s
+    /// `Children`. `marker` is the optional `(...)`-shaped marker (goes to
+    /// `args`, parsed with the same `Value` grammar as any other
+    /// element's `(args)`, normalized against the builtin `"marker"`
+    /// positional key -- see `typedmark-semantics::positional`); `attrs`
+    /// is the optional trailing `{value}`-shaped attributes (e.g.
+    /// `{tag: dev}`, goes to `value` as `ElementValue::Data`); `children`
+    /// is any nested sub-lists or indented blocks.
+    pub fn list_item(
+        content: Vec<Inline>,
+        marker: Option<Value>,
+        attrs: Option<Value>,
+        children: Vec<Block>,
+        span: Span,
+    ) -> Self {
+        Element {
+            sigil: Sigil::Bare,
+            args: marker,
+            content: Some(content),
+            children: if children.is_empty() {
+                None
+            } else {
+                Some(children)
+            },
+            value: attrs.map(ElementValue::Data),
+            span,
+        }
     }
 }
 

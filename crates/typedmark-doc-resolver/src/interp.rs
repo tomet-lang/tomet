@@ -11,7 +11,7 @@
 
 use std::ops::ControlFlow;
 use typedmark_ast::{Document, Element, ElementValue, InterpExpr, InterpExprKind, Value};
-use typedmark_walker::{Node, Visitor, walk_document};
+use typedmark_walker::{Visitor, element_attrs_view, walk_document};
 
 use crate::ResolveError;
 
@@ -50,15 +50,9 @@ fn find_by_id(doc: &Document, id: &str) -> Option<Value> {
         id: &'a str,
     }
     impl Visitor<Value> for FindById<'_> {
-        fn visit(&mut self, node: Node<'_>) -> ControlFlow<Value> {
-            if id_matches(node.attrs(), self.id) {
-                let value = match &node {
-                    Node::Element(el) => node_value(el),
-                    Node::Heading(_) | Node::ListItem(_) => {
-                        node.attrs().cloned().unwrap_or(Value::Null)
-                    }
-                };
-                return ControlFlow::Break(value);
+        fn visit(&mut self, el: &Element) -> ControlFlow<Value> {
+            if id_matches(element_attrs_view(el), self.id) {
+                return ControlFlow::Break(node_value(el));
             }
             ControlFlow::Continue(())
         }
@@ -69,7 +63,7 @@ fn find_by_id(doc: &Document, id: &str) -> Option<Value> {
     }
 }
 
-fn id_matches(value: Option<&Value>, target: &str) -> bool {
+fn id_matches(value: Option<Value>, target: &str) -> bool {
     let Some(Value::Map(entries)) = value else {
         return false;
     };

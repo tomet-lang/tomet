@@ -1,7 +1,7 @@
 //! `PrinterConfig` (loaded from a `default.config.tm`/
 //! `typedmark.config.tm`, or an `@settings`/`@config` element in a
 //! document) and the config-driven formatting choices it controls: meta
-//! format (yaml/json/toml), wikilink/link spacing, callout/list style,
+//! format (yaml/json/toml), link-key spacing, callout/list style,
 //! and per-field `@meta` rules. Split out of `typedmark-printer` because
 //! finding/loading this config is a concern shared by every consumer
 //! that needs it (`typedmark-tui`, `typedmark-edit`, `typedmark-indexer`),
@@ -28,7 +28,6 @@ pub struct PrinterConfig {
     pub heading_space_inside_brackets: bool,
     pub meta_format: Option<String>,
     pub meta_fields: std::collections::BTreeMap<String, FieldConfig>,
-    pub wikilink_no_space: bool,
     pub link_no_space: bool,
     pub ignore_files: Vec<String>,
     pub callout_content_style: Option<String>,
@@ -121,19 +120,6 @@ impl PrinterConfig {
                                 }
                             }
                             cfg.meta_fields.insert(field_name.clone(), field_cfg);
-                        }
-                    }
-                }
-            }
-            if k == "wikilink" {
-                if let Value::Map(props) = v {
-                    for (pk, pv) in props {
-                        if pk == "no_space" {
-                            if let Value::Bool(b) = pv {
-                                cfg.wikilink_no_space = *b;
-                            } else if let Value::String(s) = pv {
-                                cfg.wikilink_no_space = s == "true" || s == "1";
-                            }
                         }
                     }
                 }
@@ -281,26 +267,6 @@ impl PrinterConfig {
             "heading.space_inside_brackets" => {
                 if let Value::Bool(b) = value {
                     cfg.heading_space_inside_brackets = *b;
-                }
-            }
-            "wikilink" => {
-                if let Value::Map(map) = value {
-                    for (wk, wv) in map {
-                        if wk == "no_space" {
-                            if let Value::Bool(b) = wv {
-                                cfg.wikilink_no_space = *b;
-                            } else if let Value::String(s) = wv {
-                                cfg.wikilink_no_space = s == "true" || s == "1";
-                            }
-                        }
-                    }
-                }
-            }
-            "wikilink.no_space" => {
-                if let Value::Bool(b) = value {
-                    cfg.wikilink_no_space = *b;
-                } else if let Value::String(s) = value {
-                    cfg.wikilink_no_space = s == "true" || s == "1";
                 }
             }
             "link" => {
@@ -529,7 +495,7 @@ mod tests {
             cfg.meta_fields.get("created").unwrap().offset.as_deref(),
             Some("+09:00")
         );
-        assert_eq!(cfg.wikilink_no_space, true);
+        assert_eq!(cfg.link_no_space, true);
         assert_eq!(cfg.callout_content_style.as_deref(), Some("block"));
         assert_eq!(cfg.list_multiline_style_content.as_deref(), Some("box"));
         assert_eq!(

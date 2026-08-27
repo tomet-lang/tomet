@@ -5,7 +5,8 @@
 //! round-trip as literal text rather than being misread as `.tm`
 //! syntax on export.
 
-use typedmark_ast::{Block, Document, Element, Inline, Sigil, Span, Text, Value};
+use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Span, Text, Value};
+use typedmark_semantics::list_ordered;
 
 pub(super) fn post_process_document_wikilinks(doc: &mut Document) {
     for block in &mut doc.blocks {
@@ -18,14 +19,17 @@ fn post_process_block_wikilinks(block: &mut Block) {
         Block::Paragraph(p) => {
             p.content = post_process_inlines_wikilinks(std::mem::take(&mut p.content));
         }
-        Block::Heading(h) => {
-            h.content = post_process_inlines_wikilinks(std::mem::take(&mut h.content));
-        }
-        Block::List(list) => {
-            for item in &mut list.items {
-                item.content = post_process_inlines_wikilinks(std::mem::take(&mut item.content));
-                for child in &mut item.children {
-                    post_process_block_wikilinks(child);
+        Block::Element(el) if list_ordered(el).is_some() => {
+            if let Some(ElementValue::Children(items)) = &mut el.value {
+                for item in items {
+                    if let Some(content) = item.content.take() {
+                        item.content = Some(post_process_inlines_wikilinks(content));
+                    }
+                    if let Some(children) = &mut item.children {
+                        for child in children {
+                            post_process_block_wikilinks(child);
+                        }
+                    }
                 }
             }
         }
@@ -111,9 +115,9 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                     }
                 }
                 let url_str = &remaining[u_start..u_end];
-                let mut el = Element::new(Sigil::At(None));
+                let mut el = Element::new(Sigil::At(Some("link".to_string())));
                 el.args = Some(Value::Map(vec![(
-                    "url".to_string(),
+                    "target".to_string(),
                     Value::String(url_str.to_string()),
                 )]));
                 result.push(Inline::Element(el));
@@ -131,9 +135,9 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                         }
                     }
                     let url_str = &remaining[u_start..u_end];
-                    let mut el = Element::new(Sigil::At(None));
+                    let mut el = Element::new(Sigil::At(Some("link".to_string())));
                     el.args = Some(Value::Map(vec![(
-                        "url".to_string(),
+                        "target".to_string(),
                         Value::String(url_str.to_string()),
                     )]));
                     result.push(Inline::Element(el));
@@ -169,10 +173,24 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
             }
         }
 
+        // `![[embed]]` (image-style) keeps the plain name as `target` --
+        // `<embed>` never strips a scheme prefix at render time, it just
+        // uses `target` as-is for `src`/etc. `[[wiki]]` (regular) is a real
+        // `@link`, so it needs the `ref:` scheme prefix embedded in the
+        // string for `target_scheme` (downstream) to recognize it as a
+        // wikilink-style, search-by-name reference rather than a plain
+        // relative file path.
         let sigil = if is_embed {
             Sigil::Type("embed".to_string())
         } else {
-            Sigil::At(None)
+            Sigil::At(Some("link".to_string()))
+        };
+        let target_key_value = |raw: &str| -> String {
+            if is_embed {
+                raw.to_string()
+            } else {
+                format!("ref:{raw}")
+            }
         };
 
         let inner = &remaining[start_idx + 2..actual_end_idx];
@@ -181,8 +199,8 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
             let display = display.trim();
             let mut el = Element::new(sigil);
             el.args = Some(Value::Map(vec![(
-                "wiki".to_string(),
-                Value::String(target.to_string()),
+                "target".to_string(),
+                Value::String(target_key_value(target)),
             )]));
             el.content = Some(vec![Inline::Text(Text::new(
                 enclose_sigils_in_backticks(display),
@@ -193,8 +211,8 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
             let target = inner.trim();
             let mut el = Element::new(sigil);
             el.args = Some(Value::Map(vec![(
-                "wiki".to_string(),
-                Value::String(target.to_string()),
+                "target".to_string(),
+                Value::String(target_key_value(target)),
             )]));
             el
         };

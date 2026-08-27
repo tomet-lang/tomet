@@ -8,11 +8,13 @@
 //! etc.) that route to a `pub(super)` per-tab method based on
 //! `active_tab`.
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-use super::engine::migration::{FileTreeNode, MigrationEngine, MigrationItem};
+use super::engine::migration::MigrationItem;
 use typedmark_edit::batch_meta::{BatchMetaEngine, MetaFileEntry};
 use typedmark_edit::structural::StructuralMatch;
+use typedmark_indexer::workspace_scan::{FileTreeNode, WorkspaceIndex};
 
 mod batch_meta;
 mod explorer;
@@ -68,6 +70,7 @@ pub struct App {
     pub tree_index: usize,
     pub tree_filter_input: String,
     pub is_filtering_tree: bool,
+    tree_expanded: HashMap<PathBuf, bool>,
 
     // Tab 2: Migration State
     pub migration_items: Vec<MigrationItem>,
@@ -106,6 +109,14 @@ pub struct App {
     pub printer_config_path: Option<PathBuf>,
     pub printer_config: typedmark_config::PrinterConfig,
     pub config_root: PathBuf,
+
+    // Workspace catalog: `index` holds filesystem-derived facts only
+    // (which paths exist, what kind they are); `tree_nodes`/
+    // `migration_items`/`meta_entries` are views derived from it and
+    // reconciled (not replaced) against it in `sync_workspace_views` so
+    // that per-file UI state (selected/converted/expanded/loaded preview
+    // content) survives a reindex of unrelated files.
+    index: WorkspaceIndex,
 }
 
 impl App {
@@ -126,12 +137,7 @@ impl App {
             )
         };
 
-        let tree_nodes =
-            MigrationEngine::scan_tree_with_config(&dir_path, &printer_config, &config_root);
-        let migration_items =
-            MigrationEngine::scan_with_config(&dir_path, &printer_config, &config_root);
-        let meta_entries =
-            BatchMetaEngine::scan_with_config(&dir_path, &printer_config, &config_root);
+        let index = WorkspaceIndex::build(&dir_path, &printer_config, &config_root);
         let structural_matches = Vec::new();
 
         let mut app = Self {
@@ -142,15 +148,16 @@ impl App {
             should_quit: false,
             focused_pane: FocusedPane::List,
 
-            tree_nodes,
+            tree_nodes: Vec::new(),
             tree_index: 0,
             tree_filter_input: String::new(),
             is_filtering_tree: false,
+            tree_expanded: HashMap::new(),
 
-            migration_items,
+            migration_items: Vec::new(),
             migration_index: 0,
 
-            meta_entries,
+            meta_entries: Vec::new(),
             meta_index: 0,
             meta_key_input: "author".to_string(),
             meta_val_input: "".to_string(),
@@ -175,10 +182,77 @@ impl App {
             printer_config_path: resolved_config_path,
             printer_config,
             config_root,
+            index,
         };
 
+        app.sync_workspace_views();
         app.refresh_status();
         app
+    }
+
+    /// Re-derives `tree_nodes`/`migration_items`/`meta_entries` from
+    /// `self.index`'s current catalog, reconciling by path against the
+    /// existing values rather than replacing them outright -- so
+    /// `selected`/`converted`/loaded preview content survives for every
+    /// file the triggering action didn't touch. Call this after any
+    /// `self.index` mutation (`build`/`rebuild`/`refresh_path`).
+    fn sync_workspace_views(&mut self) {
+        let mut tree_nodes = self.index.tree_nodes();
+        for node in &mut tree_nodes {
+            match self.tree_expanded.get(&node.path) {
+                Some(&expanded) => node.expanded = expanded,
+                None => {
+                    self.tree_expanded.insert(node.path.clone(), node.expanded);
+                }
+            }
+        }
+        self.tree_nodes = tree_nodes;
+        let live: HashSet<PathBuf> = self.tree_nodes.iter().map(|n| n.path.clone()).collect();
+        self.tree_expanded.retain(|p, _| live.contains(p));
+
+        let mut old_migration: HashMap<PathBuf, MigrationItem> = self
+            .migration_items
+            .drain(..)
+            .map(|i| (i.source_path.clone(), i))
+            .collect();
+        self.migration_items = self
+            .index
+            .migration_candidates()
+            .into_iter()
+            .map(|c| {
+                old_migration
+                    .remove(&c.source_path)
+                    .unwrap_or_else(|| MigrationItem::from_candidate(c))
+            })
+            .collect();
+
+        let mut old_meta: HashMap<PathBuf, MetaFileEntry> = self
+            .meta_entries
+            .drain(..)
+            .map(|e| (e.path.clone(), e))
+            .collect();
+        self.meta_entries = self
+            .index
+            .meta_paths()
+            .into_iter()
+            .map(|p| {
+                old_meta
+                    .remove(&p)
+                    .unwrap_or_else(|| BatchMetaEngine::entries_from_paths(vec![p]).remove(0))
+            })
+            .collect();
+
+        let tv = self.visible_tree_indices().len();
+        if self.tree_index >= tv {
+            self.tree_index = tv.saturating_sub(1);
+        }
+        let mv = self.visible_migration_tree_indices().len();
+        if self.migration_index >= mv {
+            self.migration_index = mv.saturating_sub(1);
+        }
+        if self.meta_index >= self.meta_entries.len() {
+            self.meta_index = self.meta_entries.len().saturating_sub(1);
+        }
     }
 
     pub fn refresh_status(&mut self) {
@@ -298,21 +372,8 @@ impl App {
     }
 
     pub fn reload_workspace(&mut self) {
-        self.tree_nodes = MigrationEngine::scan_tree_with_config(
-            &self.dir_path,
-            &self.printer_config,
-            &self.config_root,
-        );
-        self.migration_items = MigrationEngine::scan_with_config(
-            &self.dir_path,
-            &self.printer_config,
-            &self.config_root,
-        );
-        self.meta_entries = BatchMetaEngine::scan_with_config(
-            &self.dir_path,
-            &self.printer_config,
-            &self.config_root,
-        );
+        self.index.rebuild();
+        self.sync_workspace_views();
         self.refresh_status();
     }
 }
@@ -372,6 +433,62 @@ mod tests {
         assert_eq!(
             app.migration_items[0].source_path,
             normal_dir.join("kept_note.md")
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn migration_execute_action_preserves_untouched_item_state() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("tm_test_tui_reconcile_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::write(temp_dir.join("a.md"), "# A").unwrap();
+        std::fs::write(temp_dir.join("b.md"), "# B").unwrap();
+
+        let mut app = App::new(temp_dir.clone(), None);
+        assert_eq!(app.migration_items.len(), 2);
+
+        // Simulate the user having previewed "b.md" (lazy-loads its
+        // content) but not selecting it for conversion, while selecting
+        // "a.md" for conversion.
+        for item in &mut app.migration_items {
+            if item.source_path.file_name().unwrap() == "b.md" {
+                item.ensure_loaded();
+                assert!(!item.markdown_src.is_empty());
+            } else {
+                item.selected = true;
+            }
+        }
+
+        app.migration_execute_action();
+
+        assert_eq!(
+            app.migration_items.len(),
+            2,
+            "unrelated files must not be dropped from the list"
+        );
+        let a = app
+            .migration_items
+            .iter()
+            .find(|i| i.source_path.file_name().unwrap() == "a.md")
+            .unwrap();
+        assert!(a.converted, "a.md should have been converted");
+
+        let b = app
+            .migration_items
+            .iter()
+            .find(|i| i.source_path.file_name().unwrap() == "b.md")
+            .unwrap();
+        assert!(
+            !b.converted && !b.selected,
+            "b.md was never selected for conversion, its state must be untouched"
+        );
+        assert!(
+            !b.markdown_src.is_empty(),
+            "b.md's already-loaded preview content must survive the reload \
+             triggered by converting an unrelated file"
         );
 
         let _ = std::fs::remove_dir_all(&temp_dir);

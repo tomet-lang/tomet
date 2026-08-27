@@ -2,7 +2,7 @@
 
 use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
 use typedmark_semantics::merge_connected_values;
-use typedmark_walker::{NodeMut, VisitorMut, walk_document_mut};
+use typedmark_walker::{VisitorMut, walk_document_mut};
 
 /// A remote attribute connection definition targeting one or more element IDs.
 #[derive(Debug, Clone)]
@@ -112,45 +112,21 @@ fn parse_target_ids_from_str(s: &str) -> Vec<String> {
 }
 
 /// Walks `doc` via `typedmark-walker`'s generic mutable tree walk and
-/// merges `conn`'s attrs/value into every id-bearing node (`Element`/
-/// `Heading`/`ListItem`) whose id matches `target_id` -- see that
-/// crate's module doc for why the traversal itself lives there rather
-/// than being hand-rolled here.
+/// merges `conn`'s attrs/value into every id-bearing `Element` (a list
+/// item is just `Element{ sigil: Bare, .. }`, so no separate case is
+/// needed here anymore) whose id matches `target_id` -- see that crate's
+/// module doc for why the traversal itself lives there rather than being
+/// hand-rolled here.
 struct ConnectionApplier<'a> {
     target_id: &'a str,
     conn: &'a RemoteConnection,
 }
 
 impl VisitorMut<()> for ConnectionApplier<'_> {
-    fn visit_mut(&mut self, node: NodeMut<'_>) -> std::ops::ControlFlow<()> {
-        match node {
-            NodeMut::Element(el) => apply_connection_to_element(el, self.target_id, self.conn),
-            NodeMut::Heading(h) => {
-                let has_id = attrs_has_id(h.attrs.as_ref(), self.target_id);
-                if has_id {
-                    let conn_data = self.conn.value.as_ref().or(self.conn.args.as_ref());
-                    if let Some(conn_val) = conn_data {
-                        h.attrs = merge_connected_values(h.attrs.as_ref(), Some(conn_val));
-                    }
-                }
-            }
-            NodeMut::ListItem(item) => {
-                let has_id = attrs_has_id(item.attrs.as_ref(), self.target_id);
-                if has_id {
-                    let conn_data = self.conn.value.as_ref().or(self.conn.args.as_ref());
-                    if let Some(conn_val) = conn_data {
-                        item.attrs = merge_connected_values(item.attrs.as_ref(), Some(conn_val));
-                    }
-                }
-            }
-        }
+    fn visit_mut(&mut self, el: &mut Element) -> std::ops::ControlFlow<()> {
+        apply_connection_to_element(el, self.target_id, self.conn);
         std::ops::ControlFlow::Continue(())
     }
-}
-
-fn attrs_has_id(attrs: Option<&Value>, target_id: &str) -> bool {
-    matches!(attrs, Some(Value::Map(entries))
-        if entries.iter().any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id)))
 }
 
 fn element_has_id(el: &Element, target_id: &str) -> bool {

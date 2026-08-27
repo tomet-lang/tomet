@@ -5,18 +5,19 @@
 //! ones built from Markdown or edited purely at the AST level). Uses
 //! `typedmark_config::PrinterConfig` (see that crate for config
 //! loading/discovery) to drive formatting choices: meta format
-//! (yaml/json/toml), wikilink/link spacing, callout/list style, via
+//! (yaml/json/toml), link-key spacing, callout/list style, via
 //! `typedmark-style`'s single-node renderers. Also owns `@meta` id
 //! auto-generation (`ensure_document_id_with_config`, which mutates the
 //! AST directly), built on the pure generate/validate/convert helpers
 //! in `typedmark-field-utils`.
 
 use typedmark_ast::{
-    Block, Document, Element, ElementValue, Heading, Inline, InterpExpr, InterpExprKind, List,
-    Literal, Sigil, Value,
+    Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Sigil,
+    Value,
 };
 use typedmark_config::PrinterConfig;
 use typedmark_field_utils::{generate_id_for_field, is_valid_id_format};
+use typedmark_semantics::{ElementKind, classify, heading_level, list_items, list_ordered};
 use typedmark_style::{render_args_with_config, render_value, render_value_inner_with_config};
 
 pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig) {
@@ -97,7 +98,6 @@ pub fn document_to_tm_with_config(doc: &Document, config: &PrinterConfig) -> Str
 
 fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
     match block {
-        Block::Heading(h) => render_heading(h, config, out),
         Block::Paragraph(p) => {
             let inlines_text = render_inlines(&p.content, config);
             if !inlines_text.trim().is_empty() {
@@ -105,7 +105,10 @@ fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
                 out.push('\n');
             }
         }
-        Block::List(list) => render_list(list, config, out),
+        Block::Element(el) if list_ordered(el).is_some() => render_list(el, config, out),
+        Block::Element(el) if classify(el) == ElementKind::Heading => {
+            render_heading_element(el, config, out)
+        }
         Block::Element(el) => {
             out.push_str(&render_element(el, config));
             out.push('\n');
@@ -113,33 +116,41 @@ fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
     }
 }
 
-fn render_heading(h: &Heading, config: &PrinterConfig, out: &mut String) {
-    let level = h.level.clamp(1, 6) as usize;
+/// Called only from `render_block`'s top-level dispatch, never from the
+/// shared, recursively-called `render_element` (which `render_inlines`/
+/// `ElementValue::Children` both call for nested/inline elements) -- a
+/// nested/inline `@heading(...)` must not round-trip back to `#`-sugar,
+/// consistent with `typedmark-codegen-html`/`typedmark-codegen-markdown`'s
+/// equivalent gating for the same resolved decision.
+fn render_heading_element(el: &Element, config: &PrinterConfig, out: &mut String) {
+    let level = heading_level(el).unwrap_or(1) as usize;
+    let content = el.content.as_deref().unwrap_or(&[]);
     out.push_str(&"#".repeat(level));
     if config.heading_space_inside_brackets {
         out.push_str("[ ");
-        out.push_str(&render_inlines(&h.content, config));
+        out.push_str(&render_inlines(content, config));
         out.push_str(" ]");
     } else {
         out.push('[');
-        out.push_str(&render_inlines(&h.content, config));
+        out.push_str(&render_inlines(content, config));
         out.push(']');
     }
-    if let Some(attrs) = &h.attrs {
+    if let Some(ElementValue::Data(v)) = &el.value {
         out.push(' ');
-        out.push_str(&render_value(attrs));
+        out.push_str(&render_value(v));
     }
     out.push('\n');
 }
 
-fn render_list(list: &List, config: &PrinterConfig, out: &mut String) {
-    render_list_with_indent(list, 0, config, out);
+fn render_list(el: &Element, config: &PrinterConfig, out: &mut String) {
+    render_list_with_indent(el, 0, config, out);
 }
 
-fn render_list_with_indent(list: &List, indent: usize, config: &PrinterConfig, out: &mut String) {
+fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, out: &mut String) {
+    let ordered = list_ordered(el).unwrap_or(false);
     let indent_str = "  ".repeat(indent);
-    for item in &list.items {
-        let prefix = if list.ordered {
+    for item in list_items(el) {
+        let prefix = if ordered {
             "-. ".to_string()
         } else {
             "- ".to_string()
@@ -147,12 +158,18 @@ fn render_list_with_indent(list: &List, indent: usize, config: &PrinterConfig, o
         let mut head_prefix = String::new();
         head_prefix.push_str(&indent_str);
         head_prefix.push_str(&prefix);
-        if let Some(marker) = &item.marker {
-            head_prefix.push_str(&format!("({marker}) "));
+        if let Some(marker) = &item.args {
+            head_prefix.push('(');
+            head_prefix.push_str(&render_args_with_config(marker, config));
+            head_prefix.push_str(") ");
         }
 
-        let content_str = render_inlines(&item.content, config);
+        let content_str = render_inlines(item.content.as_deref().unwrap_or(&[]), config);
         let lines: Vec<&str> = content_str.lines().collect();
+        let item_attrs = match &item.value {
+            Some(ElementValue::Data(v)) => Some(v),
+            _ => None,
+        };
 
         if lines.len() > 1 && config.list_multiline_style_content.is_some() {
             let style = config.list_multiline_style_content.as_deref().unwrap();
@@ -208,7 +225,7 @@ fn render_list_with_indent(list: &List, indent: usize, config: &PrinterConfig, o
             } else {
                 out.push_str(&content_str);
             }
-            if let Some(attrs) = &item.attrs {
+            if let Some(attrs) = item_attrs {
                 out.push(' ');
                 out.push_str(&render_value(attrs));
             }
@@ -216,15 +233,19 @@ fn render_list_with_indent(list: &List, indent: usize, config: &PrinterConfig, o
         } else {
             out.push_str(&head_prefix);
             out.push_str(&content_str);
-            if let Some(attrs) = &item.attrs {
+            if let Some(attrs) = item_attrs {
                 out.push(' ');
                 out.push_str(&render_value(attrs));
             }
             out.push('\n');
         }
-        for child in &item.children {
-            if let Block::List(sub) = child {
-                render_list_with_indent(sub, indent + 1, config, out);
+        if let Some(children) = &item.children {
+            for child in children {
+                if let Block::Element(sub) = child {
+                    if list_ordered(sub).is_some() {
+                        render_list_with_indent(sub, indent + 1, config, out);
+                    }
+                }
             }
         }
     }
@@ -539,27 +560,32 @@ pub fn render_interp_expr(expr: &InterpExpr) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use typedmark_ast::{Heading, Inline, Span, Text};
     use typedmark_config::{FieldConfig, load_config_from_str};
     use typedmark_style::render_value_inner;
 
     #[test]
     fn test_printer_config_space_inside_brackets() {
-        let doc = Document {
-            blocks: vec![Block::Heading(Heading::new(
-                1,
-                vec![Inline::Text(Text::new("Title", Span::dummy()))],
-                None,
-                Span::dummy(),
-            ))],
-            span: Span::dummy(),
-        };
+        let doc = typedmark_parser::parse_document("#[Title]\n").unwrap();
         let cfg = PrinterConfig {
             heading_space_inside_brackets: true,
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc, &cfg);
         assert!(printed.contains("#[ Title ]"));
+    }
+
+    #[test]
+    fn nested_inline_heading_does_not_reserialize_as_hash_sugar() {
+        // `@heading(2)[...]` nested inside another element's content must
+        // round-trip as a plain `@heading(...)` element, never as `##[...]`
+        // -- only `render_block`'s top-level dispatch special-cases
+        // headings; the shared, recursively-called `render_element` has no
+        // heading arm at all (mirrors `typedmark-codegen-html`/
+        // `typedmark-codegen-markdown`'s equivalent nested-heading tests).
+        let doc = typedmark_parser::parse_document("<memo>[@heading(2)[Nested]]\n").unwrap();
+        let printed = document_to_tm(&doc);
+        assert!(!printed.contains("##["), "got: {printed:?}");
+        assert!(printed.contains("@heading(2)[Nested]"), "got: {printed:?}");
     }
 
     #[test]
@@ -592,10 +618,8 @@ mod tests {
         let md = "Check [[name]] and [[name|display]] here.\n";
         let doc = typedmark_markdown::from_markdown(md);
         let printed = document_to_tm(&doc);
-        assert!(printed.contains("@(wiki: name)") || printed.contains("@(wiki:name)"));
-        assert!(
-            printed.contains("@[display](wiki: name)") || printed.contains("@[display](wiki:name)")
-        );
+        assert!(printed.contains("@link(target: \"ref:name\")"));
+        assert!(printed.contains("@link(target: \"ref:name\")[display]"));
     }
 
     #[test]
@@ -696,16 +720,16 @@ mod tests {
 
         let cfg_default = PrinterConfig::default();
         let printed_default = document_to_tm_with_config(&doc, &cfg_default);
-        assert!(printed_default.contains("@(wiki: target)"));
-        assert!(printed_default.contains("@[display](wiki: target)"));
+        assert!(printed_default.contains("@link(target: \"ref:target\")"));
+        assert!(printed_default.contains("@link(target: \"ref:target\")[display]"));
 
         let cfg_no_space = PrinterConfig {
-            wikilink_no_space: true,
+            link_no_space: true,
             ..Default::default()
         };
         let printed_no_space = document_to_tm_with_config(&doc, &cfg_no_space);
-        assert!(printed_no_space.contains("@(wiki:target)"));
-        assert!(printed_no_space.contains("@[display](wiki:target)"));
+        assert!(printed_no_space.contains("@link(target:\"ref:target\")"));
+        assert!(printed_no_space.contains("@link(target:\"ref:target\")[display]"));
     }
 
     #[test]
@@ -823,7 +847,7 @@ mod tests {
             ..Default::default()
         };
         let printed_block = document_to_tm_with_config(&doc, &cfg_block);
-        assert!(printed_block.contains("<callout>(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@[どうするんだ](wiki: 2025-04-26)？\n]"));
+        assert!(printed_block.contains("<callout>(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？\n]"));
 
         // Test "box" style
         let cfg_box = PrinterConfig {
@@ -831,7 +855,7 @@ mod tests {
             ..Default::default()
         };
         let printed_box = document_to_tm_with_config(&doc, &cfg_box);
-        assert!(printed_box.contains("<callout>(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@[どうするんだ](wiki: 2025-04-26)？ ]"));
+        assert!(printed_box.contains("<callout>(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？ ]"));
 
         // Test "expanded" style
         let cfg_expanded = PrinterConfig {
@@ -839,7 +863,7 @@ mod tests {
             ..Default::default()
         };
         let printed_expanded = document_to_tm_with_config(&doc, &cfg_expanded);
-        assert!(printed_expanded.contains("<callout>(info, title: \"2025/04/29 11:09\")[\n  コレさすがに草www\n  お前なら@[どうするんだ](wiki: 2025-04-26)？\n]"));
+        assert!(printed_expanded.contains("<callout>(info, title: \"2025/04/29 11:09\")[\n  コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？\n]"));
     }
 
     #[test]
@@ -881,14 +905,14 @@ mod tests {
 
         let cfg_default = PrinterConfig::default();
         let printed_default = document_to_tm_with_config(&doc, &cfg_default);
-        assert!(printed_default.contains("@[Google](url: \"https://google.com\")"));
+        assert!(printed_default.contains("@link(target: \"https://google.com\")[Google]"));
 
         let cfg_nospace = PrinterConfig {
             link_no_space: true,
             ..Default::default()
         };
         let printed_nospace = document_to_tm_with_config(&doc, &cfg_nospace);
-        assert!(printed_nospace.contains("@[Google](url:\"https://google.com\")"));
+        assert!(printed_nospace.contains("@link(target:\"https://google.com\")[Google]"));
     }
 
     #[test]

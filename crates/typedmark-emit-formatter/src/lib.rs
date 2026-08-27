@@ -224,6 +224,12 @@ fn is_raw_element(el: &Element) -> bool {
 }
 
 fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
+    // A list item is just `Element{ sigil: Bare, .. }` nested inside its
+    // list's `ElementValue::Children`, so `walk_element` already reaches
+    // every item's own `content` through the `Children` branch below --
+    // no separate list-shaped case is needed here anymore. `el.children`
+    // (an item's own nested sub-list) is the one shape `Children`/
+    // `content` don't cover, so it gets its own block-level recursion.
     fn walk_element(el: &Element, out: &mut Vec<(usize, usize)>) {
         if is_raw_element(el) {
             if let Some(inlines) = &el.content {
@@ -242,6 +248,11 @@ fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                 }
             }
         }
+        if let Some(children) = &el.children {
+            for child in children {
+                walk_block(child, out);
+            }
+        }
         if let Some(ElementValue::Children(children)) = &el.value {
             for child in children {
                 walk_element(child, out);
@@ -249,7 +260,7 @@ fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
         }
     }
 
-    for block in &doc.blocks {
+    fn walk_block(block: &Block, out: &mut Vec<(usize, usize)>) {
         match block {
             Block::Paragraph(p) => {
                 for inline in &p.content {
@@ -258,26 +269,12 @@ fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                     }
                 }
             }
-            Block::Heading(h) => {
-                for inline in &h.content {
-                    if let Inline::Element(el) = inline {
-                        walk_element(el, out);
-                    }
-                }
-            }
-            Block::List(list) => {
-                for item in &list.items {
-                    for inline in &item.content {
-                        if let Inline::Element(el) = inline {
-                            walk_element(el, out);
-                        }
-                    }
-                }
-            }
-            Block::Element(el) => {
-                walk_element(el, out);
-            }
+            Block::Element(el) => walk_element(el, out),
         }
+    }
+
+    for block in &doc.blocks {
+        walk_block(block, out);
     }
 }
 

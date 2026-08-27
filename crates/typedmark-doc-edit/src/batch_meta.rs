@@ -2,10 +2,10 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use typedmark_ast::{Block, Document, Element, ElementValue, Sigil, Value};
-use typedmark_indexer::{collect_tm_files_with_config, extract_metadata};
+use typedmark_indexer::extract_metadata;
 use typedmark_parser::parse_document;
 use typedmark_printer::document_to_tm;
 use typedmark_semantics::classify;
@@ -34,36 +34,19 @@ impl MetaFileEntry {
 pub struct BatchMetaEngine;
 
 impl BatchMetaEngine {
-    /// Scan directory for `.tm` / `.tmt` files and extract `@meta` and `@config` key-value maps.
-    pub fn scan(dir: &Path) -> Vec<MetaFileEntry> {
-        let (config, _, config_root) =
-            typedmark_config::find_config_file(dir).unwrap_or_else(|| {
-                (
-                    typedmark_config::PrinterConfig::default(),
-                    dir.to_path_buf(),
-                    dir.to_path_buf(),
-                )
-            });
-        Self::scan_with_config(dir, &config, &config_root)
-    }
-
-    pub fn scan_with_config(
-        dir: &Path,
-        config: &typedmark_config::PrinterConfig,
-        config_root: &Path,
-    ) -> Vec<MetaFileEntry> {
-        let mut entries = Vec::new();
-        let paths = collect_tm_files_with_config(dir, config, config_root);
-        for path in paths {
-            entries.push(MetaFileEntry {
+    /// Wrap each path into an unloaded `MetaFileEntry` (content is read
+    /// lazily later via `ensure_loaded`).
+    pub fn entries_from_paths(paths: Vec<PathBuf>) -> Vec<MetaFileEntry> {
+        paths
+            .into_iter()
+            .map(|path| MetaFileEntry {
                 path,
                 original_src: String::new(),
                 modified_src: String::new(),
                 metadata: BTreeMap::new(),
                 selected: true,
-            });
-        }
-        entries
+            })
+            .collect()
     }
 
     /// Set or update a key-value pair in `@meta` across all selected files.
@@ -136,6 +119,7 @@ fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_val:
             sigil: Sigil::At(Some(target_element.to_string())),
             args: None,
             content: None,
+            children: None,
             value: Some(ElementValue::Data(Value::Map(vec![(
                 key.to_string(),
                 Value::String(new_val.to_string()),
@@ -160,10 +144,8 @@ where
 {
     struct ElementVisitorMut<F>(F);
     impl<F: FnMut(&mut Element)> typedmark_walker::VisitorMut<()> for ElementVisitorMut<F> {
-        fn visit_mut(&mut self, node: typedmark_walker::NodeMut<'_>) -> std::ops::ControlFlow<()> {
-            if let typedmark_walker::NodeMut::Element(el) = node {
-                (self.0)(el);
-            }
+        fn visit_mut(&mut self, el: &mut Element) -> std::ops::ControlFlow<()> {
+            (self.0)(el);
             std::ops::ControlFlow::Continue(())
         }
     }

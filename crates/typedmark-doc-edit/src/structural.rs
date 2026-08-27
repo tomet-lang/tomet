@@ -266,10 +266,8 @@ where
 {
     struct ElementVisitor<'a, F>(&'a mut F);
     impl<F: FnMut(&Element)> typedmark_walker::Visitor<()> for ElementVisitor<'_, F> {
-        fn visit(&mut self, node: typedmark_walker::Node<'_>) -> std::ops::ControlFlow<()> {
-            if let typedmark_walker::Node::Element(el) = node {
-                (self.0)(el);
-            }
+        fn visit(&mut self, el: &Element) -> std::ops::ControlFlow<()> {
+            (self.0)(el);
             std::ops::ControlFlow::Continue(())
         }
     }

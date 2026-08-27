@@ -6,13 +6,13 @@ use crate::inline::{Stop, parse_inline_seq};
 use crate::value::{
     err, parse_value_at, skip_inline_ws, skip_ws_and_newlines, skip_ws_newlines_and_comments,
 };
-use typedmark_ast::{Element, Heading, Sigil, Value};
+use typedmark_ast::{Element, ElementValue, Sigil, Value};
 use typedmark_lexar::Cursor;
 
 pub(crate) fn parse_heading(
     cur: &mut Cursor,
     default_format: Option<EmbeddedFormat>,
-) -> Result<Heading> {
+) -> Result<Element> {
     let start_pos = cur.pos();
     let level = cur.eat_while(|c| c == '#').len() as u8;
     skip_inline_ws(cur);
@@ -47,7 +47,14 @@ pub(crate) fn parse_heading(
         cur.bump();
     }
     let span = cur.span_from(start_pos);
-    Ok(Heading::new(level, content, attrs, span))
+    let mut el = Element::new(Sigil::At(Some("heading".to_string())));
+    // Pre-existing quirk, preserved: a `#`-run longer than 255 silently
+    // truncates here, same as before `Heading` was folded into `Element`.
+    el.args = Some(Value::Int(level as i64));
+    el.content = Some(content);
+    el.value = attrs.map(ElementValue::Data);
+    el.span = span;
+    Ok(el)
 }
 
 pub(crate) fn parse_braced_value(cur: &mut Cursor) -> Result<Value> {

@@ -79,12 +79,12 @@
 		"list-marker": {
 			"patterns": [
 				{
-					"match": "^\\s*(-\\.|-)(?=[ \\t])(?:\\s*(\\(|\\[)([xX \\-T\\?]?|[a-zA-Z0-9_.-]+)(\\)|\\]))?",
+					"match": "^\\s*(-\\.|-)(?=[ \\t])(?:\\s*(\\()([^()\\n]*)(\\)))?",
 					"captures": {
 						"1": { "name": "punctuation.definition.list.begin.markdown markup.list.typedmark keyword.control.list.typedmark" },
-						"2": { "name": "punctuation.definition.checkbox.begin.typedmark" },
-						"3": { "name": "keyword.operator.checkbox.typedmark markup.list.checkbox.typedmark" },
-						"4": { "name": "punctuation.definition.checkbox.end.typedmark" }
+						"2": { "name": "punctuation.definition.marker.begin.typedmark" },
+						"3": { "name": "keyword.operator.marker.typedmark markup.list.marker.typedmark" },
+						"4": { "name": "punctuation.definition.marker.end.typedmark" }
 					}
 				}
 			]
@@ -282,11 +282,22 @@
 		},
 
 		"map-entry": {
-			"match": "([A-Za-z_][A-Za-z0-9_.-]*)(:)",
-			"captures": {
+			"begin": "([A-Za-z_][A-Za-z0-9_.-]*)(:)",
+			"beginCaptures": {
 				"1": { "name": "variable.other.property.typedmark" },
 				"2": { "name": "punctuation.separator.key-value.typedmark" }
-			}
+			},
+			"end": "(?=[,)\\]}]|$)",
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#string" },
+				{ "include": "#interpolation" },
+				{ "include": "#groups" },
+				{
+					"match": "[^,()\\[\\]{}\\n]+",
+					"name": "string.unquoted.plain.typedmark"
+				}
+			]
 		},
 
 		"string": {

@@ -64,7 +64,7 @@ fn highlight_typedmark_tree_sitter(src: &str) -> Vec<Line<'static>> {
             "property" => Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
-            "constant" | "markup.list.checked" => Style::default().fg(Color::Green),
+            "constant" | "markup.list.marker" => Style::default().fg(Color::Green),
             "markup.list.unnumbered" | "markup.list.numbered" => Style::default().fg(Color::Blue),
             "text.literal" => Style::default().fg(Color::Gray),
             _ => Style::default(),

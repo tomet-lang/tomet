@@ -13,3 +13,4 @@ typedmark-style = { workspace = true }
 
 [dev-dependencies]
 typedmark-markdown = { workspace = true }
+typedmark-parser = { workspace = true }

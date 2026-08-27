@@ -54,10 +54,10 @@
 (unordered_list_item) @markup.list.unnumbered @keyword.control
 (ordered_list_item) @markup.list.numbered @keyword.control
 
-; Outliner status markers (`- (T)`, `- (?)`, `- [x]`, `- ( )`) -- a
+; Outliner status markers (`- (T)`, `- (?)`, `- ("in progress")`) -- a
 ; distinct color from the rest of the item's content, same idea as
 ; `heading_marker` above.
-(list_checkbox) @markup.list.checked @constant
+(list_marker) @markup.list.marker @constant
 
 ; `<T>`/`@name` element sigils and their name.
 (type_element "<" @tag)

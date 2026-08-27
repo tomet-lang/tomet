@@ -10,10 +10,11 @@
 //! form and are dropped.
 
 use typedmark_ast::{
-    Block, Document, Element, ElementValue, Heading, Inline, InterpExpr, InterpExprKind, ListItem,
-    Literal, Value,
+    Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
-use typedmark_semantics::classify;
+use typedmark_semantics::{
+    TargetScheme, classify, heading_level, link_target, list_items, list_ordered, target_scheme,
+};
 
 pub fn to_markdown(doc: &Document) -> String {
     let mut out = String::new();
@@ -25,7 +26,6 @@ pub fn to_markdown(doc: &Document) -> String {
 
 fn render_block(block: &Block, out: &mut String) {
     match block {
-        Block::Heading(h) => render_heading(h, out),
         Block::Paragraph(p) => {
             // Same reasoning as `typedmark-html`'s `render_block`: an
             // all-invisible-element paragraph (e.g. adjacent `@meta(...)`
@@ -37,7 +37,7 @@ fn render_block(block: &Block, out: &mut String) {
                 out.push_str("\n\n");
             }
         }
-        Block::List(list) => render_list(&list.items, list.ordered, out),
+        Block::Element(el) if list_ordered(el).is_some() => render_list(el, out),
         Block::Element(el) => {
             let text = element_to_md(el, false);
             if !text.is_empty() {
@@ -48,22 +48,15 @@ fn render_block(block: &Block, out: &mut String) {
     }
 }
 
-fn render_heading(h: &Heading, out: &mut String) {
-    let level = h.level.clamp(1, 6) as usize;
-    out.push_str(&"#".repeat(level));
-    out.push(' ');
-    out.push_str(&inline_to_md(&h.content));
-    out.push_str("\n\n");
-}
-
-fn render_list(items: &[ListItem], ordered: bool, out: &mut String) {
-    render_list_with_indent(items, ordered, 0, out);
+fn render_list(el: &Element, out: &mut String) {
+    render_list_with_indent(el, 0, out);
     out.push('\n');
 }
 
-fn render_list_with_indent(items: &[ListItem], ordered: bool, indent: usize, out: &mut String) {
+fn render_list_with_indent(el: &Element, indent: usize, out: &mut String) {
+    let ordered = list_ordered(el).unwrap_or(false);
     let indent_str = "  ".repeat(indent);
-    for (i, item) in items.iter().enumerate() {
+    for (i, item) in list_items(el).iter().enumerate() {
         out.push_str(&indent_str);
         let marker = if ordered {
             format!("{}. ", i + 1)
@@ -71,14 +64,18 @@ fn render_list_with_indent(items: &[ListItem], ordered: bool, indent: usize, out
             "- ".to_string()
         };
         out.push_str(&marker);
-        if let Some(m) = &item.marker {
-            out.push_str(&format!("[{m}] "));
-        }
-        out.push_str(&inline_to_md(&item.content));
+        // `args` (the `(...)` marker `Value`) has no CommonMark equivalent
+        // -- dropped on export, same as this crate's other documented
+        // lossy cases (see the module doc).
+        out.push_str(&inline_to_md(item.content.as_deref().unwrap_or(&[])));
         out.push('\n');
-        for child in &item.children {
-            if let Block::List(sub) = child {
-                render_list_with_indent(&sub.items, sub.ordered, indent + 1, out);
+        if let Some(children) = &item.children {
+            for child in children {
+                if let Block::Element(sub) = child {
+                    if list_ordered(sub).is_some() {
+                        render_list_with_indent(sub, indent + 1, out);
+                    }
+                }
             }
         }
     }
@@ -100,6 +97,12 @@ fn element_to_md(el: &Element, inline: bool) -> String {
     match kind.as_str() {
         "meta" => String::new(),
         "config" => String::new(),
+        // Block-position only, same as CommonMark's own headings and
+        // TypedMark's own `#[x]` grammar -- a nested/inline `@heading(...)`
+        // (`inline == true`) falls through to generic/custom rendering
+        // instead, rather than emitting a bare `## text` mid-paragraph
+        // (which wouldn't parse back as a heading anyway).
+        "heading" if !inline => render_heading(el),
         "hr" => render_hr(el),
         "em" => format!("*{}*", content_to_md(el)),
         "strong" => format!("**{}**", content_to_md(el)),
@@ -108,9 +111,7 @@ fn element_to_md(el: &Element, inline: bool) -> String {
         "blockquote" => render_blockquote(el),
         "callout" => render_callout(el),
         "table" => render_table(el),
-        "url" | "file" => render_link(el, kind.as_str()),
-        "ref" => render_ref(el),
-        "wiki" => render_wiki(el),
+        "link" => render_link(el),
         "embed" => render_embed(el),
         "links" => render_links_container(el),
         // No CommonMark equivalent for `${...}` -- round-trips as literal
@@ -218,6 +219,15 @@ fn content_to_md(el: &Element) -> String {
 /// A bare `---` break exports as-is; a titled one (`---[ Title ]---`) has
 /// no CommonMark equivalent, so it's lossy: a bold line followed by a
 /// plain rule.
+/// `id`/`cssclass` attrs (`el.value`) have no CommonMark form and are
+/// dropped, same as before this was folded into the generic `Element`
+/// dispatch (see the module doc).
+fn render_heading(el: &Element) -> String {
+    let level = heading_level(el).unwrap_or(1) as usize;
+    let content = el.content.as_deref().unwrap_or(&[]);
+    format!("{} {}", "#".repeat(level), inline_to_md(content))
+}
+
 fn render_hr(el: &Element) -> String {
     match &el.content {
         Some(title) if !title.is_empty() => format!("{}\n---", inline_to_md(title)),
@@ -316,73 +326,51 @@ fn render_callout(el: &Element) -> String {
     lines.join("\n")
 }
 
-fn render_link(el: &Element, key: &str) -> String {
-    let href = el
-        .args
-        .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, key))
-        .map(value_to_plain)
-        .unwrap_or_default();
+/// `@link(target:..)` -- the target string's own scheme prefix (see
+/// `typedmark_semantics::target_scheme`) decides which CommonMark shape it
+/// exports as: a same-document anchor link (`id:`), a wikilink (`ref:`),
+/// or a plain `[text](target)`/bare-target link (everything else). The
+/// scheme prefix itself is stripped before rendering -- it's addressing
+/// metadata, not part of the visible target.
+fn render_link(el: &Element) -> String {
+    let raw_target = link_target(el, &classify(el)).unwrap_or_default();
+    let (scheme, target) = target_scheme(&raw_target);
     let text = match &el.content {
         Some(content) if !content.is_empty() => inline_to_md(content),
         _ => String::new(),
     };
-    if text.is_empty() || text == href {
-        href
-    } else {
-        format!("[{text}]({href})")
+    match scheme {
+        TargetScheme::Id => {
+            let text = if text.is_empty() {
+                target.to_string()
+            } else {
+                text
+            };
+            format!("[{text}](#link-{target})")
+        }
+        TargetScheme::Ref => {
+            if text.is_empty() || text == target {
+                format!("[[{target}]]")
+            } else {
+                format!("[[{target}|{text}]]")
+            }
+        }
+        _ => {
+            if text.is_empty() || text == target {
+                target.to_string()
+            } else {
+                format!("[{text}]({target})")
+            }
+        }
     }
 }
 
-fn render_ref(el: &Element) -> String {
-    let target = el
-        .args
-        .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, "ref"))
-        .map(value_to_plain)
-        .unwrap_or_default();
-    let text = match &el.content {
-        Some(content) if !content.is_empty() => inline_to_md(content),
-        _ => target.clone(),
-    };
-    format!("[{text}](#link-{target})")
-}
-
-fn render_wiki(el: &Element) -> String {
-    let target = el
-        .args
-        .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, "wiki"))
-        .map(value_to_plain)
-        .unwrap_or_default();
-    let display = match &el.content {
-        Some(content) if !content.is_empty() => inline_to_md(content),
-        _ => String::new(),
-    };
-
-    if display.is_empty() || display == target {
-        format!("[[{target}]]")
-    } else {
-        format!("[[{target}|{display}]]")
-    }
-}
-
+/// Strips `target`'s scheme prefix the same way `render_link` does -- see
+/// `typedmark-codegen-html`'s `render_embed_element` for why `<embed>`
+/// needs this too, not just a raw passthrough.
 fn render_embed(el: &Element) -> String {
-    let src = el
-        .args
-        .as_ref()
-        .and_then(as_map)
-        .and_then(|m| {
-            map_get(m, "path")
-                .or_else(|| map_get(m, "file"))
-                .or_else(|| map_get(m, "url"))
-                .or_else(|| map_get(m, "wiki"))
-        })
-        .map(value_to_plain)
-        .unwrap_or_default();
+    let raw_target = link_target(el, &classify(el)).unwrap_or_default();
+    let (_, src) = target_scheme(&raw_target);
     let alt = el
         .content
         .as_ref()
@@ -634,7 +622,7 @@ fn map_get<'a>(map: &'a [(String, Value)], key: &str) -> Option<&'a Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use typedmark_ast::{List, Paragraph, Sigil, Span, Text};
+    use typedmark_ast::{Paragraph, Sigil, Span, Text};
 
     #[test]
     fn adjacent_meta_blocks_have_no_visible_output() {
@@ -655,6 +643,7 @@ mod tests {
                 sigil: Sigil::At(Some("meta".to_string())),
                 args: Some(Value::String(tag.to_string())),
                 content: None,
+                children: None,
                 value: Some(ElementValue::Data(Value::Map(vec![(
                     "key".to_string(),
                     Value::String("value".to_string()),
@@ -674,28 +663,35 @@ mod tests {
                     ],
                     Span::dummy(),
                 )),
-                Block::Heading(Heading {
-                    level: 1,
-                    content: vec![Inline::Text(Text::new("next", Span::dummy()))],
-                    attrs: None,
-                    span: Span::dummy(),
-                }),
+                Block::Element(heading_element(1, vec![Inline::Text(Text::new(
+                    "next",
+                    Span::dummy(),
+                ))])),
             ],
             span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "# next\n\n");
     }
 
+    fn heading_element(level: i64, content: Vec<Inline>) -> Element {
+        Element {
+            sigil: Sigil::At(Some("heading".to_string())),
+            args: Some(Value::Int(level)),
+            content: Some(content),
+            children: None,
+            value: None,
+            span: Span::dummy(),
+        }
+    }
+
     #[test]
     fn heading_and_paragraph() {
         let doc = Document {
             blocks: vec![
-                Block::Heading(Heading {
-                    level: 2,
-                    content: vec![Inline::Text(Text::new("Title", Span::dummy()))],
-                    attrs: None,
-                    span: Span::dummy(),
-                }),
+                Block::Element(heading_element(2, vec![Inline::Text(Text::new(
+                    "Title",
+                    Span::dummy(),
+                ))])),
                 Block::Paragraph(Paragraph::new(
                     vec![Inline::Text(Text::new("Hello.", Span::dummy()))],
                     Span::dummy(),
@@ -707,21 +703,49 @@ mod tests {
     }
 
     #[test]
+    fn nested_inline_heading_does_not_export_as_bare_hash_line() {
+        // `@heading(2)[...]` nested inside a paragraph (inline position)
+        // must not emit a bare `## text` mid-paragraph -- that wouldn't
+        // parse back as a heading on re-import anyway. It falls through to
+        // generic/custom rendering instead (raw HTML passthrough, per this
+        // module's documented fallback for constructs with no CommonMark
+        // form).
+        let doc = Document {
+            blocks: vec![Block::Paragraph(Paragraph::new(
+                vec![
+                    Inline::Text(Text::new("before ", Span::dummy())),
+                    Inline::Element(heading_element(
+                        2,
+                        vec![Inline::Text(Text::new("Nested", Span::dummy()))],
+                    )),
+                    Inline::Text(Text::new(" after", Span::dummy())),
+                ],
+                Span::dummy(),
+            ))],
+            span: Span::dummy(),
+        };
+        let md = to_markdown(&doc);
+        assert!(!md.contains("## Nested"), "got: {md:?}");
+    }
+
+    #[test]
     fn bullet_and_ordered_list() {
         let doc = Document {
-            blocks: vec![Block::List(List::new(
+            blocks: vec![Block::Element(Element::list(
                 true,
                 vec![
-                    ListItem::new(
+                    Element::list_item(
                         vec![Inline::Text(Text::new("one", Span::dummy()))],
                         None,
                         None,
+                        Vec::new(),
                         Span::dummy(),
                     ),
-                    ListItem::new(
+                    Element::list_item(
                         vec![Inline::Text(Text::new("two", Span::dummy()))],
                         None,
                         None,
+                        Vec::new(),
                         Span::dummy(),
                     ),
                 ],
@@ -741,6 +765,7 @@ mod tests {
                         sigil: Sigil::Type("em".to_string()),
                         args: None,
                         content: Some(vec![Inline::Text(Text::new("a", Span::dummy()))]),
+                        children: None,
                         value: None,
                         span: Span::dummy(),
                     }),
@@ -749,6 +774,7 @@ mod tests {
                         sigil: Sigil::Type("strong".to_string()),
                         args: None,
                         content: Some(vec![Inline::Text(Text::new("b", Span::dummy()))]),
+                        children: None,
                         value: None,
                         span: Span::dummy(),
                     }),
@@ -763,12 +789,13 @@ mod tests {
     #[test]
     fn link_round_trips() {
         let el = Element {
-            sigil: Sigil::At(None),
+            sigil: Sigil::Type("link".to_string()),
             args: Some(Value::Map(vec![(
-                "url".to_string(),
+                "target".to_string(),
                 Value::String("https://example.com".to_string()),
             )])),
             content: Some(vec![Inline::Text(Text::new("Wiki", Span::dummy()))]),
+            children: None,
             value: None,
             span: Span::dummy(),
         };
@@ -787,10 +814,11 @@ mod tests {
         let el = Element {
             sigil: Sigil::Type("embed".to_string()),
             args: Some(Value::Map(vec![(
-                "file".to_string(),
+                "target".to_string(),
                 Value::String("pic.png".to_string()),
             )])),
             content: Some(vec![Inline::Text(Text::new("a cat", Span::dummy()))]),
+            children: None,
             value: None,
             span: Span::dummy(),
         };
@@ -813,6 +841,7 @@ mod tests {
                 Value::String("rust".to_string()),
             )])),
             content: Some(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))]),
+            children: None,
             value: None,
             span: Span::dummy(),
         };
@@ -881,16 +910,16 @@ mod tests {
 
     #[test]
     fn wikilink_exports_to_markdown() {
-        let mut el1 = Element::new(Sigil::At(None));
+        let mut el1 = Element::new(Sigil::Type("link".to_string()));
         el1.args = Some(Value::Map(vec![(
-            "wiki".to_string(),
-            Value::String("name".to_string()),
+            "target".to_string(),
+            Value::String("ref:name".to_string()),
         )]));
 
-        let mut el2 = Element::new(Sigil::At(None));
+        let mut el2 = Element::new(Sigil::Type("link".to_string()));
         el2.args = Some(Value::Map(vec![(
-            "wiki".to_string(),
-            Value::String("name".to_string()),
+            "target".to_string(),
+            Value::String("ref:name".to_string()),
         )]));
         el2.content = Some(vec![Inline::Text(Text::new("display", Span::dummy()))]);
 
