@@ -197,7 +197,10 @@ mod tests {
 
     #[test]
     fn embed_target_named_key() {
-        let el = map_el(Sigil::Type("embed".to_string()), vec![("target", s("a.png"))]);
+        let el = map_el(
+            Sigil::Type("embed".to_string()),
+            vec![("target", s("a.png"))],
+        );
         assert_eq!(crate::classify(&el), ElementKind::Embed);
         assert_eq!(
             link_target_of(&el),

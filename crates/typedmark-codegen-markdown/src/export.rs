@@ -663,10 +663,10 @@ mod tests {
                     ],
                     Span::dummy(),
                 )),
-                Block::Element(heading_element(1, vec![Inline::Text(Text::new(
-                    "next",
-                    Span::dummy(),
-                ))])),
+                Block::Element(heading_element(
+                    1,
+                    vec![Inline::Text(Text::new("next", Span::dummy()))],
+                )),
             ],
             span: Span::dummy(),
         };
@@ -688,10 +688,10 @@ mod tests {
     fn heading_and_paragraph() {
         let doc = Document {
             blocks: vec![
-                Block::Element(heading_element(2, vec![Inline::Text(Text::new(
-                    "Title",
-                    Span::dummy(),
-                ))])),
+                Block::Element(heading_element(
+                    2,
+                    vec![Inline::Text(Text::new("Title", Span::dummy()))],
+                )),
                 Block::Paragraph(Paragraph::new(
                     vec![Inline::Text(Text::new("Hello.", Span::dummy()))],
                     Span::dummy(),

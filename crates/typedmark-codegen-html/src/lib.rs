@@ -521,7 +521,10 @@ fn render_link_element(el: &Element, out: &mut String, inline: bool) {
     let target = target.to_string();
 
     let (class, href) = match scheme {
-        TargetScheme::Id => ("tm-id".to_string(), format!("#link-{}", escape_attr(&target))),
+        TargetScheme::Id => (
+            "tm-id".to_string(),
+            format!("#link-{}", escape_attr(&target)),
+        ),
         other => (format!("tm-{}", other.as_str()), escape_attr(&target)),
     };
     out.push_str(&format!("<a class=\"{class}\" href=\"{href}\""));
@@ -1099,10 +1102,8 @@ mod tests {
 
     #[test]
     fn renders_list_with_value_markers_and_attrs() {
-        let doc = parse_document(
-            "- (T) in-progress {tag: dev}\n- (\"?\") question {id: task1}\n",
-        )
-        .unwrap();
+        let doc = parse_document("- (T) in-progress {tag: dev}\n- (\"?\") question {id: task1}\n")
+            .unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,

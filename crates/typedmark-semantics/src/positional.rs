@@ -224,7 +224,11 @@ fn fill_positional_slots(positional_keys: &[String], mut entries: Vec<(String, V
 /// this element name, else the builtin table (see
 /// [`builtin_positional_arg_keys`]) -- same priority the two mechanisms
 /// already had before being unified into one lookup.
-fn effective_positional_keys(elem_name: Option<&str>, sigil: &Sigil, schema: &SettingsSchema) -> Vec<String> {
+fn effective_positional_keys(
+    elem_name: Option<&str>,
+    sigil: &Sigil,
+    schema: &SettingsSchema,
+) -> Vec<String> {
     if let Some(name) = elem_name {
         if let Some(pos_keys) = schema.positional_keys(name) {
             if !pos_keys.is_empty() {
@@ -412,10 +416,7 @@ mod tests {
     fn does_not_recover_when_target_key_already_present() {
         let mut el = Element::new(Sigil::At(Some("link".to_string())));
         el.args = Some(Value::Map(vec![
-            (
-                "target".to_string(),
-                Value::String("tm:foo".to_string()),
-            ),
+            ("target".to_string(), Value::String("tm:foo".to_string())),
             ("tm".to_string(), Value::String("bar".to_string())),
         ]));
         assert_eq!(
@@ -545,10 +546,7 @@ mod tests {
         assert_eq!(
             normalized_element_args_with_schema(&el, &schema),
             Some(Value::Map(vec![
-                (
-                    "title".to_string(),
-                    Value::String("Clean room".to_string())
-                ),
+                ("title".to_string(), Value::String("Clean room".to_string())),
                 ("priority".to_string(), Value::String("high".to_string())),
             ]))
         );
