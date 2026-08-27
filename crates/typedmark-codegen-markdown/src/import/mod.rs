@@ -24,7 +24,9 @@
 //! genuinely one cohesive piece -- frame push/pop per event).
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
-use typedmark_ast::{Block, Document, Element, ElementValue, Inline, Paragraph, Sigil, Span, Text, Value};
+use typedmark_ast::{
+    Block, Document, Element, ElementValue, Inline, Paragraph, Sigil, Span, Text, Value,
+};
 use typedmark_semantics::{ElementKind, classify, list_ordered};
 
 mod frontmatter;
@@ -332,9 +334,10 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
             };
             push_block(stack, Block::Element(el));
         }
-        (Frame::List { ordered, items }, TagEnd::List(_)) => {
-            push_block(stack, Block::Element(Element::list(ordered, items, Span::dummy())))
-        }
+        (Frame::List { ordered, items }, TagEnd::List(_)) => push_block(
+            stack,
+            Block::Element(Element::list(ordered, items, Span::dummy())),
+        ),
         (
             Frame::Item {
                 mut content,

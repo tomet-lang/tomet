@@ -175,7 +175,10 @@ mod tests {
                     )]))
                 );
 
-                assert_eq!(items[1].content, Some(vec![Inline::Text("question".into())]));
+                assert_eq!(
+                    items[1].content,
+                    Some(vec![Inline::Text("question".into())])
+                );
                 assert_eq!(items[1].args, Some(Value::String("?".into())));
                 assert_eq!(
                     item_attrs(&items[1]),
@@ -658,16 +661,24 @@ mod tests {
     fn indented_line_comment_is_recognized_at_block_level() {
         let doc = parse_document("#[ one ]\n\n  // indented note\n\n#[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
-        assert!(matches!(&doc.blocks[0], Block::Element(el) if classify(el) == ElementKind::Heading));
-        assert!(matches!(&doc.blocks[1], Block::Element(el) if classify(el) == ElementKind::Heading));
+        assert!(
+            matches!(&doc.blocks[0], Block::Element(el) if classify(el) == ElementKind::Heading)
+        );
+        assert!(
+            matches!(&doc.blocks[1], Block::Element(el) if classify(el) == ElementKind::Heading)
+        );
     }
 
     #[test]
     fn indented_block_comment_is_recognized_at_block_level() {
         let doc = parse_document("#[ one ]\n\n  /* indented note */\n\n#[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
-        assert!(matches!(&doc.blocks[0], Block::Element(el) if classify(el) == ElementKind::Heading));
-        assert!(matches!(&doc.blocks[1], Block::Element(el) if classify(el) == ElementKind::Heading));
+        assert!(
+            matches!(&doc.blocks[0], Block::Element(el) if classify(el) == ElementKind::Heading)
+        );
+        assert!(
+            matches!(&doc.blocks[1], Block::Element(el) if classify(el) == ElementKind::Heading)
+        );
     }
 
     #[test]

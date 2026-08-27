@@ -68,9 +68,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                     let mut parts = Vec::new();
                     for (idx, (k, val)) in entries.iter().enumerate() {
                         let val_str = render_value_inner_with_config(val, config);
-                        if idx == 0
-                            && (k == "variant" || k == "lang" || k == "format")
-                        {
+                        if idx == 0 && (k == "variant" || k == "lang" || k == "format") {
                             parts.push(val_str);
                         } else {
                             parts.push(format!("{k}: {val_str}"));
