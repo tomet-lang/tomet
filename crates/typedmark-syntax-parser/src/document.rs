@@ -78,7 +78,7 @@ pub fn parse_document(src: &str) -> Result<Document> {
             continue;
         }
         if cur.peek() == Some('<') && is_type_element_start(&cur) {
-            let el = parse_element(&mut cur, running_format)?;
+            let el = parse_element(&mut cur, running_format, true)?;
             if let Some(update) = config_format_update(&el) {
                 running_format = update;
             }
@@ -86,7 +86,7 @@ pub fn parse_document(src: &str) -> Result<Document> {
             continue;
         }
         if cur.peek() == Some('@') && is_at_element_start(&cur) {
-            let el = parse_element(&mut cur, running_format)?;
+            let el = parse_element(&mut cur, running_format, true)?;
             if let Some(update) = config_format_update(&el) {
                 running_format = update;
             }
@@ -133,7 +133,7 @@ fn skip_line_comment(cur: &mut Cursor) {
 
 fn parse_paragraph(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Block> {
     let start_pos = cur.pos();
-    let mut content = parse_inline_seq(cur, Stop::Paragraph, default_format)?;
+    let mut content = parse_inline_seq(cur, Stop::Paragraph, default_format, true)?;
     let span = cur.span_from(start_pos);
     if content.len() == 1 && matches!(content[0], Inline::Element(_)) {
         if let Inline::Element(mut el) = content.pop().unwrap() {

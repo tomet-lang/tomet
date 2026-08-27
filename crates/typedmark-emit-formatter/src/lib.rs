@@ -7,7 +7,17 @@
 //! while losslessly preserving literal whitespace and blank lines inside
 //! raw/verbatim content (`<codeblock>[...]` and elements opting in via
 //! `content:raw`). It never changes the parsed `Document` (see the
-//! `does_not_change_the_parsed_document` test).
+//! `does_not_change_the_parsed_document` test) -- with one deliberate
+//! exception: [`quote_bare_at_yaml_values`], run first, wraps a bare
+//! `@...`-led value inside any `(...format:yaml...){...}` body in `""`.
+//! Unquoted, `@` is a reserved YAML indicator that can't start a plain
+//! scalar (`embedded_format.rs` hands the body straight to `serde_yaml`,
+//! which rejects it outright), so that shape doesn't have a successfully-
+//! parsed `Document` to preserve in the first place -- this pass turns
+//! an unparseable file into a parseable one with the obvious intended
+//! reading, it doesn't change what an already-valid file means. Raw-text
+//! based rather than AST-based for exactly that reason: there's nothing
+//! to walk yet for the file this exists to fix.
 //!
 //! [`format_source_with_config`] adds a config-driven patch pass in
 //! front of [`format_source`]: if the given `typedmark_config::PrinterConfig`
@@ -40,6 +50,7 @@ use typedmark_parser::parse_document;
 /// `format_source(&format_source(src)) == format_source(src)`.
 pub fn format_source(src: &str) -> String {
     let normalized = src.replace("\r\n", "\n").replace('\r', "\n");
+    let normalized = quote_bare_at_yaml_values(&normalized);
     if normalized.trim().is_empty() {
         return String::new();
     }
@@ -96,6 +107,194 @@ pub fn format_source(src: &str) -> String {
     let mut out = out_lines.join("\n");
     out.push('\n');
     out
+}
+
+/// Finds every `(...){...}` body whose args declare `format:yaml` and
+/// wraps any bare, unquoted `@...`-led value inside it in `"..."` -- see
+/// the module doc comment for why. Raw-text scanning, not a real YAML
+/// parse: cheap, and this only ever needs to recognize three "a value
+/// starts here" shapes (`key:`, `- `, and `[`/`,` inside a flow
+/// sequence), not the whole YAML grammar.
+fn quote_bare_at_yaml_values(src: &str) -> String {
+    let mut out = String::with_capacity(src.len());
+    let mut pos = 0;
+    while let Some(rel_open) = find_next_format_yaml_body_start(&src[pos..]) {
+        let open = pos + rel_open;
+        out.push_str(&src[pos..open]);
+        let Some(close) = find_matching(src, open, '{', '}') else {
+            // Unterminated `{` -- some other problem already makes this
+            // file unparseable; not this pass's job to diagnose that, so
+            // just copy the rest through untouched.
+            out.push_str(&src[open..]);
+            return out;
+        };
+        out.push('{');
+        quote_bare_at_values_in(src, open + 1, close, &mut out);
+        out.push('}');
+        pos = close + 1;
+    }
+    out.push_str(&src[pos..]);
+    out
+}
+
+/// Byte offset (relative to `s`) of the `{` opening the next
+/// `format:yaml`-tagged element's value body, or `None` if there isn't
+/// one.
+fn find_next_format_yaml_body_start(s: &str) -> Option<usize> {
+    let mut search_from = 0;
+    loop {
+        let rel_open_paren = s[search_from..].find('(')?;
+        let open_paren = search_from + rel_open_paren;
+        let Some(close_paren) = find_matching(s, open_paren, '(', ')') else {
+            search_from = open_paren + 1;
+            continue;
+        };
+        if args_declare_format_yaml(&s[open_paren + 1..close_paren]) {
+            let bytes = s.as_bytes();
+            let mut i = close_paren + 1;
+            while i < s.len() && matches!(bytes[i], b' ' | b'\t' | b'\n' | b'\r') {
+                i += 1;
+            }
+            if i < s.len() && bytes[i] == b'{' {
+                return Some(i);
+            }
+        }
+        search_from = close_paren + 1;
+    }
+}
+
+/// Whether an element's `(args)` body (already stripped of the
+/// enclosing parens) declares a `format` key of `yaml`, e.g.
+/// `format:yaml` or `id:foo, format: yaml`. Deliberately not full
+/// `value.rs`-grade args parsing -- `format:yaml` args are always this
+/// simple in practice, and this is only a gate for the raw-text scan
+/// above, not something anything downstream relies on for correctness.
+fn args_declare_format_yaml(args: &str) -> bool {
+    args.split(',').any(|entry| {
+        entry
+            .split_once(':')
+            .is_some_and(|(key, value)| key.trim() == "format" && value.trim() == "yaml")
+    })
+}
+
+/// Byte offset of the `close` matching the `open` at `open_pos` in
+/// `src` (which must be `open`), tracking nested `open`/`close` depth
+/// and skipping over `"..."`/`'...'` quoted runs (so a stray bracket
+/// character inside a string doesn't miscount). Mirrors
+/// `typedmark-syntax-parser::value::find_matching_delimiter`'s
+/// algorithm (not reusable directly -- that one is `pub(crate)` and
+/// works off this crate's own `Cursor` type). Byte-indexed but UTF-8
+/// safe: every character this function's own logic branches on (`"`,
+/// `'`, `\`, `open`, `close`) is ASCII, so walking any other byte one at
+/// a time never lands on -- or returns -- a non-boundary offset.
+fn find_matching(src: &str, open_pos: usize, open: char, close: char) -> Option<usize> {
+    let bytes = src.as_bytes();
+    let mut i = open_pos + open.len_utf8();
+    let mut depth: u32 = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if c == b'"' || c == b'\'' {
+            i += 1;
+            while i < bytes.len() {
+                if bytes[i] == b'\\' && c == b'"' && i + 1 < bytes.len() {
+                    i += 2;
+                    continue;
+                }
+                let closed = bytes[i] == c;
+                i += 1;
+                if closed {
+                    break;
+                }
+            }
+        } else if c == open as u8 {
+            depth += 1;
+            i += 1;
+        } else if c == close as u8 {
+            if depth == 0 {
+                return Some(i);
+            }
+            depth -= 1;
+            i += 1;
+        } else {
+            i += 1;
+        }
+    }
+    None
+}
+
+/// Does the actual `@...` -> `"@..."` rewriting within one already-
+/// located `format:yaml` body's span `[start, end)`, appending to `out`.
+/// Skips existing `"..."`/`'...'` strings and `#...` comments verbatim
+/// (so it never touches an `@` that's already quoted, or one that's
+/// just commentary) and only quotes a value immediately after `key:`,
+/// `- `, or `[`/`,` (a flow-sequence item) -- anywhere else, a leading
+/// `@` is left alone.
+fn quote_bare_at_values_in(src: &str, start: usize, end: usize, out: &mut String) {
+    let bytes = src.as_bytes();
+    let mut i = start;
+    while i < end {
+        let c = bytes[i];
+        match c {
+            b'#' => {
+                let line_end = src[i..end].find('\n').map_or(end, |p| i + p);
+                out.push_str(&src[i..line_end]);
+                i = line_end;
+            }
+            b'"' | b'\'' => {
+                let quote = c;
+                let str_start = i;
+                i += 1;
+                while i < end {
+                    if bytes[i] == b'\\' && quote == b'"' && i + 1 < end {
+                        i += 2;
+                        continue;
+                    }
+                    let closed = bytes[i] == quote;
+                    i += 1;
+                    if closed {
+                        break;
+                    }
+                }
+                out.push_str(&src[str_start..i]);
+            }
+            b':' | b'-' | b',' | b'[' => {
+                out.push(c as char);
+                i += 1;
+                let ws_start = i;
+                while i < end && matches!(bytes[i], b' ' | b'\t') {
+                    i += 1;
+                }
+                out.push_str(&src[ws_start..i]);
+                if i < end && bytes[i] == b'@' {
+                    let val_start = i;
+                    let mut j = i;
+                    while j < end && !matches!(bytes[j], b',' | b']' | b'}' | b'\n' | b'#') {
+                        j += 1;
+                    }
+                    let mut val_end = j;
+                    while val_end > val_start && matches!(bytes[val_end - 1], b' ' | b'\t') {
+                        val_end -= 1;
+                    }
+                    out.push('"');
+                    for ch in src[val_start..val_end].chars() {
+                        match ch {
+                            '"' => out.push_str("\\\""),
+                            '\\' => out.push_str("\\\\"),
+                            _ => out.push(ch),
+                        }
+                    }
+                    out.push('"');
+                    out.push_str(&src[val_end..j]);
+                    i = j;
+                }
+            }
+            _ => {
+                let ch = src[i..].chars().next().expect("i < end <= src.len()");
+                out.push(ch);
+                i += ch.len_utf8();
+            }
+        }
+    }
 }
 
 /// Like [`format_source`], but first runs a config-gated patch pass --
@@ -489,6 +688,51 @@ mod tests {
     fn fenced_code_block_content_is_preserved_losslessly() {
         let src = "```rust\nfn foo() {\n    let a = 1;  \n\n    let b = 2;\n}\n```\n";
         assert_eq!(format_source(src), src);
+    }
+
+    #[test]
+    fn quotes_bare_at_led_yaml_values_so_the_document_parses() {
+        // Unquoted, `@link(...)` is invalid YAML (`@` is a reserved
+        // indicator) -- `parse_document` fails outright on this input, so
+        // this specifically checks the *raw string* the formatter
+        // produces, not a before/after `Document` comparison the way
+        // `does_not_change_the_parsed_document` does (there is no
+        // "before" `Document` here to compare against).
+        let src = "@meta(format:yaml){\n  previous: @link(ref:x)\n  next: @link(ref:y)\n  parent: [@link(ref:z), @link(ref:w)]\n}\n";
+        let expected = "@meta(format:yaml){\n  previous: \"@link(ref:x)\"\n  next: \"@link(ref:y)\"\n  parent: [\"@link(ref:z)\", \"@link(ref:w)\"]\n}\n";
+        let out = format_source(src);
+        assert_eq!(out, expected);
+        typedmark_parser::parse_document(&out)
+            .unwrap_or_else(|e| panic!("formatted output should now parse: {e}"));
+    }
+
+    #[test]
+    fn quote_bare_at_yaml_values_handles_block_list_items() {
+        let src =
+            "@meta(format:yaml){\n  refs:\n    - @link(ref:x)\n    - already \"@link(ref:y)\"\n}\n";
+        let out = format_source(src);
+        assert!(out.contains("- \"@link(ref:x)\""));
+        assert!(
+            out.contains("- already \"@link(ref:y)\""),
+            "existing quote untouched: {out:?}"
+        );
+    }
+
+    #[test]
+    fn quote_bare_at_yaml_values_leaves_already_quoted_and_unrelated_content_alone() {
+        // Already-quoted values, and `@` outside a `format:yaml` body
+        // entirely (an ordinary `@name` element), must be left untouched.
+        let src =
+            "@meta(format:yaml){\n  previous: \"@link(ref:x)\"\n}\n\n@link(ref:x)[some text]\n";
+        assert_eq!(format_source(src), src);
+    }
+
+    #[test]
+    fn quote_bare_at_yaml_values_is_idempotent() {
+        let src = "@meta(format:yaml){\n  previous: @link(ref:x)\n}\n";
+        let once = format_source(src);
+        let twice = format_source(&once);
+        assert_eq!(once, twice);
     }
 
     #[test]

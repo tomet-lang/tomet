@@ -74,9 +74,34 @@ fn skip_lookahead_gap(cur: &mut Cursor) {
     skip_element_gap(cur);
 }
 
+/// `allow_colon_connect` gates the `:(...)`/`:{...}` "connect" branch
+/// below (a bare, colon-less trailing group is *always* claimed
+/// regardless -- see `docs/ja/specifications/syntax.tm`'s
+/// `@meta(format:yaml) {...}` example, real usage this must keep
+/// working). List items pass `false` for the single top-level element
+/// they parse as their own content (`list.rs::parse_list_internal`):
+/// a list item has its own optional trailing `{attrs}`, and without
+/// this, a colon-prefixed group meant for the *item* (`- @link(ref:x)
+/// :{id:breakfast}`) always got silently claimed by `@link` instead --
+/// by the time `list.rs` got a turn, the group was already gone, with
+/// nothing left at the position it expected to still find one at (see
+/// `list_item_ending_in_an_element_does_not_error_on_a_trailing_brace`'s
+/// history for the crash this used to cause before the item-attrs guess
+/// was made speculative). `docs/ja/specifications/syntax.tm`'s
+/// `##[ コネクト ]` section had flagged exactly this shape (`- ()
+/// xxxxxx :{}`) as an unimplemented idea for attaching a group to the
+/// *enclosing* construct rather than the nearest element -- this is
+/// that, scoped narrowly to where the ambiguity actually is. Every
+/// other caller (top-level block elements, content nested inside an
+/// already-bracketed group, paragraph prose) passes `true`, unchanged:
+/// none of those have a competing attrs slot of their own to lose the
+/// group to, so `<id:taskA>:{...}`-style remote connect (see
+/// `remote_id_target_element_supports_colon_connection`) keeps working
+/// exactly as before there.
 pub(crate) fn parse_element(
     cur: &mut Cursor,
     default_format: Option<EmbeddedFormat>,
+    allow_colon_connect: bool,
 ) -> Result<Element> {
     let start_pos = cur.pos();
     let sigil = if cur.peek() == Some('<') {
@@ -108,7 +133,7 @@ pub(crate) fn parse_element(
         let checkpoint = cur.pos();
         let newlines = skip_element_gap(cur);
         if newlines <= 1 {
-            if cur.eat_str(":") {
+            if allow_colon_connect && cur.eat_str(":") {
                 skip_inline_ws(cur);
                 match cur.peek() {
                     Some('(') => {
@@ -211,7 +236,7 @@ fn parse_content(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Re
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '['"));
     }
-    let content = parse_inline_seq(cur, Stop::Bracket(']'), default_format)?;
+    let content = parse_inline_seq(cur, Stop::Bracket(']'), default_format, true)?;
     if !cur.eat_str("]") {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }
