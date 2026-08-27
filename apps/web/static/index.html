@@ -33,7 +33,8 @@
       <div class="panel-header">
         <span>TypedMark Source (.tm)</span>
       </div>
-      <textarea id="editor" spellcheck="false"></textarea>
+      <div id="editor-host" class="editor-host"></div>
+      <pre id="problems-panel" class="problems-panel" style="display:none;"></pre>
     </div>
 
     <div class="panel">
@@ -45,7 +46,9 @@
           <button class="tab" data-tab="source">HTML Source</button>
         </div>
       </div>
-      <div id="tab-preview" class="preview-container"></div>
+      <div id="tab-preview" class="preview-container">
+        <iframe id="preview-frame" class="preview-frame" title="Rendered TypedMark preview" sandbox=""></iframe>
+      </div>
       <pre id="tab-ast" class="preview-code" style="display:none;"></pre>
       <pre id="tab-markdown" class="preview-code" style="display:none;"></pre>
       <pre id="tab-source" class="preview-code" style="display:none;"></pre>
