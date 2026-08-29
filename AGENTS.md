@@ -1,4 +1,4 @@
-# TypedMark
+# Tomet
 
 ## Project overview
 
@@ -25,10 +25,10 @@ verify those the same way: reading the code and their own tests, not by
 launching the actual editor to click around.
 
 For grammar changes specifically, also run
-`cargo test -p tree-sitter-typedmark`. `typedmark-parser` is the source of
-truth for the grammar; `tree-sitter-typedmark`'s `grammar.js` is a
+`cargo test -p tree-sitter-tomet`. `tomet-parser` is the source of
+truth for the grammar; `tree-sitter-tomet`'s `grammar.js` is a
 separate, hand-maintained approximation used only for editor syntax
-highlighting, and it does not update itself when `typedmark-parser`
+highlighting, and it does not update itself when `tomet-parser`
 changes — that test is how drift between the two gets caught.
 
 ## Task tracking

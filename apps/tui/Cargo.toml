@@ -1,19 +1,19 @@
 [package]
-name = "typedmark-tui"
+name = "tomet-tui"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-typedmark-ast = { workspace = true }
-typedmark-config = { workspace = true }
-typedmark-edit = { workspace = true }
-typedmark-indexer = { workspace = true }
-typedmark-markdown = { workspace = true }
-typedmark-parser = { workspace = true }
-typedmark-printer = { workspace = true }
-typedmark-semantics = { workspace = true }
-typedmark-walker = { workspace = true }
-tree-sitter-typedmark = { workspace = true }
+tomet-ast = { workspace = true }
+tomet-config = { workspace = true }
+tomet-edit = { workspace = true }
+tomet-indexer = { workspace = true }
+tomet-markdown = { workspace = true }
+tomet-parser = { workspace = true }
+tomet-printer = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-walker = { workspace = true }
+tree-sitter-tomet = { workspace = true }
 
 #[ Crates.io ]
 anyhow = { workspace = true }

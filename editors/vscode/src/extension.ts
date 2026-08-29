@@ -34,21 +34,21 @@ function resolveServerPath(configuredPath: string, extensionPath: string): strin
 		return resolved;
 	}
 
-	// 4. Fallback: check workspace target/debug/typedmark-lsp or target/release/typedmark-lsp
+	// 4. Fallback: check workspace target/debug/tomet-lsp or target/release/tomet-lsp
 	if (workspaceFolder) {
-		const debugPath = path.join(workspaceFolder, "target", "debug", "typedmark-lsp");
+		const debugPath = path.join(workspaceFolder, "target", "debug", "tomet-lsp");
 		if (fs.existsSync(debugPath)) {
 			return debugPath;
 		}
-		const releasePath = path.join(workspaceFolder, "target", "release", "typedmark-lsp");
+		const releasePath = path.join(workspaceFolder, "target", "release", "tomet-lsp");
 		if (fs.existsSync(releasePath)) {
 			return releasePath;
 		}
-		const parentDebugPath = path.resolve(workspaceFolder, "..", "..", "target", "debug", "typedmark-lsp");
+		const parentDebugPath = path.resolve(workspaceFolder, "..", "..", "target", "debug", "tomet-lsp");
 		if (fs.existsSync(parentDebugPath)) {
 			return parentDebugPath;
 		}
-		const parentReleasePath = path.resolve(workspaceFolder, "..", "..", "target", "release", "typedmark-lsp");
+		const parentReleasePath = path.resolve(workspaceFolder, "..", "..", "target", "release", "tomet-lsp");
 		if (fs.existsSync(parentReleasePath)) {
 			return parentReleasePath;
 		}
@@ -58,11 +58,11 @@ function resolveServerPath(configuredPath: string, extensionPath: string): strin
 	// (handles running via F5 with no folder open in the Extension Development Host).
 	// extensionPath is .../editors/vscode; the repo root is two levels up.
 	const repoRoot = path.resolve(extensionPath, "..", "..");
-	const extDebugPath = path.join(repoRoot, "target", "debug", "typedmark-lsp");
+	const extDebugPath = path.join(repoRoot, "target", "debug", "tomet-lsp");
 	if (fs.existsSync(extDebugPath)) {
 		return extDebugPath;
 	}
-	const extReleasePath = path.join(repoRoot, "target", "release", "typedmark-lsp");
+	const extReleasePath = path.join(repoRoot, "target", "release", "tomet-lsp");
 	if (fs.existsSync(extReleasePath)) {
 		return extReleasePath;
 	}
@@ -81,7 +81,7 @@ function updateDecorations(editor: vscode.TextEditor | undefined): void {
 		return;
 	}
 	const langId = editor.document.languageId;
-	if (langId !== "typedmark" && langId !== "markdown") {
+	if (langId !== "tomet" && langId !== "markdown") {
 		return;
 	}
 
@@ -118,7 +118,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	}
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand("typedmark.restartServer", async () => {
+		vscode.commands.registerCommand("tomet.restartServer", async () => {
 			if (client) {
 				await client.stop();
 				client = undefined;
@@ -131,8 +131,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 async function startClient(): Promise<void> {
-	const config = vscode.workspace.getConfiguration("typedmark");
-	const rawCommand = config.get<string>("serverPath", "typedmark-lsp");
+	const config = vscode.workspace.getConfiguration("tomet");
+	const rawCommand = config.get<string>("serverPath", "tomet-lsp");
 	const command = resolveServerPath(rawCommand, activeExtensionPath as string);
 
 	const serverOptions: ServerOptions = {
@@ -142,14 +142,14 @@ async function startClient(): Promise<void> {
 
 	const clientOptions: LanguageClientOptions = {
 		documentSelector: [
-			{ scheme: "file", language: "typedmark" },
-			{ scheme: "untitled", language: "typedmark" },
+			{ scheme: "file", language: "tomet" },
+			{ scheme: "untitled", language: "tomet" },
 		],
 	};
 
 	client = new LanguageClient(
-		"typedmarkLanguageServer",
-		"TypedMark Language Server",
+		"tometLanguageServer",
+		"Tomet Language Server",
 		serverOptions,
 		clientOptions
 	);
@@ -158,8 +158,8 @@ async function startClient(): Promise<void> {
 		await client.start();
 	} catch (err: unknown) {
 		vscode.window.showErrorMessage(
-			`Failed to start typedmark-lsp ("${command}"): ${err}. ` +
-				`Install it on $PATH or set the "typedmark.serverPath" setting.`
+			`Failed to start tomet-lsp ("${command}"): ${err}. ` +
+				`Install it on $PATH or set the "tomet.serverPath" setting.`
 		);
 	}
 }

@@ -1,0 +1,45 @@
+`(args)` / `{value}` の中身、およびデータ専用の `.tmt` ファイル全体で使われる、
+軽量なキー・バリューDSL (Value DSL)。
+詳細仕様は `docs/reviews/2026-08-20-dsl-specifications.md` を参照。
+
+```tm
+// 1. 基本的なキー・バリュー (コロン ':' または イコール '=' が使用可能)
+key: "string"
+key = "string"
+key: bare_scalar            // クォート無しのスカラー (識別子/パス/列挙値)
+key: 42
+key: true
+key: null                   // nil, none もエイリアスとして受容
+
+// 2. コロン省略ブロック (HCL / CUE スタイル)
+server {
+  host: "localhost"
+  port: 8080
+}
+
+// 3. ドットパス自動展開 (TOML / Nix スタイル)
+server.http.host: "localhost"
+server.http.port: 8080
+// 上記は server: { http: { host: "localhost", port: 8080 } } に自動展開・マージされる
+
+// 4. 文字列リテール
+escaped: "Line 1\nLine 2"    // ダブルクォート (エスケープあり)
+raw_str: 'C:\path\to\file'  // シングルクォート (生文字列エスケープなし)
+multi_line: """
+  Line A
+  Line B
+"""                         // トリプルダブルクォート (複数行)
+multi_raw: '''
+  Raw line 1
+  Raw line 2
+'''                         // トリプルシングルクォート (複数行生文字列)
+
+// 5. リスト・配列
+list: [ "item1", "item2", ]  // 末尾カンマ受容
+
+// 6. コメント
+// 一行コメント (Cスタイル)
+# 一行コメント (YAML/TOMLスタイル)
+/* 複数行
+   コメント */
+```

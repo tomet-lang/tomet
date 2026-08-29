@@ -2,7 +2,7 @@
 
 ## 1. Overview & Motivation
 
-While building a broken-link checker (`typedmark-links`, this session), link-target
+While building a broken-link checker (`tomet-links`, this session), link-target
 extraction turned out to be inconsistent across the codebase's existing consumers:
 
 - HTML's `render_href_element`/`render_ref_element` and Markdown's
@@ -12,7 +12,7 @@ extraction turned out to be inconsistent across the codebase's existing consumer
   key chain (`src -> path -> file -> url -> wiki` vs `path -> file -> url -> wiki`).
   Neither `src` nor `path` is an officially supported key: `src` is a
   mistake (confirmed by this project's author), and `path` is documented
-  in `docs/ja/builtins/args.tm` as having "no special meaning" even
+  in `docs/ja/builtins/args.tmt` as having "no special meaning" even
   though the Markdown importer emits it (`![alt](dest)` -> `<embed>(path:dest)`)
   and both renderers special-case it anyway.
 
@@ -62,7 +62,7 @@ Rejected because:
   `@[display](target:@url(https://...))`.
 - It was partly based on a misunderstanding: `@file`/`@url`/`<file>` etc.
   already exist as recognized element kinds (`ElementKind::File`/`Url`/...
-  in `crates/typedmark-semantics/src/kind.rs`'s `BUILTIN_KINDS`) -- the
+  in `crates/tomet-semantics/src/kind.rs`'s `BUILTIN_KINDS`) -- the
   real problem was never a lack of named forms, it was `<embed>`'s
   fallback-chain confusion specifically (`src`/`path` never being
   official keys in the first place).
@@ -81,7 +81,7 @@ fallback order" class of bug (`<embed>`'s `src`/`path` mess), and lets
 resolution be specified once, generically, per scheme, rather than
 per-consumer.
 
-**Verified against the actual grammar (`crates/typedmark-syntax-parser/src/value.rs`'s
+**Verified against the actual grammar (`crates/tomet-syntax-parser/src/value.rs`'s
 `parse_map_body_or_scalar`) -- this splits into two structurally different
 groups, not one uniform "string with embedded scheme" mechanism:**
 
@@ -96,15 +96,15 @@ So for this group, "value carries the scheme" and "today's existing
 `key:value` map mechanism" are **the same mechanism**, just described two
 ways. Nothing needs to change structurally; the only real change is
 *vocabulary*: add `tm` and `id` to `INFERRED_AT_KEYS`
-(`crates/typedmark-semantics/src/infer.rs`) and `BUILTIN_KINDS`
-(`crates/typedmark-semantics/src/kind.rs`), and repoint `wiki`'s old
+(`crates/tomet-semantics/src/infer.rs`) and `BUILTIN_KINDS`
+(`crates/tomet-semantics/src/kind.rs`), and repoint `wiki`'s old
 role onto the name `ref` (freed up once `id:` takes over `ref:`'s old
 same-document-only meaning). `path:` as a standalone key is retired --
 its old two meanings are absorbed into Group B below.
 
 - `file:...` -- path relative to the *project root*. Targets any
-  file/attachment (image, PDF, etc.), not specifically a TypedMark document.
-- `tm:...` -- reference to another TypedMark (`.tm`/`.tmt`) *document*
+  file/attachment (image, PDF, etc.), not specifically a Tomet document.
+- `tm:...` -- reference to another Tomet (`.tmt`/`.tmt`) *document*
   specifically, project-root-relative like `file:` but semantically
   distinct: targets a document, not an arbitrary attachment. Composable
   with a `#fragment` (`tm:path/to/doc#some-id`) to jump to a specific id
@@ -115,7 +115,7 @@ its old two meanings are absorbed into Group B below.
   is pure string processing in the resolver, not a parser concern.
 - `id:...` -- id-based reference. Takes over `ref:`'s old role
   (previously a same-document-only `@links{}` id lookup, see
-  `crates/typedmark-doc-resolver/src/interp.rs`'s doc comment:
+  `crates/tomet-doc-resolver/src/interp.rs`'s doc comment:
   "Same-document only for v1 -- no cross-file lookup yet") and is
   intended to generalize it to a project-wide/cross-file id lookup.
 - `ref:...` (renamed from `wiki:`) -- resolved by searching the project
@@ -153,11 +153,11 @@ change.
 - **Backward compatibility is a non-issue for Group A, confirmed moot.**
   Since `(file:docs/x)` already parses as `Map([("file", "docs/x")])` and
   always will (there's no alternative "unified string" form competing
-  with it for identifier-like schemes, per section 4), no existing `.tm`
+  with it for identifier-like schemes, per section 4), no existing `.tmt`
   content needs migrating for `file`/`ref`/`tm`/`id`. This resolves what
   was previously an open question.
 - **Grammar changes for Group B are implemented** (a later session):
-  `typedmark-parser`'s `value.rs::parse_map_body_or_scalar` now (1) treats
+  `tomet-parser`'s `value.rs::parse_map_body_or_scalar` now (1) treats
   a leading `/` as an unambiguous bare scalar (`starts_absolute_path`,
   skipping the map-key check entirely -- `/` was never a valid identifier
   character to begin with), and (2) disambiguates `identifier://...` from
@@ -169,11 +169,11 @@ change.
   always reads that as a comment), so no existing valid `key: value`
   content can be affected by the new check. `classify()`'s corresponding
   shape-based inference (see below) and end-to-end HTML rendering are
-  covered by tests in `typedmark-parser`, `typedmark-semantics`,
-  `typedmark-html`, and `typedmark-links`.
+  covered by tests in `tomet-parser`, `tomet-semantics`,
+  `tomet-html`, and `tomet-links`.
 - **Cross-file `id:` implies project-wide id-uniqueness is now a real
-  correctness question.** `typedmark-validator`'s duplicate-id check
-  (`crates/typedmark-semantics-validator/src/id.rs`) is scoped to a
+  correctness question.** `tomet-validator`'s duplicate-id check
+  (`crates/tomet-semantics-validator/src/id.rs`) is scoped to a
   single `Document` only -- there is no cross-document duplicate-id
   detection today. If the same id exists in two files, `id:x`'s
   resolution is ambiguous with no decided policy (error? first match?).
@@ -186,27 +186,27 @@ change.
   stronger check: the id must specifically be *inside that file*) --
   these seem complementary but this wasn't explicitly confirmed.
 - **`classify()`'s bare-`@(...)` inference is implemented for both
-  groups.** Group A: `infer_at_kind` (`crates/typedmark-semantics/src/infer.rs`)
+  groups.** Group A: `infer_at_kind` (`crates/tomet-semantics/src/infer.rs`)
   checks for a recognized key in a `Value::Map`, with `tm`/`id` in
   `INFERRED_AT_KEYS`. Group B: a new `infer_at_kind_from_scalar` handles
   the bare-`Value::String` shapes that never go through the map-key path
   -- `/`-leading -> `"file"`, `scheme://`-leading -> `"url"` (its own
   `is_scheme_uri` scheme-syntax check, independent of the parser's, since
-  `typedmark-semantics` doesn't depend on `typedmark_parser`). `classify()`
+  `tomet-semantics` doesn't depend on `tomet_parser`). `classify()`
   tries `infer_at_kind` first, falling back to `infer_at_kind_from_scalar`
   only when that returns `None` -- wired into both the `Sigil::At(None)`
   arm and `classify_named_at`'s inference fallback (so `@link(/foo)`
   benefits the same way `@link(url:...)` already did).
 
-## 6. Relationship to `typedmark-links` (implemented this session)
+## 6. Relationship to `tomet-links` (implemented this session)
 
-The `typedmark-links` crate (`crates/typedmark-doc-links`) -- an
+The `tomet-links` crate (`crates/tomet-doc-links`) -- an
 SQLite-cached, mtime-invalidated broken-link checker -- was built and
 shipped in this session *before* this design discussion happened. It
 implements extraction/resolution against the **old** key-based vocabulary
 (`file:`/`url:`/`wiki:`/`ref:` as distinct argument keys, using ad-hoc
 prefix-based resolution for `./`/`/`/bare-path cases in
-`crates/typedmark-doc-links/src/check.rs`). Given section 4's finding
+`crates/tomet-doc-links/src/check.rs`). Given section 4's finding
 that Group A (`file`/`tm`/`id`/`ref`) stays key-based, updating that
 crate is smaller than originally expected: `link_target`'s per-kind key
 list gains `tm`/`id`, `wiki` support gets repointed onto `ref`'s name, and
@@ -215,7 +215,7 @@ string) once the corresponding grammar work lands. It isn't a full
 rewrite from key-switching to scheme-string-parsing, as originally assumed.
 
 The underlying architecture -- a flat, per-file, mtime-keyed SQLite cache
-of extracted links (`LinkCache` in `crates/typedmark-doc-links/src/cache.rs`)
+of extracted links (`LinkCache` in `crates/tomet-doc-links/src/cache.rs`)
 -- remains valid and reusable regardless of this vocabulary change; only
 the extraction/resolution logic layered on top of it changes. The same
 cache shape would also be the natural place to add the project-wide id

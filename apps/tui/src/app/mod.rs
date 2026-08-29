@@ -1,4 +1,4 @@
-//! State management for the TypedMark Workbench TUI.
+//! State management for the Tomet Workbench TUI.
 //!
 //! `App` aggregates state for all 4 tabs (Explorer/Migration/BatchMeta/
 //! StructuralGrep). Per-tab behavior lives in this module's submodules
@@ -12,9 +12,9 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use super::engine::migration::MigrationItem;
-use typedmark_edit::batch_meta::{BatchMetaEngine, MetaFileEntry};
-use typedmark_edit::structural::StructuralMatch;
-use typedmark_indexer::workspace_scan::{FileTreeNode, WorkspaceIndex};
+use tomet_edit::batch_meta::{BatchMetaEngine, MetaFileEntry};
+use tomet_edit::structural::StructuralMatch;
+use tomet_indexer::workspace_scan::{FileTreeNode, WorkspaceIndex};
 
 mod batch_meta;
 mod explorer;
@@ -107,7 +107,7 @@ pub struct App {
 
     // Printer Formatting Config
     pub printer_config_path: Option<PathBuf>,
-    pub printer_config: typedmark_config::PrinterConfig,
+    pub printer_config: tomet_config::PrinterConfig,
     pub config_root: PathBuf,
 
     // Workspace catalog: `index` holds filesystem-derived facts only
@@ -124,15 +124,15 @@ impl App {
         let (resolved_config_path, printer_config, config_root) = if let Some(ref path) =
             config_path
         {
-            let cfg = typedmark_config::load_config_from_file(path).unwrap_or_default();
+            let cfg = tomet_config::load_config_from_file(path).unwrap_or_default();
             (Some(path.clone()), cfg, dir_path.clone())
-        } else if let Some((cfg, found_path, root)) = typedmark_config::find_config_file(&dir_path)
+        } else if let Some((cfg, found_path, root)) = tomet_config::find_config_file(&dir_path)
         {
             (Some(found_path), cfg, root)
         } else {
             (
                 None,
-                typedmark_config::PrinterConfig::default(),
+                tomet_config::PrinterConfig::default(),
                 dir_path.clone(),
             )
         };
@@ -143,7 +143,7 @@ impl App {
         let mut app = Self {
             dir_path,
             active_tab: ActiveTab::Explorer,
-            status_message: "Welcome to TypedMark Workbench! Press Tab/1/2/3/4 to switch views."
+            status_message: "Welcome to Tomet Workbench! Press Tab/1/2/3/4 to switch views."
                 .to_string(),
             should_quit: false,
             focused_pane: FocusedPane::List,
@@ -397,7 +397,7 @@ mod tests {
         std::fs::create_dir_all(&ignored_dir).unwrap();
         std::fs::create_dir_all(&normal_dir).unwrap();
 
-        let config_file = config_dir.join("default.config.tm");
+        let config_file = config_dir.join("default.config.tmt");
         std::fs::write(
             &config_file,
             r#"@settings(format:json){

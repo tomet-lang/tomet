@@ -1,5 +1,5 @@
 [package]
-name = "typedmark-helix"
+name = "tomet-helix"
 version.workspace = true
 edition.workspace = true
 

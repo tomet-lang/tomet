@@ -52,7 +52,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         serde_json::from_value(req.params)?;
                     let edits = documents
                         .get(&params.text_document.uri)
-                        .map(|text| typedmark_lsp::format_edits(text))
+                        .map(|text| tomet_lsp::format_edits(text))
                         .unwrap_or_default();
                     let result = serde_json::to_value(edits)?;
                     connection
@@ -63,7 +63,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                     let hover = documents
                         .get(&params.text_document_position_params.text_document.uri)
                         .and_then(|text| {
-                            typedmark_lsp::hover_for(
+                            tomet_lsp::hover_for(
                                 text,
                                 params.text_document_position_params.position,
                             )
@@ -77,7 +77,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         serde_json::from_value(req.params)?;
                     let symbols = documents
                         .get(&params.text_document.uri)
-                        .map(|text| typedmark_lsp::document_symbols_for(text))
+                        .map(|text| tomet_lsp::document_symbols_for(text))
                         .unwrap_or_default();
                     let result = serde_json::to_value(symbols)?;
                     connection
@@ -92,7 +92,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         .uri
                         .clone();
                     let def = documents.get(&uri).and_then(|text| {
-                        typedmark_lsp::definition_for(
+                        tomet_lsp::definition_for(
                             text,
                             params.text_document_position_params.position,
                             &uri,
@@ -107,7 +107,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                     let items = documents
                         .get(&params.text_document_position.text_document.uri)
                         .map(|text| {
-                            typedmark_lsp::completions_for(
+                            tomet_lsp::completions_for(
                                 text,
                                 params.text_document_position.position,
                             )
@@ -152,7 +152,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
 }
 
 fn publish(connection: &Connection, uri: Uri, text: &str) -> anyhow::Result<()> {
-    let diagnostics = typedmark_lsp::diagnostics_for(text);
+    let diagnostics = tomet_lsp::diagnostics_for(text);
     publish_diagnostics(connection, uri, diagnostics)
 }
 

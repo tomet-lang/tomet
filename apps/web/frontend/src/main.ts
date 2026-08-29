@@ -16,7 +16,7 @@ import {
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { linter, lintGutter, setDiagnostics, type Diagnostic } from "@codemirror/lint";
 import { tags as t } from "@lezer/highlight";
-import { typedMarkLanguage } from "./typedmark-mode";
+import { tometLanguage } from "./tomet-mode";
 import { presets } from "./presets";
 
 // -- Theme: reuses the exact CSS custom properties already in
@@ -116,7 +116,7 @@ interface ParseResult {
  * Converts a UTF-8 byte offset (as reported by the Rust parser, which
  * indexes source bytes) to a UTF-16 code-unit offset (as CodeMirror's
  * `Diagnostic.from`/`.to` and `EditorState`'s doc positions expect).
- * Needed because TypedMark source routinely contains non-ASCII text
+ * Needed because Tomet source routinely contains non-ASCII text
  * (this project's own docs are largely Japanese) where the two indices
  * diverge.
  */
@@ -173,7 +173,7 @@ class App {
 			indentOnInput(),
 			history(),
 			keymap.of([...defaultKeymap, ...historyKeymap]),
-			typedMarkLanguage,
+			tometLanguage,
 			syntaxHighlighting(highlightStyle),
 			editorTheme,
 			linter(null),
@@ -285,7 +285,7 @@ class App {
 		}
 
 		if (data.ok) {
-			this.setStatus(true, "Valid TypedMark Document");
+			this.setStatus(true, "Valid Tomet Document");
 			// `data.html` is a *complete* standalone HTML document (own
 			// <head>/<style>), not a fragment -- `srcdoc` on an isolated
 			// iframe is the only way to show it without its own styles

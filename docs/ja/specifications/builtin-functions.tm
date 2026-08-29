@@ -1,8 +1,0 @@
-// `${...}`の構文自体はtypedmark-parserに実装済み(docs/reviews/2026-08-17-interpolation-syntax.md)。
-// ${name(args)}はInterpExpr::Callとしてパースされるが、"name"が実際に何をするか(関数の一覧・
-// 挙動)を決める評価/レジストリはまだ存在しない -- typedmark-computeの未実装分。
-// docs/develop/idea.tm の「必要か？な関数」節にある構想メモ($regex, $add, $math, $summary)は
-// まだ候補段階。
-
-${sum(1, 4)}
-${ref(id(asdf-asdfa).contents(dafault))}

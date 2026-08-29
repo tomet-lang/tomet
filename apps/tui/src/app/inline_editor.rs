@@ -246,7 +246,7 @@ impl App {
                     .find(|i| i.source_path == saved_path)
                 {
                     item.markdown_src.clear();
-                    item.typedmark_src.clear();
+                    item.tomet_src.clear();
                 }
                 if let Some(entry) = self.meta_entries.iter_mut().find(|e| e.path == saved_path) {
                     entry.original_src.clear();

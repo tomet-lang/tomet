@@ -1,0 +1,11 @@
+[package]
+name = "serde_tomet"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-parser = { workspace = true }
+
+#[ Crates.io ]
+serde = { workspace = true }

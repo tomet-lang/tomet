@@ -18,36 +18,36 @@ members = [
   "editors/helix",
 
   #[ Syntax -- grammar/parsing ]
-  "crates/typedmark-syntax-ast",
-  "crates/typedmark-syntax-lexar",
-  "crates/typedmark-syntax-parser",
+  "crates/tomet-syntax-ast",
+  "crates/tomet-syntax-lexar",
+  "crates/tomet-syntax-parser",
 
   #[ Semantics -- classification/validation ]
-  "crates/typedmark-semantics",
-  "crates/typedmark-semantics-validator",
+  "crates/tomet-semantics",
+  "crates/tomet-semantics-validator",
 
   #[ Doc -- whole-Document/workspace operations ]
-  "crates/typedmark-doc-walker",
-  "crates/typedmark-doc-resolver",
-  "crates/typedmark-doc-compute",
-  "crates/typedmark-doc-config",
-  "crates/typedmark-doc-edit",
-  "crates/typedmark-doc-indexer",
-  "crates/typedmark-doc-links",
+  "crates/tomet-doc-walker",
+  "crates/tomet-doc-resolver",
+  "crates/tomet-doc-compute",
+  "crates/tomet-doc-config",
+  "crates/tomet-doc-edit",
+  "crates/tomet-doc-indexer",
+  "crates/tomet-doc-links",
 
   #[ Codegen -- conversion to/from external formats ]
-  "crates/typedmark-codegen-markdown",
-  "crates/typedmark-codegen-html",
+  "crates/tomet-codegen-markdown",
+  "crates/tomet-codegen-html",
 
-  #[ Emit -- .tm text production ]
-  "crates/typedmark-emit-field-utils",
-  "crates/typedmark-emit-style",
-  "crates/typedmark-emit-printer",
-  "crates/typedmark-emit-formatter",
+  #[ Emit -- .tmt text production ]
+  "crates/tomet-emit-field-utils",
+  "crates/tomet-emit-style",
+  "crates/tomet-emit-printer",
+  "crates/tomet-emit-formatter",
 
   #[ Public -- external ecosystem adapters ]
-  "crates/serde_typedmark",
-  "crates/tree-sitter-typedmark",
+  "crates/serde_tomet",
+  "crates/tree-sitter-tomet",
 
   #[ Apps ]
   "apps/tui",
@@ -61,33 +61,33 @@ edition = "2024"
 
 [workspace.dependencies]
 #[ Syntax ]
-typedmark-ast = { path = "crates/typedmark-syntax-ast" }
-typedmark-lexar = { path = "crates/typedmark-syntax-lexar" }
-typedmark-parser = { path = "crates/typedmark-syntax-parser" }
+tomet-ast = { path = "crates/tomet-syntax-ast" }
+tomet-lexar = { path = "crates/tomet-syntax-lexar" }
+tomet-parser = { path = "crates/tomet-syntax-parser" }
 #[ Semantics ]
-typedmark-semantics = { path = "crates/typedmark-semantics" }
-typedmark-validator = { path = "crates/typedmark-semantics-validator" }
+tomet-semantics = { path = "crates/tomet-semantics" }
+tomet-validator = { path = "crates/tomet-semantics-validator" }
 #[ Doc ]
-typedmark-walker = { path = "crates/typedmark-doc-walker" }
-typedmark-resolver = { path = "crates/typedmark-doc-resolver" }
-typedmark-compute = { path = "crates/typedmark-doc-compute" }
-typedmark-config = { path = "crates/typedmark-doc-config" }
-typedmark-edit = { path = "crates/typedmark-doc-edit" }
-typedmark-indexer = { path = "crates/typedmark-doc-indexer" }
-typedmark-links = { path = "crates/typedmark-doc-links" }
+tomet-walker = { path = "crates/tomet-doc-walker" }
+tomet-resolver = { path = "crates/tomet-doc-resolver" }
+tomet-compute = { path = "crates/tomet-doc-compute" }
+tomet-config = { path = "crates/tomet-doc-config" }
+tomet-edit = { path = "crates/tomet-doc-edit" }
+tomet-indexer = { path = "crates/tomet-doc-indexer" }
+tomet-links = { path = "crates/tomet-doc-links" }
 #[ Codegen ]
-typedmark-markdown = { path = "crates/typedmark-codegen-markdown" }
-typedmark-html = { path = "crates/typedmark-codegen-html" }
+tomet-markdown = { path = "crates/tomet-codegen-markdown" }
+tomet-html = { path = "crates/tomet-codegen-html" }
 #[ Emit ]
-typedmark-field-utils = { path = "crates/typedmark-emit-field-utils" }
-typedmark-style = { path = "crates/typedmark-emit-style" }
-typedmark-printer = { path = "crates/typedmark-emit-printer" }
-typedmark-formatter = { path = "crates/typedmark-emit-formatter" }
+tomet-field-utils = { path = "crates/tomet-emit-field-utils" }
+tomet-style = { path = "crates/tomet-emit-style" }
+tomet-printer = { path = "crates/tomet-emit-printer" }
+tomet-formatter = { path = "crates/tomet-emit-formatter" }
 #[ Public ]
-serde_typedmark = { path = "crates/serde_typedmark" }
-tree-sitter-typedmark = { path = "crates/tree-sitter-typedmark" }
+serde_tomet = { path = "crates/serde_tomet" }
+tree-sitter-tomet = { path = "crates/tree-sitter-tomet" }
 #[ Apps ]
-typedmark-tui = { path = "apps/tui" }
+tomet-tui = { path = "apps/tui" }
 
 #[ Crates.io ]
 anyhow = "1"

@@ -1,5 +1,5 @@
 [package]
-name = "typedmark-neovim"
+name = "tomet-neovim"
 version.workspace = true
 edition.workspace = true
 

@@ -2,9 +2,9 @@
 
 ## 1. Overview & Motivation
 
-TypedMark's Connect Syntax (`:(){}`) introduces a clean, explicit way to connect and merge `(args)` attributes and `{value}` data into elements -- either immediately after an inline element/block (Inline Connection) or from a distance using an explicit ID target (Remote Connection).
+Tomet's Connect Syntax (`:(){}`) introduces a clean, explicit way to connect and merge `(args)` attributes and `{value}` data into elements -- either immediately after an inline element/block (Inline Connection) or from a distance using an explicit ID target (Remote Connection).
 
-This specification resolves design notes in `docs/idea/syntax-connection.tm` and defines the frozen mechanics for 0.1 -> 1.0.
+This specification resolves design notes in `docs/idea/syntax-connection.tmt` and defines the frozen mechanics for 0.1 -> 1.0.
 
 ---
 
@@ -58,8 +58,8 @@ When merging connected `(args)` or `{value}` data into a target element:
 
 ## 4. Parser & AST Integration Strategy
 
-- **Parser Layer (`typedmark-parser`)**:
+- **Parser Layer (`tomet-parser`)**:
   - Recognizes `:<args>` / `:{value}` after headings, list items, and elements.
   - Recognizes `<id:name>` as a targeted connect element `Sigil::Type("id:name")` or specialized `Sigil::ConnectTarget(String)`.
-- **Semantics & Resolution Layer (`typedmark-semantics` / `typedmark-resolve`)**:
+- **Semantics & Resolution Layer (`tomet-semantics` / `tomet-resolve`)**:
   - Performs the attribute merge according to the precedence rules above.

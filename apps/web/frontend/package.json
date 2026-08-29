@@ -1,8 +1,8 @@
 {
-	"name": "typedmark-web-frontend",
+	"name": "tomet-web-frontend",
 	"private": true,
 	"version": "0.1.0",
-	"description": "CodeMirror 6 editor + app logic for the typedmark-web playground, bundled to dist/app.js",
+	"description": "CodeMirror 6 editor + app logic for the tomet-web playground, bundled to dist/app.js",
 	"scripts": {
 		"build": "node esbuild.js",
 		"build:local": "node esbuild.js && cp dist/app.js ../static/app.js",

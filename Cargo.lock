@@ -1412,12 +1412,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_typedmark"
+name = "serde_tomet"
 version = "0.1.0"
 dependencies = [
  "serde",
- "typedmark-ast",
- "typedmark-parser",
+ "tomet-ast",
+ "tomet-parser",
 ]
 
 [[package]]
@@ -1628,6 +1628,293 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomet"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "clap",
+ "nanoid",
+ "serde",
+ "serde_json",
+ "serde_tomet",
+ "tokio",
+ "tomet-ast",
+ "tomet-config",
+ "tomet-formatter",
+ "tomet-html",
+ "tomet-indexer",
+ "tomet-links",
+ "tomet-markdown",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-tui",
+ "uuid",
+ "walkdir",
+]
+
+[[package]]
+name = "tomet-ast"
+version = "0.1.0"
+
+[[package]]
+name = "tomet-compute"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-resolver",
+]
+
+[[package]]
+name = "tomet-config"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-semantics",
+]
+
+[[package]]
+name = "tomet-edit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "tomet-ast",
+ "tomet-config",
+ "tomet-indexer",
+ "tomet-parser",
+ "tomet-printer",
+ "tomet-semantics",
+ "tomet-walker",
+]
+
+[[package]]
+name = "tomet-field-utils"
+version = "0.1.0"
+dependencies = [
+ "nanoid",
+ "tomet-config",
+ "uuid",
+]
+
+[[package]]
+name = "tomet-formatter"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-config",
+ "tomet-field-utils",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-style",
+]
+
+[[package]]
+name = "tomet-helix"
+version = "0.1.0"
+
+[[package]]
+name = "tomet-html"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-semantics",
+]
+
+[[package]]
+name = "tomet-indexer"
+version = "0.1.0"
+dependencies = [
+ "ignore",
+ "tomet-ast",
+ "tomet-config",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-walker",
+]
+
+[[package]]
+name = "tomet-java"
+version = "0.1.0"
+
+[[package]]
+name = "tomet-js"
+version = "0.1.0"
+
+[[package]]
+name = "tomet-lexar"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+]
+
+[[package]]
+name = "tomet-links"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "tomet-ast",
+ "tomet-config",
+ "tomet-indexer",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-walker",
+ "uuid",
+]
+
+[[package]]
+name = "tomet-lsp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lsp-server",
+ "lsp-types",
+ "serde_json",
+ "tomet-ast",
+ "tomet-formatter",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-validator",
+ "tomet-walker",
+]
+
+[[package]]
+name = "tomet-markdown"
+version = "0.1.0"
+dependencies = [
+ "nanoid",
+ "pulldown-cmark",
+ "serde_yaml",
+ "tomet-ast",
+ "tomet-html",
+ "tomet-semantics",
+]
+
+[[package]]
+name = "tomet-neovim"
+version = "0.1.0"
+
+[[package]]
+name = "tomet-parser"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "serde_yaml",
+ "tomet-ast",
+ "tomet-lexar",
+ "tomet-semantics",
+ "toml",
+]
+
+[[package]]
+name = "tomet-printer"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-config",
+ "tomet-field-utils",
+ "tomet-formatter",
+ "tomet-markdown",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-style",
+]
+
+[[package]]
+name = "tomet-python"
+version = "0.1.0"
+
+[[package]]
+name = "tomet-resolver"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-walker",
+]
+
+[[package]]
+name = "tomet-semantics"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-parser",
+]
+
+[[package]]
+name = "tomet-style"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-config",
+ "tomet-field-utils",
+]
+
+[[package]]
+name = "tomet-tui"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossterm",
+ "ratatui",
+ "tomet-ast",
+ "tomet-config",
+ "tomet-edit",
+ "tomet-indexer",
+ "tomet-markdown",
+ "tomet-parser",
+ "tomet-printer",
+ "tomet-semantics",
+ "tomet-walker",
+ "tree-sitter",
+ "tree-sitter-tomet",
+ "uuid",
+]
+
+[[package]]
+name = "tomet-validator"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-walker",
+]
+
+[[package]]
+name = "tomet-walker"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-parser",
+]
+
+[[package]]
+name = "tomet-web"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "clap",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tomet-formatter",
+ "tomet-html",
+ "tomet-markdown",
+ "tomet-parser",
+]
+
+[[package]]
+name = "tomet-zed"
+version = "0.1.0"
+dependencies = [
+ "zed_extension_api",
+]
+
+[[package]]
 name = "toml"
 version = "0.9.12+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1720,299 +2007,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "009994f150cc0cd50ff54917d5bc8bffe8cad10ca10d81c34da2ec421ae61782"
 
 [[package]]
-name = "tree-sitter-typedmark"
+name = "tree-sitter-tomet"
 version = "0.1.0"
 dependencies = [
  "cc",
  "tree-sitter",
  "tree-sitter-language",
-]
-
-[[package]]
-name = "typedmark"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "clap",
- "nanoid",
- "serde",
- "serde_json",
- "serde_typedmark",
- "tokio",
- "typedmark-ast",
- "typedmark-config",
- "typedmark-formatter",
- "typedmark-html",
- "typedmark-indexer",
- "typedmark-links",
- "typedmark-markdown",
- "typedmark-parser",
- "typedmark-semantics",
- "typedmark-tui",
- "uuid",
- "walkdir",
-]
-
-[[package]]
-name = "typedmark-ast"
-version = "0.1.0"
-
-[[package]]
-name = "typedmark-compute"
-version = "0.1.0"
-dependencies = [
- "typedmark-ast",
- "typedmark-parser",
- "typedmark-resolver",
-]
-
-[[package]]
-name = "typedmark-config"
-version = "0.1.0"
-dependencies = [
- "typedmark-ast",
- "typedmark-parser",
- "typedmark-semantics",
-]
-
-[[package]]
-name = "typedmark-edit"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "typedmark-ast",
- "typedmark-config",
- "typedmark-indexer",
- "typedmark-parser",
- "typedmark-printer",
- "typedmark-semantics",
- "typedmark-walker",
-]
-
-[[package]]
-name = "typedmark-field-utils"
-version = "0.1.0"
-dependencies = [
- "nanoid",
- "typedmark-config",
- "uuid",
-]
-
-[[package]]
-name = "typedmark-formatter"
-version = "0.1.0"
-dependencies = [
- "typedmark-ast",
- "typedmark-config",
- "typedmark-field-utils",
- "typedmark-parser",
- "typedmark-semantics",
- "typedmark-style",
-]
-
-[[package]]
-name = "typedmark-helix"
-version = "0.1.0"
-
-[[package]]
-name = "typedmark-html"
-version = "0.1.0"
-dependencies = [
- "typedmark-ast",
- "typedmark-parser",
- "typedmark-semantics",
-]
-
-[[package]]
-name = "typedmark-indexer"
-version = "0.1.0"
-dependencies = [
- "ignore",
- "typedmark-ast",
- "typedmark-config",
- "typedmark-parser",
- "typedmark-semantics",
- "typedmark-walker",
-]
-
-[[package]]
-name = "typedmark-java"
-version = "0.1.0"
-
-[[package]]
-name = "typedmark-js"
-version = "0.1.0"
-
-[[package]]
-name = "typedmark-lexar"
-version = "0.1.0"
-dependencies = [
- "typedmark-ast",
-]
-
-[[package]]
-name = "typedmark-links"
-version = "0.1.0"
-dependencies = [
- "rusqlite",
- "typedmark-ast",
- "typedmark-config",
- "typedmark-indexer",
- "typedmark-parser",
- "typedmark-semantics",
- "typedmark-walker",
- "uuid",
-]
-
-[[package]]
-name = "typedmark-lsp"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lsp-server",
- "lsp-types",
- "serde_json",
- "typedmark-ast",
- "typedmark-formatter",
- "typedmark-parser",
- "typedmark-semantics",
- "typedmark-validator",
- "typedmark-walker",
-]
-
-[[package]]
-name = "typedmark-markdown"
-version = "0.1.0"
-dependencies = [
- "nanoid",
- "pulldown-cmark",
- "serde_yaml",
- "typedmark-ast",
- "typedmark-html",
- "typedmark-semantics",
-]
-
-[[package]]
-name = "typedmark-neovim"
-version = "0.1.0"
-
-[[package]]
-name = "typedmark-parser"
-version = "0.1.0"
-dependencies = [
- "serde_json",
- "serde_yaml",
- "toml",
- "typedmark-ast",
- "typedmark-lexar",
- "typedmark-semantics",
-]
-
-[[package]]
-name = "typedmark-printer"
-version = "0.1.0"
-dependencies = [
- "typedmark-ast",
- "typedmark-config",
- "typedmark-field-utils",
- "typedmark-formatter",
- "typedmark-markdown",
- "typedmark-parser",
- "typedmark-semantics",
- "typedmark-style",
-]
-
-[[package]]
-name = "typedmark-python"
-version = "0.1.0"
-
-[[package]]
-name = "typedmark-resolver"
-version = "0.1.0"
-dependencies = [
- "typedmark-ast",
- "typedmark-parser",
- "typedmark-semantics",
- "typedmark-walker",
-]
-
-[[package]]
-name = "typedmark-semantics"
-version = "0.1.0"
-dependencies = [
- "typedmark-ast",
- "typedmark-parser",
-]
-
-[[package]]
-name = "typedmark-style"
-version = "0.1.0"
-dependencies = [
- "typedmark-ast",
- "typedmark-config",
- "typedmark-field-utils",
-]
-
-[[package]]
-name = "typedmark-tui"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "crossterm",
- "ratatui",
- "tree-sitter",
- "tree-sitter-typedmark",
- "typedmark-ast",
- "typedmark-config",
- "typedmark-edit",
- "typedmark-indexer",
- "typedmark-markdown",
- "typedmark-parser",
- "typedmark-printer",
- "typedmark-semantics",
- "typedmark-walker",
- "uuid",
-]
-
-[[package]]
-name = "typedmark-validator"
-version = "0.1.0"
-dependencies = [
- "typedmark-ast",
- "typedmark-parser",
- "typedmark-walker",
-]
-
-[[package]]
-name = "typedmark-walker"
-version = "0.1.0"
-dependencies = [
- "typedmark-ast",
- "typedmark-parser",
-]
-
-[[package]]
-name = "typedmark-web"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "clap",
- "serde",
- "serde_json",
- "tokio",
- "typedmark-formatter",
- "typedmark-html",
- "typedmark-markdown",
- "typedmark-parser",
-]
-
-[[package]]
-name = "typedmark-zed"
-version = "0.1.0"
-dependencies = [
- "zed_extension_api",
 ]
 
 [[package]]

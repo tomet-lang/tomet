@@ -1,0 +1,14 @@
+[package]
+name = "tree-sitter-tomet"
+version.workspace = true
+edition.workspace = true
+build = "build.rs"
+
+[dependencies]
+tree-sitter-language = { workspace = true }
+
+[build-dependencies]
+cc = "1"
+
+[dev-dependencies]
+tree-sitter = { workspace = true }

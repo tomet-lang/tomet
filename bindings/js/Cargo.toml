@@ -1,5 +1,5 @@
 [package]
-name = "typedmark-js"
+name = "tomet-js"
 version.workspace = true
 edition.workspace = true
 

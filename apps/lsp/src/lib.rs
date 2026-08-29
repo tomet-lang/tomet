@@ -1,4 +1,4 @@
-//! Language server library for TypedMark (`typedmark-lsp`).
+//! Language server library for Tomet (`tomet-lsp`).
 //! Provides diagnostics (parser & validator), document formatting,
 //! hover, document symbols, goto definition, and completions.
 
@@ -8,9 +8,9 @@ use lsp_types::{
     Range, SymbolKind, TextEdit, Uri,
 };
 use std::ops::ControlFlow;
-use typedmark_ast::{Element, ElementValue, Inline, InterpExprKind, Sigil, Span, Value};
-use typedmark_semantics::{ElementKind, classify, heading_level, normalized_element_args};
-use typedmark_walker::{Visitor, element_attrs_view, walk_document};
+use tomet_ast::{Element, ElementValue, Inline, InterpExprKind, Sigil, Span, Value};
+use tomet_semantics::{ElementKind, classify, heading_level, normalized_element_args};
+use tomet_walker::{Visitor, element_attrs_view, walk_document};
 
 /// Converts an AST [`Span`] to an LSP [`Range`].
 pub fn span_to_range(span: &Span) -> Range {
@@ -36,17 +36,17 @@ fn span_contains(span: &Span, line: usize, col: usize) -> bool {
 
 /// Parses `text` and produces diagnostics (both parse errors and AST validation rules).
 pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
-    match typedmark_parser::parse_document(text) {
+    match tomet_parser::parse_document(text) {
         Ok(doc) => {
-            let validation_errors = typedmark_validator::validate_document(&doc);
+            let validation_errors = tomet_validator::validate_document(&doc);
             validation_errors
                 .into_iter()
                 .map(|err| match &err {
-                    typedmark_validator::ValidationError::DuplicateId { duplicate, .. } => {
+                    tomet_validator::ValidationError::DuplicateId { duplicate, .. } => {
                         Diagnostic {
                             range: span_to_range(duplicate),
                             severity: Some(DiagnosticSeverity::ERROR),
-                            source: Some("typedmark".to_string()),
+                            source: Some("tomet".to_string()),
                             message: err.to_string(),
                             ..Diagnostic::default()
                         }
@@ -57,14 +57,14 @@ pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
         Err(err) => vec![Diagnostic {
             range: error_range(&err, text),
             severity: Some(DiagnosticSeverity::ERROR),
-            source: Some("typedmark".to_string()),
+            source: Some("tomet".to_string()),
             message: err.message.clone(),
             ..Diagnostic::default()
         }],
     }
 }
 
-fn error_range(err: &typedmark_parser::Error, text: &str) -> Range {
+fn error_range(err: &tomet_parser::Error, text: &str) -> Range {
     let line = (err.line.saturating_sub(1)) as u32;
     let col = (err.column.saturating_sub(1)) as u32;
     let start = Position::new(line, col);
@@ -77,9 +77,9 @@ fn error_range(err: &typedmark_parser::Error, text: &str) -> Range {
     Range::new(start, end)
 }
 
-/// Formats the document using `typedmark-formatter`.
+/// Formats the document using `tomet-formatter`.
 pub fn format_edits(text: &str) -> Vec<TextEdit> {
-    let formatted = typedmark_formatter::format_source(text);
+    let formatted = tomet_formatter::format_source(text);
     if formatted == text {
         return Vec::new();
     }
@@ -98,7 +98,7 @@ fn whole_document_range(text: &str) -> Range {
 
 /// Provides hover information for the symbol under the cursor.
 pub fn hover_for(text: &str, pos: Position) -> Option<Hover> {
-    let doc = typedmark_parser::parse_document(text).ok()?;
+    let doc = tomet_parser::parse_document(text).ok()?;
     let target_line = pos.line as usize + 1;
     let target_col = pos.character as usize + 1;
 
@@ -159,7 +159,7 @@ fn sigil_display_name(sigil: &Sigil) -> String {
 
 /// Provides document symbols for outline navigation in the editor.
 pub fn document_symbols_for(text: &str) -> Vec<DocumentSymbol> {
-    let Ok(doc) = typedmark_parser::parse_document(text) else {
+    let Ok(doc) = tomet_parser::parse_document(text) else {
         return Vec::new();
     };
 
@@ -242,7 +242,7 @@ fn extract_inlines_text(inlines: &[Inline]) -> String {
 
 /// Provides Goto Definition target for reference links or interpolation expressions.
 pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefinitionResponse> {
-    let doc = typedmark_parser::parse_document(text).ok()?;
+    let doc = tomet_parser::parse_document(text).ok()?;
     let target_line = pos.line as usize + 1;
     let target_col = pos.character as usize + 1;
 
@@ -364,7 +364,7 @@ pub fn completions_for(_text: &str, _pos: Position) -> Vec<CompletionItem> {
     let inferred_keys = [
         ("url", "URL link reference"),
         ("file", "File reference path"),
-        ("tm", "Reference to another TypedMark document"),
+        ("tm", "Reference to another Tomet document"),
         (
             "id",
             "Element id (definition attribute, or a same-document reference key)",
@@ -418,7 +418,7 @@ mod tests {
         let diags = diagnostics_for("<caution>[ unterminated\n");
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].severity, Some(DiagnosticSeverity::ERROR));
-        assert_eq!(diags[0].source.as_deref(), Some("typedmark"));
+        assert_eq!(diags[0].source.as_deref(), Some("tomet"));
     }
 
     #[test]
@@ -426,7 +426,7 @@ mod tests {
         let diags = diagnostics_for("#[ One ]{id: a}\n#[ Two ]{id: a}\n");
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].severity, Some(DiagnosticSeverity::ERROR));
-        assert_eq!(diags[0].source.as_deref(), Some("typedmark"));
+        assert_eq!(diags[0].source.as_deref(), Some("tomet"));
         assert!(diags[0].message.contains("duplicate id `a`"));
     }
 
@@ -453,7 +453,7 @@ mod tests {
     #[test]
     fn definition_finds_matching_id() {
         let text = "#[ Target ]{id: target1}\n\n@(id: target1)\n";
-        let uri = Uri::from_str("file:///test.tm").unwrap();
+        let uri = Uri::from_str("file:///test.tmt").unwrap();
         let def = definition_for(text, Position::new(2, 4), &uri);
         assert!(def.is_some());
     }

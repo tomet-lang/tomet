@@ -1,16 +1,16 @@
-id = "typedmark"
-name = "TypedMark"
+id = "tomet"
+name = "Tomet"
 version = "0.1.0"
 schema_version = 1
 authors = ["tomet-lang"]
-description = "Syntax highlighting and language server support for TypedMark (.tm) files."
+description = "Syntax highlighting and language server support for Tomet (.tmt) files."
 repository = "https://github.com/tomet-lang/tomet.git"
 
-[grammars.typedmark]
+[grammars.tomet]
 repository = "https://github.com/tomet-lang/tomet"
 rev = "main"
-path = "crates/tree-sitter-typedmark"
+path = "crates/tree-sitter-tomet"
 
-[language_servers.typedmark-lsp]
-name = "TypedMark Language Server"
-languages = ["TypedMark"]
+[language_servers.tomet-lsp]
+name = "Tomet Language Server"
+languages = ["Tomet"]

@@ -2,13 +2,13 @@
 
 ## Overview
 
-This document records the finalized specifications for TypedMark's **Value DSL** (used in `(args)` attribute groups, `{value}` data bodies, and `.tm`/`.tmt` data documents) and **Config DSL** (used in `@config` directive blocks, `@settings` schema definitions, and `.settings.tm` files).
+This document records the finalized specifications for Tomet's **Value DSL** (used in `(args)` attribute groups, `{value}` data bodies, and `.tmt`/`.tmt` data documents) and **Config DSL** (used in `@config` directive blocks, `@settings` schema definitions, and `.settings.tmt` files).
 
 ---
 
 ## 1. Value DSL Specification
 
-Value DSL is the data modeling language for TypedMark.
+Value DSL is the data modeling language for Tomet.
 
 ### 1.1 Key-Value Pairs and Colon-Less Blocks
 - **Key-Value Separator**: `key: value` (unified standard).
@@ -45,7 +45,7 @@ server.http.port: 8080
 ## 2. Config DSL & Schema Specification (`@settings`)
 
 ### 2.1 Embedded Format Support
-`@settings` supports embedded formats (`format: json` / `format: yaml` / `format: toml`) alongside native TypedMark syntax via `embedded_format.rs`.
+`@settings` supports embedded formats (`format: json` / `format: yaml` / `format: toml`) alongside native Tomet syntax via `embedded_format.rs`.
 
 ```tm
 @settings(format: json){
@@ -70,7 +70,7 @@ server.http.port: 8080
 ### 2.2 Schema Structure (`args` and `required` list)
 Required fields are declared at the element schema level via a top-level `required: [...]` array (aligned with JSON Schema / OpenAPI standards).
 
-In native TypedMark syntax:
+In native Tomet syntax:
 ```tm
 @settings {
   elements {

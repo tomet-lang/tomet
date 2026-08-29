@@ -1,0 +1,83 @@
+//! Renders a `Value` back into `.tmt` data-mode text: a top-level map is
+//! written as bare `key: value` lines (no enclosing braces), matching what
+//! `tomet_parser::parse_value` accepts as a whole document; nested
+//! maps/sequences use `{ }`/`[ ]`.
+
+use tomet_ast::Value;
+
+pub fn print_value(value: &Value) -> String {
+    let mut out = String::new();
+    write_value(value, &mut out, true);
+    out
+}
+
+fn write_value(value: &Value, out: &mut String, top_level: bool) {
+    match value {
+        Value::Map(entries) => write_map(entries, out, top_level),
+        Value::Seq(items) => {
+            out.push('[');
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                write_value(item, out, false);
+            }
+            out.push(']');
+        }
+        Value::String(s) => write_scalar_string(s, out),
+        Value::Int(i) => out.push_str(&i.to_string()),
+        Value::Float(f) => out.push_str(&f.to_string()),
+        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        Value::Null => out.push_str("null"),
+    }
+}
+
+fn write_map(entries: &[(String, Value)], out: &mut String, top_level: bool) {
+    if top_level {
+        for (i, (key, value)) in entries.iter().enumerate() {
+            if i > 0 {
+                out.push('\n');
+            }
+            out.push_str(key);
+            out.push_str(": ");
+            write_value(value, out, false);
+        }
+    } else {
+        out.push('{');
+        for (i, (key, value)) in entries.iter().enumerate() {
+            if i > 0 {
+                out.push_str(", ");
+            }
+            out.push_str(key);
+            out.push_str(": ");
+            write_value(value, out, false);
+        }
+        out.push('}');
+    }
+}
+
+/// Bare words are only safe when the parser would read them back as the
+/// same string (not a number/bool/null, and free of characters that
+/// terminate a scalar or entry).
+fn write_scalar_string(s: &str, out: &mut String) {
+    let needs_quotes = s.is_empty()
+        || matches!(s, "true" | "false" | "null")
+        || s.parse::<i64>().is_ok()
+        || s.parse::<f64>().is_ok()
+        || s.trim() != s
+        || s.contains(['"', ',', ')', ']', '}', '\n', '\r']);
+    if needs_quotes {
+        out.push('"');
+        for c in s.chars() {
+            match c {
+                '"' => out.push_str("\\\""),
+                '\\' => out.push_str("\\\\"),
+                '\n' => out.push_str("\\n"),
+                _ => out.push(c),
+            }
+        }
+        out.push('"');
+    } else {
+        out.push_str(s);
+    }
+}

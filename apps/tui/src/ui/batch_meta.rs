@@ -1,4 +1,4 @@
-//! Batch Meta tab rendering: `.tm` file list with metadata field
+//! Batch Meta tab rendering: `.tmt` file list with metadata field
 //! counts + metadata detail/diff preview.
 
 use ratatui::{
@@ -69,7 +69,7 @@ pub(super) fn render_batch_meta_view(f: &mut Frame, app: &mut App, area: Rect) {
             .border_style(super::get_border_style(
                 app.focused_pane == FocusedPane::List,
             ))
-            .title(" TypedMark Files (.tm) "),
+            .title(" Tomet Files (.tmt) "),
     );
     f.render_widget(list, chunks[0]);
 
@@ -113,7 +113,7 @@ pub(super) fn render_batch_meta_view(f: &mut Frame, app: &mut App, area: Rect) {
             &entry.modified_src,
         ));
     } else {
-        lines.push(Line::from("No .tm files found in directory."));
+        lines.push(Line::from("No .tmt files found in directory."));
     }
 
     let detail = Paragraph::new(lines)

@@ -4,9 +4,9 @@
   stdenv,
   mkShell,
 
-  typedmark,
-  typedmark-lsp,
-  typedmark-web,
+  tomet,
+  tomet-lsp,
+  tomet-web,
   ...
 }:
 let
@@ -24,9 +24,9 @@ let
 in
 mkShell rec {
   buildInputs = with pkgs; [
-    typedmark
-    typedmark-lsp
-    typedmark-web
+    tomet
+    tomet-lsp
+    tomet-web
 
     #[ CMake ]
     cmake

@@ -1,5 +1,5 @@
 [package]
-name = "typedmark-zed"
+name = "tomet-zed"
 version.workspace = true
 edition.workspace = true
 

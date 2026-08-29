@@ -1,0 +1,6 @@
+[package]
+name = "tomet-ast"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

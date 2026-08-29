@@ -1,5 +1,5 @@
 [package]
-name = "typedmark-java"
+name = "tomet-java"
 version.workspace = true
 edition.workspace = true
 
