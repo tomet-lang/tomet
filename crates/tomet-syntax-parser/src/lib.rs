@@ -1,4 +1,5 @@
 mod codeblock;
+pub mod cst;
 mod document;
 mod element;
 mod embedded_format;
@@ -9,6 +10,7 @@ mod interp;
 mod list;
 mod value;
 
+pub use cst::parse_cst;
 pub use document::parse_document;
 pub use error::{Error, Result};
 pub use value::parse_value;

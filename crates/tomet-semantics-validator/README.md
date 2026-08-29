@@ -1,21 +1,14 @@
 # tomet-validator
 
-Not implemented yet -- reserved in the workspace for future `.tmt` schema and
-lint validation. See `docs/develop/architecture.md` for how this crate fits
-into the rest of the pipeline.
+Read-only `.tmt` document schema and lint validation.
 
-## Intended role
+## Architecture & Responsibilities
 
-- **Schema validation**: check `<T>(args)[content]{value}` usages against a
-  project's `@settings{}` type declarations (arg names/types/required-
-  ness, allowed `content` kind, placement, singleton-ness, etc.).
-- **Cross-document reference resolution**: resolve targets like `file:`,
-  `path:`, `wiki:`, `ref:` (e.g. `wiki:file_name#id`) against the actual
-  filesystem/project and report broken links, ambiguous `wiki:` matches, etc.
+1. **Read-Only In-Memory Validation**:
+   - `tomet-validator` performs pure, read-only semantic validation across an in-memory `Document`.
+   - It performs zero I/O, no reference resolution (which is handled by `tomet-resolver` and `tomet-links`), and no AST mutations.
+   - Depends only on `tomet-ast` and `tomet-walker`.
 
-`tomet-parser` is a pure, side-effect-free static parser (see its
-"Deterministic Static Parser Boundary" note in `docs/develop/architecture.md`)
-and never does I/O or external file resolution. Both of the above require
-touching the filesystem, so they belong here, not in the parser -- this crate
-is the only place in the pipeline meant to look beyond a single source
-string.
+2. **Validation Rules**:
+   - **Duplicate ID Detection (`id.rs`)**: Walks all element nodes (headings, typed elements, bare elements, inline elements) via `tomet_walker::walk_document` and checks for duplicate `id` attributes in both `{id:...}` and `(id:...)`.
+   - **Diagnostic Error Mapping (`error.rs`)**: Emits `ValidationError::DuplicateId` carrying exact `Span` locations for the first definition and the offending duplicate, powering LSP diagnostic ranges in `apps/lsp`.

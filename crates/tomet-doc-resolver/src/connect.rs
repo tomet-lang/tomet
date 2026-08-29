@@ -2,7 +2,7 @@
 
 use tomet_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
 use tomet_semantics::merge_connected_values;
-use tomet_walker::{VisitorMut, walk_document_mut};
+use tomet_walker::{element_get_attr, for_each_element_mut};
 
 /// A remote attribute connection definition targeting one or more element IDs.
 #[derive(Debug, Clone)]
@@ -25,7 +25,9 @@ pub fn resolve_connect_targets(mut doc: Document) -> Document {
 
     for conn in &connections {
         for target_id in &conn.target_ids {
-            let _ = walk_document_mut(&mut doc, &mut ConnectionApplier { target_id, conn });
+            for_each_element_mut(&mut doc, |el| {
+                apply_connection_to_element(el, target_id, conn);
+            });
         }
     }
 
@@ -117,36 +119,15 @@ fn parse_target_ids_from_str(s: &str) -> Vec<String> {
 /// needed here anymore) whose id matches `target_id` -- see that crate's
 /// module doc for why the traversal itself lives there rather than being
 /// hand-rolled here.
-struct ConnectionApplier<'a> {
-    target_id: &'a str,
-    conn: &'a RemoteConnection,
-}
-
-impl VisitorMut<()> for ConnectionApplier<'_> {
-    fn visit_mut(&mut self, el: &mut Element) -> std::ops::ControlFlow<()> {
-        apply_connection_to_element(el, self.target_id, self.conn);
-        std::ops::ControlFlow::Continue(())
-    }
-}
-
 fn element_has_id(el: &Element, target_id: &str) -> bool {
-    if let Some(Value::Map(entries)) = &el.args {
-        if entries
-            .iter()
-            .any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id))
-        {
-            return true;
-        }
+    let Some(id_val) = element_get_attr(el, "id") else {
+        return false;
+    };
+    match id_val {
+        Value::String(s) => s == target_id,
+        Value::Int(i) => i.to_string() == target_id,
+        _ => false,
     }
-    if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
-        if entries
-            .iter()
-            .any(|(k, v)| k == "id" && matches!(v, Value::String(s) if s == target_id))
-        {
-            return true;
-        }
-    }
-    false
 }
 
 /// The `Element` half of [`ConnectionApplier`]'s merge -- recursion into

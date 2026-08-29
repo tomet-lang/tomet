@@ -1,9 +1,14 @@
-.tmtドキュメントのschema/lint validation
+# tomet-validator
 
-tomet-parserは文法(構文)としての妥当性しか見ない。その先の「意味として正しいか」——必須keyが揃っているか、型が合っているか、id重複がないか、未知の要素/属性がないか——をここで検査する。
+.tmt ドキュメントのスキーマ検証および静的リント検査を行うクレート。
 
-値を計算したり(tomet-compute)、参照を辿って中身を取ってきたり(tomet-resolve)はしない。Documentを書き換える副作用もない。あくまで読み取り専用の検査結果(OK/エラー一覧)を返すだけ。
+## 責務とアーキテクチャ
 
-#[ 実装済み ]
+-. **読み取り専用インメモリ検証**:
+   - `tomet-validator` はメモリ上の `Document` に対して副作用のない純粋な静的検証を行います。
+   - ファイル I/O、参照解決（`tomet-resolver`, `tomet-links` が担当）、計算（`tomet-compute` が担当）、AST 書き換えは行いません。
+   - `tomet-ast` と `tomet-walker` のみに依存します。
 
-- 重複id検出
+-. **実装ルール**:
+   - **重複 ID 検出 (`id.rs`)**: `tomet_walker::walk_document` を用いて見出し、ブロック要素、インライン要素、子要素の `{id:...}` / `(id:...)` を全走査し、同一ドキュメント内の重複を検出します。
+   - **診断エラー通知 (`error.rs`)**: 最初に定義された位置（`first`）と重複した位置（`duplicate`）の `Span` を保持する `ValidationError` を生成し、LSP などのエディタ診断に正確なエラー範囲を提供します。

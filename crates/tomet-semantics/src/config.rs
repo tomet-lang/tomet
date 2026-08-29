@@ -111,34 +111,20 @@ fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
 
     match k {
         "format" => {
-            if let Value::String(s) = v {
-                config.format = Some(s.clone());
-            } else if let Value::Map(format_map) = v {
-                for (fk, fv) in format_map {
-                    if fk == "table" {
-                        if let Value::Map(table_map) = fv {
-                            for (tk, tv) in table_map {
-                                if tk == "adjust_width" {
-                                    config.table_adjust_width = is_truthy(tv);
-                                }
-                            }
-                        }
-                    }
-                }
+            if let Some(s) = v.as_str() {
+                config.format = Some(s.to_string());
+            } else if let Some(adjust_width) = v.get("table").and_then(|t| t.get("adjust_width")) {
+                config.table_adjust_width = is_truthy(adjust_width);
             }
         }
         "style" => {
-            if let Value::String(s) = v {
-                config.style = Some(s.clone());
+            if let Some(s) = v.as_str() {
+                config.style = Some(s.to_string());
             }
         }
         "table" => {
-            if let Value::Map(table_map) = v {
-                for (tk, tv) in table_map {
-                    if tk == "adjust_width" {
-                        config.table_adjust_width = is_truthy(tv);
-                    }
-                }
+            if let Some(adjust_width) = v.get("adjust_width") {
+                config.table_adjust_width = is_truthy(adjust_width);
             }
         }
         "table.adjust_width" | "table_adjust_width" => {
@@ -211,10 +197,7 @@ fn process_export_path(v: &Value, config: &mut DocumentConfig) {
 /// `file(...)`/`path(...)`/`{ file: ... }` wrapper forms) aren't
 /// meaningful here and return `None`.
 fn clean_path_value(v: &Value) -> Option<String> {
-    match v {
-        Value::String(s) => Some(s.trim().to_string()),
-        _ => None,
-    }
+    v.as_str().map(|s| s.trim().to_string())
 }
 
 #[cfg(test)]

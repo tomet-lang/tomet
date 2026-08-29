@@ -80,6 +80,101 @@ pub fn element_attrs_mut(el: &mut Element) -> Option<&mut Value> {
     }
 }
 
+/// Returns a reference to the property value for `key`, checking `{value}` map first, then `(args)` map.
+pub fn element_get_attr<'a>(el: &'a Element, key: &str) -> Option<&'a Value> {
+    if let Some(ElementValue::Data(val_map)) = &el.value {
+        if let Some(v) = val_map.get(key) {
+            return Some(v);
+        }
+    }
+    if let Some(args_map) = &el.args {
+        if let Some(v) = args_map.get(key) {
+            return Some(v);
+        }
+    }
+    None
+}
+
+/// Returns whether the element contains `key` in either `{value}` or `(args)`.
+pub fn element_has_prop_key(el: &Element, key: &str) -> bool {
+    element_get_attr(el, key).is_some()
+}
+
+/// Sets or updates a property on `el`. If the key exists in `{value}` or `(args)`,
+/// updates it in place; otherwise appends to `{value}` or `(args)`.
+pub fn element_set_prop(el: &mut Element, key: &str, new_val: Value) {
+    if let Some(ElementValue::Data(Value::Map(entries))) = &mut el.value {
+        if let Some((_, val)) = entries.iter_mut().find(|(k, _)| k == key) {
+            *val = new_val;
+            return;
+        }
+    }
+    if let Some(Value::Map(entries)) = &mut el.args {
+        if let Some((_, val)) = entries.iter_mut().find(|(k, _)| k == key) {
+            *val = new_val;
+            return;
+        }
+    }
+    if let Some(ElementValue::Data(Value::Map(entries))) = &mut el.value {
+        entries.push((key.to_string(), new_val));
+    } else if let Some(Value::Map(entries)) = &mut el.args {
+        entries.push((key.to_string(), new_val));
+    } else if el.value.is_none() && el.args.is_none() {
+        el.args = Some(Value::Map(vec![(key.to_string(), new_val)]));
+    } else if el.args.is_some() {
+        el.value = Some(ElementValue::Data(Value::Map(vec![(
+            key.to_string(),
+            new_val,
+        )])));
+    } else {
+        el.args = Some(Value::Map(vec![(key.to_string(), new_val)]));
+    }
+}
+
+/// Renames all occurrences of `old_key` to `new_key` in `(args)` and `{value}`.
+pub fn element_rename_prop_key(el: &mut Element, old_key: &str, new_key: &str) -> bool {
+    let mut changed = false;
+    if let Some(Value::Map(entries)) = &mut el.args {
+        for (k, _) in entries.iter_mut() {
+            if k == old_key {
+                *k = new_key.to_string();
+                changed = true;
+            }
+        }
+    }
+    if let Some(ElementValue::Data(Value::Map(entries))) = &mut el.value {
+        for (k, _) in entries.iter_mut() {
+            if k == old_key {
+                *k = new_key.to_string();
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
+/// Replaces all values associated with `target_key` with `new_val` in `(args)` and `{value}`.
+pub fn element_replace_prop_value(el: &mut Element, target_key: &str, new_val: Value) -> bool {
+    let mut changed = false;
+    if let Some(Value::Map(entries)) = &mut el.args {
+        for (k, val) in entries.iter_mut() {
+            if k == target_key {
+                *val = new_val.clone();
+                changed = true;
+            }
+        }
+    }
+    if let Some(ElementValue::Data(Value::Map(entries))) = &mut el.value {
+        for (k, val) in entries.iter_mut() {
+            if k == target_key {
+                *val = new_val.clone();
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
 /// Called at every [`Element`] `walk_document` visits, in document order.
 /// Return `ControlFlow::Continue(())` to keep walking, or
 /// `ControlFlow::Break(b)` to stop immediately -- `b` propagates all the
@@ -90,6 +185,24 @@ pub fn element_attrs_mut(el: &mut Element) -> Option<&mut Value> {
 /// on `self` (see `tomet-validator`'s duplicate-id check).
 pub trait Visitor<B> {
     fn visit(&mut self, el: &Element) -> ControlFlow<B>;
+}
+
+impl<F, B> Visitor<B> for F
+where
+    F: FnMut(&Element) -> ControlFlow<B>,
+{
+    fn visit(&mut self, el: &Element) -> ControlFlow<B> {
+        self(el)
+    }
+}
+
+/// Traverses all elements in `doc` in document order and executes `f` for each.
+pub fn for_each_element(doc: &Document, mut f: impl FnMut(&Element)) {
+    let mut visitor = |el: &Element| -> ControlFlow<()> {
+        f(el);
+        ControlFlow::Continue(())
+    };
+    let _ = walk_document(doc, &mut visitor);
 }
 
 macro_rules! propagate {
@@ -151,6 +264,24 @@ fn walk_element<B>(element: &Element, visitor: &mut impl Visitor<B>) -> ControlF
 /// Same `Continue`/`Break` semantics as [`Visitor::visit`].
 pub trait VisitorMut<B> {
     fn visit_mut(&mut self, el: &mut Element) -> ControlFlow<B>;
+}
+
+impl<F, B> VisitorMut<B> for F
+where
+    F: FnMut(&mut Element) -> ControlFlow<B>,
+{
+    fn visit_mut(&mut self, el: &mut Element) -> ControlFlow<B> {
+        self(el)
+    }
+}
+
+/// Traverses all elements in `doc` mutably in document order and executes `f` for each in place.
+pub fn for_each_element_mut(doc: &mut Document, mut f: impl FnMut(&mut Element)) {
+    let mut visitor = |el: &mut Element| -> ControlFlow<()> {
+        f(el);
+        ControlFlow::Continue(())
+    };
+    let _ = walk_document_mut(doc, &mut visitor);
 }
 
 /// Mutable counterpart of [`walk_document`] -- same depth-first,
@@ -393,5 +524,84 @@ mod tests {
         }
         let _ = walk_document(&doc, &mut Ids(&mut ids));
         assert_eq!(ids, vec!["renamed"]);
+    }
+
+    #[test]
+    fn closure_as_visitor_with_break() {
+        let doc = parse("<a>()\n\n<b>()\n\n<c>()\n");
+        let mut count = 0;
+        let mut visitor = |_el: &Element| {
+            count += 1;
+            if count == 2 {
+                ControlFlow::Break("stopped")
+            } else {
+                ControlFlow::Continue(())
+            }
+        };
+        let res = walk_document(&doc, &mut visitor);
+        assert_eq!(res, ControlFlow::Break("stopped"));
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn for_each_element_visits_all_elements() {
+        let doc = parse("#[ h ]\n\n- item\n\n<tag>()\n");
+        let mut count = 0;
+        for_each_element(&doc, |_el| {
+            count += 1;
+        });
+        assert_eq!(count, 4);
+    }
+
+    #[test]
+    fn for_each_element_mut_modifies_elements() {
+        let mut doc = parse("<card>(active: false)\n\n<card>(active: false)\n");
+        for_each_element_mut(&mut doc, |el| {
+            if let Some(Value::Map(entries)) = element_attrs_mut(el) {
+                for (k, v) in entries {
+                    if k == "active" {
+                        *v = Value::Bool(true);
+                    }
+                }
+            }
+        });
+
+        let mut actives = Vec::new();
+        for_each_element(&doc, |el| {
+            if let Some(Value::Map(entries)) = element_attrs_view(el) {
+                for (k, v) in entries {
+                    if k == "active" {
+                        if let Value::Bool(b) = v {
+                            actives.push(b);
+                        }
+                    }
+                }
+            }
+        });
+        assert_eq!(actives, vec![true, true]);
+    }
+
+    #[test]
+    fn test_unified_element_prop_helpers() {
+        let doc = parse("<card>(id: 123){tag: important}\n");
+        let mut el = match &doc.blocks[0] {
+            Block::Element(el) => el.clone(),
+            _ => panic!("expected element"),
+        };
+
+        assert_eq!(element_get_attr(&el, "id").unwrap().as_i64(), Some(123));
+        assert_eq!(element_get_attr(&el, "tag").unwrap().as_str(), Some("important"));
+        assert!(element_has_prop_key(&el, "id"));
+        assert!(!element_has_prop_key(&el, "nonexistent"));
+
+        element_set_prop(&mut el, "tag", Value::String("urgent".into()));
+        assert_eq!(element_get_attr(&el, "tag").unwrap().as_str(), Some("urgent"));
+
+        element_rename_prop_key(&mut el, "id", "doc_id");
+        assert_eq!(element_get_attr(&el, "doc_id").unwrap().as_i64(), Some(123));
+        assert!(!element_has_prop_key(&el, "id"));
+
+        element_replace_prop_value(&mut el, "doc_id", Value::Int(456));
+        assert_eq!(element_get_attr(&el, "doc_id").unwrap().as_i64(), Some(456));
     }
 }

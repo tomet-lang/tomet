@@ -5,3 +5,4 @@ edition.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }
+tomet-cst = { workspace = true }

@@ -1,3 +1,6 @@
+pub mod cst_ast;
+pub use cst_ast::*;
+
 /// A 0-indexed byte offset and 1-indexed line/column position in source text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 pub struct Position {
@@ -44,8 +47,26 @@ impl Span {
         Self::default()
     }
 
+    /// Returns `true` if this span represents a default/dummy span with zero positions.
+    pub fn is_dummy(&self) -> bool {
+        self.start == Position::default() && self.end == Position::default()
+    }
+
     pub fn exact_eq(&self, other: &Self) -> bool {
         self.start == other.start && self.end == other.end
+    }
+
+    /// Combines two spans into a single span spanning from `self.start` to `other.end`.
+    pub fn union(&self, other: &Self) -> Self {
+        Self {
+            start: self.start,
+            end: other.end,
+        }
+    }
+
+    /// Returns `true` if the given byte offset falls within this span (`start.offset..=end.offset`).
+    pub fn contains_offset(&self, offset: usize) -> bool {
+        self.start.offset <= offset && offset <= self.end.offset
     }
 }
 
@@ -68,6 +89,92 @@ pub enum Value {
     /// Insertion-ordered key/value pairs (a `.tmt` map has no inherent
     /// sort order, so preserve whatever order the source used).
     Map(Vec<(String, Value)>),
+}
+
+impl Value {
+    /// Returns `true` if this value is `Value::Null`.
+    pub fn is_null(&self) -> bool {
+        matches!(self, Value::Null)
+    }
+
+    /// Returns the string slice if this value is a `Value::String`.
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Value::String(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Returns the `bool` value if this value is a `Value::Bool`.
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            Value::Bool(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    /// Returns the `i64` value if this value is a `Value::Int`.
+    pub fn as_i64(&self) -> Option<i64> {
+        match self {
+            Value::Int(i) => Some(*i),
+            _ => None,
+        }
+    }
+
+    /// Returns the `f64` value if this value is a `Value::Float`.
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Value::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
+
+    /// Returns a slice of elements if this value is a `Value::Seq`.
+    pub fn as_seq(&self) -> Option<&[Value]> {
+        match self {
+            Value::Seq(seq) => Some(seq.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Returns a slice of key-value pairs if this value is a `Value::Map`.
+    pub fn as_map(&self) -> Option<&[(String, Value)]> {
+        match self {
+            Value::Map(map) => Some(map.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// If this value is a `Value::Map`, returns the first value associated with `key`.
+    pub fn get(&self, key: &str) -> Option<&Value> {
+        match self {
+            Value::Map(entries) => entries
+                .iter()
+                .find_map(|(k, v)| if k == key { Some(v) } else { None }),
+            _ => None,
+        }
+    }
+
+    /// If this value is a `Value::Map`, returns a mutable reference to the first value associated with `key`.
+    pub fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
+        match self {
+            Value::Map(entries) => entries
+                .iter_mut()
+                .find_map(|(k, v)| if k == key { Some(v) } else { None }),
+            _ => None,
+        }
+    }
+
+    /// Returns `true` if a sequence or map is empty, or if string is empty.
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Value::Null => true,
+            Value::String(s) => s.is_empty(),
+            Value::Seq(seq) => seq.is_empty(),
+            Value::Map(map) => map.is_empty(),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -231,6 +338,40 @@ impl Element {
         self
     }
 
+    pub fn with_args(mut self, args: Value) -> Self {
+        self.args = Some(args);
+        self
+    }
+
+    pub fn with_content(mut self, content: Vec<Inline>) -> Self {
+        self.content = Some(content);
+        self
+    }
+
+    pub fn with_children(mut self, children: Vec<Block>) -> Self {
+        self.children = Some(children);
+        self
+    }
+
+    pub fn with_value(mut self, value: ElementValue) -> Self {
+        self.value = Some(value);
+        self
+    }
+
+    /// Returns the element's explicit name if introduced via `Sigil::Type("name")` or `Sigil::At(Some("name"))`.
+    pub fn name(&self) -> Option<&str> {
+        match &self.sigil {
+            Sigil::Type(name) => Some(name.as_str()),
+            Sigil::At(Some(name)) => Some(name.as_str()),
+            Sigil::At(None) | Sigil::Bare | Sigil::Dollar => None,
+        }
+    }
+
+    /// Returns `true` if this element has `Sigil::Bare`.
+    pub fn is_bare(&self) -> bool {
+        matches!(self.sigil, Sigil::Bare)
+    }
+
     /// A list: `sigil` is `Type("ol")` if `ordered`, else `Type("ul")`;
     /// `items` become `ElementValue::Children`. `ordered` distinguishes
     /// `-.` (auto-numbered) from plain `-` lists -- numbering itself isn't
@@ -328,4 +469,95 @@ pub enum Literal {
     Int(i64),
     Float(f64),
     String(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_position_and_span() {
+        let p1 = Position::new(1, 1, 0);
+        let p2 = Position::new(1, 10, 9);
+        let span = Span::new(p1, p2);
+
+        assert!(!span.is_dummy());
+        assert!(span.contains_offset(0));
+        assert!(span.contains_offset(5));
+        assert!(span.contains_offset(9));
+        assert!(!span.contains_offset(10));
+
+        let dummy = Span::dummy();
+        assert!(dummy.is_dummy());
+
+        // PartialEq on Span always returns true for test comparison convenience
+        assert_eq!(span, dummy);
+        // exact_eq checks field equality
+        assert!(!span.exact_eq(&dummy));
+
+        let p3 = Position::new(2, 5, 20);
+        let span2 = Span::new(p2, p3);
+        let union_span = span.union(&span2);
+        assert_eq!(union_span.start, p1);
+        assert_eq!(union_span.end, p3);
+    }
+
+    #[test]
+    fn test_value_helpers() {
+        let null_val = Value::Null;
+        assert!(null_val.is_null());
+        assert!(null_val.is_empty());
+
+        let str_val = Value::String("hello".to_string());
+        assert_eq!(str_val.as_str(), Some("hello"));
+        assert!(!str_val.is_empty());
+
+        let bool_val = Value::Bool(true);
+        assert_eq!(bool_val.as_bool(), Some(true));
+
+        let int_val = Value::Int(42);
+        assert_eq!(int_val.as_i64(), Some(42));
+
+        let float_val = Value::Float(3.14);
+        assert_eq!(float_val.as_f64(), Some(3.14));
+
+        let seq_val = Value::Seq(vec![Value::Int(1), Value::Int(2)]);
+        assert_eq!(seq_val.as_seq().map(|s| s.len()), Some(2));
+        assert!(!seq_val.is_empty());
+
+        let mut map_val = Value::Map(vec![
+            ("key1".to_string(), Value::String("val1".to_string())),
+            ("key2".to_string(), Value::Int(100)),
+        ]);
+        assert_eq!(map_val.get("key1").and_then(|v| v.as_str()), Some("val1"));
+        assert_eq!(map_val.get("key2").and_then(|v| v.as_i64()), Some(100));
+        assert!(map_val.get("nonexistent").is_none());
+
+        if let Some(v) = map_val.get_mut("key2") {
+            *v = Value::Int(200);
+        }
+        assert_eq!(map_val.get("key2").and_then(|v| v.as_i64()), Some(200));
+    }
+
+    #[test]
+    fn test_element_helpers() {
+        let el = Element::new(Sigil::Type("note".to_string()))
+            .with_args(Value::Map(vec![("key".to_string(), Value::Bool(true))]))
+            .with_content(vec![Inline::Text(Text::from("test"))]);
+
+        assert_eq!(el.name(), Some("note"));
+        assert!(!el.is_bare());
+        assert!(el.args.is_some());
+        assert!(el.content.is_some());
+
+        let bare_item = Element::list_item(
+            vec![Inline::Text(Text::from("item"))],
+            None,
+            None,
+            vec![],
+            Span::dummy(),
+        );
+        assert!(bare_item.is_bare());
+        assert_eq!(bare_item.name(), None);
+    }
 }

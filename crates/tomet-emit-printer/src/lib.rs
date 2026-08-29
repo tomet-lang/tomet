@@ -516,13 +516,44 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     if let Some(value) = &el.value {
         out.push('{');
         match value {
-            ElementValue::Data(v) => out.push_str(&render_value_inner_with_config(v, config)),
-            ElementValue::Children(children) => {
-                for (i, child) in children.iter().enumerate() {
-                    if i > 0 {
-                        out.push(' ');
+            ElementValue::Data(v) => {
+                if let Some(fmt) = get_format_from_args(el.args.as_ref()) {
+                    let json_val = value_to_json(v);
+                    let serialized = match fmt {
+                        "json" => serde_json::to_string_pretty(&json_val).ok(),
+                        "yaml" => serde_yaml::to_string(&json_val).ok(),
+                        "toml" => toml::to_string_pretty(&json_val).ok(),
+                        _ => None,
+                    };
+                    if let Some(s) = serialized {
+                        let trimmed = s.trim();
+                        out.push('\n');
+                        for line in trimmed.lines() {
+                            out.push_str("  ");
+                            out.push_str(line);
+                            out.push('\n');
+                        }
+                    } else {
+                        out.push_str(&render_value_inner_with_config(v, config));
                     }
-                    out.push_str(&render_element(child, config));
+                } else {
+                    out.push_str(&render_value_inner_with_config(v, config));
+                }
+            }
+            ElementValue::Children(children) => {
+                if children.is_empty() {
+                    // empty
+                } else if children.len() == 1 && children[0].sigil != Sigil::Bare {
+                    out.push(' ');
+                    out.push_str(&render_element(&children[0], config));
+                    out.push(' ');
+                } else {
+                    out.push('\n');
+                    for child in children {
+                        out.push_str("  ");
+                        out.push_str(&render_element(child, config));
+                        out.push('\n');
+                    }
                 }
             }
             ElementValue::Interp(expr) => out.push_str(&render_interp_expr(expr)),
@@ -531,6 +562,39 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     }
 
     out
+}
+
+fn get_format_from_args(args: Option<&Value>) -> Option<&str> {
+    if let Some(Value::Map(entries)) = args {
+        for (k, v) in entries {
+            if k == "format" {
+                if let Value::String(fmt) = v {
+                    return Some(fmt.as_str());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn value_to_json(val: &Value) -> serde_json::Value {
+    match val {
+        Value::Null => serde_json::Value::Null,
+        Value::Bool(b) => serde_json::Value::Bool(*b),
+        Value::Int(i) => serde_json::Value::Number((*i).into()),
+        Value::Float(f) => serde_json::Number::from_f64(*f)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        Value::String(s) => serde_json::Value::String(s.clone()),
+        Value::Seq(items) => serde_json::Value::Array(items.iter().map(value_to_json).collect()),
+        Value::Map(entries) => {
+            let mut map = serde_json::Map::new();
+            for (k, v) in entries {
+                map.insert(k.clone(), value_to_json(v));
+            }
+            serde_json::Value::Object(map)
+        }
+    }
 }
 
 /// Re-renders an `InterpExpr` back to source text for round-tripping
@@ -924,5 +988,43 @@ mod tests {
             printed.trim(),
             "<codeblock>(shell)[\n  irm \"https://christitus.com/win\" | iex\n]"
         );
+    }
+
+    #[test]
+    fn test_embedded_format_serialization_and_reparse() {
+        let mut el = Element::new(Sigil::At(Some("config".to_string())));
+        el.args = Some(Value::Map(vec![("format".to_string(), Value::String("json".to_string()))]));
+        el.value = Some(ElementValue::Data(Value::Map(vec![
+            ("meta".to_string(), Value::String("yaml".to_string())),
+        ])));
+        let doc = Document::new(vec![Block::Element(el)], tomet_ast::Span::dummy());
+        let printed = document_to_tm(&doc);
+        assert!(printed.contains("\"meta\": \"yaml\""));
+
+        // Verify re-parsing
+        let re_parsed = tomet_parser::parse_document(&printed).expect("valid doc");
+        assert_eq!(re_parsed.blocks.len(), 1);
+    }
+
+    #[test]
+    fn test_container_children_indentation() {
+        let mut child1 = Element::new(Sigil::Bare);
+        child1.args = Some(Value::Int(1));
+        child1.content = Some(vec![Inline::Text("note 1".into())]);
+
+        let mut child2 = Element::new(Sigil::Bare);
+        child2.args = Some(Value::Int(2));
+        child2.content = Some(vec![Inline::Text("note 2".into())]);
+
+        let mut links = Element::new(Sigil::At(Some("links".to_string())));
+        links.value = Some(ElementValue::Children(vec![child1, child2]));
+
+        let doc = Document::new(vec![Block::Element(links)], tomet_ast::Span::dummy());
+        let printed = document_to_tm(&doc);
+        assert!(printed.contains("@links{\n  (1)[note 1]\n  (2)[note 2]\n}"));
+
+        // Verify re-parsing
+        let re_parsed = tomet_parser::parse_document(&printed).expect("valid doc");
+        assert_eq!(re_parsed.blocks.len(), 1);
     }
 }

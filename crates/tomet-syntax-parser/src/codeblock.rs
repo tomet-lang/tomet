@@ -65,10 +65,10 @@ pub(crate) fn parse_fenced_code_block(cur: &mut Cursor) -> Result<Element> {
         Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
     };
     let content_span = Span::new(cur.position_at(body_start), cur.position_at(body_end));
-    let mut el = Element::new(Sigil::Type("codeblock".to_string()));
+    let mut el = Element::new(Sigil::Type("codeblock".to_string()))
+        .with_span(cur.span_from(start_pos))
+        .with_content(vec![Inline::Text(Text::new(code, content_span))]);
     el.args = args;
-    el.content = Some(vec![Inline::Text(Text::new(code, content_span))]);
-    el.span = cur.span_from(start_pos);
     Ok(el)
 }
 
@@ -104,10 +104,9 @@ pub(crate) fn is_codeblock(el: &Element) -> bool {
 }
 
 pub(crate) fn is_verbatim_content(el: &Element) -> bool {
-    let Some(Value::Map(entries)) = el.args.as_ref() else {
-        return false;
-    };
-    entries
-        .iter()
-        .any(|(key, v)| key == "content" && matches!(v, Value::String(tag) if tag == "raw"))
+    el.args
+        .as_ref()
+        .and_then(|a| a.get("content"))
+        .and_then(|v| v.as_str())
+        == Some("raw")
 }

@@ -3,11 +3,8 @@
 //! unconditionally). `Url`/`Id` are deliberately excluded -- see this
 //! crate's module doc.
 
-use std::ops::ControlFlow;
-
-use tomet_ast::{Document, Element, Span};
+use tomet_ast::{Document, Span};
 use tomet_semantics::{ElementKind, TargetScheme, link_target_of, target_scheme};
-use tomet_walker::{Visitor, walk_document};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinkKind {
@@ -75,30 +72,20 @@ pub struct DocumentLink {
     pub span: Span,
 }
 
-/// Walks `doc` and returns every `File`/`Embed`/`Tm`/`Ref` link found, in
-/// document order.
 pub fn collect_links(doc: &Document) -> Vec<DocumentLink> {
-    struct Collector {
-        links: Vec<DocumentLink>,
-    }
-    impl Visitor<()> for Collector {
-        fn visit(&mut self, el: &Element) -> ControlFlow<()> {
-            if let Some((kind, target)) = link_target_of(el)
-                && let Some((kind, target)) = LinkKind::from_element_kind_and_target(&kind, &target)
-            {
-                self.links.push(DocumentLink {
-                    kind,
-                    target,
-                    span: el.span,
-                });
-            }
-            ControlFlow::Continue(())
+    let mut links = Vec::new();
+    tomet_walker::for_each_element(doc, |el| {
+        if let Some((kind, target)) = link_target_of(el)
+            && let Some((kind, target)) = LinkKind::from_element_kind_and_target(&kind, &target)
+        {
+            links.push(DocumentLink {
+                kind,
+                target,
+                span: el.span,
+            });
         }
-    }
-
-    let mut collector = Collector { links: Vec::new() };
-    let _ = walk_document(doc, &mut collector);
-    collector.links
+    });
+    links
 }
 
 #[cfg(test)]

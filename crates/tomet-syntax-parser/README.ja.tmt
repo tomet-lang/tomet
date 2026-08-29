@@ -1,0 +1,25 @@
+# tomet-parser
+
+Tomet 言語の文法実装および再帰下降パーサー (`&str -> Document / Value`) を提供するクレート。言語仕様の正統な定義（Source of Truth）となります。
+
+## 責務とアーキテクチャ
+
+-. **決定論的静的パーサー境界 (Deterministic Static Parser Boundary)**:
+   - `tomet-parser` は純粋関数型かつ副作用のない決定論的静的パーサーです。I/O（ファイル読み込みやネットワーク）、外部解決、動的実行は一切行いません。
+   - 同一の入力に対して常に同一の AST 出力を返し、線形/予測可能な時間計算量を保証します。
+
+-. **モジュール構成**:
+   - `document.rs`: ブロック構造のディスパッチ、段落およびドキュメント全体の構築
+   - `element.rs`: 型付き要素 (`<T>`, `@name`, bare `@`)、グループ順序 (`(args)`, `[content]`, `{value}`)、コネクト構文 (`:(...)`, `:{...}`)
+   - `heading.rs`: 見出し (`#[...]`) および水平線 (`---`, `---[ title ]---`)
+   - `list.rs`: 順序付き/非順序リスト (`-`, `-.`)、マーカー値、項目属性
+   - `codeblock.rs`: フェンス付きコードブロックおよび生テキスト/verbatim (`content: raw`)
+   - `inline.rs`: インライン走査、強調 (`*em*`, `**strong**`, `==mark==`)、オートリンク、インラインコメント
+   - `interp.rs`: `${...}` 式埋め込み構文（識別子、メンバーアクセス、関数呼び出し、リテラル）
+   - `value.rs`: 軽量データ文法（マップ、シーケンス、スカラー、コメント）
+   - `embedded_format.rs`: `{value}` 内の埋め込み JSON/YAML/TOML フォーマットの透過的パース
+   - `error.rs`: ソース位置 (`Position`/`Span`) 付きの構文解析エラー
+
+3. **Tree-sitter との独立性**:
+   - `tomet-parser` は Rust による本番用再帰下降パーサーです。
+   - `tree-sitter-tomet` はエディタ構文ハイライト用の手動近似実装であり、本パーサーの変更時は `cargo test -p tree-sitter-tomet` で同期を検証します。

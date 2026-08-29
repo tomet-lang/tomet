@@ -71,10 +71,7 @@ fn parse_string_list(val: &Value) -> Vec<String> {
         Value::String(s) => vec![s.clone()],
         Value::Seq(seq) => seq
             .iter()
-            .filter_map(|item| match item {
-                Value::String(s) => Some(s.clone()),
-                _ => None,
-            })
+            .filter_map(|item| item.as_str().map(|s| s.to_string()))
             .collect(),
         _ => Vec::new(),
     }

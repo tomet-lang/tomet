@@ -47,13 +47,13 @@ pub(crate) fn parse_heading(
         cur.bump();
     }
     let span = cur.span_from(start_pos);
-    let mut el = Element::new(Sigil::At(Some("heading".to_string())));
     // Pre-existing quirk, preserved: a `#`-run longer than 255 silently
     // truncates here, same as before `Heading` was folded into `Element`.
-    el.args = Some(Value::Int(level as i64));
-    el.content = Some(content);
+    let mut el = Element::new(Sigil::At(Some("heading".to_string())))
+        .with_span(span)
+        .with_args(Value::Int(level as i64))
+        .with_content(content);
     el.value = attrs.map(ElementValue::Data);
-    el.span = span;
     Ok(el)
 }
 

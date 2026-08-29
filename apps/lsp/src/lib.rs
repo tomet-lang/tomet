@@ -34,34 +34,61 @@ fn span_contains(span: &Span, line: usize, col: usize) -> bool {
     start_ok && end_ok
 }
 
-/// Parses `text` and produces diagnostics (both parse errors and AST validation rules).
-pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
-    match tomet_parser::parse_document(text) {
-        Ok(doc) => {
-            let validation_errors = tomet_validator::validate_document(&doc);
-            validation_errors
-                .into_iter()
-                .map(|err| match &err {
-                    tomet_validator::ValidationError::DuplicateId { duplicate, .. } => {
-                        Diagnostic {
-                            range: span_to_range(duplicate),
-                            severity: Some(DiagnosticSeverity::ERROR),
-                            source: Some("tomet".to_string()),
-                            message: err.to_string(),
-                            ..Diagnostic::default()
-                        }
-                    }
-                })
-                .collect()
+/// Converts a CST [`tomet_cst::TextRange`] to an LSP [`Range`].
+pub fn text_range_to_lsp_range(text: &str, range: tomet_cst::TextRange) -> Range {
+    let start_offset = usize::from(range.start());
+    let end_offset = usize::from(range.end());
+    let start_pos = offset_to_position(text, start_offset);
+    let end_pos = offset_to_position(text, end_offset);
+    Range::new(start_pos, end_pos)
+}
+
+fn offset_to_position(text: &str, offset: usize) -> Position {
+    let mut line = 0;
+    let mut col = 0;
+    for (i, c) in text.char_indices() {
+        if i >= offset {
+            break;
         }
-        Err(err) => vec![Diagnostic {
+        if c == '\n' {
+            line += 1;
+            col = 0;
+        } else {
+            col += 1;
+        }
+    }
+    Position::new(line, col)
+}
+
+/// Parses `text` and produces diagnostics (both parse errors and CST validation rules).
+pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    let cst = tomet_parser::parse_cst(text);
+
+    // 1. CST-based lint validation (exact token wave lines!)
+    let cst_errors = tomet_validator::validate_cst(&cst);
+    for err in cst_errors {
+        diags.push(Diagnostic {
+            range: text_range_to_lsp_range(text, err.range()),
+            severity: Some(DiagnosticSeverity::ERROR),
+            source: Some("tomet".to_string()),
+            message: err.to_string(),
+            ..Diagnostic::default()
+        });
+    }
+
+    // 2. High-level parser errors if document structure is invalid
+    if let Err(err) = tomet_parser::parse_document(text) {
+        diags.push(Diagnostic {
             range: error_range(&err, text),
             severity: Some(DiagnosticSeverity::ERROR),
             source: Some("tomet".to_string()),
             message: err.message.clone(),
             ..Diagnostic::default()
-        }],
+        });
     }
+
+    diags
 }
 
 fn error_range(err: &tomet_parser::Error, text: &str) -> Range {
@@ -325,8 +352,10 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
 }
 
 /// Provides autocompletion items for elements, keywords, and builtin compute functions.
-pub fn completions_for(_text: &str, _pos: Position) -> Vec<CompletionItem> {
+pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
     let mut items = Vec::new();
+
+    let prefix = get_line_prefix(text, pos);
 
     let builtins = [
         ("callout", "Callout container block"),
@@ -345,6 +374,53 @@ pub fn completions_for(_text: &str, _pos: Position) -> Vec<CompletionItem> {
         ("links", "Link reference definitions table"),
         ("connect", "Connected data element target"),
     ];
+
+    if prefix.ends_with('@') {
+        for (name, detail) in builtins {
+            items.push(CompletionItem {
+                label: name.to_string(),
+                insert_text: Some(name.to_string()),
+                kind: Some(CompletionItemKind::KEYWORD),
+                detail: Some(detail.to_string()),
+                ..CompletionItem::default()
+            });
+        }
+        return items;
+    }
+
+    if prefix.ends_with('<') {
+        for (name, detail) in builtins {
+            items.push(CompletionItem {
+                label: name.to_string(),
+                insert_text: Some(format!("{name}>")),
+                kind: Some(CompletionItemKind::KEYWORD),
+                detail: Some(detail.to_string()),
+                ..CompletionItem::default()
+            });
+        }
+        return items;
+    }
+
+    if prefix.ends_with("${") || prefix.ends_with("${ ") {
+        let compute_funcs = [
+            ("add", "Arithmetic addition function `add(a, b)`"),
+            ("sub", "Arithmetic subtraction function `sub(a, b)`"),
+            ("mul", "Arithmetic multiplication function `mul(a, b)`"),
+            ("div", "Floating-point division function `div(a, b)`"),
+            ("mod", "Integer modulo function `mod(a, b)`"),
+        ];
+
+        for (func, detail) in compute_funcs {
+            items.push(CompletionItem {
+                label: format!("{func}(...)"),
+                insert_text: Some(format!("{func}()")),
+                kind: Some(CompletionItemKind::FUNCTION),
+                detail: Some(detail.to_string()),
+                ..CompletionItem::default()
+            });
+        }
+        return items;
+    }
 
     for (name, detail) in builtins {
         items.push(CompletionItem {
@@ -401,6 +477,12 @@ pub fn completions_for(_text: &str, _pos: Position) -> Vec<CompletionItem> {
     }
 
     items
+}
+
+fn get_line_prefix<'a>(text: &'a str, pos: Position) -> &'a str {
+    let line = text.lines().nth(pos.line as usize).unwrap_or("");
+    let char_limit = (pos.character as usize).min(line.len());
+    &line[..char_limit]
 }
 
 #[cfg(test)]
@@ -463,5 +545,28 @@ mod tests {
         let items = completions_for("", Position::new(0, 0));
         assert!(!items.is_empty());
         assert!(items.iter().any(|i| i.label == "<callout>"));
+    }
+
+    #[test]
+    fn completions_trigger_prefix() {
+        let at_items = completions_for("@", Position::new(0, 1));
+        assert!(at_items.iter().any(|i| i.label == "config"));
+
+        let lt_items = completions_for("<", Position::new(0, 1));
+        assert!(lt_items.iter().any(|i| i.label == "caution"));
+
+        let interp_items = completions_for("${", Position::new(0, 2));
+        assert!(interp_items.iter().any(|i| i.label == "add(...)"));
+    }
+
+    #[test]
+    fn exact_cst_diagnostic_range_on_duplicate_id() {
+        let text = "#[ A ]{id: my_id}\n\n#[ B ]{id: my_id}\n";
+        let diags = diagnostics_for(text);
+        assert_eq!(diags.len(), 1);
+        let diag = &diags[0];
+        assert_eq!(diag.range.start.line, 2);
+        assert_eq!(diag.range.start.character, 11);
+        assert_eq!(diag.range.end.character, 16);
     }
 }

@@ -8,7 +8,7 @@
 //! not something specific to serializing a `Document` back to `.tmt`
 //! text.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Sigil, Value};
+use tomet_ast::{Document, Value};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FieldConfig {
@@ -37,118 +37,129 @@ pub struct PrinterConfig {
 impl PrinterConfig {
     pub fn from_doc(doc: &Document) -> Self {
         let config = tomet_semantics::document_config(doc);
+        Self::from_document_config(&config)
+    }
+
+    pub fn from_document_config(config: &tomet_semantics::DocumentConfig) -> Self {
         let mut cfg = PrinterConfig::default();
-
         for (k, v) in &config.entries {
-            if k == "format" {
-                if let Value::Map(map) = v {
-                    Self::apply_format_map(&mut cfg, map);
-                }
-            } else if let Some(sub_k) = k.strip_prefix("format.") {
-                Self::apply_format_key_value(&mut cfg, sub_k, v);
-            } else {
-                Self::apply_format_key_value(&mut cfg, k, v);
-            }
+            Self::apply_entry(&mut cfg, k, v);
         }
-
-        for block in &doc.blocks {
-            if let Block::Element(el) = block {
-                if tomet_semantics::classify(el)
-                    == tomet_semantics::ElementKind::Custom("settings".to_string())
-                    || matches!(&el.sigil, Sigil::At(Some(name)) if name == "settings")
-                {
-                    Self::apply_settings_element(&mut cfg, el);
-                }
-            }
-        }
-
         cfg
     }
 
-    fn apply_settings_element(cfg: &mut Self, el: &Element) {
-        let Some(ElementValue::Data(Value::Map(entries))) = &el.value else {
+    fn apply_entry(cfg: &mut Self, key: &str, value: &Value) {
+        if key == "format" {
+            if let Value::Map(map) = value {
+                for (k, v) in map {
+                    Self::apply_entry(cfg, k, v);
+                }
+            }
             return;
-        };
-        for (k, v) in entries {
-            if k == "meta" {
-                if let Value::Map(fields) = v {
-                    for (field_name, field_val) in fields {
-                        if let Value::Map(props) = field_val {
-                            let mut field_cfg =
-                                cfg.meta_fields.get(field_name).cloned().unwrap_or_default();
-                            for (pk, pv) in props {
-                                if pk == "type" {
-                                    if let Value::String(s) = pv {
-                                        field_cfg.field_type = Some(s.clone());
-                                    }
-                                } else if pk == "format" {
-                                    if let Value::String(s) = pv {
-                                        field_cfg.format = Some(s.clone());
-                                    }
-                                } else if pk == "offset" {
-                                    if let Value::String(s) = pv {
-                                        field_cfg.offset = Some(s.clone());
-                                    }
-                                } else if pk == "always_newline" {
-                                    if let Value::Bool(b) = pv {
-                                        field_cfg.always_newline = *b;
-                                    }
-                                } else if pk == "length" {
-                                    if let Value::Int(n) = pv {
-                                        if *n > 0 {
-                                            field_cfg.length = Some(*n as usize);
-                                        }
-                                    } else if let Value::String(s) = pv {
-                                        field_cfg.length = s.parse::<usize>().ok();
-                                    }
-                                } else if pk == "prefix" {
-                                    if let Value::String(s) = pv {
-                                        field_cfg.prefix = Some(s.clone());
-                                    }
-                                } else if pk == "force" {
-                                    if let Value::Bool(b) = pv {
-                                        field_cfg.force = Some(*b);
-                                    } else if let Value::String(s) = pv {
-                                        field_cfg.force = Some(s == "true" || s == "1");
-                                    }
-                                } else if pk == "overwrite" {
-                                    if let Value::Bool(b) = pv {
-                                        field_cfg.overwrite = Some(*b);
-                                    } else if let Value::String(s) = pv {
-                                        field_cfg.overwrite = Some(s == "true" || s == "1");
-                                    }
-                                }
+        }
+        if let Some(sub_k) = key.strip_prefix("format.") {
+            Self::apply_entry(cfg, sub_k, value);
+            return;
+        }
+
+        match key {
+            "meta" => {
+                if let Value::Map(map) = value {
+                    for (k, v) in map {
+                        if k == "always_newline" {
+                            if let Some(b) = v.as_bool() {
+                                cfg.meta_always_newline = b;
                             }
-                            cfg.meta_fields.insert(field_name.clone(), field_cfg);
+                        } else if k == "format" {
+                            if let Some(s) = v.as_str() {
+                                cfg.meta_format = Some(s.to_string());
+                            }
+                        } else if let Value::Map(_) = v {
+                            Self::parse_meta_field_props(k, v, cfg);
                         }
                     }
                 }
             }
-            if k == "link" {
-                if let Value::Map(props) = v {
-                    for (pk, pv) in props {
-                        if pk == "no_space" {
-                            if let Value::Bool(b) = pv {
-                                cfg.link_no_space = *b;
-                            } else if let Value::String(s) = pv {
-                                cfg.link_no_space = s == "true" || s == "1";
-                            }
-                        }
+            "meta.always_newline" => {
+                if let Some(b) = value.as_bool() {
+                    cfg.meta_always_newline = b;
+                }
+            }
+            "meta.format" => {
+                if let Some(s) = value.as_str() {
+                    cfg.meta_format = Some(s.to_string());
+                }
+            }
+            "heading" => {
+                if let Some(space) = value
+                    .get("space_inside_brackets")
+                    .and_then(|v| v.as_bool())
+                {
+                    cfg.heading_space_inside_brackets = space;
+                }
+            }
+            "heading.space_inside_brackets" => {
+                if let Some(b) = value.as_bool() {
+                    cfg.heading_space_inside_brackets = b;
+                }
+            }
+            "link" => {
+                if let Some(no_space) = value.get("no_space") {
+                    if let Some(b) = no_space.as_bool() {
+                        cfg.link_no_space = b;
+                    } else if let Some(s) = no_space.as_str() {
+                        cfg.link_no_space = s == "true" || s == "1";
                     }
                 }
             }
-            if k == "callout" {
-                if let Value::Map(props) = v {
-                    Self::parse_callout_props(props, cfg);
+            "link.no_space" => {
+                if let Some(b) = value.as_bool() {
+                    cfg.link_no_space = b;
+                } else if let Some(s) = value.as_str() {
+                    cfg.link_no_space = s == "true" || s == "1";
                 }
             }
-            if k == "list" {
-                if let Value::Map(props) = v {
-                    Self::parse_list_props(props, cfg);
+            "callout" => {
+                if let Value::Map(map) = value {
+                    Self::parse_callout_props(map, cfg);
                 }
             }
-            if k == "elements" {
-                if let Value::Map(elems) = v {
+            "callout.style.content" => {
+                if let Some(s) = value.as_str() {
+                    cfg.callout_content_style = Some(s.to_string());
+                }
+            }
+            "callout.style" => {
+                if let Some(s) = value.get("content").and_then(|c| c.as_str()) {
+                    cfg.callout_content_style = Some(s.to_string());
+                }
+            }
+            "list" => {
+                if let Value::Map(map) = value {
+                    Self::parse_list_props(map, cfg);
+                }
+            }
+            "list.multiline.style.content" => {
+                if let Some(s) = value.as_str() {
+                    cfg.list_multiline_style_content = Some(s.to_string());
+                }
+            }
+            "list.multiline.style" => {
+                if let Some(s) = value.get("content").and_then(|c| c.as_str()) {
+                    cfg.list_multiline_style_content = Some(s.to_string());
+                }
+            }
+            "list.multiline" => {
+                if let Some(s) = value
+                    .get("style")
+                    .and_then(|st| st.get("content"))
+                    .and_then(|c| c.as_str())
+                {
+                    cfg.list_multiline_style_content = Some(s.to_string());
+                }
+            }
+            "elements" => {
+                if let Value::Map(elems) = value {
                     for (ek, ev) in elems {
                         if ek == "callout" {
                             if let Value::Map(props) = ev {
@@ -162,215 +173,23 @@ impl PrinterConfig {
                     }
                 }
             }
-            if k == "ignore" {
-                if let Value::Map(props) = v {
-                    for (pk, pv) in props {
-                        if pk == "files" {
-                            if let Value::Seq(items) = pv {
-                                for item in items {
-                                    if let Value::String(s) = item {
-                                        if !cfg.ignore_files.contains(s) {
-                                            cfg.ignore_files.push(s.clone());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn parse_callout_props(props: &[(String, Value)], cfg: &mut Self) {
-        for (pk, pv) in props {
-            if pk == "style" {
-                if let Value::Map(sprops) = pv {
-                    for (sk, sv) in sprops {
-                        if sk == "content" {
-                            if let Value::String(s) = sv {
-                                cfg.callout_content_style = Some(s.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn parse_list_props(props: &[(String, Value)], cfg: &mut Self) {
-        for (pk, pv) in props {
-            if pk == "multiline" {
-                if let Value::Map(mprops) = pv {
-                    for (mk, mv) in mprops {
-                        if mk == "style" {
-                            if let Value::Map(sprops) = mv {
-                                for (sk, sv) in sprops {
-                                    if sk == "content" {
-                                        if let Value::String(s) = sv {
-                                            cfg.list_multiline_style_content = Some(s.clone());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn apply_format_map(cfg: &mut Self, map: &[(String, Value)]) {
-        for (k, v) in map {
-            Self::apply_format_key_value(cfg, k, v);
-        }
-    }
-
-    fn apply_format_key_value(cfg: &mut Self, key: &str, value: &Value) {
-        match key {
-            "meta" => {
-                if let Value::Map(map) = value {
-                    for (mk, mv) in map {
-                        if mk == "always_newline" {
-                            if let Value::Bool(b) = mv {
-                                cfg.meta_always_newline = *b;
-                            }
-                        } else if mk == "format" {
-                            if let Value::String(s) = mv {
-                                cfg.meta_format = Some(s.clone());
-                            }
-                        }
-                    }
-                }
-            }
-            "meta.always_newline" => {
-                if let Value::Bool(b) = value {
-                    cfg.meta_always_newline = *b;
-                }
-            }
-            "meta.format" => {
-                if let Value::String(s) = value {
-                    cfg.meta_format = Some(s.clone());
-                }
-            }
-            "heading" => {
-                if let Value::Map(map) = value {
-                    for (hk, hv) in map {
-                        if hk == "space_inside_brackets" {
-                            if let Value::Bool(b) = hv {
-                                cfg.heading_space_inside_brackets = *b;
-                            }
-                        }
-                    }
-                }
-            }
-            "heading.space_inside_brackets" => {
-                if let Value::Bool(b) = value {
-                    cfg.heading_space_inside_brackets = *b;
-                }
-            }
-            "link" => {
-                if let Value::Map(map) = value {
-                    for (lk, lv) in map {
-                        if lk == "no_space" {
-                            if let Value::Bool(b) = lv {
-                                cfg.link_no_space = *b;
-                            } else if let Value::String(s) = lv {
-                                cfg.link_no_space = s == "true" || s == "1";
-                            }
-                        }
-                    }
-                }
-            }
-            "link.no_space" => {
-                if let Value::Bool(b) = value {
-                    cfg.link_no_space = *b;
-                } else if let Value::String(s) = value {
-                    cfg.link_no_space = s == "true" || s == "1";
-                }
-            }
-            "callout" => {
-                if let Value::Map(map) = value {
-                    Self::parse_callout_props(map, cfg);
-                }
-            }
-            "callout.style.content" => {
-                if let Value::String(s) = value {
-                    cfg.callout_content_style = Some(s.clone());
-                }
-            }
-            "callout.style" => {
-                if let Value::Map(map) = value {
-                    for (sk, sv) in map {
-                        if sk == "content" {
-                            if let Value::String(s) = sv {
-                                cfg.callout_content_style = Some(s.clone());
-                            }
-                        }
-                    }
-                }
-            }
-            "list" => {
-                if let Value::Map(map) = value {
-                    Self::parse_list_props(map, cfg);
-                }
-            }
-            "list.multiline.style.content" => {
-                if let Value::String(s) = value {
-                    cfg.list_multiline_style_content = Some(s.clone());
-                }
-            }
-            "list.multiline.style" => {
-                if let Value::Map(map) = value {
-                    for (sk, sv) in map {
-                        if sk == "content" {
-                            if let Value::String(s) = sv {
-                                cfg.list_multiline_style_content = Some(s.clone());
-                            }
-                        }
-                    }
-                }
-            }
-            "list.multiline" => {
-                if let Value::Map(map) = value {
-                    for (mk, mv) in map {
-                        if mk == "style" {
-                            if let Value::Map(sprops) = mv {
-                                for (sk, sv) in sprops {
-                                    if sk == "content" {
-                                        if let Value::String(s) = sv {
-                                            cfg.list_multiline_style_content = Some(s.clone());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
             "ignore" => {
-                if let Value::Map(map) = value {
-                    for (ik, iv) in map {
-                        if ik == "files" {
-                            if let Value::Seq(items) = iv {
-                                for item in items {
-                                    if let Value::String(s) = item {
-                                        if !cfg.ignore_files.contains(s) {
-                                            cfg.ignore_files.push(s.clone());
-                                        }
-                                    }
-                                }
+                if let Some(items) = value.get("files").and_then(|f| f.as_seq()) {
+                    for item in items {
+                        if let Some(s) = item.as_str() {
+                            if !cfg.ignore_files.contains(&s.to_string()) {
+                                cfg.ignore_files.push(s.to_string());
                             }
                         }
                     }
                 }
             }
             "ignore.files" => {
-                if let Value::Seq(items) = value {
+                if let Some(items) = value.as_seq() {
                     for item in items {
-                        if let Value::String(s) = item {
-                            if !cfg.ignore_files.contains(s) {
-                                cfg.ignore_files.push(s.clone());
+                        if let Some(s) = item.as_str() {
+                            if !cfg.ignore_files.contains(&s.to_string()) {
+                                cfg.ignore_files.push(s.to_string());
                             }
                         }
                     }
@@ -379,15 +198,136 @@ impl PrinterConfig {
             _ => {}
         }
     }
+
+    fn parse_meta_field_props(field_name: &str, field_val: &Value, cfg: &mut Self) {
+        if let Value::Map(props) = field_val {
+            let mut field_cfg = cfg
+                .meta_fields
+                .get(field_name)
+                .cloned()
+                .unwrap_or_default();
+            for (pk, pv) in props {
+                match pk.as_str() {
+                    "type" => field_cfg.field_type = pv.as_str().map(String::from),
+                    "format" => field_cfg.format = pv.as_str().map(String::from),
+                    "offset" => field_cfg.offset = pv.as_str().map(String::from),
+                    "always_newline" => {
+                        if let Some(b) = pv.as_bool() {
+                            field_cfg.always_newline = b;
+                        }
+                    }
+                    "length" => {
+                        if let Some(n) = pv.as_i64() {
+                            if n > 0 {
+                                field_cfg.length = Some(n as usize);
+                            }
+                        } else if let Some(s) = pv.as_str() {
+                            field_cfg.length = s.parse::<usize>().ok();
+                        }
+                    }
+                    "prefix" => field_cfg.prefix = pv.as_str().map(String::from),
+                    "force" => {
+                        if let Some(b) = pv.as_bool() {
+                            field_cfg.force = Some(b);
+                        } else if let Some(s) = pv.as_str() {
+                            field_cfg.force = Some(s == "true" || s == "1");
+                        }
+                    }
+                    "overwrite" => {
+                        if let Some(b) = pv.as_bool() {
+                            field_cfg.overwrite = Some(b);
+                        } else if let Some(s) = pv.as_str() {
+                            field_cfg.overwrite = Some(s == "true" || s == "1");
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            cfg.meta_fields.insert(field_name.to_string(), field_cfg);
+        }
+    }
+
+    fn parse_callout_props(props: &[(String, Value)], cfg: &mut Self) {
+        let map = Value::Map(props.to_vec());
+        if let Some(s) = map
+            .get("style")
+            .and_then(|st| st.get("content"))
+            .and_then(|c| c.as_str())
+        {
+            cfg.callout_content_style = Some(s.to_string());
+        }
+    }
+
+    fn parse_list_props(props: &[(String, Value)], cfg: &mut Self) {
+        let map = Value::Map(props.to_vec());
+        if let Some(s) = map
+            .get("multiline")
+            .and_then(|m| m.get("style"))
+            .and_then(|st| st.get("content"))
+            .and_then(|c| c.as_str())
+        {
+            cfg.list_multiline_style_content = Some(s.to_string());
+        }
+    }
 }
 
-pub fn load_config_from_file(path: &std::path::Path) -> Result<PrinterConfig, String> {
-    let src = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    load_config_from_str(&src)
+#[derive(Debug)]
+pub enum ConfigError {
+    Io {
+        path: std::path::PathBuf,
+        source: std::io::Error,
+    },
+    Parse {
+        path: Option<std::path::PathBuf>,
+        source: tomet_parser::Error,
+    },
 }
 
-pub fn load_config_from_str(src: &str) -> Result<PrinterConfig, String> {
-    let doc = tomet_parser::parse_document(src).map_err(|e| format!("{e:?}"))?;
+impl std::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigError::Io { path, source } => {
+                write!(f, "failed to read config file {}: {source}", path.display())
+            }
+            ConfigError::Parse {
+                path: Some(path),
+                source,
+            } => {
+                write!(f, "failed to parse config file {}: {source}", path.display())
+            }
+            ConfigError::Parse { path: None, source } => {
+                write!(f, "failed to parse config source: {source}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ConfigError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ConfigError::Io { source, .. } => Some(source),
+            ConfigError::Parse { source, .. } => Some(source),
+        }
+    }
+}
+
+pub fn load_config_from_file(path: &std::path::Path) -> Result<PrinterConfig, ConfigError> {
+    let src = std::fs::read_to_string(path).map_err(|source| ConfigError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let doc = tomet_parser::parse_document(&src).map_err(|source| ConfigError::Parse {
+        path: Some(path.to_path_buf()),
+        source,
+    })?;
+    Ok(PrinterConfig::from_doc(&doc))
+}
+
+pub fn load_config_from_str(src: &str) -> Result<PrinterConfig, ConfigError> {
+    let doc = tomet_parser::parse_document(src).map_err(|source| ConfigError::Parse {
+        path: None,
+        source,
+    })?;
     Ok(PrinterConfig::from_doc(&doc))
 }
 
@@ -533,5 +473,19 @@ mod tests {
             cfg.ignore_files,
             vec!["00-09 System/01 Apps/obsidian".to_string()]
         );
+    }
+
+    #[test]
+    fn test_heading_and_link_spacing_config() {
+        let src = r#"@config(
+  format: {
+    heading: { space_inside_brackets: true }
+    link: { no_space: true }
+  }
+)
+"#;
+        let cfg = load_config_from_str(src).expect("failed to parse config");
+        assert!(cfg.heading_space_inside_brackets);
+        assert!(cfg.link_no_space);
     }
 }

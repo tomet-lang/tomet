@@ -24,7 +24,7 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
             }
             out.push(']');
         }
-        Value::String(s) => write_scalar_string(s, out),
+        Value::String(s) => tomet_style::write_scalar_string(s, out),
         Value::Int(i) => out.push_str(&i.to_string()),
         Value::Float(f) => out.push_str(&f.to_string()),
         Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
@@ -53,31 +53,5 @@ fn write_map(entries: &[(String, Value)], out: &mut String, top_level: bool) {
             write_value(value, out, false);
         }
         out.push('}');
-    }
-}
-
-/// Bare words are only safe when the parser would read them back as the
-/// same string (not a number/bool/null, and free of characters that
-/// terminate a scalar or entry).
-fn write_scalar_string(s: &str, out: &mut String) {
-    let needs_quotes = s.is_empty()
-        || matches!(s, "true" | "false" | "null")
-        || s.parse::<i64>().is_ok()
-        || s.parse::<f64>().is_ok()
-        || s.trim() != s
-        || s.contains(['"', ',', ')', ']', '}', '\n', '\r']);
-    if needs_quotes {
-        out.push('"');
-        for c in s.chars() {
-            match c {
-                '"' => out.push_str("\\\""),
-                '\\' => out.push_str("\\\\"),
-                '\n' => out.push_str("\\n"),
-                _ => out.push(c),
-            }
-        }
-        out.push('"');
-    } else {
-        out.push_str(s);
     }
 }

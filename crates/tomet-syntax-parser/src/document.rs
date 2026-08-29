@@ -55,8 +55,8 @@ pub fn parse_document(src: &str) -> Result<Document> {
         if is_thematic_break(&cur) {
             let item_start = cur.pos();
             consume_thematic_break(&mut cur);
-            let mut el = tomet_ast::Element::new(tomet_ast::Sigil::Type("hr".to_string()));
-            el.span = cur.span_from(item_start);
+            let el = tomet_ast::Element::new(tomet_ast::Sigil::Type("hr".to_string()))
+                .with_span(cur.span_from(item_start));
             blocks.push(Block::Element(el));
             continue;
         }
@@ -67,10 +67,7 @@ pub fn parse_document(src: &str) -> Result<Document> {
         if let Some((ordered, ..)) = peek_list_marker(&cur)? {
             let items = parse_list(&mut cur, ordered, running_format)?;
             if !items.is_empty() {
-                let list_span = tomet_ast::Span::new(
-                    items.first().unwrap().span.start,
-                    items.last().unwrap().span.end,
-                );
+                let list_span = items.first().unwrap().span.union(&items.last().unwrap().span);
                 blocks.push(Block::Element(tomet_ast::Element::list(
                     ordered, items, list_span,
                 )));

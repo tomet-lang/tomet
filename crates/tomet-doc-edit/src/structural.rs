@@ -108,7 +108,7 @@ impl StructuralEngine {
 
 fn count_matches(doc: &Document, query: &StructuralQuery) -> usize {
     let mut count = 0;
-    walk_doc_elements(doc, &mut |el| {
+    tomet_walker::for_each_element(doc, |el| {
         if matches_query(el, query) {
             count += 1;
         }
@@ -125,18 +125,8 @@ fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
     }
 
     if let Some(target_key) = &query.key {
-        if !target_key.is_empty() {
-            let key_exists_in_args = el
-                .args
-                .as_ref()
-                .map_or(false, |v| value_has_key(v, target_key));
-            let key_exists_in_val = el.value.as_ref().map_or(false, |v| match v {
-                ElementValue::Data(data_val) => value_has_key(data_val, target_key),
-                ElementValue::Children(_) | ElementValue::Interp(_) => false,
-            });
-            if !key_exists_in_args && !key_exists_in_val {
-                return false;
-            }
+        if !target_key.is_empty() && !tomet_walker::element_has_prop_key(el, target_key) {
+            return false;
         }
     }
 
@@ -160,7 +150,7 @@ fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
 }
 
 fn transform_doc(doc: &mut Document, action: &StructuralAction, count: &mut usize) {
-    walk_doc_elements_mut(doc, &mut |el| match action {
+    tomet_walker::for_each_element_mut(doc, |el| match action {
         StructuralAction::RenameTag { from, to } => {
             let kind = classify(el);
             if kind.as_str().eq_ignore_ascii_case(from) {
@@ -173,76 +163,20 @@ fn transform_doc(doc: &mut Document, action: &StructuralAction, count: &mut usiz
             }
         }
         StructuralAction::RenameKey { old_key, new_key } => {
-            let mut changed = false;
-            if let Some(args) = &mut el.args {
-                if rename_map_key(args, old_key, new_key) {
-                    changed = true;
-                }
-            }
-            if let Some(ElementValue::Data(data_val)) = &mut el.value {
-                if rename_map_key(data_val, old_key, new_key) {
-                    changed = true;
-                }
-            }
-            if changed {
+            if tomet_walker::element_rename_prop_key(el, old_key, new_key) {
                 *count += 1;
             }
         }
         StructuralAction::ReplaceValue { key, new_value } => {
-            let mut changed = false;
-            if let Some(args) = &mut el.args {
-                if replace_map_value(args, key, new_value) {
-                    changed = true;
-                }
-            }
-            if let Some(ElementValue::Data(data_val)) = &mut el.value {
-                if replace_map_value(data_val, key, new_value) {
-                    changed = true;
-                }
-            }
-            if changed {
+            if tomet_walker::element_replace_prop_value(
+                el,
+                key,
+                Value::String(new_value.clone()),
+            ) {
                 *count += 1;
             }
         }
     });
-}
-
-fn rename_map_key(v: &mut Value, old_key: &str, new_key: &str) -> bool {
-    if let Value::Map(entries) = v {
-        let mut changed = false;
-        for (k, _) in entries.iter_mut() {
-            if k == old_key {
-                *k = new_key.to_string();
-                changed = true;
-            }
-        }
-        changed
-    } else {
-        false
-    }
-}
-
-fn replace_map_value(v: &mut Value, target_key: &str, new_val: &str) -> bool {
-    if let Value::Map(entries) = v {
-        let mut changed = false;
-        for (k, val) in entries.iter_mut() {
-            if k == target_key {
-                *val = Value::String(new_val.to_string());
-                changed = true;
-            }
-        }
-        changed
-    } else {
-        false
-    }
-}
-
-fn value_has_key(v: &Value, key: &str) -> bool {
-    if let Value::Map(entries) = v {
-        entries.iter().any(|(k, _)| k == key)
-    } else {
-        false
-    }
 }
 
 fn value_contains_str(v: &Value, sub: &str) -> bool {
@@ -254,31 +188,6 @@ fn value_contains_str(v: &Value, sub: &str) -> bool {
         Value::Seq(items) => items.iter().any(|item| value_contains_str(item, sub)),
         _ => false,
     }
-}
-
-/// Visits every `Element` in `doc` (document order, including ones
-/// nested inside an element's `[content]` and `ElementValue::Children`)
-/// via `tomet-walker`'s generic tree walk -- see that crate's module
-/// doc for why this shape lives there instead of being hand-rolled here.
-fn walk_doc_elements<F>(doc: &Document, f: &mut F)
-where
-    F: FnMut(&Element),
-{
-    struct ElementVisitor<'a, F>(&'a mut F);
-    impl<F: FnMut(&Element)> tomet_walker::Visitor<()> for ElementVisitor<'_, F> {
-        fn visit(&mut self, el: &Element) -> std::ops::ControlFlow<()> {
-            (self.0)(el);
-            std::ops::ControlFlow::Continue(())
-        }
-    }
-    let _ = tomet_walker::walk_document(doc, &mut ElementVisitor(f));
-}
-
-fn walk_doc_elements_mut<F>(doc: &mut Document, f: &mut F)
-where
-    F: FnMut(&mut Element),
-{
-    super::batch_meta::walk_elements_mut(doc, f);
 }
 
 #[cfg(test)]

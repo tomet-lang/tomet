@@ -1,0 +1,23 @@
+# tomet-ast
+
+Tomet ツールチェーン全体の基礎となるデータモデル (`Document`, `Block`, `Inline`, `Element`, `Value`, `Position`, `Span`) の型定義および構造アクセサメソッドを提供するクレート。
+
+##[ 含まれる主要データ型 ]
+- 純粋データ型: `Value` (Null / Bool / Int / Float / String / Seq / Map)
+- AST マークアップ構造: `Document` / `Block` / `Paragraph` / `Inline` / `Text` / `Sigil` / `Element` / `ElementValue` / `InterpExpr`
+
+##[ 設計方針 (Design Policy) ]
+
+-. **データモデルと構造アクセサに限定する (Pure Data & Structural Accessors)**:
+  - `tomet-ast` は全てのクレートから参照される基盤ライブラリであり、外部依存関係を持たない純粋なクレートとして維持する。
+  - 型の構築 (`new`, `with_*`) や構造的抽出 (`as_str()`, `get()`, `is_null()`, `Span::union()`) などの純粋な型固有メソッド (inherent methods) のみを配置する。
+
+-. **他クレートとの境界線の分離 (Crate Boundary Differentiation)**:
+  - **意味付け・分類 (Semantics)**: 「特定の要素が何を意味するか（リンク、@meta 等）」の分類ロジックは `tomet-semantics` に置く。
+  - **ツリー走査 (Traversal)**: AST の再帰的走査・検索エンジンは `tomet-walker` に置く。
+  - **シリアライズ・フォーマット (Formatting/Printing)**: `.tmt` ソースコードへの再構築・文字列化は `tomet-style` や `tomet-printer` に置く。
+  - **バリデーション・ID生成 (Validation/Utils)**: 意味的検証や ID 生成は `tomet-validator` や `tomet-field-utils` に置く。
+
+-. **`Span` の構造比較における動作仕様 (Span Equality Contract)**:
+  - AST ノード比較 (`assert_eq!(doc1, doc2)`) でソース位置の差異によってテストが落ちないよう、`Span` の `PartialEq` は一律 `true` を返すカスタム実装となっている。
+  - 厳密な位置一致を比較する場合は `Span::exact_eq()` を使用する。

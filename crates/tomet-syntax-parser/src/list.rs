@@ -209,10 +209,8 @@ fn parse_list_internal(
                 let sub_items =
                     parse_list_internal(cur, next_ordered, next_indent, default_format)?;
                 if !sub_items.is_empty() {
-                    let list_span = tomet_ast::Span::new(
-                        sub_items.first().unwrap().span.start,
-                        sub_items.last().unwrap().span.end,
-                    );
+                    let list_span =
+                        sub_items.first().unwrap().span.union(&sub_items.last().unwrap().span);
                     children.push(tomet_ast::Block::Element(Element::list(
                         next_ordered,
                         sub_items,

@@ -9,6 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 tomet-ast = { workspace = true }
+tomet-cst = { workspace = true }
 tomet-formatter = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-semantics = { workspace = true }

@@ -85,31 +85,13 @@ impl BatchMetaEngine {
 }
 
 fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_val: &str) -> bool {
-    let mut updated = false;
     let mut found = false;
 
-    walk_elements_mut(doc, |el| {
+    tomet_walker::for_each_element_mut(doc, |el| {
         let kind = classify(el);
         if kind.as_str() == target_element {
             found = true;
-            match &mut el.value {
-                Some(ElementValue::Data(Value::Map(entries))) => {
-                    if let Some((_, val)) = entries.iter_mut().find(|(k, _)| k == key) {
-                        *val = Value::String(new_val.to_string());
-                    } else {
-                        entries.push((key.to_string(), Value::String(new_val.to_string())));
-                    }
-                    updated = true;
-                }
-                None => {
-                    el.value = Some(ElementValue::Data(Value::Map(vec![(
-                        key.to_string(),
-                        Value::String(new_val.to_string()),
-                    )])));
-                    updated = true;
-                }
-                _ => {}
-            }
+            tomet_walker::element_set_prop(el, key, Value::String(new_val.to_string()));
         }
     });
 
@@ -127,29 +109,9 @@ fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_val:
             span: Default::default(),
         };
         doc.blocks.insert(0, Block::Element(new_el));
-        updated = true;
     }
 
-    updated
-}
-
-/// Visits every `Element` in `doc` with mutable access (document order,
-/// including ones nested inside an element's `[content]` and
-/// `ElementValue::Children`) via `tomet-walker`'s generic mutable tree
-/// walk -- see that crate's module doc for why this shape lives there
-/// instead of being hand-rolled here.
-pub(crate) fn walk_elements_mut<F>(doc: &mut Document, mut f: F)
-where
-    F: FnMut(&mut Element),
-{
-    struct ElementVisitorMut<F>(F);
-    impl<F: FnMut(&mut Element)> tomet_walker::VisitorMut<()> for ElementVisitorMut<F> {
-        fn visit_mut(&mut self, el: &mut Element) -> std::ops::ControlFlow<()> {
-            (self.0)(el);
-            std::ops::ControlFlow::Continue(())
-        }
-    }
-    let _ = tomet_walker::walk_document_mut(doc, &mut ElementVisitorMut(&mut f));
+    true
 }
 
 #[cfg(test)]

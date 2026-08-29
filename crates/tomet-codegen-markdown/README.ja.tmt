@@ -1,0 +1,15 @@
+# tomet-markdown
+
+CommonMark / Markdown と Tomet AST 間の双方向変換を提供するクレート。
+
+## 責務と機能
+
+-. **Markdown からのインポート (`from_markdown`)**:
+   - `pulldown-cmark` による CommonMark のパース。
+   - YAML フロントマターの `@meta(format:yaml){...}` への自動変換。
+   - Obsidian 互換の `[[WikiLink]]` を `@link(ref:...)[...]` へ変換。
+   - 見出し、リスト、テーブル、引用、コードブロック、強調、自動リンクの変換。
+
+-. **Tomet から Markdown へのエクスポート (`to_markdown`)**:
+   - `tomet_ast::Document` を標準 CommonMark 形式のテキストへエクスポート。
+   - 先頭の `@meta` を YAML フロントマターとして出力。

@@ -17,18 +17,7 @@ pub fn settings_file_ref(el: &Element) -> Option<&str> {
     if name != "settings" {
         return None;
     }
-    let Some(Value::Map(entries)) = el.args.as_ref() else {
-        return None;
-    };
-    entries.iter().find_map(|(key, value)| {
-        if key != "file" {
-            return None;
-        }
-        match value {
-            Value::String(s) => Some(s.as_str()),
-            _ => None,
-        }
-    })
+    el.args.as_ref()?.get("file")?.as_str()
 }
 
 /// Reads `path`, parses it as Tomet, and returns the `Value` held by
