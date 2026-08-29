@@ -22,7 +22,7 @@ pub fn evaluate(doc: &Document, expr: &InterpExpr) -> Result<Value, ComputeError
         InterpExprKind::Literal(Literal::Float(f)) => Ok(Value::Float(*f)),
         InterpExprKind::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
         InterpExprKind::Identifier(_) | InterpExprKind::Member { .. } => {
-            tomet_resolver::resolve_reference(doc, expr).map_err(ComputeError::Resolve)
+            Ok(tomet_resolver::resolve_reference(doc, expr)?)
         }
         InterpExprKind::Call { callee, args } => evaluate_call(doc, callee, args),
     }

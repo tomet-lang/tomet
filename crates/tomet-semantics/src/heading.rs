@@ -3,7 +3,7 @@
 //! that `tomet-codegen-html`/`tomet-codegen-markdown`/
 //! `tomet-emit-printer` each used to apply separately.
 
-use tomet_ast::{Element, Value};
+use tomet_ast::Element;
 
 use crate::kind::ElementKind;
 use crate::positional::normalized_element_args;
@@ -17,24 +17,16 @@ pub fn heading_level(el: &Element) -> Option<u8> {
     if crate::classify(el) != ElementKind::Heading {
         return None;
     }
-    match normalized_element_args(el) {
-        Some(Value::Map(entries)) => entries.iter().find_map(|(k, v)| {
-            if k != "level" {
-                return None;
-            }
-            match v {
-                Value::Int(n) => Some((*n).clamp(1, 6) as u8),
-                _ => None,
-            }
-        }),
-        _ => None,
-    }
+    normalized_element_args(el)?
+        .get("level")
+        .and_then(|v| v.as_i64())
+        .map(|n| n.clamp(1, 6) as u8)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::Sigil;
+    use tomet_ast::{Sigil, Value};
 
     #[test]
     fn type_sigil_heading_classifies_and_extracts_level() {

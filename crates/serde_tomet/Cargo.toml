@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 tomet-ast = { workspace = true }
 tomet-parser = { workspace = true }
+tomet-style = { workspace = true }
 
 #[ Crates.io ]
 serde = { workspace = true }

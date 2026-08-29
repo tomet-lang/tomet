@@ -129,8 +129,7 @@ fn classify_name(name: &str) -> ElementKind {
 /// `<link>` explicitly.
 pub fn classify(el: &Element) -> ElementKind {
     match &el.sigil {
-        Sigil::Type(name) => classify_name(name),
-        Sigil::At(Some(name)) => classify_name(name),
+        Sigil::Type(name) | Sigil::At(Some(name)) => classify_name(name),
         Sigil::At(None) => ElementKind::Custom("at".to_string()),
         Sigil::Bare => ElementKind::Bare,
         Sigil::Dollar => ElementKind::Interp,

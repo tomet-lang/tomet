@@ -1,10 +1,11 @@
 mod error;
 mod id;
 
-pub use error::ValidationError;
+pub use error::{CstValidationError, ValidationError};
 
-use id::collect_ids;
+use id::{collect_ids, collect_ids_cst};
 use tomet_ast::Document;
+use tomet_cst::{SyntaxNode, TextRange};
 
 /// Runs all validation rules against a parsed `Document` and returns every
 /// violation found. Read-only: never mutates `doc`, never does I/O.
@@ -21,6 +22,27 @@ pub fn validate_document(doc: &Document) -> Vec<ValidationError> {
             });
         } else {
             seen.push((id, span));
+        }
+    }
+
+    errors
+}
+
+/// Runs all validation rules directly against a Concrete Syntax Tree ([`SyntaxNode`])
+/// and returns violations with exact byte [`TextRange`]s.
+pub fn validate_cst(root: &SyntaxNode) -> Vec<CstValidationError> {
+    let mut errors = Vec::new();
+    let mut seen: Vec<(String, TextRange)> = Vec::new();
+
+    for (id, range) in collect_ids_cst(root) {
+        if let Some((_, first_range)) = seen.iter().find(|(seen_id, _)| *seen_id == id) {
+            errors.push(CstValidationError::DuplicateId {
+                id,
+                first_range: *first_range,
+                duplicate_range: range,
+            });
+        } else {
+            seen.push((id, range));
         }
     }
 
@@ -85,5 +107,33 @@ mod tests {
             &errors[0],
             ValidationError::DuplicateId { id, .. } if id == "a"
         ));
+    }
+
+    #[test]
+    fn duplicate_id_with_integer_values_is_reported() {
+        let doc = parse("#[ one ]{id: 42}\n#[ two ]{id: 42}\n");
+        let errors = validate_document(&doc);
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(
+            &errors[0],
+            ValidationError::DuplicateId { id, .. } if id == "42"
+        ));
+        assert_eq!(
+            errors[0].to_string(),
+            "duplicate id `42` (first defined at 1:1)"
+        );
+    }
+
+    #[test]
+    fn test_validate_cst_exact_range() {
+        let src = "#[ one ]{id: duplicate}\n\n#[ two ]{id: duplicate}\n";
+        let cst = tomet_parser::parse_cst(src);
+        let errors = validate_cst(&cst);
+        assert_eq!(errors.len(), 1);
+
+        let err = &errors[0];
+        assert_eq!(err.range().len(), tomet_cst::TextSize::from(9)); // "duplicate" has len 9
+        let err_slice = &src[usize::from(err.range().start())..usize::from(err.range().end())];
+        assert_eq!(err_slice, "duplicate"); // Exact token!
     }
 }

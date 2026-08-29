@@ -249,16 +249,10 @@ fn is_format_target_element(el: &Element) -> bool {
 
 pub(crate) fn local_format_key(el: &Element) -> Option<Option<EmbeddedFormat>> {
     let args = el.args.as_ref()?;
+    if let Some(format_val) = args.get("format") {
+        return Some(format_val.as_str().and_then(EmbeddedFormat::from_tag));
+    }
     match args {
-        Value::Map(entries) => entries.iter().find_map(|(key, v)| {
-            if key != "format" {
-                return None;
-            }
-            Some(match v {
-                Value::String(tag) => EmbeddedFormat::from_tag(tag),
-                _ => None,
-            })
-        }),
         Value::String(tag) if is_format_target_element(el) => Some(EmbeddedFormat::from_tag(tag)),
         _ => None,
     }

@@ -27,27 +27,53 @@ pub fn render_value_inner(v: &Value) -> String {
     render_value_inner_with_config(v, &PrinterConfig::default())
 }
 
+/// Formats a string scalar for Tomet source text, wrapping in `"` and escaping
+/// inner quotes and special characters only when necessary.
+pub fn quote_scalar_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    write_scalar_string(s, &mut out);
+    out
+}
+
+/// Appends a safely quoted/escaped string scalar to `out`.
+pub fn write_scalar_string(s: &str, out: &mut String) {
+    if is_iso8601(s) {
+        out.push_str(s);
+        return;
+    }
+
+    let needs_quotes = s.is_empty()
+        || matches!(s, "true" | "false" | "null")
+        || s.parse::<i64>().is_ok()
+        || s.parse::<f64>().is_ok()
+        || s.trim() != s
+        || s.contains(['"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ']);
+
+    if needs_quotes {
+        out.push('"');
+        for c in s.chars() {
+            match c {
+                '"' => out.push_str("\\\""),
+                '\\' => out.push_str("\\\\"),
+                '\n' => out.push_str("\\n"),
+                '\r' => out.push_str("\\r"),
+                '\t' => out.push_str("\\t"),
+                _ => out.push(c),
+            }
+        }
+        out.push('"');
+    } else {
+        out.push_str(s);
+    }
+}
+
 pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> String {
     match v {
         Value::Null => String::new(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
-        Value::String(s) => {
-            if is_iso8601(s) {
-                s.clone()
-            } else if s.contains(' ')
-                || s.contains(':')
-                || s.contains(',')
-                || s.contains('[')
-                || s.contains(']')
-                || s.is_empty()
-            {
-                format!("\"{s}\"")
-            } else {
-                s.clone()
-            }
-        }
+        Value::String(s) => quote_scalar_string(s),
         Value::Seq(items) => {
             let rendered: Vec<_> = items
                 .iter()
@@ -271,5 +297,17 @@ mod tests {
             render_meta_element(&el, &cfg),
             "@meta(format:yaml){\n  id: doc-12345678\n}"
         );
+    }
+
+    #[test]
+    fn test_quote_scalar_string_escaping_and_keywords() {
+        assert_eq!(quote_scalar_string("true"), "\"true\"");
+        assert_eq!(quote_scalar_string("false"), "\"false\"");
+        assert_eq!(quote_scalar_string("null"), "\"null\"");
+        assert_eq!(quote_scalar_string("123"), "\"123\"");
+        assert_eq!(quote_scalar_string("45.67"), "\"45.67\"");
+        assert_eq!(quote_scalar_string("hello \"world\""), "\"hello \\\"world\\\"\"");
+        assert_eq!(quote_scalar_string("line1\nline2"), "\"line1\\nline2\"");
+        assert_eq!(quote_scalar_string("2026-06-17T05:52:44Z"), "2026-06-17T05:52:44Z");
     }
 }

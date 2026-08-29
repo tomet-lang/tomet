@@ -1,9 +1,22 @@
-Documentの木構造を辿る処理だけを提供する
+# tomet-walker
 
-tomet-astは型定義だけ、tomet-semanticsは「1つのElementが何を意味するか」の判定だけ、で、どちらも「Document全体をどう再帰的に辿るか」というロジックは持っていない。tomet-validator(重複id検出)とtomet-resolver(`${id}`参照解決)が、それぞれ独立に同じ形の木構造ウォーカーを書いていたのを見つけて、ここに切り出した。tomet-astにしか依存しないので、どのconsumerも余計な依存(I/Oなど)を引きずらずに使える。
+`tomet_ast::Document` の AST 木構造を走査・探索する共通トラバーサルエンジン。
 
-#[ 実装済み ]
+## 責務とアーキテクチャ
 
-- walk_document(doc, visitor): Heading/ListItem/Elementを再帰的に訪問(contentの中、ElementValue::Childrenの中も含む)
-- Visitorトレイト: visit(Node)を実装するだけ。ControlFlow::Breakで即座に止められる(resolveのような「最初の一致で止めたい」用途向け)、常にContinueを返せば全部集められる(validatorのような「全部集めたい」用途向け)
-- Node: Heading/ListItem/Elementを統一。`.attrs()`でid探索に使うValue::Mapを、`.span()`で位置を取れる
+-. **パーサーや I/O に依存しない純粋な走査層**:
+   - `tomet-walker` は `Document` 全体を再帰的に走査するロジックを提供します。
+   - `tomet-ast` のみに依存し、パーサーや I/O、意味判定クレートへの依存を持ちません。
+   - `tomet-validator`, `tomet-resolver`, `tomet-indexer`, `tomet-edit`, `tomet-links`, `apps/lsp` などあらゆる下流コンシューマから共通で利用されます。
+
+-. **主な機能モジュール**:
+   - **不変走査 (`walk_document`, `Visitor`, `for_each_element`)**:
+     - 見出し、リスト項目、インライン要素、子要素（`ElementValue::Children`）を含むすべての `Element` を文書順（深さ優先）で走査。
+     - `ControlFlow::Break(b)` による早期中断と結果伝播をサポート。
+     - `for_each_element` やクロージャ直接受け渡しによるボイラープレート削減。
+   - **可変走査 (`walk_document_mut`, `VisitorMut`, `for_each_element_mut`)**:
+     - AST の一括属性変更（バッチメタデータ）や構造編集（構造検索置換）向けに、`&mut Element` をインプレースに走査・書き換え。
+     - `for_each_element_mut` やクロージャ直接受け渡しをサポート。
+   - **属性ビュー (`element_attrs_view`, `element_attrs_mut`)**:
+     - `element_attrs_view(&Element) -> Option<Value>`: 見出しの `{value}` と通常要素の `(args)` を透過的にマージして ID 探索用の統合マップを生成。
+     - `element_attrs_mut(&mut Element) -> Option<&mut Value>`: 書き換え可能な属性スロットへの可変参照を取得。

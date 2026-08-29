@@ -283,6 +283,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "countme"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7704b5fdd17b18ae31c4c1da5a2e0305a2bf17b5249300a9ee9ed7b72114c636"
+
+[[package]]
 name = "crc32fast"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1273,6 +1279,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
+name = "rowan"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "417a3a9f582e349834051b8a10c8d71ca88da4211e4093528e36b9845f6b5f21"
+dependencies = [
+ "countme",
+ "hashbrown 0.14.5",
+ "rustc-hash",
+ "text-size",
+]
+
+[[package]]
 name = "rusqlite"
 version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1285,6 +1303,12 @@ dependencies = [
  "libsqlite3-sys",
  "smallvec",
 ]
+
+[[package]]
+name = "rustc-hash"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rustix"
@@ -1418,6 +1442,7 @@ dependencies = [
  "serde",
  "tomet-ast",
  "tomet-parser",
+ "tomet-style",
 ]
 
 [[package]]
@@ -1593,6 +1618,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "text-size"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f18aa187839b2bdb1ad2fa35ead8c4c2976b64e4363c386d45ac0f7ee85c9233"
+
+[[package]]
 name = "tinystr"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1656,6 +1687,9 @@ dependencies = [
 [[package]]
 name = "tomet-ast"
 version = "0.1.0"
+dependencies = [
+ "tomet-cst",
+]
 
 [[package]]
 name = "tomet-compute"
@@ -1673,6 +1707,13 @@ dependencies = [
  "tomet-ast",
  "tomet-parser",
  "tomet-semantics",
+]
+
+[[package]]
+name = "tomet-cst"
+version = "0.1.0"
+dependencies = [
+ "rowan",
 ]
 
 [[package]]
@@ -1704,6 +1745,7 @@ version = "0.1.0"
 dependencies = [
  "tomet-ast",
  "tomet-config",
+ "tomet-cst",
  "tomet-field-utils",
  "tomet-parser",
  "tomet-semantics",
@@ -1748,6 +1790,7 @@ name = "tomet-lexar"
 version = "0.1.0"
 dependencies = [
  "tomet-ast",
+ "tomet-cst",
 ]
 
 [[package]]
@@ -1773,6 +1816,7 @@ dependencies = [
  "lsp-types",
  "serde_json",
  "tomet-ast",
+ "tomet-cst",
  "tomet-formatter",
  "tomet-parser",
  "tomet-semantics",
@@ -1803,6 +1847,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tomet-ast",
+ "tomet-cst",
  "tomet-lexar",
  "tomet-semantics",
  "toml",
@@ -1812,6 +1857,8 @@ dependencies = [
 name = "tomet-printer"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
+ "serde_yaml",
  "tomet-ast",
  "tomet-config",
  "tomet-field-utils",
@@ -1820,6 +1867,7 @@ dependencies = [
  "tomet-parser",
  "tomet-semantics",
  "tomet-style",
+ "toml",
 ]
 
 [[package]]
@@ -1879,6 +1927,7 @@ name = "tomet-validator"
 version = "0.1.0"
 dependencies = [
  "tomet-ast",
+ "tomet-cst",
  "tomet-parser",
  "tomet-walker",
 ]

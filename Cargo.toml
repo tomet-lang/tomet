@@ -18,6 +18,7 @@ members = [
   "editors/helix",
 
   #[ Syntax -- grammar/parsing ]
+  "crates/tomet-syntax-cst",
   "crates/tomet-syntax-ast",
   "crates/tomet-syntax-lexar",
   "crates/tomet-syntax-parser",
@@ -61,6 +62,7 @@ edition = "2024"
 
 [workspace.dependencies]
 #[ Syntax ]
+tomet-cst = { path = "crates/tomet-syntax-cst" }
 tomet-ast = { path = "crates/tomet-syntax-ast" }
 tomet-lexar = { path = "crates/tomet-syntax-lexar" }
 tomet-parser = { path = "crates/tomet-syntax-parser" }
@@ -106,6 +108,7 @@ pulldown-cmark = "0.13"
 ratatui = "0.29"
 rayon = "1"
 regex = "1.12"
+rowan = "0.16"
 rusqlite = { version = "0.31", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }

@@ -1,1 +1,13 @@
-astから、tmを作成する。
+# tomet-printer
+
+AST（`Document`）からフォーマット済みの `.tmt` ソースコードを再構築・シリアライズするクレート。
+
+## 責務と機能
+
+-. **AST からの `.tmt` 再構築 (`document_to_tm`)**:
+   - `Document` AST（見出し、段落、リスト、要素群）を走査し、完全な `.tmt` テキストを生成。
+   - Markdown からのインポート時やプログラムによる AST 生成時に使用。
+
+-. **フォーマット設定の適用 (`document_to_tm_with_config`)**:
+   - `PrinterConfig` に基づき見出しの括弧スペース、リスト形式、`@meta` のスタイルを適用。
+   - 必要に応じて `ensure_document_id_with_config` によりドキュメント ID を自動付与。

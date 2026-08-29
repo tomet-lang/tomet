@@ -15,32 +15,34 @@ through that doc's process, not a silent parser diff.
 ## The pipeline
 
 ```
-tomet-lexar  (byte-position cursor over &str)
+tomet-cst     (Rowan-based lossless Green/Red tree: SyntaxNode / SyntaxToken)
+      ^
+      |  uses
+tomet-lexar   (byte-position cursor & lossless tokenizer over &str)
       |
       v
-tomet-ast    (Value / Document / Block / Inline / Element types)
-      ^
-      |  builds
-tomet-parser (recursive-descent parser: &str -> Document/Value)
+tomet-parser  (recursive-descent CST & AST parser: &str -> SyntaxNode / Document / Value)
+      |
+      v
+tomet-ast     (Typed AST Facade & AstNode traits over SyntaxNode)
       |
       v
 tomet-semantics (I/O-free classification of what an Element means)
 ```
 
-- **`tomet-lexar`**: a minimal cursor over `&str`, nothing more. Exists
-  because the grammar is context-sensitive -- `<`, `@`, `(`, `[`, `{` are
-  only structural right after specific lookaheads (an element trigger),
-  plain prose otherwise -- so a hand-rolled cursor is a better fit than
-  pre-tokenizing into a context-free stream.
-- **`tomet-ast`**: the shared types every other crate speaks.
+- **`tomet-cst`**: Concrete Syntax Tree (CST) foundation powered by `rowan`.
+  Maintains 100% of characters (including trivia, comments, and whitespace)
+  losslessly (`syntax_node.text().to_string() == original_source`). Provides
+  exact `TextRange` byte spans for LSP diagnostics, autocompletion, and lossless refactorings.
+- **`tomet-lexar`**: byte-position cursor and lossless tokenizer over `&str`.
+  Emits `(SyntaxKind, &str)` tokens covering all trivia and structural elements.
+- **`tomet-ast`**: the shared typed AST every other crate speaks.
   `Value` is the pure-data subset (maps 1:1 onto serde's data model: maps,
   sequences, scalars) -- it's what fills an element's `(args)` or
   `{value}` group, and it's the entire result of parsing a data-only `.tmt`
   file. `Document`/`Block`/`Inline`/`Element` are the full markup AST
-  (headings, paragraphs, lists, typed elements), in source order. Every AST
-  node carries a source `Span` (line, column, byte offset), allowing downstream
-  consumers like `tomet-formatter` and `tomet-lsp` to perform AST-aware
-  formatting and exact diagnostic range mapping.
+  (headings, paragraphs, lists, typed elements), in source order. Also provides
+  typed `AstNode`/`AstToken` wrappers over Rowan's `SyntaxNode`.
 - **`tomet-parser`**: the actual grammar implementation, and the one
   place that gets to decide what `.tmt` source means. Recursive-descent,
   built directly on `tomet-lexar`'s cursor (see `document.rs`'s module

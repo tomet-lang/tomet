@@ -1,13 +1,20 @@
-`${function(...)}`の関数評価と@metaの動的計算
+# tomet-compute
 
-tomet-resolveが辿って取ってきた値(`${var}`で参照した要素の中身や、@metaのフィールドなど)に対して、関数を適用して計算・置換する層。例: @metaの数値フィールドを合計して表示する、複数idの内容を結合して表示する、など。
+`${...}` 埋め込み式（`InterpExpr`）の動的評価および組み込み計算関数を提供するクレート。
 
-tomet-parserと同じくI/Oはしない。参照解決はresolveの仕事、ここは「値が揃った後の計算」だけを担当する。
+## 責務とアーキテクチャ
 
-#[ 実装済み ]
+-. **純粋計算境界 (Zero I/O)**:
+   - `tomet-compute` は式評価を担当し、ファイル I/O は一切行いません。
+   - `${id}` や `${id.member}` などの参照解決は `tomet-resolver::resolve_reference` に委譲し、本クレートは値が確定した後の関数適用・演算のみに集中します。
 
-- evaluate(doc, expr): Literalはそのまま、Identifier/MemberはResolveへ委譲、Callはargsを再帰評価してから組み込み関数を呼ぶ
-- 組み込み関数: add / sub / mul / div / mod (全部2引数、数値のみ)。int同士はint、片方floatならfloat昇格、divは常にtrue division(float)、i64オーバーフロー時もfloatへ自動フォールバック(panicしない)
-
-// [ 未実装 ] callee(呼び出す関数名)は裸のIdentifierのみ対応。a.b(x)のようなMemberをcalleeにする呼び出しはUnsupportedCalleeエラー。ユーザー定義関数、文字列/真偽値向けの関数は未設計。
-tomet-js
+-. **主な機能モジュール**:
+   - **式評価 (`evaluate`)**:
+     - `Literal`: 数値・文字列リテラルをそのまま評価。
+     - `Identifier` / `Member`: `tomet-resolver` 経由で対象ノードの値を探索・解決。
+     - `Call`: 引数を左から右へ再帰評価した上で組み込み関数へディスパッチ。
+   - **組み込み算術関数 (`functions.rs`)**:
+     - `add`, `sub`, `mul`, `div`, `mod`（数値 2 引数演算）。
+     - 型昇格: 両方 `Int` なら `Int`、どちらかが `Float` なら `Float`。
+     - オーバーフロー安全性: `i64` の桁溢れ時はパニックせず自動で `Float` へ昇格。
+     - 浮動小数点除算: `div` は切り捨てず常に真除算（`Float`）を返却。

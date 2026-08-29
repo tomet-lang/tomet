@@ -1,0 +1,21 @@
+# tomet-indexer
+
+ワークスペース内のファイル探索、除外フィルタリング、ファイル種別分類、およびメタデータカタログ化を提供するクレート。
+
+## 責務とアーキテクチャ
+
+-. **ワークスペース探索・カタログ化**:
+   - `.gitignore` や隠しファイル、設定ファイル（`default.config.tmt` / `tomet.config.tmt`）の `ignore_files` を遵守した安全・高速なファイル走査を提供。
+   - CLI コマンド（`check`, `export`, `format`, `lint`）や TUI（Explorer, Migration, BatchMeta）から共通利用されます。
+
+-. **主な機能モジュール**:
+   - **パス除外・収集 (`is_path_ignored`, `collect_tm_files`, `collect_all_paths_with_config`)**:
+     - `ignore::WalkBuilder` による高速ディレクトリ走査。
+     - プレフィックス一致・相対パス一致による除外判定。
+   - **メタデータ抽出 (`extract_metadata`)**:
+     - `@meta` および `@config` のキーバリューをフラットに抽出。
+   - **ステートフルなメモリ内インデックス (`WorkspaceIndex`)**:
+     - フラットなファイルカタログ（`BTreeMap<PathBuf, EntryKind>`）を保持。
+     - 単一子ディレクトリの折りたたみ（`a/b/c`）を含むファイルツリーのメモリ内導出（`tree_nodes`）。
+     - Markdown から Tomet への移行候補抽出（`migration_candidates`）。
+     - 単一ファイルの差分更新（`refresh_path`, `remove_path`）および一括再走査（`rebuild`）。

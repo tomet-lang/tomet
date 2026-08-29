@@ -7,7 +7,7 @@
 //! extraction, adopted by `tomet-codegen-html`/`tomet-codegen-markdown`/
 //! `tomet-doc-links` instead of each reading `el.args` raw.
 
-use tomet_ast::{Element, Value};
+use tomet_ast::Element;
 
 use crate::kind::ElementKind;
 use crate::positional::normalized_element_args;
@@ -27,27 +27,22 @@ pub fn link_target(el: &Element, kind: &ElementKind) -> Option<String> {
     if !matches!(kind, ElementKind::Link | ElementKind::Embed) {
         return None;
     }
-    match normalized_element_args(el) {
-        Some(Value::Map(entries)) => entries.iter().find_map(|(k, v)| {
-            if k != "target" {
-                return None;
-            }
-            match v {
-                Value::String(s) => Some(s.clone()),
-                _ => None,
-            }
-        }),
-        // `@link(https://x)`/`<embed>(a.png)`: both `link` and `embed` are
-        // in `builtin_positional_arg_key` (`-> "target"`), so a bare
-        // positional scalar should already have arrived here as a map via
-        // `normalized_element_args` -- this branch only matters for a
-        // `Sigil` this function is never called with a `Link`/`Embed`
-        // `kind` for (guarded above), so it's effectively unreachable in
-        // practice but kept for symmetry/safety rather than relying on
-        // that invariant silently.
-        Some(Value::String(s)) => Some(s),
-        _ => None,
+    let args = normalized_element_args(el)?;
+    if let Some(target) = args.get("target").and_then(|v| v.as_str()) {
+        return Some(target.to_string());
     }
+    // `@link(https://x)`/`<embed>(a.png)`: both `link` and `embed` are
+    // in `builtin_positional_arg_key` (`-> "target"`), so a bare
+    // positional scalar should already have arrived here as a map via
+    // `normalized_element_args` -- this fallback only matters for a
+    // `Sigil` this function is never called with a `Link`/`Embed`
+    // `kind` for (guarded above), so it's effectively unreachable in
+    // practice but kept for symmetry/safety rather than relying on
+    // that invariant silently.
+    if let Some(s) = args.as_str() {
+        return Some(s.to_string());
+    }
+    None
 }
 
 /// Classifies `el` and extracts its link target in one step, for callers
@@ -140,7 +135,7 @@ fn is_scheme_uri(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::Sigil;
+    use tomet_ast::{Sigil, Value};
 
     fn map_el(sigil: Sigil, entries: Vec<(&str, Value)>) -> Element {
         let mut el = Element::new(sigil);

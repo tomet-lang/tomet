@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use ignore::WalkBuilder;
-use tomet_ast::{Document, Element, ElementValue, Value};
+use tomet_ast::{ElementValue, Value};
 use tomet_config::PrinterConfig;
 use tomet_parser::parse_document;
 use tomet_semantics::classify;
@@ -137,11 +137,10 @@ fn is_tm_file(p: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Extract all `@meta` and `@config` metadata fields from document text.
 pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
     if let Ok(doc) = parse_document(src) {
-        walk_elements(&doc, |el| {
+        tomet_walker::for_each_element(&doc, |el| {
             let kind = classify(el);
             let kind = kind.as_str();
             if kind == "meta" || kind == "config" {
@@ -180,24 +179,6 @@ fn value_to_string(v: &Value) -> String {
             format!("{{{}}}", s.join(", "))
         }
     }
-}
-
-/// Visits every `Element` in `doc` (document order, including ones
-/// nested inside an element's `[content]` and `ElementValue::Children`)
-/// via `tomet-walker`'s generic tree walk -- see that crate's module
-/// doc for why this shape lives there instead of being hand-rolled here.
-fn walk_elements<F>(doc: &Document, mut f: F)
-where
-    F: FnMut(&Element),
-{
-    struct ElementVisitor<F>(F);
-    impl<F: FnMut(&Element)> tomet_walker::Visitor<()> for ElementVisitor<F> {
-        fn visit(&mut self, el: &Element) -> std::ops::ControlFlow<()> {
-            (self.0)(el);
-            std::ops::ControlFlow::Continue(())
-        }
-    }
-    let _ = tomet_walker::walk_document(doc, &mut ElementVisitor(&mut f));
 }
 
 #[cfg(test)]

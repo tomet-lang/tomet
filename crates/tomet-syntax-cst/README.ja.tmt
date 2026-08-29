@@ -1,0 +1,15 @@
+# tomet-cst
+
+Rowan による Tomet の完全可逆・具象構文木（CST: Concrete Syntax Tree）基盤を提供するクレート。
+
+## 責務とアーキテクチャ
+
+-. **完全可逆な具象構文木 (Lossless CST)**:
+   - 空白（Trivia）、改行、コメントを 1 文字も落とさず 100% 保持する Green/Red Tree 構文木。
+   - `syntax_node.text().to_string()` により、パース前の生ソースコードと完全一致（Round-trip 完全可逆性）を保証。
+
+-. **提供する型とモジュール**:
+   - `SyntaxKind`: トークンおよび複合構文ノードの種別定義。
+   - `TometLanguage`: `rowan::Language` トレイト実装。
+   - `SyntaxNode`, `SyntaxToken`, `SyntaxElement`: バイトオフセット計算とツリー走査ハンドル。
+   - `TextRange`, `TextSize`: LSP 診断やリファクタリング用の精密なバイト範囲。

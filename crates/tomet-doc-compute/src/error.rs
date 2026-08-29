@@ -53,3 +53,9 @@ impl std::error::Error for ComputeError {
         }
     }
 }
+
+impl From<ResolveError> for ComputeError {
+    fn from(err: ResolveError) -> Self {
+        ComputeError::Resolve(err)
+    }
+}
