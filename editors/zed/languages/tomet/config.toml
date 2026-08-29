@@ -1,0 +1,29 @@
+name = "Tomet"
+grammar = "tomet"
+path_suffixes = ["tm"]
+line_comment = "//"
+block_comment = ["/*", "*/"]
+
+[[brackets]]
+start = "{"
+end = "}"
+close = true
+newline = true
+
+[[brackets]]
+start = "["
+end = "]"
+close = true
+newline = true
+
+[[brackets]]
+start = "("
+end = ")"
+close = true
+newline = true
+
+[[brackets]]
+start = "<"
+end = ">"
+close = true
+newline = false

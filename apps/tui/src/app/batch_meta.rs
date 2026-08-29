@@ -1,8 +1,8 @@
 //! Batch Meta tab: bulk `@meta` key/value updates across selected
-//! `.tm` files.
+//! `.tmt` files.
 
 use super::{App, PendingConfirm};
-use typedmark_edit::batch_meta::BatchMetaEngine;
+use tomet_edit::batch_meta::BatchMetaEngine;
 
 impl App {
     pub fn adjust_meta_scrolloff(&mut self, height: usize) {
@@ -64,7 +64,7 @@ impl App {
         let count = self.meta_entries.iter().filter(|e| e.selected).count();
         if count == 0 {
             self.status_message =
-                "No .tm files selected! Press [Space] to select or [a] to select all.".to_string();
+                "No .tmt files selected! Press [Space] to select or [a] to select all.".to_string();
         } else if self.meta_key_input.is_empty() {
             self.status_message = "Please specify a metadata KEY to update.".to_string();
         } else {
@@ -102,7 +102,7 @@ impl App {
     pub(super) fn batch_meta_status_message(&self) -> String {
         let selected_count = self.meta_entries.iter().filter(|e| e.selected).count();
         format!(
-            "Loaded {} .tm file(s) ({} selected). Press [k]ey/[v]al to set metadata, [e] to apply.",
+            "Loaded {} .tmt file(s) ({} selected). Press [k]ey/[v]al to set metadata, [e] to apply.",
             self.meta_entries.len(),
             selected_count
         )

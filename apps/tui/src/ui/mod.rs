@@ -1,4 +1,4 @@
-//! Ratatui UI Layout and widget rendering for TypedMark Workbench TUI.
+//! Ratatui UI Layout and widget rendering for Tomet Workbench TUI.
 //!
 //! `draw` lays out the shared chrome (header/tabs, controls bar,
 //! footer, confirm modal -- this file) and delegates the main content
@@ -6,7 +6,7 @@
 //! submodules (`explorer`/`migration`/`batch_meta`/`structural`).
 //! `render_controls` similarly delegates its per-tab hint text to each
 //! submodule's `*_controls_info`. `diff`/`highlight` hold
-//! tab-independent utilities (before/after diffing, `.tm` syntax
+//! tab-independent utilities (before/after diffing, `.tmt` syntax
 //! highlighting) shared across the tab-specific view functions.
 
 use ratatui::{
@@ -75,7 +75,7 @@ pub fn draw_loading(f: &mut Frame, tick: usize, message: &str) {
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(" TypedMark Workbench TUI ")
+        .title(" Tomet Workbench TUI ")
         .border_style(Style::default().fg(Color::Cyan));
 
     const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -132,9 +132,9 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
     ];
 
     let config_title = if let Some(path) = &app.printer_config_path {
-        format!(" TypedMark Workbench TUI (Config: {}) ", path.display())
+        format!(" Tomet Workbench TUI (Config: {}) ", path.display())
     } else {
-        " TypedMark Workbench TUI (Config: default) ".to_string()
+        " Tomet Workbench TUI (Config: default) ".to_string()
     };
 
     let tabs = Tabs::new(titles)

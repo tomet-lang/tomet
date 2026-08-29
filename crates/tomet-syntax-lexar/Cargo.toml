@@ -1,0 +1,7 @@
+[package]
+name = "tomet-lexar"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }

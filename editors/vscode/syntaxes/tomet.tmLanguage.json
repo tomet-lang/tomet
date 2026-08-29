@@ -1,0 +1,312 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Tomet",
+	"scopeName": "source.tomet",
+	"fileTypes": ["tm", "tmt"],
+	"patterns": [
+		{ "include": "#comments" },
+		{ "include": "#fenced-code-block" },
+		{ "include": "#heading" },
+		{ "include": "#thematic-break" },
+		{ "include": "#list-marker" },
+		{ "include": "#inline" }
+	],
+	"repository": {
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.line.double-slash.tomet",
+					"match": "//.*$"
+				},
+				{
+					"name": "comment.block.tomet",
+					"begin": "/\\*",
+					"end": "\\*/"
+				}
+			]
+		},
+
+		"fenced-code-block": {
+			"begin": "^\\s*(```)(?:([a-zA-Z0-9_+-]+))?\\s*$",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.markdown" },
+				"2": { "name": "fenced_code.block.language.tomet" }
+			},
+			"end": "^\\s*(```)\\s*$",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.markdown" }
+			},
+			"name": "markup.raw.block.fenced.tomet"
+		},
+
+		"heading": {
+			"begin": "^\\s*(#+)(\\[)",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.heading.tomet" },
+				"2": { "name": "punctuation.section.brackets.begin.tomet" }
+			},
+			"end": "\\]",
+			"endCaptures": {
+				"0": { "name": "punctuation.section.brackets.end.tomet" }
+			},
+			"name": "markup.heading.tomet",
+			"patterns": [{ "include": "#inline" }]
+		},
+
+		"thematic-break": {
+			"patterns": [
+				{
+					"begin": "^\\s*(-{3,})\\s*(\\[)",
+					"beginCaptures": {
+						"1": { "name": "punctuation.definition.thematic-break.tomet" },
+						"2": { "name": "punctuation.section.brackets.begin.tomet" }
+					},
+					"end": "(\\])\\s*(-{3,})\\s*$",
+					"endCaptures": {
+						"1": { "name": "punctuation.section.brackets.end.tomet" },
+						"2": { "name": "punctuation.definition.thematic-break.tomet" }
+					},
+					"name": "markup.heading.thematic-break.tomet",
+					"patterns": [{ "include": "#inline" }]
+				},
+				{
+					"match": "^\\s*-{3,}\\s*$",
+					"name": "punctuation.definition.thematic-break.tomet"
+				}
+			]
+		},
+
+		"list-marker": {
+			"patterns": [
+				{
+					"match": "^\\s*(-\\.|-)(?=[ \\t])(?:\\s*(\\()([^()\\n]*)(\\)))?",
+					"captures": {
+						"1": { "name": "punctuation.definition.list.begin.markdown markup.list.tomet keyword.control.list.tomet" },
+						"2": { "name": "punctuation.definition.marker.begin.tomet" },
+						"3": { "name": "keyword.operator.marker.tomet markup.list.marker.tomet" },
+						"4": { "name": "punctuation.definition.marker.end.tomet" }
+					}
+				}
+			]
+		},
+
+		"inline": {
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#string" },
+				{ "include": "#code-span" },
+				{ "include": "#strong" },
+				{ "include": "#emphasis" },
+				{ "include": "#mark" },
+				{ "include": "#interpolation" },
+				{ "include": "#connect" },
+				{ "include": "#element" },
+				{ "include": "#groups" }
+			]
+		},
+
+		"inline-basic": {
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#string" },
+				{ "include": "#code-span" },
+				{ "include": "#interpolation" },
+				{ "include": "#connect" },
+				{ "include": "#element" },
+				{ "include": "#groups" }
+			]
+		},
+
+		"code-span": {
+			"name": "markup.inline.raw.tomet",
+			"match": "`[^`\\n]*`"
+		},
+
+		"strong": {
+			"patterns": [
+				{
+					"begin": "\\*\\*(?=\\S)",
+					"end": "\\*\\*",
+					"name": "markup.bold.tomet",
+					"patterns": [{ "include": "#inline-basic" }]
+				},
+				{
+					"begin": "__(?=\\S)",
+					"end": "__",
+					"name": "markup.bold.tomet",
+					"patterns": [{ "include": "#inline-basic" }]
+				}
+			]
+		},
+
+		"emphasis": {
+			"patterns": [
+				{
+					"begin": "\\*(?=\\S)",
+					"end": "\\*",
+					"name": "markup.italic.tomet",
+					"patterns": [{ "include": "#inline-basic" }]
+				},
+				{
+					"begin": "_(?=\\S)",
+					"end": "_",
+					"name": "markup.italic.tomet",
+					"patterns": [{ "include": "#inline-basic" }]
+				}
+			]
+		},
+
+		"mark": {
+			"begin": "==(?=\\S)",
+			"end": "==",
+			"name": "markup.strikethrough.tomet",
+			"patterns": [{ "include": "#inline-basic" }]
+		},
+
+		"connect": {
+			"match": "(<->|->|<-|==>|--)",
+			"name": "keyword.operator.connect.tomet"
+		},
+
+		"interpolation": {
+			"begin": "\\$\\{",
+			"beginCaptures": {
+				"0": { "name": "punctuation.definition.template-expression.begin.tomet" }
+			},
+			"end": "\\}",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.template-expression.end.tomet" }
+			},
+			"name": "meta.template.expression.tomet",
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#string" },
+				{
+					"match": "\\b[0-9]+(\\.[0-9]+)?\\b",
+					"name": "constant.numeric.tomet"
+				},
+				{
+					"match": "([A-Za-z_][A-Za-z0-9_.-]*)\\s*(?=\\()",
+					"captures": {
+						"1": { "name": "entity.name.function.tomet" }
+					}
+				},
+				{
+					"match": "\\b[A-Za-z_][A-Za-z0-9_.-]*\\b",
+					"name": "variable.other.readwrite.tomet"
+				},
+				{
+					"match": "[,()]",
+					"name": "punctuation.separator.tomet"
+				}
+			]
+		},
+
+		"element": {
+			"patterns": [
+				{
+					"comment": "<Type> element sigil",
+					"match": "(<)([A-Za-z_][A-Za-z0-9_.-]*)(>)",
+					"captures": {
+						"1": { "name": "punctuation.definition.tag.begin.tomet" },
+						"2": { "name": "entity.name.tag.tomet" },
+						"3": { "name": "punctuation.definition.tag.end.tomet" }
+					}
+				},
+				{
+					"comment": "@name element sigil, name optional (e.g. @(parent)[])",
+					"match": "(@)([A-Za-z_][A-Za-z0-9_.-]*)?",
+					"captures": {
+						"1": { "name": "punctuation.definition.tag.tomet" },
+						"2": { "name": "entity.name.tag.tomet" }
+					}
+				}
+			]
+		},
+
+		"groups": {
+			"patterns": [
+				{ "include": "#round-group" },
+				{ "include": "#square-group" },
+				{ "include": "#curly-group" }
+			]
+		},
+
+		"round-group": {
+			"begin": "\\(",
+			"beginCaptures": {
+				"0": { "name": "punctuation.section.group.round.begin.tomet" }
+			},
+			"end": "\\)",
+			"endCaptures": {
+				"0": { "name": "punctuation.section.group.round.end.tomet" }
+			},
+			"name": "meta.group.round.tomet",
+			"patterns": [{ "include": "#value" }]
+		},
+
+		"square-group": {
+			"begin": "\\[",
+			"beginCaptures": {
+				"0": { "name": "punctuation.section.group.square.begin.tomet" }
+			},
+			"end": "\\]",
+			"endCaptures": {
+				"0": { "name": "punctuation.section.group.square.end.tomet" }
+			},
+			"name": "meta.group.square.tomet variable.parameter.content.tomet",
+			"patterns": [{ "include": "#value" }, { "include": "#inline" }]
+		},
+
+		"curly-group": {
+			"begin": "\\{",
+			"beginCaptures": {
+				"0": { "name": "punctuation.section.group.curly.begin.tomet" }
+			},
+			"end": "\\}",
+			"endCaptures": {
+				"0": { "name": "punctuation.section.group.curly.end.tomet" }
+			},
+			"name": "meta.group.curly.tomet",
+			"patterns": [{ "include": "#value" }, { "include": "#element" }]
+		},
+
+		"value": {
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#map-entry" },
+				{ "include": "#string" },
+				{ "include": "#interpolation" },
+				{ "include": "#groups" }
+			]
+		},
+
+		"map-entry": {
+			"begin": "([A-Za-z_][A-Za-z0-9_.-]*)(:)",
+			"beginCaptures": {
+				"1": { "name": "variable.other.property.tomet" },
+				"2": { "name": "punctuation.separator.key-value.tomet" }
+			},
+			"end": "(?=[,)\\]}]|$)",
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#string" },
+				{ "include": "#interpolation" },
+				{ "include": "#groups" },
+				{
+					"match": "[^,()\\[\\]{}\\n\"\\s][^,()\\[\\]{}\\n\"]*",
+					"name": "string.unquoted.plain.tomet"
+				}
+			]
+		},
+
+		"string": {
+			"name": "string.quoted.double.tomet",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{ "match": "\\\\.", "name": "constant.character.escape.tomet" }
+			]
+		}
+	}
+}

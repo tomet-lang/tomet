@@ -1,24 +1,24 @@
 [package]
-name = "typedmark"
+name = "tomet"
 version.workspace = true
 edition.workspace = true
 
 [[bin]]
-name = "typedmark"
+name = "tomet"
 path = "src/main.rs"
 
 [dependencies]
-serde_typedmark = { workspace = true }
-typedmark-ast = { workspace = true }
-typedmark-config = { workspace = true }
-typedmark-formatter = { workspace = true }
-typedmark-indexer = { workspace = true }
-typedmark-links = { workspace = true }
-typedmark-markdown = { workspace = true }
-typedmark-parser = { workspace = true }
-typedmark-html = { workspace = true }
-typedmark-semantics = { workspace = true }
-typedmark-tui = { workspace = true }
+serde_tomet = { workspace = true }
+tomet-ast = { workspace = true }
+tomet-config = { workspace = true }
+tomet-formatter = { workspace = true }
+tomet-indexer = { workspace = true }
+tomet-links = { workspace = true }
+tomet-markdown = { workspace = true }
+tomet-parser = { workspace = true }
+tomet-html = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-tui = { workspace = true }
 
 #[ Crates.io ]
 anyhow = { workspace = true }

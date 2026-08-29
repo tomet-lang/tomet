@@ -1,4 +1,4 @@
-//! Interactive Web Editor for TypedMark (`typedmark-web`).
+//! Interactive Web Editor for Tomet (`tomet-web`).
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Parser)]
 #[command(
-    name = "typedmark-web",
-    about = "Web-based interactive editor for TypedMark (.tm)"
+    name = "tomet-web",
+    about = "Web-based interactive editor for Tomet (.tmt)"
 )]
 struct Cli {
     #[arg(short, long, default_value_t = 8787)]
@@ -68,7 +68,7 @@ fn main() -> ExitCode {
             }
         };
 
-        println!("🚀 TypedMark Web Editor running at http://{addr}");
+        println!("🚀 Tomet Web Editor running at http://{addr}");
         println!("Open http://{addr} in your browser!");
         if let Err(e) = axum::serve(listener, app).await {
             eprintln!("Server error: {e}");
@@ -104,16 +104,16 @@ struct ApiParseError {
 
 async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
     let advanced = req.advanced.unwrap_or(false);
-    match typedmark_parser::parse_document(&req.source) {
+    match tomet_parser::parse_document(&req.source) {
         Ok(doc) => {
-            let options = typedmark_html::RenderOptions {
+            let options = tomet_html::RenderOptions {
                 number_headings: advanced,
                 auto_slug_headings: advanced,
                 lang: None,
             };
-            let html = typedmark_html::render_page_with(&doc, "TypedMark Web", &options);
+            let html = tomet_html::render_page_with(&doc, "Tomet Web", &options);
             let ast = format!("{doc:#?}");
-            let markdown = typedmark_markdown::to_markdown(&doc);
+            let markdown = tomet_markdown::to_markdown(&doc);
             Json(ApiParseResponse {
                 ok: true,
                 html,
@@ -123,7 +123,7 @@ async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
             })
         }
         Err(err) => {
-            let formatted = format_parse_error(Path::new("playground.tm"), &req.source, &err);
+            let formatted = format_parse_error(Path::new("playground.tmt"), &req.source, &err);
             Json(ApiParseResponse {
                 ok: false,
                 html: String::new(),
@@ -143,7 +143,7 @@ async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
 
 /// rustc-style single-error snippet: message, `--> file:line:col`, the
 /// offending source line, and a `^` caret under the error column.
-fn format_parse_error(path: &Path, src: &str, err: &typedmark_parser::Error) -> String {
+fn format_parse_error(path: &Path, src: &str, err: &tomet_parser::Error) -> String {
     let line_num = err.line;
     let col_num = err.column;
 
@@ -179,7 +179,7 @@ struct ApiFormatResponse {
 }
 
 async fn format_handler(Json(req): Json<ApiFormatRequest>) -> impl IntoResponse {
-    let formatted = typedmark_formatter::format_source(&req.source);
+    let formatted = tomet_formatter::format_source(&req.source);
     Json(ApiFormatResponse { formatted })
 }
 
@@ -190,7 +190,7 @@ mod tests {
     #[tokio::test]
     async fn parse_handler_parses_valid_doc() {
         let req = ApiParseRequest {
-            source: "#[ Hello TypedMark Web ]".into(),
+            source: "#[ Hello Tomet Web ]".into(),
             advanced: Some(false),
         };
         let _response = parse_handler(Json(req)).await;

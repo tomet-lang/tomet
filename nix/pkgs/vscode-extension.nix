@@ -9,11 +9,11 @@ let
   # specifically expects `$out/share/vscode/extensions/${vscodeExtUniqueId}`
   # to hold the extension's files.
   vscodeExtPublisher = "bardmoon";
-  vscodeExtName = "typedmark-vscode";
+  vscodeExtName = "tomet-vscode";
   vscodeExtUniqueId = "${vscodeExtPublisher}.${vscodeExtName}";
 in
 buildNpmPackage {
-  pname = "typedmark-vscode";
+  pname = "tomet-vscode";
   version = "0.1.0";
   src = "${root}/editors/vscode";
 

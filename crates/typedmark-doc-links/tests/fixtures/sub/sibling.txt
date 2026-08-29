@@ -1,1 +1,0 @@
-Sibling of sub/nested.tm, resolved source-relative via `./sibling.txt`.

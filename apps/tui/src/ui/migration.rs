@@ -1,5 +1,5 @@
 //! Migration tab rendering: file tree with selection checkboxes +
-//! Markdown-to-`.tm` conversion diff preview.
+//! Markdown-to-`.tmt` conversion diff preview.
 
 use ratatui::{
     Frame,
@@ -100,7 +100,7 @@ pub(super) fn render_migration_view(f: &mut Frame, app: &mut App, area: Rect) {
             .border_style(super::get_border_style(
                 app.focused_pane == FocusedPane::List,
             ))
-            .title(" Migration Tree (.md -> .tm) "),
+            .title(" Migration Tree (.md -> .tmt) "),
     );
     f.render_widget(file_list, chunks[0]);
 
@@ -145,7 +145,7 @@ pub(super) fn render_migration_view(f: &mut Frame, app: &mut App, area: Rect) {
             )));
             preview_lines.extend(generate_colored_diff(
                 &item.markdown_src,
-                &item.typedmark_src,
+                &item.tomet_src,
             ));
         }
     } else {
@@ -169,6 +169,6 @@ pub(super) fn render_migration_view(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 pub(super) fn migration_controls_info(_app: &App) -> String {
-    "[Space/Enter] Toggle File/Folder | [Left/Right] Expand/Collapse | [a] Toggle All | [e] Convert selected to .tm"
+    "[Space/Enter] Toggle File/Folder | [Left/Right] Expand/Collapse | [a] Toggle All | [e] Convert selected to .tmt"
         .to_string()
 }

@@ -1,0 +1,11 @@
+[package]
+name = "tomet-validator"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-walker = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

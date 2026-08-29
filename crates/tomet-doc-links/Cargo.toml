@@ -1,0 +1,18 @@
+[package]
+name = "tomet-links"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-config = { workspace = true }
+tomet-indexer = { workspace = true }
+tomet-parser = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-walker = { workspace = true }
+
+#[ Crates.io ]
+rusqlite = { workspace = true }
+
+[dev-dependencies]
+uuid = { workspace = true }

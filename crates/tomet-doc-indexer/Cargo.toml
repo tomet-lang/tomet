@@ -1,0 +1,14 @@
+[package]
+name = "tomet-indexer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-config = { workspace = true }
+tomet-parser = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-walker = { workspace = true }
+
+#[ Crates.io ]
+ignore = { workspace = true }

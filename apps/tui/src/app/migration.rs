@@ -1,5 +1,5 @@
 //! Migration tab: selecting Markdown files/directories to convert to
-//! `.tm` and running the conversion.
+//! `.tmt` and running the conversion.
 
 use std::path::Path;
 
@@ -147,7 +147,7 @@ impl App {
                     .to_string();
         } else {
             self.pending_confirm = Some(PendingConfirm {
-                message: format!("Convert {count} Markdown file(s) to .tm?"),
+                message: format!("Convert {count} Markdown file(s) to .tmt?"),
             });
         }
     }
@@ -167,7 +167,7 @@ impl App {
         ) {
             Ok(count) => {
                 self.status_message =
-                    format!("Successfully converted {count} Markdown file(s) to .tm!");
+                    format!("Successfully converted {count} Markdown file(s) to .tmt!");
                 for (source, target) in &touched {
                     self.index.refresh_path(source);
                     self.index.refresh_path(target);

@@ -1,23 +1,23 @@
 # CommonMark interop: requirements notes
 
-Goal: bidirectional conversion between TypedMark (`.tm`) and CommonMark
-Markdown -- `typedmark` should eventually be able to import a CommonMark
-file into `.tm`, and export a `.tm` document back out as CommonMark.
+Goal: bidirectional conversion between Tomet (`.tmt`) and CommonMark
+Markdown -- `tomet` should eventually be able to import a CommonMark
+file into `.tmt`, and export a `.tmt` document back out as CommonMark.
 Scope for the first pass is CommonMark only (no GFM tables, footnotes,
 strikethrough, task lists, autolinks-as-extension, etc.).
 
 This started as a requirements/gap-analysis note before any of it was
 implemented. Two things have since landed (see the "Decided and
-implemented" sections below, in chronological order): TypedMark's own
-native shorthand syntax (`typedmark-ast`/`typedmark-parser`/
-`typedmark-renderer`), and the `typedmark-markdown` importer/exporter
-crate itself. Still not started: a `Document -> .tm source text`
-serializer (belongs in `typedmark-formatter`, currently an unstarted
+implemented" sections below, in chronological order): Tomet's own
+native shorthand syntax (`tomet-ast`/`tomet-parser`/
+`tomet-renderer`), and the `tomet-markdown` importer/exporter
+crate itself. Still not started: a `Document -> .tmt source text`
+serializer (belongs in `tomet-formatter`, currently an unstarted
 stub) and the `from-md` CLI subcommand that depends on it.
 
-## Current `typedmark_ast` shape
+## Current `tomet_ast` shape
 
-From `crates/typedmark-ast/src/lib.rs`:
+From `crates/tomet-ast/src/lib.rs`:
 
 - `Block`: `Heading { level, content, attrs }`, `Paragraph(Vec<Inline>)`,
   `List(Vec<ListItem>)` (flat, unordered only, no nesting), `Element`.
@@ -29,9 +29,9 @@ From `crates/typedmark-ast/src/lib.rs`:
 - `Element` (`<T>(input)[area]{value}`, `@name...`): generic enough to
   represent arbitrary typed content, but nothing today gives specific
   elements (e.g. `<strong>`, `<em>`, `<codeblock>`) built-in rendering behavior
-  beyond what `typedmark-renderer`'s HTML mapping already does ad hoc.
+  beyond what `tomet-renderer`'s HTML mapping already does ad hoc.
 
-## CommonMark constructs with no direct `typedmark_ast` equivalent
+## CommonMark constructs with no direct `tomet_ast` equivalent
 
 Block-level:
 - Ordered lists (with start number) -- `List` has no ordering/index field.
@@ -50,20 +50,20 @@ Inline-level:
 - Emphasis (`*x*`) / strong (`**x**`) -- no `Inline` variant.
 - Inline code spans -- see above; currently indistinguishable from plain
   text at the AST level (backticks survive as literal characters, which
-  happens to make TypedMark's own serialization of them trivial, but a
+  happens to make Tomet's own serialization of them trivial, but a
   Markdown importer has no clean node to convert *into*).
   This also means "does this text tm-render span reflect an original code
   span" can't be recovered from the AST later.
 - Hard line breaks (trailing double-space / backslash-newline) -- prose
-  in `typedmark_ast` is already normalized to single spaces across
+  in `tomet_ast` is already normalized to single spaces across
   newlines (`document.rs::normalize_text`), so hard breaks have nowhere to
   live without a new marker.
 - Images -- distinct from links in CommonMark (`![alt](src)` vs
-  `[text](url)`); TypedMark's closest existing construct is `@(file:..)`
-  (per `docs/tmt/typedmark.tm`), which is semantically "reference to a
+  `[text](url)`); Tomet's closest existing construct is `@(file:..)`
+  (per `docs/tmt/tomet.tmt`), which is semantically "reference to a
   local file", not necessarily "inline image". Needs an explicit mapping
   decision (reuse `@(file:..)` vs mint a dedicated `@(image:..)` key).
-- Autolinks (`<https://...>`) -- collide syntactically with TypedMark's
+- Autolinks (`<https://...>`) -- collide syntactically with Tomet's
   `<T>` element sigil (`<` followed by an identifier). Needs a parser-side
   disambiguation rule before this can be supported at all, independent of
   AST shape.
@@ -75,10 +75,10 @@ Inline-level:
 - Flat bullet lists -> `List` (ordering/nesting lost either way -- see
   above).
 - Links `[text](url "title")` -> `@(url:..)[text]`, matching the existing
-  spec'd inference key (`docs/tmt/typedmark.tm`: "url / file / ref / meta").
+  spec'd inference key (`docs/tmt/tomet.tmt`: "url / file / ref / meta").
 - Reference-style links/footnote-like backreferences map naturally onto
   `@links { (id)[content] }` + `@(ref:id)`, which is already spec'd as the
-  TypedMark idiom for "define once, reference elsewhere".
+  Tomet idiom for "define once, reference elsewhere".
 
 ## Open design fork (not yet decided)
 
@@ -86,39 +86,39 @@ Two directions were sketched when this was scoped out; picking one is a
 prerequisite for implementation:
 
 1. **Lossy-but-lossless-via-escape-hatch, no AST changes.** Map every
-   CommonMark construct without a native `typedmark_ast` equivalent onto
+   CommonMark construct without a native `tomet_ast` equivalent onto
    the existing generic `<T>[area]{value}` element grammar (e.g.
    `<strong>[text]`, `<em>[text]`, `<codeblock>[...]` for code blocks,
    `<blockquote>[...]`). Ordered-list numbering could survive as a `data-*`
    -style attribute on each item even though the list itself renders flat.
-   Confined entirely to a new crate (e.g. `typedmark-markdown`); no changes
-   to `typedmark-ast`, `typedmark-parser`, or `typedmark-formatter`.
+   Confined entirely to a new crate (e.g. `tomet-markdown`); no changes
+   to `tomet-ast`, `tomet-parser`, or `tomet-formatter`.
    Faster to ship, but round-tripped Markdown won't look like idiomatic
-   `.tm` and nesting/ordering fidelity is capped by what a flat `List` can
+   `.tmt` and nesting/ordering fidelity is capped by what a flat `List` can
    hold.
 
-2. **Extend `typedmark_ast` natively** (`Block::CodeBlock`,
+2. **Extend `tomet_ast` natively** (`Block::CodeBlock`,
    `Block::BlockQuote`, ordered/nested list support, `Inline::Emphasis` /
    `Inline::Strong` / `Inline::Code`). Higher fidelity, reads as "real"
-   TypedMark, but touches every crate that matches on `Block`/`Inline`
+   Tomet, but touches every crate that matches on `Block`/`Inline`
    (parser, renderer, formatter, and anything downstream), and raises a
-   further question of whether the `.tm` *grammar itself* should gain
+   further question of whether the `.tmt` *grammar itself* should gain
    syntax for these constructs (nested lists, code fences, block quotes)
    or whether they'd only be producible by the Markdown importer.
 
 Recommendation when this gets picked back up: start with (1) to get a
-working bidirectional path quickly and learn from real `.tm` <-> `.md`
+working bidirectional path quickly and learn from real `.tmt` <-> `.md`
 samples, then decide whether specific constructs (most likely: code blocks
 and nested/ordered lists, since those are extremely common in real
 Markdown) are common enough to justify promoting to native AST support.
 
 ## Decided and implemented: native shorthand syntax (2026-08-09)
 
-Human readability is a founding TypedMark goal, not just an interop
+Human readability is a founding Tomet goal, not just an interop
 concern -- forcing everyday formatting through `<strong>[..]`-style
 generic elements would fight that goal even before any Markdown importer
-exists. So before the importer/exporter crate itself, TypedMark's own
-`.tm` grammar gains dedicated shorthand for the constructs that are both
+exists. So before the importer/exporter crate itself, Tomet's own
+`.tmt` grammar gains dedicated shorthand for the constructs that are both
 extremely common in real prose *and* safe to add without colliding with
 existing sigils (`<`, `@`, `#`, `-`, `` ` ``, `(`, `[`, `{`). Each form
 below still desugars to the same `Element`/`Block` shapes the generic
@@ -162,7 +162,7 @@ Rejected/adjusted from the earlier proposal:
   batch -- deferred rather than rushed.
 - `Block::List(Vec<ListItem>)` became
   `Block::List { ordered: bool, items: Vec<ListItem> }` -- the one actual
-  `typedmark_ast` change in this pass (small, additive, all 3 existing
+  `tomet_ast` change in this pass (small, additive, all 3 existing
   match sites updated).
 - Emphasis/strong/mark delimiter matching is a simplified heuristic, not
   full CommonMark flanking-delimiter-run rules: an opening delimiter must
@@ -177,23 +177,23 @@ Rejected/adjusted from the earlier proposal:
   backtick handling), which happens to also be valid CommonMark on export
   with no extra work.
 
-## Decided and implemented: `typedmark-markdown` crate (2026-08-09)
+## Decided and implemented: `tomet-markdown` crate (2026-08-09)
 
 The importer/exporter crate sketched below has been built:
-`typedmark_markdown::from_markdown(&str) -> Document` and
-`typedmark_markdown::to_markdown(&Document) -> String`, plus a `typedmark
+`tomet_markdown::from_markdown(&str) -> Document` and
+`tomet_markdown::to_markdown(&Document) -> String`, plus a `tomet
 to-md <file>` CLI subcommand (mirrors `html`'s `PathBuf` + optional
 `--out` pattern). All existing tests plus 26 new ones in the crate are
 green (`cargo test --workspace`); `cargo clippy` is clean on the new/
 touched crates.
 
-- Markdown -> TypedMark: `pulldown-cmark` 0.13, `Options::empty()`
+- Markdown -> Tomet: `pulldown-cmark` 0.13, `Options::empty()`
   (CommonMark only, no GFM extensions -- matches this doc's stated
   scope), event stream folded directly into `Document` with an explicit
-  per-open-tag frame stack (`crates/typedmark-markdown/src/import.rs`),
+  per-open-tag frame stack (`crates/tomet-markdown/src/import.rs`),
   no intermediate tree.
-- TypedMark -> Markdown: hand-written serializer
-  (`crates/typedmark-markdown/src/export.rs`), as sketched.
+- Tomet -> Markdown: hand-written serializer
+  (`crates/tomet-markdown/src/export.rs`), as sketched.
 - Clean mappings, as predicted: ATX headings, paragraphs, flat lists
   (ordered via `1.`/`2.`/.., unordered via `-`), links, and -- thanks to
   the native shorthand added earlier the same day -- emphasis/strong
@@ -202,20 +202,20 @@ touched crates.
 - Autolinks (`<https://...>`) needed no disambiguation rule after all:
   `pulldown-cmark` already resolves `<scheme:...>` to a `Link` event
   (`LinkType::Autolink`) during parsing, so the collision this doc
-  originally worried about (`<` as both TypedMark's element sigil and
-  Markdown's autolink delimiter) never reaches `typedmark-markdown` --
-  it's resolved one layer down, before any TypedMark-shaped text exists.
+  originally worried about (`<` as both Tomet's element sigil and
+  Markdown's autolink delimiter) never reaches `tomet-markdown` --
+  it's resolved one layer down, before any Tomet-shaped text exists.
 - Two new generic-element mappings (direction-1 escape hatch, no
-  `typedmark_ast` changes): `<codeblock>(lang:xxx)[code]` for fenced/
+  `tomet_ast` changes): `<codeblock>(lang:xxx)[code]` for fenced/
   indented code blocks, `<blockquote>[...]` for block quotes. Both also
-  needed new render cases in `typedmark-renderer` (`codeblock` -> `<pre><code
+  needed new render cases in `tomet-renderer` (`codeblock` -> `<pre><code
   class="language-xxx">`, `blockquote` -> `<blockquote>`), since neither
   kind existed before this pass. `codeblock`'s code lives in `[area]`, not
   `{value}` (`{value}` is reserved for `id`/`cssclass` metadata, same
   convention as a heading's `{ id:x, cssclass:y }`) -- and unlike every
   other element's `[area]`, it's parsed as raw verbatim text, not run
   through the inline grammar, so real source code isn't misread as
-  TypedMark markup.
+  Tomet markup.
 - Images -> `<embed>(file:..)[alt]` or `<embed>(url:..)[alt]` as decided
   earlier; the key is picked by a `dest.contains("://")` heuristic since
   Markdown's `![alt](dest)` doesn't distinguish local paths from URLs
@@ -237,8 +237,8 @@ touched crates.
     HTML `<mark>...</mark>` (valid CommonMark, round-trips through
     `pulldown-cmark` back to the same `mark` element since raw HTML
     survives parsing as `InlineHtml` -- but that's dropped on import per
-    the point above, so a `.tm` -> `.md` -> `.tm` round trip loses it;
-    only `.tm` -> `.md` -> HTML rendering is lossless here).
+    the point above, so a `.tmt` -> `.md` -> `.tmt` round trip loses it;
+    only `.tmt` -> `.md` -> HTML rendering is lossless here).
   - Any other hand-authored `<T>`/`@name` element with no dedicated
     mapping (`@links{}`, arbitrary generic elements) exports as raw
     `<div data-tm-kind="...">`/`<span data-tm-kind="...">` HTML, same
@@ -246,26 +246,26 @@ touched crates.
 - Heading `id`/`cssclass` attrs have no CommonMark form and are dropped
   on export (ATX headings can't carry them without an extension).
 - Test strategy, as sketched: direct fixture tests per construct in both
-  directions, plus round-trip tests in `crates/typedmark-markdown/src/
+  directions, plus round-trip tests in `crates/tomet-markdown/src/
   lib.rs` that go Markdown -> `Document` -> Markdown -> `Document` and
-  assert the *rendered HTML* (via `typedmark-renderer`) is equal, so the
-  intermediate `.tm` shape is free to be lossy as long as the second
+  assert the *rendered HTML* (via `tomet-renderer`) is equal, so the
+  intermediate `.tmt` shape is free to be lossy as long as the second
   parse produces something that renders identically to the first.
 
-### Still open: `from-md` (Markdown -> `.tm` source text)
+### Still open: `from-md` (Markdown -> `.tmt` source text)
 
-`typedmark-markdown` only goes as far as the in-memory `Document`; there
-is still no `Document -> .tm source text` serializer, so there's no
-`typedmark from-md` CLI subcommand yet (only `to-md`, the direction that
-was actually buildable this pass, since `.tm` parsing into `Document`
-already existed). That serializer is `typedmark-formatter`'s job by
+`tomet-markdown` only goes as far as the in-memory `Document`; there
+is still no `Document -> .tmt source text` serializer, so there's no
+`tomet from-md` CLI subcommand yet (only `to-md`, the direction that
+was actually buildable this pass, since `.tmt` parsing into `Document`
+already existed). That serializer is `tomet-formatter`'s job by
 name, and that crate is still the unmodified `cargo new` stub in
-`crates/typedmark-formatter/src/lib.rs` -- writing a one-off serializer
-inside `typedmark-markdown` instead would duplicate that crate's stated
-purpose, and risks emitting `.tm` text that doesn't actually re-parse
+`crates/tomet-formatter/src/lib.rs` -- writing a one-off serializer
+inside `tomet-markdown` instead would duplicate that crate's stated
+purpose, and risks emitting `.tmt` text that doesn't actually re-parse
 (e.g. how a fenced code block's raw multi-line string round-trips
-through `typedmark-parser`'s value grammar was never checked against the
+through `tomet-parser`'s value grammar was never checked against the
 real parser). Whoever picks this back up should implement
-`typedmark-formatter` first (general `Document -> .tm` pretty-printer,
+`tomet-formatter` first (general `Document -> .tmt` pretty-printer,
 useful on its own beyond Markdown interop), then wire `from-md` on top
 of it.

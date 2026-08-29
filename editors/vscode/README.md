@@ -1,12 +1,12 @@
-# TypedMark for VS Code
+# Tomet for VS Code
 
-Syntax highlighting and language server support for TypedMark (`.tm`) files.
+Syntax highlighting and language server support for Tomet (`.tmt`) files.
 
 ## Requirements
 
-This extension does not bundle `typedmark-lsp` -- it expects the binary
+This extension does not bundle `tomet-lsp` -- it expects the binary
 on `$PATH` (e.g. installed via the repo's nix package), or at the path
-set in the `typedmark.serverPath` setting.
+set in the `tomet.serverPath` setting.
 
 ## Development
 

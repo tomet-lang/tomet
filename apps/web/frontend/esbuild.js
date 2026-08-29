@@ -6,11 +6,11 @@ const options = {
 	entryPoints: ["src/main.ts"],
 	bundle: true,
 	// Self-contained (never writes outside this directory): the nix
-	// packaging build (`nix/pkgs/typedmark-web.nix`) sandboxes this npm
+	// packaging build (`nix/pkgs/tomet-web.nix`) sandboxes this npm
 	// project's own build to just `apps/web/frontend`, so a `../static`
 	// outfile silently has nowhere real to land there. `npm run
 	// build:local` copies `dist/app.js` into `../static/app.js` for local
-	// `cargo run -p typedmark-web` use; the nix derivation does the
+	// `cargo run -p tomet-web` use; the nix derivation does the
 	// equivalent copy itself, from its own build output.
 	outfile: "dist/app.js",
 	format: "iife",

@@ -1,7 +1,7 @@
 {
-	"name": "typedmark-vscode",
-	"displayName": "TypedMark",
-	"description": "Syntax highlighting and language server support for TypedMark (.tm) files.",
+	"name": "tomet-vscode",
+	"displayName": "Tomet",
+	"description": "Syntax highlighting and language server support for Tomet (.tmt) files.",
 	"version": "0.1.0",
 	"publisher": "bardmoon",
 	"repository": {
@@ -18,13 +18,13 @@
 	"contributes": {
 		"languages": [
 			{
-				"id": "typedmark",
+				"id": "tomet",
 				"aliases": [
-					"TypedMark",
-					"typedmark"
+					"Tomet",
+					"tomet"
 				],
 				"extensions": [
-					".tm",
+					".tmt",
 					".tmt"
 				],
 				"configuration": "./language-configuration.json"
@@ -32,32 +32,32 @@
 		],
 		"grammars": [
 			{
-				"language": "typedmark",
-				"scopeName": "source.typedmark",
-				"path": "./syntaxes/typedmark.tmLanguage.json"
+				"language": "tomet",
+				"scopeName": "source.tomet",
+				"path": "./syntaxes/tomet.tmLanguage.json"
 			}
 		],
 		"configurationDefaults": {
-			"[typedmark]": {
+			"[tomet]": {
 				"editor.wordWrap": "on",
 				"editor.formatOnSave": true
 			}
 		},
 		"commands": [
 			{
-				"command": "typedmark.restartServer",
-				"title": "TypedMark: Restart Language Server"
+				"command": "tomet.restartServer",
+				"title": "Tomet: Restart Language Server"
 			}
 		],
 		"configuration": {
-			"title": "TypedMark",
+			"title": "Tomet",
 			"properties": {
-				"typedmark.serverPath": {
+				"tomet.serverPath": {
 					"type": "string",
-					"default": "typedmark-lsp",
-					"description": "Path to the typedmark-lsp binary. Defaults to looking it up on $PATH (e.g. installed via the nix package)."
+					"default": "tomet-lsp",
+					"description": "Path to the tomet-lsp binary. Defaults to looking it up on $PATH (e.g. installed via the nix package)."
 				},
-				"typedmark.trace.server": {
+				"tomet.trace.server": {
 					"type": "string",
 					"enum": [
 						"off",
@@ -65,7 +65,7 @@
 						"verbose"
 					],
 					"default": "off",
-					"description": "Traces the communication between VS Code and the TypedMark language server."
+					"description": "Traces the communication between VS Code and the Tomet language server."
 				}
 			}
 		}

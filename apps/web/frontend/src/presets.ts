@@ -1,7 +1,7 @@
 export const presets: Record<string, string> = {
-	cheatsheet: `#[ TypedMark Quick Overview ]
+	cheatsheet: `#[ Tomet Quick Overview ]
 
-<caution>[ TypedMark (TM) combines standard Markdown prose with typed structure. ]
+<caution>[ Tomet (TM) combines standard Markdown prose with typed structure. ]
 
 ##[ Features ]
 
@@ -12,7 +12,7 @@ export const presets: Record<string, string> = {
 
 <codeblock>(lang:rust)[
 fn main() {
-    println!("Hello TypedMark!");
+    println!("Hello Tomet!");
 }
 ]
 
@@ -37,7 +37,7 @@ fn main() {
 
 @meta(format:json){
   {
-    "project": "TypedMark",
+    "project": "Tomet",
     "active": true,
     "tags": ["markup", "rust", "parser"]
   }
@@ -51,7 +51,7 @@ fn main() {
 
 @meta(format:toml){
   [package]
-  name = "typedmark"
+  name = "tomet"
   version = "1.0.0"
 }
 `,

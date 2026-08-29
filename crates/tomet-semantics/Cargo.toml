@@ -1,0 +1,10 @@
+[package]
+name = "tomet-semantics"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

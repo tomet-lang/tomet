@@ -1,5 +1,5 @@
-//! A small CLI for manually checking that `typedmark-parser`/
-//! `serde_typedmark` actually work against a real `.tm` file, instead of
+//! A small CLI for manually checking that `tomet-parser`/
+//! `serde_tomet` actually work against a real `.tmt` file, instead of
 //! only trusting `cargo test`'s unit tests.
 
 use std::fs;
@@ -13,10 +13,10 @@ use axum::response::Html;
 use axum::routing::get;
 
 use clap::{Parser, Subcommand};
-use typedmark_semantics::{ExportType, document_config};
+use tomet_semantics::{ExportType, document_config};
 
 #[derive(Parser)]
-#[command(name = "typedmark", about = "Parse and inspect TypedMark (.tm) files")]
+#[command(name = "tomet", about = "Parse and inspect Tomet (.tmt) files")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -46,10 +46,10 @@ enum Command {
         data: bool,
     },
     /// Parse a data file into a generic value, then render it back out
-    /// through `serde_typedmark` and reparse that -- confirms the
+    /// through `serde_tomet` and reparse that -- confirms the
     /// save/load round trip is lossless.
     Roundtrip { file: PathBuf },
-    /// Convert a `.tm` file to a standalone HTML page.
+    /// Convert a `.tmt` file to a standalone HTML page.
     Html {
         file: PathBuf,
         /// Write to this path instead of stdout.
@@ -63,7 +63,7 @@ enum Command {
         #[arg(long)]
         lang: Option<String>,
     },
-    /// Convert a `.tm` file to CommonMark. Lossy for constructs with no
+    /// Convert a `.tmt` file to CommonMark. Lossy for constructs with no
     /// Markdown equivalent (`@links{}`, generic `<T>` elements) -- see
     /// `docs/commonmark-support.md`.
     ToMd {
@@ -72,7 +72,7 @@ enum Command {
         #[arg(short, long)]
         out: Option<PathBuf>,
     },
-    /// Serve a `.tm` file as HTML over HTTP on 127.0.0.1, re-rendering it
+    /// Serve a `.tmt` file as HTML over HTTP on 127.0.0.1, re-rendering it
     /// fresh on every request (just reload the page after editing).
     Serve {
         file: PathBuf,
@@ -87,9 +87,9 @@ enum Command {
         lang: Option<String>,
     },
 
-    /// Normalize a `.tm`/`.tmt` file's whitespace (line endings, trailing
+    /// Normalize a `.tmt`/`.tmt` file's whitespace (line endings, trailing
     /// whitespace, blank lines, final newline). A directory formats every
-    /// `.tm`/`.tmt` file found under it (same file discovery as `export`/
+    /// `.tmt`/`.tmt` file found under it (same file discovery as `export`/
     /// `check-links`: honors `.gitignore` and the project config's
     /// `ignore_files`). Prints to stdout by default; see
     /// `--in-place`/`--check`.
@@ -110,12 +110,12 @@ enum Command {
         /// Target directory or file path (defaults to current directory ".").
         #[arg(default_value = ".")]
         path: PathBuf,
-        /// Optional path to custom formatting configuration file (.tm).
+        /// Optional path to custom formatting configuration file (.tmt).
         #[arg(short, long)]
         config: Option<PathBuf>,
     },
 
-    /// Export a `.tm` document or directory of documents based on `@config` settings or CLI overrides.
+    /// Export a `.tmt` document or directory of documents based on `@config` settings or CLI overrides.
     Export {
         /// Target file or directory path (defaults to current directory ".").
         #[arg(default_value = ".")]
@@ -131,10 +131,10 @@ enum Command {
         advanced: bool,
     },
 
-    /// Check every `@file`/`<embed>` link in a `.tm`/`.tmt` document or
+    /// Check every `@file`/`<embed>` link in a `.tmt`/`.tmt` document or
     /// directory for broken (non-existent) local-file targets. Uses an
     /// SQLite cache (keyed by source-file mtime) under
-    /// `<config_root>/.typedmark/` so re-checking a large vault doesn't
+    /// `<config_root>/.tomet/` so re-checking a large vault doesn't
     /// re-parse unchanged files. Exits non-zero if any broken link is
     /// found.
     CheckLinks {
@@ -188,7 +188,7 @@ fn main() -> ExitCode {
             in_place,
             check,
         } => format_cmd(path, *in_place, *check),
-        Command::Tui { path, config } => typedmark_tui::run_tui(path.clone(), config.clone()),
+        Command::Tui { path, config } => tomet_tui::run_tui(path.clone(), config.clone()),
         Command::Export {
             path,
             r#type,
@@ -207,7 +207,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn format_parse_error(path: &Path, src: &str, err: &typedmark_parser::Error) -> String {
+fn format_parse_error(path: &Path, src: &str, err: &tomet_parser::Error) -> String {
     let line_num = err.line;
     let col_num = err.column;
 
@@ -239,9 +239,9 @@ fn read(file: &PathBuf) -> anyhow::Result<String> {
 fn check(file: &PathBuf, data: bool, quiet: bool, json: bool) -> anyhow::Result<()> {
     let src = read(file)?;
     let res = if data {
-        typedmark_parser::parse_value(&src).map(|_| ())
+        tomet_parser::parse_value(&src).map(|_| ())
     } else {
-        typedmark_parser::parse_document(&src).map(|_| ())
+        tomet_parser::parse_document(&src).map(|_| ())
     };
 
     match res {
@@ -274,11 +274,11 @@ fn check(file: &PathBuf, data: bool, quiet: bool, json: bool) -> anyhow::Result<
 fn ast(file: &PathBuf, data: bool) -> anyhow::Result<()> {
     let src = read(file)?;
     if data {
-        let value = typedmark_parser::parse_value(&src)
+        let value = tomet_parser::parse_value(&src)
             .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
         println!("{value:#?}");
     } else {
-        let doc = typedmark_parser::parse_document(&src)
+        let doc = tomet_parser::parse_document(&src)
             .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
         println!("{doc:#?}");
     }
@@ -287,27 +287,27 @@ fn ast(file: &PathBuf, data: bool) -> anyhow::Result<()> {
 
 fn render_file(file: &Path, advanced: bool, lang: Option<String>) -> anyhow::Result<String> {
     let src = fs::read_to_string(file)?;
-    let doc = typedmark_parser::parse_document(&src)
+    let doc = tomet_parser::parse_document(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
     let filename_title = file
         .file_stem()
         .and_then(|s| s.to_str())
-        .unwrap_or("TypedMark");
+        .unwrap_or("Tomet");
     let title = meta_title(&doc).unwrap_or_else(|| filename_title.to_string());
-    let options = typedmark_html::RenderOptions {
+    let options = tomet_html::RenderOptions {
         number_headings: advanced,
         auto_slug_headings: advanced,
         lang,
     };
-    Ok(typedmark_html::render_page_with(&doc, &title, &options))
+    Ok(tomet_html::render_page_with(&doc, &title, &options))
 }
 
 /// Pulls a `title` string out of the document's `@meta` block, if it has
 /// one -- `<title>`/`html`/`serve` prefer this over the filename when
 /// present (see `.agents/tasks/ssg-readiness.md` step 1).
-fn meta_title(doc: &typedmark_ast::Document) -> Option<String> {
-    let meta = typedmark_semantics::document_meta(doc)?;
-    let typedmark_ast::Value::Map(map) = meta else {
+fn meta_title(doc: &tomet_ast::Document) -> Option<String> {
+    let meta = tomet_semantics::document_meta(doc)?;
+    let tomet_ast::Value::Map(map) = meta else {
         return None;
     };
     map.iter().find_map(|(k, v)| {
@@ -315,7 +315,7 @@ fn meta_title(doc: &typedmark_ast::Document) -> Option<String> {
             return None;
         }
         match v {
-            typedmark_ast::Value::String(s) => Some(s.clone()),
+            tomet_ast::Value::String(s) => Some(s.clone()),
             _ => None,
         }
     })
@@ -337,9 +337,9 @@ fn html(
 
 fn to_md(file: &PathBuf, out: &Option<PathBuf>) -> anyhow::Result<()> {
     let src = read(file)?;
-    let doc = typedmark_parser::parse_document(&src)
+    let doc = tomet_parser::parse_document(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
-    let markdown = typedmark_markdown::to_markdown(&doc);
+    let markdown = tomet_markdown::to_markdown(&doc);
     match out {
         Some(path) => fs::write(path, markdown)?,
         None => println!("{markdown}"),
@@ -397,7 +397,7 @@ fn escape_html(s: &str) -> String {
 fn format_cmd(path: &Path, write: bool, check: bool) -> anyhow::Result<()> {
     if path.is_file() {
         let src = fs::read_to_string(path)?;
-        let formatted = typedmark_formatter::format_source(&src);
+        let formatted = tomet_formatter::format_source(&src);
         return if check {
             if formatted == src {
                 Ok(())
@@ -418,9 +418,9 @@ fn format_cmd(path: &Path, write: bool, check: bool) -> anyhow::Result<()> {
         return Err(anyhow::anyhow!("path '{}' does not exist", path.display()));
     }
 
-    let files = typedmark_indexer::collect_tm_files(path);
+    let files = tomet_indexer::collect_tm_files(path);
     if files.is_empty() {
-        println!("No .tm or .tmt files found in {}", path.display());
+        println!("No .tmt or .tmt files found in {}", path.display());
         return Ok(());
     }
 
@@ -428,7 +428,7 @@ fn format_cmd(path: &Path, write: bool, check: bool) -> anyhow::Result<()> {
         let mut unformatted = Vec::new();
         for file in &files {
             let src = fs::read_to_string(file)?;
-            if typedmark_formatter::format_source(&src) != src {
+            if tomet_formatter::format_source(&src) != src {
                 unformatted.push(file);
             }
         }
@@ -450,7 +450,7 @@ fn format_cmd(path: &Path, write: bool, check: bool) -> anyhow::Result<()> {
         for file in &files {
             match fs::read_to_string(file) {
                 Ok(src) => {
-                    let formatted = typedmark_formatter::format_source(&src);
+                    let formatted = tomet_formatter::format_source(&src);
                     if formatted == src {
                         continue;
                     }
@@ -475,7 +475,7 @@ fn format_cmd(path: &Path, write: bool, check: bool) -> anyhow::Result<()> {
     // same as single-file mode (no header) staying exactly as before.
     for file in &files {
         let src = fs::read_to_string(file)?;
-        let formatted = typedmark_formatter::format_source(&src);
+        let formatted = tomet_formatter::format_source(&src);
         println!("==> {} <==", file.display());
         print!("{formatted}");
     }
@@ -489,13 +489,13 @@ fn roundtrip(file: &PathBuf) -> anyhow::Result<()> {
     // Deserialize type" here, since it can hold any shape without a
     // fixed struct -- a real caller (e.g. cettila) would use its own
     // `#[derive(Serialize, Deserialize)]` struct instead.
-    let value: serde_json::Value = serde_typedmark::from_str(&src)?;
+    let value: serde_json::Value = serde_tomet::from_str(&src)?;
     println!("parsed:\n{}", serde_json::to_string_pretty(&value)?);
 
-    let rendered = serde_typedmark::to_string(&value)?;
+    let rendered = serde_tomet::to_string(&value)?;
     println!("\nrendered back:\n{rendered}");
 
-    let reparsed: serde_json::Value = serde_typedmark::from_str(&rendered)?;
+    let reparsed: serde_json::Value = serde_tomet::from_str(&rendered)?;
     if reparsed == value {
         println!("\nround-trip OK");
         Ok(())
@@ -532,7 +532,7 @@ fn export_single_file(
     advanced: bool,
 ) -> anyhow::Result<()> {
     let src = fs::read_to_string(file_path)?;
-    let doc = typedmark_parser::parse_document(&src)
+    let doc = tomet_parser::parse_document(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file_path, &src, &e)))?;
 
     let config = document_config(&doc);
@@ -585,19 +585,19 @@ fn export_single_file(
         };
 
         let rendered = match target {
-            ExportType::CommonMark => typedmark_markdown::to_markdown(&doc),
+            ExportType::CommonMark => tomet_markdown::to_markdown(&doc),
             ExportType::Html => {
                 let filename_title = file_path
                     .file_stem()
                     .and_then(|s| s.to_str())
-                    .unwrap_or("TypedMark");
+                    .unwrap_or("Tomet");
                 let title = meta_title(&doc).unwrap_or_else(|| filename_title.to_string());
-                let options = typedmark_html::RenderOptions {
+                let options = tomet_html::RenderOptions {
                     number_headings: advanced,
                     auto_slug_headings: advanced,
                     lang: None,
                 };
-                typedmark_html::render_page_with(&doc, &title, &options)
+                tomet_html::render_page_with(&doc, &title, &options)
             }
             ExportType::Custom(fmt) => {
                 return Err(anyhow::anyhow!("unsupported export type: {fmt}"));
@@ -624,9 +624,9 @@ fn export_directory(
     override_out: Option<&Path>,
     advanced: bool,
 ) -> anyhow::Result<()> {
-    let files = typedmark_indexer::collect_tm_files(dir_path);
+    let files = tomet_indexer::collect_tm_files(dir_path);
     if files.is_empty() {
-        println!("No .tm or .tmt files found in {}", dir_path.display());
+        println!("No .tmt or .tmt files found in {}", dir_path.display());
         return Ok(());
     }
 
@@ -665,17 +665,17 @@ fn check_links_cmd(target_path: &Path, json: bool) -> anyhow::Result<bool> {
         ));
     }
 
-    let (config, _, config_root) = typedmark_config::find_config_file(target_path).unwrap_or((
-        typedmark_config::PrinterConfig::default(),
+    let (config, _, config_root) = tomet_config::find_config_file(target_path).unwrap_or((
+        tomet_config::PrinterConfig::default(),
         target_path.to_path_buf(),
         target_path.to_path_buf(),
     ));
 
-    let cache_path = typedmark_links::default_cache_path(&config_root);
-    let mut cache = typedmark_links::LinkCache::open(&cache_path)?;
+    let cache_path = tomet_links::default_cache_path(&config_root);
+    let mut cache = tomet_links::LinkCache::open(&cache_path)?;
 
     let report =
-        typedmark_links::check_vault(target_path, &config, &config_root, &config_root, &mut cache);
+        tomet_links::check_vault(target_path, &config, &config_root, &config_root, &mut cache);
 
     if json {
         println!("{}", check_links_report_to_json(&report));
@@ -703,7 +703,7 @@ fn check_links_cmd(target_path: &Path, json: bool) -> anyhow::Result<bool> {
     Ok(!report.broken.is_empty())
 }
 
-fn check_links_report_to_json(report: &typedmark_links::CheckReport) -> String {
+fn check_links_report_to_json(report: &tomet_links::CheckReport) -> String {
     let broken: Vec<serde_json::Value> = report
         .broken
         .iter()
@@ -741,25 +741,25 @@ mod tests {
 
     #[test]
     fn formats_parse_error_with_source_context() {
-        let err = typedmark_parser::Error {
+        let err = tomet_parser::Error {
             message: "expected ']'".into(),
             line: 1,
             column: 11,
             offset: 10,
         };
         let src = "<caution>[ unterminated";
-        let formatted = format_parse_error(Path::new("test.tm"), src, &err);
+        let formatted = format_parse_error(Path::new("test.tmt"), src, &err);
         assert!(formatted.contains("error: expected ']'"));
-        assert!(formatted.contains("--> test.tm:1:11"));
+        assert!(formatted.contains("--> test.tmt:1:11"));
         assert!(formatted.contains("<caution>[ unterminated"));
         assert!(formatted.contains("^ expected ']'"));
     }
 
     #[test]
     fn export_single_file_with_config_writes_output_file() {
-        let temp_dir = std::env::temp_dir().join("typedmark_test_export");
+        let temp_dir = std::env::temp_dir().join("tomet_test_export");
         let _ = fs::create_dir_all(&temp_dir);
-        let src_file = temp_dir.join("test_doc.tm");
+        let src_file = temp_dir.join("test_doc.tmt");
         let out_file = temp_dir.join("test_out.md");
 
         let src_content = format!(

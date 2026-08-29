@@ -1,5 +1,5 @@
-//! `.tm` syntax highlighting for the Explorer tab's file preview /
-//! inline editor pane, with a plain-text fallback for non-`.tm` files
+//! `.tmt` syntax highlighting for the Explorer tab's file preview /
+//! inline editor pane, with a plain-text fallback for non-`.tmt` files
 //! and tree-sitter failures. Takes only `Path`/`&str` -- no `App`
 //! dependency, not owned by any single tab.
 
@@ -15,27 +15,27 @@ pub(super) fn highlight_source_file(path: &Path, src: &str) -> Vec<Line<'static>
     let is_tm = ext.eq_ignore_ascii_case("tm") || ext.eq_ignore_ascii_case("tmt");
 
     if is_tm {
-        highlight_typedmark_tree_sitter(src)
+        highlight_tomet_tree_sitter(src)
     } else {
-        fallback_typedmark_highlight(src)
+        fallback_tomet_highlight(src)
     }
 }
 
-fn highlight_typedmark_tree_sitter(src: &str) -> Vec<Line<'static>> {
+fn highlight_tomet_tree_sitter(src: &str) -> Vec<Line<'static>> {
     let mut parser = tree_sitter::Parser::new();
-    let language: tree_sitter::Language = tree_sitter_typedmark::LANGUAGE.into();
+    let language: tree_sitter::Language = tree_sitter_tomet::LANGUAGE.into();
 
     if parser.set_language(&language).is_err() {
-        return fallback_typedmark_highlight(src);
+        return fallback_tomet_highlight(src);
     }
     let tree = match parser.parse(src, None) {
         Some(t) => t,
-        None => return fallback_typedmark_highlight(src),
+        None => return fallback_tomet_highlight(src),
     };
 
-    let query = match tree_sitter::Query::new(&language, tree_sitter_typedmark::HIGHLIGHTS_QUERY) {
+    let query = match tree_sitter::Query::new(&language, tree_sitter_tomet::HIGHLIGHTS_QUERY) {
         Ok(q) => q,
-        Err(_) => return fallback_typedmark_highlight(src),
+        Err(_) => return fallback_tomet_highlight(src),
     };
 
     let src_bytes = src.as_bytes();
@@ -120,7 +120,7 @@ fn highlight_typedmark_tree_sitter(src: &str) -> Vec<Line<'static>> {
     lines
 }
 
-fn fallback_typedmark_highlight(src: &str) -> Vec<Line<'static>> {
+fn fallback_tomet_highlight(src: &str) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     let mut in_code_block = false;
 
@@ -167,7 +167,7 @@ fn fallback_typedmark_highlight(src: &str) -> Vec<Line<'static>> {
         }
 
         if trimmed.starts_with('@') || trimmed.starts_with('<') {
-            lines.push(highlight_typedmark_line(line_str));
+            lines.push(highlight_tomet_line(line_str));
             continue;
         }
 
@@ -233,7 +233,7 @@ fn fallback_typedmark_highlight(src: &str) -> Vec<Line<'static>> {
     lines
 }
 
-fn highlight_typedmark_line(line: &str) -> Line<'static> {
+fn highlight_tomet_line(line: &str) -> Line<'static> {
     let mut spans = Vec::new();
     let chars: Vec<char> = line.chars().collect();
     let len = chars.len();

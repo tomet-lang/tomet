@@ -1,8 +1,8 @@
 //! Structural Grep tab: AST-aware search & replace (rename tag, rename
-//! key, replace value) across `.tm` files.
+//! key, replace value) across `.tmt` files.
 
 use super::{App, PendingConfirm};
-use typedmark_edit::structural::{StructuralAction, StructuralEngine, StructuralQuery};
+use tomet_edit::structural::{StructuralAction, StructuralEngine, StructuralQuery};
 
 impl App {
     pub fn adjust_structural_scrolloff(&mut self, height: usize) {

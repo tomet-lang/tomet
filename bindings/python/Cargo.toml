@@ -1,5 +1,5 @@
 [package]
-name = "typedmark-python"
+name = "tomet-python"
 version.workspace = true
 edition.workspace = true
 

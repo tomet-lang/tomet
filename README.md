@@ -1,6 +1,6 @@
-# TypedMark
+# Tomet
 
-TypedMark (`.tm` / `.tmt`) is a human-readable, strongly-typed markup language and Rust toolchain designed as a modern alternative to Markdown and JSON metadata formats.
+Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and Rust toolchain designed as a modern alternative to Markdown and JSON metadata formats.
 
 ## Features
 
@@ -8,31 +8,31 @@ TypedMark (`.tm` / `.tmt`) is a human-readable, strongly-typed markup language a
 - **Embedded Formats**: Seamlessly embed JSON, YAML, or TOML inside `{value}` blocks via `format: json|yaml|toml`.
 - **Inferred References**: Compact `@` syntax for URLs (`@(url:...)`), files (`@(file:...)`), and reference links.
 - **Bidirectional CommonMark Support**: Import from and export to CommonMark.
-- **Serde Integration**: `serde_typedmark` for data-only `.tm` documents and `{value}` structures.
-- **Toolchain & Integrations**: CLI tool (`typedmark`), Language Server Protocol (`typedmark-lsp`), tree-sitter parser, and VS Code / Zed editor integrations.
+- **Serde Integration**: `serde_tomet` for data-only `.tmt` documents and `{value}` structures.
+- **Toolchain & Integrations**: CLI tool (`tomet`), Language Server Protocol (`tomet-lsp`), tree-sitter parser, and VS Code / Zed editor integrations.
 
 ## Repository Layout
 
 ```
-typedmark/
+tomet/
 ├── apps/
-│   ├── typedmark/            # Main CLI tool (check, ast, html, serve, playground, to-md, format)
-│   ├── typedmark-lsp/        # Language Server Protocol implementation
+│   ├── tomet/            # Main CLI tool (check, ast, html, serve, playground, to-md, format)
+│   ├── tomet-lsp/        # Language Server Protocol implementation
 │   ├── bindings/             # Language bindings (Java, JS, Python)
 │   └── integrations/         # Editor extensions (VS Code, Zed, Helix, Neovim)
 ├── crates/
-│   ├── typedmark-ast/        # Shared AST & Value data models
-│   ├── typedmark-lexar/      # Cursor lexer over &str
-│   ├── typedmark-parser/     # Recursive-descent parser (source of truth for grammar)
-│   ├── typedmark-semantics/  # I/O-free classification of what an Element means
-│   ├── typedmark-resolver/    # File-referencing preprocessor (@settings(file:...))
-│   ├── typedmark-validator/  # Schema & lint validation (in progress)
+│   ├── tomet-ast/        # Shared AST & Value data models
+│   ├── tomet-lexar/      # Cursor lexer over &str
+│   ├── tomet-parser/     # Recursive-descent parser (source of truth for grammar)
+│   ├── tomet-semantics/  # I/O-free classification of what an Element means
+│   ├── tomet-resolver/    # File-referencing preprocessor (@settings(file:...))
+│   ├── tomet-validator/  # Schema & lint validation (in progress)
 │   ├── converters/
-│   │   ├── html/             # typedmark-html: Document -> HTML
-│   │   └── markdown/         # typedmark-markdown: CommonMark <-> Document
-│   ├── typedmark-formatter/  # Code formatting & whitespace normalization
-│   ├── serde_typedmark/      # Serde deserializer/serializer for TypedMark Value model
-│   └── tree-sitter-typedmark/# Tree-sitter grammar for editor syntax highlighting
+│   │   ├── html/             # tomet-html: Document -> HTML
+│   │   └── markdown/         # tomet-markdown: CommonMark <-> Document
+│   ├── tomet-formatter/  # Code formatting & whitespace normalization
+│   ├── serde_tomet/      # Serde deserializer/serializer for Tomet Value model
+│   └── tree-sitter-tomet/# Tree-sitter grammar for editor syntax highlighting
 └── docs/                     # Architecture notes, spec, and cheat sheet
 ```
 
@@ -50,7 +50,7 @@ cargo test --workspace
 
 ### Run tree-sitter tests
 ```bash
-cargo test -p tree-sitter-typedmark
+cargo test -p tree-sitter-tomet
 ```
 
 ## Architecture

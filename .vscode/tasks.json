@@ -12,19 +12,19 @@
 		},
 		{
 			"type": "shell",
-			"command": "cargo build -p typedmark-lsp",
+			"command": "cargo build -p tomet-lsp",
 			"group": "build",
 			"problemMatcher": [
 				"$rustc"
 			],
-			"label": "cargo build (typedmark-lsp)",
-			"detail": "Build typedmark-lsp binary in target/debug"
+			"label": "cargo build (tomet-lsp)",
+			"detail": "Build tomet-lsp binary in target/debug"
 		},
 		{
 			"label": "build extension and lsp",
 			"dependsOn": [
 				"npm: compile (editors/vscode)",
-				"cargo build (typedmark-lsp)"
+				"cargo build (tomet-lsp)"
 			],
 			"group": {
 				"kind": "build",

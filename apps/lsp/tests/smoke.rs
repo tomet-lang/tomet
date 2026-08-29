@@ -1,4 +1,4 @@
-//! Protocol-level smoke test: drives the actual `typedmark-lsp` binary
+//! Protocol-level smoke test: drives the actual `tomet-lsp` binary
 //! over stdio with real LSP framing, since the harness this was built in
 //! can't launch an editor to test against (see `AGENTS.md`). Exercises
 //! the full initialize -> didOpen -> didChange -> didClose -> shutdown
@@ -22,12 +22,12 @@ struct Server {
 
 impl Server {
     fn start() -> Self {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_typedmark-lsp"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_tomet-lsp"))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .expect("failed to spawn typedmark-lsp");
+            .expect("failed to spawn tomet-lsp");
         let stdin = child.stdin.take().unwrap();
         let stdout = BufReader::new(child.stdout.take().unwrap());
         Server {
@@ -110,8 +110,8 @@ fn diagnostics_lifecycle_over_stdio() {
         "textDocument/didOpen",
         json!({
             "textDocument": {
-                "uri": "file:///tmp/bad.tm",
-                "languageId": "typedmark",
+                "uri": "file:///tmp/bad.tmt",
+                "languageId": "tomet",
                 "version": 1,
                 "text": "<caution>[ unterminated\n",
             }
@@ -124,12 +124,12 @@ fn diagnostics_lifecycle_over_stdio() {
         1,
         "expected one diagnostic for a broken document: {diags:?}"
     );
-    assert_eq!(diags[0]["source"], "typedmark");
+    assert_eq!(diags[0]["source"], "tomet");
 
     server.send_notification(
         "textDocument/didChange",
         json!({
-            "textDocument": {"uri": "file:///tmp/bad.tm", "version": 2},
+            "textDocument": {"uri": "file:///tmp/bad.tmt", "version": 2},
             "contentChanges": [{"text": "#[ Hello ]\n"}],
         }),
     );
@@ -141,7 +141,7 @@ fn diagnostics_lifecycle_over_stdio() {
 
     server.send_notification(
         "textDocument/didClose",
-        json!({"textDocument": {"uri": "file:///tmp/bad.tm"}}),
+        json!({"textDocument": {"uri": "file:///tmp/bad.tmt"}}),
     );
     let diags = server.read_message();
     assert!(
@@ -171,8 +171,8 @@ fn formatting_request_returns_a_whole_document_edit() {
         "textDocument/didOpen",
         json!({
             "textDocument": {
-                "uri": "file:///tmp/messy.tm",
-                "languageId": "typedmark",
+                "uri": "file:///tmp/messy.tmt",
+                "languageId": "tomet",
                 "version": 1,
                 "text": "#[ Hello ]  \n\n\n\n- one\n",
             }
@@ -183,7 +183,7 @@ fn formatting_request_returns_a_whole_document_edit() {
     let resp = server.send_request(
         "textDocument/formatting",
         json!({
-            "textDocument": {"uri": "file:///tmp/messy.tm"},
+            "textDocument": {"uri": "file:///tmp/messy.tmt"},
             "options": {"tabSize": 2, "insertSpaces": true},
         }),
     );
@@ -218,8 +218,8 @@ fn hover_symbols_definition_completion_over_stdio() {
         "textDocument/didOpen",
         json!({
             "textDocument": {
-                "uri": "file:///tmp/doc.tm",
-                "languageId": "typedmark",
+                "uri": "file:///tmp/doc.tmt",
+                "languageId": "tomet",
                 "version": 1,
                 "text": "#[ Header ]{id: h1}\n\n<callout>(type: info)[ Message ]\n\n@(id: h1)\n",
             }
@@ -231,7 +231,7 @@ fn hover_symbols_definition_completion_over_stdio() {
     let hover_resp = server.send_request(
         "textDocument/hover",
         json!({
-            "textDocument": {"uri": "file:///tmp/doc.tm"},
+            "textDocument": {"uri": "file:///tmp/doc.tmt"},
             "position": {"line": 2, "character": 2},
         }),
     );
@@ -246,7 +246,7 @@ fn hover_symbols_definition_completion_over_stdio() {
     let symbols_resp = server.send_request(
         "textDocument/documentSymbol",
         json!({
-            "textDocument": {"uri": "file:///tmp/doc.tm"},
+            "textDocument": {"uri": "file:///tmp/doc.tmt"},
         }),
     );
     let symbols = symbols_resp["result"].as_array().unwrap();
@@ -256,7 +256,7 @@ fn hover_symbols_definition_completion_over_stdio() {
     let def_resp = server.send_request(
         "textDocument/definition",
         json!({
-            "textDocument": {"uri": "file:///tmp/doc.tm"},
+            "textDocument": {"uri": "file:///tmp/doc.tmt"},
             "position": {"line": 4, "character": 4},
         }),
     );
@@ -266,7 +266,7 @@ fn hover_symbols_definition_completion_over_stdio() {
     let comp_resp = server.send_request(
         "textDocument/completion",
         json!({
-            "textDocument": {"uri": "file:///tmp/doc.tm"},
+            "textDocument": {"uri": "file:///tmp/doc.tmt"},
             "position": {"line": 0, "character": 0},
         }),
     );

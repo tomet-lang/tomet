@@ -1,8 +1,8 @@
-# Typedmark
+# Tomet
 
 私のための言語!
 
-## What is typedmark?
+## What is tomet?
 
 1. 人間工学的見やすさ。
 2. パーサーにも優しい。
@@ -10,7 +10,7 @@
 4. key:valueを重視
 5. 私は、研究目的。
 
-## なぜtypedmarkを使用するのか？
+## なぜtometを使用するのか？
 
 1. 非曖昧な構文
 2. リンクと変数に特化。

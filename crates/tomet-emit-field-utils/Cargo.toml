@@ -1,0 +1,11 @@
+[package]
+name = "tomet-field-utils"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-config = { workspace = true }
+
+#[ Crates.io ]
+nanoid = { workspace = true }
+uuid = { workspace = true }
