@@ -47,6 +47,12 @@ pub struct DocumentConfig {
     pub style: Option<String>,
     /// Table column width alignment setting (`table.adjust_width`).
     pub table_adjust_width: bool,
+    /// Table column width adjustment mode string ("true", "false", "auto").
+    pub table_adjust_width_mode: Option<String>,
+    /// Table max column width threshold for alignment when auto mode is enabled.
+    pub table_max_col_width: Option<usize>,
+    /// Table default alignment ("left", "center", "right").
+    pub table_align: Option<String>,
     /// Raw key-value entries collected from `@config` element args and value groups.
     pub entries: Vec<(String, Value)>,
 }
@@ -100,7 +106,7 @@ fn extract_config_from_element(el: &Element, config: &mut DocumentConfig) {
 fn is_truthy(v: &Value) -> bool {
     match v {
         Value::Bool(b) => *b,
-        Value::String(s) => matches!(s.trim().to_lowercase().as_str(), "true" | "1" | "yes"),
+        Value::String(s) => matches!(s.trim().to_lowercase().as_str(), "true" | "1" | "yes" | "auto"),
         Value::Int(i) => *i != 0,
         _ => false,
     }
@@ -113,8 +119,19 @@ fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
         "format" => {
             if let Some(s) = v.as_str() {
                 config.format = Some(s.to_string());
-            } else if let Some(adjust_width) = v.get("table").and_then(|t| t.get("adjust_width")) {
-                config.table_adjust_width = is_truthy(adjust_width);
+            } else if let Some(table) = v.get("table") {
+                if let Some(adjust_width) = table.get("adjust_width") {
+                    config.table_adjust_width = is_truthy(adjust_width);
+                    if let Some(s) = adjust_width.as_str() {
+                        config.table_adjust_width_mode = Some(s.to_string());
+                    }
+                }
+                if let Some(n) = table.get("max_col_width").and_then(|m| m.as_i64()) {
+                    config.table_max_col_width = Some(n as usize);
+                }
+                if let Some(s) = table.get("align").and_then(|a| a.as_str()) {
+                    config.table_align = Some(s.to_string());
+                }
             }
         }
         "style" => {
@@ -125,10 +142,32 @@ fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
         "table" => {
             if let Some(adjust_width) = v.get("adjust_width") {
                 config.table_adjust_width = is_truthy(adjust_width);
+                if let Some(s) = adjust_width.as_str() {
+                    config.table_adjust_width_mode = Some(s.to_string());
+                }
+            }
+            if let Some(n) = v.get("max_col_width").and_then(|m| m.as_i64()) {
+                config.table_max_col_width = Some(n as usize);
+            }
+            if let Some(s) = v.get("align").and_then(|a| a.as_str()) {
+                config.table_align = Some(s.to_string());
             }
         }
         "table.adjust_width" | "table_adjust_width" => {
             config.table_adjust_width = is_truthy(v);
+            if let Some(s) = v.as_str() {
+                config.table_adjust_width_mode = Some(s.to_string());
+            }
+        }
+        "table.max_col_width" | "table_max_col_width" => {
+            if let Some(n) = v.as_i64() {
+                config.table_max_col_width = Some(n as usize);
+            }
+        }
+        "table.align" | "table_align" => {
+            if let Some(s) = v.as_str() {
+                config.table_align = Some(s.to_string());
+            }
         }
         "export" => {
             if let Value::Map(export_map) = v {

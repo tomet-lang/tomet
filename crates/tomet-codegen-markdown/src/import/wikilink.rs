@@ -194,7 +194,8 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
         };
 
         let inner = &remaining[start_idx + 2..actual_end_idx];
-        let wikilink_el = if let Some((target, display)) = inner.split_once('|') {
+        let unescaped_inner = inner.replace(r"\|", "|");
+        let wikilink_el = if let Some((target, display)) = unescaped_inner.split_once('|') {
             let target = target.trim();
             let display = display.trim();
             let mut el = Element::new(sigil);
@@ -208,7 +209,7 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
             ))]);
             el
         } else {
-            let target = inner.trim();
+            let target = unescaped_inner.trim();
             let mut el = Element::new(sigil);
             el.args = Some(Value::Map(vec![(
                 "target".to_string(),
@@ -235,6 +236,7 @@ fn enclose_sigils_in_backticks(text: &str) -> String {
         && !text.contains('^')
         && !text.contains('/')
         && !text.contains('*')
+        && !text.contains('_')
     {
         return text.to_string();
     }
@@ -288,6 +290,15 @@ fn enclose_sigils_in_backticks(text: &str) -> String {
                     out.push_str("`*/`");
                 } else {
                     out.push('*');
+                }
+            }
+            '_' => {
+                let prev = out.chars().next_back();
+                let next = chars.peek().copied();
+                if prev.map_or(true, |c| !c.is_alphanumeric()) && next.map_or(false, |c| c.is_alphanumeric()) {
+                    out.push_str("`_`");
+                } else {
+                    out.push('_');
                 }
             }
             c => out.push(c),

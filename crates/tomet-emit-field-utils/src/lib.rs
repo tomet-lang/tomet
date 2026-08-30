@@ -50,17 +50,34 @@ pub fn is_valid_id_format(existing: &str, cfg: &FieldConfig) -> bool {
 pub fn is_iso8601(s: &str) -> bool {
     let bytes = s.as_bytes();
     if bytes.len() >= 10 && bytes[4] == b'-' && bytes[7] == b'-' {
-        if bytes.len() == 10 {
-            return s[0..4].chars().all(|c| c.is_ascii_digit())
-                && s[5..7].chars().all(|c| c.is_ascii_digit())
-                && s[8..10].chars().all(|c| c.is_ascii_digit());
+        let is_date = s[0..4].chars().all(|c| c.is_ascii_digit())
+            && s[5..7].chars().all(|c| c.is_ascii_digit())
+            && s[8..10].chars().all(|c| c.is_ascii_digit());
+        if !is_date {
+            return false;
         }
-        if (bytes[10] == b'T' || bytes[10] == b' ') && bytes.len() >= 19 {
-            return s[0..4].chars().all(|c| c.is_ascii_digit())
-                && s[5..7].chars().all(|c| c.is_ascii_digit())
-                && s[8..10].chars().all(|c| c.is_ascii_digit())
-                && bytes[13] == b':'
-                && bytes[16] == b':';
+        if bytes.len() == 10 {
+            return true;
+        }
+        if bytes[10] == b'T' || bytes[10] == b' ' {
+            if bytes.len() >= 16 && bytes[13] == b':' {
+                let is_hh_mm = s[11..13].chars().all(|c| c.is_ascii_digit())
+                    && s[14..16].chars().all(|c| c.is_ascii_digit());
+                if !is_hh_mm {
+                    return false;
+                }
+                if bytes.len() == 16 {
+                    return true;
+                }
+                if bytes.len() >= 19 && bytes[16] == b':' {
+                    let is_ss = s[17..19].chars().all(|c| c.is_ascii_digit());
+                    return is_ss;
+                }
+                // Also true for YYYY-MM-DDTHH:MM+09:00 or similar
+                if bytes.len() > 16 && (bytes[16] == b'+' || bytes[16] == b'-' || bytes[16] == b'Z') {
+                    return true;
+                }
+            }
         }
     }
     false
@@ -69,15 +86,31 @@ pub fn is_iso8601(s: &str) -> bool {
 pub fn format_rfc3339(s: &str, offset: Option<&str>) -> String {
     let trimmed = s.trim();
     if is_iso8601(trimmed) {
-        if !trimmed.ends_with('Z')
-            && !trimmed.contains('+')
-            && trimmed.len() >= 19
-            && !trimmed[10..].contains('-')
-        {
-            let off = offset.unwrap_or("Z");
-            format!("{trimmed}{off}")
+        let off = offset.unwrap_or("Z");
+        let has_offset = trimmed.ends_with('Z')
+            || trimmed.contains('+')
+            || (trimmed.len() > 10 && trimmed[10..].contains('-'));
+
+        let base = if trimmed.len() > 10 && trimmed.as_bytes()[10] == b' ' {
+            let mut s = trimmed.to_string();
+            s.replace_range(10..11, "T");
+            s
         } else {
             trimmed.to_string()
+        };
+
+        if has_offset {
+            return base;
+        }
+
+        if base.len() == 10 {
+            format!("{base}T00:00:00{off}")
+        } else if base.len() == 16 {
+            format!("{base}:00{off}")
+        } else if base.len() == 19 {
+            format!("{base}{off}")
+        } else {
+            format!("{base}{off}")
         }
     } else {
         trimmed.to_string()
@@ -128,7 +161,11 @@ mod tests {
     #[test]
     fn is_iso8601_recognizes_date_and_datetime() {
         assert!(is_iso8601("2026-06-17"));
+        assert!(is_iso8601("2026-06-17T05:52"));
+        assert!(is_iso8601("2026-06-17 05:52"));
         assert!(is_iso8601("2026-06-17T05:52:44"));
+        assert!(is_iso8601("2026-06-17 05:52:44"));
+        assert!(is_iso8601("2026-06-17T05:52:44+09:00"));
         assert!(!is_iso8601("not-a-date"));
         assert!(!is_iso8601("2026/06/17"));
     }
@@ -139,6 +176,18 @@ mod tests {
             format_rfc3339("2026-06-17T05:52:44", None),
             "2026-06-17T05:52:44Z"
         );
+        assert_eq!(
+            format_rfc3339("2026-04-12T18:39", None),
+            "2026-04-12T18:39:00Z"
+        );
+        assert_eq!(
+            format_rfc3339("2026-04-12 18:39", None),
+            "2026-04-12T18:39:00Z"
+        );
+        assert_eq!(
+            format_rfc3339("2026-04-12", None),
+            "2026-04-12T00:00:00Z"
+        );
     }
 
     #[test]
@@ -146,6 +195,18 @@ mod tests {
         assert_eq!(
             format_rfc3339("2026-06-17T05:52:44", Some("+09:00")),
             "2026-06-17T05:52:44+09:00"
+        );
+        assert_eq!(
+            format_rfc3339("2026-04-12T18:39", Some("+09:00")),
+            "2026-04-12T18:39:00+09:00"
+        );
+        assert_eq!(
+            format_rfc3339("2026-04-12 18:39", Some("+09:00")),
+            "2026-04-12T18:39:00+09:00"
+        );
+        assert_eq!(
+            format_rfc3339("2026-04-12", Some("+09:00")),
+            "2026-04-12T00:00:00+09:00"
         );
     }
 

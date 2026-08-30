@@ -65,12 +65,18 @@ fn yaml_to_value(v: serde_yaml::Value) -> Value {
             let trimmed = s.trim();
             if trimmed.starts_with("[[") && trimmed.ends_with("]]") && trimmed.len() > 4 {
                 let inner = &trimmed[2..trimmed.len() - 2];
-                let target = if let Some((t, _)) = inner.split_once('|') {
+                let unescaped = inner.replace(r"\|", "|");
+                let target = if let Some((t, _)) = unescaped.split_once('|') {
                     t.trim()
                 } else {
-                    inner.trim()
+                    unescaped.trim()
                 };
-                Value::Map(vec![("ref".to_string(), Value::String(target.to_string()))])
+                if target.contains(['"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ']) {
+                    let escaped = target.replace('\\', "\\\\").replace('"', "\\\"");
+                    Value::String(format!("@link(ref:\"{escaped}\")"))
+                } else {
+                    Value::String(format!("@link(ref:{target})"))
+                }
             } else {
                 Value::String(s)
             }
@@ -162,14 +168,8 @@ mod tests {
             Some(tomet_ast::ElementValue::Data(Value::Map(vec![(
                 "topics".to_string(),
                 Value::Seq(vec![
-                    Value::Map(vec![(
-                        "ref".to_string(),
-                        Value::String("@Templater".to_string())
-                    )]),
-                    Value::Map(vec![(
-                        "ref".to_string(),
-                        Value::String("@QuickAdd".to_string())
-                    )]),
+                    Value::String("@link(ref:@Templater)".to_string()),
+                    Value::String("@link(ref:@QuickAdd)".to_string()),
                 ])
             )])))
         );

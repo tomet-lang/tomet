@@ -54,7 +54,7 @@ fn offset_to_position(text: &str, offset: usize) -> Position {
             line += 1;
             col = 0;
         } else {
-            col += 1;
+            col += c.len_utf16() as u32;
         }
     }
     Position::new(line, col)
@@ -104,9 +104,28 @@ fn error_range(err: &tomet_parser::Error, text: &str) -> Range {
     Range::new(start, end)
 }
 
-/// Formats the document using `tomet-formatter`.
-pub fn format_edits(text: &str) -> Vec<TextEdit> {
-    let formatted = tomet_formatter::format_source(text);
+/// Formats the document using `tomet-formatter` with loaded or inferred configuration.
+pub fn format_edits(text: &str, uri: Option<&Uri>) -> Vec<TextEdit> {
+    let config = if let Some(u) = uri {
+        if let Some(file_path) = uri_to_file_path(u) {
+            tomet_config::find_config_file(&file_path)
+                .map(|(cfg, _, _)| cfg)
+                .unwrap_or_else(|| {
+                    tomet_parser::parse_document(text)
+                        .map(|doc| tomet_config::PrinterConfig::from_doc(&doc))
+                        .unwrap_or_default()
+                })
+        } else {
+            tomet_parser::parse_document(text)
+                .map(|doc| tomet_config::PrinterConfig::from_doc(&doc))
+                .unwrap_or_default()
+        }
+    } else {
+        tomet_parser::parse_document(text)
+            .map(|doc| tomet_config::PrinterConfig::from_doc(&doc))
+            .unwrap_or_default()
+    };
+    let formatted = tomet_formatter::format_source_with_config(text, &config);
     if formatted == text {
         return Vec::new();
     }
@@ -114,6 +133,15 @@ pub fn format_edits(text: &str) -> Vec<TextEdit> {
         range: whole_document_range(text),
         new_text: formatted,
     }]
+}
+
+fn uri_to_file_path(u: &Uri) -> Option<std::path::PathBuf> {
+    let s = u.as_str();
+    if let Some(stripped) = s.strip_prefix("file://") {
+        Some(std::path::PathBuf::from(stripped))
+    } else {
+        None
+    }
 }
 
 fn whole_document_range(text: &str) -> Range {
@@ -129,48 +157,259 @@ pub fn hover_for(text: &str, pos: Position) -> Option<Hover> {
     let target_line = pos.line as usize + 1;
     let target_col = pos.character as usize + 1;
 
-    struct HoverFinder {
+    struct HoverFinder<'a> {
+        text: &'a str,
+        pos: Position,
         line: usize,
         col: usize,
-        best_match: Option<(Span, String)>,
+        best_match: Option<Hover>,
     }
 
-    impl Visitor<()> for HoverFinder {
+    impl<'a> Visitor<()> for HoverFinder<'a> {
         fn visit(&mut self, el: &Element) -> ControlFlow<()> {
             let span = el.span;
             if span_contains(&span, self.line, self.col) {
                 let kind = classify(el);
-                let hover_text = if kind == ElementKind::Bare {
-                    format!("**List Item** (marker: `{}`)", list_item_marker_text(el))
+                let hover = if kind == ElementKind::Table {
+                    table_hover(self.text, self.pos, el)
+                } else if kind == ElementKind::Bare {
+                    Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: format!("**List Item** (marker: `{}`)", list_item_marker_text(el)),
+                        }),
+                        range: Some(span_to_range(&span)),
+                    })
                 } else if kind == ElementKind::Heading {
-                    format!("**Heading Level {}**", heading_level(el).unwrap_or(1))
+                    Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: format!("**Heading Level {}**", heading_level(el).unwrap_or(1)),
+                        }),
+                        range: Some(span_to_range(&span)),
+                    })
                 } else {
                     let mut desc = format!("**Element**: `{}`\n", sigil_display_name(&el.sigil));
                     desc.push_str(&format!("- **Classification**: `{}`\n", kind.as_str()));
                     if let Some(norm_args) = normalized_element_args(el) {
                         desc.push_str(&format!("- **Normalized Args**: `{norm_args:?}`\n"));
                     }
-                    desc
+                    Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: desc,
+                        }),
+                        range: Some(span_to_range(&span)),
+                    })
                 };
-                self.best_match = Some((span, hover_text));
+                if let Some(h) = hover {
+                    self.best_match = Some(h);
+                }
             }
             ControlFlow::Continue(())
         }
     }
 
     let mut finder = HoverFinder {
+        text,
+        pos,
         line: target_line,
         col: target_col,
         best_match: None,
     };
     let _ = walk_document(&doc, &mut finder);
 
-    finder.best_match.map(|(span, value)| Hover {
+    finder.best_match
+}
+
+struct CellInfo {
+    col_index: usize,
+    start_char: u32,
+    end_char: u32,
+    text: String,
+}
+
+fn extract_line_cells(line: &str) -> Vec<CellInfo> {
+    let mut cells = Vec::new();
+    let mut depth = 0;
+    let mut cell_start_char = 0u32;
+    let mut char_count = 0u32;
+    let mut cell_content = String::new();
+
+    for c in line.chars() {
+        let u16_len = c.len_utf16() as u32;
+        if c == '[' {
+            if depth == 0 {
+                cell_start_char = char_count;
+                cell_content.clear();
+            } else {
+                cell_content.push(c);
+            }
+            depth += 1;
+        } else if c == ']' {
+            if depth > 0 {
+                depth -= 1;
+                if depth == 0 {
+                    let end_char = char_count + u16_len;
+                    cells.push(CellInfo {
+                        col_index: cells.len(),
+                        start_char: cell_start_char,
+                        end_char,
+                        text: cell_content.trim().to_string(),
+                    });
+                } else {
+                    cell_content.push(c);
+                }
+            }
+        } else {
+            if depth > 0 {
+                cell_content.push(c);
+            }
+        }
+        char_count += u16_len;
+    }
+
+    cells
+}
+
+fn extract_table_aligns_from_args(args: Option<&Value>) -> Vec<String> {
+    let Some(Value::Map(entries)) = args else {
+        return Vec::new();
+    };
+    for (k, v) in entries {
+        if k == "align" {
+            match v {
+                Value::Seq(seq) => {
+                    return seq
+                        .iter()
+                        .filter_map(|item| match item {
+                            Value::String(s) => Some(s.clone()),
+                            _ => None,
+                        })
+                        .collect();
+                }
+                Value::String(s) => {
+                    return vec![s.clone(); 50];
+                }
+                _ => {}
+            }
+        }
+    }
+    Vec::new()
+}
+
+fn table_hover(text: &str, pos: Position, el: &Element) -> Option<Hover> {
+    let lines: Vec<&str> = text.lines().collect();
+    let start_line = el.span.start.line.saturating_sub(1);
+    let end_line = el
+        .span
+        .end
+        .line
+        .saturating_sub(1)
+        .min(lines.len().saturating_sub(1));
+
+    let aligns = extract_table_aligns_from_args(el.args.as_ref());
+
+    let mut table_rows: Vec<(usize, Vec<CellInfo>)> = Vec::new();
+    for line_idx in start_line..=end_line {
+        if line_idx >= lines.len() {
+            break;
+        }
+        let line_str = lines[line_idx];
+        let trimmed = line_str.trim();
+        // Skip table header declaration line (e.g. `@table[...]` opening or `@table(...)`)
+        if trimmed.starts_with("@table") || trimmed.starts_with("<table") {
+            continue;
+        }
+        if trimmed == "]" || trimmed.starts_with("]{") || trimmed.starts_with("] ") {
+            continue;
+        }
+
+        let cells = extract_line_cells(line_str);
+        if !cells.is_empty() {
+            table_rows.push((line_idx, cells));
+        }
+    }
+
+    if table_rows.is_empty() {
+        return None;
+    }
+
+    let header_cells: Vec<String> = table_rows
+        .first()
+        .map(|(_, cells)| cells.iter().map(|c| c.text.clone()).collect())
+        .unwrap_or_default();
+
+    let target_line = pos.line as usize;
+    let target_char = pos.character;
+
+    for (row_idx, (line_idx, cells)) in table_rows.iter().enumerate() {
+        if *line_idx == target_line {
+            for cell in cells {
+                if target_char >= cell.start_char && target_char <= cell.end_char {
+                    let col_num = cell.col_index + 1;
+                    let row_num = row_idx + 1;
+                    let is_header = row_num == 1;
+                    let header_name = header_cells
+                        .get(cell.col_index)
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+                    let align_str = aligns.get(cell.col_index).map(|s| s.as_str());
+
+                    let mut md = String::new();
+                    if is_header {
+                        md.push_str(&format!("### 📊 Table Header (Column {col_num})\n\n"));
+                        md.push_str(&format!("- **Header**: `{}`\n", cell.text));
+                        if let Some(align) = align_str {
+                            md.push_str(&format!("- **Align**: `{align}`\n"));
+                        }
+                        md.push_str(&format!("- **Total Columns**: {}\n", header_cells.len()));
+                    } else {
+                        md.push_str(&format!(
+                            "### 📊 Table Cell (Column {col_num}, Row {row_num})\n\n"
+                        ));
+                        if !header_name.is_empty() {
+                            md.push_str(&format!("- **Header**: `{header_name}`\n"));
+                        }
+                        md.push_str(&format!("- **Value**: `{}`\n", cell.text));
+                        if let Some(align) = align_str {
+                            md.push_str(&format!("- **Align**: `{align}`\n"));
+                        }
+                    }
+
+                    let range = Range::new(
+                        Position::new(*line_idx as u32, cell.start_char),
+                        Position::new(*line_idx as u32, cell.end_char),
+                    );
+
+                    return Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: md,
+                        }),
+                        range: Some(range),
+                    });
+                }
+            }
+        }
+    }
+
+    let mut summary = format!("**Table** (`{}`)\n\n", sigil_display_name(&el.sigil));
+    summary.push_str(&format!("- **Rows**: {}\n", table_rows.len()));
+    summary.push_str(&format!("- **Columns**: {}\n", header_cells.len()));
+    if !aligns.is_empty() {
+        summary.push_str(&format!("- **Align**: `[{}]`\n", aligns.join(", ")));
+    }
+    if !header_cells.is_empty() {
+        summary.push_str(&format!("- **Headers**: `{}`\n", header_cells.join("`, `")));
+    }
+
+    Some(Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
-            value,
+            value: summary,
         }),
-        range: Some(span_to_range(&span)),
+        range: Some(span_to_range(&el.span)),
     })
 }
 
@@ -481,8 +720,18 @@ pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
 
 fn get_line_prefix<'a>(text: &'a str, pos: Position) -> &'a str {
     let line = text.lines().nth(pos.line as usize).unwrap_or("");
-    let char_limit = (pos.character as usize).min(line.len());
-    &line[..char_limit]
+    let target_utf16 = pos.character as usize;
+    let mut current_utf16 = 0;
+    let mut byte_offset = line.len();
+
+    for (b_idx, c) in line.char_indices() {
+        if current_utf16 >= target_utf16 {
+            byte_offset = b_idx;
+            break;
+        }
+        current_utf16 += c.len_utf16();
+    }
+    &line[..byte_offset]
 }
 
 #[cfg(test)]
@@ -568,5 +817,75 @@ mod tests {
         assert_eq!(diag.range.start.line, 2);
         assert_eq!(diag.range.start.character, 11);
         assert_eq!(diag.range.end.character, 16);
+    }
+
+    #[test]
+    fn format_edits_formats_tables() {
+        let text = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
+        let edits = format_edits(text, None);
+        assert_eq!(edits.len(), 1);
+        assert!(edits[0].new_text.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ]["));
+    }
+
+    #[test]
+    fn hover_on_table_header_cell() {
+        let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
+        // Position on line 1, inside "[ 電子数 2n² ]" (e.g. character 25)
+        let hover = hover_for(text, Position::new(1, 25)).expect("hover found for table header");
+        if let HoverContents::Markup(m) = hover.contents {
+            assert!(m.value.contains("Table Header (Column 3)"));
+            assert!(m.value.contains("電子数 2n²"));
+            assert!(m.value.contains("right"));
+            assert!(m.value.contains("Total Columns"));
+            assert!(m.value.contains("4"));
+        } else {
+            panic!("expected markup contents");
+        }
+    }
+
+    #[test]
+    fn hover_on_table_data_cell() {
+        let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
+        // Position on line 2, inside "[ 2 ]" (column 3, character 15)
+        let hover = hover_for(text, Position::new(2, 15)).expect("hover found for table data cell");
+        if let HoverContents::Markup(m) = hover.contents {
+            assert!(m.value.contains("Table Cell (Column 3, Row 2)"));
+            assert!(m.value.contains("電子数 2n²"));
+            assert!(m.value.contains("Value"));
+            assert!(m.value.contains("2"));
+            assert!(m.value.contains("right"));
+        } else {
+            panic!("expected markup contents");
+        }
+    }
+
+    #[test]
+    fn hover_on_table_overview() {
+        let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
+        let hover = hover_for(text, Position::new(0, 2)).expect("hover found for table overview");
+        if let HoverContents::Markup(m) = hover.contents {
+            assert!(m.value.contains("Table"));
+            assert!(m.value.contains("Rows"));
+            assert!(m.value.contains("2"));
+            assert!(m.value.contains("Columns"));
+            assert!(m.value.contains("4"));
+            assert!(m.value.contains("電子数 2n²"));
+        } else {
+            panic!("expected markup contents");
+        }
+    }
+
+    #[test]
+    fn completions_with_multibyte_characters() {
+        // "海岸@" where '海' and '岸' are 3 bytes each
+        let text = "海岸@\n";
+        // Position at character 3 (after '@')
+        let items = completions_for(text, Position::new(0, 3));
+        assert!(!items.is_empty());
+        assert!(items.iter().any(|i| i.label == "config"));
+
+        // Position at character 2 (inside '岸' in byte terms, but character 2 in LSP)
+        let items2 = completions_for(text, Position::new(0, 2));
+        assert!(!items2.is_empty());
     }
 }
