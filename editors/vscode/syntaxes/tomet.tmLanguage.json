@@ -169,35 +169,74 @@
 		},
 
 		"interpolation": {
-			"begin": "\\$\\{",
-			"beginCaptures": {
-				"0": { "name": "punctuation.definition.template-expression.begin.tomet" }
-			},
-			"end": "\\}",
-			"endCaptures": {
-				"0": { "name": "punctuation.definition.template-expression.end.tomet" }
-			},
-			"name": "meta.template.expression.tomet",
 			"patterns": [
-				{ "include": "#comments" },
-				{ "include": "#string" },
 				{
-					"match": "\\b[0-9]+(\\.[0-9]+)?\\b",
-					"name": "constant.numeric.tomet"
+					"begin": "\\$\\{",
+					"beginCaptures": {
+						"0": { "name": "punctuation.definition.template-expression.begin.tomet" }
+					},
+					"end": "\\}",
+					"endCaptures": {
+						"0": { "name": "punctuation.definition.template-expression.end.tomet" }
+					},
+					"name": "meta.template.expression.tomet",
+					"patterns": [
+						{ "include": "#comments" },
+						{ "include": "#string" },
+						{
+							"match": "\\b[0-9]+(\\.[0-9]+)?\\b",
+							"name": "constant.numeric.tomet"
+						},
+						{
+							"match": "([A-Za-z_][A-Za-z0-9_.-]*)\\s*(?=\\()",
+							"captures": {
+								"1": { "name": "entity.name.function.tomet" }
+							}
+						},
+						{
+							"match": "\\b[A-Za-z_][A-Za-z0-9_.-]*\\b",
+							"name": "variable.other.readwrite.tomet"
+						},
+						{
+							"match": "[,()]",
+							"name": "punctuation.separator.tomet"
+						}
+					]
 				},
 				{
-					"match": "([A-Za-z_][A-Za-z0-9_.-]*)\\s*(?=\\()",
-					"captures": {
-						"1": { "name": "entity.name.function.tomet" }
-					}
-				},
-				{
-					"match": "\\b[A-Za-z_][A-Za-z0-9_.-]*\\b",
-					"name": "variable.other.readwrite.tomet"
-				},
-				{
-					"match": "[,()]",
-					"name": "punctuation.separator.tomet"
+					"begin": "(\\$)([A-Za-z_][A-Za-z0-9_.-]*)\\s*(\\()",
+					"beginCaptures": {
+						"1": { "name": "punctuation.definition.template-expression.begin.tomet" },
+						"2": { "name": "entity.name.function.tomet" },
+						"3": { "name": "punctuation.separator.tomet" }
+					},
+					"end": "\\)",
+					"endCaptures": {
+						"0": { "name": "punctuation.separator.tomet" }
+					},
+					"name": "meta.template.expression.tomet",
+					"patterns": [
+						{ "include": "#comments" },
+						{ "include": "#string" },
+						{
+							"match": "\\b[0-9]+(\\.[0-9]+)?\\b",
+							"name": "constant.numeric.tomet"
+						},
+						{
+							"match": "([A-Za-z_][A-Za-z0-9_.-]*)\\s*(?=\\()",
+							"captures": {
+								"1": { "name": "entity.name.function.tomet" }
+							}
+						},
+						{
+							"match": "\\b[A-Za-z_][A-Za-z0-9_.-]*\\b",
+							"name": "variable.other.readwrite.tomet"
+						},
+						{
+							"match": ",",
+							"name": "punctuation.separator.tomet"
+						}
+					]
 				}
 			]
 		},

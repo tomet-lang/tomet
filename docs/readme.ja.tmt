@@ -1,10 +1,12 @@
-@settings(file:docs/docs.settings.tmt)
 @config(
   export: {
     type: commonmark,
     path: "README.ja.md"
   }
 )
+@meta(format:yaml){
+  id: doc-gCzNE6yl
+}
 
 #[ Tomet ]
 

@@ -30,9 +30,9 @@ pub fn resolve_reference(doc: &Document, expr: &InterpExpr) -> Result<Value, Res
                 member: member.clone(),
             })
         }
-        InterpExprKind::Literal(_) | InterpExprKind::Call { .. } => {
-            Err(ResolveError::NotAReference)
-        }
+        InterpExprKind::Literal(_)
+        | InterpExprKind::Call { .. }
+        | InterpExprKind::NamedArg { .. } => Err(ResolveError::NotAReference),
     }
 }
 

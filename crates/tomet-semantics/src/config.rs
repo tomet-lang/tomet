@@ -53,6 +53,8 @@ pub struct DocumentConfig {
     pub table_max_col_width: Option<usize>,
     /// Table default alignment ("left", "center", "right").
     pub table_align: Option<String>,
+    /// User-defined macro templates specified by `macros` map in `@config`.
+    pub macros: HashMap<String, String>,
     /// Raw key-value entries collected from `@config` element args and value groups.
     pub entries: Vec<(String, Value)>,
 }
@@ -180,9 +182,28 @@ fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
                 }
             }
         }
+        "macros" | "macro" => {
+            if let Value::Map(macro_entries) = v {
+                for (mk, mv) in macro_entries {
+                    if let Some(template) = mv.as_str() {
+                        config.macros.insert(mk.clone(), template.to_string());
+                    }
+                }
+            }
+        }
         // Fallback for flat keys
         "export_type" => process_export_type(v, config),
         "export_path" => process_export_path(v, config),
+        _ if k.starts_with("macros.") || k.starts_with("macro.") => {
+            let mname = if k.starts_with("macros.") {
+                &k["macros.".len()..]
+            } else {
+                &k["macro.".len()..]
+            };
+            if let Some(template) = v.as_str() {
+                config.macros.insert(mname.to_string(), template.to_string());
+            }
+        }
         _ if k.starts_with("export_path.") => {
             let format_sub = &k["export_path.".len()..];
             if let Some(path_str) = clean_path_value(v) {
@@ -295,5 +316,19 @@ mod tests {
         let doc = parse_document("@settings(format:json){\n  {\n    \"table\": {\n      \"adjust_width\": \"true\"\n    }\n  }\n}\n").unwrap();
         let config = document_config(&doc);
         assert!(config.table_adjust_width);
+    }
+
+    #[test]
+    fn parses_macros_config() {
+        let doc = parse_document("@config{\n  macros: {\n    gh: \"https://github.com/org/repo/issues/$1\"\n    jira: \"https://jira.org/browse/$1\"\n  }\n}\n").unwrap();
+        let config = document_config(&doc);
+        assert_eq!(
+            config.macros.get("gh").map(|s| s.as_str()),
+            Some("https://github.com/org/repo/issues/$1")
+        );
+        assert_eq!(
+            config.macros.get("jira").map(|s| s.as_str()),
+            Some("https://jira.org/browse/$1")
+        );
     }
 }

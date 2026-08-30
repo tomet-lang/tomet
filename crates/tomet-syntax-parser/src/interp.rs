@@ -5,40 +5,123 @@ use crate::value::{err, parse_quoted, skip_inline_ws};
 use tomet_ast::{Element, InterpExpr, InterpExprKind, Literal, Sigil};
 use tomet_lexar::Cursor;
 
-/// `$` immediately followed by `{`
+/// `$` immediately followed by `{` or an identifier and `(`
 pub(crate) fn is_interp_start(cur: &Cursor) -> bool {
     let mut look = *cur;
-    look.bump() == Some('$') && look.peek() == Some('{')
+    if look.bump() != Some('$') {
+        return false;
+    }
+    if look.peek() == Some('{') {
+        return true;
+    }
+    if look.peek().is_some_and(is_interp_ident_start) {
+        let _ = look.eat_while(is_interp_ident_char);
+        if look.peek() == Some('(') {
+            return true;
+        }
+    }
+    false
 }
 
-/// `${ Expr }` -- structurally just `Sigil::Dollar` with a mandatory `{value}` group
+/// `${ Expr }` or `$func(args)` -- structurally `Sigil::Dollar` with an `Interp` element value
 pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
     let start_pos = cur.pos();
     cur.eat_str("$");
-    cur.eat_str("{");
-    skip_inline_ws(cur);
-    if cur.peek() == Some('}') {
-        return Err(err(
-            cur,
-            cur.pos(),
-            "empty interpolation, expected an expression",
-        ));
+    if cur.peek() == Some('{') {
+        cur.eat_str("{");
+        skip_inline_ws(cur);
+        if cur.peek() == Some('}') {
+            return Err(err(
+                cur,
+                cur.pos(),
+                "empty interpolation, expected an expression",
+            ));
+        }
+        let expr = parse_interp_expr(cur)?;
+        skip_inline_ws(cur);
+        if !cur.eat_str("}") {
+            return Err(err(cur, cur.pos(), "unterminated '${', expected '}'"));
+        }
+        let mut el = Element::new(Sigil::Dollar);
+        el.value = Some(tomet_ast::ElementValue::Interp(expr));
+        el.span = cur.span_from(start_pos);
+        Ok(el)
+    } else {
+        let ident_start = cur.pos();
+        let name = eat_interp_ident(cur)?.to_string();
+        let callee = Box::new(InterpExpr {
+            kind: InterpExprKind::Identifier(name),
+            span: cur.span_from(ident_start),
+        });
+        let args = parse_interp_call_args(cur)?;
+        let mut expr = InterpExpr {
+            kind: InterpExprKind::Call { callee, args },
+            span: cur.span_from(start_pos),
+        };
+        loop {
+            let mut look = *cur;
+            skip_inline_ws(&mut look);
+            match look.peek() {
+                Some('.') => {
+                    look.bump();
+                    skip_inline_ws(&mut look);
+                    *cur = look;
+                    let member = eat_interp_ident(cur)?.to_string();
+                    expr = InterpExpr {
+                        kind: InterpExprKind::Member {
+                            object: Box::new(expr),
+                            member,
+                        },
+                        span: cur.span_from(start_pos),
+                    };
+                }
+                Some('(') => {
+                    *cur = look;
+                    let args = parse_interp_call_args(cur)?;
+                    expr = InterpExpr {
+                        kind: InterpExprKind::Call {
+                            callee: Box::new(expr),
+                            args,
+                        },
+                        span: cur.span_from(start_pos),
+                    };
+                }
+                _ => break,
+            }
+        }
+        let mut el = Element::new(Sigil::Dollar);
+        el.value = Some(tomet_ast::ElementValue::Interp(expr));
+        el.span = cur.span_from(start_pos);
+        Ok(el)
     }
-    let expr = parse_interp_expr(cur)?;
-    skip_inline_ws(cur);
-    if !cur.eat_str("}") {
-        return Err(err(cur, cur.pos(), "unterminated '${', expected '}'"));
-    }
-    let mut el = Element::new(Sigil::Dollar);
-    el.value = Some(tomet_ast::ElementValue::Interp(expr));
-    el.span = cur.span_from(start_pos);
-    Ok(el)
 }
 
 /// `primary (. Ident | ( Args ))*`
 pub(crate) fn parse_interp_expr(cur: &mut Cursor) -> Result<InterpExpr> {
     skip_inline_ws(cur);
     let start_pos = cur.pos();
+
+    // Check if this is `name: expr` (NamedArg)
+    let mut look = *cur;
+    if look.peek().is_some_and(is_interp_ident_start) {
+        if let Ok(name) = eat_interp_ident(&mut look) {
+            skip_inline_ws(&mut look);
+            if look.peek() == Some(':') && look.peek_at(1) != Some('/') {
+                look.bump(); // consume ':'
+                skip_inline_ws(&mut look);
+                *cur = look;
+                let val_expr = parse_interp_expr(cur)?;
+                return Ok(InterpExpr {
+                    kind: InterpExprKind::NamedArg {
+                        name: name.to_string(),
+                        value: Box::new(val_expr),
+                    },
+                    span: cur.span_from(start_pos),
+                });
+            }
+        }
+    }
+
     let mut expr = parse_interp_primary(cur, start_pos)?;
     loop {
         let mut look = *cur;

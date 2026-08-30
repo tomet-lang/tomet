@@ -1,6 +1,25 @@
-@meta{ type: config }
+@meta(format:yaml){
+  id: doc-kWBcIUUz
+  type: config
+}
 @config(format:json){
   {
+    "macros": {
+      "gh": "https://github.com/tomet-lang/tomet/issues/${1}",
+      "gh_pr": "https://github.com/tomet-lang/tomet/pull/${1}",
+      "gh_commit": "https://github.com/tomet-lang/tomet/commit/${1}",
+      "wiki": "https://ja.wikipedia.org/wiki/${1}",
+      "wiki_en": "https://en.wikipedia.org/wiki/${1}",
+      "youtube": "https://www.youtube.com/watch?v=${1}",
+      "crate": "https://crates.io/crates/${1}",
+      "docs_rs": "https://docs.rs/${1}",
+      "npm": "https://www.npmjs.com/package/${1}",
+      "jira": "https://jira.company.com/browse/${1}",
+      "rfc": "https://www.rfc-editor.org/rfc/rfc${1}.html",
+      "cve": "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-${1}",
+      "greet": "Hello, ${1} ${2}!",
+      "copyright": "(C) 2026 Tomet Projects"
+    },
     "format": {
       "meta": {
         "always_newline": true,
@@ -12,6 +31,81 @@
       "table": {
         "adjust_width": "auto",
         "max_col_width": 20
+      },
+      "link": {
+        "no_space": true
+      },
+      "blockquote": {
+        "always_newline": true
+      },
+      "callout": {
+        "style": {
+          "content": "block"
+        }
+      },
+      "list": {
+        "multiline": {
+          "style": {
+            "content": "box"
+          }
+        }
+      }
+    },
+    "meta": {
+      "aliases": {
+        "type": "list",
+        "always_newline": true
+      },
+      "created": {
+        "type": "datetime",
+        "format": "rfc3339",
+        "offset": "+09:00"
+      },
+      "modified": {
+        "type": "datetime",
+        "format": "rfc3339",
+        "offset": "+09:00"
+      },
+      "topics": {
+        "type": "list",
+        "list_type": "@link",
+        "always_newline": false
+      },
+      "url.wiki": {
+        "type": "list",
+        "always_newline": true
+      },
+      "url.source": {
+        "type": "list",
+        "always_newline": true
+      },
+      "url.main": {
+        "type": "list",
+        "always_newline": true
+      }
+    },
+    "workspace": {
+      "ignore": [
+        "00-09 System/01 Apps/obsidian"
+      ]
+    },
+    "migration": {
+      "meta": {
+        "created": {
+          "type": "datetime",
+          "format": "iso8601"
+        },
+        "updated": {
+          "type": "datetime",
+          "format": "iso8601",
+          "merge": "modified"
+        }
+      },
+      "url": {
+        "args": {
+          "display": "force"
+        },
+        "style": "link"
       }
     }
   }
