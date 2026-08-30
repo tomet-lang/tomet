@@ -1678,6 +1678,7 @@ dependencies = [
  "tomet-links",
  "tomet-markdown",
  "tomet-parser",
+ "tomet-printer",
  "tomet-semantics",
  "tomet-tui",
  "uuid",
@@ -1750,6 +1751,7 @@ dependencies = [
  "tomet-parser",
  "tomet-semantics",
  "tomet-style",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]
@@ -1816,6 +1818,7 @@ dependencies = [
  "lsp-types",
  "serde_json",
  "tomet-ast",
+ "tomet-config",
  "tomet-cst",
  "tomet-formatter",
  "tomet-parser",

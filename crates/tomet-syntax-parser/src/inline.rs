@@ -89,7 +89,7 @@ pub(crate) fn parse_inline_seq(
                 if cur.is_eof() {
                     return Err(err(cur, cur.pos(), format!("unterminated, expected '{d}'")));
                 }
-                if cur.starts_with(d) && !is_boundary(char_before(cur)) {
+                if cur.starts_with(d) && (d == "==" || !is_boundary(char_before(cur))) {
                     break;
                 }
                 if cur.peek() == Some('\n') {
@@ -265,7 +265,7 @@ fn try_one_delimited(
     }
     let mut probe = open;
     loop {
-        if probe.starts_with(delim) && !is_boundary(char_before(&probe)) {
+        if probe.starts_with(delim) && (delim == "==" || !is_boundary(char_before(&probe))) {
             break;
         }
         if probe.is_eof() {

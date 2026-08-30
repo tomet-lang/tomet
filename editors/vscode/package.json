@@ -66,6 +66,14 @@
 					],
 					"default": "off",
 					"description": "Traces the communication between VS Code and the Tomet language server."
+				},
+				"tomet.table.columnColors": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"description": "Custom colors for table column dashed underlines. If empty, VS Code theme colors (editorBracketHighlight.foreground1..3) are used in a cycle."
 				}
 			}
 		}

@@ -32,6 +32,9 @@ pub struct PrinterConfig {
     pub ignore_files: Vec<String>,
     pub callout_content_style: Option<String>,
     pub list_multiline_style_content: Option<String>,
+    pub table_adjust_width: Option<String>,
+    pub table_max_col_width: Option<usize>,
+    pub table_align: Option<String>,
 }
 
 impl PrinterConfig {
@@ -103,7 +106,7 @@ impl PrinterConfig {
                     cfg.heading_space_inside_brackets = b;
                 }
             }
-            "link" => {
+            "link" | "wikilink" => {
                 if let Some(no_space) = value.get("no_space") {
                     if let Some(b) = no_space.as_bool() {
                         cfg.link_no_space = b;
@@ -112,7 +115,7 @@ impl PrinterConfig {
                     }
                 }
             }
-            "link.no_space" => {
+            "link.no_space" | "wikilink.no_space" => {
                 if let Some(b) = value.as_bool() {
                     cfg.link_no_space = b;
                 } else if let Some(s) = value.as_str() {
@@ -158,6 +161,28 @@ impl PrinterConfig {
                     cfg.list_multiline_style_content = Some(s.to_string());
                 }
             }
+            "table" => {
+                if let Value::Map(map) = value {
+                    Self::parse_table_props(map, cfg);
+                }
+            }
+            "table.adjust_width" => {
+                if let Some(b) = value.as_bool() {
+                    cfg.table_adjust_width = Some(b.to_string());
+                } else if let Some(s) = value.as_str() {
+                    cfg.table_adjust_width = Some(s.to_string());
+                }
+            }
+            "table.max_col_width" => {
+                if let Some(n) = value.as_i64() {
+                    cfg.table_max_col_width = Some(n as usize);
+                }
+            }
+            "table.align" => {
+                if let Some(s) = value.as_str() {
+                    cfg.table_align = Some(s.to_string());
+                }
+            }
             "elements" => {
                 if let Value::Map(elems) = value {
                     for (ek, ev) in elems {
@@ -168,6 +193,21 @@ impl PrinterConfig {
                         } else if ek == "list" {
                             if let Value::Map(props) = ev {
                                 Self::parse_list_props(props, cfg);
+                            }
+                        } else if ek == "table" {
+                            if let Value::Map(props) = ev {
+                                Self::parse_table_props(props, cfg);
+                            }
+                        }
+                    }
+                }
+            }
+            "workspace" => {
+                if let Some(items) = value.get("ignore").and_then(|f| f.as_seq()) {
+                    for item in items {
+                        if let Some(s) = item.as_str() {
+                            if !cfg.ignore_files.contains(&s.to_string()) {
+                                cfg.ignore_files.push(s.to_string());
                             }
                         }
                     }
@@ -269,6 +309,27 @@ impl PrinterConfig {
             cfg.list_multiline_style_content = Some(s.to_string());
         }
     }
+
+    fn parse_table_props(props: &[(String, Value)], cfg: &mut Self) {
+        let map = Value::Map(props.to_vec());
+        if let Some(adjust_width) = map.get("adjust_width") {
+            if let Some(b) = adjust_width.as_bool() {
+                cfg.table_adjust_width = Some(b.to_string());
+            } else if let Some(s) = adjust_width.as_str() {
+                cfg.table_adjust_width = Some(s.to_string());
+            }
+        }
+        if let Some(max_col_width) = map.get("max_col_width") {
+            if let Some(n) = max_col_width.as_i64() {
+                cfg.table_max_col_width = Some(n as usize);
+            }
+        }
+        if let Some(align) = map.get("align") {
+            if let Some(s) = align.as_str() {
+                cfg.table_align = Some(s.to_string());
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -345,6 +406,8 @@ pub fn find_config_file(
         let candidates = [
             current.join("default.config.tmt"),
             current.join("tomet.config.tmt"),
+            current.join("default.config.tm"),
+            current.join("tomet.config.tm"),
         ];
         for candidate in candidates {
             if candidate.exists() {

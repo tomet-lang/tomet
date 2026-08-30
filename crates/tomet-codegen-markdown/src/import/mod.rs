@@ -69,6 +69,7 @@ enum Frame {
     },
     Table {
         rows: Vec<Vec<Vec<Inline>>>,
+        alignments: Vec<pulldown_cmark::Alignment>,
     },
     TableHead {
         cells: Vec<Vec<Inline>>,
@@ -88,6 +89,12 @@ enum Frame {
 pub struct ImportOptions {
     /// Align column widths by adding spaces inside table cells (`table.adjust_width`).
     pub adjust_table_width: bool,
+    /// Mode for table width adjustment ("true", "false", "auto").
+    pub table_adjust_width_mode: Option<String>,
+    /// Max column width threshold for alignment when auto mode is enabled.
+    pub table_max_col_width: Option<usize>,
+    /// Default table column alignment ("left", "center", "right").
+    pub table_align: Option<String>,
 }
 
 pub fn from_markdown(src: &str) -> Document {
@@ -96,12 +103,13 @@ pub fn from_markdown(src: &str) -> Document {
 
 pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Document {
     let (frontmatter, markdown_body) = frontmatter::extract_yaml_frontmatter(src);
+    let preprocessed_body = preprocess_markdown_tables(markdown_body);
 
     let mut options_flags = Options::empty();
     options_flags.insert(Options::ENABLE_TABLES);
     options_flags.insert(Options::ENABLE_TASKLISTS);
     options_flags.insert(Options::ENABLE_GFM);
-    let parser = Parser::new_ext(markdown_body, options_flags);
+    let parser = Parser::new_ext(&preprocessed_body, options_flags);
     let mut stack: Vec<Frame> = vec![Frame::Blocks(Vec::new())];
 
     if let Some(entries) = frontmatter {
@@ -113,7 +121,7 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
     for event in parser {
         match event {
             Event::Start(tag) => stack.push(start_frame(tag)),
-            Event::End(tag_end) => end_frame(&mut stack, tag_end, options.adjust_table_width),
+            Event::End(tag_end) => end_frame(&mut stack, tag_end, options),
             Event::TaskListMarker(is_checked) => {
                 // Tomet has no checkbox construct anymore -- fall back
                 // to the same "not a recognized construct, keep it as
@@ -206,7 +214,10 @@ fn start_frame(tag: Tag) -> Frame {
             dest: dest_url.into_string(),
             alt: Vec::new(),
         },
-        Tag::Table(_) => Frame::Table { rows: Vec::new() },
+        Tag::Table(alignments) => Frame::Table {
+            rows: Vec::new(),
+            alignments,
+        },
         Tag::TableHead => Frame::TableHead { cells: Vec::new() },
         Tag::TableRow => Frame::TableRow { cells: Vec::new() },
         Tag::TableCell => Frame::TableCell {
@@ -217,7 +228,7 @@ fn start_frame(tag: Tag) -> Frame {
     }
 }
 
-fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) {
+fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
     let frame = stack.pop().expect("End without matching Start");
     match (frame, tag_end) {
         (Frame::Paragraph(inlines), TagEnd::Paragraph) => push_block(
@@ -365,7 +376,39 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
                                     t.value = remainder;
                                 }
                             }
+                        } else if s.starts_with('[') {
+                            if let Some(close_idx) = s.find(']') {
+                                let is_marker = if close_idx >= 1 {
+                                    if s[close_idx..].starts_with("] ") {
+                                        Some(close_idx + 2)
+                                    } else if close_idx == s.len() - 1 {
+                                        Some(close_idx + 1)
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                };
+                                if let Some(after_idx) = is_marker {
+                                    let inner = &s[1..close_idx];
+                                    if !inner.starts_with('[') {
+                                        let marker_val = if inner.is_empty() || inner == " " {
+                                            " "
+                                        } else {
+                                            inner
+                                        };
+                                        marker = Some(Value::String(marker_val.to_string()));
+                                        let remainder = s[after_idx..].to_string();
+                                        t.value = remainder;
+                                    }
+                                }
+                            }
                         }
+                    }
+                }
+                if let Some(Inline::Text(t)) = content.first() {
+                    if t.value.is_empty() && content.len() > 1 {
+                        content.remove(0);
                     }
                 }
                 items.push(Element::list_item(
@@ -425,7 +468,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
         },
         (Frame::TableRow { cells }, TagEnd::TableRow) => {
             for frame in stack.iter_mut().rev() {
-                if let Frame::Table { rows } = frame {
+                if let Frame::Table { rows, .. } = frame {
                     rows.push(cells);
                     break;
                 }
@@ -433,14 +476,14 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
         }
         (Frame::TableHead { cells }, TagEnd::TableHead) => {
             for frame in stack.iter_mut().rev() {
-                if let Frame::Table { rows } = frame {
+                if let Frame::Table { rows, .. } = frame {
                     rows.push(cells);
                     break;
                 }
             }
         }
-        (Frame::Table { rows }, TagEnd::Table) => {
-            let el = build_table_element(rows, adjust_table_width);
+        (Frame::Table { rows, alignments }, TagEnd::Table) => {
+            let el = build_table_element(rows, alignments, options);
             push_block(stack, Block::Element(el));
         }
         // HtmlBlock and anything routed to Discard.
@@ -449,13 +492,44 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, adjust_table_width: bool) 
     }
 }
 
-fn build_table_element(rows: Vec<Vec<Vec<Inline>>>, adjust_width: bool) -> Element {
+fn char_display_width(c: char) -> usize {
+    if c.is_ascii() {
+        1
+    } else {
+        // CJK fullwidth characters, emojis, etc. count as 2 columns
+        2
+    }
+}
+
+fn inlines_display_width(inlines: &[Inline]) -> usize {
+    let mut len = 0;
+    for inline in inlines {
+        match inline {
+            Inline::Text(t) => {
+                let trimmed = t.value.trim();
+                for c in trimmed.chars() {
+                    len += char_display_width(c);
+                }
+            }
+            Inline::Element(el) => {
+                if let Some(content) = &el.content {
+                    len += inlines_display_width(content);
+                }
+            }
+        }
+    }
+    len
+}
+
+fn build_table_element(
+    rows: Vec<Vec<Vec<Inline>>>,
+    alignments: Vec<pulldown_cmark::Alignment>,
+    options: &ImportOptions,
+) -> Element {
     let mut content_inlines = Vec::new();
     if rows.is_empty() {
         let mut el = Element::new(Sigil::At(Some("table".to_string())));
-        el.args = Some(Value::Map(Vec::new()));
         el.content = Some(content_inlines);
-        el.value = Some(tomet_ast::ElementValue::Data(Value::Map(Vec::new())));
         return el;
     }
 
@@ -464,37 +538,87 @@ fn build_table_element(rows: Vec<Vec<Vec<Inline>>>, adjust_width: bool) -> Eleme
         col_count = col_count.max(row.len());
     }
 
-    let max_lens = if adjust_width {
-        let mut lens = vec![0usize; col_count];
-        for row in &rows {
-            for (c_idx, cell) in row.iter().enumerate() {
-                let len = inlines_plain_len(cell);
-                lens[c_idx] = lens[c_idx].max(len);
+    let default_align = options.table_align.as_deref().unwrap_or("left");
+
+    let mode = options
+        .table_adjust_width_mode
+        .as_deref()
+        .unwrap_or(if options.adjust_table_width { "true" } else { "false" });
+
+    let max_col_width_limit = options.table_max_col_width.unwrap_or(20);
+
+    let mut max_lens = vec![0usize; col_count];
+    for row in &rows {
+        for (c_idx, cell) in row.iter().enumerate() {
+            let len = inlines_display_width(cell);
+            max_lens[c_idx] = max_lens[c_idx].max(len);
+        }
+    }
+
+    let mut target_widths: Vec<Option<usize>> = vec![None; col_count];
+    let mut auto_align_active = true;
+
+    for (c_idx, &max_len) in max_lens.iter().enumerate() {
+        match mode {
+            "true" | "all" => {
+                target_widths[c_idx] = Some(max_len.max(1));
+            }
+            "auto" => {
+                if auto_align_active && max_len <= max_col_width_limit {
+                    target_widths[c_idx] = Some(max_len.max(1));
+                } else {
+                    auto_align_active = false;
+                    target_widths[c_idx] = None;
+                }
+            }
+            _ => {
+                target_widths[c_idx] = None;
             }
         }
-        Some(lens)
-    } else {
-        None
-    };
+    }
 
     content_inlines.push(Inline::Text(Text::new("\n", Span::dummy())));
 
     for row in &rows {
         for c_idx in 0..col_count {
             let cell_inlines = row.get(c_idx).cloned().unwrap_or_default();
-            let cell_len = inlines_plain_len(&cell_inlines);
+            let cell_len = inlines_display_width(&cell_inlines);
 
-            let (left_spaces, right_spaces) = if let Some(lens) = &max_lens {
-                let max_len = lens[c_idx].max(1);
-                let target_width = max_len + 2;
+            let col_align = alignments
+                .get(c_idx)
+                .map(|a| match a {
+                    pulldown_cmark::Alignment::Right => "right",
+                    pulldown_cmark::Alignment::Center => "center",
+                    pulldown_cmark::Alignment::Left => "left",
+                    pulldown_cmark::Alignment::None => default_align,
+                })
+                .unwrap_or(default_align);
+
+            let (left_spaces, right_spaces) = if let Some(target_w) = target_widths[c_idx] {
+                let target_width = target_w + 2;
                 let extra = if target_width > cell_len {
                     target_width - cell_len
                 } else {
                     2
                 };
-                let left = extra / 2;
-                let right = extra - left;
-                (left, right)
+                match col_align {
+                    "right" => {
+                        let left = extra.saturating_sub(1);
+                        let right = 1;
+                        (left, right)
+                    }
+                    "center" => {
+                        let left = extra / 2;
+                        let right = extra - left;
+                        (left, right)
+                    }
+                    _ => {
+                        // "left"
+                        let left = 1;
+                        let right = extra.saturating_sub(1);
+                        (left, right)
+                    }
+                }
             } else {
                 (1, 1)
             };
@@ -516,25 +640,8 @@ fn build_table_element(rows: Vec<Vec<Vec<Inline>>>, adjust_width: bool) -> Eleme
     }
 
     let mut el = Element::new(Sigil::At(Some("table".to_string())));
-    el.args = Some(Value::Map(Vec::new()));
     el.content = Some(content_inlines);
-    el.value = Some(tomet_ast::ElementValue::Data(Value::Map(Vec::new())));
     el
-}
-
-fn inlines_plain_len(inlines: &[Inline]) -> usize {
-    let mut len = 0;
-    for inline in inlines {
-        match inline {
-            Inline::Text(t) => len += t.value.trim().chars().count(),
-            Inline::Element(el) => {
-                if let Some(content) = &el.content {
-                    len += inlines_plain_len(content);
-                }
-            }
-        }
-    }
-    len
 }
 
 fn wrap_inline(tag: &str, content: Vec<Inline>) -> Inline {
@@ -546,6 +653,41 @@ fn wrap_inline(tag: &str, content: Vec<Inline>) -> Inline {
         value: None,
         span: Span::dummy(),
     })
+}
+
+fn preprocess_markdown_tables(src: &str) -> String {
+    let mut out = String::with_capacity(src.len() + 32);
+    for line in src.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('|') && trimmed.contains("[[") && trimmed.contains('|') {
+            let mut in_wikilink = false;
+            let mut chars = line.chars().peekable();
+            while let Some(ch) = chars.next() {
+                if ch == '[' && chars.peek() == Some(&'[') {
+                    out.push('[');
+                    out.push(chars.next().unwrap());
+                    in_wikilink = true;
+                } else if in_wikilink && ch == ']' && chars.peek() == Some(&']') {
+                    out.push(']');
+                    out.push(chars.next().unwrap());
+                    in_wikilink = false;
+                } else if in_wikilink && ch == '|' && !out.ends_with('\\') {
+                    out.push('\\');
+                    out.push('|');
+                } else {
+                    out.push(ch);
+                }
+            }
+            out.push('\n');
+        } else {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    if !src.ends_with('\n') && out.ends_with('\n') {
+        out.pop();
+    }
+    out
 }
 
 fn inline_target(stack: &mut [Frame]) -> Option<&mut Vec<Inline>> {
@@ -1037,6 +1179,9 @@ mod tests {
         let src = "| title | sdfasdf |\n| --- | --- |\n| title | sdfddfasdf |\n";
         let opts = ImportOptions {
             adjust_table_width: true,
+            table_adjust_width_mode: Some("true".to_string()),
+            table_max_col_width: None,
+            table_align: None,
         };
         let doc = from_markdown_with_options(src, &opts);
         let Block::Element(el) = &doc.blocks[0] else {
@@ -1048,7 +1193,56 @@ mod tests {
             Inline::Text(t) => &t.value,
             _ => "",
         };
-        assert_eq!(row0_cell1_suffix, "   ]");
+        assert_eq!(row0_cell1_suffix, "    ]");
+    }
+
+    #[test]
+    fn table_converts_with_auto_width_adjustment_stops_at_wide_column() {
+        let src = "| 殻 | n | suborbitals |\n| --- | --- | --- |\n| K殻 | 1 | 1s+2s+2p+3d (very long) |\n| L殻 | 2 | 2s+2p |\n";
+        let opts = ImportOptions {
+            adjust_table_width: true,
+            table_adjust_width_mode: Some("auto".to_string()),
+            table_max_col_width: Some(5),
+            table_align: None,
+        };
+        let doc = from_markdown_with_options(src, &opts);
+        let Block::Element(el) = &doc.blocks[0] else {
+            panic!("expected element");
+        };
+        let content = el.content.as_ref().unwrap();
+        // Col 0 (殻): display width 2 vs K殻 width 3 (<= 5) -> padded!
+        // Col 1 (n): len 1 (<= 5) -> padded!
+        // Col 2 (suborbitals): len > 5 -> NOT padded (stays "[ " and " ]")
+        let col0_header_suffix = match &content[3] {
+            Inline::Text(t) => &t.value,
+            _ => "",
+        };
+        assert_eq!(col0_header_suffix, "  ]"); // 1 base + 1 extra space on right
+    }
+
+    #[test]
+    fn table_converts_with_markdown_alignments() {
+        let src = "| left | center | right |\n| :--- | :---: | ---: |\n| 1 | 2 | 3 |\n| 100 | 200 | 300 |\n";
+        let opts = ImportOptions {
+            adjust_table_width: true,
+            table_adjust_width_mode: Some("true".to_string()),
+            table_max_col_width: Some(20),
+            table_align: Some("left".to_string()),
+        };
+        let doc = from_markdown_with_options(src, &opts);
+        let Block::Element(el) = &doc.blocks[0] else {
+            panic!("expected element");
+        };
+        let content = el.content.as_ref().unwrap();
+        let rendered: String = content
+            .iter()
+            .map(|inl| match inl {
+                Inline::Text(t) => t.value.clone(),
+                _ => String::new(),
+            })
+            .collect();
+        eprintln!("MARKDOWN IMPORT TABLE:\n{rendered}");
+        assert!(rendered.contains("[ 1    ][   2    ][     3 ]"));
     }
 
     #[test]
@@ -1069,32 +1263,38 @@ mod tests {
     }
 
     #[test]
-    fn checkbox_task_list_markers_import_as_plain_text_value_markers_stay_typed() {
-        // Tomet has no checkbox construct anymore, so CommonMark task
-        // lists come through as literal `[x] `/`[ ] ` text (no silent data
-        // loss on migration) -- `(...)` value-marker shorthand still parses
-        // into a real typed `marker`.
-        let md = "- [x] task1\n- [ ] task2\n- (x) task3\n";
+    fn checkbox_task_list_markers_and_custom_markers_import_as_typed_markers() {
+        let md = "- [x] task1\n- [ ] task2\n- [c] con item\n- [p] pro item\n- (x) task3\n";
         let doc = from_markdown(md);
         assert_eq!(doc.blocks.len(), 1);
         let Block::Element(list) = &doc.blocks[0] else {
             panic!("expected list");
         };
         let items = list_items(list);
-        assert_eq!(items.len(), 3);
-        assert_eq!(items[0].args, None);
+        assert_eq!(items.len(), 5);
+        assert_eq!(items[0].args, Some(Value::String("x".to_string())));
         assert_eq!(
             items[0].content,
-            Some(vec![Inline::Text(Text::new("[x] task1", Span::dummy()))])
+            Some(vec![Inline::Text(Text::new("task1", Span::dummy()))])
         );
-        assert_eq!(items[1].args, None);
+        assert_eq!(items[1].args, Some(Value::String(" ".to_string())));
         assert_eq!(
             items[1].content,
-            Some(vec![Inline::Text(Text::new("[ ] task2", Span::dummy()))])
+            Some(vec![Inline::Text(Text::new("task2", Span::dummy()))])
         );
-        assert_eq!(items[2].args, Some(Value::String("x".to_string())));
+        assert_eq!(items[2].args, Some(Value::String("c".to_string())));
         assert_eq!(
             items[2].content,
+            Some(vec![Inline::Text(Text::new("con item", Span::dummy()))])
+        );
+        assert_eq!(items[3].args, Some(Value::String("p".to_string())));
+        assert_eq!(
+            items[3].content,
+            Some(vec![Inline::Text(Text::new("pro item", Span::dummy()))])
+        );
+        assert_eq!(items[4].args, Some(Value::String("x".to_string())));
+        assert_eq!(
+            items[4].content,
             Some(vec![Inline::Text(Text::new("task3", Span::dummy()))])
         );
     }

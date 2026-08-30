@@ -300,21 +300,252 @@ fn quote_bare_at_values_in(src: &str, start: usize, end: usize, out: &mut String
 /// Like [`format_source`], but first runs a config-gated patch pass --
 /// see the module doc comment and `docs/develop/architecture.md`'s
 /// `tomet-formatter` bullet for the design.
+/// Formats tables in `src` according to `table.adjust_width` and `table.max_col_width`.
+pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
+    let mode = config
+        .table_adjust_width
+        .as_deref()
+        .unwrap_or("auto");
+    if mode == "false" || mode == "off" {
+        return src.to_string();
+    }
+    let max_col_width_limit = config.table_max_col_width.unwrap_or(20);
+
+    let lines: Vec<&str> = src.lines().collect();
+    let mut out_lines = Vec::new();
+    let mut i = 0;
+
+    while i < lines.len() {
+        let line = lines[i];
+        let trimmed = line.trim();
+
+        if (trimmed.starts_with("@table[") || trimmed.starts_with("<table["))
+            || (trimmed.starts_with("@table") && trimmed.contains('['))
+        {
+            out_lines.push(line.to_string());
+            i += 1;
+
+            let mut table_rows: Vec<(String, Vec<String>)> = Vec::new();
+            let mut raw_table_lines = Vec::new();
+
+            while i < lines.len() {
+                let t_line = lines[i];
+                let t_trimmed = t_line.trim();
+                if t_trimmed == "]" || t_trimmed.starts_with("]{") || t_trimmed.starts_with("] ") {
+                    break;
+                }
+                if let Some((indent, cells)) = extract_row_cells(t_line) {
+                    table_rows.push((indent, cells));
+                    raw_table_lines.push(None);
+                } else {
+                    raw_table_lines.push(Some(t_line.to_string()));
+                }
+                i += 1;
+            }
+
+            let aligns = extract_table_alignments(line, config.table_align.as_deref());
+
+            if !table_rows.is_empty() {
+                let mut col_count = 0;
+                for (_, cells) in &table_rows {
+                    col_count = col_count.max(cells.len());
+                }
+
+                let mut max_lens = vec![0usize; col_count];
+                for (_, cells) in &table_rows {
+                    for (c_idx, cell) in cells.iter().enumerate() {
+                        let len = text_display_width(cell.trim());
+                        max_lens[c_idx] = max_lens[c_idx].max(len);
+                    }
+                }
+
+                let mut target_widths: Vec<Option<usize>> = vec![None; col_count];
+                let mut auto_align_active = true;
+
+                for (c_idx, &max_len) in max_lens.iter().enumerate() {
+                    match mode {
+                        "true" | "all" => {
+                            target_widths[c_idx] = Some(max_len.max(1));
+                        }
+                        "auto" => {
+                            if auto_align_active && max_len <= max_col_width_limit {
+                                target_widths[c_idx] = Some(max_len.max(1));
+                            } else {
+                                auto_align_active = false;
+                                target_widths[c_idx] = None;
+                            }
+                        }
+                        _ => {
+                            target_widths[c_idx] = None;
+                        }
+                    }
+                }
+
+                let mut row_idx = 0;
+                for raw in raw_table_lines {
+                    if let Some(other_line) = raw {
+                        out_lines.push(other_line);
+                    } else {
+                        let (indent, cells) = &table_rows[row_idx];
+                        row_idx += 1;
+                        let mut formatted_cells = Vec::new();
+                        for c_idx in 0..col_count {
+                            let cell_text = cells.get(c_idx).map(|s| s.trim()).unwrap_or("");
+                            let cell_len = text_display_width(cell_text);
+                            let col_align = aligns.get(c_idx).map(|s| s.as_str()).unwrap_or("left");
+
+                            let (left_spaces, right_spaces) = if let Some(target_w) = target_widths[c_idx] {
+                                let target_width = target_w + 2;
+                                let extra = if target_width > cell_len {
+                                    target_width - cell_len
+                                } else {
+                                    2
+                                };
+                                match col_align {
+                                    "right" => {
+                                        let left = extra.saturating_sub(1);
+                                        let right = 1;
+                                        (left, right)
+                                    }
+                                    "center" => {
+                                        let left = extra / 2;
+                                        let right = extra - left;
+                                        (left, right)
+                                    }
+                                    _ => {
+                                        // "left"
+                                        let left = 1;
+                                        let right = extra.saturating_sub(1);
+                                        (left, right)
+                                    }
+                                }
+                            } else {
+                                (1, 1)
+                            };
+
+                            let left_str = " ".repeat(left_spaces);
+                            let right_str = " ".repeat(right_spaces);
+                            formatted_cells.push(format!("[{left_str}{cell_text}{right_str}]"));
+                        }
+                        out_lines.push(format!("{indent}{}", formatted_cells.join("")));
+                    }
+                }
+            }
+
+            if i < lines.len() {
+                out_lines.push(lines[i].to_string());
+                i += 1;
+            }
+        } else {
+            out_lines.push(line.to_string());
+            i += 1;
+        }
+    }
+
+    let mut res = out_lines.join("\n");
+    if src.ends_with('\n') && !res.ends_with('\n') {
+        res.push('\n');
+    }
+    res
+}
+
+fn extract_table_alignments(header_line: &str, default_align: Option<&str>) -> Vec<String> {
+    let def = default_align.unwrap_or("left");
+    if let Some(args_start) = header_line.find('(') {
+        if let Some(args_end) = header_line[args_start..].find(')') {
+            let args = &header_line[args_start + 1..args_start + args_end];
+            if let Some(pos) = args.find("align:") {
+                let val = args[pos + 6..].trim();
+                if val.starts_with('[') {
+                    if let Some(end_bracket) = val.find(']') {
+                        let inner = &val[1..end_bracket];
+                        let mut aligns = Vec::new();
+                        for item in inner.split(',') {
+                            let a = item.trim().trim_matches('"').trim_matches('\'');
+                            if !a.is_empty() {
+                                aligns.push(a.to_string());
+                            }
+                        }
+                        if !aligns.is_empty() {
+                            return aligns;
+                        }
+                    }
+                } else {
+                    let a = val.split(',').next().unwrap_or("").trim().trim_matches('"').trim_matches('\'');
+                    if !a.is_empty() {
+                        return vec![a.to_string(); 50];
+                    }
+                }
+            }
+        }
+    }
+    vec![def.to_string(); 50]
+}
+
+fn text_display_width(s: &str) -> usize {
+    unicode_width::UnicodeWidthStr::width(s)
+}
+
+
+fn extract_row_cells(line: &str) -> Option<(String, Vec<String>)> {
+    let trimmed = line.trim();
+    if !trimmed.starts_with('[') || !trimmed.ends_with(']') {
+        return None;
+    }
+    let indent_len = line.len() - line.trim_start().len();
+    let indent = line[..indent_len].to_string();
+
+    let mut cells = Vec::new();
+    let mut depth = 0;
+    let mut cell_start = 0;
+    let chars: Vec<(usize, char)> = line[indent_len..].char_indices().collect();
+
+    for &(byte_idx, c) in &chars {
+        if c == '[' {
+            if depth == 0 {
+                cell_start = byte_idx + c.len_utf8();
+            }
+            depth += 1;
+        } else if c == ']' {
+            depth -= 1;
+            if depth == 0 {
+                let cell_content = &line[indent_len..][cell_start..byte_idx];
+                cells.push(cell_content.to_string());
+            }
+        }
+    }
+
+    if depth == 0 && !cells.is_empty() {
+        Some((indent, cells))
+    } else {
+        None
+    }
+}
+
+/// Like [`format_source`], but first runs a config-gated patch pass --
+/// see the module doc comment and `docs/develop/architecture.md`'s
+/// `tomet-formatter` bullet for the design.
 pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
+    let patched_id_src = patch_id_if_needed(src, config);
+    let formatted_tables = format_tables_with_config(&patched_id_src, config);
+    format_source(&formatted_tables)
+}
+
+fn patch_id_if_needed(src: &str, config: &PrinterConfig) -> String {
     let Some(id_cfg) = config.meta_fields.get("id") else {
-        return format_source(src);
+        return src.to_string();
     };
     if id_cfg.field_type.is_none() {
-        return format_source(src);
+        return src.to_string();
     }
     let force = id_cfg.force.unwrap_or(true);
     let overwrite = id_cfg.overwrite.unwrap_or(false);
     if !(force || overwrite) {
-        return format_source(src);
+        return src.to_string();
     }
 
     let Ok(doc) = parse_document(src) else {
-        return format_source(src);
+        return src.to_string();
     };
 
     let meta_el = doc.blocks.iter().find_map(|block| {
@@ -328,14 +559,14 @@ pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
         None
     });
 
-    let combined = match meta_el {
+    match meta_el {
         Some(el) => match patch_existing_meta(el, id_cfg, overwrite, config) {
             Some(rendered) => {
                 let start = el.span.start.offset;
                 let end = el.span.end.offset;
                 format!("{}{}{}", &src[..start], rendered, &src[end..])
             }
-            None => return format_source(src),
+            None => src.to_string(),
         },
         None => {
             let id = generate_id_for_field(id_cfg);
@@ -347,9 +578,7 @@ pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
             let rendered = tomet_style::render_meta_element(&new_el, config);
             format!("{rendered}\n\n{src}")
         }
-    };
-
-    format_source(&combined)
+    }
 }
 
 /// Decides whether `el` (an existing `@meta` element) needs its `id`
@@ -758,6 +987,74 @@ mod tests {
                 .unwrap_or_else(|e| panic!("formatted output failed to parse: {e}"));
             assert_eq!(before, after, "formatting changed the parsed document");
         }
+    }
+
+    #[test]
+    fn test_format_tables_with_config_left_align() {
+        let src = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p <br>(2+6) ]\n]\n";
+        let mut config = PrinterConfig::default();
+        config.table_adjust_width = Some("auto".to_string());
+        config.table_max_col_width = Some(20);
+        config.table_align = Some("left".to_string());
+
+        let out = format_source_with_config(src, &config);
+        assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][ 小軌道          ]"));
+        assert!(out.contains("[ K殻 ][ 1          ][ 2          ][ 1s <br>(2)      ]"));
+    }
+
+    #[test]
+    fn test_format_tables_with_config_right_align() {
+        let src = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p <br>(2+6) ]\n]\n";
+        let mut config = PrinterConfig::default();
+        config.table_adjust_width = Some("auto".to_string());
+        config.table_max_col_width = Some(20);
+        config.table_align = Some("right".to_string());
+
+        let out = format_source_with_config(src, &config);
+        assert!(out.contains("[  殻 ][ 主量子数 n ][ 電子数 2n² ][          小軌道 ]"));
+        assert!(out.contains("[ K殻 ][          1 ][          2 ][      1s <br>(2) ]"));
+    }
+
+    #[test]
+    fn test_format_tables_with_config_center_align() {
+        let src = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p <br>(2+6) ]\n]\n";
+        let mut config = PrinterConfig::default();
+        config.table_adjust_width = Some("auto".to_string());
+        config.table_max_col_width = Some(20);
+        config.table_align = Some("center".to_string());
+
+        let out = format_source_with_config(src, &config);
+        assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][     小軌道      ]"));
+        assert!(out.contains("[ K殻 ][     1      ][     2      ][   1s <br>(2)    ]"));
+    }
+
+    #[test]
+    fn test_format_tables_with_per_table_align_arg() {
+        let src = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
+        let mut config = PrinterConfig::default();
+        config.table_adjust_width = Some("auto".to_string());
+        config.table_max_col_width = Some(20);
+
+        let out = format_source_with_config(src, &config);
+        assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][ 小軌道     ]"));
+        assert!(out.contains("[ K殻 ][          1 ][          2 ][ 1s <br>(2) ]"));
+    }
+
+    #[test]
+    fn test_format_tables_unicode_superscript_and_cjk_width() {
+        // "電子数 2n²": 3*2 + 1 + 1 + 1 + 1 = 10 visual width
+        // "2": 1 visual width
+        // Right-aligned column with target width 10 + 2 = 12:
+        // "[ 電子数 2n² ]" -> 1 + 10 + 1 = 12
+        // "[          2 ]" -> 10 + 1 + 1 = 12 (10 spaces before '2')
+        let src = "@table(align: [right])[\n[ 電子数 2n² ]\n[ 2 ]\n]\n";
+        let mut config = PrinterConfig::default();
+        config.table_adjust_width = Some("auto".to_string());
+        config.table_max_col_width = Some(20);
+
+        let out = format_source_with_config(src, &config);
+        assert!(out.contains("[ 電子数 2n² ]"));
+        assert!(out.contains("[          2 ]"));
     }
 
     fn repo_examples() -> Vec<&'static str> {

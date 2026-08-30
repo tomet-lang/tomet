@@ -173,9 +173,6 @@ pub(crate) fn parse_element(
                     el.args = Some(parse_paren_value(cur)?);
                     continue;
                 }
-                Some('(') => {
-                    return Err(err(cur, cur.pos(), "duplicate '(' group"));
-                }
                 Some('[') if el.content.is_none() => {
                     el.content = Some(if is_codeblock(&el) {
                         parse_raw_content(cur)?
@@ -185,9 +182,6 @@ pub(crate) fn parse_element(
                         parse_content(cur, default_format)?
                     });
                     continue;
-                }
-                Some('[') => {
-                    return Err(err(cur, cur.pos(), "duplicate '[' group"));
                 }
                 Some('{') if el.value.is_none() => {
                     let format = match local_format_key(&el) {
@@ -201,9 +195,6 @@ pub(crate) fn parse_element(
                         None => parse_value_group(cur, default_format)?,
                     });
                     continue;
-                }
-                Some('{') => {
-                    return Err(err(cur, cur.pos(), "duplicate '{' group"));
                 }
                 _ => {}
             }

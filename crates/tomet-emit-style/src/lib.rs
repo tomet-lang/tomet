@@ -42,11 +42,18 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
         return;
     }
 
+    let first_char = s.chars().next();
+    let starts_with_special = matches!(
+        first_char,
+        Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '#' | '~')
+    );
+
     let needs_quotes = s.is_empty()
-        || matches!(s, "true" | "false" | "null")
+        || matches!(s, "true" | "false" | "null" | "~")
         || s.parse::<i64>().is_ok()
         || s.parse::<f64>().is_ok()
         || s.trim() != s
+        || starts_with_special
         || s.contains(['"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ']);
 
     if needs_quotes {

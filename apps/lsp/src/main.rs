@@ -52,7 +52,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         serde_json::from_value(req.params)?;
                     let edits = documents
                         .get(&params.text_document.uri)
-                        .map(|text| tomet_lsp::format_edits(text))
+                        .map(|text| tomet_lsp::format_edits(text, Some(&params.text_document.uri)))
                         .unwrap_or_default();
                     let result = serde_json::to_value(edits)?;
                     connection

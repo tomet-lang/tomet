@@ -254,8 +254,8 @@
 			"endCaptures": {
 				"0": { "name": "punctuation.section.group.square.end.tomet" }
 			},
-			"name": "meta.group.square.tomet variable.parameter.content.tomet",
-			"patterns": [{ "include": "#value" }, { "include": "#inline" }]
+			"name": "meta.group.square.tomet",
+			"patterns": [{ "include": "#inline" }, { "include": "#value" }]
 		},
 
 		"curly-group": {

@@ -1315,9 +1315,15 @@ mod tests {
     }
 
     #[test]
-    fn a_second_args_group_is_a_duplicate_group_error() {
-        let err = parse_document("<T>(a:1)(b:2)\n").unwrap_err();
-        assert!(err.message.contains("duplicate"), "got: {err:?}");
+    fn a_second_args_group_is_parsed_as_subsequent_text() {
+        let doc = parse_document("<T>(a:1)(b:2)\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.args, Some(Value::Map(vec![("a".into(), Value::Int(1))])));
+            }
+            other => panic!("expected an element, got {other:?}"),
+        }
     }
 
     #[test]

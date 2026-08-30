@@ -119,6 +119,8 @@ toml = { version = "0.9", features = ["preserve_order"] }
 tree-sitter = "0.26"
 tree-sitter-language = "0.1"
 nanoid = "0.4"
+unicode-width = "0.2"
 uuid = { version = "1.23", features = ["v4"] }
 walkdir = "2"
 zed_extension_api = "0.7"
+
