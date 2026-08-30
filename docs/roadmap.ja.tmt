@@ -41,7 +41,7 @@
 ---[ 構文 ]---
 - [x] 要素設定 (.settings.tmt, json, yaml)
 - [x] コネクト構文 (`:(){}`)
-- [x] `args`推論 (基本要素対応, カスタム要素対応, positional: [ title, priority ])         // `<embed>(src)` 
+- [x] `args`推論 (基本要素対応, カスタム要素対応, positional: [ title, priority ])         // `<embed>(src)`
 - [x] `@`推論
 - [x] 代入、関数構文 (`${var}` `compute`,`resolve`)
 - [x] 構文エラー (重複)

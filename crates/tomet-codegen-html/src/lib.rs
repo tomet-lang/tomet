@@ -313,6 +313,7 @@ fn render_element(el: &Element, out: &mut String, inline: bool) {
         "links" => render_links_container(el, out),
         "link" => render_link_element(el, out, inline),
         "embed" => render_embed_element(el, out),
+        "icon" => render_icon_element(el, out, inline),
         "hr" => render_hr_element(el, out),
         "em" | "strong" | "mark" => render_wrapped_inline(el, kind.as_str(), out),
         "codeblock" => render_codeblock_element(el, out),
@@ -554,6 +555,77 @@ fn render_content_or_fallback(el: &Element, fallback: &str, out: &mut String) {
     }
 }
 
+fn render_icon_element(el: &Element, out: &mut String, inline: bool) {
+    let tag = if inline { "span" } else { "div" };
+    let name = match &el.args {
+        Some(Value::String(s)) => s.as_str(),
+        Some(Value::Map(entries)) => entries
+            .iter()
+            .find(|(k, _)| k == "name")
+            .and_then(|(_, v)| match v {
+                Value::String(s) => Some(s.as_str()),
+                _ => None,
+            })
+            .unwrap_or(""),
+        _ => "",
+    };
+    let pkg = match &el.args {
+        Some(Value::Map(entries)) => entries
+            .iter()
+            .find(|(k, _)| k == "pkg" || k == "package")
+            .and_then(|(_, v)| match v {
+                Value::String(s) => Some(s.as_str()),
+                _ => None,
+            })
+            .unwrap_or(""),
+        _ => "",
+    };
+
+    let mut class_str = format!("tm-element tm-icon");
+    if !name.is_empty() {
+        class_str.push_str(&format!(" tm-icon-{name}"));
+    }
+    if !pkg.is_empty() {
+        class_str.push_str(&format!(" tm-icon-{pkg}"));
+        if !name.is_empty() {
+            class_str.push_str(&format!(" tm-icon-{pkg}-{name}"));
+        }
+    }
+
+    let value_data = match &el.value {
+        Some(ElementValue::Data(v)) => Some(v),
+        _ => None,
+    };
+    let (id, custom_class, data) = split_attrs(value_data);
+    if let Some(c) = custom_class {
+        class_str.push(' ');
+        class_str.push_str(&c);
+    }
+
+    out.push_str(&format!("<{tag} class=\"{class_str}\""));
+    if let Some(id_str) = id {
+        out.push_str(&format!(" id=\"{}\"", escape_attr(&id_str)));
+    }
+    if !name.is_empty() {
+        out.push_str(&format!(" data-icon=\"{}\"", escape_attr(name)));
+    }
+    if !pkg.is_empty() {
+        out.push_str(&format!(" data-pkg=\"{}\"", escape_attr(pkg)));
+    }
+    for (k, v) in data {
+        out.push_str(&format!(" data-{}=\"{}\"", escape_attr(&k), escape_attr(&v)));
+    }
+    push_data_attrs(out, el.args.as_ref(), &["name", "pkg", "package"]);
+    out.push('>');
+    if let Some(content) = &el.content {
+        render_inlines(content, out);
+    }
+    out.push_str(&format!("</{tag}>"));
+    if !inline {
+        out.push('\n');
+    }
+}
+
 fn render_generic_element(el: &Element, kind: &str, out: &mut String, inline: bool) {
     let tag = if inline { "span" } else { "div" };
     out.push_str(&format!("<{tag} class=\"tm-element tm-{kind}\""));
@@ -614,6 +686,9 @@ fn render_interp_expr(expr: &InterpExpr) -> String {
         }
         InterpExprKind::Member { object, member } => {
             format!("{}.{member}", render_interp_expr(object))
+        }
+        InterpExprKind::NamedArg { name, value } => {
+            format!("{name}: {}", render_interp_expr(value))
         }
     }
 }
@@ -1197,6 +1272,23 @@ mod tests {
 </tr>\n\
 </tbody>\n\
 </table>\n"
+        );
+    }
+
+    #[test]
+    fn renders_icon_element_to_html() {
+        let doc = parse_document("<icon>(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"}\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<div class=\"tm-element tm-icon tm-icon-sun tm-icon-lucide tm-icon-lucide-sun\" data-icon=\"sun\" data-pkg=\"lucide\" data-color=\"yellow\"></div>\n"
+        );
+
+        let inline_doc = parse_document("Here is <icon>(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"} icon.\n").unwrap();
+        let inline_body = render_body(&inline_doc);
+        assert_eq!(
+            inline_body,
+            "<p>Here is <span class=\"tm-element tm-icon tm-icon-sun tm-icon-lucide tm-icon-lucide-sun\" data-icon=\"sun\" data-pkg=\"lucide\" data-color=\"yellow\"></span> icon.</p>\n"
         );
     }
 }

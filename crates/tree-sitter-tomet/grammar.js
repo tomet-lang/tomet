@@ -340,7 +340,11 @@ module.exports = grammar({
 		// opaque span rather than exposing dot-separated segments -- this
 		// grammar is highlighting-only and doesn't need a structured `Path`
 		// AST, just to recognize the whole span and not fall into `ERROR`.
-		interpolation: ($) => seq(token(prec(1, "${")), $._interp_expr, "}"),
+		interpolation: ($) =>
+			choice(
+				seq(token(prec(1, "${")), $._interp_expr, "}"),
+				seq("$", $.interp_call),
+			),
 		_interp_expr: ($) => choice($.interp_call, $.identifier, $.number, $.string),
 		interp_call: ($) =>
 			seq(

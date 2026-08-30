@@ -618,6 +618,9 @@ pub fn render_interp_expr(expr: &InterpExpr) -> String {
         InterpExprKind::Member { object, member } => {
             format!("{}.{member}", render_interp_expr(object))
         }
+        InterpExprKind::NamedArg { name, value } => {
+            format!("{name}: {}", render_interp_expr(value))
+        }
     }
 }
 

@@ -32,6 +32,7 @@ pub enum ElementKind {
     Blockquote,
     Table,
     Heading,
+    Icon,
     /// `Element { sigil: Type("ol"), .. }` -- a `-.` (auto-numbered) list.
     /// See `crate::list`.
     OrderedList,
@@ -68,6 +69,7 @@ impl ElementKind {
             ElementKind::Links => "links",
             ElementKind::Link => "link",
             ElementKind::Embed => "embed",
+            ElementKind::Icon => "icon",
             ElementKind::Hr => "hr",
             ElementKind::Em => "em",
             ElementKind::Strong => "strong",
@@ -90,12 +92,13 @@ impl ElementKind {
 /// `ElementKind::as_str`'s variant -> name match can't silently drift
 /// apart (see `builtin_kind_round_trips_through_as_str` below, which
 /// checks every entry here).
-const BUILTIN_KINDS: [(&str, ElementKind); 15] = [
+const BUILTIN_KINDS: [(&str, ElementKind); 16] = [
     ("meta", ElementKind::Meta),
     ("config", ElementKind::Config),
     ("links", ElementKind::Links),
     ("link", ElementKind::Link),
     ("embed", ElementKind::Embed),
+    ("icon", ElementKind::Icon),
     ("hr", ElementKind::Hr),
     ("em", ElementKind::Em),
     ("strong", ElementKind::Strong),

@@ -573,6 +573,9 @@ mod tests {
             InterpExprKind::Member { object, member } => {
                 format!("Member({}, {member})", describe(object))
             }
+            InterpExprKind::NamedArg { name, value } => {
+                format!("NamedArg({name}, {})", describe(value))
+            }
         }
     }
 
@@ -639,6 +642,41 @@ mod tests {
                 expected,
                 "source: {src}"
             );
+        }
+    }
+
+    #[test]
+    fn parses_dollar_func_call_syntax() {
+        let doc = parse_document("$date(\"YYYY-MM-DD\")\n").unwrap();
+        assert_eq!(
+            describe(interp_expr(&doc.blocks[0])),
+            "Call(Identifier(date), [String(\"YYYY-MM-DD\")])"
+        );
+
+        let doc2 = parse_document("$emoji(\"sparkles\")\n").unwrap();
+        assert_eq!(
+            describe(interp_expr(&doc2.blocks[0])),
+            "Call(Identifier(emoji), [String(\"sparkles\")])"
+        );
+
+        let doc3 = parse_document("$tm(\"guide/intro\", \"install\")\n").unwrap();
+        assert_eq!(
+            describe(interp_expr(&doc3.blocks[0])),
+            "Call(Identifier(tm), [String(\"guide/intro\"), String(\"install\")])"
+        );
+    }
+
+    #[test]
+    fn bare_dollar_without_parens_is_plain_text() {
+        let doc = parse_document("Price is $100 or $PATH or $foo.\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(p) => {
+                assert_eq!(
+                    &p.content,
+                    &vec![Inline::Text("Price is $100 or $PATH or $foo.".into())]
+                );
+            }
+            other => panic!("expected paragraph, got {other:?}"),
         }
     }
 

@@ -11,16 +11,184 @@ use tomet_ast::Value;
 use crate::error::ComputeError;
 
 pub(crate) fn call(name: &str, args: &[Value]) -> Result<Value, ComputeError> {
-    let (a, b) = require_two(name, args)?;
-    let a = as_number(name, a)?;
-    let b = as_number(name, b)?;
     match name {
-        "add" => Ok(checked_or_float(a, b, i64::checked_add, |x, y| x + y)),
-        "sub" => Ok(checked_or_float(a, b, i64::checked_sub, |x, y| x - y)),
-        "mul" => Ok(checked_or_float(a, b, i64::checked_mul, |x, y| x * y)),
-        "div" => div(a, b),
-        "mod" => rem(a, b),
+        "add" | "sub" | "mul" | "div" | "mod" => {
+            let (a, b) = require_two(name, args)?;
+            let a = as_number(name, a)?;
+            let b = as_number(name, b)?;
+            match name {
+                "add" => Ok(checked_or_float(a, b, i64::checked_add, |x, y| x + y)),
+                "sub" => Ok(checked_or_float(a, b, i64::checked_sub, |x, y| x - y)),
+                "mul" => Ok(checked_or_float(a, b, i64::checked_mul, |x, y| x * y)),
+                "div" => div(a, b),
+                "mod" => rem(a, b),
+                _ => unreachable!(),
+            }
+        }
+        "date" => call_date(args),
+        "unicode" => call_unicode(args),
+        "emoji" => call_emoji(args),
+        "tm" => call_tm(args),
+        "ref" => call_ref(args),
         _ => Err(ComputeError::UnknownFunction(name.to_string())),
+    }
+}
+
+fn call_date(args: &[Value]) -> Result<Value, ComputeError> {
+    match args {
+        [] => {
+            let today = time::OffsetDateTime::now_utc().date();
+            Ok(Value::String(format!(
+                "{:04}-{:02}-{:02}",
+                today.year(),
+                today.month() as u8,
+                today.day()
+            )))
+        }
+        [Value::String(s)] => Ok(Value::String(s.clone())),
+        [Value::String(s), Value::String(fmt)] => {
+            let s_trimmed = s.trim();
+            let parts: Vec<&str> = s_trimmed.split(&['-', '/', '.'][..]).collect();
+            if parts.len() == 3 {
+                let (y, m, d) = (parts[0], parts[1], parts[2]);
+                let formatted = fmt
+                    .replace("YYYY", y)
+                    .replace("YY", if y.len() >= 2 { &y[y.len() - 2..] } else { y })
+                    .replace("MM", m)
+                    .replace("DD", d);
+                Ok(Value::String(formatted))
+            } else {
+                Ok(Value::String(s.clone()))
+            }
+        }
+        other => Err(ComputeError::WrongArgCount {
+            function: "date".to_string(),
+            expected: 1,
+            got: other.len(),
+        }),
+    }
+}
+
+fn call_unicode(args: &[Value]) -> Result<Value, ComputeError> {
+    let val = match args {
+        [v] => v,
+        other => {
+            return Err(ComputeError::WrongArgCount {
+                function: "unicode".to_string(),
+                expected: 1,
+                got: other.len(),
+            });
+        }
+    };
+    let code = match val {
+        Value::Int(i) => *i as u32,
+        Value::String(s) => {
+            let clean = s
+                .trim()
+                .trim_start_matches("U+")
+                .trim_start_matches("u+")
+                .trim_start_matches("0x")
+                .trim_start_matches("0X");
+            u32::from_str_radix(clean, 16).map_err(|_| ComputeError::NotNumeric {
+                function: "unicode".to_string(),
+                value: val.clone(),
+            })?
+        }
+        _ => {
+            return Err(ComputeError::NotNumeric {
+                function: "unicode".to_string(),
+                value: val.clone(),
+            });
+        }
+    };
+    let c = char::from_u32(code).ok_or_else(|| ComputeError::NotNumeric {
+        function: "unicode".to_string(),
+        value: val.clone(),
+    })?;
+    Ok(Value::String(c.to_string()))
+}
+
+fn call_emoji(args: &[Value]) -> Result<Value, ComputeError> {
+    let val = match args {
+        [v] => v,
+        other => {
+            return Err(ComputeError::WrongArgCount {
+                function: "emoji".to_string(),
+                expected: 1,
+                got: other.len(),
+            });
+        }
+    };
+    let name = match val {
+        Value::String(s) => s.trim().trim_matches(':'),
+        _ => {
+            return Err(ComputeError::NotNumeric {
+                function: "emoji".to_string(),
+                value: val.clone(),
+            });
+        }
+    };
+    let emoji = match name {
+        "sparkles" | "sparkle" => "✨",
+        "tada" | "party" => "🎉",
+        "check" | "white_check_mark" => "✅",
+        "warning" | "warn" => "⚠️",
+        "fire" | "flame" => "🔥",
+        "rocket" => "🚀",
+        "smile" | "grinning" => "😊",
+        "heart" => "❤️",
+        "star" => "⭐",
+        "bulb" | "idea" => "💡",
+        "memo" | "pencil" => "📝",
+        "gear" | "cog" => "⚙️",
+        "link" => "🔗",
+        "book" => "📖",
+        "pin" | "pushpin" => "📌",
+        "wave" => "👋",
+        "bug" => "🐛",
+        "cross" | "x" => "❌",
+        "info" | "information_source" => "ℹ️",
+        "eyes" => "👀",
+        "clap" => "👏",
+        "thumbsup" | "+1" => "👍",
+        "thumbsdown" | "-1" => "👎",
+        "zap" | "lightning" => "⚡",
+        "art" => "🎨",
+        "construction" | "wip" => "🚧",
+        "lock" => "🔒",
+        "unlock" => "🔓",
+        "key" => "🔑",
+        "mag" | "search" => "🔍",
+        "sun" => "☀️",
+        "moon" => "🌙",
+        "coffee" => "☕",
+        other => other,
+    };
+    Ok(Value::String(emoji.to_string()))
+}
+
+fn call_tm(args: &[Value]) -> Result<Value, ComputeError> {
+    match args {
+        [Value::String(path)] => Ok(Value::String(format!("tm:{path}"))),
+        [Value::String(path), Value::String(sec)] => {
+            Ok(Value::String(format!("tm:{path}#{sec}")))
+        }
+        other => Err(ComputeError::WrongArgCount {
+            function: "tm".to_string(),
+            expected: 1,
+            got: other.len(),
+        }),
+    }
+}
+
+fn call_ref(args: &[Value]) -> Result<Value, ComputeError> {
+    match args {
+        [Value::String(target)] => Ok(Value::String(format!("ref:{target}"))),
+        other => Err(ComputeError::WrongArgCount {
+            function: "ref".to_string(),
+            expected: 1,
+            got: other.len(),
+        }),
     }
 }
 

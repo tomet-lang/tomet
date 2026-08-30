@@ -462,6 +462,10 @@ pub enum InterpExprKind {
         object: Box<InterpExpr>,
         member: String,
     },
+    NamedArg {
+        name: String,
+        value: Box<InterpExpr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

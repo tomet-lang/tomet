@@ -14,15 +14,32 @@ use tomet_ast::{Document, InterpExpr, InterpExprKind, Literal, Value};
 
 /// Evaluates `expr` against `doc`. `Literal`s evaluate to themselves;
 /// `Identifier`/`Member` chains resolve via
-/// `tomet_resolver::resolve_reference`; a `Call`'s `args` are
-/// evaluated recursively (left to right) before the named function runs.
+/// `tomet_resolver::resolve_reference` (falling back to `@config` macros for bare identifiers);
+/// a `Call` dispatches to builtins or `@config` user-defined macros after evaluating its args.
 pub fn evaluate(doc: &Document, expr: &InterpExpr) -> Result<Value, ComputeError> {
     match &expr.kind {
         InterpExprKind::Literal(Literal::Int(i)) => Ok(Value::Int(*i)),
         InterpExprKind::Literal(Literal::Float(f)) => Ok(Value::Float(*f)),
         InterpExprKind::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
-        InterpExprKind::Identifier(_) | InterpExprKind::Member { .. } => {
+        InterpExprKind::Identifier(id) => {
+            match tomet_resolver::resolve_reference(doc, expr) {
+                Ok(val) => Ok(val),
+                Err(err) => {
+                    let config = tomet_semantics::document_config(doc);
+                    if let Some(template) = config.macros.get(id) {
+                        Ok(Value::String(template.clone()))
+                    } else {
+                        Err(err.into())
+                    }
+                }
+            }
+        }
+        InterpExprKind::Member { .. } => {
             Ok(tomet_resolver::resolve_reference(doc, expr)?)
+        }
+        InterpExprKind::NamedArg { name, value } => {
+            let val = evaluate(doc, value)?;
+            Ok(Value::Map(vec![(name.clone(), val)]))
         }
         InterpExprKind::Call { callee, args } => evaluate_call(doc, callee, args),
     }
@@ -40,7 +57,56 @@ fn evaluate_call(
         .iter()
         .map(|arg| evaluate(doc, arg))
         .collect::<Result<Vec<_>, _>>()?;
-    functions::call(name, &values)
+    match functions::call(name, &values) {
+        Ok(val) => Ok(val),
+        Err(ComputeError::UnknownFunction(_)) => {
+            let config = tomet_semantics::document_config(doc);
+            if let Some(template) = config.macros.get(name) {
+                let expanded = expand_macro_template(template, &values);
+                Ok(Value::String(expanded))
+            } else {
+                Err(ComputeError::UnknownFunction(name.to_string()))
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
+fn expand_macro_template(template: &str, values: &[Value]) -> String {
+    let mut result = template.to_string();
+
+    // 1. Named placeholders: `${key}` from Map/NamedArg entries
+    for val in values {
+        if let Value::Map(entries) = val {
+            for (k, v) in entries {
+                let placeholder = format!("${{{k}}}");
+                let val_str = value_to_string(v);
+                result = result.replace(&placeholder, &val_str);
+            }
+        }
+    }
+
+    // 2. Positional placeholders: `${1}`, `${2}`, ...
+    for (i, val) in values.iter().enumerate() {
+        let val_str = match val {
+            Value::Map(entries) if entries.len() == 1 => value_to_string(&entries[0].1),
+            _ => value_to_string(val),
+        };
+        let brace_placeholder = format!("${{{}}}", i + 1);
+        result = result.replace(&brace_placeholder, &val_str);
+    }
+
+    result
+}
+
+fn value_to_string(val: &Value) -> String {
+    match val {
+        Value::String(s) => s.clone(),
+        Value::Int(i) => i.to_string(),
+        Value::Float(f) => f.to_string(),
+        Value::Bool(b) => b.to_string(),
+        _ => String::new(),
+    }
 }
 
 #[cfg(test)]
@@ -190,5 +256,81 @@ mod tests {
             evaluate(&doc, &interp("${a.b(1, 2)}")).unwrap_err(),
             ComputeError::UnsupportedCallee
         ));
+    }
+
+    #[test]
+    fn evaluates_unicode_and_emoji() {
+        let doc = parse("\n");
+        assert_eq!(
+            evaluate(&doc, &interp("$unicode(\"2713\")")).unwrap(),
+            Value::String("✓".into())
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("$emoji(\"sparkles\")")).unwrap(),
+            Value::String("✨".into())
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("$emoji(\"tada\")")).unwrap(),
+            Value::String("🎉".into())
+        );
+    }
+
+    #[test]
+    fn evaluates_tm_and_ref_uris() {
+        let doc = parse("\n");
+        assert_eq!(
+            evaluate(&doc, &interp("$tm(\"guide/intro\")")).unwrap(),
+            Value::String("tm:guide/intro".into())
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("$tm(\"guide/intro\", \"installation\")")).unwrap(),
+            Value::String("tm:guide/intro#installation".into())
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("$ref(\"アーキテクチャ\")")).unwrap(),
+            Value::String("ref:アーキテクチャ".into())
+        );
+    }
+
+    #[test]
+    fn evaluates_date_formatting() {
+        let doc = parse("\n");
+        assert_eq!(
+            evaluate(&doc, &interp("$date(\"2026-08-30\", \"YYYY年MM月DD日\")")).unwrap(),
+            Value::String("2026年08月30日".into())
+        );
+        let date_result = evaluate(&doc, &interp("$date()")).unwrap();
+        if let Value::String(s) = date_result {
+            assert!(s.contains('-'));
+        } else {
+            panic!("expected date string");
+        }
+    }
+
+    #[test]
+    fn evaluates_user_defined_macros() {
+        let doc = parse("@config{\n  macros: {\n    gh: \"https://github.com/cettila-projects/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    price: \"Price is $100 for ${1}\"\n    search: \"https://example.com/search?q=${q}&lang=${lang}\"\n    copyright: \"(C) 2026 Cettila Projects\"\n  }\n}\n");
+        assert_eq!(
+            evaluate(&doc, &interp("$gh(42)")).unwrap(),
+            Value::String("https://github.com/cettila-projects/tomet/issues/42".into())
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("$greet(\"Alice\", \"Smith\")")).unwrap(),
+            Value::String("Hello, Alice Smith!".into())
+        );
+        // Tests that currency `$100` in the template is preserved without being corrupted by `$1` matching
+        assert_eq!(
+            evaluate(&doc, &interp("$price(\"license\")")).unwrap(),
+            Value::String("Price is $100 for license".into())
+        );
+        // Tests named arguments
+        assert_eq!(
+            evaluate(&doc, &interp("$search(q: \"rust\", lang: \"ja\")")).unwrap(),
+            Value::String("https://example.com/search?q=rust&lang=ja".into())
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("${copyright}")).unwrap(),
+            Value::String("(C) 2026 Cettila Projects".into())
+        );
     }
 }
