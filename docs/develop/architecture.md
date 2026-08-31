@@ -160,7 +160,7 @@ produce and format Tomet's own source text.
   grammar with a direct struct mapping, the same role `serde_json`/
   `serde_yaml` play for their formats. Headings/prose/links have no serde
   equivalent and aren't handled here.
-- **`tomet-formatter`** (`crates/tomet-format-formatter`): AST-aware whitespace and raw-content preserving formatter,
+- **`tomet-formatter`** (`crates/tomet-formatter`): AST-aware whitespace and raw-content preserving formatter,
   plus (as of `format_source_with_config`) an opt-in, config-gated pass that makes
   small structural additions. Two-stage, config-gated pipeline:
   1. **Config-driven patch pass** (only runs if the relevant
