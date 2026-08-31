@@ -60,12 +60,14 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         .send(Message::Response(Response::new_ok(req.id, result)))?;
                 } else if req.method == HoverRequest::METHOD {
                     let params: lsp_types::HoverParams = serde_json::from_value(req.params)?;
+                    let uri = &params.text_document_position_params.text_document.uri;
                     let hover = documents
-                        .get(&params.text_document_position_params.text_document.uri)
+                        .get(uri)
                         .and_then(|text| {
                             tomet_lsp::hover_for(
                                 text,
                                 params.text_document_position_params.position,
+                                Some(uri),
                             )
                         });
                     let result = serde_json::to_value(hover)?;

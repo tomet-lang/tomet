@@ -20,31 +20,34 @@ members = [
   #[ Syntax -- grammar/parsing ]
   "crates/tomet-syntax-cst",
   "crates/tomet-syntax-ast",
-  "crates/tomet-syntax-lexar",
+  "crates/tomet-syntax-tree",
+  "crates/tomet-syntax-lexer",
   "crates/tomet-syntax-parser",
 
-  #[ Semantics -- classification/validation ]
+  #[ Semantics -- classification/validation/eval/resolve ]
   "crates/tomet-semantics",
   "crates/tomet-semantics-validator",
+  "crates/tomet-semantics-compute",
+  "crates/tomet-semantics-resolver",
 
-  #[ Doc -- whole-Document/workspace operations ]
-  "crates/tomet-doc-walker",
-  "crates/tomet-doc-resolver",
-  "crates/tomet-doc-compute",
-  "crates/tomet-doc-config",
-  "crates/tomet-doc-edit",
-  "crates/tomet-doc-indexer",
-  "crates/tomet-doc-links",
+  #[ Transform -- in-memory AST transformations & macros ]
+  "crates/tomet-transform",
 
-  #[ Codegen -- conversion to/from external formats ]
-  "crates/tomet-codegen-markdown",
-  "crates/tomet-codegen-html",
+  #[ Convert -- conversion to/from external document formats ]
+  "crates/tomet-convert-markdown",
+  "crates/tomet-convert-html",
 
-  #[ Emit -- .tmt text production ]
-  "crates/tomet-emit-field-utils",
-  "crates/tomet-emit-style",
-  "crates/tomet-emit-printer",
-  "crates/tomet-emit-formatter",
+  #[ Format -- .tmt source text production & formatting ]
+  "crates/tomet-format-field-utils",
+  "crates/tomet-format-style",
+  "crates/tomet-format-printer",
+  "crates/tomet-format-formatter",
+
+  #[ Workspace -- multi-file/disk operations & config discovery ]
+  "crates/tomet-workspace",
+  "crates/tomet-workspace-indexer",
+  "crates/tomet-workspace-links",
+  "crates/tomet-workspace-config",
 
   #[ Public -- external ecosystem adapters ]
   "crates/serde_tomet",
@@ -64,27 +67,29 @@ edition = "2024"
 #[ Syntax ]
 tomet-cst = { path = "crates/tomet-syntax-cst" }
 tomet-ast = { path = "crates/tomet-syntax-ast" }
-tomet-lexar = { path = "crates/tomet-syntax-lexar" }
+tomet-tree = { path = "crates/tomet-syntax-tree" }
+tomet-lexer = { path = "crates/tomet-syntax-lexer" }
 tomet-parser = { path = "crates/tomet-syntax-parser" }
 #[ Semantics ]
 tomet-semantics = { path = "crates/tomet-semantics" }
 tomet-validator = { path = "crates/tomet-semantics-validator" }
-#[ Doc ]
-tomet-walker = { path = "crates/tomet-doc-walker" }
-tomet-resolver = { path = "crates/tomet-doc-resolver" }
-tomet-compute = { path = "crates/tomet-doc-compute" }
-tomet-config = { path = "crates/tomet-doc-config" }
-tomet-edit = { path = "crates/tomet-doc-edit" }
-tomet-indexer = { path = "crates/tomet-doc-indexer" }
-tomet-links = { path = "crates/tomet-doc-links" }
-#[ Codegen ]
-tomet-markdown = { path = "crates/tomet-codegen-markdown" }
-tomet-html = { path = "crates/tomet-codegen-html" }
-#[ Emit ]
-tomet-field-utils = { path = "crates/tomet-emit-field-utils" }
-tomet-style = { path = "crates/tomet-emit-style" }
-tomet-printer = { path = "crates/tomet-emit-printer" }
-tomet-formatter = { path = "crates/tomet-emit-formatter" }
+tomet-compute = { path = "crates/tomet-semantics-compute" }
+tomet-resolver = { path = "crates/tomet-semantics-resolver" }
+#[ Transform ]
+tomet-transform = { path = "crates/tomet-transform" }
+#[ Convert ]
+tomet-markdown = { path = "crates/tomet-convert-markdown" }
+tomet-html = { path = "crates/tomet-convert-html" }
+#[ Format ]
+tomet-field-utils = { path = "crates/tomet-format-field-utils" }
+tomet-style = { path = "crates/tomet-format-style" }
+tomet-printer = { path = "crates/tomet-format-printer" }
+tomet-formatter = { path = "crates/tomet-format-formatter" }
+#[ Workspace ]
+tomet-workspace = { path = "crates/tomet-workspace" }
+tomet-indexer = { path = "crates/tomet-workspace-indexer" }
+tomet-links = { path = "crates/tomet-workspace-links" }
+tomet-config = { path = "crates/tomet-workspace-config" }
 #[ Public ]
 serde_tomet = { path = "crates/serde_tomet" }
 tree-sitter-tomet = { path = "crates/tree-sitter-tomet" }

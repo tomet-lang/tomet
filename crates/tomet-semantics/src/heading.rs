@@ -1,9 +1,9 @@
 //! Extracts the `level` of a heading-shaped element (`Heading`, per
 //! [`crate::classify`]) from its `args`, centralizing the `1..=6` clamp
-//! that `tomet-codegen-html`/`tomet-codegen-markdown`/
-//! `tomet-emit-printer` each used to apply separately.
+//! that `tomet-html`/`tomet-markdown`/`tomet-printer` each used to apply separately.
 
 use tomet_ast::Element;
+use tomet_tree::ValueExt;
 
 use crate::kind::ElementKind;
 use crate::positional::normalized_element_args;
@@ -27,10 +27,11 @@ pub fn heading_level(el: &Element) -> Option<u8> {
 mod tests {
     use super::*;
     use tomet_ast::{Sigil, Value};
+    use tomet_tree::element_new;
 
     #[test]
     fn type_sigil_heading_classifies_and_extracts_level() {
-        let mut el = Element::new(Sigil::Type("heading".to_string()));
+        let mut el = element_new(Sigil::Type("heading".to_string()));
         el.args = Some(Value::Int(2));
         assert_eq!(crate::classify(&el), ElementKind::Heading);
         assert_eq!(heading_level(&el), Some(2));
@@ -38,7 +39,7 @@ mod tests {
 
     #[test]
     fn at_sigil_heading_classifies_and_extracts_level() {
-        let mut el = Element::new(Sigil::At(Some("heading".to_string())));
+        let mut el = element_new(Sigil::At(Some("heading".to_string())));
         el.args = Some(Value::Int(3));
         assert_eq!(crate::classify(&el), ElementKind::Heading);
         assert_eq!(heading_level(&el), Some(3));
@@ -61,41 +62,41 @@ mod tests {
         // `#[x]` sugar produces a bare `Value::Int(level)` in `args`, not
         // already wrapped in a map -- `normalized_element_args` wraps it
         // under the single "level" positional slot before this reads it.
-        let mut el = Element::new(Sigil::At(Some("heading".to_string())));
+        let mut el = element_new(Sigil::At(Some("heading".to_string())));
         el.args = Some(Value::Int(1));
         assert_eq!(heading_level(&el), Some(1));
     }
 
     #[test]
     fn clamps_level_above_six_down_to_six() {
-        let mut el = Element::new(Sigil::Type("heading".to_string()));
+        let mut el = element_new(Sigil::Type("heading".to_string()));
         el.args = Some(Value::Int(9));
         assert_eq!(heading_level(&el), Some(6));
     }
 
     #[test]
     fn clamps_level_below_one_up_to_one() {
-        let mut el = Element::new(Sigil::Type("heading".to_string()));
+        let mut el = element_new(Sigil::Type("heading".to_string()));
         el.args = Some(Value::Int(0));
         assert_eq!(heading_level(&el), Some(1));
     }
 
     #[test]
     fn non_heading_element_is_always_none() {
-        let mut el = Element::new(Sigil::Type("codeblock".to_string()));
+        let mut el = element_new(Sigil::Type("codeblock".to_string()));
         el.args = Some(Value::Int(2));
         assert_eq!(heading_level(&el), None);
     }
 
     #[test]
     fn heading_with_missing_level_is_none() {
-        let el = Element::new(Sigil::Type("heading".to_string()));
+        let el = element_new(Sigil::Type("heading".to_string()));
         assert_eq!(heading_level(&el), None);
     }
 
     #[test]
     fn heading_with_non_int_level_is_none() {
-        let mut el = Element::new(Sigil::Type("heading".to_string()));
+        let mut el = element_new(Sigil::Type("heading".to_string()));
         el.args = Some(Value::Map(vec![(
             "level".to_string(),
             Value::String("two".to_string()),

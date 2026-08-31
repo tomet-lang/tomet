@@ -18,12 +18,13 @@ mod positional;
 mod table;
 mod target;
 
+pub use tomet_tree::{ElementExt, ValueExt};
 pub use config::{DocumentConfig, ExportType, document_config};
 pub use connect::merge_connected_values;
 pub use heading::heading_level;
 pub use kind::{ElementKind, classify};
 pub use list::{list_items, list_ordered};
-pub use meta::document_meta;
+pub use meta::{document_kind, document_meta, document_version};
 pub use positional::{
     ElementSchema, LIST_MARKER_POSITIONAL_KEY, SettingsSchema, builtin_positional_arg_keys,
     normalized_element_args, normalized_element_args_with_schema, normalized_list_marker,

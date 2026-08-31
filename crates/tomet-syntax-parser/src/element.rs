@@ -12,7 +12,8 @@ use crate::value::{
     skip_line_comment, skip_ws_newlines_and_comments,
 };
 use tomet_ast::{Element, ElementValue, Inline, Sigil, Value};
-use tomet_lexar::Cursor;
+use tomet_lexer::Cursor;
+use tomet_tree::{ValueExt, element_new};
 
 pub(crate) fn is_type_element_start(cur: &Cursor) -> bool {
     let mut look = *cur;
@@ -128,7 +129,7 @@ pub(crate) fn parse_element(
         }
     };
 
-    let mut el = Element::new(sigil);
+    let mut el = element_new(sigil);
     loop {
         let checkpoint = cur.pos();
         let newlines = skip_element_gap(cur);
@@ -293,7 +294,7 @@ pub(crate) fn parse_value_group(
 fn parse_bare_element(cur: &mut Cursor, default_format: Option<EmbeddedFormat>) -> Result<Element> {
     let start_pos = cur.pos();
     let args = parse_paren_value(cur)?;
-    let mut el = Element::new(Sigil::Bare);
+    let mut el = element_new(Sigil::Bare);
     el.args = Some(args);
     let checkpoint = cur.pos();
     skip_inline_ws(cur);

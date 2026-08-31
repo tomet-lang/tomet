@@ -9,7 +9,8 @@ use crate::interp::{is_interp_start, parse_dollar_element};
 use crate::list::peek_list_marker;
 use crate::value::{err, skip_block_comment, skip_inline_ws, skip_line_comment};
 use tomet_ast::{Element, Inline, Sigil, Span, Text, Value};
-use tomet_lexar::Cursor;
+use tomet_lexer::Cursor;
+use tomet_tree::{ElementExt, element_new};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Stop {
@@ -288,7 +289,7 @@ fn try_one_delimited(
         return Err(err(cur, cur.pos(), format!("expected '{delim}'")));
     }
     let span = cur.span_from(start_pos);
-    let mut el = Element::new(Sigil::Type(kind.to_string())).with_span(span);
+    let mut el = element_new(Sigil::Type(kind.to_string())).with_span(span);
     el.content = Some(inner);
     Ok(Some(el))
 }

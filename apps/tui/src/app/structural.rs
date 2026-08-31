@@ -1,8 +1,33 @@
 //! Structural Grep tab: AST-aware search & replace (rename tag, rename
 //! key, replace value) across `.tmt` files.
 
+use std::path::PathBuf;
+
 use super::{App, PendingConfirm};
-use tomet_edit::structural::{StructuralAction, StructuralEngine, StructuralQuery};
+use tomet_transform::{StructuralAction, StructuralQuery};
+use tomet_workspace::diff::FileDiff;
+use tomet_workspace::structural::StructuralEngine;
+
+#[derive(Debug, Clone)]
+pub struct StructuralMatch {
+    pub path: PathBuf,
+    pub original_src: String,
+    pub modified_src: String,
+    pub match_count: usize,
+    pub selected: bool,
+}
+
+impl StructuralMatch {
+    pub fn from_diff(diff: FileDiff) -> Self {
+        Self {
+            path: diff.path,
+            original_src: diff.original_src,
+            modified_src: diff.modified_src,
+            match_count: diff.changes_count,
+            selected: true,
+        }
+    }
+}
 
 impl App {
     pub fn adjust_structural_scrolloff(&mut self, height: usize) {
@@ -56,12 +81,13 @@ impl App {
                 Some(self.query_val_input.clone())
             },
         };
-        self.structural_matches = StructuralEngine::search_with_config(
+        let diffs = StructuralEngine::search_with_config(
             &self.dir_path,
             &query,
             &self.printer_config,
             &self.config_root,
         );
+        self.structural_matches = diffs.into_iter().map(StructuralMatch::from_diff).collect();
         self.structural_index = 0;
         self.status_message = format!("Found {} matching file(s).", self.structural_matches.len());
     }
@@ -119,34 +145,62 @@ impl App {
     }
 
     pub(super) fn structural_execute_action(&mut self) {
-        if !self.query_key_input.is_empty() && !self.replace_to_input.is_empty() {
-            let action = if !self.query_val_input.is_empty() {
-                StructuralAction::ReplaceValue {
+        let action = if !self.query_key_input.is_empty() && !self.replace_to_input.is_empty() {
+            if !self.query_val_input.is_empty() {
+                Some(StructuralAction::ReplaceValue {
                     key: self.query_key_input.clone(),
                     new_value: self.replace_to_input.clone(),
-                }
+                })
             } else {
-                StructuralAction::RenameKey {
+                Some(StructuralAction::RenameKey {
                     old_key: self.query_key_input.clone(),
                     new_key: self.replace_to_input.clone(),
-                }
-            };
-            StructuralEngine::apply_action(&mut self.structural_matches, &action);
-        } else if !self.query_tag_input.is_empty() && !self.replace_to_input.is_empty() {
-            StructuralEngine::apply_action(
-                &mut self.structural_matches,
-                &StructuralAction::RenameTag {
-                    from: self.query_tag_input.clone(),
-                    to: self.replace_to_input.clone(),
-                },
-            );
-        }
-        match StructuralEngine::save(&mut self.structural_matches) {
-            Ok(count) => {
-                self.status_message = format!("Refactored {count} file(s).");
+                })
             }
-            Err(e) => {
-                self.status_message = format!("Refactor save error: {e}");
+        } else if !self.query_tag_input.is_empty() && !self.replace_to_input.is_empty() {
+            Some(StructuralAction::RenameTag {
+                from: self.query_tag_input.clone(),
+                to: self.replace_to_input.clone(),
+            })
+        } else {
+            None
+        };
+
+        if let Some(act) = action {
+            let mut diffs: Vec<FileDiff> = self
+                .structural_matches
+                .iter()
+                .filter(|m| m.selected)
+                .map(|m| {
+                    FileDiff::new(
+                        m.path.clone(),
+                        m.original_src.clone(),
+                        m.modified_src.clone(),
+                        m.match_count,
+                    )
+                })
+                .collect();
+
+            StructuralEngine::apply_action(&mut diffs, &act);
+
+            match tomet_workspace::save_file_diffs(&mut diffs) {
+                Ok(count) => {
+                    for diff in diffs {
+                        if let Some(m) = self
+                            .structural_matches
+                            .iter_mut()
+                            .find(|m| m.path == diff.path)
+                        {
+                            m.original_src = diff.original_src;
+                            m.modified_src = diff.modified_src;
+                            m.match_count = diff.changes_count;
+                        }
+                    }
+                    self.status_message = format!("Refactored {count} file(s).");
+                }
+                Err(e) => {
+                    self.status_message = format!("Refactor save error: {e}");
+                }
             }
         }
     }

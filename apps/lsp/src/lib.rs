@@ -8,9 +8,9 @@ use lsp_types::{
     Range, SymbolKind, TextEdit, Uri,
 };
 use std::ops::ControlFlow;
-use tomet_ast::{Element, ElementValue, Inline, InterpExprKind, Sigil, Span, Value};
+use tomet_ast::{Document, Element, ElementValue, Inline, InterpExprKind, Sigil, Span, Value};
 use tomet_semantics::{ElementKind, classify, heading_level, normalized_element_args};
-use tomet_walker::{Visitor, element_attrs_view, walk_document};
+use tomet_tree::{ElementExt, ValueExt, Visitor, walk_document};
 
 /// Converts an AST [`Span`] to an LSP [`Range`].
 pub fn span_to_range(span: &Span) -> Range {
@@ -137,11 +137,27 @@ pub fn format_edits(text: &str, uri: Option<&Uri>) -> Vec<TextEdit> {
 
 fn uri_to_file_path(u: &Uri) -> Option<std::path::PathBuf> {
     let s = u.as_str();
-    if let Some(stripped) = s.strip_prefix("file://") {
-        Some(std::path::PathBuf::from(stripped))
-    } else {
-        None
+    let stripped = s.strip_prefix("file://")?;
+    let decoded = percent_decode_str(stripped);
+    Some(std::path::PathBuf::from(decoded))
+}
+
+fn percent_decode_str(s: &str) -> String {
+    let mut out = Vec::new();
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(b) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(b);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
     }
+    String::from_utf8_lossy(&out).to_string()
 }
 
 fn whole_document_range(text: &str) -> Range {
@@ -151,13 +167,92 @@ fn whole_document_range(text: &str) -> Range {
     Range::new(Position::new(0, 0), Position::new(end_line, end_char))
 }
 
+/// Resolves the merged configuration for a document by combining:
+/// 1. Workspace config discovered from ancestor directories (`default.config.tmt` / `tomet.config.tmt`)
+/// 2. Explicit `@config(import: ...)` / `@config(file: ...)` imported configs
+/// 3. Document's local `@config` definitions (highest precedence)
+pub fn resolve_effective_config(
+    doc: &Document,
+    uri: Option<&Uri>,
+) -> tomet_semantics::DocumentConfig {
+    let mut config = tomet_semantics::document_config(doc);
+    let file_path_opt = uri.and_then(uri_to_file_path);
+
+    // 1. Merge macros from workspace config file (e.g. default.config.tmt / tomet.config.tmt)
+    if let Some(fp) = &file_path_opt {
+        if let Some((_, cfg_path, _)) = tomet_config::find_config_file(fp) {
+            if let Ok(src) = std::fs::read_to_string(&cfg_path) {
+                if let Ok(cfg_doc) = tomet_parser::parse_document(&src) {
+                    let ext_cfg = tomet_semantics::document_config(&cfg_doc);
+                    for (k, v) in ext_cfg.macros {
+                        config.macros.entry(k).or_insert(v);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Merge macros from explicit @config(import: ...) / @settings references in the document
+    let mut import_targets = config.imports.clone();
+    for block in &doc.blocks {
+        if let tomet_ast::Block::Element(el) = block {
+            if let Some(target) = tomet_resolver::config_import_ref(el) {
+                if !import_targets.iter().any(|t| t == target) {
+                    import_targets.push(target.to_string());
+                }
+            }
+        }
+    }
+
+    for target in import_targets {
+        let clean = target.strip_prefix("file:").unwrap_or(&target).trim();
+        let candidate_paths = if let Some(fp) = &file_path_opt {
+            let start_dir = if fp.is_file() {
+                fp.parent().unwrap_or(fp)
+            } else {
+                fp.as_path()
+            };
+            let mut paths = Vec::new();
+            let mut cur = start_dir.to_path_buf();
+            loop {
+                paths.push(cur.join(clean));
+                if !cur.pop() {
+                    break;
+                }
+            }
+            paths
+        } else {
+            vec![std::path::PathBuf::from(clean)]
+        };
+        for p in candidate_paths {
+            if p.exists() {
+                if let Ok(src) = std::fs::read_to_string(&p) {
+                    if let Ok(ext_doc) = tomet_parser::parse_document(&src) {
+                        let ext_cfg = tomet_semantics::document_config(&ext_doc);
+                        for (k, v) in ext_cfg.macros {
+                            config.macros.entry(k).or_insert(v);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    config
+}
+
 /// Provides hover information for the symbol under the cursor.
-pub fn hover_for(text: &str, pos: Position) -> Option<Hover> {
+pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> {
     let doc = tomet_parser::parse_document(text).ok()?;
     let target_line = pos.line as usize + 1;
     let target_col = pos.character as usize + 1;
 
+    let config = resolve_effective_config(&doc, uri);
+
     struct HoverFinder<'a> {
+        doc: &'a Document,
+        config: &'a tomet_semantics::DocumentConfig,
         text: &'a str,
         pos: Position,
         line: usize,
@@ -172,6 +267,8 @@ pub fn hover_for(text: &str, pos: Position) -> Option<Hover> {
                 let kind = classify(el);
                 let hover = if kind == ElementKind::Table {
                     table_hover(self.text, self.pos, el)
+                } else if let Some(h) = macro_hover(self.doc, self.config, el) {
+                    Some(h)
                 } else if kind == ElementKind::Bare {
                     Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
@@ -185,6 +282,38 @@ pub fn hover_for(text: &str, pos: Position) -> Option<Hover> {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
                             value: format!("**Heading Level {}**", heading_level(el).unwrap_or(1)),
+                        }),
+                        range: Some(span_to_range(&span)),
+                    })
+                } else if kind == ElementKind::Kind {
+                    let declared_kind = normalized_element_args(el)
+                        .and_then(|v| v.get("kind").and_then(|k| k.as_str()).map(|s| s.to_string()))
+                        .or_else(|| el.args.as_ref().and_then(|v| v.as_str()).map(|s| s.to_string()))
+                        .unwrap_or_else(|| "unknown".to_string());
+                    let mut desc = format!("**Document Kind**: `{declared_kind}`\n\n");
+                    desc.push_str("Declares the document archetype and binds template and schema validation rules.");
+                    Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: desc,
+                        }),
+                        range: Some(span_to_range(&span)),
+                    })
+                } else if kind == ElementKind::Version {
+                    let declared_ver = normalized_element_args(el)
+                        .and_then(|v| v.get("version").map(|v| match v {
+                            Value::String(s) => s.clone(),
+                            Value::Int(i) => i.to_string(),
+                            Value::Float(f) => f.to_string(),
+                            _ => format!("{v:?}"),
+                        }))
+                        .unwrap_or_else(|| "unknown".to_string());
+                    let mut desc = format!("**Tomet Version**: `{declared_ver}`\n\n");
+                    desc.push_str("Declares the Tomet language and syntax specification edition for this document.");
+                    Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: desc,
                         }),
                         range: Some(span_to_range(&span)),
                     })
@@ -211,6 +340,8 @@ pub fn hover_for(text: &str, pos: Position) -> Option<Hover> {
     }
 
     let mut finder = HoverFinder {
+        doc: &doc,
+        config: &config,
         text,
         pos,
         line: target_line,
@@ -413,6 +544,102 @@ fn table_hover(text: &str, pos: Position, el: &Element) -> Option<Hover> {
     })
 }
 
+fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
+    match val {
+        Value::String(s) => {
+            let trimmed = s.trim();
+            if trimmed.starts_with('$') {
+                if let Ok(parsed) = tomet_parser::parse_document(trimmed) {
+                    struct InterpFinder(Option<tomet_ast::InterpExpr>);
+                    impl Visitor<()> for InterpFinder {
+                        fn visit(&mut self, el: &Element) -> ControlFlow<()> {
+                            if let Some(ElementValue::Interp(expr)) = &el.value {
+                                self.0 = Some(expr.clone());
+                                return ControlFlow::Break(());
+                            }
+                            ControlFlow::Continue(())
+                        }
+                    }
+                    let mut finder = InterpFinder(None);
+                    let _ = walk_document(&parsed, &mut finder);
+                    if finder.0.is_some() {
+                        return finder.0;
+                    }
+                }
+            }
+            None
+        }
+        Value::Map(entries) => {
+            for (_, v) in entries {
+                if let Some(expr) = find_interp_in_value(v) {
+                    return Some(expr);
+                }
+            }
+            None
+        }
+        Value::Seq(items) => {
+            for v in items {
+                if let Some(expr) = find_interp_in_value(v) {
+                    return Some(expr);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn macro_hover(
+    doc: &Document,
+    config: &tomet_semantics::DocumentConfig,
+    el: &Element,
+) -> Option<Hover> {
+    let expr = if let Some(ElementValue::Interp(expr)) = el.value.as_ref() {
+        Some(expr.clone())
+    } else if let Some(args) = el.args.as_ref() {
+        find_interp_in_value(args)
+    } else {
+        None
+    }?;
+
+    let md = match tomet_compute::evaluate_with_config(doc, &expr, config) {
+        Ok(val) => {
+            let rendered = match val {
+                Value::String(s) => s,
+                Value::Int(i) => i.to_string(),
+                Value::Float(f) => f.to_string(),
+                Value::Bool(b) => b.to_string(),
+                Value::Seq(seq) => format!("{seq:?}"),
+                Value::Map(map) => format!("{map:?}"),
+                Value::Null => "null".to_string(),
+            };
+            let trimmed = rendered.trim();
+            if is_web_url(trimmed) {
+                format!("**Macro Result**\n\n[{trimmed}]({trimmed})")
+            } else {
+                format!("**Macro Result**\n\n```text\n{rendered}\n```")
+            }
+        }
+        Err(err) => {
+            format!("**Macro**\n\n- **Error**: `{err}`")
+        }
+    };
+    Some(Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: md,
+        }),
+        range: Some(span_to_range(&el.span)),
+    })
+}
+
+fn is_web_url(s: &str) -> bool {
+    (s.starts_with("http://") || s.starts_with("https://"))
+        && !s.contains('\n')
+        && !s.contains('\r')
+        && !s.contains(' ')
+}
+
 fn sigil_display_name(sigil: &Sigil) -> String {
     match sigil {
         Sigil::Type(name) => format!("<{name}>"),
@@ -560,7 +787,7 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
 
     impl Visitor<()> for DefFinder {
         fn visit(&mut self, el: &Element) -> ControlFlow<()> {
-            if let Some(Value::Map(entries)) = element_attrs_view(el) {
+            if let Some(Value::Map(entries)) = el.attrs_view() {
                 for (k, v) in entries {
                     if k == "id" {
                         if let Value::String(s) = v {
@@ -597,6 +824,8 @@ pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
     let prefix = get_line_prefix(text, pos);
 
     let builtins = [
+        ("version", "Tomet language specification version"),
+        ("kind", "Document kind (archetype / schema) declaration"),
         ("callout", "Callout container block"),
         ("warning", "Warning alert block"),
         ("caution", "Caution alert block"),
@@ -764,7 +993,7 @@ mod tests {
     #[test]
     fn hover_returns_element_info() {
         let text = "<callout>(type: info)[ Message ]\n";
-        let hover = hover_for(text, Position::new(0, 2)).expect("hover found");
+        let hover = hover_for(text, Position::new(0, 2), None).expect("hover found");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("callout"));
         } else {
@@ -831,7 +1060,7 @@ mod tests {
     fn hover_on_table_header_cell() {
         let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
         // Position on line 1, inside "[ 電子数 2n² ]" (e.g. character 25)
-        let hover = hover_for(text, Position::new(1, 25)).expect("hover found for table header");
+        let hover = hover_for(text, Position::new(1, 25), None).expect("hover found for table header");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Table Header (Column 3)"));
             assert!(m.value.contains("電子数 2n²"));
@@ -847,7 +1076,7 @@ mod tests {
     fn hover_on_table_data_cell() {
         let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
         // Position on line 2, inside "[ 2 ]" (column 3, character 15)
-        let hover = hover_for(text, Position::new(2, 15)).expect("hover found for table data cell");
+        let hover = hover_for(text, Position::new(2, 15), None).expect("hover found for table data cell");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Table Cell (Column 3, Row 2)"));
             assert!(m.value.contains("電子数 2n²"));
@@ -862,7 +1091,7 @@ mod tests {
     #[test]
     fn hover_on_table_overview() {
         let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
-        let hover = hover_for(text, Position::new(0, 2)).expect("hover found for table overview");
+        let hover = hover_for(text, Position::new(0, 2), None).expect("hover found for table overview");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Table"));
             assert!(m.value.contains("Rows"));
@@ -887,5 +1116,218 @@ mod tests {
         // Position at character 2 (inside '岸' in byte terms, but character 2 in LSP)
         let items2 = completions_for(text, Position::new(0, 2));
         assert!(!items2.is_empty());
+    }
+
+    #[test]
+    fn hover_on_macro_evaluation() {
+        let text = "@config{\n  macros: {\n    gh: \"https://github.com/cettila-projects/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Cettila Projects\"\n  }\n}\n\n$gh(42)\n\n$greet(\"Alice\", \"Bob\")\n\n${copyright}\n\n$emoji(\"sparkles\")\n";
+
+        // Hover on $gh(42) (line 8, char 2)
+        let hover = hover_for(text, Position::new(8, 2), None).expect("hover found for $gh");
+        if let HoverContents::Markup(m) = hover.contents {
+            assert!(m.value.contains("Macro Result"));
+            assert!(m.value.contains("[https://github.com/cettila-projects/tomet/issues/42](https://github.com/cettila-projects/tomet/issues/42)"));
+        } else {
+            panic!("expected markup contents");
+        }
+
+        // Hover on $greet("Alice", "Bob") (line 10, char 3)
+        let hover2 = hover_for(text, Position::new(10, 3), None).expect("hover found for $greet");
+        if let HoverContents::Markup(m) = hover2.contents {
+            assert!(m.value.contains("Macro Result"));
+            assert!(m.value.contains("```text\nHello, Alice Bob!\n```"));
+        } else {
+            panic!("expected markup contents");
+        }
+
+        // Hover on ${copyright} (line 12, char 3)
+        let hover3 = hover_for(text, Position::new(12, 3), None).expect("hover found for ${copyright}");
+        if let HoverContents::Markup(m) = hover3.contents {
+            assert!(m.value.contains("Macro Result"));
+            assert!(m.value.contains("(C) 2026 Cettila Projects"));
+        } else {
+            panic!("expected markup contents");
+        }
+
+        // Hover on $emoji("sparkles") (line 14, char 2)
+        let hover4 = hover_for(text, Position::new(14, 2), None).expect("hover found for $emoji");
+        if let HoverContents::Markup(m) = hover4.contents {
+            assert!(m.value.contains("Macro Result"));
+            assert!(m.value.contains("✨"));
+        } else {
+            panic!("expected markup contents");
+        }
+    }
+
+    #[test]
+    fn hover_on_undefined_macro_shows_error() {
+        let text = "$undefined_macro(123)\n";
+        let hover = hover_for(text, Position::new(0, 5), None).expect("hover found for undefined macro");
+        if let HoverContents::Markup(m) = hover.contents {
+            assert!(m.value.contains("Macro"));
+            assert!(m.value.contains("Error"));
+            assert!(m.value.contains("undefined_macro"));
+        } else {
+            panic!("expected markup contents");
+        }
+    }
+
+    #[test]
+    fn hover_on_macro_defined_in_settings_file_ref() {
+        let unique = format!(
+            "tomet_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let dir = std::env::temp_dir().join(unique);
+        std::fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("default.config.tmt");
+        std::fs::write(
+            &config_path,
+            "@config(format:json){\n  {\n    \"macros\": {\n      \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\"\n    }\n  }\n}\n",
+        )
+        .unwrap();
+
+        let doc_path = dir.join("sub/note.tmt");
+        std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+        let doc_text = "@settings(file:\"file:default.config.tmt\")\n\n$youtube_video(\"Pm_h6FnF8HU\")\n";
+        let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
+
+        let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
+            .expect("hover found for external config macro");
+        if let HoverContents::Markup(m) = hover.contents {
+            assert!(m.value.contains("Macro Result"));
+            assert!(m.value.contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU"));
+        } else {
+            panic!("expected markup contents");
+        }
+
+        // Test embed with macro
+        let embed_doc = "@settings(file:\"file:default.config.tmt\")\n\n<embed>($youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n";
+        let hover2 = hover_for(embed_doc, Position::new(2, 10), Some(&uri))
+            .expect("hover found for embed macro");
+        if let HoverContents::Markup(m) = hover2.contents {
+            assert!(m.value.contains("Macro Result"));
+            assert!(m.value.contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU"));
+        } else {
+            panic!("expected markup contents");
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn hover_on_macro_auto_discovered_from_workspace_config() {
+        let unique = format!(
+            "tomet_auto_cfg_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let dir = std::env::temp_dir().join(unique);
+        std::fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("default.config.tmt");
+        std::fs::write(
+            &config_path,
+            "@config(format:json){\n  {\n    \"macros\": {\n      \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\",\n      \"twitter_post\": \"https://x.com/${1}/status/${2}\"\n    }\n  }\n}\n",
+        )
+        .unwrap();
+
+        // Note has NO header at all!
+        let doc_path = dir.join("10-19 Journal/12 Daily/2024/12/$2024-12-26.tmt");
+        std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+        let doc_text = "<embed>($youtube_video(\"Pm_h6FnF8HU\"))[Low]\n\n<embed>($twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n";
+        let uri = Uri::from_str(&format!("file://{}", doc_path.display()).replace(' ', "%20")).unwrap();
+
+        // Hover on youtube_video
+        let hover = hover_for(doc_text, Position::new(0, 10), Some(&uri))
+            .expect("hover found for auto-discovered youtube macro");
+        if let HoverContents::Markup(m) = hover.contents {
+            assert!(m.value.contains("Macro Result"));
+            assert!(m.value.contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU"));
+        } else {
+            panic!("expected markup contents");
+        }
+
+        // Hover on twitter_post (two arguments)
+        let hover2 = hover_for(doc_text, Position::new(2, 10), Some(&uri))
+            .expect("hover found for auto-discovered twitter macro");
+        if let HoverContents::Markup(m) = hover2.contents {
+            assert!(m.value.contains("Macro Result"));
+            assert!(m.value.contains("https://x.com/kosekibijou/status/1807568682631254496"));
+        } else {
+            panic!("expected markup contents");
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn hover_on_macro_defined_in_config_import() {
+        let unique = format!(
+            "tomet_import_cfg_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let dir = std::env::temp_dir().join(unique);
+        std::fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("custom.config.tmt");
+        std::fs::write(
+            &config_path,
+            "@config{\n  macros: {\n    wiki: \"https://ja.wikipedia.org/wiki/${1}\"\n  }\n}\n",
+        )
+        .unwrap();
+
+        let doc_path = dir.join("note.tmt");
+        let doc_text = "@config(import: \"custom.config.tmt\")\n\n$wiki(\"Rust\")\n";
+        let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
+
+        let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
+            .expect("hover found for @config(import:...) macro");
+        if let HoverContents::Markup(m) = hover.contents {
+            assert!(m.value.contains("Macro Result"));
+            assert!(m.value.contains("https://ja.wikipedia.org/wiki/Rust"));
+        } else {
+            panic!("expected markup contents");
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn hover_on_kind_and_version() {
+        let doc_text = "@version(1.0)\n@kind(j.daily)\n\n#[ Title ]\n";
+        let hover_ver = hover_for(doc_text, Position::new(0, 3), None)
+            .expect("hover found for @version");
+        if let HoverContents::Markup(m) = hover_ver.contents {
+            assert!(m.value.contains("Tomet Version"));
+            assert!(m.value.contains("1"));
+        } else {
+            panic!("expected markup contents");
+        }
+
+        let hover_kind = hover_for(doc_text, Position::new(1, 3), None)
+            .expect("hover found for @kind");
+        if let HoverContents::Markup(m) = hover_kind.contents {
+            assert!(m.value.contains("Document Kind"));
+            assert!(m.value.contains("j.daily"));
+        } else {
+            panic!("expected markup contents");
+        }
+    }
+
+    #[test]
+    fn completions_suggest_kind_and_version() {
+        let items = completions_for("@", Position::new(0, 1));
+        assert!(items.iter().any(|i| i.label == "kind"));
+        assert!(items.iter().any(|i| i.label == "version"));
     }
 }

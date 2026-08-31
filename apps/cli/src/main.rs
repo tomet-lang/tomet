@@ -162,6 +162,28 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+
+    /// Refactor .tmt file(s) across a workspace (URL macros, @meta.type -> @kind, Value DSL normalization).
+    Refactor {
+        /// Target file or directory path (defaults to current directory ".").
+        #[arg(default_value = ".")]
+        path: PathBuf,
+        /// Write modified files in place.
+        #[arg(short = 'i', long, alias = "write")]
+        in_place: bool,
+        /// Only rewrite URLs matching macros.
+        #[arg(long)]
+        url_macros: bool,
+        /// Only promote @meta.type to @kind.
+        #[arg(long)]
+        meta_kind: bool,
+        /// Only normalize @meta(format:yaml) to Value DSL.
+        #[arg(long)]
+        value_dsl: bool,
+        /// Check/dry-run mode without modifying files (exits non-zero if changes are needed).
+        #[arg(long, conflicts_with = "in_place")]
+        check: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -225,6 +247,21 @@ fn main() -> ExitCode {
             out,
             advanced,
         } => export_cmd(path, r#type.as_deref(), out.as_deref(), *advanced),
+        Command::Refactor {
+            path,
+            in_place,
+            url_macros,
+            meta_kind,
+            value_dsl,
+            check,
+        } => refactor_cmd(
+            path,
+            *in_place,
+            *url_macros,
+            *meta_kind,
+            *value_dsl,
+            *check,
+        ),
         Command::CheckLinks { .. } => unreachable!("handled above, before this match"),
     };
 
@@ -952,6 +989,75 @@ fn check_links_report_to_json(report: &tomet_links::CheckReport) -> String {
     .to_string()
 }
 
+fn refactor_cmd(
+    path: &Path,
+    in_place: bool,
+    url_macros: bool,
+    meta_kind: bool,
+    value_dsl: bool,
+    check: bool,
+) -> anyhow::Result<()> {
+    let options = if !url_macros && !meta_kind && !value_dsl {
+        tomet_workspace::RefactorOptions::default()
+    } else {
+        tomet_workspace::RefactorOptions {
+            url_to_macros: url_macros,
+            meta_type_to_kind: meta_kind,
+            meta_to_value_dsl: value_dsl,
+        }
+    };
+
+    let mut results = tomet_workspace::refactor_workspace(path, &options)?;
+    let changed_files: Vec<_> = results.iter().filter(|r| r.is_changed()).collect();
+
+    if check {
+        if changed_files.is_empty() {
+            println!("All {} file(s) are up to date.", results.len());
+            return Ok(());
+        }
+        for f in &changed_files {
+            println!(
+                "Needs refactor ({} change(s)): {}",
+                f.changes_count,
+                f.path.display()
+            );
+        }
+        return Err(anyhow::anyhow!(
+            "{} of {} file(s) need refactoring",
+            changed_files.len(),
+            results.len()
+        ));
+    }
+
+    if in_place {
+        let saved = tomet_workspace::save_file_diffs(&mut results)?;
+        println!("Refactored {} of {} file(s).", saved, results.len());
+        return Ok(());
+    }
+
+    if path.is_file() {
+        if let Some(res) = results.first() {
+            print!("{}", res.modified_src);
+        }
+    } else {
+        for res in &changed_files {
+            println!(
+                "==> {} ({} changes) <==",
+                res.path.display(),
+                res.changes_count
+            );
+            print!("{}", res.modified_src);
+        }
+        println!(
+            "\nDry-run: {} of {} file(s) would be modified.",
+            changed_files.len(),
+            results.len()
+        );
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1009,6 +1115,38 @@ mod tests {
         assert!(out_file.exists());
         let tmt_text = fs::read_to_string(&out_file).unwrap();
         assert!(tmt_text.contains("#[Title]"));
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn refactor_cmd_in_place_transforms_document() {
+        let temp_dir = std::env::temp_dir().join("tomet_test_refactor_cmd");
+        let _ = fs::create_dir_all(&temp_dir);
+        let src_file = temp_dir.join("doc.tmt");
+
+        let src_content = r#"@version(1.0)
+@meta(format:yaml){
+  type: note
+  title: My Title
+}
+@config{
+  macros: {
+    gh: "https://github.com/${1}"
+  }
+}
+
+- @link("https://github.com/cettila-projects/tomet")[Repo]
+"#;
+        fs::write(&src_file, src_content).unwrap();
+
+        let res = refactor_cmd(&src_file, true, false, false, false, false);
+        assert!(res.is_ok());
+
+        let refactored = fs::read_to_string(&src_file).unwrap();
+        assert!(refactored.contains("@kind(note)"));
+        assert!(refactored.contains("$gh(\"cettila-projects/tomet\")"));
+        assert!(!refactored.contains("format:yaml"));
 
         let _ = fs::remove_dir_all(&temp_dir);
     }

@@ -1,4 +1,5 @@
-@meta{ type: config }
+@version(1.0)
+@kind(config)
 @config(format:json){
   {
     "format": {

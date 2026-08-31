@@ -1,0 +1,10 @@
+[package]
+name = "tomet-style"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-config = { workspace = true }
+tomet-field-utils = { workspace = true }
+tomet-tree = { workspace = true }

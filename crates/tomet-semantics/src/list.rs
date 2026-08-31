@@ -2,8 +2,7 @@
 //! Type("ol"|"ul"), .. }`, see [`crate::classify`]) and their items
 //! (`Element::list_item`, `Element{ sigil: Bare, .. }`, nested inside the
 //! list's `ElementValue::Children`). Centralizes the "ol"/"ul" ordered
-//! check and the `Children` unwrap that `tomet-codegen-html`/
-//! `tomet-codegen-markdown`/`tomet-emit-printer` would otherwise
+//! check and the `Children` unwrap that `tomet-html`/`tomet-markdown`/`tomet-printer` would otherwise
 //! each duplicate.
 
 use tomet_ast::{Element, ElementValue};
@@ -37,38 +36,39 @@ pub fn list_items(el: &Element) -> &[Element] {
 mod tests {
     use super::*;
     use tomet_ast::{Sigil, Value};
+    use tomet_tree::{element_list, element_list_item, element_new};
 
     #[test]
     fn ordered_list_classifies_and_reports_ordered() {
-        let el = Element::list(true, Vec::new(), tomet_ast::Span::dummy());
+        let el = element_list(true, Vec::new(), tomet_ast::Span::dummy());
         assert_eq!(crate::classify(&el), ElementKind::OrderedList);
         assert_eq!(list_ordered(&el), Some(true));
     }
 
     #[test]
     fn unordered_list_classifies_and_reports_unordered() {
-        let el = Element::list(false, Vec::new(), tomet_ast::Span::dummy());
+        let el = element_list(false, Vec::new(), tomet_ast::Span::dummy());
         assert_eq!(crate::classify(&el), ElementKind::UnorderedList);
         assert_eq!(list_ordered(&el), Some(false));
     }
 
     #[test]
     fn non_list_element_has_no_ordered_and_no_items() {
-        let el = Element::new(Sigil::Type("codeblock".to_string()));
+        let el = element_new(Sigil::Type("codeblock".to_string()));
         assert_eq!(list_ordered(&el), None);
         assert_eq!(list_items(&el), &[] as &[Element]);
     }
 
     #[test]
     fn list_items_returns_children_in_order() {
-        let item = Element::list_item(
+        let item = element_list_item(
             vec![],
             Some(Value::String("marker".into())),
             None,
             Vec::new(),
             tomet_ast::Span::dummy(),
         );
-        let el = Element::list(false, vec![item.clone()], tomet_ast::Span::dummy());
+        let el = element_list(false, vec![item.clone()], tomet_ast::Span::dummy());
         assert_eq!(list_items(&el), &[item]);
     }
 }

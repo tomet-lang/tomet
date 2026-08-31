@@ -274,3 +274,167 @@ fn hover_symbols_definition_completion_over_stdio() {
 
     server.shutdown();
 }
+
+#[test]
+fn macro_hover_over_stdio() {
+    let mut server = Server::start();
+
+    let init = server.send_request(
+        "initialize",
+        json!({"processId": Value::Null, "rootUri": Value::Null, "capabilities": {}}),
+    );
+    assert!(init.get("error").is_none());
+    server.send_notification("initialized", json!({}));
+
+    server.send_notification(
+        "textDocument/didOpen",
+        json!({
+            "textDocument": {
+                "uri": "file:///tmp/macro_test.tmt",
+                "languageId": "tomet",
+                "version": 1,
+                "text": "@config{\n  macros: {\n    gh: \"https://github.com/cettila-projects/tomet/issues/${1}\"\n  }\n}\n\n$gh(101)\n",
+            }
+        }),
+    );
+    let _diags = server.read_message();
+
+    let hover_resp = server.send_request(
+        "textDocument/hover",
+        json!({
+            "textDocument": {"uri": "file:///tmp/macro_test.tmt"},
+            "position": {"line": 6, "character": 2},
+        }),
+    );
+    let hover_val = hover_resp["result"]["contents"]["value"]
+        .as_str()
+        .expect("hover value string");
+    assert!(hover_val.contains("Macro Result"));
+    assert!(hover_val.contains("https://github.com/cettila-projects/tomet/issues/101"));
+
+    server.shutdown();
+}
+
+#[test]
+fn macro_hover_with_config_import_over_stdio() {
+    let unique = format!(
+        "tomet_smoke_import_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let dir = std::env::temp_dir().join(unique);
+    std::fs::create_dir_all(&dir).unwrap();
+    let config_path = dir.join("custom.config.tmt");
+    std::fs::write(
+        &config_path,
+        "@config(format:json){\n  {\n    \"macros\": {\n      \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\"\n    }\n  }\n}\n",
+    )
+    .unwrap();
+
+    let doc_path = dir.join("journal.tmt");
+    let doc_uri = format!("file://{}", doc_path.display());
+
+    let mut server = Server::start();
+
+    let init = server.send_request(
+        "initialize",
+        json!({"processId": Value::Null, "rootUri": Value::Null, "capabilities": {}}),
+    );
+    assert!(init.get("error").is_none());
+    server.send_notification("initialized", json!({}));
+
+    server.send_notification(
+        "textDocument/didOpen",
+        json!({
+            "textDocument": {
+                "uri": doc_uri,
+                "languageId": "tomet",
+                "version": 1,
+                "text": "@config(import:\"custom.config.tmt\")\n\n<embed>($youtube_video(\"Pm_h6FnF8HU\"))[Video]\n",
+            }
+        }),
+    );
+    let _diags = server.read_message();
+
+    let hover_resp = server.send_request(
+        "textDocument/hover",
+        json!({
+            "textDocument": {"uri": doc_uri},
+            "position": {"line": 2, "character": 12},
+        }),
+    );
+    let hover_val = hover_resp["result"]["contents"]["value"]
+        .as_str()
+        .unwrap_or_else(|| panic!("expected hover value string, got {hover_resp:?}"));
+    assert!(hover_val.contains("Macro Result"), "got hover_val: {hover_val}");
+    assert!(hover_val.contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU"));
+
+    server.shutdown();
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn macro_hover_with_workspace_auto_config_over_stdio() {
+    let unique = format!(
+        "tomet_smoke_auto_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let dir = std::env::temp_dir().join(unique);
+    std::fs::create_dir_all(&dir).unwrap();
+    let config_path = dir.join("default.config.tmt");
+    std::fs::write(
+        &config_path,
+        "@config(format:json){\n  {\n    \"macros\": {\n      \"twitter_post\": \"https://x.com/${1}/status/${2}\"\n    }\n  }\n}\n",
+    )
+    .unwrap();
+
+    let doc_path = dir.join("sub/daily.tmt");
+    std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+    let doc_uri = format!("file://{}", doc_path.display());
+
+    let mut server = Server::start();
+
+    let init = server.send_request(
+        "initialize",
+        json!({"processId": Value::Null, "rootUri": Value::Null, "capabilities": {}}),
+    );
+    assert!(init.get("error").is_none());
+    server.send_notification("initialized", json!({}));
+
+    server.send_notification(
+        "textDocument/didOpen",
+        json!({
+            "textDocument": {
+                "uri": doc_uri,
+                "languageId": "tomet",
+                "version": 1,
+                // Zero configuration headers in note
+                "text": "<embed>($twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n",
+            }
+        }),
+    );
+    let _diags = server.read_message();
+
+    let hover_resp = server.send_request(
+        "textDocument/hover",
+        json!({
+            "textDocument": {"uri": doc_uri},
+            "position": {"line": 0, "character": 12},
+        }),
+    );
+    let hover_val = hover_resp["result"]["contents"]["value"]
+        .as_str()
+        .unwrap_or_else(|| panic!("expected hover value string, got {hover_resp:?}"));
+    assert!(hover_val.contains("Macro Result"), "got hover_val: {hover_val}");
+    assert!(hover_val.contains("https://x.com/kosekibijou/status/1807568682631254496"));
+
+    server.shutdown();
+    let _ = std::fs::remove_dir_all(&dir);
+}

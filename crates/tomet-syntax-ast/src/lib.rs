@@ -91,92 +91,6 @@ pub enum Value {
     Map(Vec<(String, Value)>),
 }
 
-impl Value {
-    /// Returns `true` if this value is `Value::Null`.
-    pub fn is_null(&self) -> bool {
-        matches!(self, Value::Null)
-    }
-
-    /// Returns the string slice if this value is a `Value::String`.
-    pub fn as_str(&self) -> Option<&str> {
-        match self {
-            Value::String(s) => Some(s.as_str()),
-            _ => None,
-        }
-    }
-
-    /// Returns the `bool` value if this value is a `Value::Bool`.
-    pub fn as_bool(&self) -> Option<bool> {
-        match self {
-            Value::Bool(b) => Some(*b),
-            _ => None,
-        }
-    }
-
-    /// Returns the `i64` value if this value is a `Value::Int`.
-    pub fn as_i64(&self) -> Option<i64> {
-        match self {
-            Value::Int(i) => Some(*i),
-            _ => None,
-        }
-    }
-
-    /// Returns the `f64` value if this value is a `Value::Float`.
-    pub fn as_f64(&self) -> Option<f64> {
-        match self {
-            Value::Float(f) => Some(*f),
-            _ => None,
-        }
-    }
-
-    /// Returns a slice of elements if this value is a `Value::Seq`.
-    pub fn as_seq(&self) -> Option<&[Value]> {
-        match self {
-            Value::Seq(seq) => Some(seq.as_slice()),
-            _ => None,
-        }
-    }
-
-    /// Returns a slice of key-value pairs if this value is a `Value::Map`.
-    pub fn as_map(&self) -> Option<&[(String, Value)]> {
-        match self {
-            Value::Map(map) => Some(map.as_slice()),
-            _ => None,
-        }
-    }
-
-    /// If this value is a `Value::Map`, returns the first value associated with `key`.
-    pub fn get(&self, key: &str) -> Option<&Value> {
-        match self {
-            Value::Map(entries) => entries
-                .iter()
-                .find_map(|(k, v)| if k == key { Some(v) } else { None }),
-            _ => None,
-        }
-    }
-
-    /// If this value is a `Value::Map`, returns a mutable reference to the first value associated with `key`.
-    pub fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
-        match self {
-            Value::Map(entries) => entries
-                .iter_mut()
-                .find_map(|(k, v)| if k == key { Some(v) } else { None }),
-            _ => None,
-        }
-    }
-
-    /// Returns `true` if a sequence or map is empty, or if string is empty.
-    pub fn is_empty(&self) -> bool {
-        match self {
-            Value::Null => true,
-            Value::String(s) => s.is_empty(),
-            Value::Seq(seq) => seq.is_empty(),
-            Value::Map(map) => map.is_empty(),
-            _ => false,
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Document {
     pub blocks: Vec<Block>,
@@ -311,7 +225,7 @@ pub enum Sigil {
 
 /// `(args)` / `[content]` / `{value}`, each optional and at most one of each,
 /// in any order in the source.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Element {
     pub sigil: Sigil,
     pub args: Option<Value>,
@@ -321,99 +235,9 @@ pub struct Element {
     pub span: Span,
 }
 
-impl Element {
-    pub fn new(sigil: Sigil) -> Self {
-        Element {
-            sigil,
-            args: None,
-            content: None,
-            children: None,
-            value: None,
-            span: Span::default(),
-        }
-    }
-
-    pub fn with_span(mut self, span: Span) -> Self {
-        self.span = span;
-        self
-    }
-
-    pub fn with_args(mut self, args: Value) -> Self {
-        self.args = Some(args);
-        self
-    }
-
-    pub fn with_content(mut self, content: Vec<Inline>) -> Self {
-        self.content = Some(content);
-        self
-    }
-
-    pub fn with_children(mut self, children: Vec<Block>) -> Self {
-        self.children = Some(children);
-        self
-    }
-
-    pub fn with_value(mut self, value: ElementValue) -> Self {
-        self.value = Some(value);
-        self
-    }
-
-    /// Returns the element's explicit name if introduced via `Sigil::Type("name")` or `Sigil::At(Some("name"))`.
-    pub fn name(&self) -> Option<&str> {
-        match &self.sigil {
-            Sigil::Type(name) => Some(name.as_str()),
-            Sigil::At(Some(name)) => Some(name.as_str()),
-            Sigil::At(None) | Sigil::Bare | Sigil::Dollar => None,
-        }
-    }
-
-    /// Returns `true` if this element has `Sigil::Bare`.
-    pub fn is_bare(&self) -> bool {
-        matches!(self.sigil, Sigil::Bare)
-    }
-
-    /// A list: `sigil` is `Type("ol")` if `ordered`, else `Type("ul")`;
-    /// `items` become `ElementValue::Children`. `ordered` distinguishes
-    /// `-.` (auto-numbered) from plain `-` lists -- numbering itself isn't
-    /// stored, it's computed at render time.
-    pub fn list(ordered: bool, items: Vec<Element>, span: Span) -> Self {
-        Element {
-            sigil: Sigil::Type(if ordered { "ol" } else { "ul" }.to_string()),
-            args: None,
-            content: None,
-            children: None,
-            value: Some(ElementValue::Children(items)),
-            span,
-        }
-    }
-
-    /// A list item: legal only as an entry of a [`Element::list`]'s
-    /// `Children`. `marker` is the optional `(...)`-shaped marker (goes to
-    /// `args`, parsed with the same `Value` grammar as any other
-    /// element's `(args)`, normalized against the builtin `"marker"`
-    /// positional key -- see `tomet-semantics::positional`); `attrs`
-    /// is the optional trailing `{value}`-shaped attributes (e.g.
-    /// `{tag: dev}`, goes to `value` as `ElementValue::Data`); `children`
-    /// is any nested sub-lists or indented blocks.
-    pub fn list_item(
-        content: Vec<Inline>,
-        marker: Option<Value>,
-        attrs: Option<Value>,
-        children: Vec<Block>,
-        span: Span,
-    ) -> Self {
-        Element {
-            sigil: Sigil::Bare,
-            args: marker,
-            content: Some(content),
-            children: if children.is_empty() {
-                None
-            } else {
-                Some(children)
-            },
-            value: attrs.map(ElementValue::Data),
-            span,
-        }
+impl Default for Sigil {
+    fn default() -> Self {
+        Sigil::Bare
     }
 }
 
@@ -428,28 +252,12 @@ pub enum ElementValue {
 }
 
 /// One node of a `${...}` interpolation's parsed expression tree.
-/// Grammar-only: this is an unresolved syntax tree -- looking up an
-/// `Identifier`/`Member`'s referenced element or calling a `Call`'s
-/// function is `tomet-resolver`/`tomet-compute`'s job, not this
-/// crate's. Deliberately not `Value`-shaped: `Value` can't distinguish a
-/// bare identifier reference from a quoted string literal (both collapse
-/// to the same `Value::String` once parsed), and can't represent a
-/// nested `Call`/`Member` as an argument or object.
-///
-/// No infix operators yet (`${a + b}` stays an open idea, not parsed).
 #[derive(Debug, Clone, PartialEq)]
 pub struct InterpExpr {
     pub kind: InterpExprKind,
     pub span: Span,
 }
 
-/// `Call`'s `callee` and `Member`'s `object` are boxed sub-expressions
-/// (not a bare `String` name), so postfix chains compose freely:
-/// `a.b(x)` (call a member) and `b(x).id` (access a member of a call's
-/// result) are both just nested `Member`/`Call` wrapping, not two
-/// separate mechanisms. A plain dotted path like `a.b.c` is the same
-/// `Member` recursion with no `Call` in the chain -- there's no separate
-/// flat `Path` variant, since `Member` alone already covers it.
 #[derive(Debug, Clone, PartialEq)]
 pub enum InterpExprKind {
     Identifier(String),
@@ -494,74 +302,7 @@ mod tests {
         let dummy = Span::dummy();
         assert!(dummy.is_dummy());
 
-        // PartialEq on Span always returns true for test comparison convenience
         assert_eq!(span, dummy);
-        // exact_eq checks field equality
         assert!(!span.exact_eq(&dummy));
-
-        let p3 = Position::new(2, 5, 20);
-        let span2 = Span::new(p2, p3);
-        let union_span = span.union(&span2);
-        assert_eq!(union_span.start, p1);
-        assert_eq!(union_span.end, p3);
-    }
-
-    #[test]
-    fn test_value_helpers() {
-        let null_val = Value::Null;
-        assert!(null_val.is_null());
-        assert!(null_val.is_empty());
-
-        let str_val = Value::String("hello".to_string());
-        assert_eq!(str_val.as_str(), Some("hello"));
-        assert!(!str_val.is_empty());
-
-        let bool_val = Value::Bool(true);
-        assert_eq!(bool_val.as_bool(), Some(true));
-
-        let int_val = Value::Int(42);
-        assert_eq!(int_val.as_i64(), Some(42));
-
-        let float_val = Value::Float(3.14);
-        assert_eq!(float_val.as_f64(), Some(3.14));
-
-        let seq_val = Value::Seq(vec![Value::Int(1), Value::Int(2)]);
-        assert_eq!(seq_val.as_seq().map(|s| s.len()), Some(2));
-        assert!(!seq_val.is_empty());
-
-        let mut map_val = Value::Map(vec![
-            ("key1".to_string(), Value::String("val1".to_string())),
-            ("key2".to_string(), Value::Int(100)),
-        ]);
-        assert_eq!(map_val.get("key1").and_then(|v| v.as_str()), Some("val1"));
-        assert_eq!(map_val.get("key2").and_then(|v| v.as_i64()), Some(100));
-        assert!(map_val.get("nonexistent").is_none());
-
-        if let Some(v) = map_val.get_mut("key2") {
-            *v = Value::Int(200);
-        }
-        assert_eq!(map_val.get("key2").and_then(|v| v.as_i64()), Some(200));
-    }
-
-    #[test]
-    fn test_element_helpers() {
-        let el = Element::new(Sigil::Type("note".to_string()))
-            .with_args(Value::Map(vec![("key".to_string(), Value::Bool(true))]))
-            .with_content(vec![Inline::Text(Text::from("test"))]);
-
-        assert_eq!(el.name(), Some("note"));
-        assert!(!el.is_bare());
-        assert!(el.args.is_some());
-        assert!(el.content.is_some());
-
-        let bare_item = Element::list_item(
-            vec![Inline::Text(Text::from("item"))],
-            None,
-            None,
-            vec![],
-            Span::dummy(),
-        );
-        assert!(bare_item.is_bare());
-        assert_eq!(bare_item.name(), None);
     }
 }

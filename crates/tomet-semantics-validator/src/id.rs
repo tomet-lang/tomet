@@ -1,13 +1,12 @@
 use tomet_ast::{Document, Span, Value};
-use tomet_walker::{element_attrs_view, for_each_element};
+use tomet_tree::{ElementExt, ValueExt, for_each_element};
 
 /// Walks every node in `doc` and returns `(id, span)` for each `id` key
-/// found in an attached `Value::Map` (see
-/// `tomet-walker::element_attrs_view`), in document order.
+/// found in an attached `Value::Map` (see `ElementExt::attrs_view`), in document order.
 pub(crate) fn collect_ids(doc: &Document) -> Vec<(String, Span)> {
     let mut ids = Vec::new();
     for_each_element(doc, |el| {
-        if let Some(id) = id_from_value(element_attrs_view(el)) {
+        if let Some(id) = id_from_value(el.attrs_view()) {
             ids.push((id, el.span));
         }
     });

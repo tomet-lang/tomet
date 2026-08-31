@@ -12,7 +12,8 @@ use crate::heading::parse_braced_value;
 use crate::inline::{Stop, parse_inline_seq};
 use crate::value::skip_inline_ws;
 use tomet_ast::{Element, Value};
-use tomet_lexar::Cursor;
+use tomet_lexer::Cursor;
+use tomet_tree::{element_list, element_list_item};
 
 pub(crate) fn eat_list_marker_with_indent(
     cur: &mut Cursor,
@@ -211,7 +212,7 @@ fn parse_list_internal(
                 if !sub_items.is_empty() {
                     let list_span =
                         sub_items.first().unwrap().span.union(&sub_items.last().unwrap().span);
-                    children.push(tomet_ast::Block::Element(Element::list(
+                    children.push(tomet_ast::Block::Element(element_list(
                         next_ordered,
                         sub_items,
                         list_span,
@@ -223,7 +224,7 @@ fn parse_list_internal(
         }
 
         let span = cur.span_from(item_start);
-        items.push(Element::list_item(content, marker, attrs, children, span));
+        items.push(element_list_item(content, marker, attrs, children, span));
     }
     Ok(items)
 }

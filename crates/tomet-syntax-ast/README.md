@@ -10,7 +10,7 @@ Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
 
 2. **Clear Crate Boundaries**:
    - **Semantics**: Classification of element meanings (e.g., links, `@meta`, `@config`) lives in `tomet-semantics`.
-   - **Traversal**: Generic tree traversal algorithms live in `tomet-walker`.
+   - **Traversal & Manipulation**: Generic tree traversal algorithms and mutation helpers live in `tomet-tree`.
    - **Formatting & Printing**: Serialization to `.tmt` text lives in `tomet-style` and `tomet-printer`.
    - **Validation & Field Utils**: Field formatting and validation helpers live in `tomet-validator` and `tomet-field-utils`.
 

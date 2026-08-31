@@ -12,8 +12,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use super::engine::migration::MigrationItem;
-use tomet_edit::batch_meta::{BatchMetaEngine, MetaFileEntry};
-use tomet_edit::structural::StructuralMatch;
 use tomet_indexer::workspace_scan::{FileTreeNode, WorkspaceIndex};
 
 mod batch_meta;
@@ -22,7 +20,9 @@ mod inline_editor;
 mod migration;
 mod structural;
 
+pub use batch_meta::MetaFileEntry;
 pub use inline_editor::InlineEditor;
+pub use structural::StructuralMatch;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveTab {
@@ -238,7 +238,7 @@ impl App {
             .map(|p| {
                 old_meta
                     .remove(&p)
-                    .unwrap_or_else(|| BatchMetaEngine::entries_from_paths(vec![p]).remove(0))
+                    .unwrap_or_else(|| MetaFileEntry::from_path(p))
             })
             .collect();
 

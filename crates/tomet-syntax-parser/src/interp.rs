@@ -3,7 +3,8 @@
 use crate::error::Result;
 use crate::value::{err, parse_quoted, skip_inline_ws};
 use tomet_ast::{Element, InterpExpr, InterpExprKind, Literal, Sigil};
-use tomet_lexar::Cursor;
+use tomet_lexer::Cursor;
+use tomet_tree::element_new;
 
 /// `$` immediately followed by `{` or an identifier and `(`
 pub(crate) fn is_interp_start(cur: &Cursor) -> bool {
@@ -42,7 +43,7 @@ pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
         if !cur.eat_str("}") {
             return Err(err(cur, cur.pos(), "unterminated '${', expected '}'"));
         }
-        let mut el = Element::new(Sigil::Dollar);
+        let mut el = element_new(Sigil::Dollar);
         el.value = Some(tomet_ast::ElementValue::Interp(expr));
         el.span = cur.span_from(start_pos);
         Ok(el)
@@ -89,7 +90,7 @@ pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
                 _ => break,
             }
         }
-        let mut el = Element::new(Sigil::Dollar);
+        let mut el = element_new(Sigil::Dollar);
         el.value = Some(tomet_ast::ElementValue::Interp(expr));
         el.span = cur.span_from(start_pos);
         Ok(el)

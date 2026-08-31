@@ -14,33 +14,24 @@ stays exactly as short as it always was. Only the directory name (and
 therefore path-lookup) carries the family grouping.
 
 <codeblock>(lang:text)[
-tomet-syntax-*      grammar/parsing: ast, lexar, parser.
-                         Turns text into a Document/Value.
+tomet-syntax-*      grammar/parsing: ast, cst, lexer, parser, tree.
+                         Turns source text into CST/AST and provides pure tree schemas.
 
-tomet-semantics*     semantics (bare, no suffix -- the crate IS
-                         the category), semantics-validator.
-                         What a parsed Element means / whether it's
-                         valid.
+tomet-semantics*     semantics (bare, no suffix -- the crate IS the category),
+                         semantics-validator, semantics-compute, semantics-resolver.
+                         What a parsed Element means / whether it's valid, runtime ${...} expression eval, and reference linking.
 
-tomet-doc-*          walker, resolver, compute, config, edit,
-                         indexer.
-                         Operations that take a whole Document (or a
-                         directory of them) as their primary input.
+tomet-transform      pure in-memory AST refactoring & macro rewrite rules.
 
-tomet-codegen-*      html, markdown.
-                         Conversion to/from an *external* document
-                         format.
+tomet-convert-*      html, markdown.
+                         Conversion to/from *external* document formats.
 
-tomet-emit-*         field-utils, style, printer, formatter.
-                         .tmt text production, config-driven. Named
-                         "emit" rather than "format" specifically so
-                         `tomet-formatter` doesn't become
-                         `tomet-format-formatter` -- "format"
-                         is a substring of "formatter", so that
-                         particular pairing reads as redundant in a
-                         way `semantics`/`semantics-validator` (whose
-                         member's name doesn't contain the category
-                         word) doesn't.
+tomet-format-*       field-utils, formatter, printer, style.
+                         .tmt source text production, formatting, and styling.
+
+tomet-workspace*     workspace (bare, no suffix), workspace-config,
+                         workspace-indexer, workspace-links.
+                         Multi-file batch I/O, directory scanning, link checking, and configuration discovery.
 
 serde_tomet,          external-ecosystem adapters. Follow their
 tree-sitter-tomet     host ecosystem's own naming convention

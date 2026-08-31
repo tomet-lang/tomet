@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn parses_table_cells_with_inline_elements() {
-        let el = Element::new(Sigil::Type("em".to_string()));
+        let el = tomet_tree::element_new(Sigil::Type("em".to_string()));
         let inlines = vec![
             Inline::Text(Text::from("[ ")),
             Inline::Element(el.clone()),

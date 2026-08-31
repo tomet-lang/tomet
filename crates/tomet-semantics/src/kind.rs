@@ -12,6 +12,8 @@ use tomet_ast::{Element, Sigil};
 /// specific to each format).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ElementKind {
+    Kind,
+    Version,
     Meta,
     Config,
     Links,
@@ -64,6 +66,8 @@ impl ElementKind {
     /// }`. `Custom(name)` returns `name` itself.
     pub fn as_str(&self) -> &str {
         match self {
+            ElementKind::Kind => "kind",
+            ElementKind::Version => "version",
             ElementKind::Meta => "meta",
             ElementKind::Config => "config",
             ElementKind::Links => "links",
@@ -92,7 +96,9 @@ impl ElementKind {
 /// `ElementKind::as_str`'s variant -> name match can't silently drift
 /// apart (see `builtin_kind_round_trips_through_as_str` below, which
 /// checks every entry here).
-const BUILTIN_KINDS: [(&str, ElementKind); 16] = [
+const BUILTIN_KINDS: [(&str, ElementKind); 18] = [
+    ("kind", ElementKind::Kind),
+    ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
     ("config", ElementKind::Config),
     ("links", ElementKind::Links),
@@ -143,6 +149,7 @@ pub fn classify(el: &Element) -> ElementKind {
 mod tests {
     use super::*;
     use tomet_ast::Value;
+    use tomet_tree::element_new;
 
     #[test]
     fn builtin_kind_round_trips_through_as_str() {
@@ -158,25 +165,25 @@ mod tests {
 
     #[test]
     fn type_sigil_with_unrecognized_name_is_custom() {
-        let el = Element::new(Sigil::Type("caution".to_string()));
+        let el = element_new(Sigil::Type("caution".to_string()));
         assert_eq!(classify(&el), ElementKind::Custom("caution".to_string()));
     }
 
     #[test]
     fn type_sigil_with_builtin_name_is_recognized() {
-        let el = Element::new(Sigil::Type("codeblock".to_string()));
+        let el = element_new(Sigil::Type("codeblock".to_string()));
         assert_eq!(classify(&el), ElementKind::Codeblock);
     }
 
     #[test]
     fn named_at_sigil_is_recognized() {
-        let el = Element::new(Sigil::At(Some("meta".to_string())));
+        let el = element_new(Sigil::At(Some("meta".to_string())));
         assert_eq!(classify(&el), ElementKind::Meta);
     }
 
     #[test]
     fn named_at_sigil_with_link_name_is_recognized() {
-        let mut el = Element::new(Sigil::At(Some("link".to_string())));
+        let mut el = element_new(Sigil::At(Some("link".to_string())));
         el.args = Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("https://example.com".to_string()),
@@ -186,7 +193,7 @@ mod tests {
 
     #[test]
     fn named_at_sigil_with_no_inferable_args_stays_custom() {
-        let el = Element::new(Sigil::At(Some("caution".to_string())));
+        let el = element_new(Sigil::At(Some("caution".to_string())));
         assert_eq!(classify(&el), ElementKind::Custom("caution".to_string()));
     }
 
@@ -195,7 +202,7 @@ mod tests {
         // No inference happens for a bare `@(...)` anymore -- kind is
         // decided purely by the element's name (`@link`, `<link>`, ...),
         // never guessed from `args`.
-        let mut el = Element::new(Sigil::At(None));
+        let mut el = element_new(Sigil::At(None));
         el.args = Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("https://example.com".to_string()),
@@ -205,19 +212,19 @@ mod tests {
 
     #[test]
     fn unnamed_at_sigil_with_no_recognized_key_is_custom_at() {
-        let el = Element::new(Sigil::At(None));
+        let el = element_new(Sigil::At(None));
         assert_eq!(classify(&el), ElementKind::Custom("at".to_string()));
     }
 
     #[test]
     fn bare_sigil_is_always_bare() {
-        let el = Element::new(Sigil::Bare);
+        let el = element_new(Sigil::Bare);
         assert_eq!(classify(&el), ElementKind::Bare);
     }
 
     #[test]
     fn dollar_sigil_is_always_interp() {
-        let el = Element::new(Sigil::Dollar);
+        let el = element_new(Sigil::Dollar);
         assert_eq!(classify(&el), ElementKind::Interp);
     }
 }

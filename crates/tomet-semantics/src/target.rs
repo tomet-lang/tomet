@@ -4,10 +4,11 @@
 //! own scheme prefix -- `url`/`file`/`tm`/`id`/`ref` are no longer carried
 //! by which argument key was used (there's only ever `target:` now); they
 //! live entirely in the target string itself. This is the canonical
-//! extraction, adopted by `tomet-codegen-html`/`tomet-codegen-markdown`/
-//! `tomet-doc-links` instead of each reading `el.args` raw.
+//! extraction, adopted by `tomet-html`/`tomet-markdown`/`tomet-links`
+//! instead of each reading `el.args` raw.
 
 use tomet_ast::Element;
+use tomet_tree::ValueExt;
 
 use crate::kind::ElementKind;
 use crate::positional::normalized_element_args;
@@ -136,9 +137,10 @@ fn is_scheme_uri(s: &str) -> bool {
 mod tests {
     use super::*;
     use tomet_ast::{Sigil, Value};
+    use tomet_tree::element_new;
 
     fn map_el(sigil: Sigil, entries: Vec<(&str, Value)>) -> Element {
-        let mut el = Element::new(sigil);
+        let mut el = element_new(sigil);
         el.args = Some(Value::Map(
             entries
                 .into_iter()
@@ -181,7 +183,7 @@ mod tests {
         // "link" IS in `builtin_positional_arg_key` (-> "target"), so
         // `normalized_element_args` turns this into a map before
         // `link_target` ever sees it.
-        let mut el = Element::new(Sigil::Type("link".to_string()));
+        let mut el = element_new(Sigil::Type("link".to_string()));
         el.args = Some(s("x.md"));
         assert_eq!(crate::classify(&el), ElementKind::Link);
         assert_eq!(
@@ -208,7 +210,7 @@ mod tests {
         // `<embed>(a.png)`: "embed" IS in builtin_positional_arg_key
         // (-> "target"), so normalized_element_args already turns this
         // into a map before link_target ever sees it.
-        let mut el = Element::new(Sigil::Type("embed".to_string()));
+        let mut el = element_new(Sigil::Type("embed".to_string()));
         el.args = Some(s("a.png"));
         assert_eq!(
             link_target_of(&el),
