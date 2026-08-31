@@ -318,10 +318,10 @@ mod tests {
 
     #[test]
     fn evaluates_user_defined_macros() {
-        let doc = parse("@config{\n  macros: {\n    gh: \"https://github.com/tomet-lang/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    price: \"Price is $100 for ${1}\"\n    search: \"https://example.com/search?q=${q}&lang=${lang}\"\n    copyright: \"(C) 2026 Tomet Lang\"\n  }\n}\n");
+        let doc = parse("@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    price: \"Price is $100 for ${1}\"\n    search: \"https://example.com/search?q=${q}&lang=${lang}\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n");
         assert_eq!(
             evaluate(&doc, &interp("$gh(42)")).unwrap(),
-            Value::String("https://github.com/tomet-lang/tomet/issues/42".into())
+            Value::String("https://github.com/tomet/tomet/issues/42".into())
         );
         assert_eq!(
             evaluate(&doc, &interp("$greet(\"Alice\", \"Smith\")")).unwrap(),
@@ -339,7 +339,7 @@ mod tests {
         );
         assert_eq!(
             evaluate(&doc, &interp("${copyright}")).unwrap(),
-            Value::String("(C) 2026 Tomet Lang".into())
+            Value::String("(C) 2026 Tomet Projects".into())
         );
     }
 }

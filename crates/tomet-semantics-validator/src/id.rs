@@ -6,6 +6,9 @@ use tomet_tree::{ElementExt, ValueExt, for_each_element};
 pub(crate) fn collect_ids(doc: &Document) -> Vec<(String, Span)> {
     let mut ids = Vec::new();
     for_each_element(doc, |el| {
+        if el.name().as_deref() == Some("link") {
+            return;
+        }
         if let Some(id) = id_from_value(el.attrs_view()) {
             ids.push((id, el.span));
         }

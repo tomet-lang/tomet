@@ -5,9 +5,9 @@
 @config(format:json){
   {
     "macros": {
-      "gh": "https://github.com/tomet-lang/tomet/issues/${1}",
-      "gh_pr": "https://github.com/tomet-lang/tomet/pull/${1}",
-      "gh_commit": "https://github.com/tomet-lang/tomet/commit/${1}",
+      "gh": "https://github.com/tomet/tomet/issues/${1}",
+      "gh_pr": "https://github.com/tomet/tomet/pull/${1}",
+      "gh_commit": "https://github.com/tomet/tomet/commit/${1}",
       "wiki": "https://ja.wikipedia.org/wiki/${1}",
       "wiki_en": "https://en.wikipedia.org/wiki/${1}",
       "youtube": "https://www.youtube.com/watch?v=${1}",

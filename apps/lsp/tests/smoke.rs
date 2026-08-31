@@ -293,7 +293,7 @@ fn macro_hover_over_stdio() {
                 "uri": "file:///tmp/macro_test.tmt",
                 "languageId": "tomet",
                 "version": 1,
-                "text": "@config{\n  macros: {\n    gh: \"https://github.com/tomet-lang/tomet/issues/${1}\"\n  }\n}\n\n$gh(101)\n",
+                "text": "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  }\n}\n\n$gh(101)\n",
             }
         }),
     );
@@ -310,7 +310,7 @@ fn macro_hover_over_stdio() {
         .as_str()
         .expect("hover value string");
     assert!(hover_val.contains("Macro Result"));
-    assert!(hover_val.contains("https://github.com/tomet-lang/tomet/issues/101"));
+    assert!(hover_val.contains("https://github.com/tomet/tomet/issues/101"));
 
     server.shutdown();
 }

@@ -24,6 +24,7 @@ struct Cli {
 static INDEX_HTML: &str = include_str!("../static/index.html");
 static STYLE_CSS: &str = include_str!("../static/style.css");
 static APP_JS: &str = include_str!("../static/app.js");
+static WASM_BYTES: &[u8] = include_bytes!("../static/tomet_js_bg.wasm");
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -57,6 +58,15 @@ fn main() -> ExitCode {
                         .unwrap()
                 }),
             )
+            .route(
+                "/tomet_js_bg.wasm",
+                get(|| async {
+                    Response::builder()
+                        .header("content-type", "application/wasm")
+                        .body(axum::body::Body::from(WASM_BYTES))
+                        .unwrap()
+                }),
+            )
             .route("/api/parse", post(parse_handler))
             .route("/api/format", post(format_handler));
 
@@ -85,11 +95,22 @@ struct ApiParseRequest {
 }
 
 #[derive(Serialize)]
+struct ApiDiagnostic {
+    message: String,
+    line: usize,
+    column: usize,
+    offset: usize,
+    severity: String,
+}
+
+#[derive(Serialize)]
 struct ApiParseResponse {
     ok: bool,
     html: String,
     ast: String,
+    ast_json: String,
     markdown: String,
+    diagnostics: Vec<ApiDiagnostic>,
     error: Option<ApiParseError>,
 }
 
@@ -113,12 +134,31 @@ async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
             };
             let html = tomet_html::render_page_with(&doc, "Tomet Web", &options);
             let ast = format!("{doc:#?}");
+            let ast_json = serde_json::to_string_pretty(&doc).unwrap_or_default();
             let markdown = tomet_markdown::to_markdown(&doc);
+            
+            let validation_errors = tomet_validator::validate_document(&doc);
+            let diagnostics = validation_errors
+                .into_iter()
+                .map(|ve| {
+                    let span = ve.span();
+                    ApiDiagnostic {
+                        message: ve.to_string(),
+                        line: span.start.line,
+                        column: span.start.column,
+                        offset: span.start.offset,
+                        severity: "warning".to_string(),
+                    }
+                })
+                .collect();
+
             Json(ApiParseResponse {
                 ok: true,
                 html,
                 ast,
+                ast_json,
                 markdown,
+                diagnostics,
                 error: None,
             })
         }
@@ -128,7 +168,9 @@ async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
                 ok: false,
                 html: String::new(),
                 ast: String::new(),
+                ast_json: String::new(),
                 markdown: String::new(),
+                diagnostics: Vec::new(),
                 error: Some(ApiParseError {
                     message: err.message,
                     line: err.line,
@@ -194,7 +236,5 @@ mod tests {
             advanced: Some(false),
         };
         let _response = parse_handler(Json(req)).await;
-
-        // Verify response builds clean
     }
 }

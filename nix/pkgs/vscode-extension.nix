@@ -17,7 +17,7 @@ buildNpmPackage {
   version = "0.1.0";
   src = "${root}/editors/vscode";
 
-  npmDepsHash = "sha256-JsXSQc8TeRokIUCy0BJpISQnkUUPXrBY3ZK3Aq08Kyw=";
+  npmDepsHash = "sha256-utxsbcya6qRWFNdL+RdGMIfYMLz1jZoNn4aWTecz5qo=";
   npmBuildScript = "compile";
 
   passthru = { inherit vscodeExtPublisher vscodeExtName vscodeExtUniqueId; };

@@ -1136,7 +1136,7 @@ mod tests {
   }
 }
 
-- @link("https://github.com/tomet-lang/tomet")[Repo]
+- @link("https://github.com/tomet/tomet")[Repo]
 "#;
         fs::write(&src_file, src_content).unwrap();
 
@@ -1145,7 +1145,7 @@ mod tests {
 
         let refactored = fs::read_to_string(&src_file).unwrap();
         assert!(refactored.contains("@kind(note)"));
-        assert!(refactored.contains("$gh(\"tomet-lang/tomet\")"));
+        assert!(refactored.contains("$gh(\"tomet/tomet\")"));
         assert!(!refactored.contains("format:yaml"));
 
         let _ = fs::remove_dir_all(&temp_dir);

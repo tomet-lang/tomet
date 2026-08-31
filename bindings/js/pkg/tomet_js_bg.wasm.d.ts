@@ -1,0 +1,20 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const formatSource: (a: number, b: number) => [number, number];
+export const fromMarkdown: (a: number, b: number) => [number, number, number];
+export const highlightSpans: (a: number, b: number) => [number, number, number];
+export const parseDocument: (a: number, b: number) => [number, number, number];
+export const parseValue: (a: number, b: number) => [number, number, number];
+export const printDocument: (a: any) => [number, number, number, number];
+export const toHtml: (a: any) => [number, number, number, number];
+export const toMarkdown: (a: any) => [number, number, number, number];
+export const validate: (a: number, b: number) => [number, number, number];
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_exn_store: (a: number) => void;
+export const __externref_table_alloc: () => number;
+export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __externref_table_dealloc: (a: number) => void;
+export const __wbindgen_start: () => void;

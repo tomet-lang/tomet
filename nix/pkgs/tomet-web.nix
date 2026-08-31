@@ -1,28 +1,33 @@
 {
+  lib,
   craneLib,
   buildNpmPackage,
 }:
 let
   src = ../..;
 
-  # Builds the CodeMirror-based editor bundle (`apps/web/frontend`) the
-  # same way `vscode-extension.nix` builds the VS Code extension's own
-  # TypeScript -- a `buildNpmPackage` derivation with a pinned
-  # `npmDepsHash`, so the network-dependent `npm install` step stays a
-  # separate, cacheable fixed-output derivation instead of living inside
-  # the (otherwise pure) Rust build below.
   frontend = buildNpmPackage {
     pname = "tomet-web-frontend";
     version = "0.1.0";
     src = "${src}/apps/web/frontend";
 
-    npmDepsHash = "sha256-6P6NZgSIBgAT9nZuMGVyw5K6vtao/DmOjTtqyohYD2Q=";
+    postUnpack = ''
+      mkdir -p $sourceRoot/packages-svelte
+      cp -r ${src}/packages/svelte/src $sourceRoot/packages-svelte/
+      mkdir -p $sourceRoot/bindings-js
+      cp -r ${src}/bindings/js/pkg/* $sourceRoot/bindings-js/
+    '';
+
+    npmDepsHash = "sha256-KBtAEZq6nmbL5HH/Ljkx/SoWT2YFS/2ae8Qb0hhoKZs=";
     npmBuildScript = "build";
 
     installPhase = ''
       runHook preInstall
       mkdir -p $out
       cp dist/app.js $out/
+      cp dist/style.css $out/
+      cp dist/index.html $out/
+      cp dist/tomet_js_bg.wasm $out/
       runHook postInstall
     '';
   };
@@ -48,6 +53,9 @@ craneLib.buildPackage (
     # compiles it in.
     preBuild = ''
       cp ${frontend}/app.js apps/web/static/app.js
+      cp ${frontend}/style.css apps/web/static/style.css
+      cp ${frontend}/index.html apps/web/static/index.html
+      cp ${frontend}/tomet_js_bg.wasm apps/web/static/tomet_js_bg.wasm
     '';
 
     doCheck = true;

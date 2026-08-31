@@ -1,0 +1,22 @@
+{
+  "name": "@tomet/tomet-wasm",
+  "version": "0.1.0",
+  "description": "High-performance JavaScript / WebAssembly bindings for Tomet markup and AST",
+  "main": "tomet_js.js",
+  "types": "index.d.ts",
+  "files": [
+    "tomet_js_bg.wasm",
+    "tomet_js.js",
+    "tomet_js.d.ts",
+    "index.d.ts"
+  ],
+  "keywords": [
+    "tomet",
+    "parser",
+    "markup",
+    "ast",
+    "wasm",
+    "markdown"
+  ],
+  "license": "MIT OR Apache-2.0"
+}
