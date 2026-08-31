@@ -31,21 +31,17 @@ pub fn evaluate_with_config(
         InterpExprKind::Literal(Literal::Int(i)) => Ok(Value::Int(*i)),
         InterpExprKind::Literal(Literal::Float(f)) => Ok(Value::Float(*f)),
         InterpExprKind::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
-        InterpExprKind::Identifier(id) => {
-            match tomet_resolver::resolve_reference(doc, expr) {
-                Ok(val) => Ok(val),
-                Err(err) => {
-                    if let Some(template) = config.macros.get(id) {
-                        Ok(Value::String(template.clone()))
-                    } else {
-                        Err(err.into())
-                    }
+        InterpExprKind::Identifier(id) => match tomet_resolver::resolve_reference(doc, expr) {
+            Ok(val) => Ok(val),
+            Err(err) => {
+                if let Some(template) = config.macros.get(id) {
+                    Ok(Value::String(template.clone()))
+                } else {
+                    Err(err.into())
                 }
             }
-        }
-        InterpExprKind::Member { .. } => {
-            Ok(tomet_resolver::resolve_reference(doc, expr)?)
-        }
+        },
+        InterpExprKind::Member { .. } => Ok(tomet_resolver::resolve_reference(doc, expr)?),
         InterpExprKind::NamedArg { name, value } => {
             let val = evaluate_with_config(doc, value, config)?;
             Ok(Value::Map(vec![(name.clone(), val)]))
@@ -318,7 +314,9 @@ mod tests {
 
     #[test]
     fn evaluates_user_defined_macros() {
-        let doc = parse("@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    price: \"Price is $100 for ${1}\"\n    search: \"https://example.com/search?q=${q}&lang=${lang}\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n");
+        let doc = parse(
+            "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    price: \"Price is $100 for ${1}\"\n    search: \"https://example.com/search?q=${q}&lang=${lang}\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n",
+        );
         assert_eq!(
             evaluate(&doc, &interp("$gh(42)")).unwrap(),
             Value::String("https://github.com/tomet/tomet/issues/42".into())

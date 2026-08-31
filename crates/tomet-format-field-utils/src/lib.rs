@@ -74,7 +74,8 @@ pub fn is_iso8601(s: &str) -> bool {
                     return is_ss;
                 }
                 // Also true for YYYY-MM-DDTHH:MM+09:00 or similar
-                if bytes.len() > 16 && (bytes[16] == b'+' || bytes[16] == b'-' || bytes[16] == b'Z') {
+                if bytes.len() > 16 && (bytes[16] == b'+' || bytes[16] == b'-' || bytes[16] == b'Z')
+                {
                     return true;
                 }
             }
@@ -184,10 +185,7 @@ mod tests {
             format_rfc3339("2026-04-12 18:39", None),
             "2026-04-12T18:39:00Z"
         );
-        assert_eq!(
-            format_rfc3339("2026-04-12", None),
-            "2026-04-12T00:00:00Z"
-        );
+        assert_eq!(format_rfc3339("2026-04-12", None), "2026-04-12T00:00:00Z");
     }
 
     #[test]

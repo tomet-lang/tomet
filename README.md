@@ -26,7 +26,7 @@ tomet/
 │   ├── tomet-syntax-*    # Syntax layer: cst, lexer, parser, ast, tree
 │   ├── tomet-semantics*  # Semantics layer: semantics, validator, compute (eval), resolver (linker)
 │   ├── tomet-transform/  # In-memory AST refactoring & macro rewrite engine
-│   ├── tomet-convert-*   # Document format converters: html, markdown
+│   ├── tomet-convert-*   # Document format converters: html, markdown, typst
 │   ├── tomet-format-*    # Source output: formatter, printer, style, field-utils
 │   ├── tomet-workspace*  # Multi-file I/O: workspace, indexer, links, config
 │   ├── serde_tomet/      # Serde deserializer/serializer for Tomet Value model

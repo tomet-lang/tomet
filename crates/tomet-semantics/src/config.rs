@@ -9,16 +9,18 @@ use crate::{ElementKind, classify, normalized_element_args};
 pub enum ExportType {
     CommonMark,
     Html,
+    Typst,
     Custom(String),
 }
 
 impl ExportType {
-    /// Parse an [`ExportType`] from a format name string (e.g. `"commonmark"`, `"html"`).
+    /// Parse an [`ExportType`] from a format name string (e.g. `"commonmark"`, `"html"`, `"typst"`).
     pub fn parse(s: &str) -> Self {
         let trimmed = s.trim();
         match trimmed.to_lowercase().as_str() {
             "commonmark" | "markdown" | "md" => ExportType::CommonMark,
             "html" | "htm" => ExportType::Html,
+            "typst" | "typ" => ExportType::Typst,
             other => ExportType::Custom(other.to_string()),
         }
     }
@@ -28,6 +30,7 @@ impl ExportType {
         match self {
             ExportType::CommonMark => "commonmark",
             ExportType::Html => "html",
+            ExportType::Typst => "typst",
             ExportType::Custom(s) => s.as_str(),
         }
     }
@@ -111,7 +114,10 @@ fn extract_config_from_element(el: &Element, config: &mut DocumentConfig) {
 fn is_truthy(v: &Value) -> bool {
     match v {
         Value::Bool(b) => *b,
-        Value::String(s) => matches!(s.trim().to_lowercase().as_str(), "true" | "1" | "yes" | "auto"),
+        Value::String(s) => matches!(
+            s.trim().to_lowercase().as_str(),
+            "true" | "1" | "yes" | "auto"
+        ),
         Value::Int(i) => *i != 0,
         _ => false,
     }
@@ -204,7 +210,9 @@ fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
                 &k["macro.".len()..]
             };
             if let Some(template) = v.as_str() {
-                config.macros.insert(mname.to_string(), template.to_string());
+                config
+                    .macros
+                    .insert(mname.to_string(), template.to_string());
             }
         }
         _ if k.starts_with("export_path.") => {

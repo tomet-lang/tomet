@@ -110,6 +110,7 @@ struct ApiParseResponse {
     ast: String,
     ast_json: String,
     markdown: String,
+    typst: String,
     diagnostics: Vec<ApiDiagnostic>,
     error: Option<ApiParseError>,
 }
@@ -136,7 +137,8 @@ async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
             let ast = format!("{doc:#?}");
             let ast_json = serde_json::to_string_pretty(&doc).unwrap_or_default();
             let markdown = tomet_markdown::to_markdown(&doc);
-            
+            let typst = tomet_typst::to_typst(&doc);
+
             let validation_errors = tomet_validator::validate_document(&doc);
             let diagnostics = validation_errors
                 .into_iter()
@@ -158,6 +160,7 @@ async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
                 ast,
                 ast_json,
                 markdown,
+                typst,
                 diagnostics,
                 error: None,
             })
@@ -170,6 +173,7 @@ async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
                 ast: String::new(),
                 ast_json: String::new(),
                 markdown: String::new(),
+                typst: String::new(),
                 diagnostics: Vec::new(),
                 error: Some(ApiParseError {
                     message: err.message,

@@ -71,7 +71,9 @@ fn yaml_to_value(v: serde_yaml::Value) -> Value {
                 } else {
                     unescaped.trim()
                 };
-                if target.contains(['"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ']) {
+                if target.contains([
+                    '"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ',
+                ]) {
                     let escaped = target.replace('\\', "\\\\").replace('"', "\\\"");
                     Value::String(format!("@link(ref:\"{escaped}\")"))
                 } else {

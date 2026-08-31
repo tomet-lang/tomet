@@ -153,6 +153,30 @@ export function toMarkdown(source_or_doc) {
 }
 
 /**
+ * Convert `.tmt` source text or a `Document` AST object into a Typst markup string.
+ * @param {any} source_or_doc
+ * @returns {string}
+ */
+export function toTypst(source_or_doc) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ret = wasm.toTypst(source_or_doc);
+        var ptr1 = ret[0];
+        var len1 = ret[1];
+        if (ret[3]) {
+            ptr1 = 0; len1 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred2_0 = ptr1;
+        deferred2_1 = len1;
+        return getStringFromWasm0(ptr1, len1);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
  * Validate `.tmt` source text and return an array of validation diagnostics.
  * @param {string} source
  * @returns {any}

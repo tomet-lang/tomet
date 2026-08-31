@@ -4,14 +4,14 @@ use std::fs;
 use std::path::Path;
 
 use tomet_ast::Document;
-use tomet_config::{find_config_file, PrinterConfig};
+use tomet_config::{PrinterConfig, find_config_file};
 use tomet_formatter::format_source;
 use tomet_indexer::collect_tm_files_with_config;
 use tomet_parser::parse_document;
 use tomet_printer::document_to_tm_with_config;
 use tomet_transform::{
-    normalize_meta_to_value_dsl, promote_meta_type_to_kind, transform_link_targets_with_macros,
-    MacroSet,
+    MacroSet, normalize_meta_to_value_dsl, promote_meta_type_to_kind,
+    transform_link_targets_with_macros,
 };
 
 use crate::diff::FileDiff;

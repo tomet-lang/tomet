@@ -273,7 +273,10 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                     Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
-                            value: format!("**List Item** (marker: `{}`)", list_item_marker_text(el)),
+                            value: format!(
+                                "**List Item** (marker: `{}`)",
+                                list_item_marker_text(el)
+                            ),
                         }),
                         range: Some(span_to_range(&span)),
                     })
@@ -287,8 +290,17 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                     })
                 } else if kind == ElementKind::Kind {
                     let declared_kind = normalized_element_args(el)
-                        .and_then(|v| v.get("kind").and_then(|k| k.as_str()).map(|s| s.to_string()))
-                        .or_else(|| el.args.as_ref().and_then(|v| v.as_str()).map(|s| s.to_string()))
+                        .and_then(|v| {
+                            v.get("kind")
+                                .and_then(|k| k.as_str())
+                                .map(|s| s.to_string())
+                        })
+                        .or_else(|| {
+                            el.args
+                                .as_ref()
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
+                        })
                         .unwrap_or_else(|| "unknown".to_string());
                     let mut desc = format!("**Document Kind**: `{declared_kind}`\n\n");
                     desc.push_str("Declares the document archetype and binds template and schema validation rules.");
@@ -301,12 +313,14 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                     })
                 } else if kind == ElementKind::Version {
                     let declared_ver = normalized_element_args(el)
-                        .and_then(|v| v.get("version").map(|v| match v {
-                            Value::String(s) => s.clone(),
-                            Value::Int(i) => i.to_string(),
-                            Value::Float(f) => f.to_string(),
-                            _ => format!("{v:?}"),
-                        }))
+                        .and_then(|v| {
+                            v.get("version").map(|v| match v {
+                                Value::String(s) => s.clone(),
+                                Value::Int(i) => i.to_string(),
+                                Value::Float(f) => f.to_string(),
+                                _ => format!("{v:?}"),
+                            })
+                        })
                         .unwrap_or_else(|| "unknown".to_string());
                     let mut desc = format!("**Tomet Version**: `{declared_ver}`\n\n");
                     desc.push_str("Declares the Tomet language and syntax specification edition for this document.");
@@ -1053,14 +1067,19 @@ mod tests {
         let text = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
         let edits = format_edits(text, None);
         assert_eq!(edits.len(), 1);
-        assert!(edits[0].new_text.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ]["));
+        assert!(
+            edits[0]
+                .new_text
+                .contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][")
+        );
     }
 
     #[test]
     fn hover_on_table_header_cell() {
         let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
         // Position on line 1, inside "[ 電子数 2n² ]" (e.g. character 25)
-        let hover = hover_for(text, Position::new(1, 25), None).expect("hover found for table header");
+        let hover =
+            hover_for(text, Position::new(1, 25), None).expect("hover found for table header");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Table Header (Column 3)"));
             assert!(m.value.contains("電子数 2n²"));
@@ -1076,7 +1095,8 @@ mod tests {
     fn hover_on_table_data_cell() {
         let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
         // Position on line 2, inside "[ 2 ]" (column 3, character 15)
-        let hover = hover_for(text, Position::new(2, 15), None).expect("hover found for table data cell");
+        let hover =
+            hover_for(text, Position::new(2, 15), None).expect("hover found for table data cell");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Table Cell (Column 3, Row 2)"));
             assert!(m.value.contains("電子数 2n²"));
@@ -1091,7 +1111,8 @@ mod tests {
     #[test]
     fn hover_on_table_overview() {
         let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
-        let hover = hover_for(text, Position::new(0, 2), None).expect("hover found for table overview");
+        let hover =
+            hover_for(text, Position::new(0, 2), None).expect("hover found for table overview");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Table"));
             assert!(m.value.contains("Rows"));
@@ -1141,7 +1162,8 @@ mod tests {
         }
 
         // Hover on ${copyright} (line 12, char 3)
-        let hover3 = hover_for(text, Position::new(12, 3), None).expect("hover found for ${copyright}");
+        let hover3 =
+            hover_for(text, Position::new(12, 3), None).expect("hover found for ${copyright}");
         if let HoverContents::Markup(m) = hover3.contents {
             assert!(m.value.contains("Macro Result"));
             assert!(m.value.contains("(C) 2026 Tomet Projects"));
@@ -1162,7 +1184,8 @@ mod tests {
     #[test]
     fn hover_on_undefined_macro_shows_error() {
         let text = "$undefined_macro(123)\n";
-        let hover = hover_for(text, Position::new(0, 5), None).expect("hover found for undefined macro");
+        let hover =
+            hover_for(text, Position::new(0, 5), None).expect("hover found for undefined macro");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Macro"));
             assert!(m.value.contains("Error"));
@@ -1193,14 +1216,18 @@ mod tests {
 
         let doc_path = dir.join("sub/note.tmt");
         std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
-        let doc_text = "@settings(file:\"file:default.config.tmt\")\n\n$youtube_video(\"Pm_h6FnF8HU\")\n";
+        let doc_text =
+            "@settings(file:\"file:default.config.tmt\")\n\n$youtube_video(\"Pm_h6FnF8HU\")\n";
         let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
 
         let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
             .expect("hover found for external config macro");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Macro Result"));
-            assert!(m.value.contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU"));
+            assert!(
+                m.value
+                    .contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU")
+            );
         } else {
             panic!("expected markup contents");
         }
@@ -1211,7 +1238,10 @@ mod tests {
             .expect("hover found for embed macro");
         if let HoverContents::Markup(m) = hover2.contents {
             assert!(m.value.contains("Macro Result"));
-            assert!(m.value.contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU"));
+            assert!(
+                m.value
+                    .contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU")
+            );
         } else {
             panic!("expected markup contents");
         }
@@ -1242,14 +1272,18 @@ mod tests {
         let doc_path = dir.join("10-19 Journal/12 Daily/2024/12/$2024-12-26.tmt");
         std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
         let doc_text = "<embed>($youtube_video(\"Pm_h6FnF8HU\"))[Low]\n\n<embed>($twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n";
-        let uri = Uri::from_str(&format!("file://{}", doc_path.display()).replace(' ', "%20")).unwrap();
+        let uri =
+            Uri::from_str(&format!("file://{}", doc_path.display()).replace(' ', "%20")).unwrap();
 
         // Hover on youtube_video
         let hover = hover_for(doc_text, Position::new(0, 10), Some(&uri))
             .expect("hover found for auto-discovered youtube macro");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Macro Result"));
-            assert!(m.value.contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU"));
+            assert!(
+                m.value
+                    .contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU")
+            );
         } else {
             panic!("expected markup contents");
         }
@@ -1259,7 +1293,10 @@ mod tests {
             .expect("hover found for auto-discovered twitter macro");
         if let HoverContents::Markup(m) = hover2.contents {
             assert!(m.value.contains("Macro Result"));
-            assert!(m.value.contains("https://x.com/kosekibijou/status/1807568682631254496"));
+            assert!(
+                m.value
+                    .contains("https://x.com/kosekibijou/status/1807568682631254496")
+            );
         } else {
             panic!("expected markup contents");
         }
@@ -1305,8 +1342,8 @@ mod tests {
     #[test]
     fn hover_on_kind_and_version() {
         let doc_text = "@version(1.0)\n@kind(j.daily)\n\n#[ Title ]\n";
-        let hover_ver = hover_for(doc_text, Position::new(0, 3), None)
-            .expect("hover found for @version");
+        let hover_ver =
+            hover_for(doc_text, Position::new(0, 3), None).expect("hover found for @version");
         if let HoverContents::Markup(m) = hover_ver.contents {
             assert!(m.value.contains("Tomet Version"));
             assert!(m.value.contains("1"));
@@ -1314,8 +1351,8 @@ mod tests {
             panic!("expected markup contents");
         }
 
-        let hover_kind = hover_for(doc_text, Position::new(1, 3), None)
-            .expect("hover found for @kind");
+        let hover_kind =
+            hover_for(doc_text, Position::new(1, 3), None).expect("hover found for @kind");
         if let HoverContents::Markup(m) = hover_kind.contents {
             assert!(m.value.contains("Document Kind"));
             assert!(m.value.contains("j.daily"));

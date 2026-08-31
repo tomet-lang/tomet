@@ -140,7 +140,9 @@ impl App {
             match BatchMetaEngine::save(&mut selected_files) {
                 Ok(count) => {
                     for file in selected_files {
-                        if let Some(entry) = self.meta_entries.iter_mut().find(|e| e.path == file.path) {
+                        if let Some(entry) =
+                            self.meta_entries.iter_mut().find(|e| e.path == file.path)
+                        {
                             entry.original_src = file.original_src;
                             entry.modified_src = file.modified_src;
                             entry.metadata = file.metadata;

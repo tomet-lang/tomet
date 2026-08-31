@@ -183,12 +183,7 @@ fn slugify(text: &str) -> String {
     slug
 }
 
-fn render_block(
-    cx: &RenderCtx,
-    block: &Block,
-    out: &mut String,
-    state: &mut HeadingState,
-) {
+fn render_block(cx: &RenderCtx, block: &Block, out: &mut String, state: &mut HeadingState) {
     match block {
         Block::Paragraph(p) => {
             // Elements with no visible output (`@meta`, ...) placed on
@@ -629,7 +624,11 @@ fn render_icon_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: b
         out.push_str(&format!(" data-pkg=\"{}\"", escape_attr(pkg)));
     }
     for (k, v) in data {
-        out.push_str(&format!(" data-{}=\"{}\"", escape_attr(&k), escape_attr(&v)));
+        out.push_str(&format!(
+            " data-{}=\"{}\"",
+            escape_attr(&k),
+            escape_attr(&v)
+        ));
     }
     push_data_attrs(out, el.args.as_ref(), &["name", "pkg", "package"]);
     out.push('>');
@@ -642,7 +641,13 @@ fn render_icon_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: b
     }
 }
 
-fn render_generic_element(cx: &RenderCtx, el: &Element, kind: &str, out: &mut String, inline: bool) {
+fn render_generic_element(
+    cx: &RenderCtx,
+    el: &Element,
+    kind: &str,
+    out: &mut String,
+    inline: bool,
+) {
     let tag = if inline { "span" } else { "div" };
     out.push_str(&format!("<{tag} class=\"tm-element tm-{kind}\""));
     push_data_attrs(out, el.args.as_ref(), &[]);
@@ -1304,14 +1309,18 @@ mod tests {
 
     #[test]
     fn renders_icon_element_to_html() {
-        let doc = parse_document("<icon>(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"}\n").unwrap();
+        let doc =
+            parse_document("<icon>(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"}\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
             "<div class=\"tm-element tm-icon tm-icon-sun tm-icon-lucide tm-icon-lucide-sun\" data-icon=\"sun\" data-pkg=\"lucide\" data-color=\"yellow\"></div>\n"
         );
 
-        let inline_doc = parse_document("Here is <icon>(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"} icon.\n").unwrap();
+        let inline_doc = parse_document(
+            "Here is <icon>(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"} icon.\n",
+        )
+        .unwrap();
         let inline_body = render_body(&inline_doc);
         assert_eq!(
             inline_body,

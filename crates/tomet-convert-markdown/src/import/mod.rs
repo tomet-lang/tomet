@@ -541,10 +541,15 @@ fn build_table_element(
 
     let default_align = options.table_align.as_deref().unwrap_or("left");
 
-    let mode = options
-        .table_adjust_width_mode
-        .as_deref()
-        .unwrap_or(if options.adjust_table_width { "true" } else { "false" });
+    let mode =
+        options
+            .table_adjust_width_mode
+            .as_deref()
+            .unwrap_or(if options.adjust_table_width {
+                "true"
+            } else {
+                "false"
+            });
 
     let max_col_width_limit = options.table_max_col_width.unwrap_or(20);
 

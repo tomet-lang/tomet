@@ -868,7 +868,9 @@ mod tests {
     #[test]
     fn thematic_break() {
         let doc = Document {
-            blocks: vec![Block::Element(tomet_tree::element_new(Sigil::Type("hr".to_string())))],
+            blocks: vec![Block::Element(tomet_tree::element_new(Sigil::Type(
+                "hr".to_string(),
+            )))],
             span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "---\n\n");

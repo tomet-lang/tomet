@@ -43,9 +43,9 @@
 
 use tomet_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
-use tomet_tree::element_new;
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
 use tomet_parser::parse_document;
+use tomet_tree::element_new;
 
 /// Format `src` in place (returns a new `String`). Idempotent:
 /// `format_source(&format_source(src)) == format_source(src)`.
@@ -303,10 +303,7 @@ fn quote_bare_at_values_in(src: &str, start: usize, end: usize, out: &mut String
 /// `tomet-formatter` bullet for the design.
 /// Formats tables in `src` according to `table.adjust_width` and `table.max_col_width`.
 pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
-    let mode = config
-        .table_adjust_width
-        .as_deref()
-        .unwrap_or("auto");
+    let mode = config.table_adjust_width.as_deref().unwrap_or("auto");
     if mode == "false" || mode == "off" {
         return src.to_string();
     }
@@ -395,34 +392,35 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
                             let cell_len = text_display_width(cell_text);
                             let col_align = aligns.get(c_idx).map(|s| s.as_str()).unwrap_or("left");
 
-                            let (left_spaces, right_spaces) = if let Some(target_w) = target_widths[c_idx] {
-                                let target_width = target_w + 2;
-                                let extra = if target_width > cell_len {
-                                    target_width - cell_len
+                            let (left_spaces, right_spaces) =
+                                if let Some(target_w) = target_widths[c_idx] {
+                                    let target_width = target_w + 2;
+                                    let extra = if target_width > cell_len {
+                                        target_width - cell_len
+                                    } else {
+                                        2
+                                    };
+                                    match col_align {
+                                        "right" => {
+                                            let left = extra.saturating_sub(1);
+                                            let right = 1;
+                                            (left, right)
+                                        }
+                                        "center" => {
+                                            let left = extra / 2;
+                                            let right = extra - left;
+                                            (left, right)
+                                        }
+                                        _ => {
+                                            // "left"
+                                            let left = 1;
+                                            let right = extra.saturating_sub(1);
+                                            (left, right)
+                                        }
+                                    }
                                 } else {
-                                    2
+                                    (1, 1)
                                 };
-                                match col_align {
-                                    "right" => {
-                                        let left = extra.saturating_sub(1);
-                                        let right = 1;
-                                        (left, right)
-                                    }
-                                    "center" => {
-                                        let left = extra / 2;
-                                        let right = extra - left;
-                                        (left, right)
-                                    }
-                                    _ => {
-                                        // "left"
-                                        let left = 1;
-                                        let right = extra.saturating_sub(1);
-                                        (left, right)
-                                    }
-                                }
-                            } else {
-                                (1, 1)
-                            };
 
                             let left_str = " ".repeat(left_spaces);
                             let right_str = " ".repeat(right_spaces);
@@ -472,7 +470,13 @@ fn extract_table_alignments(header_line: &str, default_align: Option<&str>) -> V
                         }
                     }
                 } else {
-                    let a = val.split(',').next().unwrap_or("").trim().trim_matches('"').trim_matches('\'');
+                    let a = val
+                        .split(',')
+                        .next()
+                        .unwrap_or("")
+                        .trim()
+                        .trim_matches('"')
+                        .trim_matches('\'');
                     if !a.is_empty() {
                         return vec![a.to_string(); 50];
                     }
@@ -486,7 +490,6 @@ fn extract_table_alignments(header_line: &str, default_align: Option<&str>) -> V
 fn text_display_width(s: &str) -> usize {
     unicode_width::UnicodeWidthStr::width(s)
 }
-
 
 fn extract_row_cells(line: &str) -> Option<(String, Vec<String>)> {
     let trimmed = line.trim();

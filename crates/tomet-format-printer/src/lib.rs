@@ -997,10 +997,14 @@ mod tests {
     #[test]
     fn test_embedded_format_serialization_and_reparse() {
         let mut el = element_new(Sigil::At(Some("config".to_string())));
-        el.args = Some(Value::Map(vec![("format".to_string(), Value::String("json".to_string()))]));
-        el.value = Some(ElementValue::Data(Value::Map(vec![
-            ("meta".to_string(), Value::String("yaml".to_string())),
-        ])));
+        el.args = Some(Value::Map(vec![(
+            "format".to_string(),
+            Value::String("json".to_string()),
+        )]));
+        el.value = Some(ElementValue::Data(Value::Map(vec![(
+            "meta".to_string(),
+            Value::String("yaml".to_string()),
+        )])));
         let doc = Document::new(vec![Block::Element(el)], tomet_ast::Span::dummy());
         let printed = document_to_tm(&doc);
         assert!(printed.contains("\"meta\": \"yaml\""));

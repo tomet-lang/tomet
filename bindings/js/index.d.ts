@@ -92,6 +92,11 @@ export function toHtml(sourceOrDoc: string | Document): string;
 export function toMarkdown(sourceOrDoc: string | Document): string;
 
 /**
+ * Convert `.tmt` source text or a `Document` AST object into a Typst markup string.
+ */
+export function toTypst(sourceOrDoc: string | Document): string;
+
+/**
  * Parse CommonMark Markdown text into a `Document` AST object.
  */
 export function fromMarkdown(markdown: string): Document;

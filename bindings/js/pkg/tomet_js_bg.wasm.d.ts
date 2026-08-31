@@ -9,6 +9,7 @@ export const parseValue: (a: number, b: number) => [number, number, number];
 export const printDocument: (a: any) => [number, number, number, number];
 export const toHtml: (a: any) => [number, number, number, number];
 export const toMarkdown: (a: any) => [number, number, number, number];
+export const toTypst: (a: any) => [number, number, number, number];
 export const validate: (a: number, b: number) => [number, number, number];
 export const __wbindgen_malloc: (a: number, b: number) => number;
 export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
