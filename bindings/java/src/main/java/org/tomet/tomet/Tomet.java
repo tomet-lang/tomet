@@ -71,6 +71,15 @@ public final class Tomet {
     public static native String toMarkdown(String source) throws TometException;
 
     /**
+     * Converts .tmt source text into a Typst markup string.
+     *
+     * @param source the Tomet source text
+     * @return converted Typst markup string
+     * @throws TometException if syntax parsing fails
+     */
+    public static native String toTypst(String source) throws TometException;
+
+    /**
      * Parses CommonMark Markdown text into a Document AST JSON string.
      *
      * @param markdown CommonMark source text

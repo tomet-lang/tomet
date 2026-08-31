@@ -36,6 +36,7 @@ members = [
   #[ Convert -- conversion to/from external document formats ]
   "crates/tomet-convert-markdown",
   "crates/tomet-convert-html",
+  "crates/tomet-convert-typst",
 
   #[ Format -- .tmt source text production & formatting ]
   "crates/tomet-format-field-utils",
@@ -80,6 +81,7 @@ tomet-transform = { path = "crates/tomet-transform" }
 #[ Convert ]
 tomet-markdown = { path = "crates/tomet-convert-markdown" }
 tomet-html = { path = "crates/tomet-convert-html" }
+tomet-typst = { path = "crates/tomet-convert-typst" }
 #[ Format ]
 tomet-field-utils = { path = "crates/tomet-format-field-utils" }
 tomet-style = { path = "crates/tomet-format-style" }

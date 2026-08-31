@@ -5,7 +5,9 @@ use std::path::Path;
 
 use tomet_parser::parse_document;
 use tomet_printer::document_to_tm;
-use tomet_transform::{apply_structural_action, count_structural_matches, StructuralAction, StructuralQuery};
+use tomet_transform::{
+    StructuralAction, StructuralQuery, apply_structural_action, count_structural_matches,
+};
 
 use crate::diff::FileDiff;
 
@@ -14,14 +16,13 @@ pub struct StructuralEngine;
 impl StructuralEngine {
     /// Perform structural query search across `.tmt` files.
     pub fn search(dir: &Path, query: &StructuralQuery) -> Vec<FileDiff> {
-        let (config, _, config_root) =
-            tomet_config::find_config_file(dir).unwrap_or_else(|| {
-                (
-                    tomet_config::PrinterConfig::default(),
-                    dir.to_path_buf(),
-                    dir.to_path_buf(),
-                )
-            });
+        let (config, _, config_root) = tomet_config::find_config_file(dir).unwrap_or_else(|| {
+            (
+                tomet_config::PrinterConfig::default(),
+                dir.to_path_buf(),
+                dir.to_path_buf(),
+            )
+        });
         Self::search_with_config(dir, query, &config, &config_root)
     }
 

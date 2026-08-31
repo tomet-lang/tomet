@@ -1,7 +1,7 @@
 //! Directive promotion and Value DSL normalization transformations.
 
 use tomet_ast::{Block, Document, Element, Sigil, Value};
-use tomet_semantics::{classify, ElementKind};
+use tomet_semantics::{ElementKind, classify};
 use tomet_tree::{DocumentExt, ElementExt, element_new, for_each_element_mut};
 
 /// Promotes a property `prop_key` from an element matching `source_filter` into a new top-level
@@ -49,9 +49,9 @@ where
     let insert_pos = match target_index {
         Some(idx) => idx,
         None => {
-            let version_idx = doc.find_element_block_index(|el| {
-                matches!(&el.sigil, Sigil::At(Some(name)) if name == "version")
-            });
+            let version_idx = doc.find_element_block_index(
+                |el| matches!(&el.sigil, Sigil::At(Some(name)) if name == "version"),
+            );
             match version_idx {
                 Some(v_idx) => v_idx + 1,
                 None => 0,
@@ -82,7 +82,8 @@ pub fn normalize_meta_to_value_dsl(doc: &mut Document) -> bool {
                     el.args = None;
                     changed = true;
                 }
-            } else if matches!(&el.args, Some(Value::String(fmt)) if fmt == "yaml" || fmt == "json" || fmt == "toml") {
+            } else if matches!(&el.args, Some(Value::String(fmt)) if fmt == "yaml" || fmt == "json" || fmt == "toml")
+            {
                 el.args = None;
                 changed = true;
             }

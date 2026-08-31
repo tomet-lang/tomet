@@ -170,9 +170,7 @@ fn call_emoji(args: &[Value]) -> Result<Value, ComputeError> {
 fn call_tm(args: &[Value]) -> Result<Value, ComputeError> {
     match args {
         [Value::String(path)] => Ok(Value::String(format!("tm:{path}"))),
-        [Value::String(path), Value::String(sec)] => {
-            Ok(Value::String(format!("tm:{path}#{sec}")))
-        }
+        [Value::String(path), Value::String(sec)] => Ok(Value::String(format!("tm:{path}#{sec}"))),
         other => Err(ComputeError::WrongArgCount {
             function: "tm".to_string(),
             expected: 1,

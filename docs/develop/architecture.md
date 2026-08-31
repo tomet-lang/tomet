@@ -145,6 +145,16 @@ produce and format Tomet's own source text.
   it builds/consumes `Document` values directly and uses `pulldown-cmark`
   for the actual CommonMark side, rather than round-tripping through
   Tomet source text.
+- **`tomet-typst`** (`crates/tomet-convert-typst`): one-directional
+  `Document -> Typst` markup-source export (no importer). Lossy where
+  Typst has no clean equivalent -- see the crate's own module doc for
+  the full mapping and its documented lossy cases (dropped heading
+  `id`/`cssclass`, `${...}` kept inert rather than evaluated, unrecognized
+  `<T>`/`@name` elements reduced to their inner content with a leading
+  `// tomet:{kind}` comment, since Typst's normal compile mode has no
+  raw-passthrough escape hatch the way CommonMark does). Structurally
+  closer to `tomet-html` than to `tomet-markdown`: a single `lib.rs`
+  since there's no import side to split out.
 - **`serde_tomet`**: `serde` support for the `Value` subset only
   (plain `key: value`, nested `{ }`/`[ ]`, scalars) -- the part of the
   grammar with a direct struct mapping, the same role `serde_json`/
@@ -307,9 +317,9 @@ crate's own test (`*_fixture_has_only_known_error_cases` tests against
   `roundtrip` (parse a data file -> `serde_tomet` render -> reparse,
   to confirm the save/load round trip is lossless), `html`/`serve`
   (render via `tomet-html`, `serve` re-renders fresh on every HTTP
-  request), `to-md` (via `tomet-markdown`), `format` (via
-  `tomet-formatter`, with `--write`/`--check`), `tui` (launches
-  `tomet-tui`'s workbench).
+  request), `to-md` (via `tomet-markdown`), `to-typst` (via `tomet-typst`),
+  `format` (via `tomet-formatter`, with `--write`/`--check`), `tui`
+  (launches `tomet-tui`'s workbench).
 - **`apps/lsp`** (package `tomet-lsp`): a diagnostics, formatting, hover, document symbol, goto definition,
   and completion language server (`lsp-server`/`lsp-types` over stdio, full-document sync).
   Parses the buffer with `tomet-parser` on open/change, validates AST rules with `tomet-validator`,
@@ -326,15 +336,15 @@ crate's own test (`*_fixture_has_only_known_error_cases` tests against
   on `$PATH`).
 - **`bindings/js`** (package `tomet-js`): JavaScript and WebAssembly (WASM)
   bindings using `wasm-bindgen` and `serde-wasm-bindgen`. Exports `parseDocument`,
-  `parseValue`, `toHtml`, `toMarkdown`, `fromMarkdown`, `printDocument`, `formatSource`,
+  `parseValue`, `toHtml`, `toMarkdown`, `toTypst`, `fromMarkdown`, `printDocument`, `formatSource`,
   and `validate` directly into native JS Objects and typed TypeScript models (`index.d.ts`).
 - **`bindings/python`** (package `tomet-python`, module `tomet`): Python bindings
   powered by `pyo3` and `pythonize`. Exports `loads`, `parse_document`, `to_html`,
-  `to_markdown`, `from_markdown`, `print_document`, `format`, and `validate` directly
+  `to_markdown`, `to_typst`, `from_markdown`, `print_document`, `format`, and `validate` directly
   into native Python `dict`/`list` objects with comprehensive `.pyi` type stubs.
 - **`bindings/java`** (package `tomet-java`, artifact `org.tomet:tomet`): Java and JVM
   bindings powered by JNI and `serde_json`. Exports `Tomet.parseDocumentJson`,
-  `Tomet.parseValueJson`, `Tomet.toHtml`, `Tomet.toMarkdown`, `Tomet.fromMarkdownJson`,
+  `Tomet.parseValueJson`, `Tomet.toHtml`, `Tomet.toMarkdown`, `Tomet.toTypst`, `Tomet.fromMarkdownJson`,
   `Tomet.printDocumentJson`, `Tomet.format`, and `Tomet.validateJson` for Java, Kotlin, Android, and Spring applications.
 - **`packages/react`** (package `@tomet/react`): React components for Tomet markup and
   AST rendering with custom element overrides (`<Tomet ast={doc} components={{ ... }} />`).

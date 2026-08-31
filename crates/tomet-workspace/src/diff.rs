@@ -13,7 +13,12 @@ pub struct FileDiff {
 }
 
 impl FileDiff {
-    pub fn new(path: PathBuf, original_src: String, modified_src: String, changes_count: usize) -> Self {
+    pub fn new(
+        path: PathBuf,
+        original_src: String,
+        modified_src: String,
+        changes_count: usize,
+    ) -> Self {
         Self {
             path,
             original_src,

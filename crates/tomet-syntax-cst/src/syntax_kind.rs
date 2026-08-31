@@ -91,14 +91,21 @@ impl From<SyntaxKind> for rowan::SyntaxKind {
 
 impl From<rowan::SyntaxKind> for SyntaxKind {
     fn from(kind: rowan::SyntaxKind) -> Self {
-        assert!(kind.0 < SyntaxKind::__LAST as u16, "unknown syntax kind: {}", kind.0);
+        assert!(
+            kind.0 < SyntaxKind::__LAST as u16,
+            "unknown syntax kind: {}",
+            kind.0
+        );
         unsafe { std::mem::transmute::<u16, SyntaxKind>(kind.0) }
     }
 }
 
 impl SyntaxKind {
     pub fn is_trivia(self) -> bool {
-        matches!(self, SyntaxKind::WHITESPACE | SyntaxKind::COMMENT | SyntaxKind::NEWLINE)
+        matches!(
+            self,
+            SyntaxKind::WHITESPACE | SyntaxKind::COMMENT | SyntaxKind::NEWLINE
+        )
     }
 
     pub fn is_literal(self) -> bool {

@@ -143,10 +143,7 @@ pub(super) fn render_migration_view(f: &mut Frame, app: &mut App, area: Rect) {
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
             )));
-            preview_lines.extend(generate_colored_diff(
-                &item.markdown_src,
-                &item.tomet_src,
-            ));
+            preview_lines.extend(generate_colored_diff(&item.markdown_src, &item.tomet_src));
         }
     } else {
         preview_lines.push(Line::from(

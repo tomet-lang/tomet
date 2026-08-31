@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use tomet_ast::{Document, Value};
-use tomet_semantics::{classify, ElementKind};
+use tomet_semantics::{ElementKind, classify};
 use tomet_tree::{ElementExt, transform_elements};
 
 /// A compiled macro matcher for reverse URL-to-macro rewriting.

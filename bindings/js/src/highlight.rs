@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tomet_lexer::{tokenize, SyntaxKind};
+use tomet_lexer::{SyntaxKind, tokenize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HighlightSpan {
@@ -12,7 +12,7 @@ pub fn compute_highlight_spans(src: &str) -> Vec<HighlightSpan> {
     let mut spans = Vec::new();
     let tokens = tokenize(src);
     let mut offset = 0;
-    
+
     // We compute byte offsets for every token
     let token_offsets: Vec<(SyntaxKind, &str, usize, usize)> = tokens
         .into_iter()
@@ -129,13 +129,17 @@ pub fn compute_highlight_spans(src: &str) -> Vec<HighlightSpan> {
                     i += 1;
                     list_end = token_offsets[i].3;
                 }
-                
+
                 // Peek ahead for task checkbox: whitespace then `(` then status then `)`
                 let mut check_idx = i + 1;
-                if check_idx < token_offsets.len() && token_offsets[check_idx].0 == SyntaxKind::WHITESPACE {
+                if check_idx < token_offsets.len()
+                    && token_offsets[check_idx].0 == SyntaxKind::WHITESPACE
+                {
                     check_idx += 1;
                 }
-                if check_idx < token_offsets.len() && token_offsets[check_idx].0 == SyntaxKind::L_PAREN {
+                if check_idx < token_offsets.len()
+                    && token_offsets[check_idx].0 == SyntaxKind::L_PAREN
+                {
                     let mut close_idx = check_idx + 1;
                     while close_idx < token_offsets.len()
                         && token_offsets[close_idx].0 != SyntaxKind::R_PAREN
@@ -143,7 +147,9 @@ pub fn compute_highlight_spans(src: &str) -> Vec<HighlightSpan> {
                     {
                         close_idx += 1;
                     }
-                    if close_idx < token_offsets.len() && token_offsets[close_idx].0 == SyntaxKind::R_PAREN {
+                    if close_idx < token_offsets.len()
+                        && token_offsets[close_idx].0 == SyntaxKind::R_PAREN
+                    {
                         list_end = token_offsets[close_idx].3;
                         i = close_idx;
                     }
@@ -207,7 +213,8 @@ pub fn compute_highlight_spans(src: &str) -> Vec<HighlightSpan> {
                     in_brace_depth += 1;
                     is_line_start = false;
                     continue;
-                } else if i + 1 < token_offsets.len() && token_offsets[i + 1].0 == SyntaxKind::IDENT {
+                } else if i + 1 < token_offsets.len() && token_offsets[i + 1].0 == SyntaxKind::IDENT
+                {
                     i += 1;
                     spans.push(HighlightSpan {
                         from: start,
@@ -251,7 +258,9 @@ pub fn compute_highlight_spans(src: &str) -> Vec<HighlightSpan> {
                     {
                         close_idx += 1;
                     }
-                    if close_idx < token_offsets.len() && token_offsets[close_idx].0 == SyntaxKind::BACKTICK {
+                    if close_idx < token_offsets.len()
+                        && token_offsets[close_idx].0 == SyntaxKind::BACKTICK
+                    {
                         let span_end = token_offsets[close_idx].3;
                         spans.push(HighlightSpan {
                             from: start,
@@ -268,10 +277,14 @@ pub fn compute_highlight_spans(src: &str) -> Vec<HighlightSpan> {
                 // Check if this IDENT is a property key (followed by COLON inside value group)
                 if in_paren_depth > 0 || in_brace_depth > 0 {
                     let mut next_idx = i + 1;
-                    while next_idx < token_offsets.len() && token_offsets[next_idx].0 == SyntaxKind::WHITESPACE {
+                    while next_idx < token_offsets.len()
+                        && token_offsets[next_idx].0 == SyntaxKind::WHITESPACE
+                    {
                         next_idx += 1;
                     }
-                    if next_idx < token_offsets.len() && token_offsets[next_idx].0 == SyntaxKind::COLON {
+                    if next_idx < token_offsets.len()
+                        && token_offsets[next_idx].0 == SyntaxKind::COLON
+                    {
                         spans.push(HighlightSpan {
                             from: start,
                             to: end,
@@ -331,7 +344,10 @@ pub fn compute_highlight_spans(src: &str) -> Vec<HighlightSpan> {
                 is_line_start = false;
                 continue;
             }
-            SyntaxKind::L_BRACKET | SyntaxKind::R_BRACKET | SyntaxKind::COLON | SyntaxKind::COMMA => {
+            SyntaxKind::L_BRACKET
+            | SyntaxKind::R_BRACKET
+            | SyntaxKind::COLON
+            | SyntaxKind::COMMA => {
                 spans.push(HighlightSpan {
                     from: start,
                     to: end,
@@ -359,7 +375,7 @@ mod tests {
     fn test_compute_highlight_spans() {
         let src = "#[ Heading ]\n- Official: @link(id: \"tasks\")[Tasks]\n";
         let spans = compute_highlight_spans(src);
-        
+
         let tags: Vec<(&str, &str)> = spans
             .iter()
             .map(|s| (&src[s.from..s.to], s.tag.as_str()))
@@ -367,8 +383,17 @@ mod tests {
 
         assert!(tags.iter().any(|(t, tag)| *t == "#" && *tag == "heading"));
         assert!(tags.iter().any(|(t, tag)| *t == "-" && *tag == "list"));
-        assert!(tags.iter().any(|(t, tag)| *t == "@link" && *tag == "tagName"));
-        assert!(tags.iter().any(|(t, tag)| *t == "id" && *tag == "propertyName"));
-        assert!(tags.iter().any(|(t, tag)| *t == "\"tasks\"" && *tag == "string"));
+        assert!(
+            tags.iter()
+                .any(|(t, tag)| *t == "@link" && *tag == "tagName")
+        );
+        assert!(
+            tags.iter()
+                .any(|(t, tag)| *t == "id" && *tag == "propertyName")
+        );
+        assert!(
+            tags.iter()
+                .any(|(t, tag)| *t == "\"tasks\"" && *tag == "string")
+        );
     }
 }

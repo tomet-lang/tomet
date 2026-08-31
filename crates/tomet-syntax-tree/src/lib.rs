@@ -36,11 +36,7 @@ pub fn element_set_prop(el: &mut tomet_ast::Element, key: &str, new_val: tomet_a
     el.set_prop(key, new_val);
 }
 
-pub fn element_rename_prop_key(
-    el: &mut tomet_ast::Element,
-    old_key: &str,
-    new_key: &str,
-) -> bool {
+pub fn element_rename_prop_key(el: &mut tomet_ast::Element, old_key: &str, new_key: &str) -> bool {
     el.rename_prop_key(old_key, new_key)
 }
 
@@ -125,7 +121,10 @@ mod tests {
         assert!(el.has_prop_key("tag"));
 
         el.rename_prop_key("tag", "priority");
-        assert_eq!(el.get_attr("priority").and_then(|v| v.as_str()), Some("urgent"));
+        assert_eq!(
+            el.get_attr("priority").and_then(|v| v.as_str()),
+            Some("urgent")
+        );
         assert!(!el.has_prop_key("tag"));
 
         let removed = el.remove_prop("priority");

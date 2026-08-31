@@ -21,9 +21,10 @@ print(data)  # {'name': 'Alice', 'count': 42}
 doc = tomet.parse_document("#[ Hello World ]\n\n<task>(done: true)[Buy milk]")
 print(doc["blocks"])
 
-# 3. Convert to HTML & Markdown
+# 3. Convert to HTML, Markdown & Typst
 html = tomet.to_html(doc)
 md = tomet.to_markdown(doc)
+typ = tomet.to_typst(doc)
 
 # 4. Format source code
 formatted = tomet.format("#[  Messy  Heading  ]\n")

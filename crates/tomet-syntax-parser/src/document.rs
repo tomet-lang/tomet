@@ -68,10 +68,12 @@ pub fn parse_document(src: &str) -> Result<Document> {
         if let Some((ordered, ..)) = peek_list_marker(&cur)? {
             let items = parse_list(&mut cur, ordered, running_format)?;
             if !items.is_empty() {
-                let list_span = items.first().unwrap().span.union(&items.last().unwrap().span);
-                blocks.push(Block::Element(element_list(
-                    ordered, items, list_span,
-                )));
+                let list_span = items
+                    .first()
+                    .unwrap()
+                    .span
+                    .union(&items.last().unwrap().span);
+                blocks.push(Block::Element(element_list(ordered, items, list_span)));
             }
             continue;
         }

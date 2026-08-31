@@ -61,7 +61,9 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
         || s.parse::<f64>().is_ok()
         || s.trim() != s
         || starts_with_special
-        || s.contains(['"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ']);
+        || s.contains([
+            '"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ',
+        ]);
 
     if needs_quotes {
         out.push('"');
@@ -320,8 +322,14 @@ mod tests {
         assert_eq!(quote_scalar_string("null"), "\"null\"");
         assert_eq!(quote_scalar_string("123"), "\"123\"");
         assert_eq!(quote_scalar_string("45.67"), "\"45.67\"");
-        assert_eq!(quote_scalar_string("hello \"world\""), "\"hello \\\"world\\\"\"");
+        assert_eq!(
+            quote_scalar_string("hello \"world\""),
+            "\"hello \\\"world\\\"\""
+        );
         assert_eq!(quote_scalar_string("line1\nline2"), "\"line1\\nline2\"");
-        assert_eq!(quote_scalar_string("2026-06-17T05:52:44Z"), "2026-06-17T05:52:44Z");
+        assert_eq!(
+            quote_scalar_string("2026-06-17T05:52:44Z"),
+            "2026-06-17T05:52:44Z"
+        );
     }
 }

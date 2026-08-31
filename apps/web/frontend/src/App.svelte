@@ -6,6 +6,7 @@
     formatSource as wasmFormat,
     toHtml as wasmToHtml,
     toMarkdown as wasmToMarkdown,
+    toTypst as wasmToTypst,
     validate as wasmValidate,
   } from '@tomet/wasm';
   import Editor from './components/Editor.svelte';
@@ -36,6 +37,7 @@
     ast: string;
     ast_json: string;
     markdown: string;
+    typst: string;
     diagnostics: DiagnosticInfo[];
     error: ParseErrorInfo | null;
   }
@@ -43,7 +45,7 @@
   let sourceText = $state(presets.cheatsheet);
   let selectedPreset = $state('cheatsheet');
   let advancedHeadings = $state(false);
-  let activeTab = $state<'svelte_preview' | 'html_preview' | 'ast' | 'ast_json' | 'markdown' | 'source'>('svelte_preview');
+  let activeTab = $state<'svelte_preview' | 'html_preview' | 'ast' | 'ast_json' | 'markdown' | 'typst' | 'source'>('svelte_preview');
 
   let wasmReady = $state(false);
   let parseResult = $state<ParseResult | null>(null);
@@ -128,6 +130,7 @@
       const doc = wasmParse(sourceText);
       const html = wasmToHtml(doc);
       const markdown = wasmToMarkdown(doc);
+      const typst = wasmToTypst(doc);
       const ast_json = JSON.stringify(doc, null, 2);
       const rawDiags = wasmValidate(sourceText) || [];
       const diagnostics: DiagnosticInfo[] = (Array.isArray(rawDiags) ? rawDiags : []).map((d: any) => ({
@@ -144,6 +147,7 @@
         ast: ast_json,
         ast_json,
         markdown,
+        typst,
         diagnostics,
         error: null,
       };
@@ -157,6 +161,7 @@
         ast: '',
         ast_json: '',
         markdown: '',
+        typst: '',
         diagnostics: [],
         error: {
           message: errMsg,
@@ -228,6 +233,8 @@
       content = parseResult?.ast_json || '';
     } else if (activeTab === 'markdown') {
       content = parseResult?.markdown || '';
+    } else if (activeTab === 'typst') {
+      content = parseResult?.typst || '';
     } else if (activeTab === 'svelte_preview') {
       content = sourceText;
     }
@@ -322,6 +329,9 @@
           <button class={`tab ${activeTab === 'markdown' ? 'active' : ''}`} onclick={() => (activeTab = 'markdown')}>
             CommonMark
           </button>
+          <button class={`tab ${activeTab === 'typst' ? 'active' : ''}`} onclick={() => (activeTab = 'typst')}>
+            Typst
+          </button>
           <button class={`tab ${activeTab === 'source' ? 'active' : ''}`} onclick={() => (activeTab = 'source')}>
             HTML Source
           </button>
@@ -352,6 +362,8 @@
           <pre class="code-view">{parseResult?.ast_json || ''}</pre>
         {:else if activeTab === 'markdown'}
           <pre class="code-view">{parseResult?.markdown || ''}</pre>
+        {:else if activeTab === 'typst'}
+          <pre class="code-view">{parseResult?.typst || ''}</pre>
         {:else if activeTab === 'source'}
           <pre class="code-view">{parseResult?.html || ''}</pre>
         {/if}

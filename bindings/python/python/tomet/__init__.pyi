@@ -16,6 +16,10 @@ def to_markdown(source_or_doc: Union[str, dict[str, Any]]) -> str:
     """Convert .tmt source text or a Document AST dict into a CommonMark Markdown string."""
     ...
 
+def to_typst(source_or_doc: Union[str, dict[str, Any]]) -> str:
+    """Convert .tmt source text or a Document AST dict into a Typst markup string."""
+    ...
+
 def from_markdown(markdown: str) -> dict[str, Any]:
     """Parse CommonMark Markdown text into a Document AST dict."""
     ...

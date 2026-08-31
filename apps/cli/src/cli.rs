@@ -1,0 +1,182 @@
+use std::path::PathBuf;
+
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(name = "tomet", about = "Parse and inspect Tomet (.tmt) files")]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Command,
+}
+
+#[derive(Subcommand)]
+pub enum Command {
+    /// Parse a file and report whether it's valid (prints "OK" or a detailed
+    /// snippet error with its line:column), without dumping the AST.
+    Check {
+        file: PathBuf,
+        /// Parse as a data-only document (key: value / seq / scalar)
+        /// instead of the full document grammar.
+        #[arg(long)]
+        data: bool,
+        /// Do not print "OK" when parse succeeds.
+        #[arg(short, long)]
+        quiet: bool,
+        /// Output parse diagnostic error as JSON format.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Parse a file and pretty-print the resulting AST.
+    Ast {
+        file: PathBuf,
+        #[arg(long)]
+        data: bool,
+    },
+    /// Parse a data file into a generic value, then render it back out
+    /// through `serde_tomet` and reparse that -- confirms the
+    /// save/load round trip is lossless.
+    Roundtrip { file: PathBuf },
+    /// Convert a `.tmt` file to a standalone HTML page.
+    Html {
+        file: PathBuf,
+        /// Write to this path instead of stdout.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+        /// Number headings sequentially by nesting level (1, 1.1, 1.2, 2,
+        /// ...) instead of the plain, unnumbered default.
+        #[arg(long)]
+        advanced: bool,
+        /// `<html lang="...">` for the page shell. Defaults to "ja".
+        #[arg(long)]
+        lang: Option<String>,
+    },
+    /// Convert a `.tmt` file to CommonMark. Lossy for constructs with no
+    /// Markdown equivalent (`@links{}`, generic `<T>` elements) -- see
+    /// `docs/commonmark-support.md`.
+    ToMd {
+        file: PathBuf,
+        /// Write to this path instead of stdout.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+    },
+    /// Convert a `.tmt` file to Typst markup source. Lossy for constructs
+    /// with no Typst equivalent -- see `tomet-convert-typst`'s crate doc.
+    ToTypst {
+        file: PathBuf,
+        /// Write to this path instead of stdout.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+    },
+    /// Convert CommonMark Markdown (.md) to Tomet (.tmt).
+    FromMd {
+        /// Target .md file or directory containing .md files.
+        path: PathBuf,
+        /// Write to this path instead of stdout (for single file) or target output directory (for directory).
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+        /// Write converted `.tmt` file(s) in place.
+        #[arg(short = 'i', long, alias = "write")]
+        in_place: bool,
+        /// Remove original `.md` file(s) after conversion (only with --in-place or --out).
+        #[arg(long)]
+        remove_original: bool,
+        /// Dry-run mode: convert and validate in memory without writing files.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Serve a `.tmt` file as HTML over HTTP on 127.0.0.1, re-rendering it
+    /// fresh on every request (just reload the page after editing).
+    Serve {
+        file: PathBuf,
+        #[arg(short, long, default_value_t = 8787)]
+        port: u16,
+        /// Number headings sequentially by nesting level (1, 1.1, 1.2, 2,
+        /// ...) instead of the plain, unnumbered default.
+        #[arg(long)]
+        advanced: bool,
+        /// `<html lang="...">` for the page shell. Defaults to "ja".
+        #[arg(long)]
+        lang: Option<String>,
+    },
+
+    /// Normalize a `.tmt`/`.tmt` file's whitespace (line endings, trailing
+    /// whitespace, blank lines, final newline). A directory formats every
+    /// `.tmt`/`.tmt` file found under it (same file discovery as `export`/
+    /// `check-links`: honors `.gitignore` and the project config's
+    /// `ignore_files`). Prints to stdout by default; see
+    /// `--in-place`/`--check`.
+    Format {
+        path: PathBuf,
+        /// Overwrite the file(s) in place instead of printing to stdout.
+        #[arg(short = 'i', long, alias = "write")]
+        in_place: bool,
+        /// Exit with a nonzero status if any file isn't already
+        /// formatted, without writing or printing anything.
+        #[arg(long, conflicts_with = "in_place")]
+        check: bool,
+    },
+
+    /// Launch the interactive TUI workbench for Markdown migration,
+    /// batch metadata editing, and structural AST refactoring.
+    Tui {
+        /// Target directory or file path (defaults to current directory ".").
+        #[arg(default_value = ".")]
+        path: PathBuf,
+        /// Optional path to custom formatting configuration file (.tmt).
+        #[arg(short, long)]
+        config: Option<PathBuf>,
+    },
+
+    /// Export a `.tmt` document or directory of documents based on `@config` settings or CLI overrides.
+    Export {
+        /// Target file or directory path (defaults to current directory ".").
+        #[arg(default_value = ".")]
+        path: PathBuf,
+        /// Target format (`commonmark` | `html` | `all`). Overrides @config.
+        #[arg(short = 't', long)]
+        r#type: Option<String>,
+        /// Output destination file or directory path. Overrides @config.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+        /// Number headings sequentially by nesting level for HTML export.
+        #[arg(long)]
+        advanced: bool,
+    },
+
+    /// Check every `@file`/`<embed>` link in a `.tmt`/`.tmt` document or
+    /// directory for broken (non-existent) local-file targets. Uses an
+    /// SQLite cache (keyed by source-file mtime) under
+    /// `<config_root>/.tomet/` so re-checking a large vault doesn't
+    /// re-parse unchanged files. Exits non-zero if any broken link is
+    /// found.
+    CheckLinks {
+        /// Target file or directory path (defaults to current directory ".").
+        #[arg(default_value = ".")]
+        path: PathBuf,
+        /// Print the report as JSON instead of human-readable text.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Refactor .tmt file(s) across a workspace (URL macros, @meta.type -> @kind, Value DSL normalization).
+    Refactor {
+        /// Target file or directory path (defaults to current directory ".").
+        #[arg(default_value = ".")]
+        path: PathBuf,
+        /// Write modified files in place.
+        #[arg(short = 'i', long, alias = "write")]
+        in_place: bool,
+        /// Only rewrite URLs matching macros.
+        #[arg(long)]
+        url_macros: bool,
+        /// Only promote @meta.type to @kind.
+        #[arg(long)]
+        meta_kind: bool,
+        /// Only normalize @meta(format:yaml) to Value DSL.
+        #[arg(long)]
+        value_dsl: bool,
+        /// Check/dry-run mode without modifying files (exits non-zero if changes are needed).
+        #[arg(long, conflicts_with = "in_place")]
+        check: bool,
+    },
+}

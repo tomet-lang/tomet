@@ -96,10 +96,7 @@ impl PrinterConfig {
                 }
             }
             "heading" => {
-                if let Some(space) = value
-                    .get("space_inside_brackets")
-                    .and_then(|v| v.as_bool())
-                {
+                if let Some(space) = value.get("space_inside_brackets").and_then(|v| v.as_bool()) {
                     cfg.heading_space_inside_brackets = space;
                 }
             }
@@ -252,11 +249,7 @@ impl PrinterConfig {
 
     fn parse_meta_field_props(field_name: &str, field_val: &Value, cfg: &mut Self) {
         if let Value::Map(props) = field_val {
-            let mut field_cfg = cfg
-                .meta_fields
-                .get(field_name)
-                .cloned()
-                .unwrap_or_default();
+            let mut field_cfg = cfg.meta_fields.get(field_name).cloned().unwrap_or_default();
             for (pk, pv) in props {
                 match pk.as_str() {
                     "type" => field_cfg.field_type = pv.as_str().map(String::from),
@@ -365,7 +358,11 @@ impl std::fmt::Display for ConfigError {
                 path: Some(path),
                 source,
             } => {
-                write!(f, "failed to parse config file {}: {source}", path.display())
+                write!(
+                    f,
+                    "failed to parse config file {}: {source}",
+                    path.display()
+                )
             }
             ConfigError::Parse { path: None, source } => {
                 write!(f, "failed to parse config source: {source}")
@@ -396,10 +393,8 @@ pub fn load_config_from_file(path: &std::path::Path) -> Result<PrinterConfig, Co
 }
 
 pub fn load_config_from_str(src: &str) -> Result<PrinterConfig, ConfigError> {
-    let doc = tomet_parser::parse_document(src).map_err(|source| ConfigError::Parse {
-        path: None,
-        source,
-    })?;
+    let doc = tomet_parser::parse_document(src)
+        .map_err(|source| ConfigError::Parse { path: None, source })?;
     Ok(PrinterConfig::from_doc(&doc))
 }
 

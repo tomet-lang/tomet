@@ -369,7 +369,10 @@ fn macro_hover_with_config_import_over_stdio() {
     let hover_val = hover_resp["result"]["contents"]["value"]
         .as_str()
         .unwrap_or_else(|| panic!("expected hover value string, got {hover_resp:?}"));
-    assert!(hover_val.contains("Macro Result"), "got hover_val: {hover_val}");
+    assert!(
+        hover_val.contains("Macro Result"),
+        "got hover_val: {hover_val}"
+    );
     assert!(hover_val.contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU"));
 
     server.shutdown();
@@ -432,7 +435,10 @@ fn macro_hover_with_workspace_auto_config_over_stdio() {
     let hover_val = hover_resp["result"]["contents"]["value"]
         .as_str()
         .unwrap_or_else(|| panic!("expected hover value string, got {hover_resp:?}"));
-    assert!(hover_val.contains("Macro Result"), "got hover_val: {hover_val}");
+    assert!(
+        hover_val.contains("Macro Result"),
+        "got hover_val: {hover_val}"
+    );
     assert!(hover_val.contains("https://x.com/kosekibijou/status/1807568682631254496"));
 
     server.shutdown();

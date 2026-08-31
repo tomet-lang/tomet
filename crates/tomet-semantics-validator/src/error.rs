@@ -53,7 +53,9 @@ pub enum CstValidationError {
 impl CstValidationError {
     pub fn range(&self) -> TextRange {
         match self {
-            CstValidationError::DuplicateId { duplicate_range, .. } => *duplicate_range,
+            CstValidationError::DuplicateId {
+                duplicate_range, ..
+            } => *duplicate_range,
         }
     }
 }
@@ -61,7 +63,9 @@ impl CstValidationError {
 impl fmt::Display for CstValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CstValidationError::DuplicateId { id, first_range, .. } => {
+            CstValidationError::DuplicateId {
+                id, first_range, ..
+            } => {
                 write!(
                     f,
                     "duplicate id `{id}` (first defined at byte offset {})",

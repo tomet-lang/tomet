@@ -1,5 +1,4 @@
 {
-  lib,
   craneLib,
   buildNpmPackage,
 }:

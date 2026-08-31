@@ -42,6 +42,11 @@ export function toHtml(source_or_doc: any): string;
 export function toMarkdown(source_or_doc: any): string;
 
 /**
+ * Convert `.tmt` source text or a `Document` AST object into a Typst markup string.
+ */
+export function toTypst(source_or_doc: any): string;
+
+/**
  * Validate `.tmt` source text and return an array of validation diagnostics.
  */
 export function validate(source: string): any;
@@ -58,6 +63,7 @@ export interface InitOutput {
     readonly printDocument: (a: any) => [number, number, number, number];
     readonly toHtml: (a: any) => [number, number, number, number];
     readonly toMarkdown: (a: any) => [number, number, number, number];
+    readonly toTypst: (a: any) => [number, number, number, number];
     readonly validate: (a: number, b: number) => [number, number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

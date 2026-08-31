@@ -29,7 +29,10 @@ mod tests {
     fn test_macro_pattern_and_set() {
         let mut macros = HashMap::new();
         macros.insert("gh".into(), "https://github.com/${1}".into());
-        macros.insert("gh_issue".into(), "https://github.com/${1}/issues/${2}".into());
+        macros.insert(
+            "gh_issue".into(),
+            "https://github.com/${1}/issues/${2}".into(),
+        );
 
         let set = MacroSet::from_map(&macros);
         assert_eq!(

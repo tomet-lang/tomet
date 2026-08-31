@@ -18,6 +18,7 @@ tomet-markdown = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-printer = { workspace = true }
 tomet-html = { workspace = true }
+tomet-typst = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-tui = { workspace = true }
 tomet-workspace = { workspace = true }

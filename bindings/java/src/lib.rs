@@ -105,6 +105,27 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_toMarkdown(
         .unwrap_or(std::ptr::null_mut())
 }
 
+/// Convert `.tmt` source text into a Typst markup string.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_org_tomet_tomet_Tomet_toTypst(
+    mut env: JNIEnv,
+    _class: JClass,
+    source: JString,
+) -> jstring {
+    let src = match get_string(&mut env, &source) {
+        Ok(s) => s,
+        Err(e) => return throw_err(&mut env, e),
+    };
+    let doc = match tomet_parser::parse_document(&src) {
+        Ok(d) => d,
+        Err(e) => return throw_err(&mut env, e),
+    };
+    let typ = tomet_typst::to_typst(&doc);
+    env.new_string(typ)
+        .map(|s| s.into_raw())
+        .unwrap_or(std::ptr::null_mut())
+}
+
 /// Parse CommonMark Markdown text into a `Document` AST JSON string.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_org_tomet_tomet_Tomet_fromMarkdownJson(
@@ -209,6 +230,9 @@ mod tests {
 
         let md = tomet_markdown::to_markdown(&doc);
         assert!(md.contains("Hello Java"));
+
+        let typ = tomet_typst::to_typst(&doc);
+        assert!(typ.contains("Hello Java"));
 
         let formatted = tomet_formatter::format_source("#[  Hello  ]\n");
         assert_eq!(formatted, "#[  Hello  ]\n");

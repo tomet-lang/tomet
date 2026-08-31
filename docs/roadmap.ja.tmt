@@ -3,7 +3,8 @@
 
 - 読み込みロード画面
 - index, directories
-- latex, typst
+- latex
+- typst (Document -> Typst変換は`tomet-convert-typst`で実装済み。import/PDF生成は未実装)
 ---[ 構文を決定する ]---
 - ( ) `ref`構文                      // `@this`
 - ( ) Template構文

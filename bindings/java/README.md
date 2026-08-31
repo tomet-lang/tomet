@@ -31,9 +31,10 @@ public class Main {
         String docJson = Tomet.parseDocumentJson("#[ Hello Java ]\n\n<task>(done: true)[Buy milk]");
         System.out.println("AST JSON: " + docJson);
 
-        // 2. Convert to HTML and Markdown
+        // 2. Convert to HTML, Markdown, and Typst
         String html = Tomet.toHtml("#[ Hello ]\n\nProse text");
         String md = Tomet.toMarkdown("#[ Hello ]\n\nProse text");
+        String typ = Tomet.toTypst("#[ Hello ]\n\nProse text");
 
         // 3. Format source text
         String formatted = Tomet.format("#[  Messy  Heading  ]\n");

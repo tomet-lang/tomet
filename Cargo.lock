@@ -1913,6 +1913,7 @@ dependencies = [
  "tomet-printer",
  "tomet-semantics",
  "tomet-tui",
+ "tomet-typst",
  "tomet-workspace",
  "uuid",
  "walkdir",
@@ -2018,6 +2019,7 @@ dependencies = [
  "tomet-markdown",
  "tomet-parser",
  "tomet-printer",
+ "tomet-typst",
  "tomet-validator",
 ]
 
@@ -2037,6 +2039,7 @@ dependencies = [
  "tomet-markdown",
  "tomet-parser",
  "tomet-printer",
+ "tomet-typst",
  "tomet-validator",
  "wasm-bindgen",
 ]
@@ -2147,6 +2150,7 @@ dependencies = [
  "tomet-markdown",
  "tomet-parser",
  "tomet-printer",
+ "tomet-typst",
  "tomet-validator",
 ]
 
@@ -2220,6 +2224,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomet-typst"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-tree",
+]
+
+[[package]]
 name = "tomet-validator"
 version = "0.1.0"
 dependencies = [
@@ -2245,6 +2259,7 @@ dependencies = [
  "tomet-html",
  "tomet-markdown",
  "tomet-parser",
+ "tomet-typst",
  "tomet-validator",
 ]
 

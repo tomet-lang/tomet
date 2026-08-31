@@ -85,10 +85,7 @@ pub fn apply_structural_action(doc: &mut Document, action: &StructuralAction) ->
             }
         }
         StructuralAction::ReplaceValue { key, new_value } => {
-            if el.replace_prop_value(
-                key,
-                Value::String(new_value.clone()),
-            ) {
+            if el.replace_prop_value(key, Value::String(new_value.clone())) {
                 count += 1;
             }
         }

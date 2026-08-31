@@ -61,15 +61,13 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                 } else if req.method == HoverRequest::METHOD {
                     let params: lsp_types::HoverParams = serde_json::from_value(req.params)?;
                     let uri = &params.text_document_position_params.text_document.uri;
-                    let hover = documents
-                        .get(uri)
-                        .and_then(|text| {
-                            tomet_lsp::hover_for(
-                                text,
-                                params.text_document_position_params.position,
-                                Some(uri),
-                            )
-                        });
+                    let hover = documents.get(uri).and_then(|text| {
+                        tomet_lsp::hover_for(
+                            text,
+                            params.text_document_position_params.position,
+                            Some(uri),
+                        )
+                    });
                     let result = serde_json::to_value(hover)?;
                     connection
                         .sender
@@ -109,10 +107,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                     let items = documents
                         .get(&params.text_document_position.text_document.uri)
                         .map(|text| {
-                            tomet_lsp::completions_for(
-                                text,
-                                params.text_document_position.position,
-                            )
+                            tomet_lsp::completions_for(text, params.text_document_position.position)
                         })
                         .unwrap_or_default();
                     let result = serde_json::to_value(items)?;
