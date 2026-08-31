@@ -9,13 +9,15 @@ path = "src/main.rs"
 
 [dependencies]
 tomet-ast = { workspace = true }
+tomet-compute = { workspace = true }
 tomet-config = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-formatter = { workspace = true }
 tomet-parser = { workspace = true }
+tomet-resolver = { workspace = true }
 tomet-semantics = { workspace = true }
+tomet-tree = { workspace = true }
 tomet-validator = { workspace = true }
-tomet-walker = { workspace = true }
 
 #[ Crates.io ]
 anyhow = { workspace = true }

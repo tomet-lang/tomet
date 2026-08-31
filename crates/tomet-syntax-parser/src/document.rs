@@ -18,7 +18,8 @@ use crate::interp::{is_interp_start, parse_dollar_element};
 use crate::list::{parse_list, peek_list_marker};
 use crate::value::{skip_inline_ws, skip_ws_and_newlines};
 use tomet_ast::{Block, Document, Inline, Paragraph};
-use tomet_lexar::Cursor;
+use tomet_lexer::Cursor;
+use tomet_tree::{ElementExt, element_list, element_new};
 
 /// Parse an entire source string as a markup [`Document`].
 pub fn parse_document(src: &str) -> Result<Document> {
@@ -55,7 +56,7 @@ pub fn parse_document(src: &str) -> Result<Document> {
         if is_thematic_break(&cur) {
             let item_start = cur.pos();
             consume_thematic_break(&mut cur);
-            let el = tomet_ast::Element::new(tomet_ast::Sigil::Type("hr".to_string()))
+            let el = element_new(tomet_ast::Sigil::Type("hr".to_string()))
                 .with_span(cur.span_from(item_start));
             blocks.push(Block::Element(el));
             continue;
@@ -68,7 +69,7 @@ pub fn parse_document(src: &str) -> Result<Document> {
             let items = parse_list(&mut cur, ordered, running_format)?;
             if !items.is_empty() {
                 let list_span = items.first().unwrap().span.union(&items.last().unwrap().span);
-                blocks.push(Block::Element(tomet_ast::Element::list(
+                blocks.push(Block::Element(element_list(
                     ordered, items, list_span,
                 )));
             }

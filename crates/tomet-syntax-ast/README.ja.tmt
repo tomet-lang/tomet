@@ -14,7 +14,7 @@ Tomet ツールチェーン全体の基礎となるデータモデル (`Document
 
 -. **他クレートとの境界線の分離 (Crate Boundary Differentiation)**:
   - **意味付け・分類 (Semantics)**: 「特定の要素が何を意味するか（リンク、@meta 等）」の分類ロジックは `tomet-semantics` に置く。
-  - **ツリー走査 (Traversal)**: AST の再帰的走査・検索エンジンは `tomet-walker` に置く。
+  - **ツリー走査・操作 (Traversal & Manipulation)**: AST の再帰的走査・操作エンジンは `tomet-tree` に置く。
   - **シリアライズ・フォーマット (Formatting/Printing)**: `.tmt` ソースコードへの再構築・文字列化は `tomet-style` や `tomet-printer` に置く。
   - **バリデーション・ID生成 (Validation/Utils)**: 意味的検証や ID 生成は `tomet-validator` や `tomet-field-utils` に置く。
 

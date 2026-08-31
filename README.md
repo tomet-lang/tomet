@@ -16,24 +16,22 @@ Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and 
 ```
 tomet/
 ├── apps/
-│   ├── tomet/            # Main CLI tool (check, ast, html, serve, playground, to-md, format)
-│   ├── tomet-lsp/        # Language Server Protocol implementation
-│   ├── bindings/             # Language bindings (Java, JS, Python)
-│   └── integrations/         # Editor extensions (VS Code, Zed, Helix, Neovim)
+│   ├── cli/              # Main CLI binary (`tomet`)
+│   ├── web/              # Web playground / wasm frontend
+│   ├── lsp/              # Language Server Protocol implementation (`tomet-lsp`)
+│   └── tui/              # Interactive TUI workbench (`tomet-tui`)
+├── bindings/             # Language bindings (Java, JS, Python)
+├── editors/              # Editor extensions (VS Code, Zed, Helix, Neovim)
 ├── crates/
-│   ├── tomet-ast/        # Shared AST & Value data models
-│   ├── tomet-lexar/      # Cursor lexer over &str
-│   ├── tomet-parser/     # Recursive-descent parser (source of truth for grammar)
-│   ├── tomet-semantics/  # I/O-free classification of what an Element means
-│   ├── tomet-resolver/    # File-referencing preprocessor (@settings(file:...))
-│   ├── tomet-validator/  # Schema & lint validation (in progress)
-│   ├── converters/
-│   │   ├── html/             # tomet-html: Document -> HTML
-│   │   └── markdown/         # tomet-markdown: CommonMark <-> Document
-│   ├── tomet-formatter/  # Code formatting & whitespace normalization
+│   ├── tomet-syntax-*    # Syntax layer: cst, lexer, parser, ast, tree
+│   ├── tomet-semantics*  # Semantics layer: semantics, validator, compute (eval), resolver (linker)
+│   ├── tomet-transform/  # In-memory AST refactoring & macro rewrite engine
+│   ├── tomet-convert-*   # Document format converters: html, markdown
+│   ├── tomet-format-*    # Source output: formatter, printer, style, field-utils
+│   ├── tomet-workspace*  # Multi-file I/O: workspace, indexer, links, config
 │   ├── serde_tomet/      # Serde deserializer/serializer for Tomet Value model
 │   └── tree-sitter-tomet/# Tree-sitter grammar for editor syntax highlighting
-└── docs/                     # Architecture notes, spec, and cheat sheet
+└── docs/                 # Architecture notes, spec, and documentation
 ```
 
 ## Building and Testing

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use tomet_ast::{Block, Document, Element, ElementValue, Value};
+use tomet_tree::ValueExt;
 
 use crate::{ElementKind, classify, normalized_element_args};
 
@@ -55,6 +56,8 @@ pub struct DocumentConfig {
     pub table_align: Option<String>,
     /// User-defined macro templates specified by `macros` map in `@config`.
     pub macros: HashMap<String, String>,
+    /// Imported configuration file paths specified by `import` or `imports` in `@config`.
+    pub imports: Vec<String>,
     /// Raw key-value entries collected from `@config` element args and value groups.
     pub entries: Vec<(String, Value)>,
 }
@@ -210,6 +213,17 @@ fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
                 config
                     .export_paths
                     .insert(ExportType::parse(format_sub), path_str);
+            }
+        }
+        "import" | "imports" | "file" => {
+            if let Some(s) = v.as_str() {
+                config.imports.push(s.to_string());
+            } else if let Some(items) = v.as_seq() {
+                for item in items {
+                    if let Some(s) = item.as_str() {
+                        config.imports.push(s.to_string());
+                    }
+                }
             }
         }
         _ => {}

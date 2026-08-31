@@ -1,0 +1,13 @@
+[package]
+name = "tomet-compute"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-resolver = { workspace = true }
+tomet-semantics = { workspace = true }
+time = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

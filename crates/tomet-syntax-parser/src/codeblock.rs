@@ -3,7 +3,8 @@
 use crate::error::Result;
 use crate::value::{find_matching_bracket, find_matching_delimiter, skip_inline_ws};
 use tomet_ast::{Element, Inline, Sigil, Span, Text, Value};
-use tomet_lexar::Cursor;
+use tomet_lexer::Cursor;
+use tomet_tree::{ElementExt, ValueExt, element_new};
 
 pub(crate) fn is_fenced_code_block_start(cur: &Cursor) -> bool {
     let mut look = *cur;
@@ -65,7 +66,7 @@ pub(crate) fn parse_fenced_code_block(cur: &mut Cursor) -> Result<Element> {
         Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
     };
     let content_span = Span::new(cur.position_at(body_start), cur.position_at(body_end));
-    let mut el = Element::new(Sigil::Type("codeblock".to_string()))
+    let mut el = element_new(Sigil::Type("codeblock".to_string()))
         .with_span(cur.span_from(start_pos))
         .with_content(vec![Inline::Text(Text::new(code, content_span))]);
     el.args = args;

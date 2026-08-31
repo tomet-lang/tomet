@@ -10,7 +10,7 @@
 use crate::error::Result;
 use crate::value::{err, find_matching_delimiter};
 use tomet_ast::Value;
-use tomet_lexar::Cursor;
+use tomet_lexer::Cursor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum EmbeddedFormat {
@@ -442,7 +442,7 @@ mod tests {
         assert_eq!(
             doc.blocks[1],
             Block::Element({
-                let mut el = tomet_ast::Element::new(Sigil::At(Some("meta".into())));
+                let mut el = tomet_tree::element_new(Sigil::At(Some("meta".into())));
                 el.value = Some(ElementValue::Data(Value::Map(vec![(
                     "a".into(),
                     Value::Int(1),
@@ -453,7 +453,7 @@ mod tests {
         assert_eq!(
             doc.blocks[3],
             Block::Element({
-                let mut el = tomet_ast::Element::new(Sigil::At(Some("meta".into())));
+                let mut el = tomet_tree::element_new(Sigil::At(Some("meta".into())));
                 el.value = Some(ElementValue::Data(Value::Map(vec![(
                     "b".into(),
                     Value::Int(2),

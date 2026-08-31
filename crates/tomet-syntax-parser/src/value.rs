@@ -5,7 +5,7 @@
 
 use crate::error::{Error, Result};
 use tomet_ast::Value;
-use tomet_lexar::Cursor;
+use tomet_lexer::Cursor;
 
 /// Parse an entire source string as one `Value` (a data-only `.tmt`
 /// document -- no headings, prose, or elements).
@@ -223,11 +223,61 @@ pub(crate) fn skip_quoted(cur: &mut Cursor, quote: char) {
 /// `*em*`/`_em_` delimiters, just applied to comments.
 fn eat_scalar_raw<'a>(cur: &mut Cursor<'a>) -> &'a str {
     let start = cur.pos();
+    let mut paren_depth = 0usize;
+    let mut bracket_depth = 0usize;
+    let mut brace_depth = 0usize;
     loop {
         match cur.peek() {
             None => break,
-            Some(c) if matches!(c, ',' | ')' | ']' | '}' | '\n' | '\r') => break,
-            Some(c) if is_inline_ws(c) => {
+            Some('"') => {
+                cur.bump();
+                while let Some(c) = cur.bump() {
+                    if c == '"' {
+                        break;
+                    }
+                    if c == '\\' {
+                        cur.bump();
+                    }
+                }
+            }
+            Some('(') => {
+                paren_depth += 1;
+                cur.bump();
+            }
+            Some(')') if paren_depth > 0 => {
+                paren_depth -= 1;
+                cur.bump();
+            }
+            Some('[') => {
+                bracket_depth += 1;
+                cur.bump();
+            }
+            Some(']') if bracket_depth > 0 => {
+                bracket_depth -= 1;
+                cur.bump();
+            }
+            Some('{') => {
+                brace_depth += 1;
+                cur.bump();
+            }
+            Some('}') if brace_depth > 0 => {
+                brace_depth -= 1;
+                cur.bump();
+            }
+            Some(c)
+                if matches!(c, ',' | ')' | ']' | '}' | '\n' | '\r')
+                    && paren_depth == 0
+                    && bracket_depth == 0
+                    && brace_depth == 0 =>
+            {
+                break;
+            }
+            Some(c)
+                if is_inline_ws(c)
+                    && paren_depth == 0
+                    && bracket_depth == 0
+                    && brace_depth == 0 =>
+            {
                 let mut look = *cur;
                 look.eat_while(is_inline_ws);
                 if look.starts_with("//") {

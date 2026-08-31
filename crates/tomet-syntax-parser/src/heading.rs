@@ -7,7 +7,8 @@ use crate::value::{
     err, parse_value_at, skip_inline_ws, skip_ws_and_newlines, skip_ws_newlines_and_comments,
 };
 use tomet_ast::{Element, ElementValue, Sigil, Value};
-use tomet_lexar::Cursor;
+use tomet_lexer::Cursor;
+use tomet_tree::{ElementExt, element_new};
 
 pub(crate) fn parse_heading(
     cur: &mut Cursor,
@@ -49,7 +50,7 @@ pub(crate) fn parse_heading(
     let span = cur.span_from(start_pos);
     // Pre-existing quirk, preserved: a `#`-run longer than 255 silently
     // truncates here, same as before `Heading` was folded into `Element`.
-    let mut el = Element::new(Sigil::At(Some("heading".to_string())))
+    let mut el = element_new(Sigil::At(Some("heading".to_string())))
         .with_span(span)
         .with_args(Value::Int(level as i64))
         .with_content(content);
@@ -159,7 +160,7 @@ pub(crate) fn parse_titled_thematic_break(
     if matches!(cur.peek(), Some('\n') | Some('\r')) {
         cur.bump();
     }
-    let mut el = Element::new(Sigil::Type("hr".to_string())).with_span(cur.span_from(start_pos));
+    let mut el = element_new(Sigil::Type("hr".to_string())).with_span(cur.span_from(start_pos));
     el.content = Some(title);
     Ok(el)
 }

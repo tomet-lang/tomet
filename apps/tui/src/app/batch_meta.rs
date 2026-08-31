@@ -1,8 +1,44 @@
 //! Batch Meta tab: bulk `@meta` key/value updates across selected
 //! `.tmt` files.
 
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::PathBuf;
+
 use super::{App, PendingConfirm};
-use tomet_edit::batch_meta::BatchMetaEngine;
+use tomet_indexer::extract_metadata;
+use tomet_workspace::batch_meta::{BatchMetaEngine, MetaFile};
+
+#[derive(Debug, Clone)]
+pub struct MetaFileEntry {
+    pub path: PathBuf,
+    pub original_src: String,
+    pub modified_src: String,
+    pub metadata: BTreeMap<String, String>,
+    pub selected: bool,
+}
+
+impl MetaFileEntry {
+    pub fn from_path(path: PathBuf) -> Self {
+        Self {
+            path,
+            original_src: String::new(),
+            modified_src: String::new(),
+            metadata: BTreeMap::new(),
+            selected: true,
+        }
+    }
+
+    pub fn ensure_loaded(&mut self) {
+        if self.original_src.is_empty() {
+            if let Ok(src) = fs::read_to_string(&self.path) {
+                self.metadata = extract_metadata(&src);
+                self.modified_src = src.clone();
+                self.original_src = src;
+            }
+        }
+    }
+}
 
 impl App {
     pub fn adjust_meta_scrolloff(&mut self, height: usize) {
@@ -79,14 +115,37 @@ impl App {
 
     pub(super) fn batch_meta_execute_action(&mut self) {
         if !self.meta_key_input.is_empty() {
+            let mut selected_files: Vec<MetaFile> = self
+                .meta_entries
+                .iter_mut()
+                .filter(|e| e.selected)
+                .map(|e| {
+                    e.ensure_loaded();
+                    MetaFile {
+                        path: e.path.clone(),
+                        original_src: e.original_src.clone(),
+                        modified_src: e.modified_src.clone(),
+                        metadata: e.metadata.clone(),
+                    }
+                })
+                .collect();
+
             BatchMetaEngine::update_meta_key(
-                &mut self.meta_entries,
+                &mut selected_files,
                 "meta",
                 &self.meta_key_input,
                 &self.meta_val_input,
             );
-            match BatchMetaEngine::save(&mut self.meta_entries) {
+
+            match BatchMetaEngine::save(&mut selected_files) {
                 Ok(count) => {
+                    for file in selected_files {
+                        if let Some(entry) = self.meta_entries.iter_mut().find(|e| e.path == file.path) {
+                            entry.original_src = file.original_src;
+                            entry.modified_src = file.modified_src;
+                            entry.metadata = file.metadata;
+                        }
+                    }
                     self.status_message = format!(
                         "Updated meta field '{}' in {count} file(s).",
                         self.meta_key_input

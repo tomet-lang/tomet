@@ -1,0 +1,18 @@
+[package]
+name = "tomet-workspace"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-config = { workspace = true }
+tomet-formatter = { workspace = true }
+tomet-indexer = { workspace = true }
+tomet-parser = { workspace = true }
+tomet-printer = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-transform = { workspace = true }
+tomet-tree = { workspace = true }
+
+#[ Crates.io ]
+anyhow = { workspace = true }

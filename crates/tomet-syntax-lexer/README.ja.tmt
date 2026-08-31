@@ -1,0 +1,19 @@
+# tomet-lexer
+
+Tomet ソース文字列 (`&str`) 上をバイト位置ベースで走査するカーソル型 `Cursor<'a>` を提供するクレート。
+
+##[ 概要と設計思想 ]
+
+- **コンテキスト依存文法の走査**:
+  Tomet 言語の文法は文脈依存的であり（`<`, `@`, `(`, `[`, `{` などの記号は特定条件の直後でのみ構造的な意味を持ち、通常はプロズテキスト扱いとなる）、事前トークナイズ（Context-Free Lexing）よりもソースコード上を直接ポインタ/カーソルで走査する方式が適しています。
+- **軽量なゼロコピーカーソル**:
+  `Cursor<'a>` は `&'a str` と現在のバイト位置 `pos: usize` のみを持つ `Copy` 可能な構造体です。
+
+##[ 主な機能 ]
+
+- **文字・文字列の消費 (Eating & Bumping)**:
+  `bump()`, `eat_char(c)`, `eat_str(s)`, `eat_if(pred)`, `eat_while(pred)`, `eat_whitespace()`, `eat_until_char(c)`
+- **先読み (Peeking)**:
+  `peek()`, `peek_at(n)`, `starts_with(s)`
+- **位置・Span の計算**:
+  `line_col(pos)`, `position_at(pos)`, `current_position()`, `span_from(start_pos)`

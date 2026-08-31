@@ -84,7 +84,7 @@ mod tests {
     fn duplicate_id_between_heading_and_element_is_reported() {
         // A heading's `{id:...}` lives in `Element.value`, not
         // `Element.args` -- regression coverage for `Node::attrs()`'s
-        // args+value merge (`tomet-doc-walker`'s `element_attrs_view`)
+        // args+value merge (`ElementExt::attrs_view`)
         // making it visible here at all.
         let doc = parse("#[ one ]{id:a}\n\n<task>(id:a)\n");
         let errors = validate_document(&doc);

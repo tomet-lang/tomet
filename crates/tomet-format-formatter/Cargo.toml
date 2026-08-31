@@ -1,0 +1,18 @@
+[package]
+name = "tomet-formatter"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-config = { workspace = true }
+tomet-cst = { workspace = true }
+tomet-field-utils = { workspace = true }
+tomet-parser = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-style = { workspace = true }
+tomet-tree = { workspace = true }
+unicode-width = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

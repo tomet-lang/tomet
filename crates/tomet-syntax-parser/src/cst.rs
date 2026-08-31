@@ -3,7 +3,7 @@
 //! Preserves 100% of source characters including trivia (whitespace, newlines, comments).
 
 use tomet_cst::{GreenNodeBuilder, SyntaxKind, SyntaxNode};
-use tomet_lexar::tokenize;
+use tomet_lexer::tokenize;
 
 /// Parse `src` into a lossless, resilient [`SyntaxNode`].
 ///
