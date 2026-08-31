@@ -741,7 +741,7 @@ fn roundtrip(file: &PathBuf) -> anyhow::Result<()> {
 
     // `serde_json::Value` stands in for "some arbitrary Serialize/
     // Deserialize type" here, since it can hold any shape without a
-    // fixed struct -- a real caller (e.g. cettila) would use its own
+    // fixed struct -- a real caller (e.g. tomet) would use its own
     // `#[derive(Serialize, Deserialize)]` struct instead.
     let value: serde_json::Value = serde_tomet::from_str(&src)?;
     println!("parsed:\n{}", serde_json::to_string_pretty(&value)?);
@@ -1136,7 +1136,7 @@ mod tests {
   }
 }
 
-- @link("https://github.com/cettila-projects/tomet")[Repo]
+- @link("https://github.com/tomet/tomet")[Repo]
 "#;
         fs::write(&src_file, src_content).unwrap();
 
@@ -1145,7 +1145,7 @@ mod tests {
 
         let refactored = fs::read_to_string(&src_file).unwrap();
         assert!(refactored.contains("@kind(note)"));
-        assert!(refactored.contains("$gh(\"cettila-projects/tomet\")"));
+        assert!(refactored.contains("$gh(\"tomet/tomet\")"));
         assert!(!refactored.contains("format:yaml"));
 
         let _ = fs::remove_dir_all(&temp_dir);

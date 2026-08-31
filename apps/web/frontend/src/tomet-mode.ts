@@ -27,10 +27,12 @@ interface TometState {
 	inFencedCode: boolean;
 	/** Innermost-last stack of currently-open emphasis/strong/mark delimiters. */
 	emphasisStack: EmphasisDelim[];
+	/** Depth inside `(...)` or `{...}` where property keys (`key:`) are active. */
+	inValueGroup: number;
 }
 
 function startState(): TometState {
-	return { inBlockComment: false, inFencedCode: false, emphasisStack: [] };
+	return { inBlockComment: false, inFencedCode: false, emphasisStack: [], inValueGroup: 0 };
 }
 
 function emphasisTag(delim: EmphasisDelim): string {
@@ -42,11 +44,12 @@ const HEADING_RE = /^\s*#+(?=\[)/;
 const THEMATIC_BREAK_RE = /^\s*-{3,}\s*$/;
 const TITLED_BREAK_OPEN_RE = /^\s*-{3,}(?=\[)/;
 const FENCE_RE = /^\s*```([a-zA-Z0-9_+-]*)\s*$/;
-const LIST_MARKER_RE = /^\s*(-\.|-)(?=[ \t])/;
+const LIST_MARKER_RE = /^\s*(-\.|-)(?=[ \t])(\s*\([xX ?T! -]\))?/;
 const TYPE_ELEMENT_RE = /^<[A-Za-z_][A-Za-z0-9_.-]*>/;
 const AT_ELEMENT_RE = /^@[A-Za-z_][A-Za-z0-9_.-]*|^@/;
-const MAP_KEY_RE = /^[A-Za-z_][A-Za-z0-9_.-]*(?=:)/;
-const UNQUOTED_VALUE_RE = /^[^,()[\]{}\n"\s][^,()[\]{}\n"]*/;
+const MAP_KEY_RE = /^[A-Za-z_][A-Za-z0-9_.-]*(?=\s*:)/;
+const INTERPOLATION_CALL_RE = /^\$([A-Za-z_][A-Za-z0-9_.-]*)(?=\s*\()/;
+const INTERPOLATION_VAR_RE = /^\$([A-Za-z_][A-Za-z0-9_.-]*)/;
 const EMPHASIS_DELIMS = ["**", "__", "==", "*", "_"] as const;
 
 function tokenBase(stream: StringStream, state: TometState): string | null {
@@ -89,10 +92,6 @@ function tokenBase(stream: StringStream, state: TometState): string | null {
 	for (const delim of EMPHASIS_DELIMS) {
 		if (stream.match(delim, false)) {
 			const isClose = state.emphasisStack[state.emphasisStack.length - 1] === delim;
-			// Only treat as a delimiter next to non-space content, matching
-			// `tmLanguage.json`'s `(?=\S)` open guard -- an isolated `*`/`_`
-			// (e.g. multiplication, italic underscore in a word) stays plain
-			// punctuation instead of toggling emphasis state.
 			const after = stream.string.slice(stream.pos + delim.length, stream.pos + delim.length + 1);
 			if (isClose || (after && !/\s/.test(after))) {
 				stream.match(delim);
@@ -109,10 +108,7 @@ function tokenBase(stream: StringStream, state: TometState): string | null {
 	if (stream.match("${")) {
 		return "brace.special";
 	}
-	if (stream.match(/^\b[0-9]+(\.[0-9]+)?\b/)) {
-		return "number";
-	}
-	if (stream.match(/^[A-Za-z_][A-Za-z0-9_.-]*(?=\s*\()/)) {
+	if (stream.match(INTERPOLATION_CALL_RE) || stream.match(INTERPOLATION_VAR_RE)) {
 		return "variableName.function";
 	}
 
@@ -127,8 +123,18 @@ function tokenBase(stream: StringStream, state: TometState): string | null {
 		return "operator";
 	}
 
-	if (stream.match(MAP_KEY_RE)) {
-		return "propertyName";
+	// Inside value groups `(...)` or `{...}`: recognize property keys `key:`
+	if (state.inValueGroup > 0) {
+		if (stream.match(MAP_KEY_RE)) {
+			return "propertyName";
+		}
+		if (stream.match(/^\b(true|false|null)\b/)) {
+			return "atom";
+		}
+	}
+
+	if (stream.match(/^\b[0-9]+(\.[0-9]+)?\b/)) {
+		return "number";
 	}
 
 	if (stream.match('"')) {
@@ -144,23 +150,30 @@ function tokenBase(stream: StringStream, state: TometState): string | null {
 		return "string";
 	}
 
-	if (stream.match(/^[()[\]{}]/)) {
+	// Bracket tracking for group context
+	if (stream.match(/^[\({]/)) {
+		state.inValueGroup++;
 		return "punctuation";
 	}
-	if (stream.match(":")) {
+	if (stream.match(/^[\)}]/)) {
+		if (state.inValueGroup > 0) state.inValueGroup--;
+		return "punctuation";
+	}
+	if (stream.match(/^[[\]]/)) {
+		return "punctuation";
+	}
+	if (stream.match(/^[,:]/)) {
 		return "punctuation";
 	}
 
 	if (state.emphasisStack.length > 0) {
-		// Inside an open emphasis/strong/mark span: consume a run of plain
-		// characters up to the next delimiter/special character, so the
-		// whole span (not just its edges) picks up the emphasis tag.
-		if (stream.match(/^[^*_=`$@<\n]+/)) {
+		if (stream.match(/^[^*_=`$@<\n\s(){}[\]:,]+/)) {
 			return emphasisTag(state.emphasisStack[state.emphasisStack.length - 1]);
 		}
 	}
 
-	if (stream.match(UNQUOTED_VALUE_RE)) {
+	// Consume a single plain word up to the next sigil or delimiter
+	if (stream.match(/^[^\s,()[\]{}:"`@<$=*_\\]+/)) {
 		return null;
 	}
 
@@ -183,12 +196,10 @@ const tometParser: StreamParser<TometState> = {
 		return tokenBase(stream, state);
 	},
 	blankLine(state) {
-		// A blank line always ends an in-progress emphasis/strong/mark span
-		// in the real grammar (`docs/ja/specifications/syntax.tmt`'s inline
-		// rules never carry those across a blank line) -- drop the stack so
-		// highlighting doesn't bleed into an unrelated later paragraph.
 		state.emphasisStack.length = 0;
+		state.inValueGroup = 0;
 	},
 };
 
 export const tometLanguage = StreamLanguage.define(tometParser);
+

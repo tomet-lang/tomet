@@ -33,12 +33,12 @@ mod tests {
 
         let set = MacroSet::from_map(&macros);
         assert_eq!(
-            set.rewrite_url("https://github.com/cettila-projects/tomet"),
-            Some("$gh(\"cettila-projects/tomet\")".into())
+            set.rewrite_url("https://github.com/tomet/tomet"),
+            Some("$gh(\"tomet/tomet\")".into())
         );
         assert_eq!(
-            set.rewrite_url("https://github.com/cettila-projects/tomet/issues/42"),
-            Some("$gh_issue(\"cettila-projects/tomet\", 42)".into())
+            set.rewrite_url("https://github.com/tomet/tomet/issues/42"),
+            Some("$gh_issue(\"tomet/tomet\", 42)".into())
         );
     }
 

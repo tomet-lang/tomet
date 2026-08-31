@@ -19,6 +19,7 @@ let
       "rust-src"
       # "rust-analyzer"
     ])
+    fenix.targets.wasm32-unknown-unknown.stable.rust-std
     fenix.targets.wasm32-wasip2.stable.rust-std
   ];
 in
@@ -37,9 +38,13 @@ mkShell rec {
     cargo-edit
     cargo-outdated
     cargo-nextest
+    wasm-bindgen-cli
 
     #[ VS Code extension (apps/vscode-extension) ]
     nodejs
+
+    #[ Python bindings (bindings/python) ]
+    python3
 
     #[ Misc ]
     pkg-config

@@ -107,9 +107,13 @@ cxx = "1"
 crossterm = "0.28"
 directories = "6.0"
 ignore = "0.4"
+jni = "0.21"
+js-sys = "=0.3.98"
 lsp-server = "0.10"
 lsp-types = "0.97"
 pulldown-cmark = "0.13"
+pyo3 = { version = "0.23", features = ["serde"] }
+pythonize = "0.23"
 ratatui = "0.29"
 rayon = "1"
 regex = "1.12"
@@ -117,6 +121,7 @@ rowan = "0.16"
 rusqlite = { version = "0.31", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+serde-wasm-bindgen = "0.6"
 serde_yaml = "0.9"
 time = "0.3"
 tokio = "1"
@@ -125,7 +130,7 @@ tree-sitter = "0.26"
 tree-sitter-language = "0.1"
 nanoid = "0.4"
 unicode-width = "0.2"
-uuid = { version = "1.23", features = ["v4"] }
+uuid = { version = "1.23", features = ["v4", "js"] }
 walkdir = "2"
+wasm-bindgen = "=0.2.121"
 zed_extension_api = "0.7"
-

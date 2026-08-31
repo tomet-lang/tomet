@@ -7,62 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css">
+  <script type="module" crossorigin src="/app.js"></script>
+  <link rel="stylesheet" crossorigin href="/style.css">
 </head>
 <body>
-  <header>
-    <div class="logo-area">
-      <div class="logo">Tomet</div>
-      <div class="subtitle">Interactive Web Editor</div>
-    </div>
-    <div class="controls">
-      <label class="checkbox-label">
-        <input type="checkbox" id="advanced-check"> Heading Numbers
-      </label>
-      <select id="preset-select">
-        <option value="cheatsheet">Preset: Full Cheatsheet</option>
-        <option value="tasks">Preset: Task List with Statuses</option>
-        <option value="meta">Preset: Embedded JSON/YAML/TOML</option>
-      </select>
-      <button id="format-btn" type="button">⚡ Format</button>
-    </div>
-  </header>
-
-  <main>
-    <div class="panel">
-      <div class="panel-header">
-        <span>Tomet Source (.tmt)</span>
-      </div>
-      <div id="editor-host" class="editor-host"></div>
-      <pre id="problems-panel" class="problems-panel" style="display:none;"></pre>
-    </div>
-
-    <div class="panel">
-      <div class="panel-header">
-        <div class="tabs">
-          <button class="tab active" data-tab="preview">Rendered HTML</button>
-          <button class="tab" data-tab="ast">AST Inspector</button>
-          <button class="tab" data-tab="markdown">CommonMark</button>
-          <button class="tab" data-tab="source">HTML Source</button>
-        </div>
-      </div>
-      <div id="tab-preview" class="preview-container">
-        <iframe id="preview-frame" class="preview-frame" title="Rendered Tomet preview" sandbox=""></iframe>
-      </div>
-      <pre id="tab-ast" class="preview-code" style="display:none;"></pre>
-      <pre id="tab-markdown" class="preview-code" style="display:none;"></pre>
-      <pre id="tab-source" class="preview-code" style="display:none;"></pre>
-    </div>
-  </main>
-
-  <footer>
-    <div id="status-area" class="status-badge">
-      <span class="status-dot ok"></span>
-      <span id="status-text">Ready</span>
-    </div>
-    <div style="color: var(--text-muted);">Tomet v1.0 • Pure Static Deterministic Parser</div>
-  </footer>
-
-  <script src="/app.js"></script>
+  <div id="app"></div>
 </body>
 </html>

@@ -85,10 +85,22 @@ pub fn render_body(doc: &Document) -> String {
 pub fn render_body_with(doc: &Document, options: &RenderOptions) -> String {
     let mut out = String::new();
     let mut state = HeadingState::default();
+    let config = tomet_semantics::document_config(doc);
+    let cx = RenderCtx {
+        doc,
+        config,
+        options,
+    };
     for block in &doc.blocks {
-        render_block(block, &mut out, options, &mut state);
+        render_block(&cx, block, &mut out, &mut state);
     }
     out
+}
+
+struct RenderCtx<'a> {
+    doc: &'a Document,
+    config: tomet_semantics::DocumentConfig,
+    options: &'a RenderOptions,
 }
 
 /// Per-document state threaded through heading rendering: the nesting
@@ -172,9 +184,9 @@ fn slugify(text: &str) -> String {
 }
 
 fn render_block(
+    cx: &RenderCtx,
     block: &Block,
     out: &mut String,
-    options: &RenderOptions,
     state: &mut HeadingState,
 ) {
     match block {
@@ -186,18 +198,18 @@ fn render_block(
             // every one of them is invisible, skip the wrapper entirely
             // rather than emitting a stray whitespace-only `<p>`.
             let mut inner = String::new();
-            render_inlines(&p.content, &mut inner);
+            render_inlines(cx, &p.content, &mut inner);
             if !inner.trim().is_empty() {
                 out.push_str("<p>");
                 out.push_str(&inner);
                 out.push_str("</p>\n");
             }
         }
-        Block::Element(el) if list_ordered(el).is_some() => render_list(el, out),
+        Block::Element(el) if list_ordered(el).is_some() => render_list(cx, el, out),
         Block::Element(el) if classify(el) == ElementKind::Heading => {
-            render_heading_element(el, out, options, state)
+            render_heading_element(cx, el, out, state)
         }
-        Block::Element(el) => render_element(el, out, false),
+        Block::Element(el) => render_element(cx, el, out, false),
     }
 }
 
@@ -207,9 +219,9 @@ fn render_block(
 /// prose) falls through to `render_generic_element` instead, since
 /// CommonMark/Tomet headings are both block-position-only by grammar.
 fn render_heading_element(
+    cx: &RenderCtx,
     el: &Element,
     out: &mut String,
-    options: &RenderOptions,
     state: &mut HeadingState,
 ) {
     let level = heading_level(el).unwrap_or(1);
@@ -219,7 +231,7 @@ fn render_heading_element(
         _ => None,
     };
     let (mut id, class, data) = split_attrs(value_data);
-    if id.is_none() && options.auto_slug_headings {
+    if id.is_none() && cx.options.auto_slug_headings {
         let text = inlines_to_plain(content);
         let slug = state.slugs.slug_for(&text);
         if !slug.is_empty() {
@@ -229,18 +241,18 @@ fn render_heading_element(
     out.push_str(&format!("<h{level}"));
     push_named_attrs(out, &id, &class, &data);
     out.push('>');
-    if options.number_headings {
+    if cx.options.number_headings {
         let label = state.counters.advance(level);
         // No literal space after `</span>` -- spacing is `.tmt-heading-number`'s
         // `margin-right` in `DEFAULT_STYLE`, not baked into the content, so
         // e.g. copy-pasting the heading text doesn't pick up a stray space.
         out.push_str(&format!("<span class=\"tm-heading-number\">{label}</span>"));
     }
-    render_inlines(content, out);
+    render_inlines(cx, content, out);
     out.push_str(&format!("</h{level}>\n"));
 }
 
-fn render_list(el: &Element, out: &mut String) {
+fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
     let tag = if list_ordered(el) == Some(true) {
         "ol"
     } else {
@@ -280,13 +292,13 @@ fn render_list(el: &Element, out: &mut String) {
             }
             out.push_str("</span> ");
         }
-        render_inlines(item.content.as_deref().unwrap_or(&[]), out);
+        render_inlines(cx, item.content.as_deref().unwrap_or(&[]), out);
         if let Some(children) = &item.children {
             out.push('\n');
             for child in children {
                 if let Block::Element(sub) = child {
                     if list_ordered(sub).is_some() {
-                        render_list(sub, out);
+                        render_list(cx, sub, out);
                     }
                 }
             }
@@ -296,33 +308,38 @@ fn render_list(el: &Element, out: &mut String) {
     out.push_str(&format!("</{tag}>\n"));
 }
 
-fn render_inlines(inlines: &[Inline], out: &mut String) {
+fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut String) {
     for inline in inlines {
         match inline {
             Inline::Text(t) => out.push_str(&escape_html(&t.value)),
-            Inline::Element(el) => render_element(el, out, true),
+            Inline::Element(el) => render_element(cx, el, out, true),
         }
     }
 }
 
-fn render_element(el: &Element, out: &mut String, inline: bool) {
+fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
     let kind = classify(el);
     match kind.as_str() {
         "version" | "kind" | "meta" | "config" => {}
-        "links" => render_links_container(el, out),
-        "link" => render_link_element(el, out, inline),
+        "interp" => {
+            if let Some(value) = &el.value {
+                render_element_value(cx, value, out);
+            }
+        }
+        "links" => render_links_container(cx, el, out),
+        "link" => render_link_element(cx, el, out, inline),
         "embed" => render_embed_element(el, out),
-        "icon" => render_icon_element(el, out, inline),
-        "hr" => render_hr_element(el, out),
-        "em" | "strong" | "mark" => render_wrapped_inline(el, kind.as_str(), out),
+        "icon" => render_icon_element(cx, el, out, inline),
+        "hr" => render_hr_element(cx, el, out),
+        "em" | "strong" | "mark" => render_wrapped_inline(cx, el, kind.as_str(), out),
         "codeblock" => render_codeblock_element(el, out),
-        "blockquote" => render_blockquote_element(el, out, inline),
-        "table" => render_table_element(el, out),
-        _ => render_generic_element(el, kind.as_str(), out, inline),
+        "blockquote" => render_blockquote_element(cx, el, out, inline),
+        "table" => render_table_element(cx, el, out),
+        _ => render_generic_element(cx, el, kind.as_str(), out, inline),
     }
 }
 
-fn render_table_element(el: &Element, out: &mut String) {
+fn render_table_element(cx: &RenderCtx, el: &Element, out: &mut String) {
     let inlines = match &el.content {
         Some(content) => content,
         None => {
@@ -368,7 +385,7 @@ fn render_table_element(el: &Element, out: &mut String) {
         out.push_str("<thead>\n<tr>\n");
         for cell in &hrow.cells {
             out.push_str("<th>");
-            render_inlines(&cell.content, out);
+            render_inlines(cx, &cell.content, out);
             out.push_str("</th>\n");
         }
         out.push_str("</tr>\n</thead>\n");
@@ -380,7 +397,7 @@ fn render_table_element(el: &Element, out: &mut String) {
             out.push_str("<tr>\n");
             for cell in &row.cells {
                 out.push_str("<td>");
-                render_inlines(&cell.content, out);
+                render_inlines(cx, &cell.content, out);
                 out.push_str("</td>\n");
             }
             out.push_str("</tr>\n");
@@ -395,11 +412,11 @@ fn render_table_element(el: &Element, out: &mut String) {
 /// `document.rs::parse_titled_thematic_break`'s `content`) wraps two `<hr>`s
 /// around the title, visually reproducing the source's symmetric
 /// dashes-title-dashes shape (styled via `.tmt-hr-titled` in `DEFAULT_STYLE`).
-fn render_hr_element(el: &Element, out: &mut String) {
+fn render_hr_element(cx: &RenderCtx, el: &Element, out: &mut String) {
     match &el.content {
         Some(title) if !title.is_empty() => {
             out.push_str("<div class=\"tm-hr-titled\"><hr><span>");
-            render_inlines(title, out);
+            render_inlines(cx, title, out);
             out.push_str("</span><hr></div>\n");
         }
         _ => out.push_str("<hr>\n"),
@@ -408,10 +425,10 @@ fn render_hr_element(el: &Element, out: &mut String) {
 
 /// `em`/`strong`/`mark` all wrap their `content` in a same-named HTML tag --
 /// the `Sigil::Type` name doubles as the HTML tag name for these three.
-fn render_wrapped_inline(el: &Element, tag: &str, out: &mut String) {
+fn render_wrapped_inline(cx: &RenderCtx, el: &Element, tag: &str, out: &mut String) {
     out.push_str(&format!("<{tag}>"));
     if let Some(content) = &el.content {
-        render_inlines(content, out);
+        render_inlines(cx, content, out);
     }
     out.push_str(&format!("</{tag}>"));
 }
@@ -458,10 +475,10 @@ fn render_codeblock_element(el: &Element, out: &mut String) {
 /// `<blockquote>[...]` -- the Markdown importer's mapping for block
 /// quotes. Only single-block quotes round-trip cleanly; multi-block
 /// quotes are already flattened into one inline run on import.
-fn render_blockquote_element(el: &Element, out: &mut String, inline: bool) {
+fn render_blockquote_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
     out.push_str("<blockquote>");
     if let Some(content) = &el.content {
-        render_inlines(content, out);
+        render_inlines(cx, content, out);
     }
     out.push_str("</blockquote>");
     if !inline {
@@ -514,7 +531,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
 /// same-document anchor reference (`id:`) or a real `href` (everything
 /// else: url/file/tm/ref). The scheme prefix itself is stripped before
 /// rendering -- it's addressing metadata, not part of the visible target.
-fn render_link_element(el: &Element, out: &mut String, inline: bool) {
+fn render_link_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
     let normalized_args = normalized_element_args(el);
     let raw_target = link_target(el, &classify(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
@@ -540,21 +557,21 @@ fn render_link_element(el: &Element, out: &mut String, inline: bool) {
         push_data_attrs(out, normalized_args.as_ref(), &["target"]);
     }
     out.push('>');
-    render_content_or_fallback(el, &target, out);
+    render_content_or_fallback(cx, el, &target, out);
     out.push_str("</a>");
     if !inline {
         out.push('\n');
     }
 }
 
-fn render_content_or_fallback(el: &Element, fallback: &str, out: &mut String) {
+fn render_content_or_fallback(cx: &RenderCtx, el: &Element, fallback: &str, out: &mut String) {
     match &el.content {
-        Some(content) if !content.is_empty() => render_inlines(content, out),
+        Some(content) if !content.is_empty() => render_inlines(cx, content, out),
         _ => out.push_str(&escape_html(fallback)),
     }
 }
 
-fn render_icon_element(el: &Element, out: &mut String, inline: bool) {
+fn render_icon_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
     let tag = if inline { "span" } else { "div" };
     let name = match &el.args {
         Some(Value::String(s)) => s.as_str(),
@@ -617,7 +634,7 @@ fn render_icon_element(el: &Element, out: &mut String, inline: bool) {
     push_data_attrs(out, el.args.as_ref(), &["name", "pkg", "package"]);
     out.push('>');
     if let Some(content) = &el.content {
-        render_inlines(content, out);
+        render_inlines(cx, content, out);
     }
     out.push_str(&format!("</{tag}>"));
     if !inline {
@@ -625,16 +642,16 @@ fn render_icon_element(el: &Element, out: &mut String, inline: bool) {
     }
 }
 
-fn render_generic_element(el: &Element, kind: &str, out: &mut String, inline: bool) {
+fn render_generic_element(cx: &RenderCtx, el: &Element, kind: &str, out: &mut String, inline: bool) {
     let tag = if inline { "span" } else { "div" };
     out.push_str(&format!("<{tag} class=\"tm-element tm-{kind}\""));
     push_data_attrs(out, el.args.as_ref(), &[]);
     out.push('>');
     if let Some(content) = &el.content {
-        render_inlines(content, out);
+        render_inlines(cx, content, out);
     }
     if let Some(value) = &el.value {
-        render_element_value(value, out);
+        render_element_value(cx, value, out);
     }
     out.push_str(&format!("</{tag}>"));
     if !inline {
@@ -642,7 +659,7 @@ fn render_generic_element(el: &Element, kind: &str, out: &mut String, inline: bo
     }
 }
 
-fn render_element_value(value: &ElementValue, out: &mut String) {
+fn render_element_value(cx: &RenderCtx, value: &ElementValue, out: &mut String) {
     match value {
         ElementValue::Data(v) => {
             let text = value_to_plain(v);
@@ -655,13 +672,24 @@ fn render_element_value(value: &ElementValue, out: &mut String) {
         ElementValue::Children(children) => {
             out.push_str("<div class=\"tm-children\">\n");
             for child in children {
-                render_element(child, out, false);
+                render_element(cx, child, out, false);
             }
             out.push_str("</div>\n");
         }
         ElementValue::Interp(expr) => {
-            out.push_str("<span class=\"tm-value\">");
-            out.push_str(&escape_html(&render_interp_expr(expr)));
+            let text = match tomet_compute::evaluate_with_config(cx.doc, expr, &cx.config) {
+                Ok(val) => match val {
+                    Value::String(s) => s,
+                    Value::Int(i) => i.to_string(),
+                    Value::Float(f) => f.to_string(),
+                    Value::Bool(b) => b.to_string(),
+                    Value::Null => String::new(),
+                    other => format!("{other:?}"),
+                },
+                Err(_) => render_interp_expr(expr),
+            };
+            out.push_str("<span class=\"tm-interp\">");
+            out.push_str(&escape_html(&text));
             out.push_str("</span>");
         }
     }
@@ -692,7 +720,7 @@ fn render_interp_expr(expr: &InterpExpr) -> String {
     }
 }
 
-fn render_links_container(el: &Element, out: &mut String) {
+fn render_links_container(cx: &RenderCtx, el: &Element, out: &mut String) {
     out.push_str("<dl class=\"tm-links\">\n");
     if let Some(ElementValue::Children(children)) = &el.value {
         for child in children {
@@ -704,7 +732,7 @@ fn render_links_container(el: &Element, out: &mut String) {
             ));
             out.push_str("<dd>");
             if let Some(content) = &child.content {
-                render_inlines(content, out);
+                render_inlines(cx, content, out);
             }
             out.push_str("</dd>\n");
         }
@@ -1288,6 +1316,16 @@ mod tests {
         assert_eq!(
             inline_body,
             "<p>Here is <span class=\"tm-element tm-icon tm-icon-sun tm-icon-lucide tm-icon-lucide-sun\" data-icon=\"sun\" data-pkg=\"lucide\" data-color=\"yellow\"></span> icon.</p>\n"
+        );
+    }
+
+    #[test]
+    fn renders_interp_and_macros_to_html() {
+        let doc = parse_document("@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    copyright: \"(C) 2026 Tomet\"\n  }\n}\n\nIssue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<p>Issue: <span class=\"tm-interp\">https://github.com/tomet/tomet/issues/42</span> Footer: <span class=\"tm-interp\">(C) 2026 Tomet</span> Math: <span class=\"tm-interp\">15</span></p>\n"
         );
     }
 }

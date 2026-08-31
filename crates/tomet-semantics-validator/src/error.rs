@@ -1,9 +1,10 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use tomet_ast::Span;
 use tomet_cst::TextRange;
 
 /// A `.tmt` schema/lint rule violation found by `validate_document`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ValidationError {
     /// The same `id` value appears on more than one node. `first` is where
     /// it was first seen; `duplicate` is the later, offending occurrence.

@@ -324,11 +324,23 @@ crate's own test (`*_fixture_has_only_known_error_cases` tests against
   (`vscode-languageclient`) that spawns `tomet-lsp` the same way the
   Zed extension does (configurable `serverPath`, defaults to expecting it
   on `$PATH`).
-- **`editors/helix`, `editors/neovim`, `bindings/java`, `bindings/js`,
-  `bindings/python`**: workspace members reserved for future
-  editor/language-binding support, currently all unimplemented
-  `cargo new` stubs (just the generated `add(left, right)` function and
-  its test) with no `tomet-*` dependencies wired up yet.
+- **`bindings/js`** (package `tomet-js`): JavaScript and WebAssembly (WASM)
+  bindings using `wasm-bindgen` and `serde-wasm-bindgen`. Exports `parseDocument`,
+  `parseValue`, `toHtml`, `toMarkdown`, `fromMarkdown`, `printDocument`, `formatSource`,
+  and `validate` directly into native JS Objects and typed TypeScript models (`index.d.ts`).
+- **`bindings/python`** (package `tomet-python`, module `tomet`): Python bindings
+  powered by `pyo3` and `pythonize`. Exports `loads`, `parse_document`, `to_html`,
+  `to_markdown`, `from_markdown`, `print_document`, `format`, and `validate` directly
+  into native Python `dict`/`list` objects with comprehensive `.pyi` type stubs.
+- **`bindings/java`** (package `tomet-java`, artifact `org.tomet:tomet`): Java and JVM
+  bindings powered by JNI and `serde_json`. Exports `Tomet.parseDocumentJson`,
+  `Tomet.parseValueJson`, `Tomet.toHtml`, `Tomet.toMarkdown`, `Tomet.fromMarkdownJson`,
+  `Tomet.printDocumentJson`, `Tomet.format`, and `Tomet.validateJson` for Java, Kotlin, Android, and Spring applications.
+- **`packages/react`** (package `@tomet/react`): React components for Tomet markup and
+  AST rendering with custom element overrides (`<Tomet ast={doc} components={{ ... }} />`).
+- **`packages/svelte`** (package `@tomet/svelte`): Svelte 5 components (using Runes `$props()`
+  and Snippets) for Tomet markup and AST rendering with custom element overrides.
+- **`editors/helix`, `editors/neovim`**: workspace members reserved for future editor integrations.
 
 ## Packaging
 

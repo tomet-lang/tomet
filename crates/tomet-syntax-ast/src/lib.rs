@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 pub mod cst_ast;
 pub use cst_ast::*;
 
 /// A 0-indexed byte offset and 1-indexed line/column position in source text.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
 pub struct Position {
     pub line: usize,
     pub column: usize,
@@ -32,7 +34,7 @@ impl Position {
 /// so two "equal" `Span`s could hash differently -- a Hash/Eq contract
 /// violation that breaks `HashMap`/`HashSet` lookups. Don't re-add it
 /// without also reconciling it with the custom equality above.
-#[derive(Debug, Clone, Copy, Eq, Default)]
+#[derive(Debug, Clone, Copy, Eq, Default, Serialize, Deserialize)]
 pub struct Span {
     pub start: Position,
     pub end: Position,
@@ -91,7 +93,111 @@ pub enum Value {
     Map(Vec<(String, Value)>),
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+impl Serialize for Value {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Value::Null => serializer.serialize_none(),
+            Value::Bool(b) => serializer.serialize_bool(*b),
+            Value::Int(i) => serializer.serialize_i64(*i),
+            Value::Float(f) => serializer.serialize_f64(*f),
+            Value::String(s) => serializer.serialize_str(s),
+            Value::Seq(seq) => {
+                use serde::ser::SerializeSeq;
+                let mut s = serializer.serialize_seq(Some(seq.len()))?;
+                for item in seq {
+                    s.serialize_element(item)?;
+                }
+                s.end()
+            }
+            Value::Map(map) => {
+                use serde::ser::SerializeMap;
+                let mut m = serializer.serialize_map(Some(map.len()))?;
+                for (k, v) in map {
+                    m.serialize_entry(k, v)?;
+                }
+                m.end()
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Value {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct ValueVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for ValueVisitor {
+            type Value = Value;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("any valid Tomet data value")
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E> {
+                Ok(Value::Bool(v))
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E> {
+                Ok(Value::Int(v))
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E> {
+                Ok(Value::Int(v as i64))
+            }
+
+            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E> {
+                Ok(Value::Float(f64::from(v)))
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(Value::String(v.to_string()))
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E> {
+                Ok(Value::String(v))
+            }
+
+            fn visit_none<E>(self) -> Result<Self::Value, E> {
+                Ok(Value::Null)
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E> {
+                Ok(Value::Null)
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut items = Vec::new();
+                while let Some(item) = seq.next_element()? {
+                    items.push(item);
+                }
+                Ok(Value::Seq(items))
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut entries = Vec::new();
+                while let Some((k, v)) = map.next_entry()? {
+                    entries.push((k, v));
+                }
+                Ok(Value::Map(entries))
+            }
+        }
+
+        deserializer.deserialize_any(ValueVisitor)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Document {
     pub blocks: Vec<Block>,
     pub span: Span,
@@ -103,7 +209,7 @@ impl Document {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Block {
     Paragraph(Paragraph),
     /// A list is `Element { sigil: Sigil::Type("ol"|"ul"), value:
@@ -127,7 +233,7 @@ impl Block {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Paragraph {
     pub content: Vec<Inline>,
     pub span: Span,
@@ -139,7 +245,7 @@ impl Paragraph {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Inline {
     Text(Text),
     Element(Element),
@@ -154,7 +260,7 @@ impl Inline {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Text {
     pub value: String,
     pub span: Span,
@@ -201,7 +307,7 @@ impl std::ops::DerefMut for Text {
 }
 
 /// Which sigil introduced a typed element, and its name if any.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Sigil {
     /// `<name>` -- name is mandatory.
     Type(String),
@@ -225,7 +331,7 @@ pub enum Sigil {
 
 /// `(args)` / `[content]` / `{value}`, each optional and at most one of each,
 /// in any order in the source.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Element {
     pub sigil: Sigil,
     pub args: Option<Value>,
@@ -244,7 +350,7 @@ impl Default for Sigil {
 /// The contents of an element's `{value}` group: either plain data, or (for
 /// container elements like `@links{}`) a list of nested elements, or (for
 /// `Sigil::Dollar`'s `${...}` only) an unresolved interpolation expression.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ElementValue {
     Data(Value),
     Children(Vec<Element>),
@@ -252,13 +358,13 @@ pub enum ElementValue {
 }
 
 /// One node of a `${...}` interpolation's parsed expression tree.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InterpExpr {
     pub kind: InterpExprKind,
     pub span: Span,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum InterpExprKind {
     Identifier(String),
     Literal(Literal),
@@ -276,7 +382,7 @@ pub enum InterpExprKind {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Literal {
     Int(i64),
     Float(f64),

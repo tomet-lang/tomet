@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }
+tomet-compute = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-tree = { workspace = true }
 
@@ -15,3 +16,4 @@ nanoid = { workspace = true }
 
 [dev-dependencies]
 tomet-html = { workspace = true }
+tomet-parser = { workspace = true }

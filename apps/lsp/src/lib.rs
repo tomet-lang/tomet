@@ -1120,13 +1120,13 @@ mod tests {
 
     #[test]
     fn hover_on_macro_evaluation() {
-        let text = "@config{\n  macros: {\n    gh: \"https://github.com/cettila-projects/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Cettila Projects\"\n  }\n}\n\n$gh(42)\n\n$greet(\"Alice\", \"Bob\")\n\n${copyright}\n\n$emoji(\"sparkles\")\n";
+        let text = "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n\n$gh(42)\n\n$greet(\"Alice\", \"Bob\")\n\n${copyright}\n\n$emoji(\"sparkles\")\n";
 
         // Hover on $gh(42) (line 8, char 2)
         let hover = hover_for(text, Position::new(8, 2), None).expect("hover found for $gh");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Macro Result"));
-            assert!(m.value.contains("[https://github.com/cettila-projects/tomet/issues/42](https://github.com/cettila-projects/tomet/issues/42)"));
+            assert!(m.value.contains("[https://github.com/tomet/tomet/issues/42](https://github.com/tomet/tomet/issues/42)"));
         } else {
             panic!("expected markup contents");
         }
@@ -1144,7 +1144,7 @@ mod tests {
         let hover3 = hover_for(text, Position::new(12, 3), None).expect("hover found for ${copyright}");
         if let HoverContents::Markup(m) = hover3.contents {
             assert!(m.value.contains("Macro Result"));
-            assert!(m.value.contains("(C) 2026 Cettila Projects"));
+            assert!(m.value.contains("(C) 2026 Tomet Projects"));
         } else {
             panic!("expected markup contents");
         }
