@@ -39,10 +39,10 @@ members = [
   "crates/tomet-convert-typst",
 
   #[ Format -- .tmt source text production & formatting ]
+  "crates/tomet-formatter",
   "crates/tomet-format-field-utils",
   "crates/tomet-format-style",
   "crates/tomet-format-printer",
-  "crates/tomet-format-formatter",
 
   #[ Workspace -- multi-file/disk operations & config discovery ]
   "crates/tomet-workspace",
@@ -86,7 +86,7 @@ tomet-typst = { path = "crates/tomet-convert-typst" }
 tomet-field-utils = { path = "crates/tomet-format-field-utils" }
 tomet-style = { path = "crates/tomet-format-style" }
 tomet-printer = { path = "crates/tomet-format-printer" }
-tomet-formatter = { path = "crates/tomet-format-formatter" }
+tomet-formatter = { path = "crates/tomet-formatter" }
 #[ Workspace ]
 tomet-workspace = { path = "crates/tomet-workspace" }
 tomet-indexer = { path = "crates/tomet-workspace-indexer" }
