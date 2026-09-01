@@ -10,11 +10,13 @@ pub mod batch_meta;
 pub mod diff;
 pub mod refactor;
 pub mod structural;
+pub mod template;
 
 pub use batch_meta::*;
 pub use diff::*;
 pub use refactor::*;
 pub use structural::*;
+pub use template::*;
 
 #[cfg(test)]
 mod tests {

@@ -16,6 +16,7 @@ pub enum ElementKind {
     Version,
     Meta,
     Config,
+    Blueprint,
     Links,
     /// The one officially-supported link element, `@link(target:...)`
     /// (or the positional `@link(...)` shorthand -- see
@@ -70,6 +71,7 @@ impl ElementKind {
             ElementKind::Version => "version",
             ElementKind::Meta => "meta",
             ElementKind::Config => "config",
+            ElementKind::Blueprint => "blueprint",
             ElementKind::Links => "links",
             ElementKind::Link => "link",
             ElementKind::Embed => "embed",
@@ -96,11 +98,12 @@ impl ElementKind {
 /// `ElementKind::as_str`'s variant -> name match can't silently drift
 /// apart (see `builtin_kind_round_trips_through_as_str` below, which
 /// checks every entry here).
-const BUILTIN_KINDS: [(&str, ElementKind); 18] = [
+const BUILTIN_KINDS: [(&str, ElementKind); 19] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
     ("config", ElementKind::Config),
+    ("blueprint", ElementKind::Blueprint),
     ("links", ElementKind::Links),
     ("link", ElementKind::Link),
     ("embed", ElementKind::Embed),

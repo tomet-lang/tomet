@@ -179,4 +179,29 @@ pub enum Command {
         #[arg(long, conflicts_with = "in_place")]
         check: bool,
     },
+    /// Create a new .tmt document from a template or blueprint.
+    New {
+        /// Target file path to create (defaults to "document.tmt" if omitted when --list is not used).
+        #[arg(default_value = "document.tmt")]
+        path: PathBuf,
+        /// Template or blueprint name (e.g. "daily-note", "rfc", or path to template).
+        #[arg(short, long)]
+        template: Option<String>,
+        /// List available templates in workspace instead of creating a file.
+        #[arg(short, long)]
+        list: bool,
+        /// Overwrite target file if it already exists.
+        #[arg(short = 'f', long)]
+        force: bool,
+        /// Pass custom variable as `key=value`. Can be specified multiple times.
+        #[arg(long = "var", value_parser = parse_key_val)]
+        vars: Vec<(String, String)>,
+    },
+}
+
+fn parse_key_val(s: &str) -> Result<(String, String), String> {
+    let pos = s
+        .find('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{s}`"))?;
+    Ok((s[..pos].to_string(), s[pos + 1..].to_string()))
 }

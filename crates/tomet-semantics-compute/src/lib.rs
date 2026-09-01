@@ -10,7 +10,46 @@ mod functions;
 
 pub use error::ComputeError;
 
+use std::collections::HashMap;
+
 use tomet_ast::{Document, InterpExpr, InterpExprKind, Literal, Value};
+
+/// An evaluation context carrying dynamic variables and parameters (e.g. for template instantiation).
+#[derive(Debug, Clone, Default)]
+pub struct EvaluationContext {
+    pub vars: HashMap<String, Value>,
+}
+
+impl EvaluationContext {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_var(mut self, key: impl Into<String>, val: impl Into<Value>) -> Self {
+        self.vars.insert(key.into(), val.into());
+        self
+    }
+
+    pub fn get_var(&self, path: &str) -> Option<&Value> {
+        if let Some(v) = self.vars.get(path) {
+            return Some(v);
+        }
+        let parts: Vec<&str> = path.split('.').collect();
+        if parts.len() > 1 {
+            let mut curr = self.vars.get(parts[0])?;
+            for part in &parts[1..] {
+                match curr {
+                    Value::Map(entries) => {
+                        curr = entries.iter().find(|(k, _)| k == part).map(|(_, v)| v)?;
+                    }
+                    _ => return None,
+                }
+            }
+            return Some(curr);
+        }
+        None
+    }
+}
 
 /// Evaluates `expr` against `doc`. `Literal`s evaluate to themselves;
 /// `Identifier`/`Member` chains resolve via
@@ -27,26 +66,71 @@ pub fn evaluate_with_config(
     expr: &InterpExpr,
     config: &tomet_semantics::DocumentConfig,
 ) -> Result<Value, ComputeError> {
+    let ctx = EvaluationContext::default();
+    evaluate_with_context(doc, expr, config, &ctx)
+}
+
+/// Evaluates `expr` against `doc` using an explicit variables map.
+pub fn evaluate_with_vars(
+    doc: &Document,
+    expr: &InterpExpr,
+    vars: &HashMap<String, Value>,
+) -> Result<Value, ComputeError> {
+    let config = tomet_semantics::document_config(doc);
+    let ctx = EvaluationContext { vars: vars.clone() };
+    evaluate_with_context(doc, expr, &config, &ctx)
+}
+
+/// Evaluates `expr` against `doc` using a [`tomet_semantics::DocumentConfig`] and an [`EvaluationContext`].
+pub fn evaluate_with_context(
+    doc: &Document,
+    expr: &InterpExpr,
+    config: &tomet_semantics::DocumentConfig,
+    ctx: &EvaluationContext,
+) -> Result<Value, ComputeError> {
     match &expr.kind {
         InterpExprKind::Literal(Literal::Int(i)) => Ok(Value::Int(*i)),
         InterpExprKind::Literal(Literal::Float(f)) => Ok(Value::Float(*f)),
         InterpExprKind::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
-        InterpExprKind::Identifier(id) => match tomet_resolver::resolve_reference(doc, expr) {
-            Ok(val) => Ok(val),
-            Err(err) => {
-                if let Some(template) = config.macros.get(id) {
-                    Ok(Value::String(template.clone()))
-                } else {
-                    Err(err.into())
+        InterpExprKind::Identifier(id) => {
+            if let Some(val) = ctx.get_var(id) {
+                return Ok(val.clone());
+            }
+            match tomet_resolver::resolve_reference(doc, expr) {
+                Ok(val) => Ok(val),
+                Err(err) => {
+                    if let Some(template) = config.macros.get(id) {
+                        Ok(Value::String(template.clone()))
+                    } else {
+                        Err(err.into())
+                    }
                 }
             }
-        },
-        InterpExprKind::Member { .. } => Ok(tomet_resolver::resolve_reference(doc, expr)?),
+        }
+        InterpExprKind::Member { .. } => {
+            if let Some(path) = expr_to_path(expr) {
+                if let Some(val) = ctx.get_var(&path) {
+                    return Ok(val.clone());
+                }
+            }
+            Ok(tomet_resolver::resolve_reference(doc, expr)?)
+        }
         InterpExprKind::NamedArg { name, value } => {
-            let val = evaluate_with_config(doc, value, config)?;
+            let val = evaluate_with_context(doc, value, config, ctx)?;
             Ok(Value::Map(vec![(name.clone(), val)]))
         }
-        InterpExprKind::Call { callee, args } => evaluate_call(doc, callee, args, config),
+        InterpExprKind::Call { callee, args } => evaluate_call(doc, callee, args, config, ctx),
+    }
+}
+
+fn expr_to_path(expr: &InterpExpr) -> Option<String> {
+    match &expr.kind {
+        InterpExprKind::Identifier(id) => Some(id.clone()),
+        InterpExprKind::Member { object, member } => {
+            let parent = expr_to_path(object)?;
+            Some(format!("{parent}.{member}"))
+        }
+        _ => None,
     }
 }
 
@@ -55,13 +139,14 @@ fn evaluate_call(
     callee: &InterpExpr,
     args: &[InterpExpr],
     config: &tomet_semantics::DocumentConfig,
+    ctx: &EvaluationContext,
 ) -> Result<Value, ComputeError> {
     let InterpExprKind::Identifier(name) = &callee.kind else {
         return Err(ComputeError::UnsupportedCallee);
     };
     let values = args
         .iter()
-        .map(|arg| evaluate_with_config(doc, arg, config))
+        .map(|arg| evaluate_with_context(doc, arg, config, ctx))
         .collect::<Result<Vec<_>, _>>()?;
     match functions::call(name, &values) {
         Ok(val) => Ok(val),
@@ -340,4 +425,50 @@ mod tests {
             Value::String("(C) 2026 Tomet Projects".into())
         );
     }
+
+    #[test]
+    fn evaluates_uuid_and_time_and_context_vars() {
+        let doc = parse("\n");
+        let uuid_val = evaluate(&doc, &interp("${uuid()}")).unwrap();
+        if let Value::String(s) = uuid_val {
+            assert_eq!(s.len(), 36);
+            assert_eq!(s.matches('-').count(), 4);
+        } else {
+            panic!("expected UUID string");
+        }
+
+        let time_val = evaluate(&doc, &interp("${time()}")).unwrap();
+        if let Value::String(s) = time_val {
+            assert_eq!(s.matches(':').count(), 2);
+        } else {
+            panic!("expected time string");
+        }
+
+        let single_arg_date = evaluate(&doc, &interp("${date(\"YYYY/MM/DD\")}")).unwrap();
+        if let Value::String(s) = single_arg_date {
+            assert_eq!(s.matches('/').count(), 2);
+        } else {
+            panic!("expected formatted date");
+        }
+
+        let mut vars = HashMap::new();
+        vars.insert(
+            "vars".to_string(),
+            Value::Map(vec![("title".to_string(), Value::String("My RFC".into()))]),
+        );
+        vars.insert(
+            "filename".to_string(),
+            Value::String("001-rfc.tmt".into()),
+        );
+
+        let ctx = EvaluationContext { vars };
+        let cfg = tomet_semantics::DocumentConfig::default();
+
+        let title_res = evaluate_with_context(&doc, &interp("${vars.title}"), &cfg, &ctx).unwrap();
+        assert_eq!(title_res, Value::String("My RFC".into()));
+
+        let file_res = evaluate_with_context(&doc, &interp("${filename}"), &cfg, &ctx).unwrap();
+        assert_eq!(file_res, Value::String("001-rfc.tmt".into()));
+    }
 }
+

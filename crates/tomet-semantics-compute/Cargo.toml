@@ -8,6 +8,7 @@ tomet-ast = { workspace = true }
 tomet-resolver = { workspace = true }
 tomet-semantics = { workspace = true }
 time = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 tomet-parser = { workspace = true }

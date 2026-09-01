@@ -27,14 +27,22 @@ path = "src/roundtrip.rs"
 name = "snapshot"
 path = "src/snapshot.rs"
 
+[[test]]
+name = "blueprint"
+path = "src/blueprint.rs"
+
 [dependencies]
 tomet-ast = { workspace = true }
-tomet-parser = { workspace = true }
+tomet-compute = { workspace = true }
+tomet-config = { workspace = true }
+tomet-formatter = { workspace = true }
 tomet-html = { workspace = true }
 tomet-markdown = { workspace = true }
-tomet-typst = { workspace = true }
+tomet-parser = { workspace = true }
 tomet-printer = { workspace = true }
-tomet-formatter = { workspace = true }
-tomet-config = { workspace = true }
+tomet-transform = { workspace = true }
+tomet-typst = { workspace = true }
+tomet-validator = { workspace = true }
+tomet-workspace = { workspace = true }
 tree-sitter-tomet = { workspace = true }
 tree-sitter = { workspace = true }

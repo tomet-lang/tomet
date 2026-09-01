@@ -26,6 +26,8 @@ pub(crate) fn call(name: &str, args: &[Value]) -> Result<Value, ComputeError> {
             }
         }
         "date" => call_date(args),
+        "time" => call_time(args),
+        "uuid" => call_uuid(args),
         "unicode" => call_unicode(args),
         "emoji" => call_emoji(args),
         "tm" => call_tm(args),
@@ -34,28 +36,80 @@ pub(crate) fn call(name: &str, args: &[Value]) -> Result<Value, ComputeError> {
     }
 }
 
-fn call_date(args: &[Value]) -> Result<Value, ComputeError> {
+fn call_uuid(args: &[Value]) -> Result<Value, ComputeError> {
     match args {
-        [] => {
-            let today = time::OffsetDateTime::now_utc().date();
-            Ok(Value::String(format!(
-                "{:04}-{:02}-{:02}",
-                today.year(),
-                today.month() as u8,
-                today.day()
-            )))
+        [] => Ok(Value::String(uuid::Uuid::new_v4().to_string())),
+        [Value::String(opt)] if opt == "simple" => {
+            Ok(Value::String(uuid::Uuid::new_v4().simple().to_string()))
+        }
+        [Value::String(opt)] if opt == "nil" => {
+            Ok(Value::String(uuid::Uuid::nil().to_string()))
+        }
+        _ => Ok(Value::String(uuid::Uuid::new_v4().to_string())),
+    }
+}
+
+fn call_time(args: &[Value]) -> Result<Value, ComputeError> {
+    let now = time::OffsetDateTime::now_utc().time();
+    match args {
+        [] => Ok(Value::String(format!(
+            "{:02}:{:02}:{:02}",
+            now.hour(),
+            now.minute(),
+            now.second()
+        ))),
+        [Value::String(fmt)] => {
+            let formatted = fmt
+                .replace("HH", &format!("{:02}", now.hour()))
+                .replace("MM", &format!("{:02}", now.minute()))
+                .replace("SS", &format!("{:02}", now.second()));
+            Ok(Value::String(formatted))
+        }
+        _ => Ok(Value::String(format!(
+            "{:02}:{:02}:{:02}",
+            now.hour(),
+            now.minute(),
+            now.second()
+        ))),
+    }
+}
+
+fn call_date(args: &[Value]) -> Result<Value, ComputeError> {
+    let today = time::OffsetDateTime::now_utc().date();
+    let (y, m, d) = (
+        format!("{:04}", today.year()),
+        format!("{:02}", today.month() as u8),
+        format!("{:02}", today.day()),
+    );
+    match args {
+        [] => Ok(Value::String(format!("{y}-{m}-{d}"))),
+        [Value::String(fmt)]
+            if fmt.contains("YYYY")
+                || fmt.contains("MM")
+                || fmt.contains("DD")
+                || fmt.contains("YY")
+                || fmt.contains("年")
+                || fmt.contains("月")
+                || fmt.contains("日") =>
+        {
+            let formatted = fmt
+                .replace("YYYY", &y)
+                .replace("YY", if y.len() >= 2 { &y[y.len() - 2..] } else { &y })
+                .replace("MM", &m)
+                .replace("DD", &d);
+            Ok(Value::String(formatted))
         }
         [Value::String(s)] => Ok(Value::String(s.clone())),
         [Value::String(s), Value::String(fmt)] => {
             let s_trimmed = s.trim();
             let parts: Vec<&str> = s_trimmed.split(&['-', '/', '.'][..]).collect();
             if parts.len() == 3 {
-                let (y, m, d) = (parts[0], parts[1], parts[2]);
+                let (py, pm, pd) = (parts[0], parts[1], parts[2]);
                 let formatted = fmt
-                    .replace("YYYY", y)
-                    .replace("YY", if y.len() >= 2 { &y[y.len() - 2..] } else { y })
-                    .replace("MM", m)
-                    .replace("DD", d);
+                    .replace("YYYY", py)
+                    .replace("YY", if py.len() >= 2 { &py[py.len() - 2..] } else { py })
+                    .replace("MM", pm)
+                    .replace("DD", pd);
                 Ok(Value::String(formatted))
             } else {
                 Ok(Value::String(s.clone()))

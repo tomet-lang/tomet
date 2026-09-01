@@ -1,5 +1,4 @@
-//! Whitespace-hygiene formatter for `.tmt` source text, plus an opt-in,
-//! config-gated pass for small structural additions.
+//! Whitespace-hygiene and layout formatter for `.tmt` source text.
 //!
 //! [`format_source`] is AST-aware using source [`tomet_ast::Span`]
 //! metadata. Normalizes whitespace policy (LF line endings, no trailing
@@ -26,33 +25,14 @@
 //! based rather than AST-based for exactly that reason: there's nothing
 //! to walk yet for the file this exists to fix.
 //!
-//! [`format_source_with_config`] adds a config-driven patch pass in
-//! front of [`format_source`]: if the given `tomet_config::PrinterConfig`
-//! has no relevant rule for a document, it degrades to exactly
-//! [`format_source`]'s behavior (no semantic change). Only when config
-//! opts in does it make a deliberate, structural change, mirroring
-//! `tomet-printer`'s `ensure_document_id_with_config` -- inserting a
-//! brand-new `@meta{id: ...}` block into documents that don't have one
-//! yet, or patching an `id` into/onto an existing one -- but by
-//! splicing plain text into the original source (via
-//! `tomet-style`'s single-element `render_meta_element`, at the
-//! target element's `Span`) rather than rebuilding the whole document
-//! from the AST (that full-rebuild approach is `tomet-printer`'s
-//! job, not this crate's -- see `docs/develop/architecture.md`'s
-//! `tomet-formatter` bullet for why). Note: when config *is*
-//! relevant, the patched meta block is rendered exactly like printer
-//! would -- e.g. it can turn a hand-written single-line `@meta{id: ...}`
-//! into a multi-line `@meta(format:yaml){...}` if `config.meta_format`
-//! says so, even though nothing else about that decision changed. This
-//! is intentional, not a lossiness bug: the "don't change what wasn't
-//! asked for" guarantee is about the *absence* of a matching config
-//! rule, not about preserving a touched element's original shape.
+//! [`format_source_with_config`] formats tables according to `PrinterConfig`
+//! (e.g. `table.adjust_width`, `table.max_col_width`, `table.align`) and
+//! applies [`format_source`]. It never alters document metadata (`@meta`)
+//! or injects structural elements.
 
 use tomet_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
-use tomet_config::{FieldConfig, PrinterConfig};
-use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
+use tomet_config::PrinterConfig;
 use tomet_parser::parse_document;
-use tomet_tree::element_new;
 
 /// Format `src` in place (returns a new `String`). Idempotent:
 /// `format_source(&format_source(src)) == format_source(src)`.
@@ -250,7 +230,7 @@ fn quote_bare_at_values_in(src: &str, start: usize, end: usize, out: &mut String
             }
             b'"' | b'\'' => {
                 let quote = c;
-                let str_start = i;
+                let q_start = i;
                 i += 1;
                 while i < end {
                     if bytes[i] == b'\\' && quote == b'"' && i + 1 < end {
@@ -263,37 +243,28 @@ fn quote_bare_at_values_in(src: &str, start: usize, end: usize, out: &mut String
                         break;
                     }
                 }
-                out.push_str(&src[str_start..i]);
+                out.push_str(&src[q_start..i]);
             }
-            b':' | b'-' | b',' | b'[' => {
+            b':' | b',' | b'[' => {
                 out.push(c as char);
                 i += 1;
-                let ws_start = i;
                 while i < end && matches!(bytes[i], b' ' | b'\t') {
+                    out.push(bytes[i] as char);
                     i += 1;
                 }
-                out.push_str(&src[ws_start..i]);
                 if i < end && bytes[i] == b'@' {
-                    let val_start = i;
-                    let mut j = i;
-                    while j < end && !matches!(bytes[j], b',' | b']' | b'}' | b'\n' | b'#') {
-                        j += 1;
-                    }
-                    let mut val_end = j;
-                    while val_end > val_start && matches!(bytes[val_end - 1], b' ' | b'\t') {
-                        val_end -= 1;
-                    }
-                    out.push('"');
-                    for ch in src[val_start..val_end].chars() {
-                        match ch {
-                            '"' => out.push_str("\\\""),
-                            '\\' => out.push_str("\\\\"),
-                            _ => out.push(ch),
-                        }
-                    }
-                    out.push('"');
-                    out.push_str(&src[val_end..j]);
-                    i = j;
+                    quote_one_value_at(src, &mut i, end, out);
+                }
+            }
+            b'-' if i + 1 < end && matches!(bytes[i + 1], b' ' | b'\t') => {
+                out.push('-');
+                i += 1;
+                while i < end && matches!(bytes[i], b' ' | b'\t') {
+                    out.push(bytes[i] as char);
+                    i += 1;
+                }
+                if i < end && bytes[i] == b'@' {
+                    quote_one_value_at(src, &mut i, end, out);
                 }
             }
             _ => {
@@ -305,10 +276,42 @@ fn quote_bare_at_values_in(src: &str, start: usize, end: usize, out: &mut String
     }
 }
 
-/// Like [`format_source`], but first runs a config-gated patch pass --
-/// see the module doc comment and `docs/develop/architecture.md`'s
-/// `tomet-formatter` bullet for the design.
-/// Formats tables in `src` according to `table.adjust_width` and `table.max_col_width`.
+/// Helper for [`quote_bare_at_values_in`]: having just seen a `@` at
+/// `src[*i]` in a value position, advances `*i` past the end of that
+/// scalar value, wrapping the scanned slice in `"..."` as it appends to
+/// `out`. Stops at the first newline, unquoted `,`, `]`, `}`, or `#`
+/// comment start.
+fn quote_one_value_at(src: &str, i: &mut usize, end: usize, out: &mut String) {
+    let val_start = *i;
+    let bytes = src.as_bytes();
+    let mut depth: u32 = 0;
+    while *i < end {
+        let b = bytes[*i];
+        match b {
+            b'\n' | b'\r' => break,
+            b'#' if depth == 0 => break,
+            b'(' | b'[' | b'{' => {
+                depth += 1;
+                *i += 1;
+            }
+            b')' | b']' | b'}' => {
+                if depth == 0 {
+                    break;
+                }
+                depth -= 1;
+                *i += 1;
+            }
+            b',' if depth == 0 => break,
+            _ => *i += 1,
+        }
+    }
+    let val = src[val_start..*i].trim_end();
+    out.push('"');
+    out.push_str(val);
+    out.push('"');
+}
+
+/// Formats tables in `src` according to `table.adjust_width`, `table.max_col_width`, and `table.align`.
 pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
     let mode = config.table_adjust_width.as_deref().unwrap_or("auto");
     if mode == "false" || mode == "off" {
@@ -409,7 +412,7 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
                                     };
                                     match col_align {
                                         "right" => {
-                                            let left = extra.saturating_sub(1);
+                                             let left = extra.saturating_sub(1);
                                             let right = 1;
                                             (left, right)
                                         }
@@ -419,7 +422,6 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
                                             (left, right)
                                         }
                                         _ => {
-                                            // "left"
                                             let left = 1;
                                             let right = extra.saturating_sub(1);
                                             (left, right)
@@ -533,118 +535,11 @@ fn extract_row_cells(line: &str) -> Option<(String, Vec<String>)> {
     }
 }
 
-/// Like [`format_source`], but first runs a config-gated patch pass --
-/// see the module doc comment and `docs/develop/architecture.md`'s
-/// `tomet-formatter` bullet for the design.
+/// Formats `src` by applying configured table layout formatting and whitespace hygiene.
+/// Never mutates metadata or inserts structural blocks.
 pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
-    let patched_id_src = patch_id_if_needed(src, config);
-    let formatted_tables = format_tables_with_config(&patched_id_src, config);
+    let formatted_tables = format_tables_with_config(src, config);
     format_source(&formatted_tables)
-}
-
-fn patch_id_if_needed(src: &str, config: &PrinterConfig) -> String {
-    let Some(id_cfg) = config.meta_fields.get("id") else {
-        return src.to_string();
-    };
-    if id_cfg.field_type.is_none() {
-        return src.to_string();
-    }
-    let force = id_cfg.force.unwrap_or(true);
-    let overwrite = id_cfg.overwrite.unwrap_or(false);
-    if !(force || overwrite) {
-        return src.to_string();
-    }
-
-    let Ok(doc) = parse_document(src) else {
-        return src.to_string();
-    };
-
-    let meta_el = doc.blocks.iter().find_map(|block| {
-        if let Block::Element(el) = block {
-            if tomet_semantics::classify(el) == tomet_semantics::ElementKind::Meta
-                || matches!(&el.sigil, Sigil::At(Some(name)) if name == "meta")
-            {
-                return Some(el);
-            }
-        }
-        None
-    });
-
-    match meta_el {
-        Some(el) => match patch_existing_meta(el, id_cfg, overwrite, config) {
-            Some(rendered) => {
-                let start = el.span.start.offset;
-                let end = el.span.end.offset;
-                format!("{}{}{}", &src[..start], rendered, &src[end..])
-            }
-            None => src.to_string(),
-        },
-        None => {
-            let id = generate_id_for_field(id_cfg);
-            let mut new_el = element_new(Sigil::At(Some("meta".to_string())));
-            new_el.value = Some(ElementValue::Data(Value::Map(vec![(
-                "id".to_string(),
-                Value::String(id),
-            )])));
-            let rendered = tomet_style::render_meta_element(&new_el, config);
-            format!("{rendered}\n\n{src}")
-        }
-    }
-}
-
-/// Decides whether `el` (an existing `@meta` element) needs its `id`
-/// field inserted or replaced, mirroring the per-case gating in
-/// `tomet-printer`'s `ensure_document_id_with_config` (existing
-/// valid id -> untouched; existing invalid id -> replaced only if
-/// `overwrite`; no id field -> inserted, since the caller already
-/// checked `force || overwrite` before calling this). Returns the
-/// freshly rendered `@meta{...}` text if a change is needed, `None` if
-/// nothing needs to change (caller should leave `src` untouched).
-fn patch_existing_meta(
-    el: &Element,
-    id_cfg: &FieldConfig,
-    overwrite: bool,
-    config: &PrinterConfig,
-) -> Option<String> {
-    let Some(ElementValue::Data(Value::Map(entries))) = &el.value else {
-        return None;
-    };
-    let mut entries = entries.clone();
-    let existing_idx = entries.iter().position(|(k, _)| k == "id");
-    let changed = match existing_idx {
-        Some(idx) => {
-            if overwrite {
-                let existing_str = match &entries[idx].1 {
-                    Value::String(s) => s.as_str(),
-                    _ => "",
-                };
-                if !is_valid_id_format(existing_str, id_cfg) {
-                    entries[idx].1 = Value::String(generate_id_for_field(id_cfg));
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        }
-        None => {
-            entries.insert(
-                0,
-                (
-                    "id".to_string(),
-                    Value::String(generate_id_for_field(id_cfg)),
-                ),
-            );
-            true
-        }
-    };
-    if !changed {
-        return None;
-    }
-    let mut modified = el.clone();
-    modified.value = Some(ElementValue::Data(Value::Map(entries)));
-    Some(tomet_style::render_meta_element(&modified, config))
 }
 
 fn is_raw_element(el: &Element) -> bool {
@@ -663,12 +558,6 @@ fn is_raw_element(el: &Element) -> bool {
 }
 
 fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
-    // A list item is just `Element{ sigil: Bare, .. }` nested inside its
-    // list's `ElementValue::Children`, so `walk_element` already reaches
-    // every item's own `content` through the `Children` branch below --
-    // no separate list-shaped case is needed here anymore. `el.children`
-    // (an item's own nested sub-list) is the one shape `Children`/
-    // `content` don't cover, so it gets its own block-level recursion.
     fn walk_element(el: &Element, out: &mut Vec<(usize, usize)>) {
         if is_raw_element(el) {
             if let Some(inlines) = &el.content {
@@ -723,154 +612,39 @@ mod tests {
     use tomet_config::FieldConfig;
 
     #[test]
-    fn format_source_with_config_is_noop_without_id_rule() {
-        let src = "#[ Hello ]\n\n- one\n- two\n";
-        let config = PrinterConfig::default();
-        assert_eq!(format_source_with_config(src, &config), format_source(src));
-    }
-
-    #[test]
-    fn format_source_with_config_inserts_new_meta_block_with_id() {
-        let src = "#[ Hello ]\n\nSome body text.\n";
-        let mut config = PrinterConfig::default();
-        config.meta_fields.insert(
-            "id".to_string(),
-            FieldConfig {
-                field_type: Some("nanoid".to_string()),
-                length: Some(8),
-                prefix: Some("doc-".to_string()),
-                ..Default::default()
-            },
-        );
-
-        let out = format_source_with_config(src, &config);
-        assert!(out.contains("@meta{id: doc-"));
-        assert!(out.contains("#[ Hello ]"));
-        assert!(out.contains("Some body text."));
-    }
-
-    #[test]
-    fn format_source_with_config_skips_insertion_without_force_or_overwrite() {
-        let src = "#[ Hello ]\n\nSome body text.\n";
-        let mut config = PrinterConfig::default();
-        config.meta_fields.insert(
-            "id".to_string(),
-            FieldConfig {
-                field_type: Some("nanoid".to_string()),
-                length: Some(8),
-                force: Some(false),
-                overwrite: Some(false),
-                ..Default::default()
-            },
-        );
-
-        assert_eq!(format_source_with_config(src, &config), format_source(src));
-    }
-
-    #[test]
-    fn format_source_with_config_respects_meta_format() {
-        let src = "#[ Hello ]\n\nSome body text.\n";
-        let mut config = PrinterConfig::default();
-        config.meta_format = Some("yaml".to_string());
-        config.meta_fields.insert(
-            "id".to_string(),
-            FieldConfig {
-                field_type: Some("nanoid".to_string()),
-                length: Some(8),
-                ..Default::default()
-            },
-        );
-
-        let out = format_source_with_config(src, &config);
-        assert!(out.contains("@meta(format:yaml){\n  id: "));
-    }
-
-    #[test]
-    fn format_source_with_config_is_idempotent() {
-        let src = "#[ Hello ]\n\nSome body text.\n";
-        let mut config = PrinterConfig::default();
-        config.meta_fields.insert(
-            "id".to_string(),
-            FieldConfig {
-                field_type: Some("nanoid".to_string()),
-                length: Some(8),
-                ..Default::default()
-            },
-        );
-
-        let once = format_source_with_config(src, &config);
-        let twice = format_source_with_config(&once, &config);
-        assert_eq!(once, twice);
-    }
-
-    fn id_config() -> PrinterConfig {
-        let mut config = PrinterConfig::default();
-        config.meta_fields.insert(
-            "id".to_string(),
-            FieldConfig {
-                field_type: Some("nanoid".to_string()),
-                length: Some(8),
-                prefix: Some("doc-".to_string()),
-                ..Default::default()
-            },
-        );
-        config
-    }
-
-    #[test]
-    fn format_source_with_config_inserts_id_into_existing_meta_block() {
+    fn format_source_with_config_leaves_meta_block_completely_untouched() {
         let src = "@meta{title: Hello}\n\n#[ Hello ]\n\nSome body text.\n";
-        let config = id_config();
+        let mut config = PrinterConfig::default();
+        config.meta_fields.insert(
+            "id".to_string(),
+            FieldConfig {
+                field_type: Some("nanoid".to_string()),
+                length: Some(8),
+                prefix: Some("doc-".to_string()),
+                ..Default::default()
+            },
+        );
 
         let out = format_source_with_config(src, &config);
-        assert!(out.contains("title: Hello"));
-        assert!(out.contains("id: doc-"));
-        assert!(out.contains("#[ Hello ]"));
-        assert!(out.contains("Some body text."));
+        assert_eq!(out, src);
     }
 
     #[test]
-    fn format_source_with_config_replaces_invalid_id_when_overwrite() {
-        let src = "@meta{id: not-valid, title: Hello}\n\n#[ Hello ]\n";
-        let mut config = id_config();
-        if let Some(id_cfg) = config.meta_fields.get_mut("id") {
-            id_cfg.overwrite = Some(true);
-        }
+    fn format_source_with_config_does_not_insert_meta_when_missing() {
+        let src = "#[ Hello ]\n\nSome body text.\n";
+        let mut config = PrinterConfig::default();
+        config.meta_fields.insert(
+            "id".to_string(),
+            FieldConfig {
+                field_type: Some("nanoid".to_string()),
+                length: Some(8),
+                prefix: Some("doc-".to_string()),
+                ..Default::default()
+            },
+        );
 
         let out = format_source_with_config(src, &config);
-        assert!(!out.contains("id: not-valid"));
-        assert!(out.contains("id: doc-"));
-        assert!(out.contains("title: Hello"));
-    }
-
-    #[test]
-    fn format_source_with_config_leaves_invalid_id_without_overwrite() {
-        let src = "@meta{id: not-valid, title: Hello}\n\n#[ Hello ]\n";
-        let config = id_config(); // overwrite defaults to false
-
-        assert_eq!(format_source_with_config(src, &config), format_source(src));
-    }
-
-    #[test]
-    fn format_source_with_config_reformats_existing_block_to_multiline_per_config() {
-        let src = "@meta{title: Hello}\n\n#[ Hello ]\n";
-        let mut config = id_config();
-        config.meta_format = Some("yaml".to_string());
-
-        let out = format_source_with_config(src, &config);
-        assert!(out.contains("@meta(format:yaml){\n"));
-        assert!(out.contains("  title: Hello\n"));
-        assert!(out.contains("  id: doc-"));
-    }
-
-    #[test]
-    fn format_source_with_config_existing_block_patch_is_idempotent() {
-        let src = "@meta{title: Hello}\n\n#[ Hello ]\n";
-        let config = id_config();
-
-        let once = format_source_with_config(src, &config);
-        let twice = format_source_with_config(&once, &config);
-        assert_eq!(once, twice);
+        assert_eq!(out, src);
     }
 
     #[test]
@@ -932,12 +706,6 @@ mod tests {
 
     #[test]
     fn quotes_bare_at_led_yaml_values_so_the_document_parses() {
-        // Unquoted, `@link(...)` is invalid YAML (`@` is a reserved
-        // indicator) -- `parse_document` fails outright on this input, so
-        // this specifically checks the *raw string* the formatter
-        // produces, not a before/after `Document` comparison the way
-        // `does_not_change_the_parsed_document` does (there is no
-        // "before" `Document` here to compare against).
         let src = "@meta(format:yaml){\n  previous: @link(ref:x)\n  next: @link(ref:y)\n  parent: [@link(ref:z), @link(ref:w)]\n}\n";
         let expected = "@meta(format:yaml){\n  previous: \"@link(ref:x)\"\n  next: \"@link(ref:y)\"\n  parent: [\"@link(ref:z)\", \"@link(ref:w)\"]\n}\n";
         let out = format_source(src);
@@ -960,8 +728,6 @@ mod tests {
 
     #[test]
     fn quote_bare_at_yaml_values_leaves_already_quoted_and_unrelated_content_alone() {
-        // Already-quoted values, and `@` outside a `format:yaml` body
-        // entirely (an ordinary `@name` element), must be left untouched.
         let src =
             "@meta(format:yaml){\n  previous: \"@link(ref:x)\"\n}\n\n@link(ref:x)[some text]\n";
         assert_eq!(format_source(src), src);
@@ -974,11 +740,6 @@ mod tests {
         let twice = format_source(&once);
         assert_eq!(once, twice);
     }
-
-    // The corpus-wide idempotence and `does_not_change_the_parsed_document`
-    // invariants live in the `tomet-tests` package now -- they read the
-    // shared corpus and span parser + formatter, so they belong to
-    // neither crate on its own.
 
     #[test]
     fn test_format_tables_with_config_left_align() {
@@ -1033,11 +794,6 @@ mod tests {
 
     #[test]
     fn test_format_tables_unicode_superscript_and_cjk_width() {
-        // "電子数 2n²": 3*2 + 1 + 1 + 1 + 1 = 10 visual width
-        // "2": 1 visual width
-        // Right-aligned column with target width 10 + 2 = 12:
-        // "[ 電子数 2n² ]" -> 1 + 10 + 1 = 12
-        // "[          2 ]" -> 10 + 1 + 1 = 12 (10 spaces before '2')
         let src = "@table(align: [right])[\n[ 電子数 2n² ]\n[ 2 ]\n]\n";
         let mut config = PrinterConfig::default();
         config.table_adjust_width = Some("auto".to_string());

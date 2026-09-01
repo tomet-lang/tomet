@@ -88,6 +88,13 @@ fn main() -> ExitCode {
             value_dsl,
             check,
         } => refactor_cmd(path, *in_place, *url_macros, *meta_kind, *value_dsl, *check),
+        Command::New {
+            path,
+            template,
+            list,
+            force,
+            vars,
+        } => commands::new::new_cmd(path, template.as_deref(), *list, *force, vars),
         Command::CheckLinks { .. } => unreachable!("handled above, before this match"),
     };
 

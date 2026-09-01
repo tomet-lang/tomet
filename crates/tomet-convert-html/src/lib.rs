@@ -315,7 +315,7 @@ fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut String) {
 fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
     let kind = classify(el);
     match kind.as_str() {
-        "version" | "kind" | "meta" | "config" => {}
+        "version" | "kind" | "meta" | "config" | "blueprint" => {}
         "interp" => {
             if let Some(value) = &el.value {
                 render_element_value(cx, value, out);

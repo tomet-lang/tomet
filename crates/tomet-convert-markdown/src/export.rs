@@ -102,7 +102,7 @@ fn inline_to_md(cx: &RenderCtx, inlines: &[Inline]) -> String {
 fn element_to_md(cx: &RenderCtx, el: &Element, inline: bool) -> String {
     let kind = classify(el);
     match kind.as_str() {
-        "version" | "kind" | "meta" | "config" => String::new(),
+        "version" | "kind" | "meta" | "config" | "blueprint" => String::new(),
         // Block-position only, same as CommonMark's own headings and
         // Tomet's own `#[x]` grammar -- a nested/inline `@heading(...)`
         // (`inline == true`) falls through to generic/custom rendering
