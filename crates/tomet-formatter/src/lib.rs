@@ -6,8 +6,15 @@
 //! whitespace, collapsed excess blank lines, exactly one final newline)
 //! while losslessly preserving literal whitespace and blank lines inside
 //! raw/verbatim content (`<codeblock>[...]` and elements opting in via
-//! `content:raw`). It never changes the parsed `Document` (see the
-//! `does_not_change_the_parsed_document` test) -- with one deliberate
+//! `content:raw`). It never changes the parsed `Document` -- the
+//! `does_not_change_the_parsed_document` test in the `tomet-tests`
+//! package asserts this across the whole shared corpus. That test also
+//! carries a `KNOWN_FORMAT_CHANGES_DOCUMENT` list recording where the
+//! guarantee currently does *not* hold: an element whose `(content:raw)`
+//! never takes effect (because the source used full-width `｛｝` where the
+//! grammar wants ASCII `{}`) has no raw span to protect, so the
+//! trailing-whitespace rule runs over content that was meant to be
+//! verbatim. There is one further deliberate
 //! exception: [`quote_bare_at_yaml_values`], run first, wraps a bare
 //! `@...`-led value inside any `(...format:yaml...){...}` body in `""`.
 //! Unquoted, `@` is a reserved YAML indicator that can't start a plain
@@ -968,30 +975,10 @@ mod tests {
         assert_eq!(once, twice);
     }
 
-    #[test]
-    fn is_idempotent_on_repo_spec_examples() {
-        for src in repo_examples() {
-            let once = format_source(src);
-            let twice = format_source(&once);
-            assert_eq!(once, twice, "formatting is not idempotent for: {src:?}");
-        }
-    }
-
-    #[test]
-    fn does_not_change_the_parsed_document() {
-        for src in [
-            include_str!("../../../docs/tests/readme.ja.tmt"),
-            include_str!("../../../docs/tests/tmt/examples/image.meta.tmt"),
-            include_str!("../../../docs/tests/roadmap.ja.tmt"),
-        ] {
-            let before = tomet_parser::parse_document(src)
-                .unwrap_or_else(|e| panic!("fixture failed to parse: {e}"));
-            let formatted = format_source(src);
-            let after = tomet_parser::parse_document(&formatted)
-                .unwrap_or_else(|e| panic!("formatted output failed to parse: {e}"));
-            assert_eq!(before, after, "formatting changed the parsed document");
-        }
-    }
+    // The corpus-wide idempotence and `does_not_change_the_parsed_document`
+    // invariants live in the `tomet-tests` package now -- they read the
+    // shared corpus and span parser + formatter, so they belong to
+    // neither crate on its own.
 
     #[test]
     fn test_format_tables_with_config_left_align() {
@@ -1059,14 +1046,5 @@ mod tests {
         let out = format_source_with_config(src, &config);
         assert!(out.contains("[ 電子数 2n² ]"));
         assert!(out.contains("[          2 ]"));
-    }
-
-    fn repo_examples() -> Vec<&'static str> {
-        vec![
-            include_str!("../../../docs/tests/readme.ja.tmt"),
-            include_str!("../../../docs/tests/tmt/examples/image.meta.tmt"),
-            include_str!("../../../docs/tests/ja/cheatsheet.tmt"),
-            include_str!("../../../docs/tests/roadmap.ja.tmt"),
-        ]
     }
 }

@@ -5,9 +5,10 @@ around it: a parser, an AST, consumers that turn that AST into other
 things (HTML, CommonMark, formatted source, serialized data), and a set of
 apps/editor integrations built on top. This doc is a map of how those
 pieces fit together and depend on each other -- not a spec of the
-language itself. For the grammar, `docs/ja/specifications/*.tmt` are the
+language itself. For the grammar, `docs/spec/*.tmt` are the
 spec docs (constructs marked `// 未実装` aren't implemented yet);
-`docs/ja/cheatsheet.tmt` is a live example file exercised by tests. The
+`docs/guide/cheatsheet.tmt` is a live example file, and `tests/fixtures/` holds
+the frozen copies of it that the tests actually read. The
 core grammar they document is frozen as of `docs/develop/
 grammar-freeze.md` -- breaking changes to already-decided syntax go
 through that doc's process, not a silent parser diff.
@@ -73,7 +74,7 @@ tomet-semantics (I/O-free classification of what an Element means)
   for the two forms that carry no `key:` at all, `@(/some/path)` and
   `@(https://example.com)` (`infer_at_kind_from_scalar`; the grammar
   work that makes these parse at all lives in `tomet-parser`'s
-  `value.rs` -- see `docs/reviews/2026-08-22-link-reference-uri-schemes.md`
+  `value.rs` -- see `docs/design/decisions/2026-08-22-link-reference-uri-schemes.md`
   section 5's "Group B"), and recognizing Tomet's own built-in
   vocabulary (`@version`, `@kind`, `@meta`, `@config`, `@links`, `em`/`strong`/`mark`, ...) via
   an `ElementKind` enum and a `classify(el: &Element) -> ElementKind`
@@ -96,7 +97,7 @@ tomet-semantics (I/O-free classification of what an Element means)
   `tomet-html`, `tomet-markdown`, and `tomet-links` all
   route through instead of each reading `el.args` (and disagreeing on
   fallback order) independently -- see
-  `docs/reviews/2026-08-22-link-reference-uri-schemes.md` for the design
+  `docs/design/decisions/2026-08-22-link-reference-uri-schemes.md` for the design
   history behind unifying this.
 - **`tomet-validator`** (`crates/tomet-semantics-validator`): `.tmt` schema/lint validation. Currently one
   rule -- duplicate `{id:...}`/`(id:...)` detection across a `Document`,
@@ -140,7 +141,7 @@ produce and format Tomet's own source text.
 - **`tomet-markdown`** (`crates/tomet-convert-markdown`): bidirectional CommonMark <-> `Document`
   conversion (`import.rs`/`export.rs`), lossy in both directions for
   constructs with no equivalent on the other side -- see
-  `docs/feature/commonmark-support.md` for the mapping and its known-lossy
+  `docs/design/decisions/2026-08-09-commonmark-support.md` for the mapping and its known-lossy
   cases. Notably depends only on `tomet-ast`, not `tomet-parser`:
   it builds/consumes `Document` values directly and uses `pulldown-cmark`
   for the actual CommonMark side, rather than round-tripping through
@@ -193,9 +194,13 @@ produce and format Tomet's own source text.
      while using AST `Span` metadata to losslessly preserve literal
      spacing and line breaks inside verbatim content (`<codeblock>[...]`
      or elements with `content:raw`). This stage alone still guarantees
-     `does_not_change_the_parsed_document` (its own invariant test) --
-     that invariant does not extend to stage 1, which exists precisely
-     to make deliberate, config-authorized changes.
+     `does_not_change_the_parsed_document` -- asserted across the whole
+     shared corpus by the `tomet-tests` package's `roundtrip` target,
+     which also records the one known case where the guarantee fails
+     today (an element whose `content:raw` never took effect, so there is
+     no raw span for the whitespace rule to skip). That invariant does
+     not extend to stage 1, which exists precisely to make deliberate,
+     config-authorized changes.
 - **`tomet-config`** (`crates/tomet-workspace-config`): owns `PrinterConfig`/`FieldConfig` (loaded
   from a `default.config.tmt`/`tomet.config.tmt`, or an
   `@settings`/`@config` element in a document) and everything they
@@ -351,6 +356,24 @@ crate's own test (`*_fixture_has_only_known_error_cases` tests against
 - **`packages/svelte`** (package `@tomet/svelte`): Svelte 5 components (using Runes `$props()`
   and Snippets) for Tomet markup and AST rendering with custom element overrides.
 - **`editors/helix`, `editors/neovim`**: workspace members reserved for future editor integrations.
+
+## Tests
+
+Layer-local tests live in the crate they test. Tests that span crates, or
+that need the shared `.tmt` corpus, live in the `tests/` package
+(`tomet-tests`) -- a workspace member that owns `tests/fixtures/` (the
+frozen corpus) and `tests/ref/` (committed reference output). It holds
+three targets: `corpus` (every fixture parses; the tree-sitter grammar
+produces only its documented error cases, which is how that grammar is
+noticed drifting from `tomet-parser`), `roundtrip` (parser + formatter
+and parser + printer invariants), and `snapshot` (`.tmt` rendered to
+HTML/CommonMark/Typst/printed `.tmt`, compared against `ref/`).
+
+This split exists because those tests belong to no single crate: before
+it, four crates reached outside their own directory for the corpus. See
+`tests/README.md` for the exception lists that record where current
+behavior falls short, and for why the corpus is deliberately not synced
+with `docs/`.
 
 ## Packaging
 

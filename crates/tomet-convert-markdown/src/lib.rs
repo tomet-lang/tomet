@@ -1,6 +1,6 @@
 //! Bidirectional conversion between CommonMark and `tomet_ast`.
 //!
-//! See `docs/commonmark-support.md` for the mapping this implements and
+//! See `docs/design/decisions/2026-08-09-commonmark-support.md` for the mapping this implements and
 //! its known-lossy cases.
 
 mod export;
@@ -16,7 +16,7 @@ mod roundtrip_tests {
 
     /// Round-trip through both directions and assert the *rendered HTML*
     /// is equivalent, which is the fidelity bar this crate targets (per
-    /// `docs/commonmark-support.md`'s test strategy) -- the intermediate
+    /// `docs/design/decisions/2026-08-09-commonmark-support.md`'s test strategy) -- the intermediate
     /// `.tmt` shape doesn't have to be identical, just render the same.
     fn assert_html_round_trips(markdown: &str) {
         let doc = from_markdown(markdown);

@@ -1,0 +1,82 @@
+//! End-to-end conversion snapshots: every parseable fixture rendered
+//! through each output format, compared against a committed reference.
+//!
+//! This is the coverage that did not exist anywhere before: each convert
+//! crate tested its own units, but nothing checked `.tmt` all the way to
+//! HTML/CommonMark/Typst as one pipeline.
+//!
+//! References are generated from current behavior, so they lock in
+//! today's output including any bugs. They are a regression net, not a
+//! statement that the output is correct -- when one changes, read the
+//! diff and decide, then accept it with:
+//!
+//! ```text
+//! TOMET_UPDATE_REF=1 cargo test -p tomet-tests
+//! ```
+
+use tomet_tests::{assert_snapshot, parseable_corpus, snapshot_name};
+
+#[test]
+fn html_output_matches_reference() {
+    for (rel, src) in parseable_corpus() {
+        let doc = tomet_parser::parse_document(&src)
+            .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+        // `render_body` rather than `render_page`: the page wrapper is
+        // boilerplate, and pinning it would make every fixture's
+        // reference churn on an unrelated template tweak.
+        assert_snapshot(&snapshot_name(&rel, "html"), &tomet_html::render_body(&doc));
+    }
+}
+
+#[test]
+fn markdown_output_matches_reference() {
+    for (rel, src) in parseable_corpus() {
+        let doc = tomet_parser::parse_document(&src)
+            .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+        assert_snapshot(
+            &snapshot_name(&rel, "md"),
+            &tomet_markdown::to_markdown(&doc),
+        );
+    }
+}
+
+#[test]
+fn typst_output_matches_reference() {
+    for (rel, src) in parseable_corpus() {
+        let doc = tomet_parser::parse_document(&src)
+            .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+        assert_snapshot(&snapshot_name(&rel, "typ"), &tomet_typst::to_typst(&doc));
+    }
+}
+
+#[test]
+fn printed_source_matches_reference() {
+    // The printer rebuilds `.tmt` source from the AST. `roundtrip.rs`
+    // checks that the result reparses to the same document; this pins
+    // what it actually looks like, which reparsing alone does not.
+    for (rel, src) in parseable_corpus() {
+        let doc = tomet_parser::parse_document(&src)
+            .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+        assert_snapshot(
+            &snapshot_name(&rel, "printed.tmt"),
+            &tomet_printer::document_to_tm(&doc),
+        );
+    }
+}
+
+#[test]
+fn markdown_import_export_is_stable() {
+    // CommonMark -> Document -> CommonMark. Lossy in both directions by
+    // design, so this does not assert a round trip -- it pins where the
+    // losses currently land.
+    for (rel, src) in parseable_corpus() {
+        let doc = tomet_parser::parse_document(&src)
+            .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+        let exported = tomet_markdown::to_markdown(&doc);
+        let reimported = tomet_markdown::from_markdown(&exported);
+        assert_snapshot(
+            &snapshot_name(&rel, "md.reimported.md"),
+            &tomet_markdown::to_markdown(&reimported),
+        );
+    }
+}

@@ -49,8 +49,13 @@ Moving a crate only requires updating its path in the root
 value) -- package names and `{ workspace = true }` dependency keys
 never change, so no `use` statement anywhere needs touching. Watch out
 for `include_str!`/`include_bytes!` literals using `../`-relative paths
-reaching outside the crate's own directory (a few tests reach up to
-`docs/tests/`), and for hardcoded `.parent().unwrap()` chains walking
-up to the repo root -- both are sensitive to how many directories deep
-the crate sits, which a rename alone doesn't change, but a nesting
-depth change would.
+reaching outside the crate's own directory, and for hardcoded
+`.parent().unwrap()` chains walking up to the repo root -- both are
+sensitive to how many directories deep the crate sits, which a rename
+alone doesn't change, but a nesting depth change would.
+
+No crate in here does either of those anymore. The tests that used to
+(reaching up for the shared `.tmt` corpus) live in the `tests/` package
+(`tomet-tests`) now, which owns that corpus outright -- see
+`tests/README.md`. Keep it that way: a test that needs the shared corpus
+belongs there, not in a crate reaching out of its own directory for it.

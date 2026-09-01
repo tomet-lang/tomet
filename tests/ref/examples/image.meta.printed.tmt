@@ -1,0 +1,12 @@
+@meta(format:yaml){
+  type: image
+  tags: [a, b]
+}
+
+#[既存のconfig formatの代替]
+
+ini, toml, yamlの垣根を超える。 また、このように文章を加えられる。
+
+##[ここ好き！] {x: 50, y: 190}
+
+この目、どうやって書いているんだろう？

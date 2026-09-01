@@ -16,6 +16,14 @@ test:
 test-treesitter:
     cargo test -p tree-sitter-tomet
 
+# Run the cross-crate corpus/round-trip/snapshot suite only.
+test-suite:
+    cargo test -p tomet-tests
+
+# Accept new snapshot output as the reference (read the diff first).
+update-refs:
+    TOMET_UPDATE_REF=1 cargo test -p tomet-tests
+
 # Regenerate Tree-sitter parser C files (src/parser.c, src/grammar.json) from grammar.js and test.
 gen-treesitter:
     cd crates/tree-sitter-tomet && npx -y tree-sitter-cli@0.26.12 generate

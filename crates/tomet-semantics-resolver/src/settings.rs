@@ -52,7 +52,7 @@ pub fn resolve_settings_file(path: &Path) -> Result<Value, ResolveError> {
 
 /// [`settings_file_ref`] on `el`, joined against `project_root` (`file:`
 /// is documented as project-root-relative, see
-/// `docs/ja/specifications/builtin-args.tmt`), then resolved via
+/// `docs/guide/builtins/args.tmt`), then resolved via
 /// [`resolve_settings_file`]. `None` if `el` isn't a `@settings(file:...)`
 /// reference at all; `Some(Err(_))` if it is one but resolution failed.
 pub fn resolve_settings_ref(

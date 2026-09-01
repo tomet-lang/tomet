@@ -211,7 +211,7 @@ mod tests {
         //
         // Now the two shapes mean different things, on purpose (see
         // `element::parse_element`'s `allow_colon_connect` doc comment,
-        // and `docs/ja/specifications/syntax.tmt`'s `##[ コネクト ]`,
+        // and `docs/spec/syntax.tmt`'s `##[ コネクト ]`,
         // which had flagged exactly this as an unimplemented idea): a
         // *bare* `{...}` still always belongs to the element (matches
         // how the same input already behaves with no list item involved
@@ -278,7 +278,7 @@ mod tests {
 
     #[test]
     fn list_item_colon_connect_supports_an_empty_braced_value() {
-        // The `docs/ja/specifications/syntax.tmt` `##[ コネクト ]` example
+        // The `docs/spec/syntax.tmt` `##[ コネクト ]` example
         // this feature implements (`- () xxxxxx :{}`) uses an *empty*
         // `{}` for its item-level attrs -- `heading::parse_braced_value`
         // (shared by heading and list-item attrs) used to have no
@@ -510,14 +510,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn parses_the_repo_spec_examples() {
-        parse_document(include_str!("../../../docs/tests/readme.ja.tmt")).unwrap();
-        parse_document(include_str!(
-            "../../../docs/tests/tmt/examples/image.meta.tmt"
-        ))
-        .unwrap();
-    }
+    // `parses_the_repo_spec_examples` lives in the `tomet-tests` package
+    // now -- it reads the shared corpus, which this crate no longer
+    // reaches out of its own directory for.
 
     #[test]
     fn bare_at_is_plain_text_when_not_an_element() {
@@ -1595,7 +1590,7 @@ mod tests {
 
     #[test]
     fn bare_absolute_path_parses_as_a_plain_scalar() {
-        // Group B of docs/reviews/2026-08-22-link-reference-uri-schemes.md:
+        // Group B of docs/design/decisions/2026-08-22-link-reference-uri-schemes.md:
         // a leading `/` can never start a map key, so this is unambiguous.
         assert_eq!(
             parse_value("/readme.md").unwrap(),

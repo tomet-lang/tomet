@@ -12,7 +12,7 @@ use crate::{ElementKind, classify};
 /// `None` if the document has no `@meta` element, or that element has no
 /// `{value}` group at all. Only the first top-level `@meta` is considered
 /// -- `@meta` is documented as `singleton: true` (see
-/// `docs/ja/specifications/builtin.settings.tmt`), so a well-formed document
+/// `docs/spec/builtin-settings.tmt`), so a well-formed document
 /// never has more than one anyway.
 pub fn document_meta(doc: &Document) -> Option<&Value> {
     doc.blocks.iter().find_map(|block| match block {

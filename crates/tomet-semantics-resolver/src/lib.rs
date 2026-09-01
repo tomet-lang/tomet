@@ -17,7 +17,7 @@
 //! `Value` grammar doesn't support; try `cargo run -p tomet -- check
 //! docs/docs.settings.tmt` to reproduce). That's a pre-existing gap in
 //! the schema/type-system design documented in
-//! `docs/ja/specifications/types.tmt`, unrelated to this crate -- not
+//! `docs/spec/types.tmt`, unrelated to this crate -- not
 //! something introduced or fixed here. This crate's own test fixtures
 //! (`tests/fixtures/valid_settings.tmt`) use a simplified value shape
 //! that *does* parse today, so they only exercise the file-resolution
@@ -25,10 +25,10 @@
 //!
 //! ## TODO: `@import`
 //! Not designed yet -- no grammar or semantics for it exist anywhere in
-//! `docs/`. Note: `docs/ja/cheatsheet.tmt` already contains
+//! `docs/`. Note: `docs/guide/cheatsheet.tmt` already contains
 //! `@settings(import:../docs.settings.tmt)`, which uses a *file-relative*
 //! path under an `import` key -- inconsistent with `file:`'s documented
-//! *project-root-relative* semantics (`docs/ja/specifications/builtin-args.tmt`).
+//! *project-root-relative* semantics (`docs/guide/builtins/args.tmt`).
 //! Don't treat that line as the spec for `@import`; it looks like
 //! leftover/draft content, not a settled design.
 

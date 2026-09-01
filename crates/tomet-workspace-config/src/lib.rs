@@ -480,47 +480,10 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_load_config_from_file_default_config_tm() {
-        let mut dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let path = loop {
-            let candidate = dir.join("docs/tests/test.config.tmt");
-            if candidate.exists() {
-                break candidate;
-            }
-            if !dir.pop() {
-                panic!("could not find docs/tests/test.config.tmt in parent directories");
-            }
-        };
-        let cfg = load_config_from_file(&path).expect("failed to load docs/tests/test.config.tmt");
-        assert_eq!(cfg.meta_format.as_deref(), Some("yaml"));
-        assert_eq!(cfg.meta_always_newline, true);
-        assert_eq!(cfg.meta_fields.get("aliases").unwrap().always_newline, true);
-        assert_eq!(
-            cfg.meta_fields.get("created").unwrap().format.as_deref(),
-            Some("rfc3339")
-        );
-        assert_eq!(
-            cfg.meta_fields.get("created").unwrap().offset.as_deref(),
-            Some("+09:00")
-        );
-        assert_eq!(cfg.link_no_space, true);
-        assert_eq!(cfg.callout_content_style.as_deref(), Some("block"));
-        assert_eq!(cfg.list_multiline_style_content.as_deref(), Some("box"));
-        assert_eq!(
-            cfg.ignore_files,
-            vec!["00-09 System/01 Apps/obsidian".to_string()]
-        );
-
-        let default_config_path = path.parent().unwrap().join("default.config.tmt");
-        let cfg_default = load_config_from_file(&default_config_path)
-            .expect("failed to load docs/tests/default.config.tmt");
-        assert_eq!(cfg_default.callout_content_style.as_deref(), Some("block"));
-        assert_eq!(
-            cfg_default.list_multiline_style_content.as_deref(),
-            Some("box")
-        );
-    }
+    // Loading the shared `test.config.tmt`/`default.config.tmt` fixtures
+    // lives in the `tomet-tests` package now. It used to walk up parent
+    // directories to find the repo root, which `crates/README.dirs.tmt`
+    // flags as sensitive to how deep this crate is nested.
 
     #[test]
     fn test_ignore_files_config_parsing() {

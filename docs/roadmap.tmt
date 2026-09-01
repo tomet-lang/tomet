@@ -1,0 +1,68 @@
+@config(import:docs/docs.settings.tmt)
+@meta(type:todo)
+
+- 読み込みロード画面
+- index, directories
+- latex
+- typst (Document -> Typst変換は`tomet-convert-typst`で実装済み。import/PDF生成は未実装)
+- migration
+---[ 構文を決定する ]---
+- ( ) `ref`構文                      // `@this`
+- ( ) Template構文
+- ( ) `[]`のkey
+- ( ) コネクト構文2                    // `:(){}[]`
+- ( ) `@tomet(version: 1)` or features.
+- ("!") 独自DSL Settings               // 難しいから、json,yamlに逃がした。
+- ("!") 独自DSL Value                  //
+---[ 構文を実装する ]---
+- ( ) ビルトイン関数の強化             // `@link`,`@`, `<index>`, `<callout>`, `@tag`
+- ( ) `@meta`にkdlを追加
+---[ 拡張性を確保する ]---
+- ( ) ドキュメントの補充
+- ( ) アイコン、ロゴ
+---[ CLI/Library機能を強化する ]---
+- ( ) 置換/検索
+- ( ) 変換を強化
+- ( ) Hook                           // 実行すると、規則に従って、指定されたトリガーを見て、処理を実行する（TODO）をアーカイブするとかのはなし。
+---[ 外部機能を強化する ]---
+- ( ) Zed
+  - ( ) フォーマッタ
+  - ( ) サジェスト
+  - ( ) 自動補完
+- ( ) 多言語バインディング
+- ( ) その他
+
+#[ Archive ]
+---[ 構文 ]---
+- (x) 設定
+- (x) 要素設定 (.config.tmt, json, yaml)
+- (x) Table記法
+- (x) コネクト構文 (`:(){}`)
+- (x) `args`推論 (基本要素対応, カスタム要素対応, positional: [ title, priority ])         // `<embed>(src)`
+- (x) `@`推論
+- (x) マクロ構文 (`$macro(var, var, ...)`)
+- (x) 代入、関数構文 (`${var}` `compute`,`resolve`)
+- (x) 構文エラー (重複)
+- (x) コメントアウト
+- (x) 公式構文 (`@config`, `@kind`, `@version`, `@meta`, `@references`)
+- (x) 基本構文 (空白可, 改行可, 順不同)
+- (x) 基本Markdown記法 (`*`, `**`, `==`, `__`, ``)
+- (x) 基本要素 (heading, list, horizontal line)
+- (x) 名前 (element, arg, content, value)
+- (x) 基本AST (`<T>()[]{}`)
+---[ 機能 ]---
+- (x) to_from_markdown ()
+- (x) export (`export:{type: commonmark, path: ...}`)
+---[ CLI ]---
+- (x) TUI (Explorer, Migration, Grep)
+---[ TUI ]---
+- (x) 移行 (Markdown)
+- (x) エクスプローラー
+---[ LSP ]---
+- (x) マクロ結果をホバーに表示
+---[ Integration ]---
+- (x) Svelte
+- (x) React
+- (x) Java
+- (x) Python
+- (x) Javascript

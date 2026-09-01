@@ -2184,6 +2184,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomet-tests"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-config",
+ "tomet-formatter",
+ "tomet-html",
+ "tomet-markdown",
+ "tomet-parser",
+ "tomet-printer",
+ "tomet-typst",
+ "tree-sitter",
+ "tree-sitter-tomet",
+]
+
+[[package]]
 name = "tomet-transform"
 version = "0.1.0"
 dependencies = [

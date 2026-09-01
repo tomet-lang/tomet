@@ -15,7 +15,7 @@
 //! same resolution rule -- with any `#fragment` stripped first (the
 //! fragment names an id *inside* the target document; validating that
 //! the id actually exists there is out of scope for this pass, see
-//! `docs/reviews/2026-08-22-link-reference-uri-schemes.md` section 5).
+//! `docs/design/decisions/2026-08-22-link-reference-uri-schemes.md` section 5).
 //!
 //! `Ref` targets are not paths at all: they're resolved by searching
 //! the vault for any existing file whose name or stem matches the target

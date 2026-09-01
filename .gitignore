@@ -13,6 +13,10 @@ node_modules/
 
 # -----------------------------------------------------------------------
 
+#[ Test output ]
+# Actual snapshot output, written only when it differs from tests/ref/.
+tests/store/
+
 #[ Build file ]
 build/
 dist/
