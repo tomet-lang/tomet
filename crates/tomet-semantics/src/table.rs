@@ -117,7 +117,7 @@ fn trim_inlines(inlines: &mut Vec<Inline>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Element, Sigil};
+    use tomet_ast::{Sigil};
 
     #[test]
     fn parses_plain_table_cells() {
