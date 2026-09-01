@@ -1980,10 +1980,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tomet-helix"
-version = "0.1.0"
-
-[[package]]
 name = "tomet-html"
 version = "0.1.0"
 dependencies = [
@@ -2100,10 +2096,6 @@ dependencies = [
  "tomet-semantics",
  "tomet-tree",
 ]
-
-[[package]]
-name = "tomet-neovim"
-version = "0.1.0"
 
 [[package]]
 name = "tomet-parser"

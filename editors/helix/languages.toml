@@ -1,0 +1,20 @@
+# Helix language configuration for Tomet (.tmt)
+# Merge or reference this in ~/.config/helix/languages.toml
+
+[[language]]
+name = "tomet"
+scope = "source.tmt"
+injection-regex = "tmt|tomet"
+file-types = ["tmt"]
+roots = ["tomet.config.tmt", "default.config.tmt", ".git"]
+comment-token = "//"
+block-comment-tokens = { start = "/*", end = "*/" }
+indent = { tab-width = 2, unit = "  " }
+language-servers = [ "tomet-lsp" ]
+
+[language-server.tomet-lsp]
+command = "tomet-lsp"
+
+[[grammar]]
+name = "tomet"
+source = { git = "https://github.com/tefww/tomet", rev = "main", subpath = "crates/tree-sitter-tomet" }

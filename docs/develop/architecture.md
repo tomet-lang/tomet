@@ -353,9 +353,8 @@ crate's own test (`*_fixture_has_only_known_error_cases` tests against
   `Tomet.printDocumentJson`, `Tomet.format`, and `Tomet.validateJson` for Java, Kotlin, Android, and Spring applications.
 - **`packages/react`** (package `@tomet/react`): React components for Tomet markup and
   AST rendering with custom element overrides (`<Tomet ast={doc} components={{ ... }} />`).
-- **`packages/svelte`** (package `@tomet/svelte`): Svelte 5 components (using Runes `$props()`
-  and Snippets) for Tomet markup and AST rendering with custom element overrides.
-- **`editors/helix`, `editors/neovim`**: workspace members reserved for future editor integrations.
+- **`editors/helix`**: Helix editor configuration (`languages.toml`) and Tree-sitter query definitions (`queries/tomet/`), connecting to `tomet-lsp` on `$PATH`.
+- **`editors/neovim`**: a Neovim plugin (`tomet.nvim`) providing filetype detection (`.tmt`), Tree-sitter parser registration & queries, buffer settings, and automatic `tomet-lsp` attachment.
 
 ## Tests
 
