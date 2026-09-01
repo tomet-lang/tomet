@@ -5,12 +5,12 @@
 @meta(format:json)
 @config(format:json)
 
-@url(url:<url>)[ display_name ]
-@file(file:<file>)[ display_name ]
-@ref(ref:<ref>)
-@(url:<url>)[ display_name ]     // 名前省略時は url/file/ref のキーから推論
-@(file:<file>)[ display_name ]
-@(ref:<ref>)
+@link(https:<url>)[ display_name ]
+@link(file:<file>)[ display_name ]
+@link(tmt:<tmt file>)[ display_name ]
+@link(ref:<ref>)
+
+@heading(level: <int>)[ display_name ]
 
 @references[
   <id:asdf-asdf>:()
@@ -22,6 +22,11 @@
 <embed>(file:<file>)[alt]
 <codeblock>(lang:<language>)[ <code> ]
 <blockquote>[ <content> ]
+
+${func(args) ...}
+${<var> +-*/ ...}
+$func(args)
+$(<var>)
 
 - (marker:<string>) content
 -. (marker:<string>) content
@@ -47,9 +52,4 @@
 // <icon>(pack:lucide, name:<string>)  // 未実装: 組み込みkindではなく、アイコン表示の特別処理もない
 // <index>()[ title ]                  // 未実装: 同上、目次生成などの特別処理はない
 // <callout>(variant:info)[ <content> ] // 未実装: 同上、専用のスタイル分岐はない
-
-// #(number:<uint>)[ heading ]  // 未実装: 見出しは (args) を持たない。連番機能もない
-
-// ${<var>}                     // 未実装: 変数展開の仕組み自体が存在しない
-// $(<var>)
 ```

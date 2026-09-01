@@ -1,0 +1,1 @@
+../../../../crates/tree-sitter-tomet/queries/injections.scm

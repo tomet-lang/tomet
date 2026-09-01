@@ -14,8 +14,6 @@ members = [
 
   #[ Editor Support ]
   "editors/zed",
-  "editors/neovim",
-  "editors/helix",
 
   #[ Syntax -- grammar/parsing ]
   "crates/tomet-syntax-cst",
