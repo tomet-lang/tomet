@@ -31,6 +31,10 @@ path = "src/snapshot.rs"
 name = "blueprint"
 path = "src/blueprint.rs"
 
+[[test]]
+name = "vocabulary"
+path = "src/vocabulary.rs"
+
 [dependencies]
 tomet-ast = { workspace = true }
 tomet-compute = { workspace = true }
@@ -41,6 +45,7 @@ tomet-markdown = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-printer = { workspace = true }
 tomet-transform = { workspace = true }
+tomet-tree = { workspace = true }
 tomet-typst = { workspace = true }
 tomet-validator = { workspace = true }
 tomet-workspace = { workspace = true }

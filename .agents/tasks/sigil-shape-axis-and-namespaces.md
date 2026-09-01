@@ -107,24 +107,91 @@ Headings, lists, tables, `**strong**` / `*em*` / `==mark==` / `` `code` ``,
 `---` breaks, `${...}`, comments, and the "at most one of each `(args)`
 `[content]` `{value}`, any order" grouping rule.
 
-## Open
+## Resolved (2026-09-02, during planning)
 
-- [ ] Does `${...}` expand inside a `+++` fence? Provisionally **no** —
-      `default.config.tmt` stores `"${1}"` as a macro template that must
-      survive parsing verbatim, which leaves little room for a different
-      answer. Confirm and record.
-- [ ] Identifier charset for element names. If names are ASCII-only, a
-      non-ASCII `#タグ` never lexes as an element and the fall-back-to-text
-      rule above becomes nearly unreachable. Decide before implementing
-      the lookahead.
+- [x] **`${...}` does not expand inside a `+++` fence.** Confirmed against
+      `default.config.tmt:7-22`, which stores 13 `"${1}"` macro templates
+      inside `@config(format:json){...}`. They are consumed by literal
+      `${N}` string splitting in `MacroPattern::from_template`
+      (`crates/tomet-transform/src/macro_rewrite.rs:19-36`), so they must
+      reach that function verbatim. This also preserves current behaviour:
+      `${...}` is already not expanded in embedded-format bodies,
+      `<codeblock>` bodies, or `content:raw` bodies.
+- [x] **Element names are ASCII.** `ident := [A-Za-z_][A-Za-z0-9_-]*`,
+      `name := ident ('.' ident)*`. `.` is demoted from an identifier
+      character to the namespace separator. The repo has zero non-ASCII and
+      zero dotted element names, so this costs no migration, and it matches
+      `tree-sitter-tomet`'s existing `identifier` regex (`grammar.js:443`),
+      so step 10 needs no charset work. Consequence: `#タグ` never lexes as
+      an element and stays prose — the right default for the Japanese docs.
+      Note `.` must stay legal in *map keys* (`default.config.tmt` has
+      `"url.wiki"`; `tomet-semantics/src/config.rs:206-225` prefix-matches
+      `macros.`), so keys and element names need separate lexers now.
+- [x] **`ElementValue` becomes `Group(Vec<Entry>)` + `Raw(String)` +
+      `Interp`**, with `Entry = Pair(String, Value) | Element(Element)`.
+      Chosen over a `Group { data, children }` struct because the latter
+      keeps the data/children split as fields instead of making it a view,
+      and loses the source order of a mixed group — which would make the
+      printer silently reorder. Non-map `{}` bodies (`{[1,2,3]}`, `{"str"}`,
+      `{bare}`) become parse errors; the `+++` fence covers that case now.
+      No corpus document and no test uses them. Note `parse_value`
+      (`value.rs:12-20`), the data-only-document entry point `serde_tomet`
+      uses, never touches `ElementValue` and is unaffected.
+- [x] **Migration is a one-shot throwaway text tool**, not a legacy parse
+      path and not a permanent `tomet migrate`. Nothing is published, so no
+      external upgrade path is owed. It must still do real bracket matching
+      (reuse `find_matching_bracket`/`skip_quoted` from `value.rs:113-214`)
+      rather than regex, or `<memo>(content:raw)[don't [nest] this]`
+      converts wrongly.
+- [x] **Synthesized sigils remap by shape.** `Sigil::Type` is also the AST
+      form of constructs whose *surface syntax* is unchanged —
+      `em`/`strong`/`mark` (`inline.rs:292`), `hr` (`document.rs:59`,
+      `heading.rs:163`), `codeblock` (`codeblock.rs:69`), `ol`/`ul`
+      (`tomet-syntax-tree/src/element.rs:289`). They become `#hr`,
+      `#codeblock`, `#ol`, `#ul`, `@em`, `@strong`, `@mark`. Step 2 below
+      does not mention these; they are part of it.
+- [x] **`#` requires adjacency.** A `#` run immediately followed by an
+      identifier (no space) is a block element; a `#` run + optional inline
+      whitespace + `[` is a heading. The repo has 0 occurrences of `#ident`
+      and 39 of `# word` (Markdown headings in `.tmt` READMEs, shell/YAML
+      comments inside fences), so adjacency keeps every existing line prose.
+      `@` keeps requiring a following group — that is what keeps
+      `me@example.com` prose; `#` additionally accepts end-of-line.
+
+## Correction to the analysis above
+
+`parse_value_group` (`crates/tomet-syntax-parser/src/element.rs:264-292`)
+is **not** name-driven. It branches on a `(` lookahead, so `@links{...}`
+yields `Children` because of the `(`, not because the name is `links`.
+Step 6 is therefore an independent cleanup, not something the invariant
+requires — the step-1 guard passes with that branch left in place.
+
+It stays in scope because it fixes a real bug: `@links{ note:x (1)[a] }`
+parses today as `Data(Map([("note", String("x (1)[a]"))]))` — the element
+is silently swallowed into a scalar string. (`@links{ (1)[a] note:x }`
+errors instead.)
+
+The places the parser *does* consult vocabulary are four, all retired by
+steps 3 and 5: `is_format_target_element` and `local_format_key`
+(`element.rs:238-251`), `is_verbatim_content` and `is_codeblock`
+(`codeblock.rs:103-113`). A fifth, `is_config` (`element.rs:253-262`),
+threads a document-wide `running_format` and goes with them.
 
 ## Steps
 
-- [ ] 1. Write the guard test first: parse a corpus with the builtin
-      table and the external `elements:` map emptied, and assert the tree
-      shape is identical to parsing with them populated. It fails today
-      in four places (name-driven `{}`, `content:raw`, `format:`, external
-      `elements:`). It is the acceptance criterion for steps 3-7.
+- [x] 1. Guard test — `tests/src/vocabulary.rs`, target `vocabulary`.
+      Done. Rather than emptying the builtin table (a `const` array, and
+      the parser never reads it or the external `elements:` map anyway),
+      it uses hand-written source pairs differing in exactly one
+      identifier the parser must not recognize, parses both, normalizes
+      that identifier, and compares the trees. A corpus sweep was
+      rejected: rewriting element names inside arbitrary Japanese prose
+      also rewrites the same token where it occurs as plain text, so the
+      trees would differ for reasons unrelated to vocabulary.
+      Currently fails on all 5 cases — `<codeblock>`, `(content:raw)`,
+      `(format:)`, `@meta`'s bare-string format shorthand, and
+      `@config`'s document-wide `running_format`. Acceptance criterion
+      for steps 3-7.
 - [ ] 2. AST (`crates/tomet-syntax-ast/src/lib.rs`). Drop `Sigil::Type`;
       give the sigils a namespace slot and a `#` variant. Replace
       `ElementValue::{Data, Children}` with a uniform group plus a

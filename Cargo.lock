@@ -2184,6 +2184,7 @@ dependencies = [
  "tomet-parser",
  "tomet-printer",
  "tomet-transform",
+ "tomet-tree",
  "tomet-typst",
  "tomet-validator",
  "tomet-workspace",
