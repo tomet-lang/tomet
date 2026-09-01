@@ -55,6 +55,8 @@ mkShell rec {
   ];
 
   shellHook = ''
-    echo "🦀 Rust"
+    alias nvim='nvim --cmd "set rtp+=$PWD/editors/neovim"'
+
+    echo "🦀 Rust Nvim"
   '';
 }

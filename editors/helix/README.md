@@ -7,7 +7,17 @@ Syntax highlighting, indentation, and language server support for Tomet (`.tmt`)
 - `tomet-lsp` binary on `$PATH` (e.g. built via `cargo install --path apps/lsp` or via Nix).
 - Helix 23.05 or later (with tree-sitter support).
 
-## Setup
+## Quick Setup (using `just`)
+
+If developing inside this repository, simply run:
+
+```sh
+just setup-helix
+```
+
+This links `.helix/languages.toml` and Tree-sitter queries into `~/.config/helix/runtime/queries/tomet/` automatically.
+
+## Manual Setup
 
 ### 1. Configure Language and LSP
 

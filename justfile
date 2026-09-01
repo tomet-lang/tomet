@@ -62,3 +62,17 @@ docs-check:
 clean-zed-cache:
     rm -rf ~/.local/share/zed/extensions/installed/tomet ~/.local/share/zed/extensions/work/tomet
 
+# Set up Helix workspace config and user runtime queries for local development.
+setup-helix:
+    @mkdir -p .helix
+    @ln -sfr editors/helix/languages.toml .helix/languages.toml
+    @mkdir -p ~/.config/helix/runtime/queries
+    @ln -sfr editors/helix/queries/tomet ~/.config/helix/runtime/queries/tomet
+    @echo "✅ Linked .helix/languages.toml and ~/.config/helix/runtime/queries/tomet"
+    @if command -v hx >/dev/null 2>&1; then hx --health tomet; fi
+
+# Remove Helix development runtime queries.
+clean-helix:
+    @rm -rf ~/.config/helix/runtime/queries/tomet
+    @echo "🧹 Removed ~/.config/helix/runtime/queries/tomet"
+

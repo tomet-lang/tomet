@@ -9,3 +9,8 @@ vim.bo.tabstop = 2
 vim.bo.shiftwidth = 2
 vim.bo.softtabstop = 2
 vim.bo.expandtab = true
+
+-- Start Tree-sitter highlighting if available
+if vim.treesitter then
+  pcall(vim.treesitter.start)
+end
