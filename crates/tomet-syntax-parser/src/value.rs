@@ -4,7 +4,7 @@
 //! data-shaped `{value}` groups.
 
 use crate::error::{Error, Result};
-use tomet_ast::Value;
+use tomet_ast::{Name, Value};
 use tomet_lexer::Cursor;
 
 /// Parse an entire source string as one `Value` (a data-only `.tmt`
@@ -29,8 +29,31 @@ pub(crate) fn err(cur: &Cursor, pos: usize, message: impl Into<String>) -> Error
     }
 }
 
+/// Characters legal inside a **map key**.
+///
+/// Deliberately wider than an element name (see [`is_name_start`] /
+/// [`is_name_char`]): keys are Unicode and may contain `.`, because dotted
+/// keys are one flat key here -- `default.config.tmt` has `url.wiki`, and
+/// `tomet-semantics`' config reader prefix-matches `macros.`. Element names
+/// use `.` as the namespace separator instead, so the two cannot share a
+/// lexer.
 pub(crate) fn is_ident_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_' || c == '-' || c == '.'
+}
+
+/// First character of one segment of an element name.
+///
+/// Element names are ASCII: `[A-Za-z_][A-Za-z0-9_-]*`, joined by `.` into
+/// `namespace.name`. Keeping them ASCII means a non-ASCII `#タグ` never
+/// lexes as an element and stays prose, which is the right default for the
+/// Japanese docs, and it matches `tree-sitter-tomet`'s existing regex.
+pub(crate) fn is_name_start(c: char) -> bool {
+    c.is_ascii_alphabetic() || c == '_'
+}
+
+/// Subsequent characters of one segment of an element name.
+pub(crate) fn is_name_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_' || c == '-'
 }
 
 fn is_inline_ws(c: char) -> bool {
@@ -96,121 +119,50 @@ pub(crate) fn eat_ident<'a>(cur: &mut Cursor<'a>) -> &'a str {
     cur.eat_while(is_ident_char)
 }
 
-/// Advances `cur` to the position of the `close` that matches the `open`
-/// already consumed just before `cur`'s current position, tracking nested
-/// `open`/`close` pairs and skipping over `"`/`'`-quoted runs (so a quoted
-/// `close`/`open` character -- e.g. a `"}"` inside a JSON string, or a
-/// `"]"` inside a codeblock's string literal -- can't miscount). Doesn't
-/// consume the closing delimiter. Used where a group's body is real
-/// source in some *other* language (embedded JSON/YAML/TOML, or a
-/// codeblock's source code) and only the matching bracket/brace needs
-/// finding -- quote-awareness matters there because unmatched quotes
-/// don't happen in valid source. For a body that's free-form prose
-/// instead (no language guarantees balanced quotes -- an apostrophe like
-/// `don't` would otherwise be misread as opening a quoted run and swallow
-/// the rest of the text), see the quote-agnostic
-/// [`find_matching_bracket`].
-pub(crate) fn find_matching_delimiter(
-    cur: &mut Cursor,
-    open: char,
-    close: char,
-    group_start: usize,
-) -> Result<usize> {
-    let mut depth: u32 = 0;
+/// Reads one `.`-separated element name, or `None` if `cur` is not at a
+/// name start.
+///
+/// A trailing `.` is not consumed: `#a.` reads the name `a` and leaves the
+/// `.` for whatever follows, rather than erroring, so the fall-back-to-text
+/// rule can still claim the line.
+pub(crate) fn eat_name(cur: &mut Cursor) -> Option<Name> {
+    let first = eat_name_segment(cur)?;
+    let mut segments = vec![first];
     loop {
-        match cur.peek() {
+        let checkpoint = cur.pos();
+        if cur.peek() != Some('.') {
+            break;
+        }
+        cur.bump();
+        match eat_name_segment(cur) {
+            Some(segment) => segments.push(segment),
             None => {
-                return Err(err(
-                    cur,
-                    group_start,
-                    format!("unterminated '{open}', expected matching '{close}'"),
-                ));
-            }
-            Some('"') => skip_quoted(cur, '"'),
-            Some('\'') => skip_quoted(cur, '\''),
-            Some(c) if c == open => {
-                depth += 1;
-                cur.bump();
-            }
-            Some(c) if c == close => {
-                if depth == 0 {
-                    return Ok(cur.pos());
-                }
-                depth -= 1;
-                cur.bump();
-            }
-            Some(_) => {
-                cur.bump();
+                cur.set_pos(checkpoint);
+                break;
             }
         }
     }
+    // Only the last segment is the name; everything before it is the
+    // namespace path, joined back with `.`.
+    let name = segments.pop().expect("at least one segment").to_string();
+    let namespace = if segments.is_empty() {
+        None
+    } else {
+        Some(segments.join("."))
+    };
+    Some(Name { namespace, name })
 }
 
-/// Same contract as [`find_matching_delimiter`] (nested `open`/`close`
-/// depth, doesn't consume the closing delimiter), but deliberately does
-/// *not* skip quoted runs -- a free-form-prose raw body (e.g. `content:raw`)
-/// has no guarantee its `"`/`'` occurrences are balanced the way real
-/// source code's are, so quote-skipping there would misfire on an
-/// ordinary apostrophe.
-pub(crate) fn find_matching_bracket(
-    cur: &mut Cursor,
-    open: char,
-    close: char,
-    group_start: usize,
-) -> Result<usize> {
-    let mut depth: u32 = 0;
-    loop {
-        match cur.peek() {
-            None => {
-                return Err(err(
-                    cur,
-                    group_start,
-                    format!("unterminated '{open}', expected matching '{close}'"),
-                ));
-            }
-            Some(c) if c == open => {
-                depth += 1;
-                cur.bump();
-            }
-            Some(c) if c == close => {
-                if depth == 0 {
-                    return Ok(cur.pos());
-                }
-                depth -= 1;
-                cur.bump();
-            }
-            Some(_) => {
-                cur.bump();
-            }
-        }
+fn eat_name_segment<'a>(cur: &mut Cursor<'a>) -> Option<&'a str> {
+    if !cur.peek().is_some_and(is_name_start) {
+        return None;
     }
+    Some(cur.eat_while(is_name_char))
 }
 
-/// Skips a `quote`-delimited run starting at the opening quote. Backslash
-/// escapes are only honored for `"` (JSON/TOML basic strings, and the
-/// common convention in most C-like source) -- `'` strings (TOML literal
-/// strings, YAML single-quoted scalars, and many languages' char literals)
-/// have no backslash escaping in either format, so `\` there is just a
-/// literal character. Runs to EOF harmlessly if unterminated; the caller's
-/// own EOF check reports that as "unterminated '<open>'" once the outer
-/// loop sees it.
-pub(crate) fn skip_quoted(cur: &mut Cursor, quote: char) {
-    cur.bump();
-    loop {
-        match cur.peek() {
-            None => break,
-            Some('\\') if quote == '"' => {
-                cur.bump();
-                cur.bump();
-            }
-            Some(c) => {
-                cur.bump();
-                if c == quote {
-                    break;
-                }
-            }
-        }
-    }
+/// Whether `cur` is at the start of an element name, without consuming it.
+pub(crate) fn is_name_start_at(cur: &Cursor) -> bool {
+    cur.peek().is_some_and(is_name_start)
 }
 
 /// Raw scalar text stops at any character that could plausibly end an
@@ -375,7 +327,7 @@ pub(crate) const POSITIONAL_ENTRY_KEY: &str = "";
 /// always-bare-scalar exception, see `starts_absolute_path`), or, if
 /// neither of those shapes matches, a bare value with no key at all,
 /// tagged with [`POSITIONAL_ENTRY_KEY`].
-fn parse_one_entry(cur: &mut Cursor) -> Result<(String, Value)> {
+pub(crate) fn parse_one_entry(cur: &mut Cursor) -> Result<(String, Value)> {
     let checkpoint = cur.pos();
     if !starts_absolute_path(cur) {
         let key = eat_ident(cur);

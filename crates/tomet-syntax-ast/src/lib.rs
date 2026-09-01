@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 pub mod cst_ast;
 pub use cst_ast::*;
@@ -306,27 +307,132 @@ impl std::ops::DerefMut for Text {
     }
 }
 
-/// Which sigil introduced a typed element, and its name if any.
+/// An element's name, split into its optional namespace and its own name.
+///
+/// The separator is `.`: `deck.bookmark` is `Name { namespace:
+/// Some("deck"), name: "bookmark" }`. A bare name (no namespace) is
+/// reserved for Tomet's own vocabulary -- user-defined elements must be
+/// namespaced, and an unrecognized bare name is an error rather than
+/// falling back to a `Custom` kind. That check is
+/// `tomet-semantics`' job; this type only records the split.
+///
+/// Both halves are ASCII identifiers (`[A-Za-z_][A-Za-z0-9_-]*`). `.` is
+/// the separator, so it is deliberately *not* an identifier character
+/// here -- unlike in map keys, where `url.wiki` is one flat key.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct Name {
+    pub namespace: Option<String>,
+    pub name: String,
+}
+
+impl Name {
+    /// A bare, un-namespaced name.
+    pub fn bare(name: impl Into<String>) -> Self {
+        Name {
+            namespace: None,
+            name: name.into(),
+        }
+    }
+
+    /// A namespaced name.
+    pub fn namespaced(namespace: impl Into<String>, name: impl Into<String>) -> Self {
+        Name {
+            namespace: Some(namespace.into()),
+            name: name.into(),
+        }
+    }
+
+    /// Whether this is a bare name, i.e. one reserved for Tomet's own
+    /// vocabulary.
+    pub fn is_bare(&self) -> bool {
+        self.namespace.is_none()
+    }
+}
+
+impl fmt::Display for Name {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.namespace {
+            Some(ns) => write!(f, "{ns}.{}", self.name),
+            None => f.write_str(&self.name),
+        }
+    }
+}
+
+/// Which sigil introduced an element, and its name.
+///
+/// The sigil encodes the element's *shape*, not its origin: `@` is inline,
+/// `#` is block. Origin is carried by [`Name`]'s namespace instead. (The
+/// older `<T>` sigil, which was meant to separate official from
+/// user-defined elements, carried no information in practice -- both it
+/// and `@name` classified through the same arm -- and is gone.)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Sigil {
-    /// `<name>` -- name is mandatory.
-    Type(String),
-    /// `@name` or bare `@` -- name is optional; when absent, the element's
-    /// kind is inferred from a key inside its `args` group via
-    /// `tomet_semantics::infer_at_kind` (e.g. `@(url:...)` is a link
-    /// because `url` is a recognized link key).
-    At(Option<String>),
+    /// `#name` -- a block element. `#[ ... ]` is the name-omitted form of
+    /// `#heading`, and parses to `Block(Name::bare("heading"))`.
+    Block(Name),
+    /// `@name`, or bare `@` when the name is absent (`@(url:...)`).
+    Inline(Option<Name>),
     /// No sigil at all. Only legal as an entry inside another element's
-    /// `ElementValue::Children` (e.g. the `(1)[...]` entries inside
-    /// `@links{ ... }`), where the container already supplies the type.
+    /// value group (e.g. the `(1)[...]` entries inside `#links{ ... }`),
+    /// where the container already supplies the type.
     Bare,
     /// `${...}` interpolation -- structurally just a sigil with a
     /// mandatory `{value}` group, same shape as `@name{value}`, so it
     /// reuses `Element`/`Inline::Element` rather than being a separate
-    /// `Inline` variant. No name of its own (unlike `Type`/`At`): the
+    /// `Inline` variant. No name of its own (unlike `Block`/`Inline`): the
     /// `InterpExpr` inside the `ElementValue::Interp` value group carries
     /// its own path/call name.
     Dollar,
+}
+
+impl Sigil {
+    /// This element's name, if it has one.
+    pub fn name(&self) -> Option<&Name> {
+        match self {
+            Sigil::Block(name) => Some(name),
+            Sigil::Inline(name) => name.as_ref(),
+            Sigil::Bare | Sigil::Dollar => None,
+        }
+    }
+
+    /// A block element -- one written with `#`.
+    pub fn block(name: impl Into<String>) -> Self {
+        Sigil::Block(Name::bare(name))
+    }
+
+    /// An inline element -- one written with `@`.
+    pub fn inline(name: impl Into<String>) -> Self {
+        Sigil::Inline(Some(Name::bare(name)))
+    }
+
+    pub fn is_block(&self) -> bool {
+        matches!(self, Sigil::Block(_))
+    }
+
+    pub fn is_inline(&self) -> bool {
+        matches!(self, Sigil::Inline(_))
+    }
+
+    /// Whether this element carries the bare (un-namespaced) name `name`,
+    /// regardless of shape.
+    ///
+    /// This is the check almost every consumer wants: bare names are
+    /// reserved for Tomet's own vocabulary, so `is_bare_named("meta")` asks
+    /// "is this *the* `meta` element" and cannot be satisfied by a
+    /// user-defined `deck.meta`.
+    pub fn is_bare_named(&self, name: &str) -> bool {
+        self.name().is_some_and(|n| n.is_bare() && n.name == name)
+    }
+
+    /// Like [`Sigil::is_bare_named`], but also requires a block shape.
+    pub fn is_block_named(&self, name: &str) -> bool {
+        matches!(self, Sigil::Block(n) if n.is_bare() && n.name == name)
+    }
+
+    /// Like [`Sigil::is_bare_named`], but also requires an inline shape.
+    pub fn is_inline_named(&self, name: &str) -> bool {
+        matches!(self, Sigil::Inline(Some(n)) if n.is_bare() && n.name == name)
+    }
 }
 
 /// `(args)` / `[content]` / `{value}`, each optional and at most one of each,
@@ -347,14 +453,157 @@ impl Default for Sigil {
     }
 }
 
-/// The contents of an element's `{value}` group: either plain data, or (for
-/// container elements like `@links{}`) a list of nested elements, or (for
-/// `Sigil::Dollar`'s `${...}` only) an unresolved interpolation expression.
+/// One entry inside an element's `{value}` group: either a `key: value`
+/// pair or a nested element.
+///
+/// `Pair`'s shape is exactly [`Value::Map`]'s entry type, which is what
+/// lets the data view be rebuilt from a group without copying any other
+/// structure.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Entry {
+    Pair(String, Value),
+    Element(Element),
+}
+
+/// The contents of an element's value group.
+///
+/// `{...}` is always data: it parses uniformly into [`Entry`] items in
+/// source order, whatever the element is called. "Is this a data map or a
+/// list of children?" is no longer a parse-time branch -- it is a view
+/// computed downstream in `tomet-semantics`, which is what lets the parser
+/// build the tree without consulting any element vocabulary.
+///
+/// `Raw` is a `+++` fence body, captured verbatim. Whether it is later
+/// read as JSON/YAML/TOML is decided after parsing, from the element's
+/// `format:` arg -- the fence itself is opaque, so `format:` has no effect
+/// on lexing.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ElementValue {
-    Data(Value),
-    Children(Vec<Element>),
+    Group(Vec<Entry>),
+    Raw(String),
     Interp(InterpExpr),
+}
+
+impl ElementValue {
+    /// An empty group -- what `{}` parses to.
+    pub fn empty_group() -> Self {
+        ElementValue::Group(Vec::new())
+    }
+
+    /// Builds a group from `key: value` pairs alone.
+    pub fn from_map(value: Value) -> Self {
+        match value {
+            Value::Map(entries) => ElementValue::Group(
+                entries
+                    .into_iter()
+                    .map(|(k, v)| Entry::Pair(k, v))
+                    .collect(),
+            ),
+            // A non-map body has no uniform-entry spelling; callers that
+            // build one are constructing a single positional entry.
+            other => ElementValue::Group(vec![Entry::Pair(String::new(), other)]),
+        }
+    }
+
+    /// Builds a group from nested elements alone.
+    pub fn from_children(children: Vec<Element>) -> Self {
+        ElementValue::Group(children.into_iter().map(Entry::Element).collect())
+    }
+
+    /// The data view: this group's `key: value` pairs, in source order,
+    /// as a [`Value::Map`]. Nested elements are skipped.
+    ///
+    /// Returns `None` for `Raw`/`Interp`, which carry no pairs.
+    pub fn as_data(&self) -> Option<Value> {
+        let ElementValue::Group(entries) = self else {
+            return None;
+        };
+        Some(Value::Map(
+            entries
+                .iter()
+                .filter_map(|e| match e {
+                    Entry::Pair(k, v) => Some((k.clone(), v.clone())),
+                    Entry::Element(_) => None,
+                })
+                .collect(),
+        ))
+    }
+
+    /// The children view: this group's nested elements, in source order.
+    pub fn as_children(&self) -> Vec<&Element> {
+        let ElementValue::Group(entries) = self else {
+            return Vec::new();
+        };
+        entries
+            .iter()
+            .filter_map(|e| match e {
+                Entry::Element(el) => Some(el),
+                Entry::Pair(..) => None,
+            })
+            .collect()
+    }
+
+    /// Whether this group holds any nested elements.
+    pub fn has_children(&self) -> bool {
+        matches!(self, ElementValue::Group(entries)
+            if entries.iter().any(|e| matches!(e, Entry::Element(_))))
+    }
+
+    /// This group's `key: value` pairs, in source order.
+    pub fn pairs(&self) -> impl Iterator<Item = (&String, &Value)> {
+        let entries: &[Entry] = match self {
+            ElementValue::Group(entries) => entries,
+            _ => &[],
+        };
+        entries.iter().filter_map(|e| match e {
+            Entry::Pair(k, v) => Some((k, v)),
+            Entry::Element(_) => None,
+        })
+    }
+
+    /// Mutable counterpart of [`ElementValue::pairs`].
+    pub fn pairs_mut(&mut self) -> impl Iterator<Item = (&mut String, &mut Value)> {
+        let entries: &mut [Entry] = match self {
+            ElementValue::Group(entries) => entries,
+            _ => &mut [],
+        };
+        entries.iter_mut().filter_map(|e| match e {
+            Entry::Pair(k, v) => Some((k, v)),
+            Entry::Element(_) => None,
+        })
+    }
+
+    /// The value bound to `key`, if this group has such a pair.
+    pub fn get(&self, key: &str) -> Option<&Value> {
+        self.pairs().find(|(k, _)| *k == key).map(|(_, v)| v)
+    }
+
+    /// Mutable counterpart of [`ElementValue::get`].
+    pub fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
+        self.pairs_mut().find(|(k, _)| *k == key).map(|(_, v)| v)
+    }
+
+    /// Appends a `key: value` pair. Does nothing for `Raw`/`Interp`, which
+    /// hold no entries.
+    pub fn push_pair(&mut self, key: impl Into<String>, value: Value) {
+        if let ElementValue::Group(entries) = self {
+            entries.push(Entry::Pair(key.into(), value));
+        }
+    }
+
+    /// Removes the first pair bound to `key` and returns its value.
+    pub fn remove(&mut self, key: &str) -> Option<Value> {
+        let ElementValue::Group(entries) = self else {
+            return None;
+        };
+        let idx = entries
+            .iter()
+            .position(|e| matches!(e, Entry::Pair(k, _) if k == key))?;
+        match entries.remove(idx) {
+            Entry::Pair(_, v) => Some(v),
+            Entry::Element(_) => unreachable!("position matched a Pair"),
+        }
+    }
 }
 
 /// One node of a `${...}` interpolation's parsed expression tree.

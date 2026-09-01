@@ -14,7 +14,7 @@ use crate::kind::ElementKind;
 use crate::positional::normalized_element_args;
 
 /// The raw target string of a link-shaped element, if it has one. `kind`
-/// should be `classify(el)`'s result -- only `Link`/`Embed` ever return
+/// should be `classify_lenient(el)`'s result -- only `Link`/`Embed` ever return
 /// `Some`, everything else returns `None`.
 ///
 /// `tm:path/to/doc#some-id`'s `#fragment` is returned verbatim, still
@@ -47,9 +47,9 @@ pub fn link_target(el: &Element, kind: &ElementKind) -> Option<String> {
 }
 
 /// Classifies `el` and extracts its link target in one step, for callers
-/// that don't already have `classify(el)`'s result on hand.
+/// that don't already have `classify_lenient(el)`'s result on hand.
 pub fn link_target_of(el: &Element) -> Option<(ElementKind, String)> {
-    let kind = crate::classify(el);
+    let kind = crate::classify_lenient(el);
     link_target(el, &kind).map(|target| (kind, target))
 }
 
@@ -156,8 +156,8 @@ mod tests {
 
     #[test]
     fn named_target_key_on_typed_link_element() {
-        let el = map_el(Sigil::Type("link".to_string()), vec![("target", s("x.md"))]);
-        assert_eq!(crate::classify(&el), ElementKind::Link);
+        let el = map_el(Sigil::inline("link"), vec![("target", s("x.md"))]);
+        assert_eq!(crate::classify_lenient(&el), ElementKind::Link);
         assert_eq!(
             link_target_of(&el),
             Some((ElementKind::Link, "x.md".to_string()))
@@ -166,11 +166,8 @@ mod tests {
 
     #[test]
     fn named_at_link_element() {
-        let el = map_el(
-            Sigil::At(Some("link".to_string())),
-            vec![("target", s("x.md"))],
-        );
-        assert_eq!(crate::classify(&el), ElementKind::Link);
+        let el = map_el(Sigil::inline("link"), vec![("target", s("x.md"))]);
+        assert_eq!(crate::classify_lenient(&el), ElementKind::Link);
         assert_eq!(
             link_target_of(&el),
             Some((ElementKind::Link, "x.md".to_string()))
@@ -183,9 +180,9 @@ mod tests {
         // "link" IS in `builtin_positional_arg_key` (-> "target"), so
         // `normalized_element_args` turns this into a map before
         // `link_target` ever sees it.
-        let mut el = element_new(Sigil::Type("link".to_string()));
+        let mut el = element_new(Sigil::inline("link"));
         el.args = Some(s("x.md"));
-        assert_eq!(crate::classify(&el), ElementKind::Link);
+        assert_eq!(crate::classify_lenient(&el), ElementKind::Link);
         assert_eq!(
             link_target_of(&el),
             Some((ElementKind::Link, "x.md".to_string()))
@@ -194,11 +191,8 @@ mod tests {
 
     #[test]
     fn embed_target_named_key() {
-        let el = map_el(
-            Sigil::Type("embed".to_string()),
-            vec![("target", s("a.png"))],
-        );
-        assert_eq!(crate::classify(&el), ElementKind::Embed);
+        let el = map_el(Sigil::block("embed"), vec![("target", s("a.png"))]);
+        assert_eq!(crate::classify_lenient(&el), ElementKind::Embed);
         assert_eq!(
             link_target_of(&el),
             Some((ElementKind::Embed, "a.png".to_string()))
@@ -210,7 +204,7 @@ mod tests {
         // `<embed>(a.png)`: "embed" IS in builtin_positional_arg_key
         // (-> "target"), so normalized_element_args already turns this
         // into a map before link_target ever sees it.
-        let mut el = element_new(Sigil::Type("embed".to_string()));
+        let mut el = element_new(Sigil::block("embed"));
         el.args = Some(s("a.png"));
         assert_eq!(
             link_target_of(&el),
@@ -262,20 +256,14 @@ mod tests {
 
     #[test]
     fn non_string_value_under_target_key_is_rejected() {
-        let el = map_el(
-            Sigil::Type("link".to_string()),
-            vec![("target", Value::Int(42))],
-        );
+        let el = map_el(Sigil::inline("link"), vec![("target", Value::Int(42))]);
         assert_eq!(link_target_of(&el), None);
     }
 
     #[test]
     fn non_link_kind_has_no_target() {
-        let el = map_el(
-            Sigil::At(Some("meta".to_string())),
-            vec![("format", s("json"))],
-        );
-        assert_eq!(crate::classify(&el), ElementKind::Meta);
+        let el = map_el(Sigil::block("meta"), vec![("format", s("json"))]);
+        assert_eq!(crate::classify_lenient(&el), ElementKind::Meta);
         assert_eq!(link_target_of(&el), None);
     }
 }

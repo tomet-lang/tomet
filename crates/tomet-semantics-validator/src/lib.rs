@@ -8,12 +8,42 @@ pub use error::{CstValidationError, ValidationError};
 use id::{collect_ids, collect_ids_cst};
 use tomet_ast::Document;
 use tomet_cst::{SyntaxNode, TextRange};
+use tomet_semantics::Shape;
+
+fn shape_str(shape: Shape) -> &'static str {
+    match shape {
+        Shape::Block => "a block element",
+        Shape::Inline => "an inline element",
+    }
+}
 
 /// Runs all validation rules against a parsed `Document` and returns every
 /// violation found. Read-only: never mutates `doc`, never does I/O.
 pub fn validate_document(doc: &Document) -> Vec<ValidationError> {
     let mut errors = Vec::new();
     let mut seen: Vec<(String, tomet_ast::Span)> = Vec::new();
+
+    // The parser deliberately accepts any well-formed name -- deciding
+    // which names exist is a vocabulary question, and the parser is barred
+    // from consulting one. So this is where an unknown bare name, or an
+    // element written with the wrong sigil for its shape, is reported.
+    tomet_tree::for_each_element(doc, |el| {
+        if let Err(unknown) = tomet_semantics::classify(el) {
+            errors.push(ValidationError::UnknownElement {
+                name: unknown.name,
+                span: el.span,
+            });
+            return;
+        }
+        if let Some((found, expected)) = tomet_semantics::shape_mismatch(el) {
+            errors.push(ValidationError::ShapeMismatch {
+                name: el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
+                found: shape_str(found),
+                expected: shape_str(expected),
+                span: el.span,
+            });
+        }
+    });
 
     for (id, span) in collect_ids(doc) {
         if let Some((_, first)) = seen.iter().find(|(seen_id, _)| *seen_id == id) {
@@ -88,7 +118,7 @@ mod tests {
         // `Element.args` -- regression coverage for `Node::attrs()`'s
         // args+value merge (`ElementExt::attrs_view`)
         // making it visible here at all.
-        let doc = parse("#[ one ]{id:a}\n\n<task>(id:a)\n");
+        let doc = parse("#[ one ]{id:a}\n\n#task(id:a)\n");
         let errors = validate_document(&doc);
         assert_eq!(errors.len(), 1);
         assert!(matches!(

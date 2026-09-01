@@ -23,7 +23,9 @@ pub fn new_cmd(
     if list {
         let templates = list_templates(&root, &config);
         if templates.is_empty() {
-            println!("No templates found in workspace (checked templates/, .tomet/templates/, and @config)");
+            println!(
+                "No templates found in workspace (checked templates/, .tomet/templates/, and @config)"
+            );
         } else {
             println!("Available templates:");
             for (name, path) in templates {
@@ -36,7 +38,11 @@ pub fn new_cmd(
     let template_name = match template {
         Some(t) => t.to_string(),
         None => {
-            if let Some(parent_dir_name) = path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) {
+            if let Some(parent_dir_name) = path
+                .parent()
+                .and_then(|p| p.file_name())
+                .and_then(|s| s.to_str())
+            {
                 parent_dir_name.to_string()
             } else {
                 "default".to_string()
@@ -49,14 +55,8 @@ pub fn new_cmd(
         var_map.insert(k.clone(), Value::String(v.clone()));
     }
 
-    let created_path = create_file_from_template(
-        &current_dir,
-        &template_name,
-        path,
-        &var_map,
-        &config,
-        force,
-    )?;
+    let created_path =
+        create_file_from_template(&current_dir, &template_name, path, &var_map, &config, force)?;
 
     println!("Created {}", created_path.display());
     Ok(())
@@ -85,7 +85,10 @@ mod tests {
         let cfg = PrinterConfig::default();
 
         let mut var_map = HashMap::new();
-        var_map.insert("title".to_string(), Value::String("New Auth Protocol".into()));
+        var_map.insert(
+            "title".to_string(),
+            Value::String("New Auth Protocol".into()),
+        );
         var_map.insert(
             "vars".to_string(),
             Value::Map(vec![("author".to_string(), Value::String("Bob".into()))]),

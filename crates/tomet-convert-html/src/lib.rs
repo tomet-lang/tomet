@@ -14,8 +14,8 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
-    ElementKind, TargetScheme, classify, heading_level, link_target, list_items, list_ordered,
-    normalized_element_args, target_scheme,
+    ElementKind, TargetScheme, classify_lenient, heading_level, link_target, list_items,
+    list_ordered, normalized_element_args, target_scheme,
 };
 
 const DEFAULT_STYLE: &str = "\
@@ -201,7 +201,7 @@ fn render_block(cx: &RenderCtx, block: &Block, out: &mut String, state: &mut Hea
             }
         }
         Block::Element(el) if list_ordered(el).is_some() => render_list(cx, el, out),
-        Block::Element(el) if classify(el) == ElementKind::Heading => {
+        Block::Element(el) if classify_lenient(el) == ElementKind::Heading => {
             render_heading_element(cx, el, out, state)
         }
         Block::Element(el) => render_element(cx, el, out, false),
@@ -222,10 +222,10 @@ fn render_heading_element(
     let level = heading_level(el).unwrap_or(1);
     let content = el.content.as_deref().unwrap_or(&[]);
     let value_data = match &el.value {
-        Some(ElementValue::Data(v)) => Some(v),
+        Some(v) => v.as_data(),
         _ => None,
     };
-    let (mut id, class, data) = split_attrs(value_data);
+    let (mut id, class, data) = split_attrs(value_data.as_ref());
     if id.is_none() && cx.options.auto_slug_headings {
         let text = inlines_to_plain(content);
         let slug = state.slugs.slug_for(&text);
@@ -256,10 +256,10 @@ fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
     out.push_str(&format!("<{tag}>\n"));
     for item in list_items(el) {
         let attrs = match &item.value {
-            Some(ElementValue::Data(v)) => Some(v),
+            Some(v) => v.as_data(),
             _ => None,
         };
-        let (id, class, data) = split_attrs(attrs);
+        let (id, class, data) = split_attrs(attrs.as_ref());
         out.push_str("<li");
         push_named_attrs(out, &id, &class, &data);
         out.push('>');
@@ -313,7 +313,7 @@ fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut String) {
 }
 
 fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
-    let kind = classify(el);
+    let kind = classify_lenient(el);
     match kind.as_str() {
         "version" | "kind" | "meta" | "config" | "blueprint" => {}
         "interp" => {
@@ -360,10 +360,10 @@ fn render_table_element(cx: &RenderCtx, el: &Element, out: &mut String) {
         .unwrap_or(true);
 
     let attrs = match &el.value {
-        Some(ElementValue::Data(v)) => Some(v),
+        Some(v) => v.as_data(),
         _ => None,
     };
-    let (id, class, data) = split_attrs(attrs);
+    let (id, class, data) = split_attrs(attrs.as_ref());
     let class = class.or_else(|| Some("tm-element tm-table".to_string()));
 
     out.push_str("<table");
@@ -452,10 +452,10 @@ fn render_codeblock_element(el: &Element, out: &mut String) {
         .map(|a| inlines_to_plain(a))
         .unwrap_or_default();
     let attrs = match &el.value {
-        Some(ElementValue::Data(v)) => Some(v),
+        Some(v) => v.as_data(),
         _ => None,
     };
-    let (id, class, data) = split_attrs(attrs);
+    let (id, class, data) = split_attrs(attrs.as_ref());
     out.push_str("<pre");
     push_named_attrs(out, &id, &class, &data);
     out.push_str("><code");
@@ -490,7 +490,7 @@ fn render_blockquote_element(cx: &RenderCtx, el: &Element, out: &mut String, inl
 /// share one `target` key with the scheme embedded in the string, `<embed>`
 /// needs the same treatment `@link` gets, not just a raw passthrough.
 fn render_embed_element(el: &Element, out: &mut String) {
-    let raw_target = link_target(el, &classify(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
     let alt = el
         .content
@@ -528,7 +528,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
 /// rendering -- it's addressing metadata, not part of the visible target.
 fn render_link_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
     let normalized_args = normalized_element_args(el);
-    let raw_target = link_target(el, &classify(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let target = target.to_string();
 
@@ -604,10 +604,10 @@ fn render_icon_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: b
     }
 
     let value_data = match &el.value {
-        Some(ElementValue::Data(v)) => Some(v),
+        Some(v) => v.as_data(),
         _ => None,
     };
-    let (id, custom_class, data) = split_attrs(value_data);
+    let (id, custom_class, data) = split_attrs(value_data.as_ref());
     if let Some(c) = custom_class {
         class_str.push(' ');
         class_str.push_str(&c);
@@ -666,20 +666,31 @@ fn render_generic_element(
 
 fn render_element_value(cx: &RenderCtx, value: &ElementValue, out: &mut String) {
     match value {
-        ElementValue::Data(v) => {
-            let text = value_to_plain(v);
-            if !text.is_empty() {
-                out.push_str("<span class=\"tm-value\">");
-                out.push_str(&escape_html(&text));
-                out.push_str("</span>");
+        // A group can hold both halves at once, so both are rendered:
+        // the pairs as a value span, the elements as children.
+        ElementValue::Group(_) => {
+            if let Some(data) = value.as_data() {
+                let text = value_to_plain(&data);
+                if !text.is_empty() {
+                    out.push_str("<span class=\"tm-value\">");
+                    out.push_str(&escape_html(&text));
+                    out.push_str("</span>");
+                }
+            }
+            let children = value.as_children();
+            if !children.is_empty() {
+                out.push_str("<div class=\"tm-children\">\n");
+                for child in children {
+                    render_element(cx, child, out, false);
+                }
+                out.push_str("</div>\n");
             }
         }
-        ElementValue::Children(children) => {
-            out.push_str("<div class=\"tm-children\">\n");
-            for child in children {
-                render_element(cx, child, out, false);
-            }
-            out.push_str("</div>\n");
+        // A `+++` fence body is opaque text.
+        ElementValue::Raw(body) => {
+            out.push_str("<pre class=\"tm-raw\">");
+            out.push_str(&escape_html(body));
+            out.push_str("</pre>");
         }
         ElementValue::Interp(expr) => {
             let text = match tomet_compute::evaluate_with_config(cx.doc, expr, &cx.config) {
@@ -727,7 +738,7 @@ fn render_interp_expr(expr: &InterpExpr) -> String {
 
 fn render_links_container(cx: &RenderCtx, el: &Element, out: &mut String) {
     out.push_str("<dl class=\"tm-links\">\n");
-    if let Some(ElementValue::Children(children)) = &el.value {
+    if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
         for child in children {
             let id = child.args.as_ref().map(value_to_plain).unwrap_or_default();
             out.push_str(&format!(

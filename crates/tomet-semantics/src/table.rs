@@ -117,7 +117,7 @@ fn trim_inlines(inlines: &mut Vec<Inline>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Sigil};
+    use tomet_ast::Sigil;
 
     #[test]
     fn parses_plain_table_cells() {
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn parses_table_cells_with_inline_elements() {
-        let el = tomet_tree::element_new(Sigil::Type("em".to_string()));
+        let el = tomet_tree::element_new(Sigil::inline("em"));
         let inlines = vec![
             Inline::Text(Text::from("[ ")),
             Inline::Element(el.clone()),

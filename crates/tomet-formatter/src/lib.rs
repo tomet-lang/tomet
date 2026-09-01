@@ -412,7 +412,7 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
                                     };
                                     match col_align {
                                         "right" => {
-                                             let left = extra.saturating_sub(1);
+                                            let left = extra.saturating_sub(1);
                                             let right = 1;
                                             (left, right)
                                         }
@@ -543,7 +543,7 @@ pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
 }
 
 fn is_raw_element(el: &Element) -> bool {
-    if matches!(&el.sigil, Sigil::Type(name) if name == "codeblock") {
+    if el.sigil.is_bare_named("codeblock") {
         return true;
     }
     if let Some(Value::Map(entries)) = &el.args {
@@ -581,7 +581,7 @@ fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                 walk_block(child, out);
             }
         }
-        if let Some(ElementValue::Children(children)) = &el.value {
+        if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
             for child in children {
                 walk_element(child, out);
             }

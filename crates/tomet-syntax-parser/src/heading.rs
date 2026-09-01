@@ -1,6 +1,5 @@
 //! Parsing for headings (`#[...]`) and thematic breaks (`---`).
 
-use crate::embedded_format::EmbeddedFormat;
 use crate::error::Result;
 use crate::inline::{Stop, parse_inline_seq};
 use crate::value::{
@@ -10,17 +9,14 @@ use tomet_ast::{Element, ElementValue, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
-pub(crate) fn parse_heading(
-    cur: &mut Cursor,
-    default_format: Option<EmbeddedFormat>,
-) -> Result<Element> {
+pub(crate) fn parse_heading(cur: &mut Cursor) -> Result<Element> {
     let start_pos = cur.pos();
     let level = cur.eat_while(|c| c == '#').len() as u8;
     skip_inline_ws(cur);
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '[' after '#'"));
     }
-    let content = parse_inline_seq(cur, Stop::Bracket(']'), default_format, true)?;
+    let content = parse_inline_seq(cur, Stop::Bracket(']'), true)?;
     if !cur.eat_str("]") {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }
@@ -50,11 +46,11 @@ pub(crate) fn parse_heading(
     let span = cur.span_from(start_pos);
     // Pre-existing quirk, preserved: a `#`-run longer than 255 silently
     // truncates here, same as before `Heading` was folded into `Element`.
-    let mut el = element_new(Sigil::At(Some("heading".to_string())))
+    let mut el = element_new(Sigil::block("heading"))
         .with_span(span)
         .with_args(Value::Int(level as i64))
         .with_content(content);
-    el.value = attrs.map(ElementValue::Data);
+    el.value = attrs.map(ElementValue::from_map);
     Ok(el)
 }
 
@@ -127,17 +123,14 @@ pub(crate) fn is_titled_thematic_break_start(cur: &Cursor) -> bool {
     look.peek() == Some('[')
 }
 
-pub(crate) fn parse_titled_thematic_break(
-    cur: &mut Cursor,
-    default_format: Option<EmbeddedFormat>,
-) -> Result<Element> {
+pub(crate) fn parse_titled_thematic_break(cur: &mut Cursor) -> Result<Element> {
     let start_pos = cur.pos();
     cur.eat_while(|c| c == '-');
     skip_inline_ws(cur);
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '['"));
     }
-    let title = parse_inline_seq(cur, Stop::Bracket(']'), default_format, true)?;
+    let title = parse_inline_seq(cur, Stop::Bracket(']'), true)?;
     if !cur.eat_str("]") {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }
@@ -160,7 +153,7 @@ pub(crate) fn parse_titled_thematic_break(
     if matches!(cur.peek(), Some('\n') | Some('\r')) {
         cur.bump();
     }
-    let mut el = element_new(Sigil::Type("hr".to_string())).with_span(cur.span_from(start_pos));
+    let mut el = element_new(Sigil::block("hr")).with_span(cur.span_from(start_pos));
     el.content = Some(title);
     Ok(el)
 }

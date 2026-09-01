@@ -10,7 +10,7 @@ use ignore::WalkBuilder;
 use tomet_ast::{ElementValue, Value};
 use tomet_config::PrinterConfig;
 use tomet_parser::parse_document;
-use tomet_semantics::classify;
+use tomet_semantics::classify_lenient;
 
 pub mod workspace_scan;
 
@@ -141,10 +141,10 @@ pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
     if let Ok(doc) = parse_document(src) {
         tomet_tree::for_each_element(&doc, |el| {
-            let kind = classify(el);
+            let kind = classify_lenient(el);
             let kind = kind.as_str();
             if kind == "meta" || kind == "config" {
-                if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
+                if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
                     for (k, v) in entries {
                         map.insert(format!("{kind}.{k}"), value_to_string(v));
                     }

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use tomet_ast::{Block, Document, Element, ElementValue, Value};
+use tomet_ast::{Block, Document, Element, Value};
 use tomet_tree::ValueExt;
 
-use crate::{ElementKind, classify, normalized_element_args};
+use crate::{ElementKind, classify_lenient, normalized_element_args};
 
 /// Supported target format for document exports.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -81,7 +81,7 @@ pub fn document_config(doc: &Document) -> DocumentConfig {
 
     for block in &doc.blocks {
         if let Block::Element(el) = block {
-            let kind = classify(el);
+            let kind = classify_lenient(el);
             if kind == ElementKind::Config || kind.as_str() == "settings" {
                 extract_config_from_element(el, &mut config);
             }
@@ -103,9 +103,9 @@ fn extract_config_from_element(el: &Element, config: &mut DocumentConfig) {
         }
     }
 
-    // 2. Process `{value}` if present and is a Value::Map
-    if let Some(ElementValue::Data(Value::Map(val_entries))) = &el.value {
-        for (k, v) in val_entries {
+    // 2. Process the `key: value` pairs of `{value}`, if any.
+    if let Some(value) = &el.value {
+        for (k, v) in value.pairs() {
             process_config_entry(k, v, config);
         }
     }

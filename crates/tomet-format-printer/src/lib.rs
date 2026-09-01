@@ -12,12 +12,12 @@
 //! in `tomet-field-utils`.
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Sigil,
-    Value,
+    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, InterpExprKind, Literal,
+    Sigil, Value,
 };
 use tomet_config::PrinterConfig;
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
-use tomet_semantics::{ElementKind, classify, heading_level, list_items, list_ordered};
+use tomet_semantics::{ElementKind, classify_lenient, heading_level, list_items, list_ordered};
 use tomet_style::{render_args_with_config, render_value, render_value_inner_with_config};
 use tomet_tree::element_new;
 
@@ -35,18 +35,17 @@ pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig
     let mut meta_found = false;
     for block in &mut doc.blocks {
         if let Block::Element(el) = block {
-            if tomet_semantics::classify(el) == tomet_semantics::ElementKind::Meta
-                || matches!(&el.sigil, Sigil::At(Some(name)) if name == "meta")
-            {
+            if el.sigil.is_bare_named("meta") {
                 meta_found = true;
-                if let Some(ElementValue::Data(Value::Map(entries))) = &mut el.value {
-                    let mut existing_idx = None;
-                    for (idx, (k, v)) in entries.iter().enumerate() {
-                        if k == "id" {
-                            existing_idx = Some((idx, v.clone()));
-                            break;
-                        }
-                    }
+                if let Some(ElementValue::Group(entries)) = &mut el.value {
+                    let existing_idx =
+                        entries
+                            .iter()
+                            .enumerate()
+                            .find_map(|(idx, entry)| match entry {
+                                Entry::Pair(k, v) if k == "id" => Some((idx, v.clone())),
+                                _ => None,
+                            });
 
                     if let Some((idx, val)) = existing_idx {
                         if overwrite {
@@ -56,12 +55,12 @@ pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig
                             };
                             if !is_valid_id_format(existing_str, id_cfg) {
                                 let new_id = generate_id_for_field(id_cfg);
-                                entries[idx].1 = Value::String(new_id);
+                                entries[idx] = Entry::Pair("id".to_string(), Value::String(new_id));
                             }
                         }
                     } else if force || overwrite {
                         let new_id = generate_id_for_field(id_cfg);
-                        entries.insert(0, ("id".to_string(), Value::String(new_id)));
+                        entries.insert(0, Entry::Pair("id".to_string(), Value::String(new_id)));
                     }
                 }
                 break;
@@ -71,11 +70,11 @@ pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig
 
     if !meta_found && (force || overwrite) {
         let new_id = generate_id_for_field(id_cfg);
-        let mut meta_el = element_new(Sigil::At(Some("meta".to_string())));
-        meta_el.value = Some(ElementValue::Data(Value::Map(vec![(
+        let mut meta_el = element_new(Sigil::block("meta"));
+        meta_el.value = Some(ElementValue::Group(vec![Entry::Pair(
             "id".to_string(),
             Value::String(new_id),
-        )])));
+        )]));
         doc.blocks.insert(0, Block::Element(meta_el));
     }
 }
@@ -107,7 +106,7 @@ fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
             }
         }
         Block::Element(el) if list_ordered(el).is_some() => render_list(el, config, out),
-        Block::Element(el) if classify(el) == ElementKind::Heading => {
+        Block::Element(el) if classify_lenient(el) == ElementKind::Heading => {
             render_heading_element(el, config, out)
         }
         Block::Element(el) => {
@@ -136,9 +135,9 @@ fn render_heading_element(el: &Element, config: &PrinterConfig, out: &mut String
         out.push_str(&render_inlines(content, config));
         out.push(']');
     }
-    if let Some(ElementValue::Data(v)) = &el.value {
+    if let Some(v) = el.value.as_ref().and_then(|v| v.as_data()) {
         out.push(' ');
-        out.push_str(&render_value(v));
+        out.push_str(&render_value(&v));
     }
     out.push('\n');
 }
@@ -168,7 +167,7 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
         let content_str = render_inlines(item.content.as_deref().unwrap_or(&[]), config);
         let lines: Vec<&str> = content_str.lines().collect();
         let item_attrs = match &item.value {
-            Some(ElementValue::Data(v)) => Some(v),
+            Some(v) => v.as_data(),
             _ => None,
         };
 
@@ -228,7 +227,7 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
             }
             if let Some(attrs) = item_attrs {
                 out.push(' ');
-                out.push_str(&render_value(attrs));
+                out.push_str(&render_value(&attrs));
             }
             out.push('\n');
         } else {
@@ -236,7 +235,7 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
             out.push_str(&content_str);
             if let Some(attrs) = item_attrs {
                 out.push(' ');
-                out.push_str(&render_value(attrs));
+                out.push_str(&render_value(&attrs));
             }
             out.push('\n');
         }
@@ -263,10 +262,11 @@ fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> String {
     s
 }
 
-/// Render an [`Element`] AST node into Tomet syntax: `<sigil>(args)[content]{value}`
+/// Render an [`Element`] AST node into Tomet syntax:
+/// `<sigil><name>(args)[content]{value}`, or `<sigil><name>+++body+++`.
 pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
-    if let Sigil::Type(name) = &el.sigil {
-        if name == "hr" && el.args.is_none() && el.value.is_none() {
+    {
+        if el.sigil.is_bare_named("hr") && el.args.is_none() && el.value.is_none() {
             if let Some(content) = &el.content {
                 return format!("---[{}]---", render_inlines(content, config));
             } else {
@@ -275,13 +275,11 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         }
     }
 
-    if let Sigil::At(Some(name)) = &el.sigil {
-        if name == "meta" {
-            return tomet_style::render_meta_element(el, config);
-        }
+    if el.sigil.is_bare_named("meta") {
+        return tomet_style::render_meta_element(el, config);
     }
 
-    if let Sigil::At(None) = &el.sigil {
+    if let Sigil::Inline(None) = &el.sigil {
         if el.content.is_some() && el.args.is_some() && el.value.is_none() {
             let mut out = String::from("@");
             if let Some(content) = &el.content {
@@ -298,7 +296,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         }
     }
 
-    if matches!(&el.sigil, Sigil::Type(name) if name == "codeblock") {
+    if el.sigil.is_bare_named("codeblock") {
         let mut out = String::from("<codeblock>");
         if let Some(args) = &el.args {
             out.push('(');
@@ -316,28 +314,15 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             out.push(']');
         }
         if let Some(value) = &el.value {
-            out.push('{');
-            match value {
-                ElementValue::Data(v) => out.push_str(&render_value_inner_with_config(v, config)),
-                ElementValue::Children(children) => {
-                    for (i, child) in children.iter().enumerate() {
-                        if i > 0 {
-                            out.push(' ');
-                        }
-                        out.push_str(&render_element(child, config));
-                    }
-                }
-                ElementValue::Interp(expr) => out.push_str(&render_interp_expr(expr)),
-            }
-            out.push('}');
+            out.push_str(&render_element_value(value, config));
         }
         return out;
     }
 
-    if matches!(&el.sigil, Sigil::Type(name) if name == "callout") {
+    if el.sigil.is_bare_named("callout") {
         if let Some(style) = config.callout_content_style.as_deref() {
             if style == "expanded" {
-                let mut out = String::from("<callout>");
+                let mut out = String::from("#callout");
                 if let Some(args) = &el.args {
                     out.push('(');
                     out.push_str(&render_args_with_config(args, config));
@@ -354,26 +339,11 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                     out.push(']');
                 }
                 if let Some(value) = &el.value {
-                    out.push('{');
-                    match value {
-                        ElementValue::Data(v) => {
-                            out.push_str(&render_value_inner_with_config(v, config))
-                        }
-                        ElementValue::Children(children) => {
-                            for (i, child) in children.iter().enumerate() {
-                                if i > 0 {
-                                    out.push(' ');
-                                }
-                                out.push_str(&render_element(child, config));
-                            }
-                        }
-                        ElementValue::Interp(expr) => out.push_str(&render_interp_expr(expr)),
-                    }
-                    out.push('}');
+                    out.push_str(&render_element_value(value, config));
                 }
                 return out;
             } else if style == "block" {
-                let mut out = String::from("<callout>");
+                let mut out = String::from("#callout");
                 if let Some(args) = &el.args {
                     out.push('(');
                     out.push_str(&render_args_with_config(args, config));
@@ -405,26 +375,11 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                     }
                 }
                 if let Some(value) = &el.value {
-                    out.push('{');
-                    match value {
-                        ElementValue::Data(v) => {
-                            out.push_str(&render_value_inner_with_config(v, config))
-                        }
-                        ElementValue::Children(children) => {
-                            for (i, child) in children.iter().enumerate() {
-                                if i > 0 {
-                                    out.push(' ');
-                                }
-                                out.push_str(&render_element(child, config));
-                            }
-                        }
-                        ElementValue::Interp(expr) => out.push_str(&render_interp_expr(expr)),
-                    }
-                    out.push('}');
+                    out.push_str(&render_element_value(value, config));
                 }
                 return out;
             } else if style == "box" {
-                let mut out = String::from("<callout>");
+                let mut out = String::from("#callout");
                 if let Some(args) = &el.args {
                     out.push('(');
                     out.push_str(&render_args_with_config(args, config));
@@ -459,22 +414,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                     }
                 }
                 if let Some(value) = &el.value {
-                    out.push('{');
-                    match value {
-                        ElementValue::Data(v) => {
-                            out.push_str(&render_value_inner_with_config(v, config))
-                        }
-                        ElementValue::Children(children) => {
-                            for (i, child) in children.iter().enumerate() {
-                                if i > 0 {
-                                    out.push(' ');
-                                }
-                                out.push_str(&render_element(child, config));
-                            }
-                        }
-                        ElementValue::Interp(expr) => out.push_str(&render_interp_expr(expr)),
-                    }
-                    out.push('}');
+                    out.push_str(&render_element_value(value, config));
                 }
                 return out;
             }
@@ -484,16 +424,15 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     let mut out = String::new();
 
     match &el.sigil {
-        Sigil::Type(name) => {
-            out.push('<');
-            out.push_str(name);
-            out.push('>');
+        Sigil::Block(name) => {
+            out.push('#');
+            out.push_str(&name.to_string());
         }
-        Sigil::At(Some(name)) => {
+        Sigil::Inline(Some(name)) => {
             out.push('@');
-            out.push_str(name);
+            out.push_str(&name.to_string());
         }
-        Sigil::At(None) => {
+        Sigil::Inline(None) => {
             out.push('@');
         }
         Sigil::Bare => {}
@@ -515,54 +454,87 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     }
 
     if let Some(value) = &el.value {
-        out.push('{');
-        match value {
-            ElementValue::Data(v) => {
-                if let Some(fmt) = get_format_from_args(el.args.as_ref()) {
-                    let json_val = value_to_json(v);
-                    let serialized = match fmt {
-                        "json" => serde_json::to_string_pretty(&json_val).ok(),
-                        "yaml" => serde_yaml::to_string(&json_val).ok(),
-                        "toml" => toml::to_string_pretty(&json_val).ok(),
-                        _ => None,
-                    };
-                    if let Some(s) = serialized {
-                        let trimmed = s.trim();
-                        out.push('\n');
-                        for line in trimmed.lines() {
-                            out.push_str("  ");
-                            out.push_str(line);
-                            out.push('\n');
-                        }
-                    } else {
-                        out.push_str(&render_value_inner_with_config(v, config));
-                    }
-                } else {
-                    out.push_str(&render_value_inner_with_config(v, config));
-                }
-            }
-            ElementValue::Children(children) => {
-                if children.is_empty() {
-                    // empty
-                } else if children.len() == 1 && children[0].sigil != Sigil::Bare {
-                    out.push(' ');
-                    out.push_str(&render_element(&children[0], config));
-                    out.push(' ');
-                } else {
-                    out.push('\n');
-                    for child in children {
-                        out.push_str("  ");
-                        out.push_str(&render_element(child, config));
-                        out.push('\n');
-                    }
-                }
-            }
-            ElementValue::Interp(expr) => out.push_str(&render_interp_expr(expr)),
-        }
-        out.push('}');
+        out.push_str(&render_element_value(value, config));
     }
 
     out
+}
+
+/// Renders an element's value: a `{...}` group, or a `+++` fence for a
+/// raw body.
+fn render_element_value(value: &ElementValue, config: &PrinterConfig) -> String {
+    match value {
+        // A raw body is written back as the fence it came from. The run is
+        // grown past any `+++` line inside the body, matching the rule the
+        // parser reads it with.
+        ElementValue::Raw(body) => {
+            let fence = "+".repeat(fence_len_for(body));
+            let mut out = String::new();
+            out.push_str(&fence);
+            out.push('\n');
+            out.push_str(body);
+            if !body.is_empty() && !body.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push_str(&fence);
+            out
+        }
+        ElementValue::Interp(expr) => format!("{{{}}}", render_interp_expr(expr)),
+        ElementValue::Group(entries) => {
+            format!("{{{}}}", render_group_entries(entries, config))
+        }
+    }
+}
+
+/// Renders a value group's entries in source order.
+///
+/// Order is preserved deliberately: a group may interleave `key: value`
+/// pairs and nested elements, and reordering them would change the
+/// document the formatter promises not to change.
+fn render_group_entries(entries: &[Entry], config: &PrinterConfig) -> String {
+    if entries.is_empty() {
+        return String::new();
+    }
+    let has_element = entries.iter().any(|e| matches!(e, Entry::Element(_)));
+    let rendered: Vec<String> = entries
+        .iter()
+        .map(|entry| match entry {
+            Entry::Pair(k, v) => {
+                format!("{k}: {}", render_value_inner_with_config(v, config))
+            }
+            Entry::Element(child) => render_element(child, config),
+        })
+        .collect();
+
+    // A group of pairs stays on one line; one holding elements gets a
+    // line each, which is how `#links{ (1)[..] (2)[..] }` has always been
+    // written.
+    if !has_element {
+        format!(" {} ", rendered.join(", "))
+    } else if rendered.len() == 1 {
+        format!(" {} ", rendered[0])
+    } else {
+        let mut out = String::from("\n");
+        for line in &rendered {
+            out.push_str("  ");
+            out.push_str(line);
+            out.push('\n');
+        }
+        out
+    }
+}
+
+/// The `+` run length needed to fence `body`: three, unless the body
+/// itself contains a line that would close the fence early.
+fn fence_len_for(body: &str) -> usize {
+    let longest = body
+        .lines()
+        .map(|l| l.trim_end())
+        .filter(|l| !l.is_empty() && l.chars().all(|c| c == '+'))
+        .map(|l| l.len())
+        .max()
+        .unwrap_or(0);
+    longest.max(2) + 1
 }
 
 fn get_format_from_args(args: Option<&Value>) -> Option<&str> {
@@ -996,12 +968,12 @@ mod tests {
 
     #[test]
     fn test_embedded_format_serialization_and_reparse() {
-        let mut el = element_new(Sigil::At(Some("config".to_string())));
+        let mut el = element_new(Sigil::block("config"));
         el.args = Some(Value::Map(vec![(
             "format".to_string(),
             Value::String("json".to_string()),
         )]));
-        el.value = Some(ElementValue::Data(Value::Map(vec![(
+        el.value = Some(ElementValue::from_map(Value::Map(vec![(
             "meta".to_string(),
             Value::String("yaml".to_string()),
         )])));
@@ -1024,8 +996,8 @@ mod tests {
         child2.args = Some(Value::Int(2));
         child2.content = Some(vec![Inline::Text("note 2".into())]);
 
-        let mut links = element_new(Sigil::At(Some("links".to_string())));
-        links.value = Some(ElementValue::Children(vec![child1, child2]));
+        let mut links = element_new(Sigil::block("links"));
+        links.value = Some(ElementValue::from_children(vec![child1, child2]));
 
         let doc = Document::new(vec![Block::Element(links)], tomet_ast::Span::dummy());
         let printed = document_to_tm(&doc);

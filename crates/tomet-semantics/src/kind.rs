@@ -1,4 +1,4 @@
-use tomet_ast::{Element, Sigil};
+use tomet_ast::{Element, Name, Sigil};
 
 /// What a parsed `Element` officially means, replacing the ad-hoc
 /// stringly-typed `kind: String` that `tomet-html` and
@@ -93,12 +93,16 @@ impl ElementKind {
     }
 }
 
-/// Recognized `Sigil::Type`/`Sigil::At(Some(_))` names with fixed meaning
-/// -- kept as one list so `classify`'s name -> variant match and
-/// `ElementKind::as_str`'s variant -> name match can't silently drift
-/// apart (see `builtin_kind_round_trips_through_as_str` below, which
-/// checks every entry here).
-const BUILTIN_KINDS: [(&str, ElementKind); 19] = [
+/// Recognized **bare** names with fixed meaning -- kept as one list so
+/// `classify`'s name -> variant match and `ElementKind::as_str`'s variant
+/// -> name match can't silently drift apart (see
+/// `builtin_kind_round_trips_through_as_str` below, which checks every
+/// entry here).
+///
+/// Bare names are reserved for exactly this list. A user-defined element
+/// must be namespaced (`deck.bookmark`), which is why an unrecognized bare
+/// name is an error rather than a `Custom` kind.
+pub const BUILTIN_KINDS: [(&str, ElementKind); 19] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -127,25 +131,119 @@ fn builtin_kind(name: &str) -> Option<ElementKind> {
         .map(|(_, kind)| kind.clone())
 }
 
-fn classify_name(name: &str) -> ElementKind {
-    builtin_kind(name).unwrap_or_else(|| ElementKind::Custom(name.to_string()))
+/// Classifies a [`Name`].
+///
+/// A namespaced name is always `Custom` -- namespaces are exactly how a
+/// user-defined element declares it is not part of the built-in
+/// vocabulary. A bare name must be in [`BUILTIN_KINDS`]; anything else is
+/// [`UnknownName`], not a silent `Custom`.
+///
+/// That silent fallback -- `builtin_kind(name).unwrap_or_else(|| Custom(name))`
+/// -- is where the old sigil ambiguity actually lived. `<T>` and `@name`
+/// were meant to separate official from user-defined elements, but both
+/// classified through this one arm, so the distinction never reached the
+/// tree. Namespaces carry it now, and this returns an error instead of
+/// inventing a kind.
+pub fn classify_name(name: &Name) -> Result<ElementKind, UnknownName> {
+    if !name.is_bare() {
+        return Ok(ElementKind::Custom(name.to_string()));
+    }
+    builtin_kind(&name.name).ok_or_else(|| UnknownName {
+        name: name.name.clone(),
+    })
 }
 
-/// Classifies `el` by its `Sigil`: a named `Sigil::Type` or `Sigil::At(Some)`
-/// against the built-in vocabulary (falling back to `Custom` for anything
-/// else, e.g. a hand-authored `<caution>` or `@caution`), an unnamed
-/// `Sigil::At(None)` always as `Custom("at")`, and `Sigil::Bare` always as
-/// `ElementKind::Bare`. No inference from `args` happens anywhere here
-/// anymore -- `@(url:...)`/`@link(url:...)`-style key-based guessing was
-/// retired; the only way to get `ElementKind::Link` is to write `@link`/
-/// `<link>` explicitly.
-pub fn classify(el: &Element) -> ElementKind {
-    match &el.sigil {
-        Sigil::Type(name) | Sigil::At(Some(name)) => classify_name(name),
-        Sigil::At(None) => ElementKind::Custom("at".to_string()),
-        Sigil::Bare => ElementKind::Bare,
-        Sigil::Dollar => ElementKind::Interp,
+/// An unrecognized bare element name.
+///
+/// Bare names are reserved for Tomet's own vocabulary, so this is what a
+/// `#tag` alone on a line reports -- deliberately, since hashtags are not
+/// a feature and a bare unknown name is far more likely to be a typo or a
+/// missing namespace binding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownName {
+    pub name: String,
+}
+
+impl std::fmt::Display for UnknownName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "unknown element `{}`: bare names are reserved for built-in elements; \
+             namespace it (`ns.{}`) or bind a namespace with `#import(file:..., as:ns)`",
+            self.name, self.name
+        )
     }
+}
+
+impl std::error::Error for UnknownName {}
+
+/// Classifies `el` by its `Sigil`.
+///
+/// `Sigil::Bare` is `ElementKind::Bare`, `Sigil::Dollar` is
+/// `ElementKind::Interp`, and a nameless inline `@` is `Custom("at")`.
+/// Everything else goes through [`classify_name`].
+///
+/// The sigil itself no longer contributes to the *kind* -- it encodes
+/// shape (`@` inline, `#` block), and a shape that disagrees with the
+/// element's definition is reported separately by [`shape_mismatch`]
+/// rather than producing a different kind.
+///
+/// No inference from `args` happens here -- `@(url:...)`-style key-based
+/// guessing was retired; the only way to get `ElementKind::Link` is to
+/// write `@link` explicitly.
+pub fn classify(el: &Element) -> Result<ElementKind, UnknownName> {
+    match &el.sigil {
+        Sigil::Block(name) => classify_name(name),
+        Sigil::Inline(Some(name)) => classify_name(name),
+        Sigil::Inline(None) => Ok(ElementKind::Custom("at".to_string())),
+        Sigil::Bare => Ok(ElementKind::Bare),
+        Sigil::Dollar => Ok(ElementKind::Interp),
+    }
+}
+
+/// Classifies `el`, falling back to `Custom` for an unknown bare name.
+///
+/// For consumers that render whatever they are given and have no way to
+/// report a diagnostic -- an HTML writer mid-document, say. Validation
+/// belongs to [`classify`]; this is the lenient read of the same thing.
+pub fn classify_lenient(el: &Element) -> ElementKind {
+    classify(el).unwrap_or_else(|e| ElementKind::Custom(e.name))
+}
+
+/// The shape a built-in element must be written with.
+///
+/// `None` means either shape is legal.
+fn required_shape(kind: &ElementKind) -> Option<Shape> {
+    use ElementKind::*;
+    Some(match kind {
+        Meta | Config | Blueprint | Links | Hr | Codeblock | Blockquote | Table | Heading
+        | OrderedList | UnorderedList | Kind | Version => Shape::Block,
+        Em | Strong | Mark | Link | Embed | Icon => Shape::Inline,
+        Custom(_) | Bare | Interp => return None,
+    })
+}
+
+/// Whether an element is written inline (`@`) or as a block (`#`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Shape {
+    Block,
+    Inline,
+}
+
+/// Reports an element written with the wrong sigil for its kind -- a
+/// block-only element spelled `@meta`, or an inline-only one spelled
+/// `#em`.
+///
+/// Returns `Some((found, expected))` when they disagree.
+pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {
+    let found = match &el.sigil {
+        Sigil::Block(_) => Shape::Block,
+        Sigil::Inline(Some(_)) => Shape::Inline,
+        _ => return None,
+    };
+    let kind = classify(el).ok()?;
+    let expected = required_shape(&kind)?;
+    (found != expected).then_some((found, expected))
 }
 
 #[cfg(test)]
@@ -169,35 +267,41 @@ mod tests {
     #[test]
     fn type_sigil_with_unrecognized_name_is_custom() {
         let el = element_new(Sigil::Type("caution".to_string()));
-        assert_eq!(classify(&el), ElementKind::Custom("caution".to_string()));
+        assert_eq!(
+            classify_lenient(&el),
+            ElementKind::Custom("caution".to_string())
+        );
     }
 
     #[test]
     fn type_sigil_with_builtin_name_is_recognized() {
-        let el = element_new(Sigil::Type("codeblock".to_string()));
-        assert_eq!(classify(&el), ElementKind::Codeblock);
+        let el = element_new(Sigil::block("codeblock"));
+        assert_eq!(classify_lenient(&el), ElementKind::Codeblock);
     }
 
     #[test]
     fn named_at_sigil_is_recognized() {
-        let el = element_new(Sigil::At(Some("meta".to_string())));
-        assert_eq!(classify(&el), ElementKind::Meta);
+        let el = element_new(Sigil::block("meta"));
+        assert_eq!(classify_lenient(&el), ElementKind::Meta);
     }
 
     #[test]
     fn named_at_sigil_with_link_name_is_recognized() {
-        let mut el = element_new(Sigil::At(Some("link".to_string())));
+        let mut el = element_new(Sigil::inline("link"));
         el.args = Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("https://example.com".to_string()),
         )]));
-        assert_eq!(classify(&el), ElementKind::Link);
+        assert_eq!(classify_lenient(&el), ElementKind::Link);
     }
 
     #[test]
     fn named_at_sigil_with_no_inferable_args_stays_custom() {
         let el = element_new(Sigil::At(Some("caution".to_string())));
-        assert_eq!(classify(&el), ElementKind::Custom("caution".to_string()));
+        assert_eq!(
+            classify_lenient(&el),
+            ElementKind::Custom("caution".to_string())
+        );
     }
 
     #[test]
@@ -205,29 +309,29 @@ mod tests {
         // No inference happens for a bare `@(...)` anymore -- kind is
         // decided purely by the element's name (`@link`, `<link>`, ...),
         // never guessed from `args`.
-        let mut el = element_new(Sigil::At(None));
+        let mut el = element_new(Sigil::Inline(None));
         el.args = Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("https://example.com".to_string()),
         )]));
-        assert_eq!(classify(&el), ElementKind::Custom("at".to_string()));
+        assert_eq!(classify_lenient(&el), ElementKind::Custom("at".to_string()));
     }
 
     #[test]
     fn unnamed_at_sigil_with_no_recognized_key_is_custom_at() {
-        let el = element_new(Sigil::At(None));
-        assert_eq!(classify(&el), ElementKind::Custom("at".to_string()));
+        let el = element_new(Sigil::Inline(None));
+        assert_eq!(classify_lenient(&el), ElementKind::Custom("at".to_string()));
     }
 
     #[test]
     fn bare_sigil_is_always_bare() {
         let el = element_new(Sigil::Bare);
-        assert_eq!(classify(&el), ElementKind::Bare);
+        assert_eq!(classify_lenient(&el), ElementKind::Bare);
     }
 
     #[test]
     fn dollar_sigil_is_always_interp() {
         let el = element_new(Sigil::Dollar);
-        assert_eq!(classify(&el), ElementKind::Interp);
+        assert_eq!(classify_lenient(&el), ElementKind::Interp);
     }
 }

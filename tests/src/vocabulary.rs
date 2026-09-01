@@ -23,7 +23,7 @@
 //!
 //! Until the sigil rework lands (steps 3-7 of
 //! `.agents/tasks/sigil-shape-axis-and-namespaces.md`) these tests FAIL, in
-//! the four places the parser still consults its own vocabulary. That is the
+//! the five places the parser still consults its own vocabulary. That is the
 //! point: they are the acceptance criterion for that work, not a description
 //! of current behaviour.
 

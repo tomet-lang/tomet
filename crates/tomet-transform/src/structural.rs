@@ -1,7 +1,7 @@
 //! Structural AST query matching and in-place transformations.
 
 use tomet_ast::{Document, Element, ElementValue, Sigil, Value};
-use tomet_semantics::classify;
+use tomet_semantics::classify_lenient;
 use tomet_tree::{ElementExt, for_each_element, for_each_element_mut};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -20,7 +20,7 @@ pub enum StructuralAction {
 
 /// Checks if an element matches the given query.
 pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
-    let kind = classify(el);
+    let kind = classify_lenient(el);
     if let Some(target_tag) = &query.tag {
         if !target_tag.is_empty() && !kind.as_str().eq_ignore_ascii_case(target_tag) {
             return false;
@@ -40,8 +40,11 @@ pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
                 .as_ref()
                 .map_or(false, |v| value_contains_str(v, sub));
             let in_val = el.value.as_ref().map_or(false, |v| match v {
-                ElementValue::Data(data_val) => value_contains_str(data_val, sub),
-                ElementValue::Children(_) | ElementValue::Interp(_) => false,
+                ElementValue::Group(_) => v
+                    .as_data()
+                    .is_some_and(|data| value_contains_str(&data, sub)),
+                ElementValue::Raw(body) => body.contains(sub),
+                ElementValue::Interp(_) => false,
             });
             if !in_args && !in_val {
                 return false;
@@ -69,11 +72,14 @@ pub fn apply_structural_action(doc: &mut Document, action: &StructuralAction) ->
     let mut count = 0;
     for_each_element_mut(doc, |el| match action {
         StructuralAction::RenameTag { from, to } => {
-            let kind = classify(el);
+            let kind = classify_lenient(el);
             if kind.as_str().eq_ignore_ascii_case(from) {
                 match &mut el.sigil {
-                    Sigil::Type(name) => *name = to.clone(),
-                    Sigil::At(Some(name)) => *name = to.clone(),
+                    // Renaming replaces the local half and leaves any
+                    // namespace in place: `deck.bookmark` renamed to
+                    // `card` becomes `deck.card`, not `card`.
+                    Sigil::Block(name) => name.name = to.clone(),
+                    Sigil::Inline(Some(name)) => name.name = to.clone(),
                     _ => {}
                 }
                 count += 1;

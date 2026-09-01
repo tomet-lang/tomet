@@ -6,7 +6,6 @@
 //! `"marker"` positional key by `tomet-semantics::positional`.
 
 use crate::element::parse_paren_value;
-use crate::embedded_format::EmbeddedFormat;
 use crate::error::Result;
 use crate::heading::parse_braced_value;
 use crate::inline::{Stop, parse_inline_seq};
@@ -111,10 +110,7 @@ fn connect_colon_pos(src: &str, brace_pos: usize) -> Option<usize> {
 /// there is one, so that marker isn't left dangling as ordinary
 /// trailing text once `allow_colon_connect: false` stops an inner
 /// element from consuming it itself.
-fn peek_trailing_attrs(
-    cur: &Cursor,
-    default_format: Option<EmbeddedFormat>,
-) -> Option<(usize, usize)> {
+fn peek_trailing_attrs(cur: &Cursor) -> Option<(usize, usize)> {
     let mut look = *cur;
     let mut last_brace_pos = None;
     while !look.is_eof() && look.peek() != Some('\n') && look.peek() != Some('\r') {
@@ -143,7 +139,7 @@ fn peek_trailing_attrs(
     // `parse_element`'s own claiming logic.
     let mut probe = *cur;
     let landed_at_pos = matches!(
-        parse_inline_seq(&mut probe, Stop::Offset(content_stop), default_format, false),
+        parse_inline_seq(&mut probe, Stop::Offset(content_stop), false),
         Ok(_) if probe.pos() == content_stop
     );
     if !landed_at_pos {
@@ -161,20 +157,11 @@ fn peek_trailing_attrs(
     None
 }
 
-pub(crate) fn parse_list(
-    cur: &mut Cursor,
-    ordered: bool,
-    default_format: Option<EmbeddedFormat>,
-) -> Result<Vec<Element>> {
-    parse_list_internal(cur, ordered, 0, default_format)
+pub(crate) fn parse_list(cur: &mut Cursor, ordered: bool) -> Result<Vec<Element>> {
+    parse_list_internal(cur, ordered, 0)
 }
 
-fn parse_list_internal(
-    cur: &mut Cursor,
-    ordered: bool,
-    min_indent: usize,
-    default_format: Option<EmbeddedFormat>,
-) -> Result<Vec<Element>> {
+fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Result<Vec<Element>> {
     let mut items = Vec::new();
     while let Some((indent, item_ordered, marker)) = peek_list_marker_with_indent(cur)? {
         if indent < min_indent || item_ordered != ordered {
@@ -183,10 +170,8 @@ fn parse_list_internal(
         let item_start = cur.pos();
         eat_list_marker_with_indent(cur)?;
 
-        let (content, attrs) = if let Some((content_stop, brace_pos)) =
-            peek_trailing_attrs(cur, default_format)
-        {
-            let content = parse_inline_seq(cur, Stop::Offset(content_stop), default_format, false)?;
+        let (content, attrs) = if let Some((content_stop, brace_pos)) = peek_trailing_attrs(cur) {
+            let content = parse_inline_seq(cur, Stop::Offset(content_stop), false)?;
             // `content_stop` is the colon-connect marker's position when
             // there is one (see `peek_trailing_attrs`'s doc comment),
             // short of `brace_pos` -- jump the rest of the way past it
@@ -196,7 +181,7 @@ fn parse_list_internal(
             let attrs = parse_braced_value(cur)?;
             (content, Some(attrs))
         } else {
-            let content = parse_inline_seq(cur, Stop::Line, default_format, false)?;
+            let content = parse_inline_seq(cur, Stop::Line, false)?;
             (content, None)
         };
 
@@ -207,8 +192,7 @@ fn parse_list_internal(
         let mut children = Vec::new();
         while let Some((next_indent, next_ordered, ..)) = peek_list_marker_with_indent(cur)? {
             if next_indent > indent {
-                let sub_items =
-                    parse_list_internal(cur, next_ordered, next_indent, default_format)?;
+                let sub_items = parse_list_internal(cur, next_ordered, next_indent)?;
                 if !sub_items.is_empty() {
                     let list_span = sub_items
                         .first()

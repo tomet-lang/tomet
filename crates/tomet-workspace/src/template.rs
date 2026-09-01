@@ -37,21 +37,36 @@ pub fn find_template(root: &Path, name: &str, config: &PrinterConfig) -> Option<
     }
 
     // 4. Convention checks: `.tomet/templates/<name>.tmt`
-    let dot_tomet_path = root.join(".tomet").join("templates").join(format!("{name}.tmt"));
+    let dot_tomet_path = root
+        .join(".tomet")
+        .join("templates")
+        .join(format!("{name}.tmt"));
     if dot_tomet_path.is_file() {
         return Some(dot_tomet_path);
     }
 
     // 5. Check docs/examples/templates/<name>.tmt
-    let docs_tmpl = root.join("docs").join("examples").join("templates").join(format!("{name}.tmt"));
+    let docs_tmpl = root
+        .join("docs")
+        .join("examples")
+        .join("templates")
+        .join(format!("{name}.tmt"));
     if docs_tmpl.is_file() {
         return Some(docs_tmpl);
     }
-    let docs_tmpl_prefix = root.join("docs").join("examples").join("templates").join(format!("template.{name}.tmt"));
+    let docs_tmpl_prefix = root
+        .join("docs")
+        .join("examples")
+        .join("templates")
+        .join(format!("template.{name}.tmt"));
     if docs_tmpl_prefix.is_file() {
         return Some(docs_tmpl_prefix);
     }
-    let docs_tmpl_suffix = root.join("docs").join("examples").join("templates").join(format!("{name}.template.tmt"));
+    let docs_tmpl_suffix = root
+        .join("docs")
+        .join("examples")
+        .join("templates")
+        .join(format!("{name}.template.tmt"));
     if docs_tmpl_suffix.is_file() {
         return Some(docs_tmpl_suffix);
     }
@@ -127,8 +142,12 @@ pub fn instantiate_template_file(
         .to_string();
 
     let mut ctx_vars = vars.clone();
-    ctx_vars.entry("filename".to_string()).or_insert(Value::String(filename));
-    ctx_vars.entry("title".to_string()).or_insert(Value::String(default_title));
+    ctx_vars
+        .entry("filename".to_string())
+        .or_insert(Value::String(filename));
+    ctx_vars
+        .entry("title".to_string())
+        .or_insert(Value::String(default_title));
 
     let ctx = EvaluationContext { vars: ctx_vars };
 
@@ -193,17 +212,14 @@ mod tests {
         let target_path = Path::new("notes/2026-09-01.tmt");
 
         let mut vars = HashMap::new();
-        vars.insert("title".to_string(), Value::String("2026-09-01 Daily".into()));
+        vars.insert(
+            "title".to_string(),
+            Value::String("2026-09-01 Daily".into()),
+        );
 
-        let created_path = create_file_from_template(
-            root,
-            "daily-note",
-            target_path,
-            &vars,
-            &config,
-            false,
-        )
-        .unwrap();
+        let created_path =
+            create_file_from_template(root, "daily-note", target_path, &vars, &config, false)
+                .unwrap();
 
         assert!(created_path.is_file());
         let result_content = fs::read_to_string(&created_path).unwrap();

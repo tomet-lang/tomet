@@ -456,10 +456,7 @@ mod tests {
             "vars".to_string(),
             Value::Map(vec![("title".to_string(), Value::String("My RFC".into()))]),
         );
-        vars.insert(
-            "filename".to_string(),
-            Value::String("001-rfc.tmt".into()),
-        );
+        vars.insert("filename".to_string(), Value::String("001-rfc.tmt".into()));
 
         let ctx = EvaluationContext { vars };
         let cfg = tomet_semantics::DocumentConfig::default();
@@ -471,4 +468,3 @@ mod tests {
         assert_eq!(file_res, Value::String("001-rfc.tmt".into()));
     }
 }
-

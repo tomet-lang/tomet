@@ -21,7 +21,10 @@ mod target;
 pub use config::{DocumentConfig, ExportType, document_config};
 pub use connect::merge_connected_values;
 pub use heading::heading_level;
-pub use kind::{ElementKind, classify};
+pub use kind::{
+    BUILTIN_KINDS, ElementKind, Shape, UnknownName, classify, classify_lenient, classify_name,
+    shape_mismatch,
+};
 pub use list::{list_items, list_ordered};
 pub use meta::{document_kind, document_meta, document_version};
 pub use positional::{

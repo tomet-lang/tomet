@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use tomet_ast::{Element, ElementValue, Sigil, Value};
+use tomet_ast::{Element, Sigil, Value};
 use tomet_tree::ValueExt;
 
 /// Schema definition extracted from `@settings` block for custom elements.
@@ -18,18 +18,15 @@ pub struct SettingsSchema {
 impl SettingsSchema {
     /// Parses a [`SettingsSchema`] from an `@settings` element.
     pub fn from_element(el: &Element) -> Self {
-        let is_settings =
-            matches!(&el.sigil, Sigil::At(Some(name)) | Sigil::Type(name) if name == "settings");
-        if !is_settings {
+        if !el.sigil.is_bare_named("settings") {
             return Self::default();
         }
 
-        let val = match &el.value {
-            Some(ElementValue::Data(v)) => v,
-            _ => return Self::default(),
+        let Some(val) = el.value.as_ref().and_then(|v| v.as_data()) else {
+            return Self::default();
         };
 
-        Self::from_value(val)
+        Self::from_value(&val)
     }
 
     /// Parses a [`SettingsSchema`] from a `Value::Map` representing `@settings` data.
@@ -78,46 +75,31 @@ fn parse_string_list(val: &Value) -> Vec<String> {
     }
 }
 
-/// Maps official built-in element names to their ordered positional
-/// argument key(s) -- an empty slice means no positional support at all.
+/// One table, keyed on the bare name alone.
 ///
-/// Official built-in elements (all still single-slot; nothing here has
-/// been given a second builtin slot):
-/// - `<codeblock>` -> `["lang"]`
-/// - `<embed>` -> `["target"]`
-/// - `@link` / `<link>` -> `["target"]`
-/// - `@meta` / `<meta>` -> `["format"]`
-/// - `@config` / `<config>` -> `["format"]`
-/// - `@heading` / `<heading>` -> `["level"]`
-///
-/// A project wanting more slots on a *custom* element (or on `link`
-/// itself) defines them via `@settings`'s `positional:[...]` instead --
-/// see [`SettingsSchema`]/[`normalized_element_args_with_schema`], which
-/// checks that first and only falls back to this table when no schema
-/// entry is defined. Note: unnamed `@` elements (e.g. `@(...)`) are
-/// deliberately excluded here -- `@()`/`@[]()` inference was retired, so a
-/// bare `@(...)` is always `ElementKind::Custom("at")`, never
-/// `link`/`embed`/anything else.
+/// This used to be two parallel tables, one per sigil, and they had
+/// silently drifted: `codeblock`, `embed` and `callout` had entries only
+/// under `<T>`, so `@embed(x)` and `<embed>(x)` disagreed about whether
+/// `x` meant `target`. Since the sigil now encodes shape rather than
+/// origin, keying on shape here would have preserved that bug as a
+/// feature. `callout` is kept even though it is not in `BUILTIN_KINDS`;
+/// it is a widely used custom element in the docs and dropping its
+/// positional key would silently change how `(warning)` reads.
 pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
-    match sigil {
-        Sigil::Type(name) => match name.as_str() {
-            "kind" => &["kind"],
-            "version" => &["version"],
-            "codeblock" => &["lang"],
-            "embed" | "link" => &["target"],
-            "callout" => &["variant"],
-            "meta" | "config" => &["format"],
-            "heading" => &["level"],
-            _ => &[],
-        },
-        Sigil::At(Some(name)) => match name.as_str() {
-            "kind" => &["kind"],
-            "version" => &["version"],
-            "meta" | "config" => &["format"],
-            "link" => &["target"],
-            "heading" => &["level"],
-            _ => &[],
-        },
+    let Some(name) = sigil.name() else {
+        return &[];
+    };
+    if !name.is_bare() {
+        return &[];
+    }
+    match name.name.as_str() {
+        "kind" => &["kind"],
+        "version" => &["version"],
+        "codeblock" => &["lang"],
+        "embed" | "link" => &["target"],
+        "callout" => &["variant"],
+        "meta" | "config" => &["format"],
+        "heading" => &["level"],
         _ => &[],
     }
 }
@@ -287,8 +269,7 @@ pub fn normalized_element_args(el: &Element) -> Option<Value> {
 pub fn normalized_element_args_with_schema(el: &Element, schema: &SettingsSchema) -> Option<Value> {
     let args = el.args.as_ref()?;
     let elem_name = match &el.sigil {
-        Sigil::Type(name) => Some(name.as_str()),
-        Sigil::At(Some(name)) => Some(name.as_str()),
+        Sigil::Block(name) | Sigil::Inline(Some(name)) => Some(name.name.as_str()),
         _ => None,
     };
     let positional_keys = effective_positional_keys(elem_name, &el.sigil, schema);
@@ -333,7 +314,7 @@ mod tests {
 
     #[test]
     fn normalizes_codeblock_positional_arg() {
-        let mut el = element_new(Sigil::Type("codeblock".to_string()));
+        let mut el = element_new(Sigil::block("codeblock"));
         el.args = Some(Value::String("rust".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -346,7 +327,7 @@ mod tests {
 
     #[test]
     fn normalizes_embed_positional_arg() {
-        let mut el = element_new(Sigil::Type("embed".to_string()));
+        let mut el = element_new(Sigil::block("embed"));
         el.args = Some(Value::String("foo.png".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -359,7 +340,7 @@ mod tests {
 
     #[test]
     fn normalizes_link_positional_arg() {
-        let mut el = element_new(Sigil::Type("link".to_string()));
+        let mut el = element_new(Sigil::inline("link"));
         el.args = Some(Value::String("https://example.com".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -376,7 +357,7 @@ mod tests {
         // parser's `identifier:` rule has no notion of `target` being the
         // only real key `@link` has) -- this recovers it back into one
         // `target` string.
-        let mut el = element_new(Sigil::At(Some("link".to_string())));
+        let mut el = element_new(Sigil::inline("link"));
         el.args = Some(Value::Map(vec![(
             "tm".to_string(),
             Value::String("foo/bar".to_string()),
@@ -395,7 +376,7 @@ mod tests {
         // `@link(tm:foo, predicate: depends_on)` -- only the `tm` entry is
         // a parser-split scheme prefix; `predicate` is real extra data and
         // stays untouched.
-        let mut el = element_new(Sigil::At(Some("link".to_string())));
+        let mut el = element_new(Sigil::inline("link"));
         el.args = Some(Value::Map(vec![
             ("tm".to_string(), Value::String("foo".to_string())),
             (
@@ -417,7 +398,7 @@ mod tests {
 
     #[test]
     fn does_not_recover_when_target_key_already_present() {
-        let mut el = element_new(Sigil::At(Some("link".to_string())));
+        let mut el = element_new(Sigil::inline("link"));
         el.args = Some(Value::Map(vec![
             ("target".to_string(), Value::String("tm:foo".to_string())),
             ("tm".to_string(), Value::String("bar".to_string())),
@@ -433,7 +414,7 @@ mod tests {
 
     #[test]
     fn does_not_recover_when_multiple_scheme_candidates_are_ambiguous() {
-        let mut el = element_new(Sigil::At(Some("link".to_string())));
+        let mut el = element_new(Sigil::inline("link"));
         el.args = Some(Value::Map(vec![
             ("tm".to_string(), Value::String("foo".to_string())),
             ("id".to_string(), Value::String("bar".to_string())),
@@ -491,7 +472,7 @@ mod tests {
         // Args shaped the way the parser actually produces them for
         // `@link(tm:foo, depends_on)`: first entry keyed "tm" (Group A),
         // second bare/sentinel-keyed.
-        let mut el = element_new(Sigil::At(Some("link".to_string())));
+        let mut el = element_new(Sigil::inline("link"));
         el.args = Some(Value::Map(vec![
             ("tm".to_string(), Value::String("foo".to_string())),
             (
@@ -557,7 +538,7 @@ mod tests {
 
     #[test]
     fn normalizes_meta_positional_arg() {
-        let mut el = element_new(Sigil::At(Some("meta".to_string())));
+        let mut el = element_new(Sigil::block("meta"));
         el.args = Some(Value::String("json".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -570,7 +551,7 @@ mod tests {
 
     #[test]
     fn leaves_map_args_unchanged() {
-        let mut el = element_new(Sigil::Type("codeblock".to_string()));
+        let mut el = element_new(Sigil::block("codeblock"));
         let map_val = Value::Map(vec![(
             "lang".to_string(),
             Value::String("rust".to_string()),
@@ -601,7 +582,7 @@ mod tests {
 
     #[test]
     fn unnamed_at_is_never_normalized() {
-        let mut el = element_new(Sigil::At(None));
+        let mut el = element_new(Sigil::Inline(None));
         el.args = Some(Value::String("https://example.com".to_string()));
         assert_eq!(
             normalized_element_args(&el),

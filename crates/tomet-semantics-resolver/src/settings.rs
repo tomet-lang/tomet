@@ -9,10 +9,7 @@ use crate::ResolveError;
 /// Extracts the import path string from a `@config(import:...)` / `@config(file:...)`
 /// or legacy `@settings(file:...)` reference element.
 pub fn config_import_ref(el: &Element) -> Option<&str> {
-    let Sigil::At(Some(name)) = &el.sigil else {
-        return None;
-    };
-    if name != "config" && name != "settings" {
+    if !el.sigil.is_bare_named("config") && !el.sigil.is_bare_named("settings") {
         return None;
     }
     let args = el.args.as_ref()?;
@@ -43,11 +40,9 @@ pub fn resolve_settings_file(path: &Path) -> Result<Value, ResolveError> {
         path: path.to_path_buf(),
         source,
     })?;
-    settings_block(&doc)
-        .cloned()
-        .ok_or_else(|| ResolveError::MissingSettingsBlock {
-            path: path.to_path_buf(),
-        })
+    settings_block(&doc).ok_or_else(|| ResolveError::MissingSettingsBlock {
+        path: path.to_path_buf(),
+    })
 }
 
 /// [`settings_file_ref`] on `el`, joined against `project_root` (`file:`
@@ -63,10 +58,12 @@ pub fn resolve_settings_ref(
     Some(resolve_settings_file(&project_root.join(file)))
 }
 
-/// The `Value` held by `doc`'s top-level `@config{ ... }` or `@settings{ ... }` *definition*
-/// block, i.e. a `Sigil::At` element with no `args`
-/// (unlike a reference element) and a data `{value}` group.
-fn settings_block(doc: &Document) -> Option<&Value> {
+/// The `Value` held by `doc`'s top-level `#config{ ... }` or
+/// `#settings{ ... }` *definition* block.
+///
+/// Owned rather than borrowed: a value group is a list of entries, so its
+/// data view is computed rather than stored.
+fn settings_block(doc: &Document) -> Option<Value> {
     doc.blocks.iter().find_map(|block| match block {
         Block::Element(el) => settings_value(el),
         Block::Paragraph(p) => p.content.iter().find_map(|inline| match inline {
@@ -76,15 +73,12 @@ fn settings_block(doc: &Document) -> Option<&Value> {
     })
 }
 
-fn settings_value(el: &Element) -> Option<&Value> {
-    let Sigil::At(Some(name)) = &el.sigil else {
-        return None;
-    };
-    if name != "settings" && name != "config" {
+fn settings_value(el: &Element) -> Option<Value> {
+    if !el.sigil.is_bare_named("settings") && !el.sigil.is_bare_named("config") {
         return None;
     }
     match &el.value {
-        Some(ElementValue::Data(v)) => Some(v),
+        Some(v) => v.as_data(),
         _ => None,
     }
 }
@@ -133,7 +127,7 @@ mod tests {
 
     #[test]
     fn settings_file_ref_extracts_the_path() {
-        let mut el = element_new(Sigil::At(Some("settings".to_string())));
+        let mut el = element_new(Sigil::block("settings"));
         el.args = Some(Value::Map(vec![(
             "file".to_string(),
             Value::String("docs/docs.settings.tmt".to_string()),
@@ -145,13 +139,13 @@ mod tests {
     fn settings_file_ref_is_none_for_a_definition_block() {
         // `@settings{ ... }` itself -- no `args`, so it's a definition,
         // not a reference.
-        let el = element_new(Sigil::At(Some("settings".to_string())));
+        let el = element_new(Sigil::block("settings"));
         assert_eq!(settings_file_ref(&el), None);
     }
 
     #[test]
     fn settings_file_ref_is_none_for_unrelated_elements() {
-        let mut el = element_new(Sigil::At(Some("meta".to_string())));
+        let mut el = element_new(Sigil::block("meta"));
         el.args = Some(Value::Map(vec![(
             "file".to_string(),
             Value::String("x.tmt".to_string()),
@@ -161,7 +155,7 @@ mod tests {
 
     #[test]
     fn resolve_settings_ref_joins_against_project_root() {
-        let mut el = element_new(Sigil::At(Some("settings".to_string())));
+        let mut el = element_new(Sigil::block("settings"));
         el.args = Some(Value::Map(vec![(
             "file".to_string(),
             Value::String("valid_settings.tmt".to_string()),

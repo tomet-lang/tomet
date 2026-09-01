@@ -42,9 +42,7 @@ fn call_uuid(args: &[Value]) -> Result<Value, ComputeError> {
         [Value::String(opt)] if opt == "simple" => {
             Ok(Value::String(uuid::Uuid::new_v4().simple().to_string()))
         }
-        [Value::String(opt)] if opt == "nil" => {
-            Ok(Value::String(uuid::Uuid::nil().to_string()))
-        }
+        [Value::String(opt)] if opt == "nil" => Ok(Value::String(uuid::Uuid::nil().to_string())),
         _ => Ok(Value::String(uuid::Uuid::new_v4().to_string())),
     }
 }
@@ -107,7 +105,14 @@ fn call_date(args: &[Value]) -> Result<Value, ComputeError> {
                 let (py, pm, pd) = (parts[0], parts[1], parts[2]);
                 let formatted = fmt
                     .replace("YYYY", py)
-                    .replace("YY", if py.len() >= 2 { &py[py.len() - 2..] } else { py })
+                    .replace(
+                        "YY",
+                        if py.len() >= 2 {
+                            &py[py.len() - 2..]
+                        } else {
+                            py
+                        },
+                    )
                     .replace("MM", pm)
                     .replace("DD", pd);
                 Ok(Value::String(formatted))

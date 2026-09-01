@@ -13,7 +13,8 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
-    TargetScheme, classify, heading_level, link_target, list_items, list_ordered, target_scheme,
+    TargetScheme, classify_lenient, heading_level, link_target, list_items, list_ordered,
+    target_scheme,
 };
 
 struct RenderCtx<'a> {
@@ -100,7 +101,7 @@ fn inline_to_md(cx: &RenderCtx, inlines: &[Inline]) -> String {
 }
 
 fn element_to_md(cx: &RenderCtx, el: &Element, inline: bool) -> String {
-    let kind = classify(el);
+    let kind = classify_lenient(el);
     match kind.as_str() {
         "version" | "kind" | "meta" | "config" | "blueprint" => String::new(),
         // Block-position only, same as CommonMark's own headings and
@@ -346,7 +347,7 @@ fn render_callout(cx: &RenderCtx, el: &Element) -> String {
 /// scheme prefix itself is stripped before rendering -- it's addressing
 /// metadata, not part of the visible target.
 fn render_link(cx: &RenderCtx, el: &Element) -> String {
-    let raw_target = link_target(el, &classify(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let text = match &el.content {
         Some(content) if !content.is_empty() => inline_to_md(cx, content),
@@ -382,7 +383,7 @@ fn render_link(cx: &RenderCtx, el: &Element) -> String {
 /// `tomet-html`'s `render_embed_element` for why `<embed>`
 /// needs this too, not just a raw passthrough.
 fn render_embed(el: &Element) -> String {
-    let raw_target = link_target(el, &classify(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
     let alt = el
         .content
@@ -409,7 +410,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
 
 fn render_links_container(cx: &RenderCtx, el: &Element) -> String {
     let mut out = String::new();
-    if let Some(ElementValue::Children(children)) = &el.value {
+    if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
         for (i, child) in children.iter().enumerate() {
             if i > 0 {
                 out.push('\n');
@@ -653,11 +654,11 @@ mod tests {
         // behind in the exported Markdown.
         fn meta_element(tag: &str) -> Element {
             Element {
-                sigil: Sigil::At(Some("meta".to_string())),
+                sigil: Sigil::block("meta"),
                 args: Some(Value::String(tag.to_string())),
                 content: None,
                 children: None,
-                value: Some(ElementValue::Data(Value::Map(vec![(
+                value: Some(ElementValue::from_map(Value::Map(vec![(
                     "key".to_string(),
                     Value::String("value".to_string()),
                 )]))),
@@ -688,7 +689,7 @@ mod tests {
 
     fn heading_element(level: i64, content: Vec<Inline>) -> Element {
         Element {
-            sigil: Sigil::At(Some("heading".to_string())),
+            sigil: Sigil::block("heading"),
             args: Some(Value::Int(level)),
             content: Some(content),
             children: None,
@@ -775,7 +776,7 @@ mod tests {
             blocks: vec![Block::Paragraph(Paragraph::new(
                 vec![
                     Inline::Element(Element {
-                        sigil: Sigil::Type("em".to_string()),
+                        sigil: Sigil::inline("em"),
                         args: None,
                         content: Some(vec![Inline::Text(Text::new("a", Span::dummy()))]),
                         children: None,
@@ -784,7 +785,7 @@ mod tests {
                     }),
                     Inline::Text(Text::new(" ", Span::dummy())),
                     Inline::Element(Element {
-                        sigil: Sigil::Type("strong".to_string()),
+                        sigil: Sigil::inline("strong"),
                         args: None,
                         content: Some(vec![Inline::Text(Text::new("b", Span::dummy()))]),
                         children: None,
@@ -802,7 +803,7 @@ mod tests {
     #[test]
     fn link_round_trips() {
         let el = Element {
-            sigil: Sigil::Type("link".to_string()),
+            sigil: Sigil::inline("link"),
             args: Some(Value::Map(vec![(
                 "target".to_string(),
                 Value::String("https://example.com".to_string()),
@@ -825,7 +826,7 @@ mod tests {
     #[test]
     fn embed_becomes_image() {
         let el = Element {
-            sigil: Sigil::Type("embed".to_string()),
+            sigil: Sigil::block("embed"),
             args: Some(Value::Map(vec![(
                 "target".to_string(),
                 Value::String("pic.png".to_string()),
@@ -848,7 +849,7 @@ mod tests {
     #[test]
     fn code_block_uses_fence_and_lang() {
         let el = Element {
-            sigil: Sigil::Type("codeblock".to_string()),
+            sigil: Sigil::block("codeblock"),
             args: Some(Value::Map(vec![(
                 "lang".to_string(),
                 Value::String("rust".to_string()),
@@ -881,8 +882,8 @@ mod tests {
         // `meta` is deliberately not in `tomet_semantics::INFERRED_AT_KEYS`
         // (see its doc comment) -- a bare `@` with a `meta` key falls back
         // to the generic "at" element export, unlike `@meta(...)`
-        // (`Sigil::At(Some("meta".into()))`), which exports as nothing.
-        let mut el = tomet_tree::element_new(Sigil::At(None));
+        // (`Sigil::block("meta")`), which exports as nothing.
+        let mut el = tomet_tree::element_new(Sigil::Inline(None));
         el.args = Some(Value::Map(vec![(
             "meta".to_string(),
             Value::String("yaml".to_string()),
@@ -900,7 +901,7 @@ mod tests {
 
     #[test]
     fn config_element_exports_as_nothing() {
-        let mut el = tomet_tree::element_new(Sigil::At(Some("config".to_string())));
+        let mut el = tomet_tree::element_new(Sigil::block("config"));
         el.args = Some(Value::Map(vec![(
             "format".to_string(),
             Value::String("json".to_string()),
@@ -914,7 +915,7 @@ mod tests {
 
     #[test]
     fn titled_thematic_break() {
-        let mut el = tomet_tree::element_new(Sigil::Type("hr".to_string()));
+        let mut el = tomet_tree::element_new(Sigil::block("hr"));
         el.content = Some(vec![Inline::Text(Text::new("Title", Span::dummy()))]);
         let doc = Document {
             blocks: vec![Block::Element(el)],
@@ -925,13 +926,13 @@ mod tests {
 
     #[test]
     fn wikilink_exports_to_markdown() {
-        let mut el1 = tomet_tree::element_new(Sigil::Type("link".to_string()));
+        let mut el1 = tomet_tree::element_new(Sigil::inline("link"));
         el1.args = Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("ref:name".to_string()),
         )]));
 
-        let mut el2 = tomet_tree::element_new(Sigil::Type("link".to_string()));
+        let mut el2 = tomet_tree::element_new(Sigil::inline("link"));
         el2.args = Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("ref:name".to_string()),
@@ -954,7 +955,7 @@ mod tests {
 
     #[test]
     fn table_exports_to_markdown() {
-        let mut el = tomet_tree::element_new(Sigil::At(Some("table".to_string())));
+        let mut el = tomet_tree::element_new(Sigil::block("table"));
         el.content = Some(vec![Inline::Text(Text::new(
             "[ col1 ][ col2 ]\n[ val1 ][ val2 ]",
             Span::dummy(),

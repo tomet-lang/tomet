@@ -21,8 +21,11 @@ fn post_process_block_wikilinks(block: &mut Block) {
             p.content = post_process_inlines_wikilinks(std::mem::take(&mut p.content));
         }
         Block::Element(el) if list_ordered(el).is_some() => {
-            if let Some(ElementValue::Children(items)) = &mut el.value {
-                for item in items {
+            if let Some(ElementValue::Group(entries)) = &mut el.value {
+                for item in entries.iter_mut().filter_map(|e| match e {
+                    tomet_ast::Entry::Element(el) => Some(el),
+                    tomet_ast::Entry::Pair(..) => None,
+                }) {
                     if let Some(content) = item.content.take() {
                         item.content = Some(post_process_inlines_wikilinks(content));
                     }
@@ -41,7 +44,7 @@ fn post_process_block_wikilinks(block: &mut Block) {
 }
 
 fn post_process_element_wikilinks(el: &mut Element) {
-    if matches!(&el.sigil, Sigil::Type(name) if name == "codeblock") {
+    if el.sigil.is_bare_named("codeblock") {
         return;
     }
     if let Some(content) = el.content.take() {
@@ -116,7 +119,7 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                     }
                 }
                 let url_str = &remaining[u_start..u_end];
-                let mut el = element_new(Sigil::At(Some("link".to_string())));
+                let mut el = element_new(Sigil::inline("link"));
                 el.args = Some(Value::Map(vec![(
                     "target".to_string(),
                     Value::String(url_str.to_string()),
@@ -136,7 +139,7 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                         }
                     }
                     let url_str = &remaining[u_start..u_end];
-                    let mut el = element_new(Sigil::At(Some("link".to_string())));
+                    let mut el = element_new(Sigil::inline("link"));
                     el.args = Some(Value::Map(vec![(
                         "target".to_string(),
                         Value::String(url_str.to_string()),
@@ -182,9 +185,9 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
         // wikilink-style, search-by-name reference rather than a plain
         // relative file path.
         let sigil = if is_embed {
-            Sigil::Type("embed".to_string())
+            Sigil::block("embed")
         } else {
-            Sigil::At(Some("link".to_string()))
+            Sigil::inline("link")
         };
         let target_key_value = |raw: &str| -> String {
             if is_embed {
