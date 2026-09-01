@@ -4,15 +4,24 @@
 
 Read the root `README.md` first (what the project is, directory layout,
 build/run commands) -- it's currently sparse, fill it in as you learn
-things worth putting there. Read `docs/architecture.md` before making any
-non-trivial change (the crate pipeline and its consumers, why the grammar
-has two independent implementations, the apps/editor integrations, known
-gaps like the AST carrying no span info). Do not restate either file's
-content here — extend them instead, and keep this pointer short.
+things worth putting there. Read `docs/develop/architecture.md` before
+making any non-trivial change (the crate pipeline and its consumers, why
+the grammar has two independent implementations, the apps/editor
+integrations, known gaps like the AST carrying no span info). For where a
+document belongs and what language it's written in, `docs/README.md` is
+the map and `docs/develop/docs-guide.md` is the rulebook. Do not restate
+those files' content here — extend them instead, and keep this pointer
+short.
 
 ## Language
 
-Write all comments and documentation in English. Do not use Japanese.
+Write all code comments in English. Do not use Japanese in code.
+
+For documentation the rule is scoped by audience, per
+`docs/develop/docs-guide.md`: `docs/develop/` and `docs/design/` are
+English (they sit alongside and cross-link with the English doc
+comments); `docs/spec/`, `docs/guide/`, and `docs/examples/` are the
+user-facing docs and are written in Japanese.
 
 ## Verifying changes
 
@@ -25,11 +34,19 @@ verify those the same way: reading the code and their own tests, not by
 launching the actual editor to click around.
 
 For grammar changes specifically, also run
-`cargo test -p tree-sitter-tomet`. `tomet-parser` is the source of
-truth for the grammar; `tree-sitter-tomet`'s `grammar.js` is a
+`cargo test -p tomet-tests -p tree-sitter-tomet`. `tomet-parser` is the
+source of truth for the grammar; `tree-sitter-tomet`'s `grammar.js` is a
 separate, hand-maintained approximation used only for editor syntax
-highlighting, and it does not update itself when `tomet-parser`
-changes — that test is how drift between the two gets caught.
+highlighting, and it does not update itself when `tomet-parser` changes.
+Drift between the two is caught by `tomet-tests`'s `corpus` target, which
+runs the shared `.tmt` corpus through both implementations; the grammar's
+own structural tests stay in `tree-sitter-tomet`. Cover the new construct
+by adding a fixture under `tests/fixtures/` — that corpus is frozen and
+does not pick up changes to `docs/` on its own.
+
+Cross-crate tests live in the `tests/` package (`tomet-tests`), not in the
+individual crates; see `tests/README.md` for what belongs there and how
+the snapshot references work.
 
 ## Task tracking
 

@@ -7,7 +7,7 @@
 //! elements -- see `Element::list`/`Element::list_item`). Constructs with
 //! no native equivalent (fenced/indented code, block quotes) go through
 //! the generic `<T>` element escape hatch (`pre`, `blockquote`)
-//! documented in `docs/commonmark-support.md`.
+//! documented in `docs/design/decisions/2026-08-09-commonmark-support.md`.
 //!
 //! One thing is structurally lossy on import, documented there: a block
 //! quote containing more than one block gets its content joined into a

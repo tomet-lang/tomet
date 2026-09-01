@@ -56,6 +56,9 @@ members = [
 
   #[ Apps ]
   "apps/tui",
+
+  #[ Tests -- cross-crate corpus, round-trip, and snapshot suites ]
+  "tests",
 ]
 
 default-members = ["apps/cli"]

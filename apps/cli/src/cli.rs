@@ -52,7 +52,7 @@ pub enum Command {
     },
     /// Convert a `.tmt` file to CommonMark. Lossy for constructs with no
     /// Markdown equivalent (`@links{}`, generic `<T>` elements) -- see
-    /// `docs/commonmark-support.md`.
+    /// `docs/design/decisions/2026-08-09-commonmark-support.md`.
     ToMd {
         file: PathBuf,
         /// Write to this path instead of stdout.

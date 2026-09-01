@@ -11,7 +11,7 @@ impl zed::Extension for TometExtension {
     // `apps/lsp`, package `tomet-lsp`), so unlike most extensions this doesn't
     // download one -- it expects the binary already on `$PATH` (e.g. via
     // the nix package), matching the "zed extension: nixでインストール /
-    // lsp" roadmap bullets in `docs/roadmap.ja.tmt`.
+    // lsp" roadmap bullets in `docs/roadmap.tmt`.
     fn language_server_command(
         &mut self,
         _language_server_id: &LanguageServerId,

@@ -2,5 +2,15 @@ docs/ linguist-documentation=true
 *.md linguist-language=Markdown
 *.tmt linguist-language=Tomet
 
+# `.md` under docs/spec/ and docs/guide/ is exported from the sibling
+# `.tmt` source via `@config(export:)`, so it is generated, not authored.
+# Scoped by path on purpose: the `.md` under docs/develop/ and
+# docs/design/ is hand-written and must stay a normal, reviewable file.
+docs/spec/**/*.md linguist-generated=true
+docs/guide/**/*.md linguist-generated=true
+
+# Frozen parser/formatter test inputs, deliberately not synced with docs/.
+tests/fixtures/ linguist-vendored=true
+
 *.png filter=lfs diff=lfs merge=lfs -text
 *.jpg filter=lfs diff=lfs merge=lfs -text

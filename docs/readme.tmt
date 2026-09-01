@@ -1,0 +1,74 @@
+@config(
+  export: {
+    type: commonmark,
+    path: "README.ja.md"
+  }
+)
+@meta(format:yaml){
+  id: doc-gCzNE6yl
+}
+
+#[ Tomet ]
+
+Tome to me!!
+
+##[ What is tomet? ]
+
+-. 人間工学的見やすさ。
+-. パーサーにも優しい。
+-. 拡張性を担保
+-. key:valueを重視
+-. 私は、研究目的。
+
+##[ なぜtometを使用するのか？ ]
+
+-. 非曖昧な構文
+-. リンクと変数に特化。
+-. 統一された記法
+-. ふりがなが簡単
+-. リテラルを保持
+
+<callout>(note)[
+  MDXやAstroコンポーネントのように、文書の中に型付きデータやコンポーネントを埋め込みたいエンジニア向け
+  ObsidianのDataviewやBasesのように、メタデータとノートを高度に連携させたいKB作成向け
+]
+
+---[ vs json ]---
+key:value構造で張り合える。
+tmtは、人間ファーストであり、改行ありの長文を挿入するのに長けている。
+深いネストには弱い。タイムライン形式は得意なんじゃないかと考える。
+
+---[ vs markdown ]---
+key:valueをブロックに作成可能
+テンプレート機能
+厳密
+Markdownのように簡潔にかけない。記号が多い
+
+---[ vs xml/html ]---
+文字が少ない
+深いネストを作成しない
+
+---[ vs typst ]---
+テキストファースト
+PDF無理
+HTML/Markdown、他の記法を組み込める。
+==文書を美しく組版するための言語==
+意味を持った構造を記述し、それを様々な方法で消費できる言語
+データとしての読み書き可能。
+
+---[ vs mdx ]---
+Javascript非依存
+
+##[ 構造上の弱点 ]
+
+-. 視覚的ノイズとタイピング摩擦。記号の渋滞 (LSP機能を大切に)
+-. Markdown非完全互換
+
+#[ Supported Editors ]
+
+- Helix
+- Neovim
+- VSCode
+- Zed
+
+---[ Community Support ]---

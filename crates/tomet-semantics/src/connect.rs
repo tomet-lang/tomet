@@ -1,7 +1,7 @@
 use tomet_ast::Value;
 
 /// Merges connected `(args)` or `{value}` data into a target's direct `Value`
-/// according to the precedence rules in `docs/reviews/2026-08-19-connect-syntax-spec.md`:
+/// according to the precedence rules in `docs/design/decisions/2026-08-19-connect-syntax-spec.md`:
 ///
 /// 1. Direct scalar/map properties always take precedence over connected values (Direct > Connected).
 /// 2. `Value::Seq` arrays are concatenated (merged).

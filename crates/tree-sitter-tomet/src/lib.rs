@@ -44,7 +44,7 @@
 //!   group's value content at all.** `tomet-parser` does support
 //!   them there (`value.rs::skip_line_comment`, used from
 //!   `parse_map`/`parse_flat_map`), e.g. `@config(...)`'s several-line
-//!   body in `docs/cheatsheet.tmt` uses `///`/`//`-prefixed lines as a
+//!   body in `tests/fixtures/cheatsheet.tmt` uses `///`/`//`-prefixed lines as a
 //!   doc-comment convention -- but `map`/`children`/`_entry_sep` have no
 //!   rule admitting a bare comment line at all, so a comment anywhere in
 //!   a group's body derails the rest of that group into an `ERROR`. Not
@@ -56,7 +56,7 @@
 //!   small `ERROR` -- unlike `(`/`[`/`{`/`-`, which all fall back to a
 //!   `punctuation` node when nothing opens with them.
 //! - **`<T>`/`@name` written with no group at all** (e.g. `<T>` used as
-//!   a literal placeholder in prose, as `docs/tmt/tomet.tmt` itself
+//!   a literal placeholder in prose, as `tests/fixtures/readme.tmt` itself
 //!   does when explaining the grammar) still parses as an `element`
 //!   here, where the real parser requires an immediately-following
 //!   group to even recognize it as one (see
@@ -78,7 +78,7 @@
 //!   `{value}` group's content might be a different language -- it still
 //!   tries its own `map`/`seq`/`scalar` rules. A quoted JSON key
 //!   (`{ "key": "value" }`, needed since JSON has no bare-identifier keys
-//!   -- see `docs/tmt/tomet.tmt`'s `@meta(format:json)` block) doesn't
+//!   -- see `tests/fixtures/readme.tmt`'s `@meta(format:json)` block) doesn't
 //!   match `map_entry`'s bare-identifier `key` field, so the nested
 //!   `{...}` becomes an `ERROR`. Not worth a real per-format sub-grammar
 //!   here -- this crate is for editor highlighting, not validation.
@@ -100,7 +100,7 @@
 //!
 //! `_value_scalar`'s regex (see its own comment in `grammar.js`) resolves
 //! another former limitation: a `key: [seq]` map entry (e.g.
-//! `tags: [a, b]`, as in `docs/tests/tmt/examples/image.meta.tmt`'s
+//! `tags: [a, b]`, as in `tests/fixtures/examples/image.meta.tmt`'s
 //! `@meta(format:yaml){...}`) used to get GLR-merged with a second,
 //! spurious top-level `seq` reading of the same `[...]` text, wrapping
 //! the whole map in an `ERROR` -- not just when that entry was last in
@@ -128,9 +128,9 @@
 //! of what (if anything) validly followed.
 //!
 //! Verified against real content: `cargo test` in this crate parses
-//! `docs/tmt/tomet.tmt` and `docs/tests/tmt/examples/image.meta.tmt` and checks that
+//! `tests/fixtures/readme.tmt` and `tests/fixtures/examples/image.meta.tmt` and checks that
 //! the only `ERROR`/`MISSING` nodes are the known, narrow cases above --
-//! not that there are none. `docs/tmt/tomet.tmt` also has one
+//! not that there are none. `tests/fixtures/readme.tmt` also has one
 //! pre-existing case (`###[ [] のルール ]`, a `[]` immediately inside a
 //! `[...]` content-span) that the *real* hand-written parser mishandles
 //! too (confirmed separately against `tomet-parser`), so this
@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn parses_list_value_markers() {
         // `- (T)`/`- (?)`/etc, with a space before the marker (the real
-        // fixture shape -- see `docs/cheatsheet.tmt`), each produce a
+        // fixture shape -- see `tests/fixtures/cheatsheet.tmt`), each produce a
         // `marker: (list_marker)` field/node distinct from the rest of
         // the item's content, and a trailing `{attrs}` group still works
         // alongside it.
@@ -520,42 +520,15 @@ mod tests {
         assert_eq!(children.named_child_count(), 2);
     }
 
-    #[test]
-    fn tomet_tm_fixture_has_only_known_error_cases() {
-        let src = include_str!("../../../docs/tests/readme.ja.tmt");
-        let tree = parse(src);
-        let errors = error_texts(src, &tree);
-        // Every error node's text contains (or exactly is) one of these
-        // markers, each tied to one documented case in this module's
-        // doc comment: the `のうち.../のルール` snippets are the
-        // stray-`]`-in-prose and the pre-existing `[]`-inside-`[...]`
-        // parser bug, both from this file's self-referential
-        // grammar-explanation prose, and `"key":` is the embedded-JSON
-        // quoted-key case (`@meta(format:json){ { "key": "value" } }`).
-        // (`required`/`anotation1`, the old bare-non-colon-scalar cases,
-        // no longer error -- see `scanner.c`. The bare-newline-before-`}`
-        // case no longer errors either -- see the doc comment's `map`/
-        // `conflicts` note.)
-        let known_markers = ["のうち必要なものを付ける", "のルール", "\"key\":", ""];
-        for text in &errors {
-            assert!(
-                known_markers.iter().any(|marker| text.contains(marker)),
-                "unexpected error node text: {text:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn image_meta_tm_fixture_parses_cleanly() {
-        // Used to have one remaining error wrapping `tags: [a, b]` -- the
-        // `key: [seq]`-map-entry-value misparse this module's doc comment
-        // used to document as a known gap, fixed by excluding a leading
-        // space/tab from `_value_scalar`'s character class (see that
-        // rule's own comment in `grammar.js`).
-        let src = include_str!("../../../docs/tests/tmt/examples/image.meta.tmt");
-        let tree = parse(src);
-        assert!(!tree.root_node().has_error());
-    }
+    // The fixture-corpus tests that used to live here --
+    // `tomet_tm_fixture_has_only_known_error_cases`,
+    // `image_meta_tm_fixture_parses_cleanly`,
+    // `cheatsheet_tm_fixture_has_only_known_error_cases`, and
+    // `all_tmt_docs_parse_without_unexpected_errors` -- are in the
+    // `tomet-tests` package now (`tests/src/corpus.rs`). They read the
+    // shared corpus, which this crate was reaching up to the repo root
+    // for. Verify a grammar change with `cargo test -p tomet-tests`
+    // alongside `cargo test -p tree-sitter-tomet`.
 
     #[test]
     fn highlights_query_is_valid() {
@@ -576,94 +549,6 @@ mod tests {
         let query_src = include_str!("../queries/brackets.scm");
         tree_sitter::Query::new(&LANGUAGE.into(), query_src)
             .expect("queries/brackets.scm should be a valid query against this grammar");
-    }
-
-    #[test]
-    fn cheatsheet_tm_fixture_has_only_known_error_cases() {
-        // Every error node's text contains (or exactly is) one of these
-        // markers, each tied to a documented case:
-        // - `"@config("`: *not* the bare-newline-before-`)` case (that's
-        //   fixed now, see the doc comment's `map`/`conflicts` note) --
-        //   `@config(...)`'s body has `///`/`//` line comments embedded
-        //   inside its `(...)` value group, which `tomet-parser`
-        //   supports (`value.rs::skip_line_comment`) but this grammar's
-        //   `map`/`_entry_sep` has no rule for at all, a separate,
-        //   larger, still-open gap (see the doc comment).
-        // - `"や"`/`"]"`: stray/unmatched `]` in prose (this module's doc
-        //   comment, also covers `----[💫]----`'s residual `]---` error a
-        //   bit further down -- see the next paragraph).
-        //
-        // The embedded-JSON/TOML case, the triple-backtick/unterminated
-        // code-span case, and the `<memo>(content:raw)[...]` stray-
-        // character case (`"\"key\":"`/`"key = "`/`` "`" ``/`","`/`"{"`)
-        // all used to need markers here too, but no longer error at all
-        // now that `@meta(format:json){...}`/`@meta(format:toml){...}`/
-        // `<memo>(content:raw)[...]` all live inside `docs/ja/cheatsheet.tmt`'s
-        // ``` fenced code block, which this grammar's own `fenced_code_block`
-        // rule (see the doc comment above) now consumes as one opaque
-        // text run rather than trying to parse its contents as markup.
-        //
-        // The leftover dashes after a >3-dash `thematic_break`, and
-        // `----(💫)----` a bit further down, used to also need markers
-        // here -- see
-        // `more_than_three_dashes_are_only_partially_consumed_by_thematic_break`
-        // for why they don't error anymore. `----[💫]----` (bracket, not
-        // paren) is the one case that *doesn't* fully clear: `[` has more
-        // competing token definitions than `(` does (`heading`'s own
-        // content-opening `[`, `area_group`'s, and `punctuation`'s all
-        // coexist unshared, unlike `-`, which only ever meant "start a
-        // list" or "plain punctuation") -- covered by the `"]"` marker
-        // above.
-        let src = include_str!("../../../docs/tests/ja/cheatsheet.tmt");
-        let tree = parse(src);
-        let errors = error_texts(src, &tree);
-        let known_markers = ["@config(", "や", "]"];
-        for text in &errors {
-            assert!(
-                known_markers.iter().any(|marker| text.contains(marker)),
-                "unexpected error node text: {text:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn all_tmt_docs_parse_without_unexpected_errors() {
-        fn collect_tm_files(dir: &std::path::Path, acc: &mut Vec<std::path::PathBuf>) {
-            if let Ok(entries) = std::fs::read_dir(dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir() {
-                        collect_tm_files(&path, acc);
-                    } else if let Some(ext) = path.extension() {
-                        if ext == "tm" || ext == "tmt" {
-                            acc.push(path);
-                        }
-                    }
-                }
-            }
-        }
-
-        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let repo_root = manifest_dir.parent().unwrap().parent().unwrap();
-        let tmt_dir = repo_root.join("docs").join("tests").join("tmt");
-        let mut files = Vec::new();
-        collect_tm_files(&tmt_dir, &mut files);
-        assert!(
-            !files.is_empty(),
-            "expected to find .tmt/.tmt files under docs/tests/tmt/"
-        );
-
-        for file in files {
-            let src = std::fs::read_to_string(&file)
-                .unwrap_or_else(|e| panic!("failed to read {file:?}: {e}"));
-            let tree = parse(&src);
-            let root = tree.root_node();
-            assert_eq!(
-                root.kind(),
-                "document",
-                "file {file:?} failed to produce document root node"
-            );
-        }
     }
 
     #[test]

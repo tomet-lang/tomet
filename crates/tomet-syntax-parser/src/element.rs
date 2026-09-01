@@ -77,7 +77,7 @@ fn skip_lookahead_gap(cur: &mut Cursor) {
 
 /// `allow_colon_connect` gates the `:(...)`/`:{...}` "connect" branch
 /// below (a bare, colon-less trailing group is *always* claimed
-/// regardless -- see `docs/ja/specifications/syntax.tmt`'s
+/// regardless -- see `docs/spec/syntax.tmt`'s
 /// `@meta(format:yaml) {...}` example, real usage this must keep
 /// working). List items pass `false` for the single top-level element
 /// they parse as their own content (`list.rs::parse_list_internal`):
@@ -88,7 +88,7 @@ fn skip_lookahead_gap(cur: &mut Cursor) {
 /// nothing left at the position it expected to still find one at (see
 /// `list_item_ending_in_an_element_does_not_error_on_a_trailing_brace`'s
 /// history for the crash this used to cause before the item-attrs guess
-/// was made speculative). `docs/ja/specifications/syntax.tmt`'s
+/// was made speculative). `docs/spec/syntax.tmt`'s
 /// `##[ コネクト ]` section had flagged exactly this shape (`- ()
 /// xxxxxx :{}`) as an unimplemented idea for attaching a group to the
 /// *enclosing* construct rather than the nearest element -- this is

@@ -30,7 +30,7 @@ module.exports = grammar({
 
 	// `heading`'s optional `{attrs}` can follow `]` either on the same
 	// line or after exactly one newline (see the real fixture examples in
-	// `docs/tmt/tomet.tmt`) -- with only one token of lookahead, a lone
+	// `fixtures/readme.tmt`) -- with only one token of lookahead, a lone
 	// newline right after `]` is genuinely ambiguous between "start of the
 	// attrs gap" and "the heading's own trailing newline, no attrs here",
 	// so this needs GLR resolution rather than a lookahead-free CFG
@@ -170,7 +170,7 @@ module.exports = grammar({
 		// regexes: `document.rs::eat_list_marker` skips inline whitespace
 		// *before* checking for `(` -- real fixtures write `- (T)`,
 		// with a space between the dash and the marker (see
-		// `docs/cheatsheet.tmt`) -- so deciding whether that whitespace
+		// `fixtures/cheatsheet.tmt`) -- so deciding whether that whitespace
 		// belongs to an optional marker or is just the item's own
 		// mandatory gap needs to look *past* the whitespace before
 		// committing to either interpretation. Tree-sitter's internal
@@ -334,7 +334,7 @@ module.exports = grammar({
 
 		// ---- `${...}` interpolation ---------------------------------------
 		// Grammar-only recognition of `tomet-parser::document.rs`'s
-		// `parse_interp` -- see `docs/reviews/2026-08-17-interpolation-syntax.md`
+		// `parse_interp` -- see `docs/design/decisions/2026-08-17-interpolation-syntax.md`
 		// for the decided v1 grammar (Path/Call/literal, no infix operators).
 		// `Path` (`a.b.c`) reuses the existing `identifier` token as one
 		// opaque span rather than exposing dot-separated segments -- this
@@ -567,7 +567,7 @@ module.exports = grammar({
 		// parse as one token.
 		//
 		// KNOWN DRIFT from `tomet_parser` (see this crate's own module
-		// doc, and `docs/reviews/2026-08-22-link-reference-uri-schemes.md`
+		// doc, and `docs/design/decisions/2026-08-22-link-reference-uri-schemes.md`
 		// section 5's "Group B"): the real parser's `value.rs` now
 		// special-cases `identifier://...` to read as one bare scalar
 		// (`@(https://example.com)` is valid `.tmt` today), but this
