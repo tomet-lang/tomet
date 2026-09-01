@@ -1,7 +1,7 @@
 //! Directive promotion and Value DSL normalization transformations.
 
 use tomet_ast::{Block, Document, Element, Sigil, Value};
-use tomet_semantics::{ElementKind, classify};
+use tomet_semantics::{ElementKind, classify_lenient};
 use tomet_tree::{DocumentExt, ElementExt, element_new, for_each_element_mut};
 
 /// Promotes a property `prop_key` from an element matching `source_filter` into a new top-level
@@ -49,9 +49,7 @@ where
     let insert_pos = match target_index {
         Some(idx) => idx,
         None => {
-            let version_idx = doc.find_element_block_index(
-                |el| matches!(&el.sigil, Sigil::At(Some(name)) if name == "version"),
-            );
+            let version_idx = doc.find_element_block_index(|el| el.sigil.is_bare_named("version"));
             match version_idx {
                 Some(v_idx) => v_idx + 1,
                 None => 0,
@@ -59,7 +57,7 @@ where
         }
     };
 
-    let mut new_directive = element_new(Sigil::At(Some(target_directive_name.to_string())));
+    let mut new_directive = element_new(Sigil::block(target_directive_name));
     new_directive.args = Some(prop_val);
 
     doc.insert_block(insert_pos, Block::Element(new_directive));
@@ -71,7 +69,7 @@ where
 pub fn normalize_meta_to_value_dsl(doc: &mut Document) -> bool {
     let mut changed = false;
     for_each_element_mut(doc, |el| {
-        let kind = classify(el);
+        let kind = classify_lenient(el);
         if kind == ElementKind::Meta {
             if let Some(Value::Map(entries)) = &mut el.args {
                 if let Some(pos) = entries.iter().position(|(k, _)| k == "format") {
@@ -96,7 +94,7 @@ pub fn normalize_meta_to_value_dsl(doc: &mut Document) -> bool {
 pub fn promote_meta_type_to_kind(doc: &mut Document) -> bool {
     promote_prop_to_directive(
         doc,
-        |el| classify(el) == ElementKind::Meta,
+        |el| classify_lenient(el) == ElementKind::Meta,
         "type",
         "kind",
         None,

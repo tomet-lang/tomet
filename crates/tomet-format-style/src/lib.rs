@@ -10,7 +10,7 @@
 //! already depends on `tomet-formatter`). `render_meta_element`
 //! specifically covers only `@meta` elements' actual shape per the
 //! grammar (`args` an optional format map, `value` always
-//! `ElementValue::Data(Value::Map(...))`) -- not the general
+//! `ElementValue::from_map(Value::Map(...))`) -- not the general
 //! element-rendering logic for every other sigil/kind, which stays in
 //! `tomet-printer` since it recurses into inline/child content and
 //! is genuinely part of rebuilding a whole document from its AST.
@@ -189,7 +189,7 @@ fn render_meta_field_value(
 /// settings (element-local `format:` arg takes priority over
 /// `config.meta_format`; multi-line if `config.meta_always_newline` or a
 /// format is set, else a single `@meta{k: v, ...}` line). Scoped to
-/// `@meta`'s actual shape -- `value` must be `ElementValue::Data(Value::Map(...))`,
+/// `@meta`'s actual shape -- `value` must be `ElementValue::from_map(Value::Map(...))`,
 /// which is all the grammar ever produces for `@meta`; anything else
 /// renders as a bare `@meta` (with args, if any).
 pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
@@ -213,7 +213,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
         .or_else(|| config.meta_format.clone());
 
     if config.meta_always_newline || effective_format.is_some() {
-        if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
+        if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
             let mut out = if let Some(ref fmt) = effective_format {
                 format!("@meta(format:{fmt}){{\n")
             } else {
@@ -243,9 +243,9 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
         out.push_str(&render_args_with_config(args, config));
         out.push(')');
     }
-    if let Some(ElementValue::Data(v)) = &el.value {
+    if let Some(v) = el.value.as_ref().and_then(|v| v.as_data()) {
         out.push('{');
-        out.push_str(&render_value_inner_with_config(v, config));
+        out.push_str(&render_value_inner_with_config(&v, config));
         out.push('}');
     }
     out
@@ -291,8 +291,8 @@ mod tests {
 
     #[test]
     fn render_meta_element_single_line_by_default() {
-        let mut el = tomet_tree::element_new(Sigil::At(Some("meta".to_string())));
-        el.value = Some(ElementValue::Data(Value::Map(vec![(
+        let mut el = tomet_tree::element_new(Sigil::block("meta"));
+        el.value = Some(ElementValue::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )])));
@@ -302,8 +302,8 @@ mod tests {
 
     #[test]
     fn render_meta_element_multiline_when_format_configured() {
-        let mut el = tomet_tree::element_new(Sigil::At(Some("meta".to_string())));
-        el.value = Some(ElementValue::Data(Value::Map(vec![(
+        let mut el = tomet_tree::element_new(Sigil::block("meta"));
+        el.value = Some(ElementValue::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )])));

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use tomet_ast::{Block, Document, ElementValue, Inline, Sigil, Span, Text, Value};
 use tomet_compute::EvaluationContext;
-use tomet_semantics::{ElementKind, classify};
+use tomet_semantics::{ElementKind, classify_lenient};
 use tomet_tree::{ValueExt, for_each_element_mut};
 
 /// Metadata and variable definitions extracted from a `@blueprint` directive.
@@ -19,7 +19,7 @@ pub struct BlueprintInfo {
 pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
     for block in &doc.blocks {
         if let Block::Element(el) = block {
-            if classify(el) == ElementKind::Blueprint {
+            if classify_lenient(el) == ElementKind::Blueprint {
                 let target_kind = match &el.args {
                     Some(Value::String(s)) => s.clone(),
                     Some(Value::Map(entries)) => entries
@@ -34,7 +34,7 @@ pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
                 let mut description = None;
                 let mut vars_schema = HashMap::new();
 
-                if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
+                if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
                     for (k, v) in entries {
                         if k == "description" {
                             description = v.as_str().map(String::from);
@@ -68,7 +68,7 @@ pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> boo
     // Step 1: Transform @blueprint -> @kind
     for block in &mut doc.blocks {
         if let Block::Element(el) = block {
-            if classify(el) == ElementKind::Blueprint {
+            if classify_lenient(el) == ElementKind::Blueprint {
                 let target_kind = match &el.args {
                     Some(Value::String(s)) => s.clone(),
                     Some(Value::Map(entries)) => entries
@@ -80,7 +80,7 @@ pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> boo
                     _ => "unknown".to_string(),
                 };
 
-                el.sigil = Sigil::At(Some("kind".to_string()));
+                el.sigil = Sigil::block("kind");
                 el.args = Some(Value::String(target_kind));
                 el.value = None;
                 changed = true;
@@ -94,13 +94,18 @@ pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> boo
     // Step 2: Evaluate element values, args, and content (e.g. in @meta { ... }, #[ Heading ], etc.)
     for_each_element_mut(doc, |el| {
         if let Some(ElementValue::Interp(expr)) = &el.value {
-            if let Ok(val) = tomet_compute::evaluate_with_context(&doc_snapshot, expr, &config, ctx) {
-                el.value = Some(ElementValue::Data(val));
+            if let Ok(val) = tomet_compute::evaluate_with_context(&doc_snapshot, expr, &config, ctx)
+            {
+                el.value = Some(ElementValue::from_map(val));
                 changed = true;
             }
-        } else if let Some(ElementValue::Data(val)) = &mut el.value {
-            if evaluate_value_recursively(val, &doc_snapshot, &config, ctx) {
-                changed = true;
+        } else if let Some(value) = &mut el.value {
+            // A group holds its data as separate entries, so each pair's
+            // value is walked on its own rather than one `Value` tree.
+            for (_, val) in value.pairs_mut() {
+                if evaluate_value_recursively(val, &doc_snapshot, &config, ctx) {
+                    changed = true;
+                }
             }
         }
 
@@ -139,11 +144,9 @@ fn evaluate_inlines(
     let mut new_content = Vec::new();
     for inline in inlines.iter() {
         match inline {
-            Inline::Element(el) if classify(el) == ElementKind::Interp => {
+            Inline::Element(el) if classify_lenient(el) == ElementKind::Interp => {
                 if let Some(ElementValue::Interp(expr)) = &el.value {
-                    if let Ok(val) =
-                        tomet_compute::evaluate_with_context(doc, expr, config, ctx)
-                    {
+                    if let Ok(val) = tomet_compute::evaluate_with_context(doc, expr, config, ctx) {
                         new_content.push(Inline::Text(Text {
                             value: value_to_display_string(&val),
                             span: Span::default(),
@@ -285,7 +288,10 @@ mod tests {
         let mut vars = HashMap::new();
         vars.insert(
             "vars".to_string(),
-            Value::Map(vec![("title".to_string(), Value::String("Sprint 42".into()))]),
+            Value::Map(vec![(
+                "title".to_string(),
+                Value::String("Sprint 42".into()),
+            )]),
         );
         let ctx = EvaluationContext { vars };
 
@@ -297,7 +303,7 @@ mod tests {
             Block::Element(el) => el,
             _ => panic!("expected element"),
         };
-        assert_eq!(classify(first_el), ElementKind::Kind);
+        assert_eq!(classify_lenient(first_el), ElementKind::Kind);
         assert_eq!(first_el.args, Some(Value::String("daily-note".into())));
 
         // Verify @meta fields
@@ -305,7 +311,7 @@ mod tests {
             Block::Element(el) => el,
             _ => panic!("expected element"),
         };
-        if let Some(ElementValue::Data(Value::Map(entries))) = &meta_el.value {
+        if let Some(ElementValue::from_map(Value::Map(entries))) = &meta_el.value {
             assert_eq!(
                 entries.iter().find(|(k, _)| k == "id").unwrap().1,
                 Value::String("00000000-0000-0000-0000-000000000000".into())

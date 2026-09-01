@@ -37,7 +37,7 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
-    TargetScheme, classify, heading_level, link_target, list_items, list_ordered,
+    TargetScheme, classify_lenient, heading_level, link_target, list_items, list_ordered,
     normalized_element_args, parse_table_rows, target_scheme,
 };
 
@@ -118,7 +118,7 @@ fn inline_to_typst(inlines: &[Inline]) -> String {
 }
 
 fn element_to_typst(el: &Element, inline: bool) -> String {
-    let kind = classify(el);
+    let kind = classify_lenient(el);
     match kind.as_str() {
         "version" | "kind" | "meta" | "config" | "blueprint" => String::new(),
         // Block-position only, mirroring `tomet-convert-markdown`'s
@@ -320,7 +320,7 @@ fn render_table(el: &Element) -> String {
 /// before rendering -- it's addressing metadata, not part of the visible
 /// target.
 fn render_link(el: &Element) -> String {
-    let raw_target = link_target(el, &classify(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let text = match &el.content {
         Some(content) if !content.is_empty() => inline_to_typst(content),
@@ -350,7 +350,7 @@ fn render_link(el: &Element) -> String {
 /// `tomet-convert-html`'s `render_embed_element` for why `<embed>` needs
 /// this too, not just a raw passthrough.
 fn render_embed(el: &Element) -> String {
-    let raw_target = link_target(el, &classify(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
     let alt = el
         .content
@@ -375,7 +375,7 @@ fn render_embed(el: &Element) -> String {
 /// anchor convention.
 fn render_links_container(el: &Element) -> String {
     let mut out = String::new();
-    if let Some(ElementValue::Children(children)) = &el.value {
+    if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
         for (i, child) in children.iter().enumerate() {
             if i > 0 {
                 out.push('\n');

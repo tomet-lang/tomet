@@ -39,7 +39,7 @@ pub fn resolve_reference(doc: &Document, expr: &InterpExpr) -> Result<Value, Res
 /// Depth-first search (via `tomet-tree`) for the first node anywhere
 /// in `doc` with a matching `{id: ...}` or `(id: ...)` attribute.
 /// Returns a deep copy of that node's value payload --
-/// `ElementValue::Data(v)` -> `v`, `ElementValue::Children(c)` ->
+/// `ElementValue::from_map(v)` -> `v`, `ElementValue::from_children(c)` ->
 /// `Value::Seq(...)` (wrapped as a synthetic list of the children's
 /// values).
 ///
@@ -86,7 +86,10 @@ fn node_value(el: &Element) -> Value {
         _ => None,
     };
     let value_map = match &el.value {
-        Some(ElementValue::Data(Value::Map(entries))) => Some(entries.clone()),
+        Some(v) => match v.as_data() {
+            Some(Value::Map(entries)) => Some(entries),
+            _ => None,
+        },
         _ => None,
     };
     match (args_map, value_map) {
@@ -102,7 +105,7 @@ fn node_value(el: &Element) -> Value {
         (Some(args), None) => Value::Map(args),
         (None, Some(value)) => Value::Map(value),
         (None, None) => match &el.value {
-            Some(ElementValue::Data(v)) => v.clone(),
+            Some(v) => v.as_data().unwrap_or(Value::Map(Vec::new())),
             _ => el.args.clone().unwrap_or(Value::Null),
         },
     }

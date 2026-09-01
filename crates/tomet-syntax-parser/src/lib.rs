@@ -2,8 +2,9 @@ mod codeblock;
 pub mod cst;
 mod document;
 mod element;
-mod embedded_format;
+pub mod embedded_format;
 mod error;
+mod fence;
 mod heading;
 mod inline;
 mod interp;
@@ -21,7 +22,7 @@ mod tests {
     use tomet_ast::{
         Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Sigil, Value,
     };
-    use tomet_semantics::{ElementKind, classify, heading_level, list_items, list_ordered};
+    use tomet_semantics::{ElementKind, classify_lenient, heading_level, list_items, list_ordered};
 
     #[test]
     fn parses_flat_map() {
@@ -64,12 +65,12 @@ mod tests {
         let doc = parse_document("#[ Hello ]{ id:header1 }\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(classify(el), ElementKind::Heading);
+                assert_eq!(classify_lenient(el), ElementKind::Heading);
                 assert_eq!(heading_level(el), Some(1));
                 assert_eq!(el.content, Some(vec![Inline::Text("Hello".into())]));
                 assert_eq!(
                     el.value,
-                    Some(ElementValue::Data(Value::Map(vec![(
+                    Some(ElementValue::from_map(Value::Map(vec![(
                         "id".into(),
                         Value::String("header1".into())
                     )])))
@@ -86,7 +87,7 @@ mod tests {
         assert_eq!(a, b);
         match &a.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::At(None));
+                assert_eq!(el.sigil, Sigil::Inline(None));
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
@@ -105,9 +106,9 @@ mod tests {
         let doc = parse_document("@links {\n  (1)[ note ]\n  (anotation1)[ note ]\n}\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::At(Some("links".into())));
+                assert_eq!(el.sigil, Sigil::block("links"));
                 match &el.value {
-                    Some(ElementValue::Children(children)) => {
+                    Some(ElementValue::from_children(children)) => {
                         assert_eq!(children.len(), 2);
                         assert_eq!(children[0].sigil, Sigil::Bare);
                         assert_eq!(children[0].args, Some(Value::Int(1)));
@@ -123,10 +124,10 @@ mod tests {
 
     #[test]
     fn parses_caution_as_typed_element_not_bare_bracket() {
-        let doc = parse_document("<caution>[ be careful ]\n").unwrap();
+        let doc = parse_document("#caution[ be careful ]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("caution".into()));
+                assert_eq!(el.sigil, Sigil::block("caution"));
                 assert_eq!(el.content, Some(vec![Inline::Text("be careful".into())]));
             }
             other => panic!("expected element, got {other:?}"),
@@ -137,7 +138,7 @@ mod tests {
     /// `Element::list_item` stores them under `value` as `ElementValue::Data`.
     fn item_attrs(item: &Element) -> Option<Value> {
         match &item.value {
-            Some(ElementValue::Data(v)) => Some(v.clone()),
+            Some(v) => v.as_data(),
             _ => None,
         }
     }
@@ -227,10 +228,10 @@ mod tests {
                 assert_eq!(item_attrs(&items[0]), None, "{bare:?}");
                 match items[0].content.as_deref() {
                     Some([Inline::Element(link)]) => {
-                        assert_eq!(link.sigil, Sigil::At(Some("link".into())), "{bare:?}");
+                        assert_eq!(link.sigil, Sigil::inline("link"), "{bare:?}");
                         assert_eq!(
                             link.value,
-                            Some(ElementValue::Data(Value::Map(vec![(
+                            Some(ElementValue::from_map(Value::Map(vec![(
                                 "id".into(),
                                 Value::String("breakfast".into())
                             )]))),
@@ -265,7 +266,7 @@ mod tests {
                     // else.
                     match items[0].content.as_deref() {
                         Some([Inline::Element(link)]) => {
-                            assert_eq!(link.sigil, Sigil::At(Some("link".into())), "{src:?}");
+                            assert_eq!(link.sigil, Sigil::inline("link"), "{src:?}");
                             assert_eq!(link.value, None, "{src:?}");
                         }
                         other => panic!("{src:?}: expected a single @link element, got {other:?}"),
@@ -379,7 +380,7 @@ mod tests {
         let doc = parse_document("---\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("hr".into()));
+                assert_eq!(el.sigil, Sigil::block("hr"));
                 assert_eq!(el.content, None);
             }
             other => panic!("expected hr element, got {other:?}"),
@@ -390,7 +391,7 @@ mod tests {
     fn parses_thematic_break_with_more_than_three_dashes() {
         let doc = parse_document("-----\n").unwrap();
         match &doc.blocks[0] {
-            Block::Element(el) => assert_eq!(el.sigil, Sigil::Type("hr".into())),
+            Block::Element(el) => assert_eq!(el.sigil, Sigil::block("hr")),
             other => panic!("expected hr element, got {other:?}"),
         }
     }
@@ -400,7 +401,7 @@ mod tests {
         let doc = parse_document("---[ Title ]---\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("hr".into()));
+                assert_eq!(el.sigil, Sigil::block("hr"));
                 assert_eq!(el.content, Some(vec![Inline::Text("Title".into())]));
             }
             other => panic!("expected hr element, got {other:?}"),
@@ -433,10 +434,10 @@ mod tests {
         // `---<embed>---` doesn't commit to the titled form (no `[` right
         // after the dashes) and isn't a plain break either (trailing
         // content isn't just whitespace) -- it's ordinary paragraph text.
-        let doc = parse_document("---<embed>---\n").unwrap();
+        let doc = parse_document("---@embed---\n").unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
-                assert_eq!(&p.content, &vec![Inline::Text("---<embed>---".into())]);
+                assert_eq!(&p.content, &vec![Inline::Text("---@embed---".into())]);
             }
             other => panic!("expected paragraph, got {other:?}"),
         }
@@ -458,24 +459,18 @@ mod tests {
                 assert_eq!(
                     kinds,
                     vec![
+                        (Sigil::inline("em"), Some(vec![Inline::Text("em".into())])),
                         (
-                            Sigil::Type("em".into()),
-                            Some(vec![Inline::Text("em".into())])
-                        ),
-                        (
-                            Sigil::Type("strong".into()),
+                            Sigil::inline("strong"),
                             Some(vec![Inline::Text("strong".into())])
                         ),
+                        (Sigil::inline("em"), Some(vec![Inline::Text("em2".into())])),
                         (
-                            Sigil::Type("em".into()),
-                            Some(vec![Inline::Text("em2".into())])
-                        ),
-                        (
-                            Sigil::Type("strong".into()),
+                            Sigil::inline("strong"),
                             Some(vec![Inline::Text("strong2".into())])
                         ),
                         (
-                            Sigil::Type("mark".into()),
+                            Sigil::inline("mark"),
                             Some(vec![Inline::Text("mark".into())])
                         ),
                     ]
@@ -742,7 +737,7 @@ mod tests {
 
     #[test]
     fn interpolation_inside_element_content_and_heading() {
-        let doc = parse_document("<memo>[ total: ${sum(a, b)} ]\n\n#[ ${x} ]\n").unwrap();
+        let doc = parse_document("#memo[ total: ${sum(a, b)} ]\n\n#[ ${x} ]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 let content = el.content.as_ref().expect("content");
@@ -755,7 +750,7 @@ mod tests {
         }
         match &doc.blocks[1] {
             Block::Element(el) => {
-                assert_eq!(classify(el), ElementKind::Heading);
+                assert_eq!(classify_lenient(el), ElementKind::Heading);
                 let content = el.content.as_ref().expect("content");
                 assert!(content.iter().any(|i| matches!(
                     i,
@@ -788,7 +783,8 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Element(a), Block::Element(b))
-                if classify(a) == ElementKind::Heading && classify(b) == ElementKind::Heading =>
+                if classify_lenient(a) == ElementKind::Heading
+                    && classify_lenient(b) == ElementKind::Heading =>
             {
                 assert_eq!(a.content, Some(vec![Inline::Text("one".into())]));
                 assert_eq!(b.content, Some(vec![Inline::Text("two".into())]));
@@ -802,10 +798,10 @@ mod tests {
         let doc = parse_document("#[ one ]\n\n  // indented note\n\n#[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         assert!(
-            matches!(&doc.blocks[0], Block::Element(el) if classify(el) == ElementKind::Heading)
+            matches!(&doc.blocks[0], Block::Element(el) if classify_lenient(el) == ElementKind::Heading)
         );
         assert!(
-            matches!(&doc.blocks[1], Block::Element(el) if classify(el) == ElementKind::Heading)
+            matches!(&doc.blocks[1], Block::Element(el) if classify_lenient(el) == ElementKind::Heading)
         );
     }
 
@@ -814,10 +810,10 @@ mod tests {
         let doc = parse_document("#[ one ]\n\n  /* indented note */\n\n#[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         assert!(
-            matches!(&doc.blocks[0], Block::Element(el) if classify(el) == ElementKind::Heading)
+            matches!(&doc.blocks[0], Block::Element(el) if classify_lenient(el) == ElementKind::Heading)
         );
         assert!(
-            matches!(&doc.blocks[1], Block::Element(el) if classify(el) == ElementKind::Heading)
+            matches!(&doc.blocks[1], Block::Element(el) if classify_lenient(el) == ElementKind::Heading)
         );
     }
 
@@ -853,7 +849,7 @@ mod tests {
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Paragraph(a), Block::Element(el)) => {
                 assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
-                assert_eq!(el.sigil, Sigil::At(Some("meta".into())));
+                assert_eq!(el.sigil, Sigil::block("meta"));
             }
             other => panic!("expected paragraph then element, got {other:?}"),
         }
@@ -869,8 +865,8 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Element(a), Block::Element(b)) => {
-                assert_eq!(a.sigil, Sigil::At(Some("meta".into())));
-                assert_eq!(b.sigil, Sigil::At(Some("settings".into())));
+                assert_eq!(a.sigil, Sigil::block("meta"));
+                assert_eq!(b.sigil, Sigil::block("settings"));
             }
             other => panic!("expected two elements, got {other:?}"),
         }
@@ -932,7 +928,7 @@ mod tests {
 
     #[test]
     fn inline_block_comment_works_inside_content() {
-        let doc = parse_document("<caution>[ keep /* drop */ this ]\n").unwrap();
+        let doc = parse_document("#caution[ keep /* drop */ this ]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
@@ -960,7 +956,7 @@ mod tests {
                 assert_eq!(p.content.len(), 3);
                 assert_eq!(p.content[0], Inline::Text("see ".into()));
                 if let Inline::Element(el) = &p.content[1] {
-                    assert_eq!(el.sigil, Sigil::At(None));
+                    assert_eq!(el.sigil, Sigil::Inline(None));
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
@@ -990,7 +986,7 @@ mod tests {
 
     #[test]
     fn inline_double_slash_comment_works_inside_content() {
-        let doc = parse_document("<caution>[ keep // drop this\n]\n").unwrap();
+        let doc = parse_document("#caution[ keep // drop this\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.content, Some(vec![Inline::Text("keep ".into())]));
@@ -1005,7 +1001,7 @@ mod tests {
         // dispatch of its own -- a `//` starting a line inside it is only
         // recognized because the preceding newline counts as a boundary,
         // same rule as a same-line trailing comment.
-        let doc = parse_document("<caution>[\n  keep\n  // drop this line\n  keep2\n]\n").unwrap();
+        let doc = parse_document("#caution[\n  keep\n  // drop this line\n  keep2\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
@@ -1027,7 +1023,7 @@ mod tests {
         let doc = parse_document("@config(\n  format:json\n  // a note\n)\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::At(Some("config".into())));
+                assert_eq!(el.sigil, Sigil::block("config"));
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
@@ -1047,7 +1043,7 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(
                     el.value,
-                    Some(ElementValue::Data(Value::Map(vec![(
+                    Some(ElementValue::from_map(Value::Map(vec![(
                         "key".into(),
                         Value::String("value".into())
                     )])))
@@ -1113,9 +1109,8 @@ mod tests {
         // used to break at the *first* literal `]`, corrupting the rest
         // of the content as stray trailing text. Applies to every ordinary
         // (non-raw) `[content]`, not just an opt-in one.
-        let doc =
-            parse_document("<caution>[\nline one\nline two with * and [brackets] inside\n]\n")
-                .unwrap();
+        let doc = parse_document("#caution[\nline one\nline two with * and [brackets] inside\n]\n")
+            .unwrap();
         assert_eq!(doc.blocks.len(), 1);
         match &doc.blocks[0] {
             Block::Element(el) => {
@@ -1132,7 +1127,7 @@ mod tests {
 
     #[test]
     fn an_unbalanced_bracket_inside_a_content_still_errors() {
-        assert!(parse_document("<caution>[ has an [ that never closes\n]\n").is_err());
+        assert!(parse_document("#caution[ has an [ that never closes\n]\n").is_err());
     }
 
     #[test]
@@ -1177,7 +1172,7 @@ mod tests {
         // only recognized value, anything else (or no `content` key at all)
         // parses as normal prose, so line breaks still collapse per the
         // usual lazy-continuation rule.
-        let doc = parse_document("<memo>(content:literal)[\nline one\nline two\n]\n").unwrap();
+        let doc = parse_document("#memo(content:literal)[\nline one\nline two\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
@@ -1194,7 +1189,7 @@ mod tests {
         let doc = parse_document("```rust\nfn main() {}\n```\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("codeblock".into()));
+                assert_eq!(el.sigil, Sigil::block("codeblock"));
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
@@ -1213,7 +1208,7 @@ mod tests {
         let doc = parse_document("```\nplain\n```\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("codeblock".into()));
+                assert_eq!(el.sigil, Sigil::block("codeblock"));
                 assert_eq!(el.args, None);
                 assert_eq!(el.content, Some(vec![Inline::Text("plain".into())]));
             }
@@ -1224,7 +1219,7 @@ mod tests {
     #[test]
     fn fenced_code_block_and_bracket_codeblock_produce_the_same_ast() {
         let fenced = parse_document("```rust\nfn main() {}\n```\n").unwrap();
-        let bracket = parse_document("<codeblock>(lang:rust)[fn main() {}]\n").unwrap();
+        let bracket = parse_document("#codeblock(lang:rust)[fn main() {}]\n").unwrap();
         match (&fenced.blocks[0], &bracket.blocks[0]) {
             (Block::Element(a), Block::Element(b)) => {
                 assert_eq!(a.sigil, b.sigil);
@@ -1329,7 +1324,7 @@ mod tests {
         // `()`/`{}` written out (as opposed to the group being omitted
         // entirely, which leaves `args`/`value` as `None`) is a valid,
         // deliberately-empty map -- matches the spec's own `@meta{}` etc.
-        let doc = parse_document("<T>()\n").unwrap();
+        let doc = parse_document("#T()\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.args, Some(Value::Map(vec![])));
@@ -1341,7 +1336,7 @@ mod tests {
         let doc = parse_document("@meta{}\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.value, Some(ElementValue::Data(Value::Map(vec![]))));
+                assert_eq!(el.value, Some(ElementValue::from_map(Value::Map(vec![]))));
             }
             other => panic!("expected an element, got {other:?}"),
         }
@@ -1349,7 +1344,7 @@ mod tests {
 
     #[test]
     fn a_second_args_group_is_parsed_as_subsequent_text() {
-        let doc = parse_document("<T>(a:1)(b:2)\n").unwrap();
+        let doc = parse_document("#T(a:1)(b:2)\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         match &doc.blocks[0] {
             Block::Element(el) => {
@@ -1365,7 +1360,7 @@ mod tests {
         // used to fall outside the whitespace/newline gap tolerance,
         // ending the element early and leaving the next group as
         // unrelated trailing text.
-        let doc = parse_document("<T>(a:1) // note\n[content]\n").unwrap();
+        let doc = parse_document("#T(a:1) // note\n[content]\n").unwrap();
         assert_eq!(doc.blocks.len(), 1);
         match &doc.blocks[0] {
             Block::Element(el) => {
@@ -1387,7 +1382,7 @@ mod tests {
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Paragraph(p), Block::Element(el)) => {
                 assert_eq!(&p.content, &vec![Inline::Text("text".into())]);
-                assert_eq!(el.sigil, Sigil::Type("codeblock".into()));
+                assert_eq!(el.sigil, Sigil::block("codeblock"));
             }
             other => panic!("expected paragraph then codeblock, got {other:?}"),
         }
@@ -1400,7 +1395,7 @@ mod tests {
         match (&doc.blocks[0], &doc.blocks[1], &doc.blocks[2]) {
             (Block::Paragraph(a), Block::Element(hr), Block::Paragraph(b)) => {
                 assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
-                assert_eq!(hr.sigil, Sigil::Type("hr".into()));
+                assert_eq!(hr.sigil, Sigil::block("hr"));
                 assert_eq!(&b.content, &vec![Inline::Text("more".into())]);
             }
             other => panic!("expected paragraph, hr, paragraph, got {other:?}"),
@@ -1412,10 +1407,10 @@ mod tests {
         let doc = parse_document("#[ Overview ]:{ id: intro, tag: main }\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(classify(el), ElementKind::Heading);
+                assert_eq!(classify_lenient(el), ElementKind::Heading);
                 assert_eq!(
                     el.value,
-                    Some(ElementValue::Data(Value::Map(vec![
+                    Some(ElementValue::from_map(Value::Map(vec![
                         ("id".into(), Value::String("intro".into())),
                         ("tag".into(), Value::String("main".into())),
                     ])))
@@ -1427,13 +1422,13 @@ mod tests {
 
     #[test]
     fn element_supports_inline_colon_connection() {
-        let doc = parse_document("<task>[ Task A ]:{ id: taskA, priority: high }\n").unwrap();
+        let doc = parse_document("#task[ Task A ]:{ id: taskA, priority: high }\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("task".into()));
+                assert_eq!(el.sigil, Sigil::block("task"));
                 assert_eq!(
                     el.value,
-                    Some(ElementValue::Data(Value::Map(vec![
+                    Some(ElementValue::from_map(Value::Map(vec![
                         ("id".into(), Value::String("taskA".into())),
                         ("priority".into(), Value::String("high".into())),
                     ])))
@@ -1451,7 +1446,7 @@ mod tests {
                 assert_eq!(el.sigil, Sigil::Type("id:taskA".into()));
                 assert_eq!(
                     el.value,
-                    Some(ElementValue::Data(Value::Map(vec![
+                    Some(ElementValue::from_map(Value::Map(vec![
                         ("priority".into(), Value::String("high".into())),
                         ("tag".into(), Value::String("dev".into())),
                     ])))

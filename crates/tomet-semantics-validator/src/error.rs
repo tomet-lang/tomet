@@ -26,6 +26,21 @@ pub enum ValidationError {
         kind: String,
         span: Span,
     },
+    /// An element written with a bare name that is not one of Tomet's own.
+    ///
+    /// Bare names are reserved for the built-in vocabulary; a user-defined
+    /// element must be namespaced. This is the diagnostic that replaces the
+    /// old silent fall-back to `ElementKind::Custom`, which is where the
+    /// official-vs-user-defined ambiguity actually lived.
+    UnknownElement { name: String, span: Span },
+    /// An element written with the wrong sigil for its shape -- `@meta`
+    /// instead of `#meta`, or `#em` instead of `@em`.
+    ShapeMismatch {
+        name: String,
+        found: &'static str,
+        expected: &'static str,
+        span: Span,
+    },
 }
 
 impl ValidationError {
@@ -35,6 +50,8 @@ impl ValidationError {
             ValidationError::DuplicateId { duplicate, .. } => *duplicate,
             ValidationError::MissingRequiredMetaKey { span, .. } => *span,
             ValidationError::MissingRequiredSection { span, .. } => *span,
+            ValidationError::UnknownElement { span, .. } => *span,
+            ValidationError::ShapeMismatch { span, .. } => *span,
         }
     }
 }
@@ -56,10 +73,7 @@ impl fmt::Display for ValidationError {
                 )
             }
             ValidationError::MissingRequiredSection {
-                title,
-                id,
-                kind,
-                ..
+                title, id, kind, ..
             } => {
                 if let Some(sec_id) = id {
                     write!(
@@ -72,6 +86,31 @@ impl fmt::Display for ValidationError {
                         "document of kind `{kind}` is missing required section `{title}`"
                     )
                 }
+            }
+            ValidationError::UnknownElement { name, .. } => {
+                write!(
+                    f,
+                    "unknown element `{name}`: bare names are reserved for built-in \
+                     elements; namespace it (`ns.{name}`) or bind a namespace with \
+                     `#import(file:..., as:ns)`"
+                )
+            }
+            ValidationError::ShapeMismatch {
+                name,
+                found,
+                expected,
+                ..
+            } => {
+                write!(
+                    f,
+                    "`{name}` is {expected}, but is written as {found}; \
+                     use `{}{name}`",
+                    if *expected == "a block element" {
+                        "#"
+                    } else {
+                        "@"
+                    }
+                )
             }
         }
     }

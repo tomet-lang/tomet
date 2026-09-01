@@ -5,14 +5,14 @@
 //! check and the `Children` unwrap that `tomet-html`/`tomet-markdown`/`tomet-printer` would otherwise
 //! each duplicate.
 
-use tomet_ast::{Element, ElementValue};
+use tomet_ast::Element;
 
 use crate::kind::ElementKind;
 
 /// `true` for a `-.` (auto-numbered) list, `false` for a plain `-` list.
 /// `None` for any non-list element.
 pub fn list_ordered(el: &Element) -> Option<bool> {
-    match crate::classify(el) {
+    match crate::classify_lenient(el) {
         ElementKind::OrderedList => Some(true),
         ElementKind::UnorderedList => Some(false),
         _ => None,
@@ -22,13 +22,13 @@ pub fn list_ordered(el: &Element) -> Option<bool> {
 /// A list element's items, in source order. Empty for any non-list
 /// element, or for a list with no `ElementValue::Children` (shouldn't
 /// happen for a parser-produced list, but nothing here assumes it can't).
-pub fn list_items(el: &Element) -> &[Element] {
+pub fn list_items(el: &Element) -> Vec<&Element> {
     if list_ordered(el).is_none() {
-        return &[];
+        return Vec::new();
     }
     match &el.value {
-        Some(ElementValue::Children(items)) => items,
-        _ => &[],
+        Some(value) => value.as_children(),
+        None => Vec::new(),
     }
 }
 
@@ -41,20 +41,20 @@ mod tests {
     #[test]
     fn ordered_list_classifies_and_reports_ordered() {
         let el = element_list(true, Vec::new(), tomet_ast::Span::dummy());
-        assert_eq!(crate::classify(&el), ElementKind::OrderedList);
+        assert_eq!(crate::classify_lenient(&el), ElementKind::OrderedList);
         assert_eq!(list_ordered(&el), Some(true));
     }
 
     #[test]
     fn unordered_list_classifies_and_reports_unordered() {
         let el = element_list(false, Vec::new(), tomet_ast::Span::dummy());
-        assert_eq!(crate::classify(&el), ElementKind::UnorderedList);
+        assert_eq!(crate::classify_lenient(&el), ElementKind::UnorderedList);
         assert_eq!(list_ordered(&el), Some(false));
     }
 
     #[test]
     fn non_list_element_has_no_ordered_and_no_items() {
-        let el = element_new(Sigil::Type("codeblock".to_string()));
+        let el = element_new(Sigil::block("codeblock"));
         assert_eq!(list_ordered(&el), None);
         assert_eq!(list_items(&el), &[] as &[Element]);
     }

@@ -1,7 +1,7 @@
 //! Generic recursive traversal of a [`tomet_ast::Document`]'s tree.
 
 use std::ops::ControlFlow;
-use tomet_ast::{Block, Document, Element, ElementValue, Inline};
+use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline};
 
 /// Called at every [`Element`] `walk_document` visits, in document order.
 pub trait Visitor<B> {
@@ -69,9 +69,11 @@ fn walk_element<B>(element: &Element, visitor: &mut impl Visitor<B>) -> ControlF
             propagate!(walk_block(child, visitor));
         }
     }
-    if let Some(ElementValue::Children(children)) = &element.value {
-        for child in children {
-            propagate!(walk_element(child, visitor));
+    if let Some(ElementValue::Group(entries)) = &element.value {
+        for entry in entries {
+            if let Entry::Element(child) = entry {
+                propagate!(walk_element(child, visitor));
+            }
         }
     }
     ControlFlow::Continue(())
@@ -138,9 +140,11 @@ fn walk_element_mut<B>(element: &mut Element, visitor: &mut impl VisitorMut<B>) 
             propagate!(walk_block_mut(child, visitor));
         }
     }
-    if let Some(ElementValue::Children(children)) = &mut element.value {
-        for child in children {
-            propagate!(walk_element_mut(child, visitor));
+    if let Some(ElementValue::Group(entries)) = &mut element.value {
+        for entry in entries {
+            if let Entry::Element(child) = entry {
+                propagate!(walk_element_mut(child, visitor));
+            }
         }
     }
     ControlFlow::Continue(())

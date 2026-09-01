@@ -117,10 +117,10 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::At(Some("meta".to_string())));
+                assert_eq!(el.sigil, Sigil::block("meta"));
                 assert_eq!(
                     el.value,
-                    Some(tomet_ast::ElementValue::Data(Value::Map(vec![
+                    Some(tomet_ast::ElementValue::from_map(Value::Map(vec![
                         ("title".to_string(), Value::String("Hello".to_string())),
                         ("author".to_string(), Value::String("Alice".to_string())),
                         ("draft".to_string(), Value::Bool(false)),
@@ -138,10 +138,10 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::At(Some("meta".to_string())));
+                assert_eq!(el.sigil, Sigil::block("meta"));
                 assert_eq!(
                     el.value,
-                    Some(tomet_ast::ElementValue::Data(Value::Map(vec![
+                    Some(tomet_ast::ElementValue::from_map(Value::Map(vec![
                         ("title".to_string(), Value::String("Doc".to_string())),
                         (
                             "tags".to_string(),
@@ -167,7 +167,7 @@ mod tests {
         };
         assert_eq!(
             el.value,
-            Some(tomet_ast::ElementValue::Data(Value::Map(vec![(
+            Some(tomet_ast::ElementValue::from_map(Value::Map(vec![(
                 "topics".to_string(),
                 Value::Seq(vec![
                     Value::String("@link(ref:@Templater)".to_string()),

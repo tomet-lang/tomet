@@ -9,7 +9,7 @@ use lsp_types::{
 };
 use std::ops::ControlFlow;
 use tomet_ast::{Document, Element, ElementValue, Inline, InterpExprKind, Sigil, Span, Value};
-use tomet_semantics::{ElementKind, classify, heading_level, normalized_element_args};
+use tomet_semantics::{ElementKind, classify_lenient, heading_level, normalized_element_args};
 use tomet_tree::{ElementExt, ValueExt, Visitor, walk_document};
 
 /// Converts an AST [`Span`] to an LSP [`Range`].
@@ -264,7 +264,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
         fn visit(&mut self, el: &Element) -> ControlFlow<()> {
             let span = el.span;
             if span_contains(&span, self.line, self.col) {
-                let kind = classify(el);
+                let kind = classify_lenient(el);
                 let hover = if kind == ElementKind::Table {
                     table_hover(self.text, self.pos, el)
                 } else if let Some(h) = macro_hover(self.doc, self.config, el) {
@@ -680,9 +680,9 @@ fn is_web_url(s: &str) -> bool {
 
 fn sigil_display_name(sigil: &Sigil) -> String {
     match sigil {
-        Sigil::Type(name) => format!("<{name}>"),
-        Sigil::At(Some(name)) => format!("@{name}"),
-        Sigil::At(None) => "@".to_string(),
+        Sigil::Block(name) => format!("#{name}"),
+        Sigil::Inline(Some(name)) => format!("@{name}"),
+        Sigil::Inline(None) => "@".to_string(),
         Sigil::Bare => "(bare)".to_string(),
         Sigil::Dollar => "${...}".to_string(),
     }
@@ -699,7 +699,7 @@ pub fn document_symbols_for(text: &str) -> Vec<DocumentSymbol> {
     impl Visitor<()> for SymbolCollector {
         fn visit(&mut self, el: &Element) -> ControlFlow<()> {
             let range = span_to_range(&el.span);
-            let kind = classify(el);
+            let kind = classify_lenient(el);
             let symbol = if kind == ElementKind::Heading {
                 let level = heading_level(el).unwrap_or(1);
                 let title = extract_inlines_text(el.content.as_deref().unwrap_or(&[]));
@@ -864,7 +864,10 @@ pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
     let builtins = [
         ("version", "Tomet language specification version"),
         ("kind", "Document kind (archetype / schema) declaration"),
-        ("blueprint", "Document blueprint and archetype template declaration"),
+        (
+            "blueprint",
+            "Document blueprint and archetype template declaration",
+        ),
         ("callout", "Callout container block"),
         ("warning", "Warning alert block"),
         ("caution", "Caution alert block"),

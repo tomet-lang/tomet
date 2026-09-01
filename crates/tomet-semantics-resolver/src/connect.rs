@@ -52,7 +52,7 @@ fn extract_and_remove_references_connections(blocks: &mut Vec<Block>) -> Vec<Rem
 }
 
 fn is_references_element(el: &Element) -> bool {
-    matches!(&el.sigil, Sigil::At(Some(name)) | Sigil::Type(name) if name == "references")
+    el.sigil.is_bare_named("references")
 }
 
 fn extract_connections_from_references(el: &Element) -> Vec<RemoteConnection> {
@@ -70,7 +70,7 @@ fn extract_connections_from_references(el: &Element) -> Vec<RemoteConnection> {
     }
 
     // Check `el.value` if children elements are placed inside `{ ... }`
-    if let Some(ElementValue::Children(children)) = &el.value {
+    if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
         for child_el in children {
             if let Some(conn) = parse_remote_connection_element(child_el) {
                 connections.push(conn);
@@ -81,23 +81,41 @@ fn extract_connections_from_references(el: &Element) -> Vec<RemoteConnection> {
     connections
 }
 
+/// Reads a remote connection: `#id(taskA):{ priority: high }`.
+///
+/// This used to be spelled `<id:taskA>:{...}`, with the target smuggled
+/// through `<T>`'s anything-goes name charset -- the parser stored the
+/// whole `"id:taskA"` as the element's name and this function string-split
+/// it back apart. Element names are now proper ASCII identifiers, so the
+/// target lives in a positional argument where it belongs, and nothing
+/// here has to know about a special charset.
 fn parse_remote_connection_element(el: &Element) -> Option<RemoteConnection> {
-    if let Sigil::Type(name) = &el.sigil {
-        if name.starts_with("id:") {
-            let target_str = &name[3..];
-            let target_ids = parse_target_ids_from_str(target_str);
-            let conn_val = match &el.value {
-                Some(ElementValue::Data(v)) => Some(v.clone()),
-                _ => None,
-            };
-            return Some(RemoteConnection {
-                target_ids,
-                args: el.args.clone(),
-                value: conn_val,
-            });
-        }
+    if !el.sigil.is_bare_named("id") {
+        return None;
     }
-    None
+    let target_str = el.args.as_ref().and_then(target_arg_str)?;
+    Some(RemoteConnection {
+        target_ids: parse_target_ids_from_str(&target_str),
+        args: el.args.clone(),
+        value: el.value.as_ref().and_then(|v| v.as_data()),
+    })
+}
+
+/// The target of a `#id(...)`, whether written positionally (`#id(taskA)`,
+/// which the value grammar records under the empty positional key) or
+/// explicitly (`#id(target:taskA)`).
+fn target_arg_str(args: &Value) -> Option<String> {
+    match args {
+        Value::String(s) => Some(s.clone()),
+        Value::Map(entries) => entries
+            .iter()
+            .find(|(k, _)| k.is_empty() || k == "target" || k == "id")
+            .and_then(|(_, v)| match v {
+                Value::String(s) => Some(s.clone()),
+                _ => None,
+            }),
+        _ => None,
+    }
 }
 
 fn parse_target_ids_from_str(s: &str) -> Vec<String> {
@@ -140,11 +158,11 @@ fn apply_connection_to_element(el: &mut Element, target_id: &str, conn: &RemoteC
         }
         if let Some(conn_val) = &conn.value {
             let direct_v = match &el.value {
-                Some(ElementValue::Data(v)) => Some(v),
+                Some(v) => v.as_data(),
                 _ => None,
             };
-            if let Some(merged) = merge_connected_values(direct_v, Some(conn_val)) {
-                el.value = Some(ElementValue::Data(merged));
+            if let Some(merged) = merge_connected_values(direct_v.as_ref(), Some(conn_val)) {
+                el.value = Some(ElementValue::from_map(merged));
             }
         }
     }
@@ -173,7 +191,7 @@ mod tests {
                 assert_eq!(el.sigil, Sigil::Type("task".into()));
                 assert_eq!(
                     el.value,
-                    Some(ElementValue::Data(Value::Map(vec![
+                    Some(ElementValue::from_map(Value::Map(vec![
                         ("priority".into(), Value::String("high".into())),
                         ("status".into(), Value::String("todo".into())),
                     ])))
@@ -201,7 +219,7 @@ mod tests {
                 // Direct `priority: low` MUST win over connected `priority: high`
                 assert_eq!(
                     el.value,
-                    Some(ElementValue::Data(Value::Map(vec![
+                    Some(ElementValue::from_map(Value::Map(vec![
                         ("priority".into(), Value::String("low".into())),
                         ("status".into(), Value::String("todo".into())),
                     ])))
@@ -230,7 +248,7 @@ mod tests {
                 Block::Element(el) => {
                     assert_eq!(
                         el.value,
-                        Some(ElementValue::Data(Value::Map(vec![(
+                        Some(ElementValue::from_map(Value::Map(vec![(
                             "tag".into(),
                             Value::String("house".into())
                         )])))

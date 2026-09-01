@@ -27,7 +27,7 @@ use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, Paragraph, Sigil, Span, Text, Value,
 };
-use tomet_semantics::{ElementKind, classify, list_ordered};
+use tomet_semantics::{ElementKind, classify_lenient, list_ordered};
 use tomet_tree::{element_list, element_list_item, element_new};
 
 mod frontmatter;
@@ -114,8 +114,8 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
     let mut stack: Vec<Frame> = vec![Frame::Blocks(Vec::new())];
 
     if let Some(entries) = frontmatter {
-        let mut meta_el = element_new(Sigil::At(Some("meta".to_string())));
-        meta_el.value = Some(tomet_ast::ElementValue::Data(Value::Map(entries)));
+        let mut meta_el = element_new(Sigil::block("meta"));
+        meta_el.value = Some(tomet_ast::ElementValue::from_map(Value::Map(entries)));
         push_block(&mut stack, Block::Element(meta_el));
     }
 
@@ -164,10 +164,7 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
             Event::HardBreak => {
                 push_inline(&mut stack, Inline::Text(Text::new("\n", Span::dummy())))
             }
-            Event::Rule => push_block(
-                &mut stack,
-                Block::Element(element_new(Sigil::Type("hr".to_string()))),
-            ),
+            Event::Rule => push_block(&mut stack, Block::Element(element_new(Sigil::block("hr")))),
             _ => {}
         }
     }
@@ -239,7 +236,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
         (Frame::Heading(level, inlines), TagEnd::Heading(_)) => push_block(
             stack,
             Block::Element(Element {
-                sigil: Sigil::At(Some("heading".to_string())),
+                sigil: Sigil::block("heading"),
                 // Imported headings never carry `id`/`cssclass` -- CommonMark
                 // has nothing to import them from.
                 args: Some(Value::Int(level as i64)),
@@ -307,7 +304,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 };
 
                 let el = Element {
-                    sigil: Sigil::Type("callout".to_string()),
+                    sigil: Sigil::block("callout"),
                     args: Some(args),
                     content: Some(content),
                     children: None,
@@ -317,7 +314,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 push_block(stack, Block::Element(el));
             } else {
                 let el = Element {
-                    sigil: Sigil::Type("blockquote".to_string()),
+                    sigil: Sigil::block("blockquote"),
                     args: None,
                     content: Some(content),
                     children: None,
@@ -337,7 +334,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
             };
             let el = Element {
-                sigil: Sigil::Type("codeblock".to_string()),
+                sigil: Sigil::block("codeblock"),
                 args,
                 content: Some(vec![Inline::Text(Text::new(text, Span::dummy()))]),
                 children: None,
@@ -434,7 +431,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             // otherwise -> file) once this is rendered/queried -- no key
             // choice needed here, unlike the old per-kind key scheme.
             let el = Element {
-                sigil: Sigil::At(Some("link".to_string())),
+                sigil: Sigil::inline("link"),
                 args: Some(Value::Map(vec![(
                     "target".to_string(),
                     Value::String(dest),
@@ -449,7 +446,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
         (Frame::Image { dest, alt }, TagEnd::Image) => {
             let content = if alt.is_empty() { None } else { Some(alt) };
             let el = Element {
-                sigil: Sigil::Type("embed".to_string()),
+                sigil: Sigil::block("embed"),
                 args: Some(Value::Map(vec![(
                     "target".to_string(),
                     Value::String(dest),
@@ -529,7 +526,7 @@ fn build_table_element(
 ) -> Element {
     let mut content_inlines = Vec::new();
     if rows.is_empty() {
-        let mut el = element_new(Sigil::At(Some("table".to_string())));
+        let mut el = element_new(Sigil::block("table"));
         el.content = Some(content_inlines);
         return el;
     }
@@ -645,14 +642,14 @@ fn build_table_element(
         content_inlines.push(Inline::Text(Text::new("\n", Span::dummy())));
     }
 
-    let mut el = element_new(Sigil::At(Some("table".to_string())));
+    let mut el = element_new(Sigil::block("table"));
     el.content = Some(content_inlines);
     el
 }
 
 fn wrap_inline(tag: &str, content: Vec<Inline>) -> Inline {
     Inline::Element(Element {
-        sigil: Sigil::Type(tag.to_string()),
+        sigil: Sigil::inline(tag),
         args: None,
         content: Some(content),
         children: None,
@@ -761,15 +758,18 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
         // its title text directly in, same as a paragraph -- not wrapped
         // as a nested `Inline::Element`, which is what the generic
         // `Block::Element` arm below would do.
-        Block::Element(el) if classify(&el) == ElementKind::Heading => {
+        Block::Element(el) if classify_lenient(&el) == ElementKind::Heading => {
             extend_spaced(content, el.content.unwrap_or_default())
         }
         // A list merged into flattened blockquote content (blockquotes
         // have no sibling-`children` concept, unlike `Item`) has each of
         // its items' content joined in the same way -- see the module doc.
         Block::Element(mut el) if list_ordered(&el).is_some() => {
-            if let Some(ElementValue::Children(items)) = el.value.take() {
-                for item in items {
+            if let Some(ElementValue::Group(entries)) = el.value.take() {
+                for item in entries.into_iter().filter_map(|e| match e {
+                    tomet_ast::Entry::Element(el) => Some(el),
+                    tomet_ast::Entry::Pair(..) => None,
+                }) {
                     extend_spaced(content, item.content.unwrap_or_default());
                 }
             }
@@ -801,7 +801,7 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(classify(el), ElementKind::Heading);
+                assert_eq!(classify_lenient(el), ElementKind::Heading);
                 assert_eq!(tomet_semantics::heading_level(el), Some(1));
                 assert_eq!(
                     el.content,
@@ -832,13 +832,7 @@ mod tests {
                         _ => None,
                     })
                     .collect();
-                assert_eq!(
-                    kinds,
-                    vec![
-                        Sigil::Type("em".to_string()),
-                        Sigil::Type("strong".to_string())
-                    ]
-                );
+                assert_eq!(kinds, vec![Sigil::inline("em"), Sigil::inline("strong")]);
             }
             other => panic!("expected paragraph, got {other:?}"),
         }
@@ -910,7 +904,7 @@ mod tests {
         match &doc.blocks[0] {
             Block::Paragraph(p) => match &p.content[0] {
                 Inline::Element(el) => {
-                    assert_eq!(el.sigil, Sigil::At(Some("link".to_string())));
+                    assert_eq!(el.sigil, Sigil::inline("link"));
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
@@ -934,7 +928,7 @@ mod tests {
         let doc = from_markdown("<https://example.com>\n");
         match &doc.blocks[0] {
             Block::Paragraph(p) => match &p.content[0] {
-                Inline::Element(el) => assert_eq!(el.sigil, Sigil::At(Some("link".to_string()))),
+                Inline::Element(el) => assert_eq!(el.sigil, Sigil::inline("link")),
                 other => panic!("expected element, got {other:?}"),
             },
             other => panic!("expected paragraph, got {other:?}"),
@@ -947,7 +941,7 @@ mod tests {
         match &doc.blocks[0] {
             Block::Paragraph(p) => match &p.content[0] {
                 Inline::Element(el) => {
-                    assert_eq!(el.sigil, Sigil::Type("embed".to_string()));
+                    assert_eq!(el.sigil, Sigil::block("embed"));
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
@@ -970,7 +964,7 @@ mod tests {
     fn thematic_break() {
         let doc = from_markdown("---\n");
         match &doc.blocks[0] {
-            Block::Element(el) => assert_eq!(el.sigil, Sigil::Type("hr".to_string())),
+            Block::Element(el) => assert_eq!(el.sigil, Sigil::block("hr")),
             other => panic!("expected hr element, got {other:?}"),
         }
     }
@@ -980,7 +974,7 @@ mod tests {
         let doc = from_markdown("```rust\nfn main() {}\n```\n");
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("codeblock".to_string()));
+                assert_eq!(el.sigil, Sigil::block("codeblock"));
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
@@ -1002,7 +996,7 @@ mod tests {
         let doc = from_markdown("> quoted text\n");
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("blockquote".to_string()));
+                assert_eq!(el.sigil, Sigil::block("blockquote"));
                 assert_eq!(el.args, None);
                 assert_eq!(
                     el.content,
@@ -1024,12 +1018,12 @@ mod tests {
         let doc = from_markdown("> # Quoted Title\n>\n> more text\n");
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("blockquote".to_string()));
+                assert_eq!(el.sigil, Sigil::block("blockquote"));
                 let content = el.content.as_ref().expect("content");
                 assert!(
                     !content
                         .iter()
-                        .any(|i| matches!(i, Inline::Element(inner) if classify(inner) == ElementKind::Heading)),
+                        .any(|i| matches!(i, Inline::Element(inner) if classify_lenient(inner) == ElementKind::Heading)),
                     "heading should have been spliced as text, not nested as an element: {content:?}"
                 );
                 assert!(
@@ -1086,7 +1080,7 @@ mod tests {
         let Inline::Element(el1) = &p.content[1] else {
             panic!("expected element 1");
         };
-        assert_eq!(el1.sigil, Sigil::At(Some("link".to_string())));
+        assert_eq!(el1.sigil, Sigil::inline("link"));
         assert_eq!(
             el1.args,
             Some(Value::Map(vec![(
@@ -1105,7 +1099,7 @@ mod tests {
         let Inline::Element(el2) = &p.content[3] else {
             panic!("expected element 2");
         };
-        assert_eq!(el2.sigil, Sigil::At(Some("link".to_string())));
+        assert_eq!(el2.sigil, Sigil::inline("link"));
         assert_eq!(
             el2.args,
             Some(Value::Map(vec![(
@@ -1131,7 +1125,7 @@ mod tests {
         assert_eq!(doc.blocks.len(), 1);
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::At(Some("table".to_string())));
+                assert_eq!(el.sigil, Sigil::block("table"));
                 assert!(el.content.is_some());
             }
             other => panic!("expected table element, got {other:?}"),
@@ -1316,7 +1310,7 @@ mod tests {
         let Inline::Element(embed1) = &p.content[0] else {
             panic!("expected embed element 1");
         };
-        assert_eq!(embed1.sigil, Sigil::Type("embed".to_string()));
+        assert_eq!(embed1.sigil, Sigil::block("embed"));
         assert_eq!(
             embed1.args,
             Some(Value::Map(vec![(
@@ -1332,7 +1326,7 @@ mod tests {
         let Inline::Element(embed2) = &p.content[2] else {
             panic!("expected embed element 2");
         };
-        assert_eq!(embed2.sigil, Sigil::Type("embed".to_string()));
+        assert_eq!(embed2.sigil, Sigil::block("embed"));
         assert_eq!(
             embed2.args,
             Some(Value::Map(vec![(
@@ -1358,7 +1352,7 @@ mod tests {
         let Inline::Element(el1) = &p.content[1] else {
             panic!("expected element 1");
         };
-        assert_eq!(el1.sigil, Sigil::At(Some("link".to_string())));
+        assert_eq!(el1.sigil, Sigil::inline("link"));
         assert_eq!(
             el1.args,
             Some(Value::Map(vec![(
@@ -1370,7 +1364,7 @@ mod tests {
         let Inline::Element(el2) = &p.content[3] else {
             panic!("expected element 2");
         };
-        assert_eq!(el2.sigil, Sigil::At(Some("link".to_string())));
+        assert_eq!(el2.sigil, Sigil::inline("link"));
         assert_eq!(
             el2.args,
             Some(Value::Map(vec![(
@@ -1405,7 +1399,7 @@ mod tests {
         let Block::Element(el) = &doc.blocks[0] else {
             panic!("expected element");
         };
-        assert_eq!(el.sigil, Sigil::Type("callout".to_string()));
+        assert_eq!(el.sigil, Sigil::block("callout"));
         assert_eq!(
             el.args,
             Some(Value::Map(vec![
@@ -1422,7 +1416,7 @@ mod tests {
         let Block::Element(el_plain) = &doc_plain.blocks[0] else {
             panic!("expected plain quote element");
         };
-        assert_eq!(el_plain.sigil, Sigil::Type("blockquote".to_string()));
+        assert_eq!(el_plain.sigil, Sigil::block("blockquote"));
         assert_eq!(el_plain.args, None);
     }
 

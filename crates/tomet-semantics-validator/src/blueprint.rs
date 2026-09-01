@@ -1,7 +1,7 @@
 //! Blueprint structural validation against a target document.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Span, Value};
-use tomet_semantics::{ElementKind, classify};
+use tomet_ast::{Block, Document, Element, Inline, Span, Value};
+use tomet_semantics::{ElementKind, classify_lenient};
 use tomet_tree::ValueExt;
 
 use crate::ValidationError;
@@ -30,20 +30,21 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
 
     for block in &blueprint.blocks {
         if let Block::Element(el) = block {
-            let kind = classify(el);
+            let kind = classify_lenient(el);
             if kind == ElementKind::Blueprint || kind == ElementKind::Kind {
                 found_blueprint_or_kind = true;
                 if let Some(Value::String(k)) = &el.args {
                     target_kind = k.clone();
                 } else if let Some(Value::Map(entries)) = &el.args {
-                    if let Some((_, v)) = entries.iter().find(|(k, _)| k == "target" || k == "kind") {
+                    if let Some((_, v)) = entries.iter().find(|(k, _)| k == "target" || k == "kind")
+                    {
                         if let Some(s) = v.as_str() {
                             target_kind = s.to_string();
                         }
                     }
                 }
             } else if kind == ElementKind::Meta {
-                if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
+                if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
                     for (k, _) in entries {
                         required_meta_keys.push((k.clone(), el.span));
                     }
@@ -62,8 +63,13 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
                     .and_then(|a| a.get("id"))
                     .and_then(|v| v.as_str())
                     .or_else(|| {
-                        if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
-                            entries.iter().find(|(k, _)| k == "id").and_then(|(_, v)| v.as_str())
+                        if let Some(entries) =
+                            el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>())
+                        {
+                            entries
+                                .iter()
+                                .find(|(k, _)| *k == "id")
+                                .and_then(|(_, v)| v.as_str())
                         } else {
                             None
                         }
@@ -109,9 +115,9 @@ pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<V
 
     for block in &doc.blocks {
         if let Block::Element(el) = block {
-            if classify(el) == ElementKind::Meta {
+            if classify_lenient(el) == ElementKind::Meta {
                 doc_meta_span = el.span;
-                if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
+                if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
                     for (k, _) in entries {
                         doc_meta_keys.push(k.clone());
                     }
@@ -142,15 +148,20 @@ pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<V
 
     for block in &doc.blocks {
         if let Block::Element(el) = block {
-            if classify(el) == ElementKind::Heading {
+            if classify_lenient(el) == ElementKind::Heading {
                 let id = el
                     .args
                     .as_ref()
                     .and_then(|a| a.get("id"))
                     .and_then(|v| v.as_str())
                     .or_else(|| {
-                        if let Some(ElementValue::Data(Value::Map(entries))) = &el.value {
-                            entries.iter().find(|(k, _)| k == "id").and_then(|(_, v)| v.as_str())
+                        if let Some(entries) =
+                            el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>())
+                        {
+                            entries
+                                .iter()
+                                .find(|(k, _)| *k == "id")
+                                .and_then(|(_, v)| v.as_str())
                         } else {
                             None
                         }
