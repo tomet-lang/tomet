@@ -5,6 +5,7 @@ pub mod export;
 pub mod format;
 pub mod from_md;
 pub mod html;
+pub mod new;
 pub mod refactor;
 pub mod roundtrip;
 pub mod serve;

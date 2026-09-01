@@ -13,6 +13,19 @@ pub enum ValidationError {
         first: Span,
         duplicate: Span,
     },
+    /// A required `@meta` field defined in the blueprint is missing from the document.
+    MissingRequiredMetaKey {
+        key: String,
+        kind: String,
+        span: Span,
+    },
+    /// A required section/heading defined in the blueprint is missing from the document.
+    MissingRequiredSection {
+        title: String,
+        id: Option<String>,
+        kind: String,
+        span: Span,
+    },
 }
 
 impl ValidationError {
@@ -20,6 +33,8 @@ impl ValidationError {
     pub fn span(&self) -> Span {
         match self {
             ValidationError::DuplicateId { duplicate, .. } => *duplicate,
+            ValidationError::MissingRequiredMetaKey { span, .. } => *span,
+            ValidationError::MissingRequiredSection { span, .. } => *span,
         }
     }
 }
@@ -33,6 +48,30 @@ impl fmt::Display for ValidationError {
                     "duplicate id `{id}` (first defined at {}:{})",
                     first.start.line, first.start.column
                 )
+            }
+            ValidationError::MissingRequiredMetaKey { key, kind, .. } => {
+                write!(
+                    f,
+                    "document of kind `{kind}` is missing required @meta field `{key}`"
+                )
+            }
+            ValidationError::MissingRequiredSection {
+                title,
+                id,
+                kind,
+                ..
+            } => {
+                if let Some(sec_id) = id {
+                    write!(
+                        f,
+                        "document of kind `{kind}` is missing required section `{title}` (id: {sec_id})"
+                    )
+                } else {
+                    write!(
+                        f,
+                        "document of kind `{kind}` is missing required section `{title}`"
+                    )
+                }
             }
         }
     }

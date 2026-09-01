@@ -1,0 +1,13 @@
+@blueprint(daily-note)
+@meta{
+  id: ${uuid()}
+  date: ${date("YYYY-MM-DD")}
+  title: ${title}
+}
+
+#[ TODO ] {id: todo}
+- ( ) 
+
+#[ Review ] {id: review}
+
+#[ Timeline ] {id: timeline}

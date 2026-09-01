@@ -6,11 +6,13 @@
 //! - **[`structural`]**: Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
 //! - **[`meta`]**: Batch `@meta` key/value updates.
 
+pub mod blueprint;
 pub mod directive;
 pub mod macro_rewrite;
 pub mod meta;
 pub mod structural;
 
+pub use blueprint::*;
 pub use directive::*;
 pub use macro_rewrite::*;
 pub use meta::*;

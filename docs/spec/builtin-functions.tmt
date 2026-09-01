@@ -6,3 +6,9 @@
 
 ${sum(1, 4)}
 ${ref(id(asdf-asdfa).contents(dafault))}
+$uuid()
+$date()
+$time()
+${vars.*}
+${filename}
+${title}

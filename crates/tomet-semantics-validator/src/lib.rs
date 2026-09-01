@@ -1,6 +1,8 @@
+pub mod blueprint;
 mod error;
 mod id;
 
+pub use blueprint::*;
 pub use error::{CstValidationError, ValidationError};
 
 use id::{collect_ids, collect_ids_cst};

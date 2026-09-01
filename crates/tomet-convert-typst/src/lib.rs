@@ -120,7 +120,7 @@ fn inline_to_typst(inlines: &[Inline]) -> String {
 fn element_to_typst(el: &Element, inline: bool) -> String {
     let kind = classify(el);
     match kind.as_str() {
-        "version" | "kind" | "meta" | "config" => String::new(),
+        "version" | "kind" | "meta" | "config" | "blueprint" => String::new(),
         // Block-position only, mirroring `tomet-convert-markdown`'s
         // heading handling -- a nested/inline `@heading(...)`
         // (`inline == true`) falls through to the generic fallback

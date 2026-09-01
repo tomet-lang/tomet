@@ -162,45 +162,18 @@ produce and format Tomet's own source text.
   `serde_yaml` play for their formats. Headings/prose/links have no serde
   equivalent and aren't handled here.
 - **`tomet-formatter`** (`crates/tomet-formatter`): AST-aware whitespace and raw-content preserving formatter,
-  plus (as of `format_source_with_config`) an opt-in, config-gated pass that makes
-  small structural additions. Two-stage, config-gated pipeline:
-  1. **Config-driven patch pass** (only runs if the relevant
-     `tomet-config` rule is set on the document -- e.g.
-     `meta_fields.id`; a document with no such config is untouched by
-     this stage, so `format_source_with_config` degrades to exactly
-     `format_source`'s behavior). Walks the parsed `Document` to find
-     the target `@meta` element (or decide none exists), builds the new
-     `id` state (insert if missing and `force`/`overwrite`; replace an
-     invalid one only if `overwrite`; leave a valid one alone -- the
-     same per-case gating as `tomet-printer`'s
-     `ensure_document_id_with_config`), renders that one element via
-     `tomet-style`'s `render_meta_element`, then splices the result
-     into the *original* source at that element's `Span` (or prepends a
-     freshly rendered block if there was no `@meta` element at all) --
-     never rebuilds the whole document from the AST (that's
-     `tomet-printer`'s job, and doing it here would defeat the
-     reason this crate exists: not touching content it wasn't told to
-     change). Note: when this pass *is* triggered, the touched element
-     is rendered exactly as `tomet-printer` would render it -- e.g.
-     a hand-written single-line `@meta{id: ...}` can come out multi-line
-     as `@meta(format:yaml){...}` if `config.meta_format` says so. This
-     is intentional: the losslessness guarantee is about *not touching*
-     elements/documents with no matching config rule, not about
-     preserving a touched element's original shape once config *does*
-     apply to it.
+  with layout adjustment for tables.
+  1. **Config-driven table layout** (`format_tables_with_config` / `format_source_with_config`):
+     formats `@table[...]` column widths and cell alignments according to `PrinterConfig` (e.g.
+     `table.adjust_width`, `table.max_col_width`, `table.align`). Never mutates metadata (`@meta`)
+     or injects structural elements into the document.
   2. **Whitespace-hygiene pass** (`format_source`, unconditional, always
      runs last): normalizes whitespace policy (LF line endings, no
      trailing whitespace, one final newline, collapsed blank-line runs)
      while using AST `Span` metadata to losslessly preserve literal
      spacing and line breaks inside verbatim content (`<codeblock>[...]`
-     or elements with `content:raw`). This stage alone still guarantees
-     `does_not_change_the_parsed_document` -- asserted across the whole
-     shared corpus by the `tomet-tests` package's `roundtrip` target,
-     which also records the one known case where the guarantee fails
-     today (an element whose `content:raw` never took effect, so there is
-     no raw span for the whitespace rule to skip). That invariant does
-     not extend to stage 1, which exists precisely to make deliberate,
-     config-authorized changes.
+     or elements with `content:raw`). Guaranteed `does_not_change_the_parsed_document` --
+     asserted across the whole shared corpus by the `tomet-tests` package's `roundtrip` target.
 - **`tomet-config`** (`crates/tomet-workspace-config`): owns `PrinterConfig`/`FieldConfig` (loaded
   from a `default.config.tmt`/`tomet.config.tmt`, or an
   `@settings`/`@config` element in a document) and everything they

@@ -311,6 +311,30 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                         }),
                         range: Some(span_to_range(&span)),
                     })
+                } else if kind == ElementKind::Blueprint {
+                    let target_kind = normalized_element_args(el)
+                        .and_then(|v| {
+                            v.get("target")
+                                .or_else(|| v.get("kind"))
+                                .and_then(|k| k.as_str())
+                                .map(|s| s.to_string())
+                        })
+                        .or_else(|| {
+                            el.args
+                                .as_ref()
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
+                        })
+                        .unwrap_or_else(|| "unknown".to_string());
+                    let mut desc = format!("**Blueprint Archetype**: `{target_kind}`\n\n");
+                    desc.push_str("Defines the structural blueprint and template schema for documents of this kind.");
+                    Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: desc,
+                        }),
+                        range: Some(span_to_range(&span)),
+                    })
                 } else if kind == ElementKind::Version {
                     let declared_ver = normalized_element_args(el)
                         .and_then(|v| {
@@ -840,6 +864,7 @@ pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
     let builtins = [
         ("version", "Tomet language specification version"),
         ("kind", "Document kind (archetype / schema) declaration"),
+        ("blueprint", "Document blueprint and archetype template declaration"),
         ("callout", "Callout container block"),
         ("warning", "Warning alert block"),
         ("caution", "Caution alert block"),
@@ -890,6 +915,9 @@ pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
             ("mul", "Arithmetic multiplication function `mul(a, b)`"),
             ("div", "Floating-point division function `div(a, b)`"),
             ("mod", "Integer modulo function `mod(a, b)`"),
+            ("uuid", "Generate UUID v4 identifier `uuid()`"),
+            ("date", "Current date formatted string `date(format)`"),
+            ("time", "Current time formatted string `time(format)`"),
         ];
 
         for (func, detail) in compute_funcs {

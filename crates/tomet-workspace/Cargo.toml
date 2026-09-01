@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }
+tomet-compute = { workspace = true }
 tomet-config = { workspace = true }
 tomet-formatter = { workspace = true }
 tomet-indexer = { workspace = true }

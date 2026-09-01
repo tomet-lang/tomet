@@ -1936,6 +1936,7 @@ dependencies = [
  "tomet-parser",
  "tomet-resolver",
  "tomet-semantics",
+ "uuid",
 ]
 
 [[package]]
@@ -1970,12 +1971,7 @@ version = "0.1.0"
 dependencies = [
  "tomet-ast",
  "tomet-config",
- "tomet-cst",
- "tomet-field-utils",
  "tomet-parser",
- "tomet-semantics",
- "tomet-style",
- "tomet-tree",
  "unicode-width 0.2.0",
 ]
 
@@ -2180,13 +2176,17 @@ name = "tomet-tests"
 version = "0.1.0"
 dependencies = [
  "tomet-ast",
+ "tomet-compute",
  "tomet-config",
  "tomet-formatter",
  "tomet-html",
  "tomet-markdown",
  "tomet-parser",
  "tomet-printer",
+ "tomet-transform",
  "tomet-typst",
+ "tomet-validator",
+ "tomet-workspace",
  "tree-sitter",
  "tree-sitter-tomet",
 ]
@@ -2196,6 +2196,7 @@ name = "tomet-transform"
 version = "0.1.0"
 dependencies = [
  "tomet-ast",
+ "tomet-compute",
  "tomet-parser",
  "tomet-semantics",
  "tomet-tree",
@@ -2249,6 +2250,7 @@ dependencies = [
  "tomet-ast",
  "tomet-cst",
  "tomet-parser",
+ "tomet-semantics",
  "tomet-tree",
 ]
 
@@ -2277,6 +2279,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "tomet-ast",
+ "tomet-compute",
  "tomet-config",
  "tomet-formatter",
  "tomet-indexer",

@@ -1,6 +1,6 @@
 # tomet-formatter
 
-Tomet ソースコードの空白整形および設定に基づく最小差分パッチ適用を提供するクレート。
+Tomet ソースコードの空白整形およびテーブルレイアウト調整を提供するクレート。
 
 ## 責務と機能
 
@@ -8,6 +8,7 @@ Tomet ソースコードの空白整形および設定に基づく最小差分�
    - 行末空白の除去、余剰空行の圧縮、LF 改行の統一。
    - `<codeblock>` や `content:raw` 内の空白・インデントを `Span` 情報を用いて完全保持。
    - 冪等性の保証（複数回実行しても結果が不変）。
+   - メタデータやドキュメント構造を決して勝手に変更しない。
 
--. **設定駆動のパッチ適用 (`format_source_with_config`)**:
-   - `PrinterConfig` に従い、未設定の `@meta{id: ...}` の補完やフォーマット変換を対象箇所の Span のみピンポイントで置換・挿入。
+-. **設定駆動のテーブルレイアウト調整 (`format_source_with_config`)**:
+   - `PrinterConfig` の設定（`table.adjust_width`, `table.max_col_width`, `table.align`）に基づき、`@table[...]` 内の各列幅やセルのスペース揃えを自動調整。

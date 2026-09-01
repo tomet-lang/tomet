@@ -37,6 +37,7 @@ pub struct PrinterConfig {
     pub table_max_col_width: Option<usize>,
     pub table_align: Option<String>,
     pub macros: std::collections::HashMap<String, String>,
+    pub templates: std::collections::HashMap<String, String>,
 }
 
 impl PrinterConfig {
@@ -187,6 +188,30 @@ impl PrinterConfig {
                     for (mk, mv) in entries {
                         if let Some(template) = mv.as_str() {
                             cfg.macros.insert(mk.clone(), template.to_string());
+                        }
+                    }
+                }
+            }
+            "templates" | "template" => {
+                if let Value::Map(entries) = value {
+                    for (tk, tv) in entries {
+                        if let Some(path) = tv.as_str() {
+                            cfg.templates.insert(tk.clone(), path.to_string());
+                        } else if let Some(path) = tv
+                            .get("path")
+                            .or_else(|| tv.get("template"))
+                            .and_then(|p| p.as_str())
+                        {
+                            cfg.templates.insert(tk.clone(), path.to_string());
+                        }
+                    }
+                }
+            }
+            "types" => {
+                if let Value::Map(entries) = value {
+                    for (tk, tv) in entries {
+                        if let Some(path) = tv.get("template").and_then(|p| p.as_str()) {
+                            cfg.templates.insert(tk.clone(), path.to_string());
                         }
                     }
                 }
