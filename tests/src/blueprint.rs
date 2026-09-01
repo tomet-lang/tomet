@@ -9,7 +9,8 @@ use tomet_workspace::{create_file_from_template, find_template, list_templates};
 
 #[test]
 fn test_blueprint_end_to_end_lifecycle() {
-    let temp_dir = std::env::temp_dir().join(format!("tm_test_cross_blueprint_{}", std::process::id()));
+    let temp_dir =
+        std::env::temp_dir().join(format!("tm_test_cross_blueprint_{}", std::process::id()));
     let _ = fs::remove_dir_all(&temp_dir);
     let _ = fs::create_dir_all(&temp_dir);
 
@@ -56,15 +57,9 @@ fn test_blueprint_end_to_end_lifecycle() {
     );
 
     let doc_rel_path = Path::new("journal/2026-09-01.tmt");
-    let doc_abs_path = create_file_from_template(
-        &temp_dir,
-        "daily-note",
-        doc_rel_path,
-        &vars,
-        &config,
-        false,
-    )
-    .expect("creation should succeed");
+    let doc_abs_path =
+        create_file_from_template(&temp_dir, "daily-note", doc_rel_path, &vars, &config, false)
+            .expect("creation should succeed");
 
     assert!(doc_abs_path.is_file());
     let doc_content = fs::read_to_string(&doc_abs_path).unwrap();
@@ -80,7 +75,10 @@ fn test_blueprint_end_to_end_lifecycle() {
     let doc_ast = tomet_parser::parse_document(&doc_content).unwrap();
 
     let errors = validate_against_blueprint(&doc_ast, &blueprint_ast);
-    assert!(errors.is_empty(), "newly generated document must satisfy blueprint: {errors:?}");
+    assert!(
+        errors.is_empty(),
+        "newly generated document must satisfy blueprint: {errors:?}"
+    );
 
     // 5. Test validation failure when a required section is removed
     let corrupted_src = doc_content
@@ -90,7 +88,11 @@ fn test_blueprint_end_to_end_lifecycle() {
     let corrupted_ast = tomet_parser::parse_document(&corrupted_src).unwrap();
     let errors_on_corrupt = validate_against_blueprint(&corrupted_ast, &blueprint_ast);
     assert_eq!(errors_on_corrupt.len(), 1);
-    assert!(errors_on_corrupt[0].to_string().contains("missing required section `Review` (id: review)"));
+    assert!(
+        errors_on_corrupt[0]
+            .to_string()
+            .contains("missing required section `Review` (id: review)")
+    );
 
     // 6. Test converters (HTML, Markdown, Typst ignore @blueprint)
     let html_out = tomet_html::render_body(&blueprint_ast);
