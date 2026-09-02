@@ -214,15 +214,18 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
 
     if config.meta_always_newline || effective_format.is_some() {
         if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
-            let mut out = if let Some(ref fmt) = effective_format {
-                format!("@meta(format:{fmt}){{\n")
-            } else {
-                String::from("@meta{\n")
+            // A declared `format:` means the body is written as a `+++`
+            // fence, not a `{...}` group: the fence is what carries a
+            // body in another language now.
+            let (open, close, indent) = match effective_format {
+                Some(ref fmt) => (format!("#meta(format:{fmt})+++\n"), "+++", ""),
+                None => (String::from("#meta{\n"), "}", "  "),
             };
+            let mut out = open;
             for (k, v) in entries {
                 let field_cfg = config.meta_fields.get(k);
                 let val_str = render_meta_field_value(v, field_cfg, config);
-                out.push_str("  ");
+                out.push_str(indent);
                 out.push_str(k);
                 if val_str.starts_with('\n') || val_str.is_empty() {
                     out.push(':');
@@ -232,12 +235,12 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
                 out.push_str(&val_str);
                 out.push('\n');
             }
-            out.push('}');
+            out.push_str(close);
             return out;
         }
     }
 
-    let mut out = String::from("@meta");
+    let mut out = String::from("#meta");
     if let Some(args) = &el.args {
         out.push('(');
         out.push_str(&render_args_with_config(args, config));

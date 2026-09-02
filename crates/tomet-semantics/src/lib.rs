@@ -10,6 +10,7 @@
 
 mod config;
 mod connect;
+pub mod embedded;
 mod heading;
 mod kind;
 mod list;

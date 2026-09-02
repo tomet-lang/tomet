@@ -2,7 +2,6 @@ mod codeblock;
 pub mod cst;
 mod document;
 mod element;
-pub mod embedded_format;
 mod error;
 mod fence;
 mod heading;
@@ -1131,48 +1130,76 @@ mod tests {
         assert!(parse_document("#caution[ has an [ that never closes\n]\n").is_err());
     }
 
+    /// The `Raw` body of `doc`'s first block, or a panic.
+    fn raw_body(doc: &tomet_ast::Document) -> &str {
+        match &doc.blocks[0] {
+            Block::Element(el) => match &el.value {
+                Some(ElementValue::Raw(body)) => body,
+                other => panic!("expected a raw fence body, got {other:?}"),
+            },
+            other => panic!("expected an element, got {other:?}"),
+        }
+    }
+
     #[test]
-    fn content_raw_preserves_brackets_and_newlines_losslessly() {
+    fn a_fence_preserves_brackets_and_newlines_losslessly() {
         let doc =
             parse_document("#memo+++\nline one\nline two with * and [brackets] inside\n+++\n")
                 .unwrap();
-        match &doc.blocks[0] {
-            Block::Element(el) => {
-                assert_eq!(
-                    el.content,
-                    Some(vec![Inline::Text(
-                        "\nline one\nline two with * and [brackets] inside\n".into()
-                    )])
-                );
-            }
-            other => panic!("expected an element, got {other:?}"),
-        }
+        assert_eq!(
+            raw_body(&doc),
+            "line one\nline two with * and [brackets] inside"
+        );
     }
 
     #[test]
-    fn content_raw_is_not_confused_by_an_apostrophe() {
-        // The reason `content:raw` can't reuse codeblock's quote-aware
-        // matcher as-is: free-form prose has no guarantee its `'`/`"`
-        // occurrences are balanced the way real source code's are.
+    fn a_fence_is_not_confused_by_an_apostrophe() {
+        // The old `(content:raw)[...]` matched brackets and had to stay
+        // quote-agnostic, because free-form prose gives no guarantee its
+        // `'`/`"` occurrences are balanced. A fence has no such problem:
+        // it ends at a line, so nothing inside it can be miscounted.
         let doc = parse_document("#memo+++\ndon't forget [this]\n+++\n").unwrap();
-        match &doc.blocks[0] {
-            Block::Element(el) => {
-                assert_eq!(
-                    el.content,
-                    Some(vec![Inline::Text("don't forget [this]".into())])
-                );
-            }
-            other => panic!("expected an element, got {other:?}"),
-        }
+        assert_eq!(raw_body(&doc), "don't forget [this]");
     }
 
     #[test]
-    fn an_unrecognized_content_value_falls_back_to_ordinary_prose() {
-        // Mirrors `format`'s unknown-value fallback: `content:raw` is the
-        // only recognized value, anything else (or no `content` key at all)
-        // parses as normal prose, so line breaks still collapse per the
-        // usual lazy-continuation rule.
-        let doc = parse_document("#memo(content:literal)[\nline one\nline two\n]\n").unwrap();
+    fn a_fence_body_is_not_confused_by_an_unquoted_brace() {
+        // The bug the fence removes by construction: the old
+        // `(format:yaml){...}` scanner tracked brace depth, so a `}`
+        // inside otherwise legal YAML ended the body early.
+        let doc = parse_document("#meta(format:yaml)+++\na: \"}\"\nb: 1\n+++\n").unwrap();
+        assert_eq!(raw_body(&doc), "a: \"}\"\nb: 1");
+    }
+
+    #[test]
+    fn a_longer_fence_run_escapes_a_body_containing_a_fence() {
+        let doc = parse_document("#memo++++\n+++\nstill inside\n++++\n").unwrap();
+        assert_eq!(raw_body(&doc), "+++\nstill inside");
+    }
+
+    #[test]
+    fn an_unterminated_fence_runs_to_eof() {
+        // Matching the backtick fence, and unlike `[...]`/`{...}` groups,
+        // which error when unclosed.
+        let doc = parse_document("#memo+++\nno closing line\n").unwrap();
+        assert_eq!(raw_body(&doc), "no closing line");
+    }
+
+    #[test]
+    fn interpolation_does_not_expand_inside_a_fence() {
+        // `default.config.tmt` stores macro templates such as
+        // `"https://github.com/.../${1}"` that must reach
+        // `tomet-transform`'s `MacroPattern::from_template` verbatim.
+        let doc = parse_document("#config(format:json)+++\n{\"gh\": \"x/${1}\"}\n+++\n").unwrap();
+        assert_eq!(raw_body(&doc), "{\"gh\": \"x/${1}\"}");
+    }
+
+    #[test]
+    fn content_raw_is_now_just_an_ordinary_argument() {
+        // `(content:raw)` no longer changes how `[...]` is lexed -- that
+        // was one of the four places the parser consulted an element's
+        // own arguments. Line breaks collapse per the usual rule.
+        let doc = parse_document("#memo(content:raw)[\nline one\nline two\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(

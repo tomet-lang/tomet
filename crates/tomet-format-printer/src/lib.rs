@@ -297,7 +297,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     }
 
     if el.sigil.is_bare_named("codeblock") {
-        let mut out = String::from("<codeblock>");
+        let mut out = String::from("#codeblock");
         if let Some(args) = &el.args {
             out.push('(');
             out.push_str(&render_args_with_config(args, config));

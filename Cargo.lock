@@ -2097,14 +2097,11 @@ dependencies = [
 name = "tomet-parser"
 version = "0.1.0"
 dependencies = [
- "serde_json",
- "serde_yaml",
  "tomet-ast",
  "tomet-cst",
  "tomet-lexer",
  "tomet-semantics",
  "tomet-tree",
- "toml",
 ]
 
 [[package]]
@@ -2156,9 +2153,12 @@ dependencies = [
 name = "tomet-semantics"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
+ "serde_yaml",
  "tomet-ast",
  "tomet-parser",
  "tomet-tree",
+ "toml",
 ]
 
 [[package]]
