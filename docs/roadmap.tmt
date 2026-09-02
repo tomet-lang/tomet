@@ -11,8 +11,8 @@
 - ( ) `[]`のkey
 - ( ) コネクト構文2                    // `:(){}[]`
 - ( ) `@tomet(version: 1)` or features.
-- ("!") 独自DSL Settings               // 難しいから、json,yamlに逃がした。
-- ("!") 独自DSL Value                  //
+- (STOP) 独自DSL Settings               // 難しいから、json,yamlに逃がした。
+- (STOP) 独自DSL Value                  //
 ---[ 構文を実装する ]---
 - ( ) ビルトイン関数の強化             // `@link`,`@`, `@index`, `@callout`, `@tag`
 - ( ) `#meta`にkdlを追加

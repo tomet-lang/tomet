@@ -21,7 +21,9 @@ shared corpus, or that cross a crate boundary, live here.
 | `ref/` | Committed reference output for the snapshot tests |
 | `store/` | Actual output, written only on mismatch. Gitignored |
 | `src/lib.rs` | Harness: corpus discovery, snapshot compare, tree-sitter helpers |
+| `SYNTAX.md` | Generated inventory of every construct the parser accepts |
 | `src/corpus.rs` | Every fixture parses; tree-sitter grammar drift cases |
+| `src/syntax_report.rs` | Generates and checks `SYNTAX.md` |
 | `src/roundtrip.rs` | Parser + formatter and parser + printer invariants |
 | `src/snapshot.rs` | `.tmt` -> HTML / CommonMark / Typst / printed `.tmt` |
 
@@ -35,6 +37,23 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests   # accept new snapshot output
 
 When a snapshot fails, the actual output is written to `store/` at the
 same relative path as its reference, so the two can be diffed directly.
+
+## `SYNTAX.md` is descriptive, `docs/spec/` is normative
+
+`docs/spec/` says what the language *should* accept. It is hand-written,
+so nothing forces it to match the parser, and it has drifted. `SYNTAX.md`
+says what the implementation *does* accept: every line is produced by
+running `tomet-parser` over the table in `src/syntax_report.rs`, and the
+result is compared against the committed file, so a grammar change that
+is not reflected there fails the suite.
+
+Reading the two side by side is the point. Where they disagree, the
+disagreement is the finding -- do not silently edit one to match the
+other.
+
+```bash
+TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report
+```
 
 ## The references are a regression net, not a correctness claim
 
