@@ -47,6 +47,7 @@ pub fn format_source(src: &str) -> String {
     if let Ok(doc) = parse_document(&normalized) {
         collect_raw_spans(&doc, &mut raw_spans);
     }
+    collect_fence_spans(&normalized, &mut raw_spans);
 
     let is_offset_raw = |offset: usize| -> bool {
         raw_spans
@@ -106,29 +107,24 @@ pub fn format_source(src: &str) -> String {
 fn quote_bare_at_yaml_values(src: &str) -> String {
     let mut out = String::with_capacity(src.len());
     let mut pos = 0;
-    while let Some(rel_open) = find_next_format_yaml_body_start(&src[pos..]) {
-        let open = pos + rel_open;
-        out.push_str(&src[pos..open]);
-        let Some(close) = find_matching(src, open, '{', '}') else {
-            // Unterminated `{` -- some other problem already makes this
-            // file unparseable; not this pass's job to diagnose that, so
-            // just copy the rest through untouched.
-            out.push_str(&src[open..]);
-            return out;
-        };
-        out.push('{');
-        quote_bare_at_values_in(src, open + 1, close, &mut out);
-        out.push('}');
-        pos = close + 1;
+    while let Some((body_start, body_end)) = find_next_format_yaml_body(&src[pos..]) {
+        let (body_start, body_end) = (pos + body_start, pos + body_end);
+        out.push_str(&src[pos..body_start]);
+        quote_bare_at_values_in(src, body_start, body_end, &mut out);
+        pos = body_end;
     }
     out.push_str(&src[pos..]);
     out
 }
 
-/// Byte offset (relative to `s`) of the `{` opening the next
-/// `format:yaml`-tagged element's value body, or `None` if there isn't
-/// one.
-fn find_next_format_yaml_body_start(s: &str) -> Option<usize> {
+/// Byte range (relative to `s`) of the next `format:yaml`-tagged
+/// element's `+++` fence body, or `None` if there isn't one.
+///
+/// The body used to be a `{...}` group found by brace matching. It is a
+/// fence now, so the head is `(... format:yaml ...)+++` and the body runs
+/// to the closing `+++` line -- which is both simpler and immune to the
+/// stray-brace miscount the old scan could hit.
+fn find_next_format_yaml_body(s: &str) -> Option<(usize, usize)> {
     let mut search_from = 0;
     loop {
         let rel_open_paren = s[search_from..].find('(')?;
@@ -138,13 +134,25 @@ fn find_next_format_yaml_body_start(s: &str) -> Option<usize> {
             continue;
         };
         if args_declare_format_yaml(&s[open_paren + 1..close_paren]) {
-            let bytes = s.as_bytes();
-            let mut i = close_paren + 1;
-            while i < s.len() && matches!(bytes[i], b' ' | b'\t' | b'\n' | b'\r') {
-                i += 1;
-            }
-            if i < s.len() && bytes[i] == b'{' {
-                return Some(i);
+            let after = &s[close_paren + 1..];
+            let run = after.len() - after.trim_start_matches('+').len();
+            if run >= 3 {
+                let head_end = close_paren + 1 + run;
+                // Skip to just past the newline ending the head line.
+                let body_start = match s[head_end..].find('\n') {
+                    Some(nl) => head_end + nl + 1,
+                    None => return None,
+                };
+                let closer = "+".repeat(run);
+                let mut scan = body_start;
+                while scan < s.len() {
+                    let line_end = s[scan..].find('\n').map_or(s.len(), |n| scan + n);
+                    if s[scan..line_end].trim_end() == closer {
+                        return Some((body_start, scan));
+                    }
+                    scan = line_end + 1;
+                }
+                return Some((body_start, s.len()));
             }
         }
         search_from = close_paren + 1;
@@ -327,8 +335,10 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
         let line = lines[i];
         let trimmed = line.trim();
 
-        if (trimmed.starts_with("@table[") || trimmed.starts_with("<table["))
-            || (trimmed.starts_with("@table") && trimmed.contains('['))
+        // `#table` is the block form; `@table` is accepted too so an
+        // inline-written table still gets its columns laid out rather
+        // than being silently skipped.
+        if (trimmed.starts_with("#table") || trimmed.starts_with("@table")) && trimmed.contains('[')
         {
             out_lines.push(line.to_string());
             i += 1;
@@ -557,6 +567,43 @@ fn is_raw_element(el: &Element) -> bool {
     false
 }
 
+/// Byte ranges covered by `+++` fence bodies.
+///
+/// Found by scanning lines rather than through the AST: a fence is
+/// line-oriented, so the text alone says exactly where each body starts
+/// and ends, and `ElementValue::Raw` carries no span of its own. Anything
+/// inside is verbatim -- trailing whitespace included, which is the whole
+/// point of writing it in a fence.
+fn collect_fence_spans(src: &str, out: &mut Vec<(usize, usize)>) {
+    let mut offset = 0usize;
+    let mut fence: Option<(usize, usize)> = None; // (run length, body start)
+    for line in src.split_inclusive('\n') {
+        let trimmed = line.trim_end_matches(['\n', '\r']).trim_end();
+        // A closing line is all `+`; an opening run sits at the *end* of
+        // the element head, so the two are counted from opposite sides.
+        let leading = trimmed.len() - trimmed.trim_start_matches('+').len();
+        let trailing = trimmed.len() - trimmed.trim_end_matches('+').len();
+        match fence {
+            Some((open_run, body_start)) => {
+                if leading >= open_run && leading == trimmed.len() && !trimmed.is_empty() {
+                    out.push((body_start, offset));
+                    fence = None;
+                }
+            }
+            None => {
+                if trailing >= 3 {
+                    fence = Some((trailing, offset + line.len()));
+                }
+            }
+        }
+        offset += line.len();
+    }
+    // An unterminated fence runs to EOF, matching the parser.
+    if let Some((_, body_start)) = fence {
+        out.push((body_start, src.len()));
+    }
+}
+
 fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
     fn walk_element(el: &Element, out: &mut Vec<(usize, usize)>) {
         if is_raw_element(el) {
@@ -750,7 +797,7 @@ mod tests {
         config.table_align = Some("left".to_string());
 
         let out = format_source_with_config(src, &config);
-        assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][ 小軌道          ]"));
+        assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][ 小軌道         ]"));
         assert!(out.contains("[ K殻 ][ 1          ][ 2          ][ 1s @br(2)      ]"));
     }
 
@@ -763,7 +810,7 @@ mod tests {
         config.table_align = Some("right".to_string());
 
         let out = format_source_with_config(src, &config);
-        assert!(out.contains("[  殻 ][ 主量子数 n ][ 電子数 2n² ][          小軌道 ]"));
+        assert!(out.contains("[  殻 ][ 主量子数 n ][ 電子数 2n² ][         小軌道 ]"));
         assert!(out.contains("[ K殻 ][          1 ][          2 ][      1s @br(2) ]"));
     }
 
@@ -776,7 +823,7 @@ mod tests {
         config.table_align = Some("center".to_string());
 
         let out = format_source_with_config(src, &config);
-        assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][     小軌道      ]"));
+        assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][     小軌道     ]"));
         assert!(out.contains("[ K殻 ][     1      ][     2      ][   1s @br(2)    ]"));
     }
 
@@ -788,7 +835,7 @@ mod tests {
         config.table_max_col_width = Some(20);
 
         let out = format_source_with_config(src, &config);
-        assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][ 小軌道     ]"));
+        assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][ 小軌道    ]"));
         assert!(out.contains("[ K殻 ][          1 ][          2 ][ 1s @br(2) ]"));
     }
 

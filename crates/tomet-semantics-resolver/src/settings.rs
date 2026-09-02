@@ -77,10 +77,7 @@ fn settings_value(el: &Element) -> Option<Value> {
     if !el.sigil.is_bare_named("settings") && !el.sigil.is_bare_named("config") {
         return None;
     }
-    match &el.value {
-        Some(v) => v.as_data(),
-        _ => None,
-    }
+    tomet_semantics::embedded::element_data(el)
 }
 
 #[cfg(test)]

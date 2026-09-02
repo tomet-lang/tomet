@@ -103,9 +103,10 @@ fn extract_config_from_element(el: &Element, config: &mut DocumentConfig) {
         }
     }
 
-    // 2. Process the `key: value` pairs of `{value}`, if any.
-    if let Some(value) = &el.value {
-        for (k, v) in value.pairs() {
+    // 2. Process the element's value as data -- `{key: value}` pairs, or
+    // a `+++` fence body read with its declared `format:`.
+    if let Some(Value::Map(entries)) = crate::embedded::element_data(el) {
+        for (k, v) in &entries {
             process_config_entry(k, v, config);
         }
     }

@@ -22,7 +22,7 @@ impl SettingsSchema {
             return Self::default();
         }
 
-        let Some(val) = el.value.as_ref().and_then(|v| v.as_data()) else {
+        let Some(val) = crate::embedded::element_data(el) else {
             return Self::default();
         };
 
