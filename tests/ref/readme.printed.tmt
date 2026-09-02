@@ -1,6 +1,6 @@
-@settings(file: docs/docs.settings.tmt)
+#settings(file: docs/docs.settings.tmt)
 
-@config(export: type: commonmark, path: README.ja.md)
+#config(export: type: commonmark, path: README.ja.md)
 
 #[Tomet]
 
@@ -22,7 +22,7 @@
 -. ふりがなが簡単
 -. リテラルを保持
 
-<callout>(note)[MDXやAstroコンポーネントのように、文書の中に型付きデータやコンポーネントを埋め込みたいエンジニア向け ObsidianのDataviewやBasesのように、メタデータとノートを高度に連携させたいKB作成向け]
+#callout(note)[MDXやAstroコンポーネントのように、文書の中に型付きデータやコンポーネントを埋め込みたいエンジニア向け ObsidianのDataviewやBasesのように、メタデータとノートを高度に連携させたいKB作成向け]
 
 ---[vs json]---
 

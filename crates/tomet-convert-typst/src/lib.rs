@@ -609,7 +609,7 @@ mod tests {
     fn renders_id_link_against_links_container_label() {
         assert_eq!(
             typst("@link(target:id:greeting)[Hello]\n"),
-            "#link(@link-greeting)[Hello]\n\n"
+            "#link(<link-greeting>)[Hello]\n\n"
         );
     }
 
@@ -617,7 +617,7 @@ mod tests {
     fn renders_links_container_as_labeled_bullet_list() {
         assert_eq!(
             typst("#links {\n  (greeting)[ note ]\n}\n"),
-            "- *greeting*: note @link-greeting\n\n"
+            "- *greeting*: note <link-greeting>\n\n"
         );
     }
 

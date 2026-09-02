@@ -17,7 +17,7 @@
 
 - ビルトイン関数の強化
 - Elementの挙動を一般化
-- \`\`@\`meta\`にkdlを追加
+- \`#meta\`にkdlを追加
 
 ## 拡張性を確保する
 
@@ -55,12 +55,12 @@
 - 代入、関数構文 (\`\`$\`{var}\` \`compute\`,\`resolve\`)
 - 構文エラー (重複)
 - コメントアウト
-- 公式構文 (\`\`@\`settings\`, \`\`@\`config\`, \`\`@\`meta\`, \`\`@\`references\`)
+- 公式構文 (\`#settings\`, \`#config\`, \`#meta\`, \`#references\`)
 - 基本構文 (空白可, 改行可, 順不同)
 - 基本Markdown記法 (\`\*\`, \`\*\*\`, \`==\`, \`\_\_\`, \`\`)
 - 基本要素 (heading, list, horizontal line)
 - 名前 (element, arg, content, value)
-- 基本AST (\`\`<\`T>()\[\]{}\`)
+- 基本AST (\`\`@\`T()\[\]{}\`)
 
 ## 機能
 

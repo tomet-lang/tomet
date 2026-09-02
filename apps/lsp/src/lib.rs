@@ -9,7 +9,9 @@ use lsp_types::{
 };
 use std::ops::ControlFlow;
 use tomet_ast::{Document, Element, ElementValue, Inline, InterpExprKind, Sigil, Span, Value};
-use tomet_semantics::{ElementKind, classify_lenient, heading_level, normalized_element_args};
+use tomet_semantics::{
+    BUILTIN_KINDS, ElementKind, Shape, classify_lenient, heading_level, normalized_element_args,
+};
 use tomet_tree::{ElementExt, ValueExt, Visitor, walk_document};
 
 /// Converts an AST [`Span`] to an LSP [`Range`].
@@ -486,8 +488,8 @@ fn table_hover(text: &str, pos: Position, el: &Element) -> Option<Hover> {
         }
         let line_str = lines[line_idx];
         let trimmed = line_str.trim();
-        // Skip table header declaration line (e.g. `@table[...]` opening or `@table(...)`)
-        if trimmed.starts_with("@table") || trimmed.starts_with("<table") {
+        // Skip the element's own head line (`#table[`, `#table(...)`, ...).
+        if trimmed.starts_with("#table") || trimmed.starts_with("@table") {
             continue;
         }
         if trimmed == "]" || trimmed.starts_with("]{") || trimmed.starts_with("] ") {
@@ -855,56 +857,81 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
     })
 }
 
+/// The shape a built-in kind must be written with, or `None` when either
+/// is legal.
+fn shape_of(kind: &ElementKind) -> Option<Shape> {
+    let probe = tomet_tree::element_new(match kind {
+        ElementKind::Custom(_) | ElementKind::Bare | ElementKind::Interp => return None,
+        other => tomet_ast::Sigil::block(other.as_str()),
+    });
+    match tomet_semantics::shape_mismatch(&probe) {
+        // Written as a block and reported as a mismatch -> it is inline.
+        Some((_, expected)) => Some(expected),
+        None => Some(Shape::Block),
+    }
+}
+
+/// One-line description for a built-in element name.
+fn describe_kind(name: &str) -> &'static str {
+    match name {
+        "version" => "Tomet language specification version",
+        "kind" => "Document kind (archetype / schema) declaration",
+        "blueprint" => "Document blueprint and archetype template declaration",
+        "codeblock" => "Verbatim code block",
+        "blockquote" => "Quote block",
+        "hr" => "Horizontal rule divider",
+        "meta" => "Metadata key-value declaration",
+        "config" => "Document-wide configuration",
+        "settings" => "Schema and settings block",
+        "import" => "Bind a namespace from another file",
+        "references" => "Remote connection container",
+        "id" => "Attach attributes to a remote element by id",
+        "links" => "Link reference definitions table",
+        "link" => "Link to a url, file, or document",
+        "embed" => "Embed another document or asset",
+        "icon" => "Inline icon",
+        "table" => "Table",
+        "heading" => "Section heading",
+        "em" => "Emphasis",
+        "strong" => "Strong emphasis",
+        "mark" => "Highlighted text",
+        "ol" => "Ordered list",
+        "ul" => "Unordered list",
+        _ => "Built-in element",
+    }
+}
+
 /// Provides autocompletion items for elements, keywords, and builtin compute functions.
 pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
     let mut items = Vec::new();
 
     let prefix = get_line_prefix(text, pos);
 
-    let builtins = [
-        ("version", "Tomet language specification version"),
-        ("kind", "Document kind (archetype / schema) declaration"),
-        (
-            "blueprint",
-            "Document blueprint and archetype template declaration",
-        ),
-        ("callout", "Callout container block"),
-        ("warning", "Warning alert block"),
-        ("caution", "Caution alert block"),
-        ("info", "Information alert block"),
-        ("note", "Note alert block"),
-        ("tip", "Tip alert block"),
-        ("important", "Important alert block"),
-        ("codeblock", "Verbatim code block"),
-        ("blockquote", "Quote block"),
-        ("hr", "Horizontal rule divider"),
-        ("meta", "Metadata key-value declaration"),
-        ("config", "Document-wide configuration"),
-        ("settings", "Settings file reference"),
-        ("links", "Link reference definitions table"),
-        ("connect", "Connected data element target"),
-    ];
+    // Driven by `BUILTIN_KINDS` rather than a hand-kept list. The old
+    // list had drifted badly -- it offered `callout`/`warning`/`connect`,
+    // which are not built-in at all, and omitted `link`/`embed`/`table`.
+    // Bare names are reserved for exactly this set now, so offering a
+    // non-builtin one would suggest something that fails to validate.
+    let sigil_for = |kind: &ElementKind| match shape_of(kind) {
+        Some(Shape::Inline) => '@',
+        _ => '#',
+    };
 
-    if prefix.ends_with('@') {
-        for (name, detail) in builtins {
+    if prefix.ends_with('@') || prefix.ends_with('#') {
+        let wanted = if prefix.ends_with('@') {
+            Shape::Inline
+        } else {
+            Shape::Block
+        };
+        for (name, kind) in BUILTIN_KINDS.iter() {
+            if shape_of(kind) != Some(wanted) {
+                continue;
+            }
             items.push(CompletionItem {
                 label: name.to_string(),
                 insert_text: Some(name.to_string()),
                 kind: Some(CompletionItemKind::KEYWORD),
-                detail: Some(detail.to_string()),
-                ..CompletionItem::default()
-            });
-        }
-        return items;
-    }
-
-    if prefix.ends_with('<') {
-        for (name, detail) in builtins {
-            items.push(CompletionItem {
-                label: name.to_string(),
-                insert_text: Some(format!("{name}>")),
-                kind: Some(CompletionItemKind::KEYWORD),
-                detail: Some(detail.to_string()),
+                detail: Some(describe_kind(name).to_string()),
                 ..CompletionItem::default()
             });
         }
@@ -935,17 +962,15 @@ pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
         return items;
     }
 
-    for (name, detail) in builtins {
+    // Unprefixed: offer every built-in with the sigil its shape requires,
+    // so an accepted completion is one that validates.
+    for (name, kind) in BUILTIN_KINDS.iter() {
+        let sigil = sigil_for(kind);
         items.push(CompletionItem {
-            label: format!("<{name}>"),
+            label: format!("{sigil}{name}"),
+            insert_text: Some(format!("{sigil}{name}")),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some(detail.to_string()),
-            ..CompletionItem::default()
-        });
-        items.push(CompletionItem {
-            label: format!("@{name}"),
-            kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some(detail.to_string()),
+            detail: Some(describe_kind(name).to_string()),
             ..CompletionItem::default()
         });
     }
@@ -1067,16 +1092,26 @@ mod tests {
     fn completions_returns_items() {
         let items = completions_for("", Position::new(0, 0));
         assert!(!items.is_empty());
-        assert!(items.iter().any(|i| i.label == "#callout"));
+        // Each built-in is offered with the sigil its shape requires, so
+        // an accepted completion is one that validates.
+        assert!(items.iter().any(|i| i.label == "#meta"));
+        assert!(items.iter().any(|i| i.label == "@link"));
+        // `callout` is not built-in, so it is no longer suggested: a bare
+        // name that is not built-in is an error now.
+        assert!(!items.iter().any(|i| i.label.ends_with("callout")));
     }
 
     #[test]
     fn completions_trigger_prefix() {
+        // `@` is the inline sigil, so only inline-shaped built-ins.
         let at_items = completions_for("@", Position::new(0, 1));
-        assert!(at_items.iter().any(|i| i.label == "config"));
+        assert!(at_items.iter().any(|i| i.label == "link"));
+        assert!(!at_items.iter().any(|i| i.label == "config"));
 
-        let lt_items = completions_for("<", Position::new(0, 1));
-        assert!(lt_items.iter().any(|i| i.label == "caution"));
+        // `#` is the block sigil.
+        let hash_items = completions_for("#", Position::new(0, 1));
+        assert!(hash_items.iter().any(|i| i.label == "config"));
+        assert!(!hash_items.iter().any(|i| i.label == "link"));
 
         let interp_items = completions_for("${", Position::new(0, 2));
         assert!(interp_items.iter().any(|i| i.label == "add(...)"));
@@ -1163,7 +1198,7 @@ mod tests {
         // Position at character 3 (after '@')
         let items = completions_for(text, Position::new(0, 3));
         assert!(!items.is_empty());
-        assert!(items.iter().any(|i| i.label == "config"));
+        assert!(items.iter().any(|i| i.label == "link"));
 
         // Position at character 2 (inside '岸' in byte terms, but character 2 in LSP)
         let items2 = completions_for(text, Position::new(0, 2));
@@ -1394,7 +1429,8 @@ mod tests {
 
     #[test]
     fn completions_suggest_kind_and_version() {
-        let items = completions_for("@", Position::new(0, 1));
+        // `kind` and `version` are block directives.
+        let items = completions_for("#", Position::new(0, 1));
         assert!(items.iter().any(|i| i.label == "kind"));
         assert!(items.iter().any(|i| i.label == "version"));
     }

@@ -19,7 +19,7 @@
 
 - \[ \] ビルトイン関数の強化
 - \[ \] Elementの挙動を一般化
-- \[ \] \`\@meta\`にkdlを追加
+- \[ \] \`\#meta\`にkdlを追加
 
 拡張性を確保する
 #line(length: 100%)
@@ -61,12 +61,12 @@ CLI/Library機能を強化する
 - \[x\] 代入、関数構文 (\`\${var}\` \`compute\`,\`resolve\`)
 - \[x\] 構文エラー (重複)
 - \[x\] コメントアウト
-- \[x\] 公式構文 (\`\@settings\`, \`\@config\`, \`\@meta\`, \`\@references\`)
+- \[x\] 公式構文 (\`\#settings\`, \`\#config\`, \`\#meta\`, \`\#references\`)
 - \[x\] 基本構文 (空白可, 改行可, 順不同)
 - \[x\] 基本Markdown記法 (\`\*\`, \`\*\*\`, \`==\`, \`\_\_\`, \`\`)
 - \[x\] 基本要素 (heading, list, horizontal line)
 - \[x\] 名前 (element, arg, content, value)
-- \[x\] 基本AST (\`\<T\>()\[\]{}\`)
+- \[x\] 基本AST (\`\@T()\[\]{}\`)
 
 機能
 #line(length: 100%)
