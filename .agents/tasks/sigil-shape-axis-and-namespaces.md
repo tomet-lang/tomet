@@ -224,19 +224,20 @@ threads a document-wide `running_format` and goes with them.
       `docs/docs.settings.tmt` uses both removed keys and must change.
 - [x] 9. Formatter, printer and the one-shot migrator.
       `scripts/migrate-sigils.py` and `scripts/migrate-rust-strings.py`
-      are throwaway — **delete them once the tree is settled.**
+      did their run and have been deleted, as planned.
       Codeblocks now print as ``` fences (a `#codeblock[...]` cannot round
       trip, since `[content]` is ordinary markup now).
       **Remaining:** namespace expansion on save.
-- [ ] 10. tree-sitter. Every construct is context-free after this work, so
-      `grammar.js` can be faithful for the first time. The `+++` fence
-      needs the stateful external scanner the backtick fence deferred
-      (`grammar.js`'s own note), and `heading_marker: /#+/` must become a
-      heading-vs-block-element decision.
-- [ ] 11. Corpus fixtures for each new construct. Parser-level coverage
-      exists (fence escaping, unterminated fence, `${}` staying verbatim,
-      the unquoted-`}`-in-YAML case); `tests/fixtures/` still needs
-      entries. `KNOWN_UNPARSEABLE` is now empty — `cheatsheet.tmt` parses.
+- [x] 10. tree-sitter. `block_element`/`inline_element` replace
+      `type_element`/`at_element`; `#`+name is one `block_sigil` token, at
+      the same token precedence as `heading_marker` so match length decides
+      between them. The `+++` fence is one external token covering opener,
+      body and closer together, which is what keeps the scanner stateless.
+- [x] 11. Corpus fixtures — `tests/fixtures/syntax/{sigils,fences}.tmt`.
+      Both exception lists are now empty: `KNOWN_UNPARSEABLE`
+      (`cheatsheet.tmt` parses) and `KNOWN_FORMAT_CHANGES_DOCUMENT`
+      (`examples/bookmark.tmt` survives formatting — the fence removes the
+      bracket-matching failure that caused it).
 - [ ] 12. Update `docs/` (Japanese) and the editor extensions.
 
 ## Open — needs a decision
