@@ -1247,7 +1247,7 @@ mod tests {
 
     #[test]
     fn text_with_sigil_chars_encloses_them_in_backticks() {
-        let md = "Contact @user at @foo or $100 and <> with 2 * 3 ^ 2 and **.\n";
+        let md = "Contact @user at <foo> or $100 and <> with 2 * 3 ^ 2 and **.\n";
         let doc = from_markdown(md);
         assert_eq!(doc.blocks.len(), 1);
         let Block::Paragraph(p) = &doc.blocks[0] else {
@@ -1256,7 +1256,8 @@ mod tests {
         assert_eq!(
             p.content,
             vec![Inline::Text(Text::new(
-                "Contact `@`user at @foo or `$`100 and `<>` with 2 * 3 `^` 2 and **.",
+                // `<` is no longer a Tomet sigil, so it passes through.
+                "Contact `@`user at <foo> or `$`100 and <> with 2 * 3 `^` 2 and **.",
                 Span::dummy()
             ))]
         );

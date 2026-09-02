@@ -151,6 +151,17 @@ pub(crate) fn parse_inline_seq(
             text_start = cur.pos();
             continue;
         }
+        // A block element is recognized inside a content group too, but
+        // only at a line start -- `#` means block, and block position is
+        // what a line start *is*. This is what lets `#references[` hold
+        // `#id(taskA):{...}` entries on their own lines. Mid-line, a `#`
+        // is ordinary prose.
+        if cur.peek() == Some('#') && at_line_start(cur) && is_block_element_start(cur) {
+            flush_text(&mut items, cur, &mut text_start);
+            items.push(Inline::Element(parse_element(cur, allow_colon_connect)?));
+            text_start = cur.pos();
+            continue;
+        }
         if cur.peek() == Some('$') && is_interp_start(cur) {
             flush_text(&mut items, cur, &mut text_start);
             items.push(Inline::Element(parse_dollar_element(cur)?));
@@ -271,6 +282,16 @@ fn try_one_delimited(
     let mut el = element_new(Sigil::inline(kind)).with_span(span);
     el.content = Some(inner);
     Ok(Some(el))
+}
+
+/// Whether only whitespace precedes `cur` on its line.
+fn at_line_start(cur: &Cursor) -> bool {
+    let src = cur.src();
+    let before = &src[..cur.pos()];
+    match before.rfind('\n') {
+        Some(nl) => before[nl + 1..].trim().is_empty(),
+        None => before.trim().is_empty(),
+    }
 }
 
 fn flush_text(items: &mut Vec<Inline>, cur: &Cursor, text_start: &mut usize) {

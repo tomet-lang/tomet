@@ -454,7 +454,11 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     }
 
     if let Some(value) = &el.value {
-        out.push_str(&render_element_value(value, config));
+        out.push_str(&render_element_value_with_format(
+            value,
+            get_format_from_args(el.args.as_ref()),
+            config,
+        ));
     }
 
     out
@@ -463,6 +467,44 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
 /// Renders an element's value: a `{...}` group, or a `+++` fence for a
 /// raw body.
 fn render_element_value(value: &ElementValue, config: &PrinterConfig) -> String {
+    render_element_value_with_format(value, None, config)
+}
+
+/// Renders an element's value, honouring a declared `format:`.
+///
+/// When an element says `(format:json)` and holds data, that data is
+/// written back as JSON inside a `+++` fence -- the fence being the only
+/// place another language's source can live now. Reading it back is
+/// `tomet-semantics`' `embedded::element_data`, so the round trip is
+/// data-in, data-out regardless of which side wrote it.
+///
+/// This is rendering, not parsing: the printer is free to consult an
+/// element's arguments. The invariant the rework protects is that the
+/// *parser* does not.
+fn render_element_value_with_format(
+    value: &ElementValue,
+    format: Option<&str>,
+    config: &PrinterConfig,
+) -> String {
+    if let (ElementValue::Group(_), Some(fmt)) = (value, format) {
+        if let Some(data) = value.as_data() {
+            let json = value_to_json(&data);
+            let serialized = match fmt {
+                "json" => serde_json::to_string_pretty(&json).ok(),
+                "yaml" => serde_yaml::to_string(&json).ok(),
+                "toml" => toml::to_string_pretty(&json).ok(),
+                _ => None,
+            };
+            if let Some(body) = serialized {
+                let body = body.trim_end();
+                return format!(
+                    "{}\n{body}\n{}",
+                    "+".repeat(fence_len_for(body)),
+                    "+".repeat(fence_len_for(body))
+                );
+            }
+        }
+    }
     match value {
         // A raw body is written back as the fence it came from. The run is
         // grown past any `+++` line inside the body, matching the rule the
@@ -637,7 +679,7 @@ mod tests {
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc, &cfg);
-        assert!(printed.contains("#meta(format:yaml){"));
+        assert!(printed.contains("#meta(format:yaml)+++"));
     }
 
     #[test]

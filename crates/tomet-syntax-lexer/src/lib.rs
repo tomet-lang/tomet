@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_cursor_eating_helpers() {
-        let mut cursor = Cursor::new("  hello @world");
+        let mut cursor = Cursor::new("  hello <world>");
         assert_eq!(cursor.eat_whitespace(), "  ");
         assert_eq!(cursor.peek(), Some('h'));
 

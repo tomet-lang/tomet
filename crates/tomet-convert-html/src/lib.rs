@@ -875,14 +875,15 @@ mod tests {
     fn nested_inline_heading_falls_back_to_generic_rendering() {
         // `@heading(2)[...]` outside block-top-level position (nested
         // inside a blockquote's content here) never renders as a real
-        // `<h2>` -- only `render_block`'s top-level dispatch special-cases
-        // headings (D5); `render_element`'s generic `kind.as_str()` match
-        // has no `"heading"` arm at all.
-        let doc = parse_document("#blockquote[ #heading(2)[Nested] ]\n").unwrap();
+        // An element nested inside another element's content falls to
+        // `render_element`'s generic rendering, keyed on its kind name.
+        // (This used to be demonstrated with a nested `@heading`; headings
+        // are block-shaped now, so an inline one is not expressible.)
+        let doc = parse_document("#blockquote[ @deck.badge(2)[Nested] ]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
-            "<blockquote><span class=\"tm-element tm-heading\" data-value=\"2\">Nested</span></blockquote>\n"
+            "<blockquote><span class=\"tm-element tm-deck.badge\" data-value=\"2\">Nested</span></blockquote>\n"
         );
     }
 
@@ -1144,7 +1145,7 @@ mod tests {
     fn renders_thematic_break_as_hr() {
         let doc = parse_document("---\n").unwrap();
         let body = render_body(&doc);
-        assert_eq!(body, "#hr\n");
+        assert_eq!(body, "<hr>\n");
     }
 
     #[test]
@@ -1196,15 +1197,16 @@ mod tests {
 
     #[test]
     fn codeblock_content_stays_literal_not_interpreted_as_markup() {
-        // `codeblock`'s `[content]` is the one exception to the usual inline
-        // grammar -- real code containing `*`/`<T>`/`@`/backticks must not
-        // be reinterpreted as em/strong/element triggers/code spans.
-        let doc =
-            parse_document("#codeblock(lang:rust)[let x = *ptr; let y = @T; @deco `q`]\n").unwrap();
+        // A ``` fence is the raw form. `#codeblock[...]` used to be raw
+        // too, via a hardcoded name check in the parser -- one of the four
+        // places the parser consulted an element vocabulary, and now gone.
+        // Real code containing `*`/`@`/backticks must not be reinterpreted
+        // as em/strong/element triggers/code spans.
+        let doc = parse_document("```rust\nlet x = *ptr; let y = @T; @deco `q`\n```\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
-            "<pre><code class=\"language-rust\">let x = *ptr; let y = &lt;T&gt;; @deco `q`</code></pre>\n"
+            "<pre><code class=\"language-rust\">let x = *ptr; let y = @T; @deco `q`</code></pre>\n"
         );
     }
 
@@ -1278,7 +1280,7 @@ mod tests {
     #[test]
     fn meta_and_config_with_positional_format_arg_have_no_visible_output() {
         let doc =
-            parse_document("#meta(\"json\"){\n  {\"key\": \"value\"}\n}\n#config(\"json\")\n")
+            parse_document("#meta(\"json\")+++\n{\"key\": \"value\"}\n+++\n#config(\"json\")\n")
                 .unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "");
