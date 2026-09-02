@@ -1,0 +1,45 @@
+#meta(format:yaml)+++
+id: doc-fences
+type: fixture
++++
+
+#[ `+++` フェンス ]
+
+#memo+++
+don't forget: check [this] and [that]
+括弧も引用符も、行の終わりまでそのまま。
++++
+
+#[ 埋め込みフォーマット ]
+
+`format:` は解釈だけを決める。字句解析には影響しない。
+
+#config(format:json)+++
+{
+  "macros": {
+    "gh": "https://github.com/tomet/tomet/issues/${1}"
+  },
+  "brace": "}"
+}
++++
+
+`${1}` はそのまま残り、閉じない `}` があっても本文は途中で終わらない。
+
+#[ 長いフェンス ]
+
+本文に `+++` の行が含まれるときは、より長い走りで囲む。
+
+#memo++++
++++
+これはまだ本文の中。
+++++
+
+#[ YAML の本文 ]
+
+#deck.note(format:yaml)+++
+key: value
+list:
+  - a
+  - b
+nested: { inline: map }
++++

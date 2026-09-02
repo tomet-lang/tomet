@@ -8,7 +8,6 @@
 -- "tm:tmfile"
 -- "https://example.com"
 
-
 ---[ `@link(target:tm("tmfile"))` ]---
 
 - tm("tmfile")が安全に"tm:tmfile"に展開。

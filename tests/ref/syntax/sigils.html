@@ -1,0 +1,24 @@
+<h1>シジルは形を表す</h1>
+<p>`@` はインライン、`#` はブロック。名前空間が出自を表す。</p>
+<h1>ブロック要素</h1>
+<div class="tm-element tm-memo">名前は `#` の直後に続く。空白があると本文になる</div>
+<div class="tm-element tm-deck.bookmark" data-name="foo" data-count="3">名前空間つき</div>
+<div class="tm-element tm-import" data-file="./deck.tmt" data-as="deck"></div>
+<h1>インライン要素</h1>
+<p>文中の <a class="tm-url" href="https://example.com">リンク</a> と</p>
+<div class="tm-element tm-deck.badge" data-value="2">名前空間つきインライン</div>
+<p>は行の途中でも要素になる。</p>
+<h1>本文に落ちる `#`</h1>
+<p># 見出しではない行。`#` の直後が識別子でなければただの文字。</p>
+<p>これは #タグ ではない。ASCII でない名前は要素にならない。</p>
+<h1>`{}` は常にデータ</h1>
+<dl class="tm-links">
+<dt id="link-1">1</dt>
+<dd>ひとつめ</dd>
+<dt id="link-2">2</dt>
+<dd>ふたつめ</dd>
+</dl>
+<div class="tm-element tm-deck.card"><div class="tm-children">
+<div class="tm-element tm-bare" data-value="a">対と要素が同じ並びに入る</div>
+</div>
+</div>

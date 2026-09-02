@@ -3,7 +3,7 @@
   format:json
 )
 
-#[ 雛形 ] 
+#[ 雛形 ]
 
 ```tm
 @xxx(args)[content]{value}
