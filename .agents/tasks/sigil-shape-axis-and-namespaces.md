@@ -240,6 +240,22 @@ threads a document-wide `running_format` and goes with them.
       bracket-matching failure that caused it).
 - [ ] 12. Update `docs/` (Japanese) and the editor extensions.
 
+## 実装の現況は `tests/SYNTAX.md` を見る
+
+パーサが今どの構文を受け付けるかは `tests/SYNTAX.md` が生成物として持って
+いる（`tests/src/syntax_report.rs` の表 + `tomet-parser` から生成、CIで検証）。
+`docs/spec/` は規範、`SYNTAX.md` は記述。食い違いは黙って揃えず、差分として
+読むこと。
+
+その一覧が既に1件見つけている:
+
+- [ ] **`@[ ... ]` がまだ通る。** 上の Decisions では撤去すると書いたが、
+      `is_inline_element_start` は名前なし `@` のあとの `[` を今も受け付け、
+      `classify` は `Custom("at")` を返す。
+      ただし `@[Wiki](url:...)` は `@(url:...)[Wiki]` の順序違いとして
+      `docs/spec/syntax.tmt` が正式に認めている形なので、「args のない
+      `@[...]` だけを弾く」のか「名前なし `@` ごと弾く」のかは未決。
+
 ## Open — needs a decision
 
 **Which namespace do the docs' own custom elements take?**

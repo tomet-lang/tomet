@@ -19,6 +19,13 @@ Two things live outside `docs/`:
   cross-crate invariants, and the end-to-end conversion snapshots. Its
   fixtures started as copies of documents in here, but they are **not**
   kept in sync; see `tests/README.md`.
+- [`/tests/SYNTAX.md`](../tests/SYNTAX.md) -- **every construct the parser
+  currently accepts**, with an example and the AST it produces. Generated
+  from `tomet-parser` itself and checked by `cargo test`, so unlike
+  `spec/` it cannot drift. `spec/` is normative (what the language
+  *should* accept) and hand-written; that file is descriptive (what the
+  implementation *does*). Read them side by side -- where they disagree,
+  the disagreement is the finding.
 - `/default.config.tmt` -- the real config this repository runs under.
   `docs/examples/default.config.tmt` is a *sample* showing the
   `@version`/`@kind` header style, and is not the same file.
@@ -27,6 +34,8 @@ Two things live outside `docs/`:
 
 - New to the language: [`guide/cheatsheet.tmt`](guide/cheatsheet.tmt)
 - Looking up exact syntax: [`spec/syntax.tmt`](spec/syntax.tmt)
+- Checking what the parser *actually* accepts today:
+  [`/tests/SYNTAX.md`](../tests/SYNTAX.md)
 - Working on the Rust crates: [`develop/architecture.md`](develop/architecture.md)
 - Wondering why a syntax decision went the way it did:
   [`design/decisions/`](design/decisions/), sorted by date

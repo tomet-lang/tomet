@@ -35,6 +35,10 @@ path = "src/blueprint.rs"
 name = "vocabulary"
 path = "src/vocabulary.rs"
 
+[[test]]
+name = "syntax_report"
+path = "src/syntax_report.rs"
+
 [dependencies]
 tomet-ast = { workspace = true }
 tomet-compute = { workspace = true }
