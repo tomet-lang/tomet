@@ -370,8 +370,14 @@ pub enum Sigil {
     /// `#name` -- a block element. `#[ ... ]` is the name-omitted form of
     /// `#heading`, and parses to `Block(Name::bare("heading"))`.
     Block(Name),
-    /// `@name`, or bare `@` when the name is absent (`@(url:...)`).
-    Inline(Option<Name>),
+    /// `@name` -- an inline element. The name is mandatory.
+    ///
+    /// A nameless `@(url:...)` used to infer its kind from a key in its
+    /// args. That inference was retired and `@link(target:...)` is the
+    /// one link element, but the *syntax* was left behind, so a bare `@`
+    /// still parsed and classified as the meaningless `Custom("at")`.
+    /// It is gone: an element has a name.
+    Inline(Name),
     /// No sigil at all. Only legal as an entry inside another element's
     /// value group (e.g. the `(1)[...]` entries inside `#links{ ... }`),
     /// where the container already supplies the type.
@@ -389,8 +395,7 @@ impl Sigil {
     /// This element's name, if it has one.
     pub fn name(&self) -> Option<&Name> {
         match self {
-            Sigil::Block(name) => Some(name),
-            Sigil::Inline(name) => name.as_ref(),
+            Sigil::Block(name) | Sigil::Inline(name) => Some(name),
             Sigil::Bare | Sigil::Dollar => None,
         }
     }
@@ -402,7 +407,7 @@ impl Sigil {
 
     /// An inline element -- one written with `@`.
     pub fn inline(name: impl Into<String>) -> Self {
-        Sigil::Inline(Some(Name::bare(name)))
+        Sigil::Inline(Name::bare(name))
     }
 
     pub fn is_block(&self) -> bool {
@@ -431,7 +436,7 @@ impl Sigil {
 
     /// Like [`Sigil::is_bare_named`], but also requires an inline shape.
     pub fn is_inline_named(&self, name: &str) -> bool {
-        matches!(self, Sigil::Inline(Some(n)) if n.is_bare() && n.name == name)
+        matches!(self, Sigil::Inline(n) if n.is_bare() && n.name == name)
     }
 }
 

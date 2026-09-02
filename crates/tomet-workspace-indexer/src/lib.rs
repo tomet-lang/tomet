@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use ignore::WalkBuilder;
-use tomet_ast::{ElementValue, Value};
+use tomet_ast::Value;
 use tomet_config::PrinterConfig;
 use tomet_parser::parse_document;
 use tomet_semantics::classify_lenient;

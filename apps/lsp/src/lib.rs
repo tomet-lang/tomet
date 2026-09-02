@@ -683,8 +683,7 @@ fn is_web_url(s: &str) -> bool {
 fn sigil_display_name(sigil: &Sigil) -> String {
     match sigil {
         Sigil::Block(name) => format!("#{name}"),
-        Sigil::Inline(Some(name)) => format!("@{name}"),
-        Sigil::Inline(None) => "@".to_string(),
+        Sigil::Inline(name) => format!("@{name}"),
         Sigil::Bare => "(bare)".to_string(),
         Sigil::Dollar => "${...}".to_string(),
     }
@@ -789,7 +788,7 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
     impl Visitor<()> for TargetIdFinder {
         fn visit(&mut self, el: &Element) -> ControlFlow<()> {
             if span_contains(&el.span, self.line, self.col) {
-                // Check if it's an @(id: "some_id") or has an id arg
+                // Check whether it carries an `id` arg
                 if let Some(Value::Map(entries)) = &el.args {
                     for (k, v) in entries {
                         if k == "id" {
@@ -1082,7 +1081,7 @@ mod tests {
 
     #[test]
     fn definition_finds_matching_id() {
-        let text = "#[ Target ]{id: target1}\n\n@(id: target1)\n";
+        let text = "#[ Target ]{id: target1}\n\n@deck.ref(id: target1)\n";
         let uri = Uri::from_str("file:///test.tmt").unwrap();
         let def = definition_for(text, Position::new(2, 4), &uri);
         assert!(def.is_some());

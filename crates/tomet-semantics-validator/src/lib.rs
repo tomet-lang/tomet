@@ -134,7 +134,7 @@ mod tests {
         // The second `id:a` is on an element embedded inline inside a
         // paragraph's content, not a top-level block -- exercises the
         // `visit_inlines` recursion, not just top-level `Block`s.
-        let doc = parse("#[ one ]{id:a}\n\ntext @(id:a) more text\n");
+        let doc = parse("#[ one ]{id:a}\n\ntext @deck.ref(id:a) more text\n");
         let errors = validate_document(&doc);
         assert_eq!(errors.len(), 1);
         assert!(matches!(

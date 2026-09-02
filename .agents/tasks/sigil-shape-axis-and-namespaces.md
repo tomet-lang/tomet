@@ -247,14 +247,28 @@ threads a document-wide `running_format` and goes with them.
 `docs/spec/` は規範、`SYNTAX.md` は記述。食い違いは黙って揃えず、差分として
 読むこと。
 
-その一覧が既に1件見つけている:
+その一覧が実際に見つけたもの（対応済み）:
 
-- [ ] **`@[ ... ]` がまだ通る。** 上の Decisions では撤去すると書いたが、
-      `is_inline_element_start` は名前なし `@` のあとの `[` を今も受け付け、
-      `classify` は `Custom("at")` を返す。
-      ただし `@[Wiki](url:...)` は `@(url:...)[Wiki]` の順序違いとして
-      `docs/spec/syntax.tmt` が正式に認めている形なので、「args のない
-      `@[...]` だけを弾く」のか「名前なし `@` ごと弾く」のかは未決。
+- [x] **名前なし `@` を撤去。** `@(url:...)` の推論は `1d0b7b2` の
+      `infer.rs` 削除で消え `@link(target:)` に統一されていたのに、
+      パーサだけが構文を受け付け続け、`classify` は意味のない
+      `Custom("at")` を返していた。`Sigil::Inline(Name)` にして、
+      名前なしを表現できなくした。自動リンクも `@link(target:)` を
+      作るよう変更。
+- [x] **`#id(taskA)` を撤去。** `<T>` 消滅で `<id:taskA>` が綴りを
+      失ったとき、私が独断で `#id(...)` という綴りを発明していた。
+      依頼されていないので戻した。`parse_remote_connection_element` は
+      `None` を返すだけになり、リモート接続には**現在綴りがない**。
+
+## 未決 — リモート接続の綴り
+
+`<id:taskA>:{ priority: high }` は `85b73c8` で入った機能だが、`<T>` の
+撤去で書けなくなった。代わりの綴りは決めていない。resolver 側のロジック
+（`#references[...]` を走査して対象要素に属性を配る）は残してあるが、
+`RemoteConnection` を作るものが何もないので機能していない。
+
+- 綴りを決めて `parse_remote_connection_element` を書き直す
+- あるいは機能ごと削除する
 
 ## Open — needs a decision
 

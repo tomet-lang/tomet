@@ -441,9 +441,9 @@ fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
     let span = cur.span_from(start_pos);
 
     let el = Element {
-        sigil: Sigil::Inline(None),
+        sigil: Sigil::inline("link"),
         args: Some(Value::Map(vec![(
-            "url".to_string(),
+            "target".to_string(),
             Value::String(url_str),
         )])),
         content: None,

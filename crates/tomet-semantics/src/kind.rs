@@ -25,10 +25,6 @@ pub enum ElementKind {
     Import,
     /// `#references[...]` -- the container for remote connections.
     References,
-    /// `#id(taskA):{...}` -- attaches attributes to a remote element by
-    /// id. Previously spelled `<id:taskA>`, with the target smuggled
-    /// through `<T>`'s permissive name charset.
-    Id,
     Blueprint,
     Links,
     /// The one officially-supported link element, `@link(target:...)`
@@ -87,7 +83,6 @@ impl ElementKind {
             ElementKind::Settings => "settings",
             ElementKind::Import => "import",
             ElementKind::References => "references",
-            ElementKind::Id => "id",
             ElementKind::Blueprint => "blueprint",
             ElementKind::Links => "links",
             ElementKind::Link => "link",
@@ -119,7 +114,7 @@ impl ElementKind {
 /// Bare names are reserved for exactly this list. A user-defined element
 /// must be namespaced (`deck.bookmark`), which is why an unrecognized bare
 /// name is an error rather than a `Custom` kind.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 23] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 22] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -127,7 +122,6 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 23] = [
     ("settings", ElementKind::Settings),
     ("import", ElementKind::Import),
     ("references", ElementKind::References),
-    ("id", ElementKind::Id),
     ("blueprint", ElementKind::Blueprint),
     ("links", ElementKind::Links),
     ("link", ElementKind::Link),
@@ -214,9 +208,7 @@ impl std::error::Error for UnknownName {}
 /// write `@link` explicitly.
 pub fn classify(el: &Element) -> Result<ElementKind, UnknownName> {
     match &el.sigil {
-        Sigil::Block(name) => classify_name(name),
-        Sigil::Inline(Some(name)) => classify_name(name),
-        Sigil::Inline(None) => Ok(ElementKind::Custom("at".to_string())),
+        Sigil::Block(name) | Sigil::Inline(name) => classify_name(name),
         Sigil::Bare => Ok(ElementKind::Bare),
         Sigil::Dollar => Ok(ElementKind::Interp),
     }
@@ -237,9 +229,10 @@ pub fn classify_lenient(el: &Element) -> ElementKind {
 fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
-        Meta | Config | Settings | Import | References | Id | Blueprint | Links | Hr
-        | Codeblock | Blockquote | Table | Heading | OrderedList | UnorderedList | Kind
-        | Version => Shape::Block,
+        Meta | Config | Settings | Import | References | Blueprint | Links | Hr | Codeblock
+        | Blockquote | Table | Heading | OrderedList | UnorderedList | Kind | Version => {
+            Shape::Block
+        }
         Em | Strong | Mark | Link | Embed | Icon => Shape::Inline,
         Custom(_) | Bare | Interp => return None,
     })
@@ -260,8 +253,8 @@ pub enum Shape {
 pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {
     let found = match &el.sigil {
         Sigil::Block(_) => Shape::Block,
-        Sigil::Inline(Some(_)) => Shape::Inline,
-        _ => return None,
+        Sigil::Inline(_) => Shape::Inline,
+        Sigil::Bare | Sigil::Dollar => return None,
     };
     let kind = classify(el).ok()?;
     let expected = required_shape(&kind)?;
@@ -370,28 +363,9 @@ mod tests {
     #[test]
     fn a_custom_element_may_take_either_shape() {
         let block = element_new(Sigil::Block(Name::namespaced("deck", "card")));
-        let inline = element_new(Sigil::Inline(Some(Name::namespaced("deck", "card"))));
+        let inline = element_new(Sigil::Inline(Name::namespaced("deck", "card")));
         assert_eq!(shape_mismatch(&block), None);
         assert_eq!(shape_mismatch(&inline), None);
-    }
-
-    #[test]
-    fn unnamed_at_sigil_is_always_custom_at() {
-        // No inference happens for a bare `@(...)` anymore -- kind is
-        // decided purely by the element's name (`@link`, `<link>`, ...),
-        // never guessed from `args`.
-        let mut el = element_new(Sigil::Inline(None));
-        el.args = Some(Value::Map(vec![(
-            "target".to_string(),
-            Value::String("https://example.com".to_string()),
-        )]));
-        assert_eq!(classify_lenient(&el), ElementKind::Custom("at".to_string()));
-    }
-
-    #[test]
-    fn unnamed_at_sigil_with_no_recognized_key_is_custom_at() {
-        let el = element_new(Sigil::Inline(None));
-        assert_eq!(classify_lenient(&el), ElementKind::Custom("at".to_string()));
     }
 
     #[test]

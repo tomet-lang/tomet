@@ -81,16 +81,16 @@ mod tests {
 
     #[test]
     fn parses_link_with_order_free_groups() {
-        let a = parse_document("@(url:https://example.com)[Wiki]").unwrap();
-        let b = parse_document("@[Wiki](url:https://example.com)").unwrap();
+        let a = parse_document("@link(target:https://example.com)[Wiki]").unwrap();
+        let b = parse_document("@link[Wiki](target:https://example.com)").unwrap();
         assert_eq!(a, b);
         match &a.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Inline(None));
+                assert_eq!(el.sigil, Sigil::inline("link"));
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
-                        "url".into(),
+                        "target".into(),
                         Value::String("https://example.com".into())
                     )]))
                 );
@@ -956,11 +956,11 @@ mod tests {
                 assert_eq!(p.content.len(), 3);
                 assert_eq!(p.content[0], Inline::Text("see ".into()));
                 if let Inline::Element(el) = &p.content[1] {
-                    assert_eq!(el.sigil, Sigil::Inline(None));
+                    assert_eq!(el.sigil, Sigil::inline("link"));
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
-                            "url".to_string(),
+                            "target".to_string(),
                             Value::String("https://example.com".to_string())
                         )]))
                     );
@@ -1496,7 +1496,7 @@ mod tests {
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
-                            "url".into(),
+                            "target".into(),
                             Value::String("https://example.com/foo".into())
                         )]))
                     );
@@ -1508,7 +1508,7 @@ mod tests {
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
-                            "url".into(),
+                            "target".into(),
                             Value::String("https://example.com/bar".into())
                         )]))
                     );
@@ -1533,7 +1533,7 @@ mod tests {
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
-                            "url".into(),
+                            "target".into(),
                             Value::String("https://example.com/foo".into())
                         )]))
                     );
@@ -1545,7 +1545,7 @@ mod tests {
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
-                            "url".into(),
+                            "target".into(),
                             Value::String("https://example.com/path(bar)".into())
                         )]))
                     );
@@ -1567,7 +1567,7 @@ mod tests {
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
-                            "url".into(),
+                            "target".into(),
                             Value::String("http://a.com".into())
                         )]))
                     );
@@ -1577,7 +1577,7 @@ mod tests {
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
-                            "url".into(),
+                            "target".into(),
                             Value::String("https://b.com".into())
                         )]))
                     );
@@ -1587,7 +1587,7 @@ mod tests {
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
-                            "url".into(),
+                            "target".into(),
                             Value::String("mailto:user@example.com".into())
                         )]))
                     );
@@ -1619,7 +1619,7 @@ mod tests {
             parse_value("/readme.md").unwrap(),
             Value::String("/readme.md".into())
         );
-        let doc = parse_document("@(/etc/hosts)[Hosts]\n").unwrap();
+        let doc = parse_document("@link(/etc/hosts)[Hosts]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.args, Some(Value::String("/etc/hosts".into())));
@@ -1642,7 +1642,7 @@ mod tests {
             parse_value("file://some/where").unwrap(),
             Value::String("file://some/where".into())
         );
-        let doc = parse_document("@(https://example.com)[Site]\n").unwrap();
+        let doc = parse_document("@link(https://example.com)[Site]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.args, Some(Value::String("https://example.com".into())));
@@ -1674,7 +1674,7 @@ mod tests {
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
-                        "url".into(),
+                        "target".into(),
                         Value::String("http://127.0.0.1:8888/search?lang=ja&q=@query".into())
                     )]))
                 );

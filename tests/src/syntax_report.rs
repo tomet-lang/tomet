@@ -36,19 +36,23 @@ struct Case {
 }
 
 const fn case(section: Option<&'static str>, note: &'static str, src: &'static str) -> Case {
-    Case {
-        section,
-        note,
-        src,
-    }
+    Case { section, note, src }
 }
 
 /// Every construct, in the order the report presents them.
 const CASES: &[Case] = &[
     // ---- headings ---------------------------------------------------
-    case(Some("見出し"), "`#[ ... ]` は `#heading` の名前省略形", "#[ タイトル ]\n"),
+    case(
+        Some("見出し"),
+        "`#[ ... ]` は `#heading` の名前省略形",
+        "#[ タイトル ]\n",
+    ),
     case(None, "`#` の数がレベル", "##[ 節 ]\n"),
-    case(None, "末尾の `{...}` は属性", "#[ タイトル ]{ id: intro }\n"),
+    case(
+        None,
+        "末尾の `{...}` は属性",
+        "#[ タイトル ]{ id: intro }\n",
+    ),
     case(None, "`:` を挟んでも同じ", "#[ タイトル ]:{ id: intro }\n"),
     // ---- block elements ---------------------------------------------
     case(
@@ -56,9 +60,21 @@ const CASES: &[Case] = &[
         "名前だけ。グループがなくても行末で要素になる",
         "#memo\n",
     ),
-    case(None, "`(args)` `[content]` `{value}` は各1個まで、順不同", "#memo(a: 1)[ 本文 ]{ b: 2 }\n"),
-    case(None, "順序を入れ替えても同じ木になる", "#memo[ 本文 ](a: 1)\n"),
-    case(None, "`.` 区切りの名前空間", "#deck.bookmark(name: foo)[ x ]\n"),
+    case(
+        None,
+        "`(args)` `[content]` `{value}` は各1個まで、順不同",
+        "#memo(a: 1)[ 本文 ]{ b: 2 }\n",
+    ),
+    case(
+        None,
+        "順序を入れ替えても同じ木になる",
+        "#memo[ 本文 ](a: 1)\n",
+    ),
+    case(
+        None,
+        "`.` 区切りの名前空間",
+        "#deck.bookmark(name: foo)[ x ]\n",
+    ),
     case(None, "名前空間は多段でもよい", "#a.b.c(x: 1)\n"),
     // ---- inline elements --------------------------------------------
     case(
@@ -67,7 +83,6 @@ const CASES: &[Case] = &[
         "文中の @link(target: \"https://example.com\")[リンク] です。\n",
     ),
     case(None, "名前空間つき", "文中の @deck.badge(2)[印] です。\n"),
-    case(None, "名前なしの `@`", "@(url: \"https://example.com\")[リンク]\n"),
     // ---- fall back to text ------------------------------------------
     case(
         Some("文字列に落ちる場合"),
@@ -76,7 +91,11 @@ const CASES: &[Case] = &[
     ),
     case(None, "`#` が2つ以上のときは `[` が必要", "##memo(a: 1)\n"),
     case(None, "ASCII でない名前は要素にならない", "#タグ\n"),
-    case(None, "`@` の後にグループが続かなければ文字列", "連絡は me@example.com まで\n"),
+    case(
+        None,
+        "`@` の後にグループが続かなければ文字列",
+        "連絡は me@example.com まで\n",
+    ),
     case(None, "行中の `#` は普通の文字", "C# と F# の話\n"),
     case(None, "`<` はもうシジルではない", "型は Vec<T> と書く\n"),
     // ---- the +++ fence ----------------------------------------------
@@ -90,7 +109,11 @@ const CASES: &[Case] = &[
         "本文に `+++` があるときは長い走りで囲む",
         "#memo++++\n+++\nまだ本文\n++++\n",
     ),
-    case(None, "閉じないまま EOF に達したらそこで終わる", "#memo+++\n閉じない\n"),
+    case(
+        None,
+        "閉じないまま EOF に達したらそこで終わる",
+        "#memo+++\n閉じない\n",
+    ),
     case(
         None,
         "`${...}` は展開されず逐語で残る",
@@ -107,39 +130,87 @@ const CASES: &[Case] = &[
         "#zzz(format:yaml)+++\na: 1\n+++\n",
     ),
     // ---- value groups -----------------------------------------------
-    case(Some("`{...}` グループ"), "`key: value` の並び", "#memo{ a: 1, b: two }\n"),
-    case(None, "要素の並び", "#links{\n  (1)[ ひとつ ]\n  (2)[ ふたつ ]\n}\n"),
-    case(None, "対と要素の混在。並び順は保たれる", "#deck.card{ t: x, (a)[ y ], u: z }\n"),
+    case(
+        Some("`{...}` グループ"),
+        "`key: value` の並び",
+        "#memo{ a: 1, b: two }\n",
+    ),
+    case(
+        None,
+        "要素の並び",
+        "#links{\n  (1)[ ひとつ ]\n  (2)[ ふたつ ]\n}\n",
+    ),
+    case(
+        None,
+        "対と要素の混在。並び順は保たれる",
+        "#deck.card{ t: x, (a)[ y ], u: z }\n",
+    ),
     case(None, "空のグループ", "#memo{}\n"),
     // ---- args and the value DSL -------------------------------------
-    case(Some("`(args)` と値の文法"), "`key: value`", "#memo(a: 1, b: two)\n"),
+    case(
+        Some("`(args)` と値の文法"),
+        "`key: value`",
+        "#memo(a: 1, b: two)\n",
+    ),
     case(None, "位置引数（キーなし）", "#codeblock(rust)\n"),
     case(None, "列", "#memo(xs: [1, 2, 3])\n"),
     case(None, "入れ子のマップ", "#memo(m: { x: 1 })\n"),
     case(None, "引用符つき文字列", "#memo(s: \"a, b: c\")\n"),
-    case(None, "スカラーは型が推論される", "#memo(i: 1, f: 1.5, b: true, n: null)\n"),
+    case(
+        None,
+        "スカラーは型が推論される",
+        "#memo(i: 1, f: 1.5, b: true, n: null)\n",
+    ),
     // ---- lists ------------------------------------------------------
-    case(Some("リスト"), "`-` が非順序、`-.` が順序", "- ひとつ\n- ふたつ\n"),
+    case(
+        Some("リスト"),
+        "`-` が非順序、`-.` が順序",
+        "- ひとつ\n- ふたつ\n",
+    ),
     case(None, "順序つき", "-. ひとつ\n-. ふたつ\n"),
-    case(None, "ネスト", "- 親\n-- 子\n"),
-    case(None, "`(marker)` と末尾の `{attrs}`", "- (12:01) 本文 {id: a}\n"),
+    case(
+        None,
+        "`--` は**ネストしない**。2行目は段落になる（未対応）",
+        "- 親\n-- 子\n",
+    ),
+    case(
+        None,
+        "`(12:01)` は `{12: 1}` に**誤って**分解される。`:` が \
+         `key:value` として読まれるため",
+        "- (12:01) 本文 {id: a}\n",
+    ),
+    case(
+        None,
+        "末尾の `{...}` が `:` なしで項目に付く",
+        "- 本文 {id: a}\n",
+    ),
     // ---- inline markup ----------------------------------------------
-    case(Some("インライン記法"), "強調・太字・マーク・コード", "*em* と **strong** と ==mark== と `code`\n"),
+    case(
+        Some("インライン記法"),
+        "強調・太字・マーク・コード",
+        "*em* と **strong** と ==mark== と `code`\n",
+    ),
     case(None, "自動リンク", "見て https://example.com/x ください\n"),
     // ---- breaks and code --------------------------------------------
     case(Some("区切りとコードブロック"), "区切り線", "---\n"),
     case(None, "見出しつき区切り線", "---[ 章題 ]---\n"),
-    case(None, "``` フェンス。中身は逐語", "```rust\nlet y = @T; *ptr\n```\n"),
+    case(
+        None,
+        "``` フェンス。中身は逐語",
+        "```rust\nlet y = @T; *ptr\n```\n",
+    ),
     // ---- interpolation ----------------------------------------------
     case(Some("補間 `${...}`"), "識別子", "${name}\n"),
     case(None, "メンバ参照", "${a.b.c}\n"),
     case(None, "関数呼び出し", "${sum(1, 2)}\n"),
     case(None, "`$name(...)` 形式", "$uuid()\n"),
     // ---- connect ----------------------------------------------------
-    case(Some("コネクト `:`"), "`:{...}` は値をマージ", "#task[ A ]:{ id: t1 }\n"),
+    case(
+        Some("コネクト `:`"),
+        "`:{...}` は値をマージ",
+        "#task[ A ]:{ id: t1 }\n",
+    ),
     case(None, "`:(...)` は args をマージ", "#task(a: 1):(b: 2)\n"),
-    case(None, "id 指定のリモート接続", "#id(taskA):{ priority: high }\n"),
-    case(None, "複数 id", "#id([taskA, taskB]):{ tag: house }\n"),
     // ---- comments ---------------------------------------------------
     case(Some("コメント"), "行コメント", "// 消える\n本文\n"),
     case(None, "ブロックコメント", "本文 /* 消える */ の続き\n"),
@@ -158,17 +229,24 @@ const REJECTED: &[Case] = &[
         "<memo>[ x ]\n",
     ),
     case(
+        None,
+        "名前なしの `@` も撤去。`@(url:)` の推論は `1d0b7b2` の \
+         `infer.rs` 削除で消え `@link(target:)` に統一されたのに、 \
+         パーサだけが構文を受け付け続けていた",
+        "@(url: \"https://example.com\")[リンク]\n",
+    ),
+    case(None, "`@[ ... ]` も同じ", "@[ x ]\n"),
+    case(
+        Some("綴りを失ったまま、代わりが未決のもの"),
+        "リモート接続。`<id:taskA>:{...}` と書いていたが `<T>` と共に \
+         失われた。代わりの書き方は決まっていないので、実装も \
+         受け付けない",
+        "#id(taskA):{ priority: high }\n",
+    ),
+    case(
         Some("紛らわしいが、これが正しい"),
         "`(content:raw)` は普通の引数。`[...]` の解釈を変えない",
         "#memo(content:raw)[\n1行目\n2行目\n]\n",
-    ),
-    case(
-        Some("未完了: 撤去する予定だがまだ通る"),
-        "`@[ ... ]` は名前も args もない `@`。`classify` は \
-         `Custom(\"at\")` という意味のない種別を返す。\
-         `.agents/tasks/sigil-shape-axis-and-namespaces.md` は撤去すると \
-         書いているが、実装はまだ受け付けている",
-        "@[ x ]\n",
     ),
     case(
         Some("受け付けない書き方"),
@@ -254,6 +332,17 @@ fn emit_case(out: &mut String, case: &Case, rejected_section: bool) {
     match parse_document(case.src) {
         Ok(doc) => {
             let _ = write!(out, "```\n{}```\n", dump_document(&doc));
+            // Parsing and validating are separate on purpose: the parser
+            // consults no element vocabulary, so "is this a real element"
+            // is only answerable here.
+            let errors = tomet_validator::validate_document(&doc);
+            if !errors.is_empty() {
+                out.push_str("\n検証:\n\n```\n");
+                for e in &errors {
+                    let _ = writeln!(out, "{e}");
+                }
+                out.push_str("```\n");
+            }
         }
         Err(e) => {
             let _ = write!(out, "```\nparse error: {e}\n```\n");
@@ -263,7 +352,7 @@ fn emit_case(out: &mut String, case: &Case, rejected_section: bool) {
     // out: either it means something other than it looks, or it was meant
     // to be gone and is not.
     if rejected_section && parse_document(case.src).is_ok() {
-        out.push_str("\n> **パースは通る。** 上の AST が実際の意味。\n");
+        out.push_str("\n> **パースは通る。** 上が実際の結果。\n");
     }
 }
 
@@ -381,8 +470,7 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
 fn sigil_str(sigil: &Sigil) -> String {
     match sigil {
         Sigil::Block(name) => format!("Block  #{name}"),
-        Sigil::Inline(Some(name)) => format!("Inline @{name}"),
-        Sigil::Inline(None) => "Inline @".to_string(),
+        Sigil::Inline(name) => format!("Inline @{name}"),
         Sigil::Bare => "Bare".to_string(),
         Sigil::Dollar => "Interp $".to_string(),
     }

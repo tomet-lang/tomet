@@ -34,11 +34,7 @@ https://
 
 [[1]]
 
-<div data-tm-kind="at" data-url="https://"></div>
-
-<div data-tm-kind="at" data-file="/readme.md"></div>
-
-<div data-tm-kind="at" data-ref="2"></div>
+@\[\](url:https://) @\[\](file:/readme.md) @\[\](ref:2)
 
 # heading
 

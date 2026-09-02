@@ -23,7 +23,13 @@ pub(crate) fn is_inline_element_start(cur: &Cursor) -> bool {
     if look.bump() != Some('@') {
         return false;
     }
-    let _ = eat_name(&mut look);
+    // The name is mandatory. A nameless `@(url:...)` used to infer its
+    // kind from an args key; that inference was retired in favour of the
+    // one `@link(target:...)` element, but the syntax outlived it and
+    // kept parsing into a meaningless `Custom("at")`. It is text now.
+    if eat_name(&mut look).is_none() {
+        return false;
+    }
     skip_lookahead_gap(&mut look);
     matches!(look.peek(), Some('(') | Some('[') | Some('{') | Some(':')) || is_fence_start(&look)
 }
@@ -123,7 +129,10 @@ pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Resu
         if !cur.eat_str("@") {
             return Err(err(cur, cur.pos(), "expected '@'"));
         }
-        Sigil::Inline(eat_name(cur))
+        match eat_name(cur) {
+            Some(name) => Sigil::Inline(name),
+            None => return Err(err(cur, cur.pos(), "expected an element name after '@'")),
+        }
     };
 
     let mut el = element_new(sigil);

@@ -221,7 +221,7 @@ fn hover_symbols_definition_completion_over_stdio() {
                 "uri": "file:///tmp/doc.tmt",
                 "languageId": "tomet",
                 "version": 1,
-                "text": "#[ Header ]{id: h1}\n\n#callout(type: info)[ Message ]\n\n@(id: h1)\n",
+                "text": "#[ Header ]{id: h1}\n\n#deck.callout(type: info)[ Message ]\n\n@deck.ref(id: h1)\n",
             }
         }),
     );

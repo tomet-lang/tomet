@@ -79,7 +79,7 @@ pub fn apply_structural_action(doc: &mut Document, action: &StructuralAction) ->
                     // namespace in place: `deck.bookmark` renamed to
                     // `card` becomes `deck.card`, not `card`.
                     Sigil::Block(name) => name.name = to.clone(),
-                    Sigil::Inline(Some(name)) => name.name = to.clone(),
+                    Sigil::Inline(name) => name.name = to.clone(),
                     _ => {}
                 }
                 count += 1;

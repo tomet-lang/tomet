@@ -30,7 +30,7 @@
 //! applies [`format_source`]. It never alters document metadata (`@meta`)
 //! or injects structural elements.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
+use tomet_ast::{Block, Document, Element, Inline, Value};
 use tomet_config::PrinterConfig;
 use tomet_parser::parse_document;
 

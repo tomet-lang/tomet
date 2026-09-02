@@ -36,11 +36,7 @@ ${sum(a, b)}
 
 @link(ref: 1)[]
 
-@[](url: "https://")
-
-@[](file: /readme.md)
-
-@[](ref: 2)
+@[](url:https://) @[](file:/readme.md) @[](ref:2)
 
 #[heading] {id: 1}
 
