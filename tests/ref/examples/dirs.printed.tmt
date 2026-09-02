@@ -1,17 +1,17 @@
-@settings(file: docs/docs.settings.tmt)
+#settings(file: docs/docs.settings.tmt)
 
-@meta{type: bookmark}
+#meta{type: bookmark}
 
-<file>(readme.md)[説明]
+#file(readme.md)[説明]
 
-<dirs>(src)[ソースコード]
+#dirs(src)[ソースコード]
 
-<file>(src/Cargo.toml)[パッケージコンフィグ]
+#file(src/Cargo.toml)[パッケージコンフィグ]
 
-<file>(src/crates)[Crates]
+#file(src/crates)[Crates]
 
-<dirs>(apps)[ソースコード]
+#dirs(apps)[ソースコード]
 
-<file>(apps/Cargo.toml)[パッケージコンフィグ]
+#file(apps/Cargo.toml)[パッケージコンフィグ]
 
-<file>(apps/crates)[Crates]
+#file(apps/crates)[Crates]

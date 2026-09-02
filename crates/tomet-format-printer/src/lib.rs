@@ -296,26 +296,50 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         }
     }
 
+    // A codeblock is written back as a ``` fence, which is the form it
+    // was parsed from and the only one that keeps its body verbatim.
+    // `#codeblock[...]` would not survive a round trip: `[content]` is
+    // ordinary markup now, so code containing Tomet syntax -- a `+++`
+    // fence, say -- would be reparsed as that syntax.
     if el.sigil.is_bare_named("codeblock") {
-        let mut out = String::from("#codeblock");
-        if let Some(args) = &el.args {
-            out.push('(');
-            out.push_str(&render_args_with_config(args, config));
-            out.push(')');
+        let lang = el
+            .args
+            .as_ref()
+            .and_then(|args| match args {
+                Value::String(s) => Some(s.clone()),
+                Value::Map(entries) => {
+                    entries
+                        .iter()
+                        .find(|(k, _)| k == "lang")
+                        .and_then(|(_, v)| match v {
+                            Value::String(s) => Some(s.clone()),
+                            _ => None,
+                        })
+                }
+                _ => None,
+            })
+            .unwrap_or_default();
+        let body = el
+            .content
+            .as_ref()
+            .map(|content| render_inlines(content, config))
+            .unwrap_or_default();
+        // Grow the fence past any backtick run in the body, the same rule
+        // the parser reads it back with.
+        let longest = body
+            .lines()
+            .map(|l| l.trim_end())
+            .filter(|l| !l.is_empty() && l.chars().all(|c| c == '`'))
+            .map(str::len)
+            .max()
+            .unwrap_or(0);
+        let fence = "`".repeat(longest.max(2) + 1);
+        let mut out = format!("{fence}{lang}\n");
+        out.push_str(&body);
+        if !body.is_empty() && !body.ends_with('\n') {
+            out.push('\n');
         }
-        if let Some(content) = &el.content {
-            let text = render_inlines(content, config);
-            out.push_str("[\n");
-            for line in text.lines() {
-                out.push_str("  ");
-                out.push_str(line);
-                out.push('\n');
-            }
-            out.push(']');
-        }
-        if let Some(value) = &el.value {
-            out.push_str(&render_element_value(value, config));
-        }
+        out.push_str(&fence);
         return out;
     }
 
@@ -1004,7 +1028,7 @@ mod tests {
         let printed = document_to_tm(&doc);
         assert_eq!(
             printed.trim(),
-            "#codeblock(shell)[\n  irm \"https://christitus.com/win\" | iex\n]"
+            "```shell\nirm \"https://christitus.com/win\" | iex\n```"
         );
     }
 

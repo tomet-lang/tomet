@@ -213,7 +213,10 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
         .or_else(|| config.meta_format.clone());
 
     if config.meta_always_newline || effective_format.is_some() {
-        if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
+        // Read through `element_data` rather than `pairs()`: the body may
+        // already be a `+++` fence, which has no pairs of its own and
+        // would otherwise be rendered back out empty.
+        if let Some(Value::Map(entries)) = tomet_semantics::embedded::element_data(el) {
             // A declared `format:` means the body is written as a `+++`
             // fence, not a `{...}` group: the fence is what carries a
             // body in another language now.
@@ -222,7 +225,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
                 None => (String::from("#meta{\n"), "}", "  "),
             };
             let mut out = open;
-            for (k, v) in entries {
+            for (k, v) in &entries {
                 let field_cfg = config.meta_fields.get(k);
                 let val_str = render_meta_field_value(v, field_cfg, config);
                 out.push_str(indent);
@@ -246,7 +249,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
         out.push_str(&render_args_with_config(args, config));
         out.push(')');
     }
-    if let Some(v) = el.value.as_ref().and_then(|v| v.as_data()) {
+    if let Some(v) = tomet_semantics::embedded::element_data(el) {
         out.push('{');
         out.push_str(&render_value_inner_with_config(&v, config));
         out.push('}');

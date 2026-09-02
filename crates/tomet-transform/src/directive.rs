@@ -1,6 +1,6 @@
 //! Directive promotion and Value DSL normalization transformations.
 
-use tomet_ast::{Block, Document, Element, Sigil, Value};
+use tomet_ast::{Block, Document, Element, ElementValue, Sigil, Value};
 use tomet_semantics::{ElementKind, classify_lenient};
 use tomet_tree::{DocumentExt, ElementExt, element_new, for_each_element_mut};
 
@@ -24,6 +24,13 @@ where
     for block in &mut doc.blocks {
         if let Block::Element(el) = block {
             if source_filter(el) {
+                // A `+++` fence body is opaque text, so there is no key to
+                // remove from it. Read it through its declared `format:`
+                // and rewrite it as a native group first -- otherwise this
+                // silently finds nothing whenever the source element was
+                // written as a fence, and depends on the value-DSL
+                // normalization happening to have run first.
+                materialize_raw_body(el);
                 extracted_val = el.remove_prop(prop_key);
                 break;
             }
@@ -64,13 +71,33 @@ where
     true
 }
 
-/// Normalizes `@meta` elements in `doc` from `format:yaml` (or other embedded format) to native Value DSL.
-/// Strips the `format` argument from `@meta(...)` and ensures clean map representation.
+/// Rewrites an element's `+++` fence body as a native value group, when
+/// its declared `format:` says how to read it. A no-op otherwise.
+fn materialize_raw_body(el: &mut Element) {
+    if !matches!(el.value, Some(ElementValue::Raw(_))) {
+        return;
+    }
+    if let Some(data) = tomet_semantics::embedded::element_data(el) {
+        el.value = Some(ElementValue::from_map(data));
+    }
+}
+
+/// Normalizes `#meta` elements in `doc` from `format:yaml` (or another
+/// embedded format) to the native Value DSL.
+///
+/// Reads the body through `embedded::element_data` *before* stripping the
+/// `format` argument, and rewrites it as a native group -- otherwise the
+/// body stays an opaque `+++` fence with nothing left to say how to read
+/// it, and every later pass sees an element with no data.
 pub fn normalize_meta_to_value_dsl(doc: &mut Document) -> bool {
     let mut changed = false;
     for_each_element_mut(doc, |el| {
         let kind = classify_lenient(el);
         if kind == ElementKind::Meta {
+            if matches!(el.value, Some(ElementValue::Raw(_))) {
+                materialize_raw_body(el);
+                changed = !matches!(el.value, Some(ElementValue::Raw(_))) || changed;
+            }
             if let Some(Value::Map(entries)) = &mut el.args {
                 if let Some(pos) = entries.iter().position(|(k, _)| k == "format") {
                     entries.remove(pos);

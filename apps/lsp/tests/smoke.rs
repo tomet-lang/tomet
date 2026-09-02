@@ -113,7 +113,7 @@ fn diagnostics_lifecycle_over_stdio() {
                 "uri": "file:///tmp/bad.tmt",
                 "languageId": "tomet",
                 "version": 1,
-                "text": "<caution>[ unterminated\n",
+                "text": "#caution[ unterminated\n",
             }
         }),
     );
@@ -221,7 +221,7 @@ fn hover_symbols_definition_completion_over_stdio() {
                 "uri": "file:///tmp/doc.tmt",
                 "languageId": "tomet",
                 "version": 1,
-                "text": "#[ Header ]{id: h1}\n\n<callout>(type: info)[ Message ]\n\n@(id: h1)\n",
+                "text": "#[ Header ]{id: h1}\n\n#callout(type: info)[ Message ]\n\n@(id: h1)\n",
             }
         }),
     );
@@ -293,7 +293,7 @@ fn macro_hover_over_stdio() {
                 "uri": "file:///tmp/macro_test.tmt",
                 "languageId": "tomet",
                 "version": 1,
-                "text": "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  }\n}\n\n$gh(101)\n",
+                "text": "#config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  }\n}\n\n$gh(101)\n",
             }
         }),
     );
@@ -330,7 +330,7 @@ fn macro_hover_with_config_import_over_stdio() {
     let config_path = dir.join("custom.config.tmt");
     std::fs::write(
         &config_path,
-        "@config(format:json){\n  {\n    \"macros\": {\n      \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\"\n    }\n  }\n}\n",
+        "#config(format:json)+++\n{\n  \"macros\": {\n    \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n+++\n",
     )
     .unwrap();
 
@@ -353,7 +353,7 @@ fn macro_hover_with_config_import_over_stdio() {
                 "uri": doc_uri,
                 "languageId": "tomet",
                 "version": 1,
-                "text": "@config(import:\"custom.config.tmt\")\n\n<embed>($youtube_video(\"Pm_h6FnF8HU\"))[Video]\n",
+                "text": "#config(import:\"custom.config.tmt\")\n\n@embed($youtube_video(\"Pm_h6FnF8HU\"))[Video]\n",
             }
         }),
     );
@@ -394,7 +394,7 @@ fn macro_hover_with_workspace_auto_config_over_stdio() {
     let config_path = dir.join("default.config.tmt");
     std::fs::write(
         &config_path,
-        "@config(format:json){\n  {\n    \"macros\": {\n      \"twitter_post\": \"https://x.com/${1}/status/${2}\"\n    }\n  }\n}\n",
+        "#config(format:json)+++\n{\n  \"macros\": {\n    \"twitter_post\": \"https://x.com/${1}/status/${2}\"\n  }\n}\n+++\n",
     )
     .unwrap();
 
@@ -419,7 +419,7 @@ fn macro_hover_with_workspace_auto_config_over_stdio() {
                 "languageId": "tomet",
                 "version": 1,
                 // Zero configuration headers in note
-                "text": "<embed>($twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n",
+                "text": "@embed($twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n",
             }
         }),
     );
