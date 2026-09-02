@@ -1,7 +1,7 @@
 //! Post-import pass over inline text: detects `[[wiki]]`/`![[embed]]`
 //! links and bare `http(s)://`/`mailto:` URLs (pulldown-cmark doesn't
 //! parse either as its own event), and escapes any Tomet sigil
-//! characters (`@`/`<`/`$`/`^`/`//`/`/* */`) left in plain text so they
+//! characters (`@`/`$`/`^`/`//`/`/* */`) left in plain text so they
 //! round-trip as literal text rather than being misread as `.tmt`
 //! syntax on export.
 
@@ -235,7 +235,6 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
 
 fn enclose_sigils_in_backticks(text: &str) -> String {
     if !text.contains('@')
-        && !text.contains('<')
         && !text.contains('$')
         && !text.contains('^')
         && !text.contains('/')
@@ -251,27 +250,6 @@ fn enclose_sigils_in_backticks(text: &str) -> String {
             '@' => out.push_str("`@`"),
             '$' => out.push_str("`$`"),
             '^' => out.push_str("`^`"),
-            '<' => {
-                if chars.peek() == Some(&'>') {
-                    chars.next();
-                    out.push_str("`<>`");
-                } else {
-                    let mut look = chars.clone();
-                    let ident = eat_ident_str(&mut look);
-                    if !ident.is_empty()
-                        && look.next() == Some('>')
-                        && matches!(
-                            look.peek(),
-                            Some(&'(') | Some(&'[') | Some(&'{') | Some(&':')
-                        )
-                    {
-                        out.push_str("`<`");
-                    } else {
-                        out.push('<');
-                    }
-                }
-            }
-            '>' => out.push('>'),
             '/' => {
                 if chars.peek() == Some(&'/') && !out.ends_with(':') {
                     let mut slashes = String::from("/");

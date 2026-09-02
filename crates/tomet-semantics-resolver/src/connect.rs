@@ -93,28 +93,37 @@ fn parse_remote_connection_element(el: &Element) -> Option<RemoteConnection> {
     if !el.sigil.is_bare_named("id") {
         return None;
     }
-    let target_str = el.args.as_ref().and_then(target_arg_str)?;
+    let ids = target_ids(el.args.as_ref()?);
+    if ids.is_empty() {
+        return None;
+    }
     Some(RemoteConnection {
-        target_ids: parse_target_ids_from_str(&target_str),
+        target_ids: ids,
         args: el.args.clone(),
         value: el.value.as_ref().and_then(|v| v.as_data()),
     })
 }
 
-/// The target of a `#id(...)`, whether written positionally (`#id(taskA)`,
-/// which the value grammar records under the empty positional key) or
-/// explicitly (`#id(target:taskA)`).
-fn target_arg_str(args: &Value) -> Option<String> {
+/// The target ids of a `#id(...)`.
+///
+/// Written positionally (`#id(taskA)`, recorded by the value grammar
+/// under the empty positional key), as a sequence (`#id([taskA, taskB])`),
+/// or explicitly (`#id(target:taskA)`).
+fn target_ids(args: &Value) -> Vec<String> {
+    fn from_value(v: &Value) -> Vec<String> {
+        match v {
+            Value::String(s) => parse_target_ids_from_str(s),
+            Value::Seq(items) => items.iter().flat_map(from_value).collect(),
+            _ => Vec::new(),
+        }
+    }
     match args {
-        Value::String(s) => Some(s.clone()),
         Value::Map(entries) => entries
             .iter()
             .find(|(k, _)| k.is_empty() || k == "target" || k == "id")
-            .and_then(|(_, v)| match v {
-                Value::String(s) => Some(s.clone()),
-                _ => None,
-            }),
-        _ => None,
+            .map(|(_, v)| from_value(v))
+            .unwrap_or_default(),
+        other => from_value(other),
     }
 }
 
@@ -236,7 +245,7 @@ mod tests {
 #task(id: taskB)[ Wash dishes ]
 
 #references[
-  <id:[taskA, taskB]>:{ tag: house }
+  #id([taskA, taskB]):{ tag: house }
 ]
 "#;
         let doc = parse_document(src).unwrap();
