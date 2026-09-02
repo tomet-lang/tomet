@@ -8,7 +8,6 @@
    - 位置引数指定: `positional: [title]`
    - 埋め込みフォーマット: `#settings(format: json)` または `#settings(format: yaml)` の併用サポート */
 
-
 #settings{
   // 実際に Sigil を持つ「要素」(tomet_semantics::ElementKind)の一覧。
   // 名前で識別できるものだけがここに乗る -- @T/@name で誰でも増やせる。

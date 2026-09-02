@@ -29,24 +29,18 @@ fn formatting_is_idempotent_across_the_corpus() {
 /// Fixtures where `format_source` is currently known to change the parsed
 /// document, violating `tomet-formatter`'s stated invariant.
 ///
-/// `examples/bookmark.tmt` uses full-width braces (`｛ ｝`, U+FF5B/U+FF5D)
-/// where the grammar only accepts ASCII `{ }`, so its `(content:raw)`
-/// never takes effect and the following `[ ` (trailing space, newline)
-/// is not treated as verbatim content. The whitespace-hygiene pass then
-/// strips that space, which changes the content. Minimal repro:
+/// Currently empty. `examples/bookmark.tmt` was the sole entry: it uses
+/// full-width braces (`｛ ｝`, U+FF5B/U+FF5D) where the grammar only
+/// accepts ASCII `{ }`, so its `(content:raw)` never took effect and the
+/// following `[ ` was not treated as verbatim content -- the
+/// whitespace-hygiene pass then stripped a space and changed the content.
 ///
-/// ```text
-/// <x>(content:raw)｛ id:1 ｝
-/// [
-///   a
-/// ]
-/// ```
-///
-/// With ASCII braces the same input is preserved correctly. Whether the
-/// fix belongs in the formatter (hold the invariant even for input that
-/// did not parse the way it looks) or in the fixture (a full-width brace
-/// typo) is an open question -- see `.agents/tasks/root-test-crate.md`.
-const KNOWN_FORMAT_CHANGES_DOCUMENT: &[&str] = &["examples/bookmark.tmt"];
+/// The `+++` fence removes that whole class of bug by construction. A
+/// fence is delimited by a line, not by matched brackets, so no character
+/// inside the body -- full-width brace, unquoted `}`, stray apostrophe --
+/// can end it early or make the formatter disagree with the parser about
+/// where verbatim content begins.
+const KNOWN_FORMAT_CHANGES_DOCUMENT: &[&str] = &[];
 
 #[test]
 fn formatting_does_not_change_the_parsed_document() {
