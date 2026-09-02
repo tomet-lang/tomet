@@ -39,8 +39,8 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [コネクト `:`](#コネクト-)
 - [コメント](#コメント)
 - [撤去された構文](#撤去された構文)
+- [綴りを失ったまま、代わりが未決のもの](#綴りを失ったまま、代わりが未決のもの)
 - [紛らわしいが、これが正しい](#紛らわしいが、これが正しい)
-- [未完了: 撤去する予定だがまだ通る](#未完了-撤去する予定だがまだ通る)
 - [受け付けない書き方](#受け付けない書き方)
 - [仕様にあるが未実装](#仕様にあるが未実装)
 
@@ -114,6 +114,12 @@ Block  #heading
 Block  #memo
 ```
 
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+```
+
 ### `(args)` `[content]` `{value}` は各1個まで、順不同
 
 ```tmt
@@ -129,6 +135,12 @@ Block  #memo
     b: 2
 ```
 
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+```
+
 ### 順序を入れ替えても同じ木になる
 
 ```tmt
@@ -140,6 +152,12 @@ Block  #memo
   args    {a: 1}
   content
     Text "本文"
+```
+
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
 ```
 
 ### `.` 区切りの名前空間
@@ -198,19 +216,6 @@ Paragraph
     content
       Text "印"
   Text " です。"
-```
-
-### 名前なしの `@`
-
-```tmt
-@(url: "https://example.com")[リンク]
-```
-
-```
-Inline @
-  args    {url: "https://example.com"}
-  content
-    Text "リンク"
 ```
 
 ## 文字列に落ちる場合
@@ -296,6 +301,12 @@ Block  #memo
   raw     "don't forget [this]"
 ```
 
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+```
+
 ### 本文に `+++` があるときは長い走りで囲む
 
 ```tmt
@@ -310,6 +321,12 @@ Block  #memo
   raw     "+++\nまだ本文"
 ```
 
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+```
+
 ### 閉じないまま EOF に達したらそこで終わる
 
 ```tmt
@@ -320,6 +337,12 @@ Block  #memo
 ```
 Block  #memo
   raw     "閉じない"
+```
+
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
 ```
 
 ### `${...}` は展開されず逐語で残る
@@ -365,6 +388,12 @@ Block  #zzz
   raw     "a: 1"
 ```
 
+検証:
+
+```
+unknown element `zzz`: bare names are reserved for built-in elements; namespace it (`ns.zzz`) or bind a namespace with `#import(file:..., as:ns)`
+```
+
 ## `{...}` グループ
 
 ### `key: value` の並び
@@ -378,6 +407,12 @@ Block  #memo
   group
     a: 1
     b: "two"
+```
+
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
 ```
 
 ### 要素の並び
@@ -430,6 +465,12 @@ Block  #memo
   group   (空)
 ```
 
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+```
+
 ## `(args)` と値の文法
 
 ### `key: value`
@@ -441,6 +482,12 @@ Block  #memo
 ```
 Block  #memo
   args    {a: 1, b: "two"}
+```
+
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
 ```
 
 ### 位置引数（キーなし）
@@ -465,6 +512,12 @@ Block  #memo
   args    {xs: [1, 2, 3]}
 ```
 
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+```
+
 ### 入れ子のマップ
 
 ```tmt
@@ -474,6 +527,12 @@ Block  #memo
 ```
 Block  #memo
   args    {m: {x: 1}}
+```
+
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
 ```
 
 ### 引用符つき文字列
@@ -487,6 +546,12 @@ Block  #memo
   args    {s: "a, b: c"}
 ```
 
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+```
+
 ### スカラーは型が推論される
 
 ```tmt
@@ -496,6 +561,12 @@ Block  #memo
 ```
 Block  #memo
   args    {i: 1, f: 1.5, b: true, n: null}
+```
+
+検証:
+
+```
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
 ```
 
 ## リスト
@@ -536,7 +607,7 @@ Block  #ol
         Text "ふたつ"
 ```
 
-### ネスト
+### `--` は**ネストしない**。2行目は段落になる（未対応）
 
 ```tmt
 - 親
@@ -553,7 +624,7 @@ Paragraph
   Text "-- 子"
 ```
 
-### `(marker)` と末尾の `{attrs}`
+### `(12:01)` は `{12: 1}` に**誤って**分解される。`:` が `key:value` として読まれるため
 
 ```tmt
 - (12:01) 本文 {id: a}
@@ -564,6 +635,22 @@ Block  #ul
   group
     Bare
       args    {12: 1}
+      content
+        Text "本文"
+      group
+        id: "a"
+```
+
+### 末尾の `{...}` が `:` なしで項目に付く
+
+```tmt
+- 本文 {id: a}
+```
+
+```
+Block  #ul
+  group
+    Bare
       content
         Text "本文"
       group
@@ -603,8 +690,8 @@ Paragraph
 ```
 Paragraph
   Text "見て "
-  Inline @
-    args    {url: "https://example.com/x"}
+  Inline @link
+    args    {target: "https://example.com/x"}
   Text " ください"
 ```
 
@@ -709,6 +796,12 @@ Block  #task
     id: "t1"
 ```
 
+検証:
+
+```
+unknown element `task`: bare names are reserved for built-in elements; namespace it (`ns.task`) or bind a namespace with `#import(file:..., as:ns)`
+```
+
 ### `:(...)` は args をマージ
 
 ```tmt
@@ -720,30 +813,10 @@ Block  #task
   args    {b: 2, a: 1}
 ```
 
-### id 指定のリモート接続
-
-```tmt
-#id(taskA):{ priority: high }
-```
+検証:
 
 ```
-Block  #id
-  args    "taskA"
-  group
-    priority: "high"
-```
-
-### 複数 id
-
-```tmt
-#id([taskA, taskB]):{ tag: house }
-```
-
-```
-Block  #id
-  args    ["taskA", "taskB"]
-  group
-    tag: "house"
+unknown element `task`: bare names are reserved for built-in elements; namespace it (`ns.task`) or bind a namespace with `#import(file:..., as:ns)`
 ```
 
 ## コメント
@@ -785,7 +858,58 @@ Paragraph
   Text "<memo>[ x ]"
 ```
 
-> **パースは通る。** 上の AST が実際の意味。
+> **パースは通る。** 上が実際の結果。
+
+### 名前なしの `@` も撤去。`@(url:)` の推論は `1d0b7b2` の `infer.rs` 削除で消え `@link(target:)` に統一されたのに、 パーサだけが構文を受け付け続けていた
+
+```tmt
+@(url: "https://example.com")[リンク]
+```
+
+```
+Paragraph
+  Text "@(url: \""
+  Inline @link
+    args    {target: "https://example.com\")[リンク]"}
+```
+
+> **パースは通る。** 上が実際の結果。
+
+### `@[ ... ]` も同じ
+
+```tmt
+@[ x ]
+```
+
+```
+Paragraph
+  Text "@[ x ]"
+```
+
+> **パースは通る。** 上が実際の結果。
+
+## 綴りを失ったまま、代わりが未決のもの
+
+### リモート接続。`<id:taskA>:{...}` と書いていたが `<T>` と共に 失われた。代わりの書き方は決まっていないので、実装も 受け付けない
+
+```tmt
+#id(taskA):{ priority: high }
+```
+
+```
+Block  #id
+  args    "taskA"
+  group
+    priority: "high"
+```
+
+検証:
+
+```
+unknown element `id`: bare names are reserved for built-in elements; namespace it (`ns.id`) or bind a namespace with `#import(file:..., as:ns)`
+```
+
+> **パースは通る。** 上が実際の結果。
 
 ## 紛らわしいが、これが正しい
 
@@ -805,23 +929,13 @@ Block  #memo
     Text "1行目 2行目"
 ```
 
-> **パースは通る。** 上の AST が実際の意味。
-
-## 未完了: 撤去する予定だがまだ通る
-
-### `@[ ... ]` は名前も args もない `@`。`classify` は `Custom("at")` という意味のない種別を返す。`.agents/tasks/sigil-shape-axis-and-namespaces.md` は撤去すると 書いているが、実装はまだ受け付けている
-
-```tmt
-@[ x ]
-```
+検証:
 
 ```
-Inline @
-  content
-    Text "x"
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
 ```
 
-> **パースは通る。** 上の AST が実際の意味。
+> **パースは通る。** 上が実際の結果。
 
 ## 受け付けない書き方
 
@@ -868,7 +982,7 @@ Interp $
   interp  ref(id(asdf).contents(default))
 ```
 
-> **パースは通る。** 上の AST が実際の意味。
+> **パースは通る。** 上が実際の結果。
 
 ### 正規表現リテラル（`docs/design/ideas/idea.tmt`）
 

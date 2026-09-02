@@ -193,7 +193,7 @@ fn rename_namespace(el: &mut Element, ident: &str) {
 fn sigil_name_mut(sigil: &mut Sigil) -> Option<&mut Name> {
     match sigil {
         Sigil::Block(name) => Some(name),
-        Sigil::Inline(name) => name.as_mut(),
+        Sigil::Inline(name) => Some(name),
         Sigil::Bare | Sigil::Dollar => None,
     }
 }

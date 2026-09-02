@@ -279,23 +279,6 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         return tomet_style::render_meta_element(el, config);
     }
 
-    if let Sigil::Inline(None) = &el.sigil {
-        if el.content.is_some() && el.args.is_some() && el.value.is_none() {
-            let mut out = String::from("@");
-            if let Some(content) = &el.content {
-                out.push('[');
-                out.push_str(&render_inlines(content, config));
-                out.push(']');
-            }
-            if let Some(args) = &el.args {
-                out.push('(');
-                out.push_str(&render_args_with_config(args, config));
-                out.push(')');
-            }
-            return out;
-        }
-    }
-
     // A codeblock is written back as a ``` fence, which is the form it
     // was parsed from and the only one that keeps its body verbatim.
     // `#codeblock[...]` would not survive a round trip: `[content]` is
@@ -452,12 +435,9 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             out.push('#');
             out.push_str(&name.to_string());
         }
-        Sigil::Inline(Some(name)) => {
+        Sigil::Inline(name) => {
             out.push('@');
             out.push_str(&name.to_string());
-        }
-        Sigil::Inline(None) => {
-            out.push('@');
         }
         Sigil::Bare => {}
         Sigil::Dollar => {

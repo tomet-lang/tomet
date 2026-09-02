@@ -1089,20 +1089,6 @@ mod tests {
     }
 
     #[test]
-    fn bare_at_meta_is_not_inferred_only_the_explicit_name_is() {
-        // `meta` is deliberately not in `tomet_semantics::INFERRED_AT_KEYS`
-        // (see its doc comment) -- a bare `@(meta:yaml)` falls back to the
-        // generic "at" element rendering, unlike `@meta(format:yaml){...}`
-        // above.
-        let doc = parse_document("@(meta:yaml)[]\n").unwrap();
-        let body = render_body(&doc);
-        assert!(
-            body.contains("tm-at"),
-            "expected generic 'at' kind, got: {body}"
-        );
-    }
-
-    #[test]
     fn adjacent_meta_blocks_have_no_visible_output() {
         // `@meta` is documented as `placement: head` / `singleton: true`
         // (see `docs/spec/builtin-settings.tmt`) -- three of

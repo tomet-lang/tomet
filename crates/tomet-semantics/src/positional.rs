@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use tomet_ast::{Element, Sigil, Value};
+use tomet_ast::{Element, Name, Sigil, Value};
 use tomet_tree::ValueExt;
 
 /// Schema definition extracted from `@settings` block for custom elements.
@@ -269,7 +269,7 @@ pub fn normalized_element_args(el: &Element) -> Option<Value> {
 pub fn normalized_element_args_with_schema(el: &Element, schema: &SettingsSchema) -> Option<Value> {
     let args = el.args.as_ref()?;
     let elem_name = match &el.sigil {
-        Sigil::Block(name) | Sigil::Inline(Some(name)) => Some(name.name.as_str()),
+        Sigil::Block(name) | Sigil::Inline(name) => Some(name.name.as_str()),
         _ => None,
     };
     let positional_keys = effective_positional_keys(elem_name, &el.sigil, schema);
@@ -581,8 +581,10 @@ mod tests {
     }
 
     #[test]
-    fn unnamed_at_is_never_normalized() {
-        let mut el = element_new(Sigil::Inline(None));
+    fn an_element_with_no_positional_key_leaves_a_bare_scalar_alone() {
+        // `deck.card` is namespaced, so it has no builtin positional key
+        // and nothing to normalize the scalar into.
+        let mut el = element_new(Sigil::Inline(Name::namespaced("deck", "card")));
         el.args = Some(Value::String("https://example.com".to_string()));
         assert_eq!(
             normalized_element_args(&el),

@@ -32,6 +32,8 @@ type = "location"
 
 #link("1")[1]
 
+\@\[\](url:https://) \@\[\](file:/readme.md) \@\[\](ref:2)
+
 = heading
 
 == heading

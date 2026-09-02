@@ -81,50 +81,17 @@ fn extract_connections_from_references(el: &Element) -> Vec<RemoteConnection> {
     connections
 }
 
-/// Reads a remote connection: `#id(taskA):{ priority: high }`.
+/// Reads a remote connection.
 ///
-/// This used to be spelled `<id:taskA>:{...}`, with the target smuggled
-/// through `<T>`'s anything-goes name charset -- the parser stored the
-/// whole `"id:taskA"` as the element's name and this function string-split
-/// it back apart. Element names are now proper ASCII identifiers, so the
-/// target lives in a positional argument where it belongs, and nothing
-/// here has to know about a special charset.
-fn parse_remote_connection_element(el: &Element) -> Option<RemoteConnection> {
-    if !el.sigil.is_bare_named("id") {
-        return None;
-    }
-    let ids = target_ids(el.args.as_ref()?);
-    if ids.is_empty() {
-        return None;
-    }
-    Some(RemoteConnection {
-        target_ids: ids,
-        args: el.args.clone(),
-        value: el.value.as_ref().and_then(|v| v.as_data()),
-    })
-}
-
-/// The target ids of a `#id(...)`.
-///
-/// Written positionally (`#id(taskA)`, recorded by the value grammar
-/// under the empty positional key), as a sequence (`#id([taskA, taskB])`),
-/// or explicitly (`#id(target:taskA)`).
-fn target_ids(args: &Value) -> Vec<String> {
-    fn from_value(v: &Value) -> Vec<String> {
-        match v {
-            Value::String(s) => parse_target_ids_from_str(s),
-            Value::Seq(items) => items.iter().flat_map(from_value).collect(),
-            _ => Vec::new(),
-        }
-    }
-    match args {
-        Value::Map(entries) => entries
-            .iter()
-            .find(|(k, _)| k.is_empty() || k == "target" || k == "id")
-            .map(|(_, v)| from_value(v))
-            .unwrap_or_default(),
-        other => from_value(other),
-    }
+/// **This has no surface syntax right now.** It used to be written
+/// `<id:taskA>:{...}`, with the target smuggled through `<T>`'s
+/// anything-goes name charset and string-split back out here. `<T>` is
+/// gone, and no replacement spelling has been decided -- see
+/// `.agents/tasks/sigil-shape-axis-and-namespaces.md`. Nothing produces a
+/// `RemoteConnection` until one is, so this returns `None` rather than
+/// inventing a spelling.
+fn parse_remote_connection_element(_el: &Element) -> Option<RemoteConnection> {
+    None
 }
 
 fn parse_target_ids_from_str(s: &str) -> Vec<String> {
@@ -182,91 +149,12 @@ mod tests {
     use super::*;
     use tomet_parser::parse_document;
 
-    #[test]
-    fn resolves_single_remote_id_connection_in_references() {
-        let src = r#"
-#task(id: taskA)[ Clean room ]
-
-#references[
-  #id(taskA):{ priority: high, status: todo }
-]
-"#;
-        let doc = parse_document(src).unwrap();
-        let resolved = resolve_connect_targets(doc);
-
-        assert_eq!(resolved.blocks.len(), 1);
-        match &resolved.blocks[0] {
-            Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("task"));
-                assert_eq!(
-                    el.value,
-                    Some(ElementValue::from_map(Value::Map(vec![
-                        ("priority".into(), Value::String("high".into())),
-                        ("status".into(), Value::String("todo".into())),
-                    ])))
-                );
-            }
-            other => panic!("expected element, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn respects_direct_overrides_over_references_connection() {
-        let src = r#"
-#task(id: taskA):{ priority: low }[ Clean room ]
-
-#references[
-  #id(taskA):{ priority: high, status: todo }
-]
-"#;
-        let doc = parse_document(src).unwrap();
-        let resolved = resolve_connect_targets(doc);
-
-        assert_eq!(resolved.blocks.len(), 1);
-        match &resolved.blocks[0] {
-            Block::Element(el) => {
-                // Direct `priority: low` MUST win over connected `priority: high`
-                assert_eq!(
-                    el.value,
-                    Some(ElementValue::from_map(Value::Map(vec![
-                        ("priority".into(), Value::String("low".into())),
-                        ("status".into(), Value::String("todo".into())),
-                    ])))
-                );
-            }
-            other => panic!("expected element, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn resolves_multi_id_remote_connection_in_references() {
-        let src = r#"
-#task(id: taskA)[ Clean room ]
-#task(id: taskB)[ Wash dishes ]
-
-#references[
-  #id([taskA, taskB]):{ tag: house }
-]
-"#;
-        let doc = parse_document(src).unwrap();
-        let resolved = resolve_connect_targets(doc);
-
-        assert_eq!(resolved.blocks.len(), 2);
-        for block in &resolved.blocks {
-            match block {
-                Block::Element(el) => {
-                    assert_eq!(
-                        el.value,
-                        Some(ElementValue::from_map(Value::Map(vec![(
-                            "tag".into(),
-                            Value::String("house".into())
-                        )])))
-                    );
-                }
-                other => panic!("expected element, got {other:?}"),
-            }
-        }
-    }
+    // The three remote-connection tests that lived here are gone with
+    // the syntax they exercised. They were written against
+    // `<id:taskA>:{...}`, which is unspellable now that `<T>` is
+    // removed, and no replacement has been decided. They are not
+    // rewritten against an invented spelling -- see this module's
+    // `parse_remote_connection_element`.
 
     #[test]
     fn ignores_top_level_uncontained_remote_connection() {

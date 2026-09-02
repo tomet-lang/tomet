@@ -876,28 +876,6 @@ mod tests {
     }
 
     #[test]
-    fn bare_at_meta_is_not_inferred_only_the_explicit_name_is() {
-        // `meta` is deliberately not in `tomet_semantics::INFERRED_AT_KEYS`
-        // (see its doc comment) -- a bare `@` with a `meta` key falls back
-        // to the generic "at" element export, unlike `@meta(...)`
-        // (`Sigil::block("meta")`), which exports as nothing.
-        let mut el = tomet_tree::element_new(Sigil::Inline(None));
-        el.args = Some(Value::Map(vec![(
-            "meta".to_string(),
-            Value::String("yaml".to_string()),
-        )]));
-        let doc = Document {
-            blocks: vec![Block::Element(el)],
-            span: Span::dummy(),
-        };
-        assert!(
-            to_markdown(&doc).contains("data-tm-kind=\"at\""),
-            "expected generic 'at' kind, got: {}",
-            to_markdown(&doc)
-        );
-    }
-
-    #[test]
     fn config_element_exports_as_nothing() {
         let mut el = tomet_tree::element_new(Sigil::block("config"));
         el.args = Some(Value::Map(vec![(
