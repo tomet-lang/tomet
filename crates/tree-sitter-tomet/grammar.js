@@ -26,7 +26,12 @@ module.exports = grammar({
 	// unbounded lookahead past that whitespace, which a `token()` regex
 	// can't backtrack out of once `extras`/precedence has already
 	// committed to one interpretation.
-	externals: ($) => [$._scalar_token, $._list_marker_token, $._list_marker_gap],
+	externals: ($) => [
+		$._scalar_token,
+		$._list_marker_token,
+		$._list_marker_gap,
+		$._raw_fence_token,
+	],
 
 	// `heading`'s optional `{attrs}` can follow `]` either on the same
 	// line or after exactly one newline (see the real fixture examples in
@@ -88,7 +93,9 @@ module.exports = grammar({
 				),
 				$._newline,
 			),
-		heading_marker: (_$) => /#+/,
+		// Outranks `punctuation`'s bare `#`, which is only the fallback
+		// for a `#` that starts neither a heading nor a block element.
+		heading_marker: (_$) => token(prec(1, /#+/)),
 
 		// ---- thematic break -----------------------------------------------
 		// `_dash_run` is shared with `titled_thematic_break` below so the
@@ -252,7 +259,10 @@ module.exports = grammar({
 		// `/* ... */` needs to win over a `text` run that would otherwise
 		// swallow it whole, so a bare `/` (not opening a comment) falls
 		// back to `punctuation` like the others.
-		text: (_$) => /[^\n`*_=<@$()\[{\]/-]+/,
+		// `#` is excluded so `block_sigil` can win at a line start; `<`
+		// no longer needs excluding, since it is not a sigil any more.
+		text: (_$) => /[^\n`*_=@$#()\[{\]/-]+/,
+
 		// `-` is a bare string literal alternative here, not folded into
 		// the character class like the others, so it's the *same* grammar
 		// symbol as the literal `"-"` used to start `unordered_list_item`
@@ -276,7 +286,10 @@ module.exports = grammar({
 		// followed by `{` (so `interpolation`'s higher-precedence `${`
 		// token doesn't win) has nothing else to reduce to and would
 		// otherwise dead-end into `ERROR` once excluded from `text`.
-		punctuation: (_$) => choice(/[()\[{/]/, "-", "$"),
+		// `#` and `<` join the same fallback set: a `#` that does not
+		// start a heading or a block element, and any `<` at all, are
+		// ordinary prose and need something to reduce to.
+		punctuation: (_$) => choice(/[()\[{/<>]/, "-", "$", "#"),
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -355,8 +368,13 @@ module.exports = grammar({
 			),
 		number: (_$) => /-?[0-9]+(\.[0-9]+)?/,
 
-		// ---- `<T>`/`@name` elements ---------------------------------------
-		element: ($) => choice($.type_element, $.at_element),
+		// ---- `#name`/`@name` elements -------------------------------------
+		//
+		// The sigil encodes shape: `#` block, `@` inline. The old `<T>`
+		// sigil is gone, and with it the last construct this grammar could
+		// not express without guessing -- every construct is context-free
+		// now, so this is a faithful grammar rather than an approximation.
+		element: ($) => choice($.block_element, $.inline_element),
 		// `prec.right(3, ...)` wraps the *whole* rule (not just the trailing
 		// `repeat($._element_group)`, unlike an earlier revision) --
 		// `ordered_list_item`/`unordered_list_item`'s own trailing `{attrs}`
@@ -369,17 +387,28 @@ module.exports = grammar({
 		// this rule-level precedence (higher than `value_group`'s own
 		// `token(prec(1, "{"))`) statically resolves the shift/reduce
 		// conflict in that same direction, without needing GLR.
-		type_element: ($) =>
+		// `#` and the name are one token. That is what separates a block
+		// element from a heading without lookahead: `heading_marker` is
+		// `/#+/`, which cannot match `#name` because the name must follow
+		// the `#` immediately, and `#[` cannot match `block_sigil` for the
+		// same reason. It also matches the real parser's adjacency rule,
+		// which is what keeps `# heading` and shell comments as prose.
+		block_element: ($) =>
 			prec.right(
 				3,
 				seq(
-					"<",
-					field("name", $._element_name),
-					">",
+					field("name", $.block_sigil),
 					repeat($._element_group),
 				),
 			),
-		at_element: ($) =>
+		// Same token precedence as `heading_marker`, so the two are decided
+		// by match length rather than by precedence: `#input` is a longer
+		// match than `#`, while `#[` can only be the marker. Both outrank
+		// `punctuation`'s bare `#`, which is the fallback for a `#` that
+		// starts neither.
+		block_sigil: (_$) =>
+			token(prec(1, /#[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*/)),
+		inline_element: ($) =>
 			prec.right(
 				3,
 				seq(
@@ -437,11 +466,15 @@ module.exports = grammar({
 		_element_group: ($) =>
 			seq(
 				optional(":"),
-				choice($.args_group, $.content_group, $.value_group),
+				choice($.args_group, $.content_group, $.value_group, $.raw_fence),
 			),
+		// The whole fence -- opener, body and closer -- is one token from
+		// the external scanner. See `src/scanner.c` for why it is taken
+		// whole rather than split into three.
+		raw_fence: ($) => $._raw_fence_token,
 
 		identifier: (_$) => /[A-Za-z_][A-Za-z0-9_.-]*/,
-		// `type_element`/`at_element`'s name field specifically: needs
+		// `inline_element`'s name field specifically: needs
 		// higher lexical precedence than `text` (both can match e.g. "meta"
 		// in `@meta(...)`, equal length since both stop at `(`, and
 		// tree-sitter only consults token precedence to break length ties)
@@ -451,8 +484,17 @@ module.exports = grammar({
 		// `_entry_value`/`scalar`'s comment). Aliased back to `identifier`
 		// (referencing the rule, not a bare string) so it still shows up as
 		// a normal, visible `identifier` node in the tree.
+		// An element name is an ASCII identifier, optionally `.`-separated
+		// into `namespace.name`. The old permissive charset existed to let
+		// `<id:taskA>` smuggle a target through the name; that is
+		// `#id(taskA)` now, so the name can be a real identifier.
 		_element_name: ($) =>
-			alias(token(prec(1, /[A-Za-z_][A-Za-z0-9_.:\[\], -]*/)), $.identifier),
+			alias(
+				token(
+					prec(1, /[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*/),
+				),
+				$.identifier,
+			),
 
 		// ---- data value grammar (mirrors `value.rs`, simplified) --------
 		// Newlines aren't in `extras` (they're structurally significant at

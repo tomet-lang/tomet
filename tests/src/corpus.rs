@@ -108,7 +108,7 @@ fn tree_sitter_image_meta_fixture_parses_cleanly() {
 #[test]
 fn tree_sitter_cheatsheet_fixture_has_only_known_error_cases() {
     // The embedded-JSON/TOML case, the triple-backtick/unterminated
-    // code-span case, and the `<memo>(content:raw)[...]` stray-character
+    // code-span case, and the `#memo+++...+++` stray-character
     // case all used to need markers here too, but no longer error at all
     // now that they live inside this file's ``` fenced code block, which
     // the grammar's `fenced_code_block` rule consumes as one opaque text
@@ -122,7 +122,7 @@ fn tree_sitter_cheatsheet_fixture_has_only_known_error_cases() {
     let src = read_fixture(Path::new("cheatsheet.tmt"));
     let tree = ts_parse(&src);
     let errors = ts_error_texts(&src, &tree);
-    let known_markers = ["@config(", "や", "]"];
+    let known_markers = ["#config(", "や", "]"];
     for text in &errors {
         assert!(
             known_markers.iter().any(|marker| text.contains(marker)),
