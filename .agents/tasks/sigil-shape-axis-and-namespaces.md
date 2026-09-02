@@ -1,11 +1,15 @@
 # Element sigil rework: shape axis, namespaces, `+++` raw bodies
 
 `<T>` and `@name` were introduced to separate officially-defined elements
-from user-defined ones, but `classify` (`crates/tomet-semantics/src/kind.rs:144`)
-matches `Sigil::Type(name) | Sigil::At(Some(name))` into the same arm, so
-the distinction carries no information today. A design session on
-2026-09-02 replaced the axis rather than repairing it. Every decision
-below is settled; nothing has been implemented yet.
+from user-defined ones, but `classify` matched
+`Sigil::Type(name) | Sigil::At(Some(name))` into the same arm, so the
+distinction carried no information. A design session on 2026-09-02
+replaced the axis rather than repairing it.
+
+**Status:** steps 1-7 and 9 are done and the workspace is green except
+the tree-sitter drift test. Steps 8, 10, 11, 12 remain, plus the
+namespace-binding work noted under step 7 and the open question at the
+bottom. See the step list for detail.
 
 The change is one breaking release, not several: the sigil swap, the
 namespaces and the fence all rewrite the same documents, so they ship
@@ -180,45 +184,80 @@ threads a document-wide `running_format` and goes with them.
 ## Steps
 
 - [x] 1. Guard test — `tests/src/vocabulary.rs`, target `vocabulary`.
-      Done. Rather than emptying the builtin table (a `const` array, and
-      the parser never reads it or the external `elements:` map anyway),
-      it uses hand-written source pairs differing in exactly one
-      identifier the parser must not recognize, parses both, normalizes
-      that identifier, and compares the trees. A corpus sweep was
-      rejected: rewriting element names inside arbitrary Japanese prose
-      also rewrites the same token where it occurs as plain text, so the
-      trees would differ for reasons unrelated to vocabulary.
-      Currently fails on all 5 cases — `<codeblock>`, `(content:raw)`,
-      `(format:)`, `@meta`'s bare-string format shorthand, and
-      `@config`'s document-wide `running_format`. Acceptance criterion
-      for steps 3-7.
-- [ ] 2. AST (`crates/tomet-syntax-ast/src/lib.rs`). Drop `Sigil::Type`;
-      give the sigils a namespace slot and a `#` variant. Replace
-      `ElementValue::{Data, Children}` with a uniform group plus a
-      `Raw(String)` arm, keeping `Interp`. Update the `Sigil` matches in
-      `tomet-transform/src/structural.rs:75`, `tomet-semantics/src/positional.rs`,
-      `tomet-semantics-resolver/src/settings.rs` and
-      `tomet-syntax-parser/src/element.rs:239,254`.
-- [ ] 3. Parser: `#` as the block sigil, with the heading/element
-      lookahead and the fall-back-to-text rule. Remove `<T>`.
-- [ ] 4. Parser: namespaces, and `#import(file:..., as:...)`.
-- [ ] 5. Parser: the `+++` fence. Retire `(content:raw)` and delete
-      `embedded_format.rs`'s brace counting; `format:` becomes a
-      post-parse dispatch.
-- [ ] 6. Parser: uniform `{}`.
-- [ ] 7. Semantics: unknown bare name becomes an error; data-vs-children
-      becomes a view; shape-mismatch diagnostics (e.g. a block-only
-      element written with `@`).
+      Rather than emptying the builtin table (a `const` array, and the
+      parser never reads it or the external `elements:` map anyway), it
+      uses hand-written source pairs differing in exactly one identifier
+      the parser must not recognize, parses both, normalizes that
+      identifier, and compares the trees. A corpus sweep was rejected:
+      rewriting element names inside arbitrary Japanese prose also
+      rewrites the same token where it occurs as plain text, so the trees
+      would differ for reasons unrelated to vocabulary. **Passes.**
+- [x] 2. AST. `Sigil::{Block(Name), Inline(Option<Name>), Bare, Dollar}`
+      with `Name { namespace, name }`; `ElementValue::{Group(Vec<Entry>),
+      Raw(String), Interp}` with `Entry::{Pair, Element}`. `as_data` /
+      `as_children` are the computed views. Synthesized sigils remapped by
+      shape (`#hr`, `#codeblock`, `#ol`, `#ul`, `@em`, `@strong`, `@mark`).
+- [x] 3. Parser: `#` block sigil, heading-vs-element lookahead, and the
+      fall-back-to-text rule. `<T>` and `@[...]` removed. Element names are
+      ASCII; map keys stay Unicode and may contain `.`.
+      Also: a `#` element is recognized inside `[content]` at a line start,
+      which is what lets `#references[` hold `#id(...)` entries.
+- [x] 4. Parser: namespaces. `#import(file:..., as:ns)` **parses**, but
+      the binding is not resolved yet — see step 7's remainder.
+- [x] 5. Parser: the `+++` fence. `(content:raw)` and `(format:x){...}`
+      retired; `embedded_format.rs` moved to `tomet-semantics/src/embedded.rs`
+      as a post-parse dispatch, and `tomet-parser` dropped its
+      serde_json/serde_yaml/toml dependencies.
+- [x] 6. Parser: uniform `{}`. Fixes `#links{ note:x (1)[a] }` silently
+      swallowing the element into a scalar string.
+- [x] 7. Semantics: `classify` returns `Result<_, UnknownName>`;
+      `classify_lenient` is the rendering fallback. `shape_mismatch`
+      added, surfaced by the validator as `UnknownElement` /
+      `ShapeMismatch`. The two divergent positional tables collapsed into
+      one. `settings`, `import`, `references`, `id` joined `BUILTIN_KINDS`.
+      **Remaining:** namespace binding resolution (`#import(as:)`),
+      shorthand expansion, and ambiguous-shorthand errors.
 - [ ] 8. Trim the external `elements:` surface to `args` / `singleton` /
-      `types.*.style` and reject the removed keys with a message pointing
-      at the use-site replacement.
-- [ ] 9. Formatter: namespace expansion on save, plus a migration pass
-      (`<T>` to `#T`, the `@` directives to `#`, `(content:raw)[...]` and
-      `(format:x){...}` to `+++`).
-- [ ] 10. tree-sitter. Every construct is context-free after this work,
-      so `grammar.js` can be faithful for the first time rather than an
-      approximation that drifts.
-- [ ] 11. Corpus fixtures under `tests/fixtures/` for each new construct,
-      then `cargo test -p tomet-tests -p tree-sitter-tomet`.
-- [ ] 12. Update `docs/` (Japanese, per `docs/develop/docs-guide.md`) and
-      the editor extensions.
+      `types.*.style` and reject `content` / `placement` with a message
+      pointing at the use-site replacement. Note `SettingsSchema` reads
+      only `positional` today, so this is mostly docs plus rejection.
+      `docs/docs.settings.tmt` uses both removed keys and must change.
+- [x] 9. Formatter, printer and the one-shot migrator.
+      `scripts/migrate-sigils.py` and `scripts/migrate-rust-strings.py`
+      are throwaway — **delete them once the tree is settled.**
+      Codeblocks now print as ``` fences (a `#codeblock[...]` cannot round
+      trip, since `[content]` is ordinary markup now).
+      **Remaining:** namespace expansion on save.
+- [ ] 10. tree-sitter. Every construct is context-free after this work, so
+      `grammar.js` can be faithful for the first time. The `+++` fence
+      needs the stateful external scanner the backtick fence deferred
+      (`grammar.js`'s own note), and `heading_marker: /#+/` must become a
+      heading-vs-block-element decision.
+- [ ] 11. Corpus fixtures for each new construct. Parser-level coverage
+      exists (fence escaping, unterminated fence, `${}` staying verbatim,
+      the unquoted-`}`-in-YAML case); `tests/fixtures/` still needs
+      entries. `KNOWN_UNPARSEABLE` is now empty — `cheatsheet.tmt` parses.
+- [ ] 12. Update `docs/` (Japanese) and the editor extensions.
+
+## Open — needs a decision
+
+**Which namespace do the docs' own custom elements take?**
+
+Bare names are reserved for `BUILTIN_KINDS`, so every custom element in
+`docs/` is now an `UnknownElement` *validation* error (they still parse).
+By frequency: `bookmark` (27), `line` (12), `callout` (7), `node`,
+`timestamp`, `index`, `dirs`, `memo`, `foot`, `tag`. Many occurrences are
+inside code fences as examples, but the example documents under
+`docs/examples/` use them for real.
+
+They need a namespace plus an `#import(file:..., as:ns)` binding — e.g.
+`#import(file:docs.settings.tmt, as:docs)` and then `#docs.bookmark(...)`.
+The namespace name is an editorial choice about the docs, so it is not
+being guessed here. This blocks finishing steps 11 and 12.
+
+## Known-unrelated failures
+
+`docs/spec/builtin-functions.tmt` and `docs/design/ideas/idea.tmt` do not
+parse, on `${...}` constructs that are documented but unimplemented
+(`${ref(id(x).contents(y))}`, `$regex(/*.svg/g)`). Pre-existing;
+`builtin-functions.tmt` was never touched by this work.
