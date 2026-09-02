@@ -176,10 +176,10 @@ mod tests {
     #[test]
     fn resolves_single_remote_id_connection_in_references() {
         let src = r#"
-<task>(id: taskA)[ Clean room ]
+#task(id: taskA)[ Clean room ]
 
-@references[
-  <id:taskA>:{ priority: high, status: todo }
+#references[
+  #id(taskA):{ priority: high, status: todo }
 ]
 "#;
         let doc = parse_document(src).unwrap();
@@ -188,7 +188,7 @@ mod tests {
         assert_eq!(resolved.blocks.len(), 1);
         match &resolved.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("task".into()));
+                assert_eq!(el.sigil, Sigil::block("task"));
                 assert_eq!(
                     el.value,
                     Some(ElementValue::from_map(Value::Map(vec![
@@ -204,10 +204,10 @@ mod tests {
     #[test]
     fn respects_direct_overrides_over_references_connection() {
         let src = r#"
-<task>(id: taskA):{ priority: low }[ Clean room ]
+#task(id: taskA):{ priority: low }[ Clean room ]
 
-@references[
-  <id:taskA>:{ priority: high, status: todo }
+#references[
+  #id(taskA):{ priority: high, status: todo }
 ]
 "#;
         let doc = parse_document(src).unwrap();
@@ -232,10 +232,10 @@ mod tests {
     #[test]
     fn resolves_multi_id_remote_connection_in_references() {
         let src = r#"
-<task>(id: taskA)[ Clean room ]
-<task>(id: taskB)[ Wash dishes ]
+#task(id: taskA)[ Clean room ]
+#task(id: taskB)[ Wash dishes ]
 
-@references[
+#references[
   <id:[taskA, taskB]>:{ tag: house }
 ]
 "#;
@@ -262,9 +262,9 @@ mod tests {
     #[test]
     fn ignores_top_level_uncontained_remote_connection() {
         let src = r#"
-<task>(id: taskA)[ Clean room ]
+#task(id: taskA)[ Clean room ]
 
-<id:taskA>:{ priority: high }
+#id(taskA):{ priority: high }
 "#;
         let doc = parse_document(src).unwrap();
         let resolved = resolve_connect_targets(doc);

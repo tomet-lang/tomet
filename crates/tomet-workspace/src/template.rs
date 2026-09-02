@@ -204,7 +204,7 @@ mod tests {
         let tmpl_file = tmpl_dir.join("daily-note.tmt");
         fs::write(
             &tmpl_file,
-            "@blueprint(daily-note)\n@meta{\n  id: ${uuid(\"nil\")}\n  title: ${title}\n}\n\n#[ Tasks for ${title} ] {id: tasks}\n",
+            "#blueprint(daily-note)\n#meta{\n  id: ${uuid(\"nil\")}\n  title: ${title}\n}\n\n#[ Tasks for ${title} ] {id: tasks}\n",
         )
         .unwrap();
 
@@ -223,7 +223,7 @@ mod tests {
 
         assert!(created_path.is_file());
         let result_content = fs::read_to_string(&created_path).unwrap();
-        assert!(result_content.contains("@kind(daily-note)"));
+        assert!(result_content.contains("#kind(daily-note)"));
         assert!(result_content.contains("00000000-0000-0000-0000-00000000000"));
         assert!(result_content.contains("Tasks for 2026-09-01 Daily"));
     }

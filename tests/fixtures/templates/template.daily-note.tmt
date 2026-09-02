@@ -1,5 +1,5 @@
-@settings(file:docs/docs.settings.tmt)
-@meta{
+#settings(file:docs/docs.settings.tmt)
+#meta{
   type: daily-note
   uuid: ${uuid}
 }

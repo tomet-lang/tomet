@@ -1,28 +1,28 @@
-@meta{ type: settings }
-@settings(format:json){
-  {
-    elements = {
-      bookmark = {
-        args = {
-          name = { type = string },
-          count = { type = uint, default = 0 },
-          variant = { type = string }
-        },
-        required = [ name ],
-        positional = [ name ],
-        content = nest(allow = [callout, codeblock]),
-        placement = block,
-        singleton = false
-      }
-    },
-    types = {
-      bookmark = {
-        style = one_line
+#meta{ type: settings }
+#settings(format:json)+++
+{
+  elements = {
+    bookmark = {
+      args = {
+        name = { type = string },
+        count = { type = uint, default = 0 },
+        variant = { type = string }
       },
-      todo = {},
-      daily-note = {
-        template = "path:examples/templates/template.daily-note.tmt"
-      }
+      required = [ name ],
+      positional = [ name ],
+      content = nest(allow = [callout, codeblock]),
+      placement = block,
+      singleton = false
+    }
+  },
+  types = {
+    bookmark = {
+      style = one_line
+    },
+    todo = {},
+    daily-note = {
+      template = "path:examples/templates/template.daily-note.tmt"
     }
   }
 }
++++

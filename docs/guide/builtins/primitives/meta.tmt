@@ -2,10 +2,10 @@
 #[ 全容 ]
 
 ```tm
-@meta(yaml){
-  id: <id>
-  type: "string"
-}
+#meta(yaml)+++
+id: #id
+type: "string"
++++
 
 ```
 

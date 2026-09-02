@@ -460,39 +460,41 @@ mod tests {
 
     #[test]
     fn test_printer_config_meta_format() {
-        let config_src = r#"@config(format:json){
-          {
-            "format": {
-              "meta": {
-                "format": "yaml"
-              }
-            }
-          }
-        }"#;
+        let config_src = r#"#config(format:json)+++
+{
+  "format": {
+    "meta": {
+      "format": "yaml"
+    }
+  }
+}
+
++++"#;
         let cfg = load_config_from_str(config_src).unwrap();
         assert_eq!(cfg.meta_format.as_deref(), Some("yaml"));
     }
 
     #[test]
     fn test_settings_field_config_parsing() {
-        let settings_src = r#"@settings(format:json){
-          {
-            "meta": {
-              "aliases": {
-                "type": "list",
-                "always_newline": true
-              },
-              "created": {
-                "type": "datetime",
-                "format": "rfc3339"
-              },
-              "modified": {
-                "type": "datetime",
-                "format": "rfc3339"
-              }
-            }
-          }
-        }"#;
+        let settings_src = r#"#settings(format:json)+++
+{
+  "meta": {
+    "aliases": {
+      "type": "list",
+      "always_newline": true
+    },
+    "created": {
+      "type": "datetime",
+      "format": "rfc3339"
+    },
+    "modified": {
+      "type": "datetime",
+      "format": "rfc3339"
+    }
+  }
+}
+
++++"#;
         let cfg = load_config_from_str(settings_src).unwrap();
         assert_eq!(cfg.meta_fields.get("aliases").unwrap().always_newline, true);
         assert_eq!(
@@ -515,15 +517,15 @@ mod tests {
         // `is_path_ignored`'s own matching behavior is covered by
         // `tomet-indexer`'s tests now -- this only checks that
         // `ignore.files` parses into `PrinterConfig.ignore_files`.
-        let settings_src = r#"@settings(format:json){
-  {
-    "ignore": {
-      "files": [
-        "00-09 System/01 Apps/obsidian"
-      ]
-    }
+        let settings_src = r#"#settings(format:json)+++
+{
+  "ignore": {
+    "files": [
+      "00-09 System/01 Apps/obsidian"
+    ]
   }
 }
++++
 "#;
         let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
         assert_eq!(
@@ -534,7 +536,7 @@ mod tests {
 
     #[test]
     fn test_heading_and_link_spacing_config() {
-        let src = r#"@config(
+        let src = r#"#config(
   format: {
     heading: { space_inside_brackets: true }
     link: { no_space: true }

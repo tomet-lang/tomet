@@ -869,9 +869,7 @@ mod tests {
     #[test]
     fn thematic_break() {
         let doc = Document {
-            blocks: vec![Block::Element(tomet_tree::element_new(Sigil::Type(
-                "hr".to_string(),
-            )))],
+            blocks: vec![Block::Element(tomet_tree::element_new(Sigil::block("hr")))],
             span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "---\n\n");
@@ -972,7 +970,7 @@ mod tests {
 
     #[test]
     fn macro_and_interp_exports_to_markdown() {
-        let doc = tomet_parser::parse_document("@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    copyright: \"(C) 2026 Tomet\"\n  }\n}\n\nIssue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
+        let doc = tomet_parser::parse_document("#config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    copyright: \"(C) 2026 Tomet\"\n  }\n}\n\nIssue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
         assert_eq!(
             to_markdown(&doc),
             "Issue: https://github.com/tomet/tomet/issues/42 Footer: (C) 2026 Tomet Math: 15\n\n"

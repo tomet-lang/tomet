@@ -878,7 +878,7 @@ mod tests {
         // `<h2>` -- only `render_block`'s top-level dispatch special-cases
         // headings (D5); `render_element`'s generic `kind.as_str()` match
         // has no `"heading"` arm at all.
-        let doc = parse_document("<blockquote>[ @heading(2)[Nested] ]\n").unwrap();
+        let doc = parse_document("#blockquote[ #heading(2)[Nested] ]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1020,7 +1020,7 @@ mod tests {
 
     #[test]
     fn renders_links_container_as_definition_list() {
-        let doc = parse_document("@links {\n  (1)[ note ]\n  (anotation1)[ note2 ]\n}\n").unwrap();
+        let doc = parse_document("#links {\n  (1)[ note ]\n  (anotation1)[ note2 ]\n}\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1075,14 +1075,14 @@ mod tests {
 
     #[test]
     fn meta_element_has_no_visible_output() {
-        let doc = parse_document("@meta(format:yaml){\n  key: value\n}\n").unwrap();
+        let doc = parse_document("#meta(format:yaml)+++\nkey: value\n+++\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "");
     }
 
     #[test]
     fn config_element_has_no_visible_output() {
-        let doc = parse_document("@config(format:json)\n").unwrap();
+        let doc = parse_document("#config(format:json)\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "");
     }
@@ -1116,7 +1116,7 @@ mod tests {
         // than leaking a stray whitespace-only `<p>` -- garbage in,
         // harmless out.
         let doc = parse_document(
-            "@meta(format:json){\n  {\"key\":\"value\"}\n}\n@meta(format:yaml){\n  key:value\n}\n@meta(format:toml){\n  key = \"value\"\n}\n\n#[ next ]\n",
+            "#meta(format:json)+++\n{\"key\":\"value\"}\n+++\n#meta(format:yaml)+++\nkey:value\n+++\n#meta(format:toml)+++\nkey = \"value\"\n+++\n\n#[ next ]\n",
         )
         .unwrap();
         let body = render_body(&doc);
@@ -1125,7 +1125,7 @@ mod tests {
 
     #[test]
     fn renders_typed_element_generically() {
-        let doc = parse_document("<caution>[ be careful ]\n").unwrap();
+        let doc = parse_document("#caution[ be careful ]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1144,7 +1144,7 @@ mod tests {
     fn renders_thematic_break_as_hr() {
         let doc = parse_document("---\n").unwrap();
         let body = render_body(&doc);
-        assert_eq!(body, "<hr>\n");
+        assert_eq!(body, "#hr\n");
     }
 
     #[test]
@@ -1169,14 +1169,14 @@ mod tests {
 
     #[test]
     fn renders_embed_as_img() {
-        let doc = parse_document("<embed>(target:assets/pic.png)[a cat]\n").unwrap();
+        let doc = parse_document("@embed(target:assets/pic.png)[a cat]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "<img src=\"assets/pic.png\" alt=\"a cat\">\n");
     }
 
     #[test]
     fn renders_codeblock_with_lang() {
-        let doc = parse_document("<codeblock>(lang:rust)[fn main() {}]\n").unwrap();
+        let doc = parse_document("#codeblock(lang:rust)[fn main() {}]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1199,8 +1199,8 @@ mod tests {
         // `codeblock`'s `[content]` is the one exception to the usual inline
         // grammar -- real code containing `*`/`<T>`/`@`/backticks must not
         // be reinterpreted as em/strong/element triggers/code spans.
-        let doc = parse_document("<codeblock>(lang:rust)[let x = *ptr; let y = <T>; @deco `q`]\n")
-            .unwrap();
+        let doc =
+            parse_document("#codeblock(lang:rust)[let x = *ptr; let y = @T; @deco `q`]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1210,7 +1210,7 @@ mod tests {
 
     #[test]
     fn codeblock_with_a_nested_bracket_is_not_truncated_early() {
-        let doc = parse_document("<codeblock>(lang:rust)[let v = [1, 2, 3];]\n").unwrap();
+        let doc = parse_document("#codeblock(lang:rust)[let v = [1, 2, 3];]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1249,7 +1249,7 @@ mod tests {
     #[test]
     fn codeblock_value_group_is_id_cssclass_metadata_not_code() {
         let doc =
-            parse_document("<codeblock>(lang:rust){id:snippet1, cssclass:card}[fn main() {}]\n")
+            parse_document("#codeblock(lang:rust){id:snippet1, cssclass:card}[fn main() {}]\n")
                 .unwrap();
         let body = render_body(&doc);
         assert_eq!(
@@ -1260,7 +1260,7 @@ mod tests {
 
     #[test]
     fn renders_codeblock_with_positional_lang_arg() {
-        let doc = parse_document("<codeblock>(\"rust\")[fn main() {}]\n").unwrap();
+        let doc = parse_document("#codeblock(\"rust\")[fn main() {}]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1270,7 +1270,7 @@ mod tests {
 
     #[test]
     fn renders_embed_with_positional_src_arg() {
-        let doc = parse_document("<embed>(\"assets/pic.png\")[a cat]\n").unwrap();
+        let doc = parse_document("@embed(\"assets/pic.png\")[a cat]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "<img src=\"assets/pic.png\" alt=\"a cat\">\n");
     }
@@ -1278,7 +1278,7 @@ mod tests {
     #[test]
     fn meta_and_config_with_positional_format_arg_have_no_visible_output() {
         let doc =
-            parse_document("@meta(\"json\"){\n  {\"key\": \"value\"}\n}\n@config(\"json\")\n")
+            parse_document("#meta(\"json\"){\n  {\"key\": \"value\"}\n}\n#config(\"json\")\n")
                 .unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "");
@@ -1286,7 +1286,7 @@ mod tests {
 
     #[test]
     fn renders_table_element_to_html() {
-        let src = "@table()[\n[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]\n[ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]\n[ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]\n]{}\n";
+        let src = "#table()[\n[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]\n[ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]\n[ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]\n]{}\n";
         let doc = parse_document(src).unwrap();
         let body = render_body(&doc);
         assert_eq!(
@@ -1321,7 +1321,7 @@ mod tests {
     #[test]
     fn renders_icon_element_to_html() {
         let doc =
-            parse_document("<icon>(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"}\n").unwrap();
+            parse_document("@icon(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"}\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1329,7 +1329,7 @@ mod tests {
         );
 
         let inline_doc = parse_document(
-            "Here is <icon>(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"} icon.\n",
+            "Here is @icon(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"} icon.\n",
         )
         .unwrap();
         let inline_body = render_body(&inline_doc);
@@ -1341,7 +1341,7 @@ mod tests {
 
     #[test]
     fn renders_interp_and_macros_to_html() {
-        let doc = parse_document("@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    copyright: \"(C) 2026 Tomet\"\n  }\n}\n\nIssue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
+        let doc = parse_document("#config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    copyright: \"(C) 2026 Tomet\"\n  }\n}\n\nIssue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,

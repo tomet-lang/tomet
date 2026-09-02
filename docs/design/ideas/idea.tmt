@@ -22,7 +22,7 @@
 
 ---[ 名前付きスロット ]---
 
-<callout>(note)
+#callout(note)
 :title:[title]
 :body:[
     content
@@ -63,7 +63,7 @@
 
 `[]`でリスト項目自体をラップする案(複数行/ネストされたアウトライン記法)は不採用。
 `[]`は要素のcontent専用のまま据え置き、複数行/ネストが要る場合は子として
-`<T>()[...]`要素を書く形に決定。経緯は `docs/design/decisions/2026-08-16-syntax-decisions.md` を参照。
+`@T()[...]`要素を書く形に決定。経緯は `docs/design/decisions/2026-08-16-syntax-decisions.md` を参照。
 
 #[ 関数の属性(配置コンテキスト) ]
 
@@ -71,15 +71,15 @@
 
 []の中や文字の途中で使用できる。
 
-<codeblock>(lang:tm)[
+#codeblock(lang:tm)[
   **aaaa**
   *aaaa*
   ==aaaa==
   _aaaa_
   `aaaa`
-  <icon>()
+  @icon()
   @link[]()
-  @import()
+  #import()
   $(a.a)
   @tag[]
 ]
@@ -92,13 +92,13 @@
 
 行を独占する。その後に何かを記入することは基本無い(書けるけど。行の最初にスペースすらもかけないってこと。)。
 
-<codeblock>(lang:tm)[
-  @config()
-  @meta(){}
+#codeblock(lang:tm)[
+  #config()
+  #meta(){}
   ##[]{}
-  <index>()
-  <codeblock>()
-  <blockquote>[]
+  #index()
+  #codeblock()
+  #blockquote[]
 ]
 
 ##[ 例外 ]
@@ -131,9 +131,9 @@
 #[ 新しい関数 ]
 
 - @tag[unko]
-- <index>(){}
-- <template>
-- <time>
+- @index(){}
+- @template
+- @time
 
 ---[ 必要か？な関数 ]---
 

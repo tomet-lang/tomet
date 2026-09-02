@@ -433,7 +433,7 @@ mod tests {
         // An arbitrary custom element's own `tm`-named field is left
         // alone -- recovery is scoped to elements whose positional key
         // is `target` (`@link`/`<embed>`), not a general mechanism.
-        let mut el = element_new(Sigil::Type("caution".to_string()));
+        let mut el = element_new(Sigil::block("caution"));
         el.args = Some(Value::Map(vec![(
             "tm".to_string(),
             Value::String("foo".to_string()),
@@ -515,7 +515,7 @@ mod tests {
         )]);
         let schema = SettingsSchema::from_value(&settings_val);
 
-        let mut el = element_new(Sigil::Type("task".to_string()));
+        let mut el = element_new(Sigil::block("task"));
         el.args = Some(Value::Map(vec![
             (
                 POSITIONAL_ENTRY_KEY.to_string(),
@@ -604,7 +604,7 @@ mod tests {
         )]);
         let schema = SettingsSchema::from_value(&settings_val);
 
-        let mut el = element_new(Sigil::Type("task".to_string()));
+        let mut el = element_new(Sigil::block("task"));
         el.args = Some(Value::String("Clean room".to_string()));
 
         assert_eq!(
@@ -633,7 +633,7 @@ mod tests {
         )]);
         let schema = SettingsSchema::from_value(&settings_val);
 
-        let mut el = element_new(Sigil::Type("task".to_string()));
+        let mut el = element_new(Sigil::block("task"));
         el.args = Some(Value::Seq(vec![
             Value::String("Clean room".to_string()),
             Value::String("high".to_string()),

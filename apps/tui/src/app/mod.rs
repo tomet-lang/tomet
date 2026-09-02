@@ -399,15 +399,15 @@ mod tests {
         let config_file = config_dir.join("default.config.tmt");
         std::fs::write(
             &config_file,
-            r#"@settings(format:json){
-  {
-    "ignore": {
-      "files": [
-        "00-09 System/01 Apps/obsidian"
-      ]
-    }
+            r#"#settings(format:json)+++
+{
+  "ignore": {
+    "files": [
+      "00-09 System/01 Apps/obsidian"
+    ]
   }
 }
++++
 "#,
         )
         .unwrap();
@@ -486,8 +486,7 @@ mod tests {
         );
         assert!(
             !b.markdown_src.is_empty(),
-            "b.md's already-loaded preview content must survive the reload \
-             triggered by converting an unrelated file"
+            "b.md's already-loaded preview content must survive the reload \\n             triggered by converting an unrelated file"
         );
 
         let _ = std::fs::remove_dir_all(&temp_dir);

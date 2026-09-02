@@ -1,5 +1,5 @@
-@settings(file:docs/docs.settings.tmt)
-@config(
+#settings(file:docs/docs.settings.tmt)
+#config(
   format:json
 )
 
@@ -8,7 +8,7 @@
 ```tm
 @xxx(args)[content]{value}
 @()[]{}
-<T>()[]{}
+#T()[]{}
 #()[]{}
 ##()[]{}
 -.()[]{}
@@ -25,20 +25,20 @@ $()
 ##[ 柔軟性 ]
 
 ```tm
-<T>()             // 括弧削減
+#T()             // 括弧削減
 
-<T>{}()[]         // 並び替え
+#T{}()[]         // 並び替え
 
 @xxx () [] {}     // 1スペース
 # []              // 1スペース
 
-<T>(){}           // 改行
+#T(){}           // 改行
 []                // 改行
 ```
 
 ##[ 短縮 ]
 
-組み込みの参照系は `<T>` の代わりに `@` を使い、`()` の中のキー名`(url / file / ref / meta など)`から種別を推論する。名前を書かなくていい分、キーの意味は型ごとに一意に保つ。
+組み込みの参照系は `@T` の代わりに `@` を使い、`()` の中のキー名`(url / file / ref / meta など)`から種別を推論する。名前を書かなくていい分、キーの意味は型ごとに一意に保つ。
 - `@(url:https://example.com)[Wiki]`
 - `@[Wiki](url:https://example.com)`
 - `@(file:assets/image.png)[Caption]`
@@ -62,7 +62,7 @@ _xxx_
 \`\`\`tm          // コードブロック
 \`\`\`            // コードブロック
 
-@table()[
+#table()[
 [][][][]
 [][][][]
 ]

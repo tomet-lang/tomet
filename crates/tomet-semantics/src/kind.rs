@@ -16,6 +16,19 @@ pub enum ElementKind {
     Version,
     Meta,
     Config,
+    /// `#settings{...}` -- the schema/config block. Not previously in
+    /// `BUILTIN_KINDS` despite three places matching it by raw string; a
+    /// bare name has to be built-in now, so it is listed properly.
+    Settings,
+    /// `#import(file:..., as:ns)` -- binds a namespace. The binding is
+    /// resolved by `tomet-resolver`; this only recognizes the element.
+    Import,
+    /// `#references[...]` -- the container for remote connections.
+    References,
+    /// `#id(taskA):{...}` -- attaches attributes to a remote element by
+    /// id. Previously spelled `<id:taskA>`, with the target smuggled
+    /// through `<T>`'s permissive name charset.
+    Id,
     Blueprint,
     Links,
     /// The one officially-supported link element, `@link(target:...)`
@@ -71,6 +84,10 @@ impl ElementKind {
             ElementKind::Version => "version",
             ElementKind::Meta => "meta",
             ElementKind::Config => "config",
+            ElementKind::Settings => "settings",
+            ElementKind::Import => "import",
+            ElementKind::References => "references",
+            ElementKind::Id => "id",
             ElementKind::Blueprint => "blueprint",
             ElementKind::Links => "links",
             ElementKind::Link => "link",
@@ -102,11 +119,15 @@ impl ElementKind {
 /// Bare names are reserved for exactly this list. A user-defined element
 /// must be namespaced (`deck.bookmark`), which is why an unrecognized bare
 /// name is an error rather than a `Custom` kind.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 19] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 23] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
     ("config", ElementKind::Config),
+    ("settings", ElementKind::Settings),
+    ("import", ElementKind::Import),
+    ("references", ElementKind::References),
+    ("id", ElementKind::Id),
     ("blueprint", ElementKind::Blueprint),
     ("links", ElementKind::Links),
     ("link", ElementKind::Link),
@@ -216,8 +237,9 @@ pub fn classify_lenient(el: &Element) -> ElementKind {
 fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
-        Meta | Config | Blueprint | Links | Hr | Codeblock | Blockquote | Table | Heading
-        | OrderedList | UnorderedList | Kind | Version => Shape::Block,
+        Meta | Config | Settings | Import | References | Id | Blueprint | Links | Hr
+        | Codeblock | Blockquote | Table | Heading | OrderedList | UnorderedList | Kind
+        | Version => Shape::Block,
         Em | Strong | Mark | Link | Embed | Icon => Shape::Inline,
         Custom(_) | Bare | Interp => return None,
     })
@@ -257,16 +279,48 @@ mod tests {
         for (name, kind) in &BUILTIN_KINDS {
             assert_eq!(kind.as_str(), *name, "as_str() mismatch for {name:?}");
             assert_eq!(
-                classify_name(name),
-                *kind,
+                classify_name(&Name::bare(*name)),
+                Ok(kind.clone()),
                 "classify_name() mismatch for {name:?}"
             );
         }
     }
 
     #[test]
-    fn type_sigil_with_unrecognized_name_is_custom() {
-        let el = element_new(Sigil::Type("caution".to_string()));
+    fn unknown_bare_name_is_an_error() {
+        // Bare names are reserved for the built-in vocabulary, so this is
+        // the diagnostic that replaces the old silent `Custom` fallback.
+        let el = element_new(Sigil::block("caution"));
+        assert_eq!(
+            classify(&el),
+            Err(UnknownName {
+                name: "caution".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn namespaced_name_is_custom() {
+        let el = element_new(Sigil::Block(Name::namespaced("deck", "caution")));
+        assert_eq!(
+            classify(&el),
+            Ok(ElementKind::Custom("deck.caution".to_string()))
+        );
+    }
+
+    #[test]
+    fn namespacing_never_shadows_a_builtin() {
+        // `deck.meta` is the user's element, not Tomet's `#meta`.
+        let el = element_new(Sigil::Block(Name::namespaced("deck", "meta")));
+        assert_eq!(
+            classify(&el),
+            Ok(ElementKind::Custom("deck.meta".to_string()))
+        );
+    }
+
+    #[test]
+    fn classify_lenient_falls_back_for_an_unknown_bare_name() {
+        let el = element_new(Sigil::block("caution"));
         assert_eq!(
             classify_lenient(&el),
             ElementKind::Custom("caution".to_string())
@@ -296,12 +350,29 @@ mod tests {
     }
 
     #[test]
-    fn named_at_sigil_with_no_inferable_args_stays_custom() {
-        let el = element_new(Sigil::At(Some("caution".to_string())));
-        assert_eq!(
-            classify_lenient(&el),
-            ElementKind::Custom("caution".to_string())
-        );
+    fn shape_mismatch_reports_a_block_element_written_inline() {
+        let el = element_new(Sigil::inline("meta"));
+        assert_eq!(shape_mismatch(&el), Some((Shape::Inline, Shape::Block)));
+    }
+
+    #[test]
+    fn shape_mismatch_reports_an_inline_element_written_as_a_block() {
+        let el = element_new(Sigil::block("em"));
+        assert_eq!(shape_mismatch(&el), Some((Shape::Block, Shape::Inline)));
+    }
+
+    #[test]
+    fn a_correctly_shaped_element_has_no_mismatch() {
+        assert_eq!(shape_mismatch(&element_new(Sigil::block("meta"))), None);
+        assert_eq!(shape_mismatch(&element_new(Sigil::inline("em"))), None);
+    }
+
+    #[test]
+    fn a_custom_element_may_take_either_shape() {
+        let block = element_new(Sigil::Block(Name::namespaced("deck", "card")));
+        let inline = element_new(Sigil::Inline(Some(Name::namespaced("deck", "card"))));
+        assert_eq!(shape_mismatch(&block), None);
+        assert_eq!(shape_mismatch(&inline), None);
     }
 
     #[test]

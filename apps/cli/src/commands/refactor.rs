@@ -80,12 +80,12 @@ mod tests {
         let _ = fs::create_dir_all(&temp_dir);
         let src_file = temp_dir.join("doc.tmt");
 
-        let src_content = r#"@version(1.0)
-@meta(format:yaml){
-  type: note
-  title: My Title
-}
-@config{
+        let src_content = r#"#version(1.0)
+#meta(format:yaml)+++
+type: note
+title: My Title
++++
+#config{
   macros: {
     gh: "https://github.com/${1}"
   }
@@ -99,7 +99,7 @@ mod tests {
         assert!(res.is_ok());
 
         let refactored = fs::read_to_string(&src_file).unwrap();
-        assert!(refactored.contains("@kind(note)"));
+        assert!(refactored.contains("#kind(note)"));
         assert!(refactored.contains("$gh(\"tomet/tomet\")"));
         assert!(!refactored.contains("format:yaml"));
 

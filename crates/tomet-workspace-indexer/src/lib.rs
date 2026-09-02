@@ -198,15 +198,15 @@ mod tests {
 
     #[test]
     fn test_is_path_ignored_with_config_from_settings() {
-        let settings_src = r#"@settings(format:json){
-  {
-    "ignore": {
-      "files": [
-        "00-09 System/01 Apps/obsidian"
-      ]
-    }
+        let settings_src = r#"#settings(format:json)+++
+{
+  "ignore": {
+    "files": [
+      "00-09 System/01 Apps/obsidian"
+    ]
   }
 }
++++
 "#;
         let cfg =
             tomet_config::load_config_from_str(settings_src).expect("failed to parse settings");
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_extract_metadata_collects_meta_and_config_fields() {
-        let src = "@meta{author: Alice}\n\n@config{lang: en}\n\n#[Doc]\n";
+        let src = "#meta{author: Alice}\n\n#config{lang: en}\n\n#[Doc]\n";
         let map = extract_metadata(src);
         assert_eq!(map.get("meta.author"), Some(&"Alice".to_string()));
         assert_eq!(map.get("config.lang"), Some(&"en".to_string()));

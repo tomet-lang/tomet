@@ -97,8 +97,8 @@ mod tests {
 
     #[test]
     fn finds_meta_value_from_a_meta_element() {
-        let doc = parse_document("@meta(format:yaml){\n  title: Hello\n}\n").unwrap();
-        let value = document_meta(&doc).expect("expected @meta value");
+        let doc = parse_document("#meta(format:yaml)+++\ntitle: Hello\n+++\n").unwrap();
+        let value = document_meta(&doc).expect("expected #meta value");
         match value {
             Value::Map(map) => {
                 assert_eq!(
@@ -118,33 +118,33 @@ mod tests {
 
     #[test]
     fn meta_element_without_a_value_group_is_none() {
-        let doc = parse_document("@meta(format:yaml)\n").unwrap();
+        let doc = parse_document("#meta(format:yaml)\n").unwrap();
         assert_eq!(document_meta(&doc), None);
     }
 
     #[test]
     fn extracts_document_kind_from_kind_directive() {
-        let doc = parse_document("@kind(j.daily)\n\n#[ Daily Note ]\n").unwrap();
+        let doc = parse_document("#kind(j.daily)\n\n#[ Daily Note ]\n").unwrap();
         assert_eq!(document_kind(&doc), Some("j.daily".to_string()));
 
-        let doc2 = parse_document("<kind>(config)\n").unwrap();
+        let doc2 = parse_document("#kind(config)\n").unwrap();
         assert_eq!(document_kind(&doc2), Some("config".to_string()));
 
         // No @kind directive -> returns None
-        let doc3 = parse_document("@meta{\n  title: Test\n}\n").unwrap();
+        let doc3 = parse_document("#meta{\n  title: Test\n}\n").unwrap();
         assert_eq!(document_kind(&doc3), None);
     }
 
     #[test]
     fn extracts_document_version_from_version_directive() {
-        let doc = parse_document("@version(1.0)\n\n#[ Doc ]\n").unwrap();
+        let doc = parse_document("#version(1.0)\n\n#[ Doc ]\n").unwrap();
         assert_eq!(document_version(&doc), Some("1".to_string()));
 
-        let doc2 = parse_document("@version(\"1.0\")\n").unwrap();
+        let doc2 = parse_document("#version(\"1.0\")\n").unwrap();
         assert_eq!(document_version(&doc2), Some("1.0".to_string()));
 
         // No @version directive -> returns None
-        let doc3 = parse_document("@meta{\n  title: Test\n}\n").unwrap();
+        let doc3 = parse_document("#meta{\n  title: Test\n}\n").unwrap();
         assert_eq!(document_version(&doc3), None);
     }
 }
