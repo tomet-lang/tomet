@@ -14,6 +14,3 @@
 
 ("{" @open
   "}" @close)
-
-("<" @open
-  ">" @close)

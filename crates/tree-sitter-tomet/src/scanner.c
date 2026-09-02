@@ -52,6 +52,7 @@ enum TokenType {
   SCALAR,
   LIST_MARKER_TOKEN,
   LIST_MARKER_GAP,
+  RAW_FENCE,
 };
 
 void *tree_sitter_tomet_external_scanner_create(void) { return NULL; }
@@ -93,6 +94,77 @@ static bool is_scalar_terminator(int32_t c) {
     default:
       return false;
   }
+}
+
+// A whole `+++` fence -- opening run, the rest of its line, the body, and
+// the closing run -- as one token.
+//
+// Taking the entire fence in a single token is what lets this be
+// stateless: the opening run's length only has to survive until the
+// matching close is found, which is within this one call, so the scanner
+// needs no serialize/deserialize. That is also why the backtick fence's
+// variable length was left as a known gap in `grammar.js` -- it is split
+// across an opener, a body and a closer, and would need real state.
+//
+// Mirrors `crates/tomet-syntax-parser/src/fence.rs`: a closing line is one
+// whose leading `+` run is at least as long as the opening run and which
+// holds nothing else but inline whitespace; an unterminated fence runs to
+// EOF rather than failing.
+static bool scan_raw_fence(TSLexer *lexer) {
+  // External scanners run before tree-sitter's automatic `extras`
+  // skipping, so inline whitespace between the element head and its
+  // fence (`#meta(format:yaml) +++`) has to be consumed here.
+  while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+    lexer->advance(lexer, true);
+  }
+
+  unsigned open_run = 0;
+  while (lexer->lookahead == '+') {
+    lexer->advance(lexer, false);
+    open_run++;
+  }
+  if (open_run < 3) {
+    return false;
+  }
+
+  // Rest of the opening line.
+  while (!lexer->eof(lexer) && lexer->lookahead != '\n' && lexer->lookahead != '\r') {
+    lexer->advance(lexer, false);
+  }
+
+  while (!lexer->eof(lexer)) {
+    // Consume the line terminator.
+    if (lexer->lookahead == '\r') {
+      lexer->advance(lexer, false);
+    }
+    if (lexer->lookahead == '\n') {
+      lexer->advance(lexer, false);
+    }
+
+    unsigned run = 0;
+    while (lexer->lookahead == '+') {
+      lexer->advance(lexer, false);
+      run++;
+    }
+    if (run >= open_run) {
+      while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+        lexer->advance(lexer, false);
+      }
+      if (lexer->eof(lexer) || lexer->lookahead == '\n' || lexer->lookahead == '\r') {
+        lexer->mark_end(lexer);
+        lexer->result_symbol = RAW_FENCE;
+        return true;
+      }
+    }
+    // Not a closing line -- skip the rest of it.
+    while (!lexer->eof(lexer) && lexer->lookahead != '\n' && lexer->lookahead != '\r') {
+      lexer->advance(lexer, false);
+    }
+  }
+
+  lexer->mark_end(lexer);
+  lexer->result_symbol = RAW_FENCE;
+  return true;
 }
 
 // Handles both `LIST_MARKER_TOKEN` and `LIST_MARKER_GAP` in one pass --
@@ -146,6 +218,11 @@ static bool scan_list_marker_gap(TSLexer *lexer, const bool *valid_symbols) {
 bool tree_sitter_tomet_external_scanner_scan(void *payload, TSLexer *lexer,
                                                    const bool *valid_symbols) {
   (void)payload;
+
+  if (valid_symbols[RAW_FENCE] &&
+      (lexer->lookahead == '+' || lexer->lookahead == ' ' || lexer->lookahead == '\t')) {
+    return scan_raw_fence(lexer);
+  }
 
   if (valid_symbols[LIST_MARKER_TOKEN] || valid_symbols[LIST_MARKER_GAP]) {
     return scan_list_marker_gap(lexer, valid_symbols);

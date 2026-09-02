@@ -59,12 +59,14 @@
 ; `heading_marker` above.
 (list_marker) @markup.list.marker @constant
 
-; `<T>`/`@name` element sigils and their name.
-(type_element "<" @tag)
-(type_element ">" @tag)
-(at_element "@" @tag)
-(type_element name: (identifier) @tag)
-(at_element name: (identifier) @tag)
+; `#name`/`@name` element sigils and their name. `block_sigil` is one
+; token covering the `#` and the name together -- see `grammar.js`.
+(block_element name: (block_sigil) @tag)
+(inline_element "@" @tag)
+(inline_element name: (identifier) @tag)
+
+; A `+++` fence body is verbatim text, like a code block's.
+(raw_fence) @string.special
 
 ; `${...}` interpolation -- sigil/brace treated like other structural
 ; delimiters (`@punctuation.special`, matching `heading_marker`/
