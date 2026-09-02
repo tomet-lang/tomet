@@ -1,19 +1,24 @@
-#[ `<content>` ]
+#[ `@content` ]
 
 ---[ `<content:default>` ]---
 
 全てのブロックを入れることができる。
 
----[ `<content:raw>` ]---
+---[ `+++` フェンス ]---
 
-`(content:raw)` を args に指定すると改行やスペースを保持する生テキストになる
-(`<codeblock>` は常にこれと同じ扱い)。
+要素の頭の末尾に `+++` を置くと、閉じる `+++` だけの行までが生テキストになり、
+改行やスペースがそのまま保持される。`(content:raw)` の置き換え。
+
+本文に `+++` の行が含まれる場合は、`++++` のように長くして囲む
+(コードフェンスと同じ規則)。閉じられないままEOFに達した場合はそこで終わる。
+
+`[content]` `{value}` とは排他で、一行形式はない。
 
 ```
-<memo>(content:raw)[
+#memo+++
 あ あ
 あ
-]
++++
 ```
 
 ---[ `<content:nest>` ]---
@@ -23,23 +28,23 @@
 
 ```
 // @foot[
-//   (id:<string>):[ <content> ]
-//   (id:<string>):[ <content> ]
+//   (id:@string):[ @content ]
+//   (id:@string):[ @content ]
 // ]
 
-@links{
+#links{
   (id1)[ content ]
   (id2)[ content ]
 }
 ```
 
-#[ `<value>` ]
+#[ `@value` ]
 
 json、yaml、toml の中から選択可能。
 
 // kdl は未実装(embedded formatとして認識されない)。
 
-#[ `<args>` ]
+#[ `@args` ]
 
 独自軽量言語のみ。
 

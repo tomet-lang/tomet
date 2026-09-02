@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn evaluates_identifier_via_resolve() {
-        let doc = parse("<x>(id:a, n:5)\n");
+        let doc = parse("#x(id:a, n:5)\n");
         assert_eq!(evaluate(&doc, &interp("${a.n}")).unwrap(), Value::Int(5));
     }
 
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn callee_that_is_not_a_plain_identifier_is_an_error() {
-        let doc = parse("<x>(id:a)\n");
+        let doc = parse("#x(id:a)\n");
         assert!(matches!(
             evaluate(&doc, &interp("${a.b(1, 2)}")).unwrap_err(),
             ComputeError::UnsupportedCallee
@@ -400,7 +400,7 @@ mod tests {
     #[test]
     fn evaluates_user_defined_macros() {
         let doc = parse(
-            "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    price: \"Price is $100 for ${1}\"\n    search: \"https://example.com/search?q=${q}&lang=${lang}\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n",
+            "#config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    price: \"Price is $100 for ${1}\"\n    search: \"https://example.com/search?q=${q}&lang=${lang}\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n",
         );
         assert_eq!(
             evaluate(&doc, &interp("$gh(42)")).unwrap(),

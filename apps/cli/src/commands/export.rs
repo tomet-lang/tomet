@@ -165,7 +165,7 @@ mod tests {
         let out_file = temp_dir.join("test_out.md");
 
         let src_content = format!(
-            "@config(\n  export: {{\n    type: commonmark\n    path: \"{}\"\n  }}\n)\n#[ Hello Export ]\n",
+            "#config(\n  export: {{\n    type: commonmark\n    path: \"{}\"\n  }}\n)\n#[ Hello Export ]\n",
             out_file.display()
         );
         fs::write(&src_file, src_content).unwrap();

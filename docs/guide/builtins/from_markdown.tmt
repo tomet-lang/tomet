@@ -39,8 +39,8 @@
 ![embed](path)
 ![[embed]]
 
-<embed>[embed](path:path)
-<embed>(ref:file_name)
+@embed[embed](path:path)
+@embed(ref:file_name)
 ```
 
 ##[ Blockquote ]
@@ -48,7 +48,7 @@
 ```tm
 > blockquote
 
-<blockquote>
+#blockquote
 [ blockquote ]
 ```
 
@@ -60,7 +60,7 @@
 >
 > Contents
 
-<callout>(info, title: Title)
+#callout(info, title: Title)
 [ Contents ]
 ```
 
@@ -68,7 +68,7 @@
 \`\`\`tm
 \`\`\`
 
-<codeblock>(tm)[
+#codeblock(tm)[
 ]
 \`\`\`(tm)
 \`\`\`
@@ -99,7 +99,7 @@ _torikesi_
 | table | ---- | ---- |
 | asdff | asdf | asdf |
 
-@table()[
+#table()[
 [ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]
 [ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]
 [ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]

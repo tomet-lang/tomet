@@ -1020,7 +1020,7 @@ mod tests {
 
     #[test]
     fn invalid_document_reports_one_diagnostic() {
-        let diags = diagnostics_for("<caution>[ unterminated\n");
+        let diags = diagnostics_for("#caution[ unterminated\n");
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].severity, Some(DiagnosticSeverity::ERROR));
         assert_eq!(diags[0].source.as_deref(), Some("tomet"));
@@ -1037,7 +1037,7 @@ mod tests {
 
     #[test]
     fn hover_returns_element_info() {
-        let text = "<callout>(type: info)[ Message ]\n";
+        let text = "#callout(type: info)[ Message ]\n";
         let hover = hover_for(text, Position::new(0, 2), None).expect("hover found");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("callout"));
@@ -1048,11 +1048,11 @@ mod tests {
 
     #[test]
     fn document_symbols_returns_headings_and_elements() {
-        let text = "#[ Heading ]\n\n<info>[ Note ]\n";
+        let text = "#[ Heading ]\n\n#info[ Note ]\n";
         let symbols = document_symbols_for(text);
         assert_eq!(symbols.len(), 2);
         assert_eq!(symbols[0].name, "# Heading");
-        assert_eq!(symbols[1].name, "<info>");
+        assert_eq!(symbols[1].name, "#info");
     }
 
     #[test]
@@ -1067,7 +1067,7 @@ mod tests {
     fn completions_returns_items() {
         let items = completions_for("", Position::new(0, 0));
         assert!(!items.is_empty());
-        assert!(items.iter().any(|i| i.label == "<callout>"));
+        assert!(items.iter().any(|i| i.label == "#callout"));
     }
 
     #[test]
@@ -1095,7 +1095,7 @@ mod tests {
 
     #[test]
     fn format_edits_formats_tables() {
-        let text = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
+        let text = "#table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
         let edits = format_edits(text, None);
         assert_eq!(edits.len(), 1);
         assert!(
@@ -1107,7 +1107,7 @@ mod tests {
 
     #[test]
     fn hover_on_table_header_cell() {
-        let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
+        let text = "#table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
         // Position on line 1, inside "[ 電子数 2n² ]" (e.g. character 25)
         let hover =
             hover_for(text, Position::new(1, 25), None).expect("hover found for table header");
@@ -1124,7 +1124,7 @@ mod tests {
 
     #[test]
     fn hover_on_table_data_cell() {
-        let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
+        let text = "#table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
         // Position on line 2, inside "[ 2 ]" (column 3, character 15)
         let hover =
             hover_for(text, Position::new(2, 15), None).expect("hover found for table data cell");
@@ -1141,7 +1141,7 @@ mod tests {
 
     #[test]
     fn hover_on_table_overview() {
-        let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s <br>(2) ]\n]\n";
+        let text = "#table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
         let hover =
             hover_for(text, Position::new(0, 2), None).expect("hover found for table overview");
         if let HoverContents::Markup(m) = hover.contents {
@@ -1172,7 +1172,7 @@ mod tests {
 
     #[test]
     fn hover_on_macro_evaluation() {
-        let text = "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n\n$gh(42)\n\n$greet(\"Alice\", \"Bob\")\n\n${copyright}\n\n$emoji(\"sparkles\")\n";
+        let text = "#config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n\n$gh(42)\n\n$greet(\"Alice\", \"Bob\")\n\n${copyright}\n\n$emoji(\"sparkles\")\n";
 
         // Hover on $gh(42) (line 8, char 2)
         let hover = hover_for(text, Position::new(8, 2), None).expect("hover found for $gh");
@@ -1241,14 +1241,14 @@ mod tests {
         let config_path = dir.join("default.config.tmt");
         std::fs::write(
             &config_path,
-            "@config(format:json){\n  {\n    \"macros\": {\n      \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\"\n    }\n  }\n}\n",
+            "#config(format:json)+++\n{\n  \"macros\": {\n    \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n+++\n",
         )
         .unwrap();
 
         let doc_path = dir.join("sub/note.tmt");
         std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
         let doc_text =
-            "@settings(file:\"file:default.config.tmt\")\n\n$youtube_video(\"Pm_h6FnF8HU\")\n";
+            "#settings(file:\"file:default.config.tmt\")\n\n$youtube_video(\"Pm_h6FnF8HU\")\n";
         let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
 
         let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
@@ -1264,7 +1264,7 @@ mod tests {
         }
 
         // Test embed with macro
-        let embed_doc = "@settings(file:\"file:default.config.tmt\")\n\n<embed>($youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n";
+        let embed_doc = "#settings(file:\"file:default.config.tmt\")\n\n@embed($youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n";
         let hover2 = hover_for(embed_doc, Position::new(2, 10), Some(&uri))
             .expect("hover found for embed macro");
         if let HoverContents::Markup(m) = hover2.contents {
@@ -1295,14 +1295,14 @@ mod tests {
         let config_path = dir.join("default.config.tmt");
         std::fs::write(
             &config_path,
-            "@config(format:json){\n  {\n    \"macros\": {\n      \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\",\n      \"twitter_post\": \"https://x.com/${1}/status/${2}\"\n    }\n  }\n}\n",
+            "#config(format:json)+++\n{\n  \"macros\": {\n    \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\",\n    \"twitter_post\": \"https://x.com/${1}/status/${2}\"\n  }\n}\n+++\n",
         )
         .unwrap();
 
         // Note has NO header at all!
         let doc_path = dir.join("10-19 Journal/12 Daily/2024/12/$2024-12-26.tmt");
         std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
-        let doc_text = "<embed>($youtube_video(\"Pm_h6FnF8HU\"))[Low]\n\n<embed>($twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n";
+        let doc_text = "@embed($youtube_video(\"Pm_h6FnF8HU\"))[Low]\n\n@embed($twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n";
         let uri =
             Uri::from_str(&format!("file://{}", doc_path.display()).replace(' ', "%20")).unwrap();
 
@@ -1350,16 +1350,16 @@ mod tests {
         let config_path = dir.join("custom.config.tmt");
         std::fs::write(
             &config_path,
-            "@config{\n  macros: {\n    wiki: \"https://ja.wikipedia.org/wiki/${1}\"\n  }\n}\n",
+            "#config{\n  macros: {\n    wiki: \"https://ja.wikipedia.org/wiki/${1}\"\n  }\n}\n",
         )
         .unwrap();
 
         let doc_path = dir.join("note.tmt");
-        let doc_text = "@config(import: \"custom.config.tmt\")\n\n$wiki(\"Rust\")\n";
+        let doc_text = "#config(import: \"custom.config.tmt\")\n\n$wiki(\"Rust\")\n";
         let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
 
         let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
-            .expect("hover found for @config(import:...) macro");
+            .expect("hover found for #config(import:...) macro");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Macro Result"));
             assert!(m.value.contains("https://ja.wikipedia.org/wiki/Rust"));
@@ -1372,9 +1372,9 @@ mod tests {
 
     #[test]
     fn hover_on_kind_and_version() {
-        let doc_text = "@version(1.0)\n@kind(j.daily)\n\n#[ Title ]\n";
+        let doc_text = "#version(1.0)\n#kind(j.daily)\n\n#[ Title ]\n";
         let hover_ver =
-            hover_for(doc_text, Position::new(0, 3), None).expect("hover found for @version");
+            hover_for(doc_text, Position::new(0, 3), None).expect("hover found for #version");
         if let HoverContents::Markup(m) = hover_ver.contents {
             assert!(m.value.contains("Tomet Version"));
             assert!(m.value.contains("1"));
@@ -1383,7 +1383,7 @@ mod tests {
         }
 
         let hover_kind =
-            hover_for(doc_text, Position::new(1, 3), None).expect("hover found for @kind");
+            hover_for(doc_text, Position::new(1, 3), None).expect("hover found for #kind");
         if let HoverContents::Markup(m) = hover_kind.contents {
             assert!(m.value.contains("Document Kind"));
             assert!(m.value.contains("j.daily"));

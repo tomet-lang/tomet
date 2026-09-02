@@ -1,17 +1,17 @@
-@meta{
+#meta{
   type: guide
   title: "テンプレートとブループリント"
 }
 
 Tometにおけるテンプレート機能は、単なるテキストの初期生成（スキャフォールディング）だけでなく、ドキュメントの型・構造検証（ブループリント）を兼ね備えた統合システムです。
 
-#[ 1. @blueprint によるテンプレート定義 ]
+#[ 1. #blueprint によるテンプレート定義 ]
 
-テンプレートファイルは、先頭に `@blueprint(target-kind)` を宣言した通常の `.tmt` ファイルです。
+テンプレートファイルは、先頭に `#blueprint(target-kind)` を宣言した通常の `.tmt` ファイルです。
 
 ```tm
-@blueprint(daily-note)
-@meta{
+#blueprint(daily-note)
+#meta{
   id: ${uuid()}
   date: ${date("YYYY-MM-DD")}
   title: ${title}
@@ -47,11 +47,11 @@ tomet new --list
 - `${time()}`: 現在の時刻を展開。
 - `${filename}`: 作成先ファイル名。
 - `${title}`: ファイル名や引数から推定されるタイトル。
-- `${vars.<name>}`: CLIの `--var <name>=<value>` で渡されたカスタム変数。
+- `${vars.@name}`: CLIの `--var @name=@value` で渡されたカスタム変数。
 
 #[ 4. 構造検証（ブループリント検証） ]
 
-生成されたドキュメントは `@kind(daily-note)` を持ちます。`tomet-validator` および LSP は、プロジェクト内の `@blueprint(daily-note)` と照合し、以下の構造整合性を検証します。
+生成されたドキュメントは `#kind(daily-note)` を持ちます。`tomet-validator` および LSP は、プロジェクト内の `#blueprint(daily-note)` と照合し、以下の構造整合性を検証します。
 
-1. **必須 `@meta` フィールド**: ブループリントに定義されたメタデータキーの存在をチェック。
+1. **必須 `#meta` フィールド**: ブループリントに定義されたメタデータキーの存在をチェック。
 2. **必須セクション**: `{id: ...}` が付与された見出し（例: `#[ Review ] {id: review}`）がドキュメントに存在するかをチェック。

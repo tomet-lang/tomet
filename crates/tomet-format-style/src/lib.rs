@@ -297,7 +297,7 @@ mod tests {
             Value::String("doc-12345678".to_string()),
         )])));
         let cfg = PrinterConfig::default();
-        assert_eq!(render_meta_element(&el, &cfg), "@meta{id: doc-12345678}");
+        assert_eq!(render_meta_element(&el, &cfg), "#meta{id: doc-12345678}");
     }
 
     #[test]
@@ -311,7 +311,7 @@ mod tests {
         cfg.meta_format = Some("yaml".to_string());
         assert_eq!(
             render_meta_element(&el, &cfg),
-            "@meta(format:yaml){\n  id: doc-12345678\n}"
+            "#meta(format:yaml)+++\nid: doc-12345678\n+++"
         );
     }
 

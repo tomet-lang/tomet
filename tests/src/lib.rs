@@ -80,10 +80,13 @@ pub fn read_fixture(rel: &Path) -> String {
 /// reality exactly, so a fixture that starts or stops parsing shows up as
 /// a failure rather than silently changing which files get covered.
 ///
-/// `cheatsheet.tmt` is a frozen copy of `docs/guide/cheatsheet.tmt`, which
-/// exercises constructs the parser does not accept yet. Keeping it in the
-/// corpus is deliberate -- it is the file that tells us when that changes.
-pub const KNOWN_UNPARSEABLE: &[&str] = &["cheatsheet.tmt"];
+/// Currently empty. `cheatsheet.tmt` used to be the sole entry: it is a
+/// frozen copy of `docs/guide/cheatsheet.tmt` and exercised constructs the
+/// parser did not accept. The sigil rework fixed the last of them -- the
+/// `(format:...)` brace scanner that ended a body early at an unquoted
+/// `}` -- so it now parses, and the entry is gone rather than kept as a
+/// permanent carve-out.
+pub const KNOWN_UNPARSEABLE: &[&str] = &[];
 
 pub fn is_known_unparseable(rel: &Path) -> bool {
     let key = rel.to_string_lossy().replace('\\', "/");

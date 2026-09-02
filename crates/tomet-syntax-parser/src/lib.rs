@@ -103,12 +103,13 @@ mod tests {
 
     #[test]
     fn parses_links_container_with_bare_children() {
-        let doc = parse_document("@links {\n  (1)[ note ]\n  (anotation1)[ note ]\n}\n").unwrap();
+        let doc = parse_document("#links {\n  (1)[ note ]\n  (anotation1)[ note ]\n}\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::block("links"));
                 match &el.value {
-                    Some(ElementValue::from_children(children)) => {
+                    Some(value) => {
+                        let children = value.as_children();
                         assert_eq!(children.len(), 2);
                         assert_eq!(children[0].sigil, Sigil::Bare);
                         assert_eq!(children[0].args, Some(Value::Int(1)));
@@ -844,7 +845,7 @@ mod tests {
         // text on its own next line is a separate case, unaffected here --
         // that's still ordinary lazy continuation, since only a following
         // element trigger ends a paragraph early, not a preceding one.)
-        let doc = parse_document("text\n@meta{key:value}\n").unwrap();
+        let doc = parse_document("text\n#meta{key:value}\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Paragraph(a), Block::Element(el)) => {
@@ -861,7 +862,7 @@ mod tests {
         // (no blank line between them, as `docs/docs.settings.tmt` itself is
         // written) used to lazily continue into one `Block::Paragraph` --
         // it must now become two independent `Block::Element`s instead.
-        let doc = parse_document("@meta{ type:@settings }\n@settings{ key:value }\n").unwrap();
+        let doc = parse_document("#meta{ type:#settings }\n#settings{ key:value }\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Element(a), Block::Element(b)) => {
@@ -1020,7 +1021,7 @@ mod tests {
     fn own_line_comment_works_inside_a_paren_group() {
         // The original trigger case: a `//` comment on its own line between
         // entries in `@config(...)`'s `(args)` map.
-        let doc = parse_document("@config(\n  format:json\n  // a note\n)\n").unwrap();
+        let doc = parse_document("#config(\n  format:json\n  // a note\n)\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::block("config"));
@@ -1038,7 +1039,7 @@ mod tests {
 
     #[test]
     fn own_line_comment_works_inside_a_lightweight_value_group() {
-        let doc = parse_document("@meta{\n  key: value\n  // a note\n}\n").unwrap();
+        let doc = parse_document("#meta{\n  key: value\n  // a note\n}\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
@@ -1132,10 +1133,9 @@ mod tests {
 
     #[test]
     fn content_raw_preserves_brackets_and_newlines_losslessly() {
-        let doc = parse_document(
-            "<memo>(content:raw)[\nline one\nline two with * and [brackets] inside\n]\n",
-        )
-        .unwrap();
+        let doc =
+            parse_document("#memo+++\nline one\nline two with * and [brackets] inside\n+++\n")
+                .unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
@@ -1154,7 +1154,7 @@ mod tests {
         // The reason `content:raw` can't reuse codeblock's quote-aware
         // matcher as-is: free-form prose has no guarantee its `'`/`"`
         // occurrences are balanced the way real source code's are.
-        let doc = parse_document("<memo>(content:raw)[don't forget [this]]\n").unwrap();
+        let doc = parse_document("#memo+++\ndon't forget [this]\n+++\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
@@ -1333,7 +1333,7 @@ mod tests {
             other => panic!("expected an element, got {other:?}"),
         }
 
-        let doc = parse_document("@meta{}\n").unwrap();
+        let doc = parse_document("#meta{}\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.value, Some(ElementValue::from_map(Value::Map(vec![]))));
@@ -1440,10 +1440,11 @@ mod tests {
 
     #[test]
     fn remote_id_target_element_supports_colon_connection() {
-        let doc = parse_document("<id:taskA>:{ priority: high, tag: dev }\n").unwrap();
+        let doc = parse_document("#id(taskA):{ priority: high, tag: dev }\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::Type("id:taskA".into()));
+                assert_eq!(el.sigil, Sigil::block("id"));
+                assert_eq!(el.args, Some(Value::String("taskA".into())));
                 assert_eq!(
                     el.value,
                     Some(ElementValue::from_map(Value::Map(vec![
@@ -1640,14 +1641,14 @@ mod tests {
 
     #[test]
     fn bare_url_autolink_preserves_query_param_placeholder() {
-        let doc = parse_document("http://127.0.0.1:8888/search?lang=ja&q=<query>\n").unwrap();
+        let doc = parse_document("http://127.0.0.1:8888/search?lang=ja&q=@query\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
                         "url".into(),
-                        Value::String("http://127.0.0.1:8888/search?lang=ja&q=<query>".into())
+                        Value::String("http://127.0.0.1:8888/search?lang=ja&q=@query".into())
                     )]))
                 );
             }

@@ -78,7 +78,7 @@ mod tests {
         let tmpl_file = tmpl_dir.join("rfc.tmt");
         fs::write(
             &tmpl_file,
-            "@blueprint(rfc)\n@meta{\n  id: ${uuid(\"nil\")}\n  title: ${title}\n  author: ${vars.author}\n}\n\n#[ Motivation for ${title} ] {id: motivation}\n",
+            "#blueprint(rfc)\n#meta{\n  id: ${uuid(\"nil\")}\n  title: ${title}\n  author: ${vars.author}\n}\n\n#[ Motivation for ${title} ] {id: motivation}\n",
         )
         .unwrap();
 
@@ -106,7 +106,7 @@ mod tests {
 
         assert!(created.is_file());
         let content = fs::read_to_string(&created).unwrap();
-        assert!(content.contains("@kind(rfc)"));
+        assert!(content.contains("#kind(rfc)"));
         assert!(content.contains("New Auth Protocol"));
         assert!(content.contains("Bob"));
     }

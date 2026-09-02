@@ -566,7 +566,7 @@ mod tests {
     #[test]
     fn renders_codeblock_with_lang_using_a_safe_fence() {
         assert_eq!(
-            typst("<codeblock>(lang:rust)[fn main() {}]\n"),
+            typst("#codeblock(lang:rust)[fn main() {}]\n"),
             "```rust\nfn main() {}\n```\n\n"
         );
     }
@@ -574,7 +574,7 @@ mod tests {
     #[test]
     fn renders_codeblock_with_positional_lang_arg() {
         assert_eq!(
-            typst("<codeblock>(\"rust\")[fn main() {}]\n"),
+            typst("#codeblock(\"rust\")[fn main() {}]\n"),
             "```rust\nfn main() {}\n```\n\n"
         );
     }
@@ -592,7 +592,7 @@ mod tests {
     #[test]
     fn renders_blockquote() {
         assert_eq!(
-            typst("<blockquote>[ some quoted text ]\n"),
+            typst("#blockquote[ some quoted text ]\n"),
             "#quote(block: true)[some quoted text]\n\n"
         );
     }
@@ -609,35 +609,35 @@ mod tests {
     fn renders_id_link_against_links_container_label() {
         assert_eq!(
             typst("@link(target:id:greeting)[Hello]\n"),
-            "#link(<link-greeting>)[Hello]\n\n"
+            "#link(@link-greeting)[Hello]\n\n"
         );
     }
 
     #[test]
     fn renders_links_container_as_labeled_bullet_list() {
         assert_eq!(
-            typst("@links {\n  (greeting)[ note ]\n}\n"),
-            "- *greeting*: note <link-greeting>\n\n"
+            typst("#links {\n  (greeting)[ note ]\n}\n"),
+            "- *greeting*: note @link-greeting\n\n"
         );
     }
 
     #[test]
     fn renders_embed_as_image_with_alt() {
         assert_eq!(
-            typst("<embed>(target:assets/pic.png)[a cat]\n"),
+            typst("@embed(target:assets/pic.png)[a cat]\n"),
             "#image(\"assets/pic.png\", alt: \"a cat\")\n\n"
         );
     }
 
     #[test]
     fn meta_and_config_have_no_visible_output() {
-        assert_eq!(typst("@meta(format:yaml){\n  key: value\n}\n"), "");
-        assert_eq!(typst("@config(format:json)\n"), "");
+        assert_eq!(typst("#meta(format:yaml)+++\nkey: value\n+++\n"), "");
+        assert_eq!(typst("#config(format:json)\n"), "");
     }
 
     #[test]
     fn renders_table() {
-        let src = "@table()[\n[ h1 ][ h2 ]\n[ a ][ b ]\n]{}\n";
+        let src = "#table()[\n[ h1 ][ h2 ]\n[ a ][ b ]\n]{}\n";
         assert_eq!(
             typst(src),
             "#table(\n  columns: 2,\n  [*h1*], [*h2*],\n  [a], [b],\n)\n\n"
@@ -647,7 +647,7 @@ mod tests {
     #[test]
     fn renders_typed_element_generically_with_a_kind_comment() {
         assert_eq!(
-            typst("<caution>[ be careful ]\n"),
+            typst("#caution[ be careful ]\n"),
             "// tomet:caution\nbe careful\n\n"
         );
     }

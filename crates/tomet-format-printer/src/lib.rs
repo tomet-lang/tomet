@@ -622,10 +622,10 @@ mod tests {
         // headings; the shared, recursively-called `render_element` has no
         // heading arm at all (mirrors `tomet-html`/
         // `tomet-markdown`'s equivalent nested-heading tests).
-        let doc = tomet_parser::parse_document("<memo>[@heading(2)[Nested]]\n").unwrap();
+        let doc = tomet_parser::parse_document("#memo[#heading(2)[Nested]]\n").unwrap();
         let printed = document_to_tm(&doc);
         assert!(!printed.contains("##["), "got: {printed:?}");
-        assert!(printed.contains("@heading(2)[Nested]"), "got: {printed:?}");
+        assert!(printed.contains("#heading(2)[Nested]"), "got: {printed:?}");
     }
 
     #[test]
@@ -637,7 +637,7 @@ mod tests {
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc, &cfg);
-        assert!(printed.contains("@meta(format:yaml){"));
+        assert!(printed.contains("#meta(format:yaml){"));
     }
 
     #[test]
@@ -774,17 +774,17 @@ mod tests {
 
     #[test]
     fn test_nanoid_generation_and_ensure_document_id() {
-        let settings_src = r#"@settings(format:json){
-  {
-    "meta": {
-      "id": {
-        "type": "nanoid",
-        "length": 8,
-        "prefix": "doc-"
-      }
+        let settings_src = r#"#settings(format:json)+++
+{
+  "meta": {
+    "id": {
+      "type": "nanoid",
+      "length": 8,
+      "prefix": "doc-"
     }
   }
 }
++++
 "#;
         let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
         let id_cfg = cfg.meta_fields.get("id").expect("id config present");
@@ -805,19 +805,19 @@ mod tests {
 
     #[test]
     fn test_nanoid_force_and_overwrite_behavior() {
-        let settings_src = r#"@settings(format:json){
-  {
-    "meta": {
-      "id": {
-        "type": "nanoid",
-        "length": 8,
-        "prefix": "doc-",
-        "force": true,
-        "overwrite": true
-      }
+        let settings_src = r#"#settings(format:json)+++
+{
+  "meta": {
+    "id": {
+      "type": "nanoid",
+      "length": 8,
+      "prefix": "doc-",
+      "force": true,
+      "overwrite": true
     }
   }
 }
++++
 "#;
         let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
         let id_cfg = cfg.meta_fields.get("id").unwrap();
@@ -865,15 +865,15 @@ mod tests {
         let md = "> [!info] 2025/04/29 11:09\n> コレさすがに草www\n";
         let doc = tomet_markdown::from_markdown(md);
         let printed = document_to_tm_with_config(&doc, &PrinterConfig::default());
-        assert!(printed.contains("<callout>(info, title: \"2025/04/29 11:09\")["));
+        assert!(printed.contains("#callout(info, title: \"2025/04/29 11:09\")["));
         assert!(printed.contains("コレさすがに草www"));
 
         let md_plain = "> Plain quote text\n";
         let doc_plain = tomet_markdown::from_markdown(md_plain);
         let printed_plain = document_to_tm_with_config(&doc_plain, &PrinterConfig::default());
-        assert!(printed_plain.contains("<blockquote>["));
+        assert!(printed_plain.contains("#blockquote["));
         assert!(printed_plain.contains("Plain quote text"));
-        assert!(!printed_plain.contains("<blockquote>("));
+        assert!(!printed_plain.contains("#blockquote("));
     }
 
     #[test]
@@ -887,7 +887,7 @@ mod tests {
             ..Default::default()
         };
         let printed_block = document_to_tm_with_config(&doc, &cfg_block);
-        assert!(printed_block.contains("<callout>(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？\n]"));
+        assert!(printed_block.contains("#callout(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？\n]"));
 
         // Test "box" style
         let cfg_box = PrinterConfig {
@@ -895,7 +895,7 @@ mod tests {
             ..Default::default()
         };
         let printed_box = document_to_tm_with_config(&doc, &cfg_box);
-        assert!(printed_box.contains("<callout>(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？ ]"));
+        assert!(printed_box.contains("#callout(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？ ]"));
 
         // Test "expanded" style
         let cfg_expanded = PrinterConfig {
@@ -903,7 +903,7 @@ mod tests {
             ..Default::default()
         };
         let printed_expanded = document_to_tm_with_config(&doc, &cfg_expanded);
-        assert!(printed_expanded.contains("<callout>(info, title: \"2025/04/29 11:09\")[\n  コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？\n]"));
+        assert!(printed_expanded.contains("#callout(info, title: \"2025/04/29 11:09\")[\n  コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？\n]"));
     }
 
     #[test]
@@ -935,7 +935,7 @@ mod tests {
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc_callout, &cfg);
-        assert!(printed.contains("<callout>(info, title: \"Single Line\")\n[ 一行テキスト ]"));
+        assert!(printed.contains("#callout(info, title: \"Single Line\")\n[ 一行テキスト ]"));
     }
 
     #[test]
@@ -962,7 +962,7 @@ mod tests {
         let printed = document_to_tm(&doc);
         assert_eq!(
             printed.trim(),
-            "<codeblock>(shell)[\n  irm \"https://christitus.com/win\" | iex\n]"
+            "#codeblock(shell)[\n  irm \"https://christitus.com/win\" | iex\n]"
         );
     }
 
@@ -1001,7 +1001,7 @@ mod tests {
 
         let doc = Document::new(vec![Block::Element(links)], tomet_ast::Span::dummy());
         let printed = document_to_tm(&doc);
-        assert!(printed.contains("@links{\n  (1)[note 1]\n  (2)[note 2]\n}"));
+        assert!(printed.contains("#links{\n  (1)[note 1]\n  (2)[note 2]\n}"));
 
         // Verify re-parsing
         let re_parsed = tomet_parser::parse_document(&printed).expect("valid doc");

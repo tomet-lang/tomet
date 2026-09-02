@@ -56,7 +56,7 @@ mod tests {
     fn non_list_element_has_no_ordered_and_no_items() {
         let el = element_new(Sigil::block("codeblock"));
         assert_eq!(list_ordered(&el), None);
-        assert_eq!(list_items(&el), &[] as &[Element]);
+        assert!(list_items(&el).is_empty());
     }
 
     #[test]
@@ -69,6 +69,6 @@ mod tests {
             tomet_ast::Span::dummy(),
         );
         let el = element_list(false, vec![item.clone()], tomet_ast::Span::dummy());
-        assert_eq!(list_items(&el), &[item]);
+        assert_eq!(list_items(&el), vec![&item]);
     }
 }

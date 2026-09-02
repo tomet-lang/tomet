@@ -2,30 +2,30 @@
 #[ 全容 ]
 
 ```tm
-@config(import:<target>)
+#config(import:@target)
 
-@config(format:json){
-  elements = {
-    example = {
-      args = {
-        name = { type = string },
-        count = { type = uint, default = 0 },
-        variant = { type = string }
-      },
-      required = [ name ],
-      positional = [ name ],
-      content = nest(allow = [callout, codeblock]),
-      placement = block,
-      singleton = false
-    }
-  },
-  types = {
-    example = {
-      style = one_line
-      template = "path:ja/features/templates/template.daily-note.tmt"
-    }
+#config(format:json)+++
+elements = {
+  example = {
+    args = {
+      name = { type = string },
+      count = { type = uint, default = 0 },
+      variant = { type = string }
+    },
+    required = [ name ],
+    positional = [ name ],
+    content = nest(allow = [callout, codeblock]),
+    placement = block,
+    singleton = false
+  }
+},
+types = {
+  example = {
+    style = one_line
+    template = "path:ja/features/templates/template.daily-note.tmt"
   }
 }
++++
 ```
 
 #[ 未実装 ]

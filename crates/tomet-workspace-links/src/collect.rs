@@ -112,7 +112,7 @@ mod tests {
 
 @link(target:id:1)
 
-<embed>[alt](pic.png)
+@embed[alt](pic.png)
 
 @link(target:ref:Some Page)
 

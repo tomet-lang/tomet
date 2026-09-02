@@ -1,4 +1,4 @@
-@meta{ type: "settings" }
+#meta{ type: "settings" }
 
 /* Tomet 設定DSL (Config DSL / Schema Specification)
    詳細な文法・スキーマ型定義の仕様は docs/design/decisions/2026-08-20-dsl-specifications.md を参照。
@@ -6,12 +6,12 @@
    要素スキーマ定義の特徴:
    - 必須フィールド一括指定: `required: [title, id]` (JSON Schema / OpenAPI 標準に準拠)
    - 位置引数指定: `positional: [title]`
-   - 埋め込みフォーマット: `@settings(format: json)` または `@settings(format: yaml)` の併用サポート */
+   - 埋め込みフォーマット: `#settings(format: json)` または `#settings(format: yaml)` の併用サポート */
 
 
-@settings{
+#settings{
   // 実際に Sigil を持つ「要素」(tomet_semantics::ElementKind)の一覧。
-  // 名前で識別できるものだけがここに乗る -- <T>/@name で誰でも増やせる。
+  // 名前で識別できるものだけがここに乗る -- @T/@name で誰でも増やせる。
   elements: {
     settings: {
       args: { target: { type: string } },
@@ -95,7 +95,7 @@
   },
 
   // 見出し/リスト/インラインコードのような構文プリミティブは Sigil を
-  // 持たず classify() の対象にもならない -- <T>/@name のように誰でも
+  // 持たず classify() の対象にもならない -- @T/@name のように誰でも
   // 追加できる「要素」ではないので、elements とは別枠にした。
   primitives: {
     heading: {
@@ -116,7 +116,7 @@
       placement: block,
       content: language
     },
-    inline_code_span: {    // 1つの backtick。地の文保護のみで<code>にはならない
+    inline_code_span: {    // 1つの backtick。地の文保護のみで@codeにはならない
       placement: inline,
       content: raw
     }

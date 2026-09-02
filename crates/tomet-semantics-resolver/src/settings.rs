@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn resolve_settings_ref_is_none_for_non_settings_elements() {
-        let el = element_new(Sigil::Type("caution".to_string()));
+        let el = element_new(Sigil::block("caution"));
         assert!(resolve_settings_ref(&el, &fixture("")).is_none());
     }
 }

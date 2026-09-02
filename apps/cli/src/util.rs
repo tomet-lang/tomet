@@ -61,11 +61,11 @@ mod tests {
             column: 11,
             offset: 10,
         };
-        let src = "<caution>[ unterminated";
+        let src = "#caution[ unterminated";
         let formatted = format_parse_error(Path::new("test.tmt"), src, &err);
         assert!(formatted.contains("error: expected ']'"));
         assert!(formatted.contains("--> test.tmt:1:11"));
-        assert!(formatted.contains("<caution>[ unterminated"));
+        assert!(formatted.contains("#caution[ unterminated"));
         assert!(formatted.contains("^ expected ']'"));
     }
 }

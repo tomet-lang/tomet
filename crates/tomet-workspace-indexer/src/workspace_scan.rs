@@ -344,7 +344,7 @@ mod tests {
     #[test]
     fn refresh_path_adds_updates_and_removes() {
         let dir = temp_dir("refresh");
-        fs::write(dir.join("existing.tmt"), "@meta{}\n").unwrap();
+        fs::write(dir.join("existing.tmt"), "#meta{}\n").unwrap();
         let mut index = WorkspaceIndex::build(&dir, &PrinterConfig::default(), &dir);
         assert_eq!(index.meta_paths().len(), 1);
         assert_eq!(index.migration_candidates().len(), 0);
@@ -371,7 +371,7 @@ mod tests {
         let mut index = WorkspaceIndex::build(&dir, &PrinterConfig::default(), &dir);
         assert_eq!(index.meta_paths().len(), 0);
 
-        fs::write(dir.join("appeared.tmt"), "@meta{}\n").unwrap();
+        fs::write(dir.join("appeared.tmt"), "#meta{}\n").unwrap();
         index.rebuild();
         assert_eq!(index.meta_paths().len(), 1);
 
