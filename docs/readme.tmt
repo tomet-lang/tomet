@@ -4,9 +4,9 @@
     path: "README.ja.md"
   }
 )
-@meta(format:yaml)+++
+@meta{
 id: doc-gCzNE6yl
-+++
+}
 
 #[ Tomet ]
 

@@ -28,6 +28,7 @@ mkShell rec {
     tomet
     tomet-lsp
     tomet-web
+    # twrit
 
     #[ CMake ]
     cmake

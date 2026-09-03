@@ -9,7 +9,7 @@ ${ref(id(asdf-asdfa).contents(dafault))}
 $uuid()
 $date()
 $time()
-$regex(/*.svg/g)
+$regex("/*.svg/g")
 ${vars.*}
 ${filename}
 ${title}

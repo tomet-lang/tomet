@@ -4,6 +4,8 @@
 # Keep project-specific ignore rules in subdirectories whenever possible.
 # -----------------------------------------------------------------------
 
+.tomet/
+
 #[ Zed extension build ]
 editors/zed/extension.wasm
 editors/zed/grammars/

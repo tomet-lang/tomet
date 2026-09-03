@@ -10,7 +10,7 @@ roots = ["tomet.config.tmt", "default.config.tmt", ".git"]
 comment-token = "//"
 block-comment-tokens = { start = "/*", end = "*/" }
 indent = { tab-width = 2, unit = "  " }
-language-servers = [ "tomet-lsp" ]
+language-servers = ["tomet-lsp"]
 
 [language-server.tomet-lsp]
 command = "tomet-lsp"
