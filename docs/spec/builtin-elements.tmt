@@ -1,27 +1,27 @@
-#settings(file:docs/docs.settings.tmt)
-#meta{}
+@settings(file:docs/docs.settings.tmt)
+@meta{}
 
 ```tm
-#meta(format:json)
-#config(format:json)
+@meta(format:json)
+@config(format:json)
 
 @link(https:@url)[ display_name ]
 @link(file:@file)[ display_name ]
 @link(tmt:<tmt file>)[ display_name ]
 @link(ref:@ref)
 
-#heading(level: @int)[ display_name ]
+@heading(level: @int)[ display_name ]
 
-#references[
-  #id(asdf-asdf):()
-  #id(asdf-asdf):[]
-  #id(asdf-asd2):{tag: important}
+@references[
+  @id(asdf-asdf):()
+  @id(asdf-asdf):[]
+  @id(asdf-asd2):{tag: important}
   <id(asdf-asdf)>:(){}[]
 ]
 
 @embed(file:@file)[alt]
-#codeblock(lang:@language)[ @code ]
-#blockquote[ @content ]
+@codeblock(lang:@language)[ @code ]
+@blockquote[ @content ]
 
 ${func(args) ...}
 ${@var +-*/ ...}

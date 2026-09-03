@@ -2,7 +2,7 @@
 
 use crate::error::Result;
 use crate::value::skip_inline_ws;
-use tomet_ast::{Element, Inline, Sigil, Span, Text, Value};
+use tomet_ast::{Element, Inline, Placement, Sigil, Span, Text, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -41,7 +41,8 @@ pub(crate) fn parse_fenced_code_block(cur: &mut Cursor) -> Result<Element> {
         Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
     };
     let content_span = Span::new(cur.position_at(body_start), cur.position_at(body_end));
-    let mut el = element_new(Sigil::block("codeblock"))
+    let mut el = element_new(Sigil::named("codeblock"))
+        .with_placement(Placement::Block)
         .with_span(cur.span_from(start_pos))
         .with_content(vec![Inline::Text(Text::new(code, content_span))]);
     el.args = args;

@@ -159,9 +159,9 @@ mod tests {
     #[test]
     fn ignores_top_level_uncontained_remote_connection() {
         let src = r#"
-#task(id: taskA)[ Clean room ]
+@task(id: taskA)[ Clean room ]
 
-#id(taskA):{ priority: high }
+@id(taskA):{ priority: high }
 "#;
         let doc = parse_document(src).unwrap();
         let resolved = resolve_connect_targets(doc);

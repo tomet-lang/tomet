@@ -1,0 +1,84 @@
+```
+@meta(format:json)+++
+{
+  "key": "value",
+  "type": "person"
+}
++++
+@meta(format:yaml)+++
+key: value
+date: time
+type: character
++++
+@meta(format:toml)+++
+key = "value"
+type = "location"
++++
+// #meta(format:ini){
+//   key = "value"
+// }
+// #meta(format:kdl){
+//   key = "value"
+// }
+```
+
+`${some_id}`
+
+`${sum(a, b)}`
+
+@link(target: "url:https://")[]
+
+@link(target: "file:/readme.md")[]
+
+@link(target: "ref:1")[]
+
+@[](url:https://) @[](file:/readme.md) @[](ref:2)
+
+#[heading] {id: "1"}
+
+##[heading] {id: "2"}
+
+###[heading] {id: "3"}
+
+@embed(target: "url:https://")[alt]
+
+@embed(target: "file:/readme.md")[alt]
+
+@embed(target: "ref:3")[alt]
+
+```sh
+sudo whoami ls --help
+```
+
+@memo[]
+
+@blockquote[引用文]
+
+- outline/list
+
+-. number1
+-. number2
+
+- check
+- none
+- custom?
+- custom
+
+1. aaaa
+
+@strong[aaaa] @em[aaaa] @mark[aaaa] @em[aaaa] `aaaa`
+
+```(lang:sh)
+```
+
+---
+
+---
+
+---
+
+---
+
+@table(align: center)[[ title ][ sdfasdf ][ fasdf ][ sdffdsf ]
+[ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]
+[ title ][ sdfasdf ][ fasdf ][ sdffdsf ]]

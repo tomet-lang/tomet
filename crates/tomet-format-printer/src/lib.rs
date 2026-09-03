@@ -13,12 +13,14 @@
 
 use tomet_ast::{
     Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, InterpExprKind, Literal,
-    Sigil, Value,
+    Placement, Sigil, Value,
 };
 use tomet_config::PrinterConfig;
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
 use tomet_semantics::{ElementKind, classify_lenient, heading_level, list_items, list_ordered};
-use tomet_style::{render_args_with_config, render_value, render_value_inner_with_config};
+use tomet_style::{
+    render_args_with_config, render_nested, render_value, render_value_inner_with_config,
+};
 use tomet_tree::element_new;
 
 pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig) {
@@ -70,7 +72,7 @@ pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig
 
     if !meta_found && (force || overwrite) {
         let new_id = generate_id_for_field(id_cfg);
-        let mut meta_el = element_new(Sigil::block("meta"));
+        let mut meta_el = element_new(Sigil::named("meta"));
         meta_el.value = Some(ElementValue::Group(vec![Entry::Pair(
             "id".to_string(),
             Value::String(new_id),
@@ -251,12 +253,29 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
     }
 }
 
+/// Renders a run of inlines.
+///
+/// A `[content]` group holds `Inline`s, but one of them may be
+/// block-placed -- an element written at a line start inside the group,
+/// the way `@references[` holds its entries. Placement is spelled with
+/// line breaks rather than with a sigil, so such an element has to start
+/// and end its own line here or it would come back from the parser as
+/// part of the running text.
 fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> String {
     let mut s = String::new();
     for inline in inlines {
         match inline {
             Inline::Text(t) => s.push_str(&t.value),
-            Inline::Element(el) => s.push_str(&render_element(el, config)),
+            Inline::Element(el) => {
+                let block = el.placement == Placement::Block;
+                if block && !s.is_empty() && !s.ends_with('\n') {
+                    s.push('\n');
+                }
+                s.push_str(&render_element(el, config));
+                if block {
+                    s.push('\n');
+                }
+            }
         }
     }
     s
@@ -281,7 +300,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
 
     // A codeblock is written back as a ``` fence, which is the form it
     // was parsed from and the only one that keeps its body verbatim.
-    // `#codeblock[...]` would not survive a round trip: `[content]` is
+    // `@codeblock[...]` would not survive a round trip: `[content]` is
     // ordinary markup now, so code containing Tomet syntax -- a `+++`
     // fence, say -- would be reparsed as that syntax.
     if el.sigil.is_bare_named("codeblock") {
@@ -329,7 +348,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     if el.sigil.is_bare_named("callout") {
         if let Some(style) = config.callout_content_style.as_deref() {
             if style == "expanded" {
-                let mut out = String::from("#callout");
+                let mut out = String::from("@callout");
                 if let Some(args) = &el.args {
                     out.push('(');
                     out.push_str(&render_args_with_config(args, config));
@@ -350,7 +369,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 }
                 return out;
             } else if style == "block" {
-                let mut out = String::from("#callout");
+                let mut out = String::from("@callout");
                 if let Some(args) = &el.args {
                     out.push('(');
                     out.push_str(&render_args_with_config(args, config));
@@ -386,7 +405,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 }
                 return out;
             } else if style == "box" {
-                let mut out = String::from("#callout");
+                let mut out = String::from("@callout");
                 if let Some(args) = &el.args {
                     out.push('(');
                     out.push_str(&render_args_with_config(args, config));
@@ -431,11 +450,10 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     let mut out = String::new();
 
     match &el.sigil {
-        Sigil::Block(name) => {
-            out.push('#');
-            out.push_str(&name.to_string());
-        }
-        Sigil::Inline(name) => {
+        // One sigil, whatever the placement. A block-placed element is
+        // told apart by standing alone on its line, which is the same
+        // condition the parser reads it back with.
+        Sigil::Named(name) => {
             out.push('@');
             out.push_str(&name.to_string());
         }
@@ -545,15 +563,16 @@ fn render_group_entries(entries: &[Entry], config: &PrinterConfig) -> String {
     let rendered: Vec<String> = entries
         .iter()
         .map(|entry| match entry {
-            Entry::Pair(k, v) => {
-                format!("{k}: {}", render_value_inner_with_config(v, config))
-            }
+            // `render_nested`, not `render_value_inner_with_config`: a
+            // nested map needs its own braces here or `m: { k: v }`
+            // prints as `m: k: v` and reparses as a string.
+            Entry::Pair(k, v) => format!("{k}: {}", render_nested(v, config)),
             Entry::Element(child) => render_element(child, config),
         })
         .collect();
 
     // A group of pairs stays on one line; one holding elements gets a
-    // line each, which is how `#links{ (1)[..] (2)[..] }` has always been
+    // line each, which is how `@links{ (1)[..] (2)[..] }` has always been
     // written.
     if !has_element {
         format!(" {} ", rendered.join(", "))
@@ -668,10 +687,10 @@ mod tests {
         // headings; the shared, recursively-called `render_element` has no
         // heading arm at all (mirrors `tomet-html`/
         // `tomet-markdown`'s equivalent nested-heading tests).
-        let doc = tomet_parser::parse_document("#memo[#heading(2)[Nested]]\n").unwrap();
+        let doc = tomet_parser::parse_document("@memo[@heading(2)[Nested]]\n").unwrap();
         let printed = document_to_tm(&doc);
         assert!(!printed.contains("##["), "got: {printed:?}");
-        assert!(printed.contains("#heading(2)[Nested]"), "got: {printed:?}");
+        assert!(printed.contains("@heading(2)[Nested]"), "got: {printed:?}");
     }
 
     #[test]
@@ -683,7 +702,7 @@ mod tests {
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc, &cfg);
-        assert!(printed.contains("#meta(format:yaml)+++"));
+        assert!(printed.contains("@meta(format:yaml)+++"));
     }
 
     #[test]
@@ -820,7 +839,7 @@ mod tests {
 
     #[test]
     fn test_nanoid_generation_and_ensure_document_id() {
-        let settings_src = r#"#settings(format:json)+++
+        let settings_src = r#"@settings(format:json)+++
 {
   "meta": {
     "id": {
@@ -851,7 +870,7 @@ mod tests {
 
     #[test]
     fn test_nanoid_force_and_overwrite_behavior() {
-        let settings_src = r#"#settings(format:json)+++
+        let settings_src = r#"@settings(format:json)+++
 {
   "meta": {
     "id": {
@@ -911,15 +930,15 @@ mod tests {
         let md = "> [!info] 2025/04/29 11:09\n> コレさすがに草www\n";
         let doc = tomet_markdown::from_markdown(md);
         let printed = document_to_tm_with_config(&doc, &PrinterConfig::default());
-        assert!(printed.contains("#callout(info, title: \"2025/04/29 11:09\")["));
+        assert!(printed.contains("@callout(info, title: \"2025/04/29 11:09\")["));
         assert!(printed.contains("コレさすがに草www"));
 
         let md_plain = "> Plain quote text\n";
         let doc_plain = tomet_markdown::from_markdown(md_plain);
         let printed_plain = document_to_tm_with_config(&doc_plain, &PrinterConfig::default());
-        assert!(printed_plain.contains("#blockquote["));
+        assert!(printed_plain.contains("@blockquote["));
         assert!(printed_plain.contains("Plain quote text"));
-        assert!(!printed_plain.contains("#blockquote("));
+        assert!(!printed_plain.contains("@blockquote("));
     }
 
     #[test]
@@ -933,7 +952,7 @@ mod tests {
             ..Default::default()
         };
         let printed_block = document_to_tm_with_config(&doc, &cfg_block);
-        assert!(printed_block.contains("#callout(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？\n]"));
+        assert!(printed_block.contains("@callout(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？\n]"));
 
         // Test "box" style
         let cfg_box = PrinterConfig {
@@ -941,7 +960,7 @@ mod tests {
             ..Default::default()
         };
         let printed_box = document_to_tm_with_config(&doc, &cfg_box);
-        assert!(printed_box.contains("#callout(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？ ]"));
+        assert!(printed_box.contains("@callout(info, title: \"2025/04/29 11:09\")\n[ コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？ ]"));
 
         // Test "expanded" style
         let cfg_expanded = PrinterConfig {
@@ -949,7 +968,7 @@ mod tests {
             ..Default::default()
         };
         let printed_expanded = document_to_tm_with_config(&doc, &cfg_expanded);
-        assert!(printed_expanded.contains("#callout(info, title: \"2025/04/29 11:09\")[\n  コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？\n]"));
+        assert!(printed_expanded.contains("@callout(info, title: \"2025/04/29 11:09\")[\n  コレさすがに草www\n  お前なら@link(target: \"ref:2025-04-26\")[どうするんだ]？\n]"));
     }
 
     #[test]
@@ -981,7 +1000,7 @@ mod tests {
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc_callout, &cfg);
-        assert!(printed.contains("#callout(info, title: \"Single Line\")\n[ 一行テキスト ]"));
+        assert!(printed.contains("@callout(info, title: \"Single Line\")\n[ 一行テキスト ]"));
     }
 
     #[test]
@@ -1014,7 +1033,7 @@ mod tests {
 
     #[test]
     fn test_embedded_format_serialization_and_reparse() {
-        let mut el = element_new(Sigil::block("config"));
+        let mut el = element_new(Sigil::named("config"));
         el.args = Some(Value::Map(vec![(
             "format".to_string(),
             Value::String("json".to_string()),
@@ -1042,12 +1061,12 @@ mod tests {
         child2.args = Some(Value::Int(2));
         child2.content = Some(vec![Inline::Text("note 2".into())]);
 
-        let mut links = element_new(Sigil::block("links"));
+        let mut links = element_new(Sigil::named("links"));
         links.value = Some(ElementValue::from_children(vec![child1, child2]));
 
         let doc = Document::new(vec![Block::Element(links)], tomet_ast::Span::dummy());
         let printed = document_to_tm(&doc);
-        assert!(printed.contains("#links{\n  (1)[note 1]\n  (2)[note 2]\n}"));
+        assert!(printed.contains("@links{\n  (1)[note 1]\n  (2)[note 2]\n}"));
 
         // Verify re-parsing
         let re_parsed = tomet_parser::parse_document(&printed).expect("valid doc");

@@ -1,11 +1,14 @@
 //! Extension trait, attribute helpers, and constructors for [`tomet_ast::Element`].
 
-use tomet_ast::{Block, Element, ElementValue, Inline, Name, Sigil, Span, Value};
+use tomet_ast::{Block, Element, ElementValue, Inline, Name, Placement, Sigil, Span, Value};
 
 /// Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
 pub trait ElementExt {
     /// Consumes `self` and sets its `span`.
     fn with_span(self, span: Span) -> Self;
+
+    /// Consumes `self` and sets its `placement`.
+    fn with_placement(self, placement: Placement) -> Self;
 
     /// Consumes `self` and sets its `args`.
     fn with_args(self, args: Value) -> Self;
@@ -75,6 +78,11 @@ pub trait ElementExt {
 impl ElementExt for Element {
     fn with_span(mut self, span: Span) -> Self {
         self.span = span;
+        self
+    }
+
+    fn with_placement(mut self, placement: Placement) -> Self {
+        self.placement = placement;
         self
     }
 
@@ -271,9 +279,13 @@ impl ElementExt for Element {
 }
 
 /// Creates a new [`Element`] with given `sigil` and default empty fields.
+///
+/// The placement is [`Placement::Inline`]; a caller building a block uses
+/// [`ElementExt::with_placement`], and the parser sets it from position.
 pub fn element_new(sigil: Sigil) -> Element {
     Element {
         sigil,
+        placement: Placement::Inline,
         args: None,
         content: None,
         children: None,
@@ -282,13 +294,15 @@ pub fn element_new(sigil: Sigil) -> Element {
     }
 }
 
-/// A list element constructor (`#ol` if `ordered`, else `#ul`).
+/// A list element constructor (`ol` if `ordered`, else `ul`).
 ///
-/// Lists are block-shaped, so they take the block sigil even though no `#`
-/// appears in the source -- the marker (`-` / `-.`) is their surface form.
+/// A list has no sigil in the source -- the marker (`-` / `-.`) is its
+/// surface form -- but it always stands as a block, so it is constructed
+/// with [`Placement::Block`] directly.
 pub fn element_list(ordered: bool, items: Vec<Element>, span: Span) -> Element {
     Element {
-        sigil: Sigil::block(if ordered { "ol" } else { "ul" }),
+        sigil: Sigil::named(if ordered { "ol" } else { "ul" }),
+        placement: Placement::Block,
         args: None,
         content: None,
         children: None,
@@ -307,6 +321,7 @@ pub fn element_list_item(
 ) -> Element {
     Element {
         sigil: Sigil::Bare,
+        placement: Placement::Block,
         args: marker,
         content: Some(content),
         children: if children.is_empty() {

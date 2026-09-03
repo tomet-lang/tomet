@@ -1,16 +1,16 @@
 ```
-#meta(format:json)+++
+@meta(format:json)+++
 {
   "key": "value",
   "type": "person"
 }
 +++
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 key: value
 date: time
 type: character
 +++
-#meta(format:toml)+++
+@meta(format:toml)+++
 key = "value"
 type = "location"
 +++

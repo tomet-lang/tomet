@@ -35,6 +35,7 @@ members = [
   "crates/tomet-convert-markdown",
   "crates/tomet-convert-html",
   "crates/tomet-convert-typst",
+  "crates/tomet-convert-pandoc",
 
   #[ Format -- .tmt source text production & formatting ]
   "crates/tomet-formatter",
@@ -83,6 +84,7 @@ tomet-transform = { path = "crates/tomet-transform" }
 tomet-markdown = { path = "crates/tomet-convert-markdown" }
 tomet-html = { path = "crates/tomet-convert-html" }
 tomet-typst = { path = "crates/tomet-convert-typst" }
+tomet-pandoc = { path = "crates/tomet-convert-pandoc" }
 #[ Format ]
 tomet-field-utils = { path = "crates/tomet-format-field-utils" }
 tomet-style = { path = "crates/tomet-format-style" }

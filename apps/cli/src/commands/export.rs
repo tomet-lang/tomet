@@ -57,6 +57,7 @@ fn export_single_file(
             ExportType::CommonMark => "md",
             ExportType::Html => "html",
             ExportType::Typst => "typ",
+            ExportType::Pandoc => "json",
             ExportType::Custom(s) => s.as_str(),
         };
 
@@ -85,6 +86,9 @@ fn export_single_file(
 
         let rendered = match target {
             ExportType::CommonMark => tomet_markdown::to_markdown(&doc),
+            // Pandoc's AST, not a rendering -- `pandoc -f json` turns it
+            // into whatever format is actually wanted.
+            ExportType::Pandoc => serde_json::to_string(&tomet_pandoc::to_pandoc(&doc))?,
             ExportType::Html => {
                 let filename_title = file_path
                     .file_stem()
@@ -165,7 +169,7 @@ mod tests {
         let out_file = temp_dir.join("test_out.md");
 
         let src_content = format!(
-            "#config(\n  export: {{\n    type: commonmark\n    path: \"{}\"\n  }}\n)\n#[ Hello Export ]\n",
+            "@config(\n  export: {{\n    type: commonmark\n    path: \"{}\"\n  }}\n)\n#[ Hello Export ]\n",
             out_file.display()
         );
         fs::write(&src_file, src_content).unwrap();

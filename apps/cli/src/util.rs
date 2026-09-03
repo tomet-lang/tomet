@@ -26,8 +26,24 @@ pub(crate) fn format_parse_error(path: &Path, src: &str, err: &tomet_parser::Err
     )
 }
 
+/// Reads a source file, or standard input when the path is `-`.
+///
+/// The `-` convention is what makes this CLI usable in a pipe, which the
+/// Pandoc bridge depends on: `pandoc -t json x.docx | tomet from-pandoc -`
+/// has nowhere to put a temporary file. Nothing else changes -- a real
+/// path is still read from disk.
 pub(crate) fn read(file: &PathBuf) -> anyhow::Result<String> {
+    if is_stdin(file) {
+        let mut buf = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf)?;
+        return Ok(buf);
+    }
     Ok(fs::read_to_string(file)?)
+}
+
+/// Whether a path means standard input rather than a file on disk.
+pub(crate) fn is_stdin(path: &Path) -> bool {
+    path.as_os_str() == "-"
 }
 
 /// Pulls a `title` string out of the document's `@meta` block, if it has
@@ -61,11 +77,11 @@ mod tests {
             column: 11,
             offset: 10,
         };
-        let src = "#caution[ unterminated";
+        let src = "@caution[ unterminated";
         let formatted = format_parse_error(Path::new("test.tmt"), src, &err);
         assert!(formatted.contains("error: expected ']'"));
         assert!(formatted.contains("--> test.tmt:1:11"));
-        assert!(formatted.contains("#caution[ unterminated"));
+        assert!(formatted.contains("@caution[ unterminated"));
         assert!(formatted.contains("^ expected ']'"));
     }
 }

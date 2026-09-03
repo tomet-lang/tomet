@@ -1,5 +1,5 @@
-#meta{ type: settings }
-#settings(format:json)+++
+@meta{ type: settings }
+@settings(format:json)+++
 {
   elements = {
     bookmark = {

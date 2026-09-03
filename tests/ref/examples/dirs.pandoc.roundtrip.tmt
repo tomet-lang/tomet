@@ -1,0 +1,15 @@
+@meta{type: bookmark}
+
+@file[説明]{ value: readme.md }
+
+@dirs[ソースコード]{ value: src }
+
+@file[パッケージコンフィグ]{ value: src/Cargo.toml }
+
+@file[Crates]{ value: src/crates }
+
+@dirs[ソースコード]{ value: apps }
+
+@file[パッケージコンフィグ]{ value: apps/Cargo.toml }
+
+@file[Crates]{ value: apps/crates }

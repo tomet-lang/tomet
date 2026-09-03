@@ -1,0 +1,97 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {
+    "type": {
+      "t": "MetaInlines",
+      "c": [
+        {
+          "t": "Str",
+          "c": "daily-note"
+        }
+      ]
+    },
+    "uuid": {
+      "t": "MetaInlines",
+      "c": [
+        {
+          "t": "Str",
+          "c": "${uuid}"
+        }
+      ]
+    }
+  },
+  "blocks": [
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "todo",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "TODO"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "review",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "Review"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "feadback",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "Feadback"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "timeline",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "Timeline"
+          }
+        ]
+      ]
+    }
+  ]
+}

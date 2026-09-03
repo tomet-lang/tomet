@@ -1,5 +1,5 @@
-#meta{ type: config }
-#config(format:json)+++
+@meta{ type: config }
+@config(format:json)+++
 {
   "format": {
     "meta": {

@@ -40,9 +40,10 @@ mkShell rec {
     cargo-nextest
     wasm-bindgen-cli
 
+    #[ Pandoc ]
+    haskellPackages.pandoc-cli
     #[ VS Code extension (apps/vscode-extension) ]
     nodejs
-
     #[ Python bindings (bindings/python) ]
     python3
 

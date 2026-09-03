@@ -213,7 +213,7 @@ impl Document {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Block {
     Paragraph(Paragraph),
-    /// A list is `Element { sigil: Sigil::Type("ol"|"ul"), value:
+    /// A list is `Element { sigil: Sigil::Named("ol"|"ul"), value:
     /// Some(ElementValue::Children(items)), .. }`. `"ol"` vs `"ul"`
     /// distinguishes `-.` (auto-numbered) from plain `-` lists; numbering
     /// itself isn't stored, it's computed at render time. Each item is an
@@ -360,32 +360,36 @@ impl fmt::Display for Name {
 
 /// Which sigil introduced an element, and its name.
 ///
-/// The sigil encodes the element's *shape*, not its origin: `@` is inline,
-/// `#` is block. Origin is carried by [`Name`]'s namespace instead. (The
-/// older `<T>` sigil, which was meant to separate official from
-/// user-defined elements, carried no information in practice -- both it
-/// and `@name` classified through the same arm -- and is gone.)
+/// There is one element sigil, `@`. It says "an element starts here" and
+/// nothing else: whether the element stands as a block or belongs to a
+/// paragraph is [`Placement`], which the parser derives from position, and
+/// origin is carried by [`Name`]'s namespace.
+///
+/// Two earlier axes were tried here and both carried no information. `<T>`
+/// vs `@name` was meant to separate official from user-defined elements,
+/// but both classified through the same arm. `#name` vs `@name` was meant
+/// to encode shape, but the parser never consulted it (position already
+/// decided placement) and `tomet-semantics`' `required_shape` already knew
+/// each builtin's shape, so the sigil only restated it. `#` is the heading
+/// marker now, and nothing else.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Sigil {
-    /// `#name` -- a block element. `#[ ... ]` is the name-omitted form of
-    /// `#heading`, and parses to `Block(Name::bare("heading"))`.
-    Block(Name),
-    /// `@name` -- an inline element. The name is mandatory.
+    /// `@name` -- an element. The name is mandatory.
     ///
     /// A nameless `@(url:...)` used to infer its kind from a key in its
     /// args. That inference was retired and `@link(target:...)` is the
     /// one link element, but the *syntax* was left behind, so a bare `@`
     /// still parsed and classified as the meaningless `Custom("at")`.
     /// It is gone: an element has a name.
-    Inline(Name),
+    Named(Name),
     /// No sigil at all. Only legal as an entry inside another element's
-    /// value group (e.g. the `(1)[...]` entries inside `#links{ ... }`),
+    /// value group (e.g. the `(1)[...]` entries inside `@links{ ... }`),
     /// where the container already supplies the type.
     Bare,
     /// `${...}` interpolation -- structurally just a sigil with a
     /// mandatory `{value}` group, same shape as `@name{value}`, so it
     /// reuses `Element`/`Inline::Element` rather than being a separate
-    /// `Inline` variant. No name of its own (unlike `Block`/`Inline`): the
+    /// `Inline` variant. No name of its own (unlike `Named`): the
     /// `InterpExpr` inside the `ElementValue::Interp` value group carries
     /// its own path/call name.
     Dollar,
@@ -395,31 +399,17 @@ impl Sigil {
     /// This element's name, if it has one.
     pub fn name(&self) -> Option<&Name> {
         match self {
-            Sigil::Block(name) | Sigil::Inline(name) => Some(name),
+            Sigil::Named(name) => Some(name),
             Sigil::Bare | Sigil::Dollar => None,
         }
     }
 
-    /// A block element -- one written with `#`.
-    pub fn block(name: impl Into<String>) -> Self {
-        Sigil::Block(Name::bare(name))
+    /// An element with a bare (un-namespaced) name.
+    pub fn named(name: impl Into<String>) -> Self {
+        Sigil::Named(Name::bare(name))
     }
 
-    /// An inline element -- one written with `@`.
-    pub fn inline(name: impl Into<String>) -> Self {
-        Sigil::Inline(Name::bare(name))
-    }
-
-    pub fn is_block(&self) -> bool {
-        matches!(self, Sigil::Block(_))
-    }
-
-    pub fn is_inline(&self) -> bool {
-        matches!(self, Sigil::Inline(_))
-    }
-
-    /// Whether this element carries the bare (un-namespaced) name `name`,
-    /// regardless of shape.
+    /// Whether this element carries the bare (un-namespaced) name `name`.
     ///
     /// This is the check almost every consumer wants: bare names are
     /// reserved for Tomet's own vocabulary, so `is_bare_named("meta")` asks
@@ -428,16 +418,29 @@ impl Sigil {
     pub fn is_bare_named(&self, name: &str) -> bool {
         self.name().is_some_and(|n| n.is_bare() && n.name == name)
     }
+}
 
-    /// Like [`Sigil::is_bare_named`], but also requires a block shape.
-    pub fn is_block_named(&self, name: &str) -> bool {
-        matches!(self, Sigil::Block(n) if n.is_bare() && n.name == name)
-    }
-
-    /// Like [`Sigil::is_bare_named`], but also requires an inline shape.
-    pub fn is_inline_named(&self, name: &str) -> bool {
-        matches!(self, Sigil::Inline(n) if n.is_bare() && n.name == name)
-    }
+/// Where an element sits: on its own as a block, or inside running text.
+///
+/// The parser derives this from position alone -- never from the element's
+/// name, so the vocabulary-free invariant holds. An element is
+/// [`Placement::Block`] when it is in block context (document start, after
+/// a blank line, or after a block closed) *and* it ends its line; anything
+/// else is [`Placement::Inline`].
+///
+/// It is recorded rather than implied by the tree because [`Element`]'s
+/// `content` is a `Vec<Inline>`: an element written at a line start inside
+/// another element's `[content]` is a block, and this field is the only
+/// place that survives.
+///
+/// This is placement, not shape. Which shape an element is *allowed* to
+/// take is a vocabulary question, answered by `tomet-semantics`'
+/// `required_shape` and checked against this field by `shape_mismatch`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum Placement {
+    Block,
+    #[default]
+    Inline,
 }
 
 /// `(args)` / `[content]` / `{value}`, each optional and at most one of each,
@@ -445,6 +448,7 @@ impl Sigil {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Element {
     pub sigil: Sigil,
+    pub placement: Placement,
     pub args: Option<Value>,
     pub content: Option<Vec<Inline>>,
     pub children: Option<Vec<Block>>,

@@ -3,11 +3,8 @@
 <h1>ブロック要素</h1>
 <div class="tm-element tm-memo">名前は `#` の直後に続く。空白があると本文になる</div>
 <div class="tm-element tm-deck.bookmark" data-name="foo" data-count="3">名前空間つき</div>
-<div class="tm-element tm-import" data-file="./deck.tmt" data-as="deck"></div>
 <h1>インライン要素</h1>
-<p>文中の <a class="tm-url" href="https://example.com">リンク</a> と</p>
-<div class="tm-element tm-deck.badge" data-value="2">名前空間つきインライン</div>
-<p>は行の途中でも要素になる。</p>
+<p>文中の <a class="tm-url" href="https://example.com">リンク</a> と <span class="tm-element tm-deck.badge" data-value="2">名前空間つきインライン</span> は行の途中でも要素になる。</p>
 <h1>本文に落ちる `#`</h1>
 <p># 見出しではない行。`#` の直後が識別子でなければただの文字。</p>
 <p>これは #タグ ではない。ASCII でない名前は要素にならない。</p>

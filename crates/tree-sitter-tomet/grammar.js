@@ -93,8 +93,9 @@ module.exports = grammar({
 				),
 				$._newline,
 			),
-		// Outranks `punctuation`'s bare `#`, which is only the fallback
-		// for a `#` that starts neither a heading nor a block element.
+		// Outranks `punctuation`'s bare `#`, which is the fallback for a
+		// `#` that does not start a heading. `#` has no other meaning, so
+		// this marker no longer competes with an element sigil for it.
 		heading_marker: (_$) => token(prec(1, /#+/)),
 
 		// ---- thematic break -----------------------------------------------
@@ -259,7 +260,7 @@ module.exports = grammar({
 		// `/* ... */` needs to win over a `text` run that would otherwise
 		// swallow it whole, so a bare `/` (not opening a comment) falls
 		// back to `punctuation` like the others.
-		// `#` is excluded so `block_sigil` can win at a line start; `<`
+		// `#` is excluded so `heading_marker` can win at a line start; `<`
 		// no longer needs excluding, since it is not a sigil any more.
 		text: (_$) => /[^\n`*_=@$#()\[{\]/-]+/,
 
@@ -368,13 +369,16 @@ module.exports = grammar({
 			),
 		number: (_$) => /-?[0-9]+(\.[0-9]+)?/,
 
-		// ---- `#name`/`@name` elements -------------------------------------
+		// ---- `@name` elements ---------------------------------------------
 		//
-		// The sigil encodes shape: `#` block, `@` inline. The old `<T>`
-		// sigil is gone, and with it the last construct this grammar could
-		// not express without guessing -- every construct is context-free
-		// now, so this is a faithful grammar rather than an approximation.
-		element: ($) => choice($.block_element, $.inline_element),
+		// One sigil, whatever the element's placement. `#` and `<T>` were
+		// both tried here and both carried no information; `#` is the
+		// heading marker and nothing else now. Whether an element stands
+		// as a block or belongs to running text is decided by position
+		// (does it occupy its own line), which is a question for
+		// `tomet-parser`, not for syntax highlighting -- so this grammar
+		// has one element rule.
+		element: ($) => $.inline_element,
 		// `prec.right(3, ...)` wraps the *whole* rule (not just the trailing
 		// `repeat($._element_group)`, unlike an earlier revision) --
 		// `ordered_list_item`/`unordered_list_item`'s own trailing `{attrs}`
@@ -387,27 +391,6 @@ module.exports = grammar({
 		// this rule-level precedence (higher than `value_group`'s own
 		// `token(prec(1, "{"))`) statically resolves the shift/reduce
 		// conflict in that same direction, without needing GLR.
-		// `#` and the name are one token. That is what separates a block
-		// element from a heading without lookahead: `heading_marker` is
-		// `/#+/`, which cannot match `#name` because the name must follow
-		// the `#` immediately, and `#[` cannot match `block_sigil` for the
-		// same reason. It also matches the real parser's adjacency rule,
-		// which is what keeps `# heading` and shell comments as prose.
-		block_element: ($) =>
-			prec.right(
-				3,
-				seq(
-					field("name", $.block_sigil),
-					repeat($._element_group),
-				),
-			),
-		// Same token precedence as `heading_marker`, so the two are decided
-		// by match length rather than by precedence: `#input` is a longer
-		// match than `#`, while `#[` can only be the marker. Both outrank
-		// `punctuation`'s bare `#`, which is the fallback for a `#` that
-		// starts neither.
-		block_sigil: (_$) =>
-			token(prec(1, /#[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*/)),
 		inline_element: ($) =>
 			prec.right(
 				3,

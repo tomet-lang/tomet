@@ -1,8 +1,8 @@
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 type: config
 +++
 
-#config(json)+++
+@config(json)+++
 {
   "format": {
     "meta": {

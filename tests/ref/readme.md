@@ -1,5 +1,3 @@
-<div data-tm-kind="settings" data-file="docs/docs.settings.tmt"></div>
-
 # Tomet
 
 私のための言語!

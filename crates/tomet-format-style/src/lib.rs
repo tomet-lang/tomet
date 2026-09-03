@@ -83,6 +83,23 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
     }
 }
 
+/// Renders a value that sits *inside* another one.
+///
+/// A map needs its own braces there. `render_value_inner_with_config`
+/// deliberately renders a map unwrapped, because at the top level the
+/// caller supplies the braces -- but recursing into it that way printed
+/// `m: { k: v }` as `m: k: v`, which reparses as the string `"k: v"`.
+/// Nesting was destroyed by any print-then-parse cycle.
+///
+/// Public because the printer renders a value group's pairs itself and
+/// needs the same rule.
+pub fn render_nested(v: &Value, config: &PrinterConfig) -> String {
+    match v {
+        Value::Map(_) => format!("{{{}}}", render_value_inner_with_config(v, config)),
+        _ => render_value_inner_with_config(v, config),
+    }
+}
+
 pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> String {
     match v {
         Value::Null => String::new(),
@@ -93,7 +110,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
         Value::Seq(items) => {
             let rendered: Vec<_> = items
                 .iter()
-                .map(|item| render_value_inner_with_config(item, config))
+                .map(|item| render_nested(item, config))
                 .collect();
             format!("[{}]", rendered.join(", "))
         }
@@ -102,14 +119,11 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                 let key = &entries[0].0;
                 if key == "target" {
                     let space = if config.link_no_space { "" } else { " " };
-                    format!(
-                        "@({key}:{space}{})",
-                        render_value_inner_with_config(&entries[0].1, config)
-                    )
+                    format!("@({key}:{space}{})", render_nested(&entries[0].1, config))
                 } else {
                     let mut parts = Vec::new();
                     for (idx, (k, val)) in entries.iter().enumerate() {
-                        let val_str = render_value_inner_with_config(val, config);
+                        let val_str = render_nested(val, config);
                         if idx == 0 && (k == "variant" || k == "lang" || k == "format") {
                             parts.push(val_str);
                         } else {
@@ -121,7 +135,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
             } else {
                 let mut parts = Vec::new();
                 for (idx, (k, val)) in entries.iter().enumerate() {
-                    let val_str = render_value_inner_with_config(val, config);
+                    let val_str = render_nested(val, config);
                     if idx == 0 && (k == "variant" || k == "lang" || k == "format") {
                         parts.push(val_str);
                     } else {
@@ -221,8 +235,8 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
             // fence, not a `{...}` group: the fence is what carries a
             // body in another language now.
             let (open, close, indent) = match effective_format {
-                Some(ref fmt) => (format!("#meta(format:{fmt})+++\n"), "+++", ""),
-                None => (String::from("#meta{\n"), "}", "  "),
+                Some(ref fmt) => (format!("@meta(format:{fmt})+++\n"), "+++", ""),
+                None => (String::from("@meta{\n"), "}", "  "),
             };
             let mut out = open;
             for (k, v) in &entries {
@@ -243,7 +257,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
         }
     }
 
-    let mut out = String::from("#meta");
+    let mut out = String::from("@meta");
     if let Some(args) = &el.args {
         out.push('(');
         out.push_str(&render_args_with_config(args, config));
@@ -261,6 +275,45 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
 mod tests {
     use super::*;
     use tomet_ast::Sigil;
+
+    fn map(entries: &[(&str, Value)]) -> Value {
+        Value::Map(
+            entries
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn a_nested_map_keeps_its_braces() {
+        // Without them `m: { k: v }` printed as `m: k: v`, which reparses
+        // as the string "k: v" -- nesting destroyed by any
+        // print-then-parse cycle.
+        assert_eq!(
+            render_value(&map(&[
+                ("id", Value::String("c1".into())),
+                ("m", map(&[("k", Value::String("v".into()))])),
+            ])),
+            "{id: c1, m: {k: v}}"
+        );
+    }
+
+    #[test]
+    fn a_map_inside_a_sequence_keeps_its_braces() {
+        assert_eq!(
+            render_value_inner(&Value::Seq(vec![
+                map(&[("k", Value::Int(1))]),
+                Value::Int(2),
+            ])),
+            "[{k: 1}, 2]"
+        );
+    }
+
+    #[test]
+    fn a_top_level_map_is_still_wrapped_once() {
+        assert_eq!(render_value(&map(&[("a", Value::Int(1))])), "{a: 1}");
+    }
 
     #[test]
     fn render_value_inner_quotes_strings_needing_it() {
@@ -297,18 +350,18 @@ mod tests {
 
     #[test]
     fn render_meta_element_single_line_by_default() {
-        let mut el = tomet_tree::element_new(Sigil::block("meta"));
+        let mut el = tomet_tree::element_new(Sigil::named("meta"));
         el.value = Some(ElementValue::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )])));
         let cfg = PrinterConfig::default();
-        assert_eq!(render_meta_element(&el, &cfg), "#meta{id: doc-12345678}");
+        assert_eq!(render_meta_element(&el, &cfg), "@meta{id: doc-12345678}");
     }
 
     #[test]
     fn render_meta_element_multiline_when_format_configured() {
-        let mut el = tomet_tree::element_new(Sigil::block("meta"));
+        let mut el = tomet_tree::element_new(Sigil::named("meta"));
         el.value = Some(ElementValue::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
@@ -317,7 +370,7 @@ mod tests {
         cfg.meta_format = Some("yaml".to_string());
         assert_eq!(
             render_meta_element(&el, &cfg),
-            "#meta(format:yaml)+++\nid: doc-12345678\n+++"
+            "@meta(format:yaml)+++\nid: doc-12345678\n+++"
         );
     }
 

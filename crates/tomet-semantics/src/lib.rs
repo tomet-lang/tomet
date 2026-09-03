@@ -11,6 +11,7 @@
 mod config;
 mod connect;
 pub mod embedded;
+pub mod flatten;
 mod heading;
 mod kind;
 mod list;
@@ -21,10 +22,14 @@ mod target;
 
 pub use config::{DocumentConfig, ExportType, document_config};
 pub use connect::merge_connected_values;
+pub use flatten::{
+    EXACT_DATA_KEY, FlatData, POSITIONAL_KEY, flatten_data, flatten_element_data, scalar_string,
+    value_to_json,
+};
 pub use heading::heading_level;
 pub use kind::{
     BUILTIN_KINDS, ElementKind, Shape, UnknownName, classify, classify_lenient, classify_name,
-    shape_mismatch,
+    is_directive, shape_mismatch,
 };
 pub use list::{list_items, list_ordered};
 pub use meta::{document_kind, document_meta, document_version};

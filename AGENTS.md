@@ -8,7 +8,7 @@ things worth putting there. Read `docs/develop/architecture.md` before
 making any non-trivial change (the crate pipeline and its consumers, why
 the grammar has two independent implementations, the apps/editor
 integrations, known gaps like the AST carrying no span info). For where a
-document belongs and what language it's written in, `docs/README.md` is
+document belongs and what language it's written in, `docs/README.tmt` is
 the map and `docs/develop/docs-guide.md` is the rulebook. Do not restate
 those files' content here — extend them instead, and keep this pointer
 short.

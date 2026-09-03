@@ -1,5 +1,13 @@
-#config(import:docs/docs.settings.tmt)
-#meta(type:todo)
+@config(import:docs/docs.settings.tmt)
+@meta(type:todo)
+
+│ #links{ (1)[..] }（Bare 子要素）       │ 547eb77 / b6c01b4 │
+├────────────────────────────────────────┼───────────────────┤
+│ リストのネスト処理 parse_list_internal │ 85a85a1 / e7f95bd │
+├────────────────────────────────────────┼───────────────────┤
+│ リスト末尾 {attrs}（: なし）           │ d07bb1f / b6c01b4 │
+├────────────────────────────────────────┼───────────────────┤
+│ 自動リンク                             │ 1f799fa / 85a85a1 │
 
 - 読み込みロード画面
 - index, directories

@@ -49,14 +49,14 @@ mod tests {
 
     #[test]
     fn test_promote_meta_type_to_kind() {
-        let mut doc = parse_doc("#version(1.0)\n#meta{\n  type: task\n  id: doc-1\n}\n");
+        let mut doc = parse_doc("@version(1.0)\n@meta{\n  type: task\n  id: doc-1\n}\n");
         assert!(promote_meta_type_to_kind(&mut doc));
         assert_eq!(doc.blocks.len(), 3);
     }
 
     #[test]
     fn test_structural_transform() {
-        let mut doc = parse_doc("#note[Check this]\n");
+        let mut doc = parse_doc("@note[Check this]\n");
         let action = StructuralAction::RenameTag {
             from: "note".into(),
             to: "warning".into(),

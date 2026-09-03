@@ -1,6 +1,6 @@
-#settings(file: docs/docs.settings.tmt)
+@settings(file: docs/docs.settings.tmt)
 
-#meta(type: todo)
+@meta(type: todo)
 
 - testファイルを別途用意しろ。
 - ちゃんと分割しろ

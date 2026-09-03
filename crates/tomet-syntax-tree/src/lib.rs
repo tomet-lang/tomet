@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn test_element_extension_traits() {
-        let mut el = element_new(Sigil::block("card"));
+        let mut el = element_new(Sigil::named("card"));
         el.set_prop("tag", Value::String("urgent".into()));
         assert_eq!(el.get_attr("tag").and_then(|v| v.as_str()), Some("urgent"));
         assert!(el.has_prop_key("tag"));

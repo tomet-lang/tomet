@@ -1,16 +1,16 @@
 ```
-#meta(format:json)+++
+@meta(format:json)+++
 {
   "key": "value",
   "type": "person"
 }
 +++
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 key: value
 date: time
 type: character
 +++
-#meta(format:toml)+++
+@meta(format:toml)+++
 key = "value"
 type = "location"
 +++
@@ -22,9 +22,9 @@ type = "location"
 // }
 ```
 
-\`$\`{some\_id}
+`$`{some\_id}
 
-\`$\`{sum(a, b)}
+`$`{sum(a, b)}
 
 https://
 
@@ -32,7 +32,7 @@ https://
 
 [[1]]
 
-\`@\`\[\](url:https://) \`@\`\[\](file:/readme.md) \`@\`\[\](ref:2)
+`@`\[\](url:https://) `@`\[\](file:/readme.md) `@`\[\](ref:2)
 
 # heading
 
@@ -64,7 +64,7 @@ sudo whoami ls --help
 
 1. aaaa
 
-**aaaa** *aaaa* \<mark>aaaa</mark> *aaaa* \`aaaa\`
+**aaaa** *aaaa* \<mark>aaaa</mark> *aaaa* `aaaa`
 
 ```(lang:sh)
 

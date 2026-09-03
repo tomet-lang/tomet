@@ -48,7 +48,7 @@
 ```tm
 > blockquote
 
-#blockquote
+@blockquote
 [ blockquote ]
 ```
 
@@ -59,7 +59,7 @@
 >
 > Contents
 
-#callout(info, title: Title)
+@callout(info, title: Title)
 [ Contents ]
 ```
 
@@ -67,7 +67,7 @@
 \`\`\`tm
 \`\`\`
 
-#codeblock(tm)[
+@codeblock(tm)[
 ]
 \`\`\`(tm)
 \`\`\`
@@ -98,7 +98,7 @@ _torikesi_
 | table | ---- | ---- |
 | asdff | asdf | asdf |
 
-#table()[
+@table()[
 [ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]
 [ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]
 [ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]

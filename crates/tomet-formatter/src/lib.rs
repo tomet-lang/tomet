@@ -338,7 +338,7 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
         // `#table` is the block form; `@table` is accepted too so an
         // inline-written table still gets its columns laid out rather
         // than being silently skipped.
-        if (trimmed.starts_with("#table") || trimmed.starts_with("@table")) && trimmed.contains('[')
+        if (trimmed.starts_with("@table") || trimmed.starts_with("@table")) && trimmed.contains('[')
         {
             out_lines.push(line.to_string());
             i += 1;
@@ -660,7 +660,7 @@ mod tests {
 
     #[test]
     fn format_source_with_config_leaves_meta_block_completely_untouched() {
-        let src = "#meta{title: Hello}\n\n#[ Hello ]\n\nSome body text.\n";
+        let src = "@meta{title: Hello}\n\n#[ Hello ]\n\nSome body text.\n";
         let mut config = PrinterConfig::default();
         config.meta_fields.insert(
             "id".to_string(),
@@ -735,13 +735,13 @@ mod tests {
 
     #[test]
     fn raw_content_is_preserved_losslessly() {
-        let src = "#memo+++\nline one  \n\nline two\n+++\n";
+        let src = "@memo+++\nline one  \n\nline two\n+++\n";
         assert_eq!(format_source(src), src);
     }
 
     #[test]
     fn codeblock_content_is_preserved_losslessly() {
-        let src = "#codeblock(lang:rust)[\nfn foo() {\n    let a = 1;  \n\n    let b = 2;\n}\n]\n";
+        let src = "@codeblock(lang:rust)[\nfn foo() {\n    let a = 1;  \n\n    let b = 2;\n}\n]\n";
         assert_eq!(format_source(src), src);
     }
 
@@ -753,8 +753,8 @@ mod tests {
 
     #[test]
     fn quotes_bare_at_led_yaml_values_so_the_document_parses() {
-        let src = "#meta(format:yaml)+++\nprevious: @link(ref:x)\nnext: @link(ref:y)\nparent: [@link(ref:z), @link(ref:w)]\n+++\n";
-        let expected = "#meta(format:yaml)+++\nprevious: \"@link(ref:x)\"\nnext: \"@link(ref:y)\"\nparent: [\"@link(ref:z)\", \"@link(ref:w)\"]\n+++\n";
+        let src = "@meta(format:yaml)+++\nprevious: @link(ref:x)\nnext: @link(ref:y)\nparent: [@link(ref:z), @link(ref:w)]\n+++\n";
+        let expected = "@meta(format:yaml)+++\nprevious: \"@link(ref:x)\"\nnext: \"@link(ref:y)\"\nparent: [\"@link(ref:z)\", \"@link(ref:w)\"]\n+++\n";
         let out = format_source(src);
         assert_eq!(out, expected);
         tomet_parser::parse_document(&out)
@@ -764,7 +764,7 @@ mod tests {
     #[test]
     fn quote_bare_at_yaml_values_handles_block_list_items() {
         let src =
-            "#meta(format:yaml)+++\nrefs:\n  - @link(ref:x)\n  - already \"@link(ref:y)\"\n+++\n";
+            "@meta(format:yaml)+++\nrefs:\n  - @link(ref:x)\n  - already \"@link(ref:y)\"\n+++\n";
         let out = format_source(src);
         assert!(out.contains("- \"@link(ref:x)\""));
         assert!(
@@ -776,13 +776,13 @@ mod tests {
     #[test]
     fn quote_bare_at_yaml_values_leaves_already_quoted_and_unrelated_content_alone() {
         let src =
-            "#meta(format:yaml)+++\nprevious: \"@link(ref:x)\"\n+++\n\n@link(ref:x)[some text]\n";
+            "@meta(format:yaml)+++\nprevious: \"@link(ref:x)\"\n+++\n\n@link(ref:x)[some text]\n";
         assert_eq!(format_source(src), src);
     }
 
     #[test]
     fn quote_bare_at_yaml_values_is_idempotent() {
-        let src = "#meta(format:yaml)+++\nprevious: @link(ref:x)\n+++\n";
+        let src = "@meta(format:yaml)+++\nprevious: @link(ref:x)\n+++\n";
         let once = format_source(src);
         let twice = format_source(&once);
         assert_eq!(once, twice);
@@ -790,7 +790,7 @@ mod tests {
 
     #[test]
     fn test_format_tables_with_config_left_align() {
-        let src = "#table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p @br(2+6) ]\n]\n";
+        let src = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p @br(2+6) ]\n]\n";
         let mut config = PrinterConfig::default();
         config.table_adjust_width = Some("auto".to_string());
         config.table_max_col_width = Some(20);
@@ -803,7 +803,7 @@ mod tests {
 
     #[test]
     fn test_format_tables_with_config_right_align() {
-        let src = "#table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p @br(2+6) ]\n]\n";
+        let src = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p @br(2+6) ]\n]\n";
         let mut config = PrinterConfig::default();
         config.table_adjust_width = Some("auto".to_string());
         config.table_max_col_width = Some(20);
@@ -816,7 +816,7 @@ mod tests {
 
     #[test]
     fn test_format_tables_with_config_center_align() {
-        let src = "#table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p @br(2+6) ]\n]\n";
+        let src = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p @br(2+6) ]\n]\n";
         let mut config = PrinterConfig::default();
         config.table_adjust_width = Some("auto".to_string());
         config.table_max_col_width = Some(20);
@@ -829,7 +829,7 @@ mod tests {
 
     #[test]
     fn test_format_tables_with_per_table_align_arg() {
-        let src = "#table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
+        let src = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
         let mut config = PrinterConfig::default();
         config.table_adjust_width = Some("auto".to_string());
         config.table_max_col_width = Some(20);
@@ -841,7 +841,7 @@ mod tests {
 
     #[test]
     fn test_format_tables_unicode_superscript_and_cjk_width() {
-        let src = "#table(align: [right])[\n[ 電子数 2n² ]\n[ 2 ]\n]\n";
+        let src = "@table(align: [right])[\n[ 電子数 2n² ]\n[ 2 ]\n]\n";
         let mut config = PrinterConfig::default();
         config.table_adjust_width = Some("auto".to_string());
         config.table_max_col_width = Some(20);

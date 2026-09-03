@@ -64,8 +64,8 @@ const CASES: &[Case] = &[
     Case {
         label: "`#codeblock`'s content is not parsed differently from any \
                 other element's (was codeblock.rs `is_codeblock`)",
-        known: "#codeblock[ *a* ]",
-        unknown: "#zzz[ *a* ]",
+        known: "@codeblock[ *a* ]",
+        unknown: "@zzz[ *a* ]",
         known_ident: "codeblock",
         unknown_ident: "zzz",
         kind: Ident::ElementName,
@@ -73,8 +73,8 @@ const CASES: &[Case] = &[
     Case {
         label: "`(content:raw)` is an ordinary argument and does not switch \
                 `[...]` to verbatim (was codeblock.rs `is_verbatim_content`)",
-        known: "#memo(content:raw)[ *a* ]",
-        unknown: "#memo(zcontent:raw)[ *a* ]",
+        known: "@memo(content:raw)[ *a* ]",
+        unknown: "@memo(zcontent:raw)[ *a* ]",
         known_ident: "content",
         unknown_ident: "zcontent",
         kind: Ident::ArgKey,
@@ -82,8 +82,8 @@ const CASES: &[Case] = &[
     Case {
         label: "`(format:json)` does not change how a `+++` fence is lexed \
                 (was element.rs `local_format_key`)",
-        known: "#x(format:json)+++\n{\"a\": 1}\n+++\n",
-        unknown: "#x(zformat:json)+++\n{\"a\": 1}\n+++\n",
+        known: "@x(format:json)+++\n{\"a\": 1}\n+++\n",
+        unknown: "@x(zformat:json)+++\n{\"a\": 1}\n+++\n",
         known_ident: "format",
         unknown_ident: "zformat",
         kind: Ident::ArgKey,
@@ -94,8 +94,8 @@ const CASES: &[Case] = &[
         // `~` is the probe: read as YAML it is null, read by Tomet's own
         // value grammar it is the string "~". `a: 1` would have parsed
         // identically either way and quietly passed.
-        known: "#meta(yaml){ a: ~ }",
-        unknown: "#zzz(yaml){ a: ~ }",
+        known: "@meta(yaml){ a: ~ }",
+        unknown: "@zzz(yaml){ a: ~ }",
         known_ident: "meta",
         unknown_ident: "zzz",
         kind: Ident::ElementName,
@@ -103,16 +103,16 @@ const CASES: &[Case] = &[
     Case {
         label: "`#config` sets no document-wide lexing mode \
                 (was element.rs `is_config`, threaded as `running_format`)",
-        known: "#config(format:json)+++\n{\"a\": 1}\n+++\n\n#x{ b: 2 }\n",
-        unknown: "#zzz(format:json)+++\n{\"a\": 1}\n+++\n\n#x{ b: 2 }\n",
+        known: "@config(format:json)+++\n{\"a\": 1}\n+++\n\n@x{ b: 2 }\n",
+        unknown: "@zzz(format:json)+++\n{\"a\": 1}\n+++\n\n@x{ b: 2 }\n",
         known_ident: "config",
         unknown_ident: "zzz",
         kind: Ident::ElementName,
     },
     Case {
         label: "a namespaced name is lexed exactly like a bare one",
-        known: "#deck.card(a:1)[ x ]",
-        unknown: "#zzz.card(a:1)[ x ]",
+        known: "@deck.card(a:1)[ x ]",
+        unknown: "@zzz.card(a:1)[ x ]",
         known_ident: "deck",
         unknown_ident: "zzz",
         kind: Ident::Namespace,
@@ -192,8 +192,8 @@ fn rename_namespace(el: &mut Element, ident: &str) {
 
 fn sigil_name_mut(sigil: &mut Sigil) -> Option<&mut Name> {
     match sigil {
-        Sigil::Block(name) => Some(name),
-        Sigil::Inline(name) => Some(name),
+        Sigil::Named(name) => Some(name),
+        Sigil::Named(name) => Some(name),
         Sigil::Bare | Sigil::Dollar => None,
     }
 }

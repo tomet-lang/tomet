@@ -92,7 +92,7 @@ impl fmt::Display for ValidationError {
                     f,
                     "unknown element `{name}`: bare names are reserved for built-in \
                      elements; namespace it (`ns.{name}`) or bind a namespace with \
-                     `#import(file:..., as:ns)`"
+                     `@import(file:..., as:ns)`"
                 )
             }
             ValidationError::ShapeMismatch {

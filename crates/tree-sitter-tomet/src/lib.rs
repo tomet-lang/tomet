@@ -346,8 +346,8 @@ mod tests {
     #[test]
     fn parses_elements_with_all_group_kinds() {
         for src in [
-            "#caution[ be careful ]\n",
-            "#input(name:email, type:email){status:required}\n",
+            "@caution[ be careful ]\n",
+            "@input(name:email, type:email){status:required}\n",
             "@(url:https://example.com)[Wiki]\n",
             "@embed(file:assets/pic.png)[alt text]\n",
         ] {
@@ -363,9 +363,9 @@ mod tests {
     fn parses_colon_connect_syntax() {
         for src in [
             "#[ Title ]:{ id: intro, tag: main }\n",
-            "#task[ Task A ]:{ id: taskA, priority: high }\n",
-            "#id(taskA):{ priority: high, tag: dev }\n",
-            "#id([taskA, taskB]):{ tag: house }\n",
+            "@task[ Task A ]:{ id: taskA, priority: high }\n",
+            "@id(taskA):{ priority: high, tag: dev }\n",
+            "@id([taskA, taskB]):{ tag: house }\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -406,7 +406,7 @@ mod tests {
             "@foo(yaml)\n",
             "@foo(json)\n",
             "@foo(toml)\n",
-            "#input{required}\n",
+            "@input{required}\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -441,7 +441,7 @@ mod tests {
         // space before `hello` on purpose -- see `scanner.c`'s comment on
         // why this scanner only engages when the identifier-shaped run
         // starts immediately at the current lex position.
-        let src = "#input{hello world}\n";
+        let src = "@input{hello world}\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
         let scalar = find_kind(tree.root_node(), "scalar").expect("expected a scalar node");
@@ -457,7 +457,7 @@ mod tests {
         // different, pre-existing limitation unrelated to this one (see
         // this module's doc comment), confirmed to already reproduce with
         // this exact source on the grammar from before `scanner.c` existed.
-        let tree = parse("#meta(format:json)+++\nkey:value\n+++\n");
+        let tree = parse("@meta(format:json)+++\nkey:value\n+++\n");
         assert!(!tree.root_node().has_error());
     }
 
@@ -501,17 +501,17 @@ mod tests {
         // whitespace between an element and its first group caused the
         // element to parse with zero groups and the group's own text to
         // fall out as unrelated paragraph content.
-        let tree = parse("#links {\n  (1)[ note ]\n  (anotation1)[ note2 ]\n}\n");
+        let tree = parse("@links {\n  (1)[ note ]\n  (anotation1)[ note2 ]\n}\n");
         let root = tree.root_node();
         let element = root.child(0).unwrap().child(0).unwrap();
         assert_eq!(element.kind(), "element");
-        let block_element = element
+        let inline_element = element
             .child(0)
-            .expect("expected element to wrap a block_element");
-        assert_eq!(block_element.kind(), "block_element");
-        let value_group = block_element
+            .expect("expected element to wrap an inline_element");
+        assert_eq!(inline_element.kind(), "inline_element");
+        let value_group = inline_element
             .named_child(1)
-            .expect("expected a value_group as the block_element's second named child");
+            .expect("expected a value_group as the element's second named child");
         assert_eq!(value_group.kind(), "value_group");
         let children = value_group
             .named_child(0)
@@ -560,7 +560,7 @@ mod tests {
 
     #[test]
     fn parses_single_quoted_strings() {
-        let src = "#settings(title: 'my title') { path: 'foo/bar' }\n";
+        let src = "@settings(title: 'my title') { path: 'foo/bar' }\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
         assert!(find_kind(tree.root_node(), "string").is_some());
@@ -568,7 +568,7 @@ mod tests {
 
     #[test]
     fn parses_colon_less_braced_maps() {
-        let src = "#settings {\n  elements {\n    bookmark {\n      title: { type: string }\n    }\n  }\n}\n";
+        let src = "@settings {\n  elements {\n    bookmark {\n      title: { type: string }\n    }\n  }\n}\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
     }
@@ -584,7 +584,7 @@ mod tests {
         // enclosing block into an `ERROR` that swallowed everything after
         // it too.
         let src =
-            "#meta(format:yaml)+++\nid: doc-1\nflags:\nrating:\nreviewed:\ntype: j.daily\n+++\n";
+            "@meta(format:yaml)+++\nid: doc-1\nflags:\nrating:\nreviewed:\ntype: j.daily\n+++\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
     }
@@ -599,9 +599,9 @@ mod tests {
         // the broader one found while fixing it (an earlier, non-last
         // `[seq]`-valued entry, still followed by more entries).
         for src in [
-            "#meta(format:yaml)+++\naliases: []\n+++\n",
-            "#meta(format:yaml)+++\naliases: []\nflags: x\n+++\n",
-            "#meta(format:yaml)+++\naliases: [a, b]\nflags: x\n+++\n",
+            "@meta(format:yaml)+++\naliases: []\n+++\n",
+            "@meta(format:yaml)+++\naliases: []\nflags: x\n+++\n",
+            "@meta(format:yaml)+++\naliases: [a, b]\nflags: x\n+++\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -618,7 +618,7 @@ mod tests {
         // whitespace, or multi-word bare values would break, and the tail
         // must still allow colons (URLs, timestamps).
         let src =
-            "#meta(format:yaml)+++\na: hello world\nb: 12:34\nc: https://example.com/x\n+++\n";
+            "@meta(format:yaml)+++\na: hello world\nb: 12:34\nc: https://example.com/x\n+++\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
     }

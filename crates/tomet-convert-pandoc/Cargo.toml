@@ -1,0 +1,17 @@
+[package]
+name = "tomet-pandoc"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-tree = { workspace = true }
+
+#[ Crates.io ]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }
+tomet-printer = { workspace = true }

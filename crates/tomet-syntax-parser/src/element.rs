@@ -1,4 +1,4 @@
-//! Parsing for typed elements (`<T>`, `@name`, bare elements, colon connect syntax).
+//! Parsing for elements (`@name`, bare elements, colon connect syntax).
 
 use crate::error::Result;
 use crate::fence::{is_fence_start, parse_fence};
@@ -12,13 +12,25 @@ use tomet_ast::{Element, ElementValue, Entry, Inline, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::element_new;
 
-/// Whether `cur` starts an inline element (`@name`, or a bare `@`).
+/// Whether `cur` starts an element (`@name`).
 ///
-/// An `@` only introduces an element when a group or a `:` connect
-/// follows. That is what keeps `me@example.com` and a lone `@foo` in prose
-/// as plain text, and it is the same fall-back-to-text rule `#` uses
-/// below.
-pub(crate) fn is_inline_element_start(cur: &Cursor) -> bool {
+/// `block_context` is whether the cursor sits where a block may begin --
+/// the document's top level, or a line start inside another element's
+/// `[content]`. It only widens what may follow the name, never the sigil
+/// or the name itself:
+///
+/// - anywhere: a group (`(`, `[`, `{`), a `:` connect, or a `+++` fence
+///   must follow. This is what keeps `me@example.com` and a lone `@foo`
+///   in running prose as plain text.
+/// - in block context only: end-of-line also counts, so `@memo` alone on
+///   its line is an element. It then fails later, in `tomet-semantics`,
+///   as an unknown bare name -- the intended report, and the reason no
+///   hashtag-style syntax exists.
+///
+/// The old `#name` spelling had the end-of-line allowance bound to the
+/// sigil rather than to the position. There is one element sigil now, so
+/// the allowance belongs to the position.
+pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
     let mut look = *cur;
     if look.bump() != Some('@') {
         return false;
@@ -27,36 +39,44 @@ pub(crate) fn is_inline_element_start(cur: &Cursor) -> bool {
     // kind from an args key; that inference was retired in favour of the
     // one `@link(target:...)` element, but the syntax outlived it and
     // kept parsing into a meaningless `Custom("at")`. It is text now.
-    if eat_name(&mut look).is_none() {
+    if !is_name_start_at(&look) || eat_name(&mut look).is_none() {
         return false;
     }
-    skip_lookahead_gap(&mut look);
-    matches!(look.peek(), Some('(') | Some('[') | Some('{') | Some(':')) || is_fence_start(&look)
-}
-
-/// Whether `cur` starts a block element (`#name`).
-///
-/// The name must follow the `#` run immediately -- no space. `# heading`
-/// therefore stays prose, which is what keeps Markdown-style headings and
-/// shell/YAML comments inside the docs from being reinterpreted.
-///
-/// Unlike `@`, a block element may also be followed by nothing at all: a
-/// `#name` alone on its line is an element. It then fails later, in
-/// `tomet-semantics`, as an unknown bare name -- which is the intended
-/// report, and the reason no hashtag syntax is being introduced.
-pub(crate) fn is_block_element_start(cur: &Cursor) -> bool {
-    let mut look = *cur;
-    if look.bump() != Some('#') {
-        return false;
-    }
-    if !is_name_start_at(&look) {
-        return false;
-    }
-    let _ = eat_name(&mut look);
     skip_lookahead_gap(&mut look);
     matches!(look.peek(), Some('(') | Some('[') | Some('{') | Some(':'))
         || is_fence_start(&look)
-        || matches!(look.peek(), None | Some('\n') | Some('\r'))
+        || (block_context && matches!(look.peek(), None | Some('\n') | Some('\r')))
+}
+
+/// Whether the element starting at `cur` ends its line.
+///
+/// The second half of the placement rule: an element in block context is a
+/// block only if nothing but inline whitespace and comments follows it
+/// before the line break. `@link(…)[Tomet] は…` therefore opens a
+/// paragraph instead of being torn out of one.
+///
+/// The element is parsed speculatively on a copy of the cursor and the
+/// copy is thrown away -- the same probe `eat_list_marker_with_indent`
+/// uses for a list marker's `(...)` form.
+pub(crate) fn element_ends_line(cur: &Cursor) -> bool {
+    let mut probe = *cur;
+    if parse_element(&mut probe, true).is_err() {
+        return false;
+    }
+    skip_inline_ws(&mut probe);
+    while probe.starts_with("//") || probe.starts_with("/*") {
+        if probe.starts_with("//") {
+            skip_line_comment(&mut probe);
+        } else if skip_block_comment(&mut probe).is_err() {
+            return false;
+        }
+        skip_inline_ws(&mut probe);
+    }
+    // A `+++` fence swallows its own closing line, newline included, so
+    // the probe can already sit at the start of the *next* line. That
+    // still means the element ended its line.
+    matches!(probe.peek(), None | Some('\n') | Some('\r'))
+        || probe.src()[..probe.pos()].ends_with(['\n', '\r'])
 }
 
 fn skip_element_gap(cur: &mut Cursor) -> u8 {
@@ -119,20 +139,12 @@ fn skip_lookahead_gap(cur: &mut Cursor) {
 /// exactly as before there.
 pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Result<Element> {
     let start_pos = cur.pos();
-    let sigil = if cur.peek() == Some('#') {
-        cur.bump();
-        match eat_name(cur) {
-            Some(name) => Sigil::Block(name),
-            None => return Err(err(cur, cur.pos(), "expected an element name after '#'")),
-        }
-    } else {
-        if !cur.eat_str("@") {
-            return Err(err(cur, cur.pos(), "expected '@'"));
-        }
-        match eat_name(cur) {
-            Some(name) => Sigil::Inline(name),
-            None => return Err(err(cur, cur.pos(), "expected an element name after '@'")),
-        }
+    if !cur.eat_str("@") {
+        return Err(err(cur, cur.pos(), "expected '@'"));
+    }
+    let sigil = match eat_name(cur) {
+        Some(name) => Sigil::Named(name),
+        None => return Err(err(cur, cur.pos(), "expected an element name after '@'")),
     };
 
     let mut el = element_new(sigil);
@@ -233,13 +245,13 @@ fn parse_content(cur: &mut Cursor) -> Result<Vec<Inline>> {
 /// `{}` is always data: entries are read uniformly, each either a
 /// `key: value` pair or a nested element, in source order. Nothing here
 /// consults the enclosing element's name -- which is what lets
-/// `#links{ (1)[a] note:x (2)[b] }` parse at all. It previously either
+/// `@links{ (1)[a] note:x (2)[b] }` parse at all. It previously either
 /// errored or, worse, swallowed the elements into a scalar string,
 /// depending on which came first.
 ///
 /// A non-map body (`{[1,2,3]}`, `{"str"}`, `{bare}`) is rejected. Those had
 /// no uniform-entry spelling, and the `+++` fence now covers the case they
-/// served -- `#meta(format:json)+++ [1,2,3] +++`.
+/// served -- `@meta(format:json)+++ [1,2,3] +++`.
 pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
     let group_start = cur.pos();
     if !cur.eat_str("{") {

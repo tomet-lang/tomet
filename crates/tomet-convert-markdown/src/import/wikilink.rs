@@ -119,7 +119,7 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                     }
                 }
                 let url_str = &remaining[u_start..u_end];
-                let mut el = element_new(Sigil::inline("link"));
+                let mut el = element_new(Sigil::named("link"));
                 el.args = Some(Value::Map(vec![(
                     "target".to_string(),
                     Value::String(url_str.to_string()),
@@ -139,7 +139,7 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                         }
                     }
                     let url_str = &remaining[u_start..u_end];
-                    let mut el = element_new(Sigil::inline("link"));
+                    let mut el = element_new(Sigil::named("link"));
                     el.args = Some(Value::Map(vec![(
                         "target".to_string(),
                         Value::String(url_str.to_string()),
@@ -185,9 +185,9 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
         // wikilink-style, search-by-name reference rather than a plain
         // relative file path.
         let sigil = if is_embed {
-            Sigil::block("embed")
+            Sigil::named("embed")
         } else {
-            Sigil::inline("link")
+            Sigil::named("link")
         };
         let target_key_value = |raw: &str| -> String {
             if is_embed {

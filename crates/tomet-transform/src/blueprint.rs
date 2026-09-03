@@ -80,7 +80,7 @@ pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> boo
                     _ => "unknown".to_string(),
                 };
 
-                el.sigil = Sigil::block("kind");
+                el.sigil = Sigil::named("kind");
                 el.args = Some(Value::String(target_kind));
                 el.value = None;
                 changed = true;
@@ -269,7 +269,7 @@ mod tests {
 
     #[test]
     fn extracts_blueprint_info() {
-        let src = "#blueprint(daily-note){\n  description: \"Daily note\"\n  vars: {\n    author: \"Alice\"\n  }\n}\n\n#[ Plan ] {id: plan}\n";
+        let src = "@blueprint(daily-note){\n  description: \"Daily note\"\n  vars: {\n    author: \"Alice\"\n  }\n}\n\n#[ Plan ] {id: plan}\n";
         let doc = tomet_parser::parse_document(src).unwrap();
         let info = extract_blueprint_info(&doc).unwrap();
         assert_eq!(info.target_kind, "daily-note");
@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn instantiates_blueprint_to_kind_and_evaluates_interp() {
-        let src = "#blueprint(daily-note)\n#meta{\n  id: ${uuid(\"nil\")}\n  date: ${date(\"YYYY-MM-DD\")}\n  title: ${vars.title}\n}\n\n#[ Plan for ${vars.title} ] {id: plan}\n";
+        let src = "@blueprint(daily-note)\n@meta{\n  id: ${uuid(\"nil\")}\n  date: ${date(\"YYYY-MM-DD\")}\n  title: ${vars.title}\n}\n\n#[ Plan for ${vars.title} ] {id: plan}\n";
         let mut doc = tomet_parser::parse_document(src).unwrap();
 
         let mut vars = HashMap::new();

@@ -1,9 +1,9 @@
 #[ 全容 ]
 
 ```tm
-#config(import:@target)
+@config(import:@target)
 
-#config(format:json)+++
+@config(format:json)+++
 elements = {
   example = {
     args = {

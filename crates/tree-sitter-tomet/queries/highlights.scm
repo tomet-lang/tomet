@@ -59,9 +59,8 @@
 ; `heading_marker` above.
 (list_marker) @markup.list.marker @constant
 
-; `#name`/`@name` element sigils and their name. `block_sigil` is one
-; token covering the `#` and the name together -- see `grammar.js`.
-(block_element name: (block_sigil) @tag)
+; The `@name` element sigil and its name. There is one element sigil
+; whatever the element's placement -- see `grammar.js`.
 (inline_element "@" @tag)
 (inline_element name: (identifier) @tag)
 

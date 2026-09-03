@@ -1,4 +1,4 @@
-use tomet_ast::{Element, Name, Sigil};
+use tomet_ast::{Element, Name, Placement, Sigil};
 
 /// What a parsed `Element` officially means, replacing the ad-hoc
 /// stringly-typed `kind: String` that `tomet-html` and
@@ -16,14 +16,14 @@ pub enum ElementKind {
     Version,
     Meta,
     Config,
-    /// `#settings{...}` -- the schema/config block. Not previously in
+    /// `@settings{...}` -- the schema/config block. Not previously in
     /// `BUILTIN_KINDS` despite three places matching it by raw string; a
     /// bare name has to be built-in now, so it is listed properly.
     Settings,
-    /// `#import(file:..., as:ns)` -- binds a namespace. The binding is
+    /// `@import(file:..., as:ns)` -- binds a namespace. The binding is
     /// resolved by `tomet-resolver`; this only recognizes the element.
     Import,
-    /// `#references[...]` -- the container for remote connections.
+    /// `@references[...]` -- the container for remote connections.
     References,
     Blueprint,
     Links,
@@ -184,7 +184,7 @@ impl std::fmt::Display for UnknownName {
         write!(
             f,
             "unknown element `{}`: bare names are reserved for built-in elements; \
-             namespace it (`ns.{}`) or bind a namespace with `#import(file:..., as:ns)`",
+             namespace it (`ns.{}`) or bind a namespace with `@import(file:..., as:ns)`",
             self.name, self.name
         )
     }
@@ -195,20 +195,18 @@ impl std::error::Error for UnknownName {}
 /// Classifies `el` by its `Sigil`.
 ///
 /// `Sigil::Bare` is `ElementKind::Bare`, `Sigil::Dollar` is
-/// `ElementKind::Interp`, and a nameless inline `@` is `Custom("at")`.
-/// Everything else goes through [`classify_name`].
+/// `ElementKind::Interp`. Everything else goes through [`classify_name`].
 ///
-/// The sigil itself no longer contributes to the *kind* -- it encodes
-/// shape (`@` inline, `#` block), and a shape that disagrees with the
-/// element's definition is reported separately by [`shape_mismatch`]
-/// rather than producing a different kind.
+/// The name is all the sigil carries. Where the element sits is
+/// `Element::placement`, and a placement that disagrees with the kind's
+/// definition is reported separately by [`shape_mismatch`].
 ///
 /// No inference from `args` happens here -- `@(url:...)`-style key-based
 /// guessing was retired; the only way to get `ElementKind::Link` is to
 /// write `@link` explicitly.
 pub fn classify(el: &Element) -> Result<ElementKind, UnknownName> {
     match &el.sigil {
-        Sigil::Block(name) | Sigil::Inline(name) => classify_name(name),
+        Sigil::Named(name) => classify_name(name),
         Sigil::Bare => Ok(ElementKind::Bare),
         Sigil::Dollar => Ok(ElementKind::Interp),
     }
@@ -223,7 +221,26 @@ pub fn classify_lenient(el: &Element) -> ElementKind {
     classify(el).unwrap_or_else(|e| ElementKind::Custom(e.name))
 }
 
-/// The shape a built-in element must be written with.
+/// Whether a kind is a directive -- an element that configures or
+/// annotates the document and has no rendering of its own.
+///
+/// Every writer needs this and each used to keep its own copy of the
+/// list, which is how `settings` and `import` came to be missing from all
+/// three of them: they joined [`BUILTIN_KINDS`] after those lists were
+/// written, so `@settings(file:...)` exported as a stray `<div>`.
+pub fn is_directive(kind: &ElementKind) -> bool {
+    use ElementKind::*;
+    matches!(
+        kind,
+        Version | Kind | Meta | Config | Settings | Import | Blueprint
+    )
+}
+
+/// The shape a built-in element must take.
+///
+/// This table is the only place shape lives. The surface syntax does not
+/// carry it: an element is spelled `@name` wherever it appears, and the
+/// parser decides placement from position without consulting this.
 ///
 /// `None` means either shape is legal.
 fn required_shape(kind: &ElementKind) -> Option<Shape> {
@@ -238,24 +255,36 @@ fn required_shape(kind: &ElementKind) -> Option<Shape> {
     })
 }
 
-/// Whether an element is written inline (`@`) or as a block (`#`).
+/// Whether an element stands on its own or belongs to running text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
     Block,
     Inline,
 }
 
-/// Reports an element written with the wrong sigil for its kind -- a
-/// block-only element spelled `@meta`, or an inline-only one spelled
-/// `#em`.
+impl From<Placement> for Shape {
+    fn from(placement: Placement) -> Self {
+        match placement {
+            Placement::Block => Shape::Block,
+            Placement::Inline => Shape::Inline,
+        }
+    }
+}
+
+/// Reports an element put where its kind cannot go -- a `meta` in the
+/// middle of a paragraph, or a `heading` standing as a block inside one.
+///
+/// The comparison is between the element's *placement*, which the parser
+/// derived from position, and [`required_shape`]. It used to compare the
+/// author's sigil against the same table, which made the report about
+/// spelling (`#em`) rather than about the document.
 ///
 /// Returns `Some((found, expected))` when they disagree.
 pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {
-    let found = match &el.sigil {
-        Sigil::Block(_) => Shape::Block,
-        Sigil::Inline(_) => Shape::Inline,
-        Sigil::Bare | Sigil::Dollar => return None,
-    };
+    if matches!(el.sigil, Sigil::Bare | Sigil::Dollar) {
+        return None;
+    }
+    let found = Shape::from(el.placement);
     let kind = classify(el).ok()?;
     let expected = required_shape(&kind)?;
     (found != expected).then_some((found, expected))
@@ -265,7 +294,7 @@ pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {
 mod tests {
     use super::*;
     use tomet_ast::Value;
-    use tomet_tree::element_new;
+    use tomet_tree::{ElementExt, element_new};
 
     #[test]
     fn builtin_kind_round_trips_through_as_str() {
@@ -283,7 +312,7 @@ mod tests {
     fn unknown_bare_name_is_an_error() {
         // Bare names are reserved for the built-in vocabulary, so this is
         // the diagnostic that replaces the old silent `Custom` fallback.
-        let el = element_new(Sigil::block("caution"));
+        let el = element_new(Sigil::named("caution"));
         assert_eq!(
             classify(&el),
             Err(UnknownName {
@@ -294,7 +323,7 @@ mod tests {
 
     #[test]
     fn namespaced_name_is_custom() {
-        let el = element_new(Sigil::Block(Name::namespaced("deck", "caution")));
+        let el = element_new(Sigil::Named(Name::namespaced("deck", "caution")));
         assert_eq!(
             classify(&el),
             Ok(ElementKind::Custom("deck.caution".to_string()))
@@ -304,7 +333,7 @@ mod tests {
     #[test]
     fn namespacing_never_shadows_a_builtin() {
         // `deck.meta` is the user's element, not Tomet's `#meta`.
-        let el = element_new(Sigil::Block(Name::namespaced("deck", "meta")));
+        let el = element_new(Sigil::Named(Name::namespaced("deck", "meta")));
         assert_eq!(
             classify(&el),
             Ok(ElementKind::Custom("deck.meta".to_string()))
@@ -313,7 +342,7 @@ mod tests {
 
     #[test]
     fn classify_lenient_falls_back_for_an_unknown_bare_name() {
-        let el = element_new(Sigil::block("caution"));
+        let el = element_new(Sigil::named("caution"));
         assert_eq!(
             classify_lenient(&el),
             ElementKind::Custom("caution".to_string())
@@ -322,19 +351,19 @@ mod tests {
 
     #[test]
     fn type_sigil_with_builtin_name_is_recognized() {
-        let el = element_new(Sigil::block("codeblock"));
+        let el = element_new(Sigil::named("codeblock"));
         assert_eq!(classify_lenient(&el), ElementKind::Codeblock);
     }
 
     #[test]
     fn named_at_sigil_is_recognized() {
-        let el = element_new(Sigil::block("meta"));
+        let el = element_new(Sigil::named("meta"));
         assert_eq!(classify_lenient(&el), ElementKind::Meta);
     }
 
     #[test]
     fn named_at_sigil_with_link_name_is_recognized() {
-        let mut el = element_new(Sigil::inline("link"));
+        let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("https://example.com".to_string()),
@@ -343,27 +372,30 @@ mod tests {
     }
 
     #[test]
-    fn shape_mismatch_reports_a_block_element_written_inline() {
-        let el = element_new(Sigil::inline("meta"));
+    fn shape_mismatch_reports_a_block_element_put_in_running_text() {
+        let el = element_new(Sigil::named("meta")).with_placement(Placement::Inline);
         assert_eq!(shape_mismatch(&el), Some((Shape::Inline, Shape::Block)));
     }
 
     #[test]
-    fn shape_mismatch_reports_an_inline_element_written_as_a_block() {
-        let el = element_new(Sigil::block("em"));
+    fn shape_mismatch_reports_an_inline_element_standing_as_a_block() {
+        let el = element_new(Sigil::named("em")).with_placement(Placement::Block);
         assert_eq!(shape_mismatch(&el), Some((Shape::Block, Shape::Inline)));
     }
 
     #[test]
-    fn a_correctly_shaped_element_has_no_mismatch() {
-        assert_eq!(shape_mismatch(&element_new(Sigil::block("meta"))), None);
-        assert_eq!(shape_mismatch(&element_new(Sigil::inline("em"))), None);
+    fn a_correctly_placed_element_has_no_mismatch() {
+        let meta = element_new(Sigil::named("meta")).with_placement(Placement::Block);
+        let em = element_new(Sigil::named("em")).with_placement(Placement::Inline);
+        assert_eq!(shape_mismatch(&meta), None);
+        assert_eq!(shape_mismatch(&em), None);
     }
 
     #[test]
     fn a_custom_element_may_take_either_shape() {
-        let block = element_new(Sigil::Block(Name::namespaced("deck", "card")));
-        let inline = element_new(Sigil::Inline(Name::namespaced("deck", "card")));
+        let name = Name::namespaced("deck", "card");
+        let block = element_new(Sigil::Named(name.clone())).with_placement(Placement::Block);
+        let inline = element_new(Sigil::Named(name)).with_placement(Placement::Inline);
         assert_eq!(shape_mismatch(&block), None);
         assert_eq!(shape_mismatch(&inline), None);
     }

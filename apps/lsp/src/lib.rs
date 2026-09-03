@@ -488,8 +488,8 @@ fn table_hover(text: &str, pos: Position, el: &Element) -> Option<Hover> {
         }
         let line_str = lines[line_idx];
         let trimmed = line_str.trim();
-        // Skip the element's own head line (`#table[`, `#table(...)`, ...).
-        if trimmed.starts_with("#table") || trimmed.starts_with("@table") {
+        // Skip the element's own head line (`@table[`, `@table(...)`, ...).
+        if trimmed.starts_with("@table") || trimmed.starts_with("@table") {
             continue;
         }
         if trimmed == "]" || trimmed.starts_with("]{") || trimmed.starts_with("] ") {
@@ -682,8 +682,7 @@ fn is_web_url(s: &str) -> bool {
 
 fn sigil_display_name(sigil: &Sigil) -> String {
     match sigil {
-        Sigil::Block(name) => format!("#{name}"),
-        Sigil::Inline(name) => format!("@{name}"),
+        Sigil::Named(name) => format!("@{name}"),
         Sigil::Bare => "(bare)".to_string(),
         Sigil::Dollar => "${...}".to_string(),
     }
@@ -856,17 +855,31 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
     })
 }
 
-/// The shape a built-in kind must be written with, or `None` when either
-/// is legal.
+/// The shape a built-in kind must take, or `None` when either is legal.
 fn shape_of(kind: &ElementKind) -> Option<Shape> {
     let probe = tomet_tree::element_new(match kind {
         ElementKind::Custom(_) | ElementKind::Bare | ElementKind::Interp => return None,
-        other => tomet_ast::Sigil::block(other.as_str()),
-    });
+        other => tomet_ast::Sigil::named(other.as_str()),
+    })
+    .with_placement(tomet_ast::Placement::Block);
     match tomet_semantics::shape_mismatch(&probe) {
-        // Written as a block and reported as a mismatch -> it is inline.
+        // Placed as a block and reported as a mismatch -> it is inline.
         Some((_, expected)) => Some(expected),
         None => Some(Shape::Block),
+    }
+}
+
+/// Completion detail for a built-in: its description, plus where it may
+/// be placed when only one placement is legal.
+///
+/// Shape used to be visible in the completion's sigil (`#meta` vs
+/// `@link`). One sigil spells every element now, so the constraint that
+/// `required_shape` still enforces is said in words here instead.
+fn detail_for(name: &str, kind: &ElementKind) -> String {
+    match shape_of(kind) {
+        Some(Shape::Block) => format!("{} (block)", describe_kind(name)),
+        Some(Shape::Inline) => format!("{} (inline)", describe_kind(name)),
+        None => describe_kind(name).to_string(),
     }
 }
 
@@ -911,26 +924,17 @@ pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
     // which are not built-in at all, and omitted `link`/`embed`/`table`.
     // Bare names are reserved for exactly this set now, so offering a
     // non-builtin one would suggest something that fails to validate.
-    let sigil_for = |kind: &ElementKind| match shape_of(kind) {
-        Some(Shape::Inline) => '@',
-        _ => '#',
-    };
-
-    if prefix.ends_with('@') || prefix.ends_with('#') {
-        let wanted = if prefix.ends_with('@') {
-            Shape::Inline
-        } else {
-            Shape::Block
-        };
+    // Every element is spelled `@name`, whatever its shape. Shape decides
+    // where the element may be *placed*, not how it is spelled, so it is
+    // reported in the completion detail instead of splitting the list
+    // across two sigils.
+    if prefix.ends_with('@') {
         for (name, kind) in BUILTIN_KINDS.iter() {
-            if shape_of(kind) != Some(wanted) {
-                continue;
-            }
             items.push(CompletionItem {
                 label: name.to_string(),
                 insert_text: Some(name.to_string()),
                 kind: Some(CompletionItemKind::KEYWORD),
-                detail: Some(describe_kind(name).to_string()),
+                detail: Some(detail_for(name, kind)),
                 ..CompletionItem::default()
             });
         }
@@ -961,15 +965,13 @@ pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
         return items;
     }
 
-    // Unprefixed: offer every built-in with the sigil its shape requires,
-    // so an accepted completion is one that validates.
+    // Unprefixed: offer every built-in under the one element sigil.
     for (name, kind) in BUILTIN_KINDS.iter() {
-        let sigil = sigil_for(kind);
         items.push(CompletionItem {
-            label: format!("{sigil}{name}"),
-            insert_text: Some(format!("{sigil}{name}")),
+            label: format!("@{name}"),
+            insert_text: Some(format!("@{name}")),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some(describe_kind(name).to_string()),
+            detail: Some(detail_for(name, kind)),
             ..CompletionItem::default()
         });
     }
@@ -1044,7 +1046,7 @@ mod tests {
 
     #[test]
     fn invalid_document_reports_one_diagnostic() {
-        let diags = diagnostics_for("#caution[ unterminated\n");
+        let diags = diagnostics_for("@caution[ unterminated\n");
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].severity, Some(DiagnosticSeverity::ERROR));
         assert_eq!(diags[0].source.as_deref(), Some("tomet"));
@@ -1061,7 +1063,7 @@ mod tests {
 
     #[test]
     fn hover_returns_element_info() {
-        let text = "#callout(type: info)[ Message ]\n";
+        let text = "@callout(type: info)[ Message ]\n";
         let hover = hover_for(text, Position::new(0, 2), None).expect("hover found");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("callout"));
@@ -1072,11 +1074,11 @@ mod tests {
 
     #[test]
     fn document_symbols_returns_headings_and_elements() {
-        let text = "#[ Heading ]\n\n#info[ Note ]\n";
+        let text = "#[ Heading ]\n\n@info[ Note ]\n";
         let symbols = document_symbols_for(text);
         assert_eq!(symbols.len(), 2);
         assert_eq!(symbols[0].name, "# Heading");
-        assert_eq!(symbols[1].name, "#info");
+        assert_eq!(symbols[1].name, "@info");
     }
 
     #[test]
@@ -1093,7 +1095,7 @@ mod tests {
         assert!(!items.is_empty());
         // Each built-in is offered with the sigil its shape requires, so
         // an accepted completion is one that validates.
-        assert!(items.iter().any(|i| i.label == "#meta"));
+        assert!(items.iter().any(|i| i.label == "@meta"));
         assert!(items.iter().any(|i| i.label == "@link"));
         // `callout` is not built-in, so it is no longer suggested: a bare
         // name that is not built-in is an error now.
@@ -1102,15 +1104,22 @@ mod tests {
 
     #[test]
     fn completions_trigger_prefix() {
-        // `@` is the inline sigil, so only inline-shaped built-ins.
+        // One sigil, so `@` offers every built-in whatever its shape.
+        // Where each may be placed is said in the detail line instead.
         let at_items = completions_for("@", Position::new(0, 1));
         assert!(at_items.iter().any(|i| i.label == "link"));
-        assert!(!at_items.iter().any(|i| i.label == "config"));
+        assert!(at_items.iter().any(|i| i.label == "config"));
+        let config = at_items.iter().find(|i| i.label == "config").unwrap();
+        assert!(config.detail.as_deref().unwrap().ends_with("(block)"));
+        let link = at_items.iter().find(|i| i.label == "link").unwrap();
+        assert!(link.detail.as_deref().unwrap().ends_with("(inline)"));
 
-        // `#` is the block sigil.
-        let hash_items = completions_for("#", Position::new(0, 1));
-        assert!(hash_items.iter().any(|i| i.label == "config"));
-        assert!(!hash_items.iter().any(|i| i.label == "link"));
+        // `#` is the heading marker and offers no elements.
+        assert!(
+            completions_for("#", Position::new(0, 1))
+                .iter()
+                .all(|i| { i.label != "config" && i.label != "link" })
+        );
 
         let interp_items = completions_for("${", Position::new(0, 2));
         assert!(interp_items.iter().any(|i| i.label == "add(...)"));
@@ -1129,7 +1138,7 @@ mod tests {
 
     #[test]
     fn format_edits_formats_tables() {
-        let text = "#table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
+        let text = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
         let edits = format_edits(text, None);
         assert_eq!(edits.len(), 1);
         assert!(
@@ -1141,7 +1150,7 @@ mod tests {
 
     #[test]
     fn hover_on_table_header_cell() {
-        let text = "#table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
+        let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
         // Position on line 1, inside "[ 電子数 2n² ]" (e.g. character 25)
         let hover =
             hover_for(text, Position::new(1, 25), None).expect("hover found for table header");
@@ -1158,7 +1167,7 @@ mod tests {
 
     #[test]
     fn hover_on_table_data_cell() {
-        let text = "#table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
+        let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
         // Position on line 2, inside "[ 2 ]" (column 3, character 15)
         let hover =
             hover_for(text, Position::new(2, 15), None).expect("hover found for table data cell");
@@ -1175,7 +1184,7 @@ mod tests {
 
     #[test]
     fn hover_on_table_overview() {
-        let text = "#table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
+        let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
         let hover =
             hover_for(text, Position::new(0, 2), None).expect("hover found for table overview");
         if let HoverContents::Markup(m) = hover.contents {
@@ -1206,7 +1215,7 @@ mod tests {
 
     #[test]
     fn hover_on_macro_evaluation() {
-        let text = "#config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n\n$gh(42)\n\n$greet(\"Alice\", \"Bob\")\n\n${copyright}\n\n$emoji(\"sparkles\")\n";
+        let text = "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n\n$gh(42)\n\n$greet(\"Alice\", \"Bob\")\n\n${copyright}\n\n$emoji(\"sparkles\")\n";
 
         // Hover on $gh(42) (line 8, char 2)
         let hover = hover_for(text, Position::new(8, 2), None).expect("hover found for $gh");
@@ -1275,14 +1284,14 @@ mod tests {
         let config_path = dir.join("default.config.tmt");
         std::fs::write(
             &config_path,
-            "#config(format:json)+++\n{\n  \"macros\": {\n    \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n+++\n",
+            "@config(format:json)+++\n{\n  \"macros\": {\n    \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n+++\n",
         )
         .unwrap();
 
         let doc_path = dir.join("sub/note.tmt");
         std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
         let doc_text =
-            "#settings(file:\"file:default.config.tmt\")\n\n$youtube_video(\"Pm_h6FnF8HU\")\n";
+            "@settings(file:\"file:default.config.tmt\")\n\n$youtube_video(\"Pm_h6FnF8HU\")\n";
         let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
 
         let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
@@ -1298,7 +1307,7 @@ mod tests {
         }
 
         // Test embed with macro
-        let embed_doc = "#settings(file:\"file:default.config.tmt\")\n\n@embed($youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n";
+        let embed_doc = "@settings(file:\"file:default.config.tmt\")\n\n@embed($youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n";
         let hover2 = hover_for(embed_doc, Position::new(2, 10), Some(&uri))
             .expect("hover found for embed macro");
         if let HoverContents::Markup(m) = hover2.contents {
@@ -1329,7 +1338,7 @@ mod tests {
         let config_path = dir.join("default.config.tmt");
         std::fs::write(
             &config_path,
-            "#config(format:json)+++\n{\n  \"macros\": {\n    \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\",\n    \"twitter_post\": \"https://x.com/${1}/status/${2}\"\n  }\n}\n+++\n",
+            "@config(format:json)+++\n{\n  \"macros\": {\n    \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\",\n    \"twitter_post\": \"https://x.com/${1}/status/${2}\"\n  }\n}\n+++\n",
         )
         .unwrap();
 
@@ -1384,16 +1393,16 @@ mod tests {
         let config_path = dir.join("custom.config.tmt");
         std::fs::write(
             &config_path,
-            "#config{\n  macros: {\n    wiki: \"https://ja.wikipedia.org/wiki/${1}\"\n  }\n}\n",
+            "@config{\n  macros: {\n    wiki: \"https://ja.wikipedia.org/wiki/${1}\"\n  }\n}\n",
         )
         .unwrap();
 
         let doc_path = dir.join("note.tmt");
-        let doc_text = "#config(import: \"custom.config.tmt\")\n\n$wiki(\"Rust\")\n";
+        let doc_text = "@config(import: \"custom.config.tmt\")\n\n$wiki(\"Rust\")\n";
         let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
 
         let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
-            .expect("hover found for #config(import:...) macro");
+            .expect("hover found for @config(import:...) macro");
         if let HoverContents::Markup(m) = hover.contents {
             assert!(m.value.contains("Macro Result"));
             assert!(m.value.contains("https://ja.wikipedia.org/wiki/Rust"));
@@ -1406,7 +1415,7 @@ mod tests {
 
     #[test]
     fn hover_on_kind_and_version() {
-        let doc_text = "#version(1.0)\n#kind(j.daily)\n\n#[ Title ]\n";
+        let doc_text = "@version(1.0)\n@kind(j.daily)\n\n#[ Title ]\n";
         let hover_ver =
             hover_for(doc_text, Position::new(0, 3), None).expect("hover found for #version");
         if let HoverContents::Markup(m) = hover_ver.contents {
@@ -1428,8 +1437,9 @@ mod tests {
 
     #[test]
     fn completions_suggest_kind_and_version() {
-        // `kind` and `version` are block directives.
-        let items = completions_for("#", Position::new(0, 1));
+        // `kind` and `version` are block directives, offered under the one
+        // element sigil like everything else.
+        let items = completions_for("@", Position::new(0, 1));
         assert!(items.iter().any(|i| i.label == "kind"));
         assert!(items.iter().any(|i| i.label == "version"));
     }

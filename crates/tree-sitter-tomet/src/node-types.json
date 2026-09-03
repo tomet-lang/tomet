@@ -34,44 +34,6 @@
     }
   },
   {
-    "type": "block_element",
-    "named": true,
-    "fields": {
-      "name": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "block_sigil",
-            "named": true
-          }
-        ]
-      }
-    },
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "args_group",
-          "named": true
-        },
-        {
-          "type": "content_group",
-          "named": true
-        },
-        {
-          "type": "raw_fence",
-          "named": true
-        },
-        {
-          "type": "value_group",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "braced_map",
     "named": true,
     "fields": {},
@@ -200,10 +162,6 @@
       "multiple": false,
       "required": true,
       "types": [
-        {
-          "type": "block_element",
-          "named": true
-        },
         {
           "type": "inline_element",
           "named": true
@@ -1065,10 +1023,6 @@
   },
   {
     "type": "block_comment",
-    "named": true
-  },
-  {
-    "type": "block_sigil",
     "named": true
   },
   {

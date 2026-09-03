@@ -122,7 +122,7 @@ fn tree_sitter_cheatsheet_fixture_has_only_known_error_cases() {
     let src = read_fixture(Path::new("cheatsheet.tmt"));
     let tree = ts_parse(&src);
     let errors = ts_error_texts(&src, &tree);
-    let known_markers = ["#config(", "や", "]"];
+    let known_markers = ["@config(", "や", "]"];
     for text in &errors {
         assert!(
             known_markers.iter().any(|marker| text.contains(marker)),

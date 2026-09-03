@@ -15,7 +15,7 @@
 `[content]` `{value}` とは排他で、一行形式はない。
 
 ```
-#memo+++
+@memo+++
 あ あ
 あ
 +++
@@ -32,7 +32,7 @@
 //   (id:@string):[ @content ]
 // ]
 
-#links{
+@links{
   (id1)[ content ]
   (id2)[ content ]
 }
