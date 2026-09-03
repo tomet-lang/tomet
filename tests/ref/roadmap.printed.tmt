@@ -1,6 +1,6 @@
 @settings(file: docs/docs.settings.tmt)
 
-@meta(type: todo)
+@kind(todo)
 
 - testファイルを別途用意しろ。
 - ちゃんと分割しろ

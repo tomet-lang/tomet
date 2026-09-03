@@ -1,5 +1,5 @@
+@kind(image)
 @meta(format:yaml) +++
-type: image
 tags: [a, b]
 +++
 

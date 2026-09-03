@@ -1,4 +1,4 @@
-@meta{type: daily-note, uuid: ${uuid}}
+@meta{uuid: ${uuid}}
 
 #[TODO] {id: todo}
 

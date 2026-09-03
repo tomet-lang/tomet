@@ -1,5 +1,3 @@
-@meta{type: node-graph}
-
 #[Nodes]
 
 @node[開幕。]{ id: dsaf-asdf, type: textarea, x: "123", y: "456" }

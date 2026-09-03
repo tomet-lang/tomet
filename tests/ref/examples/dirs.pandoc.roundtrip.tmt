@@ -1,5 +1,3 @@
-@meta{type: bookmark}
-
 @file[説明]{ value: readme.md }
 
 @dirs[ソースコード]{ value: src }

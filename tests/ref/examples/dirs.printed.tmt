@@ -1,6 +1,6 @@
 @settings(file: docs/docs.settings.tmt)
 
-@meta{type: bookmark}
+@kind(bookmark)
 
 @file(readme.md)[説明]
 

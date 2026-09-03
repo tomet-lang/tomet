@@ -1,4 +1,4 @@
-@meta{ type: "settings" }
+@kind(settings)
 
 /* Tomet 設定DSL (Config DSL / Schema Specification)
    詳細な文法・スキーマ型定義の仕様は docs/design/decisions/2026-08-20-dsl-specifications.md を参照。
@@ -12,6 +12,30 @@
   // 実際に Sigil を持つ「要素」(tomet_semantics::ElementKind)の一覧。
   // 名前で識別できるものだけがここに乗る -- @T/@name で誰でも増やせる。
   elements: {
+    kind: {
+      // 文書の種別。この文書を検証するスキーマを選ぶ。
+      // 値は文字列で、`j.daily` のような名前空間つきも単なる文字列。
+      // 効くのは先頭のトップレベル `@kind` 一つだけ (tomet_semantics::document_kind)。
+      // 未実装: placement/singleton はまだ強制されない。`tomet check` は
+      // パースしかせず、singleton の実装はどこにも無い。
+      args: { kind: { type: string } },
+      required: [ kind ],
+      positional: [ kind ],
+      placement: head,
+      singleton: true
+    },
+    version: {
+      // 構文バージョン。ワークスペース直下の設定文書に一度書けば全体に効くので、
+      // 個々の文書には書かない。
+      // 値は文字列・整数・小数のいずれでもよく (`@version(1.0)` は小数)、
+      // 読み出し時に文字列へ正規化される。
+      // 未実装: placement/singleton は kind と同じくまだ強制されない。
+      args: { version: { type: string } },
+      required: [ version ],
+      positional: [ version ],
+      placement: head,
+      singleton: true
+    },
     settings: {
       args: { target: { type: string } },
       required: [ target ],
@@ -33,9 +57,10 @@
     },
     meta: {
       // meta の {value} は現状どのconsumerからも読まれない
-      // (html/markdownどちらも素通りする)。type/idはここでは将来案。
+      // (html/markdownどちらも素通りする)。id はここでは将来案。
+      // `type` はここには無い。文書の種別は `@kind` が持つ。
       args: { format: [ json, toml, yaml ] },
-      values: { type: string, id: uuid },
+      values: { id: uuid },
       placement: head,
       singleton: true
     },

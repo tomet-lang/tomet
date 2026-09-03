@@ -3,7 +3,6 @@
 ```tm
 @meta(yaml)+++
 id: #id
-type: "string"
 +++
 
 ```

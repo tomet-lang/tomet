@@ -1,6 +1,7 @@
+@kind(fixture)
+
 @meta(format:yaml)+++
 id: doc-fences
-type: fixture
 +++
 
 #[`+++` フェンス]
