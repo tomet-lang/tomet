@@ -27,7 +27,6 @@
 @blockquote[ @content ]
 
 ${func(args) ...}
-${@var +-*/ ...}
 $func(args)
 $(@var)
 
@@ -41,6 +40,9 @@ $(@var)
 // 以下は未実装(構想段階):
 
 ```tm
+// ${@var +-*/ ...}               // 未実装: 演算子は無い。算術は関数形のみ (${sub(1, 2)})。
+//                                   入れるなら `-` の前後に空白が要る -- `a-b` は識別子ひとつ
+
 // #config(
 //   style: structural,
 //   export: { type: commonmark, path: "README.md" }

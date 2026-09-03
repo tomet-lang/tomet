@@ -153,7 +153,7 @@
 sigil自体は`${...}`に決定済み(docs/design/decisions/2026-08-17-interpolation-syntax.md)。
 `${name(args)}`という関数呼び出し構文はtomet-parserに実装済み。まだ未決なのは:
 
-- $regex(/*.svg/g)
+- $regex("/*.svg/g")
 - $add(a, b)
 - $math()
 - $summury()
