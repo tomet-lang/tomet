@@ -5,15 +5,6 @@
     1
   ],
   "meta": {
-    "type": {
-      "t": "MetaInlines",
-      "c": [
-        {
-          "t": "Str",
-          "c": "daily-note"
-        }
-      ]
-    },
     "uuid": {
       "t": "MetaInlines",
       "c": [

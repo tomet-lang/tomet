@@ -1,6 +1,8 @@
 @settings(file: docs/docs.settings.tmt)
 
-@meta{type: daily-note, uuid: ${uuid}}
+@kind(daily-note)
+
+@meta{uuid: ${uuid}}
 
 #[TODO] {id: todo}
 

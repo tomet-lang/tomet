@@ -27,15 +27,6 @@
           ]
         }
       ]
-    },
-    "type": {
-      "t": "MetaInlines",
-      "c": [
-        {
-          "t": "Str",
-          "c": "image"
-        }
-      ]
     }
   },
   "blocks": [

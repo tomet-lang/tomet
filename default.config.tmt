@@ -1,6 +1,6 @@
+@kind(config)
 @meta(format:yaml)+++
 id: doc-kWBcIUUz
-type: config
 +++
 @config(format:json)+++
 {
@@ -30,7 +30,7 @@ type: config
     },
     "table": {
       "adjust_width": "auto",
-      "max_col_width": 30
+      "max_col_width": 50
     },
     "link": {
       "no_space": true

@@ -2,12 +2,15 @@
 @meta{}
 
 ```tm
+@kind(@string)
+@version(@string)
+
 @meta(format:json)
 @config(format:json)
 
 @link(https:@url)[ display_name ]
 @link(file:@file)[ display_name ]
-@link(tmt:<tmt file>)[ display_name ]
+@link(tmt:@tmt_file)[ display_name ]
 @link(ref:@ref)
 
 @heading(level: @int)[ display_name ]
@@ -16,7 +19,7 @@
   @id(asdf-asdf):()
   @id(asdf-asdf):[]
   @id(asdf-asd2):{tag: important}
-  <id(asdf-asdf)>:(){}[]
+  @id(asdf-asdf):(){}[]
 ]
 
 @embed(file:@file)[alt]
@@ -42,7 +45,7 @@ $(@var)
 //   style: structural,
 //   export: { type: commonmark, path: "README.md" }
 // )
-// #import(file:path)            // Unimplemented: #import is not yet designed (see docs/develop/architecture.md)
+// #import(file:path)            // Unimplemented: #import is not yet designed
 
 // @link(url:@url)[ display_name ]  // 未実装: `@link`という明示名には特別な意味がない
                                       // (url/file/refとして特別扱いされるのは @url/@file/@ref か

@@ -1,4 +1,4 @@
-@meta{ type: config }
+@kind(config)
 @config(format:json)+++
 {
   "format": {

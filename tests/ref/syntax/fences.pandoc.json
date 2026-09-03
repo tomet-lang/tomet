@@ -13,15 +13,6 @@
           "c": "doc-fences"
         }
       ]
-    },
-    "type": {
-      "t": "MetaInlines",
-      "c": [
-        {
-          "t": "Str",
-          "c": "fixture"
-        }
-      ]
     }
   },
   "blocks": [

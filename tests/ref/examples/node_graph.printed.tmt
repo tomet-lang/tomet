@@ -1,4 +1,4 @@
-@meta{type: node-graph}
+@kind(node-graph)
 
 #[Nodes]
 

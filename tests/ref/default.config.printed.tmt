@@ -1,6 +1,4 @@
-@meta(format:yaml)+++
-type: config
-+++
+@kind(config)
 
 @config(json)+++
 {

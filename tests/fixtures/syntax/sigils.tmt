@@ -1,6 +1,6 @@
+@kind(fixture)
 @meta(format:yaml)+++
 id: doc-sigils
-type: fixture
 +++
 
 #[ シジルは形を表す ]
