@@ -150,10 +150,14 @@ Until then `just docs-check` sweeps them for parse/format only.
   two `@kind`, or a `@kind` in the middle of the body, passes. Enforcing this
   is its own task and touches every element that claims to be a singleton.
 - Dangling prose references to `docs/design/decisions/`, deleted in
-  `4055fe5`. The four in `docs/README.tmt` and `docs/develop/docs-guide.md`
-  are gone with step 9; nine remain, in `docs/spec/` (4),
-  `docs/design/ideas/idea.tmt` (2), `docs/develop/architecture.md` (3) and
-  `docs/guide/cheatsheet.tmt` (1). These are prose mentions, not
+  `4055fe5`. 18 remain across 12 files, and the earlier count was too low
+  because it only swept `docs/`: 10 of them are in Rust source
+  (`tomet-convert-markdown` 4, `tomet-convert-html`, `tomet-semantics`,
+  `tomet-syntax-parser`, `tomet-workspace-links`, `tree-sitter-tomet` 2).
+  The rest are in `docs/spec/` (3), `docs/guide/cheatsheet.tmt` and
+  `docs/design/ideas/idea.tmt` (2). The two in
+  `docs/design/ideas/documentation-layers.tmt` are that sketch's own record
+  of the deletion and should stay. These are prose mentions, not
   `@link(file:...)`, so the link checker cannot see them. Fixing them is a
   judgement call per site -- delete the sentence, or repoint it at whatever
   now carries the reasoning.

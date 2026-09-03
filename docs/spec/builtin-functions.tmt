@@ -1,8 +1,11 @@
-// `${...}`の構文自体はtomet-parserに実装済み(docs/design/decisions/2026-08-17-interpolation-syntax.md)。
+// `${...}`の構文自体はtomet-parserに実装済み。
 // ${name(args)}はInterpExpr::Callとしてパースされるが、"name"が実際に何をするか(関数の一覧・
 // 挙動)を決める評価/レジストリはまだ存在しない -- tomet-computeの未実装分。
-// docs/develop/idea.tmt の「必要か？な関数」節にある構想メモ($regex, $add, $math, $summary)は
+// docs/design/ideas/idea.tmt の「必要か？な関数」節にある構想メモ($regex, $add, $math, $summary)は
 // まだ候補段階。
+//
+// 識別子には `-` を含められる。要素の引数と同じ規則なので、`node-graph` のような
+// kind をそのまま `${ref(id(node-graph))}` と書ける。
 
 ${sum(1, 4)}
 ${ref(id(asdf-asdfa).contents(dafault))}
@@ -10,6 +13,9 @@ $uuid()
 $date()
 $time()
 $regex("/*.svg/g")
-${vars.*}
 ${filename}
 ${title}
+
+// 以下は未実装:
+//
+// ${vars.*}    // ワイルドカードのメンバアクセス。`.` の後には識別子しか来られない
