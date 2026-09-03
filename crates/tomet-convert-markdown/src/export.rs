@@ -13,8 +13,8 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
-    TargetScheme, classify_lenient, heading_level, link_target, list_items, list_ordered,
-    target_scheme,
+    TargetScheme, classify_lenient, heading_level, is_directive, link_target, list_items,
+    list_ordered, target_scheme,
 };
 
 struct RenderCtx<'a> {
@@ -103,7 +103,11 @@ fn inline_to_md(cx: &RenderCtx, inlines: &[Inline]) -> String {
 fn element_to_md(cx: &RenderCtx, el: &Element, inline: bool) -> String {
     let kind = classify_lenient(el);
     match kind.as_str() {
-        "version" | "kind" | "meta" | "config" | "blueprint" => String::new(),
+        // Directives configure or annotate the document and have no
+        // rendering of their own. The list lives in `tomet-semantics` so
+        // the three writers cannot drift apart -- which they did, all
+        // three missing `settings` and `import`.
+        _ if is_directive(&kind) => String::new(),
         // Block-position only, same as CommonMark's own headings and
         // Tomet's own `#[x]` grammar -- a nested/inline `@heading(...)`
         // (`inline == true`) falls through to generic/custom rendering
@@ -457,11 +461,30 @@ fn push_data_attrs(out: &mut String, args: &Value) {
     }
 }
 
+/// Escapes CommonMark's special characters in a run of plain text.
+///
+/// A backtick-delimited span is the exception: it is passed through
+/// verbatim, backticks included. Tomet does not turn `` `x` `` into an
+/// element -- the parser keeps the backticks as literal text and only
+/// shields the run from further markup (`inline.rs`'s backtick probe) --
+/// so by the time it reaches here it looks like ordinary text. Escaping
+/// it would turn the author's inline code into a literal ``\`x\``, which
+/// is what every `` `spec/` `` in the docs used to export as.
+///
+/// The rule matches the parser's: an opening backtick pairs with the next
+/// backtick on the same line. An unpaired one is escaped as before.
 fn escape_text(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
     while let Some(c) = chars.next() {
-        if matches!(c, '\\' | '`' | '*' | '_' | '[' | ']') {
+        if c == '`' {
+            if let Some(span) = take_code_span(&mut chars) {
+                out.push('`');
+                out.push_str(&span);
+                continue;
+            }
+            out.push('\\');
+        } else if matches!(c, '\\' | '*' | '_' | '[' | ']') {
             out.push('\\');
         } else if c == '<' {
             let mut look = chars.clone();
@@ -481,6 +504,27 @@ fn escape_text(s: &str) -> String {
         out.push(c);
     }
     out
+}
+
+/// Consumes the rest of a backtick span, closing backtick included.
+///
+/// `chars` must sit just past the opening backtick. Returns `None` (and
+/// leaves `chars` untouched) when no closing backtick follows on the same
+/// line, which is the parser's condition for the span not being one.
+fn take_code_span(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Option<String> {
+    let mut look = chars.clone();
+    let mut span = String::new();
+    loop {
+        match look.next()? {
+            '`' => {
+                span.push('`');
+                *chars = look;
+                return Some(span);
+            }
+            '\n' | '\r' => return None,
+            ch => span.push(ch),
+        }
+    }
 }
 
 fn is_common_html_tag(name: &str) -> bool {
@@ -636,7 +680,57 @@ fn map_get<'a>(map: &'a [(String, Value)], key: &str) -> Option<&'a Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Paragraph, Sigil, Span, Text};
+    use tomet_ast::{Paragraph, Placement, Sigil, Span, Text};
+
+    #[test]
+    fn a_backtick_span_survives_export_unescaped() {
+        // Tomet keeps `` `x` `` as literal text (the parser only shields
+        // the run from further markup), so it reaches the writer looking
+        // like prose. Escaping it turned every `` `spec/` `` in the docs
+        // into a literal ``\`spec/\``.
+        let doc =
+            tomet_parser::parse_document("地の文に `code` と `spec/` があります。\n").unwrap();
+        assert_eq!(
+            to_markdown(&doc).trim(),
+            "地の文に `code` と `spec/` があります。"
+        );
+    }
+
+    #[test]
+    fn an_unpaired_backtick_is_still_escaped() {
+        // No closing backtick on the line -- not a span, so it stays an
+        // escaped literal, exactly as before.
+        let doc = tomet_parser::parse_document("値段は 100` です\n").unwrap();
+        assert_eq!(to_markdown(&doc).trim(), "値段は 100\\` です");
+    }
+
+    #[test]
+    fn a_backtick_span_is_not_escaped_inside_a_table_cell() {
+        let doc = tomet_parser::parse_document(
+            "@table()[\n[ Dir ][ Lang ]\n[ `spec/` ][ 日本語 ]\n]{}\n",
+        )
+        .unwrap();
+        assert!(
+            to_markdown(&doc).contains("| `spec/` |"),
+            "got: {}",
+            to_markdown(&doc)
+        );
+    }
+
+    #[test]
+    fn directives_have_no_markdown_output() {
+        // `settings` and `import` joined `BUILTIN_KINDS` after this list
+        // was written, so they used to fall through to the generic
+        // passthrough and emit a `<div data-tm-kind="settings">`.
+        for src in [
+            "@settings(file:docs/docs.settings.tmt)\n",
+            "@import(file:./deck.tmt, as:deck)\n",
+            "@meta{type: note}\n",
+        ] {
+            let doc = tomet_parser::parse_document(src).unwrap();
+            assert_eq!(to_markdown(&doc).trim(), "", "for {src:?}");
+        }
+    }
 
     #[test]
     fn adjacent_meta_blocks_have_no_visible_output() {
@@ -654,7 +748,8 @@ mod tests {
         // behind in the exported Markdown.
         fn meta_element(tag: &str) -> Element {
             Element {
-                sigil: Sigil::block("meta"),
+                sigil: Sigil::named("meta"),
+                placement: Placement::Inline,
                 args: Some(Value::String(tag.to_string())),
                 content: None,
                 children: None,
@@ -689,7 +784,8 @@ mod tests {
 
     fn heading_element(level: i64, content: Vec<Inline>) -> Element {
         Element {
-            sigil: Sigil::block("heading"),
+            sigil: Sigil::named("heading"),
+            placement: Placement::Block,
             args: Some(Value::Int(level)),
             content: Some(content),
             children: None,
@@ -776,7 +872,8 @@ mod tests {
             blocks: vec![Block::Paragraph(Paragraph::new(
                 vec![
                     Inline::Element(Element {
-                        sigil: Sigil::inline("em"),
+                        sigil: Sigil::named("em"),
+                        placement: Placement::Inline,
                         args: None,
                         content: Some(vec![Inline::Text(Text::new("a", Span::dummy()))]),
                         children: None,
@@ -785,7 +882,8 @@ mod tests {
                     }),
                     Inline::Text(Text::new(" ", Span::dummy())),
                     Inline::Element(Element {
-                        sigil: Sigil::inline("strong"),
+                        sigil: Sigil::named("strong"),
+                        placement: Placement::Inline,
                         args: None,
                         content: Some(vec![Inline::Text(Text::new("b", Span::dummy()))]),
                         children: None,
@@ -803,7 +901,8 @@ mod tests {
     #[test]
     fn link_round_trips() {
         let el = Element {
-            sigil: Sigil::inline("link"),
+            sigil: Sigil::named("link"),
+            placement: Placement::Inline,
             args: Some(Value::Map(vec![(
                 "target".to_string(),
                 Value::String("https://example.com".to_string()),
@@ -826,7 +925,8 @@ mod tests {
     #[test]
     fn embed_becomes_image() {
         let el = Element {
-            sigil: Sigil::block("embed"),
+            sigil: Sigil::named("embed"),
+            placement: Placement::Inline,
             args: Some(Value::Map(vec![(
                 "target".to_string(),
                 Value::String("pic.png".to_string()),
@@ -849,7 +949,8 @@ mod tests {
     #[test]
     fn code_block_uses_fence_and_lang() {
         let el = Element {
-            sigil: Sigil::block("codeblock"),
+            sigil: Sigil::named("codeblock"),
+            placement: Placement::Block,
             args: Some(Value::Map(vec![(
                 "lang".to_string(),
                 Value::String("rust".to_string()),
@@ -869,7 +970,7 @@ mod tests {
     #[test]
     fn thematic_break() {
         let doc = Document {
-            blocks: vec![Block::Element(tomet_tree::element_new(Sigil::block("hr")))],
+            blocks: vec![Block::Element(tomet_tree::element_new(Sigil::named("hr")))],
             span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "---\n\n");
@@ -877,7 +978,7 @@ mod tests {
 
     #[test]
     fn config_element_exports_as_nothing() {
-        let mut el = tomet_tree::element_new(Sigil::block("config"));
+        let mut el = tomet_tree::element_new(Sigil::named("config"));
         el.args = Some(Value::Map(vec![(
             "format".to_string(),
             Value::String("json".to_string()),
@@ -891,7 +992,7 @@ mod tests {
 
     #[test]
     fn titled_thematic_break() {
-        let mut el = tomet_tree::element_new(Sigil::block("hr"));
+        let mut el = tomet_tree::element_new(Sigil::named("hr"));
         el.content = Some(vec![Inline::Text(Text::new("Title", Span::dummy()))]);
         let doc = Document {
             blocks: vec![Block::Element(el)],
@@ -902,13 +1003,13 @@ mod tests {
 
     #[test]
     fn wikilink_exports_to_markdown() {
-        let mut el1 = tomet_tree::element_new(Sigil::inline("link"));
+        let mut el1 = tomet_tree::element_new(Sigil::named("link"));
         el1.args = Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("ref:name".to_string()),
         )]));
 
-        let mut el2 = tomet_tree::element_new(Sigil::inline("link"));
+        let mut el2 = tomet_tree::element_new(Sigil::named("link"));
         el2.args = Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("ref:name".to_string()),
@@ -931,7 +1032,7 @@ mod tests {
 
     #[test]
     fn table_exports_to_markdown() {
-        let mut el = tomet_tree::element_new(Sigil::block("table"));
+        let mut el = tomet_tree::element_new(Sigil::named("table"));
         el.content = Some(vec![Inline::Text(Text::new(
             "[ col1 ][ col2 ]\n[ val1 ][ val2 ]",
             Span::dummy(),
@@ -948,7 +1049,7 @@ mod tests {
 
     #[test]
     fn macro_and_interp_exports_to_markdown() {
-        let doc = tomet_parser::parse_document("#config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    copyright: \"(C) 2026 Tomet\"\n  }\n}\n\nIssue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
+        let doc = tomet_parser::parse_document("@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    copyright: \"(C) 2026 Tomet\"\n  }\n}\n\nIssue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
         assert_eq!(
             to_markdown(&doc),
             "Issue: https://github.com/tomet/tomet/issues/42 Footer: (C) 2026 Tomet Math: 15\n\n"

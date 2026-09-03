@@ -1,7 +1,7 @@
 #[ 全容 ]
 
 ```tm
-#config(format:yaml)+++
+@config(format:yaml)+++
 format: "json"
 export:
   path: /path
@@ -12,7 +12,7 @@ export:
 #[ 独自言語 ]
 
 ```tm
-#config{
+@config{
   format: "json",
   export {
     path: /path

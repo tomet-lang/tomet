@@ -64,9 +64,9 @@ fn test_blueprint_end_to_end_lifecycle() {
     assert!(doc_abs_path.is_file());
     let doc_content = fs::read_to_string(&doc_abs_path).unwrap();
 
-    // Verify converted #kind(daily-note)
-    assert!(doc_content.contains("#kind(daily-note)"));
-    assert!(!doc_content.contains("#blueprint"));
+    // Verify converted @kind(daily-note)
+    assert!(doc_content.contains("@kind(daily-note)"));
+    assert!(!doc_content.contains("@blueprint"));
     assert!(doc_content.contains("author: Alice"));
     assert!(doc_content.contains("2026-09-01"));
 

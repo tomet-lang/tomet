@@ -1,6 +1,6 @@
 //! Metadata element manipulation in documents.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Sigil, Value};
+use tomet_ast::{Block, Document, Element, ElementValue, Placement, Sigil, Value};
 use tomet_semantics::classify_lenient;
 use tomet_tree::{ElementExt, for_each_element_mut};
 
@@ -19,7 +19,9 @@ pub fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_
 
     if !found {
         let new_el = Element {
-            sigil: Sigil::block(target_element),
+            sigil: Sigil::named(target_element),
+            // A directive inserted at the top of the document stands alone.
+            placement: Placement::Block,
             args: None,
             content: None,
             children: None,

@@ -37,8 +37,8 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
-    TargetScheme, classify_lenient, heading_level, link_target, list_items, list_ordered,
-    normalized_element_args, parse_table_rows, target_scheme,
+    TargetScheme, classify_lenient, heading_level, is_directive, link_target, list_items,
+    list_ordered, normalized_element_args, parse_table_rows, target_scheme,
 };
 
 pub fn to_typst(doc: &Document) -> String {
@@ -120,7 +120,8 @@ fn inline_to_typst(inlines: &[Inline]) -> String {
 fn element_to_typst(el: &Element, inline: bool) -> String {
     let kind = classify_lenient(el);
     match kind.as_str() {
-        "version" | "kind" | "meta" | "config" | "blueprint" => String::new(),
+        // Directives -- see `tomet_semantics::is_directive`.
+        _ if is_directive(&kind) => String::new(),
         // Block-position only, mirroring `tomet-convert-markdown`'s
         // heading handling -- a nested/inline `@heading(...)`
         // (`inline == true`) falls through to the generic fallback
@@ -566,7 +567,7 @@ mod tests {
     #[test]
     fn renders_codeblock_with_lang_using_a_safe_fence() {
         assert_eq!(
-            typst("#codeblock(lang:rust)[fn main() {}]\n"),
+            typst("@codeblock(lang:rust)[fn main() {}]\n"),
             "```rust\nfn main() {}\n```\n\n"
         );
     }
@@ -574,7 +575,7 @@ mod tests {
     #[test]
     fn renders_codeblock_with_positional_lang_arg() {
         assert_eq!(
-            typst("#codeblock(\"rust\")[fn main() {}]\n"),
+            typst("@codeblock(\"rust\")[fn main() {}]\n"),
             "```rust\nfn main() {}\n```\n\n"
         );
     }
@@ -592,7 +593,7 @@ mod tests {
     #[test]
     fn renders_blockquote() {
         assert_eq!(
-            typst("#blockquote[ some quoted text ]\n"),
+            typst("@blockquote[ some quoted text ]\n"),
             "#quote(block: true)[some quoted text]\n\n"
         );
     }
@@ -616,7 +617,7 @@ mod tests {
     #[test]
     fn renders_links_container_as_labeled_bullet_list() {
         assert_eq!(
-            typst("#links {\n  (greeting)[ note ]\n}\n"),
+            typst("@links {\n  (greeting)[ note ]\n}\n"),
             "- *greeting*: note <link-greeting>\n\n"
         );
     }
@@ -631,13 +632,13 @@ mod tests {
 
     #[test]
     fn meta_and_config_have_no_visible_output() {
-        assert_eq!(typst("#meta(format:yaml)+++\nkey: value\n+++\n"), "");
-        assert_eq!(typst("#config(format:json)\n"), "");
+        assert_eq!(typst("@meta(format:yaml)+++\nkey: value\n+++\n"), "");
+        assert_eq!(typst("@config(format:json)\n"), "");
     }
 
     #[test]
     fn renders_table() {
-        let src = "#table()[\n[ h1 ][ h2 ]\n[ a ][ b ]\n]{}\n";
+        let src = "@table()[\n[ h1 ][ h2 ]\n[ a ][ b ]\n]{}\n";
         assert_eq!(
             typst(src),
             "#table(\n  columns: 2,\n  [*h1*], [*h2*],\n  [a], [b],\n)\n\n"
@@ -647,7 +648,7 @@ mod tests {
     #[test]
     fn renders_typed_element_generically_with_a_kind_comment() {
         assert_eq!(
-            typst("#caution[ be careful ]\n"),
+            typst("@caution[ be careful ]\n"),
             "// tomet:caution\nbe careful\n\n"
         );
     }

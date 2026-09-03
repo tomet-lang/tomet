@@ -1,4 +1,4 @@
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 type: image
 tags: [a, b]
 +++

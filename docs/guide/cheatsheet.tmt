@@ -1,5 +1,5 @@
-#settings(file:docs/docs.settings.tmt)
-#config(
+@settings(file:docs/docs.settings.tmt)
+@config(
   format:json
   /// [ (意図)[formatterが見る。視覚に長けたフォーマットであるために、
   ///   @[一行ずつ](file:tmt/examples/bookmark.tmt)]や、@[エリアだけ改行](file:tmt/examples/scenario.tmt)などをフォーマッタや出力が合わせるために記入したい。
@@ -11,18 +11,18 @@
 )
 
 ```
-#meta(format:json)+++
+@meta(format:json)+++
 {
   "key": "value",
   "type": "person"
 }
 +++
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 key: value
 date: time
 type: character
 +++
-#meta(format:toml)+++
+@meta(format:toml)+++
 key = "value"
 type = "location"
 +++
@@ -95,7 +95,7 @@ ${sum(a, b)}
 @embed[alt](ref:3)
 // 現在のコードでは、src:になってしまっているので、要変更
 
-#codeblock(lang:sh)[
+@codeblock(lang:sh)[
 sudo whoami
 ls --help
 ]
@@ -103,11 +103,11 @@ ls --help
 // content:raw: opts any element's [content] into raw/verbatim text, same
 // treatment as codeblock -- byte-safe against an embedded "]" and
 // newline-preserving (no inline markup, no lazy-continuation folding).
-#memo+++
+@memo+++
   don't forget: check [this] and [that]
 +++
 
-#blockquote[ 引用文 ]
+@blockquote[ 引用文 ]
 
 // @callout(caution)[
 //
@@ -148,7 +148,7 @@ _aaaa_
 /* block comment */
 
 /*
-#table()[
+@table()[
 [ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]
 [ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]
 [ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]

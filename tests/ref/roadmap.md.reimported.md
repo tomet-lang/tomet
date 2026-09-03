@@ -4,10 +4,10 @@
 
 ## 構文を決定する
 
-- \`ref\`構文
+- `ref`構文
 - エスケープ構文
 - Template構文
-- \`\[\]\`のkey
+- `[]`のkey
 - コネクト構文2
 - Table記法
 - 独自DSL Settings
@@ -17,7 +17,7 @@
 
 - ビルトイン関数の強化
 - Elementの挙動を一般化
-- \`#meta\`にkdlを追加
+- `#meta`にkdlを追加
 
 ## 拡張性を確保する
 
@@ -49,21 +49,21 @@
 ## 構文
 
 - 要素設定 (.settings.tmt, json, yaml)
-- コネクト構文 (\`:(){}\`)
-- \`args\`推論 (基本要素対応, カスタム要素対応, positional: \[ title, priority \])
-- \`\`@\`\`推論
-- 代入、関数構文 (\`\`$\`{var}\` \`compute\`,\`resolve\`)
+- コネクト構文 (`:(){}`)
+- `args`推論 (基本要素対応, カスタム要素対応, positional: \[ title, priority \])
+- ``@``推論
+- 代入、関数構文 (``$`{var}` `compute`,`resolve`)
 - 構文エラー (重複)
 - コメントアウト
-- 公式構文 (\`#settings\`, \`#config\`, \`#meta\`, \`#references\`)
+- 公式構文 (`#settings`, `#config`, `#meta`, `#references`)
 - 基本構文 (空白可, 改行可, 順不同)
-- 基本Markdown記法 (\`\*\`, \`\*\*\`, \`==\`, \`\_\_\`, \`\`)
+- 基本Markdown記法 (`*`, `**`, `==`, `__`, ``)
 - 基本要素 (heading, list, horizontal line)
 - 名前 (element, arg, content, value)
-- 基本AST (\`\`@\`T()\[\]{}\`)
+- 基本AST (``@`T()[]{}`)
 
 ## 機能
 
 - to\_from\_markdown ()
-- export (\`export:{type: commonmark, path: ...}\`)
+- export (`export:{type: commonmark, path: ...}`)
 

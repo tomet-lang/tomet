@@ -399,7 +399,7 @@ mod tests {
         let config_file = config_dir.join("default.config.tmt");
         std::fs::write(
             &config_file,
-            r#"#settings(format:json)+++
+            r#"@settings(format:json)+++
 {
   "ignore": {
     "files": [

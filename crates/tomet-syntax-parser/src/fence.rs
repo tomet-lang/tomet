@@ -9,7 +9,7 @@
 //! don't forget: check [this] and [that]
 //! +++
 //!
-//! #meta(format:yaml)+++
+//! @meta(format:yaml)+++
 //! key: value
 //! +++
 //! ```

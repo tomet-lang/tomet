@@ -23,7 +23,9 @@
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, Sigil, Value};
+use tomet_ast::{
+    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, Placement, Sigil, Value,
+};
 use tomet_parser::parse_document;
 
 /// One documented construct: a heading it files under, a one-line note in
@@ -44,7 +46,7 @@ const CASES: &[Case] = &[
     // ---- headings ---------------------------------------------------
     case(
         Some("見出し"),
-        "`#[ ... ]` は `#heading` の名前省略形",
+        "`#[ ... ]` は見出し専用のマーカー",
         "#[ タイトル ]\n",
     ),
     case(None, "`#` の数がレベル", "##[ 節 ]\n"),
@@ -56,41 +58,57 @@ const CASES: &[Case] = &[
     case(None, "`:` を挟んでも同じ", "#[ タイトル ]:{ id: intro }\n"),
     // ---- block elements ---------------------------------------------
     case(
-        Some("ブロック要素 `#name`"),
-        "名前だけ。グループがなくても行末で要素になる",
-        "#memo\n",
+        Some("ブロック配置の要素"),
+        "行に要素しかなければブロック。グループがなくても行末で要素になる",
+        "@memo\n",
     ),
     case(
         None,
         "`(args)` `[content]` `{value}` は各1個まで、順不同",
-        "#memo(a: 1)[ 本文 ]{ b: 2 }\n",
+        "@memo(a: 1)[ 本文 ]{ b: 2 }\n",
     ),
     case(
         None,
         "順序を入れ替えても同じ木になる",
-        "#memo[ 本文 ](a: 1)\n",
+        "@memo[ 本文 ](a: 1)\n",
     ),
     case(
         None,
         "`.` 区切りの名前空間",
-        "#deck.bookmark(name: foo)[ x ]\n",
+        "@deck.bookmark(name: foo)[ x ]\n",
     ),
-    case(None, "名前空間は多段でもよい", "#a.b.c(x: 1)\n"),
+    case(None, "名前空間は多段でもよい", "@a.b.c(x: 1)\n"),
+    case(
+        None,
+        "行頭にあっても、後ろに続きがあればブロックにならない。\
+         段落の書き出しとして読む",
+        "@link(target: \"https://example.com\")[Tomet] は軽量マークアップ言語です。\n",
+    ),
+    case(
+        None,
+        "折り返した行の先頭にある要素も地の文の一部。\
+         段落を切るのは空行",
+        "この言語の名前は\n@link(target: \"https://example.com\")[Tomet] といいます。\n",
+    ),
     // ---- inline elements --------------------------------------------
     case(
-        Some("インライン要素 `@name`"),
-        "行の途中で要素になる",
+        Some("インライン配置の要素"),
+        "行の途中の要素は地の文の一部",
         "文中の @link(target: \"https://example.com\")[リンク] です。\n",
     ),
     case(None, "名前空間つき", "文中の @deck.badge(2)[印] です。\n"),
     // ---- fall back to text ------------------------------------------
     case(
         Some("文字列に落ちる場合"),
-        "`#` と名前の間に空白があると要素にならない",
+        "`#` の後に `[` がなければ地の文",
         "# 見出しではない\n",
     ),
-    case(None, "`#` が2つ以上のときは `[` が必要", "##memo(a: 1)\n"),
-    case(None, "ASCII でない名前は要素にならない", "#タグ\n"),
+    case(
+        None,
+        "`#` の後が `[` でなければ見出しにならない",
+        "#memo(a: 1)\n",
+    ),
+    case(None, "ASCII でない名前は要素にならない", "@タグ\n"),
     case(
         None,
         "`@` の後にグループが続かなければ文字列",
@@ -102,64 +120,64 @@ const CASES: &[Case] = &[
     case(
         Some("`+++` フェンス"),
         "閉じる `+++` だけの行まで逐語。括弧も引用符もそのまま",
-        "#memo+++\ndon't forget [this]\n+++\n",
+        "@memo+++\ndon't forget [this]\n+++\n",
     ),
     case(
         None,
         "本文に `+++` があるときは長い走りで囲む",
-        "#memo++++\n+++\nまだ本文\n++++\n",
+        "@memo++++\n+++\nまだ本文\n++++\n",
     ),
     case(
         None,
         "閉じないまま EOF に達したらそこで終わる",
-        "#memo+++\n閉じない\n",
+        "@memo+++\n閉じない\n",
     ),
     case(
         None,
         "`${...}` は展開されず逐語で残る",
-        "#config(format:json)+++\n{\"gh\": \"x/${1}\"}\n+++\n",
+        "@config(format:json)+++\n{\"gh\": \"x/${1}\"}\n+++\n",
     ),
     case(
         None,
         "引用符の中の `}` で本文が途切れない",
-        "#meta(format:yaml)+++\na: \"}\"\nb: 1\n+++\n",
+        "@meta(format:yaml)+++\na: \"}\"\nb: 1\n+++\n",
     ),
     case(
         None,
         "`format:` は解釈だけを決め、字句解析には影響しない",
-        "#zzz(format:yaml)+++\na: 1\n+++\n",
+        "@zzz(format:yaml)+++\na: 1\n+++\n",
     ),
     // ---- value groups -----------------------------------------------
     case(
         Some("`{...}` グループ"),
         "`key: value` の並び",
-        "#memo{ a: 1, b: two }\n",
+        "@memo{ a: 1, b: two }\n",
     ),
     case(
         None,
         "要素の並び",
-        "#links{\n  (1)[ ひとつ ]\n  (2)[ ふたつ ]\n}\n",
+        "@links{\n  (1)[ ひとつ ]\n  (2)[ ふたつ ]\n}\n",
     ),
     case(
         None,
         "対と要素の混在。並び順は保たれる",
-        "#deck.card{ t: x, (a)[ y ], u: z }\n",
+        "@deck.card{ t: x, (a)[ y ], u: z }\n",
     ),
-    case(None, "空のグループ", "#memo{}\n"),
+    case(None, "空のグループ", "@memo{}\n"),
     // ---- args and the value DSL -------------------------------------
     case(
         Some("`(args)` と値の文法"),
         "`key: value`",
-        "#memo(a: 1, b: two)\n",
+        "@memo(a: 1, b: two)\n",
     ),
-    case(None, "位置引数（キーなし）", "#codeblock(rust)\n"),
-    case(None, "列", "#memo(xs: [1, 2, 3])\n"),
-    case(None, "入れ子のマップ", "#memo(m: { x: 1 })\n"),
-    case(None, "引用符つき文字列", "#memo(s: \"a, b: c\")\n"),
+    case(None, "位置引数（キーなし）", "@codeblock(rust)\n"),
+    case(None, "列", "@memo(xs: [1, 2, 3])\n"),
+    case(None, "入れ子のマップ", "@memo(m: { x: 1 })\n"),
+    case(None, "引用符つき文字列", "@memo(s: \"a, b: c\")\n"),
     case(
         None,
         "スカラーは型が推論される",
-        "#memo(i: 1, f: 1.5, b: true, n: null)\n",
+        "@memo(i: 1, f: 1.5, b: true, n: null)\n",
     ),
     // ---- lists ------------------------------------------------------
     case(
@@ -208,9 +226,9 @@ const CASES: &[Case] = &[
     case(
         Some("コネクト `:`"),
         "`:{...}` は値をマージ",
-        "#task[ A ]:{ id: t1 }\n",
+        "@task[ A ]:{ id: t1 }\n",
     ),
-    case(None, "`:(...)` は args をマージ", "#task(a: 1):(b: 2)\n"),
+    case(None, "`:(...)` は args をマージ", "@task(a: 1):(b: 2)\n"),
     // ---- comments ---------------------------------------------------
     case(Some("コメント"), "行コメント", "// 消える\n本文\n"),
     case(None, "ブロックコメント", "本文 /* 消える */ の続き\n"),
@@ -237,24 +255,30 @@ const REJECTED: &[Case] = &[
     ),
     case(None, "`@[ ... ]` も同じ", "@[ x ]\n"),
     case(
+        None,
+        "`#name` のブロックシジルも撤去。形はシジルではなく位置が決めるので、\
+         `#` は見出し専用に戻った",
+        "#memo[ x ]\n",
+    ),
+    case(
         Some("綴りを失ったまま、代わりが未決のもの"),
         "リモート接続。`<id:taskA>:{...}` と書いていたが `<T>` と共に \
          失われた。代わりの書き方は決まっていないので、実装も \
          受け付けない",
-        "#id(taskA):{ priority: high }\n",
+        "@id(taskA):{ priority: high }\n",
     ),
     case(
         Some("紛らわしいが、これが正しい"),
         "`(content:raw)` は普通の引数。`[...]` の解釈を変えない",
-        "#memo(content:raw)[\n1行目\n2行目\n]\n",
+        "@memo(content:raw)[\n1行目\n2行目\n]\n",
     ),
     case(
         Some("受け付けない書き方"),
         "`{...}` に列は書けない。`+++` フェンスを使う",
-        "#memo{[1, 2, 3]}\n",
+        "@memo{[1, 2, 3]}\n",
     ),
-    case(None, "`{...}` に裸のスカラーも書けない", "#memo{hello}\n"),
-    case(None, "閉じない `[`", "#memo[ 閉じない\n"),
+    case(None, "`{...}` に裸のスカラーも書けない", "@memo{hello}\n"),
+    case(None, "閉じない `[`", "@memo[ 閉じない\n"),
     case(
         Some("仕様にあるが未実装"),
         "入れ子の呼び出し（`docs/spec/builtin-functions.tmt`）",
@@ -417,7 +441,7 @@ fn dump_inline(out: &mut String, inline: &Inline, depth: usize) {
 
 fn dump_element(out: &mut String, el: &Element, depth: usize) {
     indent(out, depth);
-    let _ = writeln!(out, "{}", sigil_str(&el.sigil));
+    let _ = writeln!(out, "{}", element_head(el));
 
     if let Some(args) = &el.args {
         indent(out, depth + 1);
@@ -467,10 +491,20 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
     }
 }
 
-fn sigil_str(sigil: &Sigil) -> String {
-    match sigil {
-        Sigil::Block(name) => format!("Block  #{name}"),
-        Sigil::Inline(name) => format!("Inline @{name}"),
+/// The element's head line in the dump: its placement, then its name.
+///
+/// Placement is shown because the sigil no longer carries it -- every
+/// element is `@name`, and whether it stands as a block is decided by
+/// position.
+fn element_head(el: &Element) -> String {
+    match &el.sigil {
+        Sigil::Named(name) => {
+            let placement = match el.placement {
+                Placement::Block => "Block ",
+                Placement::Inline => "Inline",
+            };
+            format!("{placement} @{name}")
+        }
         Sigil::Bare => "Bare".to_string(),
         Sigil::Dollar => "Interp $".to_string(),
     }

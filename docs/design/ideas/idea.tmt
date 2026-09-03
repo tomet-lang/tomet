@@ -7,6 +7,19 @@
 - ```tmと```(tm)あるいは```(lang:tm)
 - `-.`が数字ならば、`#.#.`でヘッダーに数字がついてもいいのではないか？
 - `-.`で改行したら、`-.`が勝手に作成されてほしい。
+- `@kind`vs`@role`
+
+---[ コネクト構文追加関数 ]---
+
+`:as()`
+`:description()`
+
+---[ `#`参照性 ]---
+
+`#[ heading ]`
+`#tag()`
+`#id()`
+これら`#`は、よくよく抽象化して考えると、"参照"に使用されていないだろうか？
 
 ---[ マルチライン記法 ]---
 
@@ -22,7 +35,7 @@
 
 ---[ 名前付きスロット ]---
 
-#callout(note)
+@callout(note)
 :title:[title]
 :body:[
     content
@@ -31,7 +44,7 @@
 ---[ ? ]---
 
 ```tm
-#( Header )[ 
+#( Header )[
 コンテンツ
 ]
 ```
@@ -71,7 +84,7 @@
 
 []の中や文字の途中で使用できる。
 
-#codeblock(lang:tm)[
+@codeblock(lang:tm)[
   **aaaa**
   *aaaa*
   ==aaaa==
@@ -79,7 +92,7 @@
   `aaaa`
   @icon()
   @link[]()
-  #import()
+  @import()
   $(a.a)
   @tag[]
 ]
@@ -92,13 +105,13 @@
 
 行を独占する。その後に何かを記入することは基本無い(書けるけど。行の最初にスペースすらもかけないってこと。)。
 
-#codeblock(lang:tm)[
-  #config()
-  #meta(){}
+@codeblock(lang:tm)[
+  @config()
+  @meta(){}
   ##[]{}
-  #index()
-  #codeblock()
-  #blockquote[]
+  @index()
+  @codeblock()
+  @blockquote[]
 ]
 
 ##[ 例外 ]

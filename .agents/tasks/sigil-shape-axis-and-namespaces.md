@@ -6,10 +6,10 @@ from user-defined ones, but `classify` matched
 distinction carried no information. A design session on 2026-09-02
 replaced the axis rather than repairing it.
 
-**Status:** steps 1-7 and 9 are done and the workspace is green except
-the tree-sitter drift test. Steps 8, 10, 11, 12 remain, plus the
+**Status:** steps 1-7 and 9-11 are done. Steps 8 and 12 remain, plus the
 namespace-binding work noted under step 7 and the open question at the
-bottom. See the step list for detail.
+bottom. **A design session on 2026-09-03 retracted the shape axis
+itself** — see "One sigil: `@`" below and steps 13-18.
 
 The change is one breaking release, not several: the sigil swap, the
 namespaces and the fence all rewrite the same documents, so they ship
@@ -17,7 +17,78 @@ together.
 
 ## Decisions
 
-### Sigils encode shape, not origin
+### One sigil: `@`. Position decides placement (2026-09-03)
+
+The shape axis is removed. `#` stops being a block sigil; `@` is the only
+element sigil. `#` stays as the heading marker and nothing else.
+
+It carried no information — the same defect as the origin axis it
+replaced, in a new spelling:
+
+- **The parser never consulted it.** `is_inline_element_start`
+  (`crates/tomet-syntax-parser/src/element.rs:21`) and
+  `is_block_element_start` (`:47`) differ only in the glyph and in
+  whether end-of-line is accepted; both then require `( [ { :` or a
+  fence. Placement in the tree came from position, not from the sigil.
+- **The vocabulary already holds the shape.** `required_shape`
+  (`crates/tomet-semantics/src/kind.rs:229`) knows every builtin's shape,
+  and `shape_mismatch` (`:253`) only checks the author's sigil back
+  against that table.
+- **For custom elements it constrains nothing** —
+  `a_custom_element_may_take_either_shape` (`kind.rs:364`).
+
+It also failed to prevent the accident it was introduced for. Measured
+against `parse_document` with a temporary test, since deleted:
+
+| source | blocks before this change |
+| --- | --- |
+| `@link(…)[Tomet] は軽量…です。` | **2** (Element + Paragraph) — the sentence is torn |
+| `この言語の名前は` ⏎ `@link(…)[Tomet] といいます。` | **3** (Paragraph + Element + Paragraph) |
+| `この言語の名前は` ⏎ `Tomet といいます。` | 1 (correct) |
+
+Rows 1 and 2 come from `document.rs:76-79` (any line-start `@` element is
+taken as a block) and `inline.rs:73-79` (a paragraph breaks when its
+continuation line starts with an element).
+
+**The rule.** An element is placed as a block when both hold, and is part
+of the paragraph otherwise:
+
+1. **it is in block context** — `parse_document`'s loop position:
+   document start, after a blank line, or after a block closed. A
+   paragraph's continuation line is not block context.
+2. **it ends its line** — from the element's end, only inline whitespace
+   and comments before the line break or EOF.
+
+Neither consults the element vocabulary, so the step-1 invariant stands.
+
+The group requirement moves from the sigil to the position too. In block
+context a bare `@name` + end-of-line is an element (this is where `#`'s
+end-of-line allowance lands); mid-paragraph an element still requires
+`( [ { :` or a fence, which is what keeps `me@example.com` prose.
+
+**Placement is recorded, not declared.** `Element` gains a `placement:
+Placement` field that the parser derives from position. It is needed
+because `Element.content` is `Option<Vec<Inline>>`, so a block element
+sitting at a line start inside `[content]` (`inline.rs:159`) has nowhere
+else to record that it was a block. Making `content` a `Vec<Block>` was
+rejected for now: `.content` has 162 uses across 19 files.
+
+Shape stays a semantic property. `required_shape` remains its single
+source of truth, and validation compares it against *placement*, which
+turns the report into a real error ("`heading` inside a paragraph")
+instead of a spelling one ("`#em`").
+
+`Block` / `Inline` in `tomet-syntax-ast/src/lib.rs:214,250` stay — they
+express position in the tree, which is real. Only the surface declaration
+goes.
+
+`+++` still sits at the end of the element head; the sentence "every
+block element line starts with `#`" now reads `@`.
+
+### ~~Sigils encode shape, not origin~~ (retracted 2026-09-03)
+
+Kept for the record. Superseded by the section above; `#name` is no
+longer an element spelling.
 
 - `@name` — inline element
 - `#name` — block element
@@ -239,6 +310,75 @@ threads a document-wide `running_format` and goes with them.
       (`examples/bookmark.tmt` survives formatting — the fence removes the
       bracket-matching failure that caused it).
 - [ ] 12. Update `docs/` (Japanese) and the editor extensions.
+
+### Steps 13-18 — retracting the shape axis (2026-09-03)
+
+- [x] 13. AST: `Sigil::{Block,Inline}` collapse to `Sigil::Named(Name)`;
+      `Placement::{Block,Inline}` added and carried on `Element`.
+      Synthesized elements get their placement at construction
+      (`tomet-syntax-tree/src/element.rs`): `heading`/`hr`/`codeblock`/
+      `ol`/`ul` are `Block`, `em`/`strong`/`mark` are `Inline`.
+- [x] 14. Parser: one element-start predicate, with the end-of-line
+      allowance scoped by position instead of by sigil. `#` keeps only
+      `is_heading_start` (`document.rs:109`).
+- [x] 15. Parser: apply the two-condition rule. Drop the element clauses
+      from the paragraph stop set (`inline.rs:73-79`); take a line-start
+      element as a block only when it ends its line, probing with a cursor
+      copy the way `eat_list_marker_with_indent` (`list.rs:47-54`) does.
+      Check whether the single-element promotion (`document.rs:129-139`)
+      is still reachable.
+- [x] 16. Semantics: `shape_mismatch` compares `required_shape` against
+      `el.placement`; the validator's message becomes about placement, not
+      spelling. Collapse the two-arm matches in `positional.rs:272` and
+      `transform/structural.rs:81`.
+- [x] 17. Printer and tree-sitter: one sigil in
+      `format-printer/src/lib.rs:434-442`, and a `Placement::Block`
+      element starts and ends its own line so it round trips. `grammar.js`
+      drops `block_element`/`block_sigil`, and `heading_marker` regains
+      sole ownership of `#`.
+- [x] 18. Rewrite the corpus and `docs/` (342 line-start `#name`
+      occurrences across 62 files), regenerate `tests/SYNTAX.md`, and add
+      the regression cases from the table above. They live in the report
+      itself, which is CI-verified: the torn-sentence case, the
+      continuation-line case, `@memo` alone on its line, and
+      `me@example.com`.
+
+### Fallout worth knowing about
+
+`tests/fixtures/examples/bookmark.tmt` now prints as one long paragraph
+instead of alternating element/paragraph blocks. Its elements are written
+`@bookmark(...)｛ ... ｝` with **fullwidth** braces, so the element head
+ends at `)` and the `｛...｝` text follows it on the same line -- the
+element does not end its line, so it is inline, and with element triggers
+no longer breaking a paragraph the whole run lazily continues into one.
+
+The document was already parsing wrong before this change (the old
+reference shows the same `｛...｝` split off as loose prose); it is wrong
+differently now. No other corpus document changed shape -- the rest are
+pure `#`->`@` renames, because a normal `@name(...)[...]` line ends its
+own line and stays a block.
+
+**Update (2026-09-03).** The fullwidth braces were fixed in the fixture
+and it now reads `@bookmark(...){ ... }+++ ... +++`, which hits a
+different wall: **`{value}` and a `+++` fence are exclusive** (the rule
+recorded above, enforced at
+`crates/tomet-syntax-parser/src/element.rs:201` via
+`el.value.is_none() && el.content.is_none()`). Taking the `{value}` group
+fills `el.value`, so the following `+++` is not read as a fence, the
+element cannot end its line, and the rest of the document flows into one
+paragraph.
+
+So the language has no spelling for "an element with attributes *and* a
+verbatim body", which is exactly what `bookmark` wants. Deferred by
+decision -- it is one example document, not a blocker. The bookmark
+snapshot references under `tests/ref/` therefore **record output that is
+known to be wrong**; they are descriptive, not blessed. When the
+exclusivity is revisited, regenerate them rather than diffing against
+them.
+
+Options, if it is picked up: move the attributes into `(args)` (works
+today), or let `{value}` and `+++` coexist by giving the raw body its own
+slot instead of sharing `ElementValue::value`.
 
 ## 実装の現況は `tests/SYNTAX.md` を見る
 

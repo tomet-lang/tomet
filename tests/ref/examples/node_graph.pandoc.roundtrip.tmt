@@ -1,0 +1,13 @@
+@meta{type: node-graph}
+
+#[Nodes]
+
+@node[開幕。]{ id: dsaf-asdf, type: textarea, x: "123", y: "456" }
+
+@node[左のスペースを二個に固定すると、 一行で書いた場合のものと、文章のスタート位置が同じになるため、 見やすさを維持することができるのではないだろうか？]{ id: dsaf-asdf, type: textarea, x: "123", y: "456" }
+
+@node[]{ id: dsaf-asdf, type: number, x: "123", y: "456" }
+
+@node[]{ id: dsaf-asdf, type: export, x: "123", y: "456" }
+
+#[Links]

@@ -1,10 +1,10 @@
-#config(
+@config(
   export: {
     type: commonmark,
     path: "README.ja.md"
   }
 )
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 id: doc-gCzNE6yl
 +++
 
@@ -28,7 +28,7 @@ id: doc-gCzNE6yl
 -. ふりがなが簡単
 -. リテラルを保持
 
-#callout(note)[
+@callout(note)[
   MDXやAstroコンポーネントのように、文書の中に型付きデータやコンポーネントを埋め込みたいエンジニア向け
   ObsidianのDataviewやBasesのように、メタデータとノートを高度に連携させたいKB作成向け
 ]

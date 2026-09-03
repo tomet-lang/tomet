@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     fn non_list_element_has_no_ordered_and_no_items() {
-        let el = element_new(Sigil::block("codeblock"));
+        let el = element_new(Sigil::named("codeblock"));
         assert_eq!(list_ordered(&el), None);
         assert!(list_items(&el).is_empty());
     }

@@ -1,5 +1,5 @@
-#settings(file:docs/docs.settings.tmt)
-#meta(type:todo)
+@settings(file:docs/docs.settings.tmt)
+@meta(type:todo)
 
 - testファイルを別途用意しろ。
 - ちゃんと分割しろ

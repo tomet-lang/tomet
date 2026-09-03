@@ -933,52 +933,8 @@
       "value": "-?[0-9]+(\\.[0-9]+)?"
     },
     "element": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "SYMBOL",
-          "name": "block_element"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "inline_element"
-        }
-      ]
-    },
-    "block_element": {
-      "type": "PREC_RIGHT",
-      "value": 3,
-      "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "FIELD",
-            "name": "name",
-            "content": {
-              "type": "SYMBOL",
-              "name": "block_sigil"
-            }
-          },
-          {
-            "type": "REPEAT",
-            "content": {
-              "type": "SYMBOL",
-              "name": "_element_group"
-            }
-          }
-        ]
-      }
-    },
-    "block_sigil": {
-      "type": "TOKEN",
-      "content": {
-        "type": "PREC",
-        "value": 1,
-        "content": {
-          "type": "PATTERN",
-          "value": "#[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)*"
-        }
-      }
+      "type": "SYMBOL",
+      "name": "inline_element"
     },
     "inline_element": {
       "type": "PREC_RIGHT",

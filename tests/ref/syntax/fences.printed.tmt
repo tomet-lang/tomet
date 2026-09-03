@@ -1,11 +1,11 @@
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 id: doc-fences
 type: fixture
 +++
 
 #[`+++` フェンス]
 
-#memo+++
+@memo+++
 don't forget: check [this] and [that]
 括弧も引用符も、行の終わりまでそのまま。
 +++
@@ -14,7 +14,7 @@ don't forget: check [this] and [that]
 
 `format:` は解釈だけを決める。字句解析には影響しない。
 
-#config(json)+++
+@config(json)+++
 {
   "macros": {
     "gh": "https://github.com/tomet/tomet/issues/${1}"
@@ -29,14 +29,14 @@ don't forget: check [this] and [that]
 
 本文に `+++` の行が含まれるときは、より長い走りで囲む。
 
-#memo++++
+@memo++++
 +++
 これはまだ本文の中。
 ++++
 
 #[YAML の本文]
 
-#deck.note(yaml)+++
+@deck.note(yaml)+++
 key: value
 list:
   - a

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use tomet_ast::{Element, Name, Sigil, Value};
+use tomet_ast::{Element, Sigil, Value};
 use tomet_tree::ValueExt;
 
 /// Schema definition extracted from `@settings` block for custom elements.
@@ -269,7 +269,7 @@ pub fn normalized_element_args(el: &Element) -> Option<Value> {
 pub fn normalized_element_args_with_schema(el: &Element, schema: &SettingsSchema) -> Option<Value> {
     let args = el.args.as_ref()?;
     let elem_name = match &el.sigil {
-        Sigil::Block(name) | Sigil::Inline(name) => Some(name.name.as_str()),
+        Sigil::Named(name) => Some(name.name.as_str()),
         _ => None,
     };
     let positional_keys = effective_positional_keys(elem_name, &el.sigil, schema);
@@ -310,11 +310,12 @@ pub fn normalized_element_args_with_schema(el: &Element, schema: &SettingsSchema
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_ast::Name;
     use tomet_tree::element_new;
 
     #[test]
     fn normalizes_codeblock_positional_arg() {
-        let mut el = element_new(Sigil::block("codeblock"));
+        let mut el = element_new(Sigil::named("codeblock"));
         el.args = Some(Value::String("rust".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -327,7 +328,7 @@ mod tests {
 
     #[test]
     fn normalizes_embed_positional_arg() {
-        let mut el = element_new(Sigil::block("embed"));
+        let mut el = element_new(Sigil::named("embed"));
         el.args = Some(Value::String("foo.png".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -340,7 +341,7 @@ mod tests {
 
     #[test]
     fn normalizes_link_positional_arg() {
-        let mut el = element_new(Sigil::inline("link"));
+        let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::String("https://example.com".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -357,7 +358,7 @@ mod tests {
         // parser's `identifier:` rule has no notion of `target` being the
         // only real key `@link` has) -- this recovers it back into one
         // `target` string.
-        let mut el = element_new(Sigil::inline("link"));
+        let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::Map(vec![(
             "tm".to_string(),
             Value::String("foo/bar".to_string()),
@@ -376,7 +377,7 @@ mod tests {
         // `@link(tm:foo, predicate: depends_on)` -- only the `tm` entry is
         // a parser-split scheme prefix; `predicate` is real extra data and
         // stays untouched.
-        let mut el = element_new(Sigil::inline("link"));
+        let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::Map(vec![
             ("tm".to_string(), Value::String("foo".to_string())),
             (
@@ -398,7 +399,7 @@ mod tests {
 
     #[test]
     fn does_not_recover_when_target_key_already_present() {
-        let mut el = element_new(Sigil::inline("link"));
+        let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::Map(vec![
             ("target".to_string(), Value::String("tm:foo".to_string())),
             ("tm".to_string(), Value::String("bar".to_string())),
@@ -414,7 +415,7 @@ mod tests {
 
     #[test]
     fn does_not_recover_when_multiple_scheme_candidates_are_ambiguous() {
-        let mut el = element_new(Sigil::inline("link"));
+        let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::Map(vec![
             ("tm".to_string(), Value::String("foo".to_string())),
             ("id".to_string(), Value::String("bar".to_string())),
@@ -433,7 +434,7 @@ mod tests {
         // An arbitrary custom element's own `tm`-named field is left
         // alone -- recovery is scoped to elements whose positional key
         // is `target` (`@link`/`<embed>`), not a general mechanism.
-        let mut el = element_new(Sigil::block("caution"));
+        let mut el = element_new(Sigil::named("caution"));
         el.args = Some(Value::Map(vec![(
             "tm".to_string(),
             Value::String("foo".to_string()),
@@ -472,7 +473,7 @@ mod tests {
         // Args shaped the way the parser actually produces them for
         // `@link(tm:foo, depends_on)`: first entry keyed "tm" (Group A),
         // second bare/sentinel-keyed.
-        let mut el = element_new(Sigil::inline("link"));
+        let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::Map(vec![
             ("tm".to_string(), Value::String("foo".to_string())),
             (
@@ -515,7 +516,7 @@ mod tests {
         )]);
         let schema = SettingsSchema::from_value(&settings_val);
 
-        let mut el = element_new(Sigil::block("task"));
+        let mut el = element_new(Sigil::named("task"));
         el.args = Some(Value::Map(vec![
             (
                 POSITIONAL_ENTRY_KEY.to_string(),
@@ -538,7 +539,7 @@ mod tests {
 
     #[test]
     fn normalizes_meta_positional_arg() {
-        let mut el = element_new(Sigil::block("meta"));
+        let mut el = element_new(Sigil::named("meta"));
         el.args = Some(Value::String("json".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -551,7 +552,7 @@ mod tests {
 
     #[test]
     fn leaves_map_args_unchanged() {
-        let mut el = element_new(Sigil::block("codeblock"));
+        let mut el = element_new(Sigil::named("codeblock"));
         let map_val = Value::Map(vec![(
             "lang".to_string(),
             Value::String("rust".to_string()),
@@ -584,7 +585,7 @@ mod tests {
     fn an_element_with_no_positional_key_leaves_a_bare_scalar_alone() {
         // `deck.card` is namespaced, so it has no builtin positional key
         // and nothing to normalize the scalar into.
-        let mut el = element_new(Sigil::Inline(Name::namespaced("deck", "card")));
+        let mut el = element_new(Sigil::Named(Name::namespaced("deck", "card")));
         el.args = Some(Value::String("https://example.com".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -606,7 +607,7 @@ mod tests {
         )]);
         let schema = SettingsSchema::from_value(&settings_val);
 
-        let mut el = element_new(Sigil::block("task"));
+        let mut el = element_new(Sigil::named("task"));
         el.args = Some(Value::String("Clean room".to_string()));
 
         assert_eq!(
@@ -635,7 +636,7 @@ mod tests {
         )]);
         let schema = SettingsSchema::from_value(&settings_val);
 
-        let mut el = element_new(Sigil::block("task"));
+        let mut el = element_new(Sigil::named("task"));
         el.args = Some(Value::Seq(vec![
             Value::String("Clean room".to_string()),
             Value::String("high".to_string()),

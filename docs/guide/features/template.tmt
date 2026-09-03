@@ -1,4 +1,4 @@
-#meta{
+@meta{
   type: guide
   title: "テンプレートとブループリント"
 }
@@ -10,8 +10,8 @@ Tometにおけるテンプレート機能は、単なるテキストの初期生
 テンプレートファイルは、先頭に `#blueprint(target-kind)` を宣言した通常の `.tmt` ファイルです。
 
 ```tm
-#blueprint(daily-note)
-#meta{
+@blueprint(daily-note)
+@meta{
   id: ${uuid()}
   date: ${date("YYYY-MM-DD")}
   title: ${title}

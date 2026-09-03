@@ -26,8 +26,8 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 ## 目次
 
 - [見出し](#見出し)
-- [ブロック要素 `#name`](#ブロック要素-name)
-- [インライン要素 `@name`](#インライン要素-name)
+- [ブロック配置の要素](#ブロック配置の要素)
+- [インライン配置の要素](#インライン配置の要素)
 - [文字列に落ちる場合](#文字列に落ちる場合)
 - [`+++` フェンス](#-フェンス)
 - [`{...}` グループ](#-グループ)
@@ -46,14 +46,14 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 
 ## 見出し
 
-### `#[ ... ]` は `#heading` の名前省略形
+### `#[ ... ]` は見出し専用のマーカー
 
 ```tmt
 #[ タイトル ]
 ```
 
 ```
-Block  #heading
+Block  @heading
   args    1
   content
     Text "タイトル"
@@ -66,7 +66,7 @@ Block  #heading
 ```
 
 ```
-Block  #heading
+Block  @heading
   args    2
   content
     Text "節"
@@ -79,7 +79,7 @@ Block  #heading
 ```
 
 ```
-Block  #heading
+Block  @heading
   args    1
   content
     Text "タイトル"
@@ -94,7 +94,7 @@ Block  #heading
 ```
 
 ```
-Block  #heading
+Block  @heading
   args    1
   content
     Text "タイトル"
@@ -102,32 +102,32 @@ Block  #heading
     id: "intro"
 ```
 
-## ブロック要素 `#name`
+## ブロック配置の要素
 
-### 名前だけ。グループがなくても行末で要素になる
+### 行に要素しかなければブロック。グループがなくても行末で要素になる
 
 ```tmt
-#memo
+@memo
 ```
 
 ```
-Block  #memo
+Block  @memo
 ```
 
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### `(args)` `[content]` `{value}` は各1個まで、順不同
 
 ```tmt
-#memo(a: 1)[ 本文 ]{ b: 2 }
+@memo(a: 1)[ 本文 ]{ b: 2 }
 ```
 
 ```
-Block  #memo
+Block  @memo
   args    {a: 1}
   content
     Text "本文"
@@ -138,17 +138,17 @@ Block  #memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### 順序を入れ替えても同じ木になる
 
 ```tmt
-#memo[ 本文 ](a: 1)
+@memo[ 本文 ](a: 1)
 ```
 
 ```
-Block  #memo
+Block  @memo
   args    {a: 1}
   content
     Text "本文"
@@ -157,17 +157,17 @@ Block  #memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### `.` 区切りの名前空間
 
 ```tmt
-#deck.bookmark(name: foo)[ x ]
+@deck.bookmark(name: foo)[ x ]
 ```
 
 ```
-Block  #deck.bookmark
+Block  @deck.bookmark
   args    {name: "foo"}
   content
     Text "x"
@@ -176,17 +176,49 @@ Block  #deck.bookmark
 ### 名前空間は多段でもよい
 
 ```tmt
-#a.b.c(x: 1)
+@a.b.c(x: 1)
 ```
 
 ```
-Block  #a.b.c
+Block  @a.b.c
   args    {x: 1}
 ```
 
-## インライン要素 `@name`
+### 行頭にあっても、後ろに続きがあればブロックにならない。段落の書き出しとして読む
 
-### 行の途中で要素になる
+```tmt
+@link(target: "https://example.com")[Tomet] は軽量マークアップ言語です。
+```
+
+```
+Paragraph
+  Inline @link
+    args    {target: "https://example.com"}
+    content
+      Text "Tomet"
+  Text " は軽量マークアップ言語です。"
+```
+
+### 折り返した行の先頭にある要素も地の文の一部。段落を切るのは空行
+
+```tmt
+この言語の名前は
+@link(target: "https://example.com")[Tomet] といいます。
+```
+
+```
+Paragraph
+  Text "この言語の名前は "
+  Inline @link
+    args    {target: "https://example.com"}
+    content
+      Text "Tomet"
+  Text " といいます。"
+```
+
+## インライン配置の要素
+
+### 行の途中の要素は地の文の一部
 
 ```tmt
 文中の @link(target: "https://example.com")[リンク] です。
@@ -220,7 +252,7 @@ Paragraph
 
 ## 文字列に落ちる場合
 
-### `#` と名前の間に空白があると要素にならない
+### `#` の後に `[` がなければ地の文
 
 ```tmt
 # 見出しではない
@@ -231,26 +263,26 @@ Paragraph
   Text "# 見出しではない"
 ```
 
-### `#` が2つ以上のときは `[` が必要
+### `#` の後が `[` でなければ見出しにならない
 
 ```tmt
-##memo(a: 1)
+#memo(a: 1)
 ```
 
 ```
 Paragraph
-  Text "##memo(a: 1)"
+  Text "#memo(a: 1)"
 ```
 
 ### ASCII でない名前は要素にならない
 
 ```tmt
-#タグ
+@タグ
 ```
 
 ```
 Paragraph
-  Text "#タグ"
+  Text "@タグ"
 ```
 
 ### `@` の後にグループが続かなければ文字列
@@ -291,70 +323,70 @@ Paragraph
 ### 閉じる `+++` だけの行まで逐語。括弧も引用符もそのまま
 
 ```tmt
-#memo+++
+@memo+++
 don't forget [this]
 +++
 ```
 
 ```
-Block  #memo
+Block  @memo
   raw     "don't forget [this]"
 ```
 
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### 本文に `+++` があるときは長い走りで囲む
 
 ```tmt
-#memo++++
+@memo++++
 +++
 まだ本文
 ++++
 ```
 
 ```
-Block  #memo
+Block  @memo
   raw     "+++\nまだ本文"
 ```
 
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### 閉じないまま EOF に達したらそこで終わる
 
 ```tmt
-#memo+++
+@memo+++
 閉じない
 ```
 
 ```
-Block  #memo
+Block  @memo
   raw     "閉じない"
 ```
 
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### `${...}` は展開されず逐語で残る
 
 ```tmt
-#config(format:json)+++
+@config(format:json)+++
 {"gh": "x/${1}"}
 +++
 ```
 
 ```
-Block  #config
+Block  @config
   args    {format: "json"}
   raw     "{\"gh\": \"x/${1}\"}"
 ```
@@ -362,14 +394,14 @@ Block  #config
 ### 引用符の中の `}` で本文が途切れない
 
 ```tmt
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 a: "}"
 b: 1
 +++
 ```
 
 ```
-Block  #meta
+Block  @meta
   args    {format: "yaml"}
   raw     "a: \"}\"\nb: 1"
 ```
@@ -377,13 +409,13 @@ Block  #meta
 ### `format:` は解釈だけを決め、字句解析には影響しない
 
 ```tmt
-#zzz(format:yaml)+++
+@zzz(format:yaml)+++
 a: 1
 +++
 ```
 
 ```
-Block  #zzz
+Block  @zzz
   args    {format: "yaml"}
   raw     "a: 1"
 ```
@@ -391,7 +423,7 @@ Block  #zzz
 検証:
 
 ```
-unknown element `zzz`: bare names are reserved for built-in elements; namespace it (`ns.zzz`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `zzz`: bare names are reserved for built-in elements; namespace it (`ns.zzz`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ## `{...}` グループ
@@ -399,11 +431,11 @@ unknown element `zzz`: bare names are reserved for built-in elements; namespace 
 ### `key: value` の並び
 
 ```tmt
-#memo{ a: 1, b: two }
+@memo{ a: 1, b: two }
 ```
 
 ```
-Block  #memo
+Block  @memo
   group
     a: 1
     b: "two"
@@ -412,20 +444,20 @@ Block  #memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### 要素の並び
 
 ```tmt
-#links{
+@links{
   (1)[ ひとつ ]
   (2)[ ふたつ ]
 }
 ```
 
 ```
-Block  #links
+Block  @links
   group
     Bare
       args    1
@@ -440,11 +472,11 @@ Block  #links
 ### 対と要素の混在。並び順は保たれる
 
 ```tmt
-#deck.card{ t: x, (a)[ y ], u: z }
+@deck.card{ t: x, (a)[ y ], u: z }
 ```
 
 ```
-Block  #deck.card
+Block  @deck.card
   group
     t: "x"
     Bare
@@ -457,18 +489,18 @@ Block  #deck.card
 ### 空のグループ
 
 ```tmt
-#memo{}
+@memo{}
 ```
 
 ```
-Block  #memo
+Block  @memo
   group   (空)
 ```
 
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ## `(args)` と値の文法
@@ -476,97 +508,97 @@ unknown element `memo`: bare names are reserved for built-in elements; namespace
 ### `key: value`
 
 ```tmt
-#memo(a: 1, b: two)
+@memo(a: 1, b: two)
 ```
 
 ```
-Block  #memo
+Block  @memo
   args    {a: 1, b: "two"}
 ```
 
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### 位置引数（キーなし）
 
 ```tmt
-#codeblock(rust)
+@codeblock(rust)
 ```
 
 ```
-Block  #codeblock
+Block  @codeblock
   args    "rust"
 ```
 
 ### 列
 
 ```tmt
-#memo(xs: [1, 2, 3])
+@memo(xs: [1, 2, 3])
 ```
 
 ```
-Block  #memo
+Block  @memo
   args    {xs: [1, 2, 3]}
 ```
 
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### 入れ子のマップ
 
 ```tmt
-#memo(m: { x: 1 })
+@memo(m: { x: 1 })
 ```
 
 ```
-Block  #memo
+Block  @memo
   args    {m: {x: 1}}
 ```
 
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### 引用符つき文字列
 
 ```tmt
-#memo(s: "a, b: c")
+@memo(s: "a, b: c")
 ```
 
 ```
-Block  #memo
+Block  @memo
   args    {s: "a, b: c"}
 ```
 
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### スカラーは型が推論される
 
 ```tmt
-#memo(i: 1, f: 1.5, b: true, n: null)
+@memo(i: 1, f: 1.5, b: true, n: null)
 ```
 
 ```
-Block  #memo
+Block  @memo
   args    {i: 1, f: 1.5, b: true, n: null}
 ```
 
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ## リスト
@@ -579,7 +611,7 @@ unknown element `memo`: bare names are reserved for built-in elements; namespace
 ```
 
 ```
-Block  #ul
+Block  @ul
   group
     Bare
       content
@@ -597,7 +629,7 @@ Block  #ul
 ```
 
 ```
-Block  #ol
+Block  @ol
   group
     Bare
       content
@@ -615,7 +647,7 @@ Block  #ol
 ```
 
 ```
-Block  #ul
+Block  @ul
   group
     Bare
       content
@@ -631,7 +663,7 @@ Paragraph
 ```
 
 ```
-Block  #ul
+Block  @ul
   group
     Bare
       args    {12: 1}
@@ -648,7 +680,7 @@ Block  #ul
 ```
 
 ```
-Block  #ul
+Block  @ul
   group
     Bare
       content
@@ -704,7 +736,7 @@ Paragraph
 ```
 
 ```
-Block  #hr
+Block  @hr
 ```
 
 ### 見出しつき区切り線
@@ -714,7 +746,7 @@ Block  #hr
 ```
 
 ```
-Block  #hr
+Block  @hr
   content
     Text "章題"
 ```
@@ -728,7 +760,7 @@ let y = @T; *ptr
 ```
 
 ```
-Block  #codeblock
+Block  @codeblock
   args    {lang: "rust"}
   content
     Text "let y = @T; *ptr"
@@ -785,11 +817,11 @@ Interp $
 ### `:{...}` は値をマージ
 
 ```tmt
-#task[ A ]:{ id: t1 }
+@task[ A ]:{ id: t1 }
 ```
 
 ```
-Block  #task
+Block  @task
   content
     Text "A"
   group
@@ -799,24 +831,24 @@ Block  #task
 検証:
 
 ```
-unknown element `task`: bare names are reserved for built-in elements; namespace it (`ns.task`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `task`: bare names are reserved for built-in elements; namespace it (`ns.task`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ### `:(...)` は args をマージ
 
 ```tmt
-#task(a: 1):(b: 2)
+@task(a: 1):(b: 2)
 ```
 
 ```
-Block  #task
+Block  @task
   args    {b: 2, a: 1}
 ```
 
 検証:
 
 ```
-unknown element `task`: bare names are reserved for built-in elements; namespace it (`ns.task`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `task`: bare names are reserved for built-in elements; namespace it (`ns.task`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 ## コメント
@@ -888,16 +920,29 @@ Paragraph
 
 > **パースは通る。** 上が実際の結果。
 
+### `#name` のブロックシジルも撤去。形はシジルではなく位置が決めるので、`#` は見出し専用に戻った
+
+```tmt
+#memo[ x ]
+```
+
+```
+Paragraph
+  Text "#memo[ x ]"
+```
+
+> **パースは通る。** 上が実際の結果。
+
 ## 綴りを失ったまま、代わりが未決のもの
 
 ### リモート接続。`<id:taskA>:{...}` と書いていたが `<T>` と共に 失われた。代わりの書き方は決まっていないので、実装も 受け付けない
 
 ```tmt
-#id(taskA):{ priority: high }
+@id(taskA):{ priority: high }
 ```
 
 ```
-Block  #id
+Block  @id
   args    "taskA"
   group
     priority: "high"
@@ -906,7 +951,7 @@ Block  #id
 検証:
 
 ```
-unknown element `id`: bare names are reserved for built-in elements; namespace it (`ns.id`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `id`: bare names are reserved for built-in elements; namespace it (`ns.id`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 > **パースは通る。** 上が実際の結果。
@@ -916,14 +961,14 @@ unknown element `id`: bare names are reserved for built-in elements; namespace i
 ### `(content:raw)` は普通の引数。`[...]` の解釈を変えない
 
 ```tmt
-#memo(content:raw)[
+@memo(content:raw)[
 1行目
 2行目
 ]
 ```
 
 ```
-Block  #memo
+Block  @memo
   args    {content: "raw"}
   content
     Text "1行目 2行目"
@@ -932,7 +977,7 @@ Block  #memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `#import(file:..., as:ns)`
+unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
 ```
 
 > **パースは通る。** 上が実際の結果。
@@ -942,7 +987,7 @@ unknown element `memo`: bare names are reserved for built-in elements; namespace
 ### `{...}` に列は書けない。`+++` フェンスを使う
 
 ```tmt
-#memo{[1, 2, 3]}
+@memo{[1, 2, 3]}
 ```
 
 ```
@@ -952,7 +997,7 @@ parse error: 1:6: a '{...}' group holds 'key: value' entries or elements; write 
 ### `{...}` に裸のスカラーも書けない
 
 ```tmt
-#memo{hello}
+@memo{hello}
 ```
 
 ```
@@ -962,7 +1007,7 @@ parse error: 1:6: a '{...}' group holds 'key: value' entries or elements; write 
 ### 閉じない `[`
 
 ```tmt
-#memo[ 閉じない
+@memo[ 閉じない
 ```
 
 ```

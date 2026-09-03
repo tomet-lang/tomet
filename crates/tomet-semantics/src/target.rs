@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn named_target_key_on_typed_link_element() {
-        let el = map_el(Sigil::inline("link"), vec![("target", s("x.md"))]);
+        let el = map_el(Sigil::named("link"), vec![("target", s("x.md"))]);
         assert_eq!(crate::classify_lenient(&el), ElementKind::Link);
         assert_eq!(
             link_target_of(&el),
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn named_at_link_element() {
-        let el = map_el(Sigil::inline("link"), vec![("target", s("x.md"))]);
+        let el = map_el(Sigil::named("link"), vec![("target", s("x.md"))]);
         assert_eq!(crate::classify_lenient(&el), ElementKind::Link);
         assert_eq!(
             link_target_of(&el),
@@ -180,7 +180,7 @@ mod tests {
         // "link" IS in `builtin_positional_arg_key` (-> "target"), so
         // `normalized_element_args` turns this into a map before
         // `link_target` ever sees it.
-        let mut el = element_new(Sigil::inline("link"));
+        let mut el = element_new(Sigil::named("link"));
         el.args = Some(s("x.md"));
         assert_eq!(crate::classify_lenient(&el), ElementKind::Link);
         assert_eq!(
@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn embed_target_named_key() {
-        let el = map_el(Sigil::block("embed"), vec![("target", s("a.png"))]);
+        let el = map_el(Sigil::named("embed"), vec![("target", s("a.png"))]);
         assert_eq!(crate::classify_lenient(&el), ElementKind::Embed);
         assert_eq!(
             link_target_of(&el),
@@ -204,7 +204,7 @@ mod tests {
         // `<embed>(a.png)`: "embed" IS in builtin_positional_arg_key
         // (-> "target"), so normalized_element_args already turns this
         // into a map before link_target ever sees it.
-        let mut el = element_new(Sigil::block("embed"));
+        let mut el = element_new(Sigil::named("embed"));
         el.args = Some(s("a.png"));
         assert_eq!(
             link_target_of(&el),
@@ -256,13 +256,13 @@ mod tests {
 
     #[test]
     fn non_string_value_under_target_key_is_rejected() {
-        let el = map_el(Sigil::inline("link"), vec![("target", Value::Int(42))]);
+        let el = map_el(Sigil::named("link"), vec![("target", Value::Int(42))]);
         assert_eq!(link_target_of(&el), None);
     }
 
     #[test]
     fn non_link_kind_has_no_target() {
-        let el = map_el(Sigil::block("meta"), vec![("format", s("json"))]);
+        let el = map_el(Sigil::named("meta"), vec![("format", s("json"))]);
         assert_eq!(crate::classify_lenient(&el), ElementKind::Meta);
         assert_eq!(link_target_of(&el), None);
     }

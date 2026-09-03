@@ -86,7 +86,7 @@ mod tests {
         assert_eq!(a, b);
         match &a.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::inline("link"));
+                assert_eq!(el.sigil, Sigil::named("link"));
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
@@ -102,10 +102,10 @@ mod tests {
 
     #[test]
     fn parses_links_container_with_bare_children() {
-        let doc = parse_document("#links {\n  (1)[ note ]\n  (anotation1)[ note ]\n}\n").unwrap();
+        let doc = parse_document("@links {\n  (1)[ note ]\n  (anotation1)[ note ]\n}\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("links"));
+                assert_eq!(el.sigil, Sigil::named("links"));
                 match &el.value {
                     Some(value) => {
                         let children = value.as_children();
@@ -124,10 +124,10 @@ mod tests {
 
     #[test]
     fn parses_caution_as_typed_element_not_bare_bracket() {
-        let doc = parse_document("#caution[ be careful ]\n").unwrap();
+        let doc = parse_document("@caution[ be careful ]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("caution"));
+                assert_eq!(el.sigil, Sigil::named("caution"));
                 assert_eq!(el.content, Some(vec![Inline::Text("be careful".into())]));
             }
             other => panic!("expected element, got {other:?}"),
@@ -228,7 +228,7 @@ mod tests {
                 assert_eq!(item_attrs(&items[0]), None, "{bare:?}");
                 match items[0].content.as_deref() {
                     Some([Inline::Element(link)]) => {
-                        assert_eq!(link.sigil, Sigil::inline("link"), "{bare:?}");
+                        assert_eq!(link.sigil, Sigil::named("link"), "{bare:?}");
                         assert_eq!(
                             link.value,
                             Some(ElementValue::from_map(Value::Map(vec![(
@@ -266,7 +266,7 @@ mod tests {
                     // else.
                     match items[0].content.as_deref() {
                         Some([Inline::Element(link)]) => {
-                            assert_eq!(link.sigil, Sigil::inline("link"), "{src:?}");
+                            assert_eq!(link.sigil, Sigil::named("link"), "{src:?}");
                             assert_eq!(link.value, None, "{src:?}");
                         }
                         other => panic!("{src:?}: expected a single @link element, got {other:?}"),
@@ -380,7 +380,7 @@ mod tests {
         let doc = parse_document("---\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("hr"));
+                assert_eq!(el.sigil, Sigil::named("hr"));
                 assert_eq!(el.content, None);
             }
             other => panic!("expected hr element, got {other:?}"),
@@ -391,7 +391,7 @@ mod tests {
     fn parses_thematic_break_with_more_than_three_dashes() {
         let doc = parse_document("-----\n").unwrap();
         match &doc.blocks[0] {
-            Block::Element(el) => assert_eq!(el.sigil, Sigil::block("hr")),
+            Block::Element(el) => assert_eq!(el.sigil, Sigil::named("hr")),
             other => panic!("expected hr element, got {other:?}"),
         }
     }
@@ -401,7 +401,7 @@ mod tests {
         let doc = parse_document("---[ Title ]---\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("hr"));
+                assert_eq!(el.sigil, Sigil::named("hr"));
                 assert_eq!(el.content, Some(vec![Inline::Text("Title".into())]));
             }
             other => panic!("expected hr element, got {other:?}"),
@@ -459,18 +459,18 @@ mod tests {
                 assert_eq!(
                     kinds,
                     vec![
-                        (Sigil::inline("em"), Some(vec![Inline::Text("em".into())])),
+                        (Sigil::named("em"), Some(vec![Inline::Text("em".into())])),
                         (
-                            Sigil::inline("strong"),
+                            Sigil::named("strong"),
                             Some(vec![Inline::Text("strong".into())])
                         ),
-                        (Sigil::inline("em"), Some(vec![Inline::Text("em2".into())])),
+                        (Sigil::named("em"), Some(vec![Inline::Text("em2".into())])),
                         (
-                            Sigil::inline("strong"),
+                            Sigil::named("strong"),
                             Some(vec![Inline::Text("strong2".into())])
                         ),
                         (
-                            Sigil::inline("mark"),
+                            Sigil::named("mark"),
                             Some(vec![Inline::Text("mark".into())])
                         ),
                     ]
@@ -737,7 +737,7 @@ mod tests {
 
     #[test]
     fn interpolation_inside_element_content_and_heading() {
-        let doc = parse_document("#memo[ total: ${sum(a, b)} ]\n\n#[ ${x} ]\n").unwrap();
+        let doc = parse_document("@memo[ total: ${sum(a, b)} ]\n\n#[ ${x} ]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 let content = el.content.as_ref().expect("content");
@@ -835,23 +835,40 @@ mod tests {
     }
 
     #[test]
-    fn an_element_trigger_ends_a_paragraph_with_no_blank_line_before_it() {
-        // Same as `#`/list markers/comments already do in the lazy-continuation
-        // check -- a `<T>`/`@name` element trigger on the next line ends the
-        // paragraph even with no blank line separating them, rather than
-        // being folded into one `Block::Paragraph` together with the
-        // previous line. (An element trigger followed by *more* running
-        // text on its own next line is a separate case, unaffected here --
-        // that's still ordinary lazy continuation, since only a following
-        // element trigger ends a paragraph early, not a preceding one.)
-        let doc = parse_document("text\n#meta{key:value}\n").unwrap();
-        assert_eq!(doc.blocks.len(), 2);
-        match (&doc.blocks[0], &doc.blocks[1]) {
-            (Block::Paragraph(a), Block::Element(el)) => {
-                assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
-                assert_eq!(el.sigil, Sigil::block("meta"));
+    fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
+        // An element trigger used to end a paragraph early, so a sentence
+        // wrapped across lines was torn into separate blocks the moment a
+        // line happened to start with one. A continuation line is not
+        // block context, so the element belongs to the running text; a
+        // blank line is what opens a block.
+        let doc = parse_document("text\n@meta{key:value}\n").unwrap();
+        assert_eq!(doc.blocks.len(), 1);
+        match &doc.blocks[0] {
+            Block::Paragraph(p) => {
+                assert_eq!(p.content.len(), 2);
+                // The newline is folded into the text as a space, the way
+                // any wrapped line is.
+                assert_eq!(&p.content[0], &Inline::Text("text ".into()));
+                match &p.content[1] {
+                    Inline::Element(el) => {
+                        assert_eq!(el.sigil, Sigil::named("meta"));
+                        assert_eq!(el.placement, tomet_ast::Placement::Inline);
+                    }
+                    other => panic!("expected an element, got {other:?}"),
+                }
             }
-            other => panic!("expected paragraph then element, got {other:?}"),
+            other => panic!("expected one paragraph, got {other:?}"),
+        }
+
+        // With the blank line, it is a block.
+        let doc = parse_document("text\n\n@meta{key:value}\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        match &doc.blocks[1] {
+            Block::Element(el) => {
+                assert_eq!(el.sigil, Sigil::named("meta"));
+                assert_eq!(el.placement, tomet_ast::Placement::Block);
+            }
+            other => panic!("expected an element, got {other:?}"),
         }
     }
 
@@ -861,12 +878,12 @@ mod tests {
         // (no blank line between them, as `docs/docs.settings.tmt` itself is
         // written) used to lazily continue into one `Block::Paragraph` --
         // it must now become two independent `Block::Element`s instead.
-        let doc = parse_document("#meta{ type:#settings }\n#settings{ key:value }\n").unwrap();
+        let doc = parse_document("@meta{ type:#settings }\n@settings{ key:value }\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Element(a), Block::Element(b)) => {
-                assert_eq!(a.sigil, Sigil::block("meta"));
-                assert_eq!(b.sigil, Sigil::block("settings"));
+                assert_eq!(a.sigil, Sigil::named("meta"));
+                assert_eq!(b.sigil, Sigil::named("settings"));
             }
             other => panic!("expected two elements, got {other:?}"),
         }
@@ -928,7 +945,7 @@ mod tests {
 
     #[test]
     fn inline_block_comment_works_inside_content() {
-        let doc = parse_document("#caution[ keep /* drop */ this ]\n").unwrap();
+        let doc = parse_document("@caution[ keep /* drop */ this ]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
@@ -956,7 +973,7 @@ mod tests {
                 assert_eq!(p.content.len(), 3);
                 assert_eq!(p.content[0], Inline::Text("see ".into()));
                 if let Inline::Element(el) = &p.content[1] {
-                    assert_eq!(el.sigil, Sigil::inline("link"));
+                    assert_eq!(el.sigil, Sigil::named("link"));
                     assert_eq!(
                         el.args,
                         Some(Value::Map(vec![(
@@ -986,7 +1003,7 @@ mod tests {
 
     #[test]
     fn inline_double_slash_comment_works_inside_content() {
-        let doc = parse_document("#caution[ keep // drop this\n]\n").unwrap();
+        let doc = parse_document("@caution[ keep // drop this\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.content, Some(vec![Inline::Text("keep ".into())]));
@@ -1001,7 +1018,7 @@ mod tests {
         // dispatch of its own -- a `//` starting a line inside it is only
         // recognized because the preceding newline counts as a boundary,
         // same rule as a same-line trailing comment.
-        let doc = parse_document("#caution[\n  keep\n  // drop this line\n  keep2\n]\n").unwrap();
+        let doc = parse_document("@caution[\n  keep\n  // drop this line\n  keep2\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
@@ -1020,10 +1037,10 @@ mod tests {
     fn own_line_comment_works_inside_a_paren_group() {
         // The original trigger case: a `//` comment on its own line between
         // entries in `@config(...)`'s `(args)` map.
-        let doc = parse_document("#config(\n  format:json\n  // a note\n)\n").unwrap();
+        let doc = parse_document("@config(\n  format:json\n  // a note\n)\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("config"));
+                assert_eq!(el.sigil, Sigil::named("config"));
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
@@ -1038,7 +1055,7 @@ mod tests {
 
     #[test]
     fn own_line_comment_works_inside_a_lightweight_value_group() {
-        let doc = parse_document("#meta{\n  key: value\n  // a note\n}\n").unwrap();
+        let doc = parse_document("@meta{\n  key: value\n  // a note\n}\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
@@ -1109,7 +1126,7 @@ mod tests {
         // used to break at the *first* literal `]`, corrupting the rest
         // of the content as stray trailing text. Applies to every ordinary
         // (non-raw) `[content]`, not just an opt-in one.
-        let doc = parse_document("#caution[\nline one\nline two with * and [brackets] inside\n]\n")
+        let doc = parse_document("@caution[\nline one\nline two with * and [brackets] inside\n]\n")
             .unwrap();
         assert_eq!(doc.blocks.len(), 1);
         match &doc.blocks[0] {
@@ -1127,7 +1144,7 @@ mod tests {
 
     #[test]
     fn an_unbalanced_bracket_inside_a_content_still_errors() {
-        assert!(parse_document("#caution[ has an [ that never closes\n]\n").is_err());
+        assert!(parse_document("@caution[ has an [ that never closes\n]\n").is_err());
     }
 
     /// The `Raw` body of `doc`'s first block, or a panic.
@@ -1144,7 +1161,7 @@ mod tests {
     #[test]
     fn a_fence_preserves_brackets_and_newlines_losslessly() {
         let doc =
-            parse_document("#memo+++\nline one\nline two with * and [brackets] inside\n+++\n")
+            parse_document("@memo+++\nline one\nline two with * and [brackets] inside\n+++\n")
                 .unwrap();
         assert_eq!(
             raw_body(&doc),
@@ -1158,7 +1175,7 @@ mod tests {
         // quote-agnostic, because free-form prose gives no guarantee its
         // `'`/`"` occurrences are balanced. A fence has no such problem:
         // it ends at a line, so nothing inside it can be miscounted.
-        let doc = parse_document("#memo+++\ndon't forget [this]\n+++\n").unwrap();
+        let doc = parse_document("@memo+++\ndon't forget [this]\n+++\n").unwrap();
         assert_eq!(raw_body(&doc), "don't forget [this]");
     }
 
@@ -1167,13 +1184,13 @@ mod tests {
         // The bug the fence removes by construction: the old
         // `(format:yaml){...}` scanner tracked brace depth, so a `}`
         // inside otherwise legal YAML ended the body early.
-        let doc = parse_document("#meta(format:yaml)+++\na: \"}\"\nb: 1\n+++\n").unwrap();
+        let doc = parse_document("@meta(format:yaml)+++\na: \"}\"\nb: 1\n+++\n").unwrap();
         assert_eq!(raw_body(&doc), "a: \"}\"\nb: 1");
     }
 
     #[test]
     fn a_longer_fence_run_escapes_a_body_containing_a_fence() {
-        let doc = parse_document("#memo++++\n+++\nstill inside\n++++\n").unwrap();
+        let doc = parse_document("@memo++++\n+++\nstill inside\n++++\n").unwrap();
         assert_eq!(raw_body(&doc), "+++\nstill inside");
     }
 
@@ -1181,7 +1198,7 @@ mod tests {
     fn an_unterminated_fence_runs_to_eof() {
         // Matching the backtick fence, and unlike `[...]`/`{...}` groups,
         // which error when unclosed.
-        let doc = parse_document("#memo+++\nno closing line\n").unwrap();
+        let doc = parse_document("@memo+++\nno closing line\n").unwrap();
         assert_eq!(raw_body(&doc), "no closing line");
     }
 
@@ -1190,7 +1207,7 @@ mod tests {
         // `default.config.tmt` stores macro templates such as
         // `"https://github.com/.../${1}"` that must reach
         // `tomet-transform`'s `MacroPattern::from_template` verbatim.
-        let doc = parse_document("#config(format:json)+++\n{\"gh\": \"x/${1}\"}\n+++\n").unwrap();
+        let doc = parse_document("@config(format:json)+++\n{\"gh\": \"x/${1}\"}\n+++\n").unwrap();
         assert_eq!(raw_body(&doc), "{\"gh\": \"x/${1}\"}");
     }
 
@@ -1199,7 +1216,7 @@ mod tests {
         // `(content:raw)` no longer changes how `[...]` is lexed -- that
         // was one of the four places the parser consulted an element's
         // own arguments. Line breaks collapse per the usual rule.
-        let doc = parse_document("#memo(content:raw)[\nline one\nline two\n]\n").unwrap();
+        let doc = parse_document("@memo(content:raw)[\nline one\nline two\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(
@@ -1216,7 +1233,7 @@ mod tests {
         let doc = parse_document("```rust\nfn main() {}\n```\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("codeblock"));
+                assert_eq!(el.sigil, Sigil::named("codeblock"));
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
@@ -1235,7 +1252,7 @@ mod tests {
         let doc = parse_document("```\nplain\n```\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("codeblock"));
+                assert_eq!(el.sigil, Sigil::named("codeblock"));
                 assert_eq!(el.args, None);
                 assert_eq!(el.content, Some(vec![Inline::Text("plain".into())]));
             }
@@ -1246,7 +1263,7 @@ mod tests {
     #[test]
     fn fenced_code_block_and_bracket_codeblock_produce_the_same_ast() {
         let fenced = parse_document("```rust\nfn main() {}\n```\n").unwrap();
-        let bracket = parse_document("#codeblock(lang:rust)[fn main() {}]\n").unwrap();
+        let bracket = parse_document("@codeblock(lang:rust)[fn main() {}]\n").unwrap();
         match (&fenced.blocks[0], &bracket.blocks[0]) {
             (Block::Element(a), Block::Element(b)) => {
                 assert_eq!(a.sigil, b.sigil);
@@ -1351,7 +1368,7 @@ mod tests {
         // `()`/`{}` written out (as opposed to the group being omitted
         // entirely, which leaves `args`/`value` as `None`) is a valid,
         // deliberately-empty map -- matches the spec's own `@meta{}` etc.
-        let doc = parse_document("#T()\n").unwrap();
+        let doc = parse_document("@T()\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.args, Some(Value::Map(vec![])));
@@ -1360,7 +1377,7 @@ mod tests {
             other => panic!("expected an element, got {other:?}"),
         }
 
-        let doc = parse_document("#meta{}\n").unwrap();
+        let doc = parse_document("@meta{}\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.value, Some(ElementValue::from_map(Value::Map(vec![]))));
@@ -1371,10 +1388,17 @@ mod tests {
 
     #[test]
     fn a_second_args_group_is_parsed_as_subsequent_text() {
-        let doc = parse_document("#T(a:1)(b:2)\n").unwrap();
-        assert_eq!(doc.blocks.len(), 2);
-        match &doc.blocks[0] {
-            Block::Element(el) => {
+        // The element does not end its line -- `(b:2)` trails it -- so the
+        // whole line is a paragraph holding the element plus that text.
+        let doc = parse_document("@T(a:1)(b:2)\n").unwrap();
+        assert_eq!(doc.blocks.len(), 1);
+        let Block::Paragraph(p) = &doc.blocks[0] else {
+            panic!("expected a paragraph, got {:?}", doc.blocks[0]);
+        };
+        assert_eq!(p.content.len(), 2);
+        assert_eq!(&p.content[1], &Inline::Text("(b:2)".into()));
+        match &p.content[0] {
+            Inline::Element(el) => {
                 assert_eq!(el.args, Some(Value::Map(vec![("a".into(), Value::Int(1))])));
             }
             other => panic!("expected an element, got {other:?}"),
@@ -1387,7 +1411,7 @@ mod tests {
         // used to fall outside the whitespace/newline gap tolerance,
         // ending the element early and leaving the next group as
         // unrelated trailing text.
-        let doc = parse_document("#T(a:1) // note\n[content]\n").unwrap();
+        let doc = parse_document("@T(a:1) // note\n[content]\n").unwrap();
         assert_eq!(doc.blocks.len(), 1);
         match &doc.blocks[0] {
             Block::Element(el) => {
@@ -1409,7 +1433,7 @@ mod tests {
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Paragraph(p), Block::Element(el)) => {
                 assert_eq!(&p.content, &vec![Inline::Text("text".into())]);
-                assert_eq!(el.sigil, Sigil::block("codeblock"));
+                assert_eq!(el.sigil, Sigil::named("codeblock"));
             }
             other => panic!("expected paragraph then codeblock, got {other:?}"),
         }
@@ -1422,7 +1446,7 @@ mod tests {
         match (&doc.blocks[0], &doc.blocks[1], &doc.blocks[2]) {
             (Block::Paragraph(a), Block::Element(hr), Block::Paragraph(b)) => {
                 assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
-                assert_eq!(hr.sigil, Sigil::block("hr"));
+                assert_eq!(hr.sigil, Sigil::named("hr"));
                 assert_eq!(&b.content, &vec![Inline::Text("more".into())]);
             }
             other => panic!("expected paragraph, hr, paragraph, got {other:?}"),
@@ -1449,10 +1473,10 @@ mod tests {
 
     #[test]
     fn element_supports_inline_colon_connection() {
-        let doc = parse_document("#task[ Task A ]:{ id: taskA, priority: high }\n").unwrap();
+        let doc = parse_document("@task[ Task A ]:{ id: taskA, priority: high }\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("task"));
+                assert_eq!(el.sigil, Sigil::named("task"));
                 assert_eq!(
                     el.value,
                     Some(ElementValue::from_map(Value::Map(vec![
@@ -1467,10 +1491,10 @@ mod tests {
 
     #[test]
     fn remote_id_target_element_supports_colon_connection() {
-        let doc = parse_document("#id(taskA):{ priority: high, tag: dev }\n").unwrap();
+        let doc = parse_document("@id(taskA):{ priority: high, tag: dev }\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("id"));
+                assert_eq!(el.sigil, Sigil::named("id"));
                 assert_eq!(el.args, Some(Value::String("taskA".into())));
                 assert_eq!(
                     el.value,
@@ -1668,9 +1692,16 @@ mod tests {
 
     #[test]
     fn bare_url_autolink_preserves_query_param_placeholder() {
+        // An autolink is found while scanning running text, so a line
+        // holding nothing but a URL is a paragraph with one link in it --
+        // not a block-placed element. Only an explicit `@name` standing on
+        // its own line is a block.
         let doc = parse_document("http://127.0.0.1:8888/search?lang=ja&q=@query\n").unwrap();
-        match &doc.blocks[0] {
-            Block::Element(el) => {
+        let Block::Paragraph(p) = &doc.blocks[0] else {
+            panic!("expected a paragraph, got {:?}", doc.blocks[0]);
+        };
+        match &p.content[0] {
+            Inline::Element(el) => {
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(

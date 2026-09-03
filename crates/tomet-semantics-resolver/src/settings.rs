@@ -58,8 +58,8 @@ pub fn resolve_settings_ref(
     Some(resolve_settings_file(&project_root.join(file)))
 }
 
-/// The `Value` held by `doc`'s top-level `#config{ ... }` or
-/// `#settings{ ... }` *definition* block.
+/// The `Value` held by `doc`'s top-level `@config{ ... }` or
+/// `@settings{ ... }` *definition* block.
 ///
 /// Owned rather than borrowed: a value group is a list of entries, so its
 /// data view is computed rather than stored.
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn settings_file_ref_extracts_the_path() {
-        let mut el = element_new(Sigil::block("settings"));
+        let mut el = element_new(Sigil::named("settings"));
         el.args = Some(Value::Map(vec![(
             "file".to_string(),
             Value::String("docs/docs.settings.tmt".to_string()),
@@ -136,13 +136,13 @@ mod tests {
     fn settings_file_ref_is_none_for_a_definition_block() {
         // `@settings{ ... }` itself -- no `args`, so it's a definition,
         // not a reference.
-        let el = element_new(Sigil::block("settings"));
+        let el = element_new(Sigil::named("settings"));
         assert_eq!(settings_file_ref(&el), None);
     }
 
     #[test]
     fn settings_file_ref_is_none_for_unrelated_elements() {
-        let mut el = element_new(Sigil::block("meta"));
+        let mut el = element_new(Sigil::named("meta"));
         el.args = Some(Value::Map(vec![(
             "file".to_string(),
             Value::String("x.tmt".to_string()),
@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn resolve_settings_ref_joins_against_project_root() {
-        let mut el = element_new(Sigil::block("settings"));
+        let mut el = element_new(Sigil::named("settings"));
         el.args = Some(Value::Map(vec![(
             "file".to_string(),
             Value::String("valid_settings.tmt".to_string()),
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn resolve_settings_ref_is_none_for_non_settings_elements() {
-        let el = element_new(Sigil::block("caution"));
+        let el = element_new(Sigil::named("caution"));
         assert!(resolve_settings_ref(&el, &fixture("")).is_none());
     }
 }

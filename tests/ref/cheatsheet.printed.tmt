@@ -1,20 +1,20 @@
-#settings(file: docs/docs.settings.tmt)
+@settings(file: docs/docs.settings.tmt)
 
-#config(json)
+@config(json)
 
 ```
-#meta(format:json)+++
+@meta(format:json)+++
 {
   "key": "value",
   "type": "person"
 }
 +++
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 key: value
 date: time
 type: character
 +++
-#meta(format:toml)+++
+@meta(format:toml)+++
 key = "value"
 type = "location"
 +++
@@ -54,11 +54,11 @@ ${sum(a, b)}
 sudo whoami ls --help
 ```
 
-#memo+++
+@memo+++
   don't forget: check [this] and [that]
 +++
 
-#blockquote[引用文]
+@blockquote[引用文]
 
 - outline/list
 
@@ -85,4 +85,4 @@ sudo whoami ls --help
 
 ---[💫]---
 
-#table(align: center)[[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ] [ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ] [ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]]{}
+@table(align: center)[[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ] [ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ] [ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]]{}

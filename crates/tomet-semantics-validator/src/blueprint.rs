@@ -222,10 +222,10 @@ mod tests {
     #[test]
     fn validates_matching_document_successfully() {
         let blueprint = parse(
-            "#blueprint(daily-note)\n#meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n#[ Plan ] {id: plan}\n\n#[ Review ] {id: review}\n",
+            "@blueprint(daily-note)\n@meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n#[ Plan ] {id: plan}\n\n#[ Review ] {id: review}\n",
         );
         let doc = parse(
-            "#kind(daily-note)\n#meta{\n  id: doc-123\n  date: 2026-09-01\n}\n\n#[ Plan ] {id: plan}\n- ( ) My task\n\n#[ Review ] {id: review}\nGood day.\n",
+            "@kind(daily-note)\n@meta{\n  id: doc-123\n  date: 2026-09-01\n}\n\n#[ Plan ] {id: plan}\n- ( ) My task\n\n#[ Review ] {id: review}\nGood day.\n",
         );
 
         let errors = validate_against_blueprint(&doc, &blueprint);
@@ -235,11 +235,11 @@ mod tests {
     #[test]
     fn reports_missing_meta_key_and_missing_section() {
         let blueprint = parse(
-            "#blueprint(daily-note)\n#meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n#[ Plan ] {id: plan}\n\n#[ Review ] {id: review}\n",
+            "@blueprint(daily-note)\n@meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n#[ Plan ] {id: plan}\n\n#[ Review ] {id: review}\n",
         );
         // doc is missing `@meta.date` and `#[ Review ] {id: review}`
         let doc = parse(
-            "#kind(daily-note)\n#meta{\n  id: doc-123\n}\n\n#[ Plan ] {id: plan}\n- ( ) My task\n",
+            "@kind(daily-note)\n@meta{\n  id: doc-123\n}\n\n#[ Plan ] {id: plan}\n- ( ) My task\n",
         );
 
         let errors = validate_against_blueprint(&doc, &blueprint);

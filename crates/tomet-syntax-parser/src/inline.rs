@@ -1,13 +1,13 @@
 //! Parsing for inline sequences, text normalization, and inline delimiters (`*em*`, `**strong**`, `==mark==`).
 
 use crate::codeblock::is_fenced_code_block_start;
-use crate::element::{is_block_element_start, is_inline_element_start, parse_element};
+use crate::element::{element_ends_line, is_element_start, parse_element};
 use crate::error::Result;
 use crate::heading::{is_thematic_break, is_titled_thematic_break_start};
 use crate::interp::{is_interp_start, parse_dollar_element};
 use crate::list::peek_list_marker;
 use crate::value::{err, skip_block_comment, skip_inline_ws, skip_line_comment};
-use tomet_ast::{Element, Inline, Sigil, Span, Text, Value};
+use tomet_ast::{Element, Inline, Placement, Sigil, Span, Text, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -68,15 +68,19 @@ pub(crate) fn parse_inline_seq(
                     let mut look = *cur;
                     look.bump();
                     skip_inline_ws(&mut look);
+                    // An element on a continuation line does *not* end the
+                    // paragraph. A line inside a paragraph is not block
+                    // context, so the element belongs to the running text:
+                    // wrapping a sentence so that `@link(…)[Tomet]` lands
+                    // at a line start used to split one paragraph into
+                    // three blocks. A block is opened by a blank line
+                    // first, which is what the checks below still detect.
                     if look.is_eof()
                         || look.peek() == Some('\n')
-                        || (look.peek() == Some('#')
-                            && (crate::document::is_heading_start(&look)
-                                || is_block_element_start(&look)))
+                        || (look.peek() == Some('#') && crate::document::is_heading_start(&look))
                         || matches!(peek_list_marker(&look), Ok(Some(_)))
                         || look.starts_with("//")
                         || look.starts_with("/*")
-                        || (look.peek() == Some('@') && is_inline_element_start(&look))
                         || is_titled_thematic_break_start(&look)
                         || is_thematic_break(&look)
                         || is_fenced_code_block_start(&look)
@@ -145,22 +149,30 @@ pub(crate) fn parse_inline_seq(
             text_start = cur.pos();
             continue;
         }
-        if cur.peek() == Some('@') && is_inline_element_start(cur) {
-            flush_text(&mut items, cur, &mut text_start);
-            items.push(Inline::Element(parse_element(cur, allow_colon_connect)?));
-            text_start = cur.pos();
-            continue;
-        }
-        // A block element is recognized inside a content group too, but
-        // only at a line start -- `#` means block, and block position is
-        // what a line start *is*. This is what lets `#references[` hold
-        // `#id(taskA):{...}` entries on their own lines. Mid-line, a `#`
-        // is ordinary prose.
-        if cur.peek() == Some('#') && at_line_start(cur) && is_block_element_start(cur) {
-            flush_text(&mut items, cur, &mut text_start);
-            items.push(Inline::Element(parse_element(cur, allow_colon_connect)?));
-            text_start = cur.pos();
-            continue;
+        // The placement rule applies inside a content group as well: a
+        // line start there is block context, so an element that also ends
+        // its line stands as a block. That is what lets `@references[`
+        // hold entries on their own lines, while `@link(…)[x]` mid-line
+        // stays part of the running text.
+        //
+        // A paragraph is the exception, and the reason this depends on
+        // `stop` at all: its continuation lines are *inside* running text,
+        // so a line start there is not block context. Treating it as one
+        // is what used to tear a wrapped sentence into separate blocks.
+        if cur.peek() == Some('@') {
+            let block_context = matches!(stop, Stop::Bracket(_)) && at_line_start(cur);
+            if is_element_start(cur, block_context) {
+                let block = block_context && element_ends_line(cur);
+                flush_text(&mut items, cur, &mut text_start);
+                let el = parse_element(cur, allow_colon_connect)?;
+                items.push(Inline::Element(if block {
+                    el.with_placement(Placement::Block)
+                } else {
+                    el
+                }));
+                text_start = cur.pos();
+                continue;
+            }
         }
         if cur.peek() == Some('$') && is_interp_start(cur) {
             flush_text(&mut items, cur, &mut text_start);
@@ -279,7 +291,7 @@ fn try_one_delimited(
         return Err(err(cur, cur.pos(), format!("expected '{delim}'")));
     }
     let span = cur.span_from(start_pos);
-    let mut el = element_new(Sigil::inline(kind)).with_span(span);
+    let mut el = element_new(Sigil::named(kind)).with_span(span);
     el.content = Some(inner);
     Ok(Some(el))
 }
@@ -441,7 +453,10 @@ fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
     let span = cur.span_from(start_pos);
 
     let el = Element {
-        sigil: Sigil::inline("link"),
+        sigil: Sigil::named("link"),
+        // An autolink is found while scanning running text, so it is
+        // always part of it.
+        placement: Placement::Inline,
         args: Some(Value::Map(vec![(
             "target".to_string(),
             Value::String(url_str),

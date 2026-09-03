@@ -117,7 +117,7 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("meta"));
+                assert_eq!(el.sigil, Sigil::named("meta"));
                 assert_eq!(
                     el.value,
                     Some(tomet_ast::ElementValue::from_map(Value::Map(vec![
@@ -138,7 +138,7 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::block("meta"));
+                assert_eq!(el.sigil, Sigil::named("meta"));
                 assert_eq!(
                     el.value,
                     Some(tomet_ast::ElementValue::from_map(Value::Map(vec![

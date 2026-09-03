@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_printer_config_meta_format() {
-        let config_src = r#"#config(format:json)+++
+        let config_src = r#"@config(format:json)+++
 {
   "format": {
     "meta": {
@@ -476,7 +476,7 @@ mod tests {
 
     #[test]
     fn test_settings_field_config_parsing() {
-        let settings_src = r#"#settings(format:json)+++
+        let settings_src = r#"@settings(format:json)+++
 {
   "meta": {
     "aliases": {
@@ -517,7 +517,7 @@ mod tests {
         // `is_path_ignored`'s own matching behavior is covered by
         // `tomet-indexer`'s tests now -- this only checks that
         // `ignore.files` parses into `PrinterConfig.ignore_files`.
-        let settings_src = r#"#settings(format:json)+++
+        let settings_src = r#"@settings(format:json)+++
 {
   "ignore": {
     "files": [
@@ -536,7 +536,7 @@ mod tests {
 
     #[test]
     fn test_heading_and_link_spacing_config() {
-        let src = r#"#config(
+        let src = r#"@config(
   format: {
     heading: { space_inside_brackets: true }
     link: { no_space: true }

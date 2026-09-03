@@ -17,11 +17,13 @@ use commands::check_links::check_links_cmd;
 use commands::export::export_cmd;
 use commands::format::format_cmd;
 use commands::from_md::from_md_cmd;
+use commands::from_pandoc::from_pandoc;
 use commands::html::html;
 use commands::refactor::refactor_cmd;
 use commands::roundtrip::roundtrip;
 use commands::serve::serve;
 use commands::to_md::to_md;
+use commands::to_pandoc::to_pandoc;
 use commands::to_typst::to_typst;
 
 fn main() -> ExitCode {
@@ -55,6 +57,8 @@ fn main() -> ExitCode {
         } => html(file, out, *advanced, lang.clone()),
         Command::ToMd { file, out } => to_md(file, out),
         Command::ToTypst { file, out } => to_typst(file, out),
+        Command::ToPandoc { file, out } => to_pandoc(file, out),
+        Command::FromPandoc { file, out } => from_pandoc(file, out),
         Command::FromMd {
             path,
             out,

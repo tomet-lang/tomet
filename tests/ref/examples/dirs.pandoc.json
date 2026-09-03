@@ -1,0 +1,216 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {
+    "type": {
+      "t": "MetaInlines",
+      "c": [
+        {
+          "t": "Str",
+          "c": "bookmark"
+        }
+      ]
+    }
+  },
+  "blocks": [
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-file"
+          ],
+          [
+            [
+              "value",
+              "readme.md"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "Para",
+            "c": [
+              {
+                "t": "Str",
+                "c": "説明"
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-dirs"
+          ],
+          [
+            [
+              "value",
+              "src"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "Para",
+            "c": [
+              {
+                "t": "Str",
+                "c": "ソースコード"
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-file"
+          ],
+          [
+            [
+              "value",
+              "src/Cargo.toml"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "Para",
+            "c": [
+              {
+                "t": "Str",
+                "c": "パッケージコンフィグ"
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-file"
+          ],
+          [
+            [
+              "value",
+              "src/crates"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "Para",
+            "c": [
+              {
+                "t": "Str",
+                "c": "Crates"
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-dirs"
+          ],
+          [
+            [
+              "value",
+              "apps"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "Para",
+            "c": [
+              {
+                "t": "Str",
+                "c": "ソースコード"
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-file"
+          ],
+          [
+            [
+              "value",
+              "apps/Cargo.toml"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "Para",
+            "c": [
+              {
+                "t": "Str",
+                "c": "パッケージコンフィグ"
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-file"
+          ],
+          [
+            [
+              "value",
+              "apps/crates"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "Para",
+            "c": [
+              {
+                "t": "Str",
+                "c": "Crates"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  ]
+}

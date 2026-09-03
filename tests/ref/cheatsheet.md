@@ -1,18 +1,16 @@
-<div data-tm-kind="settings" data-file="docs/docs.settings.tmt"></div>
-
 ```
-#meta(format:json)+++
+@meta(format:json)+++
 {
   "key": "value",
   "type": "person"
 }
 +++
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 key: value
 date: time
 type: character
 +++
-#meta(format:toml)+++
+@meta(format:toml)+++
 key = "value"
 type = "location"
 +++
@@ -68,7 +66,7 @@ sudo whoami ls --help
 
 1. aaaa
 
-**aaaa** *aaaa* <mark>aaaa</mark> *aaaa* \`aaaa\`
+**aaaa** *aaaa* <mark>aaaa</mark> *aaaa* `aaaa`
 
 ```(lang:sh)
 

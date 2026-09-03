@@ -74,13 +74,11 @@ pub fn apply_structural_action(doc: &mut Document, action: &StructuralAction) ->
         StructuralAction::RenameTag { from, to } => {
             let kind = classify_lenient(el);
             if kind.as_str().eq_ignore_ascii_case(from) {
-                match &mut el.sigil {
-                    // Renaming replaces the local half and leaves any
-                    // namespace in place: `deck.bookmark` renamed to
-                    // `card` becomes `deck.card`, not `card`.
-                    Sigil::Block(name) => name.name = to.clone(),
-                    Sigil::Inline(name) => name.name = to.clone(),
-                    _ => {}
+                // Renaming replaces the local half and leaves any
+                // namespace in place: `deck.bookmark` renamed to `card`
+                // becomes `deck.card`, not `card`.
+                if let Sigil::Named(name) = &mut el.sigil {
+                    name.name = to.clone();
                 }
                 count += 1;
             }

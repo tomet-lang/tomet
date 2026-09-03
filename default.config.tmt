@@ -1,8 +1,8 @@
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 id: doc-kWBcIUUz
 type: config
 +++
-#config(format:json)+++
+@config(format:json)+++
 {
   "macros": {
     "gh": "https://github.com/tomet/tomet/issues/${1}",
@@ -30,7 +30,7 @@ type: config
     },
     "table": {
       "adjust_width": "auto",
-      "max_col_width": 20
+      "max_col_width": 30
     },
     "link": {
       "no_space": true

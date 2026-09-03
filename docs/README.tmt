@@ -1,0 +1,59 @@
+@settings(file:docs/docs.settings.tmt)
+@meta{}
+
+#[ Tomet のドキュメント ]
+
+何がどこにあるかの地図。探しものがここから辿れないなら、間違っているのは
+このページのほう。別の場所に二つ目の索引を作らず、ここを直すこと。
+
+@table[
+[ ディレクトリ ][ 内容 ][ 言語 ][ 形式 ]
+[ @link(file:fact/)[`fact/`] ][ Tomet が何であるか。理念と、他フォーマットとの棲み分け ][ 日本語 ][ `.tmt` ]
+[ @link(file:spec/)[`spec/`] ][ 言語仕様。文法、型、推論、組み込みの要素・関数・設定 ][ 日本語 ][ `.tmt`（`.md` は生成物） ]
+[ @link(file:guide/)[`guide/`] ][ 使い方。チートシート、CLI、設定、機能、組み込み ][ 日本語 ][ `.tmt`（`.md` は生成物） ]
+[ @link(file:examples/)[`examples/`] ][ 実際に動く `.tmt` のサンプルとテンプレート ][ 日本語 ][ `.tmt` ]
+[ @link(file:develop/)[`develop/`] ][ 開発者向け。アーキテクチャ、ドキュメントの規約 ][ 英語 ][ `.md` ]
+[ @link(file:design/decisions/)[`design/decisions/`] ][ 日付つきの設計判断の記録。史料であり、後から書き換えない ][ 英語 ][ `.md` ]
+[ @link(file:design/ideas/)[`design/ideas/`] ][ 未決のスケッチとメモ ][ 混在 ][ `.tmt` ]
+]
+
+`docs/` の外に、二つ。
+
+- `/tests` — `tomet-tests` パッケージ。凍結された `.tmt` コーパス、クレート
+  横断の不変条件、変換のスナップショット。ここの fixture は `docs/` の文書を
+  複製したところから始まったが、同期は取っていない。`tests/README.md` を見る。
+- @link(file:../tests/SYNTAX.md)[`/tests/SYNTAX.md`] — パーサが今受け付ける
+  構文の全部。例と、それが作る AST つき。`tomet-parser` 自身から生成され
+  `cargo test` で検証されるので、`spec/` と違って乖離しようがない。`spec/` は
+  規範的（言語が何を受け付ける*べき*か）で手書き、こちらは記述的（実装が何を
+  受け付ける*か*）で生成物。並べて読むこと。食い違っていたら、その食い違い
+  自体が読み取るべき情報。
+- `/default.config.tmt` — このリポジトリが実際に使っている設定。
+  `docs/examples/default.config.tmt` は `@version`/`@kind` ヘッダの書き方を
+  見せる*見本*であって、同じファイルではない。
+
+#[ ここから読む ]
+
+- 言語をはじめて触る: @link(file:guide/cheatsheet.tmt)[`guide/cheatsheet.tmt`]
+- なぜこのフォーマットがあるのか: @link(file:fact/root.tmt)[`fact/root.tmt`]
+- 正確な構文を引く: @link(file:spec/syntax.tmt)[`spec/syntax.tmt`]
+- パーサが今日*実際に*受け付けるものを確かめる:
+  @link(file:../tests/SYNTAX.md)[`/tests/SYNTAX.md`]
+- Rust のクレートをいじる:
+  @link(file:develop/architecture.md)[`develop/architecture.md`]
+- ある構文がなぜそう決まったのかを知る:
+  @link(file:design/decisions/)[`design/decisions/`]、日付順
+- ドキュメントを書く・動かす:
+  @link(file:develop/docs-guide.md)[`develop/docs-guide.md`]
+
+#[ 文書を検査する ]
+
+`docs/` 以下の `.tmt` は本物の Tomet 文書なので、そのままドッグフーディングに
+なっている。全部がまだパースでき、整形されていることを確かめるには:
+
+```bash
+just docs-check
+```
+
+これは意図的に `cargo test` の一部にしていない。ここの文書は動き続けるもので、
+散文を直したせいで無関係なコード変更が落ちるのは困るから。

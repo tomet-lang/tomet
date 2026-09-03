@@ -14,8 +14,8 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
-    ElementKind, TargetScheme, classify_lenient, heading_level, link_target, list_items,
-    list_ordered, normalized_element_args, target_scheme,
+    EXACT_DATA_KEY, ElementKind, TargetScheme, classify_lenient, flatten_data, heading_level,
+    is_directive, link_target, list_items, list_ordered, normalized_element_args, target_scheme,
 };
 
 const DEFAULT_STYLE: &str = "\
@@ -315,7 +315,8 @@ fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut String) {
 fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
     let kind = classify_lenient(el);
     match kind.as_str() {
-        "version" | "kind" | "meta" | "config" | "blueprint" => {}
+        // Directives -- see `tomet_semantics::is_directive`.
+        _ if is_directive(&kind) => {}
         "interp" => {
             if let Some(value) = &el.value {
                 render_element_value(cx, value, out);
@@ -789,27 +790,45 @@ fn push_named_attrs(
     }
 }
 
+/// Writes an element's arguments as `data-*` attributes.
+///
+/// Follows the shared projection rule (`tomet_semantics::flatten`): a
+/// scalar or a sequence of scalars gets its own readable attribute, and
+/// when that projection would lose something -- a nested map -- the whole
+/// group is added as JSON under `data-tomet-data`.
+///
+/// Before that, a nested map rendered as `data-m=""`: the key survived
+/// and its contents did not.
 fn push_data_attrs(out: &mut String, args: Option<&Value>, skip: &[&str]) {
+    let Some(args) = args else {
+        return;
+    };
+    let data = flatten_data(Some(args), None);
+
     match args {
-        Some(Value::Map(map)) => {
-            for (k, v) in map {
+        Value::Map(_) => {
+            for (k, v) in &data.pairs {
                 if skip.contains(&k.as_str()) {
                     continue;
                 }
-                out.push_str(&format!(
-                    " data-{}=\"{}\"",
-                    escape_attr(k),
-                    escape_attr(&value_to_plain(v))
-                ));
+                out.push_str(&format!(" data-{}=\"{}\"", escape_attr(k), escape_attr(v)));
             }
         }
-        Some(v) => {
-            let text = value_to_plain(v);
-            if !text.is_empty() {
-                out.push_str(&format!(" data-value=\"{}\"", escape_attr(&text)));
+        // A positional group (`@x(1)`) has no key to project onto, so
+        // the shared rule hands it back separately.
+        _ => {
+            if let Some(text) = data.positional.as_ref().filter(|t| !t.is_empty()) {
+                out.push_str(&format!(" data-value=\"{}\"", escape_attr(text)));
             }
         }
-        None => {}
+    }
+
+    if let Some(exact) = data.exact {
+        out.push_str(&format!(
+            " data-{}=\"{}\"",
+            EXACT_DATA_KEY,
+            escape_attr(&exact)
+        ));
     }
 }
 
@@ -865,6 +884,28 @@ mod tests {
     use tomet_parser::parse_document;
 
     #[test]
+    fn a_nested_map_survives_as_an_exact_copy() {
+        // It used to render as `data-m=""` -- key kept, contents gone.
+        let doc = parse_document("@deck.x(a: 1, m: { k: v })[ 本文 ]\n").unwrap();
+        let html = render_body(&doc);
+        assert!(html.contains(r#"data-a="1""#), "got {html}");
+        assert!(
+            !html.contains(r#"data-m="""#),
+            "the empty attr is gone: {html}"
+        );
+        assert!(html.contains("data-tomet-data="), "got {html}");
+        assert!(html.contains("&quot;m&quot;"), "got {html}");
+    }
+
+    #[test]
+    fn flat_args_need_no_exact_copy() {
+        let doc = parse_document("@deck.x(a: 1, tags: [p, q])[ 本文 ]\n").unwrap();
+        let html = render_body(&doc);
+        assert!(html.contains(r#"data-tags="p, q""#), "got {html}");
+        assert!(!html.contains("data-tomet-data="), "got {html}");
+    }
+
+    #[test]
     fn renders_heading_with_id_and_cssclass() {
         let doc = parse_document("#[ Hello ]{ id:header1, cssclass:card }\n").unwrap();
         let body = render_body(&doc);
@@ -879,7 +920,7 @@ mod tests {
         // `render_element`'s generic rendering, keyed on its kind name.
         // (This used to be demonstrated with a nested `@heading`; headings
         // are block-shaped now, so an inline one is not expressible.)
-        let doc = parse_document("#blockquote[ @deck.badge(2)[Nested] ]\n").unwrap();
+        let doc = parse_document("@blockquote[ @deck.badge(2)[Nested] ]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1021,7 +1062,7 @@ mod tests {
 
     #[test]
     fn renders_links_container_as_definition_list() {
-        let doc = parse_document("#links {\n  (1)[ note ]\n  (anotation1)[ note2 ]\n}\n").unwrap();
+        let doc = parse_document("@links {\n  (1)[ note ]\n  (anotation1)[ note2 ]\n}\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1076,14 +1117,14 @@ mod tests {
 
     #[test]
     fn meta_element_has_no_visible_output() {
-        let doc = parse_document("#meta(format:yaml)+++\nkey: value\n+++\n").unwrap();
+        let doc = parse_document("@meta(format:yaml)+++\nkey: value\n+++\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "");
     }
 
     #[test]
     fn config_element_has_no_visible_output() {
-        let doc = parse_document("#config(format:json)\n").unwrap();
+        let doc = parse_document("@config(format:json)\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "");
     }
@@ -1103,7 +1144,7 @@ mod tests {
         // than leaking a stray whitespace-only `<p>` -- garbage in,
         // harmless out.
         let doc = parse_document(
-            "#meta(format:json)+++\n{\"key\":\"value\"}\n+++\n#meta(format:yaml)+++\nkey:value\n+++\n#meta(format:toml)+++\nkey = \"value\"\n+++\n\n#[ next ]\n",
+            "@meta(format:json)+++\n{\"key\":\"value\"}\n+++\n@meta(format:yaml)+++\nkey:value\n+++\n@meta(format:toml)+++\nkey = \"value\"\n+++\n\n#[ next ]\n",
         )
         .unwrap();
         let body = render_body(&doc);
@@ -1112,7 +1153,7 @@ mod tests {
 
     #[test]
     fn renders_typed_element_generically() {
-        let doc = parse_document("#caution[ be careful ]\n").unwrap();
+        let doc = parse_document("@caution[ be careful ]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1163,7 +1204,7 @@ mod tests {
 
     #[test]
     fn renders_codeblock_with_lang() {
-        let doc = parse_document("#codeblock(lang:rust)[fn main() {}]\n").unwrap();
+        let doc = parse_document("@codeblock(lang:rust)[fn main() {}]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1198,7 +1239,7 @@ mod tests {
 
     #[test]
     fn codeblock_with_a_nested_bracket_is_not_truncated_early() {
-        let doc = parse_document("#codeblock(lang:rust)[let v = [1, 2, 3];]\n").unwrap();
+        let doc = parse_document("@codeblock(lang:rust)[let v = [1, 2, 3];]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1237,7 +1278,7 @@ mod tests {
     #[test]
     fn codeblock_value_group_is_id_cssclass_metadata_not_code() {
         let doc =
-            parse_document("#codeblock(lang:rust){id:snippet1, cssclass:card}[fn main() {}]\n")
+            parse_document("@codeblock(lang:rust){id:snippet1, cssclass:card}[fn main() {}]\n")
                 .unwrap();
         let body = render_body(&doc);
         assert_eq!(
@@ -1248,7 +1289,7 @@ mod tests {
 
     #[test]
     fn renders_codeblock_with_positional_lang_arg() {
-        let doc = parse_document("#codeblock(\"rust\")[fn main() {}]\n").unwrap();
+        let doc = parse_document("@codeblock(\"rust\")[fn main() {}]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1266,7 +1307,7 @@ mod tests {
     #[test]
     fn meta_and_config_with_positional_format_arg_have_no_visible_output() {
         let doc =
-            parse_document("#meta(\"json\")+++\n{\"key\": \"value\"}\n+++\n#config(\"json\")\n")
+            parse_document("@meta(\"json\")+++\n{\"key\": \"value\"}\n+++\n@config(\"json\")\n")
                 .unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "");
@@ -1274,7 +1315,7 @@ mod tests {
 
     #[test]
     fn renders_table_element_to_html() {
-        let src = "#table()[\n[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]\n[ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]\n[ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]\n]{}\n";
+        let src = "@table()[\n[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]\n[ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]\n[ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]\n]{}\n";
         let doc = parse_document(src).unwrap();
         let body = render_body(&doc);
         assert_eq!(
@@ -1329,7 +1370,7 @@ mod tests {
 
     #[test]
     fn renders_interp_and_macros_to_html() {
-        let doc = parse_document("#config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    copyright: \"(C) 2026 Tomet\"\n  }\n}\n\nIssue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
+        let doc = parse_document("@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    copyright: \"(C) 2026 Tomet\"\n  }\n}\n\nIssue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,

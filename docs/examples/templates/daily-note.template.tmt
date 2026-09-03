@@ -1,5 +1,5 @@
-#blueprint(daily-note)
-#meta{
+@blueprint(daily-note)
+@meta{
   id: ${uuid()}
   date: ${date("YYYY-MM-DD")}
   title: ${title}

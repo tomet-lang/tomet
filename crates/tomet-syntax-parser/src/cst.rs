@@ -359,9 +359,9 @@ mod tests {
     fn test_cst_lossless_roundtrip_all_syntaxes() {
         let cases = [
             "#[ Heading ]\n\nParagraph text with *em* and @tag[ content ].\n",
-            "#config(format:json)+++\n{\n  \"meta\": \"yaml\"\n}\n+++\n",
+            "@config(format:json)+++\n{\n  \"meta\": \"yaml\"\n}\n+++\n",
             "- item 1\n- item 2\n-. ordered 1\n\n```rust\nfn main() {}\n```\n",
-            "// Comment line\n#card(id: 123){ priority: high }[ Note ]\n",
+            "// Comment line\n@card(id: 123){ priority: high }[ Note ]\n",
         ];
 
         for case in cases {

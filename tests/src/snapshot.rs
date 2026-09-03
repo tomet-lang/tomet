@@ -80,3 +80,36 @@ fn markdown_import_export_is_stable() {
         );
     }
 }
+
+#[test]
+fn pandoc_output_matches_reference() {
+    // `.tmt` -> Pandoc's AST, JSON-encoded. This is what
+    // `pandoc -f json` reads, so the reference is the wire format
+    // itself -- a change here is a change to what Pandoc will accept.
+    for (rel, src) in parseable_corpus() {
+        let doc = tomet_parser::parse_document(&src)
+            .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+        let json = serde_json::to_string_pretty(&tomet_pandoc::to_pandoc(&doc))
+            .expect("the Pandoc AST serializes");
+        assert_snapshot(&snapshot_name(&rel, "pandoc.json"), &json);
+    }
+}
+
+#[test]
+fn pandoc_round_trip_is_stable() {
+    // `.tmt` -> Pandoc -> `.tmt`. Lossy by design: Pandoc's `Attr` is
+    // flat, so unless the exact copy was needed there is nothing left to
+    // say which pair came from `(args)` rather than `{value}`, and
+    // Pandoc metadata has no numeric type. This does not assert a round
+    // trip -- it pins where the losses land, so a change in them shows up
+    // as a diff rather than as a surprise.
+    for (rel, src) in parseable_corpus() {
+        let doc = tomet_parser::parse_document(&src)
+            .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+        let back = tomet_pandoc::from_pandoc(&tomet_pandoc::to_pandoc(&doc));
+        assert_snapshot(
+            &snapshot_name(&rel, "pandoc.roundtrip.tmt"),
+            &tomet_printer::document_to_tm(&back),
+        );
+    }
+}

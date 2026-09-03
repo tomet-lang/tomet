@@ -1909,6 +1909,7 @@ dependencies = [
  "tomet-indexer",
  "tomet-links",
  "tomet-markdown",
+ "tomet-pandoc",
  "tomet-parser",
  "tomet-printer",
  "tomet-semantics",
@@ -2094,6 +2095,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomet-pandoc"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-printer",
+ "tomet-semantics",
+ "tomet-tree",
+]
+
+[[package]]
 name = "tomet-parser"
 version = "0.1.0"
 dependencies = [
@@ -2176,12 +2190,14 @@ dependencies = [
 name = "tomet-tests"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "tomet-ast",
  "tomet-compute",
  "tomet-config",
  "tomet-formatter",
  "tomet-html",
  "tomet-markdown",
+ "tomet-pandoc",
  "tomet-parser",
  "tomet-printer",
  "tomet-transform",

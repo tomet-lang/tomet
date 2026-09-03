@@ -120,7 +120,7 @@ mod tests {
         // making it visible here at all.
         // `deck.task` is namespaced: a bare `task` would also report
         // `UnknownElement`, which is a different rule.
-        let doc = parse("#[ one ]{id:a}\n\n#deck.task(id:a)\n");
+        let doc = parse("#[ one ]{id:a}\n\n@deck.task(id:a)\n");
         let errors = validate_document(&doc);
         assert_eq!(errors.len(), 1);
         assert!(matches!(

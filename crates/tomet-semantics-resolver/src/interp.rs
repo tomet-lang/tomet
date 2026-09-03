@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn resolves_bare_id_from_args() {
-        let doc = parse("#x(id:greeting, text:hi)\n");
+        let doc = parse("@x(id:greeting, text:hi)\n");
         let value = resolve_reference(&doc, &interp("${greeting}")).unwrap();
         assert_eq!(
             value,
@@ -155,7 +155,7 @@ mod tests {
         // matched id itself lives. The merge is unfiltered (no special
         // "drop the id key" rule), so it shows up in the result
         // alongside `{value}`'s `text` key.
-        let doc = parse("#meta(id:greeting){text: hi}\n");
+        let doc = parse("@meta(id:greeting){text: hi}\n");
         let value = resolve_reference(&doc, &interp("${greeting}")).unwrap();
         assert_eq!(
             value,
@@ -168,28 +168,28 @@ mod tests {
 
     #[test]
     fn member_prefers_value_over_args_on_conflict() {
-        let doc = parse("#x(id:greeting, text:from_args){text: from_value}\n");
+        let doc = parse("@x(id:greeting, text:from_args){text: from_value}\n");
         let value = resolve_reference(&doc, &interp("${greeting.text}")).unwrap();
         assert_eq!(value, Value::String("from_value".into()));
     }
 
     #[test]
     fn member_falls_back_to_args_when_absent_from_value() {
-        let doc = parse("#x(id:greeting, text:from_args){other: from_value}\n");
+        let doc = parse("@x(id:greeting, text:from_args){other: from_value}\n");
         let value = resolve_reference(&doc, &interp("${greeting.text}")).unwrap();
         assert_eq!(value, Value::String("from_args".into()));
     }
 
     #[test]
     fn nested_member_chain_resolves() {
-        let doc = parse("#x(id:a){b: {c: deep}}\n");
+        let doc = parse("@x(id:a){b: {c: deep}}\n");
         let value = resolve_reference(&doc, &interp("${a.b.c}")).unwrap();
         assert_eq!(value, Value::String("deep".into()));
     }
 
     #[test]
     fn unknown_id_is_an_error() {
-        let doc = parse("#x(id:known)\n");
+        let doc = parse("@x(id:known)\n");
         let err = resolve_reference(&doc, &interp("${missing}")).unwrap_err();
         assert!(matches!(err, ResolveError::UnknownId { id } if id == "missing"));
     }
@@ -202,14 +202,14 @@ mod tests {
         // so a truly non-map base only shows up one level deeper, here
         // via `.text` landing on a plain string before `.sub` tries to
         // go further.
-        let doc = parse("#x(id:a, text:hi)\n");
+        let doc = parse("@x(id:a, text:hi)\n");
         let err = resolve_reference(&doc, &interp("${a.text.sub}")).unwrap_err();
         assert!(matches!(err, ResolveError::NoSuchMember { member } if member == "sub"));
     }
 
     #[test]
     fn missing_member_key_is_an_error() {
-        let doc = parse("#x(id:a){present: yes}\n");
+        let doc = parse("@x(id:a){present: yes}\n");
         let err = resolve_reference(&doc, &interp("${a.absent}")).unwrap_err();
         assert!(matches!(err, ResolveError::NoSuchMember { member } if member == "absent"));
     }

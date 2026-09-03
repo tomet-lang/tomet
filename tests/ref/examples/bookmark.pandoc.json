@@ -1,0 +1,284 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {},
+  "blocks": [
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Span",
+          "c": [
+            [
+              "uuid-asld-lask-sdff",
+              [
+                "tomet-bookmark"
+              ],
+              [
+                [
+                  "tags",
+                  "a, a"
+                ],
+                [
+                  "value",
+                  "https://example.com"
+                ]
+              ]
+            ],
+            []
+          ]
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "ブックマークの"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "メモ"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "改行を保持できる"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Span",
+          "c": [
+            [
+              "uuid-asld-lask-sdff",
+              [
+                "tomet-bookmark"
+              ],
+              [
+                [
+                  "tags",
+                  "a, a"
+                ],
+                [
+                  "value",
+                  "https://example.com"
+                ]
+              ]
+            ],
+            []
+          ]
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "メモ"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Span",
+          "c": [
+            [
+              "uuid-asld-lask-sdff",
+              [
+                "tomet-bookmark"
+              ],
+              [
+                [
+                  "tags",
+                  "a, a"
+                ],
+                [
+                  "value",
+                  "https://example.com"
+                ]
+              ]
+            ],
+            []
+          ]
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "メモ"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Span",
+          "c": [
+            [
+              "uuid-asld-lask-sdff",
+              [
+                "tomet-bookmark"
+              ],
+              [
+                [
+                  "tags",
+                  "a, a"
+                ],
+                [
+                  "value",
+                  "https://example.com"
+                ]
+              ]
+            ],
+            []
+          ]
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "メモ"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Span",
+          "c": [
+            [
+              "uuid-asld-lask-sdff",
+              [
+                "tomet-bookmark"
+              ],
+              [
+                [
+                  "tags",
+                  "a, a"
+                ],
+                [
+                  "value",
+                  "https://example.com"
+                ]
+              ]
+            ],
+            []
+          ]
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "メモ"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Span",
+          "c": [
+            [
+              "uuid-asld-lask-sdff",
+              [
+                "tomet-bookmark"
+              ],
+              [
+                [
+                  "tags",
+                  "a, a"
+                ],
+                [
+                  "value",
+                  "https://example.com"
+                ]
+              ]
+            ],
+            []
+          ]
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "メモ"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "+++"
+        }
+      ]
+    }
+  ]
+}

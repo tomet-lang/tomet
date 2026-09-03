@@ -1,4 +1,4 @@
-#meta(format:yaml)+++
+@meta(format:yaml)+++
 id: doc-sigils
 type: fixture
 +++
@@ -9,19 +9,15 @@ type: fixture
 
 #[ブロック要素]
 
-#memo[名前は `#` の直後に続く。空白があると本文になる]
+@memo[名前は `#` の直後に続く。空白があると本文になる]
 
-#deck.bookmark(name: foo, count: 3)[名前空間つき]
+@deck.bookmark(name: foo, count: 3)[名前空間つき]
 
-#import(file: ./deck.tmt, as: deck)
+@import(file: ./deck.tmt, as: deck)
 
 #[インライン要素]
 
-文中の @link(target: "https://example.com")[リンク] と
-
-@deck.badge(2)[名前空間つきインライン]
-
-は行の途中でも要素になる。
+文中の @link(target: "https://example.com")[リンク] と @deck.badge(2)[名前空間つきインライン] は行の途中でも要素になる。
 
 #[本文に落ちる `#`]
 
@@ -31,12 +27,12 @@ type: fixture
 
 #[`{}` は常にデータ]
 
-#links{
+@links{
   (1)[ひとつめ]
   (2)[ふたつめ]
 }
 
-#deck.card{
+@deck.card{
   title: 混在
   (a)[対と要素が同じ並びに入る]
 }

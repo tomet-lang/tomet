@@ -15,7 +15,7 @@
 //! That ordering is the point. `format:` used to steer the lexer: a
 //! `{...}` body was scanned with brace-depth tracking and handed to
 //! another parser mid-parse, which meant the element's own arguments could
-//! change the shape of the tree -- and it terminated `#meta(format:yaml)`
+//! change the shape of the tree -- and it terminated `@meta(format:yaml)`
 //! early at the first unquoted `}` inside otherwise legal YAML. A fence
 //! has no such failure mode, and `format:` is now pure interpretation.
 
@@ -235,7 +235,7 @@ fn toml_to_value(v: toml::Value) -> Value {
 pub fn element_format(el: &tomet_ast::Element) -> Option<EmbeddedFormat> {
     let args = el.args.as_ref()?;
     let tag = match args {
-        // `#meta(yaml)` -- the positional shorthand, normalized to
+        // `@meta(yaml)` -- the positional shorthand, normalized to
         // `format:` by `crate::positional`.
         Value::String(tag) => tag.as_str(),
         Value::Map(entries) => entries

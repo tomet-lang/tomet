@@ -1,7 +1,7 @@
 #[ 全容 ]
 
 ```tm
-#meta(yaml)+++
+@meta(yaml)+++
 id: #id
 type: "string"
 +++

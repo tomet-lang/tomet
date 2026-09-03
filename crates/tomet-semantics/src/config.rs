@@ -10,6 +10,10 @@ pub enum ExportType {
     CommonMark,
     Html,
     Typst,
+    /// Pandoc's own AST, JSON-encoded -- not a rendering, but the input
+    /// `pandoc -f json` takes, and so the route to every format Pandoc
+    /// writes.
+    Pandoc,
     Custom(String),
 }
 
@@ -21,6 +25,7 @@ impl ExportType {
             "commonmark" | "markdown" | "md" => ExportType::CommonMark,
             "html" | "htm" => ExportType::Html,
             "typst" | "typ" => ExportType::Typst,
+            "pandoc" | "json" => ExportType::Pandoc,
             other => ExportType::Custom(other.to_string()),
         }
     }
@@ -31,6 +36,7 @@ impl ExportType {
             ExportType::CommonMark => "commonmark",
             ExportType::Html => "html",
             ExportType::Typst => "typst",
+            ExportType::Pandoc => "pandoc",
             ExportType::Custom(s) => s.as_str(),
         }
     }
@@ -291,7 +297,7 @@ mod tests {
     #[test]
     fn parses_grouped_export_config_args() {
         let doc = parse_document(
-            "#config(\n  format: json\n  export: {\n    type: commonmark\n    path: \"README.md\"\n  }\n)\n",
+            "@config(\n  format: json\n  export: {\n    type: commonmark\n    path: \"README.md\"\n  }\n)\n",
         )
         .unwrap();
 
@@ -308,7 +314,7 @@ mod tests {
     #[test]
     fn parses_grouped_export_config_with_sequence_and_map_paths() {
         let doc = parse_document(
-            "#config(\n  export: {\n    type: [commonmark, html]\n    path: {\n      commonmark: \"README.md\"\n      html: \"index.html\"\n    }\n  }\n)\n",
+            "@config(\n  export: {\n    type: [commonmark, html]\n    path: {\n      commonmark: \"README.md\"\n      html: \"index.html\"\n    }\n  }\n)\n",
         )
         .unwrap();
 
@@ -336,14 +342,14 @@ mod tests {
 
     #[test]
     fn parses_table_adjust_width_config() {
-        let doc = parse_document("#settings(format:json)+++\n{\n  \"table\": {\n    \"adjust_width\": \"true\"\n  }\n}\n+++\n").unwrap();
+        let doc = parse_document("@settings(format:json)+++\n{\n  \"table\": {\n    \"adjust_width\": \"true\"\n  }\n}\n+++\n").unwrap();
         let config = document_config(&doc);
         assert!(config.table_adjust_width);
     }
 
     #[test]
     fn parses_macros_config() {
-        let doc = parse_document("#config{\n  macros: {\n    gh: \"https://github.com/org/repo/issues/$1\"\n    jira: \"https://jira.org/browse/$1\"\n  }\n}\n").unwrap();
+        let doc = parse_document("@config{\n  macros: {\n    gh: \"https://github.com/org/repo/issues/$1\"\n    jira: \"https://jira.org/browse/$1\"\n  }\n}\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(
             config.macros.get("gh").map(|s| s.as_str()),

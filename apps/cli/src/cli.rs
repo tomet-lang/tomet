@@ -67,6 +67,26 @@ pub enum Command {
         #[arg(short, long)]
         out: Option<PathBuf>,
     },
+    /// Convert a `.tmt` file to Pandoc's JSON AST, which `pandoc -f json`
+    /// reads -- the bridge to every format Pandoc writes (docx, LaTeX,
+    /// EPUB, org, ...). Pass `-` to read the `.tmt` from stdin.
+    ToPandoc {
+        file: PathBuf,
+        /// Write to this path instead of stdout.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+    },
+    /// Convert Pandoc's JSON AST (`pandoc -t json <file>`) to Tomet
+    /// (.tmt) -- the bridge from every format Pandoc reads. Pass `-` to
+    /// read the JSON from stdin, which is the usual way:
+    /// `pandoc -t json x.docx | tomet from-pandoc -`.
+    FromPandoc {
+        /// Target `.json` file, or `-` for stdin.
+        file: PathBuf,
+        /// Write to this path instead of stdout.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+    },
     /// Convert CommonMark Markdown (.md) to Tomet (.tmt).
     FromMd {
         /// Target .md file or directory containing .md files.

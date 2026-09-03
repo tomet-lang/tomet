@@ -64,7 +64,7 @@ where
         }
     };
 
-    let mut new_directive = element_new(Sigil::block(target_directive_name));
+    let mut new_directive = element_new(Sigil::named(target_directive_name));
     new_directive.args = Some(prop_val);
 
     doc.insert_block(insert_pos, Block::Element(new_directive));
