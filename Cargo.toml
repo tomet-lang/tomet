@@ -28,6 +28,9 @@ members = [
   "crates/tomet-semantics-compute",
   "crates/tomet-semantics-resolver",
 
+  #[ Config -- PrinterConfig discovery & loading; the producers sit on this ]
+  "crates/tomet-config",
+
   #[ Transform -- in-memory AST transformations & macros ]
   "crates/tomet-transform",
 
@@ -47,7 +50,6 @@ members = [
   "crates/tomet-workspace",
   "crates/tomet-workspace-indexer",
   "crates/tomet-workspace-links",
-  "crates/tomet-workspace-config",
 
   #[ Public -- external ecosystem adapters ]
   "crates/serde_tomet",
@@ -94,7 +96,7 @@ tomet-formatter = { path = "crates/tomet-formatter" }
 tomet-workspace = { path = "crates/tomet-workspace" }
 tomet-indexer = { path = "crates/tomet-workspace-indexer" }
 tomet-links = { path = "crates/tomet-workspace-links" }
-tomet-config = { path = "crates/tomet-workspace-config" }
+tomet-config = { path = "crates/tomet-config" }
 #[ Public ]
 serde_tomet = { path = "crates/serde_tomet" }
 tree-sitter-tomet = { path = "crates/tree-sitter-tomet" }

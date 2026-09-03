@@ -1,7 +1,7 @@
 //! Invariants that span more than one crate: parser + formatter, and
 //! parser + printer.
 //!
-//! Moved here from `tomet-formatter` and `tomet-workspace-config`, which
+//! Moved here from `tomet-formatter` and `tomet-config`, which
 //! were reaching up to the repo root for the shared corpus.
 
 use std::path::Path;
@@ -104,7 +104,7 @@ fn printed_source_parses() {
 #[test]
 fn config_fixtures_load() {
     // Was a `.parent().unwrap()` walk up to the repo root inside
-    // `tomet-workspace-config`; the fixtures are local to this package now.
+    // `tomet-config`; the fixtures are local to this package now.
     let cfg = tomet_config::load_config_from_file(&fixtures_dir().join("test.config.tmt"))
         .expect("failed to load test.config.tmt");
     assert_eq!(cfg.meta_format.as_deref(), Some("yaml"));
