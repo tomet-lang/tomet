@@ -1,0 +1,98 @@
+@kind(writ)
+
+#[ Writ: workspace root ]
+
+Rules the whole repository obeys.
+
+Scope is this directory and everything under it. A narrower rule lives in a
+`.writ.tmt` closer to what it governs; read every `.writ.tmt` from a file up
+to here, the way `.gitignore` is read.
+
+Only the author edits this file. An agent that finds a rule in its way
+proposes an edit here and stops. It does not work around the rule, and it
+does not relax the rule to fit the change it wanted to make.
+
+##[ crate-layering ]
+
+Every workspace member belongs to exactly one layer, and depends only on
+layers strictly below its own. Same-layer dependencies are allowed;
+upward ones are not.
+
+@table[
+[ Layer         ][ Members ]
+[ 6. apps       ][ `apps/*`, `bindings/*`, `tests` ]
+[ 5. workspace  ][ `crates/tomet-workspace`, `crates/tomet-workspace-indexer`, `crates/tomet-workspace-links` ]
+[ 4. produce    ][ `crates/tomet-format*`, `crates/tomet-convert-*`, `crates/tomet-transform` ]
+[ 3. config     ][ `crates/tomet-workspace-config` ]
+[ 2. semantics  ][ `crates/tomet-semantics*` ]
+[ 1. syntax     ][ `crates/tomet-syntax-*` ]
+[ 0. standalone ][ `crates/tree-sitter-tomet` ]
+]
+
+Layer 0 depends on no workspace member at all, in either direction. It is
+the hand-maintained grammar approximation, and it is only worth having
+because it is independent of the parser.
+
+`crates/serde_tomet` sits in layer 4. It is an ecosystem adapter, not a
+producer, and the name carries no layer prefix.
+
+Dev-dependencies are exempt. A crate may reach upward in `[dev-dependencies]`
+to get a parser for its own tests -- `tomet-syntax-tree` and
+`tomet-semantics` both do, and neither is a layering violation.
+
+---[ Why ]---
+
+The order is what keeps a change local. Touching the parser today means
+reading `crates/tomet-syntax-*` and nothing else; the moment an edge runs
+upward, it means reading the applications too.
+
+The layer is derived from the directory name, not the package name. The two
+disagree -- `crates/tomet-syntax-parser` publishes `tomet-parser` -- and the
+directory is the half that is arranged by layer, which is why the workspace
+member list in `Cargo.toml` is already grouped this way in comments.
+
+`crates/tomet-workspace-config` is the one member whose name lies about its
+layer. Nothing in `workspace/` depends on it more than `format/` does: the
+format and convert crates sit on top of it, so it cannot be in the same
+layer as `tomet-workspace`. Recorded here rather than quietly grouped,
+because the honest fix is a rename and the rule should not pretend the
+rename already happened.
+
+The rejected alternative is a rule per crate. It states the same thing and
+cannot answer the question that matters -- whether some crate has no rule at
+all. Deriving the layer from the directory prefix means a new member that
+matches no prefix and no exception line above is unclassified, and an
+unclassified member is a failure rather than a silence.
+
+---[ Guard ]---
+
+None yet. This is `twrit`'s first job: read the table, read every member's
+`[dependencies]`, and fail on an unclassified member or an upward edge.
+
+##[ kind-not-meta-type ]
+
+A document declares its kind with a top-level `@kind(...)`. The `type:`
+field inside `@meta` is the superseded spelling and does not appear in this
+repository -- not in documentation, not in examples, not in fixtures.
+
+---[ Why ]---
+
+A kind selects the schema that validates the document, so it is a directive
+about the document, not a field of its metadata. Buried inside `@meta` it
+was reachable only through a nested lookup, and a reader had to open a map
+to find out what they were holding.
+
+This rule exists because the decision had already been made and tooled --
+`promote_meta_type_to_kind`, and a `refactor` subcommand to run it -- and
+still lost ground. With no rule naming it, `docs/guide/` went on teaching
+the old spelling, `docs/spec/builtin-settings.tmt` was itself written in it,
+and eleven files under `docs/` had drifted back by the time anyone counted.
+The migration existed; the rule did not.
+
+---[ Guard ]---
+
+`tomet refactor --check --meta-kind` -- non-zero while any file still
+carries the old spelling.
+
+Known gap: files that fail to parse are skipped with a warning rather than
+failing the run, so a broken file is also an unguarded one.

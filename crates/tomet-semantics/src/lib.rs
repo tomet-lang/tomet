@@ -4,9 +4,7 @@
 //! small `Document`-level lookups (`document_meta`) built directly on top
 //! of that classification. Depends only on `tomet-ast`; consumers
 //! (`tomet-html`, `tomet-markdown`, the CLI/TUI) use this instead
-//! of each carrying their own copy of this logic. See
-//! `docs/develop/architecture.md` for how this crate fits into the rest of
-//! the pipeline.
+//! of each carrying their own copy of this logic.
 
 mod config;
 mod connect;

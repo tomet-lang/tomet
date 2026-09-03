@@ -1,0 +1,90 @@
+@kind(writ)
+
+#[ Writ: tomet-syntax-parser ]
+
+Rules this crate must obey.
+
+Scope is this directory. Rules that bind more than this crate live in a
+`.writ.tmt` further up; read every `.writ.tmt` from here to the workspace
+root, the way `.gitignore` is read.
+
+Only the author edits this file. An agent that finds a rule in its way
+proposes an edit here and stops. It does not work around the rule, and it
+does not relax the rule to fit the change it wanted to make.
+
+##[ parser-purity ]
+
+The parser is pure, deterministic and side-effect-free. It performs no
+I/O, resolves no external file, and executes nothing. The same input text
+produces the same tree, in predictable time.
+
+File resolution is `tomet-semantics-resolver`'s job -- Tomet's
+preprocessor/linker layer, and the only place reading a referenced file is
+allowed. `@config(import:)` and `@settings(file:)` are resolved there,
+after parsing.
+
+---[ Why ]---
+
+Every consumer holds a `Document` and needs to trust it. A parser that
+reads the filesystem gives a different tree depending on what is on disk,
+which turns every downstream test into an integration test and makes an
+LSP buffer disagree with the file it came from.
+
+It is also what lets the tree be cached and compared at all. The
+vocabulary guard below works by parsing two sources and comparing trees;
+that comparison means nothing if parsing can consult anything but its
+input.
+
+---[ Guard ]---
+
+None yet. `tomet-syntax-parser`'s `[dependencies]` carry nothing that can
+do I/O today, which is the property `twrit` should pin: no `std::fs`, no
+`std::net`, and no dependency that provides them.
+
+##[ no-vocabulary ]
+
+The parser builds the tree without consulting any element vocabulary.
+Renaming an element -- or renaming a key inside its `(args)` -- changes the
+name recorded in the tree and nothing else about its *shape*. External files
+may add constraints or change how a document renders; they must never change
+the tree.
+
+This says nothing about what the tree *means*. Classification, validation
+and evaluation read the vocabulary; that is their job and it happens after
+parsing.
+
+---[ Why ]---
+
+Built-ins and user-defined elements stay symmetric. The moment the parser
+recognizes `codeblock`, no element a user writes can behave like
+`codeblock`, and the format has started growing by privileging its own
+names. `fact/root.tmt` promises the opposite: identifier, input, data, and a
+setting that says where each one goes.
+
+It also keeps the grammar still. If element names reached into parsing, then
+adding an element would be a grammar change -- `tree-sitter-tomet`'s
+hand-maintained approximation and every downstream consumer would have to
+move with it.
+
+The rejected alternative is worth writing down, because it is the one that
+keeps looking cheaper: special-case the element in the parser. That is what
+this parser used to do, in `is_codeblock`, `is_verbatim_content`,
+`local_format_key`, `is_format_target_element` and `is_config`. Each branch
+was locally reasonable. The accumulated cost was a `running_format` mode
+threaded through the parser, and content that lexed differently depending on
+the element name above it. Meaning migrated from settings into the grammar
+one branch at a time, and nothing pointed at the accumulation.
+
+---[ Guard ]---
+
+@link(file:../../tests/src/vocabulary.rs)[`tests/src/vocabulary.rs`]
+
+Each case is a pair of sources differing in exactly one identifier the
+parser is not allowed to recognize. Both are parsed, the identifier is
+normalized to a shared placeholder, and the two trees are compared. `Span`
+compares equal unconditionally, so the comparison is on shape. Every case
+names the branch it pins down -- a branch this parser used to have.
+
+Known gap: the guard has no case asserting that it still detects a
+violation. Gut the comparison and it stays green forever. A reintroduced
+vocabulary lookup would be caught today; a quietly broken guard would not.

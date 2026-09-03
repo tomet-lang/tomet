@@ -2,8 +2,8 @@
 //! `@settings(file:...)`; `@import` is future work, see the TODO below.
 //! This is Tomet's "preprocessor/linker" layer: the only place I/O
 //! and file resolution are allowed, precisely because `tomet-parser`
-//! itself must have none (see `docs/develop/architecture.md`'s
-//! "Deterministic Static Parser Boundary").
+//! itself must have none (see `crates/tomet-syntax-parser/.writ.tmt`'s
+//! `parser-purity`).
 //!
 //! Deliberately does not depend on `tomet-semantics`: recognizing a
 //! `@settings(file:...)` reference only needs a direct
