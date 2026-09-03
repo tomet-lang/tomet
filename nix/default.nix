@@ -31,6 +31,7 @@ flake-parts.lib.mkFlake { inherit inputs; } {
         tomet = pkgs.callPackage ./pkgs/tomet.nix { inherit craneLib; };
         tomet-lsp = pkgs.callPackage ./pkgs/tomet-lsp.nix { inherit craneLib; };
         tomet-web = pkgs.callPackage ./pkgs/tomet-web.nix { inherit craneLib; };
+        twrit = inputs.twrit.packages.${pkgs.system}.twrit;
       };
 
       treefmt = import ./formatter.nix;
