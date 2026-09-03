@@ -27,9 +27,17 @@ impl FileDiff {
         }
     }
 
-    /// Returns `true` if the file content has been modified.
+    /// Returns `true` if a refactoring pass actually rewrote something.
+    ///
+    /// Deliberately not `original_src != modified_src`. Producing
+    /// `modified_src` re-prints and re-formats the whole document, so any
+    /// file that was not already in canonical printer form differs
+    /// textually even when no pass touched it. Comparing the text made
+    /// `refactor --check` report nearly every file as needing work with a
+    /// change count of zero, and made `refactor -i` rewrite files no pass
+    /// had anything to say about -- reformatting is `tomet format`'s job.
     pub fn is_changed(&self) -> bool {
-        self.original_src != self.modified_src
+        self.changes_count > 0
     }
 
     /// Saves the modified content to disk if changed.
