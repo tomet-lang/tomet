@@ -23,7 +23,7 @@ upward ones are not.
 [ 6. apps       ][ `apps/*`, `bindings/*`, `tests` ]
 [ 5. workspace  ][ `crates/tomet-workspace`, `crates/tomet-workspace-indexer`, `crates/tomet-workspace-links` ]
 [ 4. produce    ][ `crates/tomet-format*`, `crates/tomet-convert-*`, `crates/tomet-transform` ]
-[ 3. config     ][ `crates/tomet-workspace-config` ]
+[ 3. config     ][ `crates/tomet-config` ]
 [ 2. semantics  ][ `crates/tomet-semantics*` ]
 [ 1. syntax     ][ `crates/tomet-syntax-*` ]
 [ 0. standalone ][ `crates/tree-sitter-tomet` ]
@@ -51,12 +51,12 @@ disagree -- `crates/tomet-syntax-parser` publishes `tomet-parser` -- and the
 directory is the half that is arranged by layer, which is why the workspace
 member list in `Cargo.toml` is already grouped this way in comments.
 
-`crates/tomet-workspace-config` is the one member whose name lies about its
-layer. Nothing in `workspace/` depends on it more than `format/` does: the
-format and convert crates sit on top of it, so it cannot be in the same
-layer as `tomet-workspace`. Recorded here rather than quietly grouped,
-because the honest fix is a rename and the rule should not pretend the
-rename already happened.
+Every member's directory now agrees with its layer. It did not always:
+`crates/tomet-config` was `crates/tomet-workspace-config`, which read as
+part of the workspace layer while the format and convert crates were
+sitting on top of it. The rule carried it as a named exception until the
+rename, rather than quietly filing it under the wrong prefix -- an
+exception a reader can see is worth more than a tidy table that lies.
 
 The rejected alternative is a rule per crate. It states the same thing and
 cannot answer the question that matters -- whether some crate has no rule at
