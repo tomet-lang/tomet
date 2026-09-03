@@ -73,10 +73,10 @@ fn main() -> ExitCode {
             lang,
         } => serve(file, *port, *advanced, lang.clone()),
         Command::Format {
-            path,
+            paths,
             in_place,
             check,
-        } => format_cmd(path, *in_place, *check),
+        } => format_cmd(paths, *in_place, *check),
         Command::Tui { path, config } => tomet_tui::run_tui(path.clone(), config.clone()),
         Command::Export {
             path,

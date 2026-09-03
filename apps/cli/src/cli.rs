@@ -126,7 +126,9 @@ pub enum Command {
     /// `ignore_files`). Prints to stdout by default; see
     /// `--in-place`/`--check`.
     Format {
-        path: PathBuf,
+        /// Target file(s) or directory/directories to format.
+        #[arg(required = true)]
+        paths: Vec<PathBuf>,
         /// Overwrite the file(s) in place instead of printing to stdout.
         #[arg(short = 'i', long, alias = "write")]
         in_place: bool,
