@@ -53,6 +53,17 @@ cargo test --workspace
 cargo test -p tree-sitter-tomet
 ```
 
-## Architecture
+## Packaging
 
-For a detailed overview of the crate pipeline, parser design, tree-sitter grammar synchronization, and AST constraints, see [docs/develop/architecture.md](docs/develop/architecture.md).
+Nix is the packaging story. `nix/pkgs/tomet.nix` and
+`nix/pkgs/vscode-extension.nix` build the CLI and the VS Code extension;
+`nix/dev.nix` is the dev shell.
+
+## Finding your way around
+
+- Crate layers and the dependency direction between them: the
+  `crate-layering` entry in `.writ.tmt`.
+- What a crate is and why it exists: that crate's `//!` module doc.
+- What a crate depends on: its `Cargo.toml`.
+- What the CLI does: `tomet --help`.
+- The language itself: `docs/README.tmt` is the map.

@@ -143,7 +143,7 @@ const RECOVERABLE_TARGET_SCHEMES: [&str; 5] = ["url", "file", "tm", "id", "ref"]
 /// one) -- must match `tomet_syntax_parser::value::POSITIONAL_ENTRY_KEY`
 /// exactly. Duplicated here rather than imported since `tomet-semantics`
 /// deliberately doesn't depend on `tomet-parser` (see this crate's own
-/// module doc / `docs/develop/architecture.md`'s pipeline diagram) --
+/// module doc) --
 /// `eat_ident` never produces an empty *real* key, so `""` can't collide.
 const POSITIONAL_ENTRY_KEY: &str = "";
 

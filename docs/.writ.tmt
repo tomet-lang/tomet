@@ -1,0 +1,126 @@
+@kind(writ)
+
+#[ Writ: docs ]
+
+Rules for `docs/` itself.
+
+Scope is this directory. `docs/README.tmt` is the map -- what is where, and
+where to start reading. This is the rulebook behind it: it says nothing
+about what any document contains, only about where a document goes, what
+language it is in, and which files are written by a tool rather than a
+person.
+
+Only the author edits this file. An agent that finds a rule in its way
+proposes an edit here and stops.
+
+##[ document-placement ]
+
+A new document goes where it belongs by what it *is*, not by what it is
+about.
+
+@table[
+[ The document is... ][ Put it in ]
+[ normative -- it defines what the language accepts and what it means ][ `spec/` ]
+[ instructional -- it shows how to get something done ][ `guide/` ]
+[ a runnable sample document ][ `examples/` ]
+[ a statement of what Tomet is and why it exists ][ `fact/` ]
+[ an idea not yet decided ][ `design/ideas/` ]
+[ a rule this repository must obey ][ the nearest `.writ.tmt` ]
+]
+
+Two of these carry an obligation. A document in `spec/` has to be kept in
+step with `tomet-syntax-parser`. A document in `examples/` has to pass
+`just docs-check`, because it is a real document and not a listing.
+
+Two kinds of document have no home here on purpose.
+
+A dated record of a decision has none: git is that record. A decision worth
+carrying forward is written where it applies -- beside the rule it
+justifies, or in the doc comment of the code it explains -- and the
+alternatives that were rejected are written next to the one that was taken,
+not in a separate file ordered by date.
+
+Prose about the Rust workspace has none either. What a crate is and why it
+exists belongs in that crate's `//!`, which dies with the crate and so
+cannot outlive what it describes. How the layers depend on each other is
+the root `.writ.tmt`'s `crate-layering`. Build and packaging commands are
+the root `README.md`'s. `docs/develop/architecture.md` used to hold all
+three at once; by the time it was removed, seven of its claims had gone
+false -- three dependency lists, half the CLI's subcommands, and a
+grammar-freeze process whose document did not exist.
+
+---[ Why ]---
+
+The split that earns its keep is `spec/` against `guide/`. Before the
+restructure these were `ja/specifications/` and `ja/builtins/`, which split
+spec from spec: a reader had to check both every time. Splitting on
+normative against instructional means a reader picks one and is done.
+
+The rejected alternative is filing by topic -- a directory per feature, each
+holding its spec and its guide and its examples together. It reads well for
+the person who already knows which feature they want, and badly for everyone
+else, which is the wrong way round for documentation.
+
+---[ Guard ]---
+
+None yet. `twrit` can check the cheap half: every directory under `docs/`
+appears in the table above, so a new directory nobody described is a
+failure rather than a silence.
+
+##[ docs-language ]
+
+`spec/`, `guide/`, `examples/` and `fact/` are written in **Japanese**.
+Japanese is the default, so filenames carry no `.ja` suffix and there is no
+`ja/` directory level. English translations, if they are ever added, go
+under `docs/en/` mirroring the same tree.
+
+Every `.writ.tmt` is written in **English**.
+
+`design/ideas/` is whichever language the thinking happened in. It is a
+sketchpad, and forcing a translation step onto a sketch is how sketches stop
+being written.
+
+---[ Why ]---
+
+The line is not about audience for its own sake -- it is about what each
+document sits next to. A writ is read in the same pass as the code it
+governs and cross-links with in-code doc comments, which are English by
+`AGENTS.md`'s rule. `spec/` and `guide/` are read by people using Tomet,
+and Japanese is what they are written for.
+
+---[ Guard ]---
+
+No kana in any `.writ.tmt`. Currently true.
+
+```bash
+find . -name '.writ.tmt' -not -path './target/*' \
+  -exec grep -lP '[\x{3040}-\x{30ff}]' {} +
+```
+
+##[ generated-md-not-edited ]
+
+`.md` under `spec/` and `guide/` is exported from the sibling `.tmt` via
+`@config(export:)`. Do not hand-edit it. Edit the `.tmt` and re-export.
+
+`.gitattributes` marks those two paths `linguist-generated` so GitHub
+collapses them in diffs, scoped by path so that the hand-written `.md` under
+`develop/` and `design/` stays a normal reviewable file.
+
+This rule governs no file today: nothing under `spec/` or `guide/` declares
+`@config(export:)`, and no `.md` exists there. It is written down because
+the `.gitattributes` entries are already in place, and because the first
+export will otherwise arrive with nobody having decided this.
+
+`docs/README.tmt` is not exported either, for a different reason. `tomet
+export` escapes backticks in prose (`` `spec/` `` becomes ``\`spec/\``) and
+emits a `<div>` for the `@settings` header, so the rendered output would be
+worse than the source. The consequence is that GitHub shows no rendered
+index for `docs/`. Fix those two export bugs and this can become generated
+like the rest.
+
+---[ Guard ]---
+
+None yet, and the shape is already known: re-export and diff, the way
+`tomet refactor --check` works. A generated file that disagrees with its
+source is a failure with a mechanical fix, which is better than a rule
+asking people to remember.
