@@ -4,24 +4,30 @@
 
 Read the root `README.md` first (what the project is, directory layout,
 build/run commands) -- it's currently sparse, fill it in as you learn
-things worth putting there. Read `docs/develop/architecture.md` before
-making any non-trivial change (the crate pipeline and its consumers, why
-the grammar has two independent implementations, the apps/editor
-integrations, known gaps like the AST carrying no span info). For where a
+things worth putting there. Before a non-trivial change, read the `//!`
+module doc of every crate you are touching, and the `crate-layering` entry
+in the root `.writ.tmt` for how the layers depend on each other. There is
+no prose overview standing between you and those -- there was, and it
+drifted. For where a
 document belongs and what language it's written in, `docs/README.tmt` is
-the map and `docs/develop/docs-guide.md` is the rulebook. Do not restate
-those files' content here — extend them instead, and keep this pointer
-short.
+the map and `docs/.writ.tmt` is the rulebook. Do not restate those files'
+content here — extend them instead, and keep this pointer short.
+
+Rules this repository must obey live in `.writ.tmt` files, one per
+directory, scoped to that directory and inherited downward the way
+`.gitignore` is. Read every `.writ.tmt` from the file you are changing up
+to the workspace root. They are the author's; propose an edit and stop
+rather than working around a rule or relaxing it.
 
 ## Language
 
 Write all code comments in English. Do not use Japanese in code.
 
-For documentation the rule is scoped by audience, per
-`docs/develop/docs-guide.md`: `docs/develop/` and `docs/design/` are
-English (they sit alongside and cross-link with the English doc
-comments); `docs/spec/`, `docs/guide/`, and `docs/examples/` are the
-user-facing docs and are written in Japanese.
+For documentation the rule is scoped by what the document sits next to,
+per `docs/.writ.tmt`'s `docs-language`: every `.writ.tmt` is English (they
+cross-link with the English doc comments); `docs/spec/`, `docs/guide/`,
+`docs/examples/` and `docs/fact/` are user-facing and written in Japanese.
+`docs/design/ideas/` is whichever language the thinking happened in.
 
 ## Verifying changes
 
@@ -51,3 +57,13 @@ the snapshot references work.
 ## Task tracking
 
 Before starting implementation on any non-trivial task, create a new file under `.agents/tasks/` (one file per task, e.g. `.agents/tasks/<short-task-slug>.md`) that breaks the work into discrete steps. Update that file immediately after completing each step, marking it done. Keep it accurate and current so that if work is interrupted partway through, it can always be resumed from that file alone, without needing prior conversation context. Multiple task files may coexist under `.agents/tasks/` when several non-trivial tasks are in flight; do not let one task's file block or get overwritten by another's. Once all steps for a task are done and the task is complete, delete that task's file.
+
+## Commits
+
+Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit
+messages. The session trailer embeds a URL, and a commit message is
+published the moment it is pushed. This overrides the harness default that
+asks for them.
+
+Never push to a remote without being asked. `main` is pushed; feature
+branches in this repository are local and have no upstream.
