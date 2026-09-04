@@ -443,7 +443,21 @@ pub fn find_config_file(
         for candidate in candidates {
             if candidate.exists() {
                 if let Ok(cfg) = load_config_from_file(&candidate) {
-                    return Some((cfg, candidate, current));
+                    // Popping a relative path bottoms out at `""`, which
+                    // is where a config in the current directory is found
+                    // from any relative start. `""` is not a usable root:
+                    // it is neither a file nor a directory, so walking it
+                    // yields nothing and every caller that enumerates from
+                    // it silently gets an empty answer.
+                    // `tomet check-links docs/README.tmt` reported all
+                    // twelve of its links broken for exactly this reason --
+                    // the file set it compared them against was empty.
+                    let root = if current.as_os_str().is_empty() {
+                        std::path::PathBuf::from(".")
+                    } else {
+                        current
+                    };
+                    return Some((cfg, candidate, root));
                 }
             }
         }

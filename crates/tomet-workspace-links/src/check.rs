@@ -94,6 +94,24 @@ fn resolve_file_target(source: &Path, target: &str, project_root: &Path) -> Path
     normalize_join(project_root, target_path)
 }
 
+/// Puts a resolved target into the same form as the walked file set.
+///
+/// `existing` is built by walking `project_root`, so its entries carry
+/// whatever form that path has. A target resolved through the referencing
+/// file's own directory carries the form of *that* path instead, and the
+/// two stop matching the moment they differ -- which is why
+/// `tomet check-links docs/README.tmt` used to call `../tests/SYNTAX.md`
+/// broken while the same link resolved when the whole repository was
+/// scanned. `Path::join` leaves an already-absolute path alone, so this is
+/// a no-op when both sides are absolute.
+fn rebase_on_project_root(resolved: PathBuf, project_root: &Path) -> PathBuf {
+    if resolved.is_absolute() {
+        resolved
+    } else {
+        normalize_join(project_root, &resolved)
+    }
+}
+
 /// Whether `target` names any existing file by full filename or stem
 /// (extension-agnostic, the usual wikilink convention).
 fn resolve_ref_target(target: &str, existing: &HashSet<PathBuf>) -> bool {
@@ -118,7 +136,11 @@ pub fn check_vault(
     cache: &mut LinkCache,
 ) -> CheckReport {
     let files = tomet_indexer::collect_tm_files_with_config(root, config, config_root);
-    let existing = tomet_indexer::collect_all_paths_with_config(root, config, config_root);
+    // Built from `project_root`, not `root`: what exists on disk does not
+    // depend on what was asked to be checked. Building it from `root` made
+    // single-file mode report every link as broken, since the set then held
+    // exactly the one file being checked.
+    let existing = tomet_indexer::collect_all_paths_with_config(project_root, config, config_root);
 
     let mut report = CheckReport {
         files_scanned: files.len(),
@@ -142,11 +164,17 @@ pub fn check_vault(
             let resolved = match link.kind {
                 LinkKind::Ref => resolve_ref_target(&link.target, &existing),
                 LinkKind::File | LinkKind::Embed => {
-                    existing.contains(&resolve_file_target(file, &link.target, project_root))
+                    existing.contains(&rebase_on_project_root(
+                        resolve_file_target(file, &link.target, project_root),
+                        project_root,
+                    ))
                 }
                 LinkKind::Tm => {
                     let path_part = link.target.split('#').next().unwrap_or(&link.target);
-                    existing.contains(&resolve_file_target(file, path_part, project_root))
+                    existing.contains(&rebase_on_project_root(
+                        resolve_file_target(file, path_part, project_root),
+                        project_root,
+                    ))
                 }
             };
             if !resolved {
