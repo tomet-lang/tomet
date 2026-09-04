@@ -75,6 +75,9 @@ type = "location"
 ${some_id}
 ${sum(a, b)}
 
+// 宛先は記法を見せるための作り物なので、フェンスの中に置く。
+// 生きた要素のままだと `tomet check-links` が実在しない先を追いかける。
+```
 @link[](url:https://)
 @link[](file:/readme.md)
 @link[](ref:1)
@@ -82,6 +85,7 @@ ${sum(a, b)}
 @[](url:https://)
 @[](file:/readme.md)
 @[](ref:2)
+```
 
 #[ heading ]{ id:1 }
 ##[ heading ]{ id:2 }
@@ -90,9 +94,11 @@ ${sum(a, b)}
 // @index(){}
 // @icon()
 
+```
 @embed[alt](url:https://)
 @embed[alt](file:/readme.md)
 @embed[alt](ref:3)
+```
 // 現在のコードでは、src:になってしまっているので、要変更
 
 @codeblock(lang:sh)[
