@@ -77,7 +77,7 @@ pub fn collect_tm_files_with_config(
         }
     } else if path.is_dir() {
         for entry in WalkBuilder::new(path)
-            .hidden(true)
+            .hidden(false)
             .git_ignore(true)
             .build()
             .filter_map(|e| e.ok())
@@ -102,7 +102,7 @@ pub fn collect_tm_files_with_config(
 /// primitive other extension-filtered scans (this crate's own
 /// `collect_tm_files_with_config`, `workspace_scan`'s `WorkspaceIndex`,
 /// and `tomet-links`'s existence checks) can build on, so
-/// `.hidden(true)`/`.git_ignore(true)`/`is_path_ignored` semantics can't
+/// `.hidden(false)`/`.git_ignore(true)`/`is_path_ignored` semantics can't
 /// drift between independently-configured `WalkBuilder`s.
 pub fn collect_all_paths_with_config(
     path: &Path,
@@ -114,11 +114,16 @@ pub fn collect_all_paths_with_config(
         paths.insert(path.to_path_buf());
     } else if path.is_dir() {
         for entry in WalkBuilder::new(path)
-            .hidden(true)
+            .hidden(false)
             .git_ignore(true)
             .build()
             .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().map_or(false, |ft| ft.is_file()))
+            // Directories are in the set too. Its one consumer is the link
+            // checker, and `@link(file:./spec/)` is a link to a directory --
+            // a perfectly ordinary thing for an index page to write, and
+            // one that reported broken for as long as this collected only
+            // files.
+            .filter(|e| e.file_type().is_some_and(|ft| ft.is_file() || ft.is_dir()))
         {
             let p = entry.path();
             if is_path_ignored(p, Some(config_root), &config.ignore_files) {
