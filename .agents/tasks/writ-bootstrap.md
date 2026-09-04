@@ -143,6 +143,12 @@ Until then `just docs-check` sweeps them for parse/format only.
 
 ## Known gaps, recorded but not fixed here
 
+Five entries were resolved after this file was written and have been
+removed: the vocabulary guard's missing negative case, `check-links`
+skipping hidden files, its single-file false positives, `docs/README.tmt`'s
+own unresolvable links, and `@kind` being absent from `docs/spec/`. Each is
+described in the commit that closed it.
+
 - `singleton` and `placement` are declared in `docs/spec/builtin-settings.tmt`
   for several elements but implemented nowhere -- the word appears in two doc
   comments and no code. `tomet check` only parses
@@ -150,8 +156,8 @@ Until then `just docs-check` sweeps them for parse/format only.
   two `@kind`, or a `@kind` in the middle of the body, passes. Enforcing this
   is its own task and touches every element that claims to be a singleton.
 - Dangling prose references to `docs/design/decisions/`, deleted in
-  `4055fe5`. 18 remain across 12 files, and the earlier count was too low
-  because it only swept `docs/`: 10 of them are in Rust source
+  `4055fe5`. 18 remain across 12 files, and an earlier count was too low
+  because it only swept `docs/`: 10 are in Rust source
   (`tomet-convert-markdown` 4, `tomet-convert-html`, `tomet-semantics`,
   `tomet-syntax-parser`, `tomet-workspace-links`, `tree-sitter-tomet` 2).
   The rest are in `docs/spec/` (3), `docs/guide/cheatsheet.tmt` and
@@ -167,25 +173,15 @@ Until then `just docs-check` sweeps them for parse/format only.
   `.tmt` there declares `@config(export:)`. Recorded in the writ's
   `generated-md-not-edited` entry as governing zero files today.
 - `tomet refactor --check` silently skips files that fail to parse (warns
-  and moves on): `docs/design/ideas/idea.tmt:156`,
-  `docs/spec/builtin-functions.tmt:8`. A guard that skips broken files has
-  a hole exactly where it matters most.
-- `tests/src/vocabulary.rs` has no case asserting the guard still detects a
-  violation; gut the comparison and it stays green. Recorded in the writ
-  entry itself.
-- `tomet check-links` skips hidden files on directory walks, so the guard
-  links inside `.writ.tmt` are not link-checked today. Deliberate for now:
-  a writ is not part of the document corpus, and `twrit` is the tool that
-  should read it. Revisit only if a general `--hidden` flag is wanted.
-- Single-file `tomet check-links <file>` reports false positives (existence
-  is judged against the set of scanned files, so `docs/README.tmt` alone
-  reports all 15 of its links broken). Directory mode is the only usable
-  form.
-- `docs/README.tmt`'s own links do not resolve: bare `file:fact/` resolves
-  against the project root (`crates/tomet-workspace-links/src/check.rs:94`),
-  so it looks for `./fact/`. Pre-existing, unrelated to this task.
-- `@kind` appears nowhere in `docs/spec/`, and
-  `docs/guide/builtins/primitives/` has no `kind.tmt` while `meta.tmt`
-  still shows `type:` as the canonical example. The spelling was decided
-  and tooled but never written down normatively -- which is the case study
-  that motivated this whole task.
+  and moves on). A guard that skips broken files has a hole exactly where
+  it matters most.
+- Four links under `docs/` still report broken, all in
+  `docs/guide/cheatsheet.tmt`: `@link[](file:/readme.md)` and friends are
+  syntax illustrations rather than links to anywhere. Either fence them, or
+  point them at real files -- until then `check-links docs` cannot reach
+  zero, which is what makes a check worth running.
+- Three writ entries have no guard: `parser-purity` (pin that
+  `tomet-syntax-parser`'s dependencies carry nothing that can do I/O),
+  `document-placement` (every directory under `docs/` appears in the table),
+  and `generated-md-not-edited` (re-export and diff -- governs zero files
+  until something declares `@config(export:)`).
