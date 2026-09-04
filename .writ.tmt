@@ -77,6 +77,52 @@ unclassified member is a failure rather than a silence.
 no layer, a member matching two, an upward edge, or anything `crates/
 tree-sitter-tomet` comes to depend on.
 
+##[ tmtroot-mirrors-the-root ]
+
+`tmtroot/` holds sources whose output lands at a path this repository does
+not choose. Its structure mirrors the repository root: `tmtroot/x.tmt`
+produces a file at `/`, `tmtroot/.github/x.tmt` one under `/.github/`.
+
+Nothing else goes there. A document whose output lands beside it -- the
+ordinary case -- stays where it belongs by what it is, and `docs/`'s own
+writ decides that.
+
+---[ Why ]---
+
+`README.ja.md` has to be at the repository root because that is where a
+forge looks for it. `AGENTS.md` likewise, because that is where agent
+tooling looks. The source cannot sit beside its output without putting two
+files with the same content side by side, so it has to live somewhere else
+-- and then something has to say where the output goes.
+
+Mirroring answers that without a rule anyone has to read. The path is the
+answer. Every project that has needed this has arrived at the same shape:
+GNU Stow maps `dotfiles/vim/.vimrc` to `~/.vimrc`, chezmoi mirrors `$HOME`,
+Hugo copies `static/robots.txt` to `/robots.txt`, `public/favicon.ico`
+becomes `/favicon.ico` in most web toolchains, and a Debian package builds
+`debian/<pkg>/usr/bin/x` for `/usr/bin/x`.
+
+The name has precedent too. `sysroot`, `buildroot` and `chroot` all name a
+directory standing in for `/`, and `tmtroot` is the same compound. Plain
+`root/` was rejected for sitting inside the actual root and reading as a
+claim to be it; `exports/` for describing every export rather than these,
+since a document under `spec/` may export perfectly well and stay put.
+
+One place it is weaker than the prior art: those copy verbatim, so the
+output name is visible in the source name. Here `@config(export: path)`
+renames, and `tmtroot/readme.tmt` becoming `/README.ja.md` cannot be read
+off the path. Deriving the path from the position when it is not declared
+would close that, and is not decided.
+
+---[ Guard ]---
+
+`tomet export --check` covers whether the outputs are current.
+
+Nothing yet checks the other half -- that every `.tmt` under `tmtroot/`
+declares an export at all. A file there that produces nothing is a file in
+the wrong directory. Cheap to add, and red today: two placeholders are
+still empty.
+
 ##[ blueprint-shape ]
 
 A blueprint declares what it is, what it targets, and what it says about
@@ -110,9 +156,15 @@ and `#` taking different groups from `@name`.
 
 Rejected, and worth naming because the code accepted all of them at once:
 
-- `@blueprint(kind: writ)`. `@kind(blueprint)` sits two lines above, so
-  `kind` would appear twice in three lines meaning two different things --
-  this file's kind, and the output's.
+- `@blueprint(kind: writ)`. Both spellings behave identically:
+  `document_kind` narrows to `@kind` elements with `classify_lenient`
+  before it reads any argument, so a blueprint's key is never mistaken for
+  the document's own kind whatever it is called. This is a choice for the
+  reader, not a collision being avoided -- and worth saying so, because a
+  rule that looks like it has a mechanical reason sends the next person
+  hunting for one. What it costs is that `kind` would appear twice in
+  three lines meaning two different things: this file's kind, and the
+  output's.
 - `@blueprint(target: writ)`. Spelling the key is not wrong, only
   redundant: `embed` and `link` already normalize a positional to `target`,
   and `@kind(writ)` is positional too, so promotion becomes the same value
