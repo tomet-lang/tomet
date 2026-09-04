@@ -4,8 +4,13 @@ docs/ linguist-documentation=true
 
 # `.md` under docs/spec/ and docs/guide/ is exported from the sibling
 # `.tmt` source via `@config(export:)`, so it is generated, not authored.
-# Scoped by path on purpose: the `.md` under docs/develop/ and
-# docs/design/ is hand-written and must stay a normal, reviewable file.
+# Scoped by path on purpose: the `.md` under docs/design/ is hand-written
+# and must stay a normal, reviewable file.
+#
+# Matches nothing today -- no `.tmt` under either path declares
+# `@config(export:)` yet. Kept because the rule has to exist before the
+# first export lands, not after it. See `docs/.writ.tmt`'s
+# `generated-md-not-edited`.
 docs/spec/**/*.md linguist-generated=true
 docs/guide/**/*.md linguist-generated=true
 
