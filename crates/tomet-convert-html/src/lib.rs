@@ -1258,11 +1258,15 @@ mod tests {
         );
     }
 
+    /// `[...]` after a list marker is the item's content group, the same
+    /// group `@name[...]` takes -- not a checkbox, and not literal text.
+    /// Text following the group stays in the item, the way
+    /// `@x[T] content` keeps both halves in one paragraph.
     #[test]
-    fn bracket_content_is_plain_text_in_html() {
+    fn bracket_after_a_list_marker_is_the_content_group() {
         let doc = parse_document("- [T] content\n").unwrap();
         let body = render_body(&doc);
-        assert_eq!(body, "<ul>\n<li>[T] content</li>\n</ul>\n");
+        assert_eq!(body, "<ul>\n<li>T content</li>\n</ul>\n");
     }
 
     #[test]

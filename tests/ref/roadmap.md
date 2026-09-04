@@ -5,11 +5,11 @@
 構文を決定する
 ---
 
-- \[ \] `ref`構文
-- \[ \] エスケープ構文
-- \[ \] Template構文
-- \[ \] `[]`のkey
-- \[ \] コネクト構文2
+- `ref`構文
+- エスケープ構文
+- Template構文
+- `[]`のkey
+- コネクト構文2
 - Table記法
 - 独自DSL Settings
 - 独自DSL Value
@@ -17,60 +17,60 @@
 構文を実装する
 ---
 
-- \[ \] ビルトイン関数の強化
-- \[ \] Elementの挙動を一般化
-- \[ \] `#meta`にkdlを追加
+- ビルトイン関数の強化
+- Elementの挙動を一般化
+- `#meta`にkdlを追加
 
 拡張性を確保する
 ---
 
-- \[ \] ドキュメントの補充
-- \[ \] アイコン、ロゴ
-- \[ \] IDEサポート
+- ドキュメントの補充
+- アイコン、ロゴ
+- IDEサポート
 
 CLI/Library機能を強化する
 ---
 
-- \[ \] 置換/検索
-- \[ \] 変換を強化
-- \[ \] TUIエディター
-- \[ \] Webエディター
-- \[ \] Svelte向けパッケージ
-- \[ \] React向けパッケージ
-- \[ \] Hook
+- 置換/検索
+- 変換を強化
+- TUIエディター
+- Webエディター
+- Svelte向けパッケージ
+- React向けパッケージ
+- Hook
 
 外部機能を強化する
 ---
 
-- \[ \] Zed
-  - \[ \] フォーマッタ
-  - \[ \] サジェスト
-  - \[ \] 自動補完
-- \[ \] 多言語バインディング
-- \[ \] その他
+- Zed
+  - フォーマッタ
+  - サジェスト
+  - 自動補完
+- 多言語バインディング
+- その他
 
 # Archive
 
 構文
 ---
 
-- \[x\] 要素設定 (.settings.tmt, json, yaml)
-- \[x\] コネクト構文 (`:(){}`)
-- \[x\] `args`推論 (基本要素対応, カスタム要素対応, positional: \[ title, priority \])
-- \[x\] `@`推論
-- \[x\] 代入、関数構文 (`${var}` `compute`,`resolve`)
-- \[x\] 構文エラー (重複)
-- \[x\] コメントアウト
-- \[x\] 公式構文 (`#settings`, `#config`, `#meta`, `#references`)
-- \[x\] 基本構文 (空白可, 改行可, 順不同)
-- \[x\] 基本Markdown記法 (`*`, `**`, `==`, `__`, ``)
-- \[x\] 基本要素 (heading, list, horizontal line)
-- \[x\] 名前 (element, arg, content, value)
-- \[x\] 基本AST (`@T()[]{}`)
+- x 要素設定 (.settings.tmt, json, yaml)
+- x コネクト構文 (`:(){}`)
+- x `args`推論 (基本要素対応, カスタム要素対応, positional: \[ title, priority \])
+- x `@`推論
+- x 代入、関数構文 (`${var}` `compute`,`resolve`)
+- x 構文エラー (重複)
+- x コメントアウト
+- x 公式構文 (`#settings`, `#config`, `#meta`, `#references`)
+- x 基本構文 (空白可, 改行可, 順不同)
+- x 基本Markdown記法 (`*`, `**`, `==`, `__`, ``)
+- x 基本要素 (heading, list, horizontal line)
+- x 名前 (element, arg, content, value)
+- x 基本AST (`@T()[]{}`)
 
 機能
 ---
 
-- \[x\] to\_from\_markdown ()
-- \[x\] export (`export:{type: commonmark, path: ...}`)
+- x to\_from\_markdown ()
+- x export (`export:{type: commonmark, path: ...}`)
 

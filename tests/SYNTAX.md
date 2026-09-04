@@ -72,6 +72,34 @@ Block  @heading
     Text "節"
 ```
 
+### `#` に空白が続けば、括弧なしでも見出しになる（糖衣）
+
+```tmt
+# 見出しになる
+```
+
+```
+Block  @heading
+  args    1
+  content
+    Text "見出しになる"
+```
+
+### `#` は `(args)` も `{value}` も取る。レベルは `#` の数
+
+```tmt
+##(id: sec)[ 見出し ]{ tag: syntax }
+```
+
+```
+Block  @heading
+  args    {id: "sec", level: 2}
+  content
+    Text "見出し"
+  group
+    tag: "syntax"
+```
+
 ### 末尾の `{...}` は属性
 
 ```tmt
@@ -252,26 +280,15 @@ Paragraph
 
 ## 文字列に落ちる場合
 
-### `#` の後に `[` がなければ地の文
+### `#` の直後に空白もグループも無ければ地の文
 
 ```tmt
-# 見出しではない
+#タグ ではない
 ```
 
 ```
 Paragraph
-  Text "# 見出しではない"
-```
-
-### `#` の後が `[` でなければ見出しにならない
-
-```tmt
-#memo(a: 1)
-```
-
-```
-Paragraph
-  Text "#memo(a: 1)"
+  Text "#タグ ではない"
 ```
 
 ### ASCII でない名前は要素にならない

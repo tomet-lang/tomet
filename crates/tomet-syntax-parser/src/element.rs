@@ -2,7 +2,7 @@
 
 use crate::error::Result;
 use crate::fence::{is_fence_start, parse_fence};
-use crate::heading::merge_values;
+use crate::heading::{merge_values, parse_braced_value};
 use crate::inline::{Stop, parse_inline_seq};
 use crate::value::{
     POSITIONAL_ENTRY_KEY, eat_name, err, is_name_start_at, parse_one_entry, parse_value_at,
@@ -148,6 +148,25 @@ pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Resu
     };
 
     let mut el = element_new(sigil);
+    parse_groups(cur, &mut el, allow_colon_connect)?;
+    el.span = cur.span_from(start_pos);
+    Ok(el)
+}
+
+/// Reads an element's `(args)`, `[content]` and `{value}` groups -- in any
+/// order, each at most once -- plus the colon-connect form and the `+++`
+/// fence that stands in for a body.
+///
+/// Split out of [`parse_element`] because a sigil is a sigil: `-` and `#`
+/// take the same groups as `@name` and must not grow a second, subtly
+/// different implementation of this. `[content]` stops at its closing
+/// bracket rather than at end of line, which is what lets a bracketed
+/// group span lines while the bracket-less sugar stays on one.
+pub(crate) fn parse_groups(
+    cur: &mut Cursor,
+    el: &mut Element,
+    allow_colon_connect: bool,
+) -> Result<()> {
     loop {
         let checkpoint = cur.pos();
         let newlines = skip_element_gap(cur);
@@ -208,8 +227,106 @@ pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Resu
         cur.set_pos(checkpoint);
         break;
     }
-    el.span = cur.span_from(start_pos);
-    Ok(el)
+    Ok(())
+}
+
+/// Byte offset of a `:` immediately (only inline whitespace between)
+/// preceding `brace_pos`, if there is one -- the colon-connect marker
+/// that dedicates this line's trailing `{...}` to the sigil itself
+/// rather than to whatever element precedes it (see
+/// `element::parse_element`'s `allow_colon_connect` doc comment).
+/// Byte-indexed but UTF-8 safe: only ever steps back over bytes it has
+/// just confirmed are the ASCII space/tab/colon it's looking for, so it
+/// never lands on, or reads across, a multi-byte character's interior.
+pub(crate) fn connect_colon_pos(src: &str, brace_pos: usize) -> Option<usize> {
+    let bytes = src.as_bytes();
+    let mut i = brace_pos;
+    while i > 0 && matches!(bytes[i - 1], b' ' | b'\t') {
+        i -= 1;
+    }
+    if i > 0 && bytes[i - 1] == b':' {
+        Some(i - 1)
+    } else {
+        None
+    }
+}
+
+/// Finds this line's own trailing `{attrs}`, if the rest of the line
+/// has one. Returns `(content_stop, brace_pos)`: `content_stop` is
+/// where the line's own inline *content* parsing must stop -- normally
+/// the same as `brace_pos` (a bare, colon-less `{}` is always claimed
+/// by an element instead, so content parsing runs right up to it
+/// regardless of whether it turns out to belong to the item or not),
+/// but the position of a preceding colon-connect marker instead when
+/// there is one, so that marker isn't left dangling as ordinary
+/// trailing text once `allow_colon_connect: false` stops an inner
+/// element from consuming it itself.
+pub(crate) fn peek_trailing_attrs(cur: &Cursor) -> Option<(usize, usize)> {
+    let mut look = *cur;
+    let mut last_brace_pos = None;
+    while !look.is_eof() && look.peek() != Some('\n') && look.peek() != Some('\r') {
+        if look.peek() == Some('{') {
+            last_brace_pos = Some(look.pos());
+        }
+        look.bump();
+    }
+    let brace_pos = last_brace_pos?;
+    let content_stop = connect_colon_pos(cur.src(), brace_pos).unwrap_or(brace_pos);
+
+    // Confirm inline content parsing, stopped at `content_stop`,
+    // actually lands exactly there rather than overshooting it. A bare,
+    // colon-less trailing group is still always claimed by an element
+    // regardless of `allow_colon_connect` (`@meta(format:yaml) {...}`
+    // is real, existing usage that must keep working) -- so this line's
+    // one `{` can still belong to an inner element instead of the item,
+    // and `Stop::Offset` alone can't be trusted to have actually
+    // stopped parsing there: `parse_inline_seq` only checks its target
+    // *between* separate line items, not while a single element is
+    // mid-way through claiming one more trailing group -- so it can
+    // walk straight past `content_stop` without ever noticing.
+    // Speculatively parsing here (the result is discarded either way --
+    // `parse_list_internal` reparses for real once this confirms the
+    // guess) is the only way to know without duplicating
+    // `parse_element`'s own claiming logic.
+    let mut probe = *cur;
+    let landed_at_pos = matches!(
+        parse_inline_seq(&mut probe, Stop::Offset(content_stop), false),
+        Ok(_) if probe.pos() == content_stop
+    );
+    if !landed_at_pos {
+        return None;
+    }
+
+    let mut test_cur = *cur;
+    test_cur.set_pos(brace_pos);
+    if parse_braced_value(&mut test_cur).is_ok() {
+        skip_inline_ws(&mut test_cur);
+        if matches!(test_cur.peek(), None | Some('\n') | Some('\r')) {
+            return Some((content_stop, brace_pos));
+        }
+    }
+    None
+}
+
+/// Reads a bracket-less body: inline content to the end of the line, plus
+/// the line's own trailing `{attrs}` if it has one.
+///
+/// This is the sugar shared by `-` and `#`. It is single-line on purpose:
+/// content that spans lines has to say so with an explicit `[ ... ]`
+/// group, which is what [`parse_groups`] reads.
+pub(crate) fn parse_sugar_body(cur: &mut Cursor) -> Result<(Vec<Inline>, Option<Value>)> {
+    if let Some((content_stop, brace_pos)) = peek_trailing_attrs(cur) {
+        let content = parse_inline_seq(cur, Stop::Offset(content_stop), false)?;
+        // `content_stop` is the colon-connect marker's position when there
+        // is one, short of `brace_pos` -- jump the rest of the way past it
+        // and its surrounding whitespace, neither of which needs to
+        // survive as an AST node.
+        cur.set_pos(brace_pos);
+        let attrs = crate::heading::parse_braced_value(cur)?;
+        Ok((content, Some(attrs)))
+    } else {
+        Ok((parse_inline_seq(cur, Stop::Line, false)?, None))
+    }
 }
 
 pub(crate) fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
