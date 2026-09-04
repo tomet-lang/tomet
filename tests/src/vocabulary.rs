@@ -119,48 +119,84 @@ const CASES: &[Case] = &[
     },
 ];
 
-#[test]
-fn element_names_and_arg_keys_do_not_change_the_tree() {
-    let mut failures = Vec::new();
-
-    for case in CASES {
-        let mut known = match parse_document(case.known) {
-            Ok(doc) => doc,
-            Err(e) => {
-                failures.push(format!(
-                    "{}\n    known source failed to parse: {e}",
-                    case.label
-                ));
-                continue;
-            }
-        };
-        let mut unknown = match parse_document(case.unknown) {
-            Ok(doc) => doc,
-            Err(e) => {
-                failures.push(format!(
-                    "{}\n    unknown source failed to parse: {e}",
-                    case.label
-                ));
-                continue;
-            }
-        };
-
-        normalize(&mut known, case.known_ident, case.kind);
-        normalize(&mut unknown, case.unknown_ident, case.kind);
-
-        if known != unknown {
-            failures.push(format!(
-                "{}\n      with `{}`: {known:?}\n      with `{}`: {unknown:?}",
-                case.label, case.known_ident, case.unknown_ident,
+/// Runs one case the way the guard does: parse both sources, normalize the
+/// one identifier the parser is not allowed to recognize, compare the trees.
+/// `Some(report)` means they differed -- a vocabulary lookup got through.
+///
+/// A separate function rather than a loop body so that
+/// [`the_guard_reports_a_difference_it_is_given`] can drive the same code.
+/// A guard that cannot be shown to fail is not known to work, and this one
+/// is the only thing standing behind `no-vocabulary`.
+fn compare_case(case: &Case) -> Option<String> {
+    let mut known = match parse_document(case.known) {
+        Ok(doc) => doc,
+        Err(e) => {
+            return Some(format!(
+                "{}\n    known source failed to parse: {e}",
+                case.label
             ));
         }
+    };
+    let mut unknown = match parse_document(case.unknown) {
+        Ok(doc) => doc,
+        Err(e) => {
+            return Some(format!(
+                "{}\n    unknown source failed to parse: {e}",
+                case.label
+            ));
+        }
+    };
+
+    normalize(&mut known, case.known_ident, case.kind);
+    normalize(&mut unknown, case.unknown_ident, case.kind);
+
+    if known != unknown {
+        return Some(format!(
+            "{}\n      with `{}`: {known:?}\n      with `{}`: {unknown:?}",
+            case.label, case.known_ident, case.unknown_ident,
+        ));
     }
+    None
+}
+
+#[test]
+fn element_names_and_arg_keys_do_not_change_the_tree() {
+    let failures: Vec<String> = CASES.iter().filter_map(compare_case).collect();
 
     assert!(
         failures.is_empty(),
         "the parser consulted an element vocabulary in {} case(s):\n\n{}",
         failures.len(),
         failures.join("\n\n"),
+    );
+}
+
+/// Proves [`compare_case`] can still say "different".
+///
+/// Every part of the comparison can rot into a no-op -- drop the `!=`,
+/// normalize too much, compare something always equal -- and the result
+/// looks exactly like a guard that passes. This feeds it a pair that
+/// differs in *shape*, which renaming an identifier cannot hide: `*a*` is
+/// an `em` element, `a` is one `Text`. If this stops failing, the guard
+/// above has stopped checking anything.
+///
+/// Not hypothetical. The tree-sitter drift check in this same package
+/// carried an empty marker for as long as it existed, and
+/// `text.contains("")` is always true.
+#[test]
+fn the_guard_reports_a_difference_it_is_given() {
+    let planted = Case {
+        label: "planted difference: the two sources are not the same tree",
+        known: "@memo[ *a* ]",
+        unknown: "@zzz[ a ]",
+        known_ident: "memo",
+        unknown_ident: "zzz",
+        kind: Ident::ElementName,
+    };
+
+    assert!(
+        compare_case(&planted).is_some(),
+        "the comparison no longer distinguishes trees that differ"
     );
 }
 
