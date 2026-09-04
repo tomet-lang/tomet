@@ -76,10 +76,12 @@ sudo whoami ls --help
 
 ---
 
-Title
+**Title**
+
 ---
 
-💫
+**💫**
+
 ---
 
 | title | sdfasdf | fasdf | sdffdsf |
