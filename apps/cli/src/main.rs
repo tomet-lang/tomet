@@ -83,7 +83,8 @@ fn main() -> ExitCode {
             r#type,
             out,
             advanced,
-        } => export_cmd(path, r#type.as_deref(), out.as_deref(), *advanced),
+            check,
+        } => export_cmd(path, r#type.as_deref(), out.as_deref(), *advanced, *check),
         Command::Refactor {
             path,
             in_place,

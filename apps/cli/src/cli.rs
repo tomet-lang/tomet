@@ -163,6 +163,12 @@ pub enum Command {
         /// Number headings sequentially by nesting level for HTML export.
         #[arg(long)]
         advanced: bool,
+        /// Compare each declared output against what the source renders to
+        /// now, without writing anything. Exits non-zero if any differ or
+        /// are missing -- a generated file that disagrees with its source
+        /// is a failure with a mechanical fix.
+        #[arg(long)]
+        check: bool,
     },
 
     /// Check every `@file`/`<embed>` link in a `.tmt`/`.tmt` document or

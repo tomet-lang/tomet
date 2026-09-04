@@ -10,11 +10,12 @@ pub(crate) fn export_cmd(
     override_type: Option<&str>,
     override_out: Option<&Path>,
     advanced: bool,
+    check: bool,
 ) -> anyhow::Result<()> {
     if target_path.is_file() {
-        export_single_file(target_path, override_type, override_out, advanced)
+        export_single_file(target_path, override_type, override_out, advanced, check)
     } else if target_path.is_dir() {
-        export_directory(target_path, override_type, override_out, advanced)
+        export_directory(target_path, override_type, override_out, advanced, check)
     } else {
         Err(anyhow::anyhow!(
             "path '{}' does not exist",
@@ -23,11 +24,56 @@ pub(crate) fn export_cmd(
     }
 }
 
+/// Set by `--check`: a generated file that disagrees with its source is a
+/// failure with a mechanical fix, which beats a rule asking people to
+/// remember not to hand-edit it.
+#[derive(Debug, Default)]
+pub(crate) struct StaleExports(pub Vec<PathBuf>);
+
 fn export_single_file(
     file_path: &Path,
     override_type: Option<&str>,
     override_out: Option<&Path>,
     advanced: bool,
+    check: bool,
+) -> anyhow::Result<()> {
+    let mut stale = StaleExports::default();
+    export_one(
+        file_path,
+        override_type,
+        override_out,
+        advanced,
+        check,
+        &mut stale,
+    )?;
+    report_stale(&stale, check)
+}
+
+/// Non-zero exit when `--check` found something out of date, so this can
+/// gate a commit the way `format --check` and `refactor --check` do.
+pub(crate) fn report_stale(stale: &StaleExports, check: bool) -> anyhow::Result<()> {
+    if !check || stale.0.is_empty() {
+        if check {
+            println!("All exports are up to date.");
+        }
+        return Ok(());
+    }
+    for path in &stale.0 {
+        println!("Stale export: {}", path.display());
+    }
+    Err(anyhow::anyhow!(
+        "{} export(s) differ from their source; re-run without --check",
+        stale.0.len()
+    ))
+}
+
+fn export_one(
+    file_path: &Path,
+    override_type: Option<&str>,
+    override_out: Option<&Path>,
+    advanced: bool,
+    check: bool,
+    stale: &mut StaleExports,
 ) -> anyhow::Result<()> {
     let src = fs::read_to_string(file_path)?;
     let doc = tomet_parser::parse_document(&src)
@@ -109,12 +155,21 @@ fn export_single_file(
         };
 
         if let Some(dest) = out_path {
+            if check {
+                // Missing counts as stale: the source says a file should be
+                // there, so its absence is exactly what this is for.
+                let current = fs::read_to_string(&dest).unwrap_or_default();
+                if current != rendered {
+                    stale.0.push(dest);
+                }
+                continue;
+            }
             if let Some(parent) = dest.parent() {
                 fs::create_dir_all(parent)?;
             }
             fs::write(&dest, &rendered)?;
             println!("Exported {} -> {}", file_path.display(), dest.display());
-        } else {
+        } else if !check {
             print!("{rendered}");
         }
     }
@@ -127,6 +182,7 @@ fn export_directory(
     override_type: Option<&str>,
     override_out: Option<&Path>,
     advanced: bool,
+    check: bool,
 ) -> anyhow::Result<()> {
     let files = tomet_indexer::collect_tm_files(dir_path);
     if files.is_empty() {
@@ -135,6 +191,7 @@ fn export_directory(
     }
 
     let mut exported_count = 0;
+    let mut stale = StaleExports::default();
     for file in &files {
         let relative_out = if let Some(out_dir) = override_out {
             if let Ok(rel) = file.strip_prefix(dir_path) {
@@ -147,12 +204,22 @@ fn export_directory(
             None
         };
 
-        match export_single_file(file, override_type, relative_out.as_deref(), advanced) {
+        match export_one(
+            file,
+            override_type,
+            relative_out.as_deref(),
+            advanced,
+            check,
+            &mut stale,
+        ) {
             Ok(()) => exported_count += 1,
             Err(e) => eprintln!("Error exporting {}: {e}", file.display()),
         }
     }
 
+    if check {
+        return report_stale(&stale, check);
+    }
     println!("Batch export finished: {exported_count} file(s) processed.");
     Ok(())
 }
@@ -160,6 +227,36 @@ fn export_directory(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `--check` has to fail before it is worth running. Exports once,
+    /// confirms clean, edits the output by hand, confirms it is caught.
+    #[test]
+    fn check_mode_catches_a_hand_edited_export() {
+        let dir = std::env::temp_dir().join("tomet_test_export_check");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("temp dir");
+        let src = dir.join("doc.tmt");
+        let out = dir.join("doc.md");
+        fs::write(
+            &src,
+            format!(
+                "@config(export: {{ type: commonmark, path: \"{}\" }})\n\n#[ Title ]\n",
+                out.display()
+            ),
+        )
+        .expect("write source");
+
+        export_cmd(&src, None, None, false, false).expect("export writes");
+        export_cmd(&src, None, None, false, true).expect("freshly exported output is up to date");
+
+        fs::write(&out, "# Hand edited\n").expect("tamper");
+        assert!(
+            export_cmd(&src, None, None, false, true).is_err(),
+            "a hand-edited export must not pass --check"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn export_single_file_with_config_writes_output_file() {
@@ -174,7 +271,7 @@ mod tests {
         );
         fs::write(&src_file, src_content).unwrap();
 
-        let res = export_cmd(&src_file, None, None, false);
+        let res = export_cmd(&src_file, None, None, false, false);
         assert!(res.is_ok());
         assert!(out_file.exists());
         let exported_text = fs::read_to_string(&out_file).unwrap();
