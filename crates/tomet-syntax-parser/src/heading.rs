@@ -1,9 +1,10 @@
 //! Parsing for headings (`#[...]`) and thematic breaks (`---`).
 
 use crate::error::Result;
+use crate::element::{parse_groups, parse_sugar_body};
 use crate::inline::{Stop, parse_inline_seq};
 use crate::value::{
-    err, parse_value_at, skip_inline_ws, skip_ws_and_newlines, skip_ws_newlines_and_comments,
+    err, parse_value_at, skip_inline_ws, skip_ws_newlines_and_comments,
 };
 use tomet_ast::{Element, ElementValue, Placement, Sigil, Value};
 use tomet_lexer::Cursor;
@@ -12,46 +13,47 @@ use tomet_tree::{ElementExt, element_new};
 pub(crate) fn parse_heading(cur: &mut Cursor) -> Result<Element> {
     let start_pos = cur.pos();
     let level = cur.eat_while(|c| c == '#').len() as u8;
+
+    // A `#` run must be followed by a group, or by whitespace and then the
+    // sugar's content. `#tag` is neither, and stays prose.
+    let had_ws = matches!(cur.peek(), Some(' ') | Some('\t'));
     skip_inline_ws(cur);
-    if !cur.eat_str("[") {
-        return Err(err(cur, cur.pos(), "expected '[' after '#'"));
-    }
-    let content = parse_inline_seq(cur, Stop::Bracket(']'), true)?;
-    if !cur.eat_str("]") {
-        return Err(err(cur, cur.pos(), "expected ']'"));
-    }
-    let checkpoint = cur.pos();
-    skip_ws_and_newlines(cur);
-    let mut attrs = if cur.peek() == Some('{') {
-        Some(parse_braced_value(cur)?)
-    } else {
-        cur.set_pos(checkpoint);
-        None
-    };
-    skip_inline_ws(cur);
-    if cur.eat_str(":") {
-        skip_inline_ws(cur);
-        if cur.peek() == Some('{') {
-            let connected_val = parse_braced_value(cur)?;
-            attrs = merge_values(attrs.as_ref(), Some(&connected_val));
-        } else if cur.peek() == Some('(') {
-            let connected_args = parse_paren_value(cur)?;
-            attrs = merge_values(attrs.as_ref(), Some(&connected_args));
+
+    let mut el = element_new(Sigil::named("heading")).with_placement(Placement::Block);
+
+    match cur.peek() {
+        Some('[') | Some('(') | Some('{') => {
+            // The full form. Groups are read by the same code that reads
+            // `@name`'s, so `#` takes `(args)`, `[content]` and `{value}`
+            // in any order, and `[content]` may span lines.
+            parse_groups(cur, &mut el, true)?;
         }
+        _ if had_ws => {
+            let (content, attrs) = parse_sugar_body(cur)?;
+            el.content = Some(content);
+            el.value = attrs.map(ElementValue::from_map);
+        }
+        _ => return Err(err(cur, cur.pos(), "expected '[' or a space after '#'")),
     }
+
     skip_inline_ws(cur);
     if matches!(cur.peek(), Some('\n') | Some('\r')) {
         cur.bump();
     }
-    let span = cur.span_from(start_pos);
+
+    // The level is the `#` run, and it lands in `args` under the builtin
+    // positional key that `tomet-semantics::heading_level` reads. An
+    // explicit `(args)` group merges *around* it rather than replacing it:
+    // `#(id: x)[ y ]` is a level-1 heading that also carries `id`.
     // Pre-existing quirk, preserved: a `#`-run longer than 255 silently
     // truncates here, same as before `Heading` was folded into `Element`.
-    let mut el = element_new(Sigil::named("heading"))
-        .with_placement(Placement::Block)
-        .with_span(span)
-        .with_args(Value::Int(level as i64))
-        .with_content(content);
-    el.value = attrs.map(ElementValue::from_map);
+    let level_args = Value::Map(vec![("level".into(), Value::Int(level as i64))]);
+    el.args = match el.args.take() {
+        Some(explicit) => merge_values(Some(&level_args), Some(&explicit)),
+        None => Some(Value::Int(level as i64)),
+    };
+
+    el.span = cur.span_from(start_pos);
     Ok(el)
 }
 

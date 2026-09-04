@@ -332,21 +332,44 @@ mod tests {
     }
 
     #[test]
-    fn bracket_content_is_never_a_marker() {
-        // `[...]` after a list marker has no special meaning at all (the
-        // checkbox form is gone) -- it's just literal text.
+    fn bracket_after_a_list_marker_is_the_content_group() {
+        // `[...]` is the item's content group -- the same group `@name`
+        // takes -- not a checkbox and not literal text. `args` stays
+        // `None` because no `(...)` was written. Trailing text joins the
+        // item rather than falling out as a block of its own, matching
+        // `@x[T] content`, where both halves stay in one paragraph.
         let doc = parse_document("- [T] content\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(list) => {
                 let items = list_items(list);
                 assert_eq!(items[0].args, None);
-                assert_eq!(
-                    items[0].content,
-                    Some(vec![Inline::Text("[T] content".into())])
-                );
+                let content = items[0].content.as_ref().expect("content");
+                let text: String = content
+                    .iter()
+                    .map(|inline| match inline {
+                        Inline::Text(t) => t.value.as_str(),
+                        other => panic!("expected text, got {other:?}"),
+                    })
+                    .collect();
+                assert_eq!(text, "T content");
             }
             other => panic!("expected list, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn a_bracketed_list_item_may_span_lines() {
+        // The bracket-less sugar is single-line by design; a group is the
+        // explicit trigger that lets an item spread out.
+        let doc = parse_document("- ()[ first\n  second ]\n- ()[ third ]\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(list) => {
+                let items = list_items(list);
+                assert_eq!(items.len(), 2, "both items belong to one list");
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+        assert_eq!(doc.blocks.len(), 1, "no stray paragraph split off");
     }
 
     #[test]

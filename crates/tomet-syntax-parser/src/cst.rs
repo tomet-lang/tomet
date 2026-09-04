@@ -285,6 +285,20 @@ impl<'a> CstParser<'a> {
         if let Some(SyntaxKind::DOT) = self.current_kind() {
             self.bump(); // '.'
         }
+        while let Some(SyntaxKind::WHITESPACE) = self.current_kind() {
+            self.bump();
+        }
+
+        // A list item is an element: it takes the same `(args)`,
+        // `[content]` and `{value}` groups. Reading them here is what
+        // keeps a bracketed item -- which may span lines -- inside one
+        // node instead of ending at the first newline.
+        if matches!(
+            self.current_kind(),
+            Some(SyntaxKind::L_PAREN) | Some(SyntaxKind::L_BRACKET) | Some(SyntaxKind::L_BRACE)
+        ) {
+            self.parse_optional_element_groups();
+        }
 
         while let Some(k) = self.current_kind() {
             if k == SyntaxKind::NEWLINE {

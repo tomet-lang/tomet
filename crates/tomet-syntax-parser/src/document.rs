@@ -104,8 +104,17 @@ pub fn parse_document(src: &str) -> Result<Document> {
 pub(crate) fn is_heading_start(cur: &Cursor) -> bool {
     let mut look = *cur;
     look.eat_while(|c| c == '#');
+    // A group may follow the run directly: `#[ x ]`, `#(id: a)[ x ]`.
+    if matches!(look.peek(), Some('[') | Some('(') | Some('{')) {
+        return true;
+    }
+    // Otherwise the bracket-less sugar, which needs a space to separate
+    // the run from its content. That space is what keeps `#tag` prose.
+    if !matches!(look.peek(), Some(' ') | Some('\t')) {
+        return false;
+    }
     skip_inline_ws(&mut look);
-    look.peek() == Some('[')
+    !matches!(look.peek(), None | Some('\n') | Some('\r'))
 }
 
 fn is_line_comment_start(cur: &Cursor) -> bool {
