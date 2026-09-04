@@ -248,6 +248,16 @@
     "type": "heading",
     "named": true,
     "fields": {
+      "args": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "args_group",
+            "named": true
+          }
+        ]
+      },
       "attrs": {
         "multiple": false,
         "required": false,
@@ -354,12 +364,26 @@
     "type": "interp_call",
     "named": true,
     "fields": {
+      "member": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
         "types": [
           {
             "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "interp_call",
             "named": true
           }
         ]
@@ -560,6 +584,16 @@
         "types": [
           {
             "type": "value_group",
+            "named": true
+          }
+        ]
+      },
+      "content": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "content_group",
             "named": true
           }
         ]
@@ -853,6 +887,16 @@
           }
         ]
       },
+      "content": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "content_group",
+            "named": true
+          }
+        ]
+      },
       "marker": {
         "multiple": false,
         "required": false,
@@ -991,6 +1035,10 @@
   },
   {
     "type": "-.",
+    "named": false
+  },
+  {
+    "type": ".",
     "named": false
   },
   {
