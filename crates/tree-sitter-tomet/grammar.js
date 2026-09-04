@@ -78,12 +78,22 @@ module.exports = grammar({
 		_blank_gap: ($) => repeat1($._newline),
 
 		// ---- headings ----------------------------------------------------
+		// `#` is a sigil like `@name` and `-`: it takes `(args)`,
+		// `[content]` and `{value}`. The bracket-less sugar (`# title`)
+		// needs whitespace after the run -- that space is the whole
+		// reason `#tag` stays prose.
 		heading: ($) =>
 			seq(
 				field("marker", $.heading_marker),
-				"[",
-				field("content", repeat($._bracket_item)),
-				"]",
+				choice(
+					seq(
+						optional(field("args", $.args_group)),
+						"[",
+						field("content", repeat($._bracket_item)),
+						"]",
+					),
+					seq(/[ \t]+/, field("content", repeat1($._line_item))),
+				),
 				optional(
 					seq(
 						optional($._blank_gap),
@@ -193,26 +203,62 @@ module.exports = grammar({
 		// commitment, no backtracking required.
 		list_marker: ($) => $._list_marker_token,
 
+		// A list item is an element: it takes the same `(args)`,
+		// `[content]` and `{value}` groups `@name` does. The bracketed
+		// form needs no gap after the marker (`- ()[ x ]`) and may span
+		// lines, since `content_group` admits `_newline` through
+		// `_bracket_item`. The bracket-less sugar keeps its mandatory gap
+		// and stays on one line.
 		ordered_list_item: ($) =>
 			seq(
 				"-.",
 				choice(
-					seq(field("marker", $.list_marker), $._list_marker_gap),
+					seq(
+						field("marker", $.list_marker),
+						choice($._list_marker_gap, optional(/[ \t]*/)),
+					),
 					$._list_marker_gap,
 				),
-				repeat($._line_item),
-				optional(field("attrs", $.value_group)),
+				choice(
+					seq(
+						field("content", $.content_group),
+						optional(field("attrs", $.value_group)),
+						repeat($._line_item),
+					),
+					seq(
+						repeat($._line_item),
+						optional(field("attrs", $.value_group)),
+					),
+				),
 				$._newline,
 			),
+		// A list item is an element: it takes the same `(args)`,
+		// `[content]` and `{value}` groups `@name` does. The bracketed
+		// form needs no gap after the marker (`- ()[ x ]`) and may span
+		// lines, since `content_group` admits `_newline` through
+		// `_bracket_item`. The bracket-less sugar keeps its mandatory gap
+		// and stays on one line.
 		unordered_list_item: ($) =>
 			seq(
 				"-",
 				choice(
-					seq(field("marker", $.list_marker), $._list_marker_gap),
+					seq(
+						field("marker", $.list_marker),
+						choice($._list_marker_gap, optional(/[ \t]*/)),
+					),
 					$._list_marker_gap,
 				),
-				repeat($._line_item),
-				optional(field("attrs", $.value_group)),
+				choice(
+					seq(
+						field("content", $.content_group),
+						optional(field("attrs", $.value_group)),
+						repeat($._line_item),
+					),
+					seq(
+						repeat($._line_item),
+						optional(field("attrs", $.value_group)),
+					),
+				),
 				$._newline,
 			),
 
@@ -360,12 +406,18 @@ module.exports = grammar({
 				seq("$", $.interp_call),
 			),
 		_interp_expr: ($) => choice($.interp_call, $.identifier, $.number, $.string),
+		// A call's callee may itself be a call followed by `.name`, which
+		// is how `${ref(id(x).contents(y))}` reads: member access binds to
+		// whatever precedes it, then takes its own argument list.
 		interp_call: ($) =>
-			seq(
-				field("name", $.identifier),
-				"(",
-				optional(seq($._interp_expr, repeat(seq(",", $._interp_expr)))),
-				")",
+			prec.left(
+				seq(
+					field("name", choice($.identifier, $.interp_call)),
+					repeat(seq(".", field("member", $.identifier))),
+					"(",
+					optional(seq($._interp_expr, repeat(seq(",", $._interp_expr)))),
+					")",
+				),
 			),
 		number: (_$) => /-?[0-9]+(\.[0-9]+)?/,
 
