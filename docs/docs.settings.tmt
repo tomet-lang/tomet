@@ -21,7 +21,7 @@
     },
     todo = {},
     daily-note = {
-      template = "path:examples/templates/template.daily-note.tmt"
+      template = "path:examples/blueprints/daily-note.blueprint.tmt"
     }
   }
 }

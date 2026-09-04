@@ -1,3 +1,4 @@
+@kind(blueprint)
 @blueprint(rfc){
   description: "Request for Comments template"
   vars: {

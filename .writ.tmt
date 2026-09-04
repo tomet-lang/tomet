@@ -77,6 +77,63 @@ unclassified member is a failure rather than a silence.
 no layer, a member matching two, an upward edge, or anything `crates/
 tree-sitter-tomet` comes to depend on.
 
+##[ blueprint-shape ]
+
+A blueprint declares what it is, what it targets, and what it says about
+itself -- in that order, in the three slots every element has.
+
+```tmt
+@kind(blueprint)
+@blueprint(writ){
+  version: "1.0.0"
+  description: "twrit"
+}
+```
+
+`@kind(blueprint)` is written, never inferred from `@blueprint` being
+present. The target is the positional argument, normalized to `target`.
+`@blueprint`'s `{...}` holds the blueprint's own metadata and never the
+target. Instantiating promotes `@blueprint(X)` to `@kind(X)`.
+
+---[ Why ]---
+
+`why/root.tmt` puts it plainly: identifier, input, data, and a setting that
+says where each one goes. A blueprint has all three and nothing else --
+what it is, what it is parameterised by, what it records about itself. The
+shape is not invented for blueprints; it is the shape, applied.
+
+`@kind` is the one answer to "what is this document". Inferring it from an
+element's presence makes a second path to the same question, and a second
+path is what has gone wrong every time: `@meta{type:}` beside `@kind`, the
+identifier rules differing between element arguments and interpolation, `-`
+and `#` taking different groups from `@name`.
+
+Rejected, and worth naming because the code accepted all of them at once:
+
+- `@blueprint(kind: writ)`. `@kind(blueprint)` sits two lines above, so
+  `kind` would appear twice in three lines meaning two different things --
+  this file's kind, and the output's.
+- `@blueprint(target: writ)`. Spelling the key is not wrong, only
+  redundant: `embed` and `link` already normalize a positional to `target`,
+  and `@kind(writ)` is positional too, so promotion becomes the same value
+  moving rather than a change of shape.
+- `@target(writ)` as a separate element. It makes the promotion easy to
+  see, but the target is a fact *about the blueprint* and belongs with its
+  other facts. One element fewer.
+- A document counting as a blueprint because it has any `@kind` at all.
+  That is what `extract_blueprint_schema` did, and it is why nothing could
+  tell a blueprint from the documents it describes.
+
+None of this was written down when `@blueprint` was implemented in
+`bb38aff`, and it appears nowhere in `docs/spec/`. That is the whole reason
+this entry exists.
+
+---[ Guard ]---
+
+None yet. Two halves are checkable: no document carries `@blueprint`
+without `@kind(blueprint)`, and `@blueprint`'s args are a bare positional
+rather than a `target:`/`kind:` map.
+
 ##[ kind-not-meta-type ]
 
 A document declares its kind with a top-level `@kind(...)`. The `type:`

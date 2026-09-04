@@ -85,7 +85,7 @@ parsing.
 Built-ins and user-defined elements stay symmetric. The moment the parser
 recognizes `codeblock`, no element a user writes can behave like
 `codeblock`, and the format has started growing by privileging its own
-names. `fact/root.tmt` promises the opposite: identifier, input, data, and a
+names. `why/root.tmt` promises the opposite: identifier, input, data, and a
 setting that says where each one goes.
 
 It also keeps the grammar still. If element names reached into parsing, then

@@ -26,7 +26,7 @@ Write all code comments in English. Do not use Japanese in code.
 For documentation the rule is scoped by what the document sits next to,
 per `docs/.writ.tmt`'s `docs-language`: every `.writ.tmt` is English (they
 cross-link with the English doc comments); `docs/spec/`, `docs/guide/`,
-`docs/examples/` and `docs/fact/` are user-facing and written in Japanese.
+`docs/examples/` and `docs/why/` are user-facing and written in Japanese.
 `docs/design/ideas/` is whichever language the thinking happened in.
 
 ## Verifying changes

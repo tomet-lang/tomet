@@ -23,7 +23,7 @@ about.
 [ normative -- it defines what the language accepts and what it means ][ `spec/` ]
 [ instructional -- it shows how to get something done ][ `guide/` ]
 [ a runnable sample document ][ `examples/` ]
-[ a statement of what Tomet is and why it exists ][ `fact/` ]
+[ a statement of what Tomet is for, and why it exists ][ `why/` ]
 [ an idea not yet decided ][ `design/ideas/` ]
 [ a rule this repository must obey ][ the nearest `.writ.tmt` ]
 ]
@@ -51,6 +51,25 @@ grammar-freeze process whose document did not exist.
 
 ---[ Why ]---
 
+`why/` was `fact/`, which named the one thing it is not. What is in there
+is chosen, not observed: "readable to a reader", "document-first",
+"portable" are commitments, and a commitment can be abandoned but not
+disproved. The name also had it exactly backwards for this repository,
+where the standing distinction is that the implementation is the truth
+about how things *work* and a document is the truth about how they *should*.
+`fact/` held the second and was named for the first.
+
+`why/` says what it does rather than claiming authority it does not have --
+the binding layer here is the writs. It also completes a reading anyone can
+follow: `spec/` is what, `guide/` is how, `why/` is why. `docs/README.tmt`
+had been describing it as "なぜこのフォーマットがあるのか" all along; only
+the directory name had not caught up.
+
+`spec/` and `guide/` keep their names. They are terms of art that carry more
+than `what/` and `how/` would -- `spec/` says normative and precise, `guide/`
+says instructional -- and matching what every other language project calls
+them is itself a kindness to a newcomer.
+
 The split that earns its keep is `spec/` against `guide/`. Before the
 restructure these were `ja/specifications/` and `ja/builtins/`, which split
 spec from spec: a reader had to check both every time. Splitting on
@@ -69,7 +88,7 @@ failure rather than a silence.
 
 ##[ docs-language ]
 
-`spec/`, `guide/`, `examples/` and `fact/` are written in **Japanese**.
+`spec/`, `guide/`, `examples/` and `why/` are written in **Japanese**.
 Japanese is the default, so filenames carry no `.ja` suffix and there is no
 `ja/` directory level. English translations, if they are ever added, go
 under `docs/en/` mirroring the same tree.

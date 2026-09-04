@@ -45,30 +45,21 @@ pub fn find_template(root: &Path, name: &str, config: &PrinterConfig) -> Option<
         return Some(dot_tomet_path);
     }
 
-    // 5. Check docs/examples/templates/<name>.tmt
-    let docs_tmpl = root
+    // 5. `docs/examples/blueprints/<name>.blueprint.tmt`.
+    //
+    // One spelling. This used to try `<name>.tmt`, `template.<name>.tmt`
+    // and `<name>.template.tmt` in turn, which is what let
+    // `docs/docs.settings.tmt` point at a filename that does not exist and
+    // still resolve -- the first two misses were invisible and the third
+    // hit. Three spellings for one thing is the same "nobody chose" that
+    // `@blueprint`'s three argument forms were.
+    let docs_blueprint = root
         .join("docs")
         .join("examples")
-        .join("templates")
-        .join(format!("{name}.tmt"));
-    if docs_tmpl.is_file() {
-        return Some(docs_tmpl);
-    }
-    let docs_tmpl_prefix = root
-        .join("docs")
-        .join("examples")
-        .join("templates")
-        .join(format!("template.{name}.tmt"));
-    if docs_tmpl_prefix.is_file() {
-        return Some(docs_tmpl_prefix);
-    }
-    let docs_tmpl_suffix = root
-        .join("docs")
-        .join("examples")
-        .join("templates")
-        .join(format!("{name}.template.tmt"));
-    if docs_tmpl_suffix.is_file() {
-        return Some(docs_tmpl_suffix);
+        .join("blueprints")
+        .join(format!("{name}.blueprint.tmt"));
+    if docs_blueprint.is_file() {
+        return Some(docs_blueprint);
     }
 
     None
@@ -90,7 +81,7 @@ pub fn list_templates(root: &Path, config: &PrinterConfig) -> Vec<(String, PathB
     let search_dirs = [
         root.join("templates"),
         root.join(".tomet").join("templates"),
-        root.join("docs").join("examples").join("templates"),
+        root.join("docs").join("examples").join("blueprints"),
     ];
 
     for dir in &search_dirs {
@@ -100,9 +91,11 @@ pub fn list_templates(root: &Path, config: &PrinterConfig) -> Vec<(String, PathB
                     let path = entry.path();
                     if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("tmt") {
                         if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                            let clean_name = stem
-                                .trim_start_matches("template.")
-                                .trim_end_matches(".template");
+                            // `daily-note.blueprint.tmt` lists as
+                            // `daily-note`. One suffix, matching
+                            // `find_template_path` -- the two used to
+                            // disagree about which spellings exist.
+                            let clean_name = stem.trim_end_matches(".blueprint");
                             results.entry(clean_name.to_string()).or_insert(path);
                         }
                     }

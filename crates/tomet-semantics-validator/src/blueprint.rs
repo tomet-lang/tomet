@@ -26,13 +26,18 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
     let mut target_kind = "unknown".to_string();
     let mut required_meta_keys = Vec::new();
     let mut required_sections = Vec::new();
-    let mut found_blueprint_or_kind = false;
+    let mut found_blueprint = false;
 
     for block in &blueprint.blocks {
         if let Block::Element(el) = block {
             let kind = classify_lenient(el);
-            if kind == ElementKind::Blueprint || kind == ElementKind::Kind {
-                found_blueprint_or_kind = true;
+            // `@blueprint` only. This used to accept any `@kind` too,
+            // which meant every ordinary document read as a blueprint of
+            // itself and nothing could tell the two apart. A document is a
+            // blueprint because it says `@kind(blueprint)` and carries
+            // `@blueprint(target)`, not because it has a kind at all.
+            if kind == ElementKind::Blueprint {
+                found_blueprint = true;
                 if let Some(Value::String(k)) = &el.args {
                     target_kind = k.clone();
                 } else if let Some(Value::Map(entries)) = &el.args {
@@ -89,7 +94,7 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
         }
     }
 
-    if found_blueprint_or_kind {
+    if found_blueprint {
         Some(BlueprintSchema {
             target_kind,
             required_meta_keys,
@@ -217,6 +222,36 @@ mod tests {
 
     fn parse(src: &str) -> Document {
         tomet_parser::parse_document(src).unwrap()
+    }
+
+    /// An ordinary document is not a blueprint of itself.
+    ///
+    /// `extract_blueprint_schema` used to accept any `@kind` as evidence of
+    /// blueprint-ness, so every document in the vault answered "yes, I am a
+    /// schema" and nothing could tell a blueprint from what it describes.
+    /// No test exercised that branch, which is how it survived.
+    #[test]
+    fn a_plain_kind_document_is_not_a_blueprint() {
+        let doc = tomet_parser::parse_document(
+            "@kind(daily-note)\n@meta{\n  id: doc-1\n}\n\n#[ Plan ] {id: plan}\n",
+        )
+        .unwrap();
+        assert!(
+            extract_blueprint_schema(&doc).is_none(),
+            "a document with a kind but no `@blueprint` must not read as a schema"
+        );
+    }
+
+    #[test]
+    fn a_blueprint_still_extracts_its_schema() {
+        let doc = tomet_parser::parse_document(
+            "@kind(blueprint)\n@blueprint(daily-note)\n\n#[ Plan ] {id: plan}\n",
+        )
+        .unwrap();
+        assert!(
+            extract_blueprint_schema(&doc).is_some(),
+            "the decided shape must still be recognised"
+        );
     }
 
     #[test]

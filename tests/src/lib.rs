@@ -141,7 +141,7 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // nothing to do with the sigil work.
     ("syntax/sigils.tmt", &["title: 混在,"]),
     // One missing token, which `ts_error_texts` reports as empty text.
-    ("templates/template.daily-note.tmt", &[MISSING_NODE]),
+    ("blueprints/daily-note.blueprint.tmt", &[MISSING_NODE]),
 ];
 
 /// Records a fixture as drifting wholesale, without pinning the text of

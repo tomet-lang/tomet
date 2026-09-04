@@ -10,6 +10,11 @@
 │ 自動リンク                             │ 1f799fa / 85a85a1 │
 - crates/tomet-workspace-config は workspace 層にいません。 format と convert がこれの上に乗っているので、それらより下の独立した層です。名前のほうが間違っている。黙って分類し直さず、例外として書いて「リネームが本当の直し方」と記録しました
 
+- mode。`commonmark`、`no_data`
+- export force
+- kindとrules?
+- export後のパスの整合性
+
 - 読み込みロード画面
 - index, directories
 - latex
