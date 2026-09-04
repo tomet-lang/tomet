@@ -115,10 +115,20 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // clean" half will force each entry out again as it is fixed.
     //
     // A group on the line *after* its element: `@file(readme.md)` then
-    // `[ 説明 ]`. `skip_element_gap` allows one newline between an
-    // element's groups (and `docs/spec/syntax.tmt` shows the form), but
-    // `inline_element`'s `repeat($._element_group)` has no gap between
-    // repetitions.
+    // `[ 説明 ]`. `skip_element_gap` continues while `newlines <= 1`, and
+    // `docs/spec/syntax.tmt` shows the form, but `inline_element`'s
+    // `repeat($._element_group)` has no gap between repetitions.
+    //
+    // Adding `optional($._newline)` to that repeat does not fix it, with
+    // or without an explicit `prec.right` on the gap: `paragraph` is
+    // `repeat1(seq(repeat1($._line_item), $._newline))`, so the newline is
+    // taken as the paragraph's line separator before the element can
+    // consider it. Both were tried and reverted.
+    //
+    // Deciding needs lookahead *past* the newline and its indentation for
+    // a `(`/`[`/`{`, which tree-sitter's internal lexer cannot do -- the
+    // same wall `_list_marker_gap` hit. The fix is an external scanner
+    // token in `src/scanner.c`, next to that one.
     ("examples/dirs.tmt", &["]"]),
     ("examples/node_graph.tmt", &["]"]),
     ("examples/scenario.tmt", &["]"]),
