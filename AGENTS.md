@@ -56,7 +56,11 @@ the snapshot references work.
 
 ## Task tracking
 
-Before starting implementation on any non-trivial task, create a new file under `.agents/tasks/` (one file per task, e.g. `.agents/tasks/<short-task-slug>.md`) that breaks the work into discrete steps. Update that file immediately after completing each step, marking it done. Keep it accurate and current so that if work is interrupted partway through, it can always be resumed from that file alone, without needing prior conversation context. Multiple task files may coexist under `.agents/tasks/` when several non-trivial tasks are in flight; do not let one task's file block or get overwritten by another's. Once all steps for a task are done and the task is complete, delete that task's file.
+Before starting implementation on any non-trivial task, create a new file under `.agents/tasks/` (one file per task, e.g. `.agents/tasks/<short-task-slug>.md`) that breaks the work into discrete steps. Update that file immediately after completing each step, marking it done. Keep it accurate and current so that if work is interrupted partway through, it can always be resumed from that file alone, without needing prior conversation context. Multiple task files may coexist under `.agents/tasks/` when several non-trivial tasks are in flight; do not let one task's file block or get overwritten by another's.
+
+If a session has to end early — for any reason, including a warning that a usage limit is close — stop at the next safe checkpoint. Finish the current atomic step rather than starting a new one, and write the state and the next steps into the task file before ending. Create the file at that point if the task never got one.
+
+When the task is done, fold anything worth keeping into where it belongs — a doc comment, a writ entry, a commit message — and then delete the task file. Deleting without folding is how the only copy of a decision gets lost; decide the destination when the task is created, not when it is deleted.
 
 ## Commits
 
