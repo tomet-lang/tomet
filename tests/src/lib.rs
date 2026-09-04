@@ -88,6 +88,73 @@ pub fn read_fixture(rel: &Path) -> String {
 /// permanent carve-out.
 pub const KNOWN_UNPARSEABLE: &[&str] = &[];
 
+/// Fixtures the tree-sitter grammar is known to mis-parse, and the text
+/// of the error nodes it produces for each.
+///
+/// The default for every other fixture is **no error nodes at all**.
+/// `grammar.js` is a hand-maintained approximation of `tomet-parser` and
+/// does not follow it on its own, so a fixture covering new syntax lands
+/// here as a failure until the grammar catches up -- which is the whole
+/// point of keeping the two side by side.
+///
+/// A marker matches by substring. An empty marker would match anything
+/// and make the check vacuous, so the sweep rejects one outright rather
+/// than trusting nobody adds it back.
+pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
+    // `----[💫]----`: `[` has more competing token definitions than `(`
+    // does -- `heading`'s content-opening `[`, `area_group`'s, and
+    // `punctuation`'s all coexist unshared.
+    ("cheatsheet.tmt", &["@config(", "や", "]"]),
+    // ---- drift the grammar has not caught up with -------------------
+    //
+    // Everything below was already drifting and nobody could see it: the
+    // only tree-sitter error checks read two hard-coded filenames, so
+    // five of these six files were never shown to the grammar at all.
+    // Recorded rather than fixed, so the tree is honest while
+    // `grammar.js` is brought up to date; the sweep's "listed but now
+    // clean" half will force each entry out again as it is fixed.
+    //
+    // A group on the line *after* its element: `@file(readme.md)` then
+    // `[ 説明 ]`. `skip_element_gap` allows one newline between an
+    // element's groups (and `docs/spec/syntax.tmt` shows the form), but
+    // `inline_element`'s `repeat($._element_group)` has no gap between
+    // repetitions.
+    ("examples/dirs.tmt", &["]"]),
+    ("examples/node_graph.tmt", &["]"]),
+    ("examples/scenario.tmt", &["]"]),
+    // Every line here is `- [ ] item`, so the grammar errors once per
+    // item with no substring in common. Recorded coarsely rather than as
+    // 32 texts that would all be deleted together anyway.
+    ("roadmap.tmt", &[ANY_ERROR]),
+    // A `{...}` group mixing a `key: value` pair with a bare element --
+    // `@deck.card{ title: 混在, (a)[ ... ] }`. Predates this list and has
+    // nothing to do with the sigil work.
+    ("syntax/sigils.tmt", &["title: 混在,"]),
+    // One missing token, which `ts_error_texts` reports as empty text.
+    ("templates/template.daily-note.tmt", &[MISSING_NODE]),
+];
+
+/// Records a fixture as drifting wholesale, without pinning the text of
+/// each error node. Deliberately coarse: use it when the grammar fails
+/// once per line and the texts share nothing, not to wave away a case
+/// worth naming.
+pub const ANY_ERROR: &str = "<any>";
+
+/// Stands in for an error node with no text -- a *missing* token rather
+/// than an unexpected one. Spelled out so it can be recorded without an
+/// empty marker, which would match everything.
+pub const MISSING_NODE: &str = "<missing>";
+
+/// The markers recorded for `rel`, or `None` when the grammar is expected
+/// to parse it without any error node.
+pub fn known_ts_errors(rel: &Path) -> Option<&'static [&'static str]> {
+    let key = rel.to_string_lossy().replace('\\', "/");
+    KNOWN_TS_ERRORS
+        .iter()
+        .find(|(name, _)| *name == key)
+        .map(|(_, markers)| *markers)
+}
+
 pub fn is_known_unparseable(rel: &Path) -> bool {
     let key = rel.to_string_lossy().replace('\\', "/");
     KNOWN_UNPARSEABLE.contains(&key.as_str())

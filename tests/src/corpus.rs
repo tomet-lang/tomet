@@ -3,16 +3,26 @@
 //!
 //! `tomet-parser` is the source of truth; `tree-sitter-tomet`'s
 //! `grammar.js` is a hand-maintained approximation used for editor syntax
-//! highlighting. The `known error cases` tests below are how the two are
-//! noticed drifting apart -- a grammar change in `tomet-parser` does not
-//! automatically show up in the tree-sitter grammar.
+//! highlighting. A grammar change in `tomet-parser` does not show up in
+//! the tree-sitter grammar on its own, so
+//! `tree_sitter_has_no_unexpected_errors_anywhere_in_the_corpus` sweeps
+//! **every** fixture through both and holds the difference against
+//! `KNOWN_TS_ERRORS`.
+//!
+//! It used to read two hard-coded filenames instead, which meant most of
+//! the corpus was never shown to the grammar at all, and one of the two
+//! carried an empty marker -- `text.contains("")` is always true, so that
+//! check could not fail. Widening the sweep immediately turned up five
+//! fixtures that had been drifting unseen, and one entry that had been
+//! recording errors the grammar stopped making.
 //!
 //! Moved here from `tomet-syntax-parser` and `tree-sitter-tomet`, which
 //! were reaching up to the repo root for these fixtures.
 
 use std::path::Path;
 use tomet_tests::{
-    KNOWN_UNPARSEABLE, corpus, is_known_unparseable, read_fixture, ts_error_texts, ts_parse,
+    ANY_ERROR, KNOWN_TS_ERRORS, KNOWN_UNPARSEABLE, MISSING_NODE, corpus, is_known_unparseable, known_ts_errors,
+    read_fixture, ts_error_texts, ts_parse,
 };
 
 #[test]
@@ -74,22 +84,80 @@ fn tree_sitter_parses_every_fixture_to_a_document_root() {
 }
 
 #[test]
-fn tree_sitter_readme_fixture_has_only_known_error_cases() {
-    let src = read_fixture(Path::new("readme.tmt"));
-    let tree = ts_parse(&src);
-    let errors = ts_error_texts(&src, &tree);
-    // Every error node's text contains (or exactly is) one of these
-    // markers, each tied to one documented case in `tree-sitter-tomet`'s
-    // module doc comment: the `のうち.../のルール` snippets are the
-    // stray-`]`-in-prose and the pre-existing `[]`-inside-`[...]` parser
-    // bug, both from this file's self-referential grammar-explanation
-    // prose, and `"key":` is the embedded-JSON quoted-key case
-    // (`@meta(format:json){ { "key": "value" } }`).
-    let known_markers = ["のうち必要なものを付ける", "のルール", "\"key\":", ""];
-    for text in &errors {
+fn tree_sitter_has_no_unexpected_errors_anywhere_in_the_corpus() {
+    let mut unexpected = Vec::new();
+    let mut clean_but_listed = Vec::new();
+
+    for rel in corpus() {
+        let src = read_fixture(&rel);
+        let tree = ts_parse(&src);
+        let errors: Vec<String> = ts_error_texts(&src, &tree)
+            .into_iter()
+            .map(|text| {
+                if text.is_empty() {
+                    MISSING_NODE.to_string()
+                } else {
+                    text
+                }
+            })
+            .collect();
+
+        match known_ts_errors(&rel) {
+            None => {
+                for text in &errors {
+                    unexpected.push(format!("{}: {text:?}", rel.display()));
+                }
+            }
+            Some(markers) => {
+                if errors.is_empty() {
+                    clean_but_listed.push(rel.display().to_string());
+                }
+                if markers.contains(&ANY_ERROR) {
+                    continue;
+                }
+                for text in &errors {
+                    if !markers.iter().any(|marker| text.contains(marker)) {
+                        unexpected.push(format!("{}: {text:?}", rel.display()));
+                    }
+                }
+            }
+        }
+    }
+
+    assert!(
+        unexpected.is_empty(),
+        "the tree-sitter grammar errors on syntax `tomet-parser` accepts.\n\
+         `grammar.js` is hand-maintained and does not follow the parser on\n\
+         its own -- update it, or record the case in `KNOWN_TS_ERRORS`:\n  {}",
+        unexpected.join("\n  ")
+    );
+    assert!(
+        clean_but_listed.is_empty(),
+        "these fixtures are listed in KNOWN_TS_ERRORS but the grammar now\n\
+         parses them cleanly. That is good news -- remove them:\n  {}",
+        clean_but_listed.join("\n  ")
+    );
+}
+
+/// A marker of `""` matches every string, which would make the sweep above
+/// pass no matter what the grammar did. One was in the list until the
+/// sweep was written, and it had made the readme check vacuous.
+#[test]
+fn known_ts_error_markers_are_not_vacuous() {
+    for (name, markers) in KNOWN_TS_ERRORS {
         assert!(
-            known_markers.iter().any(|marker| text.contains(marker)),
-            "unexpected error node text: {text:?}"
+            !markers.is_empty(),
+            "{name} has an empty marker list; drop the entry instead"
+        );
+        for marker in *markers {
+            assert!(
+                !marker.is_empty(),
+                "{name} has an empty marker, which matches anything"
+            );
+        }
+        assert!(
+            corpus().iter().any(|rel| rel == Path::new(name)),
+            "KNOWN_TS_ERRORS lists {name:?}, which is not in the corpus"
         );
     }
 }
@@ -103,30 +171,4 @@ fn tree_sitter_image_meta_fixture_parses_cleanly() {
     let src = read_fixture(Path::new("examples/image.meta.tmt"));
     let tree = ts_parse(&src);
     assert!(!tree.root_node().has_error());
-}
-
-#[test]
-fn tree_sitter_cheatsheet_fixture_has_only_known_error_cases() {
-    // The embedded-JSON/TOML case, the triple-backtick/unterminated
-    // code-span case, and the `#memo+++...+++` stray-character
-    // case all used to need markers here too, but no longer error at all
-    // now that they live inside this file's ``` fenced code block, which
-    // the grammar's `fenced_code_block` rule consumes as one opaque text
-    // run rather than parsing its contents as markup.
-    //
-    // `----[💫]----` is the one leftover: `[` has more competing token
-    // definitions than `(` does (`heading`'s own content-opening `[`,
-    // `area_group`'s, and `punctuation`'s all coexist unshared, unlike
-    // `-`, which only ever meant "start a list" or "plain punctuation")
-    // -- covered by the `"]"` marker below.
-    let src = read_fixture(Path::new("cheatsheet.tmt"));
-    let tree = ts_parse(&src);
-    let errors = ts_error_texts(&src, &tree);
-    let known_markers = ["@config(", "や", "]"];
-    for text in &errors {
-        assert!(
-            known_markers.iter().any(|marker| text.contains(marker)),
-            "unexpected error node text: {text:?}"
-        );
-    }
 }
