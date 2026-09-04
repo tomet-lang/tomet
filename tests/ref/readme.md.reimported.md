@@ -20,15 +20,21 @@
 
 > MDXやAstroコンポーネントのように、文書の中に型付きデータやコンポーネントを埋め込みたいエンジニア向け ObsidianのDataviewやBasesのように、メタデータとノートを高度に連携させたいKB作成向け
 
-## vs json
+**vs json**
+
+---
 
 key:value構造で張り合える。 tmtは、人間ファーストであり、改行ありの長文を挿入するのに長けている。 深いネストには弱い。タイムライン形式は得意なんじゃないかと考える。
 
-## vs markdown
+**vs markdown**
+
+---
 
 key:valueをブロックに作成可能 テンプレート機能 厳密 Markdownのように簡潔にかけない。記号が多い
 
-## vs xml/html
+**vs xml/html**
+
+---
 
 文字が少ない 深いネストを作成しない
 
@@ -44,5 +50,7 @@ key:valueをブロックに作成可能 テンプレート機能 厳密 Markdown
 - VSCode
 - Zed
 
-## Community Support
+**Community Support**
+
+---
 

@@ -248,7 +248,13 @@ fn render_heading(cx: &RenderCtx, el: &Element) -> String {
 
 fn render_hr(cx: &RenderCtx, el: &Element) -> String {
     match &el.content {
-        Some(title) if !title.is_empty() => format!("{}\n---", inline_to_md(cx, title)),
+        // The blank line is load-bearing. `Title` immediately above `---`
+        // is a setext heading in CommonMark, so without it a labelled
+        // divider silently exports as an `<h2>` -- the one shape this is
+        // trying not to be.
+        Some(title) if !title.is_empty() => {
+            format!("**{}**\n\n---", inline_to_md(cx, title))
+        }
         _ => "---".to_string(),
     }
 }
@@ -990,15 +996,19 @@ mod tests {
         assert_eq!(to_markdown(&doc), "");
     }
 
+    /// The pair this asserts is the point: a bold line, a blank line, then
+    /// the rule. `Title\n---` -- what this used to produce, and what this
+    /// test used to lock in -- is a setext heading, so the divider came out
+    /// as an `<h2>`.
     #[test]
-    fn titled_thematic_break() {
+    fn titled_thematic_break_is_not_a_setext_heading() {
         let mut el = tomet_tree::element_new(Sigil::named("hr"));
         el.content = Some(vec![Inline::Text(Text::new("Title", Span::dummy()))]);
         let doc = Document {
             blocks: vec![Block::Element(el)],
             span: Span::dummy(),
         };
-        assert_eq!(to_markdown(&doc), "Title\n---\n\n");
+        assert_eq!(to_markdown(&doc), "**Title**\n\n---\n\n");
     }
 
     #[test]

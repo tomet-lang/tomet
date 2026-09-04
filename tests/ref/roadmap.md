@@ -2,7 +2,8 @@
 - ちゃんと分割しろ
 - 読み込みロード画面
 
-構文を決定する
+**構文を決定する**
+
 ---
 
 - `ref`構文
@@ -14,21 +15,24 @@
 - 独自DSL Settings
 - 独自DSL Value
 
-構文を実装する
+**構文を実装する**
+
 ---
 
 - ビルトイン関数の強化
 - Elementの挙動を一般化
 - `#meta`にkdlを追加
 
-拡張性を確保する
+**拡張性を確保する**
+
 ---
 
 - ドキュメントの補充
 - アイコン、ロゴ
 - IDEサポート
 
-CLI/Library機能を強化する
+**CLI/Library機能を強化する**
+
 ---
 
 - 置換/検索
@@ -39,7 +43,8 @@ CLI/Library機能を強化する
 - React向けパッケージ
 - Hook
 
-外部機能を強化する
+**外部機能を強化する**
+
 ---
 
 - Zed
@@ -51,7 +56,8 @@ CLI/Library機能を強化する
 
 # Archive
 
-構文
+**構文**
+
 ---
 
 - x 要素設定 (.settings.tmt, json, yaml)
@@ -68,7 +74,8 @@ CLI/Library機能を強化する
 - x 名前 (element, arg, content, value)
 - x 基本AST (`@T()[]{}`)
 
-機能
+**機能**
+
 ---
 
 - x to\_from\_markdown ()
