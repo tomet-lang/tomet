@@ -15,6 +15,7 @@
 - latex
 - typst (Document -> Typst変換は`tomet-convert-typst`で実装済み。import/PDF生成は未実装)
 - migration
+- 構文変更によるbindigsの乖離
 ---[ 構文を決定する ]---
 - ( ) `ref`構文                      // `@this`
 - ( ) `[]`のkey
