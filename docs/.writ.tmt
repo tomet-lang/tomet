@@ -120,7 +120,15 @@ like the rest.
 
 ---[ Guard ]---
 
-None yet, and the shape is already known: re-export and diff, the way
-`tomet refactor --check` works. A generated file that disagrees with its
-source is a failure with a mechanical fix, which is better than a rule
-asking people to remember.
+```bash
+tomet export --check .
+```
+
+Re-renders every source that declares an output and compares it against
+what is on disk, writing nothing. A file that differs, or is missing
+entirely, exits non-zero. Better than a rule asking people to remember not
+to hand-edit: the failure names the file and the fix is to re-run the same
+command without `--check`.
+
+It governs one file today, `docs/exports/readme.tmt`. Nothing under `spec/`
+or `guide/` declares an output yet.
