@@ -36,6 +36,19 @@
       placement: head,
       singleton: true
     },
+    blueprint: {
+      // 位置引数は生成物の kind。`target` に正規化される -- `kind` ではない。
+      // すぐ上に `@kind(blueprint)` が並ぶので、そこで `kind:` を使うと
+      // 「このファイルの種別」と「生成物の種別」が二行のうちに二度出てくる。
+      // `embed`/`link` も位置引数を `target` に落とすので、語彙は増えない。
+      args: { target: { type: string } },
+      required: [ target ],
+      positional: [ target ],
+      // 雛形自身についての情報。対象は args 側であってここではない。
+      values: { version: string, description: string },
+      placement: head,
+      singleton: true
+    },
     settings: {
       args: { target: { type: string } },
       required: [ target ],

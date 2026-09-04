@@ -1,6 +1,8 @@
 @settings(file: docs/docs.settings.tmt)
 
-@kind(daily-note)
+@kind(blueprint)
+
+@blueprint(daily-note)
 
 @meta{uuid: ${uuid}}
 

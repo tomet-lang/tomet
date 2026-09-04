@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use tomet_ast::{Block, Document, ElementValue, Inline, Sigil, Span, Text, Value};
 use tomet_compute::EvaluationContext;
-use tomet_semantics::{ElementKind, classify_lenient};
+use tomet_semantics::{ElementKind, classify_lenient, normalized_element_args};
 use tomet_tree::{ValueExt, for_each_element_mut};
 
 /// Metadata and variable definitions extracted from a `@blueprint` directive.
@@ -65,23 +65,49 @@ pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
 pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> bool {
     let mut changed = false;
 
+    // Step 0: drop the blueprint's own `@kind(blueprint)`.
+    //
+    // It says what the *blueprint* is, and the blueprint is what stops
+    // existing here. Leaving it produces a document with two kinds --
+    // `@kind(blueprint)` from the source and `@kind(daily-note)` from the
+    // promotion below -- which is what running `tomet new` for the first
+    // time after the shape was decided actually produced.
+    let before = doc.blocks.len();
+    doc.blocks.retain(|block| {
+        let Block::Element(el) = block else {
+            return true;
+        };
+        if classify_lenient(el) != ElementKind::Kind {
+            return true;
+        }
+        normalized_element_args(el)
+            .as_ref()
+            .and_then(|args| args.get("kind"))
+            .and_then(|v| v.as_str())
+            != Some("blueprint")
+    });
+    changed |= doc.blocks.len() != before;
+
     // Step 1: Transform @blueprint -> @kind
     for block in &mut doc.blocks {
         if let Block::Element(el) = block {
             if classify_lenient(el) == ElementKind::Blueprint {
-                let target_kind = match &el.args {
-                    Some(Value::String(s)) => s.clone(),
-                    Some(Value::Map(entries)) => entries
-                        .iter()
-                        .find(|(k, _)| k == "target" || k == "kind")
-                        .and_then(|(_, v)| v.as_str())
-                        .unwrap_or("unknown")
-                        .to_string(),
-                    _ => "unknown".to_string(),
-                };
+                // The target is `@blueprint`'s positional argument, which
+                // `tomet-semantics::positional` normalizes to `target`.
+                // This used to also accept a spelled-out `target:` and a
+                // `kind:`, three spellings for one thing that nobody had
+                // chosen between -- see the root writ's `blueprint-shape`.
+                let target_kind = normalized_element_args(el)
+                    .as_ref()
+                    .and_then(|args| args.get("target"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
 
                 el.sigil = Sigil::named("kind");
                 el.args = Some(Value::String(target_kind));
+                // `{version, description}` describes the blueprint, not the
+                // document it produces, so it does not survive promotion.
                 el.value = None;
                 changed = true;
             }
@@ -266,6 +292,36 @@ fn value_to_display_string(val: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Instantiating leaves exactly one kind behind.
+    ///
+    /// A blueprint carries two: `@kind(blueprint)`, saying what the file
+    /// is, and `@blueprint(target)`, saying what it produces. Only the
+    /// second survives -- the first describes a thing that stops existing.
+    /// The first run of `tomet new` after the shape was decided emitted
+    /// both, which is what this pins.
+    #[test]
+    fn instantiating_leaves_one_kind() {
+        let mut doc = tomet_parser::parse_document(
+            "@kind(blueprint)\n@blueprint(daily-note){\n  version: \"1.0\"\n}\n\n#[ Plan ]\n",
+        )
+        .unwrap();
+        instantiate_blueprint(&mut doc, &EvaluationContext::default());
+
+        let kinds: Vec<String> = doc
+            .blocks
+            .iter()
+            .filter_map(|block| match block {
+                Block::Element(el) if classify_lenient(el) == ElementKind::Kind => el
+                    .args
+                    .as_ref()
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(kinds, vec!["daily-note".to_string()]);
+    }
 
     #[test]
     fn extracts_blueprint_info() {

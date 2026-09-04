@@ -1,5 +1,5 @@
-@blueprint{
+@kind(blueprint)
+@blueprint(writ){
   version: "1.0.0",
   description: "twrit"
 }
-@kind(writ)

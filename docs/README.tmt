@@ -8,7 +8,7 @@
 
 @table[
 [ ディレクトリ                               ][ 内容 ][ 言語 ][ 形式 ]
-[ @link(file:./fact/)[`fact/`]                 ][ Tomet が何であるか。理念と、他フォーマットとの棲み分け ][ 日本語 ][ `.tmt` ]
+[ @link(file:./why/)[`why/`]                   ][ Tomet が何のためにあるか。理念と、他フォーマットとの棲み分け ][ 日本語 ][ `.tmt` ]
 [ @link(file:./spec/)[`spec/`]                 ][ 言語仕様。文法、型、推論、組み込みの要素・関数・設定 ][ 日本語 ][ `.tmt` ]
 [ @link(file:./guide/)[`guide/`]               ][ 使い方。チートシート、CLI、設定、機能、組み込み ][ 日本語 ][ `.tmt` ]
 [ @link(file:./examples/)[`examples/`]         ][ 実際に動く `.tmt` のサンプルとテンプレート ][ 日本語 ][ `.tmt` ]
@@ -36,7 +36,7 @@
 #[ ここから読む ]
 
 - 言語をはじめて触る: @link(file:./guide/cheatsheet.tmt)[`guide/cheatsheet.tmt`]
-- なぜこのフォーマットがあるのか: @link(file:./fact/root.tmt)[`fact/root.tmt`]
+- なぜこのフォーマットがあるのか: @link(file:./why/root.tmt)[`why/root.tmt`]
 - 正確な構文を引く: @link(file:./spec/syntax.tmt)[`spec/syntax.tmt`]
 - パーサが今日*実際に*受け付けるものを確かめる: @link(file:../tests/SYNTAX.md)[`/tests/SYNTAX.md`]
 - ドキュメントを書く・動かす: @link(file:./.writ.tmt)[`docs/.writ.tmt`]

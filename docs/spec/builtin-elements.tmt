@@ -5,6 +5,11 @@
 @kind(@string)
 @version(@string)
 
+// blueprint は生成物の雛形。識別子・入力・データがそのまま:
+// 何であるか(blueprint)、何を対象にするか(位置引数)、自身について何を言うか。
+// 実体化のとき @blueprint(X) は @kind(X) に昇格する。
+@blueprint(@string){ version: @string, description: @string }
+
 @meta(format:json)
 @config(format:json)
 
