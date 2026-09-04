@@ -143,11 +143,13 @@ Until then `just docs-check` sweeps them for parse/format only.
 
 ## Known gaps, recorded but not fixed here
 
-Five entries were resolved after this file was written and have been
-removed: the vocabulary guard's missing negative case, `check-links`
+Entries resolved after this file was written have been removed rather than
+left to rot: the vocabulary guard's missing negative case, `check-links`
 skipping hidden files, its single-file false positives, `docs/README.tmt`'s
-own unresolvable links, and `@kind` being absent from `docs/spec/`. Each is
-described in the commit that closed it.
+own unresolvable links, `@kind` being absent from `docs/spec/`, the four
+illustration links under `docs/`, and the map's claim that `spec/` and
+`guide/` hold generated `.md`. Each is described in the commit that closed
+it.
 
 - `singleton` and `placement` are declared in `docs/spec/builtin-settings.tmt`
   for several elements but implemented nowhere -- the word appears in two doc
@@ -167,19 +169,15 @@ described in the commit that closed it.
   `@link(file:...)`, so the link checker cannot see them. Fixing them is a
   judgement call per site -- delete the sentence, or repoint it at whatever
   now carries the reasoning.
-- `docs/README.tmt` still describes `spec/` and `guide/` as "`.tmt` (`.md`
-  is generated)", and `.gitattributes` has `linguist-generated` rules for
-  `docs/spec/**/*.md` and `docs/guide/**/*.md`. No such `.md` exists and no
-  `.tmt` there declares `@config(export:)`. Recorded in the writ's
-  `generated-md-not-edited` entry as governing zero files today.
 - `tomet refactor --check` silently skips files that fail to parse (warns
   and moves on). A guard that skips broken files has a hole exactly where
   it matters most.
-- Four links under `docs/` still report broken, all in
-  `docs/guide/cheatsheet.tmt`: `@link[](file:/readme.md)` and friends are
-  syntax illustrations rather than links to anywhere. Either fence them, or
-  point them at real files -- until then `check-links docs` cannot reach
-  zero, which is what makes a check worth running.
+- `tomet check-links .` reports 18 broken, all in
+  `tests/fixtures/cheatsheet.tmt` and its generated refs. That copy is
+  frozen test input where a link pointing nowhere is the coverage, so the
+  meaningful invocation is `check-links docs`, which reports 0. Worth
+  deciding whether the repo-wide form should skip `tests/` rather than
+  being permanently non-zero.
 - Three writ entries have no guard: `parser-purity` (pin that
   `tomet-syntax-parser`'s dependencies carry nothing that can do I/O),
   `document-placement` (every directory under `docs/` appears in the table),
