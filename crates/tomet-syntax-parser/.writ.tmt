@@ -37,9 +37,36 @@ input.
 
 ---[ Guard ]---
 
-None yet. `tomet-syntax-parser`'s `[dependencies]` carry nothing that can
-do I/O today, which is the property `twrit` should pin: no `std::fs`, no
-`std::net`, and no dependency that provides them.
+@pure{
+  crates: [ "crates/tomet-syntax-parser" ]
+  forbid: [ "std::fs", "std::net", "std::process", "std::env" ]
+  allow-external: [
+    "rowan", "countme", "hashbrown", "rustc-hash", "text-size",
+    "serde", "serde_core", "serde_derive",
+    "proc-macro2", "quote", "syn", "unicode-ident"
+  ]
+}
+
+`twrit check` reads that and pins both ways the ability could be acquired.
+The source may not name an API that does I/O, so it cannot be done
+bare-handed; and every external crate in the dependency *closure* is listed
+above, so nothing new arrives without someone deciding to add it here.
+
+The closure, not the direct list. `tomet-syntax-parser`'s four dependencies
+are all workspace members and its `Crates.io` section is empty, which reads
+like "no external crates" and is not: `tomet-ast` brings `serde` and
+`tomet-cst` brings `rowan`, and those bring nine more. None of the twelve
+does I/O -- they are syntax-tree machinery and derive machinery -- but the
+guard found them the first time it ran, against a writ that had just
+claimed otherwise. An allowlist says what is true; "no external
+dependencies" said something that felt better.
+
+Paths are relative to the workspace root, as in `@layers`.
+
+This is the entry the vocabulary guard below rests on. That guard works by
+parsing two sources and comparing the trees; if parsing could consult the
+filesystem, the same input could produce different trees and the comparison
+would mean nothing.
 
 ##[ no-vocabulary ]
 
