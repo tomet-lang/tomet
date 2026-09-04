@@ -17,24 +17,30 @@ does not relax the rule to fit the change it wanted to make.
 Every workspace member belongs to exactly one layer, and depends only on
 layers strictly below its own. Same-layer dependencies are allowed;
 upward ones are not.
+/tests/SYNTAX.md
+@layers{
+  6: [ "apps/*", "bindings/*", "editors/*", "tests" ]
+  5: [ "crates/tomet-workspace", "crates/tomet-workspace-indexer", "crates/tomet-workspace-links" ]
+  4: [ "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet" ]
+  3: [ "crates/tomet-config" ]
+  2: [ "crates/tomet-semantics*" ]
+  1: [ "crates/tomet-syntax-*" ]
+  0: [ "crates/tree-sitter-tomet" ]
+}
 
-@table[
-[ Layer         ][ Members ]
-[ 6. apps       ][ `apps/*`, `bindings/*`, `tests` ]
-[ 5. workspace  ][ `crates/tomet-workspace`, `crates/tomet-workspace-indexer`, `crates/tomet-workspace-links` ]
-[ 4. produce    ][ `crates/tomet-format*`, `crates/tomet-convert-*`, `crates/tomet-transform` ]
-[ 3. config     ][ `crates/tomet-config` ]
-[ 2. semantics  ][ `crates/tomet-semantics*` ]
-[ 1. syntax     ][ `crates/tomet-syntax-*` ]
-[ 0. standalone ][ `crates/tree-sitter-tomet` ]
-]
+Layer 0 depends on no workspace member at all. Things may depend on it --
+`tests` and `apps/tui` both do -- but it may depend on nothing, because it
+is the hand-maintained grammar approximation and is only worth having while
+it stays independent of the parser.
 
-Layer 0 depends on no workspace member at all, in either direction. It is
-the hand-maintained grammar approximation, and it is only worth having
-because it is independent of the parser.
+`crates/serde_tomet` is listed by name in layer 4. It is an ecosystem
+adapter rather than a producer, and its name carries no layer prefix to
+match on.
 
-`crates/serde_tomet` sits in layer 4. It is an ecosystem adapter, not a
-producer, and the name carries no layer prefix.
+A pattern ending in `*` matches by prefix; every other pattern is exact.
+Patterns are directory paths relative to the workspace root, because the
+directory is the half of a crate's identity that is arranged by layer --
+`crates/tomet-syntax-parser` publishes `tomet-parser`.
 
 Dev-dependencies are exempt. A crate may reach upward in `[dev-dependencies]`
 to get a parser for its own tests -- `tomet-syntax-tree` and
@@ -66,8 +72,10 @@ unclassified member is a failure rather than a silence.
 
 ---[ Guard ]---
 
-None yet. This is `twrit`'s first job: read the table, read every member's
-`[dependencies]`, and fail on an unclassified member or an upward edge.
+`twrit check`. It reads `@layers` above, reads every workspace member's
+`[dependencies]` through `cargo_metadata`, and fails on a member matching
+no layer, a member matching two, an upward edge, or anything `crates/
+tree-sitter-tomet` comes to depend on.
 
 ##[ kind-not-meta-type ]
 
