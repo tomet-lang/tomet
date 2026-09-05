@@ -24,7 +24,7 @@
 					"tomet"
 				],
 				"extensions": [
-					".tmt",
+					".tm",
 					".tmt"
 				],
 				"configuration": "./language-configuration.json"

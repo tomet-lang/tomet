@@ -189,8 +189,11 @@
   要求していない
 - `docs/design/decisions/` は削除済み（`4055fe5`）だが、`docs/README.tmt` に
   その行が残っている
-- `.agents/tasks/sigil-shape-axis-and-namespaces.md` の434行も、完了すれば
-  規約通り消える。畳み込み先が決まっていない
+- `.agents/tasks/sigil-shape-axis-and-namespaces.md` の800行は 2026-09-06 に
+  完了して消えた。畳み込み先はその場で決めた: 排他規則の帰結は
+  `tests/README.md`、リモート接続と名前空間の未決は `docs/roadmap.tmt`、
+  綴りの撤去理由は各 doc コメント。**先に決めていれば探さずに済んだ**という
+  のがこの節の主張の実例になっている
 
 #[ 最初の一歩 ]
 

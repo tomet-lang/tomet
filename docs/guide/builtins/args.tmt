@@ -1,38 +1,63 @@
 ---[ `(args)` ]---
 
 ```(lang:tm)
-format: json                   // json / toml / yaml のいずれか。{value}の中身をそのフォーマットの
-                               // 生ソースとして扱う。#config(format:...)で以降のデフォルトにもでき
+format: json                  // json / toml / yaml のいずれか。`+++` の中身を
+                              // そのフォーマットの生ソースとして扱う。
+                              // その要素にだけ効く。文書全体の既定にはならない。
 
-url: @url                     // @(url:...) / @url(url:...) として推論・特別レンダリングされる
-file: @file                   // @(file:...) / @file(file:...) として推論・特別レンダリングされる。
-                                // プロジェクトルート相対で、任意のファイル/添付を指す
-tm: @tm                       // @(tm:...) / @tm(tm:...) として推論・特別レンダリングされる。
-                                // file: と同じくプロジェクトルート相対だが、他の .tmt/.tmt ドキュメント
-                                // を指す点で意味的に区別される。#fragment を併記して文書内の特定の id
-                                // を指せる (tm:path/to/doc#some-id)
-id: #id                        // @(id:...) / #id(id:...) として推論・特別レンダリングされる。
-                                // idベースの参照。現状は同一ドキュメント内のみ (`${id}`と同じid属性空間)
-ref: @ref                     // @(ref:...) / @ref(ref:...) として推論・特別レンダリングされる。
-                                // ファイル名/タイトルでプロジェクト内を検索して解決する
-                                // (旧 wiki: キーの役割を引き継いだもの)
-
-// format: kdl                 // 未実装: kdlはembedded formatとして認識されない
-// path:(@path,@path#@var)  // 未実装: path というキーには何の特別な意味もない
-// url:(@url#@var)           // 未実装: `#var` のようなフラグメント/変数展開の仕組みは無い
+target: "https://..."         // @link / @embed が指す先。キーはこの一つだけ。
+                              // 何を指しているかは接頭辞が決める
+                              // (tomet_semantics::target_scheme)。
+                              // 位置引数は target に正規化されるので
+                              // @link("https://...") と書ける。
 ```
 
----[ `{var}` ]---
+##[ target の接頭辞 ]
 
+@table[
+[ 接頭辞             ][ 指すもの ]
+[ `https:` / `http:` ][ 外部 URL ]
+[ `file:`            ][ プロジェクトルート相対の任意のファイル・添付 ]
+[ `tm:`              ][ 他の `.tmt` 文書。`tm:path/to/doc#some-id` で文書内の id へ ]
+[ `id:`              ][ id による参照。現状は同一文書内のみ（`${id}` と同じ id 空間） ]
+[ `ref:`             ][ ファイル名・タイトルでプロジェクト内を検索して解決 ]
+]
+
+##[ 旧い per-scheme キー ]
+
+`target` に一本化する前は接頭辞ではなくキーで書いていた。`url` / `file` /
+`tm` / `id` / `ref` の五つだけが `target` に回収される
+（`tomet_semantics::RECOVERABLE_TARGET_SCHEMES`）。
+
+```tm
+@link(url:"https://example.com")[Wiki]    // target: "https://example.com" に回収
+@link(https:"//example.com")[Wiki]        // 回収されない。target は空のまま
 ```
-id: xxxx-xxxx,        // 見出し・リスト項目・codeblockのidに使われる(html: id属性)
-cssclass: "name"      // 同上、cssclassに使われる(html: class属性)。値は単一の文字列
 
-// type: #settings    // 未実装: typeという特別なキーはどのconsumerからも読まれない
+キー名から要素の種別を推論する短縮（`@(url:...)` が link になる）は撤去
+された。@link(file:docs/spec/syntax.tmt)[`spec/syntax.tmt`] の「撤去済み」を
+参照。
+
+##[ 未実装 ]
+
+```tm
+// format: kdl              // kdl は embedded format として認識されない
+// path:(@path,@path#@var)  // path というキーに特別な意味は無い
+// url:(@url#@var)          // `#var` のようなフラグメント／変数展開は無い
+```
+
+---[ `{value}` ]---
+
+```tm
+id: xxxx-xxxx        // 見出し・リスト項目・codeblock の id（html: id 属性）
+cssclass: "name"     // 同上、cssclass（html: class 属性）。値は単一の文字列
+
+// type: @settings   // 未実装: type という特別なキーはどの consumer からも読まれない
+                     // 文書の種別は @kind が持つ
 ```
 
 ---[ special ]---
 
-```
-// @this               // 未実装: `@this` に特別な意味は無い
+```tm
+// @this             // 未実装: `@this` に特別な意味は無い
 ```

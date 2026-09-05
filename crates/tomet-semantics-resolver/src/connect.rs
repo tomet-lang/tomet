@@ -86,10 +86,15 @@ fn extract_connections_from_references(el: &Element) -> Vec<RemoteConnection> {
 /// **This has no surface syntax right now.** It used to be written
 /// `<id:taskA>:{...}`, with the target smuggled through `<T>`'s
 /// anything-goes name charset and string-split back out here. `<T>` is
-/// gone, and no replacement spelling has been decided -- see
-/// `.agents/tasks/sigil-shape-axis-and-namespaces.md`. Nothing produces a
+/// gone, and no replacement spelling has been decided. Nothing produces a
 /// `RemoteConnection` until one is, so this returns `None` rather than
-/// inventing a spelling.
+/// inventing a spelling -- a spelling was invented here once (`@id(...)`)
+/// and withdrawn, because nobody had asked for it.
+///
+/// The surrounding logic is intact: `resolve_connect_targets` still walks
+/// `@references[...]` and hands each target element its attributes. Only
+/// the way in is missing. Decide a spelling and rewrite this, or drop the
+/// feature; `docs/roadmap.tmt` carries the question.
 fn parse_remote_connection_element(_el: &Element) -> Option<RemoteConnection> {
     None
 }

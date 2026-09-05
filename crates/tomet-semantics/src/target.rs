@@ -32,7 +32,7 @@ pub fn link_target(el: &Element, kind: &ElementKind) -> Option<String> {
     if let Some(target) = args.get("target").and_then(|v| v.as_str()) {
         return Some(target.to_string());
     }
-    // `@link(https://x)`/`<embed>(a.png)`: both `link` and `embed` are
+    // `@link(https://x)`/`@embed(a.png)`: both `link` and `embed` are
     // in `builtin_positional_arg_key` (`-> "target"`), so a bare
     // positional scalar should already have arrived here as a map via
     // `normalized_element_args` -- this fallback only matters for a
@@ -56,7 +56,7 @@ pub fn link_target_of(el: &Element) -> Option<(ElementKind, String)> {
 /// What kind of thing a `target` string points at, derived purely from the
 /// string's own scheme prefix (never from which key/element name carried
 /// it -- there's only ever one key, `target`, for both `@link` and
-/// `<embed>`).
+/// `@embed`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetScheme {
     /// `scheme://...` (`https://...`, ...), or an explicit `url:...`
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn embed_bare_positional_maps_to_target_via_normalized_args() {
-        // `<embed>(a.png)`: "embed" IS in builtin_positional_arg_key
+        // `@embed(a.png)`: "embed" IS in builtin_positional_arg_key
         // (-> "target"), so normalized_element_args already turns this
         // into a map before link_target ever sees it.
         let mut el = element_new(Sigil::named("embed"));

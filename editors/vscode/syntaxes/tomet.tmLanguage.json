@@ -6,6 +6,7 @@
 	"patterns": [
 		{ "include": "#comments" },
 		{ "include": "#fenced-code-block" },
+		{ "include": "#raw-fence" },
 		{ "include": "#heading" },
 		{ "include": "#thematic-break" },
 		{ "include": "#list-marker" },
@@ -40,17 +41,45 @@
 		},
 
 		"heading": {
-			"begin": "^\\s*(#+)(\\[)",
-			"beginCaptures": {
-				"1": { "name": "punctuation.definition.heading.tomet" },
-				"2": { "name": "punctuation.section.brackets.begin.tomet" }
-			},
-			"end": "\\]",
-			"endCaptures": {
-				"0": { "name": "punctuation.section.brackets.end.tomet" }
-			},
-			"name": "markup.heading.tomet",
-			"patterns": [{ "include": "#inline" }]
+			"comment": "`#` is the heading marker and nothing else -- it stopped being a block-element sigil when the shape axis was retracted. The run's length is the level. Three spellings: `#[ ... ]`, `#(args)[ ... ]`, and the bracket-less `# text` sugar.",
+			"patterns": [
+				{
+					"comment": "`##(id: sec)[ 見出し ]` -- a heading takes `(args)` and a trailing `{value}` like any element.",
+					"begin": "^[ \\t]*(#+)(?=[ \\t]*\\()",
+					"beginCaptures": {
+						"1": { "name": "punctuation.definition.heading.tomet" }
+					},
+					"end": "(?<=\\])",
+					"name": "markup.heading.tomet",
+					"patterns": [
+						{ "include": "#round-group" },
+						{ "include": "#square-group" }
+					]
+				},
+				{
+					"begin": "^[ \\t]*(#+)[ \\t]*(\\[)",
+					"beginCaptures": {
+						"1": { "name": "punctuation.definition.heading.tomet" },
+						"2": { "name": "punctuation.section.brackets.begin.tomet" }
+					},
+					"end": "\\]",
+					"endCaptures": {
+						"0": { "name": "punctuation.section.brackets.end.tomet" }
+					},
+					"name": "markup.heading.tomet",
+					"patterns": [{ "include": "#inline" }]
+				},
+				{
+					"comment": "Bracket-less sugar. Requires the space: `#name` with no space is not a heading, and no longer an element either -- it falls back to prose, which is what keeps `#タグ` and a shell comment inside a fence as text.",
+					"begin": "^[ \\t]*(#+)(?=[ \\t]+\\S)",
+					"beginCaptures": {
+						"1": { "name": "punctuation.definition.heading.tomet" }
+					},
+					"end": "$",
+					"name": "markup.heading.tomet",
+					"patterns": [{ "include": "#inline" }]
+				}
+			]
 		},
 
 		"thematic-break": {
@@ -242,25 +271,38 @@
 		},
 
 		"element": {
+			"comment": "`@name` is the only element sigil, whatever the element's placement: `#` is the heading marker and nothing else, and shape comes from position rather than spelling. The name is required -- a name-less `@(...)` stopped forming an element. Names are ASCII, `.`-separated for namespaces (`@deck.ref`). Both alternatives refuse a `@` preceded by a word character, which is the half that keeps an email address prose.",
 			"patterns": [
 				{
-					"comment": "<Type> element sigil",
-					"match": "(<)([A-Za-z_][A-Za-z0-9_.-]*)(>)",
+					"comment": "Mid-line: an element needs one of `( [ { :` or a `+++` fence after the name. Without one it is text -- `連絡は me@example.com まで` is a paragraph.",
+					"match": "(?<![A-Za-z0-9_])(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[(\\[{:]|\\+{3,})",
 					"captures": {
-						"1": { "name": "punctuation.definition.tag.begin.tomet" },
-						"2": { "name": "entity.name.tag.tomet" },
-						"3": { "name": "punctuation.definition.tag.end.tomet" }
+						"1": { "name": "punctuation.definition.tag.tomet" },
+						"2": { "name": "entity.name.tag.tomet" }
 					}
 				},
 				{
-					"comment": "@name element sigil, name optional (e.g. @(parent)[])",
-					"match": "(@)([A-Za-z_][A-Za-z0-9_.-]*)?",
+					"comment": "A bare `@name` that starts and ends its own line. This is where the block rule's end-of-line allowance lands; the real parser also requires block context, which a line-oriented grammar cannot see.",
+					"match": "^[ \\t]*(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)[ \\t]*$",
 					"captures": {
 						"1": { "name": "punctuation.definition.tag.tomet" },
 						"2": { "name": "entity.name.tag.tomet" }
 					}
 				}
 			]
+		},
+
+		"raw-fence": {
+			"comment": "A `+++` fence carries a raw or embedded body: `@memo+++`, `@meta(format:yaml)+++`. It opens at the end of an element head and closes on a line holding only the run. A longer run escapes a body containing `+++`, matching the backtick fence's rule. The lookbehind is what keeps this from firing on the closing line: an opener always follows a name or a group's closing bracket.",
+			"begin": "(?<=[)\\]}A-Za-z0-9_-])(\\+{3,})[ \\t]*$",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.raw.begin.tomet" }
+			},
+			"end": "^[ \\t]*(\\+{3,})[ \\t]*$",
+			"endCaptures": {
+				"1": { "name": "punctuation.definition.raw.end.tomet" }
+			},
+			"name": "markup.raw.block.fence.tomet"
 		},
 
 		"groups": {

@@ -66,6 +66,23 @@ Some references are legitimately empty: a config-only document such as
 `test.config.tmt` renders to nothing in HTML/Typst, because `@meta` and
 `@config` are invisible in output formats.
 
+One set is known to be wrong rather than merely unverified. Every
+`ref/examples/bookmark.*` records the document parsed as a single
+paragraph. `fixtures/examples/bookmark.tmt` writes
+`@bookmark(...){ id: ..., tags: [...] }+++ ... +++`, and `{value}` and a
+`+++` fence are exclusive (`element.rs`, and `docs/spec/types.tmt` says
+so): taking the `{...}` group fills the element's value, so the `+++` is
+never read as a fence, the element does not end its line, and the rest of
+the file flows into the paragraph.
+
+The real gap is in the language, not the fixture: there is no spelling
+for *an element with attributes and a verbatim body*, which is exactly
+what a bookmark wants. Deferred deliberately -- it is one example
+document. If it is picked up, the two options are moving the attributes
+into `(args)`, which works today, or giving the raw body its own slot
+instead of sharing `Element::value`. Either way, regenerate these
+references rather than diffing against them.
+
 ## `fixtures/` is deliberately not synced with `docs/`
 
 Every file in `fixtures/` began as a copy of a document under `docs/`,
