@@ -92,7 +92,7 @@
     },
     "url": {
       "args": {
-        "display": "force"
+        "label": "force"
       },
       "style": "link"
     }
