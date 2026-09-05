@@ -1,7 +1,7 @@
 //! Workspace and document refactoring pipeline.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use tomet_ast::Document;
 use tomet_config::{PrinterConfig, find_config_file};
@@ -91,10 +91,28 @@ pub fn refactor_source(
 }
 
 /// Discovers and refactors all `.tmt` files in `dir_or_file`.
+/// What a sweep found: the per-file diffs, and the files it could not
+/// look at.
+///
+/// The errors are carried rather than dropped. One unreadable or
+/// unparseable file should not abort the sweep -- that is
+/// `check_vault`'s convention too -- but it must not vanish either.
+/// `--check` is a guard, and a guard that stays quiet about the files it
+/// skipped has its hole exactly where it matters most: a file broken
+/// enough not to parse is the likeliest one to still carry the spelling
+/// being migrated away from.
+#[derive(Debug, Default)]
+pub struct RefactorReport {
+    pub diffs: Vec<FileDiff>,
+    /// Path and error message, one per file that could not be read or
+    /// parsed.
+    pub errors: Vec<(PathBuf, String)>,
+}
+
 pub fn refactor_workspace(
     target_path: &Path,
     options: &RefactorOptions,
-) -> anyhow::Result<Vec<FileDiff>> {
+) -> anyhow::Result<RefactorReport> {
     let (config, _, config_root) = find_config_file(target_path).unwrap_or_else(|| {
         (
             PrinterConfig::default(),
@@ -109,23 +127,28 @@ pub fn refactor_workspace(
         collect_tm_files_with_config(target_path, &config, &config_root)
     };
 
-    let mut results = Vec::new();
+    let mut report = RefactorReport::default();
 
     for path in files {
         let original_src = match fs::read_to_string(&path) {
             Ok(s) => s,
-            Err(_) => continue,
+            Err(e) => {
+                report.errors.push((path, e.to_string()));
+                continue;
+            }
         };
 
         match refactor_source(&original_src, &config, options) {
             Ok((modified_src, count)) => {
-                results.push(FileDiff::new(path, original_src, modified_src, count));
+                report
+                    .diffs
+                    .push(FileDiff::new(path, original_src, modified_src, count));
             }
             Err(e) => {
-                eprintln!("Warning: Skipping {}: {e}", path.display());
+                report.errors.push((path, e.to_string()));
             }
         }
     }
 
-    Ok(results)
+    Ok(report)
 }

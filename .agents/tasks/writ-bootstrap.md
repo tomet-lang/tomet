@@ -157,29 +157,3 @@ it.
   (`apps/cli/src/commands/check.rs:10`), so a document with two `@meta`, or
   two `@kind`, or a `@kind` in the middle of the body, passes. Enforcing this
   is its own task and touches every element that claims to be a singleton.
-- Dangling prose references to `docs/design/decisions/`, deleted in
-  `4055fe5`. 18 remain across 12 files, and an earlier count was too low
-  because it only swept `docs/`: 10 are in Rust source
-  (`tomet-convert-markdown` 4, `tomet-convert-html`, `tomet-semantics`,
-  `tomet-syntax-parser`, `tomet-workspace-links`, `tree-sitter-tomet` 2).
-  The rest are in `docs/spec/` (3), `docs/guide/cheatsheet.tmt` and
-  `docs/design/ideas/idea.tmt` (2). The two in
-  `docs/design/ideas/documentation-layers.tmt` are that sketch's own record
-  of the deletion and should stay. These are prose mentions, not
-  `@link(file:...)`, so the link checker cannot see them. Fixing them is a
-  judgement call per site -- delete the sentence, or repoint it at whatever
-  now carries the reasoning.
-- `tomet refactor --check` silently skips files that fail to parse (warns
-  and moves on). A guard that skips broken files has a hole exactly where
-  it matters most.
-- `tomet check-links .` reports 18 broken, all in
-  `tests/fixtures/cheatsheet.tmt` and its generated refs. That copy is
-  frozen test input where a link pointing nowhere is the coverage, so the
-  meaningful invocation is `check-links docs`, which reports 0. Worth
-  deciding whether the repo-wide form should skip `tests/` rather than
-  being permanently non-zero.
-- Three writ entries have no guard: `parser-purity` (pin that
-  `tomet-syntax-parser`'s dependencies carry nothing that can do I/O),
-  `document-placement` (every directory under `docs/` appears in the table),
-  and `generated-md-not-edited` (re-export and diff -- governs zero files
-  until something declares `@config(export:)`).

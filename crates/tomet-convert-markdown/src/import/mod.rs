@@ -6,10 +6,10 @@
 //! exist for Tomet's own native shorthand (`em`/`strong`/`hr`, list
 //! elements -- see `Element::list`/`Element::list_item`). Constructs with
 //! no native equivalent (fenced/indented code, block quotes) go through
-//! the generic `<T>` element escape hatch (`pre`, `blockquote`)
-//! documented in `docs/design/decisions/2026-08-09-commonmark-support.md`.
+//! the generic named-element escape hatch -- `@codeblock` and
+//! `@blockquote`, which are ordinary elements rather than AST variants.
 //!
-//! One thing is structurally lossy on import, documented there: a block
+//! One thing is structurally lossy on import: a block
 //! quote containing more than one block gets its content joined into a
 //! single inline run (`Element::content` is `Vec<Inline>`, not
 //! `Vec<Block>`), so a list inside a quote has its items' content

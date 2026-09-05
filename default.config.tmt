@@ -86,7 +86,10 @@ id: doc-kWBcIUUz
   },
   "workspace": {
     "ignore": [
-      "00-09 System/01 Apps/obsidian"
+      "00-09 System/01 Apps/obsidian",
+      "tests/fixtures",
+      "tests/ref",
+      "tests/store"
     ]
   },
   "migration": {

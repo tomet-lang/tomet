@@ -7,7 +7,7 @@
 -. **リンク検証と I/O 解決層**:
    - `File`, `Embed`, `Tm`, `Ref` リンクが実際にディスク上に存在するかを網羅的に検査。
    - 外部 URL (`Url`) やドキュメント内 ID (`Id`) はスコープ外として除外（それぞれネットワークチェッカーや `tomet-validator` の担当）。
-   - `.tomet/links-cache.sqlite3` に各ファイルの更新日時（`mtime`）と抽出リンクを保存し、変更のないファイルに対する再パースをスキップ。
+   - ユーザーのキャッシュディレクトリ（Unix なら `~/.cache/tomet/links.sqlite3`）に各ファイルの更新日時（`mtime`）と抽出リンクを保存し、変更のないファイルに対する再パースをスキップ。vault の中には置かない。
 
 -. **主な機能モジュール**:
    - **リンク抽出 (`collect_links`, `DocumentLink`, `LinkKind`)**:

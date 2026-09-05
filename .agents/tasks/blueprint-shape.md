@@ -79,9 +79,10 @@ found it.
 
 ## Watch
 
-- `docs/twrit/` and `docs/exports/` are still unclassified directories, and
-  `document-placement`'s guard is waiting on where the blueprint lands. The
-  standing proposal is that configuration and schema live at the root of
-  what they govern -- `default.config.tmt` governs the repo,
-  `docs/docs.settings.tmt` governs `docs/` -- which would put the writ
-  blueprint at the repository root.
+- Resolved. `docs/exports/` became `tmtroot/` in `f6a267b`, and the writ
+  blueprint went to `.tomet/blueprints/writ.blueprint.tmt`, so `docs/twrit/`
+  is gone and `document-placement` has its guard. The standing proposal --
+  configuration and schema at the root of what they govern, which would
+  have put the blueprint at the repository root -- was argued and rejected;
+  the reasoning is the root writ's `dot-tomet-is-authored`. Nothing is left
+  open here, so this file can go.

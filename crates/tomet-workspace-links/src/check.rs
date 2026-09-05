@@ -14,8 +14,8 @@
 //! `Tm` targets are project-root-relative like `File`, so they reuse the
 //! same resolution rule -- with any `#fragment` stripped first (the
 //! fragment names an id *inside* the target document; validating that
-//! the id actually exists there is out of scope for this pass, see
-//! `docs/design/decisions/2026-08-22-link-reference-uri-schemes.md` section 5).
+//! the id actually exists there is out of scope for this pass, which
+//! only asks whether the file is there).
 //!
 //! `Ref` targets are not paths at all: they're resolved by searching
 //! the vault for any existing file whose name or stem matches the target
@@ -27,6 +27,7 @@ use std::path::{Path, PathBuf};
 
 use tomet_ast::Span;
 use tomet_config::PrinterConfig;
+use tomet_indexer::{normalize_join, resolve_document_relative};
 
 use crate::cache::LinkCache;
 use crate::collect::LinkKind;
@@ -55,43 +56,14 @@ fn is_external(target: &str) -> bool {
     target.contains("://")
 }
 
-/// Joins `base`/`target`, then collapses `.`/`..` components lexically
-/// (no filesystem access -- a broken link's target by definition might
-/// not exist, so this can't use `Path::canonicalize`).
-fn normalize_join(base: &Path, target: &Path) -> PathBuf {
-    let mut result = base.to_path_buf();
-    for component in target.components() {
-        match component {
-            std::path::Component::ParentDir => {
-                result.pop();
-            }
-            std::path::Component::CurDir => {}
-            other => result.push(other.as_os_str()),
-        }
-    }
-    result
-}
-
+/// The rule itself lives in `tomet-indexer` because it is not a link
+/// rule: it is what a relative path written inside a document means,
+/// and `@config(export: path)` needs the same answer.
+///
+/// (For `file:` specifically, a leading `/` is a placeholder pending a
+/// decision -- see this module's doc.)
 fn resolve_file_target(source: &Path, target: &str, project_root: &Path) -> PathBuf {
-    let target_path = Path::new(target);
-
-    // Leading `/`: OS-absolute path. (For `file:` specifically this is a
-    // placeholder pending a decision -- see module doc.)
-    if target_path.is_absolute() {
-        return target_path.to_path_buf();
-    }
-
-    // Explicit `./`/`../` marker: relative to the referencing file's own
-    // directory.
-    if target.starts_with("./") || target.starts_with("../") {
-        return match source.parent() {
-            Some(parent) => normalize_join(parent, target_path),
-            None => target_path.to_path_buf(),
-        };
-    }
-
-    // Bare relative-looking string: relative to the project root.
-    normalize_join(project_root, target_path)
+    resolve_document_relative(source, target, project_root)
 }
 
 /// Puts a resolved target into the same form as the walked file set.

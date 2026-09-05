@@ -21,7 +21,7 @@ elements = {
 types = {
   example = {
     style = one_line
-    template = "path:ja/features/templates/template.daily-note.tmt"
+    template = ".tomet/blueprints/daily-note.blueprint.tmt"
   }
 }
 +++

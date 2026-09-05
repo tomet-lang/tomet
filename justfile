@@ -41,24 +41,34 @@ tui path=".":
 format-check:
     cargo fmt --all -- --check
 
-# Validate that every .tmt file under docs/, plus every `.writ.tmt`
-# anywhere in the tree, parses cleanly and is correctly formatted. Not
-# part of `cargo test` on purpose -- these are the repo's real, evolving
-# documentation, not fixed fixtures, so a run here is meant to be
-# triggered manually (or from CI) rather than failing unrelated code
-# changes. The `.writ.tmt` sweep lives here only until `twrit` reads
-# them itself.
+# Validate that every .tmt file under docs/ and .tomet/, plus every
+# `.writ.tmt` anywhere in the tree, parses cleanly and is correctly
+# formatted -- and that every document under docs/ sits somewhere
+# `docs/.writ.tmt`'s placement table names. Not part of `cargo test` on
+# purpose -- these are the repo's real, evolving documentation, not fixed
+# fixtures, so a run here is meant to be triggered manually (or from CI)
+# rather than failing unrelated code changes. The `.writ.tmt` sweep lives
+# here only until `twrit` reads them itself.
 docs-check:
     cargo build -p tomet
     fail=0; \
     tmp=$(mktemp); \
-    find docs -type f -name '*.tmt' > "$tmp"; \
+    find docs .tomet -type f -name '*.tmt' > "$tmp"; \
     find . -type f -name '.writ.tmt' -not -path './target/*' -not -path './.git/*' >> "$tmp"; \
     while IFS= read -r f; do \
         if ! ./target/debug/tomet check -q "$f"; then echo "PARSE FAIL: $f"; fail=1; fi; \
         if ! ./target/debug/tomet format --check "$f" >/dev/null 2>&1; then echo "FORMAT FAIL: $f"; fail=1; fi; \
     done < "$tmp"; \
     rm -f "$tmp"; \
+    stray=$(find docs -name '*.tmt' \
+        | grep -vE '^docs/(spec|guide|examples|why|design/ideas)/' \
+        | grep -vE '^docs/(README|roadmap|docs\.settings|\.writ)\.tmt$'); \
+    if [ -n "$stray" ]; then \
+        echo "$stray" | while IFS= read -r f; do \
+            echo "PLACEMENT FAIL: $f -- no row in docs/.writ.tmt's placement table"; \
+        done; \
+        fail=1; \
+    fi; \
     exit $fail
 
 # Clean Zed editor extension build and installation cache.

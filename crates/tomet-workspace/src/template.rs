@@ -1,4 +1,9 @@
-//! Template discovery and file instantiation across a workspace.
+//! Blueprint discovery and file instantiation across a workspace.
+//!
+//! A vault keeps its blueprints in `.tomet/blueprints/`. The names here
+//! still say `template` because `tomet new --template` does; the
+//! vocabulary migration that renamed `docs/examples/templates/` to
+//! `blueprints/` has not reached the CLI's flag yet.
 
 use std::collections::HashMap;
 use std::fs;
@@ -10,7 +15,7 @@ use tomet_compute::EvaluationContext;
 use tomet_config::PrinterConfig;
 use tomet_transform::instantiate_blueprint;
 
-/// Discovers a template file for `name` within `root` workspace or according to `config`.
+/// Discovers a blueprint file for `name` within `root` workspace or according to `config`.
 pub fn find_template(root: &Path, name: &str, config: &PrinterConfig) -> Option<PathBuf> {
     // 1. Check explicit configuration
     if let Some(cfg_path) = config.templates.get(name) {
@@ -20,7 +25,7 @@ pub fn find_template(root: &Path, name: &str, config: &PrinterConfig) -> Option<
         }
     }
 
-    // 2. Direct path check (e.g. if name is already a path like "templates/daily.tmt")
+    // 2. Direct path check (e.g. if name is already a path like ".tomet/blueprints/daily.blueprint.tmt")
     let direct_path = root.join(name);
     if direct_path.is_file() {
         return Some(direct_path);
@@ -30,42 +35,33 @@ pub fn find_template(root: &Path, name: &str, config: &PrinterConfig) -> Option<
         return Some(direct_tmt);
     }
 
-    // 3. Convention checks: `templates/<name>.tmt`
-    let conv_path = root.join("templates").join(format!("{name}.tmt"));
-    if conv_path.is_file() {
-        return Some(conv_path);
-    }
-
-    // 4. Convention checks: `.tomet/templates/<name>.tmt`
-    let dot_tomet_path = root
-        .join(".tomet")
-        .join("templates")
-        .join(format!("{name}.tmt"));
-    if dot_tomet_path.is_file() {
-        return Some(dot_tomet_path);
-    }
-
-    // 5. `docs/examples/blueprints/<name>.blueprint.tmt`.
+    // 3. The convention: `.tomet/blueprints/<name>.blueprint.tmt`.
     //
-    // One spelling. This used to try `<name>.tmt`, `template.<name>.tmt`
-    // and `<name>.template.tmt` in turn, which is what let
-    // `docs/docs.settings.tmt` point at a filename that does not exist and
-    // still resolve -- the first two misses were invisible and the third
-    // hit. Three spellings for one thing is the same "nobody chose" that
-    // `@blueprint`'s three argument forms were.
-    let docs_blueprint = root
-        .join("docs")
-        .join("examples")
-        .join("blueprints")
-        .join(format!("{name}.blueprint.tmt"));
-    if docs_blueprint.is_file() {
-        return Some(docs_blueprint);
+    // One directory, one spelling. There used to be three of each --
+    // `templates/`, `.tomet/templates/` and `docs/examples/blueprints/`,
+    // times `<name>.tmt`, `template.<name>.tmt` and
+    // `<name>.template.tmt` -- which is how `docs/docs.settings.tmt`
+    // pointed at a filename that does not exist and still resolved.
+    //
+    // `templates/` at the root of a vault is gone because that name is
+    // the vault owner's to spend, not Tomet's: a directory without a dot
+    // belongs to whoever made the vault. `.tomet/` is the one place this
+    // tool gets to define, so a convention lives there or nowhere.
+    let conventional = blueprint_dir(root).join(format!("{name}.blueprint.tmt"));
+    if conventional.is_file() {
+        return Some(conventional);
     }
 
     None
 }
 
-/// Lists all available templates in workspace.
+/// `<root>/.tomet/blueprints`, where a vault keeps the blueprints
+/// `tomet new` instantiates.
+pub fn blueprint_dir(root: &Path) -> PathBuf {
+    root.join(".tomet").join("blueprints")
+}
+
+/// Lists all available blueprints in workspace.
 pub fn list_templates(root: &Path, config: &PrinterConfig) -> Vec<(String, PathBuf)> {
     let mut results = HashMap::new();
 
@@ -77,29 +73,23 @@ pub fn list_templates(root: &Path, config: &PrinterConfig) -> Vec<(String, PathB
         }
     }
 
-    // From conventions
-    let search_dirs = [
-        root.join("templates"),
-        root.join(".tomet").join("templates"),
-        root.join("docs").join("examples").join("blueprints"),
-    ];
-
-    for dir in &search_dirs {
-        if dir.is_dir() {
-            if let Ok(entries) = fs::read_dir(dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("tmt") {
-                        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                            // `daily-note.blueprint.tmt` lists as
-                            // `daily-note`. One suffix, matching
-                            // `find_template_path` -- the two used to
-                            // disagree about which spellings exist.
-                            let clean_name = stem.trim_end_matches(".blueprint");
-                            results.entry(clean_name.to_string()).or_insert(path);
-                        }
-                    }
-                }
+    // From the convention. One directory, matching `find_template` --
+    // the two used to disagree about which spellings and which
+    // directories existed.
+    let dir = blueprint_dir(root);
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("tmt") {
+                continue;
+            }
+            // `daily-note.blueprint.tmt` lists as `daily-note`.
+            if let Some(name) = path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .and_then(|s| s.strip_suffix(".blueprint.tmt"))
+            {
+                results.entry(name.to_string()).or_insert(path);
             }
         }
     }
@@ -191,10 +181,10 @@ mod tests {
         let _ = fs::create_dir_all(&temp_dir);
         let root = &temp_dir;
 
-        let tmpl_dir = root.join("templates");
+        let tmpl_dir = blueprint_dir(root);
         fs::create_dir_all(&tmpl_dir).unwrap();
 
-        let tmpl_file = tmpl_dir.join("daily-note.tmt");
+        let tmpl_file = tmpl_dir.join("daily-note.blueprint.tmt");
         fs::write(
             &tmpl_file,
             "@blueprint(daily-note)\n@meta{\n  id: ${uuid(\"nil\")}\n  title: ${title}\n}\n\n#[ Tasks for ${title} ] {id: tasks}\n",

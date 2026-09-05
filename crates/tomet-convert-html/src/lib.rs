@@ -429,9 +429,9 @@ fn render_wrapped_inline(cx: &RenderCtx, el: &Element, tag: &str, out: &mut Stri
     out.push_str(&format!("</{tag}>"));
 }
 
-/// `<codeblock>(lang:xxx)[code]` -- the Markdown importer's mapping for
+/// `@codeblock(lang:xxx)[code]` -- the Markdown importer's mapping for
 /// fenced (and indented) code blocks, since `tomet_ast` has no
-/// dedicated code-block variant (see `docs/design/decisions/2026-08-09-commonmark-support.md`). `lang`
+/// dedicated code-block variant. `lang`
 /// is a display-only syntax-highlighting hint, never a parse-mode switch
 /// (unrelated to the generic `format` key other elements use for their
 /// `{value}`). Code lives in `[content]`, parsed as raw verbatim text (see

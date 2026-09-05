@@ -12,6 +12,7 @@ tomet-semantics = { workspace = true }
 tomet-tree = { workspace = true }
 
 #[ Crates.io ]
+directories = { workspace = true }
 rusqlite = { workspace = true }
 
 [dev-dependencies]

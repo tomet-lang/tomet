@@ -51,8 +51,9 @@ pub enum Command {
         lang: Option<String>,
     },
     /// Convert a `.tmt` file to CommonMark. Lossy for constructs with no
-    /// Markdown equivalent (`@links{}`, generic `<T>` elements) -- see
-    /// `docs/design/decisions/2026-08-09-commonmark-support.md`.
+    /// Markdown equivalent (`@links{}`, and any `@T` element the importer
+    /// never produces); `tomet-markdown`'s module docs list what falls
+    /// back to HTML passthrough.
     ToMd {
         file: PathBuf,
         /// Write to this path instead of stdout.
@@ -173,10 +174,10 @@ pub enum Command {
 
     /// Check every `@file`/`<embed>` link in a `.tmt`/`.tmt` document or
     /// directory for broken (non-existent) local-file targets. Uses an
-    /// SQLite cache (keyed by source-file mtime) under
-    /// `<config_root>/.tomet/` so re-checking a large vault doesn't
-    /// re-parse unchanged files. Exits non-zero if any broken link is
-    /// found.
+    /// SQLite cache (keyed by source-file mtime) in the user's cache
+    /// directory -- `~/.cache/tomet/` on Unix, never inside the vault --
+    /// so re-checking a large vault doesn't re-parse unchanged files.
+    /// Exits non-zero if any broken link is found.
     CheckLinks {
         /// Target file or directory path (defaults to current directory ".").
         #[arg(default_value = ".")]

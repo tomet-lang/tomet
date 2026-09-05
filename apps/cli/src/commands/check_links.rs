@@ -18,11 +18,16 @@ pub(crate) fn check_links_cmd(target_path: &Path, json: bool) -> anyhow::Result<
         target_path.to_path_buf(),
     ));
 
-    let cache_path = tomet_links::default_cache_path(&config_root);
+    let cache_path = tomet_links::default_cache_path();
     let mut cache = tomet_links::LinkCache::open(&cache_path)?;
 
     let report =
         tomet_links::check_vault(target_path, &config, &config_root, &config_root, &mut cache);
+
+    // One database is shared by every vault on the machine, so rows for
+    // vaults that have since moved or been deleted would otherwise sit
+    // there forever. Nothing reads them, but nothing removes them either.
+    let _ = cache.prune_missing();
 
     if json {
         println!("{}", check_links_report_to_json(&report));

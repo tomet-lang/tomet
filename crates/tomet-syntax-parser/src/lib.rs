@@ -1660,8 +1660,8 @@ mod tests {
 
     #[test]
     fn bare_absolute_path_parses_as_a_plain_scalar() {
-        // Group B of docs/design/decisions/2026-08-22-link-reference-uri-schemes.md:
-        // a leading `/` can never start a map key, so this is unambiguous.
+        // A leading `/` can never start a map key, so this is
+        // unambiguous and needs no scheme to disambiguate it.
         assert_eq!(
             parse_value("/readme.md").unwrap(),
             Value::String("/readme.md".into())
