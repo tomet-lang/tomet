@@ -1,5 +1,7 @@
 @kind(vocabulary)
-@vocabulary(writ){ version: "1.0.0" }
+@vocabulary(writ){
+  version: "1.0.0"
+}
 
 @element(layers){
   display: block

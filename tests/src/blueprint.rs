@@ -5,7 +5,7 @@ use std::path::Path;
 use tomet_ast::Value;
 use tomet_config::PrinterConfig;
 use tomet_validator::validate_against_blueprint;
-use tomet_workspace::{create_file_from_template, find_template, list_templates};
+use tomet_workspace::{create_file_from_blueprint, find_blueprint, list_blueprints};
 
 #[test]
 fn test_blueprint_end_to_end_lifecycle() {
@@ -14,11 +14,13 @@ fn test_blueprint_end_to_end_lifecycle() {
     let _ = fs::remove_dir_all(&temp_dir);
     let _ = fs::create_dir_all(&temp_dir);
 
-    // 1. Create a blueprint file
-    let tmpl_dir = tomet_workspace::blueprint_dir(&temp_dir);
+    // 1. Create a blueprint file. Where it sits is up to the vault --
+    //    what makes it a blueprint is being declared, and naming itself.
+    let tmpl_dir = temp_dir.join(".tomet/blueprints");
     fs::create_dir_all(&tmpl_dir).unwrap();
 
-    let blueprint_src = r#"@blueprint(daily-note){
+    let blueprint_src = r#"@kind(blueprint)
+@blueprint(daily-note){
   description: "Daily Standup & Plan"
   vars: {
     author: { type: string, default: "Anonymous" }
@@ -40,14 +42,17 @@ fn test_blueprint_end_to_end_lifecycle() {
     let blueprint_file = tmpl_dir.join("daily-note.blueprint.tmt");
     fs::write(&blueprint_file, blueprint_src).unwrap();
 
-    // 2. Discover template
-    let config = PrinterConfig::default();
-    let found = find_template(&temp_dir, "daily-note", &config);
+    // 2. Discover it through the declaration, by the name it gives itself
+    let config = PrinterConfig {
+        blueprints: vec![".tomet/blueprints/daily-note.blueprint.tmt".to_string()],
+        ..PrinterConfig::default()
+    };
+    let found = find_blueprint(&temp_dir, "daily-note", &config);
     assert_eq!(found, Some(blueprint_file.clone()));
 
-    let templates = list_templates(&temp_dir, &config);
-    assert_eq!(templates.len(), 1);
-    assert_eq!(templates[0].0, "daily-note");
+    let blueprints = list_blueprints(&temp_dir, &config);
+    assert_eq!(blueprints.len(), 1);
+    assert_eq!(blueprints[0].0, "daily-note");
 
     // 3. Instantiate document via workspace
     let mut vars = HashMap::new();
@@ -58,7 +63,7 @@ fn test_blueprint_end_to_end_lifecycle() {
 
     let doc_rel_path = Path::new("journal/2026-09-01.tmt");
     let doc_abs_path =
-        create_file_from_template(&temp_dir, "daily-note", doc_rel_path, &vars, &config, false)
+        create_file_from_blueprint(&temp_dir, "daily-note", doc_rel_path, &vars, &config, false)
             .expect("creation should succeed");
 
     assert!(doc_abs_path.is_file());

@@ -1,0 +1,69 @@
+@kind(guide)
+@meta{
+  title: "ブループリント"
+}
+
+ブループリントは、文書の雛形であると同時にその型でもある。`tomet new` が実体化し、`tomet-validator` と LSP が同じものに対して構造を検証する。
+
+綴りは `blueprint` ひとつ。`template` という語は使わない。
+
+#[ 1. @blueprint による定義 ]
+
+ブループリントは、先頭に `@kind(blueprint)` と `@blueprint(target-kind)` を宣言した通常の `.tmt` ファイルです。
+
+```tm
+@kind(blueprint)
+@blueprint(daily-note)
+@meta{
+  id: ${uuid()}
+  date: ${date("YYYY-MM-DD")}
+  title: ${title}
+}
+
+#[ TODO ] {id: todo}
+- ( ) 
+
+#[ Review ] {id: review}
+```
+
+**置き場所は自由で、代わりに vault が宣言する。** 設定の `blueprints` にパスを並べ、各ファイルは `@blueprint(X)` で自分の名前を名乗る。慣習でファイルを探しにいくことはしない —— 探して当たらなかったことは見えないが、宣言したパスが無いことは見えるため。
+
+```tm
+blueprints: [
+  ".tomet/blueprints/daily-note.blueprint.tmt"
+  "docs/examples/blueprints/rfc.blueprint.tmt"
+]
+```
+
+#[ 2. ブループリントからのドキュメント生成 (CLI) ]
+
+`tomet new` は、宣言されたブループリントを名前で引いて文書を作る。
+
+```bash
+# ブループリント名を指定して新規作成
+tomet new docs/daily/2026-09-01.tmt --blueprint daily-note
+
+# 変数を渡して作成
+tomet new docs/rfcs/001-auth.tmt --blueprint rfc --var title="OAuth2 Support"
+
+# 宣言されているブループリントの確認
+tomet new --list
+```
+
+#[ 3. 動的変数と組み込み関数 ]
+
+ブループリント内では `${...}` 式を使用して、生成時に動的な値を展開できます。
+
+- `${uuid()}`: 新しいUUID v4文字列を生成。
+- `${date()}` / `${date("YYYY-MM-DD")}`: 現在の日付を展開。
+- `${time()}`: 現在の時刻を展開。
+- `${filename}`: 作成先ファイル名。
+- `${title}`: ファイル名や引数から推定されるタイトル。
+- `${vars.@name}`: CLIの `--var @name=@value` で渡されたカスタム変数。
+
+#[ 4. 構造検証（ブループリント検証） ]
+
+生成されたドキュメントは `@kind(daily-note)` を持ちます。`tomet-validator` および LSP は、プロジェクト内の `@blueprint(daily-note)` と照合し、以下の構造整合性を検証します。
+
+1. **必須 `@meta` フィールド**: ブループリントに定義されたメタデータキーの存在をチェック。
+2. **必須セクション**: `{id: ...}` が付与された見出し（例: `#[ Review ] {id: review}`）がドキュメントに存在するかをチェック。

@@ -5,18 +5,19 @@
 //! - **[`refactor`]**: Refactoring pipeline across `.tmt` files.
 //! - **[`structural`]**: Structural search & replace engine across a workspace.
 //! - **[`batch_meta`]**: Batch metadata update engine.
+//! - **[`blueprint`]**: Blueprint discovery and document instantiation.
 
 pub mod batch_meta;
+pub mod blueprint;
 pub mod diff;
 pub mod refactor;
 pub mod structural;
-pub mod template;
 
 pub use batch_meta::*;
+pub use blueprint::*;
 pub use diff::*;
 pub use refactor::*;
 pub use structural::*;
-pub use template::*;
 
 #[cfg(test)]
 mod tests {

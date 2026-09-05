@@ -84,6 +84,14 @@ id: doc-kWBcIUUz
       "always_newline": true
     }
   },
+  "blueprints": [
+    ".tomet/blueprints/writ.blueprint.tmt",
+    "docs/examples/blueprints/daily-note.blueprint.tmt",
+    "docs/examples/blueprints/rfc.blueprint.tmt"
+  ],
+  "vocabularies": [
+    ".tomet/vocabularies/writ.vocabulary.tmt"
+  ],
   "workspace": {
     "ignore": [
       "00-09 System/01 Apps/obsidian",

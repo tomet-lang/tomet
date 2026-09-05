@@ -305,7 +305,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                         })
                         .unwrap_or_else(|| "unknown".to_string());
                     let mut desc = format!("**Document Kind**: `{declared_kind}`\n\n");
-                    desc.push_str("Declares the document archetype and binds template and schema validation rules.");
+                    desc.push_str("Declares the document kind, and binds the blueprint and vocabulary that go with it.");
                     Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
@@ -329,7 +329,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                         })
                         .unwrap_or_else(|| "unknown".to_string());
                     let mut desc = format!("**Blueprint Archetype**: `{target_kind}`\n\n");
-                    desc.push_str("Defines the structural blueprint and template schema for documents of this kind.");
+                    desc.push_str("Defines the structure documents of this kind must have, and what `tomet new` instantiates.");
                     Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
@@ -888,7 +888,9 @@ fn describe_kind(name: &str) -> &'static str {
     match name {
         "version" => "Tomet language specification version",
         "kind" => "Document kind (archetype / schema) declaration",
-        "blueprint" => "Document blueprint and archetype template declaration",
+        "blueprint" => {
+            "Declares the structure of one document kind, and what `tomet new` instantiates"
+        }
         "codeblock" => "Verbatim code block",
         "blockquote" => "Quote block",
         "hr" => "Horizontal rule divider",
