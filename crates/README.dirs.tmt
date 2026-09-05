@@ -13,7 +13,7 @@ intentional: `use tomet_ast::...` and every dependency reference
 stays exactly as short as it always was. Only the directory name (and
 therefore path-lookup) carries the family grouping.
 
-<codeblock>(lang:text)[
+@codeblock(lang:text)+++
 tomet-syntax-*      grammar/parsing: ast, cst, lexer, parser, tree.
                          Turns source text into CST/AST and provides pure tree schemas.
 
@@ -38,7 +38,7 @@ tree-sitter-tomet     host ecosystem's own naming convention
                          (serde_*, tree-sitter-*) rather than
                          tomet's -- that's what makes them
                          discoverable to serde/tree-sitter tooling.
-]
++++
 
 `tomet-tui` lives in `apps/tui`, not here -- it's consumed as a
 subcommand of `apps/cli`, not depended on by any other crate, so it's

@@ -132,7 +132,14 @@ impl LinkCache {
     }
 
     pub fn links_for(&mut self, source: &Path) -> Result<CacheOutcome, LinkCacheError> {
-        let path_str = source.to_string_lossy().to_string();
+        // One database serves every vault, so the key has to be absolute:
+        // two vaults each holding `docs/README.tmt` would otherwise be the
+        // same row. `canonicalize` also resolves symlinks, which is what
+        // keeps a vault reached by two paths from being cached twice.
+        let path_str = std::fs::canonicalize(source)
+            .unwrap_or_else(|_| source.to_path_buf())
+            .to_string_lossy()
+            .to_string();
         let metadata = std::fs::metadata(source).map_err(|e| LinkCacheError::Io {
             path: path_str.clone(),
             source: e,
@@ -188,6 +195,27 @@ impl LinkCache {
         tx.commit()?;
 
         Ok(CacheOutcome::Miss(links))
+    }
+
+    /// Drops every row whose file is no longer on disk, returning how
+    /// many went. A shared cache accumulates these as vaults are moved or
+    /// deleted; nothing else notices them, because a row is only ever
+    /// read back by the path it is keyed on.
+    pub fn prune_missing(&mut self) -> rusqlite::Result<usize> {
+        let stale: Vec<String> = {
+            let mut stmt = self.conn.prepare("SELECT path FROM files")?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+            rows.filter_map(|row| row.ok())
+                .filter(|path| !Path::new(path).exists())
+                .collect()
+        };
+
+        let tx = self.conn.transaction()?;
+        for path in &stale {
+            tx.execute("DELETE FROM files WHERE path = ?1", params![path])?;
+        }
+        tx.commit()?;
+        Ok(stale.len())
     }
 
     fn read_links(&self, path_str: &str) -> rusqlite::Result<Vec<DocumentLink>> {
@@ -259,6 +287,41 @@ mod tests {
         assert!(outcome_b.is_hit());
         assert_eq!(outcome_a.links()[0].target, "x.md");
         assert_eq!(outcome_b.links()[0].target, "y.md");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn pruning_drops_a_deleted_files_row_and_its_links() {
+        let dir = temp_dir("prune");
+        let kept = dir.join("kept.tmt");
+        let gone = dir.join("gone.tmt");
+        fs::write(&kept, "@link(x.md)\n[Kept]\n").unwrap();
+        fs::write(&gone, "@link(y.md)\n[Gone]\n").unwrap();
+
+        let mut cache = LinkCache::open_in_memory().unwrap();
+        cache.links_for(&kept).unwrap();
+        cache.links_for(&gone).unwrap();
+
+        fs::remove_file(&gone).unwrap();
+        assert_eq!(cache.prune_missing().unwrap(), 1);
+
+        let files: i64 = cache
+            .conn
+            .query_row("SELECT COUNT(*) FROM files", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(files, 1);
+
+        // The cascade is the half that could silently not happen: it
+        // needs `PRAGMA foreign_keys = ON`, which is set per connection
+        // and defaults to off.
+        let links: i64 = cache
+            .conn
+            .query_row("SELECT COUNT(*) FROM links", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(links, 1);
+
+        assert!(cache.links_for(&kept).unwrap().is_hit());
 
         let _ = fs::remove_dir_all(&dir);
     }

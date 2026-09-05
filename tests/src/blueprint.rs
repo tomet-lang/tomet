@@ -15,7 +15,7 @@ fn test_blueprint_end_to_end_lifecycle() {
     let _ = fs::create_dir_all(&temp_dir);
 
     // 1. Create a blueprint file
-    let tmpl_dir = temp_dir.join("templates");
+    let tmpl_dir = tomet_workspace::blueprint_dir(&temp_dir);
     fs::create_dir_all(&tmpl_dir).unwrap();
 
     let blueprint_src = r#"@blueprint(daily-note){
@@ -37,7 +37,7 @@ fn test_blueprint_end_to_end_lifecycle() {
 #[ Review ] {id: review}
 "#;
 
-    let blueprint_file = tmpl_dir.join("daily-note.tmt");
+    let blueprint_file = tmpl_dir.join("daily-note.blueprint.tmt");
     fs::write(&blueprint_file, blueprint_src).unwrap();
 
     // 2. Discover template

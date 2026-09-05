@@ -83,6 +83,10 @@ tree-sitter-tomet` comes to depend on.
 not choose. Its structure mirrors the repository root: `tmtroot/x.tmt`
 produces a file at `/`, `tmtroot/.github/x.tmt` one under `/.github/`.
 
+The `/` in that sentence is the project root -- the directory holding
+`default.config.tmt` -- because that is what a declared output path is
+measured from, wherever the export is run from.
+
 Nothing else goes there. A document whose output lands beside it -- the
 ordinary case -- stays where it belongs by what it is, and `docs/`'s own
 writ decides that.
@@ -114,14 +118,101 @@ renames, and `tmtroot/readme.tmt` becoming `/README.ja.md` cannot be read
 off the path. Deriving the path from the position when it is not declared
 would close that, and is not decided.
 
+What a declared path is measured from was decided, and it was not a
+design question in the end. `export` handed the string to `fs::write`
+unchanged, so it resolved against the process's working directory:
+`tmtroot/readme.tmt` landed at the repository root or under `docs/`
+depending on where you stood, and this rule held only because everyone
+happened to run from the root. The answer already existed -- a path
+written inside a document is absolute, or `./`/`../` from the document's
+own directory, or measured from the project root -- and links had been
+following it all along. Export was the one place that had not. The rule
+now lives in `tomet-indexer::resolve_document_relative` so there is one
+copy of it, and `a_bare_export_path_is_measured_from_the_project_root`
+pins it.
+
 ---[ Guard ]---
 
-`tomet export --check` covers whether the outputs are current.
+`tomet export --check .` covers whether the outputs are current, and is
+green -- it is measured from the project root now, so it means the same
+thing from any directory.
 
 Nothing yet checks the other half -- that every `.tmt` under `tmtroot/`
 declares an export at all. A file there that produces nothing is a file in
-the wrong directory. Cheap to add, and red today: two placeholders are
-still empty.
+the wrong directory. Cheap to add, and it would be red the day it landed:
+`agents.tmt` and `cluade.tmt` are both empty. Filling or dropping them
+comes first -- a guard that ships red teaches people to ignore it.
+
+##[ dot-tomet-is-authored ]
+
+`.tomet/` is the directory Tomet defines for itself inside a vault, and
+only what a person writes goes in it -- configuration, blueprints,
+anything else this format asks an author for. It is committed. Nothing a
+tool generates goes there, or anywhere else in the tree: derived state
+belongs in the user's cache directory, `~/.cache/tomet/` on Unix.
+
+---[ Why ]---
+
+A leading dot says the directory was defined by an application rather than
+by whoever made the vault. It says nothing about who writes what is inside
+it. `.cargo/`, `.vscode/` and `.zed/` are hand-written settings;
+`.direnv/` is a built environment. So `.tomet/` being hidden was never an
+argument for putting machine state in it -- and the two were mixed here
+until this entry: `find_template` looked up `.tomet/templates/` while
+`.gitignore` swallowed `.tomet/` whole, which made it a directory you
+could be told to write to and could never commit.
+
+The in-tree directories that do hold generated state are not there because
+the state is generated. `target/`, `result`, `node_modules/` and `.venv/`
+are there because something resolves those exact paths -- a linker, a
+runtime's module lookup, an interpreter. Position is the reason, not
+derivation. pnpm makes the distinction visible: it moved `node_modules/`'s
+contents into a global store and left behind only the symlinks whose
+position means something.
+
+A link cache has no such requirement, and a vault gives it a reason to be
+elsewhere. A vault is synced -- Dropbox, iCloud, git -- and a SQLite file
+inside a synced directory is a binary conflict waiting to happen. That is
+what separates a vault from a project: `.mypy_cache/` is never synced, a
+vault usually is. Obsidian's `.obsidian/` is where this goes wrong in
+practice.
+
+Rejected, in the order they were argued:
+
+- Ignoring `.tomet/cache/` and committing the rest. It spells the ignore
+  more precisely and changes nothing else: the mixing stays, and a
+  database still sits inside a tree that gets synced.
+- Keeping the cache vault-local because it costs one `.gitignore` line,
+  the same as `.git/`, `target/` and `node_modules/`. That was the
+  reasoning in `cache_path.rs`, and it does not survive being checked --
+  those three are entirely machine-owned, which is exactly the property
+  `.tomet/` did not have.
+- Putting the writ blueprint at the repository root, on the principle
+  that configuration and schema sit at the root of what they govern. The
+  root is a table of contents, not a classification. What earns a place
+  there is the index itself (`README.md`), what an outside tool positions
+  (`Cargo.toml`, `flake.nix`, `justfile`, `AGENTS.md`), and what this
+  repository's own conventions position (`.writ.tmt`, one per directory).
+  A blueprint is none of the three.
+
+`default.config.tmt` stays at the root, and not by the principle just
+rejected. `find_config_file` returns the directory it was found in as
+`config_root`, so its position is what declares where a vault begins: it
+is a boundary marker, like `Cargo.toml` or `package.json`. Making the
+directory the marker instead -- `.tomet/config.tmt`, the way `.git/`
+works -- is coherent and undecided, and is held up by the four spellings
+the search already accepts.
+
+---[ Guard ]---
+
+```bash
+git ls-files --others --ignored --exclude-standard .tomet
+```
+
+Empty while nothing under `.tomet/` is ignored. It catches the failure
+that actually happened -- a rule telling authors to write somewhere git
+was told to discard -- rather than trying to prove no tool ever writes
+into the tree.
 
 ##[ blueprint-shape ]
 

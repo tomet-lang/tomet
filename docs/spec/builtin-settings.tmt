@@ -1,7 +1,6 @@
 @kind(settings)
 
 /* Tomet 設定DSL (Config DSL / Schema Specification)
-   詳細な文法・スキーマ型定義の仕様は docs/design/decisions/2026-08-20-dsl-specifications.md を参照。
 
    要素スキーマ定義の特徴:
    - 必須フィールド一括指定: `required: [title, id]` (JSON Schema / OpenAPI 標準に準拠)

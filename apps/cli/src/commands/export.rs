@@ -38,6 +38,7 @@ fn export_single_file(
     check: bool,
 ) -> anyhow::Result<()> {
     let mut stale = StaleExports::default();
+    let project_root = project_root_for(file_path);
     export_one(
         file_path,
         override_type,
@@ -45,8 +46,30 @@ fn export_single_file(
         advanced,
         check,
         &mut stale,
+        &project_root,
     )?;
     report_stale(&stale, check)
+}
+
+/// Where a declared output path is measured from: the directory holding
+/// the nearest `default.config.tmt`, which is what declares where the
+/// vault begins.
+///
+/// Falls back to the target's own directory when there is no config to
+/// find, which keeps a loose file exporting beside itself rather than
+/// into whatever directory the shell happened to be in.
+fn project_root_for(target: &Path) -> PathBuf {
+    if let Some((_, _, root)) = tomet_config::find_config_file(target) {
+        return root;
+    }
+    if target.is_dir() {
+        return target.to_path_buf();
+    }
+    target
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."))
 }
 
 /// Non-zero exit when `--check` found something out of date, so this can
@@ -74,6 +97,7 @@ fn export_one(
     advanced: bool,
     check: bool,
     stale: &mut StaleExports,
+    project_root: &Path,
 ) -> anyhow::Result<()> {
     let src = fs::read_to_string(file_path)?;
     let doc = tomet_parser::parse_document(&src)
@@ -119,7 +143,20 @@ fn export_one(
                 Some(out.to_path_buf())
             }
         } else if let Some(cfg_path) = config.export_path_for(target) {
-            Some(PathBuf::from(cfg_path))
+            // A path a document declares means the same thing here as it
+            // does in a link: bare is measured from the project root,
+            // `./`/`../` from the document's own directory. This used to
+            // hand the string straight to `fs::write`, which measured it
+            // from the process's working directory instead -- so
+            // `tmtroot/readme.tmt` declaring `README.ja.md` landed at the
+            // repository root or under `docs/` depending on where you
+            // stood, and `--check` only agreed with itself from one of
+            // them.
+            Some(tomet_indexer::resolve_document_relative(
+                file_path,
+                cfg_path,
+                project_root,
+            ))
         } else if targets.len() == 1 {
             None
         } else {
@@ -185,6 +222,7 @@ fn export_directory(
     check: bool,
 ) -> anyhow::Result<()> {
     let files = tomet_indexer::collect_tm_files(dir_path);
+    let project_root = project_root_for(dir_path);
     if files.is_empty() {
         println!("No .tmt or .tmt files found in {}", dir_path.display());
         return Ok(());
@@ -211,6 +249,7 @@ fn export_directory(
             advanced,
             check,
             &mut stale,
+            &project_root,
         ) {
             Ok(()) => exported_count += 1,
             Err(e) => eprintln!("Error exporting {}: {e}", file.display()),
@@ -227,6 +266,49 @@ fn export_directory(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A bare declared path is measured from the project root -- the
+    /// directory holding `default.config.tmt` -- and not from wherever
+    /// the process happens to be standing.
+    ///
+    /// The source sits in a subdirectory and declares plain `out.md`.
+    /// Landing beside the source, or in the test runner's own working
+    /// directory, are the two ways this used to go wrong; both are
+    /// asserted against. `tmtroot/` depends on this: its whole point is
+    /// that a source in one place produces a file in another.
+    #[test]
+    fn a_bare_export_path_is_measured_from_the_project_root() {
+        let root = std::env::temp_dir().join("tomet_test_export_root");
+        let _ = fs::remove_dir_all(&root);
+        let sub = root.join("sub");
+        fs::create_dir_all(&sub).expect("temp dirs");
+        fs::write(root.join("default.config.tmt"), "@kind(config)\n").expect("config");
+
+        let src = sub.join("doc.tmt");
+        fs::write(
+            &src,
+            "@config(export: { type: commonmark, path: \"out.md\" })\n\n#[ Title ]\n",
+        )
+        .expect("write source");
+
+        export_cmd(&src, None, None, false, false).expect("export writes");
+
+        assert!(root.join("out.md").is_file(), "output belongs at the root");
+        assert!(
+            !sub.join("out.md").exists(),
+            "output must not land beside its source"
+        );
+        assert!(
+            !Path::new("out.md").exists(),
+            "output must not land in the working directory"
+        );
+
+        // And `--check` agrees with the same file, which is what makes it
+        // usable as a guard from anywhere.
+        export_cmd(&src, None, None, false, true).expect("freshly exported output is up to date");
+
+        let _ = fs::remove_dir_all(&root);
+    }
 
     /// `--check` has to fail before it is worth running. Exports once,
     /// confirms clean, edits the output by hand, confirms it is caught.

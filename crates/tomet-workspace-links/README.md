@@ -7,7 +7,7 @@ Vault-wide broken-link detection, target resolution, and SQLite-backed mtime cac
 1. **Vault-Wide Link Integrity & Resolution Layer**:
    - `tomet-links` scans workspaces and checks `File`, `Embed`, `Tm`, and `Ref` links for validity against real files on disk.
    - External URLs (`Url`) and intra-document identifiers (`Id`) are deliberately excluded (handled by network checkers or `tomet-validator`).
-   - SQLite cache database (`.tomet/links-cache.sqlite3`) avoids re-parsing unchanged files across runs based on filesystem modification timestamps (`mtime`).
+   - SQLite cache database in the user's cache directory (`~/.cache/tomet/links.sqlite3` on Unix, never inside the vault) avoids re-parsing unchanged files across runs based on filesystem modification timestamps (`mtime`).
 
 2. **Core Capabilities**:
    - **Link Collection (`collect_links`, `DocumentLink`, `LinkKind`)**:

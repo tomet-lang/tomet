@@ -1,6 +1,6 @@
-//! `tomet_ast::Document` -> CommonMark, hand-written (the output
-//! space is much smaller than the input space, so no need for a crate
-//! here -- see `docs/design/decisions/2026-08-09-commonmark-support.md`).
+//! `tomet_ast::Document` -> CommonMark, hand-written: the output space
+//! is much smaller than the input space, so there is no crate worth
+//! pulling in for it.
 //!
 //! Constructs with no CommonMark equivalent (`mark`, and any `<T>`/`@`
 //! element the importer never produces but a hand-authored `.tmt` file

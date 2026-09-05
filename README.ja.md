@@ -1,6 +1,6 @@
 # Tomet
 
-私のための言語!
+Tome to me!!
 
 ## What is tomet?
 
@@ -18,7 +18,8 @@
 4. ふりがなが簡単
 5. リテラルを保持
 
-<div data-tm-kind="callout">MDXやAstroコンポーネントのように、文書の中に型付きデータやコンポーネントを埋め込みたいエンジニア向け ObsidianのDataviewやBasesのように、メタデータとノートを高度に連携させたいKB作成向け</div>
+> [!note]
+> MDXやAstroコンポーネントのように、文書の中に型付きデータやコンポーネントを埋め込みたいエンジニア向け ObsidianのDataviewやBasesのように、メタデータとノートを高度に連携させたいKB作成向け
 
 **vs json**
 
@@ -38,6 +39,18 @@ key:valueをブロックに作成可能 テンプレート機能 厳密 Markdown
 
 文字が少ない 深いネストを作成しない
 
+**vs typst**
+
+---
+
+テキストファースト PDF無理 HTML/Markdown、他の記法を組み込める。 <mark>文書を美しく組版するための言語</mark> 意味を持った構造を記述し、それを様々な方法で消費できる言語 データとしての読み書き可能。
+
+**vs mdx**
+
+---
+
+Javascript非依存
+
 ## 構造上の弱点
 
 1. 視覚的ノイズとタイピング摩擦。記号の渋滞 (LSP機能を大切に)
@@ -53,3 +66,4 @@ key:valueをブロックに作成可能 テンプレート機能 厳密 Markdown
 **Community Support**
 
 ---
+

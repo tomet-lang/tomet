@@ -71,7 +71,7 @@ type = "location"
 // @(foo:bool){foo:true}
 
 // ${...} は構文解析のみ実装済み。評価(参照解決・関数計算)はtomet-resolve/
-// tomet-computeの未実装分。詳細: docs/design/decisions/2026-08-17-interpolation-syntax.md
+// tomet-computeの未実装分。
 ${some_id}
 ${sum(a, b)}
 

@@ -14,6 +14,57 @@ use tomet_semantics::classify_lenient;
 
 pub mod workspace_scan;
 
+/// What a relative path written *inside* a document means, resolved
+/// against the document and the project it belongs to.
+///
+/// Three cases, decided by this project's author for links and applied
+/// wherever a document names a path:
+///
+/// - absolute -- an OS-absolute path, taken as given;
+/// - starting with `./` or `../` -- relative to the referencing file's
+///   own directory;
+/// - anything else -- relative to the *project root*, not to the
+///   process's working directory.
+///
+/// The last is the one that is easy to get wrong by doing nothing.
+/// `@config(export: path)` did exactly that: it handed the string
+/// straight to `fs::write`, so `tmtroot/readme.tmt` declaring
+/// `README.ja.md` wrote to the repository root or to `docs/` depending
+/// on where you happened to be standing. Running the export from the
+/// right directory made it look correct.
+pub fn resolve_document_relative(source: &Path, target: &str, project_root: &Path) -> PathBuf {
+    let target_path = Path::new(target);
+
+    if target_path.is_absolute() {
+        return target_path.to_path_buf();
+    }
+
+    if target.starts_with("./") || target.starts_with("../") {
+        return match source.parent() {
+            Some(parent) => normalize_join(parent, target_path),
+            None => target_path.to_path_buf(),
+        };
+    }
+
+    normalize_join(project_root, target_path)
+}
+
+/// `base.join(target)` with `.` dropped and `..` popped, so the result
+/// has no traversal components left in it.
+pub fn normalize_join(base: &Path, target: &Path) -> PathBuf {
+    let mut result = base.to_path_buf();
+    for component in target.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                result.pop();
+            }
+            std::path::Component::CurDir => {}
+            other => result.push(other.as_os_str()),
+        }
+    }
+    result
+}
+
 /// Whether `path` matches one of `ignore_patterns` (each pattern
 /// matched against the path both as given and relative to `root`, with
 /// a directory-prefix or exact-segment match).

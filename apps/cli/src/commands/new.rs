@@ -23,9 +23,7 @@ pub fn new_cmd(
     if list {
         let templates = list_templates(&root, &config);
         if templates.is_empty() {
-            println!(
-                "No templates found in workspace (checked templates/, .tomet/templates/, and @config)"
-            );
+            println!("No blueprints found in workspace (checked .tomet/blueprints/ and @config)");
         } else {
             println!("Available templates:");
             for (name, path) in templates {
@@ -73,9 +71,9 @@ mod tests {
         let _ = fs::remove_dir_all(&temp_dir);
         let _ = fs::create_dir_all(&temp_dir);
 
-        let tmpl_dir = temp_dir.join("templates");
+        let tmpl_dir = tomet_workspace::blueprint_dir(&temp_dir);
         fs::create_dir_all(&tmpl_dir).unwrap();
-        let tmpl_file = tmpl_dir.join("rfc.tmt");
+        let tmpl_file = tmpl_dir.join("rfc.blueprint.tmt");
         fs::write(
             &tmpl_file,
             "@blueprint(rfc)\n@meta{\n  id: ${uuid(\"nil\")}\n  title: ${title}\n  author: ${vars.author}\n}\n\n#[ Motivation for ${title} ] {id: motivation}\n",

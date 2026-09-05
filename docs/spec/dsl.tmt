@@ -1,6 +1,5 @@
 `(args)` / `{value}` の中身、およびデータ専用の `.tmt` ファイル全体で使われる、
 軽量なキー・バリューDSL (Value DSL)。
-詳細仕様は `docs/design/decisions/2026-08-20-dsl-specifications.md` を参照。
 
 ```tm
 // 1. 基本的なキー・バリュー (コロン ':' または イコール '=' が使用可能)

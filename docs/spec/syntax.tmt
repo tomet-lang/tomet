@@ -24,7 +24,6 @@
 ---[]---
 ${xxx}                // 実装済み: `${id}` / `${a.b}` / `${sum(a, b)}` の構文解析のみ。
                       // 参照解決/関数評価はtomet-resolve/tomet-computeの未実装分。
-                      // 詳細: docs/design/decisions/2026-08-17-interpolation-syntax.md
 // xxx
 /*  */
 ```
