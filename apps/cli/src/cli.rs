@@ -11,12 +11,22 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Parse a file and report whether it's valid (prints "OK" or a detailed
-    /// snippet error with its line:column), without dumping the AST.
+    /// Check a `.tmt` file, or every one under a directory, and report
+    /// whether it is valid: it parses, and every element it writes exists
+    /// in a namespace the document has in scope.
+    ///
+    /// A directory is swept the way `format --check` and `check-links`
+    /// sweep one -- through the workspace index, so `workspace.ignore`
+    /// applies and hidden files like `.writ.tmt` are included. One
+    /// unreadable file does not stop the sweep; the run exits non-zero at
+    /// the end.
     Check {
-        file: PathBuf,
+        /// File or directory to check (defaults to ".").
+        #[arg(default_value = ".")]
+        path: PathBuf,
         /// Parse as a data-only document (key: value / seq / scalar)
-        /// instead of the full document grammar.
+        /// instead of the full document grammar. One file only -- a
+        /// directory of data-only documents is not a thing this has met.
         #[arg(long)]
         data: bool,
         /// Do not print "OK" when parse succeeds.

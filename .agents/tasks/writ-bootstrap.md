@@ -12,7 +12,11 @@ collecting every `.writ.tmt`, the way `.gitignore` is read. Entries carry
 deleted and git holds the history.
 
 `twrit` (in the sibling `../tomet-writ` repo) will eventually read these.
-Until then `just docs-check` sweeps them for parse/format only.
+Until then `just docs-check` sweeps them along with everything else
+the workspace index sees -- `tomet check .` validates them, `tomet format
+--check .` formats them, and only the placement rule is still a grep in
+the justfile because it is this repository's docs layout rather than a
+rule of the language.
 
 ## Steps
 
