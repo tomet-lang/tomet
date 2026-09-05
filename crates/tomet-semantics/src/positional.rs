@@ -97,6 +97,9 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         "version" => &["version"],
         "codeblock" => &["lang"],
         "embed" | "link" => &["target"],
+        // The namespace to bring into scope. The vault says where it
+        // lives, so this names it, not its file.
+        "use" => &["target"],
         // The kind the blueprint produces. `target` and not `kind`:
         // `@kind(blueprint)` sits directly above it, and `kind` there would
         // mean the output's kind while `@kind` means this file's.

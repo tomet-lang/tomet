@@ -469,6 +469,47 @@ because those entries carry behavior and not only shape, and
 `@vocabulary(std)` must eventually be writable. Recorded where it applies,
 on `BUILTIN_KINDS` in `crates/tomet-semantics/src/kind.rs`.
 
+### Built, 2026-09-06
+
+The first slice shipped. What is standing:
+
+- `std` is 30 names. The vocabulary document's own six joined it
+  (`vocabulary`, `element`, `param`, `args`, `data`, `content`) because
+  reading a `@vocabulary(vocabulary)` document would need the machinery it
+  defines -- so a kind's vocabulary can never declare those six, though a
+  `@use`d namespace still can. `@import` split into `@use` and
+  `@include`; `callout` joined too, for reasons recorded on
+  `BUILTIN_KINDS` itself.
+- Reading and deciding are split across the layer line.
+  `Vocabulary::from_document` and `Bindings::for_document` are pure, in
+  `tomet-semantics`; `tomet-resolver` only adds "read them off disk".
+  That is what lets the js/java/python bindings hand vocabularies in as
+  source text (`validateWith`, `validate_with`, `validateJsonWith`) from
+  a target that cannot open a file. `crate-layering` forced the split by
+  refusing a `PrinterConfig` argument, and the result was better than the
+  plan.
+- `tomet check` validates now, not just parses.
+- **Open vocabularies.** `@vocabulary(ns){ open: true }` declares nothing
+  and answers for any name. `docs/design/ideas/` uses it through
+  `@kind(idea)`. A sketch writes elements that do not exist yet, which is
+  what a sketch is for, so asking it to obey a vocabulary asks it to stop
+  being one. Making that a property of a vocabulary rather than a flag on
+  the checker keeps the exemption in the document and the fact of it in
+  the config, where you can read which kinds are open. `std` still wins
+  inside an open namespace.
+- **`required_shape` returns `None` for `link`, `embed` and `icon`.** One
+  alone on a line is not a structural error; `shape_mismatch` is for
+  `heading` inside a paragraph. Constraining those three caught nothing
+  but ordinary writing.
+- `docs/` needed six vocabularies and no shared one, because kind and
+  element were one-to-one: `bookmark`, `dirs`, `node-graph`, `scenario`,
+  `video`, plus open `idea`. That closes this file's old open question.
+
+Not built: `@args`/`@data`/`@content` parse and are ignored -- the three
+slots are described in `docs/spec/vocabulary.tmt` and read by nothing.
+`singleton` and `region` are read off a declaration and enforced nowhere.
+`@include` is recognized and expands nothing.
+
 ### The principle behind all of it
 
 Recorded as `explicit-form-first` in the root `.writ.tmt`, because it

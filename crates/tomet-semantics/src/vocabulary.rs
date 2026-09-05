@@ -179,7 +179,12 @@ impl Bindings {
     /// that the code says which one wins.
     pub fn classify(&self, name: &Name) -> Result<ElementKind, UnknownName> {
         let unknown = || UnknownName {
-            name: name.name.clone(),
+            name: name.to_string(),
+            unbound_namespace: None,
+        };
+        let unbound = |namespace: &str| UnknownName {
+            name: name.to_string(),
+            unbound_namespace: Some(namespace.to_string()),
         };
 
         let Some(namespace) = name.namespace.as_deref() else {
@@ -206,7 +211,8 @@ impl Bindings {
 
         match vocab {
             Some(vocab) if vocab.has(&name.name) => Ok(ElementKind::Custom(name.to_string())),
-            _ => Err(unknown()),
+            Some(_) => Err(unknown()),
+            None => Err(unbound(namespace)),
         }
     }
 
@@ -225,10 +231,16 @@ impl Bindings {
 
 /// The namespaces a document asks for with `@use`.
 ///
-/// The argument is a path and the namespace is whatever that file calls
-/// itself, so this takes the file's stem as the link between the two.
-/// It is the weakest part of `@use` and will be replaced when `@use`
-/// resolves the path properly.
+/// The argument is the namespace, not a path. The vault already says
+/// where each vocabulary lives, so naming the file here would write the
+/// path twice -- and a vocabulary names itself, so the path was never
+/// the thing being identified anyway.
+///
+/// It also makes the two ways into scope use one currency: `@kind(writ)`
+/// binds by name, and so does `@use(deck)`. The earlier path form forced
+/// a step between them (path -> file -> namespace) that nothing could
+/// take without carrying paths through this layer, which is why it had
+/// been trimming a filename stem and hoping.
 fn used_namespaces(doc: &Document) -> Vec<String> {
     let mut names = Vec::new();
     for block in &doc.blocks {
@@ -239,27 +251,13 @@ fn used_namespaces(doc: &Document) -> Vec<String> {
         let Some(args) = normalized_element_args(el) else {
             continue;
         };
-        let target = args
-            .as_str()
-            .map(str::to_string)
-            .or_else(|| {
-                args.get("target")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string)
-            })
-            .or_else(|| {
-                args.get("file")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string)
-            });
-        if let Some(target) = target {
-            let stem = target
-                .rsplit('/')
-                .next()
-                .unwrap_or(&target)
-                .trim_end_matches(".tmt")
-                .trim_end_matches(".vocabulary");
-            names.push(stem.to_string());
+        let namespace = args.as_str().map(str::to_string).or_else(|| {
+            args.get("target")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+        });
+        if let Some(namespace) = namespace {
+            names.push(namespace);
         }
     }
     names
@@ -446,6 +444,28 @@ mod tests {
         );
         assert_eq!(bound.classify(&name("link")), Ok(ElementKind::Link));
         assert!(bound.classify(&name("nonesuch")).is_err());
+    }
+
+    /// `@use` names the namespace, and that is what puts it in scope.
+    ///
+    /// It used to name a file, which meant this had to guess the
+    /// namespace from a filename stem -- and the vault had already
+    /// declared that path, so the document was repeating it.
+    #[test]
+    fn use_brings_a_namespace_into_scope_by_name() {
+        let deck = vocab("@vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
+        let doc = tomet_parser::parse_document("@kind(writ)\n@use(deck)\n\n@deck.ref(id:1)\n")
+            .expect("document parses");
+
+        let bound = Bindings::for_document(&doc, [vocab(WRIT), deck]);
+        assert_eq!(
+            bound.classify(&name("deck.ref")),
+            Ok(ElementKind::Custom("deck.ref".into()))
+        );
+        assert!(
+            bound.classify(&name("ref")).is_err(),
+            "a @use'd namespace is never written bare"
+        );
     }
 
     /// A vocabulary that is available but not asked for stays out of

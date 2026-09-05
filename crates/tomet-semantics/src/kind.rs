@@ -20,9 +20,11 @@ pub enum ElementKind {
     /// `BUILTIN_KINDS` despite three places matching it by raw string; a
     /// bare name has to be built-in now, so it is listed properly.
     Settings,
-    /// `@use(file)` -- binds a vocabulary as a namespace, under the name
-    /// that vocabulary gives itself. `{ as: other }` renames it, and is
-    /// only for a collision.
+    /// `@use(ns)` -- brings a vocabulary into scope, by the name it gives
+    /// itself. `{ as: other }` renames it, and is only for a collision.
+    ///
+    /// The namespace, not a path: the vault declares where each
+    /// vocabulary lives, so a path here would say it twice.
     ///
     /// Was `@import`, which carried two jobs at once: binding a namespace
     /// and splicing a document in. They are [`ElementKind::Use`] and
@@ -254,7 +256,8 @@ pub fn classify_name(name: &Name) -> Result<ElementKind, UnknownName> {
         return Ok(ElementKind::Custom(name.to_string()));
     }
     builtin_kind(&name.name).ok_or_else(|| UnknownName {
-        name: name.name.clone(),
+        name: name.to_string(),
+        unbound_namespace: None,
     })
 }
 
@@ -264,13 +267,37 @@ pub fn classify_name(name: &Name) -> Result<ElementKind, UnknownName> {
 /// `#tag` alone on a line reports -- deliberately, since hashtags are not
 /// a feature and a bare unknown name is far more likely to be a typo or a
 /// missing namespace binding.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct UnknownName {
+    /// The name as written, namespace included -- `deck.ref`, not `ref`.
+    ///
+    /// It used to hold only the local part, so writing `@deck.ref` with
+    /// `deck` out of scope was reported as "unknown element `ref`",
+    /// naming something the author had not written.
     pub name: String,
+    /// Set when the name is namespaced and that namespace is not in
+    /// scope at all. The distinction matters to whoever has to fix it:
+    /// a missing `@use` is a different edit from a typo in the element.
+    pub unbound_namespace: Option<String>,
 }
 
 impl std::fmt::Display for UnknownName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(namespace) = &self.unbound_namespace {
+            return write!(
+                f,
+                "`{}`: the namespace `{namespace}` is not in scope -- declare its \
+                 vocabulary in `vocabularies` and write `@use({namespace})`",
+                self.name
+            );
+        }
+        if let Some((namespace, local)) = self.name.split_once('.') {
+            return write!(
+                f,
+                "`{}`: the namespace `{namespace}` declares no `{local}`",
+                self.name
+            );
+        }
         write!(
             f,
             "unknown element `{}`: only `std` and this document's own `@kind` may be \
@@ -414,7 +441,8 @@ mod tests {
         assert_eq!(
             classify(&el),
             Err(UnknownName {
-                name: "caution".to_string()
+                name: "caution".to_string(),
+                unbound_namespace: None,
             })
         );
     }

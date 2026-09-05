@@ -32,7 +32,14 @@ pub enum ValidationError {
     /// element must be namespaced. This is the diagnostic that replaces the
     /// old silent fall-back to `ElementKind::Custom`, which is where the
     /// official-vs-user-defined ambiguity actually lived.
-    UnknownElement { name: String, span: Span },
+    UnknownElement {
+        name: String,
+        /// Set when the name is namespaced and that namespace is not in
+        /// scope -- a missing `@use` rather than a misspelled element.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        unbound_namespace: Option<String>,
+        span: Span,
+    },
     /// An element written with the wrong sigil for its shape -- `@meta`
     /// instead of `#meta`, or `#em` instead of `@em`.
     ShapeMismatch {
@@ -87,12 +94,22 @@ impl fmt::Display for ValidationError {
                     )
                 }
             }
-            ValidationError::UnknownElement { name, .. } => {
+            ValidationError::UnknownElement {
+                name,
+                unbound_namespace,
+                ..
+            } => {
+                // One wording, in `tomet_semantics::UnknownName`. This arm
+                // used to carry its own copy and the two drifted -- it was
+                // still advising `@import(file:..., as:ns)` after that
+                // element had split into `@use` and `@include`.
                 write!(
                     f,
-                    "unknown element `{name}`: only `std` and this document's own \
-                     `@kind` may be written bare; namespace it (`ns.{name}`), or \
-                     declare the vocabulary that has it and bind it with `@use`"
+                    "{}",
+                    tomet_semantics::UnknownName {
+                        name: name.clone(),
+                        unbound_namespace: unbound_namespace.clone(),
+                    }
                 )
             }
             ValidationError::ShapeMismatch {

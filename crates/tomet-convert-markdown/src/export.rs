@@ -734,7 +734,7 @@ mod tests {
         // a `Custom` kind again, and the div came straight back.
         for src in [
             "@settings(file:docs/docs.settings.tmt)\n",
-            "@use(./deck.tmt)\n",
+            "@use(deck)\n",
             "@include(./chapter.tmt)\n",
             "@meta{type: note}\n",
         ] {

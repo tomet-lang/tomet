@@ -59,6 +59,7 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Valida
         if let Err(unknown) = classify_in(el, bindings) {
             errors.push(ValidationError::UnknownElement {
                 name: unknown.name,
+                unbound_namespace: unknown.unbound_namespace,
                 span: el.span,
             });
             return;
