@@ -45,6 +45,10 @@
   入れれば一本で済む。綴りは省略形なので重複ではないが、実装が重複している。
 - `format.blockquote.always_newline`と`migration`は`default.config.tmt`に
   書かれているが読む側が無い。実装するか消すか。
+- `@nocheck`
+- `//(TODO)`
+- `//(NOCHECK)`
+- 説明書を一ページにエクスポート(Crates.ioみたいな感じで。)
 
 - 読み込みロード画面
 - index, directories
@@ -66,13 +70,29 @@
 - ( ) `[]`のkey
 - ( ) コネクト構文2                    // `:(){}[]`
 - ( ) `@tomet(version: 1)` or features.
+- ( ) 全角ブレースを黙って地の文にしない   // パーサは ASCII `{}` しか取らないので
+                                      // `@bookmark(...)｛...｝` は要素ではなく
+                                      // 地の文になる。`tomet check` は通る。
+                                      // 受け付けるか、はっきり落とすか。
+                                      // 黙って別の文書として読むのは、名前空間で
+                                      // 潰した `Custom` の暗黙フォールバックと同じ病
+                                      // (現物: docs/examples/bookmark.tmt)
 - (STOP) 独自DSL Settings               // 難しいから、json,yamlに逃がした。
 - (STOP) 独自DSL Value                  //
 ---[ 構文を実装する ]---
 - ( ) ビルトイン関数の強化             // `@link`, `@index`, `@callout`, `@tag`
 - ( ) `@meta`にkdlを追加
 ---[ 拡張性を確保する ]---
-- ( ) ドキュメントの補充
+- ( ) ドキュメントの補充                // 空のまま: guide/builtins/primitives/
+                                      // {link,references}.tmt と
+                                      // guide/builtins/value_dsl/settings_dsl.tmt が
+                                      // 0 バイト。value_dsl/tval.tmt と guide/cli.tmt は
+                                      // 見出しだけ
+- ( ) spec/ と guide/ の .md を生成する  // `.gitattributes` は
+                                      // `docs/{spec,guide}/**/*.md` を
+                                      // linguist-generated として先に宣言済みだが、
+                                      // どちらの `.tmt` も `@config(export:)` を
+                                      // 持たないので今は何にもマッチしない
 - ( ) docs のカスタム要素の名前空間     // 機構は決着済み。kind に紐づくものは
                                       // その kind の語彙、共有するものは語彙 +
                                       // `@use`。どちらに振るかが未決:
@@ -86,6 +106,9 @@
 - ( ) アイコン、ロゴ
 ---[ CLI/Library機能を強化する ]---
 - ( ) 置換/検索
+- ( ) `refactor -i` がコメントを落とす      // AST にコメントノードが無く、
+                                      // 再印字で消える。せめて警告を出すか、
+                                      // CST 経由の書き換えにするか
 - ( ) 変換を強化
 - ( ) Hook                           // 実行すると、規則に従って、指定されたトリガーを見て、処理を実行する（TODO）をアーカイブするとかのはなし。
 ---[ 外部機能を強化する ]---

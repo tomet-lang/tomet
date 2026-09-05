@@ -71,6 +71,22 @@ pub fn refactor_document(
 }
 
 /// Refactors source text, returning the transformed and formatted text alongside the changes count.
+///
+/// **Lossy: this drops comments.** It parses to a `Document` and prints
+/// the whole document back, and `tomet_ast` has no comment node at all --
+/// `//` and `/* */` exist in the source text and nowhere in the tree, so
+/// anything that round-trips through the AST loses them. Measured, not
+/// assumed: a file carrying `@meta{ type: note }` and a `//` line comes
+/// back with the comment gone.
+///
+/// The counting half is sound, because it counts rule hits rather than a
+/// text diff -- `tomet refactor --check` is safe to run on anything, and
+/// `FileDiff::is_changed` is `changes_count > 0` precisely so a file no
+/// rule touched is never rewritten. It is `-i` on a file a rule *does*
+/// touch that costs you the comments.
+///
+/// The `+++` fence used to be collapsed onto one line here too. That half
+/// is fixed: a fence is delimited by lines, so the printer reproduces it.
 pub fn refactor_source(
     src: &str,
     config: &PrinterConfig,
