@@ -109,7 +109,7 @@ ls --help
 // content:raw: opts any element's [content] into raw/verbatim text, same
 // treatment as codeblock -- byte-safe against an embedded "]" and
 // newline-preserving (no inline markup, no lazy-continuation folding).
-@memo+++
+@blockquote+++
   don't forget: check [this] and [that]
 +++
 

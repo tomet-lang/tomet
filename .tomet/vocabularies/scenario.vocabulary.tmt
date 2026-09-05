@@ -1,0 +1,9 @@
+@kind(vocabulary)
+@vocabulary(scenario){ version: "1.0.0" }
+
+@element(line){
+  display: block
+}[
+  台詞ひとつ。位置引数は話者、`[content]` が台詞。
+  `docs/examples/scenario.tmt` が使い方の見本。
+]

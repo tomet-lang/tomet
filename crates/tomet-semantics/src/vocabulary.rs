@@ -59,6 +59,22 @@ pub struct ElementDecl {
 pub struct Vocabulary {
     pub namespace: String,
     pub elements: BTreeMap<String, ElementDecl>,
+    /// `@vocabulary(ns){ open: true }` -- any name resolves in this
+    /// namespace, declared or not.
+    ///
+    /// For a sketchpad. `docs/design/ideas/` writes elements that do not
+    /// exist yet, which is what a sketch is for, so asking it to obey a
+    /// vocabulary asks it to stop being a sketch. Making that a property
+    /// of a *vocabulary* rather than a flag on the checker keeps the
+    /// question where it belongs, and keeps the exemption visible: an
+    /// open vocabulary has to be declared in the vault's config like any
+    /// other, so which kinds are open is a thing you can read.
+    ///
+    /// `std` still wins. An open vocabulary claims every undeclared name,
+    /// but bare names are resolved against the builtins first, so `@link`
+    /// in a sketch is still `@std.link` and still has to be shaped like
+    /// one.
+    pub open: bool,
 }
 
 impl Vocabulary {
@@ -69,9 +85,11 @@ impl Vocabulary {
     /// to contain `@element`. That is the same rule `@blueprint` needed
     /// after `extract_blueprint_schema` had counted any `@kind` at all.
     pub fn from_document(doc: &Document) -> Option<Self> {
+        let (namespace, open) = header(doc)?;
         let mut vocab = Vocabulary {
-            namespace: header_namespace(doc)?,
+            namespace,
             elements: BTreeMap::new(),
+            open,
         };
 
         for block in &doc.blocks {
@@ -86,6 +104,12 @@ impl Vocabulary {
         }
 
         Some(vocab)
+    }
+
+    /// Whether this vocabulary answers for `name` -- because it declares
+    /// it, or because it is open.
+    pub fn has(&self, name: &str) -> bool {
+        self.open || self.elements.contains_key(name)
     }
 
     /// Names this vocabulary declares that `std` already has, in
@@ -131,9 +155,10 @@ impl Bindings {
                 return Ok(kind);
             }
             return match self.kind.as_ref() {
-                Some(vocab) if vocab.elements.contains_key(&name.name) => Ok(ElementKind::Custom(
-                    format!("{}.{}", vocab.namespace, name.name),
-                )),
+                Some(vocab) if vocab.has(&name.name) => Ok(ElementKind::Custom(format!(
+                    "{}.{}",
+                    vocab.namespace, name.name
+                ))),
                 _ => Err(unknown()),
             };
         };
@@ -148,9 +173,7 @@ impl Bindings {
         };
 
         match vocab {
-            Some(vocab) if vocab.elements.contains_key(&name.name) => {
-                Ok(ElementKind::Custom(name.to_string()))
-            }
+            Some(vocab) if vocab.has(&name.name) => Ok(ElementKind::Custom(name.to_string())),
             _ => Err(unknown()),
         }
     }
@@ -175,8 +198,8 @@ fn builtin(name: &str) -> Option<ElementKind> {
         .map(|(_, kind)| kind.clone())
 }
 
-/// The namespace a `@vocabulary(ns)` header names.
-fn header_namespace(doc: &Document) -> Option<String> {
+/// The namespace a `@vocabulary(ns)` header names, and whether it is open.
+fn header(doc: &Document) -> Option<(String, bool)> {
     doc.blocks.iter().find_map(|block| {
         let Block::Element(el) = block else {
             return None;
@@ -184,7 +207,11 @@ fn header_namespace(doc: &Document) -> Option<String> {
         if classify_lenient(el) != ElementKind::Vocabulary {
             return None;
         }
-        positional_name(el)
+        let name = positional_name(el)?;
+        let open = crate::embedded::element_data(el)
+            .and_then(|data| data.get("open").and_then(|v| v.as_bool()))
+            .unwrap_or(false);
+        Some((name, open))
     })
 }
 

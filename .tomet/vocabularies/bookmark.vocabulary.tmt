@@ -1,0 +1,9 @@
+@kind(vocabulary)
+@vocabulary(bookmark){ version: "1.0.0" }
+
+@element(bookmark){
+  display: block
+}[
+  ブックマークひとつ。位置引数は保存する URL。
+  `docs/examples/bookmark.tmt` が使い方の見本。
+]

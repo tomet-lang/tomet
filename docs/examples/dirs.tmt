@@ -1,5 +1,5 @@
 @settings(file:docs/docs.settings.tmt)
-@kind(bookmark)
+@kind(dirs)
 
 @file(readme.md)
 [ 説明 ]

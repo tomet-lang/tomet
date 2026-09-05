@@ -34,6 +34,9 @@
 - `[label]:style(color:#ffffff):link(https://)`
   - 今 > `@link[@color[asdfasdf](white)](https:///)`
 - `->`
+- tmtroot vs tmtdocs
+- idの種類にsha1追加
+- `@element`ではなくて、`@define`のほうが適切か？
 
 - 読み込みロード画面
 - index, directories

@@ -2270,6 +2270,7 @@ dependencies = [
  "tomet-pandoc",
  "tomet-parser",
  "tomet-printer",
+ "tomet-semantics",
  "tomet-transform",
  "tomet-tree",
  "tomet-typst",

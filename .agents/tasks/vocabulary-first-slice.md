@@ -71,10 +71,10 @@
     「use `#link`」—— `#` が要素シジルだった頃の助言で、今は従いようがない。
     位置で決まると言うように直した。
 
-- [ ] 6. `tomet check` が語彙を解決してバリデータを呼ぶ。
+- [x] 6. `tomet check` が語彙を解決してバリデータを呼ぶ。
       **配線は書けているが未コミット**（`$SCRATCH/check-wired.rs`）。
       繋ぐと `docs-check` が 10 ファイルで赤くなる。内訳は下記 step 7。
-- [ ] 7. 190 件が落ちることを確認。落ちない分は何が残ったかを記録する。
+- [x] 7. 190 件が落ちることを確認。落ちない分は何が残ったかを記録する。
       配線した状態で計測済み: 追跡下の `.tmt` 139 件中 90 件が通り 49 件が落ちる。
       docs/ に残る未知の名前（件数順）:
       `bookmark` 27 / `line` 12 / `file` 6 / `timestamp` 4 / `node` 4 /
@@ -87,14 +87,35 @@
       いる。`required_shape(Link) = Inline` が厳しすぎるのではないか、
       という設計上の問いが残っている（下記）。
 
-## 決めてもらう必要があるもの
+  step 6/7 の結果: `docs/` は全部通る。`tomet check` はバリデータを呼ぶ。
+  リポジトリ全体では 105 通過 / 34 不通過で、不通過は全部 `tests/` の
+  凍結フィクスチャ（`workspace.ignore` が既に他の guard から外している）と
+  `tmtroot/readme.tmt`（下記）。
 
-1. **docs/ の自作要素の名前空間割り当て**（上記 12 名前）。
-2. **`required_shape(Link) = Inline` は正しいか。**
-   `crates/tomet-syntax-parser/.writ.tmt:107` は `@link(file:...)` を
-   行に単独で置いている。ごく自然な書き方だが、`link` は inline 専用なので
-   ShapeMismatch になる。`heading` が段落の中にある、のような本物の誤りと
-   同じ扱いでよいのか。
+## 決着したもの
+
+1. **docs/ の自作要素**: kind ごとの語彙 6 つ。kind と要素が一対一だった。
+   `bookmark` / `dirs` / `node-graph` / `scenario` / `video` が実要素を宣言し、
+   `idea` は `open: true` で宣言ゼロ。
+2. **`required_shape(Link)` は `None` に**（著者の判断）。link/embed/icon は
+   行に単独で立ちうる。`shape_mismatch` が捕まえるべきは「段落の中の
+   `heading`」のような構造の誤りで、単独行のリンクは何も壊していない。
+   LSP の `shape_of` は「ブロックとして置いて怒られるか」で形を逆算していて
+   「どちらでも可」を表現できなかったので、`required_shape` を公開して
+   直接引くようにした。
+
+## 残っている決定
+
 3. **ファイルを読めない実行環境に語彙をどう渡すか。**
    js/java/python バインディングと `apps/web` は `validate_document` を
    呼んでいて、名前空間つき要素を全部 unknown と報告するようになる。
+4. **`callout` を `std` に入れるか。** `tmtroot/readme.tmt` が唯一の
+   未解決ファイルで、`@callout(note)[...]` を使っている。
+   `docs/spec/builtin-elements.tmt` は「組み込み kind ではない」と書いているが、
+   実装は八箇所で特別扱いしている ——
+   `positional.rs`（`variant` を位置引数に）、`convert-typst`、
+   `convert-markdown` の export と **import**（`> [!note]` から
+   `Sigil::named("callout")` を作る）、`format-printer` の style、
+   `tomet-config` の二箇所、LSP。
+   つまり Markdown を往復させると、検証が拒否する要素が生成される。
+   `BUILTIN_KINDS` だけが知らない状態。
