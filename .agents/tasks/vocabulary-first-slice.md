@@ -109,7 +109,7 @@
 3. **ファイルを読めない実行環境に語彙をどう渡すか。**
    js/java/python バインディングと `apps/web` は `validate_document` を
    呼んでいて、名前空間つき要素を全部 unknown と報告するようになる。
-4. **`callout` を `std` に入れるか。** `tmtroot/readme.tmt` が唯一の
+4. ~~**`callout` を `std` に入れるか。**~~ 入れた（著者の判断）。 `tmtroot/readme.tmt` が唯一の
    未解決ファイルで、`@callout(note)[...]` を使っている。
    `docs/spec/builtin-elements.tmt` は「組み込み kind ではない」と書いているが、
    実装は八箇所で特別扱いしている ——
@@ -118,4 +118,11 @@
    `Sigil::named("callout")` を作る）、`format-printer` の style、
    `tomet-config` の二箇所、LSP。
    つまり Markdown を往復させると、検証が拒否する要素が生成される。
-   `BUILTIN_KINDS` だけが知らない状態。
+   `BUILTIN_KINDS` だけが知らない状態だった。
+   三つの writer は `kind.as_str()` にマッチしていて、しかも `heading` や
+   `codeblock` や `link` と同じ arm の並びにいたので、一覧に足しても
+   何も壊れなかった。壊れたのは LSP のテスト二つで、どちらも
+   「callout は組み込みではないから補完に出ない」を固定していた。
+   対照として `memo` には特別扱いが一つも無く、本当に組み込みではない。
+   これで `tests/` の凍結フィクスチャと意図的に不正な
+   `invalid_syntax.tmt` を除く**全ての文書が通る**（115 / 145）。
