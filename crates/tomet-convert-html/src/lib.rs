@@ -420,7 +420,7 @@ fn render_hr_element(cx: &RenderCtx, el: &Element, out: &mut String) {
 }
 
 /// `em`/`strong`/`mark` all wrap their `content` in a same-named HTML tag --
-/// the `Sigil::Type` name doubles as the HTML tag name for these three.
+/// the element's own name doubles as the HTML tag name for these three.
 fn render_wrapped_inline(cx: &RenderCtx, el: &Element, tag: &str, out: &mut String) {
     out.push_str(&format!("<{tag}>"));
     if let Some(content) = &el.content {

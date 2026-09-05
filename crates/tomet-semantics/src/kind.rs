@@ -95,19 +95,21 @@ pub enum ElementKind {
     Table,
     Heading,
     Icon,
-    /// `Element { sigil: Type("ol"), .. }` -- a `-.` (auto-numbered) list.
+    /// `Element { sigil: Named("ol"), .. }` -- a `-.` (auto-numbered) list.
     /// See `crate::list`.
     OrderedList,
-    /// `Element { sigil: Type("ul"), .. }` -- a plain `-` list.
+    /// `Element { sigil: Named("ul"), .. }` -- a plain `-` list.
     /// See `crate::list`.
     UnorderedList,
-    /// A `<T>`/`@name` (or an unnamed `@` with no inferred key) that
-    /// doesn't match any of the built-in kinds above -- consumers fall
-    /// back to their own generic rendering, keyed on the name.
+    /// A namespaced `@ns.name` that doesn't match any of the built-in
+    /// kinds above -- consumers fall back to their own generic rendering,
+    /// keyed on the name. A *bare* name that matches nothing is
+    /// [`UnknownName`] rather than this, which is the whole point of
+    /// namespaces.
     Custom(String),
     /// `Sigil::Bare` -- the untyped `(key)[content]` entries inside a
     /// container like `@links{}`. Its string form ("bare") can collide
-    /// with a user writing a literal `<bare>`/`@bare` element (which
+    /// with a user writing a literal `@bare` element (which
     /// would classify as `Custom("bare")` instead), but that's the same
     /// ambiguity the old stringly-typed `element_kind()` already had --
     /// not a regression.

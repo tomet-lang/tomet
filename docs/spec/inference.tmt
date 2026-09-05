@@ -1,10 +1,64 @@
-##[ args推論 ]
+#[ 推論 ]
 
-`#settings`内で設定をする
-最初は登録順序で無制限に推論できるようにしたが、やめた。
+パーサは語彙を引かない。ここでいう推論はすべて `tomet-semantics` の仕事で、
+木の形は変えず、書かれた値に名前を与えるだけである。
 
-##[ `@`推論 ]
+#[ 位置引数はキーに正規化される ]
 
-argsを見て推論をする。
-`@`要素の一部のみ対応。なぜなら、無制限に増やせると、
-見る人が知る必要な要素が無制限に増やされる。
+`(...)` に裸の値を書くと、その要素の一つ目のスロットの名前が付く
+（`tomet_semantics::builtin_positional_arg_keys`）。
+
+@table[
+[ 要素                ][ 一つ目のスロット ]
+[ `@kind`             ][ `kind`           ]
+[ `@version`          ][ `version`        ]
+[ `@heading`          ][ `level`          ]
+[ `@codeblock`        ][ `lang`           ]
+[ `@link` / `@embed`  ][ `target`         ]
+[ `@use`              ][ `target`         ]
+[ `@blueprint`        ][ `target`         ]
+[ `@callout`          ][ `variant`        ]
+[ `@meta` / `@config` ][ `format`         ]
+]
+
+```tm
+@link("https://example.com")        // target: "https://example.com" と同じ
+@link(target:"https://example.com")
+```
+
+list item の `(...)` マーカーは `marker` に正規化される
+（`LIST_MARKER_POSITIONAL_KEY`）。
+
+##[ 表は std の分だけ ]
+
+カスタム要素には一つ目のスロットが無いので、裸の値は名前を持たないまま残る。
+語彙の `@param` を読む実装が入ればそこが出どころになる。それまでは std の表が
+すべてである。
+
+#[ target のスキーム回収 ]
+
+`@link(tm:foo)` の `tm:foo` は、パーサからはキー `tm`・値 `foo` のマップ
+エントリとして出てくる。パーサに「この要素の本当のキーは `target` だけだ」と
+いう知識は無いためで、`url` / `file` / `tm` / `id` / `ref` の五つに限って
+`target: "tm:foo"` へ回収される（`RECOVERABLE_TARGET_SCHEMES`）。
+
+五つ**だけ**なのは、回収を無制限にすると任意のキーが黙って `target` に
+化けるからである。候補が二つ以上あるときも回収しない。
+
+---[ 撤去済み ]---
+
+##[ キー名からの種別推論 ]
+
+`@(url:...)` を link に、`@(file:...)` を embed に、というキー名からの推論は
+`1d0b7b2` で消えた。名前を省いた `@(...)` は要素にならない。
+
+無制限に増やせる推論は、読む人が知らなければならない要素を無制限に増やす。
+`ElementKind::Link` を得る唯一の方法は `@link` と書くことである。
+
+##[ `@settings` の `positional:` ]
+
+`elements.<名前>.positional: [ ... ]` で、カスタム要素の位置引数の並びを
+設定側から与えられた。撤去した。引数の宣言が既に持っている順序を別の場所に
+もう一度書くもので、しかも実際にはどこからも読まれていなかった。
+@link(file:docs/spec/vocabulary.tmt)[`spec/vocabulary.tmt`] の `@param` が
+置き換えである。

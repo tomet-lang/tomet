@@ -1,6 +1,6 @@
 name = "Tomet"
 grammar = "tomet"
-path_suffixes = ["tm"]
+path_suffixes = ["tm", "tmt"]
 line_comment = "//"
 block_comment = ["/*", "*/"]
 
@@ -22,8 +22,3 @@ end = ")"
 close = true
 newline = true
 
-[[brackets]]
-start = "<"
-end = ">"
-close = true
-newline = false

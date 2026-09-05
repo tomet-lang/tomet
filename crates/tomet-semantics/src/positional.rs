@@ -5,9 +5,9 @@ use tomet_ast::{Element, Sigil, Value};
 /// This used to be two parallel tables, one per sigil, and they had
 /// silently drifted: `codeblock`, `embed` and `callout` had entries only
 /// under `<T>`, so `@embed(x)` and `<embed>(x)` disagreed about whether
-/// `x` meant `target`. Since the sigil now encodes shape rather than
-/// origin, keying on shape here would have preserved that bug as a
-/// feature. `callout` is kept even though it is not in `BUILTIN_KINDS`;
+/// `x` meant `target`. Both of those sigils are gone -- `@name` is the
+/// only one, and shape comes from position -- so keying on anything but
+/// the name would have preserved that bug as a feature. `callout` is kept even though it is not in `BUILTIN_KINDS`;
 /// it is a widely used custom element in the docs and dropping its
 /// positional key would silently change how `(warning)` reads.
 pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
@@ -59,7 +59,7 @@ pub fn normalized_list_marker(marker: &Value) -> Value {
 }
 
 /// The old per-scheme argument keys (`url`/`file`/`tm`/`id`/`ref`), from
-/// before `@link`/`<embed>` were unified onto one `target` key -- a bare
+/// before `@link`/`@embed` were unified onto one `target` key -- a bare
 /// `tm:foo/bar` (no `target:` wrapper) still parses as a map entry
 /// `("tm", "foo/bar")`, since the parser's `identifier:` rule has no
 /// notion of "target" being the only real key these two elements have (it
@@ -80,8 +80,9 @@ const RECOVERABLE_TARGET_SCHEMES: [&str; 5] = ["url", "file", "tm", "id", "ref"]
 const POSITIONAL_ENTRY_KEY: &str = "";
 
 /// Scoped to elements whose *first* positional slot is `"target"`
-/// (`@link`/`<embed>`'s builtin default, or any custom element a project
-/// gives that name via `@settings`) -- when that's the only legitimate
+/// (`@link`/`@embed`'s builtin default; a custom element could once be
+/// given that slot through `@settings`, which is a `@vocabulary` question
+/// now and unread either way) -- when that's the only legitimate
 /// key defined, any *other* single key present is unambiguously an
 /// artifact of the parser's `identifier:` rule splitting a bare
 /// `scheme:value` positional argument, not a real intentional field.
@@ -352,7 +353,7 @@ mod tests {
     fn does_not_recover_for_non_link_embed_elements() {
         // An arbitrary custom element's own `tm`-named field is left
         // alone -- recovery is scoped to elements whose positional key
-        // is `target` (`@link`/`<embed>`), not a general mechanism.
+        // is `target` (`@link`/`@embed`), not a general mechanism.
         let mut el = element_new(Sigil::named("caution"));
         el.args = Some(Value::Map(vec![(
             "tm".to_string(),

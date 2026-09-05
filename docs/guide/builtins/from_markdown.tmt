@@ -29,8 +29,8 @@
 [display](path)
 [[wikilink]]
 
-@[display](path:path)
-@(ref:file_name)
+@link(file:path)[display]
+@link(target:"ref:file_name")
 ```
 
 ##[ Embed ]
