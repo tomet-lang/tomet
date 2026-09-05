@@ -152,8 +152,20 @@ illustration links under `docs/`, and the map's claim that `spec/` and
 it.
 
 - `singleton` and `placement` are declared in `docs/spec/builtin-settings.tmt`
-  for several elements but implemented nowhere -- the word appears in two doc
-  comments and no code. `tomet check` only parses
+  for several elements and enforced nowhere. `tomet check` only parses
   (`apps/cli/src/commands/check.rs:10`), so a document with two `@meta`, or
-  two `@kind`, or a `@kind` in the middle of the body, passes. Enforcing this
-  is its own task and touches every element that claims to be a singleton.
+  two `@kind`, or a `@kind` in the middle of the body, passes.
+  This is not one gap but three, and the wording above was wrong about all
+  of them -- see `.agents/tasks/sigil-shape-axis-and-namespaces.md`'s
+  "Namespaces, settled (2026-09-05)":
+  - `placement:` is not waiting to be implemented, it is waiting to be
+    deleted. It mixed two rules (`head` is a region, `block` is a shape)
+    under the name of a third thing (the derived fact `Element.placement`).
+    Its replacements are `display` and `region`, on the element's
+    vocabulary entry.
+  - `singleton` needs somewhere to be declared, which is the vocabulary,
+    which does not exist yet.
+  - Nothing can be enforced from the CLI at all until then: `tomet check`
+    does not call `validate_document`, and turning it on today reports 246
+    errors across 48 files, 190 of them custom elements that are unknown
+    only because `classify` never reads the settings that declare them.

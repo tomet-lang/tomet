@@ -7,9 +7,12 @@ distinction carried no information. A design session on 2026-09-02
 replaced the axis rather than repairing it.
 
 **Status:** steps 1-7 and 9-11 are done. Steps 8 and 12 remain, plus the
-namespace-binding work noted under step 7 and the open question at the
-bottom. **A design session on 2026-09-03 retracted the shape axis
-itself** — see "One sigil: `@`" below and steps 13-18.
+namespace-binding work noted under step 7. **A design session on
+2026-09-03 retracted the shape axis itself** — see "One sigil: `@`" below
+and steps 13-18. **A design session on 2026-09-05 settled the namespace
+design end to end** — see "Namespaces, settled (2026-09-05)" below, which
+supersedes the "Namespaces encode origin" section and closes the old open
+question at the bottom.
 
 The change is one breaking release, not several: the sigil swap, the
 namespaces and the fence all rewrite the same documents, so they ship
@@ -233,6 +236,247 @@ Headings, lists, tables, `**strong**` / `*em*` / `==mark==` / `` `code` ``,
       `@` keeps requiring a following group — that is what keeps
       `me@example.com` prose; `#` additionally accepts end-of-line.
 
+
+## Namespaces, settled (2026-09-05)
+
+A design session with the author took the namespace work from "decided in
+outline" to "decided". This section supersedes "Namespaces encode origin"
+where they disagree. Nothing here is built yet.
+
+### One name per job
+
+`@import` and `@settings` were each a bundle. `import` was meant to splice
+a `.tmt` file in at that point; `settings` was meant to load "the document
+with all the settings" — and settings has since split into three unrelated
+things. A name coined to cover several jobs cannot say what it means.
+
+| element | job |
+| --- | --- |
+| `@kind` | what this document is |
+| `@config` | how this document behaves (export, ...) |
+| `@settings` | how **Tomet** behaves (format, macros, ignore) |
+| `@vocabulary` | which element names exist |
+| `@use` | bring a vocabulary into scope |
+| `@include` | splice another document in here (the old `import` intent; unbuilt) |
+
+`settings` is not discarded, it is returned to a narrow honest job — what
+the word means in every other application. `@config` keeps the document,
+and the two stop sharing a spelling that only file position disambiguated.
+
+`vocabulary` is the word this repository already speaks: the
+`no-vocabulary` writ, `classify`'s "a vocabulary question", and
+`tests/src/vocabulary.rs`. `use` rather than `import` because binding is
+not inclusion.
+
+### `std` is a real namespace
+
+Not "bare names are reserved". `@link` is shorthand for `@std.link`.
+
+Exactly two namespaces may be written bare:
+
+- `std`, because the language carries it;
+- the document's own `@kind(X)`, because it is declared on the first line.
+
+The boundary is not privilege, it is **what a reader can resolve without
+leaving the document**. A third shorthand would send them elsewhere.
+
+`std` always wins a collision, and it is never ambiguous, because **a
+vocabulary may not declare a name that `std` already has**. The error
+fires once at the declaration, not at every use site. Namespaces brought
+in with `@use` are not shorthand-eligible, so they may shadow freely:
+shadowing is only a problem where shorthand exists. `std` is reserved as a
+namespace name.
+
+Namespaces nest. `Name { namespace: Option<String>, name: String }` is one
+level and has to become a path. A vocabulary names itself; `@use`'s `as:`
+is the collision escape hatch only, so `@deck.ref` means the same thing in
+every document. Written in the data slot, matching `@blueprint(writ){...}`
+— `@use(deck.tmt){ as: other }`. `:as(...)` was considered and rejected:
+`:` already means "this group attaches to the enclosing item", which
+points the opposite way.
+
+### `@vocabulary` is not `@blueprint`
+
+The author's instinct, with the reasons found afterward:
+
+- **Lifetime.** A blueprint is consumed — `tomet new` instantiates it and
+  the blueprint's own kind is dropped (`instantiating_leaves_one_kind`). A
+  vocabulary is never consumed. Bundling means every instantiation has to
+  carry-or-drop the vocabulary half correctly, which is the bug class that
+  test already exists for.
+- **Phase.** A vocabulary is needed to *read* a document (is `@writ.layers`
+  a real element, what are its arguments). A blueprint is needed to
+  *validate* one (are the required sections present). A renderer needs the
+  first and never the second.
+- **Cardinality.** One vocabulary can serve several kinds. Inside one
+  kind's blueprint, the others would have to `@use` a blueprint — "I want
+  this template's dictionary but not its template".
+
+Placement, symmetric with blueprints:
+
+```
+.tomet/
+├── blueprints/writ.blueprint.tmt      structure (needed to validate)
+└── vocabularies/writ.vocabulary.tmt   element vocabulary (needed to read)
+```
+
+`@kind(X)` binds both, by name, with no import line. `@use` is only for a
+vocabulary not tied to a kind.
+
+### Three axes, not one `placement:`
+
+One word hid three concepts, and the settings key named the one that is
+not a rule:
+
+| | what it is | where it lives today |
+| --- | --- | --- |
+| **placement** | a *fact* — where this occurrence sits | `Element.placement`, derived by the parser |
+| **display** | a *rule* — the shape this kind may take | `required_shape`, `Shape`; `None` for `Custom(_)` |
+| **region** | a *rule* — may only appear before body content | nowhere |
+
+`placement: head` and `placement: block` are not two values of one axis:
+`head` is a region and `block` is a shape. That mixing is why the key is
+rejected — the same disease as `settings`. Rejecting it does not dispose
+of the two rules it was smuggling.
+
+They are independent, and this language already holds the proof:
+`is_directive` covers seven kinds and `singleton: true` covers six. The
+difference is `Import` — head-only, and repeatable, because you bring in
+several vocabularies.
+
+```tmt
+@element(layers){
+  display: block       // may not appear inside a paragraph
+  region: preamble     // only before body content
+  singleton: true      // at most one per document
+}
+```
+
+`display` is CSS's word and reads correctly. `shape` was rejected for
+sitting too close to `style`, which this repository uses heavily and which
+shares the value `block` (`format.callout.style.content = block`) — and
+`shape` came from the retracted shape-axis design anyway. `flow` was
+rejected as actively wrong: in HTML5, phrasing content *is* flow content,
+so `flow: inline` contradicts the one spec using the word. `display` is
+free once `migration.url.args.display` is renamed to `label`, which it
+should be regardless — it means the display text of `@link[label](...)`,
+and no code reads the key.
+
+`region: preamble` rather than `head`, because "head" already means the
+element head (where `+++` attaches) in this project.
+
+Implementing `display` for custom elements is small: `required_shape`
+consults the vocabulary instead of returning `None` for `Custom(_)`.
+`region` is new machinery — nothing represents it.
+
+### The vocabulary is a document, not a map
+
+Both files that configure Tomet — `docs/docs.settings.tmt` and
+`default.config.tmt` — are written in JSON inside a `+++` fence. The
+format does not eat its own dog food exactly where it matters most.
+
+```tmt
+@kind(vocabulary)
+@vocabulary(writ){ version: "1.0.0" }
+
+@element(layers){
+  display: block
+  singleton: true
+
+  @args{
+    @param(level){ type: uint, positional: true }[ Layer number. ]
+    @param(crates){ type: [string] }[ Directory patterns in this layer. ]
+  }
+  @data{ open: false }
+  @content{ allow: (link, em) }
+}[
+  Which layer each crate is in. A layer depends only on layers below it.
+]
+```
+
+`{}` holds the declaration, `[content]` holds the prose that says what the
+element *means* — which is what a reader actually asks for, and what a
+`description:` string cannot carry. `{}` may hold pairs and elements at
+once (`Entry::{Pair, Element}`, the case step 6 fixed), so there is no
+choice to make between "a map" and "nested elements".
+
+`@element` blocks sit at the top level of the document rather than nested
+in `@vocabulary`'s `{}`, for the same reason `.writ.tmt` lists `##[ entry ]`
+sections instead of nesting them.
+
+`@param`, not `@arg`: parameter is the declaration side, argument is the
+call side. Both words stay correct and `(args)` needs no rename.
+
+### The vocabulary describes three slots, and one has two forms
+
+`{...}` and `+++...+++` are the *same* slot — `Element.value`, as
+`ElementValue::Group` or `Raw`. So:
+
+| slot | what the vocabulary must say |
+| --- | --- |
+| `(args)` | which names, types, required, positional, defaults |
+| `{data}` | allowed? Group: which keys, which elements, **open or closed**. Raw: allowed, which embedded formats |
+| `[content]` | allowed? which elements |
+
+`(args)`'s params and `{data}`'s keys need the *same* machinery — name,
+type, required, default — so `@param` serves both. The real difference is
+**open or closed**: `@meta{...}` takes any key, `@blueprint{version:,
+description:}` takes a fixed set. Written explicitly (`open: false`), never
+derived from "no keys declared yet", so that "not described" and "open"
+stay distinguishable.
+
+`[content]`'s answer fell out of the language. Raw moved to `+++`, so
+`raw` is not a content option; and `*a*` parses to `@em`
+(`inline.rs:227-231`), so "prose" is not a category separate from inline
+elements. What is left is one question — which elements may appear:
+
+```tmt
+@content{ allow: (link, em, strong, mark) }   // explicit; the base form
+@content{ allow: inline }                     // shorthand: everything display: inline
+@content{ allow: any }
+```
+
+The shorthand vocabulary is `display`'s own values, so no second
+classification system is invented — which is where HTML5 arrived after
+starting from fixed element lists. No `@content` means no content, a
+deliberately strict default matching the `open:` decision.
+
+Nesting is stated by the **container** (`allow:`), not by the child
+(`within:`). The child-side form is open for extension but makes "what may
+go inside `@links`?" unanswerable without scanning every vocabulary; that
+question has to be answerable from one place, for readers and for
+completion. Extension is bought back by naming a category rather than a
+list.
+
+### Self-description is the design test
+
+`@vocabulary(writ)` is easy and proves nothing. `@vocabulary(std)` is
+where the format's limits appear, and the near test is whether
+`@vocabulary(std)` can declare `vocabulary`, `element` and `param`
+themselves. Writing it out already found:
+
+- **`@param(name)`'s type is not `string`.** It is an identifier, and
+  `@element(bookmrak)` should be caught. Does the type language have
+  identifiers, or are names not values?
+- **`default:`'s type depends on `type:`.** Almost every schema language
+  gives up here and takes `any`. Giving up is fine; doing it by accident
+  is not.
+- **`type:`'s type is a type.** The type language is separate from the
+  value language.
+
+The author's decision on `std` itself: it stays hard-coded for now,
+because those entries carry behavior and not only shape, and
+`@vocabulary(std)` must eventually be writable. Recorded where it applies,
+on `BUILTIN_KINDS` in `crates/tomet-semantics/src/kind.rs`.
+
+### The principle behind all of it
+
+Recorded as `explicit-form-first` in the root `.writ.tmt`, because it
+binds work that is happening now: build the explicit form first, add a
+shorthand afterward as something that *expands* to it, and never write the
+same fact twice. A shorthand expands; a duplicate restates. This is what
+separates `@link` (fine) from `required: [ name ]` (not).
+
 ## Correction to the analysis above
 
 `parse_value_group` (`crates/tomet-syntax-parser/src/element.rs:264-292`)
@@ -410,21 +654,29 @@ slot instead of sharing `ElementValue::value`.
 - 綴りを決めて `parse_remote_connection_element` を書き直す
 - あるいは機能ごと削除する
 
-## Open — needs a decision
+## Open — the editorial half only
 
 **Which namespace do the docs' own custom elements take?**
 
-Bare names are reserved for `BUILTIN_KINDS`, so every custom element in
-`docs/` is now an `UnknownElement` *validation* error (they still parse).
-By frequency: `bookmark` (27), `line` (12), `callout` (7), `node`,
-`timestamp`, `index`, `dirs`, `memo`, `foot`, `tag`. Many occurrences are
-inside code fences as examples, but the example documents under
-`docs/examples/` use them for real.
+The mechanism is settled above: an element tied to a kind lives in that
+kind's vocabulary and needs no binding; one shared across kinds needs a
+vocabulary plus `@use`. What is still open is editorial — which of
+`docs/`'s customs (`bookmark`, `line`, `node`, `timestamp`, `dirs`,
+`memo`, `foot`, `tag`, `index`) are kind-scoped and which are shared, and
+what the shared vocabulary is called.
 
-They need a namespace plus an `#import(file:..., as:ns)` binding — e.g.
-`#import(file:docs.settings.tmt, as:docs)` and then `#docs.bookmark(...)`.
-The namespace name is an editorial choice about the docs, so it is not
-being guessed here. This blocks finishing steps 11 and 12.
+`callout` and `memo` are deferred by the author's call: early sketches, to
+be added back or dropped later, and not worth blocking the design on.
+`docs/spec/builtin-elements.tmt` says callout is not a builtin while
+`default.config.tmt` configures `format.callout.style` and the guide
+teaches `@callout(note)[...]`; those three have to agree eventually.
+
+Measured 2026-09-05 over every tracked `.tmt`: `validate_document` reports
+246 errors across 48 files — 190 `UnknownElement`, 29 `ShapeMismatch`, 27
+`DuplicateId`. `bookmark` (45) is *declared* in `docs/docs.settings.tmt`
+and still unknown, because `classify` never reads the settings. This is
+why `tomet check` does not call the validator, while the js/java/python
+bindings and `apps/web` all do.
 
 ## Known-unrelated failures
 
