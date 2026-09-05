@@ -4,11 +4,11 @@ use std::path::Path;
 use anyhow::Result;
 use tomet_ast::Value;
 use tomet_config::{PrinterConfig, find_config_file};
-use tomet_workspace::{create_file_from_template, list_templates};
+use tomet_workspace::{create_file_from_blueprint, declaration_errors, list_blueprints};
 
 pub fn new_cmd(
     path: &Path,
-    template: Option<&str>,
+    blueprint: Option<&str>,
     list: bool,
     force: bool,
     vars: &[(String, String)],
@@ -20,20 +20,29 @@ pub fn new_cmd(
         (PrinterConfig::default(), current_dir.clone())
     };
 
+    // A declared path that rotted is reported here, once, wherever the
+    // command was going. Finding out at the document that wanted the
+    // blueprint would name the wrong file.
+    for problem in declaration_errors(&root, &config) {
+        eprintln!("warning: {problem}");
+    }
+
     if list {
-        let templates = list_templates(&root, &config);
-        if templates.is_empty() {
-            println!("No blueprints found in workspace (checked .tomet/blueprints/ and @config)");
+        let blueprints = list_blueprints(&root, &config);
+        if blueprints.is_empty() {
+            println!(
+                "This vault declares no blueprints. Add their paths to `blueprints` in the config."
+            );
         } else {
-            println!("Available templates:");
-            for (name, path) in templates {
+            println!("Declared blueprints:");
+            for (name, path) in blueprints {
                 println!("  - {:<15} ({})", name, path.display());
             }
         }
         return Ok(());
     }
 
-    let template_name = match template {
+    let blueprint_name = match blueprint {
         Some(t) => t.to_string(),
         None => {
             if let Some(parent_dir_name) = path
@@ -54,7 +63,7 @@ pub fn new_cmd(
     }
 
     let created_path =
-        create_file_from_template(&current_dir, &template_name, path, &var_map, &config, force)?;
+        create_file_from_blueprint(&root, &blueprint_name, path, &var_map, &config, force)?;
 
     println!("Created {}", created_path.display());
     Ok(())
@@ -71,16 +80,19 @@ mod tests {
         let _ = fs::remove_dir_all(&temp_dir);
         let _ = fs::create_dir_all(&temp_dir);
 
-        let tmpl_dir = tomet_workspace::blueprint_dir(&temp_dir);
+        let tmpl_dir = temp_dir.join(".tomet/blueprints");
         fs::create_dir_all(&tmpl_dir).unwrap();
         let tmpl_file = tmpl_dir.join("rfc.blueprint.tmt");
         fs::write(
             &tmpl_file,
-            "@blueprint(rfc)\n@meta{\n  id: ${uuid(\"nil\")}\n  title: ${title}\n  author: ${vars.author}\n}\n\n#[ Motivation for ${title} ] {id: motivation}\n",
+            "@kind(blueprint)\n@blueprint(rfc)\n@meta{\n  id: ${uuid(\"nil\")}\n  title: ${title}\n  author: ${vars.author}\n}\n\n#[ Motivation for ${title} ] {id: motivation}\n",
         )
         .unwrap();
 
-        let cfg = PrinterConfig::default();
+        let cfg = PrinterConfig {
+            blueprints: vec![".tomet/blueprints/rfc.blueprint.tmt".to_string()],
+            ..PrinterConfig::default()
+        };
 
         let mut var_map = HashMap::new();
         var_map.insert(
@@ -92,7 +104,7 @@ mod tests {
             Value::Map(vec![("author".to_string(), Value::String("Bob".into()))]),
         );
 
-        let created = create_file_from_template(
+        let created = create_file_from_blueprint(
             &temp_dir,
             "rfc",
             Path::new("rfcs/001.tmt"),

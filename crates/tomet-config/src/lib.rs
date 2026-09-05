@@ -37,7 +37,39 @@ pub struct PrinterConfig {
     pub table_max_col_width: Option<usize>,
     pub table_align: Option<String>,
     pub macros: std::collections::HashMap<String, String>,
-    pub templates: std::collections::HashMap<String, String>,
+    /// Blueprint files this vault declares, as paths relative to the
+    /// config's own directory. Paths only: a blueprint names itself with
+    /// `@blueprint(X)`, so a name -> path map would write the name twice
+    /// and the path a third time. Same shape as Cargo's
+    /// `[workspace] members`.
+    pub blueprints: Vec<String>,
+    /// Vocabulary files this vault declares, by the same rule -- each one
+    /// names itself with `@vocabulary(ns)`.
+    pub vocabularies: Vec<String>,
+}
+
+/// Reads a declared list of paths. A single string is accepted as a
+/// one-element list, which is the only shorthand here -- it expands to
+/// the explicit form rather than restating it.
+fn collect_paths(value: &Value, out: &mut Vec<String>) {
+    match value {
+        Value::Seq(items) => {
+            for item in items {
+                if let Some(path) = item.as_str() {
+                    if !out.iter().any(|p| p == path) {
+                        out.push(path.to_string());
+                    }
+                }
+            }
+        }
+        other => {
+            if let Some(path) = other.as_str() {
+                if !out.iter().any(|p| p == path) {
+                    out.push(path.to_string());
+                }
+            }
+        }
+    }
 }
 
 impl PrinterConfig {
@@ -192,29 +224,11 @@ impl PrinterConfig {
                     }
                 }
             }
-            "templates" | "template" => {
-                if let Value::Map(entries) = value {
-                    for (tk, tv) in entries {
-                        if let Some(path) = tv.as_str() {
-                            cfg.templates.insert(tk.clone(), path.to_string());
-                        } else if let Some(path) = tv
-                            .get("path")
-                            .or_else(|| tv.get("template"))
-                            .and_then(|p| p.as_str())
-                        {
-                            cfg.templates.insert(tk.clone(), path.to_string());
-                        }
-                    }
-                }
+            "blueprints" => {
+                collect_paths(value, &mut cfg.blueprints);
             }
-            "types" => {
-                if let Value::Map(entries) = value {
-                    for (tk, tv) in entries {
-                        if let Some(path) = tv.get("template").and_then(|p| p.as_str()) {
-                            cfg.templates.insert(tk.clone(), path.to_string());
-                        }
-                    }
-                }
+            "vocabularies" => {
+                collect_paths(value, &mut cfg.vocabularies);
             }
             "elements" => {
                 if let Value::Map(elems) = value {

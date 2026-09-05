@@ -19,10 +19,7 @@
     bookmark = {
       style = one_line
     },
-    todo = {},
-    daily-note = {
-      template = "examples/blueprints/daily-note.blueprint.tmt"
-    }
+    todo = {}
   }
 }
 +++

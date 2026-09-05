@@ -39,8 +39,16 @@
     失敗を繰り返さないため。テストで固定済み。
 
 - [ ] 3. `tomet-semantics-resolver` に語彙の読み込み。
-      `.tomet/vocabularies/<X>.vocabulary.tmt` を名前で引く
-      (`blueprint_dir` と対称)。`@kind(X)` と `@use` から束縛を作る。
+      **慣習探索は却下された（著者の判断）。** vault が設定の
+      `vocabularies` にパスを並べ、各ファイルが `@vocabulary(ns)` で
+      自分の名前を名乗る。Cargo の `[workspace] members` の形。
+      名前 -> パスのマップは重複（名前がキー・パス・ファイル内の三箇所）。
+      理由: 慣習探索は**当たらなかったことが見えない**。`@kind(writ)` に
+      対してファイル名が `writ.vocabluary.tmt` だと、エラーは使用箇所で
+      N 回出て、原因の場所では出ない。宣言リストなら一度、書いた場所で出る。
+      blueprint も同じ形に揃え済み（下記）。
+      `PrinterConfig.vocabularies` は入った。読み込みと `Bindings` の
+      組み立てが残り。
 - [x] 4. `.tomet/vocabularies/writ.vocabulary.tmt` を本物として書く。
       `@layers` を宣言する。これが最初の実物になる。
 - [ ] 5. `validate_document_with(doc, &Vocabulary)`。既存の

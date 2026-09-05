@@ -208,15 +208,17 @@ pub enum Command {
         #[arg(long, conflicts_with = "in_place")]
         check: bool,
     },
-    /// Create a new .tmt document from a template or blueprint.
+    /// Create a new .tmt document from a blueprint.
     New {
         /// Target file path to create (defaults to "document.tmt" if omitted when --list is not used).
         #[arg(default_value = "document.tmt")]
         path: PathBuf,
-        /// Template or blueprint name (e.g. "daily-note", "rfc", or path to template).
+        /// Blueprint name, as the blueprint gives it in `@blueprint(...)`
+        /// (e.g. "daily-note", "rfc"). Resolved among the blueprints the
+        /// vault declares in `blueprints`, never searched for on disk.
         #[arg(short, long)]
-        template: Option<String>,
-        /// List available templates in workspace instead of creating a file.
+        blueprint: Option<String>,
+        /// List the blueprints this vault declares instead of creating a file.
         #[arg(short, long)]
         list: bool,
         /// Overwrite target file if it already exists.

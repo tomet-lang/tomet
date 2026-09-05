@@ -1,4 +1,4 @@
-//! Blueprint template extraction, transformation, and instantiation.
+//! Blueprint schema extraction, transformation, and instantiation.
 
 use std::collections::HashMap;
 
