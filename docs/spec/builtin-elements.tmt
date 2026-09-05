@@ -52,6 +52,8 @@
 @embed(file:@file)[alt]
 @codeblock(lang:@language)[ @code ]
 @blockquote[ @content ]
+@callout(@variant)[ @content ]     // 位置引数は variant。`{title:}` も取る
+@callout(variant:info, title:@string)[ @content ]
 
 ${func(args) ...}
 $func(args)
@@ -83,7 +85,6 @@ ${@var +-*/ ...}               // 未実装: 演算子は無い。算術は関�
 
 @icon(pack:lucide, name:@string)  // 未実装: 組み込みkindではなく、アイコン表示の特別処理もない
 @index()[ title ]                  // 未実装: 同上、目次生成などの特別処理はない
-@callout(variant:info)[ @content ] // 未実装: 同上、専用のスタイル分岐はない
 @style()
 @color()
 ```

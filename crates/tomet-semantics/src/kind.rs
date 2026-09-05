@@ -69,6 +69,27 @@ pub enum ElementKind {
     Mark,
     Codeblock,
     Blockquote,
+    /// `@callout(variant)[ ... ]` -- an admonition.
+    ///
+    /// Late to this list, and the list was the only thing that did not
+    /// know. `callout` is special-cased in eight places:
+    /// `positional::builtin_positional_arg_key` (`variant` is its
+    /// positional), the Markdown and Typst writers' `render_callout`,
+    /// the Markdown *reader*, which turns `> [!note]` into
+    /// `Sigil::named("callout")`, `tomet-format-printer`'s style branch,
+    /// two arms in `tomet-config`, and the LSP.
+    ///
+    /// The reader is what settles it: a Markdown round-trip produced an
+    /// element that validation then rejected as unknown. The three
+    /// writers already match `callout` in the same arm list as `heading`,
+    /// `codeblock` and `link`, on `kind.as_str()`, so joining the list
+    /// changes nothing for them.
+    ///
+    /// This records that the name exists and stands as a block. What its
+    /// variants are, and whether it ever gets styling of its own, is
+    /// still undecided -- `docs/spec/builtin-elements.tmt` used to say it
+    /// was not built in at all, which was the part that was false.
+    Callout,
     Table,
     Heading,
     Icon,
@@ -128,6 +149,7 @@ impl ElementKind {
             ElementKind::Mark => "mark",
             ElementKind::Codeblock => "codeblock",
             ElementKind::Blockquote => "blockquote",
+            ElementKind::Callout => "callout",
             ElementKind::Table => "table",
             ElementKind::Heading => "heading",
             ElementKind::OrderedList => "ol",
@@ -168,7 +190,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 29] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 30] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -200,6 +222,7 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 29] = [
     ("mark", ElementKind::Mark),
     ("codeblock", ElementKind::Codeblock),
     ("blockquote", ElementKind::Blockquote),
+    ("callout", ElementKind::Callout),
     ("table", ElementKind::Table),
     ("heading", ElementKind::Heading),
     ("ol", ElementKind::OrderedList),
@@ -315,8 +338,8 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
         Meta | Config | Settings | Use | Include | References | Blueprint | Links | Hr
-        | Codeblock | Blockquote | Table | Heading | OrderedList | UnorderedList | Kind
-        | Version | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
+        | Codeblock | Blockquote | Callout | Table | Heading | OrderedList | UnorderedList
+        | Kind | Version | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
         Em | Strong | Mark => Shape::Inline,
         // Either shape. A link, an embed or an icon alone on a line is
         // not a structural error -- it is how you show one file, one

@@ -1079,9 +1079,14 @@ mod tests {
         // an accepted completion is one that validates.
         assert!(items.iter().any(|i| i.label == "@meta"));
         assert!(items.iter().any(|i| i.label == "@link"));
-        // `callout` is not built-in, so it is no longer suggested: a bare
-        // name that is not built-in is an error now.
-        assert!(!items.iter().any(|i| i.label.ends_with("callout")));
+        // `callout` joined `BUILTIN_KINDS`, so it is offered again. It
+        // had been special-cased in eight places while the list did not
+        // know about it -- including the Markdown reader, which produced
+        // an element validation then called unknown.
+        assert!(items.iter().any(|i| i.label == "@callout"));
+        // `memo` really is not built in -- nothing special-cases it --
+        // so it is still not offered.
+        assert!(!items.iter().any(|i| i.label.ends_with("memo")));
     }
 
     #[test]
