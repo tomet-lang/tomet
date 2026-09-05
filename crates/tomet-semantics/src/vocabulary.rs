@@ -139,6 +139,38 @@ pub struct Bindings {
 }
 
 impl Bindings {
+    /// What `doc` has in scope, given every vocabulary available.
+    ///
+    /// Pure: the vocabularies arrive already parsed, so this is the half
+    /// a caller that cannot open a file can still run.
+    /// `tomet-resolver::bindings_for` is this plus reading them off disk,
+    /// and a wasm host that has the sources can pass them straight in.
+    ///
+    /// A document's `@kind(X)` binds the vocabulary calling itself `X`.
+    /// Everything else has to be asked for with `@use`.
+    pub fn for_document<I>(doc: &Document, available: I) -> Self
+    where
+        I: IntoIterator<Item = Vocabulary>,
+    {
+        let by_namespace: BTreeMap<String, Vocabulary> = available
+            .into_iter()
+            .map(|v| (v.namespace.clone(), v))
+            .collect();
+
+        let kind = crate::meta::document_kind(doc)
+            .and_then(|kind| by_namespace.get(&kind))
+            .cloned();
+
+        let mut used = BTreeMap::new();
+        for namespace in used_namespaces(doc) {
+            if let Some(vocab) = by_namespace.get(&namespace) {
+                used.insert(namespace, vocab.clone());
+            }
+        }
+
+        Bindings { kind, used }
+    }
+
     /// Resolves an element name against `std` and everything in scope.
     ///
     /// A bare name goes to `std` first and to the document's kind second.
@@ -189,6 +221,48 @@ impl Bindings {
         };
         vocab.elements.get(&name.name)
     }
+}
+
+/// The namespaces a document asks for with `@use`.
+///
+/// The argument is a path and the namespace is whatever that file calls
+/// itself, so this takes the file's stem as the link between the two.
+/// It is the weakest part of `@use` and will be replaced when `@use`
+/// resolves the path properly.
+fn used_namespaces(doc: &Document) -> Vec<String> {
+    let mut names = Vec::new();
+    for block in &doc.blocks {
+        let Block::Element(el) = block else { continue };
+        if classify_lenient(el) != ElementKind::Use {
+            continue;
+        }
+        let Some(args) = normalized_element_args(el) else {
+            continue;
+        };
+        let target = args
+            .as_str()
+            .map(str::to_string)
+            .or_else(|| {
+                args.get("target")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+            })
+            .or_else(|| {
+                args.get("file")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+            });
+        if let Some(target) = target {
+            let stem = target
+                .rsplit('/')
+                .next()
+                .unwrap_or(&target)
+                .trim_end_matches(".tmt")
+                .trim_end_matches(".vocabulary");
+            names.push(stem.to_string());
+        }
+    }
+    names
 }
 
 fn builtin(name: &str) -> Option<ElementKind> {
@@ -345,6 +419,48 @@ mod tests {
         assert!(
             b.classify(&name("std.layers")).is_err(),
             "std is not a fallback for everything in scope"
+        );
+    }
+
+    /// The point of `for_document`: a caller that cannot open a file can
+    /// still get the same answer by handing over the vocabularies.
+    ///
+    /// This is what the js/java/python bindings and `apps/web` needed --
+    /// they call the validator with nothing in scope, so every element a
+    /// vocabulary declares came back unknown. Correct, since nothing had
+    /// said it existed, but useless in an editor whose host had the files
+    /// all along.
+    #[test]
+    fn a_caller_that_cannot_read_files_can_pass_the_vocabularies_in() {
+        let doc = tomet_parser::parse_document("@kind(writ)\n\n@layers{ 1: [ \"a\" ] }\n")
+            .expect("document parses");
+
+        // Nothing in scope: `std` only, so the kind's element is unknown.
+        assert!(Bindings::default().classify(&name("layers")).is_err());
+
+        // The same document, with the vocabulary handed over.
+        let bound = Bindings::for_document(&doc, [vocab(WRIT)]);
+        assert_eq!(
+            bound.classify(&name("layers")),
+            Ok(ElementKind::Custom("writ.layers".into()))
+        );
+        assert_eq!(bound.classify(&name("link")), Ok(ElementKind::Link));
+        assert!(bound.classify(&name("nonesuch")).is_err());
+    }
+
+    /// A vocabulary that is available but not asked for stays out of
+    /// scope. Only the document's own kind binds without being written.
+    #[test]
+    fn an_available_vocabulary_is_not_in_scope_unless_the_document_asks() {
+        let deck = vocab("@vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
+        let doc =
+            tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n").expect("document parses");
+
+        let bound = Bindings::for_document(&doc, [vocab(WRIT), deck]);
+        assert!(bound.classify(&name("layers")).is_ok());
+        assert!(
+            bound.classify(&name("deck.ref")).is_err(),
+            "available is not the same as bound -- `@use` is what asks"
         );
     }
 

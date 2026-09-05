@@ -81,7 +81,6 @@ pub(crate) fn peek_list_marker(cur: &Cursor) -> Result<Option<(bool, Option<Valu
     eat_list_marker(&mut look)
 }
 
-
 pub(crate) fn parse_list(cur: &mut Cursor, ordered: bool) -> Result<Vec<Element>> {
     parse_list_internal(cur, ordered, 0)
 }

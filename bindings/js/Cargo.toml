@@ -16,6 +16,7 @@ tomet-markdown = { workspace = true }
 tomet-typst = { workspace = true }
 tomet-formatter = { workspace = true }
 tomet-printer = { workspace = true }
+tomet-semantics = { workspace = true }
 tomet-validator = { workspace = true }
 
 wasm-bindgen = { workspace = true }

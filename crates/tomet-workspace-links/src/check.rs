@@ -135,12 +135,10 @@ pub fn check_vault(
 
             let resolved = match link.kind {
                 LinkKind::Ref => resolve_ref_target(&link.target, &existing),
-                LinkKind::File | LinkKind::Embed => {
-                    existing.contains(&rebase_on_project_root(
-                        resolve_file_target(file, &link.target, project_root),
-                        project_root,
-                    ))
-                }
+                LinkKind::File | LinkKind::Embed => existing.contains(&rebase_on_project_root(
+                    resolve_file_target(file, &link.target, project_root),
+                    project_root,
+                )),
                 LinkKind::Tm => {
                     let path_part = link.target.split('#').next().unwrap_or(&link.target);
                     existing.contains(&rebase_on_project_root(

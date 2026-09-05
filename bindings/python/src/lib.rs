@@ -89,10 +89,36 @@ fn validate<'py>(py: Python<'py>, source: &str) -> PyResult<Bound<'py, PyAny>> {
     pythonize::pythonize(py, &diagnostics).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
+/// Validate `.tmt` source text against `std` plus the vocabularies given
+/// as source text.
+///
+/// Without them, `validate` knows only `std`, so every element a
+/// vocabulary declares comes back as unknown. A source that does not
+/// parse, or has no `@vocabulary(ns)` header, is skipped -- it binds no
+/// namespace. Check vocabularies themselves with `tomet check`.
+#[pyfunction]
+fn validate_with<'py>(
+    py: Python<'py>,
+    source: &str,
+    vocabularies: Vec<String>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let doc =
+        tomet_parser::parse_document(source).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let parsed = vocabularies.iter().filter_map(|src| {
+        tomet_parser::parse_document(src)
+            .ok()
+            .and_then(|d| tomet_semantics::Vocabulary::from_document(&d))
+    });
+    let bindings = tomet_semantics::Bindings::for_document(&doc, parsed);
+    let diagnostics = tomet_validator::validate_document_with(&doc, &bindings);
+    pythonize::pythonize(py, &diagnostics).map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
 /// Tomet Python bindings module.
 #[pymodule]
 fn tomet(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(loads, m)?)?;
+    m.add_function(wrap_pyfunction!(validate_with, m)?)?;
     m.add_function(wrap_pyfunction!(parse_document, m)?)?;
     m.add_function(wrap_pyfunction!(to_html, m)?)?;
     m.add_function(wrap_pyfunction!(to_markdown, m)?)?;

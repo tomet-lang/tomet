@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use tomet_ast::Document;
-use tomet_semantics::{Bindings, Vocabulary, document_kind};
+use tomet_semantics::{Bindings, Vocabulary};
 
 /// Every vocabulary `config` declares, with whatever went wrong.
 #[derive(Debug, Default)]
@@ -86,70 +86,12 @@ pub fn load_vocabularies(root: &Path, declared: &[String]) -> LoadedVocabularies
     loaded
 }
 
-/// The namespaces `doc` has in scope.
+/// The namespaces `doc` has in scope, from what was loaded off disk.
 ///
-/// Its `@kind(X)` binds the vocabulary calling itself `X`, with no
-/// declaration in the document -- the kind is already on the first line,
-/// which is what earns its names the right to be written bare. Everything
-/// else has to be asked for with `@use`, and is always written out.
+/// The decision itself is `Bindings::for_document`, which is pure. This
+/// only supplies what reading the filesystem found, so a caller that
+/// cannot read one -- a wasm host, say -- can call that directly with
+/// vocabularies it obtained some other way.
 pub fn bindings_for(doc: &Document, loaded: &LoadedVocabularies) -> Bindings {
-    let kind = document_kind(doc)
-        .and_then(|kind| loaded.by_namespace.get(&kind))
-        .cloned();
-
-    let mut used = BTreeMap::new();
-    for namespace in used_namespaces(doc) {
-        if let Some(vocab) = loaded.by_namespace.get(&namespace) {
-            used.insert(namespace, vocab.clone());
-        }
-    }
-
-    Bindings { kind, used }
-}
-
-/// The namespaces a document asks for with `@use`.
-///
-/// The argument is a path, and the namespace is whatever that file calls
-/// itself -- so this resolves the path back through what was declared,
-/// rather than guessing a name from the filename.
-fn used_namespaces(doc: &Document) -> Vec<String> {
-    use tomet_ast::Block;
-    use tomet_semantics::{ElementKind, classify_lenient, normalized_element_args};
-    use tomet_tree::ValueExt;
-
-    let mut names = Vec::new();
-    for block in &doc.blocks {
-        let Block::Element(el) = block else { continue };
-        if classify_lenient(el) != ElementKind::Use {
-            continue;
-        }
-        let Some(args) = normalized_element_args(el) else {
-            continue;
-        };
-        let target = args
-            .as_str()
-            .map(str::to_string)
-            .or_else(|| {
-                args.get("target")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string)
-            })
-            .or_else(|| {
-                args.get("file")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string)
-            });
-        if let Some(target) = target {
-            // The declared list is keyed by namespace, and a `@use` names
-            // a file. The file's stem is the best link available until
-            // `@use` resolution reads the file itself.
-            let stem = Path::new(&target)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .map(|n| n.trim_end_matches(".tmt").trim_end_matches(".vocabulary"))
-                .unwrap_or(&target);
-            names.push(stem.to_string());
-        }
-    }
-    names
+    Bindings::for_document(doc, loaded.by_namespace.values().cloned())
 }

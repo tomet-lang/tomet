@@ -1,11 +1,9 @@
 //! Parsing for headings (`#[...]`) and thematic breaks (`---`).
 
-use crate::error::Result;
 use crate::element::{parse_groups, parse_sugar_body};
+use crate::error::Result;
 use crate::inline::{Stop, parse_inline_seq};
-use crate::value::{
-    err, parse_value_at, skip_inline_ws, skip_ws_newlines_and_comments,
-};
+use crate::value::{err, parse_value_at, skip_inline_ws, skip_ws_newlines_and_comments};
 use tomet_ast::{Element, ElementValue, Placement, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};

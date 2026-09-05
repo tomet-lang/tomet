@@ -21,8 +21,8 @@
 
 use std::path::Path;
 use tomet_tests::{
-    ANY_ERROR, KNOWN_TS_ERRORS, KNOWN_UNPARSEABLE, MISSING_NODE, corpus, is_known_unparseable, known_ts_errors,
-    read_fixture, ts_error_texts, ts_parse,
+    ANY_ERROR, KNOWN_TS_ERRORS, KNOWN_UNPARSEABLE, MISSING_NODE, corpus, is_known_unparseable,
+    known_ts_errors, read_fixture, ts_error_texts, ts_parse,
 };
 
 #[test]
