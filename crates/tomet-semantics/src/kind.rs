@@ -111,9 +111,29 @@ impl ElementKind {
 /// `builtin_kind_round_trips_through_as_str` below, which checks every
 /// entry here).
 ///
-/// Bare names are reserved for exactly this list. A user-defined element
-/// must be namespaced (`deck.bookmark`), which is why an unrecognized bare
-/// name is an error rather than a `Custom` kind.
+/// This is the `std` namespace. `@link` is shorthand for `@std.link`, and
+/// bare names resolve here and nowhere else -- a user-defined element must
+/// be namespaced (`deck.bookmark`), which is why an unrecognized bare name
+/// is an error rather than a `Custom` kind. The only other namespace whose
+/// names may be written bare is the document's own `@kind`, and `std` wins
+/// any collision between the two: a vocabulary may not declare a name that
+/// appears here, so the shorthand is never ambiguous.
+///
+/// **Why `std` lives in Rust rather than in a `@vocabulary(std)` document,
+/// and what has to change.** These entries carry behavior, not just shape:
+/// `@link`'s target kind is derived from the target string's own scheme
+/// prefix (`crate::target::target_scheme`), `@meta` selects an embedded
+/// format, `@codeblock` takes a raw body. A vocabulary document declares
+/// names, arguments and constraints; it cannot yet declare any of that, so
+/// moving `std` into one would either lose the behavior or smuggle it in
+/// under a key that means "call into the binary".
+///
+/// That is a limit of the vocabulary format, not a property of `std`, and
+/// the author's decision is that it has to go: `@vocabulary(std)` must
+/// eventually be writable. Until then, treat this list as the one
+/// hard-coded namespace and not as a permanent exemption. The useful test
+/// while designing the format is to try to express `@link` in it -- what
+/// that cannot say is exactly what is still missing.
 pub const BUILTIN_KINDS: [(&str, ElementKind); 22] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),

@@ -277,6 +277,69 @@ None yet. Two halves are checkable: no document carries `@blueprint`
 without `@kind(blueprint)`, and `@blueprint`'s args are a bare positional
 rather than a `target:`/`kind:` map.
 
+##[ explicit-form-first ]
+
+Build the explicit form first. A shorthand comes afterward, as an
+alternative that expands to it, and nothing is ever written twice.
+
+The test that separates the two:
+
+- A **shorthand** expands to the explicit form. `tomet fmt` can do it
+  mechanically, because the explicit form holds everything the shorthand
+  meant.
+- A **duplicate** restates the explicit form. Nothing can repair it,
+  because when the two disagree there is no ground for saying which one
+  is right.
+
+If a second spelling cannot be expanded into the first, it is not a
+shorthand, whatever it is called.
+
+`docs/why/dev.tmt` states the same thing as a commitment about the
+language, for the people using it. This entry is the working rule: the
+test above, and what it has already caught here. Neither restates the
+other -- if this entry ever starts explaining *why the language is like
+that*, the explanation belongs there instead.
+
+---[ Why ]---
+
+Every asymmetry this repository has had to remove was a duplicate that
+had been mistaken for a convenience.
+
+- `@meta{ type: }` beside `@kind(...)`. The same fact in two places; by
+  the time anyone counted, eleven files under `docs/` had drifted back to
+  the old spelling.
+- `@blueprint`'s three argument forms -- positional, `target:`, `kind:`.
+  Three ways to say one thing, none of them chosen.
+- Three template lookup directories times three filename spellings, which
+  is how `docs/docs.settings.tmt` pointed at a file that does not exist
+  and still resolved: the misses were invisible and one hit.
+- `required: [ name ]` and `positional: [ name ]` hoisted out of an
+  `args` map. The intent was good -- a reader wants those two answers
+  without scanning every argument -- but a hand-written summary of
+  derivable facts is a duplicate, and `positional` went further by
+  stating an order the argument list already had. What a reader wants is
+  a *view*, and a view is generated, not stored.
+
+Shorthands, by contrast, have cost nothing:
+
+- `@link` for `@std.link`, and a kind's own names inside a document that
+  declares that kind. Both expand, and both resolve without leaving the
+  file.
+- An argument's position in a declaration, rather than a separate list
+  naming the order.
+
+The rule also says which half to build when only one can be afforded: the
+explicit one. A shorthand with no explicit form behind it has nowhere to
+expand to, and becomes the only spelling by accident rather than by
+choice.
+
+---[ Guard ]---
+
+None mechanical for the general rule. The checkable half is per feature:
+a shorthand must have a formatter expansion, and a test that the
+expansion round-trips. A shorthand `tomet fmt` cannot expand is a second
+spelling wearing the word.
+
 ##[ kind-not-meta-type ]
 
 A document declares its kind with a top-level `@kind(...)`. The `type:`
