@@ -437,6 +437,30 @@ pub fn load_config_from_str(src: &str) -> Result<PrinterConfig, ConfigError> {
     Ok(PrinterConfig::from_doc(&doc))
 }
 
+/// The config that governs `path`, for a tool about to act on `src`.
+///
+/// The nearest `default.config.tmt`/`tomet.config.tmt` up the tree wins,
+/// because that file's position is what says where the vault begins.
+/// With no vault to find, the document's own `@config` is used, and
+/// failing that the defaults.
+///
+/// This exists so there is one answer to the question. There were two:
+/// the LSP resolved a config before formatting and `tomet format` did
+/// not, so a file the editor wrote on save was a file `format --check`
+/// rejected -- with `table.adjust_width`, `max_col_width` and
+/// `always_newline` all live in this repository's own config, the two
+/// disagreed on real documents.
+pub fn config_for(path: Option<&std::path::Path>, src: &str) -> PrinterConfig {
+    if let Some(path) = path {
+        if let Some((cfg, _, _)) = find_config_file(path) {
+            return cfg;
+        }
+    }
+    tomet_parser::parse_document(src)
+        .map(|doc| PrinterConfig::from_doc(&doc))
+        .unwrap_or_default()
+}
+
 /// Searches `start` and its parent directories for `default.config.tmt` or `tomet.config.tmt`.
 /// Returns `(PrinterConfig, config_file_path, config_directory_path)`.
 pub fn find_config_file(
