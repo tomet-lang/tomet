@@ -505,9 +505,18 @@ The first slice shipped. What is standing:
   element were one-to-one: `bookmark`, `dirs`, `node-graph`, `scenario`,
   `video`, plus open `idea`. That closes this file's old open question.
 
+- **`singleton` and `region` are enforced** (2026-09-06). Both had been
+  declared in `docs/spec/builtin-settings.tmt` and read by nothing, under
+  a `placement:` key carrying three concepts. `std` has its own tables
+  (`builtin_singleton`, `builtin_region`) and a vocabulary's `@element`
+  supplies the same two for what it declares -- one rule, two sources.
+  The preamble is the run of preamble-region elements at the top; the
+  first block that is not one of them ends it. Enabling both cost nothing:
+  zero hits across every real document, and four in `tests/fixtures`,
+  which put `@use` and `@config` mid-document on purpose.
+
 Not built: `@args`/`@data`/`@content` parse and are ignored -- the three
 slots are described in `docs/spec/vocabulary.tmt` and read by nothing.
-`singleton` and `region` are read off a declaration and enforced nowhere.
 `@include` is recognized and expands nothing.
 
 ### The principle behind all of it

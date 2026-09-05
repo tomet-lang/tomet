@@ -396,6 +396,40 @@ impl From<Placement> for Shape {
     }
 }
 
+/// Whether at most one of `kind` may appear in a document.
+///
+/// The six the spec has always declared, and nothing else.
+/// `docs/spec/builtin-settings.tmt` listed them as `singleton: true`
+/// while no code read the word; this is that list, in code.
+///
+/// `@use` is deliberately absent, and is the proof the two axes are
+/// separate: it may only sit in the preamble, and you write several,
+/// because you bring in several vocabularies.
+pub fn builtin_singleton(kind: &ElementKind) -> bool {
+    use ElementKind::*;
+    matches!(
+        kind,
+        Kind | Version | Meta | Config | Settings | Blueprint | Vocabulary
+    )
+}
+
+/// Where in a document `kind` may appear.
+///
+/// The same six, plus the elements that bring something into scope. What
+/// the spec spelled `placement: head` -- a name that also carried the
+/// block/inline rule, which is why the key is being retired in favour of
+/// these two plus `display`.
+pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
+    use crate::vocabulary::Region;
+    use ElementKind::*;
+    match kind {
+        Kind | Version | Meta | Config | Settings | Blueprint | Vocabulary | Use | Include => {
+            Region::Preamble
+        }
+        _ => Region::Body,
+    }
+}
+
 /// Reports an element put where its kind cannot go -- a `meta` in the
 /// middle of a paragraph, or a `heading` standing as a block inside one.
 ///

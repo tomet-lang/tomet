@@ -142,6 +142,14 @@ kind に紐づかない語彙、つまり複数の kind で共有するものだ
 三つは独立している。`@use` は `region: preamble` かつ `singleton: false` である
 — 語彙は複数持ち込むのだから。
 
+`region` と `singleton` は実装済みで、`tomet check` が報告する。`display` も
+含めて、std は組み込みの表（`builtin_singleton` / `builtin_region` /
+`required_shape`）を、語彙で宣言された要素は `@element` の宣言を見る。
+一つの規則に二つの出どころがあるだけで、規則が二つあるわけではない。
+
+前文（preamble）は、文書の先頭に並ぶ `region: preamble` の要素の連なりを指す。
+その並びでない最初のブロックが前文を終わらせる。
+
 `display` は**規則**であって、その出現がどこにあったかという**事実**ではない。
 事実は位置から導出され、要素に記録される。規則と事実が食い違ったときに
 報告が出る。
