@@ -74,6 +74,8 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Valida
         }
     });
 
+    check_singletons_and_regions(doc, bindings, &mut errors);
+
     for (id, span) in collect_ids(doc) {
         if let Some((_, first)) = seen.iter().find(|(seen_id, _)| *seen_id == id) {
             errors.push(ValidationError::DuplicateId {
@@ -87,6 +89,86 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Valida
     }
 
     errors
+}
+
+/// Enforces the `singleton` and `region` axes.
+///
+/// Both were declared in `docs/spec/builtin-settings.tmt` and read by
+/// nothing, under a `placement:` key that also carried the block/inline
+/// rule -- three concepts in one word, which is why that key is being
+/// retired in favour of `display`, `region` and `singleton`.
+///
+/// The preamble is the run of preamble-region elements at the top of the
+/// document. The first top-level block that is not one of them ends it,
+/// and anything preamble-only after that point, or nested inside
+/// content, is out of place.
+fn check_singletons_and_regions(
+    doc: &Document,
+    bindings: &Bindings,
+    errors: &mut Vec<ValidationError>,
+) {
+    use tomet_ast::Block;
+    use tomet_semantics::Region;
+
+    let constraints = |el: &tomet_ast::Element| -> Option<(String, bool, Region)> {
+        let name = el.sigil.name()?;
+        let kind = classify_in(el, bindings).ok()?;
+        // A vocabulary says what it wants; `std` has its own table.
+        let (singleton, region) = match bindings.declaration(name) {
+            Some(decl) => (decl.singleton, decl.region),
+            None => (
+                tomet_semantics::builtin_singleton(&kind),
+                tomet_semantics::builtin_region(&kind),
+            ),
+        };
+        Some((name.to_string(), singleton, region))
+    };
+
+    let mut in_preamble = true;
+    let mut seen: Vec<(String, tomet_ast::Span)> = Vec::new();
+
+    // `in_place` is passed in rather than captured: the closure would
+    // otherwise borrow `in_preamble` for the whole loop.
+    let mut visit = |el: &tomet_ast::Element, in_place: bool| {
+        let Some((name, singleton, region)) = constraints(el) else {
+            return;
+        };
+        if singleton {
+            if let Some((_, first)) = seen.iter().find(|(seen_name, _)| *seen_name == name) {
+                errors.push(ValidationError::DuplicateSingleton {
+                    name: name.clone(),
+                    first: *first,
+                    duplicate: el.span,
+                });
+            } else {
+                seen.push((name.clone(), el.span));
+            }
+        }
+        if region == Region::Preamble && !in_place {
+            errors.push(ValidationError::OutsidePreamble {
+                name,
+                span: el.span,
+            });
+        }
+    };
+
+    for block in &doc.blocks {
+        match block {
+            Block::Element(el) => {
+                let still_preamble = constraints(el)
+                    .map(|(_, _, region)| region == Region::Preamble)
+                    .unwrap_or(false);
+                visit(el, in_preamble);
+                if !still_preamble {
+                    in_preamble = false;
+                }
+            }
+            other => {
+                in_preamble = false;
+                tomet_tree::for_each_element_in_block(other, |el| visit(el, false));
+            }
+        }
+    }
 }
 
 /// Runs all validation rules directly against a Concrete Syntax Tree ([`SyntaxNode`])
@@ -139,6 +221,74 @@ mod tests {
             &errors[0],
             ValidationError::DuplicateId { id, .. } if id == "a"
         ));
+    }
+
+    /// `singleton` was declared for six elements and enforced nowhere,
+    /// so two `@meta` -- or two `@kind`, which is two answers to what the
+    /// document is -- passed every check this project had.
+    #[test]
+    fn a_second_singleton_is_reported() {
+        let doc = parse("@kind(note)\n@meta{a: 1}\n@meta{b: 2}\n\n#[ T ]\n");
+        let errors = validate_document(&doc);
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(matches!(
+            &errors[0],
+            ValidationError::DuplicateSingleton { name, .. } if name == "meta"
+        ));
+    }
+
+    /// A vocabulary's own `singleton: true` is enforced the same way. The
+    /// builtin table and a declaration are two sources for one rule, not
+    /// two rules.
+    #[test]
+    fn a_vocabularys_singleton_is_enforced_too() {
+        let vocab = tomet_parser::parse_document(
+            "@kind(vocabulary)\n@vocabulary(deck)\n\n@element(spread){ singleton: true }[ One. ]\n",
+        )
+        .expect("vocabulary parses");
+        let bindings = Bindings {
+            kind: tomet_semantics::Vocabulary::from_document(&vocab),
+            ..Bindings::default()
+        };
+
+        let doc = parse("@kind(deck)\n\n#[ T ]\n\n@spread{}\n@spread{}\n");
+        let errors = validate_document_with(&doc, &bindings);
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(matches!(
+            &errors[0],
+            ValidationError::DuplicateSingleton { name, .. } if name == "spread"
+        ));
+    }
+
+    /// The preamble is the run of preamble-region elements at the top.
+    /// The first block that is not one of them ends it.
+    #[test]
+    fn a_preamble_element_after_the_body_is_reported() {
+        let doc = parse("@kind(note)\n\n#[ T ]\n\n@use(deck)\n");
+        let errors = validate_document(&doc);
+        assert!(
+            errors.iter().any(
+                |e| matches!(e, ValidationError::OutsidePreamble { name, .. } if name == "use")
+            ),
+            "{errors:?}"
+        );
+    }
+
+    /// Several `@use` in the preamble is fine -- you bring in several
+    /// vocabularies. That `use` is preamble-only and not a singleton is
+    /// what proves the two axes are independent.
+    #[test]
+    fn several_preamble_elements_are_fine_when_they_are_not_singletons() {
+        let doc = parse("@kind(note)\n@use(deck)\n@use(cards)\n\n#[ T ]\n");
+        let errors = validate_document(&doc);
+        assert!(
+            !errors.iter().any(|e| matches!(
+                e,
+                ValidationError::DuplicateSingleton { .. }
+                    | ValidationError::OutsidePreamble { .. }
+            )),
+            "{errors:?}"
+        );
     }
 
     /// A document with `deck` in scope.

@@ -40,6 +40,25 @@ pub enum ValidationError {
         unbound_namespace: Option<String>,
         span: Span,
     },
+    /// A second copy of an element that may appear at most once.
+    ///
+    /// `singleton` was declared in `docs/spec/builtin-settings.tmt` for
+    /// six elements and enforced nowhere, so a document with two `@meta`
+    /// -- or two `@kind`, which is two answers to what the document is --
+    /// passed every check this project had.
+    DuplicateSingleton {
+        name: String,
+        first: Span,
+        duplicate: Span,
+    },
+    /// An element that may only sit in the preamble, found after the
+    /// document's body has started.
+    ///
+    /// The preamble is the run of such elements at the top of the file;
+    /// the first block that is not one of them ends it. A `@kind` below
+    /// that point is a directive nobody reading top-down would meet in
+    /// time.
+    OutsidePreamble { name: String, span: Span },
     /// An element written with the wrong sigil for its shape -- `@meta`
     /// instead of `#meta`, or `#em` instead of `@em`.
     ShapeMismatch {
@@ -59,6 +78,8 @@ impl ValidationError {
             ValidationError::MissingRequiredSection { span, .. } => *span,
             ValidationError::UnknownElement { span, .. } => *span,
             ValidationError::ShapeMismatch { span, .. } => *span,
+            ValidationError::DuplicateSingleton { duplicate, .. } => *duplicate,
+            ValidationError::OutsidePreamble { span, .. } => *span,
         }
     }
 }
@@ -110,6 +131,20 @@ impl fmt::Display for ValidationError {
                         name: name.clone(),
                         unbound_namespace: unbound_namespace.clone(),
                     }
+                )
+            }
+            ValidationError::DuplicateSingleton { name, first, .. } => {
+                write!(
+                    f,
+                    "`{name}` may appear once in a document; the first is at {}:{}",
+                    first.start.line, first.start.column
+                )
+            }
+            ValidationError::OutsidePreamble { name, .. } => {
+                write!(
+                    f,
+                    "`{name}` belongs in the preamble -- before the document's body \
+                     starts, not after it"
                 )
             }
             ValidationError::ShapeMismatch {

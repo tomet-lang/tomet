@@ -26,6 +26,16 @@ pub fn for_each_element(doc: &Document, mut f: impl FnMut(&Element)) {
     let _ = walk_document(doc, &mut visitor);
 }
 
+/// [`for_each_element`] over one [`Block`], for callers that walk the
+/// document's own top level themselves and need the elements below it.
+pub fn for_each_element_in_block(block: &Block, mut f: impl FnMut(&Element)) {
+    let mut visitor = |el: &Element| -> ControlFlow<()> {
+        f(el);
+        ControlFlow::Continue(())
+    };
+    let _ = walk_block(block, &mut visitor);
+}
+
 macro_rules! propagate {
     ($e:expr) => {
         match $e {
