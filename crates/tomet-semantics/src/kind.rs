@@ -26,6 +26,25 @@ pub enum ElementKind {
     /// `@references[...]` -- the container for remote connections.
     References,
     Blueprint,
+    /// `@vocabulary(ns){...}` -- the header of a vocabulary document,
+    /// naming the namespace it declares. See `docs/spec/vocabulary.tmt`.
+    Vocabulary,
+    /// `@element(name){...}[prose]` -- one element declared by a
+    /// vocabulary.
+    Element,
+    /// `@param(name){type: ...}` -- one named, typed entry, in either
+    /// `@args` or `@data`. Parameter is the declaration side; argument is
+    /// the call side, which is why the surface slot stays `(args)`.
+    Param,
+    /// `@args{...}` -- inside `@element`, the description of that
+    /// element's `(args)` slot.
+    Args,
+    /// `@data{...}` -- inside `@element`, the description of that
+    /// element's `{...}`/`+++...+++` slot.
+    Data,
+    /// `@content{...}` -- inside `@element`, the description of that
+    /// element's `[content]` slot.
+    Content,
     Links,
     /// The one officially-supported link element, `@link(target:...)`
     /// (or the positional `@link(...)` shorthand -- see
@@ -84,6 +103,12 @@ impl ElementKind {
             ElementKind::Import => "import",
             ElementKind::References => "references",
             ElementKind::Blueprint => "blueprint",
+            ElementKind::Vocabulary => "vocabulary",
+            ElementKind::Element => "element",
+            ElementKind::Param => "param",
+            ElementKind::Args => "args",
+            ElementKind::Data => "data",
+            ElementKind::Content => "content",
             ElementKind::Links => "links",
             ElementKind::Link => "link",
             ElementKind::Embed => "embed",
@@ -134,7 +159,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 22] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 28] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -143,6 +168,18 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 22] = [
     ("import", ElementKind::Import),
     ("references", ElementKind::References),
     ("blueprint", ElementKind::Blueprint),
+    // The vocabulary document's own six. They are here rather than in a
+    // `@vocabulary(vocabulary)` document because reading that document
+    // would need the machinery it defines. The cost is that a kind's
+    // vocabulary can no longer declare any of these six names -- a
+    // namespace brought in with `@use` still can, since it is never
+    // written bare.
+    ("vocabulary", ElementKind::Vocabulary),
+    ("element", ElementKind::Element),
+    ("param", ElementKind::Param),
+    ("args", ElementKind::Args),
+    ("data", ElementKind::Data),
+    ("content", ElementKind::Content),
     ("links", ElementKind::Links),
     ("link", ElementKind::Link),
     ("embed", ElementKind::Embed),
@@ -252,7 +289,7 @@ pub fn is_directive(kind: &ElementKind) -> bool {
     use ElementKind::*;
     matches!(
         kind,
-        Version | Kind | Meta | Config | Settings | Import | Blueprint
+        Version | Kind | Meta | Config | Settings | Import | Blueprint | Vocabulary
     )
 }
 
@@ -267,9 +304,8 @@ fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
         Meta | Config | Settings | Import | References | Blueprint | Links | Hr | Codeblock
-        | Blockquote | Table | Heading | OrderedList | UnorderedList | Kind | Version => {
-            Shape::Block
-        }
+        | Blockquote | Table | Heading | OrderedList | UnorderedList | Kind | Version
+        | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
         Em | Strong | Mark | Link | Embed | Icon => Shape::Inline,
         Custom(_) | Bare | Interp => return None,
     })

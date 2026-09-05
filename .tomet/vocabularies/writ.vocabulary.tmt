@@ -1,0 +1,19 @@
+@kind(vocabulary)
+@vocabulary(writ){ version: "1.0.0" }
+
+@element(layers){
+  display: block
+  singleton: true
+}[
+  各クレートがどの層にいるか。上の層は下の層にだけ依存できる。
+  ルートの `.writ.tmt` の `crate-layering` が唯一の書き手で、`twrit check`
+  がこれを読んでワークスペースの `[dependencies]` と突き合わせる。
+]
+
+@element(pure){
+  display: block
+  singleton: true
+}[
+  そのクレートの依存閉包が I/O をできる何かを持たないという宣言。
+  `crates/tomet-syntax-parser/.writ.tmt` の `parser-purity` が使う。
+]
