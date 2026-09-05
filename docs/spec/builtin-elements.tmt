@@ -77,8 +77,8 @@ ${@var +-*/ ...}               // 未実装: 演算子は無い。算術は関�
   export: { type: commonmark, path: "README.md" }
 )
 // @import は二つの仕事を一語に負わせていた。分けて、名前を別にした。
-@use(@file)                   // 未実装: 語彙を名前空間として束縛する
-@use(@file){ as: @string }    // 未実装: as: は名前が衝突したときの逃げ道だけ
+@use(@namespace)              // 語彙を scope に入れる。パスではなく名前空間名。
+@use(@namespace){ as: @string } // as: は名前が衝突したときの逃げ道だけ
 @include(@file)               // 未実装: 他の文書をここに展開する
 
 @tag{}                            // 未実装: 組み込みkindではない。書けるが汎用要素として扱われる

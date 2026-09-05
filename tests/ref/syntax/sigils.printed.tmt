@@ -14,7 +14,7 @@ id: doc-sigils
 
 @deck.bookmark(name: foo, count: 3)[名前空間つき]
 
-@use(./deck.tmt){ as: deck }
+@use(deck)
 
 #[インライン要素]
 

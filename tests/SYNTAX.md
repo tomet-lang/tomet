@@ -204,7 +204,7 @@ Block  @deck.bookmark
 検証:
 
 ```
-unknown element `bookmark`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.bookmark`), or declare the vocabulary that has it and bind it with `@use`
+`deck.bookmark`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `@use(deck)`
 ```
 
 ### 名前空間は多段でもよい
@@ -221,7 +221,7 @@ Block  @a.b.c
 検証:
 
 ```
-unknown element `c`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.c`), or declare the vocabulary that has it and bind it with `@use`
+`a.b.c`: the namespace `a.b` is not in scope -- declare its vocabulary in `vocabularies` and write `@use(a.b)`
 ```
 
 ### 行頭にあっても、後ろに続きがあればブロックにならない。段落の書き出しとして読む
@@ -293,7 +293,7 @@ Paragraph
 検証:
 
 ```
-unknown element `badge`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.badge`), or declare the vocabulary that has it and bind it with `@use`
+`deck.badge`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `@use(deck)`
 ```
 
 ## 文字列に落ちる場合
@@ -524,7 +524,7 @@ Block  @deck.card
 検証:
 
 ```
-unknown element `card`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.card`), or declare the vocabulary that has it and bind it with `@use`
+`deck.card`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `@use(deck)`
 ```
 
 ### 空のグループ
