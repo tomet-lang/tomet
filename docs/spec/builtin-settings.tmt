@@ -1,171 +1,147 @@
 @kind(settings)
 
-/* Tomet 設定DSL (Config DSL / Schema Specification)
+/* Tomet 設定DSL (Config DSL)
 
-   このページの `elements` は置き換え予定である。要素の語彙は `@vocabulary`
-   が宣言するものになり、この面には残らない。特に:
-   - `placement:` は実装されるのではなく削除される。`head` は領域の規則、
-     `block`/`inline` は形の規則で、同じ軸の値ではない。置き換えの
-     `region` と `display` は実装済み。
-   - `singleton:` は残るが、置き場所が `@vocabulary` の `@element` に移る。
-     こちらも実装済みで、`tomet check` が二つ目を報告する。
-   - `required:` / `positional:` は引数ごとの `@param` に吸収される。
-     名前のリストを別に持つと、同じ事実が三箇所に住むため。
-   @link(file:./vocabulary.tmt)[`spec/vocabulary.tmt`] を参照。
+   `@settings` は **Tomet がどう振る舞うか**を書く場所である。整形、マクロ、
+   vault が持つファイルの一覧。文書自身について言うことは `@config` が持ち、
+   どの要素名が存在するかは @link(file:./vocabulary.tmt)[`spec/vocabulary.tmt`]
+   の `@vocabulary` が持つ。
 
-   要素スキーマ定義の特徴:
-   - 必須フィールド一括指定: `required: [title, id]` (JSON Schema / OpenAPI 標準に準拠)
-   - 位置引数指定: `positional: [title]`
-   - 埋め込みフォーマット: `#settings(format: json)` または `#settings(format: yaml)` の併用サポート */
+   このページは `tomet-config` の `PrinterConfig::apply_entry` が実際に読む
+   キーだけを載せる。読む側が無いキーはそう書く。 */
 
+#[ 全体の形 ]
+
+`@settings` と `@config` は同じキー空間を読む。値は `{...}` でも `+++` の
+中の JSON / TOML / YAML でもよい。
+
+```tm
 @settings{
-  // 実際に Sigil を持つ「要素」(tomet_semantics::ElementKind)の一覧。
-  // 名前で識別できるものだけがここに乗る -- @T/@name で誰でも増やせる。
-  elements: {
-    kind: {
-      // 文書の種別。この文書を検証するスキーマを選ぶ。
-      // 値は文字列で、`j.daily` のような名前空間つきも単なる文字列。
-      // 効くのは先頭のトップレベル `@kind` 一つだけ (tomet_semantics::document_kind)。
-      // 未実装: placement/singleton はまだ強制されない。`tomet check` は
-      // パースしかせず、singleton の実装はどこにも無い。
-      args: { kind: { type: string } },
-      required: [ kind ],
-      positional: [ kind ],
-      placement: head,
-      singleton: true
-    },
-    version: {
-      // 構文バージョン。ワークスペース直下の設定文書に一度書けば全体に効くので、
-      // 個々の文書には書かない。
-      // 値は文字列・整数・小数のいずれでもよく (`@version(1.0)` は小数)、
-      // 読み出し時に文字列へ正規化される。
-      // 未実装: placement/singleton は kind と同じくまだ強制されない。
-      args: { version: { type: string } },
-      required: [ version ],
-      positional: [ version ],
-      placement: head,
-      singleton: true
-    },
-    blueprint: {
-      // 位置引数は生成物の kind。`target` に正規化される -- `kind` ではない。
-      // すぐ上に `@kind(blueprint)` が並ぶので、そこで `kind:` を使うと
-      // 「このファイルの種別」と「生成物の種別」が二行のうちに二度出てくる。
-      // `embed`/`link` も位置引数を `target` に落とすので、語彙は増えない。
-      args: { target: { type: string } },
-      required: [ target ],
-      positional: [ target ],
-      // 雛形自身についての情報。対象は args 側であってここではない。
-      values: { version: string, description: string },
-      placement: head,
-      singleton: true
-    },
-    settings: {
-      args: { target: { type: string } },
-      required: [ target ],
-      values: any,
-      placement: head,
-      singleton: true
-    },
-    config: {
-      // args reads format, style, and export ({ type, path }).
-      args: {
-        format: [ json, toml, yaml ],
-        export: {
-          type: [ commonmark, html ],
-          path: string
-        }
-      },
-      placement: head,
-      singleton: true
-    },
-    meta: {
-      // meta の {value} は現状どのconsumerからも読まれない
-      // (html/markdownどちらも素通りする)。id はここでは将来案。
-      // `type` はここには無い。文書の種別は `@kind` が持つ。
-      args: { format: [ json, toml, yaml ] },
-      values: { id: uuid },
-      placement: head,
-      singleton: true
-    },
-    // `@link` という明示名には特別な意味は無い。実際に特別レンダリング
-    // されるのは url/file/ref (と、名前省略時の @(url:...) 等のキー推論)。
-    url: {
-      args: { target: { type: string } },
-      required: [ target ],
-      content: inline,
-      placement: inline
-    },
-    file: {
-      args: { target: { type: string } },
-      required: [ target ],
-      content: inline,
-      placement: inline
-    },
-    ref: {
-      args: { target: { type: string } },
-      required: [ target ],
-      content: inline,
-      placement: inline
-    },
-    embed: {
-      // src には file/url のみ使われる(refでは解決されない)
-      args: { target: { type: string } },
-      required: [ target ],
-      content: inline,
-      placement: inline
-    },
-    hr: {
-      content: inline,
-      placement: block
-    },
-    em: {
-      content: inline,
-      placement: inline
-    },
-    strong: {
-      content: inline,
-      placement: inline
-    },
-    mark: {
-      content: inline,
-      placement: inline
-    },
-    codeblock: {
-      args: { lang: { type: string } },
-      content: raw,
-      placement: block
-    },
-    blockquote: {
-      content: raw,
-      placement: block
-    }
-  },
+  format: { heading: { space_inside_brackets: true } }
+}
 
-  // 見出し/リスト/インラインコードのような構文プリミティブは Sigil を
-  // 持たず classify() の対象にもならない -- @T/@name のように誰でも
-  // 追加できる「要素」ではないので、elements とは別枠にした。
-  primitives: {
-    heading: {
-      placement: block,
-      content: inline
-    },
-    list: {
-      placement: block
-    },
-    list_ordered: {
-      placement: block
-    },
-    thematic_break: {      // 3つ以上の '-'。実体は elements.hr と同じ
-      placement: block
-    },
-    fenced_code: {         // 3つの backtick。実体は elements.codeblock と同じ
-      args: { lang: { type: string } },
-      placement: block,
-      content: language
-    },
-    inline_code_span: {    // 1つの backtick。地の文保護のみで@codeにはならない
-      placement: inline,
-      content: raw
-    }
+@settings(format:json)+++
+{ "format": { "heading": { "space_inside_brackets": true } } }
++++
+```
+
+##[ format は剥がされる ]
+
+`format` は入れ子の器であって、それ自体は何も決めない。中のキーが解釈される
+ときには `format` は取り除かれている。したがって次の三つは同じ意味になる。
+
+```tm
+@settings{ format: { callout: { style: { content: block } } } }
+@settings{ format.callout.style.content: block }
+@settings{ callout: { style: { content: block } } }
+```
+
+ドット記法は入れ子形へ機械的に展開できる省略形であり、`explicit-form-first`
+の言う重複ではない。ただし今の実装は展開を一般化しておらず、キーごとに
+手書きの分岐を持っている。
+
+#[ 整形 ]
+
+@table[
+[ キー                            ][ 値                       ][ 何を決めるか                                    ]
+[ `meta.always_newline`           ][ `bool`                   ][ `@meta` の各フィールドを改行で分ける            ]
+[ `meta.format`                   ][ `json` / `toml` / `yaml` ][ `@meta` の埋め込み形式                          ]
+[ `heading.space_inside_brackets` ][ `bool`                   ][ `#[ 見出し ]` の括弧内の空白                    ]
+[ `link.no_space`                 ][ `bool`                   ][ `@link` の引数の空白を詰める。`wikilink` は別名 ]
+[ `callout.style.content`         ][ `block` ほか             ][ `@callout` の内容の並べ方                       ]
+[ `list.multiline.style.content`  ][ `box` ほか               ][ 複数行のリスト項目の並べ方                      ]
+[ `table.adjust_width`            ][ `auto` / `bool`          ][ 表の桁を揃えるか                                ]
+[ `table.max_col_width`           ][ `int`                    ][ 揃えるときの一列の上限                          ]
+[ `table.align`                   ][ `string`                 ][ 表の既定の寄せ                                  ]
+]
+
+##[ meta のフィールドごとの規則 ]
+
+`meta` の直下で、上の二つ以外のキーはフィールド名として読まれる。
+
+```tm
+@settings{
+  meta: {
+    created: { type: datetime, format: rfc3339, offset: "+09:00" }
+    topics:  { type: list, always_newline: false }
   }
 }
+```
+
+@table[
+[ キー             ][ 値                       ]
+[ `type`           ][ `list` / `datetime` ほか ]
+[ `format`         ][ `rfc3339` / `iso8601`    ]
+[ `offset`         ][ `"+09:00"`               ]
+[ `always_newline` ][ `bool`                   ]
+[ `length`         ][ `int`（正）              ]
+[ `prefix`         ][ `string`                 ]
+[ `force`          ][ `bool`                   ]
+[ `overwrite`      ][ `bool`                   ]
+]
+
+#[ マクロ ]
+
+`${名前(引数)}` の展開先。`${1}`、`${2}` が位置引数になる。`macro` は別名。
+
+```tm
+@settings{
+  macros: {
+    gh: "https://github.com/tomet/tomet/issues/${1}"
+  }
+}
+```
+
+`${...}` は `+++` の中では展開されない。マクロの定義そのものが `+++` の中に
+書かれた JSON であっても、`${1}` は文字列のまま
+`MacroPattern::from_template` に届く必要があるためである。
+
+#[ vault が持つファイル ]
+
+@table[
+[ キー               ][ 値             ][ 何を指すか                   ]
+[ `blueprints`       ][ パスの配列     ][ `@blueprint(X)` を持つ文書   ]
+[ `vocabularies`     ][ パスの配列     ][ `@vocabulary(ns)` を持つ文書 ]
+[ `workspace.ignore` ][ パターンの配列 ][ 走査から外す                 ]
+[ `ignore.files`     ][ パターンの配列 ][ 同上。古い綴り               ]
+]
+
+どちらも**パスだけ**を並べる。blueprint も語彙も自分で名前を名乗るので、
+名前とパスの対応表を書くと名前が二度、パスが三度書かれることになる。
+Cargo の `[workspace] members` と同じ形である。文字列ひとつは要素ひとつの
+配列として受け付ける。
+
+#[ 撤去されたキー ]
+
+@table[
+[ キー       ][ どこへ行ったか                             ]
+[ `elements` ][ `@vocabulary` 文書の `@element` / `@param` ]
+[ `types`    ][ 行き先は無い。読む側が無かった             ]
+]
+
+`elements` はカスタム要素の `args` / `required` / `positional` / `content` /
+`placement` / `singleton` を書く面だった。要素が何であるかは宣言の場所、
+つまり語彙が言う。設定の側にその写しを置くと、同じ事実が二箇所に住む。
+
+`placement:` は実装されずに消えた。`head` は領域の規則、`block` / `inline` は
+形の規則で、同じ軸の値ではない。置き換えは `region` と `display` で、どちらも
+`@element` の中にあり、`singleton` とともに `tomet check` が強制する。
+
+`required:` / `positional:` は引数ごとの `@param` に吸収される。名前のリストを
+別に持つのは、引数の宣言が既に持っている順序を二度書くことである。
+
+どちらのキーも、書かれていれば `tomet check` が撤去済みとして報告する。
+黙って無視しないのは、無視されていたことがそもそもの原因だったからである。
+六つのキーのうち実際に読まれていたのは `positional` ひとつだけで、それも
+誰も組み立てないスキーマ経由だった。つまり `singleton: true` と書いた文書は、
+何にも従われないまま通っていた。
+
+#[ 読む側が無いキー ]
+
+`default.config.tmt` に書かれているが、今のところどこからも読まれない。
+
+@table[
+[ キー                               ][ 意図                                ]
+[ `format.blockquote.always_newline` ][ `@blockquote` の内容を改行で分ける  ]
+[ `migration`                        ][ Markdown から取り込むときの変換規則 ]
+]

@@ -1,4 +1,3 @@
-@config(import:docs/docs.settings.tmt)
 @kind(todo)
 
 │ #links{ (1)[..] }（Bare 子要素）       │ 547eb77 / b6c01b4 │
@@ -25,6 +24,7 @@
 └──────────────────────────┴────────────────────────────────────┘
 
 - プロパティの重複のワーニング
+- ハイライトがおかしい
 - mode。`commonmark`、`no_data`
 - export force
 - kindとrules?
@@ -37,6 +37,14 @@
 - tmtroot vs tmtdocs
 - idの種類にsha1追加
 - `@element`ではなくて、`@define`のほうが適切か？
+- agents.tmtの移行。
+- checkのエラー個数指定`@`
+- yaml削除
+- 設定のドット記法を一般化する。`apply_entry`が`callout.style.content`のような
+  キーごとに手書きの分岐を12本持っている。`.`で分割して入れ子にする一段を
+  入れれば一本で済む。綴りは省略形なので重複ではないが、実装が重複している。
+- `format.blockquote.always_newline`と`migration`は`default.config.tmt`に
+  書かれているが読む側が無い。実装するか消すか。
 
 - 読み込みロード画面
 - index, directories

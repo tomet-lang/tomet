@@ -1,32 +1,54 @@
 #[ 全容 ]
 
+`@settings` は **Tomet がどう振る舞うか**を書く。整形、マクロ、vault が持つ
+ファイルの一覧。
+
 ```tm
 @config(import:@target)
 
-@config(format:json)+++
-elements = {
-  example = {
-    args = {
-      name = { type = string },
-      count = { type = uint, default = 0 },
-      variant = { type = string }
-    },
-    required = [ name ],
-    positional = [ name ],
-    content = nest(allow = [callout, codeblock]),
-    placement = block,
-    singleton = false
-  }
-},
-types = {
-  example = {
-    style = one_line
-    template = ".tomet/blueprints/daily-note.blueprint.tmt"
-  }
+@settings(format:json)+++
+{
+  "format": {
+    "meta": { "format": "yaml", "always_newline": true },
+    "heading": { "space_inside_brackets": true },
+    "table": { "adjust_width": "auto", "max_col_width": 50 }
+  },
+  "meta": {
+    "created": { "type": "datetime", "format": "rfc3339", "offset": "+09:00" }
+  },
+  "macros": {
+    "gh": "https://github.com/tomet/tomet/issues/${1}"
+  },
+  "blueprints": [ ".tomet/blueprints/daily-note.blueprint.tmt" ],
+  "vocabularies": [ ".tomet/vocabularies/deck.vocabulary.tmt" ],
+  "workspace": { "ignore": [ "tests/fixtures" ] }
 }
 +++
 ```
 
+キーの一覧は @link(file:docs/spec/builtin-settings.tmt)[`spec/builtin-settings.tmt`]
+にある。
+
+#[ 要素はここには書かない ]
+
+どの要素名が存在し、何を取るのかは `@vocabulary` 文書が言う。`@settings` に
+`elements` を書く綴りは撤去され、書かれていれば `tomet check` が報告する。
+
+```tm
+@kind(vocabulary)
+@vocabulary(deck){ version: "1.0.0" }
+
+@element(card){
+  display: block
+  @args{ @param(id){ type: uint, positional: true }[ 通し番号。 ] }
+}[
+  カード一枚。
+]
+```
+
+@link(file:docs/spec/vocabulary.tmt)[`spec/vocabulary.tmt`] を参照。
+
 #[ 未実装 ]
 
 - 独自言語
+- `@args` / `@data` / `@content` はパースされるが、まだ読まれない

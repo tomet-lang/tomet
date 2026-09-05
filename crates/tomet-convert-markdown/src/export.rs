@@ -733,7 +733,7 @@ mod tests {
         // and `@include`: dropping `import` from `BUILTIN_KINDS` made it
         // a `Custom` kind again, and the div came straight back.
         for src in [
-            "@settings(file:docs/docs.settings.tmt)\n",
+            "@settings(file:project.settings.tmt)\n",
             "@use(deck)\n",
             "@include(./chapter.tmt)\n",
             "@meta{type: note}\n",

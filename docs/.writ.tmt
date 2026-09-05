@@ -28,14 +28,20 @@ about.
 [ a rule this repository must obey ][ the nearest `.writ.tmt` ]
 [ the map of what is where ][ `README.tmt` ]
 [ a record of what is not done yet ][ `roadmap.tmt` ]
-[ settings the documents here load ][ `docs.settings.tmt` ]
 ]
 
-The last three name a file rather than a directory, and they are the whole
-of it: `README.tmt`, `roadmap.tmt`, `docs.settings.tmt` and `.writ.tmt`
-are the only files at the root of `docs/`. Everything else is inside a
-directory this table names. There is exactly one of each, so a directory
-for any of them would hold a single file and answer no question.
+The last two name a file rather than a directory, and they are the whole
+of it: `README.tmt`, `roadmap.tmt` and `.writ.tmt` are the only files at
+the root of `docs/`. Everything else is inside a directory this table
+names. There is exactly one of each, so a directory for any of them would
+hold a single file and answer no question.
+
+There was a fourth, `docs.settings.tmt`, holding settings every document
+here loaded with `@settings(file:...)`. It declared one custom element and
+a rendering style, and nothing read either: a `@vocabulary` document says
+what an element is now, and the style key had no consumer at all. The
+settings line went with the file rather than being left pointing at
+nothing.
 
 Two of these carry an obligation. A document in `spec/` has to be kept in
 step with `tomet-syntax-parser`. A document in `examples/` has to pass

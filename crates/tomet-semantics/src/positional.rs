@@ -1,79 +1,4 @@
-use std::collections::HashMap;
 use tomet_ast::{Element, Sigil, Value};
-use tomet_tree::ValueExt;
-
-/// Schema definition extracted from `@settings` block for custom elements.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct ElementSchema {
-    /// Ordered list of keys allowed for positional inference.
-    pub positional: Vec<String>,
-}
-
-/// Project/Document level settings schema parsed from `@settings`.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct SettingsSchema {
-    pub elements: HashMap<String, ElementSchema>,
-}
-
-impl SettingsSchema {
-    /// Parses a [`SettingsSchema`] from an `@settings` element.
-    pub fn from_element(el: &Element) -> Self {
-        if !el.sigil.is_bare_named("settings") {
-            return Self::default();
-        }
-
-        let Some(val) = crate::embedded::element_data(el) else {
-            return Self::default();
-        };
-
-        Self::from_value(&val)
-    }
-
-    /// Parses a [`SettingsSchema`] from a `Value::Map` representing `@settings` data.
-    pub fn from_value(val: &Value) -> Self {
-        let mut schema = Self::default();
-        let Value::Map(root_entries) = val else {
-            return schema;
-        };
-
-        for (root_k, root_v) in root_entries {
-            if root_k == "elements" {
-                if let Value::Map(elem_entries) = root_v {
-                    for (elem_name, elem_v) in elem_entries {
-                        let mut elem_schema = ElementSchema::default();
-                        if let Value::Map(props) = elem_v {
-                            for (prop_k, prop_v) in props {
-                                if prop_k == "positional" {
-                                    elem_schema.positional = parse_string_list(prop_v);
-                                }
-                            }
-                        }
-                        schema.elements.insert(elem_name.clone(), elem_schema);
-                    }
-                }
-            }
-        }
-        schema
-    }
-
-    /// Returns the positional arg key list for an element name, if defined in schema.
-    pub fn positional_keys(&self, elem_name: &str) -> Option<&[String]> {
-        self.elements
-            .get(elem_name)
-            .map(|s| s.positional.as_slice())
-    }
-}
-
-fn parse_string_list(val: &Value) -> Vec<String> {
-    match val {
-        Value::String(s) => vec![s.clone()],
-        Value::Seq(seq) => seq
-            .iter()
-            .filter_map(|item| item.as_str().map(|s| s.to_string()))
-            .collect(),
-        _ => Vec::new(),
-    }
-}
 
 /// One table, keyed on the bare name alone.
 ///
@@ -210,23 +135,16 @@ fn fill_positional_slots(positional_keys: &[String], mut entries: Vec<(String, V
     Value::Map(entries)
 }
 
-/// The effective ordered positional-key list for `el`: a custom
-/// `@settings`-defined schema entry if one exists and is non-empty for
-/// this element name, else the builtin table (see
-/// [`builtin_positional_arg_keys`]) -- same priority the two mechanisms
-/// already had before being unified into one lookup.
-fn effective_positional_keys(
-    elem_name: Option<&str>,
-    sigil: &Sigil,
-    schema: &SettingsSchema,
-) -> Vec<String> {
-    if let Some(name) = elem_name {
-        if let Some(pos_keys) = schema.positional_keys(name) {
-            if !pos_keys.is_empty() {
-                return pos_keys.to_vec();
-            }
-        }
-    }
+/// The ordered positional-key list for `sigil`, owned.
+///
+/// There used to be a second source here: an `@settings` `elements:` map
+/// could give a custom element its own `positional: [ ... ]` list, and it
+/// won over the builtin table. That surface is gone -- which names exist
+/// and what their parameters are is a `@vocabulary` question now, and the
+/// list form was the duplicate `explicit-form-first` names outright (an
+/// order the parameter declarations already carry). Until `@param` is
+/// read, `std`'s table is the whole of it.
+fn positional_keys(sigil: &Sigil) -> Vec<String> {
     builtin_positional_arg_keys(sigil)
         .iter()
         .map(|s| s.to_string())
@@ -251,14 +169,8 @@ fn scalar_to_plain(v: &Value) -> String {
     }
 }
 
-/// Returns the normalized `args` map for an [`Element`], using default built-in rules.
-pub fn normalized_element_args(el: &Element) -> Option<Value> {
-    normalized_element_args_with_schema(el, &SettingsSchema::default())
-}
-
-/// Returns the normalized `args` map for an [`Element`], taking custom
-/// `@settings` into account. One unified pipeline for every shape `args`
-/// can take:
+/// Returns the normalized `args` map for an [`Element`]. One unified
+/// pipeline for every shape `args` can take:
 /// - `Value::Map`: recover a scheme-collision `target` entry if this
 ///   element's first slot is `"target"` (see
 ///   [`recover_target_scheme_entry`]), then fill any still-unfilled slots
@@ -266,20 +178,20 @@ pub fn normalized_element_args(el: &Element) -> Option<Value> {
 ///   [`POSITIONAL_ENTRY_KEY`] (`@link(tm:foo, depends_on)`'s `depends_on`,
 ///   or a custom element's `(a, b)`).
 /// - `Value::Seq`: an explicit `[...]`-bracketed positional list
-///   (`<task>([a, b])`) -- independent of the parser's bare-comma-list
+///   (`@task([a, b])`) -- independent of the parser's bare-comma-list
 ///   sentinel mechanism, zipped against the slot list positionally.
 /// - anything else (a bare scalar): wrapped under the first slot, same as
 ///   before this was generalized.
 ///
 /// An element with no positional slots defined at all (empty list) is
 /// returned untouched in every case.
-pub fn normalized_element_args_with_schema(el: &Element, schema: &SettingsSchema) -> Option<Value> {
+///
+/// There was a `_with_schema` twin taking a `SettingsSchema`, and every
+/// caller passed the default. It has been folded back in here along with
+/// the `@settings` surface it read (see [`positional_keys`]).
+pub fn normalized_element_args(el: &Element) -> Option<Value> {
     let args = el.args.as_ref()?;
-    let elem_name = match &el.sigil {
-        Sigil::Named(name) => Some(name.name.as_str()),
-        _ => None,
-    };
-    let positional_keys = effective_positional_keys(elem_name, &el.sigil, schema);
+    let positional_keys = positional_keys(&el.sigil);
 
     match args {
         Value::Map(entries) => {
@@ -455,74 +367,22 @@ mod tests {
         );
     }
 
+    /// A custom element's positional args are left as the parser produced
+    /// them, sentinel keys and all.
+    ///
+    /// Two tests used to sit here giving `link` a second `predicate` slot
+    /// and `task` a `title`/`priority` pair through an `@settings`
+    /// `elements: { <name>: { positional: [...] } }` map. That surface is
+    /// gone -- it was a second source for a fact the parameter
+    /// declarations already order, and nothing outside those tests ever
+    /// built a `SettingsSchema`. Until `@param` is read, `std`'s table is
+    /// the only source, and it has no entry for a custom name.
+    ///
+    /// A consequence worth stating: every builtin has at most one
+    /// positional slot, so `fill_positional_slots`' multi-slot loop is
+    /// written for `@param` and exercised with one slot today.
     #[test]
-    fn fills_a_settings_defined_second_slot_from_a_bare_second_positional_value() {
-        // `@link(tm:foo, depends_on)` -- no `predicate` written anywhere
-        // in code, purely a project-level `@settings` schema choice. The
-        // `tm` entry recovers into `target` first, then the bare
-        // (sentinel-keyed) `depends_on` entry fills the still-unfilled
-        // `predicate` slot.
-        let settings_val = Value::Map(vec![(
-            "elements".to_string(),
-            Value::Map(vec![(
-                "link".to_string(),
-                Value::Map(vec![(
-                    "positional".to_string(),
-                    Value::Seq(vec![
-                        Value::String("target".to_string()),
-                        Value::String("predicate".to_string()),
-                    ]),
-                )]),
-            )]),
-        )]);
-        let schema = SettingsSchema::from_value(&settings_val);
-
-        // Args shaped the way the parser actually produces them for
-        // `@link(tm:foo, depends_on)`: first entry keyed "tm" (Group A),
-        // second bare/sentinel-keyed.
-        let mut el = element_new(Sigil::named("link"));
-        el.args = Some(Value::Map(vec![
-            ("tm".to_string(), Value::String("foo".to_string())),
-            (
-                POSITIONAL_ENTRY_KEY.to_string(),
-                Value::String("depends_on".to_string()),
-            ),
-        ]));
-
-        assert_eq!(
-            normalized_element_args_with_schema(&el, &schema),
-            Some(Value::Map(vec![
-                ("target".to_string(), Value::String("tm:foo".to_string())),
-                (
-                    "predicate".to_string(),
-                    Value::String("depends_on".to_string())
-                ),
-            ]))
-        );
-    }
-
-    #[test]
-    fn settings_positional_schema_now_reachable_from_a_bare_comma_list() {
-        // Companion to `normalizes_custom_element_multiple_positional_args_seq_via_settings`
-        // (which constructs a `Value::Seq` directly, bypassing the parser)
-        // -- this exercises the *other* shape the parser now actually
-        // produces for a bare, unbracketed `(a, b)`: a `Value::Map` with
-        // two sentinel-keyed entries, not a `Seq`.
-        let settings_val = Value::Map(vec![(
-            "elements".to_string(),
-            Value::Map(vec![(
-                "task".to_string(),
-                Value::Map(vec![(
-                    "positional".to_string(),
-                    Value::Seq(vec![
-                        Value::String("title".to_string()),
-                        Value::String("priority".to_string()),
-                    ]),
-                )]),
-            )]),
-        )]);
-        let schema = SettingsSchema::from_value(&settings_val);
-
+    fn a_custom_element_gets_no_positional_inference() {
         let mut el = element_new(Sigil::named("task"));
         el.args = Some(Value::Map(vec![
             (
@@ -536,10 +396,16 @@ mod tests {
         ]));
 
         assert_eq!(
-            normalized_element_args_with_schema(&el, &schema),
+            normalized_element_args(&el),
             Some(Value::Map(vec![
-                ("title".to_string(), Value::String("Clean room".to_string())),
-                ("priority".to_string(), Value::String("high".to_string())),
+                (
+                    POSITIONAL_ENTRY_KEY.to_string(),
+                    Value::String("Clean room".to_string()),
+                ),
+                (
+                    POSITIONAL_ENTRY_KEY.to_string(),
+                    Value::String("high".to_string()),
+                ),
             ]))
         );
     }
@@ -600,49 +466,11 @@ mod tests {
         );
     }
 
+    /// The `Seq` arm is the explicit `@name([a, b])` form, and it too is
+    /// left alone for a custom name -- same reason as
+    /// [`a_custom_element_gets_no_positional_inference`].
     #[test]
-    fn normalizes_custom_element_single_positional_arg_via_settings() {
-        let settings_val = Value::Map(vec![(
-            "elements".to_string(),
-            Value::Map(vec![(
-                "task".to_string(),
-                Value::Map(vec![(
-                    "positional".to_string(),
-                    Value::Seq(vec![Value::String("title".to_string())]),
-                )]),
-            )]),
-        )]);
-        let schema = SettingsSchema::from_value(&settings_val);
-
-        let mut el = element_new(Sigil::named("task"));
-        el.args = Some(Value::String("Clean room".to_string()));
-
-        assert_eq!(
-            normalized_element_args_with_schema(&el, &schema),
-            Some(Value::Map(vec![(
-                "title".to_string(),
-                Value::String("Clean room".to_string())
-            )]))
-        );
-    }
-
-    #[test]
-    fn normalizes_custom_element_multiple_positional_args_seq_via_settings() {
-        let settings_val = Value::Map(vec![(
-            "elements".to_string(),
-            Value::Map(vec![(
-                "task".to_string(),
-                Value::Map(vec![(
-                    "positional".to_string(),
-                    Value::Seq(vec![
-                        Value::String("title".to_string()),
-                        Value::String("priority".to_string()),
-                    ]),
-                )]),
-            )]),
-        )]);
-        let schema = SettingsSchema::from_value(&settings_val);
-
+    fn a_custom_elements_bracketed_positional_list_is_left_alone() {
         let mut el = element_new(Sigil::named("task"));
         el.args = Some(Value::Seq(vec![
             Value::String("Clean room".to_string()),
@@ -650,10 +478,10 @@ mod tests {
         ]));
 
         assert_eq!(
-            normalized_element_args_with_schema(&el, &schema),
-            Some(Value::Map(vec![
-                ("title".to_string(), Value::String("Clean room".to_string())),
-                ("priority".to_string(), Value::String("high".to_string())),
+            normalized_element_args(&el),
+            Some(Value::Seq(vec![
+                Value::String("Clean room".to_string()),
+                Value::String("high".to_string()),
             ]))
         );
     }

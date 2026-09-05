@@ -666,7 +666,7 @@ mod tests {
     #[test]
     fn directives_produce_nothing() {
         assert!(convert("@meta{type: note}\n").is_empty());
-        assert!(convert("@settings(file:docs/docs.settings.tmt)\n").is_empty());
+        assert!(convert("@settings(file:project.settings.tmt)\n").is_empty());
         // ...and a paragraph that held only directives leaves no empty
         // `Para` behind either.
         assert!(convert("@meta{a: 1} @meta{b: 2}\n").is_empty());

@@ -1,4 +1,3 @@
-@settings(file:docs/docs.settings.tmt)
 @kind(dirs)
 
 @file(readme.md)

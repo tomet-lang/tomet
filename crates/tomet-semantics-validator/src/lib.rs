@@ -75,6 +75,7 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Valida
     });
 
     check_singletons_and_regions(doc, bindings, &mut errors);
+    check_retired_settings_keys(doc, &mut errors);
 
     for (id, span) in collect_ids(doc) {
         if let Some((_, first)) = seen.iter().find(|(seen_id, _)| *seen_id == id) {
@@ -166,6 +167,41 @@ fn check_singletons_and_regions(
             other => {
                 in_preamble = false;
                 tomet_tree::for_each_element_in_block(other, |el| visit(el, false));
+            }
+        }
+    }
+}
+
+/// Reports `@settings`/`@config` keys that have been retired.
+///
+/// One key so far, `elements:`, plus the `types:` map that sat beside it.
+/// Between them they described a custom element -- its arguments, whether
+/// it was a singleton, which shape it took -- which is a `@vocabulary`
+/// question now. See [`ValidationError::RetiredSettingsKey`] for why this
+/// is an error and not a silent skip.
+///
+/// Top-level blocks only, matching what a settings loader would actually
+/// read: an `@settings` buried in a paragraph is already reported by the
+/// region rule above.
+fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<ValidationError>) {
+    use tomet_ast::{Block, Value};
+
+    const RETIRED: [&str; 2] = ["elements", "types"];
+
+    for block in &doc.blocks {
+        let Block::Element(el) = block else { continue };
+        if !el.sigil.is_bare_named("settings") && !el.sigil.is_bare_named("config") {
+            continue;
+        }
+        let Some(Value::Map(entries)) = tomet_semantics::embedded::element_data(el) else {
+            continue;
+        };
+        for key in RETIRED {
+            if entries.iter().any(|(k, _)| k == key) {
+                errors.push(ValidationError::RetiredSettingsKey {
+                    key: key.to_string(),
+                    span: el.span,
+                });
             }
         }
     }
@@ -287,6 +323,64 @@ mod tests {
                 ValidationError::DuplicateSingleton { .. }
                     | ValidationError::OutsidePreamble { .. }
             )),
+            "{errors:?}"
+        );
+    }
+
+    /// `elements:` described a custom element in `@settings`; a
+    /// `@vocabulary` document says all of it now, so the settings copy is
+    /// reported rather than skipped -- skipping is how it survived being
+    /// read by nothing.
+    #[test]
+    fn a_retired_settings_key_is_reported() {
+        let doc = parse(
+            "@kind(settings)\n@settings(format:json)+++\n\
+             { \"elements\": { \"bookmark\": { \"singleton\": false } } }\n+++\n",
+        );
+        let errors = validate_document(&doc);
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::RetiredSettingsKey { key, .. } if key == "elements")),
+            "{errors:?}"
+        );
+    }
+
+    /// `types:` goes with it, and its message has to say there is nowhere
+    /// to move it to rather than inventing a destination.
+    #[test]
+    fn the_types_map_is_retired_too_and_says_it_has_no_replacement() {
+        let doc = parse(
+            "@kind(settings)\n@settings(format:json)+++\n\
+             { \"types\": { \"bookmark\": { \"style\": \"one_line\" } } }\n+++\n",
+        );
+        let errors = validate_document(&doc);
+        let reported = errors
+            .iter()
+            .find(
+                |e| matches!(e, ValidationError::RetiredSettingsKey { key, .. } if key == "types"),
+            )
+            .unwrap_or_else(|| panic!("{errors:?}"));
+        assert!(
+            reported.to_string().contains("no replacement"),
+            "{reported}"
+        );
+    }
+
+    /// The live surface is untouched. `format`, `macros` and the path
+    /// lists are what `tomet-config` actually reads.
+    #[test]
+    fn a_settings_document_using_only_live_keys_is_clean() {
+        let doc = parse(
+            "@kind(config)\n@config(format:json)+++\n\
+             { \"format\": { \"callout\": { \"style\": { \"content\": \"block\" } } },\n\
+             \"macros\": { \"gh\": \"https://example.com/${1}\" } }\n+++\n",
+        );
+        let errors = validate_document(&doc);
+        assert!(
+            !errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::RetiredSettingsKey { .. })),
             "{errors:?}"
         );
     }
