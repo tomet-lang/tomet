@@ -725,12 +725,17 @@ mod tests {
 
     #[test]
     fn directives_have_no_markdown_output() {
-        // `settings` and `import` joined `BUILTIN_KINDS` after this list
-        // was written, so they used to fall through to the generic
-        // passthrough and emit a `<div data-tm-kind="settings">`.
+        // `settings` and the binding element joined `BUILTIN_KINDS` after
+        // this list was written, so they used to fall through to the
+        // generic passthrough and emit a `<div data-tm-kind="settings">`.
+        //
+        // This list is also what caught `@import` splitting into `@use`
+        // and `@include`: dropping `import` from `BUILTIN_KINDS` made it
+        // a `Custom` kind again, and the div came straight back.
         for src in [
             "@settings(file:docs/docs.settings.tmt)\n",
-            "@import(file:./deck.tmt, as:deck)\n",
+            "@use(./deck.tmt)\n",
+            "@include(./chapter.tmt)\n",
             "@meta{type: note}\n",
         ] {
             let doc = tomet_parser::parse_document(src).unwrap();

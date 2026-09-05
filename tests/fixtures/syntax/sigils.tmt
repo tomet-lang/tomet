@@ -13,7 +13,7 @@ id: doc-sigils
 
 @deck.bookmark(name: foo, count: 3)[ 名前空間つき ]
 
-@import(file: ./deck.tmt, as: deck)
+@use(./deck.tmt){ as: deck }
 
 #[ インライン要素 ]
 

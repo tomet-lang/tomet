@@ -8,7 +8,21 @@ pub use error::{CstValidationError, ValidationError};
 use id::{collect_ids, collect_ids_cst};
 use tomet_ast::Document;
 use tomet_cst::{SyntaxNode, TextRange};
-use tomet_semantics::Shape;
+use tomet_semantics::{Bindings, Shape};
+
+/// Classifies `el` against `std` and the namespaces in scope.
+///
+/// `Sigil::Bare` and `Sigil::Dollar` carry no name and are not a
+/// vocabulary question, so they go straight through.
+fn classify_in(
+    el: &tomet_ast::Element,
+    bindings: &Bindings,
+) -> Result<tomet_semantics::ElementKind, tomet_semantics::UnknownName> {
+    match &el.sigil {
+        tomet_ast::Sigil::Named(name) => bindings.classify(name),
+        _ => tomet_semantics::classify(el),
+    }
+}
 
 fn shape_str(shape: Shape) -> &'static str {
     match shape {
@@ -19,16 +33,30 @@ fn shape_str(shape: Shape) -> &'static str {
 
 /// Runs all validation rules against a parsed `Document` and returns every
 /// violation found. Read-only: never mutates `doc`, never does I/O.
+///
+/// Knows only `std`, so every element from a vocabulary is reported as
+/// unknown. Callers that can read the vault's vocabularies -- which means
+/// callers that may do I/O -- should use [`validate_document_with`] and
+/// pass what is in scope.
 pub fn validate_document(doc: &Document) -> Vec<ValidationError> {
+    validate_document_with(doc, &Bindings::default())
+}
+
+/// [`validate_document`], with the namespaces the document has in scope.
+///
+/// Still does no I/O: `bindings` arrives already loaded, by whoever was
+/// allowed to read the files. That split is why this can consult a
+/// vocabulary without the layer below it gaining the ability to open one.
+pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<ValidationError> {
     let mut errors = Vec::new();
     let mut seen: Vec<(String, tomet_ast::Span)> = Vec::new();
 
     // The parser deliberately accepts any well-formed name -- deciding
     // which names exist is a vocabulary question, and the parser is barred
-    // from consulting one. So this is where an unknown bare name, or an
-    // element written with the wrong sigil for its shape, is reported.
+    // from consulting one. So this is where an unknown name, or an
+    // element written with the wrong shape, is reported.
     tomet_tree::for_each_element(doc, |el| {
-        if let Err(unknown) = tomet_semantics::classify(el) {
+        if let Err(unknown) = classify_in(el, bindings) {
             errors.push(ValidationError::UnknownElement {
                 name: unknown.name,
                 span: el.span,
@@ -112,16 +140,39 @@ mod tests {
         ));
     }
 
+    /// A document with `deck` in scope.
+    ///
+    /// These cases used to rely on a namespaced name passing
+    /// unconditionally -- `classify_name` returned `Custom` for anything
+    /// with a namespace, bound or not. That was the hole `Bindings`
+    /// closed, so the namespace has to actually be in scope now, and
+    /// saying so here is what keeps these tests about duplicate ids.
+    fn with_deck() -> Bindings {
+        let vocab = tomet_parser::parse_document(
+            "@kind(vocabulary)\n@vocabulary(deck)\n\n@element(task){}[ A task. ]\n@element(ref){}[ A ref. ]\n",
+        )
+        .expect("vocabulary parses");
+        Bindings {
+            used: [(
+                "deck".to_string(),
+                tomet_semantics::Vocabulary::from_document(&vocab).expect("has a header"),
+            )]
+            .into_iter()
+            .collect(),
+            ..Bindings::default()
+        }
+    }
+
     #[test]
     fn duplicate_id_between_heading_and_element_is_reported() {
         // A heading's `{id:...}` lives in `Element.value`, not
         // `Element.args` -- regression coverage for `Node::attrs()`'s
         // args+value merge (`ElementExt::attrs_view`)
         // making it visible here at all.
-        // `deck.task` is namespaced: a bare `task` would also report
-        // `UnknownElement`, which is a different rule.
+        // `deck.task` is namespaced and `deck` is in scope, so the only
+        // rule left to fire is the one being tested.
         let doc = parse("#[ one ]{id:a}\n\n@deck.task(id:a)\n");
-        let errors = validate_document(&doc);
+        let errors = validate_document_with(&doc, &with_deck());
         assert_eq!(errors.len(), 1);
         assert!(matches!(
             &errors[0],
@@ -135,7 +186,7 @@ mod tests {
         // paragraph's content, not a top-level block -- exercises the
         // `visit_inlines` recursion, not just top-level `Block`s.
         let doc = parse("#[ one ]{id:a}\n\ntext @deck.ref(id:a) more text\n");
-        let errors = validate_document(&doc);
+        let errors = validate_document_with(&doc, &with_deck());
         assert_eq!(errors.len(), 1);
         assert!(matches!(
             &errors[0],
