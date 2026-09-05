@@ -42,11 +42,11 @@ fn main() -> ExitCode {
 
     let result = match &cli.command {
         Command::Check {
-            file,
+            path,
             data,
             quiet,
             json,
-        } => check(file, *data, *quiet, *json),
+        } => check(path, *data, *quiet, *json),
         Command::Ast { file, data } => ast(file, *data),
         Command::Roundtrip { file } => roundtrip(file),
         Command::Html {
