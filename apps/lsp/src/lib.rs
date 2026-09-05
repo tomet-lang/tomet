@@ -108,25 +108,8 @@ fn error_range(err: &tomet_parser::Error, text: &str) -> Range {
 
 /// Formats the document using `tomet-formatter` with loaded or inferred configuration.
 pub fn format_edits(text: &str, uri: Option<&Uri>) -> Vec<TextEdit> {
-    let config = if let Some(u) = uri {
-        if let Some(file_path) = uri_to_file_path(u) {
-            tomet_config::find_config_file(&file_path)
-                .map(|(cfg, _, _)| cfg)
-                .unwrap_or_else(|| {
-                    tomet_parser::parse_document(text)
-                        .map(|doc| tomet_config::PrinterConfig::from_doc(&doc))
-                        .unwrap_or_default()
-                })
-        } else {
-            tomet_parser::parse_document(text)
-                .map(|doc| tomet_config::PrinterConfig::from_doc(&doc))
-                .unwrap_or_default()
-        }
-    } else {
-        tomet_parser::parse_document(text)
-            .map(|doc| tomet_config::PrinterConfig::from_doc(&doc))
-            .unwrap_or_default()
-    };
+    let path = uri.and_then(uri_to_file_path);
+    let config = tomet_config::config_for(path.as_deref(), text);
     let formatted = tomet_formatter::format_source_with_config(text, &config);
     if formatted == text {
         return Vec::new();
