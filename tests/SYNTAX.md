@@ -145,7 +145,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### `(args)` `[content]` `{value}` は各1個まで、順不同
@@ -166,7 +166,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### 順序を入れ替えても同じ木になる
@@ -185,7 +185,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### `.` 区切りの名前空間
@@ -201,6 +201,12 @@ Block  @deck.bookmark
     Text "x"
 ```
 
+検証:
+
+```
+unknown element `bookmark`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.bookmark`), or declare the vocabulary that has it and bind it with `@use`
+```
+
 ### 名前空間は多段でもよい
 
 ```tmt
@@ -210,6 +216,12 @@ Block  @deck.bookmark
 ```
 Block  @a.b.c
   args    {x: 1}
+```
+
+検証:
+
+```
+unknown element `c`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.c`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### 行頭にあっても、後ろに続きがあればブロックにならない。段落の書き出しとして読む
@@ -276,6 +288,12 @@ Paragraph
     content
       Text "印"
   Text " です。"
+```
+
+検証:
+
+```
+unknown element `badge`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.badge`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ## 文字列に落ちる場合
@@ -353,7 +371,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### 本文に `+++` があるときは長い走りで囲む
@@ -373,7 +391,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### 閉じないまま EOF に達したらそこで終わる
@@ -391,7 +409,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### `${...}` は展開されず逐語で残る
@@ -440,7 +458,7 @@ Block  @zzz
 検証:
 
 ```
-unknown element `zzz`: bare names are reserved for built-in elements; namespace it (`ns.zzz`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `zzz`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.zzz`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ## `{...}` グループ
@@ -461,7 +479,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### 要素の並び
@@ -503,6 +521,12 @@ Block  @deck.card
     u: "z"
 ```
 
+検証:
+
+```
+unknown element `card`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.card`), or declare the vocabulary that has it and bind it with `@use`
+```
+
 ### 空のグループ
 
 ```tmt
@@ -517,7 +541,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ## `(args)` と値の文法
@@ -536,7 +560,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### 位置引数（キーなし）
@@ -564,7 +588,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### 入れ子のマップ
@@ -581,7 +605,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### 引用符つき文字列
@@ -598,7 +622,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### スカラーは型が推論される
@@ -615,7 +639,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ## リスト
@@ -848,7 +872,7 @@ Block  @task
 検証:
 
 ```
-unknown element `task`: bare names are reserved for built-in elements; namespace it (`ns.task`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### `:(...)` は args をマージ
@@ -865,7 +889,7 @@ Block  @task
 検証:
 
 ```
-unknown element `task`: bare names are reserved for built-in elements; namespace it (`ns.task`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ## コメント
@@ -968,7 +992,7 @@ Block  @id
 検証:
 
 ```
-unknown element `id`: bare names are reserved for built-in elements; namespace it (`ns.id`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `id`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.id`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 > **パースは通る。** 上が実際の結果。
@@ -994,7 +1018,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: bare names are reserved for built-in elements; namespace it (`ns.memo`) or bind a namespace with `@import(file:..., as:ns)`
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 > **パースは通る。** 上が実際の結果。

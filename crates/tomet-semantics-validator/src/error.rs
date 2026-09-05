@@ -90,9 +90,9 @@ impl fmt::Display for ValidationError {
             ValidationError::UnknownElement { name, .. } => {
                 write!(
                     f,
-                    "unknown element `{name}`: bare names are reserved for built-in \
-                     elements; namespace it (`ns.{name}`) or bind a namespace with \
-                     `@import(file:..., as:ns)`"
+                    "unknown element `{name}`: only `std` and this document's own \
+                     `@kind` may be written bare; namespace it (`ns.{name}`), or \
+                     declare the vocabulary that has it and bind it with `@use`"
                 )
             }
             ValidationError::ShapeMismatch {
@@ -101,14 +101,18 @@ impl fmt::Display for ValidationError {
                 expected,
                 ..
             } => {
+                // Not "use `#name`" any more. `#` stopped being the block
+                // sigil when the shape axis was retracted, so the old
+                // advice named an edit that cannot be made: `@` is the
+                // only element sigil and shape comes from position.
                 write!(
                     f,
                     "`{name}` is {expected}, but is written as {found}; \
-                     use `{}{name}`",
+                     shape comes from position -- {}",
                     if *expected == "a block element" {
-                        "#"
+                        "give it a line of its own, in block context"
                     } else {
-                        "@"
+                        "put it inside a paragraph, not alone on its line"
                     }
                 )
             }

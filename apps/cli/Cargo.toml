@@ -20,7 +20,9 @@ tomet-printer = { workspace = true }
 tomet-html = { workspace = true }
 tomet-typst = { workspace = true }
 tomet-pandoc = { workspace = true }
+tomet-resolver = { workspace = true }
 tomet-semantics = { workspace = true }
+tomet-validator = { workspace = true }
 tomet-tui = { workspace = true }
 tomet-workspace = { workspace = true }
 

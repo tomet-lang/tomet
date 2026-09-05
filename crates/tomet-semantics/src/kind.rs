@@ -20,9 +20,17 @@ pub enum ElementKind {
     /// `BUILTIN_KINDS` despite three places matching it by raw string; a
     /// bare name has to be built-in now, so it is listed properly.
     Settings,
-    /// `@import(file:..., as:ns)` -- binds a namespace. The binding is
-    /// resolved by `tomet-resolver`; this only recognizes the element.
-    Import,
+    /// `@use(file)` -- binds a vocabulary as a namespace, under the name
+    /// that vocabulary gives itself. `{ as: other }` renames it, and is
+    /// only for a collision.
+    ///
+    /// Was `@import`, which carried two jobs at once: binding a namespace
+    /// and splicing a document in. They are [`ElementKind::Use`] and
+    /// [`ElementKind::Include`] now. See `docs/spec/vocabulary.tmt`.
+    Use,
+    /// `@include(file)` -- splices another document in at this point.
+    /// Recognized only; nothing expands it yet.
+    Include,
     /// `@references[...]` -- the container for remote connections.
     References,
     Blueprint,
@@ -100,7 +108,8 @@ impl ElementKind {
             ElementKind::Meta => "meta",
             ElementKind::Config => "config",
             ElementKind::Settings => "settings",
-            ElementKind::Import => "import",
+            ElementKind::Use => "use",
+            ElementKind::Include => "include",
             ElementKind::References => "references",
             ElementKind::Blueprint => "blueprint",
             ElementKind::Vocabulary => "vocabulary",
@@ -159,13 +168,14 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 28] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 29] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
     ("config", ElementKind::Config),
     ("settings", ElementKind::Settings),
-    ("import", ElementKind::Import),
+    ("use", ElementKind::Use),
+    ("include", ElementKind::Include),
     ("references", ElementKind::References),
     ("blueprint", ElementKind::Blueprint),
     // The vocabulary document's own six. They are here rather than in a
@@ -240,8 +250,9 @@ impl std::fmt::Display for UnknownName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "unknown element `{}`: bare names are reserved for built-in elements; \
-             namespace it (`ns.{}`) or bind a namespace with `@import(file:..., as:ns)`",
+            "unknown element `{}`: only `std` and this document's own `@kind` may be \
+             written bare; namespace it (`ns.{}`), or declare the vocabulary that has it \
+             and bind it with `@use`",
             self.name, self.name
         )
     }
@@ -289,7 +300,7 @@ pub fn is_directive(kind: &ElementKind) -> bool {
     use ElementKind::*;
     matches!(
         kind,
-        Version | Kind | Meta | Config | Settings | Import | Blueprint | Vocabulary
+        Version | Kind | Meta | Config | Settings | Use | Include | Blueprint | Vocabulary
     )
 }
 
@@ -303,9 +314,9 @@ pub fn is_directive(kind: &ElementKind) -> bool {
 fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
-        Meta | Config | Settings | Import | References | Blueprint | Links | Hr | Codeblock
-        | Blockquote | Table | Heading | OrderedList | UnorderedList | Kind | Version
-        | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
+        Meta | Config | Settings | Use | Include | References | Blueprint | Links | Hr
+        | Codeblock | Blockquote | Table | Heading | OrderedList | UnorderedList | Kind
+        | Version | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
         Em | Strong | Mark | Link | Embed | Icon => Shape::Inline,
         Custom(_) | Bare | Interp => return None,
     })

@@ -36,6 +36,7 @@ mod connect;
 mod error;
 mod interp;
 mod settings;
+mod vocabulary;
 
 pub use connect::{RemoteConnection, resolve_connect_targets};
 pub use error::ResolveError;
@@ -43,3 +44,4 @@ pub use interp::resolve_reference;
 pub use settings::{
     config_import_ref, resolve_settings_file, resolve_settings_ref, settings_file_ref,
 };
+pub use vocabulary::{LoadedVocabularies, bindings_for, load_vocabularies};
