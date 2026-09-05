@@ -90,7 +90,13 @@ id: doc-kWBcIUUz
     "docs/examples/blueprints/rfc.blueprint.tmt"
   ],
   "vocabularies": [
-    ".tomet/vocabularies/writ.vocabulary.tmt"
+    ".tomet/vocabularies/writ.vocabulary.tmt",
+    ".tomet/vocabularies/bookmark.vocabulary.tmt",
+    ".tomet/vocabularies/node-graph.vocabulary.tmt",
+    ".tomet/vocabularies/scenario.vocabulary.tmt",
+    ".tomet/vocabularies/video.vocabulary.tmt",
+    ".tomet/vocabularies/dirs.vocabulary.tmt",
+    ".tomet/vocabularies/idea.vocabulary.tmt"
   ],
   "workspace": {
     "ignore": [

@@ -311,13 +311,21 @@ pub fn is_directive(kind: &ElementKind) -> bool {
 /// parser decides placement from position without consulting this.
 ///
 /// `None` means either shape is legal.
-fn required_shape(kind: &ElementKind) -> Option<Shape> {
+pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
         Meta | Config | Settings | Use | Include | References | Blueprint | Links | Hr
         | Codeblock | Blockquote | Table | Heading | OrderedList | UnorderedList | Kind
         | Version | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
-        Em | Strong | Mark | Link | Embed | Icon => Shape::Inline,
+        Em | Strong | Mark => Shape::Inline,
+        // Either shape. A link, an embed or an icon alone on a line is
+        // not a structural error -- it is how you show one file, one
+        // image, one glyph. What `shape_mismatch` is for is the case
+        // that breaks something: a `heading` inside a paragraph, or
+        // `*emphasis*` standing as a block. Constraining these three
+        // caught nothing but ordinary writing, in this repository's own
+        // `.writ.tmt` among other places.
+        Link | Embed | Icon => return None,
         Custom(_) | Bare | Interp => return None,
     })
 }

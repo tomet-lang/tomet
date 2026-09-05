@@ -1,0 +1,17 @@
+@kind(vocabulary)
+@vocabulary(idea){
+  version: "1.0.0"
+  open: true
+}
+
+`docs/design/ideas/` のためのスケッチパッド語彙。要素をひとつも宣言せず、
+`open: true` によって**どんな名前でも受け付ける**。
+
+スケッチはまだ存在しない要素を書く場所で、それがスケッチの仕事だから。
+`docs/.writ.tmt` の `document-placement` が `design/ideas/` を
+「an idea not yet decided」と呼び、`docs-language` が「スケッチに翻訳の手間を
+課すのがスケッチを書かせなくする方法だ」と書いているのと同じ理由。
+
+`std` は依然として勝つ。開いた語彙は宣言されていない名前を全部引き受けるが、
+bare な名前はまず組み込みに当たるので、スケッチの中の `@link` もやはり
+`@std.link` であり、inline として書かれる必要がある。

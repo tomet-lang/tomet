@@ -1,0 +1,16 @@
+@kind(vocabulary)
+@vocabulary(dirs){ version: "1.0.0" }
+
+@element(dirs){
+  display: block
+}[
+  ディレクトリひとつ。位置引数はパス、`[content]` が説明。
+]
+
+@element(file){
+  display: block
+}[
+  ファイルひとつ。位置引数はパス、`[content]` が説明。
+  `std` の `@link(target:"file:...")` とは別物で、こちらは
+  リンクではなくツリーの一項目を表す。
+]

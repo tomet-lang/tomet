@@ -840,16 +840,12 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
 
 /// The shape a built-in kind must take, or `None` when either is legal.
 fn shape_of(kind: &ElementKind) -> Option<Shape> {
-    let probe = tomet_tree::element_new(match kind {
-        ElementKind::Custom(_) | ElementKind::Bare | ElementKind::Interp => return None,
-        other => tomet_ast::Sigil::named(other.as_str()),
-    })
-    .with_placement(tomet_ast::Placement::Block);
-    match tomet_semantics::shape_mismatch(&probe) {
-        // Placed as a block and reported as a mismatch -> it is inline.
-        Some((_, expected)) => Some(expected),
-        None => Some(Shape::Block),
-    }
+    // Asked directly rather than inferred. This used to place a probe
+    // element as a block and read the mismatch back, which cannot tell
+    // "block only" from "either shape" -- both come back without a
+    // mismatch. `link` became the second of those and started reading as
+    // block-only.
+    tomet_semantics::required_shape(kind)
 }
 
 /// Completion detail for a built-in: its description, plus where it may
@@ -1097,8 +1093,13 @@ mod tests {
         assert!(at_items.iter().any(|i| i.label == "config"));
         let config = at_items.iter().find(|i| i.label == "config").unwrap();
         assert!(config.detail.as_deref().unwrap().ends_with("(block)"));
+        // `link` takes either shape -- a link alone on a line is how you
+        // show one file -- so its detail carries no placement note.
         let link = at_items.iter().find(|i| i.label == "link").unwrap();
-        assert!(link.detail.as_deref().unwrap().ends_with("(inline)"));
+        let detail = link.detail.as_deref().unwrap();
+        assert!(!detail.ends_with("(inline)") && !detail.ends_with("(block)"));
+        let em = at_items.iter().find(|i| i.label == "em").unwrap();
+        assert!(em.detail.as_deref().unwrap().ends_with("(inline)"));
 
         // `#` is the heading marker and offers no elements.
         assert!(

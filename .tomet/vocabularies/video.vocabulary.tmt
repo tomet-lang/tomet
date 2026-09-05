@@ -1,0 +1,9 @@
+@kind(vocabulary)
+@vocabulary(video){ version: "1.0.0" }
+
+@element(timestamp){
+  display: block
+}[
+  動画の一点についてのメモ。`time:` が位置、`[content]` が本文。
+  `docs/examples/video.memo.tmt` が使い方の見本。
+]

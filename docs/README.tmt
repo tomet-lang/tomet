@@ -29,8 +29,10 @@
     自体が読み取るべき情報。
   ]
 - [ `/default.config.tmt` — このリポジトリが実際に使っている設定。
-    `docs/examples/default.config.tmt` は `@version`/`@kind` ヘッダの書き方を
-    見せる*見本*であって、同じファイルではない。
+    `docs/examples/config.tmt` は `@version`/`@kind` ヘッダの書き方を見せる
+    *見本*であって、同じファイルではない。名前を `default.config.tmt` から
+    変えたのは、`find_config_file` が名前で vault の境界を探すので、見本が
+    本物として拾われて `docs/examples/` が独立した vault になっていたため。
   ]
 
 #[ ここから読む ]
