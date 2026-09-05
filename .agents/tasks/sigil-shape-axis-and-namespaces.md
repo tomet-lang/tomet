@@ -6,9 +6,11 @@ from user-defined ones, but `classify` matched
 distinction carried no information. A design session on 2026-09-02
 replaced the axis rather than repairing it.
 
-**Status:** steps 1-7 and 9-11 are done. Steps 8 and 12 remain, plus the
-namespace-binding work noted under step 7. **A design session on
-2026-09-03 retracted the shape axis itself** — see "One sigil: `@`" below
+**Status:** steps 1-11 are done. **Only step 12 remains** — `docs/` and
+the editor extensions. Within that, Zed's queries already track the
+current grammar; VS Code's `tmLanguage.json` does not (it still has the
+`<Type>` sigil, a name-optional `@`, and no `+++` fence). **A design
+session on 2026-09-03 retracted the shape axis itself** — see "One sigil: `@`" below
 and steps 13-18. **A design session on 2026-09-05 settled the namespace
 design end to end** — see "Namespaces, settled (2026-09-05)" below, which
 supersedes the "Namespaces encode origin" section and closes the old open
@@ -519,6 +521,57 @@ Not built: `@args`/`@data`/`@content` parse and are ignored -- the three
 slots are described in `docs/spec/vocabulary.tmt` and read by nothing.
 `@include` is recognized and expands nothing.
 
+### Step 8, redone (2026-09-06)
+
+Step 8 said to *trim* the external `elements:` surface to `args` /
+`singleton` / `types.*.style`. It was written on 2026-09-02, before the
+vocabulary design, and by the time it came up all three of those were
+duplicates of what a `@vocabulary` says -- exactly the shape
+`explicit-form-first`'s Why section rejects by name (`required: [ name ]`,
+`positional: [ name ]`).
+
+Measured before deciding, which is what changed the answer. **Almost the
+whole surface was dead:**
+
+| surface | who read it |
+| --- | --- |
+| `elements.*.positional` | `SettingsSchema` -> `normalized_element_args_with_schema` -> **no callers** |
+| `elements.*.args` / `required` / `content` / `placement` / `singleton` | nobody; `SettingsSchema::from_value` skipped every key but `positional` |
+| `types.*.style` | nobody; `one_line` appears nowhere in the code |
+| `elements.callout` / `list` / `table` | `tomet-config`, and only for style -- a fifth spelling of `format.callout.style`, used by no config here |
+
+So a document could write `singleton: true` and be obeyed by nothing. That
+is why the retired keys are now *reported* rather than skipped: being
+skipped is how they survived.
+
+What landed:
+
+- The schema surface is gone from the code. `SettingsSchema`,
+  `ElementSchema` and `normalized_element_args_with_schema` are deleted;
+  `effective_positional_keys` collapsed to `builtin_positional_arg_keys`.
+  Until `@param` is read, `std`'s table is the only source of a positional
+  key, so a custom element gets no inference -- which it effectively
+  already did not, since nothing built a schema to give it one.
+- `ValidationError::RetiredSettingsKey` reports `elements` and `types` in
+  a top-level `@settings`/`@config`, naming `@vocabulary` for the first
+  and saying plainly that the second has no replacement.
+- `tomet-config` lost its `elements` arm, so the key means nothing at all
+  and the rejection covers the whole of it rather than half.
+- `docs/docs.settings.tmt` is deleted along with the eight
+  `@settings(file:...)` lines that loaded it, `docs/roadmap.tmt`'s
+  `@config(import:...)`, the `docs/.writ.tmt` placement row, and the
+  `justfile` allowlist entry. `bookmark` was already declared in
+  `.tomet/vocabularies/bookmark.vocabulary.tmt`.
+- `docs/spec/builtin-settings.tmt` stopped describing elements and now
+  lists only what `PrinterConfig::apply_entry` actually reads, plus the
+  two keys in `default.config.tmt` that nothing reads
+  (`format.blockquote.always_newline`, `migration`).
+
+Left alone on purpose: `tests/fixtures/` and `tests/ref/` still reference
+the deleted settings path. They are the frozen corpus, `workspace.ignore`
+keeps them out of the sweep, and the reference is never resolved there --
+`@settings(file:...)` is still a valid spelling.
+
 ### The principle behind all of it
 
 Recorded as `explicit-form-first` in the root `.writ.tmt`, because it
@@ -580,19 +633,26 @@ threads a document-wide `running_format` and goes with them.
       added, surfaced by the validator as `UnknownElement` /
       `ShapeMismatch`. The two divergent positional tables collapsed into
       one. `settings`, `import`, `references`, `id` joined `BUILTIN_KINDS`.
-      **Remaining:** namespace binding resolution (`#import(as:)`),
-      shorthand expansion, and ambiguous-shorthand errors.
-- [ ] 8. Trim the external `elements:` surface to `args` / `singleton` /
-      `types.*.style` and reject `content` / `placement` with a message
-      pointing at the use-site replacement. Note `SettingsSchema` reads
-      only `positional` today, so this is mostly docs plus rejection.
-      `docs/docs.settings.tmt` uses both removed keys and must change.
+      Binding resolution landed with `Bindings::for_document`, which binds
+      by *namespace name* (`@kind(X)`, `@use(ns)`) rather than by path, so
+      the `#import(as:)` form this line used to name no longer exists.
+      Shorthand expansion and ambiguous-shorthand errors are **moot, not
+      pending**: the 2026-09-05 design makes exactly two namespaces
+      shorthand-eligible (`std` and the document's own `@kind`), both
+      resolvable without leaving the file, and a vocabulary may not shadow
+      a `std` name -- so there is nothing to expand on save and no
+      ambiguity to report.
+- [x] 8. ~~Trim the external `elements:` surface to `args` / `singleton` /
+      `types.*.style`~~ — **deleted, not trimmed** (2026-09-06). The
+      trimming was written before the vocabulary design and the three keys
+      it kept turned out to be read by nothing; see "Step 8, redone" below.
 - [x] 9. Formatter, printer and the one-shot migrator.
       `scripts/migrate-sigils.py` and `scripts/migrate-rust-strings.py`
       did their run and have been deleted, as planned.
       Codeblocks now print as ``` fences (a `#codeblock[...]` cannot round
       trip, since `[content]` is ordinary markup now).
-      **Remaining:** namespace expansion on save.
+      No namespace expansion on save -- see step 7 for why there is
+      nothing to expand.
 - [x] 10. tree-sitter. `block_element`/`inline_element` replace
       `type_element`/`at_element`; `#`+name is one `block_sigil` token, at
       the same token precedence as `heading_marker` so match length decides
@@ -721,12 +781,12 @@ be added back or dropped later, and not worth blocking the design on.
 `default.config.tmt` configures `format.callout.style` and the guide
 teaches `@callout(note)[...]`; those three have to agree eventually.
 
-Measured 2026-09-05 over every tracked `.tmt`: `validate_document` reports
-246 errors across 48 files — 190 `UnknownElement`, 29 `ShapeMismatch`, 27
-`DuplicateId`. `bookmark` (45) is *declared* in `docs/docs.settings.tmt`
-and still unknown, because `classify` never reads the settings. This is
-why `tomet check` does not call the validator, while the js/java/python
-bindings and `apps/web` all do.
+The measurement that used to sit here (2026-09-05: 246 errors across 48
+files, `bookmark` unknown because `classify` never read the settings) is
+closed. `tomet check .` calls the validator and reports `OK: 85 file(s)`;
+`bookmark` resolves through `.tomet/vocabularies/bookmark.vocabulary.tmt`,
+which is where it should have been declared all along. Only the editorial
+question above is left.
 
 ## Known-unrelated failures
 

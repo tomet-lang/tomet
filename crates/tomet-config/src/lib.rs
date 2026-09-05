@@ -230,25 +230,12 @@ impl PrinterConfig {
             "vocabularies" => {
                 collect_paths(value, &mut cfg.vocabularies);
             }
-            "elements" => {
-                if let Value::Map(elems) = value {
-                    for (ek, ev) in elems {
-                        if ek == "callout" {
-                            if let Value::Map(props) = ev {
-                                Self::parse_callout_props(props, cfg);
-                            }
-                        } else if ek == "list" {
-                            if let Value::Map(props) = ev {
-                                Self::parse_list_props(props, cfg);
-                            }
-                        } else if ek == "table" {
-                            if let Value::Map(props) = ev {
-                                Self::parse_table_props(props, cfg);
-                            }
-                        }
-                    }
-                }
-            }
+            // No `elements` arm. It used to reach `callout`, `list` and
+            // `table` here and read their style out -- a fifth spelling of
+            // `format.callout.style`, used by no config in this repository.
+            // `elements:` now means nothing at all in `@settings`, which is
+            // what lets `tomet_validator` reject the whole key instead of
+            // half of it.
             "workspace" => {
                 if let Some(items) = value.get("ignore").and_then(|f| f.as_seq()) {
                     for item in items {
@@ -556,6 +543,29 @@ mod tests {
         assert_eq!(
             cfg.meta_fields.get("modified").unwrap().format.as_deref(),
             Some("rfc3339")
+        );
+    }
+
+    /// `format.callout.style.content` is the spelling that is read.
+    /// `elements.callout.style.content` said the same thing and no longer
+    /// does -- one fact, one place. `tomet_validator` reports the retired
+    /// key so the change is not a silent no-op for anyone who wrote it.
+    #[test]
+    fn callout_style_is_read_from_format_and_no_longer_from_elements() {
+        let live = r#"@config(format:json)+++
+{ "format": { "callout": { "style": { "content": "block" } } } }
++++"#;
+        assert_eq!(
+            load_config_from_str(live).unwrap().callout_content_style,
+            Some("block".to_string())
+        );
+
+        let retired = r#"@config(format:json)+++
+{ "elements": { "callout": { "style": { "content": "block" } } } }
++++"#;
+        assert_eq!(
+            load_config_from_str(retired).unwrap().callout_content_style,
+            None
         );
     }
 

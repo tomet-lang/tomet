@@ -94,8 +94,8 @@ mod tests {
         let value = resolve_settings_file(&fixture("valid_settings.tmt")).unwrap();
         match value {
             Value::Map(entries) => {
-                assert!(entries.iter().any(|(k, _)| k == "elements"));
-                assert!(entries.iter().any(|(k, _)| k == "types"));
+                assert!(entries.iter().any(|(k, _)| k == "format"));
+                assert!(entries.iter().any(|(k, _)| k == "macros"));
             }
             other => panic!("expected a map, got {other:?}"),
         }

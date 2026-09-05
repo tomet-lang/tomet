@@ -67,6 +67,19 @@ pub enum ValidationError {
         expected: &'static str,
         span: Span,
     },
+    /// A top-level `@settings`/`@config` key that has been retired.
+    ///
+    /// `elements:` described what a custom element takes -- its `args`,
+    /// `required`, `positional`, `content`, `placement` and `singleton`.
+    /// A `@vocabulary` document says all of that now, at the declaration
+    /// rather than in a settings map beside it, so the settings copy was
+    /// the second place one fact lived.
+    ///
+    /// It is reported rather than ignored because ignoring is how it got
+    /// here: of the six keys only `positional` was ever read, by a
+    /// `SettingsSchema` no caller ever built, so a document could declare
+    /// `singleton: true` and be obeyed by nothing at all.
+    RetiredSettingsKey { key: String, span: Span },
 }
 
 impl ValidationError {
@@ -80,6 +93,7 @@ impl ValidationError {
             ValidationError::ShapeMismatch { span, .. } => *span,
             ValidationError::DuplicateSingleton { duplicate, .. } => *duplicate,
             ValidationError::OutsidePreamble { span, .. } => *span,
+            ValidationError::RetiredSettingsKey { span, .. } => *span,
         }
     }
 }
@@ -167,6 +181,27 @@ impl fmt::Display for ValidationError {
                         "put it inside a paragraph, not alone on its line"
                     }
                 )
+            }
+            ValidationError::RetiredSettingsKey { key, .. } => {
+                // Named per key rather than one generic sentence: `elements`
+                // has somewhere to go and `types` does not, and telling a
+                // reader to move something that has no destination is worse
+                // than telling them it is gone.
+                let advice = match key.as_str() {
+                    "elements" => {
+                        "declare elements in a `@vocabulary` document instead -- \
+                         `@element` carries `display`, `region` and `singleton`, \
+                         and `@param` carries the arguments (docs/spec/vocabulary.tmt)"
+                    }
+                    "types" => {
+                        "it has no replacement: nothing read it, and per-element \
+                         rendering style has no home in settings yet -- \
+                         `format.callout.style` and `format.list.multiline.style` \
+                         are the only two that are read"
+                    }
+                    _ => "remove it",
+                };
+                write!(f, "`{key}` in `@settings` is retired; {advice}")
             }
         }
     }

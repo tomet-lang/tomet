@@ -65,7 +65,7 @@ docs-check:
     ./target/debug/tomet format --check .
     @stray=$(find docs -name '*.tmt' \
         | grep -vE '^docs/(spec|guide|examples|why|design/ideas)/' \
-        | grep -vE '^docs/(README|roadmap|docs\.settings|\.writ)\.tmt$'); \
+        | grep -vE '^docs/(README|roadmap|\.writ)\.tmt$'); \
     if [ -n "$stray" ]; then \
         echo "$stray" | while IFS= read -r f; do \
             echo "PLACEMENT FAIL: $f -- no row in docs/.writ.tmt's placement table"; \
