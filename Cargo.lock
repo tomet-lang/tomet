@@ -2081,6 +2081,7 @@ dependencies = [
  "tomet-markdown",
  "tomet-parser",
  "tomet-printer",
+ "tomet-semantics",
  "tomet-typst",
  "tomet-validator",
 ]
@@ -2101,6 +2102,7 @@ dependencies = [
  "tomet-markdown",
  "tomet-parser",
  "tomet-printer",
+ "tomet-semantics",
  "tomet-typst",
  "tomet-validator",
  "wasm-bindgen",
@@ -2219,6 +2221,7 @@ dependencies = [
  "tomet-markdown",
  "tomet-parser",
  "tomet-printer",
+ "tomet-semantics",
  "tomet-typst",
  "tomet-validator",
 ]

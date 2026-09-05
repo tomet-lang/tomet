@@ -210,6 +210,52 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_validateJson(
         .unwrap_or(std::ptr::null_mut())
 }
 
+/// Validate `.tmt` source text against `std` plus vocabularies passed as
+/// a JSON array of source strings.
+///
+/// Without them, `validateJson` knows only `std`, so every element a
+/// vocabulary declares comes back as unknown. A source that does not
+/// parse, or has no `@vocabulary(ns)` header, is skipped -- it binds no
+/// namespace. Check vocabularies themselves with `tomet check`.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_org_tomet_tomet_Tomet_validateJsonWith(
+    mut env: JNIEnv,
+    _class: JClass,
+    source: JString,
+    vocabularies_json: JString,
+) -> jstring {
+    let src = match get_string(&mut env, &source) {
+        Ok(s) => s,
+        Err(e) => return throw_err(&mut env, e),
+    };
+    let vocab_json = match get_string(&mut env, &vocabularies_json) {
+        Ok(s) => s,
+        Err(e) => return throw_err(&mut env, e),
+    };
+    let vocabularies: Vec<String> = match serde_json::from_str(&vocab_json) {
+        Ok(v) => v,
+        Err(e) => return throw_err(&mut env, e),
+    };
+    let doc = match tomet_parser::parse_document(&src) {
+        Ok(d) => d,
+        Err(e) => return throw_err(&mut env, e),
+    };
+    let parsed = vocabularies.iter().filter_map(|v| {
+        tomet_parser::parse_document(v)
+            .ok()
+            .and_then(|d| tomet_semantics::Vocabulary::from_document(&d))
+    });
+    let bindings = tomet_semantics::Bindings::for_document(&doc, parsed);
+    let diagnostics = tomet_validator::validate_document_with(&doc, &bindings);
+    let json = match serde_json::to_string(&diagnostics) {
+        Ok(j) => j,
+        Err(e) => return throw_err(&mut env, e),
+    };
+    env.new_string(json)
+        .map(|s| s.into_raw())
+        .unwrap_or(std::ptr::null_mut())
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

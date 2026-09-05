@@ -90,6 +90,39 @@ pub fn validate(source: &str) -> Result<JsValue, JsValue> {
     serde_wasm_bindgen::to_value(&diagnostics).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+/// Validate `.tmt` source text against `std` plus the vocabularies given
+/// as source text.
+///
+/// A host that has the vault's `@vocabulary(...)` files can pass their
+/// contents here. Without them, `validate` knows only `std`, so every
+/// element a vocabulary declares comes back as unknown -- correct, since
+/// nothing said it existed, but not useful in an editor that could have
+/// said so.
+///
+/// A source that does not parse, or that carries no `@vocabulary(ns)`
+/// header, is skipped: it declares no namespace, so there is nothing to
+/// bind. Check vocabularies themselves with `tomet check`.
+#[wasm_bindgen(js_name = validateWith)]
+pub fn validate_with(source: &str, vocabularies: Vec<String>) -> Result<JsValue, JsValue> {
+    let doc =
+        tomet_parser::parse_document(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let bindings = bindings_from_sources(&doc, &vocabularies);
+    let diagnostics = tomet_validator::validate_document_with(&doc, &bindings);
+    serde_wasm_bindgen::to_value(&diagnostics).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+fn bindings_from_sources(
+    doc: &tomet_ast::Document,
+    vocabularies: &[String],
+) -> tomet_semantics::Bindings {
+    let parsed = vocabularies.iter().filter_map(|src| {
+        tomet_parser::parse_document(src)
+            .ok()
+            .and_then(|d| tomet_semantics::Vocabulary::from_document(&d))
+    });
+    tomet_semantics::Bindings::for_document(doc, parsed)
+}
+
 /// Compute syntax highlight token spans for CodeMirror and other editors.
 #[wasm_bindgen(js_name = highlightSpans)]
 pub fn highlight_spans(source: &str) -> Result<JsValue, JsValue> {

@@ -106,9 +106,13 @@
 
 ## 残っている決定
 
-3. **ファイルを読めない実行環境に語彙をどう渡すか。**
-   js/java/python バインディングと `apps/web` は `validate_document` を
-   呼んでいて、名前空間つき要素を全部 unknown と報告するようになる。
+3. ~~**ファイルを読めない実行環境に語彙をどう渡すか。**~~ 呼び出し側が渡す
+   （著者の判断）。`Bindings::for_document(doc, vocabularies)` を
+   `tomet-semantics` に置いた。純粋なので wasm からも呼べる。
+   `tomet-resolver::bindings_for` はそれを「ディスクから読む」で包むだけに
+   なった。js は `validateWith`、python は `validate_with`、java は
+   `validateJsonWith`。`apps/web` は据え置き（サーバなので、必要になったら
+   resolver をそのまま使える）。
 4. ~~**`callout` を `std` に入れるか。**~~ 入れた（著者の判断）。 `tmtroot/readme.tmt` が唯一の
    未解決ファイルで、`@callout(note)[...]` を使っている。
    `docs/spec/builtin-elements.tmt` は「組み込み kind ではない」と書いているが、

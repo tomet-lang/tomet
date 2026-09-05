@@ -113,4 +113,20 @@ public final class Tomet {
      * @throws TometException if syntax parsing fails
      */
     public static native String validateJson(String source) throws TometException;
+
+    /**
+     * Validates .tmt source text against std plus the given vocabularies.
+     *
+     * <p>Without them, {@link #validateJson} knows only the std namespace, so
+     * every element a vocabulary declares is reported as unknown. A vocabulary
+     * source that does not parse, or that carries no {@code @vocabulary(ns)}
+     * header, is skipped: it binds no namespace.
+     *
+     * @param source            Tomet source text
+     * @param vocabulariesJson  JSON array of vocabulary source strings
+     * @return JSON string containing the array of validation diagnostics
+     * @throws TometException if syntax parsing fails
+     */
+    public static native String validateJsonWith(String source, String vocabulariesJson)
+            throws TometException;
 }
