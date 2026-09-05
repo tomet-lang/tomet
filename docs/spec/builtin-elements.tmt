@@ -10,12 +10,34 @@
 // 実体化のとき @blueprint(X) は @kind(X) に昇格する。
 @blueprint(@string){ version: @string, description: @string }
 
+// vocabulary は語彙。どの要素名が存在するかを宣言する。blueprint とは別物で、
+// blueprint は実体化で消費されるが語彙は消費されず、必要になる時期も違う
+// (語彙は文書を読むのに、blueprint は検証するのに要る)。
+// 現状は名前の認識だけ。宣言を読んで検証に使う実装はまだ無い。
+@vocabulary(@string){ version: @string }
+@element(@string){ display: block, region: preamble, singleton: @bool }[ 説明 ]
+@param(@string){ type: @type, required: @bool, positional: @bool, default: @any }[ 説明 ]
+@args{ ... }                  // @element の中。(args) スロットの記述
+@data{ open: @bool, ... }     // @element の中。{value} スロットの記述
+@content{ allow: (@name) }    // @element の中。[content] スロットの記述
+
 @meta(format:json)
 @config(format:json)
 
-@link(https:@url)[ display_name ]
+// link/embed のキーは `target` ひとつだけ。何を指しているか(url/file/tm/id/ref)は
+// キーではなく、target 文字列自身の接頭辞から導かれる (tomet_semantics::target_scheme)。
+@link("https://example.com")[ display_name ]   // 位置引数は target に正規化される
+@link(target:"file:a/b.tmt")[ display_name ]
+@link(target:"ref:note")
+
+// 旧い per-scheme キー。target 一本に統一する前の綴りで、
+// url/file/tm/id/ref の五つだけが target に回収される
+// (tomet_semantics::RECOVERABLE_TARGET_SCHEMES)。それ以外のキーは回収されず、
+// target が空のまま残る -- `@link(https:...)` や `@link(tmt:...)` は動かない。
+@link(url:@url)[ display_name ]
 @link(file:@file)[ display_name ]
-@link(tmt:@tmt_file)[ display_name ]
+@link(tm:@tmt_file)[ display_name ]
+@link(id:@id)[ display_name ]
 @link(ref:@ref)
 
 @heading(level: @int)[ display_name ]
@@ -42,24 +64,26 @@ $(@var)
 /* comments */
 ```
 
-// 以下は未実装(構想段階):
+#[ 以下は未実装(構想段階) ]
 
 ```tm
-// ${@var +-*/ ...}               // 未実装: 演算子は無い。算術は関数形のみ (${sub(1, 2)})。
-//                                   入れるなら `-` の前後に空白が要る -- `a-b` は識別子ひとつ
+${@var +-*/ ...}               // 未実装: 演算子は無い。算術は関数形のみ (${sub(1, 2)})。
+                                  入れるなら `-` の前後に空白が要る -- `a-b` は識別子ひとつ
 
-// #config(
-//   style: structural,
-//   export: { type: commonmark, path: "README.md" }
-// )
-// #import(file:path)            // Unimplemented: #import is not yet designed
+@config(
+  style: structural,
+  export: { type: commonmark, path: "README.md" }
+)
+// @import は二つの仕事を一語に負わせていた。分けて、名前を別にした。
+@use(@file)                   // 未実装: 語彙を名前空間として束縛する
+@use(@file){ as: @string }    // 未実装: as: は名前が衝突したときの逃げ道だけ
+@include(@file)               // 未実装: 他の文書をここに展開する
 
-// @link(url:@url)[ display_name ]  // 未実装: `@link`という明示名には特別な意味がない
-                                      // (url/file/refとして特別扱いされるのは @url/@file/@ref か
-                                      // 名前を省略した @(url:...) のみ)
-// @tag{}                            // 未実装: 組み込みkindではない。書けるが汎用要素として扱われる
+@tag{}                            // 未実装: 組み込みkindではない。書けるが汎用要素として扱われる
 
-// @icon(pack:lucide, name:@string)  // 未実装: 組み込みkindではなく、アイコン表示の特別処理もない
-// @index()[ title ]                  // 未実装: 同上、目次生成などの特別処理はない
-// @callout(variant:info)[ @content ] // 未実装: 同上、専用のスタイル分岐はない
+@icon(pack:lucide, name:@string)  // 未実装: 組み込みkindではなく、アイコン表示の特別処理もない
+@index()[ title ]                  // 未実装: 同上、目次生成などの特別処理はない
+@callout(variant:info)[ @content ] // 未実装: 同上、専用のスタイル分岐はない
+@style()
+@color()
 ```
