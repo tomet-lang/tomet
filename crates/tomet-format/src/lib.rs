@@ -4,18 +4,25 @@
 //! metadata. Normalizes whitespace policy (LF line endings, no trailing
 //! whitespace, collapsed excess blank lines, exactly one final newline)
 //! while losslessly preserving literal whitespace and blank lines inside
-//! raw/verbatim content (`<codeblock>[...]` and elements opting in via
-//! `content:raw`). It never changes the parsed `Document` -- the
-//! `does_not_change_the_parsed_document` test in the `tomet-tests`
-//! package asserts this across the whole shared corpus. That test also
-//! carries a `KNOWN_FORMAT_CHANGES_DOCUMENT` list recording where the
-//! guarantee currently does *not* hold: an element whose `(content:raw)`
-//! never takes effect (because the source used full-width `｛｝` where the
-//! grammar wants ASCII `{}`) has no raw span to protect, so the
-//! trailing-whitespace rule runs over content that was meant to be
-//! verbatim. There is one further deliberate
-//! exception: [`quote_bare_at_yaml_values`], run first, wraps a bare
-//! `@...`-led value inside any `(...format:yaml...){...}` body in `""`.
+//! raw/verbatim content (a ``` fenced code block, and any element body
+//! carried by a `+++` fence). It never changes the parsed `Document` --
+//! the `does_not_change_the_parsed_document` test in the `tomet-tests`
+//! package asserts this across the whole shared corpus, and its
+//! `KNOWN_FORMAT_CHANGES_DOCUMENT` exception list is empty.
+//!
+//! The list held one entry until the `+++` fence replaced
+//! `(content:raw)[...]`. A raw body used to be delimited by matched
+//! brackets, so a source that wrote full-width `｛｝` where the grammar
+//! wants ASCII `{}` did not opt into raw at all, left no raw span to
+//! protect, and had the trailing-whitespace rule run over content meant
+//! to be verbatim. A fence is delimited by a *line*, so no character
+//! inside the body can end it early or make the formatter disagree with
+//! the parser about where verbatim content begins. The bug class is gone
+//! by construction rather than by exception.
+//!
+//! There is one deliberate exception left:
+//! [`quote_bare_at_yaml_values`], run first, wraps a bare `@...`-led
+//! value inside any `(format:yaml)+++ ... +++` body in `""`.
 //! Unquoted, `@` is a reserved YAML indicator that can't start a plain
 //! scalar (`embedded_format.rs` hands the body straight to `serde_yaml`,
 //! which rejects it outright), so that shape doesn't have a successfully-

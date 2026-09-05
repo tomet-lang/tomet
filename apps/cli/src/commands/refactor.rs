@@ -60,6 +60,8 @@ pub(crate) fn refactor_cmd(
     }
 
     if in_place {
+        // Lossy -- `refactor_source` re-prints from the AST, which carries
+        // no comments. See its doc comment before widening what `-i` runs on.
         let total = report.diffs.len();
         let saved = tomet_workspace::save_file_diffs(&mut report.diffs)?;
         println!("Refactored {saved} of {total} file(s).");

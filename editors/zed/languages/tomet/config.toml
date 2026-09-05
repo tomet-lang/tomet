@@ -21,4 +21,3 @@ start = "("
 end = ")"
 close = true
 newline = true
-
