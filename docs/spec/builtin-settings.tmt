@@ -2,6 +2,16 @@
 
 /* Tomet 設定DSL (Config DSL / Schema Specification)
 
+   このページの `elements` は置き換え予定である。要素の語彙は `@vocabulary`
+   が宣言するものになり、この面には残らない。特に:
+   - `placement:` は実装されるのではなく削除される。`head` は領域の規則、
+     `block`/`inline` は形の規則で、同じ軸の値ではない。置き換えは
+     `display` と `region` の二つ。
+   - `singleton:` は残るが、置き場所が `@vocabulary` の `@element` に移る。
+   - `required:` / `positional:` は引数ごとの `@param` に吸収される。
+     名前のリストを別に持つと、同じ事実が三箇所に住むため。
+   @link(file:./vocabulary.tmt)[`spec/vocabulary.tmt`] を参照。
+
    要素スキーマ定義の特徴:
    - 必須フィールド一括指定: `required: [title, id]` (JSON Schema / OpenAPI 標準に準拠)
    - 位置引数指定: `positional: [title]`

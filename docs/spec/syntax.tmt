@@ -5,8 +5,8 @@
 
 ```tm
 @xxx(args)[content]{value}
-@()[]{}
 @T()[]{}
+@ns.T()[]{}       // 名前空間つき。区切りは `.`
 #[]{}
 ##[]{}
 - (marker) content    // () は @T(args) と同じ Value 文法。key:value も、
@@ -69,11 +69,29 @@ ${xxx}                // 実装済み: `${id}` / `${a.b}` / `${sum(a, b)}` の�
 
 ##[ 短縮 ]
 
-組み込みの参照系は `@T` の代わりに `@` を使い、`()` の中のキー名`(url / file / ref)`から種別を推論する。名前を書かなくていい分、キーの意味は型ごとに一意に保つ。
-- `@(url:https://example.com)[Wiki]`
-- `@[Wiki](url:https://example.com)`
-- `@(file:assets/image.png)[Caption]`
-- `@(ref:anotation1)`
+省略できるのは**名前空間**である。要素の名前そのものは省略できない。
+
+```tm
+@link(target:"...")        // @std.link の省略形
+@layers{}                  // @kind(writ) の文書でのみ、@writ.layers の省略形
+@deck.ref(id:3)            // @use で持ち込んだものは省略できない
+```
+
+省略が許されるのは `std` と、その文書の `@kind` が名乗る名前空間の二つだけ。
+どちらも読者が文書を出ずに解決できる。詳細は
+@link(file:./vocabulary.tmt)[`spec/vocabulary.tmt`]。
+
+---[ 撤去済み ]---
+
+`()` の中のキー名から種別を推論する短縮（`@(url:...)` が link になる）は
+無くなった。`ElementKind::Link` を得る唯一の方法は `@link` と書くこと。
+名前を省いた `@(...)` は字句としてはまだ通るが、種別を持たない。
+
+```tm
+@(url:https://example.com)[Wiki]    // 撤去: link にならない
+@(file:assets/image.png)[Caption]   // 撤去
+@(ref:anotation1)                   // 撤去
+```
 
 ##[ コネクト ]
 
