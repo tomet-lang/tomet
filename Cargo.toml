@@ -41,7 +41,7 @@ members = [
   "crates/tomet-convert-pandoc",
 
   #[ Format -- .tmt source text production & formatting ]
-  "crates/tomet-formatter",
+  "crates/tomet-format",
   "crates/tomet-format-field-utils",
   "crates/tomet-format-style",
   "crates/tomet-format-printer",
@@ -91,7 +91,7 @@ tomet-pandoc = { path = "crates/tomet-convert-pandoc" }
 tomet-field-utils = { path = "crates/tomet-format-field-utils" }
 tomet-style = { path = "crates/tomet-format-style" }
 tomet-printer = { path = "crates/tomet-format-printer" }
-tomet-formatter = { path = "crates/tomet-formatter" }
+tomet-formatter = { path = "crates/tomet-format" }
 #[ Workspace ]
 tomet-workspace = { path = "crates/tomet-workspace" }
 tomet-indexer = { path = "crates/tomet-workspace-indexer" }

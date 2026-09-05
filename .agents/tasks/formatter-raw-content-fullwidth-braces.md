@@ -31,7 +31,7 @@ those lines as ordinary text.
 
 ## Open question: which side is wrong
 
-- **Formatter.** `crates/tomet-formatter/src/lib.rs`'s module doc and
+- **Formatter.** `crates/tomet-format/src/lib.rs`'s module doc and
   `docs/develop/architecture.md` both state the no-semantic-change
   guarantee without qualification. Under that reading the formatter should
   hold the line even for input that did not parse the way it looks.
@@ -57,5 +57,5 @@ entry is removed.
 - [ ] 1. Decide the scope of the no-semantic-change guarantee
 - [ ] 2. Fix accordingly (formatter, parser, and/or fixture)
 - [ ] 3. Remove `examples/bookmark.tmt` from `KNOWN_FORMAT_CHANGES_DOCUMENT`
-- [ ] 4. Reconcile the wording in `crates/tomet-formatter/src/lib.rs` and
+- [ ] 4. Reconcile the wording in `crates/tomet-format/src/lib.rs` and
       `docs/develop/architecture.md` with whatever was decided

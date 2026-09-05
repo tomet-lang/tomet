@@ -5,6 +5,21 @@ prefix family, not through subdirectories -- see
 each crate's `//!` module doc for what it actually does and
 how they depend on each other; this file is just the naming map.
 
+A family is spelled `tomet-<family>` for the crate that *is* the family,
+and `tomet-<family>-<name>` for the rest. Three families have a bare
+centre (`semantics`, `format`, `workspace`) and two do not (`syntax`,
+`convert`), which is why the root `.writ.tmt`'s `@layers` patterns are
+`tomet-semantics*` in the first case and `tomet-convert-*` in the second
+-- the hyphen is present exactly when there is no bare centre to match.
+
+`crates/tomet-format` was `crates/tomet-formatter` until 2026-09-06, the
+one crate that did not follow this. The table below listed it as a member
+of `tomet-format-*` while the directory said otherwise, and `@layers` had
+been loosened to `tomet-format*` to cope -- a pattern that read like the
+`tomet-semantics*` case without having its reason. Renaming the directory
+made the loosening correct instead of coincidental. The package is still
+`tomet-formatter`; only the directory moved.
+
 Each package's Cargo.toml `name` is unprefixed by family (e.g.
 `tomet-ast`, unchanged since before this naming scheme) even though
 its directory carries the family prefix (`tomet-syntax-ast`) --
@@ -23,15 +38,17 @@ tomet-semantics*     semantics (bare, no suffix -- the crate IS the category),
 
 tomet-transform      pure in-memory AST refactoring & macro rewrite rules.
 
-tomet-convert-*      html, markdown.
+tomet-convert-*      html, markdown, pandoc, typst.
                          Conversion to/from *external* document formats.
 
-tomet-format-*       field-utils, formatter, printer, style.
+tomet-format*        format (bare, no suffix -- publishes tomet-formatter),
+                         format-field-utils, format-printer, format-style.
                          .tmt source text production, formatting, and styling.
 
-tomet-workspace*     workspace (bare, no suffix), workspace-config,
+tomet-workspace*     workspace (bare, no suffix),
                          workspace-indexer, workspace-links.
-                         Multi-file batch I/O, directory scanning, link checking, and configuration discovery.
+                         Multi-file batch I/O, directory scanning, and link checking.
+                         Config discovery is tomet-config, which sits below these.
 
 serde_tomet,          external-ecosystem adapters. Follow their
 tree-sitter-tomet     host ecosystem's own naming convention
