@@ -31,6 +31,9 @@ members = [
   #[ Config -- PrinterConfig discovery & loading; the producers sit on this ]
   "crates/tomet-config",
 
+  #[ Load -- the front door: config + vocabularies + parse + bind ]
+  "crates/tomet-load",
+
   #[ Transform -- in-memory AST transformations & macros ]
   "crates/tomet-transform",
 
@@ -97,6 +100,7 @@ tomet-workspace = { path = "crates/tomet-workspace" }
 tomet-indexer = { path = "crates/tomet-workspace-indexer" }
 tomet-links = { path = "crates/tomet-workspace-links" }
 tomet-config = { path = "crates/tomet-config" }
+tomet-load = { path = "crates/tomet-load" }
 #[ Public ]
 serde_tomet = { path = "crates/serde_tomet" }
 tree-sitter-tomet = { path = "crates/tree-sitter-tomet" }
