@@ -18,6 +18,7 @@ Every workspace member belongs to exactly one layer, and depends only on
 layers strictly below its own. Same-layer dependencies are allowed;
 upward ones are not.
 /tests/SYNTAX.md
+
 @layers{
   6: [ "apps/*", "bindings/*", "editors/*", "tests" ]
   5: [ "crates/tomet-workspace", "crates/tomet-workspace-indexer", "crates/tomet-workspace-links" ]
