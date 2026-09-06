@@ -59,5 +59,6 @@ cssclass: "name"     // 同上、cssclass（html: class 属性）。値は単一
 ---[ special ]---
 
 ```tm
-// @this             // 未実装: `@this` に特別な意味は無い
+// @self             // 未実装。要素の位置での自己参照。補間側の `${self.*}` と
+                     // 同じ語を使う (docs/spec/builtin-functions.tmt)
 ```
