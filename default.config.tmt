@@ -96,7 +96,6 @@ id: doc-kWBcIUUz
     ".tomet/vocabularies/node-graph.vocabulary.tmt",
     ".tomet/vocabularies/scenario.vocabulary.tmt",
     ".tomet/vocabularies/video.vocabulary.tmt",
-    ".tomet/vocabularies/dirs.vocabulary.tmt",
     ".tomet/vocabularies/idea.vocabulary.tmt"
   ],
   "workspace": {

@@ -28,6 +28,23 @@ pub fn link_target(el: &Element, kind: &ElementKind) -> Option<String> {
     if !matches!(kind, ElementKind::Link | ElementKind::Embed) {
         return None;
     }
+    target_arg(el)
+}
+
+/// The path a `@file`/`@dir` names, or `None` for anything else.
+///
+/// No scheme prefix to strip: the element name already said which of the
+/// two this is, so a `file:`/`dir:` inside the value would be saying it
+/// twice. That is the difference from [`link_target`], where one element
+/// serves every scheme and the string has to carry which.
+pub fn path_target(el: &Element, kind: &ElementKind) -> Option<String> {
+    if !matches!(kind, ElementKind::File | ElementKind::Dir) {
+        return None;
+    }
+    target_arg(el)
+}
+
+fn target_arg(el: &Element) -> Option<String> {
     let args = normalized_element_args(el)?;
     if let Some(target) = args.get("target").and_then(|v| v.as_str()) {
         return Some(target.to_string());
@@ -51,6 +68,13 @@ pub fn link_target(el: &Element, kind: &ElementKind) -> Option<String> {
 pub fn link_target_of(el: &Element) -> Option<(ElementKind, String)> {
     let kind = crate::classify_std_lenient(el);
     link_target(el, &kind).map(|target| (kind, target))
+}
+
+/// [`path_target`] with the kind it classified to, for a caller sweeping
+/// a document without one in hand.
+pub fn path_target_of(el: &Element) -> Option<(ElementKind, String)> {
+    let kind = crate::classify_std_lenient(el);
+    path_target(el, &kind).map(|target| (kind, target))
 }
 
 /// What kind of thing a `target` string points at, derived purely from the
@@ -306,5 +330,47 @@ mod tests {
         let el = map_el(Sigil::named("meta"), vec![("format", s("json"))]);
         assert_eq!(crate::classify_std_lenient(&el), ElementKind::Meta);
         assert_eq!(link_target_of(&el), None);
+    }
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+    use tomet_ast::{Sigil, Value};
+    use tomet_tree::element_new;
+
+    fn path_el(name: &str, value: &str) -> Element {
+        let mut el = element_new(Sigil::named(name));
+        el.args = Some(Value::String(value.to_string()));
+        el
+    }
+
+    #[test]
+    fn file_and_dir_carry_a_bare_path() {
+        // No scheme prefix to strip: the element name is the scheme.
+        // Writing `@file(file:x)` would say it twice, and this is what
+        // makes that visible -- the value comes back whole.
+        let el = path_el("file", "docs/README.tmt");
+        assert_eq!(
+            path_target(&el, &ElementKind::File),
+            Some("docs/README.tmt".to_string())
+        );
+        let el = path_el("dir", "docs/spec");
+        assert_eq!(
+            path_target(&el, &ElementKind::Dir),
+            Some("docs/spec".to_string())
+        );
+    }
+
+    #[test]
+    fn path_target_and_link_target_do_not_answer_for_each_other() {
+        // Two accessors because they are two questions. A caller sweeping
+        // for links must not pick up a mention, and a caller sweeping for
+        // mentions must not pick up a link -- they render differently and
+        // only one produces an `<a>`.
+        let file = path_el("file", "x.rs");
+        assert_eq!(link_target(&file, &ElementKind::File), None);
+        let link = path_el("link", "x.rs");
+        assert_eq!(path_target(&link, &ElementKind::Link), None);
     }
 }

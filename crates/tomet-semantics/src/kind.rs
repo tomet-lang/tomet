@@ -80,6 +80,23 @@ pub enum ElementKind {
     /// scheme prefix via `crate::target::target_scheme`, once the target
     /// has been extracted with `crate::target::link_target`.
     Link,
+    /// `@file(path/to/x)` -- a path, named and not navigated to.
+    ///
+    /// Separate from [`Link`](ElementKind::Link) because the two differ
+    /// in what they produce: `@link` is an `<a>`, and this is a mention.
+    /// Prose that says "read `codeblock.rs`" is not offering to take the
+    /// reader there. Before this, such a mention was written in
+    /// backticks, which no checker can tell from a sentence that happens
+    /// to look like a path -- 453 of them here, and of the 164 distinct
+    /// ones only 64 name something that exists.
+    ///
+    /// Checked like `@link(file:...)`: the path has to exist and be a
+    /// file. Not a duplicate of it -- one navigates, one names.
+    File,
+    /// `@dir(path/to/x)` -- the same for a directory, checked with
+    /// `is_dir` rather than `is_file`, for the reason `dir:` exists at
+    /// all (see `crate::target::TargetScheme::Dir`).
+    Dir,
     Embed,
     Hr,
     Em,
@@ -162,6 +179,8 @@ impl ElementKind {
             ElementKind::Draft => "draft",
             ElementKind::Fixme => "fixme",
             ElementKind::Links => "links",
+            ElementKind::File => "file",
+            ElementKind::Dir => "dir",
             ElementKind::Link => "link",
             ElementKind::Embed => "embed",
             ElementKind::Icon => "icon",
@@ -212,7 +231,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 32] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 34] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -241,6 +260,8 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 32] = [
     ("draft", ElementKind::Draft),
     ("fixme", ElementKind::Fixme),
     ("links", ElementKind::Links),
+    ("file", ElementKind::File),
+    ("dir", ElementKind::Dir),
     ("link", ElementKind::Link),
     ("embed", ElementKind::Embed),
     ("icon", ElementKind::Icon),
@@ -420,7 +441,9 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         // `*emphasis*` standing as a block. Constraining these three
         // caught nothing but ordinary writing, in this repository's own
         // `.writ.tmt` among other places.
-        Link | Embed | Icon => return None,
+        // A path mention goes both ways too: inside a sentence, and alone
+        // in a table cell where the cell is the reference.
+        Link | Embed | Icon | File | Dir => return None,
         // Either shape, for the same reason: a gap is sometimes a phrase
         // inside a sentence and sometimes a whole missing section.
         Draft | Fixme => return None,

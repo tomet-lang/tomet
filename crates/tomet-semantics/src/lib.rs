@@ -38,6 +38,9 @@ pub use positional::{
     normalized_element_args_in, normalized_list_marker,
 };
 pub use table::{TableCell, TableRow, parse_table_rows};
-pub use target::{TargetScheme, link_target, link_target_of, target_scheme};
+pub use target::{
+    EXPLICIT_SCHEMES, TargetScheme, link_target, link_target_of, path_target, path_target_of,
+    target_scheme,
+};
 pub use tomet_tree::{ElementExt, ValueExt};
 pub use vocabulary::{Bindings, ElementDecl, ParamDecl, Region, Vocabulary};

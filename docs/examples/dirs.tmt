@@ -1,18 +1,26 @@
 @kind(dirs)
 
-@file(readme.md)
-[ 説明 ]
+@file(README.md)
+[ このリポジトリが何であるか、どう建てるか ]
 
-@dirs(src)
-[ ソースコード ]
-@file(src/Cargo.toml)
-[ パッケージコンフィグ ]
-@file(src/crates)
-[ Crates ]
+@dir(crates)
+[ ライブラリ。層ごとに名前の前置きが違う ]
+@dir(crates/tomet-syntax-parser)
+[ 文法の正。ここが受け付けるものが言語である ]
+@file(crates/tomet-syntax-parser/.writ.tmt)
+[ このクレートが従う規則 ]
 
-@dirs(apps)
-[ ソースコード ]
-@file(apps/Cargo.toml)
-[ パッケージコンフィグ ]
-@file(apps/crates)
-[ Crates ]
+@dir(apps)
+[ 実行されるもの ]
+@file(apps/cli/src/main.rs)
+[ `tomet` コマンドの入口 ]
+
+@dir(docs)
+[ 文書。どこに何があるかは `docs/README.tmt` ]
+@file(docs/README.tmt)
+[ その地図 ]
+
+@dir(tests)
+[ クレートをまたぐ検査と、凍結したコーパス ]
+@file(tests/SYNTAX.md)
+[ パーサが実際に受け付ける構文の全部。生成物 ]

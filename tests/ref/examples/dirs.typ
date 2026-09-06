@@ -1,21 +1,14 @@
-// tomet:file
-説明
+`readme.md` 説明
 
-// tomet:dirs
-ソースコード
+`src` ソースコード
 
-// tomet:file
-パッケージコンフィグ
+`src/Cargo.toml` パッケージコンフィグ
 
-// tomet:file
-Crates
+`src/crates` Crates
 
-// tomet:dirs
-ソースコード
+`apps` ソースコード
 
-// tomet:file
-パッケージコンフィグ
+`apps/Cargo.toml` パッケージコンフィグ
 
-// tomet:file
-Crates
+`apps/crates` Crates
 

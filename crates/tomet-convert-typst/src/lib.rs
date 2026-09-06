@@ -37,6 +37,7 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
+    path_target,
     TargetScheme, classify_std_lenient, heading_level, is_directive, link_target, list_items,
     list_ordered, normalized_element_args, parse_table_rows, target_scheme,
 };
@@ -137,6 +138,7 @@ fn element_to_typst(el: &Element, inline: bool) -> String {
         "callout" => render_callout(el),
         "table" => render_table(el),
         "link" => render_link(el),
+        "file" | "dir" => render_path(el, inline),
         "embed" => render_embed(el),
         "links" => render_links_container(el),
         "interp" => render_interp(el),
@@ -320,6 +322,23 @@ fn render_table(el: &Element) -> String {
 /// into the same general case). The scheme prefix itself is stripped
 /// before rendering -- it's addressing metadata, not part of the visible
 /// target.
+/// `@file(x)`/`@dir(x)` -> Typst raw text, the same shape CommonMark
+/// gets. A path is named, not navigated to, so there is no `#link` here.
+fn render_path(el: &Element, inline: bool) -> String {
+    let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
+    let content = match &el.content {
+        Some(content) if !content.is_empty() => Some(inline_to_typst(content)),
+        _ => None,
+    };
+    if inline {
+        return format!("`{}`", content.unwrap_or(path));
+    }
+    match content {
+        Some(content) => format!("`{path}` {content}"),
+        None => format!("`{path}`"),
+    }
+}
+
 fn render_link(el: &Element) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);

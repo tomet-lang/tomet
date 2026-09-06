@@ -14,6 +14,7 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
+    path_target,
     EXACT_DATA_KEY, ElementKind, TargetScheme, classify_std_lenient, flatten_data, heading_level,
     is_directive, link_target, list_items, list_ordered, normalized_element_args, target_scheme,
 };
@@ -324,6 +325,7 @@ fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) 
         }
         "links" => render_links_container(cx, el, out),
         "link" => render_link_element(cx, el, out, inline),
+        "file" | "dir" => render_path_element(cx, el, out, inline),
         "embed" => render_embed_element(el, out),
         "icon" => render_icon_element(cx, el, out, inline),
         "hr" => render_hr_element(cx, el, out),
@@ -520,6 +522,53 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
         }
     }
     s
+}
+
+/// `@file(x)`/`@dir(x)` -- a path named, not navigated to.
+///
+/// A `<code>`, not an `<a>`, and that is the whole difference from
+/// `render_link_element`. Prose saying "read `codeblock.rs`" is not
+/// offering to take the reader there, and before these elements existed
+/// it was written in backticks -- which is exactly what this renders back
+/// to, so moving a mention onto `@file` changes what a checker can see
+/// and nothing a reader can.
+fn render_path_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
+    let kind = classify_std_lenient(el);
+    let path = path_target(el, &kind).unwrap_or_default();
+    let class = format!("tm-{}", kind.as_str());
+    let content = el
+        .content
+        .as_ref()
+        .filter(|c| !c.is_empty())
+        .map(|c| {
+            let mut s = String::new();
+            render_inlines(cx, c, &mut s);
+            s
+        });
+
+    if inline {
+        // A mention. `[content]` is a label and stands in for the path,
+        // the way `@link`'s does -- the whole point of writing one is
+        // that the path is long and the sentence is not about its length.
+        out.push_str(&format!("<code class=\"{class}\">"));
+        out.push_str(&content.unwrap_or_else(|| escape_html(&path)));
+        out.push_str("</code>");
+        return;
+    }
+
+    // A listing row. Here `[content]` describes the path rather than
+    // replacing it, and both are wanted: a directory tree whose rows say
+    // only "Crates" tells the reader nothing, which is what this rendered
+    // as while the path lived in a `data-value` nobody sees.
+    out.push_str(&format!(
+        "<div class=\"{class}\"><code>{}</code>",
+        escape_html(&path)
+    ));
+    if let Some(content) = content {
+        out.push_str(" ");
+        out.push_str(&content);
+    }
+    out.push_str("</div>\n");
 }
 
 /// `@link(target:..)` -- the target string's own scheme prefix (see
