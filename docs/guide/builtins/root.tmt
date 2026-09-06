@@ -1,0 +1,104 @@
+#[ 組み込み要素の地図 ]
+
+組み込み要素は32個ある。全部を覚える必要はない。六つの群のどれかに入ると知って
+いれば、探しているものがどのあたりにあるか見当がつく。
+
+正確な引数と全一覧は
+@link(file:../../spec/builtin-elements.tmt)[`spec/builtin-elements.tmt`] にある。
+この頁は地図のほうで、群が分かると何が分かるかを書く。
+
+##[ 六つの群 ]
+
+@table[
+[ 群       ][ 何のためにあるか       ][ 要素 ]
+[ 宣言     ][ 文書が自分について言う ][ `kind` `version` `meta` `config` `settings` `blueprint` `use` `include` ]
+[ 語彙     ][ 要素そのものを宣言する ][ `vocabulary` `element` `param` `args` `data` `content` ]
+[ 印       ][ 書きかけの箇所を印す   ][ `draft` `fixme` ]
+[ 外を指す ][ 外や、文書の別の場所へ ][ `references` `links` `link` `embed` ]
+[ 構造     ][ 本文の骨格を作る       ][ `heading` `ol` `ul` `table` `codeblock` `blockquote` `callout` `hr` ]
+[ 文字     ][ 地の文の中で一語を扱う ][ `em` `strong` `mark` `icon` ]
+]
+
+##[ 群が分かると三つ分かる ]
+
+**どこに置けるか。** 宣言の八つと `vocabulary` は preamble にしか置けない。本文が
+始まったあとに `@kind` は書けない。ほかの23個は本文側である。
+
+**何個書けるか。** 一文書に一つまでなのは七つだけ — `kind` `version` `meta`
+`config` `settings` `blueprint` `vocabulary`。`use` は preamble 専用だがいくつでも
+書ける。置ける場所と個数は別の軸である。
+
+**名前で書くのかどうか。** 構造と文字の12個のうち八つには糖衣があり、実際には名前を
+書かない。
+
+@table[
+[ 糖衣           ][ 要素        ]
+[ `#[ ]` `##[ ]` ][ `heading`   ]
+[ `- `           ][ `ul`        ]
+[ `-. `          ][ `ol`        ]
+[ ` ``` `        ][ `codeblock` ]
+[ `---`          ][ `hr`        ]
+[ `*x*`          ][ `em`        ]
+[ `**x**`        ][ `strong`    ]
+[ `==x==`        ][ `mark`      ]
+]
+
+残りの `blockquote` `table` `callout` `link` `embed` `icon` は名前で書く。`>` は
+引用の糖衣ではないので、`@blockquote[ ... ]` と書くことになる。
+
+`---[ 見出し ]---` は heading ではなく、題のついた `hr` である。節を区切るが、
+文書の階層は作らない。
+
+##[ 宣言 ]
+
+文書の頭で、これが何の文書で、どう扱われるかを決める。ここを間違えると本文が
+どれだけ正しくても通らないので、最初に読むところ。
+
+- @link(file:./primitives/kind.tmt)[`kind`] — 何の文書か。語彙もこれで決まる
+- @link(file:./primitives/meta.tmt)[`meta`] — 文書についてのデータ
+- @link(file:./primitives/config.tmt)[`config`] — 文書の処理設定。エクスポート先もここ
+- @link(file:./primitives/settings.tmt)[`settings`] — 整形とマクロと vault の設定
+
+`use` は語彙を scope に入れる。`include` は名前が通るだけで、まだ何も差し込まない。
+
+##[ 語彙 ]
+
+要素を自分で足すときに使う六つ。`@element` で名前を宣言し、`@args` `@data`
+`@content` で三つのスロットを説明し、`@param` で項目に型を与える。
+
+スロットに何を書けるかは
+@link(file:./args.tmt)[`args.tmt`] を見る。
+
+##[ 印 ]
+
+`draft` はそこに文章が無いこと、`fixme` は文章はあるが直すこと。どちらも警告として
+報告され、`tomet check` は通る。見れば決まる境目なので、迷ったら「無い」のか
+「間違っている」のかで選ぶ。
+
+##[ 外を指す ]
+
+`link` のキーは `target` ひとつだけで、何を指しているかは target 文字列の接頭辞から
+決まる。`url:` `file:` `tm:` `id:` `ref:` の五つ。
+
+##[ 構造 ]
+
+本文の骨格。八つとも block で、地の文の中には置けない。
+
+##[ 文字 ]
+
+地の文の中の一語や一字。`em` `strong` `mark` は inline 専用で、単独の行には置けない。
+`icon` は名前が通るだけで、アイコンを引く処理はまだ無い。
+
+##[ まだ解説の無い要素 ]
+
+次の要素は、`primitives/` にファイルはあるが中身が0バイトである。spec の一覧には
+載っているので、書き方を知りたいときはそちらへ。
+
+@table[
+[ 群       ][ 要素                        ]
+[ 外を指す ][ `link` `references`         ]
+[ 構造     ][ `heading` `ol` `ul` `table` ]
+]
+
+書けている四つ（`kind` `meta` `config` `settings`）が全部「宣言」の群だというのは
+偶然で、構造と外を指す群は丸ごと空いている。
