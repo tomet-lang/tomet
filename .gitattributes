@@ -14,6 +14,12 @@ docs/ linguist-documentation=true
 docs/spec/**/*.md linguist-generated=true
 docs/guide/**/*.md linguist-generated=true
 
+# Exported from `tmtroot/`, whose layout mirrors the repository root.
+# `README.md` is not here: it is hand-written English, and only its
+# Japanese sibling is generated.
+/AGENTS.md linguist-generated=true
+/README.ja.md linguist-generated=true
+
 # Frozen parser/formatter test inputs, deliberately not synced with docs/.
 tests/fixtures/ linguist-vendored=true
 

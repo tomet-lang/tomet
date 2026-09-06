@@ -1,0 +1,80 @@
+@config(
+  export: {
+    type: commonmark,
+    path: "AGENTS.md"
+  }
+)
+
+#[ Tomet ]
+
+##[ Project overview ]
+
+Read the root `README.md` first (what the project is, directory layout,
+build/run commands) -- it's currently sparse, fill it in as you learn
+things worth putting there. Before a non-trivial change, read the `//!`
+module doc of every crate you are touching, and the `crate-layering` entry
+in the root `.writ.tmt` for how the layers depend on each other. There is
+no prose overview standing between you and those -- there was, and it
+drifted. For where a
+document belongs and what language it's written in, `docs/README.tmt` is
+the map and `docs/.writ.tmt` is the rulebook. Do not restate those files'
+content here — extend them instead, and keep this pointer short.
+
+Rules this repository must obey live in `.writ.tmt` files, one per
+directory, scoped to that directory and inherited downward the way
+`.gitignore` is. Read every `.writ.tmt` from the file you are changing up
+to the workspace root. They are the author's; propose an edit and stop
+rather than working around a rule or relaxing it.
+
+##[ Language ]
+
+Write all code comments in English. Do not use Japanese in code.
+
+For documentation the rule is scoped by what the document sits next to,
+per `docs/.writ.tmt`'s `docs-language`: every `.writ.tmt` is English (they
+cross-link with the English doc comments); `docs/spec/`, `docs/guide/`,
+`docs/examples/` and `docs/why/` are user-facing and written in Japanese.
+`docs/design/ideas/` is whichever language the thinking happened in.
+
+##[ Verifying changes ]
+
+There's no standalone GUI app here to screenshot or click through — this
+is a parser/CLI/LSP/editor-extensions project. Verify with `cargo build`/
+`cargo test`/`cargo check` and by reading the code. For the editor
+extensions (`editors/vscode`, `editors/zed`), this
+environment can't reliably launch a real VS Code/Zed window either, so
+verify those the same way: reading the code and their own tests, not by
+launching the actual editor to click around.
+
+For grammar changes specifically, also run
+`cargo test -p tomet-tests -p tree-sitter-tomet`. `tomet-parser` is the
+source of truth for the grammar; `tree-sitter-tomet`'s `grammar.js` is a
+separate, hand-maintained approximation used only for editor syntax
+highlighting, and it does not update itself when `tomet-parser` changes.
+Drift between the two is caught by `tomet-tests`'s `corpus` target, which
+runs the shared `.tmt` corpus through both implementations; the grammar's
+own structural tests stay in `tree-sitter-tomet`. Cover the new construct
+by adding a fixture under `tests/fixtures/` — that corpus is frozen and
+does not pick up changes to `docs/` on its own.
+
+Cross-crate tests live in the `tests/` package (`tomet-tests`), not in the
+individual crates; see `tests/README.md` for what belongs there and how
+the snapshot references work.
+
+##[ Task tracking ]
+
+Before starting implementation on any non-trivial task, create a new file under `.agents/tasks/` (one file per task, e.g. `.agents/tasks/<short-task-slug>.md`) that breaks the work into discrete steps. Update that file immediately after completing each step, marking it done. Keep it accurate and current so that if work is interrupted partway through, it can always be resumed from that file alone, without needing prior conversation context. Multiple task files may coexist under `.agents/tasks/` when several non-trivial tasks are in flight; do not let one task's file block or get overwritten by another's.
+
+If a session has to end early — for any reason, including a warning that a usage limit is close — stop at the next safe checkpoint. Finish the current atomic step rather than starting a new one, and write the state and the next steps into the task file before ending. Create the file at that point if the task never got one.
+
+When the task is done, fold anything worth keeping into where it belongs — a doc comment, a writ entry, a commit message — and then delete the task file. Deleting without folding is how the only copy of a decision gets lost; decide the destination when the task is created, not when it is deleted.
+
+##[ Commits ]
+
+Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit
+messages. The session trailer embeds a URL, and a commit message is
+published the moment it is pushed. This overrides the harness default that
+asks for them.
+
+Never push to a remote without being asked. `main` is pushed; feature
+branches in this repository are local and have no upstream.
