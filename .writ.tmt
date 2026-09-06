@@ -31,7 +31,6 @@ does not relax the rule to fit the change it wanted to make.
 Every workspace member belongs to exactly one layer, and depends only on
 layers strictly below its own. Same-layer dependencies are allowed;
 upward ones are not.
-/tests/SYNTAX.md
 
 Layer 0 depends on no workspace member at all. Things may depend on it --
 `tests` and `apps/tui` both do -- but it may depend on nothing, because it
