@@ -5,6 +5,8 @@
   }
 )
 
+${macro.generated_by(self.path)}
+
 #[ Tomet ]
 
 ##[ Project overview ]

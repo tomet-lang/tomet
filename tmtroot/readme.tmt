@@ -4,9 +4,12 @@
     path: "README.ja.md"
   }
 )
+
 @meta{
 id: doc-gCzNE6yl
 }
+
+${macro.generated_by(self.path)}
 
 #[ Tomet ]
 

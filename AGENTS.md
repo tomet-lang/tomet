@@ -1,3 +1,5 @@
+<!-- Generated from tmtroot/agents.tmt. Edit that, then `tomet export .`. -->
+
 # Tomet
 
 ## Project overview
