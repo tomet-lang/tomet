@@ -137,11 +137,66 @@ pins it.
 green -- it is measured from the project root now, so it means the same
 thing from any directory.
 
-Nothing yet checks the other half -- that every `.tmt` under `tmtroot/`
-declares an export at all. A file there that produces nothing is a file in
-the wrong directory. Cheap to add, and it would be red the day it landed:
-`agents.tmt` and `cluade.tmt` are both empty. Filling or dropping them
-comes first -- a guard that ships red teaches people to ignore it.
+The other half -- that every `.tmt` under `tmtroot/` declares an export at
+all, since a file there that produces nothing is a file in the wrong
+directory:
+
+```bash
+find tmtroot -name '*.tmt' -exec grep -L 'export:' {} +
+```
+
+Empty while every file declares one. Both halves run in `just docs-check`.
+
+It waited for a green day rather than shipping red, which is what a guard
+nobody can satisfy teaches people to ignore. `agents.tmt` was empty and
+`cluade.tmt` was empty and misspelled; the first now exports `AGENTS.md`
+and the second is deleted, because `CLAUDE.md` is eleven bytes of tooling
+glue whose whole content is `@AGENTS.md` -- a line Tomet reads as an
+element in namespace `AGENTS` and rejects.
+
+A grep and not a parse. It can be fooled by prose containing `export:`,
+which fails open, and the honest reason it is a grep is that no tool
+reports "this document declares no output": `tomet export` prints such a
+file to stdout and `--check` only compares outputs that were declared.
+Tighten it when one does.
+
+##[ tmtroot-output-not-edited ]
+
+A file exported from `tmtroot/` is generated. Do not hand-edit it. Edit
+the source and re-export.
+
+Each source says so in its own output, from the macro rather than by
+hand:
+
+```tmt
+${macro.generated_by(self.path)}
+```
+
+`.gitattributes` marks `/AGENTS.md` and `/README.ja.md`
+`linguist-generated`. `README.md` is not marked, and is not generated: it
+is hand-written English, and only its Japanese sibling comes from
+`tmtroot/`.
+
+---[ Why ]---
+
+`docs/.writ.tmt` has the same rule for `docs/`, and a writ is scoped to
+its own directory, so that one cannot reach a file at the repository root.
+The rule has to exist here or `AGENTS.md` is governed by nothing.
+
+`AGENTS.md` is the case that made it urgent. It is what every agent
+working in this repository reads, so it is the file most likely to be
+edited in place by something that never looked at `tmtroot/` -- and the
+edit would be lost at the next export, silently.
+
+The banner is written `${macro.generated_by(self.path)}` and not typed
+out because typing it puts the source's own path inside the source, where
+it goes stale the moment the file moves. The wording lives once, in
+`default.config.tmt`.
+
+---[ Guard ]---
+
+`tomet export --check .`, the same one as above: a hand-edit makes the
+output disagree with its source, which is exactly what that reports.
 
 ##[ dot-tomet-is-authored ]
 

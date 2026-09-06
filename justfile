@@ -63,6 +63,14 @@ docs-check:
     cargo build -p tomet
     ./target/debug/tomet check .
     ./target/debug/tomet format --check .
+    ./target/debug/tomet export --check .
+    @stray=$(find tmtroot -name '*.tmt' -exec grep -L 'export:' {} +); \
+    if [ -n "$stray" ]; then \
+        echo "$stray" | while IFS= read -r f; do \
+            echo "TMTROOT FAIL: $f -- declares no @config(export:), so it produces nothing"; \
+        done; \
+        exit 1; \
+    fi
     @stray=$(find docs -name '*.tmt' \
         | grep -vE '^docs/(spec|guide|examples|why|design/ideas)/' \
         | grep -vE '^docs/(README|roadmap|\.writ)\.tmt$'); \
