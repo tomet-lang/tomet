@@ -33,3 +33,11 @@ ASCII でない名前は要素にならない。
 
 <div data-tm-kind="deck.card"></div>
 
+# 未完成の印
+
+文書が自分について言う印。`@draft` はそこに文章が無いこと、`@fixme` は 文章はあるが直すこと。どちらも警告で、`tomet check` は通る。
+
+<div data-tm-kind="draft">ここに書く予定の節</div>
+
+段落の途中にも置ける。<span data-tm-kind="fixme">この例は古い</span> のように、 行を占有しなくてもよい。どちらの配置でも形の誤りにはならない。
+

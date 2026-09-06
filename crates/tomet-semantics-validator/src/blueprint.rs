@@ -4,7 +4,7 @@ use tomet_ast::{Block, Document, Element, Inline, Span, Value};
 use tomet_semantics::{ElementKind, classify_lenient};
 use tomet_tree::ValueExt;
 
-use crate::ValidationError;
+use crate::Diagnostic;
 
 /// Structural requirement extracted from a blueprint.
 #[derive(Debug, Clone, PartialEq)]
@@ -106,7 +106,7 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
 }
 
 /// Validates `doc` against `blueprint` and returns any missing structural elements or fields.
-pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<ValidationError> {
+pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<Diagnostic> {
     let Some(schema) = extract_blueprint_schema(blueprint) else {
         return Vec::new();
     };
@@ -140,7 +140,7 @@ pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<V
 
     for (req_key, _) in &schema.required_meta_keys {
         if !doc_meta_keys.contains(req_key) {
-            errors.push(ValidationError::MissingRequiredMetaKey {
+            errors.push(Diagnostic::MissingRequiredMetaKey {
                 key: req_key.clone(),
                 kind: schema.target_kind.clone(),
                 span: doc_meta_span,
@@ -191,7 +191,7 @@ pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<V
         });
 
         if !is_present {
-            errors.push(ValidationError::MissingRequiredSection {
+            errors.push(Diagnostic::MissingRequiredSection {
                 title: req_sec.title.clone(),
                 id: req_sec.id.clone(),
                 kind: schema.target_kind.clone(),
@@ -281,11 +281,11 @@ mod tests {
         assert_eq!(errors.len(), 2);
         assert!(matches!(
             &errors[0],
-            ValidationError::MissingRequiredMetaKey { key, kind, .. } if key == "date" && kind == "daily-note"
+            Diagnostic::MissingRequiredMetaKey { key, kind, .. } if key == "date" && kind == "daily-note"
         ));
         assert!(matches!(
             &errors[1],
-            ValidationError::MissingRequiredSection { title, id, kind, .. } if title == "Review" && id.as_deref() == Some("review") && kind == "daily-note"
+            Diagnostic::MissingRequiredSection { title, id, kind, .. } if title == "Review" && id.as_deref() == Some("review") && kind == "daily-note"
         ));
     }
 }

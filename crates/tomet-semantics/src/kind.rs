@@ -55,6 +55,22 @@ pub enum ElementKind {
     /// `@content{...}` -- inside `@element`, the description of that
     /// element's `[content]` slot.
     Content,
+    /// `@draft[ what is missing ]` -- there is no text here yet, and the
+    /// element stands in place of it.
+    ///
+    /// The test that keeps this from collapsing into [`Fixme`] is
+    /// decidable by looking: `Draft` is an absence, `Fixme` is a presence
+    /// that is wrong. They also differ at export -- a draft marks output
+    /// that is not there, a fixme marks output that is publishable with a
+    /// note against it.
+    ///
+    /// In `std` because an unfinished spot happens in every kind, so no
+    /// kind's vocabulary can own it and a shared one would need `@use` in
+    /// every document that ever has a gap.
+    Draft,
+    /// `@fixme[ what is wrong ]` -- there is text here and it needs
+    /// revisiting. See [`Draft`](ElementKind::Draft) for the difference.
+    Fixme,
     Links,
     /// The one officially-supported link element, `@link(target:...)`
     /// (or the positional `@link(...)` shorthand -- see
@@ -143,6 +159,8 @@ impl ElementKind {
             ElementKind::Args => "args",
             ElementKind::Data => "data",
             ElementKind::Content => "content",
+            ElementKind::Draft => "draft",
+            ElementKind::Fixme => "fixme",
             ElementKind::Links => "links",
             ElementKind::Link => "link",
             ElementKind::Embed => "embed",
@@ -194,7 +212,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 30] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 32] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -216,6 +234,12 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 30] = [
     ("args", ElementKind::Args),
     ("data", ElementKind::Data),
     ("content", ElementKind::Content),
+    // Marks on the document about the document. `//(TODO)` was the first
+    // spelling tried and cannot work: `tomet_ast` has no comment node, so
+    // a comment marker is invisible to every consumer and is dropped by
+    // anything that re-prints from the tree.
+    ("draft", ElementKind::Draft),
+    ("fixme", ElementKind::Fixme),
     ("links", ElementKind::Links),
     ("link", ElementKind::Link),
     ("embed", ElementKind::Embed),
@@ -378,6 +402,9 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         // caught nothing but ordinary writing, in this repository's own
         // `.writ.tmt` among other places.
         Link | Embed | Icon => return None,
+        // Either shape, for the same reason: a gap is sometimes a phrase
+        // inside a sentence and sometimes a whole missing section.
+        Draft | Fixme => return None,
         Custom(_) | Bare | Interp => return None,
     })
 }

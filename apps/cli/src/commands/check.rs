@@ -61,6 +61,7 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
 
     let mut checked = 0usize;
     let mut failed = 0usize;
+    let mut warned = 0usize;
     let mut json_files: Vec<serde_json::Value> = Vec::new();
 
     for file in &files {
@@ -95,23 +96,37 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
         };
 
         let bindings = tomet_resolver::bindings_for(&doc, &loaded);
-        let errors = tomet_validator::validate_document_with(&doc, &bindings);
+        let diagnostics = tomet_validator::validate_document_with(&doc, &bindings);
         checked += 1;
-        if errors.is_empty() {
+        if diagnostics.is_empty() {
             continue;
         }
-        failed += 1;
+
+        // A warning is the document telling you about itself -- `@draft`,
+        // `@fixme`. It is reported and does not fail the run: marking a
+        // gap has to stay cheaper than leaving it unmarked.
+        let is_error =
+            |d: &tomet_validator::Diagnostic| d.severity() == tomet_validator::Severity::Error;
+        if diagnostics.iter().any(is_error) {
+            failed += 1;
+        }
+        warned += diagnostics.iter().filter(|d| !is_error(d)).count();
+
         if json {
             json_files.push(serde_json::json!({
                 "file": file.display().to_string(),
-                "errors": errors
+                "errors": diagnostics
                     .iter()
-                    .map(|e| serde_json::json!({ "message": e.to_string() }))
+                    .map(|d| serde_json::json!({
+                        "message": d.to_string(),
+                        "severity": if is_error(d) { "error" } else { "warning" },
+                    }))
                     .collect::<Vec<_>>(),
             }));
         } else {
-            for e in &errors {
-                eprintln!("{}: {e}", file.display());
+            for d in &diagnostics {
+                let label = if is_error(d) { "" } else { "warning: " };
+                eprintln!("{}: {label}{d}", file.display());
             }
         }
     }
@@ -127,10 +142,18 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
         ));
     }
     if !quiet {
-        if files.len() == 1 {
-            println!("OK");
+        // The count is printed on a green run too. A document with gaps
+        // still passes, and saying so is the only way the marks stay
+        // visible rather than becoming decoration.
+        let gaps = if warned > 0 {
+            format!(" ({warned} warning(s))")
         } else {
-            println!("OK: {checked} file(s)");
+            String::new()
+        };
+        if files.len() == 1 {
+            println!("OK{gaps}");
+        } else {
+            println!("OK: {checked} file(s){gaps}");
         }
     }
     Ok(())
