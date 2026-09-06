@@ -41,7 +41,7 @@ pub(crate) fn serve(
 
 async fn render_handler(State(state): State<ServeState>) -> Html<String> {
     Html(
-        render_file(&state.file, state.advanced, state.lang.clone())
+        render_file(&state.file, state.advanced, state.lang.clone(), false)
             .unwrap_or_else(|e| error_page(&state.file, &e)),
     )
 }
