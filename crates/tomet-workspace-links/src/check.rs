@@ -84,6 +84,28 @@ fn rebase_on_project_root(resolved: PathBuf, project_root: &Path) -> PathBuf {
     }
 }
 
+/// Whether `target` resolves to a path in the vault of the wanted kind.
+///
+/// Two questions, and both have to hold. `existing` says the path is in
+/// the vault at all -- it honours `.gitignore` and `workspace.ignore`, so
+/// a path on disk that the vault excludes is not a target. `wanted` says
+/// it is the kind the scheme claimed.
+///
+/// The second half is what `file:` was missing. The set carries
+/// directories as well as files, so `file:./spec/` resolved and the
+/// checker reported a file where there was a directory. `dir:` exists so
+/// the writer says which, and this is where the saying is held to.
+fn exists_as(
+    target: &str,
+    from: &Path,
+    project_root: &Path,
+    existing: &HashSet<PathBuf>,
+    wanted: fn(&Path) -> bool,
+) -> bool {
+    let path = rebase_on_project_root(resolve_file_target(from, target, project_root), project_root);
+    existing.contains(&path) && wanted(&path)
+}
+
 /// Whether `target` names any existing file by full filename or stem
 /// (extension-agnostic, the usual wikilink convention).
 fn resolve_ref_target(target: &str, existing: &HashSet<PathBuf>) -> bool {
@@ -135,16 +157,15 @@ pub fn check_vault(
 
             let resolved = match link.kind {
                 LinkKind::Ref => resolve_ref_target(&link.target, &existing),
-                LinkKind::File | LinkKind::Embed => existing.contains(&rebase_on_project_root(
-                    resolve_file_target(file, &link.target, project_root),
-                    project_root,
-                )),
+                LinkKind::File | LinkKind::Embed => {
+                    exists_as(&link.target, file, project_root, &existing, Path::is_file)
+                }
+                LinkKind::Dir => {
+                    exists_as(&link.target, file, project_root, &existing, Path::is_dir)
+                }
                 LinkKind::Tm => {
                     let path_part = link.target.split('#').next().unwrap_or(&link.target);
-                    existing.contains(&rebase_on_project_root(
-                        resolve_file_target(file, path_part, project_root),
-                        project_root,
-                    ))
+                    exists_as(path_part, file, project_root, &existing, Path::is_file)
                 }
             };
             if !resolved {
@@ -225,5 +246,66 @@ mod tests {
         assert!(is_external("http://example.com/x.png"));
         assert!(!is_external("docs/asdf.txt"));
         assert!(!is_external("./sibling.txt"));
+    }
+}
+
+#[cfg(test)]
+mod kind_tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    /// A vault with one file and one directory, both in `existing`.
+    fn vault() -> (PathBuf, HashSet<PathBuf>) {
+        let root = std::env::temp_dir().join(format!("tm_dir_scheme_{}", uuid::Uuid::new_v4()));
+        let dir = root.join("spec");
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("syntax.tmt");
+        std::fs::write(&file, "@kind(config)\n").unwrap();
+        // As `collect_all_paths_with_config` builds it: files and
+        // directories alike.
+        (root.clone(), HashSet::from([dir, file]))
+    }
+
+    #[test]
+    fn file_does_not_accept_a_directory() {
+        // The whole reason `dir:` exists. This used to resolve, and the
+        // checker then reported a file where there was a directory --
+        // `.exists()` proves neither.
+        let (root, existing) = vault();
+        let source = root.join("README.tmt");
+        assert!(!exists_as("./spec/", &source, &root, &existing, Path::is_file));
+        assert!(exists_as("./spec/", &source, &root, &existing, Path::is_dir));
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn dir_does_not_accept_a_file() {
+        // The other direction, which was never possible to say at all.
+        let (root, existing) = vault();
+        let source = root.join("README.tmt");
+        let target = "./spec/syntax.tmt";
+        assert!(!exists_as(target, &source, &root, &existing, Path::is_dir));
+        assert!(exists_as(target, &source, &root, &existing, Path::is_file));
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn a_trailing_slash_changes_nothing_for_dir() {
+        let (root, existing) = vault();
+        let source = root.join("README.tmt");
+        assert!(exists_as("./spec/", &source, &root, &existing, Path::is_dir));
+        assert!(exists_as("./spec", &source, &root, &existing, Path::is_dir));
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn a_path_outside_the_vault_is_not_a_target() {
+        // `existing` honours `.gitignore` and `workspace.ignore`, so being
+        // on disk is not enough. Both halves have to hold.
+        let (root, existing) = vault();
+        let source = root.join("README.tmt");
+        std::fs::create_dir_all(root.join("ignored")).unwrap();
+        assert!(!exists_as("./ignored/", &source, &root, &existing, Path::is_dir));
+        std::fs::remove_dir_all(&root).ok();
     }
 }

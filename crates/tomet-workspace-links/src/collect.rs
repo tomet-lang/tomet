@@ -10,12 +10,23 @@ use tomet_tree::for_each_element;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinkKind {
     File,
+    Dir,
     Embed,
     Tm,
     Ref,
 }
 
 impl LinkKind {
+    /// Every kind, so the cache schema can spell its CHECK from this
+    /// rather than from a hand-copied list that nothing holds to it.
+    pub const ALL: [LinkKind; 5] = [
+        LinkKind::File,
+        LinkKind::Dir,
+        LinkKind::Embed,
+        LinkKind::Tm,
+        LinkKind::Ref,
+    ];
+
     /// `Embed` (`<embed>`/`@embed`) is always a link regardless of what its
     /// `target` string looks like -- it's "this is embedded media", not a
     /// scheme distinction. `Link` (`@link`/`<link>`) has no fixed kind of
@@ -23,7 +34,7 @@ impl LinkKind {
     /// (or excludes it: `Url` needs network, `Id` is same-document-only --
     /// see this module's doc comment). Returns the scheme-stripped
     /// remainder of `target` alongside the resolved `LinkKind`, since the
-    /// scheme prefix (`tm:`/`ref:`/`file:`) is no longer part of the actual
+    /// scheme prefix (`tm:`/`ref:`/`file:`/`dir:`) is no longer part of the actual
     /// target value once it's been recognized.
     fn from_element_kind_and_target(kind: &ElementKind, target: &str) -> Option<(Self, String)> {
         match kind {
@@ -32,6 +43,7 @@ impl LinkKind {
                 let (scheme, rest) = target_scheme(target);
                 let link_kind = match scheme {
                     TargetScheme::File => LinkKind::File,
+                    TargetScheme::Dir => LinkKind::Dir,
                     TargetScheme::Tm => LinkKind::Tm,
                     TargetScheme::Ref => LinkKind::Ref,
                     TargetScheme::Url | TargetScheme::Id => return None,
@@ -45,6 +57,7 @@ impl LinkKind {
     pub fn as_str(&self) -> &'static str {
         match self {
             LinkKind::File => "file",
+            LinkKind::Dir => "dir",
             LinkKind::Embed => "embed",
             LinkKind::Tm => "tm",
             LinkKind::Ref => "ref",
@@ -58,6 +71,7 @@ impl std::str::FromStr for LinkKind {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "file" => Ok(LinkKind::File),
+            "dir" => Ok(LinkKind::Dir),
             "embed" => Ok(LinkKind::Embed),
             "tm" => Ok(LinkKind::Tm),
             "ref" => Ok(LinkKind::Ref),
