@@ -289,10 +289,10 @@ pub fn classify_name(name: &Name) -> Result<ElementKind, UnknownName> {
 
 /// An unrecognized bare element name.
 ///
-/// Bare names are reserved for Tomet's own vocabulary, so this is what a
-/// `#tag` alone on a line reports -- deliberately, since hashtags are not
-/// a feature and a bare unknown name is far more likely to be a typo or a
-/// missing namespace binding.
+/// A bare name resolves only in `std` or the document's own `@kind`
+/// namespace, so this is what a `#tag` alone on a line reports --
+/// deliberately, since hashtags are not a feature and a bare unknown name
+/// is far more likely to be a typo or a missing namespace binding.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct UnknownName {
     /// The name as written, namespace included -- `deck.ref`, not `ref`.

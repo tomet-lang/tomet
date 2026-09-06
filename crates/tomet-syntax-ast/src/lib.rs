@@ -310,11 +310,14 @@ impl std::ops::DerefMut for Text {
 /// An element's name, split into its optional namespace and its own name.
 ///
 /// The separator is `.`: `deck.bookmark` is `Name { namespace:
-/// Some("deck"), name: "bookmark" }`. A bare name (no namespace) is
-/// reserved for Tomet's own vocabulary -- user-defined elements must be
-/// namespaced, and an unrecognized bare name is an error rather than
-/// falling back to a `Custom` kind. That check is
-/// `tomet-semantics`' job; this type only records the split.
+/// Some("deck"), name: "bookmark" }`. Exactly two namespaces may be
+/// written bare: `std`, which the language carries, and the document's
+/// own `@kind`, declared on its first line. A name from any other
+/// namespace -- anything brought in with `@use` -- is always written
+/// out, and a bare name in neither of the two is an error rather than
+/// falling back to a `Custom` kind. That check is `Bindings::classify`
+/// in `tomet-semantics`, not the free `classify` beside it, which only
+/// knows `std`. This type only records the split.
 ///
 /// Both halves are ASCII identifiers (`[A-Za-z_][A-Za-z0-9_-]*`). `.` is
 /// the separator, so it is deliberately *not* an identifier character
@@ -411,10 +414,15 @@ impl Sigil {
 
     /// Whether this element carries the bare (un-namespaced) name `name`.
     ///
-    /// This is the check almost every consumer wants: bare names are
-    /// reserved for Tomet's own vocabulary, so `is_bare_named("meta")` asks
-    /// "is this *the* `meta` element" and cannot be satisfied by a
-    /// user-defined `deck.meta`.
+    /// This is the check almost every consumer wants: a bare name resolves
+    /// in `std` or in the document's own `@kind` namespace, never in one
+    /// brought in with `@use`, so `is_bare_named("meta")` asks "is this
+    /// *the* `meta` element" and cannot be satisfied by a user-defined
+    /// `deck.meta`.
+    ///
+    /// It is a spelling test, not a resolution. A `@kind(writ)` document
+    /// writes its own `@layers` bare as well; telling that apart from a
+    /// `std` name is `Bindings::classify`'s job.
     pub fn is_bare_named(&self, name: &str) -> bool {
         self.name().is_some_and(|n| n.is_bare() && n.name == name)
     }
