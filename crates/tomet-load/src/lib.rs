@@ -135,12 +135,11 @@ pub enum LoadError {
 impl std::fmt::Display for LoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LoadError::Io { path, source } => {
-                write!(f, "failed to read {}: {source}", path.display())
-            }
-            LoadError::Parse { path, source } => {
-                write!(f, "failed to parse {}: {source}", path.display())
-            }
+            // The cause is not interpolated here: it is what `source`
+            // returns, and `anyhow`'s `{:#}` walks that chain. Saying it
+            // in both places prints it twice.
+            LoadError::Io { path, .. } => write!(f, "failed to read {}", path.display()),
+            LoadError::Parse { path, .. } => write!(f, "failed to parse {}", path.display()),
         }
     }
 }
