@@ -233,6 +233,43 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
     }
 }
 
+/// Wraps the characters Tomet gives meaning to -- `@`, `$`, `//`, `/*`,
+/// `*`, `_` -- in backticks, so imported Markdown prose reads back as the
+/// prose it was.
+///
+/// **Skips what is already inside a code span.** This runs from
+/// `post_process_document_wikilinks`, a pass over the whole document
+/// *after* every event is collected, and by then `Event::Code` has been
+/// flattened to backticked plain text -- so without this the pass cannot
+/// tell a code span from prose and protects its content a second time.
+/// `` `//!` `` came back as ``` ``//`!` ```.
+///
+/// Tomet's AST has no code-span node (`` `x` `` is a `Text` whose value
+/// includes the backticks), so "keep code spans distinct" is not
+/// available; the escaper has to do the skipping itself. The run rule is
+/// CommonMark's: N backticks close on the next run of exactly N, and an
+/// unclosed run is literal rather than swallowing the rest of the line.
+/// Byte offset of a backtick run of exactly `len` in `s`, or `None`.
+/// A longer run is not a match -- CommonMark closes on an exact length.
+fn closing_run(s: &str, len: usize) -> Option<usize> {
+    let b = s.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] != b'`' {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < b.len() && b[i] == b'`' {
+            i += 1;
+        }
+        if i - start == len {
+            return Some(start);
+        }
+    }
+    None
+}
+
 fn enclose_sigils_in_backticks(text: &str) -> String {
     if !text.contains('@')
         && !text.contains('$')
@@ -246,6 +283,27 @@ fn enclose_sigils_in_backticks(text: &str) -> String {
     let mut out = String::with_capacity(text.len() + 8);
     let mut chars = text.chars().peekable();
     while let Some(ch) = chars.next() {
+        if ch == '`' {
+            let mut open = String::from("`");
+            while chars.peek() == Some(&'`') {
+                open.push(chars.next().unwrap());
+            }
+            // Look for a closing run of exactly the same length. The rest
+            // is copied verbatim either way -- an unclosed run is a
+            // literal backtick, not the start of a span.
+            let rest: String = chars.clone().collect();
+            match closing_run(&rest, open.len()) {
+                Some(end) => {
+                    out.push_str(&open);
+                    out.push_str(&rest[..end + open.len()]);
+                    for _ in 0..rest[..end + open.len()].chars().count() {
+                        chars.next();
+                    }
+                }
+                None => out.push_str(&open),
+            }
+            continue;
+        }
         match ch {
             '@' => out.push_str("`@`"),
             '$' => out.push_str("`$`"),
