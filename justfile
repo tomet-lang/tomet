@@ -81,6 +81,33 @@ docs-check:
         exit 1; \
     fi
 
+# Run the two guards that `.writ.tmt` entries name but nothing executed.
+#
+# Both were written into a writ under `---[ Guard ]---` as a shell block
+# and wired to nothing, so the entry looked guarded while the rule was
+# held by nobody. Both held when this recipe was first written; the point
+# is that nothing would have noticed if they stopped.
+#
+# Separate from `docs-check` on the same reasoning that keeps that recipe
+# out of `cargo test`: these are checks over prose this repository is
+# still writing, and a run aimed at one should not fail on the other.
+writ-check:
+    @stray=$(find . -name '.writ.tmt' -not -path './target/*' \
+        -exec grep -lP '[\x{3040}-\x{30ff}]' {} +); \
+    if [ -n "$stray" ]; then \
+        echo "$stray" | while IFS= read -r f; do \
+            echo "LANGUAGE FAIL: $f -- kana in a writ; docs-language says every .writ.tmt is English"; \
+        done; \
+        exit 1; \
+    fi
+    @stray=$(git ls-files --others --ignored --exclude-standard .tomet); \
+    if [ -n "$stray" ]; then \
+        echo "$stray" | while IFS= read -r f; do \
+            echo "AUTHORED FAIL: $f -- ignored file under .tomet; dot-tomet-is-authored says every file there is hand-written"; \
+        done; \
+        exit 1; \
+    fi
+
 # Clean Zed editor extension build and installation cache.
 clean-zed-cache:
     rm -rf ~/.local/share/zed/extensions/installed/tomet ~/.local/share/zed/extensions/work/tomet
