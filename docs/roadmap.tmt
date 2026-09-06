@@ -24,6 +24,7 @@
 └──────────────────────────┴────────────────────────────────────┘
 
 - プロパティの重複のワーニング
+- tasksもtmtで、雛形決めたほうが良さそう？
 - ハイライトがおかしい
 - mode。`commonmark`、`no_data`
 - export force
@@ -34,6 +35,7 @@
 - `[label]:style(color:#ffffff):link(https://)`
   - 今 > `@link[@color[asdfasdf](white)](https:///)`
 - `->`
+- `\n`も統一？
 - tmtroot vs tmtdocs
 - idの種類にsha1追加
 - `@element`ではなくて、`@define`のほうが適切か？
@@ -68,6 +70,13 @@
                                       // 専用スロットを与えるか (tests/README.md)
 - ( ) `ref`構文                      // `@this`
 - ( ) `[]`のkey
+- ( ) 対の後ろの要素が文字列に飲まれる    // `@links{ (1)[a] note: x (2)[b] }` の
+                                      // `note` が `"x (2)[b]"` になる。
+                                      // 要素が先の順序は直っているが、
+                                      // 対が先の順序が残っている
+- ( ) `allow: (link, em)` がリストにならない // `_entry_value` に括弧の形が無く
+                                      // 文字列になる。spec/vocabulary.tmt の
+                                      // `@content{ allow: ... }` が書けない
 - ( ) コネクト構文2                    // `:(){}[]`
 - ( ) `@tomet(version: 1)` or features.
 - ( ) 全角ブレースを黙って地の文にしない   // パーサは ASCII `{}` しか取らないので

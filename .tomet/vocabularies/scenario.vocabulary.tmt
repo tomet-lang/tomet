@@ -3,7 +3,10 @@
 
 @element(line){
   display: block
+  @args{
+    @param(speaker){ type: string, positional: true, required: true }[ 話者。 ]
+  }
 }[
-  台詞ひとつ。位置引数は話者、`[content]` が台詞。
+  台詞ひとつ。`[content]` が台詞。
   `docs/examples/scenario.tmt` が使い方の見本。
 ]

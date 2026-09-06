@@ -67,6 +67,23 @@ pub enum ValidationError {
         expected: &'static str,
         span: Span,
     },
+    /// An argument the element's vocabulary entry does not declare.
+    ///
+    /// Only reported for an element whose declaration has `@args` at all.
+    /// No `@args` means "nothing said", not "takes none" -- saying the
+    /// second is `@data`'s `open: false`, and there is no `@args`
+    /// equivalent yet.
+    UnknownArgument {
+        element: String,
+        argument: String,
+        span: Span,
+    },
+    /// A `@param` marked `required: true` with no argument to fill it.
+    MissingRequiredArgument {
+        element: String,
+        argument: String,
+        span: Span,
+    },
     /// A top-level `@settings`/`@config` key that has been retired.
     ///
     /// `elements:` described what a custom element takes -- its `args`,
@@ -94,6 +111,8 @@ impl ValidationError {
             ValidationError::DuplicateSingleton { duplicate, .. } => *duplicate,
             ValidationError::OutsidePreamble { span, .. } => *span,
             ValidationError::RetiredSettingsKey { span, .. } => *span,
+            ValidationError::UnknownArgument { span, .. } => *span,
+            ValidationError::MissingRequiredArgument { span, .. } => *span,
         }
     }
 }
@@ -181,6 +200,20 @@ impl fmt::Display for ValidationError {
                         "put it inside a paragraph, not alone on its line"
                     }
                 )
+            }
+            ValidationError::UnknownArgument {
+                element, argument, ..
+            } => {
+                write!(
+                    f,
+                    "`{element}` has no argument `{argument}`; its vocabulary \
+                     declares the ones it takes with `@param`"
+                )
+            }
+            ValidationError::MissingRequiredArgument {
+                element, argument, ..
+            } => {
+                write!(f, "`{element}` requires the argument `{argument}`")
             }
             ValidationError::RetiredSettingsKey { key, .. } => {
                 // Named per key rather than one generic sentence: `elements`

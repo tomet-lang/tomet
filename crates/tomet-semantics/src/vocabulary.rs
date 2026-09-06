@@ -20,7 +20,7 @@
 
 use std::collections::BTreeMap;
 
-use tomet_ast::{Block, Document, Name};
+use tomet_ast::{Block, Document, Element, Name, Value};
 use tomet_tree::ValueExt;
 
 use crate::kind::{BUILTIN_KINDS, ElementKind, Shape, UnknownName, classify_lenient};
@@ -41,17 +41,60 @@ pub enum Region {
     Body,
 }
 
+/// One parameter, as `@param(name){ ... }` declares it.
+///
+/// `param` and not `arg`: parameter is the declaration side, argument is
+/// the call side, so `(args)` needs no rename.
+///
+/// **`ty` is read but never checked.** It is kept as the parser produced
+/// it -- `uint` arrives as a string, `[string]` as a sequence -- because
+/// checking a value against it needs a type language this project has not
+/// settled: `@param(name)`'s own type is an identifier rather than a
+/// string, `default:`'s type depends on `type:`, and `type:`'s type is a
+/// type. Interpreting it here would mean deciding all three by accident.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ParamDecl {
+    pub name: String,
+    /// The declared type, verbatim. See the note above.
+    pub ty: Option<Value>,
+    pub required: bool,
+    /// Whether this parameter may be filled by position rather than by
+    /// name. The *order* comes from where the `@param` sits, which is why
+    /// there is no separate `positional: [ ... ]` list -- that would state
+    /// an order the declarations already carry.
+    pub positional: bool,
+    pub default: Option<Value>,
+}
+
 /// One element, as a vocabulary declares it.
 ///
-/// Only the three axes are read so far. `@args`, `@data` and `@content`
-/// parse and are ignored here; they describe the three slots and are the
-/// next thing to land.
+/// `@args` is read; `@data` and `@content` are not yet. `@content`'s
+/// `allow: (link, em)` cannot be read even in principle today -- a
+/// parenthesised value has no form in `_entry_value`, so it arrives as
+/// the string `"(link, em)"`.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ElementDecl {
     /// The shape this element may take, or `None` for either.
     pub display: Option<Shape>,
     pub region: Region,
     pub singleton: bool,
+    /// `(args)`, in declaration order.
+    pub params: Vec<ParamDecl>,
+}
+
+impl ElementDecl {
+    /// The positional slots, in declaration order.
+    pub fn positional_keys(&self) -> Vec<String> {
+        self.params
+            .iter()
+            .filter(|p| p.positional)
+            .map(|p| p.name.clone())
+            .collect()
+    }
+
+    pub fn param(&self, name: &str) -> Option<&ParamDecl> {
+        self.params.iter().find(|p| p.name == name)
+    }
 }
 
 /// The elements one namespace declares.
@@ -321,7 +364,54 @@ fn decl_from_element(el: &tomet_ast::Element) -> ElementDecl {
             .get("singleton")
             .and_then(|v| v.as_bool())
             .unwrap_or(false),
+        params: params_from_element(el),
     }
+}
+
+/// The `@param` declarations inside an `@element`'s `@args`.
+///
+/// Two levels of `as_children`, because that is the shape: `{...}` holds
+/// entries in source order, and an entry is a pair or an element. `@args`
+/// is one of the elements; each `@param` inside it is another. Nothing
+/// here reads a name off a *pair*, so `args: something` in the data half
+/// is not mistaken for the slot description.
+///
+/// An `@element` with no `@args` declares no parameters, which is not the
+/// same as declaring that it takes none -- that distinction belongs to
+/// `@data`'s `open:` and is not built yet.
+fn params_from_element(el: &Element) -> Vec<ParamDecl> {
+    let Some(value) = el.value.as_ref() else {
+        return Vec::new();
+    };
+    let Some(args) = value
+        .as_children()
+        .into_iter()
+        .find(|child| classify_lenient(child) == ElementKind::Args)
+    else {
+        return Vec::new();
+    };
+    let Some(args_value) = args.value.as_ref() else {
+        return Vec::new();
+    };
+    args_value
+        .as_children()
+        .into_iter()
+        .filter(|child| classify_lenient(child) == ElementKind::Param)
+        .filter_map(param_from_element)
+        .collect()
+}
+
+fn param_from_element(el: &Element) -> Option<ParamDecl> {
+    let name = positional_name(el)?;
+    let data = crate::embedded::element_data(el);
+    let get = |key: &str| data.as_ref().and_then(|d| d.get(key).cloned());
+    Some(ParamDecl {
+        name,
+        ty: get("type"),
+        required: get("required").and_then(|v| v.as_bool()).unwrap_or(false),
+        positional: get("positional").and_then(|v| v.as_bool()).unwrap_or(false),
+        default: get("default"),
+    })
 }
 
 #[cfg(test)]
@@ -358,6 +448,59 @@ mod tests {
         assert!(layers.singleton);
         assert_eq!(layers.region, Region::Body);
         assert!(!v.elements["pure"].singleton);
+    }
+
+    /// `@args`' `@param` declarations are read, in the order they are
+    /// written -- which is what makes a separate `positional: [ ... ]`
+    /// list a duplicate rather than a shorthand.
+    #[test]
+    fn reads_the_parameters_an_element_declares() {
+        let v = vocab(
+            r#"@kind(vocabulary)
+@vocabulary(deck){ version: "1.0.0" }
+
+@element(card){
+  display: block
+  @args{
+    @param(id){ type: uint, positional: true, required: true }[ 通し番号。 ]
+    @param(tags){ type: [string] }[ タグ。 ]
+  }
+}[
+  カード一枚。
+]
+"#,
+        );
+        let card = &v.elements["card"];
+        assert_eq!(
+            card.params
+                .iter()
+                .map(|p| p.name.as_str())
+                .collect::<Vec<_>>(),
+            ["id", "tags"]
+        );
+        assert_eq!(card.positional_keys(), ["id"]);
+
+        let id = card.param("id").expect("declared");
+        assert!(id.required);
+        assert!(id.positional);
+        // Read verbatim, never interpreted -- see `ParamDecl::ty`.
+        assert_eq!(id.ty, Some(Value::String("uint".to_string())));
+
+        let tags = card.param("tags").expect("declared");
+        assert!(!tags.required);
+        assert!(!tags.positional);
+        assert_eq!(
+            tags.ty,
+            Some(Value::Seq(vec![Value::String("string".to_string())]))
+        );
+    }
+
+    /// An element with no `@args` declares no parameters. That is not the
+    /// same as declaring it takes none, which is `@data`'s `open:` and is
+    /// not built.
+    #[test]
+    fn an_element_without_args_has_no_parameters() {
+        assert!(vocab(WRIT).elements["layers"].params.is_empty());
     }
 
     /// A document is a vocabulary because it says so, not because it
