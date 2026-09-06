@@ -1,5 +1,5 @@
 <h1>シジルは同じグループを取る</h1>
-<p>`@name` も `-` も `#` も、`(args)` `[content]` `{value}` を取る。 省略できるところと、書ける形は同じ。</p>
+<p>`@name` も `-` も `#` も、`(args)` `[content]` `{value}` を取る。省略できるところと、書ける形は同じ。</p>
 <h1>リスト項目の完全形</h1>
 <ul>
 <li><span class="tm-list-marker"></span> 括弧を書けば内容はグループになる</li>
@@ -8,7 +8,7 @@
 </ul>
 <h1>グループは行をまたげる</h1>
 <ul>
-<li><span class="tm-list-marker"></span> 一行目のあと 二行目が続いても、項目は分かれない。 折り返しを許すのがグループの役目。</li>
+<li><span class="tm-list-marker"></span> 一行目のあと二行目が続いても、項目は分かれない。折り返しを許すのがグループの役目。</li>
 <li><span class="tm-list-marker"></span> 次の項目もちゃんと同じリストに入る</li>
 </ul>
 <h1>糖衣は一行のまま</h1>
@@ -24,7 +24,7 @@
 <h1>見出しにならないもの</h1>
 <p>これは #タグ ではない。`#` の直後に空白もグループも無ければただの文字。</p>
 <h1>`{...}` は名前つき要素も取る</h1>
-<p>`{...}` は常にデータで、中身は書いた順の `Entry` の並び。裸の `(marker)[content]` も、名前つきの `@name` も同じ並びに入る。語彙が要素を 宣言する形はこれが無いと書けない。</p>
+<p>`{...}` は常にデータで、中身は書いた順の `Entry` の並び。裸の `(marker)[content]` も、名前つきの `@name` も同じ並びに入る。語彙が要素を宣言する形はこれが無いと書けない。</p>
 <div class="tm-element tm-element" data-value="card">カード一枚。<div class="tm-children">
 <div class="tm-element tm-args"><div class="tm-children">
 <div class="tm-element tm-param" data-value="id">通し番号。</div>
@@ -34,4 +34,4 @@
 </div>
 </div>
 <p>行頭にあって行を終える要素はブロック配置になる。`[content]` の中と同じ規則で、 `@args` がブロック形だと宣言されているのはそのため。</p>
-<p>`@` のあとにグループが続かなければ要素にならないのは、グループの中でも同じ。 連絡は me@example.com まで。</p>
+<p>`@` のあとにグループが続かなければ要素にならないのは、グループの中でも同じ。連絡は me@example.com まで。</p>

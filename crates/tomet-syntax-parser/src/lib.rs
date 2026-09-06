@@ -528,6 +528,48 @@ mod tests {
         }
     }
 
+    /// The one `Inline::Text` of the document's first paragraph.
+    fn paragraph_text(src: &str) -> String {
+        let doc = parse_document(src).unwrap();
+        match &doc.blocks[0] {
+            Block::Paragraph(p) => match &p.content[..] {
+                [Inline::Text(t)] => t.value.clone(),
+                other => panic!("expected a single text run, got {other:?}"),
+            },
+            other => panic!("expected paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_fold_between_two_wide_characters_joins_with_nothing() {
+        assert_eq!(
+            paragraph_text("日本語の段落を手で折ると、\nここに空白は入らない。\n"),
+            "日本語の段落を手で折ると、ここに空白は入らない。"
+        );
+    }
+
+    #[test]
+    fn a_fold_between_two_narrow_characters_still_joins_with_a_space() {
+        assert_eq!(
+            paragraph_text("an English paragraph folded\nby hand keeps its space\n"),
+            "an English paragraph folded by hand keeps its space"
+        );
+    }
+
+    #[test]
+    fn a_fold_with_a_narrow_character_on_either_side_keeps_the_space() {
+        assert_eq!(paragraph_text("日本語\nEnglish\n"), "日本語 English");
+        assert_eq!(paragraph_text("English\n日本語\n"), "English 日本語");
+    }
+
+    #[test]
+    fn ambiguous_width_counts_as_narrow_at_a_fold() {
+        // `→` is East Asian Ambiguous. Calling it wide needs a locale the
+        // parser does not have, so it stays narrow and the fold keeps its
+        // space.
+        assert_eq!(paragraph_text("矢印→\nあ\n"), "矢印→ あ");
+    }
+
     // `parses_the_repo_spec_examples` lives in the `tomet-tests` package
     // now -- it reads the shared corpus, which this crate no longer
     // reaches out of its own directory for.

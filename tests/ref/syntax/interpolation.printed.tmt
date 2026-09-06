@@ -6,7 +6,7 @@ id: doc-interpolation
 
 #[補間の識別子は要素の識別子と同じ形]
 
-`-` を含められる。要素の引数で `@kind(node-graph)` と書けるものが、補間の 中でも同じように書ける。
+`-` を含められる。要素の引数で `@kind(node-graph)` と書けるものが、補間の中でも同じように書ける。
 
 ${ref(id(node-graph))}
 

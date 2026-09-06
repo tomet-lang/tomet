@@ -2189,6 +2189,7 @@ dependencies = [
  "tomet-lexer",
  "tomet-semantics",
  "tomet-tree",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]

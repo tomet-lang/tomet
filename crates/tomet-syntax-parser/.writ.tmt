@@ -43,7 +43,7 @@ input.
   allow-external: [
     "rowan", "countme", "hashbrown", "rustc-hash", "text-size",
     "serde", "serde_core", "serde_derive",
-    "proc-macro2", "quote", "syn", "unicode-ident"
+    "proc-macro2", "quote", "syn", "unicode-ident", "unicode-width"
   ]
 }
 
@@ -52,14 +52,20 @@ The source may not name an API that does I/O, so it cannot be done
 bare-handed; and every external crate in the dependency *closure* is listed
 above, so nothing new arrives without someone deciding to add it here.
 
-The closure, not the direct list. `tomet-syntax-parser`'s four dependencies
-are all workspace members and its `Crates.io` section is empty, which reads
-like "no external crates" and is not: `tomet-ast` brings `serde` and
-`tomet-cst` brings `rowan`, and those bring nine more. None of the twelve
-does I/O -- they are syntax-tree machinery and derive machinery -- but the
-guard found them the first time it ran, against a writ that had just
-claimed otherwise. An allowlist says what is true; "no external
-dependencies" said something that felt better.
+The closure, not the direct list. `tomet-syntax-parser` names one external
+crate of its own, and that one entry reads like the whole story and is not:
+`tomet-ast` brings `serde` and `tomet-cst` brings `rowan`, and those bring
+nine more. None of the thirteen does I/O -- they are syntax-tree machinery,
+derive machinery, and one Unicode table -- but the guard found them the
+first time it ran, against a writ that had just claimed otherwise. An
+allowlist says what is true; "no external dependencies" said something that
+felt better.
+
+`unicode-width` is the one direct entry. The parser asks it whether a
+character is wide, to decide what a folded line joins with, and a width
+table is exactly the kind of dependency this rule is indifferent to: it is
+a pure function of the character, so the same input still produces the same
+tree.
 
 Paths are relative to the workspace root, as in `@layers`.
 
