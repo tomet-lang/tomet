@@ -162,22 +162,22 @@ The root's `tmtroot-output-not-edited` says the same thing for the files
 exported to the repository root. Two entries and not one because a writ is
 scoped to its own directory, so this one cannot reach `/AGENTS.md`.
 
-`docs/README.tmt` is still not exported, but not for the reasons this
-entry used to give. It blamed two export bugs -- backticks escaped in
-prose, and a `<div>` emitted for the `@settings` header -- and **both are
-gone**: `tomet to-md docs/README.tmt` produces neither today, and the
-`@settings` line went with `docs/docs.settings.tmt`.
+`docs/README.tmt` is still not exported, but every bug this entry has
+blamed for that is now gone. It named two export bugs -- backticks escaped
+in prose, and a `<div>` for the `@settings` header -- and then the fold
+that put an ASCII space into every hand-wrapped Japanese paragraph.
+`normalize_text` now joins a fold between two wide characters with
+nothing, so `tomet to-md docs/README.tmt` produces none of the three.
 
-What actually stops it is that a hand-wrapped Japanese paragraph gains an
-ASCII space at every fold. `normalize_text`
-(`crates/tomet-syntax-parser/src/inline.rs`) turns a newline plus the
-whitespace after it into one space, which is right for English and wrong
-between two wide characters -- and it happens in the *parser*, so the
-space is in the AST before any writer sees it. Every document that would
-be exported from here is Japanese.
+Two smaller losses are left, and neither is a reason on its own:
 
-Fix that and this can become generated like the rest. It is a change to
-what a line fold means, so it is a language decision, not a writer's.
+- A fold landing right before inline markup still gains a space, because
+  the neighbour the rule sees is the `*` or the backtick rather than the
+  wide character inside it.
+- `.gitattributes` marks `docs/{spec,guide}/**/*.md` and not `docs/*.md`,
+  so a `docs/README.md` would arrive as a normal reviewable file.
+
+Exporting it is now a decision rather than a wait.
 
 ---[ Guard ]---
 

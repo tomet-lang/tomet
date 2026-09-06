@@ -10,6 +10,7 @@ use crate::value::{err, skip_block_comment, skip_inline_ws, skip_line_comment};
 use tomet_ast::{Element, Inline, Placement, Sigil, Span, Text, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
+use unicode_width::UnicodeWidthChar;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Stop {
@@ -320,6 +321,21 @@ fn flush_text_upto(items: &mut Vec<Inline>, cur: &Cursor, text_start: &mut usize
     }
 }
 
+/// Whether `c` is East Asian wide or fullwidth.
+///
+/// Only used to decide what a folded line joins with. Ambiguous-width
+/// characters count as narrow, which is `unicode-width`'s default and the
+/// usual choice outside a locale-aware terminal.
+fn is_wide(c: char) -> bool {
+    UnicodeWidthChar::width(c) == Some(2)
+}
+
+/// Fold the newlines inside one text run.
+///
+/// A fold joins with a space -- CommonMark's softbreak -- except between two
+/// wide characters, where the space would be a visible gap in the middle of a
+/// sentence. Only this run is visible here, so a fold landing on a run
+/// boundary, as in `折ると、\n**強調**`, still joins with a space.
 fn normalize_text(raw: &str) -> String {
     let mut out = String::new();
     let mut chars = raw.chars().peekable();
@@ -331,7 +347,11 @@ fn normalize_text(raw: &str) -> String {
             ) {
                 chars.next();
             }
-            out.push(' ');
+            let between_wide = out.chars().next_back().is_some_and(is_wide)
+                && chars.peek().copied().is_some_and(is_wide);
+            if !between_wide {
+                out.push(' ');
+            }
         } else {
             out.push(c);
         }
