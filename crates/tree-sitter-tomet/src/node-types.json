@@ -59,6 +59,10 @@
         {
           "type": "bare_element",
           "named": true
+        },
+        {
+          "type": "inline_element",
+          "named": true
         }
       ]
     }

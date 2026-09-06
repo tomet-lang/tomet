@@ -297,7 +297,7 @@ fn try_one_delimited(
 }
 
 /// Whether only whitespace precedes `cur` on its line.
-fn at_line_start(cur: &Cursor) -> bool {
+pub(crate) fn at_line_start(cur: &Cursor) -> bool {
     let src = cur.src();
     let before = &src[..cur.pos()];
     match before.rfind('\n') {
