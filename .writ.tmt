@@ -21,7 +21,7 @@ upward ones are not.
 
 @layers{
   6: [ "apps/*", "bindings/*", "editors/*", "tests" ]
-  5: [ "crates/tomet-workspace", "crates/tomet-workspace-indexer", "crates/tomet-workspace-links" ]
+  5: [ "crates/tomet-workspace", "crates/tomet-workspace-indexer", "crates/tomet-workspace-links", "crates/tomet-load" ]
   4: [ "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet" ]
   3: [ "crates/tomet-config" ]
   2: [ "crates/tomet-semantics*" ]

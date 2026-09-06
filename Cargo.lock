@@ -1976,6 +1976,7 @@ dependencies = [
  "tomet-html",
  "tomet-indexer",
  "tomet-links",
+ "tomet-load",
  "tomet-markdown",
  "tomet-pandoc",
  "tomet-parser",
@@ -2130,6 +2131,17 @@ dependencies = [
  "tomet-semantics",
  "tomet-tree",
  "uuid",
+]
+
+[[package]]
+name = "tomet-load"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-config",
+ "tomet-parser",
+ "tomet-resolver",
+ "tomet-semantics",
 ]
 
 [[package]]

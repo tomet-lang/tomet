@@ -34,27 +34,17 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
 
     // Resolved once for the whole run. Per file it would re-read and
     // re-parse every declared vocabulary, which for this repository is
-    // seven files times eighty-five documents.
-    let (config, config_root) = tomet_config::find_config_file(path)
-        .map(|(cfg, _, root)| (cfg, root))
-        .unwrap_or_else(|| {
-            let root = if path.is_dir() {
-                path.clone()
-            } else {
-                path.parent().unwrap_or(Path::new(".")).to_path_buf()
-            };
-            (tomet_config::PrinterConfig::default(), root)
-        });
-
-    let loaded = tomet_resolver::load_vocabularies(&config_root, &config.vocabularies);
-    for problem in &loaded.errors {
+    // seven files times eighty-five documents -- which is why the front
+    // door has a vault and a per-document call rather than one function.
+    let vault = tomet_load::Vault::discover(path);
+    for problem in &vault.vocabulary_errors {
         eprintln!("warning: {problem}");
     }
 
     let files = if path.is_file() {
         vec![path.clone()]
     } else if path.is_dir() {
-        tomet_indexer::collect_tm_files_with_config(path, &config, &config_root)
+        tomet_indexer::collect_tm_files_with_config(path, &vault.config, &vault.root)
     } else {
         return Err(anyhow::anyhow!("path '{}' does not exist", path.display()));
     };
@@ -95,7 +85,7 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
             }
         };
 
-        let bindings = tomet_resolver::bindings_for(&doc, &loaded);
+        let bindings = vault.bindings(&doc);
         let diagnostics = tomet_validator::validate_document_with(&doc, &bindings);
         checked += 1;
         if diagnostics.is_empty() {
