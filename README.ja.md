@@ -1,3 +1,5 @@
+<!-- Generated from tmtroot/readme.tmt. Edit that, then `tomet export .`. -->
+
 # Tomet
 
 Tome to me!!

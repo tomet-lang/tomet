@@ -18,7 +18,8 @@ id: doc-kWBcIUUz
     "rfc": "https://www.rfc-editor.org/rfc/rfc${1}.html",
     "cve": "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-${1}",
     "greet": "Hello, ${1} ${2}!",
-    "copyright": "(C) 2026 Tomet Projects"
+    "copyright": "(C) 2026 Tomet Projects",
+    "generated_by": "<!-- Generated from ${1}. Edit that, then `tomet export .`. -->"
   },
   "format": {
     "meta": {
