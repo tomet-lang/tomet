@@ -1,6 +1,6 @@
 //! Resolution for remote attribute connections declared inside `@references[...]` blocks.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
+use tomet_ast::{Block, Document, Element, ElementValue, Inline, Value};
 use tomet_semantics::merge_connected_values;
 use tomet_tree::{ElementExt, for_each_element_mut};
 
@@ -99,6 +99,16 @@ fn parse_remote_connection_element(_el: &Element) -> Option<RemoteConnection> {
     None
 }
 
+/// Reads the target list a remote connection carried: one id, or
+/// `[a, b]`.
+///
+/// Dead, and deliberately so. Its only caller was
+/// `parse_remote_connection_element`, which returns `None` until a
+/// spelling is decided -- so this is the half of the feature that still
+/// works, kept beside the half that does not. Deleting it would make
+/// "decide a spelling" mean "and rewrite the parsing too", which is not
+/// what the roadmap entry is asking for.
+#[allow(dead_code)]
 fn parse_target_ids_from_str(s: &str) -> Vec<String> {
     let s = s.trim();
     if s.starts_with('[') && s.ends_with(']') {

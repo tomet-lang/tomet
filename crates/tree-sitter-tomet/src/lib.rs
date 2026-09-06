@@ -156,7 +156,6 @@ pub const HIGHLIGHTS_QUERY: &str = include_str!("../queries/highlights.scm");
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeSet;
     use tree_sitter::{Node, Parser};
 
     fn parse(src: &str) -> tree_sitter::Tree {
@@ -170,33 +169,6 @@ mod tests {
     /// Collects the source text of every `ERROR`/`MISSING` node in the
     /// tree, so a fixture-level assertion can compare against exactly
     /// the known, documented cases rather than just counting them.
-    fn error_texts(src: &str, tree: &tree_sitter::Tree) -> BTreeSet<String> {
-        let mut out = BTreeSet::new();
-        let mut cursor = tree.walk();
-        let mut visit = |node: Node| {
-            if node.is_error() || node.is_missing() {
-                out.insert(
-                    node.utf8_text(src.as_bytes())
-                        .unwrap_or_default()
-                        .to_string(),
-                );
-            }
-        };
-        loop {
-            visit(cursor.node());
-            if cursor.goto_first_child() {
-                continue;
-            }
-            loop {
-                if cursor.goto_next_sibling() {
-                    break;
-                }
-                if !cursor.goto_parent() {
-                    return out;
-                }
-            }
-        }
-    }
 
     #[test]
     fn parses_a_heading() {

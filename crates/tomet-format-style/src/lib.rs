@@ -15,7 +15,7 @@
 //! `tomet-printer` since it recurses into inline/child content and
 //! is genuinely part of rebuilding a whole document from its AST.
 
-use tomet_ast::{Element, ElementValue, Value};
+use tomet_ast::{Element, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_field_utils::is_iso8601;
 
@@ -274,7 +274,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::Sigil;
+    use tomet_ast::{ElementValue, Sigil};
 
     fn map(entries: &[(&str, Value)]) -> Value {
         Value::Map(
