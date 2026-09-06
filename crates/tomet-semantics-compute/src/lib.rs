@@ -141,6 +141,25 @@ fn evaluate_call(
     config: &tomet_semantics::DocumentConfig,
     ctx: &EvaluationContext,
 ) -> Result<Value, ComputeError> {
+    // `${macro.NAME(...)}` names the namespace, so it goes straight to the
+    // macros and never tries a builtin. That is the point of writing it:
+    // a bare `${gh(12)}` reaches the same template only *after*
+    // `functions::call` misses, so a macro named like a builtin loses
+    // silently -- the fallback `docs/spec/builtin-functions.tmt` rejects.
+    // Unknown under `macro.` is an error, not a fall-through.
+    if let InterpExprKind::Member { object, member } = &callee.kind {
+        if matches!(&object.kind, InterpExprKind::Identifier(ns) if ns == "macro") {
+            let Some(template) = config.macros.get(member) else {
+                return Err(ComputeError::UnknownFunction(format!("macro.{member}")));
+            };
+            let values = args
+                .iter()
+                .map(|arg| evaluate_with_context(doc, arg, config, ctx))
+                .collect::<Result<Vec<_>, _>>()?;
+            return Ok(Value::String(expand_macro_template(template, &values)));
+        }
+    }
+
     let InterpExprKind::Identifier(name) = &callee.kind else {
         return Err(ComputeError::UnsupportedCallee);
     };
@@ -337,6 +356,58 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    /// `macro.NAME` names the namespace, so it goes to the macros and
+    /// nowhere else. A bare `${gh(12)}` reaches the same template only
+    /// after `functions::call` misses -- so a macro named like a builtin
+    /// loses silently, which is the fallback the spec rejects.
+    #[test]
+    fn a_namespaced_macro_call_expands() {
+        let doc = parse("@kind(note)\n");
+        let mut config = tomet_semantics::DocumentConfig::default();
+        config
+            .macros
+            .insert("gh".to_string(), "issues/${1}".to_string());
+
+        let expr = interp("${macro.gh(12)}");
+        assert_eq!(
+            evaluate_with_config(&doc, &expr, &config).unwrap(),
+            Value::String("issues/12".to_string())
+        );
+    }
+
+    /// Unknown under `macro.` is an error rather than a fall-through to a
+    /// builtin -- that is the whole reason for writing the namespace.
+    #[test]
+    fn an_unknown_namespaced_macro_is_an_error() {
+        let doc = parse("@kind(note)\n");
+        let config = tomet_semantics::DocumentConfig::default();
+        let expr = interp("${macro.date()}");
+        assert!(matches!(
+            evaluate_with_config(&doc, &expr, &config),
+            Err(ComputeError::UnknownFunction(_))
+        ));
+    }
+
+    /// `self.*` is whatever the caller seeded, read through the same
+    /// dotted-path walk `get_var` already did for any map.
+    #[test]
+    fn self_is_read_from_the_context() {
+        let doc = parse("@kind(note)\n");
+        let config = tomet_semantics::DocumentConfig::default();
+        let ctx = EvaluationContext::new().with_var(
+            "self",
+            Value::Map(vec![(
+                "path".to_string(),
+                Value::String("tmtroot/agents.tmt".to_string()),
+            )]),
+        );
+        let expr = interp("${self.path}");
+        assert_eq!(
+            evaluate_with_context(&doc, &expr, &config, &ctx).unwrap(),
+            Value::String("tmtroot/agents.tmt".to_string())
+        );
     }
 
     #[test]

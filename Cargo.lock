@@ -1970,6 +1970,7 @@ dependencies = [
  "serde_tomet",
  "tokio",
  "tomet-ast",
+ "tomet-compute",
  "tomet-config",
  "tomet-formatter",
  "tomet-html",

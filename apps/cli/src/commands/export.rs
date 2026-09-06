@@ -168,7 +168,10 @@ fn export_one(
         };
 
         let rendered = match target {
-            ExportType::CommonMark => tomet_markdown::to_markdown(&doc),
+            ExportType::CommonMark => {
+                let (config, vars) = crate::util::render_context(&doc, file_path, project_root);
+                tomet_markdown::to_markdown_with_context(&doc, &config, &vars)
+            }
             // Pandoc's AST, not a rendering -- `pandoc -f json` turns it
             // into whatever format is actually wanted.
             ExportType::Pandoc => serde_json::to_string(&tomet_pandoc::to_pandoc(&doc))?,

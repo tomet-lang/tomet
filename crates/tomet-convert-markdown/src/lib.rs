@@ -7,7 +7,7 @@
 mod export;
 mod import;
 
-pub use export::to_markdown;
+pub use export::{to_markdown, to_markdown_with_context};
 pub use import::{ImportOptions, from_markdown, from_markdown_with_options};
 
 #[cfg(test)]
