@@ -20,12 +20,38 @@ use tomet_semantics::{
 struct RenderCtx<'a> {
     doc: &'a Document,
     config: tomet_semantics::DocumentConfig,
+    vars: tomet_compute::EvaluationContext,
 }
 
+/// Renders `doc`, knowing only what the document says about itself.
+///
+/// A caller that can read the vault -- which means one allowed to do
+/// I/O -- should use [`to_markdown_with_context`]. The same split
+/// `validate_document`/`validate_document_with` uses, and for the same
+/// reason: a vault's macros and a document's own path both arrive from
+/// outside, and most callers here have no vault to ask.
 pub fn to_markdown(doc: &Document) -> String {
-    let mut out = String::new();
     let config = tomet_semantics::document_config(doc);
-    let cx = RenderCtx { doc, config };
+    to_markdown_with_context(doc, &config, &tomet_compute::EvaluationContext::default())
+}
+
+/// [`to_markdown`], with the config the vault contributes and the
+/// variables `${...}` may read (`self.path`, `self.filename`).
+///
+/// Without this the fourteen macros in a `default.config.tmt` expand
+/// nowhere: `document_config` reads a document's own `@config` and
+/// nothing else, so `${macro.gh(12)}` had no template to find.
+pub fn to_markdown_with_context(
+    doc: &Document,
+    config: &tomet_semantics::DocumentConfig,
+    vars: &tomet_compute::EvaluationContext,
+) -> String {
+    let mut out = String::new();
+    let cx = RenderCtx {
+        doc,
+        config: config.clone(),
+        vars: vars.clone(),
+    };
     for block in &doc.blocks {
         render_block(&cx, block, &mut out);
     }
@@ -192,7 +218,7 @@ fn render_table(cx: &RenderCtx, el: &Element) -> String {
 fn render_interp(cx: &RenderCtx, el: &Element) -> String {
     match &el.value {
         Some(ElementValue::Interp(expr)) => {
-            match tomet_compute::evaluate_with_config(cx.doc, expr, &cx.config) {
+            match tomet_compute::evaluate_with_context(cx.doc, expr, &cx.config, &cx.vars) {
                 Ok(val) => match val {
                     Value::String(s) => s,
                     Value::Int(i) => i.to_string(),

@@ -85,3 +85,53 @@ mod tests {
         assert!(formatted.contains("^ expected ']'"));
     }
 }
+
+/// The config and variables a `${...}` needs, for a document being
+/// rendered from a real file inside a real vault.
+///
+/// Two things the pure renderers cannot know on their own:
+///
+/// - **The vault's macros.** `tomet_semantics::document_config` reads a
+///   document's own `@config` and nothing else, so a `default.config.tmt`
+///   defining `gh`, `wiki` and a dozen others expanded nowhere. They are
+///   merged underneath the document's own, which wins on a clash --
+///   nearer declaration, same rule as the config search itself.
+/// - **Where the document is.** `self.path` is relative to the project
+///   root (`tmtroot/agents.tmt`), `self.filename` is the basename. Two
+///   fields rather than one, because naming either for the other's
+///   meaning is how a field starts lying.
+pub(crate) fn render_context(
+    doc: &tomet_ast::Document,
+    file_path: &Path,
+    project_root: &Path,
+) -> (
+    tomet_semantics::DocumentConfig,
+    tomet_compute::EvaluationContext,
+) {
+    let mut config = tomet_semantics::document_config(doc);
+    if let Some((vault, _, _)) = tomet_config::find_config_file(file_path) {
+        for (name, template) in vault.macros {
+            config.macros.entry(name).or_insert(template);
+        }
+    }
+
+    let rel = file_path
+        .strip_prefix(project_root)
+        .unwrap_or(file_path)
+        .to_string_lossy()
+        .replace('\\', "/");
+    let rel = rel.strip_prefix("./").unwrap_or(&rel).to_string();
+    let filename = file_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let vars = tomet_compute::EvaluationContext::new().with_var(
+        "self",
+        tomet_ast::Value::Map(vec![
+            ("path".to_string(), tomet_ast::Value::String(rel)),
+            ("filename".to_string(), tomet_ast::Value::String(filename)),
+        ]),
+    );
+    (config, vars)
+}

@@ -60,13 +60,9 @@
                                       // 書けない。`(args)` に寄せるか、生の本文に
                                       // 専用スロットを与えるか (tests/README.md)
 - ( ) `ref`構文                      // `@self`
-- ( ) `${}` に名前空間を入れる          // `std.` / `macro.` / `self.`。
-                                      // 今はフォールバックの連鎖で、要素名で
-                                      // 潰した暗黙の解決がそのまま残っている
-- ( ) `${self.filename}` と `${self.config.*}`
-- ( ) vault のマクロが文書に届かない    // DocumentConfig が文書自身の @config
-                                      // しか読まないので default.config.tmt の
-                                      // macros が展開されない
+- ( ) `${}` の `std.` と、裸マクロの拒否   // `macro.` と `self.` は入った。
+                                      // `${gh(12)}` はまだ通る（移行が要る）
+- ( ) `${self.config.*}`               // path と filename だけ入っている
 - ( ) `${file("x.tmt").*}`             // 他の文書を引く。I/O なので resolver 側
 - ( ) `[]`のkey
 - ( ) 対の後ろの要素が文字列に飲まれる    // `@links{ (1)[a] note: x (2)[b] }` の
