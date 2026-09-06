@@ -64,9 +64,9 @@ pub(crate) fn parse_braced_value(cur: &mut Cursor) -> Result<Value> {
     // deliberately errors ("expected a value") on an immediately-
     // closing bracket, since *that* function is also used for sequence
     // items and single-value positions where an empty body is never
-    // valid. A whole `{}`/`()` *group*, though, is: `element.rs`'s own
-    // `parse_value_group` and `parse_paren_value` right below both
-    // special-case it into an empty `Value::Map` before ever calling
+    // valid. A whole `{}`/`()` *group*, though, is: `element.rs`'s
+    // `parse_value_group` and `parse_paren_value` both special-case it
+    // into an empty `Value::Map` before ever calling
     // `parse_value_at` -- this mirrors that (this function's callers,
     // heading/list-item attrs, are exactly that same "whole group"
     // position, not a sequence item).
