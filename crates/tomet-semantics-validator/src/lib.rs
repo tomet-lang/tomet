@@ -76,6 +76,7 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Valida
 
     check_singletons_and_regions(doc, bindings, &mut errors);
     check_retired_settings_keys(doc, &mut errors);
+    check_arguments(doc, bindings, &mut errors);
 
     for (id, span) in collect_ids(doc) {
         if let Some((_, first)) = seen.iter().find(|(seen_id, _)| *seen_id == id) {
@@ -170,6 +171,62 @@ fn check_singletons_and_regions(
             }
         }
     }
+}
+
+/// Checks each element's `(args)` against the `@param`s its vocabulary
+/// declares.
+///
+/// Silent for anything `std` owns, and for a custom element whose
+/// declaration carries no `@args`. An absent `@args` says nothing about
+/// the arguments rather than saying there are none -- that second
+/// statement is `@data`'s `open: false`, which has no `(args)` twin yet,
+/// and inventing one here would decide it by accident.
+///
+/// The arguments are normalized first, so a positional value has already
+/// been moved onto the slot its `@param` declares. Without that,
+/// `@deck.card(3)` would report the sentinel-keyed entry as an unknown
+/// argument named `""`.
+fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<ValidationError>) {
+    use tomet_ast::Value;
+
+    tomet_tree::for_each_element(doc, |el| {
+        let Some(name) = el.sigil.name() else { return };
+        let Some(decl) = bindings.declaration(name) else {
+            return;
+        };
+        if decl.params.is_empty() {
+            return;
+        }
+
+        let args = tomet_semantics::normalized_element_args_in(el, bindings);
+        let entries: &[(String, Value)] = match args.as_ref() {
+            Some(Value::Map(entries)) => entries,
+            // A non-map `(args)` survives normalization only when the
+            // element has no positional slot to put it on, which cannot
+            // happen here: `decl.params` is non-empty. Anything else is
+            // `(args)` being absent.
+            _ => &[],
+        };
+
+        for (key, _) in entries {
+            if !key.is_empty() && decl.param(key).is_none() {
+                errors.push(ValidationError::UnknownArgument {
+                    element: name.to_string(),
+                    argument: key.clone(),
+                    span: el.span,
+                });
+            }
+        }
+        for param in decl.params.iter().filter(|p| p.required) {
+            if !entries.iter().any(|(k, _)| *k == param.name) {
+                errors.push(ValidationError::MissingRequiredArgument {
+                    element: name.to_string(),
+                    argument: param.name.clone(),
+                    span: el.span,
+                });
+            }
+        }
+    });
 }
 
 /// Reports `@settings`/`@config` keys that have been retired.
@@ -323,6 +380,76 @@ mod tests {
                 ValidationError::DuplicateSingleton { .. }
                     | ValidationError::OutsidePreamble { .. }
             )),
+            "{errors:?}"
+        );
+    }
+
+    /// A vocabulary with a declared parameter list.
+    fn deck_with_params() -> Bindings {
+        let vocab = tomet_semantics::Vocabulary::from_document(&parse(
+            r#"@kind(vocabulary)
+@vocabulary(deck){}
+
+@element(card){
+  @args{
+    @param(id){ positional: true, required: true }[ 通し番号。 ]
+    @param(tags){}[ タグ。 ]
+  }
+}[ カード。 ]
+
+@element(plain){}[ 宣言なし。 ]
+"#,
+        ))
+        .expect("a vocabulary");
+        Bindings::for_document(&parse("@kind(deck)\n"), [vocab])
+    }
+
+    /// A positional argument fills the slot its `@param` declares, so it
+    /// is not reported as an unknown argument keyed `""`.
+    #[test]
+    fn a_positional_argument_lands_on_its_declared_slot() {
+        let doc = parse("@kind(deck)\n\n@card(3)\n");
+        let errors = validate_document_with(&doc, &deck_with_params());
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[test]
+    fn an_undeclared_argument_is_reported() {
+        let doc = parse("@kind(deck)\n\n@card(id: 3, colour: red)\n");
+        let errors = validate_document_with(&doc, &deck_with_params());
+        assert!(
+            errors.iter().any(|e| matches!(
+                e,
+                ValidationError::UnknownArgument { argument, .. } if argument == "colour"
+            )),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn a_missing_required_argument_is_reported() {
+        let doc = parse("@kind(deck)\n\n@card(tags: a)\n");
+        let errors = validate_document_with(&doc, &deck_with_params());
+        assert!(
+            errors.iter().any(|e| matches!(
+                e,
+                ValidationError::MissingRequiredArgument { argument, .. } if argument == "id"
+            )),
+            "{errors:?}"
+        );
+    }
+
+    /// An element whose declaration has no `@args` says nothing about its
+    /// arguments. Saying it takes none is a different statement, and one
+    /// the vocabulary has no spelling for yet.
+    #[test]
+    fn an_element_with_no_args_declaration_is_not_checked() {
+        let doc = parse("@kind(deck)\n\n@plain(anything: 1)\n");
+        let errors = validate_document_with(&doc, &deck_with_params());
+        assert!(
+            !errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::UnknownArgument { .. })),
             "{errors:?}"
         );
     }

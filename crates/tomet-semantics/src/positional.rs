@@ -1,5 +1,7 @@
 use tomet_ast::{Element, Sigil, Value};
 
+use crate::vocabulary::{Bindings, ElementDecl};
+
 /// One table, keyed on the bare name alone.
 ///
 /// This used to be two parallel tables, one per sigil, and they had
@@ -138,18 +140,25 @@ fn fill_positional_slots(positional_keys: &[String], mut entries: Vec<(String, V
 
 /// The ordered positional-key list for `sigil`, owned.
 ///
-/// There used to be a second source here: an `@settings` `elements:` map
-/// could give a custom element its own `positional: [ ... ]` list, and it
-/// won over the builtin table. That surface is gone -- which names exist
-/// and what their parameters are is a `@vocabulary` question now, and the
-/// list form was the duplicate `explicit-form-first` names outright (an
-/// order the parameter declarations already carry). Until `@param` is
-/// read, `std`'s table is the whole of it.
-fn positional_keys(sigil: &Sigil) -> Vec<String> {
-    builtin_positional_arg_keys(sigil)
-        .iter()
-        .map(|s| s.to_string())
-        .collect()
+/// Two sources, and `std` is asked first: its table is hard-coded and a
+/// vocabulary may not shadow a builtin name, so the order cannot matter --
+/// it is written this way round so the code says which one wins.
+///
+/// A vocabulary's half is the `@param`s marked `positional: true`, in
+/// declaration order. There is no separate `positional: [ ... ]` list
+/// because that would state an order the declarations already carry; an
+/// `@settings` key spelled exactly that way was deleted for being the
+/// duplicate `explicit-form-first` names outright.
+fn positional_keys(sigil: &Sigil, bindings: &Bindings) -> Vec<String> {
+    let builtin = builtin_positional_arg_keys(sigil);
+    if !builtin.is_empty() {
+        return builtin.iter().map(|s| s.to_string()).collect();
+    }
+    sigil
+        .name()
+        .and_then(|name| bindings.declaration(name))
+        .map(ElementDecl::positional_keys)
+        .unwrap_or_default()
 }
 
 /// Stringifies a scalar `Value` back to the plain text it would have come
@@ -187,12 +196,25 @@ fn scalar_to_plain(v: &Value) -> String {
 /// An element with no positional slots defined at all (empty list) is
 /// returned untouched in every case.
 ///
-/// There was a `_with_schema` twin taking a `SettingsSchema`, and every
-/// caller passed the default. It has been folded back in here along with
-/// the `@settings` surface it read (see [`positional_keys`]).
+/// Knows only `std`. A caller holding the document's [`Bindings`] should
+/// use [`normalized_element_args_in`], which also reads what a vocabulary
+/// declares -- the same split as `validate_document` and
+/// `validate_document_with`, and for the same reason: most callers here
+/// (HTML, Typst, `@meta` reading) have no vault to resolve against.
+///
+/// This is deliberately *not* the `_with_schema` twin that used to sit
+/// here. That one took a `SettingsSchema` no caller ever built, so its
+/// second source was dead on arrival; this one exists because the
+/// validator passes real bindings through it.
 pub fn normalized_element_args(el: &Element) -> Option<Value> {
+    normalized_element_args_in(el, &Bindings::default())
+}
+
+/// [`normalized_element_args`], plus the positional slots a vocabulary in
+/// scope declares with `@param(name){ positional: true }`.
+pub fn normalized_element_args_in(el: &Element, bindings: &Bindings) -> Option<Value> {
     let args = el.args.as_ref()?;
-    let positional_keys = positional_keys(&el.sigil);
+    let positional_keys = positional_keys(&el.sigil, bindings);
 
     match args {
         Value::Map(entries) => {

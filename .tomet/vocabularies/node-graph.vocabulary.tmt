@@ -3,6 +3,9 @@
 
 @element(node){
   display: block
+  @args{
+    @param(type){ type: string, required: true }[ ノードの種類。`textarea` / `number` / `export`。 ]
+  }
 }[
   グラフのノードひとつ。`{x, y}` が座標、`[content]` が中身。
   `docs/examples/node_graph.tmt` が使い方の見本。

@@ -3,7 +3,10 @@
 
 @element(bookmark){
   display: block
+  @args{
+    @param(url){ type: string, positional: true, required: true }[ 保存する URL。 ]
+  }
 }[
-  ブックマークひとつ。位置引数は保存する URL。
+  ブックマークひとつ。
   `docs/examples/bookmark.tmt` が使い方の見本。
 ]

@@ -3,7 +3,10 @@
 
 @element(timestamp){
   display: block
+  @args{
+    @param(time){ type: string, positional: true, required: true }[ 動画内の時刻。`"02:59"` のように quote する。 ]
+  }
 }[
-  動画の一点についてのメモ。`time:` が位置、`[content]` が本文。
+  動画の一点についてのメモ。`[content]` が本文。
   `docs/examples/video.memo.tmt` が使い方の見本。
 ]

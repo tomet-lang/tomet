@@ -3,14 +3,20 @@
 
 @element(dirs){
   display: block
+  @args{
+    @param(path){ type: string, positional: true, required: true }[ ディレクトリのパス。 ]
+  }
 }[
-  ディレクトリひとつ。位置引数はパス、`[content]` が説明。
+  ディレクトリひとつ。`[content]` が説明。
 ]
 
 @element(file){
   display: block
+  @args{
+    @param(path){ type: string, positional: true, required: true }[ ファイルのパス。 ]
+  }
 }[
-  ファイルひとつ。位置引数はパス、`[content]` が説明。
+  ファイルひとつ。`[content]` が説明。
   `std` の `@link(target:"file:...")` とは別物で、こちらは
   リンクではなくツリーの一項目を表す。
 ]
