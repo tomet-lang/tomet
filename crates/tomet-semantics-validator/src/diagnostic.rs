@@ -3,9 +3,28 @@ use std::fmt;
 use tomet_ast::Span;
 use tomet_cst::TextRange;
 
-/// A `.tmt` schema/lint rule violation found by `validate_document`.
+/// How much a [`Diagnostic`] matters.
+///
+/// Derived from the variant rather than stored: severity is a property of
+/// the rule, not of the occurrence, so keeping a field would be a second
+/// place the same fact lives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Severity {
+    /// The document is wrong. `tomet check` fails.
+    Error,
+    /// The document says something about itself that a reader should see,
+    /// and is otherwise fine. `tomet check` reports it and still passes.
+    Warning,
+}
+
+/// Something `validate_document` found and a reader should know about.
+///
+/// Named for what the callers already called it: `bindings/{js,java,
+/// python}` each bind the result to `diagnostics`. It was
+/// `ValidationError` while every variant really was an error; `Draft` and
+/// `Fixme` are not, so the name moved rather than the meaning stretching.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ValidationError {
+pub enum Diagnostic {
     /// The same `id` value appears on more than one node. `first` is where
     /// it was first seen; `duplicate` is the later, offending occurrence.
     DuplicateId {
@@ -84,6 +103,19 @@ pub enum ValidationError {
         argument: String,
         span: Span,
     },
+    /// `@draft[ ... ]` -- the document says it is unfinished here.
+    ///
+    /// A warning, not an error: an unfinished document is a normal state
+    /// to be in and to commit, and the whole point of writing the marker
+    /// is that a reader (and `tomet check`) can find it. Failing the run
+    /// would make the honest thing the expensive one.
+    ///
+    /// This is why it is an element and not `//(TODO)`: `tomet_ast` has no
+    /// comment node, so a comment marker cannot be counted here at all,
+    /// and is dropped by anything that re-prints from the tree.
+    Draft { note: String, span: Span },
+    /// `@fixme[ ... ]` -- there is text here and it needs revisiting.
+    Fixme { note: String, span: Span },
     /// A top-level `@settings`/`@config` key that has been retired.
     ///
     /// `elements:` described what a custom element takes -- its `args`,
@@ -99,41 +131,51 @@ pub enum ValidationError {
     RetiredSettingsKey { key: String, span: Span },
 }
 
-impl ValidationError {
+impl Diagnostic {
     /// Returns the primary span where the validation violation occurred.
     pub fn span(&self) -> Span {
         match self {
-            ValidationError::DuplicateId { duplicate, .. } => *duplicate,
-            ValidationError::MissingRequiredMetaKey { span, .. } => *span,
-            ValidationError::MissingRequiredSection { span, .. } => *span,
-            ValidationError::UnknownElement { span, .. } => *span,
-            ValidationError::ShapeMismatch { span, .. } => *span,
-            ValidationError::DuplicateSingleton { duplicate, .. } => *duplicate,
-            ValidationError::OutsidePreamble { span, .. } => *span,
-            ValidationError::RetiredSettingsKey { span, .. } => *span,
-            ValidationError::UnknownArgument { span, .. } => *span,
-            ValidationError::MissingRequiredArgument { span, .. } => *span,
+            Diagnostic::DuplicateId { duplicate, .. } => *duplicate,
+            Diagnostic::MissingRequiredMetaKey { span, .. } => *span,
+            Diagnostic::MissingRequiredSection { span, .. } => *span,
+            Diagnostic::UnknownElement { span, .. } => *span,
+            Diagnostic::ShapeMismatch { span, .. } => *span,
+            Diagnostic::DuplicateSingleton { duplicate, .. } => *duplicate,
+            Diagnostic::OutsidePreamble { span, .. } => *span,
+            Diagnostic::RetiredSettingsKey { span, .. } => *span,
+            Diagnostic::UnknownArgument { span, .. } => *span,
+            Diagnostic::MissingRequiredArgument { span, .. } => *span,
+            Diagnostic::Draft { span, .. } => *span,
+            Diagnostic::Fixme { span, .. } => *span,
+        }
+    }
+
+    /// How much this matters. See [`Severity`].
+    pub fn severity(&self) -> Severity {
+        match self {
+            Diagnostic::Draft { .. } | Diagnostic::Fixme { .. } => Severity::Warning,
+            _ => Severity::Error,
         }
     }
 }
 
-impl fmt::Display for ValidationError {
+impl fmt::Display for Diagnostic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ValidationError::DuplicateId { id, first, .. } => {
+            Diagnostic::DuplicateId { id, first, .. } => {
                 write!(
                     f,
                     "duplicate id `{id}` (first defined at {}:{})",
                     first.start.line, first.start.column
                 )
             }
-            ValidationError::MissingRequiredMetaKey { key, kind, .. } => {
+            Diagnostic::MissingRequiredMetaKey { key, kind, .. } => {
                 write!(
                     f,
                     "document of kind `{kind}` is missing required @meta field `{key}`"
                 )
             }
-            ValidationError::MissingRequiredSection {
+            Diagnostic::MissingRequiredSection {
                 title, id, kind, ..
             } => {
                 if let Some(sec_id) = id {
@@ -148,7 +190,7 @@ impl fmt::Display for ValidationError {
                     )
                 }
             }
-            ValidationError::UnknownElement {
+            Diagnostic::UnknownElement {
                 name,
                 unbound_namespace,
                 ..
@@ -166,21 +208,21 @@ impl fmt::Display for ValidationError {
                     }
                 )
             }
-            ValidationError::DuplicateSingleton { name, first, .. } => {
+            Diagnostic::DuplicateSingleton { name, first, .. } => {
                 write!(
                     f,
                     "`{name}` may appear once in a document; the first is at {}:{}",
                     first.start.line, first.start.column
                 )
             }
-            ValidationError::OutsidePreamble { name, .. } => {
+            Diagnostic::OutsidePreamble { name, .. } => {
                 write!(
                     f,
                     "`{name}` belongs in the preamble -- before the document's body \
                      starts, not after it"
                 )
             }
-            ValidationError::ShapeMismatch {
+            Diagnostic::ShapeMismatch {
                 name,
                 found,
                 expected,
@@ -201,7 +243,7 @@ impl fmt::Display for ValidationError {
                     }
                 )
             }
-            ValidationError::UnknownArgument {
+            Diagnostic::UnknownArgument {
                 element, argument, ..
             } => {
                 write!(
@@ -210,12 +252,26 @@ impl fmt::Display for ValidationError {
                      declares the ones it takes with `@param`"
                 )
             }
-            ValidationError::MissingRequiredArgument {
+            Diagnostic::MissingRequiredArgument {
                 element, argument, ..
             } => {
                 write!(f, "`{element}` requires the argument `{argument}`")
             }
-            ValidationError::RetiredSettingsKey { key, .. } => {
+            Diagnostic::Draft { note, .. } => {
+                if note.is_empty() {
+                    write!(f, "unfinished here")
+                } else {
+                    write!(f, "unfinished here: {note}")
+                }
+            }
+            Diagnostic::Fixme { note, .. } => {
+                if note.is_empty() {
+                    write!(f, "marked to fix")
+                } else {
+                    write!(f, "marked to fix: {note}")
+                }
+            }
+            Diagnostic::RetiredSettingsKey { key, .. } => {
                 // Named per key rather than one generic sentence: `elements`
                 // has somewhere to go and `types` does not, and telling a
                 // reader to move something that has no destination is worse
@@ -240,7 +296,7 @@ impl fmt::Display for ValidationError {
     }
 }
 
-impl std::error::Error for ValidationError {}
+impl std::error::Error for Diagnostic {}
 
 /// A validation error tied directly to precise byte ranges in the CST.
 #[derive(Debug, Clone, PartialEq, Eq)]

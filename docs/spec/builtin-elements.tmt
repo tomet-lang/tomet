@@ -23,6 +23,13 @@
 @meta(format:json)
 @config(format:json)
 
+// 文書が自分について言う印。どちらも警告として報告され、`tomet check` は通る。
+// draft は「ここに文章が無い」、fixme は「文章はあるが直す」。見れば決まる。
+// `//(TODO)` ではないのは、AST にコメントのノードが無く、数えることも
+// 印を保つこともできないため。
+@draft[ 何が足りないか ]
+@fixme[ 何が間違っているか ]
+
 // link/embed のキーは `target` ひとつだけ。何を指しているか(url/file/tm/id/ref)は
 // キーではなく、target 文字列自身の接頭辞から導かれる (tomet_semantics::target_scheme)。
 @link("https://example.com")[ display_name ]   // 位置引数は target に正規化される

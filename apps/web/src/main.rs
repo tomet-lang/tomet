@@ -139,17 +139,23 @@ async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
             let markdown = tomet_markdown::to_markdown(&doc);
             let typst = tomet_typst::to_typst(&doc);
 
-            let validation_errors = tomet_validator::validate_document(&doc);
-            let diagnostics = validation_errors
+            // The severity comes from the diagnostic now. It used to be
+            // the literal "warning" on every one of them, so an unknown
+            // element was reported as gently as a `@draft`.
+            let diagnostics = tomet_validator::validate_document(&doc)
                 .into_iter()
-                .map(|ve| {
-                    let span = ve.span();
+                .map(|d| {
+                    let span = d.span();
                     ApiDiagnostic {
-                        message: ve.to_string(),
+                        message: d.to_string(),
                         line: span.start.line,
                         column: span.start.column,
                         offset: span.start.offset,
-                        severity: "warning".to_string(),
+                        severity: match d.severity() {
+                            tomet_validator::Severity::Error => "error",
+                            tomet_validator::Severity::Warning => "warning",
+                        }
+                        .to_string(),
                     }
                 })
                 .collect();

@@ -1,9 +1,9 @@
 pub mod blueprint;
-mod error;
+mod diagnostic;
 mod id;
 
 pub use blueprint::*;
-pub use error::{CstValidationError, ValidationError};
+pub use diagnostic::{CstValidationError, Diagnostic, Severity};
 
 use id::{collect_ids, collect_ids_cst};
 use tomet_ast::Document;
@@ -38,7 +38,7 @@ fn shape_str(shape: Shape) -> &'static str {
 /// unknown. Callers that can read the vault's vocabularies -- which means
 /// callers that may do I/O -- should use [`validate_document_with`] and
 /// pass what is in scope.
-pub fn validate_document(doc: &Document) -> Vec<ValidationError> {
+pub fn validate_document(doc: &Document) -> Vec<Diagnostic> {
     validate_document_with(doc, &Bindings::default())
 }
 
@@ -47,7 +47,7 @@ pub fn validate_document(doc: &Document) -> Vec<ValidationError> {
 /// Still does no I/O: `bindings` arrives already loaded, by whoever was
 /// allowed to read the files. That split is why this can consult a
 /// vocabulary without the layer below it gaining the ability to open one.
-pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<ValidationError> {
+pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
     let mut seen: Vec<(String, tomet_ast::Span)> = Vec::new();
 
@@ -57,7 +57,7 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Valida
     // element written with the wrong shape, is reported.
     tomet_tree::for_each_element(doc, |el| {
         if let Err(unknown) = classify_in(el, bindings) {
-            errors.push(ValidationError::UnknownElement {
+            errors.push(Diagnostic::UnknownElement {
                 name: unknown.name,
                 unbound_namespace: unknown.unbound_namespace,
                 span: el.span,
@@ -65,7 +65,7 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Valida
             return;
         }
         if let Some((found, expected)) = tomet_semantics::shape_mismatch(el) {
-            errors.push(ValidationError::ShapeMismatch {
+            errors.push(Diagnostic::ShapeMismatch {
                 name: el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
                 found: shape_str(found),
                 expected: shape_str(expected),
@@ -77,10 +77,11 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Valida
     check_singletons_and_regions(doc, bindings, &mut errors);
     check_retired_settings_keys(doc, &mut errors);
     check_arguments(doc, bindings, &mut errors);
+    check_unfinished(doc, &mut errors);
 
     for (id, span) in collect_ids(doc) {
         if let Some((_, first)) = seen.iter().find(|(seen_id, _)| *seen_id == id) {
-            errors.push(ValidationError::DuplicateId {
+            errors.push(Diagnostic::DuplicateId {
                 id,
                 first: *first,
                 duplicate: span,
@@ -104,11 +105,7 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Valida
 /// document. The first top-level block that is not one of them ends it,
 /// and anything preamble-only after that point, or nested inside
 /// content, is out of place.
-fn check_singletons_and_regions(
-    doc: &Document,
-    bindings: &Bindings,
-    errors: &mut Vec<ValidationError>,
-) {
+fn check_singletons_and_regions(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     use tomet_ast::Block;
     use tomet_semantics::Region;
 
@@ -137,7 +134,7 @@ fn check_singletons_and_regions(
         };
         if singleton {
             if let Some((_, first)) = seen.iter().find(|(seen_name, _)| *seen_name == name) {
-                errors.push(ValidationError::DuplicateSingleton {
+                errors.push(Diagnostic::DuplicateSingleton {
                     name: name.clone(),
                     first: *first,
                     duplicate: el.span,
@@ -147,7 +144,7 @@ fn check_singletons_and_regions(
             }
         }
         if region == Region::Preamble && !in_place {
-            errors.push(ValidationError::OutsidePreamble {
+            errors.push(Diagnostic::OutsidePreamble {
                 name,
                 span: el.span,
             });
@@ -173,6 +170,52 @@ fn check_singletons_and_regions(
     }
 }
 
+/// Surfaces `@draft` and `@fixme` -- the document's own statement that it
+/// is unfinished somewhere.
+///
+/// Warnings, so `tomet check` reports them and still passes: marking a
+/// gap has to be cheaper than leaving it unmarked, or nobody marks it.
+///
+/// `classify` rather than a name comparison, so a `@ns.draft` from some
+/// vocabulary is not mistaken for `std`'s.
+fn check_unfinished(doc: &Document, errors: &mut Vec<Diagnostic>) {
+    tomet_tree::for_each_element(doc, |el| {
+        let kind = match tomet_semantics::classify(el) {
+            Ok(kind) => kind,
+            Err(_) => return,
+        };
+        let note = note_text(el);
+        match kind {
+            tomet_semantics::ElementKind::Draft => errors.push(Diagnostic::Draft {
+                note,
+                span: el.span,
+            }),
+            tomet_semantics::ElementKind::Fixme => errors.push(Diagnostic::Fixme {
+                note,
+                span: el.span,
+            }),
+            _ => {}
+        }
+    });
+}
+
+/// The plain text of an element's `[content]`, which is where the note
+/// about what is missing lives. Nested elements are skipped: a note is
+/// prose, and anything richer belongs in the document rather than in the
+/// marker.
+fn note_text(el: &tomet_ast::Element) -> String {
+    let Some(inlines) = el.content.as_ref() else {
+        return String::new();
+    };
+    let mut out = String::new();
+    for inline in inlines {
+        if let tomet_ast::Inline::Text(t) = inline {
+            out.push_str(&t.value);
+        }
+    }
+    out.trim().to_string()
+}
+
 /// Checks each element's `(args)` against the `@param`s its vocabulary
 /// declares.
 ///
@@ -186,7 +229,7 @@ fn check_singletons_and_regions(
 /// been moved onto the slot its `@param` declares. Without that,
 /// `@deck.card(3)` would report the sentinel-keyed entry as an unknown
 /// argument named `""`.
-fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<ValidationError>) {
+fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     use tomet_ast::Value;
 
     tomet_tree::for_each_element(doc, |el| {
@@ -210,7 +253,7 @@ fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Validat
 
         for (key, _) in entries {
             if !key.is_empty() && decl.param(key).is_none() {
-                errors.push(ValidationError::UnknownArgument {
+                errors.push(Diagnostic::UnknownArgument {
                     element: name.to_string(),
                     argument: key.clone(),
                     span: el.span,
@@ -219,7 +262,7 @@ fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Validat
         }
         for param in decl.params.iter().filter(|p| p.required) {
             if !entries.iter().any(|(k, _)| *k == param.name) {
-                errors.push(ValidationError::MissingRequiredArgument {
+                errors.push(Diagnostic::MissingRequiredArgument {
                     element: name.to_string(),
                     argument: param.name.clone(),
                     span: el.span,
@@ -234,13 +277,13 @@ fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Validat
 /// One key so far, `elements:`, plus the `types:` map that sat beside it.
 /// Between them they described a custom element -- its arguments, whether
 /// it was a singleton, which shape it took -- which is a `@vocabulary`
-/// question now. See [`ValidationError::RetiredSettingsKey`] for why this
+/// question now. See [`Diagnostic::RetiredSettingsKey`] for why this
 /// is an error and not a silent skip.
 ///
 /// Top-level blocks only, matching what a settings loader would actually
 /// read: an `@settings` buried in a paragraph is already reported by the
 /// region rule above.
-fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<ValidationError>) {
+fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>) {
     use tomet_ast::{Block, Value};
 
     const RETIRED: [&str; 2] = ["elements", "types"];
@@ -255,7 +298,7 @@ fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<ValidationError>
         };
         for key in RETIRED {
             if entries.iter().any(|(k, _)| k == key) {
-                errors.push(ValidationError::RetiredSettingsKey {
+                errors.push(Diagnostic::RetiredSettingsKey {
                     key: key.to_string(),
                     span: el.span,
                 });
@@ -312,7 +355,7 @@ mod tests {
         assert_eq!(errors.len(), 1);
         assert!(matches!(
             &errors[0],
-            ValidationError::DuplicateId { id, .. } if id == "a"
+            Diagnostic::DuplicateId { id, .. } if id == "a"
         ));
     }
 
@@ -326,7 +369,7 @@ mod tests {
         assert_eq!(errors.len(), 1, "{errors:?}");
         assert!(matches!(
             &errors[0],
-            ValidationError::DuplicateSingleton { name, .. } if name == "meta"
+            Diagnostic::DuplicateSingleton { name, .. } if name == "meta"
         ));
     }
 
@@ -349,7 +392,7 @@ mod tests {
         assert_eq!(errors.len(), 1, "{errors:?}");
         assert!(matches!(
             &errors[0],
-            ValidationError::DuplicateSingleton { name, .. } if name == "spread"
+            Diagnostic::DuplicateSingleton { name, .. } if name == "spread"
         ));
     }
 
@@ -360,9 +403,9 @@ mod tests {
         let doc = parse("@kind(note)\n\n#[ T ]\n\n@use(deck)\n");
         let errors = validate_document(&doc);
         assert!(
-            errors.iter().any(
-                |e| matches!(e, ValidationError::OutsidePreamble { name, .. } if name == "use")
-            ),
+            errors
+                .iter()
+                .any(|e| matches!(e, Diagnostic::OutsidePreamble { name, .. } if name == "use")),
             "{errors:?}"
         );
     }
@@ -377,8 +420,7 @@ mod tests {
         assert!(
             !errors.iter().any(|e| matches!(
                 e,
-                ValidationError::DuplicateSingleton { .. }
-                    | ValidationError::OutsidePreamble { .. }
+                Diagnostic::DuplicateSingleton { .. } | Diagnostic::OutsidePreamble { .. }
             )),
             "{errors:?}"
         );
@@ -420,7 +462,7 @@ mod tests {
         assert!(
             errors.iter().any(|e| matches!(
                 e,
-                ValidationError::UnknownArgument { argument, .. } if argument == "colour"
+                Diagnostic::UnknownArgument { argument, .. } if argument == "colour"
             )),
             "{errors:?}"
         );
@@ -433,7 +475,7 @@ mod tests {
         assert!(
             errors.iter().any(|e| matches!(
                 e,
-                ValidationError::MissingRequiredArgument { argument, .. } if argument == "id"
+                Diagnostic::MissingRequiredArgument { argument, .. } if argument == "id"
             )),
             "{errors:?}"
         );
@@ -449,9 +491,57 @@ mod tests {
         assert!(
             !errors
                 .iter()
-                .any(|e| matches!(e, ValidationError::UnknownArgument { .. })),
+                .any(|e| matches!(e, Diagnostic::UnknownArgument { .. })),
             "{errors:?}"
         );
+    }
+
+    /// `@draft` and `@fixme` are warnings, and carry the note so the
+    /// report says what is missing rather than only where.
+    #[test]
+    fn draft_and_fixme_are_warnings_that_carry_their_note() {
+        let doc = parse(
+            "@kind(note)\n\n@draft[ ローカル保存の理由 ]\n\n地の文に @fixme[ 直す ] も置ける。\n",
+        );
+        let diagnostics = validate_document(&doc);
+
+        let draft = diagnostics
+            .iter()
+            .find(|d| matches!(d, Diagnostic::Draft { .. }))
+            .unwrap_or_else(|| panic!("{diagnostics:?}"));
+        assert_eq!(draft.severity(), Severity::Warning);
+        assert!(draft.to_string().contains("ローカル保存の理由"), "{draft}");
+
+        let fixme = diagnostics
+            .iter()
+            .find(|d| matches!(d, Diagnostic::Fixme { .. }))
+            .unwrap_or_else(|| panic!("{diagnostics:?}"));
+        assert_eq!(fixme.severity(), Severity::Warning);
+    }
+
+    /// Both take either shape: a gap is sometimes a whole missing section
+    /// and sometimes a phrase inside a sentence, so neither placement is
+    /// a `ShapeMismatch`.
+    #[test]
+    fn an_unfinished_marker_is_not_a_shape_error_in_either_position() {
+        let doc =
+            parse("@kind(note)\n\n@draft[ 節まるごと ]\n\n文の途中の @draft[ 一語 ] も可。\n");
+        assert!(
+            !validate_document(&doc)
+                .iter()
+                .any(|d| matches!(d, Diagnostic::ShapeMismatch { .. })),
+            "{:?}",
+            validate_document(&doc)
+        );
+    }
+
+    /// Everything else stays an error, so a green run means the document
+    /// is correct and not merely unfinished.
+    #[test]
+    fn an_unknown_element_is_still_an_error() {
+        let doc = parse("@kind(note)\n\n@nonesuch{}\n");
+        let diagnostics = validate_document(&doc);
+        assert!(diagnostics.iter().all(|d| d.severity() == Severity::Error));
     }
 
     /// `elements:` described a custom element in `@settings`; a
@@ -466,9 +556,9 @@ mod tests {
         );
         let errors = validate_document(&doc);
         assert!(
-            errors
-                .iter()
-                .any(|e| matches!(e, ValidationError::RetiredSettingsKey { key, .. } if key == "elements")),
+            errors.iter().any(
+                |e| matches!(e, Diagnostic::RetiredSettingsKey { key, .. } if key == "elements")
+            ),
             "{errors:?}"
         );
     }
@@ -484,9 +574,7 @@ mod tests {
         let errors = validate_document(&doc);
         let reported = errors
             .iter()
-            .find(
-                |e| matches!(e, ValidationError::RetiredSettingsKey { key, .. } if key == "types"),
-            )
+            .find(|e| matches!(e, Diagnostic::RetiredSettingsKey { key, .. } if key == "types"))
             .unwrap_or_else(|| panic!("{errors:?}"));
         assert!(
             reported.to_string().contains("no replacement"),
@@ -507,7 +595,7 @@ mod tests {
         assert!(
             !errors
                 .iter()
-                .any(|e| matches!(e, ValidationError::RetiredSettingsKey { .. })),
+                .any(|e| matches!(e, Diagnostic::RetiredSettingsKey { .. })),
             "{errors:?}"
         );
     }
@@ -548,7 +636,7 @@ mod tests {
         assert_eq!(errors.len(), 1);
         assert!(matches!(
             &errors[0],
-            ValidationError::DuplicateId { id, .. } if id == "a"
+            Diagnostic::DuplicateId { id, .. } if id == "a"
         ));
     }
 
@@ -562,7 +650,7 @@ mod tests {
         assert_eq!(errors.len(), 1);
         assert!(matches!(
             &errors[0],
-            ValidationError::DuplicateId { id, .. } if id == "a"
+            Diagnostic::DuplicateId { id, .. } if id == "a"
         ));
     }
 
@@ -573,7 +661,7 @@ mod tests {
         assert_eq!(errors.len(), 1);
         assert!(matches!(
             &errors[0],
-            ValidationError::DuplicateId { id, .. } if id == "42"
+            Diagnostic::DuplicateId { id, .. } if id == "42"
         ));
         assert_eq!(
             errors[0].to_string(),
