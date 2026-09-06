@@ -1,14 +1,14 @@
-<div data-tm-kind="file">説明</div>
+`readme.md` 説明
 
-<div data-tm-kind="dirs">ソースコード</div>
+`src` ソースコード
 
-<div data-tm-kind="file">パッケージコンフィグ</div>
+`src/Cargo.toml` パッケージコンフィグ
 
-<div data-tm-kind="file">Crates</div>
+`src/crates` Crates
 
-<div data-tm-kind="dirs">ソースコード</div>
+`apps` ソースコード
 
-<div data-tm-kind="file">パッケージコンフィグ</div>
+`apps/Cargo.toml` パッケージコンフィグ
 
-<div data-tm-kind="file">Crates</div>
+`apps/crates` Crates
 

@@ -13,6 +13,7 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
+    path_target,
     TargetScheme, classify_std_lenient, heading_level, is_directive, link_target, list_items,
     list_ordered, target_scheme,
 };
@@ -149,6 +150,7 @@ fn element_to_md(cx: &RenderCtx, el: &Element, inline: bool) -> String {
         "callout" => render_callout(cx, el),
         "table" => render_table(cx, el),
         "link" => render_link(cx, el),
+        "file" | "dir" => render_path(cx, el, inline),
         "embed" => render_embed(el),
         "links" => render_links_container(cx, el),
         // Evaluate `${...}` interpolations and macros
@@ -382,6 +384,32 @@ fn render_callout(cx: &RenderCtx, el: &Element) -> String {
 /// or a plain `[text](target)`/bare-target link (everything else). The
 /// scheme prefix itself is stripped before rendering -- it's addressing
 /// metadata, not part of the visible target.
+/// `@file(x)`/`@dir(x)` -> a code span, which is what these mentions
+/// were written as before the elements existed.
+///
+/// Lossless in the direction that matters here: moving a backticked path
+/// onto `@file` changes what `tomet check-links` can see and leaves the
+/// exported Markdown byte-identical. The import direction cannot recover
+/// it -- a code span in Markdown is a code span, and nothing in it says
+/// whether the author meant a path.
+fn render_path(cx: &RenderCtx, el: &Element, inline: bool) -> String {
+    let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
+    let content = match &el.content {
+        Some(content) if !content.is_empty() => Some(inline_to_md(cx, content)),
+        _ => None,
+    };
+    if inline {
+        // A mention: `[content]` is a label and stands in for the path.
+        return format!("`{}`", content.unwrap_or(path));
+    }
+    // A listing row: the description goes beside the path, not instead
+    // of it.
+    match content {
+        Some(content) => format!("`{path}` {content}"),
+        None => format!("`{path}`"),
+    }
+}
+
 fn render_link(cx: &RenderCtx, el: &Element) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);

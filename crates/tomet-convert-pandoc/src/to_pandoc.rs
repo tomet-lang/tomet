@@ -5,6 +5,7 @@ use tomet_ast::{
     InterpExprKind, Literal, Placement, Value,
 };
 use tomet_semantics::{
+    path_target,
     TableRow, classify_std_lenient, document_meta, flatten_data, flatten_element_data, heading_level,
     is_directive, link_target, list_items, list_ordered, normalized_element_args, parse_table_rows,
 };
@@ -96,6 +97,23 @@ fn element_to_blocks(el: &Element) -> Vec<Block> {
         "blockquote" => vec![Block::BlockQuote(content_to_blocks(content_of(el)))],
         "ol" | "ul" => vec![list_to_pandoc(el)],
         "table" => table_to_pandoc(el),
+        // A path standing as a block is a listing row, so the
+        // description goes beside the path rather than instead of it --
+        // the same split the HTML/Markdown/Typst writers make. One
+        // element serves a mention and a row; only the placement says
+        // which, and only the row wants both halves shown.
+        "file" | "dir" => {
+            let mut inlines = vec![Inline::Code(
+                attr_from_value(el, &[]),
+                path_target(el, &kind).unwrap_or_default(),
+            )];
+            let content = content_to_inlines(el);
+            if !content.is_empty() {
+                inlines.push(Inline::Space);
+                inlines.extend(content);
+            }
+            vec![Block::Para(inlines)]
+        }
         // An inline-only kind can still stand alone on its line -- the
         // placement rule makes `@link(...)[x]` on its own line a block.
         // It keeps its own mapping and gets wrapped, rather than falling
@@ -133,6 +151,13 @@ fn element_to_inlines(el: &Element) -> Vec<Inline> {
             attr_from_value(el, &[]),
             content_to_inlines(el),
             Target::url(link_target(el, &kind).unwrap_or_default()),
+        )],
+        // A path is named, not navigated to: `Code`, not `Link`. Pandoc's
+        // `Code` is what a CommonMark code span reads back as, so this
+        // matches what the Markdown writer emits.
+        "file" | "dir" => vec![Inline::Code(
+            attr_from_value(el, &[]),
+            path_target(el, &kind).unwrap_or_default(),
         )],
         "embed" => vec![Inline::Image(
             attr_from_value(el, &[]),

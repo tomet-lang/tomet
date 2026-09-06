@@ -4,7 +4,7 @@
 //! crate's module doc.
 
 use tomet_ast::{Document, Span};
-use tomet_semantics::{ElementKind, TargetScheme, link_target_of, target_scheme};
+use tomet_semantics::{ElementKind, TargetScheme, link_target_of, target_scheme, path_target_of};
 use tomet_tree::for_each_element;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +39,11 @@ impl LinkKind {
     fn from_element_kind_and_target(kind: &ElementKind, target: &str) -> Option<(Self, String)> {
         match kind {
             ElementKind::Embed => Some((LinkKind::Embed, target.to_string())),
+            // `@file`/`@dir` carry no scheme prefix: the element name is
+            // the scheme. Checked exactly as `file:`/`dir:` are, because
+            // the question is the same one -- only the rendering differs.
+            ElementKind::File => Some((LinkKind::File, target.to_string())),
+            ElementKind::Dir => Some((LinkKind::Dir, target.to_string())),
             ElementKind::Link => {
                 let (scheme, rest) = target_scheme(target);
                 let link_kind = match scheme {
@@ -90,7 +95,7 @@ pub struct DocumentLink {
 pub fn collect_links(doc: &Document) -> Vec<DocumentLink> {
     let mut links = Vec::new();
     for_each_element(doc, |el| {
-        if let Some((kind, target)) = link_target_of(el)
+        if let Some((kind, target)) = link_target_of(el).or_else(|| path_target_of(el))
             && let Some((kind, target)) = LinkKind::from_element_kind_and_target(&kind, &target)
         {
             links.push(DocumentLink {

@@ -1,13 +1,13 @@
-@file[説明]{ value: readme.md }
+`readme.md` 説明
 
-@dirs[ソースコード]{ value: src }
+`src` ソースコード
 
-@file[パッケージコンフィグ]{ value: src/Cargo.toml }
+`src/Cargo.toml` パッケージコンフィグ
 
-@file[Crates]{ value: src/crates }
+`src/crates` Crates
 
-@dirs[ソースコード]{ value: apps }
+`apps` ソースコード
 
-@file[パッケージコンフィグ]{ value: apps/Cargo.toml }
+`apps/Cargo.toml` パッケージコンフィグ
 
-@file[Crates]{ value: apps/crates }
+`apps/crates` Crates

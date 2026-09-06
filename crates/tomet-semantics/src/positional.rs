@@ -24,6 +24,10 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         "version" => &["version"],
         "codeblock" => &["lang"],
         "embed" | "link" => &["target"],
+        // A path mention names one thing, so its single positional slot
+        // is the path. The element name says file or directory; unlike
+        // `@link`, there is no scheme prefix to carry it.
+        "file" | "dir" => &["target"],
         // The namespace to bring into scope. The vault says where it
         // lives, so this names it, not its file.
         "use" => &["target"],
