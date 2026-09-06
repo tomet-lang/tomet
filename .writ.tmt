@@ -14,20 +14,24 @@ does not relax the rule to fit the change it wanted to make.
 
 ##[ crate-layering ]
 
+@rule(crate-layering){
+  guard: { twrit: layers }
+
+  layers: {
+    6: [ "apps/*", "bindings/*", "editors/*", "tests" ]
+    5: [ "crates/tomet-workspace", "crates/tomet-workspace-indexer", "crates/tomet-workspace-links", "crates/tomet-load" ]
+    4: [ "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet" ]
+    3: [ "crates/tomet-config" ]
+    2: [ "crates/tomet-semantics*" ]
+    1: [ "crates/tomet-syntax-*" ]
+    0: [ "crates/tree-sitter-tomet" ]
+  }
+}
+
 Every workspace member belongs to exactly one layer, and depends only on
 layers strictly below its own. Same-layer dependencies are allowed;
 upward ones are not.
 /tests/SYNTAX.md
-
-@layers{
-  6: [ "apps/*", "bindings/*", "editors/*", "tests" ]
-  5: [ "crates/tomet-workspace", "crates/tomet-workspace-indexer", "crates/tomet-workspace-links", "crates/tomet-load" ]
-  4: [ "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet" ]
-  3: [ "crates/tomet-config" ]
-  2: [ "crates/tomet-semantics*" ]
-  1: [ "crates/tomet-syntax-*" ]
-  0: [ "crates/tree-sitter-tomet" ]
-}
 
 Layer 0 depends on no workspace member at all. Things may depend on it --
 `tests` and `apps/tui` both do -- but it may depend on nothing, because it
@@ -79,6 +83,10 @@ no layer, a member matching two, an upward edge, or anything `crates/
 tree-sitter-tomet` comes to depend on.
 
 ##[ tmtroot-mirrors-the-root ]
+
+@rule(tmtroot-mirrors-the-root){
+  guard: { runs: "just docs-check" }
+}
 
 `tmtroot/` holds sources whose output lands at a path this repository does
 not choose. Its structure mirrors the repository root: `tmtroot/x.tmt`
@@ -163,6 +171,10 @@ Tighten it when one does.
 
 ##[ tmtroot-output-not-edited ]
 
+@rule(tmtroot-output-not-edited){
+  guard: { runs: "just docs-check" }
+}
+
 A file exported from `tmtroot/` is generated. Do not hand-edit it. Edit
 the source and re-export.
 
@@ -200,6 +212,10 @@ it goes stale the moment the file moves. The wording lives once, in
 output disagree with its source, which is exactly what that reports.
 
 ##[ dot-tomet-is-authored ]
+
+@rule(dot-tomet-is-authored){
+  guard: { runs: "just writ-check" }
+}
 
 `.tomet/` is the directory Tomet defines for itself inside a vault, and
 only what a person writes goes in it -- configuration, blueprints,
@@ -272,6 +288,10 @@ into the tree.
 
 ##[ blueprint-shape ]
 
+@rule(blueprint-shape){
+  guard: { none: "checkable in two halves, neither written yet" }
+}
+
 A blueprint declares what it is, what it targets, and what it says about
 itself -- in that order, in the three slots every element has.
 
@@ -335,6 +355,10 @@ rather than a `target:`/`kind:` map.
 
 ##[ explicit-form-first ]
 
+@rule(explicit-form-first){
+  guard: { none: "no mechanical check for the general rule" }
+}
+
 Build the explicit form first. A shorthand comes afterward, as an
 alternative that expands to it, and nothing is ever written twice.
 
@@ -397,6 +421,10 @@ expansion round-trips. A shorthand `tomet fmt` cannot expand is a second
 spelling wearing the word.
 
 ##[ kind-not-meta-type ]
+
+@rule(kind-not-meta-type){
+  guard: { runs: "tomet refactor --check --meta-kind" }
+}
 
 A document declares its kind with a top-level `@kind(...)`. The `type:`
 field inside `@meta` is the superseded spelling and does not appear in this

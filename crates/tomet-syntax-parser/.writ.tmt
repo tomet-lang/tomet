@@ -14,6 +14,20 @@ does not relax the rule to fit the change it wanted to make.
 
 ##[ parser-purity ]
 
+@rule(parser-purity){
+  guard: { twrit: pure }
+
+  pure: {
+    crates: [ "crates/tomet-syntax-parser" ]
+    forbid: [ "std::fs", "std::net", "std::process", "std::env" ]
+    allow-external: [
+      "rowan", "countme", "hashbrown", "rustc-hash", "text-size",
+      "serde", "serde_core", "serde_derive",
+      "proc-macro2", "quote", "syn", "unicode-ident", "unicode-width"
+    ]
+  }
+}
+
 The parser is pure, deterministic and side-effect-free. It performs no
 I/O, resolves no external file, and executes nothing. The same input text
 produces the same tree, in predictable time.
@@ -36,16 +50,6 @@ that comparison means nothing if parsing can consult anything but its
 input.
 
 ---[ Guard ]---
-
-@pure{
-  crates: [ "crates/tomet-syntax-parser" ]
-  forbid: [ "std::fs", "std::net", "std::process", "std::env" ]
-  allow-external: [
-    "rowan", "countme", "hashbrown", "rustc-hash", "text-size",
-    "serde", "serde_core", "serde_derive",
-    "proc-macro2", "quote", "syn", "unicode-ident", "unicode-width"
-  ]
-}
 
 `twrit check` reads that and pins both ways the ability could be acquired.
 The source may not name an API that does I/O, so it cannot be done
@@ -75,6 +79,10 @@ filesystem, the same input could produce different trees and the comparison
 would mean nothing.
 
 ##[ no-vocabulary ]
+
+@rule(no-vocabulary){
+  guard: { test: "tests/src/vocabulary.rs" }
+}
 
 The parser builds the tree without consulting any element vocabulary.
 Renaming an element -- or renaming a key inside its `(args)` -- changes the
