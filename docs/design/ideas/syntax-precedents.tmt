@@ -1,0 +1,14 @@
+@kind(idea)
+
+```(tmt)
+#[heading]
+Rustの#[test]とかと似てる。
+# heading
+Markdownの書き方
+@name
+JSDocとかSlintとか？
+@name[]{}
+どっかで似たようなのを見た
+${}
+Nixとか
+```

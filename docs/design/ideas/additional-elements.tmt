@@ -1,0 +1,8 @@
+@kind(idea)
+
+#[ blueprintに必要 ]
+
+$only(header,primitives)
+$allow(header,primitives)
+- `@dir()`、`@file()`による整合性チェック。
+- `@command()`

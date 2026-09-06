@@ -1,0 +1,26 @@
+@kind(idea)
+
+|-- apps/
+|  |-- cli/
+|  |-- web/
+|  |-- lsp/
+|-- bindings/
+|-- editors/
+|-- crates/
+|  |-- tomet-syntax
+|  |  |-- ast
+|  |  |-- cst
+|  |-- tomet-semantics
+|  |  |-- validator
+|--> apps/
+|  |--> cli/
+|  |--> web/
+|  |--> lsp/
+|--> bindings/
+|--> editors/
+|--> crates/
+|  |--> tomet-syntax
+|  |  |--> ast
+|  |  |--> cst
+|  |--> tomet-semantics
+|  |  |--> validator
