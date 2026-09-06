@@ -1,0 +1,453 @@
+@kind(writ)
+
+#[ Writ: workspace root ]
+
+Rules the whole repository obeys.
+
+Scope is this directory and everything under it. A narrower rule lives in a
+`.writ.tmt` closer to what it governs; read every `.writ.tmt` from a file up
+to here, the way `.gitignore` is read.
+
+Only the author edits this file. An agent that finds a rule in its way
+proposes an edit here and stops. It does not work around the rule, and it
+does not relax the rule to fit the change it wanted to make.
+
+##[ crate-layering ]
+
+@rule(crate-layering){
+  guard: { twrit: layers }
+
+  layers: {
+    6: [ "apps/*", "bindings/*", "editors/*", "tests" ]
+    5: [ "crates/tomet-workspace", "crates/tomet-workspace-indexer", "crates/tomet-workspace-links", "crates/tomet-load" ]
+    4: [ "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet" ]
+    3: [ "crates/tomet-config" ]
+    2: [ "crates/tomet-semantics*" ]
+    1: [ "crates/tomet-syntax-*" ]
+    0: [ "crates/tree-sitter-tomet" ]
+  }
+}
+
+Every workspace member belongs to exactly one layer, and depends only on
+layers strictly below its own. Same-layer dependencies are allowed;
+upward ones are not.
+/tests/SYNTAX.md
+
+Layer 0 depends on no workspace member at all. Things may depend on it --
+`tests` and `apps/tui` both do -- but it may depend on nothing, because it
+is the hand-maintained grammar approximation and is only worth having while
+it stays independent of the parser.
+
+`crates/serde_tomet` is listed by name in layer 4. It is an ecosystem
+adapter rather than a producer, and its name carries no layer prefix to
+match on.
+
+A pattern ending in `*` matches by prefix; every other pattern is exact.
+Patterns are directory paths relative to the workspace root, because the
+directory is the half of a crate's identity that is arranged by layer --
+`crates/tomet-syntax-parser` publishes `tomet-parser`.
+
+Dev-dependencies are exempt. A crate may reach upward in `[dev-dependencies]`
+to get a parser for its own tests -- `tomet-syntax-tree` and
+`tomet-semantics` both do, and neither is a layering violation.
+
+---[ Why ]---
+
+The order is what keeps a change local. Touching the parser today means
+reading `crates/tomet-syntax-*` and nothing else; the moment an edge runs
+upward, it means reading the applications too.
+
+The layer is derived from the directory name, not the package name. The two
+disagree -- `crates/tomet-syntax-parser` publishes `tomet-parser` -- and the
+directory is the half that is arranged by layer, which is why the workspace
+member list in `Cargo.toml` is already grouped this way in comments.
+
+Every member's directory now agrees with its layer. It did not always:
+`crates/tomet-config` was `crates/tomet-workspace-config`, which read as
+part of the workspace layer while the format and convert crates were
+sitting on top of it. The rule carried it as a named exception until the
+rename, rather than quietly filing it under the wrong prefix -- an
+exception a reader can see is worth more than a tidy table that lies.
+
+The rejected alternative is a rule per crate. It states the same thing and
+cannot answer the question that matters -- whether some crate has no rule at
+all. Deriving the layer from the directory prefix means a new member that
+matches no prefix and no exception line above is unclassified, and an
+unclassified member is a failure rather than a silence.
+
+---[ Guard ]---
+
+`twrit check`. It reads `@layers` above, reads every workspace member's
+`[dependencies]` through `cargo_metadata`, and fails on a member matching
+no layer, a member matching two, an upward edge, or anything `crates/
+tree-sitter-tomet` comes to depend on.
+
+##[ tmtroot-mirrors-the-root ]
+
+@rule(tmtroot-mirrors-the-root){
+  guard: { runs: "just docs-check" }
+}
+
+`tmtroot/` holds sources whose output lands at a path this repository does
+not choose. Its structure mirrors the repository root: `tmtroot/x.tmt`
+produces a file at `/`, `tmtroot/.github/x.tmt` one under `/.github/`.
+
+The `/` in that sentence is the project root -- the directory holding
+`default.config.tmt` -- because that is what a declared output path is
+measured from, wherever the export is run from.
+
+Nothing else goes there. A document whose output lands beside it -- the
+ordinary case -- stays where it belongs by what it is, and `docs/`'s own
+writ decides that.
+
+---[ Why ]---
+
+`README.ja.md` has to be at the repository root because that is where a
+forge looks for it. `AGENTS.md` likewise, because that is where agent
+tooling looks. The source cannot sit beside its output without putting two
+files with the same content side by side, so it has to live somewhere else
+-- and then something has to say where the output goes.
+
+Mirroring answers that without a rule anyone has to read. The path is the
+answer. Every project that has needed this has arrived at the same shape:
+GNU Stow maps `dotfiles/vim/.vimrc` to `~/.vimrc`, chezmoi mirrors `$HOME`,
+Hugo copies `static/robots.txt` to `/robots.txt`, `public/favicon.ico`
+becomes `/favicon.ico` in most web toolchains, and a Debian package builds
+`debian/<pkg>/usr/bin/x` for `/usr/bin/x`.
+
+The name has precedent too. `sysroot`, `buildroot` and `chroot` all name a
+directory standing in for `/`, and `tmtroot` is the same compound. Plain
+`root/` was rejected for sitting inside the actual root and reading as a
+claim to be it; `exports/` for describing every export rather than these,
+since a document under `spec/` may export perfectly well and stay put.
+
+One place it is weaker than the prior art: those copy verbatim, so the
+output name is visible in the source name. Here `@config(export: path)`
+renames, and `tmtroot/readme.tmt` becoming `/README.ja.md` cannot be read
+off the path. Deriving the path from the position when it is not declared
+would close that, and is not decided.
+
+What a declared path is measured from was decided, and it was not a
+design question in the end. `export` handed the string to `fs::write`
+unchanged, so it resolved against the process's working directory:
+`tmtroot/readme.tmt` landed at the repository root or under `docs/`
+depending on where you stood, and this rule held only because everyone
+happened to run from the root. The answer already existed -- a path
+written inside a document is absolute, or `./`/`../` from the document's
+own directory, or measured from the project root -- and links had been
+following it all along. Export was the one place that had not. The rule
+now lives in `tomet-indexer::resolve_document_relative` so there is one
+copy of it, and `a_bare_export_path_is_measured_from_the_project_root`
+pins it.
+
+---[ Guard ]---
+
+`tomet export --check .` covers whether the outputs are current, and is
+green -- it is measured from the project root now, so it means the same
+thing from any directory.
+
+The other half -- that every `.tmt` under `tmtroot/` declares an export at
+all, since a file there that produces nothing is a file in the wrong
+directory:
+
+```bash
+find tmtroot -name '*.tmt' -exec grep -L 'export:' {} +
+```
+
+Empty while every file declares one. Both halves run in `just docs-check`.
+
+It waited for a green day rather than shipping red, which is what a guard
+nobody can satisfy teaches people to ignore. `agents.tmt` was empty and
+`cluade.tmt` was empty and misspelled; the first now exports `AGENTS.md`
+and the second is deleted, because `CLAUDE.md` is eleven bytes of tooling
+glue whose whole content is `@AGENTS.md` -- a line Tomet reads as an
+element in namespace `AGENTS` and rejects.
+
+A grep and not a parse. It can be fooled by prose containing `export:`,
+which fails open, and the honest reason it is a grep is that no tool
+reports "this document declares no output": `tomet export` prints such a
+file to stdout and `--check` only compares outputs that were declared.
+Tighten it when one does.
+
+##[ tmtroot-output-not-edited ]
+
+@rule(tmtroot-output-not-edited){
+  guard: { runs: "just docs-check" }
+}
+
+A file exported from `tmtroot/` is generated. Do not hand-edit it. Edit
+the source and re-export.
+
+Each source says so in its own output, from the macro rather than by
+hand:
+
+```tmt
+${macro.generated_by(self.path)}
+```
+
+`.gitattributes` marks `/AGENTS.md` and `/README.ja.md`
+`linguist-generated`. `README.md` is not marked, and is not generated: it
+is hand-written English, and only its Japanese sibling comes from
+`tmtroot/`.
+
+---[ Why ]---
+
+`docs/.writ.tmt` has the same rule for `docs/`, and a writ is scoped to
+its own directory, so that one cannot reach a file at the repository root.
+The rule has to exist here or `AGENTS.md` is governed by nothing.
+
+`AGENTS.md` is the case that made it urgent. It is what every agent
+working in this repository reads, so it is the file most likely to be
+edited in place by something that never looked at `tmtroot/` -- and the
+edit would be lost at the next export, silently.
+
+The banner is written `${macro.generated_by(self.path)}` and not typed
+out because typing it puts the source's own path inside the source, where
+it goes stale the moment the file moves. The wording lives once, in
+`default.config.tmt`.
+
+---[ Guard ]---
+
+`tomet export --check .`, the same one as above: a hand-edit makes the
+output disagree with its source, which is exactly what that reports.
+
+##[ dot-tomet-is-authored ]
+
+@rule(dot-tomet-is-authored){
+  guard: { runs: "just writ-check" }
+}
+
+`.tomet/` is the directory Tomet defines for itself inside a vault, and
+only what a person writes goes in it -- configuration, blueprints,
+anything else this format asks an author for. It is committed. Nothing a
+tool generates goes there, or anywhere else in the tree: derived state
+belongs in the user's cache directory, `~/.cache/tomet/` on Unix.
+
+---[ Why ]---
+
+A leading dot says the directory was defined by an application rather than
+by whoever made the vault. It says nothing about who writes what is inside
+it. `.cargo/`, `.vscode/` and `.zed/` are hand-written settings;
+`.direnv/` is a built environment. So `.tomet/` being hidden was never an
+argument for putting machine state in it -- and the two were mixed here
+until this entry: `find_template` looked up `.tomet/templates/` while
+`.gitignore` swallowed `.tomet/` whole, which made it a directory you
+could be told to write to and could never commit.
+
+The in-tree directories that do hold generated state are not there because
+the state is generated. `target/`, `result`, `node_modules/` and `.venv/`
+are there because something resolves those exact paths -- a linker, a
+runtime's module lookup, an interpreter. Position is the reason, not
+derivation. pnpm makes the distinction visible: it moved `node_modules/`'s
+contents into a global store and left behind only the symlinks whose
+position means something.
+
+A link cache has no such requirement, and a vault gives it a reason to be
+elsewhere. A vault is synced -- Dropbox, iCloud, git -- and a SQLite file
+inside a synced directory is a binary conflict waiting to happen. That is
+what separates a vault from a project: `.mypy_cache/` is never synced, a
+vault usually is. Obsidian's `.obsidian/` is where this goes wrong in
+practice.
+
+Rejected, in the order they were argued:
+
+- Ignoring `.tomet/cache/` and committing the rest. It spells the ignore
+  more precisely and changes nothing else: the mixing stays, and a
+  database still sits inside a tree that gets synced.
+- Keeping the cache vault-local because it costs one `.gitignore` line,
+  the same as `.git/`, `target/` and `node_modules/`. That was the
+  reasoning in `cache_path.rs`, and it does not survive being checked --
+  those three are entirely machine-owned, which is exactly the property
+  `.tomet/` did not have.
+- Putting the writ blueprint at the repository root, on the principle
+  that configuration and schema sit at the root of what they govern. The
+  root is a table of contents, not a classification. What earns a place
+  there is the index itself (`README.md`), what an outside tool positions
+  (`Cargo.toml`, `flake.nix`, `justfile`, `AGENTS.md`), and what this
+  repository's own conventions position (`.writ.tmt`, one per directory).
+  A blueprint is none of the three.
+
+`default.config.tmt` stays at the root, and not by the principle just
+rejected. `find_config_file` returns the directory it was found in as
+`config_root`, so its position is what declares where a vault begins: it
+is a boundary marker, like `Cargo.toml` or `package.json`. Making the
+directory the marker instead -- `.tomet/config.tmt`, the way `.git/`
+works -- is coherent and undecided, and is held up by the four spellings
+the search already accepts.
+
+---[ Guard ]---
+
+```bash
+git ls-files --others --ignored --exclude-standard .tomet
+```
+
+Empty while nothing under `.tomet/` is ignored. It catches the failure
+that actually happened -- a rule telling authors to write somewhere git
+was told to discard -- rather than trying to prove no tool ever writes
+into the tree.
+
+##[ blueprint-shape ]
+
+@rule(blueprint-shape){
+  guard: { none: "checkable in two halves, neither written yet" }
+}
+
+A blueprint declares what it is, what it targets, and what it says about
+itself -- in that order, in the three slots every element has.
+
+```tmt
+@kind(blueprint)
+@blueprint(writ){
+  version: "1.0.0"
+  description: "twrit"
+}
+```
+
+`@kind(blueprint)` is written, never inferred from `@blueprint` being
+present. The target is the positional argument, normalized to `target`.
+`@blueprint`'s `{...}` holds the blueprint's own metadata and never the
+target. Instantiating promotes `@blueprint(X)` to `@kind(X)`.
+
+---[ Why ]---
+
+`why/root.tmt` puts it plainly: identifier, input, data, and a setting that
+says where each one goes. A blueprint has all three and nothing else --
+what it is, what it is parameterised by, what it records about itself. The
+shape is not invented for blueprints; it is the shape, applied.
+
+`@kind` is the one answer to "what is this document". Inferring it from an
+element's presence makes a second path to the same question, and a second
+path is what has gone wrong every time: `@meta{type:}` beside `@kind`, the
+identifier rules differing between element arguments and interpolation, `-`
+and `#` taking different groups from `@name`.
+
+Rejected, and worth naming because the code accepted all of them at once:
+
+- `@blueprint(kind: writ)`. Both spellings behave identically:
+  `document_kind` narrows to `@kind` elements with `classify_lenient`
+  before it reads any argument, so a blueprint's key is never mistaken for
+  the document's own kind whatever it is called. This is a choice for the
+  reader, not a collision being avoided -- and worth saying so, because a
+  rule that looks like it has a mechanical reason sends the next person
+  hunting for one. What it costs is that `kind` would appear twice in
+  three lines meaning two different things: this file's kind, and the
+  output's.
+- `@blueprint(target: writ)`. Spelling the key is not wrong, only
+  redundant: `embed` and `link` already normalize a positional to `target`,
+  and `@kind(writ)` is positional too, so promotion becomes the same value
+  moving rather than a change of shape.
+- `@target(writ)` as a separate element. It makes the promotion easy to
+  see, but the target is a fact *about the blueprint* and belongs with its
+  other facts. One element fewer.
+- A document counting as a blueprint because it has any `@kind` at all.
+  That is what `extract_blueprint_schema` did, and it is why nothing could
+  tell a blueprint from the documents it describes.
+
+None of this was written down when `@blueprint` was implemented in
+`bb38aff`, and it appears nowhere in `docs/spec/`. That is the whole reason
+this entry exists.
+
+---[ Guard ]---
+
+None yet. Two halves are checkable: no document carries `@blueprint`
+without `@kind(blueprint)`, and `@blueprint`'s args are a bare positional
+rather than a `target:`/`kind:` map.
+
+##[ explicit-form-first ]
+
+@rule(explicit-form-first){
+  guard: { none: "no mechanical check for the general rule" }
+}
+
+Build the explicit form first. A shorthand comes afterward, as an
+alternative that expands to it, and nothing is ever written twice.
+
+The test that separates the two:
+
+- A **shorthand** expands to the explicit form. `tomet fmt` can do it
+  mechanically, because the explicit form holds everything the shorthand
+  meant.
+- A **duplicate** restates the explicit form. Nothing can repair it,
+  because when the two disagree there is no ground for saying which one
+  is right.
+
+If a second spelling cannot be expanded into the first, it is not a
+shorthand, whatever it is called.
+
+`docs/why/dev.tmt` states the same thing as a commitment about the
+language, for the people using it. This entry is the working rule: the
+test above, and what it has already caught here. Neither restates the
+other -- if this entry ever starts explaining *why the language is like
+that*, the explanation belongs there instead.
+
+---[ Why ]---
+
+Every asymmetry this repository has had to remove was a duplicate that
+had been mistaken for a convenience.
+
+- `@meta{ type: }` beside `@kind(...)`. The same fact in two places; by
+  the time anyone counted, eleven files under `docs/` had drifted back to
+  the old spelling.
+- `@blueprint`'s three argument forms -- positional, `target:`, `kind:`.
+  Three ways to say one thing, none of them chosen.
+- Three template lookup directories times three filename spellings, which
+  is how `docs/docs.settings.tmt` pointed at a file that does not exist
+  and still resolved: the misses were invisible and one hit.
+- `required: [ name ]` and `positional: [ name ]` hoisted out of an
+  `args` map. The intent was good -- a reader wants those two answers
+  without scanning every argument -- but a hand-written summary of
+  derivable facts is a duplicate, and `positional` went further by
+  stating an order the argument list already had. What a reader wants is
+  a *view*, and a view is generated, not stored.
+
+Shorthands, by contrast, have cost nothing:
+
+- `@link` for `@std.link`, and a kind's own names inside a document that
+  declares that kind. Both expand, and both resolve without leaving the
+  file.
+- An argument's position in a declaration, rather than a separate list
+  naming the order.
+
+The rule also says which half to build when only one can be afforded: the
+explicit one. A shorthand with no explicit form behind it has nowhere to
+expand to, and becomes the only spelling by accident rather than by
+choice.
+
+---[ Guard ]---
+
+None mechanical for the general rule. The checkable half is per feature:
+a shorthand must have a formatter expansion, and a test that the
+expansion round-trips. A shorthand `tomet fmt` cannot expand is a second
+spelling wearing the word.
+
+##[ kind-not-meta-type ]
+
+@rule(kind-not-meta-type){
+  guard: { runs: "tomet refactor --check --meta-kind" }
+}
+
+A document declares its kind with a top-level `@kind(...)`. The `type:`
+field inside `@meta` is the superseded spelling and does not appear in this
+repository -- not in documentation, not in examples, not in fixtures.
+
+---[ Why ]---
+
+A kind selects the schema that validates the document, so it is a directive
+about the document, not a field of its metadata. Buried inside `@meta` it
+was reachable only through a nested lookup, and a reader had to open a map
+to find out what they were holding.
+
+This rule exists because the decision had already been made and tooled --
+`promote_meta_type_to_kind`, and a `refactor` subcommand to run it -- and
+still lost ground. With no rule naming it, `docs/guide/` went on teaching
+the old spelling, `docs/spec/builtin-settings.tmt` was itself written in it,
+and eleven files under `docs/` had drifted back by the time anyone counted.
+The migration existed; the rule did not.
+
+---[ Guard ]---
+
+`tomet refactor --check --meta-kind` -- non-zero while any file still
+carries the old spelling.
+
+Known gap: files that fail to parse are skipped with a warning rather than
+failing the run, so a broken file is also an unguarded one.
