@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Value};
+use tomet_ast::{Block, Document, Element, Inline, Value};
 use tomet_tree::ValueExt;
 
 use crate::ResolveError;
@@ -83,6 +83,7 @@ fn settings_value(el: &Element) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_ast::Sigil;
     use tomet_tree::element_new;
 
     fn fixture(name: &str) -> std::path::PathBuf {

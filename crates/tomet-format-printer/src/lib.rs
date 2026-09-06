@@ -18,9 +18,7 @@ use tomet_ast::{
 use tomet_config::PrinterConfig;
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
 use tomet_semantics::{ElementKind, classify_lenient, heading_level, list_items, list_ordered};
-use tomet_style::{
-    render_args_with_config, render_nested, render_value, render_value_inner_with_config,
-};
+use tomet_style::{render_args_with_config, render_nested, render_value};
 use tomet_tree::element_new;
 
 pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig) {

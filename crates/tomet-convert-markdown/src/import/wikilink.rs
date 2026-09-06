@@ -290,16 +290,3 @@ fn enclose_sigils_in_backticks(text: &str) -> String {
     }
     out
 }
-
-fn eat_ident_str(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String {
-    let mut s = String::new();
-    while let Some(&c) = chars.peek() {
-        if c.is_alphanumeric() || c == '_' || c == '-' {
-            s.push(c);
-            chars.next();
-        } else {
-            break;
-        }
-    }
-    s
-}

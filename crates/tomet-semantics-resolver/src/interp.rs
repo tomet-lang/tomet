@@ -10,7 +10,7 @@
 //! sub-expressions rather than reimplementing id lookup itself.
 
 use std::ops::ControlFlow;
-use tomet_ast::{Document, Element, ElementValue, InterpExpr, InterpExprKind, Value};
+use tomet_ast::{Document, Element, InterpExpr, InterpExprKind, Value};
 use tomet_tree::{ElementExt, ValueExt, walk_document};
 
 use crate::ResolveError;
@@ -118,7 +118,7 @@ fn value_member(base: &Value, member: &str) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::Block;
+    use tomet_ast::{Block, ElementValue};
 
     fn parse(src: &str) -> Document {
         tomet_parser::parse_document(src).expect("valid Tomet source")

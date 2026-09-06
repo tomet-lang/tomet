@@ -82,23 +82,6 @@ pub(crate) fn parse_braced_value(cur: &mut Cursor) -> Result<Value> {
     Ok(v)
 }
 
-fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
-    if !cur.eat_str("(") {
-        return Err(err(cur, cur.pos(), "expected '('"));
-    }
-    skip_ws_newlines_and_comments(cur);
-    let v = if cur.peek() == Some(')') {
-        Value::Map(Vec::new())
-    } else {
-        parse_value_at(cur)?
-    };
-    skip_ws_newlines_and_comments(cur);
-    if !cur.eat_str(")") {
-        return Err(err(cur, cur.pos(), "expected ')'"));
-    }
-    Ok(v)
-}
-
 pub(crate) fn is_thematic_break(cur: &Cursor) -> bool {
     let mut look = *cur;
     if look.eat_while(|c| c == '-').len() < 3 {
