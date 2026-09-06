@@ -63,8 +63,8 @@
 - x 要素設定 (.settings.tmt, json, yaml)
 - x コネクト構文 (`:(){}`)
 - x `args`推論 (基本要素対応, カスタム要素対応, positional: \[ title, priority \])
-- x ``@``推論
-- x 代入、関数構文 (``$`{var}` `compute`,`resolve`)
+- x `@`推論
+- x 代入、関数構文 (`${var}` `compute`,`resolve`)
 - x 構文エラー (重複)
 - x コメントアウト
 - x 公式構文 (`#settings`, `#config`, `#meta`, `#references`)
@@ -72,7 +72,7 @@
 - x 基本Markdown記法 (`*`, `**`, `==`, `__`, ``)
 - x 基本要素 (heading, list, horizontal line)
 - x 名前 (element, arg, content, value)
-- x 基本AST (``@`T()[]{}`)
+- x 基本AST (`@T()[]{}`)
 
 **機能**
 
