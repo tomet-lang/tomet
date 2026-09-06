@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use tomet_ast::{Block, Document, ElementValue, Inline, Sigil, Span, Text, Value};
 use tomet_compute::EvaluationContext;
-use tomet_semantics::{ElementKind, classify_lenient, normalized_element_args};
+use tomet_semantics::{ElementKind, classify_std_lenient, normalized_element_args};
 use tomet_tree::{ValueExt, for_each_element_mut};
 
 /// Metadata and variable definitions extracted from a `@blueprint` directive.
@@ -19,7 +19,7 @@ pub struct BlueprintInfo {
 pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
     for block in &doc.blocks {
         if let Block::Element(el) = block {
-            if classify_lenient(el) == ElementKind::Blueprint {
+            if classify_std_lenient(el) == ElementKind::Blueprint {
                 let target_kind = match &el.args {
                     Some(Value::String(s)) => s.clone(),
                     Some(Value::Map(entries)) => entries
@@ -77,7 +77,7 @@ pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> boo
         let Block::Element(el) = block else {
             return true;
         };
-        if classify_lenient(el) != ElementKind::Kind {
+        if classify_std_lenient(el) != ElementKind::Kind {
             return true;
         }
         normalized_element_args(el)
@@ -91,7 +91,7 @@ pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> boo
     // Step 1: Transform @blueprint -> @kind
     for block in &mut doc.blocks {
         if let Block::Element(el) = block {
-            if classify_lenient(el) == ElementKind::Blueprint {
+            if classify_std_lenient(el) == ElementKind::Blueprint {
                 // The target is `@blueprint`'s positional argument, which
                 // `tomet-semantics::positional` normalizes to `target`.
                 // This used to also accept a spelled-out `target:` and a
@@ -170,7 +170,7 @@ fn evaluate_inlines(
     let mut new_content = Vec::new();
     for inline in inlines.iter() {
         match inline {
-            Inline::Element(el) if classify_lenient(el) == ElementKind::Interp => {
+            Inline::Element(el) if classify_std_lenient(el) == ElementKind::Interp => {
                 if let Some(ElementValue::Interp(expr)) = &el.value {
                     if let Ok(val) = tomet_compute::evaluate_with_context(doc, expr, config, ctx) {
                         new_content.push(Inline::Text(Text {
@@ -312,7 +312,7 @@ mod tests {
             .blocks
             .iter()
             .filter_map(|block| match block {
-                Block::Element(el) if classify_lenient(el) == ElementKind::Kind => el
+                Block::Element(el) if classify_std_lenient(el) == ElementKind::Kind => el
                     .args
                     .as_ref()
                     .and_then(|v| v.as_str())
@@ -359,7 +359,7 @@ mod tests {
             Block::Element(el) => el,
             _ => panic!("expected element"),
         };
-        assert_eq!(classify_lenient(first_el), ElementKind::Kind);
+        assert_eq!(classify_std_lenient(first_el), ElementKind::Kind);
         assert_eq!(first_el.args, Some(Value::String("daily-note".into())));
 
         // Verify @meta fields

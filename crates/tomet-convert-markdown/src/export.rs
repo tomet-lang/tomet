@@ -13,7 +13,7 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
-    TargetScheme, classify_lenient, heading_level, is_directive, link_target, list_items,
+    TargetScheme, classify_std_lenient, heading_level, is_directive, link_target, list_items,
     list_ordered, target_scheme,
 };
 
@@ -127,7 +127,7 @@ fn inline_to_md(cx: &RenderCtx, inlines: &[Inline]) -> String {
 }
 
 fn element_to_md(cx: &RenderCtx, el: &Element, inline: bool) -> String {
-    let kind = classify_lenient(el);
+    let kind = classify_std_lenient(el);
     match kind.as_str() {
         // Directives configure or annotate the document and have no
         // rendering of their own. The list lives in `tomet-semantics` so
@@ -383,7 +383,7 @@ fn render_callout(cx: &RenderCtx, el: &Element) -> String {
 /// scheme prefix itself is stripped before rendering -- it's addressing
 /// metadata, not part of the visible target.
 fn render_link(cx: &RenderCtx, el: &Element) -> String {
-    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let text = match &el.content {
         Some(content) if !content.is_empty() => inline_to_md(cx, content),
@@ -419,7 +419,7 @@ fn render_link(cx: &RenderCtx, el: &Element) -> String {
 /// `tomet-html`'s `render_embed_element` for why `<embed>`
 /// needs this too, not just a raw passthrough.
 fn render_embed(el: &Element) -> String {
-    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
     let alt = el
         .content

@@ -1,7 +1,7 @@
 //! Directive promotion and Value DSL normalization transformations.
 
 use tomet_ast::{Block, Document, Element, ElementValue, Sigil, Value};
-use tomet_semantics::{ElementKind, classify_lenient};
+use tomet_semantics::{ElementKind, classify_std_lenient};
 use tomet_tree::{DocumentExt, ElementExt, element_new, for_each_element_mut};
 
 /// Promotes a property `prop_key` from an element matching `source_filter` into a new top-level
@@ -92,7 +92,7 @@ fn materialize_raw_body(el: &mut Element) {
 pub fn normalize_meta_to_value_dsl(doc: &mut Document) -> bool {
     let mut changed = false;
     for_each_element_mut(doc, |el| {
-        let kind = classify_lenient(el);
+        let kind = classify_std_lenient(el);
         if kind == ElementKind::Meta {
             if matches!(el.value, Some(ElementValue::Raw(_))) {
                 materialize_raw_body(el);
@@ -121,7 +121,7 @@ pub fn normalize_meta_to_value_dsl(doc: &mut Document) -> bool {
 pub fn promote_meta_type_to_kind(doc: &mut Document) -> bool {
     promote_prop_to_directive(
         doc,
-        |el| classify_lenient(el) == ElementKind::Meta,
+        |el| classify_std_lenient(el) == ElementKind::Meta,
         "type",
         "kind",
         None,

@@ -17,7 +17,7 @@ use tomet_ast::{
 };
 use tomet_config::PrinterConfig;
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
-use tomet_semantics::{ElementKind, classify_lenient, heading_level, list_items, list_ordered};
+use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
 use tomet_style::{render_args_with_config, render_nested, render_value};
 use tomet_tree::element_new;
 
@@ -106,7 +106,7 @@ fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
             }
         }
         Block::Element(el) if list_ordered(el).is_some() => render_list(el, config, out),
-        Block::Element(el) if classify_lenient(el) == ElementKind::Heading => {
+        Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading => {
             render_heading_element(el, config, out)
         }
         Block::Element(el) => {

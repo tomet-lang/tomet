@@ -1,7 +1,7 @@
 //! Blueprint structural validation against a target document.
 
 use tomet_ast::{Block, Document, Element, Inline, Span, Value};
-use tomet_semantics::{ElementKind, classify_lenient};
+use tomet_semantics::{ElementKind, classify_std_lenient};
 use tomet_tree::ValueExt;
 
 use crate::Diagnostic;
@@ -30,7 +30,7 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
 
     for block in &blueprint.blocks {
         if let Block::Element(el) = block {
-            let kind = classify_lenient(el);
+            let kind = classify_std_lenient(el);
             // `@blueprint` only. This used to accept any `@kind` too,
             // which meant every ordinary document read as a blueprint of
             // itself and nothing could tell the two apart. A document is a
@@ -120,7 +120,7 @@ pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<D
 
     for block in &doc.blocks {
         if let Block::Element(el) = block {
-            if classify_lenient(el) == ElementKind::Meta {
+            if classify_std_lenient(el) == ElementKind::Meta {
                 doc_meta_span = el.span;
                 if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
                     for (k, _) in entries {
@@ -153,7 +153,7 @@ pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<D
 
     for block in &doc.blocks {
         if let Block::Element(el) = block {
-            if classify_lenient(el) == ElementKind::Heading {
+            if classify_std_lenient(el) == ElementKind::Heading {
                 let id = el
                     .args
                     .as_ref()

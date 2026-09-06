@@ -27,7 +27,7 @@ use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, Paragraph, Placement, Sigil, Span, Text, Value,
 };
-use tomet_semantics::{ElementKind, classify_lenient, list_ordered};
+use tomet_semantics::{ElementKind, classify_std_lenient, list_ordered};
 use tomet_tree::{ElementExt, element_list, element_list_item, element_new};
 
 mod frontmatter;
@@ -789,7 +789,7 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
         // its title text directly in, same as a paragraph -- not wrapped
         // as a nested `Inline::Element`, which is what the generic
         // `Block::Element` arm below would do.
-        Block::Element(el) if classify_lenient(&el) == ElementKind::Heading => {
+        Block::Element(el) if classify_std_lenient(&el) == ElementKind::Heading => {
             extend_spaced(content, el.content.unwrap_or_default())
         }
         // A list merged into flattened blockquote content (blockquotes
@@ -832,7 +832,7 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(classify_lenient(el), ElementKind::Heading);
+                assert_eq!(classify_std_lenient(el), ElementKind::Heading);
                 assert_eq!(tomet_semantics::heading_level(el), Some(1));
                 assert_eq!(
                     el.content,
@@ -1054,7 +1054,7 @@ mod tests {
                 assert!(
                     !content
                         .iter()
-                        .any(|i| matches!(i, Inline::Element(inner) if classify_lenient(inner) == ElementKind::Heading)),
+                        .any(|i| matches!(i, Inline::Element(inner) if classify_std_lenient(inner) == ElementKind::Heading)),
                     "heading should have been spliced as text, not nested as an element: {content:?}"
                 );
                 assert!(

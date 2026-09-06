@@ -37,7 +37,7 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
-    TargetScheme, classify_lenient, heading_level, is_directive, link_target, list_items,
+    TargetScheme, classify_std_lenient, heading_level, is_directive, link_target, list_items,
     list_ordered, normalized_element_args, parse_table_rows, target_scheme,
 };
 
@@ -118,7 +118,7 @@ fn inline_to_typst(inlines: &[Inline]) -> String {
 }
 
 fn element_to_typst(el: &Element, inline: bool) -> String {
-    let kind = classify_lenient(el);
+    let kind = classify_std_lenient(el);
     match kind.as_str() {
         // Directives -- see `tomet_semantics::is_directive`.
         _ if is_directive(&kind) => String::new(),
@@ -321,7 +321,7 @@ fn render_table(el: &Element) -> String {
 /// before rendering -- it's addressing metadata, not part of the visible
 /// target.
 fn render_link(el: &Element) -> String {
-    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let text = match &el.content {
         Some(content) if !content.is_empty() => inline_to_typst(content),
@@ -351,7 +351,7 @@ fn render_link(el: &Element) -> String {
 /// `tomet-convert-html`'s `render_embed_element` for why `<embed>` needs
 /// this too, not just a raw passthrough.
 fn render_embed(el: &Element) -> String {
-    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
     let alt = el
         .content

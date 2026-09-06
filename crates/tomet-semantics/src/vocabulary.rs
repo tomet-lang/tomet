@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 use tomet_ast::{Block, Document, Element, Name, Value};
 use tomet_tree::ValueExt;
 
-use crate::kind::{BUILTIN_KINDS, ElementKind, Shape, UnknownName, classify_lenient};
+use crate::kind::{BUILTIN_KINDS, ElementKind, Shape, UnknownName, classify_std_lenient};
 use crate::positional::normalized_element_args;
 
 /// Where an element is allowed to sit in a document.
@@ -137,7 +137,7 @@ impl Vocabulary {
 
         for block in &doc.blocks {
             let Block::Element(el) = block else { continue };
-            if classify_lenient(el) != ElementKind::Element {
+            if classify_std_lenient(el) != ElementKind::Element {
                 continue;
             }
             let Some(name) = positional_name(el) else {
@@ -288,7 +288,7 @@ fn used_namespaces(doc: &Document) -> Vec<String> {
     let mut names = Vec::new();
     for block in &doc.blocks {
         let Block::Element(el) = block else { continue };
-        if classify_lenient(el) != ElementKind::Use {
+        if classify_std_lenient(el) != ElementKind::Use {
             continue;
         }
         let Some(args) = normalized_element_args(el) else {
@@ -319,7 +319,7 @@ fn header(doc: &Document) -> Option<(String, bool)> {
         let Block::Element(el) = block else {
             return None;
         };
-        if classify_lenient(el) != ElementKind::Vocabulary {
+        if classify_std_lenient(el) != ElementKind::Vocabulary {
             return None;
         }
         let name = positional_name(el)?;
@@ -386,7 +386,7 @@ fn params_from_element(el: &Element) -> Vec<ParamDecl> {
     let Some(args) = value
         .as_children()
         .into_iter()
-        .find(|child| classify_lenient(child) == ElementKind::Args)
+        .find(|child| classify_std_lenient(child) == ElementKind::Args)
     else {
         return Vec::new();
     };
@@ -396,7 +396,7 @@ fn params_from_element(el: &Element) -> Vec<ParamDecl> {
     args_value
         .as_children()
         .into_iter()
-        .filter(|child| classify_lenient(child) == ElementKind::Param)
+        .filter(|child| classify_std_lenient(child) == ElementKind::Param)
         .filter_map(param_from_element)
         .collect()
 }

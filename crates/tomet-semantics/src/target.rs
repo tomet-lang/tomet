@@ -1,5 +1,5 @@
 //! Extracts the raw target string of a link-shaped element (`Link`/`Embed`,
-//! per [`crate::classify`]) under their one canonical `target` key, and
+//! per [`crate::classify_std`]) under their one canonical `target` key, and
 //! classifies *what kind* of target that string is (`TargetScheme`) by its
 //! own scheme prefix -- `url`/`file`/`tm`/`id`/`ref` are no longer carried
 //! by which argument key was used (there's only ever `target:` now); they
@@ -14,7 +14,7 @@ use crate::kind::ElementKind;
 use crate::positional::normalized_element_args;
 
 /// The raw target string of a link-shaped element, if it has one. `kind`
-/// should be `classify_lenient(el)`'s result -- only `Link`/`Embed` ever return
+/// should be `classify_std_lenient(el)`'s result -- only `Link`/`Embed` ever return
 /// `Some`, everything else returns `None`.
 ///
 /// `tm:path/to/doc#some-id`'s `#fragment` is returned verbatim, still
@@ -47,9 +47,9 @@ pub fn link_target(el: &Element, kind: &ElementKind) -> Option<String> {
 }
 
 /// Classifies `el` and extracts its link target in one step, for callers
-/// that don't already have `classify_lenient(el)`'s result on hand.
+/// that don't already have `classify_std_lenient(el)`'s result on hand.
 pub fn link_target_of(el: &Element) -> Option<(ElementKind, String)> {
-    let kind = crate::classify_lenient(el);
+    let kind = crate::classify_std_lenient(el);
     link_target(el, &kind).map(|target| (kind, target))
 }
 
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn named_target_key_on_typed_link_element() {
         let el = map_el(Sigil::named("link"), vec![("target", s("x.md"))]);
-        assert_eq!(crate::classify_lenient(&el), ElementKind::Link);
+        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Link);
         assert_eq!(
             link_target_of(&el),
             Some((ElementKind::Link, "x.md".to_string()))
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn named_at_link_element() {
         let el = map_el(Sigil::named("link"), vec![("target", s("x.md"))]);
-        assert_eq!(crate::classify_lenient(&el), ElementKind::Link);
+        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Link);
         assert_eq!(
             link_target_of(&el),
             Some((ElementKind::Link, "x.md".to_string()))
@@ -182,7 +182,7 @@ mod tests {
         // `link_target` ever sees it.
         let mut el = element_new(Sigil::named("link"));
         el.args = Some(s("x.md"));
-        assert_eq!(crate::classify_lenient(&el), ElementKind::Link);
+        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Link);
         assert_eq!(
             link_target_of(&el),
             Some((ElementKind::Link, "x.md".to_string()))
@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn embed_target_named_key() {
         let el = map_el(Sigil::named("embed"), vec![("target", s("a.png"))]);
-        assert_eq!(crate::classify_lenient(&el), ElementKind::Embed);
+        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Embed);
         assert_eq!(
             link_target_of(&el),
             Some((ElementKind::Embed, "a.png".to_string()))
@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn non_link_kind_has_no_target() {
         let el = map_el(Sigil::named("meta"), vec![("format", s("json"))]);
-        assert_eq!(crate::classify_lenient(&el), ElementKind::Meta);
+        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Meta);
         assert_eq!(link_target_of(&el), None);
     }
 }

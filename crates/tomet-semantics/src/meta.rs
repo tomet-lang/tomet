@@ -1,7 +1,7 @@
 use tomet_ast::{Block, Document, Element, Value};
 use tomet_tree::ValueExt;
 
-use crate::{ElementKind, classify_lenient};
+use crate::{ElementKind, classify_std_lenient};
 
 /// Returns this document's `@meta` element's parsed data, if it has one --
 /// the `{...}` group from `@meta(format:...){...}`, already normalized to
@@ -16,7 +16,7 @@ use crate::{ElementKind, classify_lenient};
 /// never has more than one anyway.
 pub fn document_meta(doc: &Document) -> Option<Value> {
     doc.blocks.iter().find_map(|block| match block {
-        Block::Element(el) if classify_lenient(el) == ElementKind::Meta => meta_data(el),
+        Block::Element(el) if classify_std_lenient(el) == ElementKind::Meta => meta_data(el),
         _ => None,
     })
 }
@@ -32,7 +32,7 @@ use crate::positional::normalized_element_args;
 pub fn document_kind(doc: &Document) -> Option<String> {
     for block in &doc.blocks {
         if let Block::Element(el) = block {
-            if classify_lenient(el) == ElementKind::Kind {
+            if classify_std_lenient(el) == ElementKind::Kind {
                 if let Some(val) = normalized_element_args(el) {
                     if let Some(s) = val.get("kind").and_then(|v| v.as_str()) {
                         return Some(s.to_string());
@@ -61,7 +61,7 @@ pub fn document_kind(doc: &Document) -> Option<String> {
 pub fn document_version(doc: &Document) -> Option<String> {
     for block in &doc.blocks {
         if let Block::Element(el) = block {
-            if classify_lenient(el) == ElementKind::Version {
+            if classify_std_lenient(el) == ElementKind::Version {
                 if let Some(val) = normalized_element_args(el) {
                     if let Some(v) = val.get("version") {
                         return Some(value_to_version_string(v));
