@@ -15,6 +15,10 @@ proposes an edit here and stops.
 
 ##[ document-placement ]
 
+@rule(document-placement){
+  guard: { runs: "just docs-check" }
+}
+
 A new document goes where it belongs by what it *is*, not by what it is
 about.
 
@@ -116,6 +120,10 @@ that prompted this.
 
 ##[ docs-language ]
 
+@rule(docs-language){
+  guard: { runs: "just writ-check" }
+}
+
 `spec/`, `guide/`, `examples/` and `why/` are written in **Japanese**.
 Japanese is the default, so filenames carry no `.ja` suffix and there is no
 `ja/` directory level. English translations, if they are ever added, go
@@ -145,6 +153,10 @@ find . -name '.writ.tmt' -not -path './target/*' \
 ```
 
 ##[ generated-md-not-edited ]
+
+@rule(generated-md-not-edited){
+  guard: { runs: "just docs-check" }
+}
 
 `.md` under `spec/` and `guide/` is exported from the sibling `.tmt` via
 `@config(export:)`. Do not hand-edit it. Edit the `.tmt` and re-export.
