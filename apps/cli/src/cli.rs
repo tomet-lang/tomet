@@ -46,7 +46,8 @@ pub enum Command {
     /// through `serde_tomet` and reparse that -- confirms the
     /// save/load round trip is lossless.
     Roundtrip { file: PathBuf },
-    /// Convert a `.tmt` file to a standalone HTML page.
+    /// Convert a `.tmt` file to HTML: a standalone page, or just the
+    /// rendered body with `--body`.
     Html {
         file: PathBuf,
         /// Write to this path instead of stdout.
@@ -59,6 +60,11 @@ pub enum Command {
         /// `<html lang="...">` for the page shell. Defaults to "ja".
         #[arg(long)]
         lang: Option<String>,
+        /// Emit just the rendered body, with no `<html>`/`<head>` shell,
+        /// for templating into a page of your own. `--lang` has no effect
+        /// alongside this, since the shell is what carries it.
+        #[arg(long)]
+        body: bool,
     },
     /// Convert a `.tmt` file to CommonMark. Lossy for constructs with no
     /// Markdown equivalent (`@links{}`, and any `@T` element the importer
