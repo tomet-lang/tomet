@@ -3,14 +3,14 @@
 use crate::error::Result;
 use crate::fence::{is_fence_start, parse_fence};
 use crate::heading::{merge_values, parse_braced_value};
-use crate::inline::{Stop, parse_inline_seq};
+use crate::inline::{Stop, at_line_start, parse_inline_seq};
 use crate::value::{
     POSITIONAL_ENTRY_KEY, eat_name, err, is_name_start_at, parse_one_entry, parse_value_at,
     skip_block_comment, skip_inline_ws, skip_line_comment, skip_ws_newlines_and_comments,
 };
-use tomet_ast::{Element, ElementValue, Entry, Inline, Sigil, Value};
+use tomet_ast::{Element, ElementValue, Entry, Inline, Placement, Sigil, Value};
 use tomet_lexer::Cursor;
-use tomet_tree::element_new;
+use tomet_tree::{ElementExt, element_new};
 
 /// Whether `cur` starts an element (`@name`).
 ///
@@ -366,6 +366,12 @@ fn parse_content(cur: &mut Cursor) -> Result<Vec<Inline>> {
 /// errored or, worse, swallowed the elements into a scalar string,
 /// depending on which came first.
 ///
+/// "A nested element" means a *named* one too, not only the bare
+/// `(marker)[content]` form. That half arrived late: this comment claimed
+/// the general rule while the code took only `(`, so a vocabulary's own
+/// `@element(c){ @args{ @param(id){...} } }` -- the shape
+/// `docs/spec/vocabulary.tmt` is written in -- could not be parsed at all.
+///
 /// A non-map body (`{[1,2,3]}`, `{"str"}`, `{bare}`) is rejected. Those had
 /// no uniform-entry spelling, and the `+++` fence now covers the case they
 /// served -- `@meta(format:json)+++ [1,2,3] +++`.
@@ -381,6 +387,31 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
             None => return Err(err(cur, group_start, "unterminated '{', expected '}'")),
             Some('}') => break,
             Some('(') => entries.push(Entry::Element(parse_bare_element(cur)?)),
+            // A named entry, `@args{ ... }`. Unambiguous: `is_ident_char`
+            // excludes `@`, so a map key cannot begin with one, and this
+            // position errors today -- `eat_ident` returns empty and the
+            // `POSITIONAL_ENTRY_KEY` rejection below takes over. So this
+            // arm only turns errors into parses.
+            //
+            // `block_context: false`: a group entry still has to carry a
+            // group, a `:` or a fence after the name, so a bare `@foo`
+            // inside `{...}` stays the error it already was.
+            // The placement rule reaches inside a group too, the same way
+            // it reaches inside `[content]` (see `inline.rs`): a line start
+            // here is block context, so an element that also ends its line
+            // stands as a block. `@args{ ... }` on its own line inside
+            // `@element(x){ ... }` is what that is for -- `required_shape`
+            // calls those six block elements, and placement is what it is
+            // compared against.
+            _ if is_element_start(cur, at_line_start(cur)) => {
+                let block = at_line_start(cur) && element_ends_line(cur);
+                let el = parse_element(cur, false)?;
+                entries.push(Entry::Element(if block {
+                    el.with_placement(Placement::Block)
+                } else {
+                    el
+                }));
+            }
             _ => {
                 let (key, value) = parse_one_entry(cur)?;
                 if key == POSITIONAL_ENTRY_KEY {

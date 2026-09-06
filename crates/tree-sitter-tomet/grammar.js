@@ -477,6 +477,13 @@ module.exports = grammar({
 				")",
 			),
 		content_group: ($) => seq(token(prec(1, "[")), repeat($._bracket_item), "]"),
+		// `{...}` is always data. Entries are read uniformly, each a
+		// `key: value` pair, a bare `(marker)[content]` entry, or a named
+		// element, in source order -- nothing here consults the enclosing
+		// element's name. `@links{ (1)[a] note: x (2)[b] }` and
+		// `@element(c){ display: block @args{ @param(id){} } }` are the two
+		// shapes that needs.
+		//
 		value_group: ($) =>
 			seq(
 				token(prec(1, "{")),
@@ -488,10 +495,20 @@ module.exports = grammar({
 				optional($._blank_gap),
 				"}",
 			),
-		// `@links { (1)[...] (id2)[...] }`-style bare children: a container
-		// whose `{value}` holds a list of `(args)[content]` entries with no
-		// sigil of their own (the container already supplies the type).
-		children: ($) => repeat1(seq(optional($._blank_gap), $.bare_element)),
+		// A `{...}` group's elements: bare `(args)[content]` entries whose
+		// container supplies the type (`@links{ (1)[...] (2)[...] }`), and
+		// named ones (`@element(c){ @args{ @param(id){} } }`), which is how
+		// a vocabulary declares an element's slots.
+		//
+		// Pairs and elements in the *same* group are a shape the real
+		// parser takes and this rule does not -- see `KNOWN_TS_ERRORS`.
+		// Splicing `map_entry` into this list was tried and reverted: it
+		// makes `id: review` ambiguous with `id:` followed by an entry
+		// keyed `review`, and the lexer prefers `identifier` over a scalar.
+		children: ($) =>
+			repeat1(
+				seq(optional($._blank_gap), choice($.bare_element, $.inline_element)),
+			),
 		// Simplification: unlike `args_group`/`value_group`'s own internal
 		// gaps, `content_group` here must immediately follow (inline whitespace
 		// only, no blank-line tolerance) -- avoids an LR conflict where a

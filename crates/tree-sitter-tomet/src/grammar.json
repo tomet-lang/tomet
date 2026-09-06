@@ -1353,8 +1353,17 @@
             ]
           },
           {
-            "type": "SYMBOL",
-            "name": "bare_element"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "bare_element"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "inline_element"
+              }
+            ]
           }
         ]
       }

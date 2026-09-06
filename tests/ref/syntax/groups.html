@@ -23,3 +23,15 @@
 <h1 data-tag="groups">引数も値も取れる</h1>
 <h1>見出しにならないもの</h1>
 <p>これは #タグ ではない。`#` の直後に空白もグループも無ければただの文字。</p>
+<h1>`{...}` は名前つき要素も取る</h1>
+<p>`{...}` は常にデータで、中身は書いた順の `Entry` の並び。裸の `(marker)[content]` も、名前つきの `@name` も同じ並びに入る。語彙が要素を 宣言する形はこれが無いと書けない。</p>
+<div class="tm-element tm-element" data-value="card">カード一枚。<div class="tm-children">
+<div class="tm-element tm-args"><div class="tm-children">
+<div class="tm-element tm-param" data-value="id">通し番号。</div>
+</div>
+</div>
+<div class="tm-element tm-data"></div>
+</div>
+</div>
+<p>行頭にあって行を終える要素はブロック配置になる。`[content]` の中と同じ規則で、 `@args` がブロック形だと宣言されているのはそのため。</p>
+<p>`@` のあとにグループが続かなければ要素にならないのは、グループの中でも同じ。 連絡は me@example.com まで。</p>

@@ -142,6 +142,16 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     ("syntax/sigils.tmt", &["title: 混在,"]),
     // One missing token, which `ts_error_texts` reports as empty text.
     ("blueprints/daily-note.blueprint.tmt", &[MISSING_NODE]),
+    // Two shapes at once, neither of them new. `children` and `value` are
+    // alternatives in `value_group`, so a group holding a pair *and* an
+    // element errors (the same limitation `syntax/sigils.tmt` records);
+    // and `_entry_value` has no parenthesised form, so
+    // `@content{ allow: (link, em) }` has nowhere to go. Coarse rather
+    // than seven texts that would all be deleted together.
+    //
+    // Named elements inside a group do parse -- that is what `children`
+    // gained when the real parser learned `@element(c){ @args{ ... } }`.
+    ("syntax/groups.tmt", &[ANY_ERROR]),
 ];
 
 /// Records a fixture as drifting wholesale, without pinning the text of
