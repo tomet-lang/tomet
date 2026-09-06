@@ -70,7 +70,11 @@ pub fn normalized_list_marker(marker: &Value) -> Value {
 /// [`recover_target_scheme_entry`] -- reusing `target_scheme`'s own
 /// recognized explicit prefixes (see `crate::target`) rather than a
 /// separately invented vocabulary.
-const RECOVERABLE_TARGET_SCHEMES: [&str; 5] = ["url", "file", "tm", "id", "ref"];
+fn is_recoverable_target_scheme(key: &str) -> bool {
+    crate::target::EXPLICIT_SCHEMES
+        .iter()
+        .any(|(name, _)| *name == key)
+}
 
 /// Sentinel key `tomet_parser` tags a bare, unkeyed positional entry
 /// with (`(a, b)`'s two entries, or `@link(tm:foo, depends_on)`'s second
@@ -104,7 +108,7 @@ fn recover_target_scheme_entry(
     let candidates: Vec<usize> = entries
         .iter()
         .enumerate()
-        .filter(|(_, (k, _))| RECOVERABLE_TARGET_SCHEMES.contains(&k.as_str()))
+        .filter(|(_, (k, _))| is_recoverable_target_scheme(k))
         .map(|(idx, _)| idx)
         .collect();
     let [idx] = candidates[..] else {

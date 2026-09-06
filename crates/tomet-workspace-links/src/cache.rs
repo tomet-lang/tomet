@@ -78,6 +78,51 @@ pub struct LinkCache {
     conn: Connection,
 }
 
+/// The cache is derived state, so its schema carries a version and a
+/// mismatch wipes rather than migrates: rebuilding costs one re-parse of
+/// the vault, and a migration path would be code with no way to be wrong
+/// loudly.
+const SCHEMA_VERSION: i64 = 2;
+
+/// One DDL, used by both the on-disk and the in-memory constructor. The
+/// two used to be separate copies of the same text, and the `kind` CHECK
+/// in each was a hand-written third copy of `LinkKind`'s own names.
+fn schema() -> String {
+    let kinds: Vec<String> = LinkKind::ALL
+        .iter()
+        .map(|k| format!("'{}'", k.as_str()))
+        .collect();
+    format!(
+        "CREATE TABLE IF NOT EXISTS files (
+            path        TEXT PRIMARY KEY,
+            mtime_secs  INTEGER NOT NULL,
+            mtime_nanos INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS links (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_path  TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+            kind       TEXT NOT NULL CHECK (kind IN ({})),
+            target     TEXT NOT NULL,
+            start_line INTEGER NOT NULL,
+            start_col  INTEGER NOT NULL,
+            end_line   INTEGER NOT NULL,
+            end_col    INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_links_file_path ON links(file_path);",
+        kinds.join(", ")
+    )
+}
+
+/// Drops everything when the stored version is not this one.
+fn migrate(conn: &Connection) -> rusqlite::Result<()> {
+    let found: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    if found != SCHEMA_VERSION {
+        conn.execute_batch("DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS files;")?;
+        conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+    }
+    Ok(())
+}
+
 impl LinkCache {
     pub fn open(path: &Path) -> rusqlite::Result<Self> {
         if let Some(parent) = path.parent() {
@@ -85,24 +130,8 @@ impl LinkCache {
         }
         let conn = Connection::open(path)?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS files (
-                path        TEXT PRIMARY KEY,
-                mtime_secs  INTEGER NOT NULL,
-                mtime_nanos INTEGER NOT NULL DEFAULT 0
-            );
-            CREATE TABLE IF NOT EXISTS links (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                file_path  TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
-                kind       TEXT NOT NULL CHECK (kind IN ('file', 'embed', 'tm', 'ref')),
-                target     TEXT NOT NULL,
-                start_line INTEGER NOT NULL,
-                start_col  INTEGER NOT NULL,
-                end_line   INTEGER NOT NULL,
-                end_col    INTEGER NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_links_file_path ON links(file_path);",
-        )?;
+        migrate(&conn)?;
+        conn.execute_batch(&schema())?;
         Ok(Self { conn })
     }
 
@@ -110,24 +139,8 @@ impl LinkCache {
     pub fn open_in_memory() -> rusqlite::Result<Self> {
         let conn = Connection::open_in_memory()?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
-        conn.execute_batch(
-            "CREATE TABLE files (
-                path        TEXT PRIMARY KEY,
-                mtime_secs  INTEGER NOT NULL,
-                mtime_nanos INTEGER NOT NULL DEFAULT 0
-            );
-            CREATE TABLE links (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                file_path  TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
-                kind       TEXT NOT NULL CHECK (kind IN ('file', 'embed', 'tm', 'ref')),
-                target     TEXT NOT NULL,
-                start_line INTEGER NOT NULL,
-                start_col  INTEGER NOT NULL,
-                end_line   INTEGER NOT NULL,
-                end_col    INTEGER NOT NULL
-            );
-            CREATE INDEX idx_links_file_path ON links(file_path);",
-        )?;
+        conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        conn.execute_batch(&schema())?;
         Ok(Self { conn })
     }
 
