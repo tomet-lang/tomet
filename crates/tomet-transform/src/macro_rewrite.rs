@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use tomet_ast::{Document, Value};
-use tomet_semantics::{ElementKind, classify_lenient};
+use tomet_semantics::{ElementKind, classify_std_lenient};
 use tomet_tree::{ElementExt, transform_elements};
 
 /// A compiled macro matcher for reverse URL-to-macro rewriting.
@@ -143,7 +143,7 @@ pub fn transform_link_targets_with_macros(doc: &mut Document, macro_set: &MacroS
     transform_elements(
         doc,
         |el| {
-            let kind = classify_lenient(el);
+            let kind = classify_std_lenient(el);
             matches!(kind, ElementKind::Link | ElementKind::Embed)
         },
         |el| {

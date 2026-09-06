@@ -1,5 +1,5 @@
 //! Helpers for list-shaped elements (`Element::list`, `Element{ sigil:
-//! Type("ol"|"ul"), .. }`, see [`crate::classify`]) and their items
+//! Type("ol"|"ul"), .. }`, see [`crate::classify_std`]) and their items
 //! (`Element::list_item`, `Element{ sigil: Bare, .. }`, nested inside the
 //! list's `ElementValue::Children`). Centralizes the "ol"/"ul" ordered
 //! check and the `Children` unwrap that `tomet-html`/`tomet-markdown`/`tomet-printer` would otherwise
@@ -12,7 +12,7 @@ use crate::kind::ElementKind;
 /// `true` for a `-.` (auto-numbered) list, `false` for a plain `-` list.
 /// `None` for any non-list element.
 pub fn list_ordered(el: &Element) -> Option<bool> {
-    match crate::classify_lenient(el) {
+    match crate::classify_std_lenient(el) {
         ElementKind::OrderedList => Some(true),
         ElementKind::UnorderedList => Some(false),
         _ => None,
@@ -41,14 +41,14 @@ mod tests {
     #[test]
     fn ordered_list_classifies_and_reports_ordered() {
         let el = element_list(true, Vec::new(), tomet_ast::Span::dummy());
-        assert_eq!(crate::classify_lenient(&el), ElementKind::OrderedList);
+        assert_eq!(crate::classify_std_lenient(&el), ElementKind::OrderedList);
         assert_eq!(list_ordered(&el), Some(true));
     }
 
     #[test]
     fn unordered_list_classifies_and_reports_unordered() {
         let el = element_list(false, Vec::new(), tomet_ast::Span::dummy());
-        assert_eq!(crate::classify_lenient(&el), ElementKind::UnorderedList);
+        assert_eq!(crate::classify_std_lenient(&el), ElementKind::UnorderedList);
         assert_eq!(list_ordered(&el), Some(false));
     }
 

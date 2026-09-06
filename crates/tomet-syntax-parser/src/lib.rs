@@ -21,7 +21,7 @@ mod tests {
     use tomet_ast::{
         Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Sigil, Value,
     };
-    use tomet_semantics::{ElementKind, classify_lenient, heading_level, list_items, list_ordered};
+    use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
 
     #[test]
     fn parses_flat_map() {
@@ -64,7 +64,7 @@ mod tests {
         let doc = parse_document("#[ Hello ]{ id:header1 }\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(classify_lenient(el), ElementKind::Heading);
+                assert_eq!(classify_std_lenient(el), ElementKind::Heading);
                 assert_eq!(heading_level(el), Some(1));
                 assert_eq!(el.content, Some(vec![Inline::Text("Hello".into())]));
                 assert_eq!(
@@ -815,7 +815,7 @@ mod tests {
         }
         match &doc.blocks[1] {
             Block::Element(el) => {
-                assert_eq!(classify_lenient(el), ElementKind::Heading);
+                assert_eq!(classify_std_lenient(el), ElementKind::Heading);
                 let content = el.content.as_ref().expect("content");
                 assert!(content.iter().any(|i| matches!(
                     i,
@@ -848,8 +848,8 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Element(a), Block::Element(b))
-                if classify_lenient(a) == ElementKind::Heading
-                    && classify_lenient(b) == ElementKind::Heading =>
+                if classify_std_lenient(a) == ElementKind::Heading
+                    && classify_std_lenient(b) == ElementKind::Heading =>
             {
                 assert_eq!(a.content, Some(vec![Inline::Text("one".into())]));
                 assert_eq!(b.content, Some(vec![Inline::Text("two".into())]));
@@ -863,10 +863,10 @@ mod tests {
         let doc = parse_document("#[ one ]\n\n  // indented note\n\n#[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         assert!(
-            matches!(&doc.blocks[0], Block::Element(el) if classify_lenient(el) == ElementKind::Heading)
+            matches!(&doc.blocks[0], Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading)
         );
         assert!(
-            matches!(&doc.blocks[1], Block::Element(el) if classify_lenient(el) == ElementKind::Heading)
+            matches!(&doc.blocks[1], Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading)
         );
     }
 
@@ -875,10 +875,10 @@ mod tests {
         let doc = parse_document("#[ one ]\n\n  /* indented note */\n\n#[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         assert!(
-            matches!(&doc.blocks[0], Block::Element(el) if classify_lenient(el) == ElementKind::Heading)
+            matches!(&doc.blocks[0], Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading)
         );
         assert!(
-            matches!(&doc.blocks[1], Block::Element(el) if classify_lenient(el) == ElementKind::Heading)
+            matches!(&doc.blocks[1], Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading)
         );
     }
 
@@ -1523,7 +1523,7 @@ mod tests {
         let doc = parse_document("#[ Overview ]:{ id: intro, tag: main }\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(classify_lenient(el), ElementKind::Heading);
+                assert_eq!(classify_std_lenient(el), ElementKind::Heading);
                 assert_eq!(
                     el.value,
                     Some(ElementValue::from_map(Value::Map(vec![

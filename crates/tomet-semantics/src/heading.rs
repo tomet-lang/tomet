@@ -1,5 +1,5 @@
 //! Extracts the `level` of a heading-shaped element (`Heading`, per
-//! [`crate::classify`]) from its `args`, centralizing the `1..=6` clamp
+//! [`crate::classify_std`]) from its `args`, centralizing the `1..=6` clamp
 //! that `tomet-html`/`tomet-markdown`/`tomet-printer` each used to apply separately.
 
 use tomet_ast::Element;
@@ -14,7 +14,7 @@ use crate::positional::normalized_element_args;
 /// `@heading(level: "two")`) -- callers fall back to a default level
 /// themselves, this function never guesses one.
 pub fn heading_level(el: &Element) -> Option<u8> {
-    if crate::classify_lenient(el) != ElementKind::Heading {
+    if crate::classify_std_lenient(el) != ElementKind::Heading {
         return None;
     }
     normalized_element_args(el)?
@@ -33,7 +33,7 @@ mod tests {
     fn type_sigil_heading_classifies_and_extracts_level() {
         let mut el = element_new(Sigil::named("heading"));
         el.args = Some(Value::Int(2));
-        assert_eq!(crate::classify_lenient(&el), ElementKind::Heading);
+        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Heading);
         assert_eq!(heading_level(&el), Some(2));
     }
 
@@ -41,7 +41,7 @@ mod tests {
     fn at_sigil_heading_classifies_and_extracts_level() {
         let mut el = element_new(Sigil::named("heading"));
         el.args = Some(Value::Int(3));
-        assert_eq!(crate::classify_lenient(&el), ElementKind::Heading);
+        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Heading);
         assert_eq!(heading_level(&el), Some(3));
     }
 

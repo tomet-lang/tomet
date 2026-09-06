@@ -14,7 +14,7 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
 };
 use tomet_semantics::{
-    EXACT_DATA_KEY, ElementKind, TargetScheme, classify_lenient, flatten_data, heading_level,
+    EXACT_DATA_KEY, ElementKind, TargetScheme, classify_std_lenient, flatten_data, heading_level,
     is_directive, link_target, list_items, list_ordered, normalized_element_args, target_scheme,
 };
 
@@ -201,7 +201,7 @@ fn render_block(cx: &RenderCtx, block: &Block, out: &mut String, state: &mut Hea
             }
         }
         Block::Element(el) if list_ordered(el).is_some() => render_list(cx, el, out),
-        Block::Element(el) if classify_lenient(el) == ElementKind::Heading => {
+        Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading => {
             render_heading_element(cx, el, out, state)
         }
         Block::Element(el) => render_element(cx, el, out, false),
@@ -313,7 +313,7 @@ fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut String) {
 }
 
 fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
-    let kind = classify_lenient(el);
+    let kind = classify_std_lenient(el);
     match kind.as_str() {
         // Directives -- see `tomet_semantics::is_directive`.
         _ if is_directive(&kind) => {}
@@ -491,7 +491,7 @@ fn render_blockquote_element(cx: &RenderCtx, el: &Element, out: &mut String, inl
 /// share one `target` key with the scheme embedded in the string, `<embed>`
 /// needs the same treatment `@link` gets, not just a raw passthrough.
 fn render_embed_element(el: &Element, out: &mut String) {
-    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
     let alt = el
         .content
@@ -529,7 +529,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
 /// rendering -- it's addressing metadata, not part of the visible target.
 fn render_link_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
     let normalized_args = normalized_element_args(el);
-    let raw_target = link_target(el, &classify_lenient(el)).unwrap_or_default();
+    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let target = target.to_string();
 

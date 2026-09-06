@@ -25,7 +25,7 @@ use anyhow::{Context, Result, bail};
 use tomet_ast::{Block, Value};
 use tomet_compute::EvaluationContext;
 use tomet_config::PrinterConfig;
-use tomet_semantics::{ElementKind, ValueExt, classify_lenient, normalized_element_args};
+use tomet_semantics::{ElementKind, ValueExt, classify_std_lenient, normalized_element_args};
 use tomet_transform::instantiate_blueprint;
 
 /// Every blueprint `config` declares, as `(name, path)`, sorted by name.
@@ -97,7 +97,7 @@ fn blueprint_name(path: &Path) -> Option<String> {
         let Block::Element(el) = block else {
             return None;
         };
-        if classify_lenient(el) != ElementKind::Blueprint {
+        if classify_std_lenient(el) != ElementKind::Blueprint {
             return None;
         }
         let args = normalized_element_args(el)?;

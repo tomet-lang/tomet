@@ -27,8 +27,9 @@ pub use flatten::{
 };
 pub use heading::heading_level;
 pub use kind::{
-    BUILTIN_KINDS, ElementKind, Shape, UnknownName, builtin_region, builtin_singleton, classify,
-    classify_lenient, classify_name, is_directive, required_shape, shape_mismatch,
+    BUILTIN_KINDS, ElementKind, Shape, UnknownName, builtin_region, builtin_singleton,
+    classify_std, classify_std_lenient, classify_std_name, is_directive, required_shape,
+    shape_mismatch,
 };
 pub use list::{list_items, list_ordered};
 pub use meta::{document_kind, document_meta, document_version};

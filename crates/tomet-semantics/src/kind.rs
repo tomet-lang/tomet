@@ -184,7 +184,7 @@ impl ElementKind {
 }
 
 /// Recognized **bare** names with fixed meaning -- kept as one list so
-/// `classify`'s name -> variant match and `ElementKind::as_str`'s variant
+/// `classify_std`'s name -> variant match and `ElementKind::as_str`'s variant
 /// -> name match can't silently drift apart (see
 /// `builtin_kind_round_trips_through_as_str` below, which checks every
 /// entry here).
@@ -264,7 +264,13 @@ fn builtin_kind(name: &str) -> Option<ElementKind> {
         .map(|(_, kind)| kind.clone())
 }
 
-/// Classifies a [`Name`].
+/// Classifies a [`Name`] against the `std` vocabulary alone.
+///
+/// `std` alone is the whole of what this sees. A document may also write
+/// its own `@kind`'s namespace bare, and names it brought in with `@use`
+/// resolve too -- none of that is here, because none of it is knowable
+/// from a `Name`. That resolution is `Bindings::classify`; this is the
+/// narrower question underneath it.
 ///
 /// A namespaced name is always `Custom` -- namespaces are exactly how a
 /// user-defined element declares it is not part of the built-in
@@ -277,7 +283,7 @@ fn builtin_kind(name: &str) -> Option<ElementKind> {
 /// classified through this one arm, so the distinction never reached the
 /// tree. Namespaces carry it now, and this returns an error instead of
 /// inventing a kind.
-pub fn classify_name(name: &Name) -> Result<ElementKind, UnknownName> {
+pub fn classify_std_name(name: &Name) -> Result<ElementKind, UnknownName> {
     if !name.is_bare() {
         return Ok(ElementKind::Custom(name.to_string()));
     }
@@ -336,10 +342,20 @@ impl std::fmt::Display for UnknownName {
 
 impl std::error::Error for UnknownName {}
 
-/// Classifies `el` by its `Sigil`.
+/// Classifies `el` by its `Sigil`, against the `std` vocabulary alone.
+///
+/// The `_std` is the whole caveat. For a document carrying a `@kind`,
+/// this returns [`UnknownName`] for every element that document's own
+/// vocabulary declares, which is correct for what it asks and wrong for
+/// what a caller usually wants. `Bindings::classify` is the one that
+/// answers "what does this name mean *in this document*".
+///
+/// Reach for this when there is no document to resolve against -- the
+/// validator uses it for the non-`Named` sigils, which carry no name to
+/// resolve.
 ///
 /// `Sigil::Bare` is `ElementKind::Bare`, `Sigil::Dollar` is
-/// `ElementKind::Interp`. Everything else goes through [`classify_name`].
+/// `ElementKind::Interp`. Everything else goes through [`classify_std_name`].
 ///
 /// The name is all the sigil carries. Where the element sits is
 /// `Element::placement`, and a placement that disagrees with the kind's
@@ -348,21 +364,24 @@ impl std::error::Error for UnknownName {}
 /// No inference from `args` happens here -- `@(url:...)`-style key-based
 /// guessing was retired; the only way to get `ElementKind::Link` is to
 /// write `@link` explicitly.
-pub fn classify(el: &Element) -> Result<ElementKind, UnknownName> {
+pub fn classify_std(el: &Element) -> Result<ElementKind, UnknownName> {
     match &el.sigil {
-        Sigil::Named(name) => classify_name(name),
+        Sigil::Named(name) => classify_std_name(name),
         Sigil::Bare => Ok(ElementKind::Bare),
         Sigil::Dollar => Ok(ElementKind::Interp),
     }
 }
 
-/// Classifies `el`, falling back to `Custom` for an unknown bare name.
+/// [`classify_std`], falling back to `Custom` for an unknown bare name.
+///
+/// Same `std`-only scope, and the same caveat: a user vocabulary's
+/// elements come back as `Custom` here rather than as themselves.
 ///
 /// For consumers that render whatever they are given and have no way to
 /// report a diagnostic -- an HTML writer mid-document, say. Validation
-/// belongs to [`classify`]; this is the lenient read of the same thing.
-pub fn classify_lenient(el: &Element) -> ElementKind {
-    classify(el).unwrap_or_else(|e| ElementKind::Custom(e.name))
+/// belongs to [`classify_std`]; this is the lenient read of the same thing.
+pub fn classify_std_lenient(el: &Element) -> ElementKind {
+    classify_std(el).unwrap_or_else(|e| ElementKind::Custom(e.name))
 }
 
 /// Whether a kind is a directive -- an element that configures or
@@ -473,7 +492,7 @@ pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {
         return None;
     }
     let found = Shape::from(el.placement);
-    let kind = classify(el).ok()?;
+    let kind = classify_std(el).ok()?;
     let expected = required_shape(&kind)?;
     (found != expected).then_some((found, expected))
 }
@@ -489,9 +508,9 @@ mod tests {
         for (name, kind) in &BUILTIN_KINDS {
             assert_eq!(kind.as_str(), *name, "as_str() mismatch for {name:?}");
             assert_eq!(
-                classify_name(&Name::bare(*name)),
+                classify_std_name(&Name::bare(*name)),
                 Ok(kind.clone()),
-                "classify_name() mismatch for {name:?}"
+                "classify_std_name() mismatch for {name:?}"
             );
         }
     }
@@ -502,7 +521,7 @@ mod tests {
         // the diagnostic that replaces the old silent `Custom` fallback.
         let el = element_new(Sigil::named("caution"));
         assert_eq!(
-            classify(&el),
+            classify_std(&el),
             Err(UnknownName {
                 name: "caution".to_string(),
                 unbound_namespace: None,
@@ -514,7 +533,7 @@ mod tests {
     fn namespaced_name_is_custom() {
         let el = element_new(Sigil::Named(Name::namespaced("deck", "caution")));
         assert_eq!(
-            classify(&el),
+            classify_std(&el),
             Ok(ElementKind::Custom("deck.caution".to_string()))
         );
     }
@@ -524,16 +543,16 @@ mod tests {
         // `deck.meta` is the user's element, not Tomet's `#meta`.
         let el = element_new(Sigil::Named(Name::namespaced("deck", "meta")));
         assert_eq!(
-            classify(&el),
+            classify_std(&el),
             Ok(ElementKind::Custom("deck.meta".to_string()))
         );
     }
 
     #[test]
-    fn classify_lenient_falls_back_for_an_unknown_bare_name() {
+    fn classify_std_lenient_falls_back_for_an_unknown_bare_name() {
         let el = element_new(Sigil::named("caution"));
         assert_eq!(
-            classify_lenient(&el),
+            classify_std_lenient(&el),
             ElementKind::Custom("caution".to_string())
         );
     }
@@ -541,13 +560,13 @@ mod tests {
     #[test]
     fn type_sigil_with_builtin_name_is_recognized() {
         let el = element_new(Sigil::named("codeblock"));
-        assert_eq!(classify_lenient(&el), ElementKind::Codeblock);
+        assert_eq!(classify_std_lenient(&el), ElementKind::Codeblock);
     }
 
     #[test]
     fn named_at_sigil_is_recognized() {
         let el = element_new(Sigil::named("meta"));
-        assert_eq!(classify_lenient(&el), ElementKind::Meta);
+        assert_eq!(classify_std_lenient(&el), ElementKind::Meta);
     }
 
     #[test]
@@ -557,7 +576,7 @@ mod tests {
             "target".to_string(),
             Value::String("https://example.com".to_string()),
         )]));
-        assert_eq!(classify_lenient(&el), ElementKind::Link);
+        assert_eq!(classify_std_lenient(&el), ElementKind::Link);
     }
 
     #[test]
@@ -592,12 +611,12 @@ mod tests {
     #[test]
     fn bare_sigil_is_always_bare() {
         let el = element_new(Sigil::Bare);
-        assert_eq!(classify_lenient(&el), ElementKind::Bare);
+        assert_eq!(classify_std_lenient(&el), ElementKind::Bare);
     }
 
     #[test]
     fn dollar_sigil_is_always_interp() {
         let el = element_new(Sigil::Dollar);
-        assert_eq!(classify_lenient(&el), ElementKind::Interp);
+        assert_eq!(classify_std_lenient(&el), ElementKind::Interp);
     }
 }

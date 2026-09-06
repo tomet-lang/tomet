@@ -20,7 +20,7 @@ fn classify_in(
 ) -> Result<tomet_semantics::ElementKind, tomet_semantics::UnknownName> {
     match &el.sigil {
         tomet_ast::Sigil::Named(name) => bindings.classify(name),
-        _ => tomet_semantics::classify(el),
+        _ => tomet_semantics::classify_std(el),
     }
 }
 
@@ -176,11 +176,11 @@ fn check_singletons_and_regions(doc: &Document, bindings: &Bindings, errors: &mu
 /// Warnings, so `tomet check` reports them and still passes: marking a
 /// gap has to be cheaper than leaving it unmarked, or nobody marks it.
 ///
-/// `classify` rather than a name comparison, so a `@ns.draft` from some
+/// `classify_std` rather than a name comparison, so a `@ns.draft` from some
 /// vocabulary is not mistaken for `std`'s.
 fn check_unfinished(doc: &Document, errors: &mut Vec<Diagnostic>) {
     tomet_tree::for_each_element(doc, |el| {
-        let kind = match tomet_semantics::classify(el) {
+        let kind = match tomet_semantics::classify_std(el) {
             Ok(kind) => kind,
             Err(_) => return,
         };
@@ -603,7 +603,7 @@ mod tests {
     /// A document with `deck` in scope.
     ///
     /// These cases used to rely on a namespaced name passing
-    /// unconditionally -- `classify_name` returned `Custom` for anything
+    /// unconditionally -- `classify_std_name` returned `Custom` for anything
     /// with a namespace, bound or not. That was the hole `Bindings`
     /// closed, so the namespace has to actually be in scope now, and
     /// saying so here is what keeps these tests about duplicate ids.

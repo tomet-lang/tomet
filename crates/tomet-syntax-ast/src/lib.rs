@@ -316,7 +316,7 @@ impl std::ops::DerefMut for Text {
 /// namespace -- anything brought in with `@use` -- is always written
 /// out, and a bare name in neither of the two is an error rather than
 /// falling back to a `Custom` kind. That check is `Bindings::classify`
-/// in `tomet-semantics`, not the free `classify` beside it, which only
+/// in `tomet-semantics`, not the free `classify_std` beside it, which only
 /// knows `std`. This type only records the split.
 ///
 /// Both halves are ASCII identifiers (`[A-Za-z_][A-Za-z0-9_-]*`). `.` is

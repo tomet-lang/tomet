@@ -5,7 +5,7 @@ use tomet_ast::{
     InterpExprKind, Literal, Placement, Value,
 };
 use tomet_semantics::{
-    TableRow, classify_lenient, document_meta, flatten_data, flatten_element_data, heading_level,
+    TableRow, classify_std_lenient, document_meta, flatten_data, flatten_element_data, heading_level,
     is_directive, link_target, list_items, list_ordered, normalized_element_args, parse_table_rows,
 };
 
@@ -78,7 +78,7 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
 
 /// An element in block position.
 fn element_to_blocks(el: &Element) -> Vec<Block> {
-    let kind = classify_lenient(el);
+    let kind = classify_std_lenient(el);
     if is_directive(&kind) {
         return Vec::new();
     }
@@ -115,7 +115,7 @@ fn element_to_blocks(el: &Element) -> Vec<Block> {
 
 /// An element in inline position.
 fn element_to_inlines(el: &Element) -> Vec<Inline> {
-    let kind = classify_lenient(el);
+    let kind = classify_std_lenient(el);
     if is_directive(&kind) {
         return Vec::new();
     }

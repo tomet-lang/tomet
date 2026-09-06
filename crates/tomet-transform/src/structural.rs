@@ -1,7 +1,7 @@
 //! Structural AST query matching and in-place transformations.
 
 use tomet_ast::{Document, Element, ElementValue, Sigil, Value};
-use tomet_semantics::classify_lenient;
+use tomet_semantics::classify_std_lenient;
 use tomet_tree::{ElementExt, for_each_element, for_each_element_mut};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -20,7 +20,7 @@ pub enum StructuralAction {
 
 /// Checks if an element matches the given query.
 pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
-    let kind = classify_lenient(el);
+    let kind = classify_std_lenient(el);
     if let Some(target_tag) = &query.tag {
         if !target_tag.is_empty() && !kind.as_str().eq_ignore_ascii_case(target_tag) {
             return false;
@@ -72,7 +72,7 @@ pub fn apply_structural_action(doc: &mut Document, action: &StructuralAction) ->
     let mut count = 0;
     for_each_element_mut(doc, |el| match action {
         StructuralAction::RenameTag { from, to } => {
-            let kind = classify_lenient(el);
+            let kind = classify_std_lenient(el);
             if kind.as_str().eq_ignore_ascii_case(from) {
                 // Renaming replaces the local half and leaves any
                 // namespace in place: `deck.bookmark` renamed to `card`
