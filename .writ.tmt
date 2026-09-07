@@ -450,3 +450,25 @@ carries the old spelling.
 
 Known gap: files that fail to parse are skipped with a warning rather than
 failing the run, so a broken file is also an unguarded one.
+
+##[ file-io-doors ]
+
+@rule(file-io-doors){
+  guard: { twrit: door }
+
+  door: {
+    names: [ "std::fs" ]
+    within: [ "crates/*" ]
+    allowed: [
+      "crates/tomet-semantics-resolver",
+      "crates/tomet-config",
+      "crates/tomet-load",
+      "crates/tomet-workspace",
+      "crates/tomet-workspace-indexer",
+      "crates/tomet-workspace-links"
+    ]
+  }
+}
+
+A library crate reads a file only if it is named above. Programs are out
+of scope: a CLI reads files because that is what a CLI is.
