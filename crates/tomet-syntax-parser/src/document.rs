@@ -104,8 +104,9 @@ pub fn parse_document(src: &str) -> Result<Document> {
 pub(crate) fn is_heading_start(cur: &Cursor) -> bool {
     let mut look = *cur;
     look.eat_while(|c| c == '#');
-    // A group may follow the run directly: `#[ x ]`, `#(id: a)[ x ]`.
-    if matches!(look.peek(), Some('[') | Some('(') | Some('{')) {
+    // A group may follow the run directly: `#[ x ]`, `#(id: a)[ x ]`,
+    // `#| x` -- the last being `[content]` without the brackets.
+    if matches!(look.peek(), Some('[') | Some('(') | Some('{') | Some('|')) {
         return true;
     }
     // Otherwise the bracket-less sugar, which needs a space to separate

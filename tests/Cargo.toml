@@ -36,6 +36,10 @@ name = "vocabulary"
 path = "src/vocabulary.rs"
 
 [[test]]
+name = "pipe"
+path = "src/pipe.rs"
+
+[[test]]
 name = "syntax_report"
 path = "src/syntax_report.rs"
 

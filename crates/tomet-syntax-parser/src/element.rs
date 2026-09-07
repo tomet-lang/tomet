@@ -19,9 +19,10 @@ use tomet_tree::{ElementExt, element_new};
 /// `[content]`. It only widens what may follow the name, never the sigil
 /// or the name itself:
 ///
-/// - anywhere: a group (`(`, `[`, `{`), a `:` connect, or a `+++` fence
-///   must follow. This is what keeps `me@example.com` and a lone `@foo`
-///   in running prose as plain text.
+/// - anywhere: a group (`(`, `[`, `{`, or `|` for the bracket-less
+///   `[content]`), a `:` connect, or a `+++` fence must follow. This is
+///   what keeps `me@example.com` and a lone `@foo` in running prose as
+///   plain text.
 /// - in block context only: end-of-line also counts, so `@memo` alone on
 ///   its line is an element. It then fails later, in `tomet-semantics`,
 ///   as an unknown bare name -- the intended report, and the reason no
@@ -43,8 +44,10 @@ pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
         return false;
     }
     skip_lookahead_gap(&mut look);
-    matches!(look.peek(), Some('(') | Some('[') | Some('{') | Some(':'))
-        || is_fence_start(&look)
+    matches!(
+        look.peek(),
+        Some('(') | Some('[') | Some('{') | Some('|') | Some(':')
+    ) || is_fence_start(&look)
         || (block_context && matches!(look.peek(), None | Some('\n') | Some('\r')))
 }
 
@@ -160,8 +163,10 @@ pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Resu
 /// Split out of [`parse_element`] because a sigil is a sigil: `-` and `#`
 /// take the same groups as `@name` and must not grow a second, subtly
 /// different implementation of this. `[content]` stops at its closing
-/// bracket rather than at end of line, which is what lets a bracketed
-/// group span lines while the bracket-less sugar stays on one.
+/// bracket rather than at end of line, and `|content` -- the same group
+/// without the brackets -- stops at the end of its marked run, so either
+/// spelling may span lines. Only the bracket-less *sugar* body
+/// (`parse_sugar_body`, the `- x` and `# x` forms) is still one line.
 pub(crate) fn parse_groups(
     cur: &mut Cursor,
     el: &mut Element,
@@ -209,6 +214,12 @@ pub(crate) fn parse_groups(
                 }
                 Some('[') if el.content.is_none() => {
                     el.content = Some(parse_content(cur)?);
+                    continue;
+                }
+                // `|` is `[` without the brackets -- same slot, closed by
+                // the end of the marked run instead of by `]`.
+                Some('|') if el.content.is_none() => {
+                    el.content = Some(parse_pipe_content(cur)?);
                     continue;
                 }
                 Some('{') if el.value.is_none() => {
@@ -344,6 +355,23 @@ pub(crate) fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
         return Err(err(cur, cur.pos(), "expected ')'"));
     }
     Ok(v)
+}
+
+/// Parses a `|`-prefixed content run: `[content]` spelled without brackets.
+///
+/// Nothing about the content is decided here. The run's text is the same
+/// contiguous slice of source it would be between brackets, and
+/// `normalize_text` folds each marker away with the newline it follows, so
+/// line joining, whitespace, and every element's own reading of its content
+/// are inherited rather than restated. A `|` run and the bracketed form of
+/// the same content parse to the same tree, and `tests/src/pipe.rs` pins
+/// that.
+fn parse_pipe_content(cur: &mut Cursor) -> Result<Vec<Inline>> {
+    let (_, col) = cur.line_col(cur.pos());
+    if !cur.eat_str("|") {
+        return Err(err(cur, cur.pos(), "expected '|'"));
+    }
+    parse_inline_seq(cur, Stop::PipeRun { col }, true)
 }
 
 fn parse_content(cur: &mut Cursor) -> Result<Vec<Inline>> {

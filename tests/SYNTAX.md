@@ -32,6 +32,7 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [`+++` フェンス](#-フェンス)
 - [`{...}` グループ](#-グループ)
 - [`(args)` と値の文法](#args-と値の文法)
+- [`|` で開く内容](#-で開く内容)
 - [リスト](#リスト)
 - [インライン記法](#インライン記法)
 - [区切りとコードブロック](#区切りとコードブロック)
@@ -642,6 +643,90 @@ Block  @memo
 unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
+## `|` で開く内容
+
+### `|` は `[` が置ける位置に置ける。`]` の代わりに、`|` で始まる行の連なりの終わりで閉じる
+
+```tmt
+@blockquote(A)
+| 一行目
+| 二行目
+```
+
+```
+Block  @blockquote
+  args    "A"
+  content
+    Text "一行目二行目"
+```
+
+### 同じものを括弧で書いた形。木は一致する
+
+```tmt
+@blockquote(A)[ 一行目
+  二行目 ]
+```
+
+```
+Block  @blockquote
+  args    "A"
+  content
+    Text "一行目二行目"
+```
+
+### 要素の行で開いてもよい
+
+```tmt
+@blockquote| 本文
+```
+
+```
+Block  @blockquote
+  content
+    Text "本文"
+```
+
+### リスト項目も例外ではない。継続行は開いた `|` と同じ列に立つ
+
+```tmt
+- (x)| 一行目
+     | 二行目
+```
+
+```
+Block  @ul
+  group
+    Bare
+      args    "x"
+      content
+        Text "一行目二行目"
+```
+
+### 見出しも同じ
+
+```tmt
+#| 一行目
+ | 二行目
+```
+
+```
+Block  @heading
+  args    1
+  content
+    Text "一行目二行目"
+```
+
+### 継続する先が無い `|` は地の文。地の文にエスケープが無いので、行頭の `|` は綴れなければならない
+
+```tmt
+| a | b |
+```
+
+```
+Paragraph
+  Text "| a | b |"
+```
+
 ## リスト
 
 ### `-` が非順序、`-.` が順序
@@ -685,6 +770,7 @@ Block  @ol
 ```tmt
 -[ 括弧 ]
 -{ id: x }
+-| マーカー
 ```
 
 ```
@@ -697,6 +783,9 @@ Block  @ul
       content
       group
         id: "x"
+    Bare
+      content
+        Text "マーカー"
 ```
 
 ### `--` は**ネストしない**。2行目は段落になる（未対応）
