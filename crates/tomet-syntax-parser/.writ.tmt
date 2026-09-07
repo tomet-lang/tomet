@@ -23,7 +23,8 @@ does not relax the rule to fit the change it wanted to make.
     allow-external: [
       "rowan", "countme", "hashbrown", "rustc-hash", "text-size",
       "serde", "serde_core", "serde_derive",
-      "proc-macro2", "quote", "syn", "unicode-ident", "unicode-width"
+      "proc-macro2", "quote", "syn", "unicode-ident", "unicode-width",
+      "ahash", "cfg-if", "once_cell", "zerocopy", "zerocopy-derive"
     ]
   }
 }
@@ -59,11 +60,20 @@ above, so nothing new arrives without someone deciding to add it here.
 The closure, not the direct list. `tomet-syntax-parser` names one external
 crate of its own, and that one entry reads like the whole story and is not:
 `tomet-ast` brings `serde` and `tomet-cst` brings `rowan`, and those bring
-nine more. None of the thirteen does I/O -- they are syntax-tree machinery,
-derive machinery, and one Unicode table -- but the guard found them the
-first time it ran, against a writ that had just claimed otherwise. An
-allowlist says what is true; "no external dependencies" said something that
-felt better.
+nine more, and `hashbrown` brings `ahash` and its four. None of the
+eighteen does I/O -- they are syntax-tree machinery, derive machinery, a
+hasher, and one Unicode table -- but the guard found them, against a writ
+that had just claimed otherwise. An allowlist says what is true; "no
+external dependencies" said something that felt better.
+
+The last five arrived when the walk stopped being one level deep on the
+external side. Until then it saw `serde` and not `serde_derive`, which
+`serde` brings; a thirteen-entry list assembled that way was the same kind
+of statement as the one it replaced. They are also why the closure has to
+be the *resolved* one: `cargo tree -p tomet-parser` shows `hashbrown`
+without `ahash` and `cargo tree --workspace` shows it with, because
+feature unification is per build and this repository builds with
+`--workspace`.
 
 `unicode-width` is the one direct entry. The parser asks it whether a
 character is wide, to decide what a folded line joins with, and a width
