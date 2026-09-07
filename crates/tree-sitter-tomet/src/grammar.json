@@ -129,6 +129,35 @@
               "type": "SEQ",
               "members": [
                 {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "FIELD",
+                      "name": "args",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "args_group"
+                      }
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
+                },
+                {
+                  "type": "FIELD",
+                  "name": "content",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "marked_content"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "SEQ",
+              "members": [
+                {
                   "type": "PATTERN",
                   "value": "[ \\t]+"
                 },
@@ -477,6 +506,14 @@
               ]
             },
             {
+              "type": "FIELD",
+              "name": "content",
+              "content": {
+                "type": "SYMBOL",
+                "name": "marked_content"
+              }
+            },
+            {
               "type": "SEQ",
               "members": [
                 {
@@ -602,6 +639,14 @@
               ]
             },
             {
+              "type": "FIELD",
+              "name": "content",
+              "content": {
+                "type": "SYMBOL",
+                "name": "marked_content"
+              }
+            },
+            {
               "type": "SEQ",
               "members": [
                 {
@@ -716,14 +761,14 @@
     },
     "text": {
       "type": "PATTERN",
-      "value": "[^\\n`*_=@$#()\\[{\\]/-]+"
+      "value": "[^\\n`*_=@$#()\\[{\\]/|-]+"
     },
     "punctuation": {
       "type": "CHOICE",
       "members": [
         {
           "type": "PATTERN",
-          "value": "[()\\[{/<>]"
+          "value": "[()\\[{/<>|]"
         },
         {
           "type": "STRING",
@@ -888,7 +933,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`*=<@$()\\[{\\]/]+"
+            "value": "[^\\n`*=<@$()\\[{\\]/|]+"
           },
           "named": true,
           "value": "text"
@@ -930,7 +975,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`_=<@$()\\[{\\]/]+"
+            "value": "[^\\n`_=<@$()\\[{\\]/|]+"
           },
           "named": true,
           "value": "text"
@@ -976,7 +1021,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`*_=<@$()\\[{\\]/]+"
+            "value": "[^\\n`*_=<@$()\\[{\\]/|]+"
           },
           "named": true,
           "value": "text"
@@ -1265,6 +1310,52 @@
         }
       ]
     },
+    "marked_content": {
+      "type": "PREC_RIGHT",
+      "value": 0,
+      "content": {
+        "type": "REPEAT1",
+        "content": {
+          "type": "PREC_RIGHT",
+          "value": 0,
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "TOKEN",
+                "content": {
+                  "type": "PREC",
+                  "value": 1,
+                  "content": {
+                    "type": "STRING",
+                    "value": "|"
+                  }
+                }
+              },
+              {
+                "type": "REPEAT",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_line_item"
+                }
+              },
+              {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "_newline"
+                  },
+                  {
+                    "type": "BLANK"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
     "value_group": {
       "type": "SEQ",
       "members": [
@@ -1414,6 +1505,10 @@
             {
               "type": "SYMBOL",
               "name": "content_group"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "marked_content"
             },
             {
               "type": "SYMBOL",
