@@ -680,6 +680,25 @@ Block  @ol
         Text "ふたつ"
 ```
 
+### グループが直接続けば空白は要らない。`#[ x ]` や `@name[ x ]` と同じ
+
+```tmt
+-[ 括弧 ]
+-{ id: x }
+```
+
+```
+Block  @ul
+  group
+    Bare
+      content
+        Text "括弧"
+    Bare
+      content
+      group
+        id: "x"
+```
+
 ### `--` は**ネストしない**。2行目は段落になる（未対応）
 
 ```tmt

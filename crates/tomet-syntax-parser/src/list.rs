@@ -41,7 +41,7 @@ pub(crate) fn eat_list_marker_with_indent(
     skip_inline_ws(&mut look);
 
     let mut marker = None;
-    let mut found_bracket = false;
+    let mut found_group = false;
 
     if look.peek() == Some('(') {
         let mut probe = look;
@@ -51,12 +51,25 @@ pub(crate) fn eat_list_marker_with_indent(
         // marker from the text that follows it.
         if matches!(probe.peek(), Some(' ') | Some('\t') | Some('[') | Some('{')) {
             marker = Some(value);
-            found_bracket = true;
+            found_group = true;
             look = probe;
         }
     }
 
-    if !found_bracket && !has_ws {
+    // A group opening directly on the marker is the full form, and needs
+    // no space in front of it -- `#[ x ]` and `@name[ x ]` read that way,
+    // and a list item is the same element.
+    //
+    // Only `(` used to count, because the flag was set solely by the
+    // branch above: `-()[ x ]` was an item and `-[ x ]` was a paragraph.
+    // That is the asymmetry `2a99315` set out to remove and reached only
+    // halfway -- it unified how the groups are *read* (`parse_groups`) and
+    // left how the marker is *recognized* where it was.
+    if !found_group && matches!(look.peek(), Some('[') | Some('{')) {
+        found_group = true;
+    }
+
+    if !found_group && !has_ws {
         return Ok(None);
     }
 
