@@ -21,8 +21,8 @@
 として記録していた（2026-09-03 に修正）。誰も承認していない挙動が、参照
 ファイルという権威の形を得ていた。
 
-この区別自体はリポジトリが既に持っている。`docs/spec/` が規範で
-`tests/SYNTAX.md` が記述、食い違いそのものが読むべき情報、と書いてある。
+この区別自体はリポジトリが既に持っている。@dir(docs/spec/) が規範で
+@file(tests/SYNTAX.md) が記述、食い違いそのものが読むべき情報、と書いてある。
 適用範囲が狭かっただけ。
 
 #[ 四つの層 ]
@@ -123,7 +123,7 @@
 
 不変条件を**強制する**テスト。違反したらコードが落ちる。
 
-既に実例がある。`tests/src/vocabulary.rs` は「パーサは要素語彙を参照しない」
+既に実例がある。@file(tests/src/vocabulary.rs) は「パーサは要素語彙を参照しない」
 を、パーサが認識してはいけない識別子だけが違う2つのソースを parse して木を
 比較することで強制している。**規則の側に名前が無いだけ。**
 
@@ -137,7 +137,7 @@
 散文だけだと破られたことに気づけない。テストだけだと**なぜそうなのかが
 伝わらない**。対にすると両方成立する。
 
-生成物（`tests/SYNTAX.md`）とは別物であることに注意。生成物は「実装が何を
+生成物（@file(tests/SYNTAX.md)）とは別物であることに注意。生成物は「実装が何を
 受け付けるか」を**記述する文書**、番人は「実装がこうであってはならない」を
 **強制する檻**。
 
@@ -181,11 +181,11 @@
 #[ 導出と集約 ]
 
 「小さく保つ。導けることは書かない」を、どう機構にするか。2026-09-07 に
-`crates/tomet-config` で実測したところから。
+@dir(crates/tomet-config) で実測したところから。
 
 ##[ 手書きの一覧は、静かに欠ける ]
 
-`crates/tomet-config/README.md` は 23 行。そのうち事実を並べている箇所を
+@file(crates/tomet-config/README.md) は 23 行。そのうち事実を並べている箇所を
 ワークスペースと突き合わせた結果。
 
 @table()[
@@ -257,7 +257,7 @@ export の中に Rust パーサを置くと、次に Python パーサが要る�
 blueprints と vocabularies を宣言している。これはスキーマなので、同じ機構で
 取扱説明書が出せる。
 
-`docs/spec/builtin-settings.tmt` が実例になる。あの文書は冒頭で「`tomet-config`
+@file(docs/spec/builtin-settings.tmt) が実例になる。あの文書は冒頭で「`tomet-config`
 の `PrinterConfig::apply_entry` が実際に読むキーだけを載せる」と宣言している。
 **自分が何から導出されるかを散文で書いていて、導出されていない。** 今は正確
 だが、それは手で監査したからで、手の監査は一回だけ正しい。
@@ -393,23 +393,23 @@ felt better」と、`corpus.rs` の「ハードコードされた 2 ファイル
   **畳み込みの指示が無い。** 2026-09-03 に `pandoc-bridge.md` を消したとき、
   そこにしか無かった知識は判断で crate の doc コメントへ移した。規約は何も
   要求していない
-- `docs/design/decisions/` は削除済み（`4055fe5`）だが、`docs/README.tmt` に
+- `docs/design/decisions/` は削除済み（`4055fe5`）だが、@file(docs/README.tmt) に
   その行が残っている
 - `.agents/tasks/sigil-shape-axis-and-namespaces.md` の800行は 2026-09-06 に
   完了して消えた。畳み込み先はその場で決めた: 排他規則の帰結は
-  `tests/README.md`、リモート接続と名前空間の未決は `docs/roadmap.tmt`、
+  @file(tests/README.md)、リモート接続と名前空間の未決は @file(docs/roadmap.tmt)、
   綴りの撤去理由は各 doc コメント。**先に決めていれば探さずに済んだ**という
   のがこの節の主張の実例になっている
-- `//!` が無いメンバーが 6 件ある: `bindings/java`、`bindings/js`、
-  `bindings/python`、`editors/zed`、`crates/tomet-syntax-ast`、
-  `crates/tomet-semantics-validator`。`AGENTS.md` は「触るクレートの `//!` を
+- `//!` が無いメンバーが 6 件ある: @dir(bindings/java)、@dir(bindings/js)、
+  @dir(bindings/python)、@dir(editors/zed)、@dir(crates/tomet-syntax-ast)、
+  @dir(crates/tomet-semantics-validator)。`AGENTS.md` は「触るクレートの `//!` を
   読め」と指示しているので、その 6 件では指示が空振りする。
-  `crates/tomet-syntax-parser` も `//!` は無いが、規則は `.writ.tmt` にある
+  @dir(crates/tomet-syntax-parser) も `//!` は無いが、規則は `.writ.tmt` にある
 - 33 メンバーのうち README.md を持つのは 21、`.writ.tmt` を持つのは 1
 - 宣言されているのに番人が無い不変条件が二つ。`tomet-syntax-cst` の「100% の
   文字を保存する」と、`tomet-convert-typst` の `escape_text` の取りこぼし
   （`//!` 自身が「まだどのテストにも当たっていない」と書いている）
-- `tests/src/blueprint.rs` に `//!` が無い。6 つの番人で唯一、何を守っている
+- @file(tests/src/blueprint.rs) に `//!` が無い。6 つの番人で唯一、何を守っている
   のか宣言されていないので、writ のエントリにできない
 
 #[ 最初の一歩 ]

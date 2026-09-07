@@ -16,7 +16,7 @@
 [ `tomet` コマンドの入口 ]
 
 @dir(docs)
-[ 文書。どこに何があるかは `docs/README.tmt` ]
+[ 文書。どこに何があるかは @file(docs/README.tmt) ]
 @file(docs/README.tmt)
 [ その地図 ]
 
