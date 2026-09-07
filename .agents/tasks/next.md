@@ -37,17 +37,27 @@
 `tests/ref/syntax/sigils.pandoc.roundtrip.tmt`。
 後半（グループ entry が body に落ちる）は Pandoc に表現がなく、設計判断が要る。
 
-**D. `|` 継続構文（設計中、実装未着手）**
-`docs/design/ideas/syntax-continuation.tmt` に 2026-09-08 の会話を記録済み。
-規則は「`|` は `[` が置ける位置に置け、`]` の代わりに `|` 行の連なりの終わりで
-閉じる」の一つだけ。作者の合意は (a) `|content` == `[content]` /
-(c) リストも例外にしない / (d) 裸の `|` は地の文、まで取れている。未決は列の規則、
-formatter の綴り、名前付きスロットとの関係。実装の入口は `list.rs` が `(args)`
-の直後に許す文字の集合に `'|'` を足すところ。
+**D. `|` 継続構文 — 実装済み（2026-09-08）**
+`181b542` `-[ x ]` の非対称除去 / `0fc9e4b` パーサとテスト /
+`1771a1f` tree-sitter と fixture。設計は
+`docs/design/ideas/syntax-continuation.tmt`。
 
-あわせて、消した仕様の一文と同じ主張が `crates/tomet-syntax-parser/src/list.rs`
-のコメント 2 箇所とパーサの挙動（`parse_sugar_body` が一行で閉じる）に残っている。
-`|` を入れるならそこも要る。
+残っているもの:
+
+- **連結と空白の意味論（先送り中）。** `|` は `[content]` から継承するだけで
+  何も決めていない。テーブルの行が AST に無く、行を分けているのが `]` と `[`
+  の間の空白だという弱さも一緒に継承している。テーブルを汎用化するときに
+  両方まとめて決める。等価性は `tests/src/pipe.rs` が固定しているので、
+  片方だけ直れば落ちる。
+- **列の規則の帰結。** 開いた `|` の列に揃えるので、`@blockquote(A)| x` の
+  続きは列 15 に立つ。複数行にするなら `|` を次の行で開く形が自然な綴りに
+  なる。狙い通りか未確認。
+- **printer の往復バグ（既存、`|` と無関係）。** `@references[` が最初の
+  ブロック子要素を開き括弧と同じ行に置き、読み直すと Inline になる。
+  括弧形でも壊れる。`tests/src/pipe.rs` の該当テストがそこを避けている。
+- **tree-sitter は `|` の中のテーブル行を読めない。** 裸の `]` にトークンが
+  無く、外部スキャナが要る。`KNOWN_TS_ERRORS` の `syntax/pipe-table.tmt`。
+  `examples/dirs.tmt` などと同じ壁。
 
 **C. `@tomet/astro`** — `packages/astro/`、骨組み 33 行で未追跡。README の
 Prerequisites（`bindings/js` が名前で解決できない / `index.d.ts` が 1 破壊的
