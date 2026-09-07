@@ -208,7 +208,7 @@ It governs one file today, @file(tmtroot/readme.tmt) (it was
 `guide/` declares an output yet.
 
 Frozen test input is out of its way: `default.config.tmt`'s
-`workspace.ignore` skips `tests/fixtures`, `tests/ref` and `tests/store`,
+`workspace.ignore` skips @dir(tests/fixtures), @dir(tests/ref) and `tests/store`,
 where a stale export or a broken link is the coverage rather than a
 defect. Without that the repository-wide invocation was permanently
 non-zero, which is worse than having no guard -- it teaches people to

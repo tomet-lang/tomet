@@ -56,7 +56,7 @@ highlighting, and it does not update itself when `tomet-parser` changes.
 Drift between the two is caught by `tomet-tests`'s `corpus` target, which
 runs the shared `.tmt` corpus through both implementations; the grammar's
 own structural tests stay in `tree-sitter-tomet`. Cover the new construct
-by adding a fixture under `tests/fixtures/` — that corpus is frozen and
+by adding a fixture under @dir(tests/fixtures/) — that corpus is frozen and
 does not pick up changes to @dir(docs/) on its own.
 
 Cross-crate tests live in the @dir(tests/) package (`tomet-tests`), not in the
