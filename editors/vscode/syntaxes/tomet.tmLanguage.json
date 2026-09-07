@@ -14,28 +14,35 @@
 	],
 	"repository": {
 		"comments": {
+			"comment": "A comment opens only at the start of a line or after whitespace. `https://example.com` keeps its slashes -- same boundary the parser uses (`eat_scalar_raw` in tomet-syntax-parser/src/value.rs, `is_line_comment_start` in document.rs). Without the lookbehind a bare URL inside `(...)` ate the closing paren and every line after it.",
 			"patterns": [
 				{
 					"name": "comment.line.double-slash.tomet",
-					"match": "//.*$"
+					"match": "(?<![^ \\t])//.*$"
 				},
 				{
 					"name": "comment.block.tomet",
-					"begin": "/\\*",
+					"begin": "(?<![^ \\t])/\\*",
 					"end": "\\*/"
 				}
 			]
 		},
 
+		"autolink": {
+			"comment": "A bare URL is an autolink -- the parser rewrites `see https://example.com` into a `@link` element. Listed before `#map-entry` so the scheme's `:` is not read as a key separator.",
+			"match": "(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9+.-]*://[^\\s,()\\[\\]{}\"]+",
+			"name": "markup.underline.link.tomet string.other.link.tomet"
+		},
+
 		"fenced-code-block": {
 			"begin": "^\\s*(```)(?:([a-zA-Z0-9_+-]+))?\\s*$",
 			"beginCaptures": {
-				"1": { "name": "punctuation.definition.markdown" },
-				"2": { "name": "fenced_code.block.language.tomet" }
+				"1": { "name": "punctuation.definition.markdown keyword.control.fence.tomet" },
+				"2": { "name": "fenced_code.block.language.tomet entity.name.type.fence.tomet" }
 			},
 			"end": "^\\s*(```)\\s*$",
 			"endCaptures": {
-				"0": { "name": "punctuation.definition.markdown" }
+				"0": { "name": "punctuation.definition.markdown keyword.control.fence.tomet" }
 			},
 			"name": "markup.raw.block.fenced.tomet"
 		},
@@ -87,20 +94,20 @@
 				{
 					"begin": "^\\s*(-{3,})\\s*(\\[)",
 					"beginCaptures": {
-						"1": { "name": "punctuation.definition.thematic-break.tomet" },
+						"1": { "name": "punctuation.definition.thematic-break.tomet keyword.control.thematic-break.tomet" },
 						"2": { "name": "punctuation.section.brackets.begin.tomet" }
 					},
 					"end": "(\\])\\s*(-{3,})\\s*$",
 					"endCaptures": {
 						"1": { "name": "punctuation.section.brackets.end.tomet" },
-						"2": { "name": "punctuation.definition.thematic-break.tomet" }
+						"2": { "name": "punctuation.definition.thematic-break.tomet keyword.control.thematic-break.tomet" }
 					},
 					"name": "markup.heading.thematic-break.tomet",
 					"patterns": [{ "include": "#inline" }]
 				},
 				{
 					"match": "^\\s*-{3,}\\s*$",
-					"name": "punctuation.definition.thematic-break.tomet"
+					"name": "punctuation.definition.thematic-break.tomet keyword.control.thematic-break.tomet"
 				}
 			]
 		},
@@ -120,10 +127,11 @@
 		},
 
 		"inline": {
+			"comment": "No `#string` here on purpose: a quote is only a string delimiter inside a `(args)`/`{value}` group, where `#value` supplies it. In prose `\"` is an ordinary character, so including it here turned `これは 5\" のディスク` into a string that ran to the end of the file.",
 			"patterns": [
 				{ "include": "#comments" },
-				{ "include": "#string" },
 				{ "include": "#code-span" },
+				{ "include": "#autolink" },
 				{ "include": "#strong" },
 				{ "include": "#emphasis" },
 				{ "include": "#mark" },
@@ -137,8 +145,8 @@
 		"inline-basic": {
 			"patterns": [
 				{ "include": "#comments" },
-				{ "include": "#string" },
 				{ "include": "#code-span" },
+				{ "include": "#autolink" },
 				{ "include": "#interpolation" },
 				{ "include": "#connect" },
 				{ "include": "#element" },
@@ -152,16 +160,17 @@
 		},
 
 		"strong": {
+			"comment": "`try_one_delimited` (tomet-syntax-parser/src/inline.rs) is the model for all three delimiter rules: an `_` run does not open when the character before it is alphanumeric -- that is what keeps `serde_tomet` and `from_str` out of italics -- the closing run may not have whitespace before it, and the search gives up at a blank line. Without that last bound one stray `_` ran to the end of the file and stripped every heading, list and element below it of its scope.",
 			"patterns": [
 				{
 					"begin": "\\*\\*(?=\\S)",
-					"end": "\\*\\*",
+					"end": "(?<=\\S)\\*\\*|^(?=[ \\t]*$)",
 					"name": "markup.bold.tomet",
 					"patterns": [{ "include": "#inline-basic" }]
 				},
 				{
-					"begin": "__(?=\\S)",
-					"end": "__",
+					"begin": "(?<![[:alnum:]])__(?=\\S)",
+					"end": "(?<=\\S)__|^(?=[ \\t]*$)",
 					"name": "markup.bold.tomet",
 					"patterns": [{ "include": "#inline-basic" }]
 				}
@@ -172,13 +181,13 @@
 			"patterns": [
 				{
 					"begin": "\\*(?=\\S)",
-					"end": "\\*",
+					"end": "(?<=\\S)\\*|^(?=[ \\t]*$)",
 					"name": "markup.italic.tomet",
 					"patterns": [{ "include": "#inline-basic" }]
 				},
 				{
-					"begin": "_(?=\\S)",
-					"end": "_",
+					"begin": "(?<![[:alnum:]])_(?=\\S)",
+					"end": "(?<=\\S)_|^(?=[ \\t]*$)",
 					"name": "markup.italic.tomet",
 					"patterns": [{ "include": "#inline-basic" }]
 				}
@@ -186,9 +195,10 @@
 		},
 
 		"mark": {
+			"comment": "`==x==` is a highlight, not a deletion. It used to carry `markup.strikethrough`, which every theme renders as struck-through text.",
 			"begin": "==(?=\\S)",
-			"end": "==",
-			"name": "markup.strikethrough.tomet",
+			"end": "==|^(?=[ \\t]*$)",
+			"name": "markup.highlight.tomet markup.inserted.tomet",
 			"patterns": [{ "include": "#inline-basic" }]
 		},
 
@@ -274,8 +284,8 @@
 			"comment": "`@name` is the only element sigil, whatever the element's placement: `#` is the heading marker and nothing else, and shape comes from position rather than spelling. The name is required -- a name-less `@(...)` stopped forming an element. Names are ASCII, `.`-separated for namespaces (`@deck.ref`). Both alternatives refuse a `@` preceded by a word character, which is the half that keeps an email address prose.",
 			"patterns": [
 				{
-					"comment": "Mid-line: an element needs one of `( [ { :` or a `+++` fence after the name. Without one it is text -- `連絡は me@example.com まで` is a paragraph.",
-					"match": "(?<![A-Za-z0-9_])(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[(\\[{:]|\\+{3,})",
+					"comment": "Mid-line: an element needs one of `( [ { :` or a `+++` fence after the name. Without one it is text -- `連絡は me@example.com まで` is a paragraph. The whitespace in the lookahead is what spec/syntax.tmt's `@name () [] {}` spelling needs; the group does not have to be flush against the name.",
+					"match": "(?<![A-Za-z0-9_])(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*(?:[(\\[{:]|\\+{3,}))",
 					"captures": {
 						"1": { "name": "punctuation.definition.tag.tomet" },
 						"2": { "name": "entity.name.tag.tomet" }
@@ -296,21 +306,43 @@
 			"comment": "A `+++` fence carries a raw or embedded body: `@memo+++`, `@meta(format:yaml)+++`. It opens at the end of an element head and closes on a line holding only the run. A longer run escapes a body containing `+++`, matching the backtick fence's rule. The lookbehind is what keeps this from firing on the closing line: an opener always follows a name or a group's closing bracket.",
 			"begin": "(?<=[)\\]}A-Za-z0-9_-])(\\+{3,})[ \\t]*$",
 			"beginCaptures": {
-				"1": { "name": "punctuation.definition.raw.begin.tomet" }
+				"1": { "name": "punctuation.definition.raw.begin.tomet keyword.control.raw.tomet" }
 			},
 			"end": "^[ \\t]*(\\+{3,})[ \\t]*$",
 			"endCaptures": {
-				"1": { "name": "punctuation.definition.raw.end.tomet" }
+				"1": { "name": "punctuation.definition.raw.end.tomet keyword.control.raw.tomet" }
 			},
 			"name": "markup.raw.block.fence.tomet"
 		},
 
 		"groups": {
+			"comment": "Square brackets are the one group whose meaning depends on where it was entered from: `[content]` after an element is prose, `[a, b]` inside a `(args)`/`{value}` is a sequence. `#groups` is the content reading and `#value-groups` the value one; `(...)` and `{...}` are values either way.",
 			"patterns": [
 				{ "include": "#round-group" },
 				{ "include": "#square-group" },
 				{ "include": "#curly-group" }
 			]
+		},
+
+		"value-groups": {
+			"patterns": [
+				{ "include": "#round-group" },
+				{ "include": "#square-seq" },
+				{ "include": "#curly-group" }
+			]
+		},
+
+		"square-seq": {
+			"begin": "\\[",
+			"beginCaptures": {
+				"0": { "name": "punctuation.section.group.square.begin.tomet" }
+			},
+			"end": "\\]",
+			"endCaptures": {
+				"0": { "name": "punctuation.section.group.square.end.tomet" }
+			},
+			"name": "meta.sequence.tomet",
+			"patterns": [{ "include": "#value" }]
 		},
 
 		"round-group": {
@@ -336,7 +368,7 @@
 				"0": { "name": "punctuation.section.group.square.end.tomet" }
 			},
 			"name": "meta.group.square.tomet",
-			"patterns": [{ "include": "#inline" }, { "include": "#value" }]
+			"patterns": [{ "include": "#inline" }]
 		},
 
 		"curly-group": {
@@ -355,10 +387,12 @@
 		"value": {
 			"patterns": [
 				{ "include": "#comments" },
+				{ "include": "#autolink" },
 				{ "include": "#map-entry" },
 				{ "include": "#string" },
 				{ "include": "#interpolation" },
-				{ "include": "#groups" }
+				{ "include": "#value-groups" },
+				{ "include": "#scalar" }
 			]
 		},
 
@@ -371,9 +405,11 @@
 			"end": "(?=[,)\\]}]|$)",
 			"patterns": [
 				{ "include": "#comments" },
+				{ "include": "#autolink" },
 				{ "include": "#string" },
 				{ "include": "#interpolation" },
-				{ "include": "#groups" },
+				{ "include": "#value-groups" },
+				{ "include": "#scalar" },
 				{
 					"match": "[^,()\\[\\]{}\\n\"\\s][^,()\\[\\]{}\\n\"]*",
 					"name": "string.unquoted.plain.tomet"
@@ -381,10 +417,29 @@
 			]
 		},
 
+		"scalar": {
+			"comment": "Unquoted values. `parse_scalar` tries i64, then f64, then falls back to a string, so the number rules go first. Positional arguments live here too -- `@kind(bookmark)`'s `bookmark` used to carry no scope at all and rendered in the plain foreground.",
+			"patterns": [
+				{
+					"match": "(?<![A-Za-z0-9_.-])[+-]?[0-9]+(?:\\.[0-9]+)?(?![A-Za-z0-9_.-])",
+					"name": "constant.numeric.tomet"
+				},
+				{
+					"match": "(?<![A-Za-z0-9_.-])(?:true|false|null)(?![A-Za-z0-9_.-])",
+					"name": "constant.language.tomet"
+				},
+				{
+					"match": "[^\\s,()\\[\\]{}\"]+",
+					"name": "string.unquoted.plain.tomet"
+				}
+			]
+		},
+
 		"string": {
+			"comment": "The blank-line escape hatch is not in `parse_quoted` -- an unterminated quote is a hard parse error there. It is here so one stray `\"` cannot repaint the rest of the document.",
 			"name": "string.quoted.double.tomet",
 			"begin": "\"",
-			"end": "\"",
+			"end": "\"|^(?=[ \\t]*$)",
 			"patterns": [
 				{ "match": "\\\\.", "name": "constant.character.escape.tomet" }
 			]
