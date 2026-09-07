@@ -48,8 +48,12 @@ pub(crate) fn eat_list_marker_with_indent(
         let value = parse_paren_value(&mut probe)?;
         // `- (x) content` and `- (x)[ content ]` are the same element with
         // the same args; only the sugar needs a space to separate the
-        // marker from the text that follows it.
-        if matches!(probe.peek(), Some(' ') | Some('\t') | Some('[') | Some('{')) {
+        // marker from the text that follows it. `|` joins the group
+        // openers because it is one -- `[content]` without the brackets.
+        if matches!(
+            probe.peek(),
+            Some(' ') | Some('\t') | Some('[') | Some('{') | Some('|')
+        ) {
             marker = Some(value);
             found_group = true;
             look = probe;
@@ -65,7 +69,7 @@ pub(crate) fn eat_list_marker_with_indent(
     // That is the asymmetry `2a99315` set out to remove and reached only
     // halfway -- it unified how the groups are *read* (`parse_groups`) and
     // left how the marker is *recognized* where it was.
-    if !found_group && matches!(look.peek(), Some('[') | Some('{')) {
+    if !found_group && matches!(look.peek(), Some('[') | Some('{') | Some('|')) {
         found_group = true;
     }
 
@@ -107,12 +111,13 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
         let item_start = cur.pos();
         eat_list_marker_with_indent(cur)?;
 
-        let (content, attrs) = if matches!(cur.peek(), Some('[') | Some('{')) {
+        let (content, attrs) = if matches!(cur.peek(), Some('[') | Some('{') | Some('|')) {
             // The full form: `- ()[ content ]{value}`. Groups are read by
             // the same code that reads `@name`'s, so `[content]` stops at
-            // its closing bracket and may span lines. The bracket-less
-            // sugar below stays single-line, which is the whole point of
-            // requiring a group to spread out.
+            // its closing bracket and `|content` at the end of its marked
+            // run -- either may span lines. Only the bracket-less sugar
+            // below is one line, and it is one line because it has no
+            // group to close rather than because spreading out is barred.
             let mut item = element_new(Sigil::Bare);
             parse_groups(cur, &mut item, false)?;
             let attrs = item.value.and_then(|v| v.as_data());
@@ -141,7 +146,8 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
             (content, attrs)
         } else {
             // The bracket-less sugar, shared with `#`: one line, plus this
-            // line's own trailing `{attrs}`.
+            // line's own trailing `{attrs}`. Spreading out means opening a
+            // group -- `[ ]` or `|` -- exactly as it does for `@name`.
             parse_sugar_body(cur)?
         };
 

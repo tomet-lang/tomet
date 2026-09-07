@@ -19,6 +19,10 @@ pub(crate) enum Stop {
     Line,
     Offset(usize),
     Delim(&'static str),
+    /// A `|`-prefixed run: `[content]` spelled without brackets. `col` is
+    /// the 1-based column of the opening `|`, and a following line stays in
+    /// the run only when its own `|` stands in that same column.
+    PipeRun { col: usize },
 }
 
 /// `allow_colon_connect` is threaded straight through to every element
@@ -36,6 +40,10 @@ pub(crate) fn parse_inline_seq(
     let mut items = Vec::new();
     let mut text_start = cur.pos();
     let mut bracket_depth: u32 = 0;
+    // A `|` run's markers are folded away with the newline they follow, so
+    // the run's text stays one contiguous slice of the source and comes out
+    // identical to the same content written between brackets.
+    let fold_pipes = matches!(stop, Stop::PipeRun { .. });
     loop {
         match stop {
             Stop::Bracket(c) => {
@@ -106,6 +114,14 @@ pub(crate) fn parse_inline_seq(
                     }
                 }
             }
+            Stop::PipeRun { col } => {
+                if cur.is_eof() {
+                    break;
+                }
+                if cur.peek() == Some('\n') && !pipe_run_continues(cur, col)? {
+                    break;
+                }
+            }
         }
         if cur.peek() == Some('`') {
             let mut probe = *cur;
@@ -132,20 +148,20 @@ pub(crate) fn parse_inline_seq(
         if is_autolink_start(cur) {
             let before = cur.pos();
             if let Some(el) = try_autolink(cur, stop)? {
-                flush_text_upto(&mut items, cur, &mut text_start, before);
+                flush_text_upto(&mut items, cur, &mut text_start, before, fold_pipes);
                 items.push(Inline::Element(el));
                 text_start = cur.pos();
                 continue;
             }
         }
         if cur.starts_with("/*") {
-            flush_text(&mut items, cur, &mut text_start);
+            flush_text(&mut items, cur, &mut text_start, fold_pipes);
             skip_block_comment(cur)?;
             text_start = cur.pos();
             continue;
         }
         if cur.starts_with("//") && is_boundary(char_before(cur)) {
-            flush_text(&mut items, cur, &mut text_start);
+            flush_text(&mut items, cur, &mut text_start, fold_pipes);
             skip_line_comment(cur);
             text_start = cur.pos();
             continue;
@@ -161,10 +177,14 @@ pub(crate) fn parse_inline_seq(
         // so a line start there is not block context. Treating it as one
         // is what used to tear a wrapped sentence into separate blocks.
         if cur.peek() == Some('@') {
-            let block_context = matches!(stop, Stop::Bracket(_)) && at_line_start(cur);
+            let block_context = match stop {
+                Stop::Bracket(_) => at_line_start(cur),
+                Stop::PipeRun { .. } => at_marked_line_start(cur),
+                _ => false,
+            };
             if is_element_start(cur, block_context) {
                 let block = block_context && element_ends_line(cur);
-                flush_text(&mut items, cur, &mut text_start);
+                flush_text(&mut items, cur, &mut text_start, fold_pipes);
                 let el = parse_element(cur, allow_colon_connect)?;
                 items.push(Inline::Element(if block {
                     el.with_placement(Placement::Block)
@@ -176,7 +196,7 @@ pub(crate) fn parse_inline_seq(
             }
         }
         if cur.peek() == Some('$') && is_interp_start(cur) {
-            flush_text(&mut items, cur, &mut text_start);
+            flush_text(&mut items, cur, &mut text_start, fold_pipes);
             items.push(Inline::Element(parse_dollar_element(cur)?));
             text_start = cur.pos();
             continue;
@@ -184,7 +204,7 @@ pub(crate) fn parse_inline_seq(
         if matches!(cur.peek(), Some('*') | Some('_') | Some('=')) {
             let before = cur.pos();
             if let Some(el) = try_delimited(cur, allow_colon_connect)? {
-                flush_text_upto(&mut items, cur, &mut text_start, before);
+                flush_text_upto(&mut items, cur, &mut text_start, before, fold_pipes);
                 items.push(Inline::Element(el));
                 text_start = cur.pos();
                 continue;
@@ -194,7 +214,7 @@ pub(crate) fn parse_inline_seq(
             break;
         }
     }
-    flush_text(&mut items, cur, &mut text_start);
+    flush_text(&mut items, cur, &mut text_start, fold_pipes);
     Ok(trim_edges(items))
 }
 
@@ -307,15 +327,77 @@ pub(crate) fn at_line_start(cur: &Cursor) -> bool {
     }
 }
 
-fn flush_text(items: &mut Vec<Inline>, cur: &Cursor, text_start: &mut usize) {
-    flush_text_upto(items, cur, text_start, cur.pos());
+/// Whether the line after the newline at `cur` continues a `|` run opened in
+/// column `col`.
+///
+/// The marker is left where it is rather than consumed: `normalize_text`
+/// folds it away with the newline, which is what keeps the run's text one
+/// contiguous slice of the source.
+///
+/// A `|` in the wrong column is an error, not the end of the run. Ending
+/// quietly would drop the line into prose -- the failure that made a wrapped
+/// list item break every export -- and once lists nest, the column is the
+/// only thing that says which content a marker belongs to.
+fn pipe_run_continues(cur: &Cursor, col: usize) -> Result<bool> {
+    let mut look = *cur;
+    look.bump();
+    skip_inline_ws(&mut look);
+    // A blank line closes every block, this one included.
+    if matches!(look.peek(), None | Some('\n') | Some('\r')) {
+        return Ok(false);
+    }
+    if look.peek() != Some('|') {
+        return Ok(false);
+    }
+    let (_, marker_col) = look.line_col(look.pos());
+    if marker_col != col {
+        return Err(err(
+            &look,
+            look.pos(),
+            format!(
+                "this `|` stands in column {marker_col}, and the content it would \
+                 continue opens in column {col}: it lines up with no content"
+            ),
+        ));
+    }
+    Ok(true)
 }
 
-fn flush_text_upto(items: &mut Vec<Inline>, cur: &Cursor, text_start: &mut usize, end: usize) {
+/// [`at_line_start`] for a `|` run: the marker is the line's left edge, not
+/// content, so an element standing after one is at a line start exactly as
+/// it would be inside brackets.
+///
+/// Without this the two spellings disagree about placement -- an element on
+/// its own line becomes a block inside `[ ]` and stayed inline inside a run
+/// -- which is the sort of quiet divergence `tests/src/pipe.rs` exists to
+/// refuse.
+fn at_marked_line_start(cur: &Cursor) -> bool {
+    let before = &cur.src()[..cur.pos()];
+    let line = match before.rfind(['\n', '\r']) {
+        Some(nl) => &before[nl + 1..],
+        None => before,
+    };
+    match line.split_once('|') {
+        Some((head, tail)) => head.trim().is_empty() && tail.trim().is_empty(),
+        None => false,
+    }
+}
+
+fn flush_text(items: &mut Vec<Inline>, cur: &Cursor, text_start: &mut usize, fold_pipes: bool) {
+    flush_text_upto(items, cur, text_start, cur.pos(), fold_pipes);
+}
+
+fn flush_text_upto(
+    items: &mut Vec<Inline>,
+    cur: &Cursor,
+    text_start: &mut usize,
+    end: usize,
+    fold_pipes: bool,
+) {
     let raw = &cur.src()[*text_start..end];
     let span = Span::new(cur.position_at(*text_start), cur.position_at(end));
     *text_start = end;
-    let normalized = normalize_text(raw);
+    let normalized = normalize_text(raw, fold_pipes);
     if !normalized.is_empty() {
         items.push(Inline::Text(Text::new(normalized, span)));
     }
@@ -336,7 +418,13 @@ fn is_wide(c: char) -> bool {
 /// wide characters, where the space would be a visible gap in the middle of a
 /// sentence. Only this run is visible here, so a fold landing on a run
 /// boundary, as in `折ると、\n**強調**`, still joins with a space.
-fn normalize_text(raw: &str) -> String {
+///
+/// `fold_pipes` extends the fold over a `|` run's marker and the whitespace
+/// after it, so `x| a\n| b` folds exactly the way `x[ a\n  b ]` does. That is
+/// the whole of what makes `|` a respelling rather than a second construct:
+/// the joining rule is not reimplemented here, it is the same rule reaching
+/// one character further.
+fn normalize_text(raw: &str, fold_pipes: bool) -> String {
     let mut out = String::new();
     let mut chars = raw.chars().peekable();
     while let Some(c) = chars.next() {
@@ -346,6 +434,12 @@ fn normalize_text(raw: &str) -> String {
                 Some(' ') | Some('\t') | Some('\n') | Some('\r')
             ) {
                 chars.next();
+            }
+            if fold_pipes && chars.peek() == Some(&'|') {
+                chars.next();
+                while matches!(chars.peek(), Some(' ') | Some('\t')) {
+                    chars.next();
+                }
             }
             let between_wide = out.chars().next_back().is_some_and(is_wide)
                 && chars.peek().copied().is_some_and(is_wide);
@@ -394,7 +488,10 @@ fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
                     bracket_depth -= 1;
                 }
             }
-            Stop::Line | Stop::Paragraph => {
+            // A `|` run joins with the same line ending as any other
+            // fold, and a URL never survives one, so the run's marker is
+            // simply out of reach here.
+            Stop::Line | Stop::Paragraph | Stop::PipeRun { .. } => {
                 if probe.peek() == Some('\n') || probe.peek() == Some('\r') {
                     break;
                 }

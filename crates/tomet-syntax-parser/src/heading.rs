@@ -20,10 +20,11 @@ pub(crate) fn parse_heading(cur: &mut Cursor) -> Result<Element> {
     let mut el = element_new(Sigil::named("heading")).with_placement(Placement::Block);
 
     match cur.peek() {
-        Some('[') | Some('(') | Some('{') => {
+        Some('[') | Some('(') | Some('{') | Some('|') => {
             // The full form. Groups are read by the same code that reads
             // `@name`'s, so `#` takes `(args)`, `[content]` and `{value}`
-            // in any order, and `[content]` may span lines.
+            // in any order, and its content -- bracketed or `|`-marked --
+            // may span lines.
             parse_groups(cur, &mut el, true)?;
         }
         _ if had_ws => {
