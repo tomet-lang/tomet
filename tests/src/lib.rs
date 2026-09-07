@@ -136,6 +136,21 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // item with no substring in common. Recorded coarsely rather than as
     // 32 texts that would all be deleted together anyway.
     ("roadmap.tmt", &[ANY_ERROR]),
+    // A table's rows inside a `|` run: `|[ 糖衣 ][ 要素 ]`. A bare `]`
+    // has no token in `_line_item` -- `punctuation`'s class does not carry
+    // it and `text` excludes it -- so it can only be eaten by a
+    // `content_group` that opened, and the `[` in front of it is taken by
+    // `punctuation` first. That is the same wall as the three `examples/`
+    // entries above, reached from one more direction; `|` did not
+    // introduce it. Adding `content_group` to the run's item choice was
+    // tried and changes nothing, because the lexer picks `punctuation`
+    // before the grammar gets a say.
+    //
+    // Recorded coarsely: every row errors the same way, so the texts would
+    // all be deleted together. The bracketed half of the same file is the
+    // reason it is its own fixture -- `syntax/pipe.tmt` stays clean, and
+    // this one holds the case that is honestly still drifting.
+    ("syntax/pipe-table.tmt", &[ANY_ERROR]),
     // A `{...}` group mixing a `key: value` pair with a bare element --
     // `@deck.card{ title: 混在, (a)[ ... ] }`. Predates this list and has
     // nothing to do with the sigil work.

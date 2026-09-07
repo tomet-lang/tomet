@@ -92,6 +92,10 @@ module.exports = grammar({
 						field("content", repeat($._bracket_item)),
 						"]",
 					),
+					seq(
+						optional(field("args", $.args_group)),
+						field("content", $.marked_content),
+					),
 					seq(/[ \t]+/, field("content", repeat1($._line_item))),
 				),
 				optional(
@@ -225,6 +229,7 @@ module.exports = grammar({
 						optional(field("attrs", $.value_group)),
 						repeat($._line_item),
 					),
+					field("content", $.marked_content),
 					seq(
 						repeat($._line_item),
 						optional(field("attrs", $.value_group)),
@@ -254,6 +259,7 @@ module.exports = grammar({
 						optional(field("attrs", $.value_group)),
 						repeat($._line_item),
 					),
+					field("content", $.marked_content),
 					seq(
 						repeat($._line_item),
 						optional(field("attrs", $.value_group)),
@@ -308,7 +314,7 @@ module.exports = grammar({
 		// back to `punctuation` like the others.
 		// `#` is excluded so `heading_marker` can win at a line start; `<`
 		// no longer needs excluding, since it is not a sigil any more.
-		text: (_$) => /[^\n`*_=@$#()\[{\]/-]+/,
+		text: (_$) => /[^\n`*_=@$#()\[{\]/|-]+/,
 
 		// `-` is a bare string literal alternative here, not folded into
 		// the character class like the others, so it's the *same* grammar
@@ -336,7 +342,7 @@ module.exports = grammar({
 		// `#` and `<` join the same fallback set: a `#` that does not
 		// start a heading or a block element, and any `<` at all, are
 		// ordinary prose and need something to reduce to.
-		punctuation: (_$) => choice(/[()\[{/<>]/, "-", "$", "#"),
+		punctuation: (_$) => choice(/[()\[{/<>|]/, "-", "$", "#"),
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -366,7 +372,7 @@ module.exports = grammar({
 				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*=<@$()\[{\]/]+/, $.text),
+				alias(/[^\n`*=<@$()\[{\]/|]+/, $.text),
 			),
 		_bracket_item_no_underscore: ($) =>
 			choice(
@@ -377,7 +383,7 @@ module.exports = grammar({
 				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`_=<@$()\[{\]/]+/, $.text),
+				alias(/[^\n`_=<@$()\[{\]/|]+/, $.text),
 			),
 		_bracket_item_no_equals: ($) =>
 			choice(
@@ -389,7 +395,7 @@ module.exports = grammar({
 				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*_=<@$()\[{\]/]+/, $.text),
+				alias(/[^\n`*_=<@$()\[{\]/|]+/, $.text),
 			),
 
 		// ---- `${...}` interpolation ---------------------------------------
@@ -477,6 +483,27 @@ module.exports = grammar({
 				")",
 			),
 		content_group: ($) => seq(token(prec(1, "[")), repeat($._bracket_item), "]"),
+		// `|content` is `[content]` without the brackets: the same group,
+		// closed by the end of the marked run rather than by `]`.
+		//
+		// Simplification: `tomet-parser` also requires every marker in one
+		// run to stand in the same column, and rejects a run whose markers
+		// do not line up. A column is not something this grammar can see
+		// without an external scanner, and a highlighter does not need it,
+		// so any indentation is accepted here -- one more entry in the list
+		// of approximations in `src/lib.rs`.
+		marked_content: ($) =>
+			prec.right(
+				repeat1(
+					prec.right(
+						seq(
+							token(prec(1, "|")),
+							repeat($._line_item),
+							optional($._newline),
+						),
+					),
+				),
+			),
 		// `{...}` is always data. Entries are read uniformly, each a
 		// `key: value` pair, a bare `(marker)[content]` entry, or a named
 		// element, in source order -- nothing here consults the enclosing
@@ -518,7 +545,13 @@ module.exports = grammar({
 		_element_group: ($) =>
 			seq(
 				optional(":"),
-				choice($.args_group, $.content_group, $.value_group, $.raw_fence),
+				choice(
+					$.args_group,
+					$.content_group,
+					$.marked_content,
+					$.value_group,
+					$.raw_fence,
+				),
 			),
 		// The whole fence -- opener, body and closer -- is one token from
 		// the external scanner. See `src/scanner.c` for why it is taken
