@@ -17,7 +17,7 @@
 ]{}
 
 規範の側でコードを正にすると、エージェントの間違いがそのまま正典になる。
-実例: `tests/ref/readme.printed.tmt` が、入れ子マップを壊す出力を期待値
+実例: @file(tests/ref/readme.printed.tmt) が、入れ子マップを壊す出力を期待値
 として記録していた（2026-09-03 に修正）。誰も承認していない挙動が、参照
 ファイルという権威の形を得ていた。
 
@@ -296,10 +296,10 @@ writ が名指ししているのは 1 個。埋まらない 4 個は「規則が
 関数名を指させれば書ける。専用要素にすると、性質が増えるたびに語彙が増える。
 
 `@derived` と `@descriptive` を分けるのは、どちらも生成物なのに保証が違うから。
-`SYNTAX.md` は実装を走らせて作るので嘘をつけない。`tests/ref/` は
+`SYNTAX.md` は実装を走らせて作るので嘘をつけない。@dir(tests/ref/) は
 `snapshot.rs` の `//!` が自分で "a regression net, not a statement that the
 output is correct" と書いている。この区別が無かったところで
-`tests/ref/readme.printed.tmt` が壊れた出力を期待値として権威化した。
+@file(tests/ref/readme.printed.tmt) が壊れた出力を期待値として権威化した。
 
 ##[ `@door` -- 能力が許される場所のリスト ]
 

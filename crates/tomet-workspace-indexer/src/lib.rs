@@ -100,6 +100,20 @@ pub fn is_path_ignored(path: &Path, root: Option<&Path>, ignore_patterns: &[Stri
     false
 }
 
+/// Whether the sweep skips `p`: not part of the vault, or in it and
+/// left alone.
+///
+/// The two lists answer different questions and only this one takes
+/// both. `ignore` says a path is not the vault's; `unswept` says it is,
+/// and is not processed -- the frozen corpus is skipped because a stale
+/// export there is the coverage, not because the repository lacks it.
+/// Reference resolution asks only the first, which is why a document can
+/// name `tests/fixtures` and cannot name a path outside the vault.
+pub fn is_path_unswept(p: &Path, config_root: Option<&Path>, config: &PrinterConfig) -> bool {
+    is_path_ignored(p, config_root, &config.ignore_files)
+        || is_path_ignored(p, config_root, &config.unswept_files)
+}
+
 /// Collects every `.tmt`/`.tmt` file under `path` (or just `path` itself
 /// if it's a single file), auto-discovering the nearest
 /// `default.config.tmt`/`tomet.config.tmt` for `ignore_files` rules.
@@ -135,7 +149,7 @@ pub fn collect_tm_files_with_config(
             .filter(|e| e.file_type().map_or(false, |ft| ft.is_file()))
         {
             let p = entry.path();
-            if is_path_ignored(p, Some(config_root), &config.ignore_files) {
+            if is_path_unswept(p, Some(config_root), config) {
                 continue;
             }
             if is_tm_file(p) {
@@ -169,14 +183,18 @@ pub fn collect_all_paths_with_config(
             .git_ignore(true)
             .build()
             .filter_map(|e| e.ok())
-            // Directories are in the set too. Its one consumer is the link
-            // checker, and `@link(file:./spec/)` is a link to a directory --
-            // a perfectly ordinary thing for an index page to write, and
-            // one that reported broken for as long as this collected only
-            // files.
+            // Directories are in the set too. Its one consumer is the
+            // link checker, and `@dir(docs/spec)` names one -- a perfectly
+            // ordinary thing for an index page to write, and one that
+            // reported broken for as long as this collected only files.
             .filter(|e| e.file_type().is_some_and(|ft| ft.is_file() || ft.is_dir()))
         {
             let p = entry.path();
+            // `ignore` only, deliberately: `unswept` says a path is in
+            // the vault and not processed, and a reference to it is
+            // therefore fine. Asking both here is what made
+            // `@dir(tests/fixtures)` report broken while the directory
+            // sat committed in the repository.
             if is_path_ignored(p, Some(config_root), &config.ignore_files) {
                 continue;
             }
@@ -300,5 +318,45 @@ mod tests {
         assert_eq!(names, vec!["a.tmt", "b.tmt"]);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod unswept_tests {
+    use super::*;
+
+    fn config(ignore: &[&str], unswept: &[&str]) -> PrinterConfig {
+        PrinterConfig {
+            ignore_files: ignore.iter().map(|s| s.to_string()).collect(),
+            unswept_files: unswept.iter().map(|s| s.to_string()).collect(),
+            ..PrinterConfig::default()
+        }
+    }
+
+    #[test]
+    fn the_sweep_skips_both_lists_and_references_skip_only_ignore() {
+        // The whole point of the split. `unswept` says a path is in the
+        // vault and left alone, so a document may name it; `ignore` says
+        // it is not the vault's, so a reference to it is broken.
+        //
+        // While one list served both, `@dir(tests/fixtures)` reported
+        // broken against a directory sitting committed in the repository.
+        let root = Path::new("/vault");
+        let cfg = config(&["vendor"], &["tests/fixtures"]);
+
+        let frozen = Path::new("/vault/tests/fixtures/x.tmt");
+        let foreign = Path::new("/vault/vendor/y.tmt");
+
+        assert!(is_path_unswept(frozen, Some(root), &cfg), "frozen is not swept");
+        assert!(is_path_unswept(foreign, Some(root), &cfg), "foreign is not swept");
+
+        assert!(
+            !is_path_ignored(frozen, Some(root), &cfg.ignore_files),
+            "frozen is still referable"
+        );
+        assert!(
+            is_path_ignored(foreign, Some(root), &cfg.ignore_files),
+            "foreign is not referable"
+        );
     }
 }

@@ -53,7 +53,7 @@ just docs-check
 見る範囲は @dir(docs/) に限らない。ワークスペースの索引を通すので、
 `workspace.ignore` が決める —— @dir(.tomet/)、@dir(tmtroot/)、@dir(crates/) の `.tmt`、
 そしてどの階層の `.writ.tmt` も入り、凍結されたテスト入力
-（`tests/fixtures`、`tests/ref`、`tests/store`）は外れる。
+（@dir(tests/fixtures)、@dir(tests/ref)、`tests/store`）は外れる。
 
 これは意図的に `cargo test` の一部にしていない。ここの文書は動き続けるもので、
 散文を直したせいで無関係なコード変更が落ちるのは困るから。

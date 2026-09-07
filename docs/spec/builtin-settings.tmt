@@ -99,12 +99,32 @@
 #[ vault が持つファイル ]
 
 @table[
-[ キー               ][ 値             ][ 何を指すか                   ]
-[ `blueprints`       ][ パスの配列     ][ `@blueprint(X)` を持つ文書   ]
-[ `vocabularies`     ][ パスの配列     ][ `@vocabulary(ns)` を持つ文書 ]
-[ `workspace.ignore` ][ パターンの配列 ][ 走査から外す                 ]
-[ `ignore.files`     ][ パターンの配列 ][ 同上。古い綴り               ]
+[ キー                ][ 値             ][ 何を指すか                     ]
+[ `blueprints`        ][ パスの配列     ][ `@blueprint(X)` を持つ文書     ]
+[ `vocabularies`      ][ パスの配列     ][ `@vocabulary(ns)` を持つ文書   ]
+[ `workspace.ignore`  ][ パターンの配列 ][ vault の外。走査も参照もしない ]
+[ `workspace.unswept` ][ パターンの配列 ][ vault の中。走査しないだけ     ]
+[ `ignore.files`      ][ パターンの配列 ][ `ignore` の古い綴り            ]
 ]
+
+###[ ignore と unswept ]
+
+除外に二つの意味がある。
+
+@table[
+[ 鍵                  ][ 意味                       ][ 参照できるか ]
+[ `workspace.ignore`  ][ この vault のものではない  ][ できない     ]
+[ `workspace.unswept` ][ vault の中。処理しないだけ ][ できる       ]
+]
+
+一つの鍵で兼ねていたときは、`@dir(tests/fixtures)` が broken になっていた。
+凍結コーパスを走査から外しているのは、**そこの壊れたリンクや古いエクスポート
+がカバレッジそのものだから**であって、リポジトリがそれを持っていないからでは
+ない。実際コミットされている。「掃かない」を「無い」と読んでいたのが誤り。
+
+`.gitignore` は別で、こちらは常に効く。`target/` や `tests/store` は誰かが
+クローンした時点では存在しないので、参照として危険であり、どちらの鍵にも
+関係なく落ちる。
 
 どちらも**パスだけ**を並べる。blueprint も語彙も自分で名前を名乗るので、
 名前とパスの対応表を書くと名前が二度、パスが三度書かれることになる。

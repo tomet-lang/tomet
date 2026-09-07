@@ -26,7 +26,6 @@ use std::path::{Path, PathBuf};
 use ignore::WalkBuilder;
 use tomet_config::PrinterConfig;
 
-use crate::is_path_ignored;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EntryKind {
@@ -90,7 +89,7 @@ impl WorkspaceIndex {
         if path == self.root {
             return;
         }
-        if is_path_ignored(path, Some(&self.config_root), &self.config.ignore_files) {
+        if crate::is_path_unswept(path, Some(&self.config_root), &self.config) {
             self.entries.remove(path);
             return;
         }
@@ -172,7 +171,7 @@ fn populate_entries(
         if p == root {
             continue;
         }
-        if is_path_ignored(p, Some(config_root), &config.ignore_files) {
+        if crate::is_path_unswept(p, Some(config_root), config) {
             continue;
         }
         let is_dir = entry.file_type().map_or(false, |ft| ft.is_dir());

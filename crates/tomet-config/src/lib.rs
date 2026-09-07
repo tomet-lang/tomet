@@ -30,7 +30,19 @@ pub struct PrinterConfig {
     pub meta_format: Option<String>,
     pub meta_fields: std::collections::BTreeMap<String, FieldConfig>,
     pub link_no_space: bool,
+    /// `workspace.ignore` -- paths that are not part of this vault.
+    /// Neither swept nor resolvable: a reference to one is broken,
+    /// because as far as this vault is concerned it is not there.
     pub ignore_files: Vec<String>,
+    /// `workspace.unswept` -- paths that are in the vault and left alone.
+    ///
+    /// Two intents used to share `ignore`, and only one of them is
+    /// "not ours". `tests/fixtures` is committed and is the frozen
+    /// corpus: it is skipped because a stale export or a broken link
+    /// *there* is the coverage, not because the repository does not
+    /// contain it. A document saying so could not say it with `@dir`
+    /// while one list served both.
+    pub unswept_files: Vec<String>,
     pub callout_content_style: Option<String>,
     pub list_multiline_style_content: Option<String>,
     pub table_adjust_width: Option<String>,
@@ -242,6 +254,15 @@ impl PrinterConfig {
                         if let Some(s) = item.as_str() {
                             if !cfg.ignore_files.contains(&s.to_string()) {
                                 cfg.ignore_files.push(s.to_string());
+                            }
+                        }
+                    }
+                }
+                if let Some(items) = value.get("unswept").and_then(|f| f.as_seq()) {
+                    for item in items {
+                        if let Some(s) = item.as_str() {
+                            if !cfg.unswept_files.contains(&s.to_string()) {
+                                cfg.unswept_files.push(s.to_string());
                             }
                         }
                     }
