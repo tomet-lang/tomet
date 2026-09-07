@@ -1,6 +1,21 @@
 #[ 全容 ]
 
 ```tm
+@config{
+  format: "json"
+  export: {
+    path: /path
+  }
+}
+
+```
+
+#[ 埋め込み形式 ]
+
+`+++` フェンスに JSON / TOML / YAML を書いても同じキーを読む。外から
+持ち込んだ設定をそのまま貼るときに使う。
+
+```tm
 @config(format:yaml)+++
 format: "json"
 export:
@@ -9,18 +24,6 @@ export:
 
 ```
 
-#[ 独自言語 ]
-
-```tm
-@config{
-  format: "json",
-  export {
-    path: /path
-  }
-}
-
-```
-
 #[ 未実装 ]
 
-- 独自言語
+- `:` を省略したブロック記法 (`export { path: /path }`)。`export: {...}` と書く。

@@ -1,131 +1,74 @@
 @kind(config)
-@meta(format:yaml)+++
-id: doc-kWBcIUUz
-+++
-@config(format:json)+++
-{
-  "macros": {
-    "gh": "https://github.com/tomet/tomet/issues/${1}",
-    "gh_pr": "https://github.com/tomet/tomet/pull/${1}",
-    "gh_commit": "https://github.com/tomet/tomet/commit/${1}",
-    "wiki": "https://ja.wikipedia.org/wiki/${1}",
-    "wiki_en": "https://en.wikipedia.org/wiki/${1}",
-    "youtube": "https://www.youtube.com/watch?v=${1}",
-    "crate": "https://crates.io/crates/${1}",
-    "docs_rs": "https://docs.rs/${1}",
-    "npm": "https://www.npmjs.com/package/${1}",
-    "jira": "https://jira.company.com/browse/${1}",
-    "rfc": "https://www.rfc-editor.org/rfc/rfc${1}.html",
-    "cve": "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-${1}",
-    "greet": "Hello, ${1} ${2}!",
-    "copyright": "(C) 2026 Tomet Projects",
-    "generated_by": "<!-- Generated from ${1}. Edit that, then `tomet export .`. -->"
-  },
-  "format": {
-    "meta": {
-      "always_newline": true,
-      "format": "yaml"
-    },
-    "heading": {
-      "space_inside_brackets": true
-    },
-    "table": {
-      "adjust_width": "auto",
-      "max_col_width": 50
-    },
-    "link": {
-      "no_space": true
-    },
-    "blockquote": {
-      "always_newline": true
-    },
-    "callout": {
-      "style": {
-        "content": "block"
-      }
-    },
-    "list": {
-      "multiline": {
-        "style": {
-          "content": "box"
-        }
+@meta{
+  id: doc-kWBcIUUz
+}
+@config{
+  macros: {
+    gh: "https://github.com/tomet/tomet/issues/${1}"
+    gh_pr: "https://github.com/tomet/tomet/pull/${1}"
+    gh_commit: "https://github.com/tomet/tomet/commit/${1}"
+    wiki: "https://ja.wikipedia.org/wiki/${1}"
+    wiki_en: "https://en.wikipedia.org/wiki/${1}"
+    youtube: "https://www.youtube.com/watch?v=${1}"
+    crate: "https://crates.io/crates/${1}"
+    docs_rs: "https://docs.rs/${1}"
+    npm: "https://www.npmjs.com/package/${1}"
+    jira: "https://jira.company.com/browse/${1}"
+    rfc: "https://www.rfc-editor.org/rfc/rfc${1}.html"
+    cve: "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-${1}"
+    greet: "Hello, ${1} ${2}!"
+    copyright: "(C) 2026 Tomet Projects"
+    generated_by: "<!-- Generated from ${1}. Edit that, then `tomet export .`. -->"
+  }
+  format: {
+    meta: { always_newline: true, format: yaml }
+    heading: { space_inside_brackets: true }
+    table: { adjust_width: auto, max_col_width: 50 }
+    link: { no_space: true }
+    blockquote: { always_newline: true }
+    callout: {
+      style: { content: block }
+    }
+    list: {
+      multiline: {
+        style: { content: box }
       }
     }
-  },
-  "meta": {
-    "aliases": {
-      "type": "list",
-      "always_newline": true
-    },
-    "created": {
-      "type": "datetime",
-      "format": "rfc3339",
-      "offset": "+09:00"
-    },
-    "modified": {
-      "type": "datetime",
-      "format": "rfc3339",
-      "offset": "+09:00"
-    },
-    "topics": {
-      "type": "list",
-      "list_type": "@link",
-      "always_newline": false
-    },
-    "url.wiki": {
-      "type": "list",
-      "always_newline": true
-    },
-    "url.source": {
-      "type": "list",
-      "always_newline": true
-    },
-    "url.main": {
-      "type": "list",
-      "always_newline": true
-    }
-  },
-  "blueprints": [
+  }
+  meta: {
+    aliases: { type: list, always_newline: true }
+    created: { type: datetime, format: rfc3339, offset: "+09:00" }
+    modified: { type: datetime, format: rfc3339, offset: "+09:00" }
+    topics: { type: list, list_type: "@link", always_newline: false }
+    url.wiki: { type: list, always_newline: true }
+    url.source: { type: list, always_newline: true }
+    url.main: { type: list, always_newline: true }
+  }
+  blueprints: [
     ".tomet/blueprints/writ.blueprint.tmt",
     "docs/examples/blueprints/daily-note.blueprint.tmt",
-    "docs/examples/blueprints/rfc.blueprint.tmt"
-  ],
-  "vocabularies": [
+    "docs/examples/blueprints/rfc.blueprint.tmt",
+  ]
+  vocabularies: [
     ".tomet/vocabularies/writ.vocabulary.tmt",
     ".tomet/vocabularies/bookmark.vocabulary.tmt",
     ".tomet/vocabularies/node-graph.vocabulary.tmt",
     ".tomet/vocabularies/scenario.vocabulary.tmt",
     ".tomet/vocabularies/video.vocabulary.tmt",
-    ".tomet/vocabularies/idea.vocabulary.tmt"
-  ],
-  "workspace": {
-    "ignore": [
-      "00-09 System/01 Apps/obsidian"
-    ],
-    "unswept": [
-      "tests/fixtures",
-      "tests/ref",
-      "tests/store"
-    ]
-  },
-  "migration": {
-    "meta": {
-      "created": {
-        "type": "datetime",
-        "format": "iso8601"
-      },
-      "updated": {
-        "type": "datetime",
-        "format": "iso8601",
-        "merge": "modified"
-      }
-    },
-    "url": {
-      "args": {
-        "label": "force"
-      },
-      "style": "link"
+    ".tomet/vocabularies/idea.vocabulary.tmt",
+  ]
+  workspace: {
+    ignore: [ "00-09 System/01 Apps/obsidian" ]
+    unswept: [ "tests/fixtures", "tests/ref", "tests/store" ]
+  }
+  migration: {
+    meta: {
+      created: { type: datetime, format: iso8601 }
+      updated: { type: datetime, format: iso8601, merge: modified }
+    }
+    url: {
+      args: { label: force }
+      style: link
     }
   }
 }
-+++
