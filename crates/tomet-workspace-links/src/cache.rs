@@ -82,7 +82,32 @@ pub struct LinkCache {
 /// mismatch wipes rather than migrates: rebuilding costs one re-parse of
 /// the vault, and a migration path would be code with no way to be wrong
 /// loudly.
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
+
+/// Bumped whenever *what counts as a link* changes -- a new extraction
+/// rule, a changed target string, a scheme that starts or stops being
+/// followed.
+///
+/// The schema version is not enough. Rows are keyed on the source file's
+/// mtime, so a document that has not changed is served from the cache
+/// however much the collector has: adding `@file`/`@dir` made
+/// `check-links .` report one broken link where a fresh run reported six,
+/// and the difference was invisible. A checker serving a stale answer
+/// looks exactly like a checker that passed, which is the failure this
+/// whole crate exists to prevent, one level in.
+const COLLECTOR_VERSION: u32 = 1;
+
+/// What the cached rows were produced by.
+///
+/// The kind list is in here so the common case invalidates itself: a new
+/// `LinkKind` changes the signature without anyone remembering to bump
+/// anything. `COLLECTOR_VERSION` covers the rest, and has to be bumped by
+/// hand -- which is a thing to forget, so the automatic half carries as
+/// much as it can.
+fn collector_signature() -> String {
+    let kinds: Vec<&str> = LinkKind::ALL.iter().map(|k| k.as_str()).collect();
+    format!("v{COLLECTOR_VERSION}:{}", kinds.join(","))
+}
 
 /// One DDL, used by both the on-disk and the in-memory constructor. The
 /// two used to be separate copies of the same text, and the `kind` CHECK
@@ -115,10 +140,28 @@ fn schema() -> String {
 
 /// Drops everything when the stored version is not this one.
 fn migrate(conn: &Connection) -> rusqlite::Result<()> {
-    let found: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-    if found != SCHEMA_VERSION {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS meta (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );",
+    )?;
+
+    let schema: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    let collector: Option<String> = conn
+        .query_row("SELECT value FROM meta WHERE key = 'collector'", [], |r| {
+            r.get(0)
+        })
+        .ok();
+
+    let want = collector_signature();
+    if schema != SCHEMA_VERSION || collector.as_deref() != Some(want.as_str()) {
         conn.execute_batch("DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS files;")?;
         conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES ('collector', ?1)",
+            [&want],
+        )?;
     }
     Ok(())
 }
@@ -367,5 +410,75 @@ mod tests {
         assert_eq!(outcome_b.links()[0].target, "y.md");
 
         let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod signature_tests {
+    use super::*;
+
+    /// A cache written by a different collector is discarded, not served.
+    ///
+    /// The failure this prevents is silent and points the wrong way: rows
+    /// are keyed on the source file's mtime, so an unchanged document is
+    /// served from the cache however much the extraction has changed. A
+    /// reader upgrading `tomet` would be told the new checks found
+    /// nothing, when they had not run.
+    #[test]
+    fn a_cache_from_another_collector_is_dropped() {
+        let path = std::env::temp_dir().join(format!(
+            "tm_collector_sig_{}.sqlite",
+            uuid::Uuid::new_v4()
+        ));
+
+        {
+            let cache = LinkCache::open(&path).unwrap();
+            cache
+                .conn
+                .execute(
+                    "INSERT OR REPLACE INTO meta (key, value) VALUES ('collector', 'v0:file')",
+                    [],
+                )
+                .unwrap();
+            cache
+                .conn
+                .execute(
+                    "INSERT INTO files (path, mtime_secs) VALUES ('/x.tmt', 1)",
+                    [],
+                )
+                .unwrap();
+        }
+
+        let cache = LinkCache::open(&path).unwrap();
+        let rows: i64 = cache
+            .conn
+            .query_row("SELECT count(*) FROM files", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rows, 0, "rows from another collector were kept");
+
+        let stored: String = cache
+            .conn
+            .query_row("SELECT value FROM meta WHERE key = 'collector'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(stored, collector_signature());
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// The kind list is in the signature, so the common change -- a new
+    /// `LinkKind` -- invalidates without anyone remembering to bump
+    /// `COLLECTOR_VERSION`.
+    #[test]
+    fn the_signature_carries_every_link_kind() {
+        let sig = collector_signature();
+        for kind in LinkKind::ALL {
+            assert!(
+                sig.contains(kind.as_str()),
+                "{} is not in the cache signature",
+                kind.as_str()
+            );
+        }
     }
 }
