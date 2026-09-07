@@ -33,18 +33,18 @@ layers strictly below its own. Same-layer dependencies are allowed;
 upward ones are not.
 
 Layer 0 depends on no workspace member at all. Things may depend on it --
-`tests` and `apps/tui` both do -- but it may depend on nothing, because it
+`tests` and @dir(apps/tui) both do -- but it may depend on nothing, because it
 is the hand-maintained grammar approximation and is only worth having while
 it stays independent of the parser.
 
-`crates/serde_tomet` is listed by name in layer 4. It is an ecosystem
+@dir(crates/serde_tomet) is listed by name in layer 4. It is an ecosystem
 adapter rather than a producer, and its name carries no layer prefix to
 match on.
 
 A pattern ending in `*` matches by prefix; every other pattern is exact.
 Patterns are directory paths relative to the workspace root, because the
 directory is the half of a crate's identity that is arranged by layer --
-`crates/tomet-syntax-parser` publishes `tomet-parser`.
+@dir(crates/tomet-syntax-parser) publishes `tomet-parser`.
 
 Dev-dependencies are exempt. A crate may reach upward in `[dev-dependencies]`
 to get a parser for its own tests -- `tomet-syntax-tree` and
@@ -57,12 +57,12 @@ reading `crates/tomet-syntax-*` and nothing else; the moment an edge runs
 upward, it means reading the applications too.
 
 The layer is derived from the directory name, not the package name. The two
-disagree -- `crates/tomet-syntax-parser` publishes `tomet-parser` -- and the
+disagree -- @dir(crates/tomet-syntax-parser) publishes `tomet-parser` -- and the
 directory is the half that is arranged by layer, which is why the workspace
 member list in `Cargo.toml` is already grouped this way in comments.
 
 Every member's directory now agrees with its layer. It did not always:
-`crates/tomet-config` was `crates/tomet-workspace-config`, which read as
+@dir(crates/tomet-config) was `crates/tomet-workspace-config`, which read as
 part of the workspace layer while the format and convert crates were
 sitting on top of it. The rule carried it as a named exception until the
 rename, rather than quietly filing it under the wrong prefix -- an
@@ -87,7 +87,7 @@ tree-sitter-tomet` comes to depend on.
   guard: { runs: "just docs-check" }
 }
 
-`tmtroot/` holds sources whose output lands at a path this repository does
+@dir(tmtroot/) holds sources whose output lands at a path this repository does
 not choose. Its structure mirrors the repository root: `tmtroot/x.tmt`
 produces a file at `/`, `tmtroot/.github/x.tmt` one under `/.github/`.
 
@@ -96,7 +96,7 @@ The `/` in that sentence is the project root -- the directory holding
 measured from, wherever the export is run from.
 
 Nothing else goes there. A document whose output lands beside it -- the
-ordinary case -- stays where it belongs by what it is, and `docs/`'s own
+ordinary case -- stays where it belongs by what it is, and @dir(docs/)'s own
 writ decides that.
 
 ---[ Why ]---
@@ -122,14 +122,14 @@ since a document under `spec/` may export perfectly well and stay put.
 
 One place it is weaker than the prior art: those copy verbatim, so the
 output name is visible in the source name. Here `@config(export: path)`
-renames, and `tmtroot/readme.tmt` becoming `/README.ja.md` cannot be read
+renames, and @file(tmtroot/readme.tmt) becoming `/README.ja.md` cannot be read
 off the path. Deriving the path from the position when it is not declared
 would close that, and is not decided.
 
 What a declared path is measured from was decided, and it was not a
 design question in the end. `export` handed the string to `fs::write`
 unchanged, so it resolved against the process's working directory:
-`tmtroot/readme.tmt` landed at the repository root or under `docs/`
+@file(tmtroot/readme.tmt) landed at the repository root or under @dir(docs/)
 depending on where you stood, and this rule held only because everyone
 happened to run from the root. The answer already existed -- a path
 written inside a document is absolute, or `./`/`../` from the document's
@@ -145,7 +145,7 @@ pins it.
 green -- it is measured from the project root now, so it means the same
 thing from any directory.
 
-The other half -- that every `.tmt` under `tmtroot/` declares an export at
+The other half -- that every `.tmt` under @dir(tmtroot/) declares an export at
 all, since a file there that produces nothing is a file in the wrong
 directory:
 
@@ -174,7 +174,7 @@ Tighten it when one does.
   guard: { runs: "just docs-check" }
 }
 
-A file exported from `tmtroot/` is generated. Do not hand-edit it. Edit
+A file exported from @dir(tmtroot/) is generated. Do not hand-edit it. Edit
 the source and re-export.
 
 Each source says so in its own output, from the macro rather than by
@@ -187,17 +187,17 @@ ${macro.generated_by(self.path)}
 `.gitattributes` marks `/AGENTS.md` and `/README.ja.md`
 `linguist-generated`. `README.md` is not marked, and is not generated: it
 is hand-written English, and only its Japanese sibling comes from
-`tmtroot/`.
+@dir(tmtroot/).
 
 ---[ Why ]---
 
-`docs/.writ.tmt` has the same rule for `docs/`, and a writ is scoped to
+`docs/.writ.tmt` has the same rule for @dir(docs/), and a writ is scoped to
 its own directory, so that one cannot reach a file at the repository root.
 The rule has to exist here or `AGENTS.md` is governed by nothing.
 
 `AGENTS.md` is the case that made it urgent. It is what every agent
 working in this repository reads, so it is the file most likely to be
-edited in place by something that never looked at `tmtroot/` -- and the
+edited in place by something that never looked at @dir(tmtroot/) -- and the
 edit would be lost at the next export, silently.
 
 The banner is written `${macro.generated_by(self.path)}` and not typed
@@ -216,7 +216,7 @@ output disagree with its source, which is exactly what that reports.
   guard: { runs: "just writ-check" }
 }
 
-`.tomet/` is the directory Tomet defines for itself inside a vault, and
+@dir(.tomet/) is the directory Tomet defines for itself inside a vault, and
 only what a person writes goes in it -- configuration, blueprints,
 anything else this format asks an author for. It is committed. Nothing a
 tool generates goes there, or anywhere else in the tree: derived state
@@ -227,10 +227,10 @@ belongs in the user's cache directory, `~/.cache/tomet/` on Unix.
 A leading dot says the directory was defined by an application rather than
 by whoever made the vault. It says nothing about who writes what is inside
 it. `.cargo/`, `.vscode/` and `.zed/` are hand-written settings;
-`.direnv/` is a built environment. So `.tomet/` being hidden was never an
+`.direnv/` is a built environment. So @dir(.tomet/) being hidden was never an
 argument for putting machine state in it -- and the two were mixed here
 until this entry: `find_template` looked up `.tomet/templates/` while
-`.gitignore` swallowed `.tomet/` whole, which made it a directory you
+`.gitignore` swallowed @dir(.tomet/) whole, which made it a directory you
 could be told to write to and could never commit.
 
 The in-tree directories that do hold generated state are not there because
@@ -257,7 +257,7 @@ Rejected, in the order they were argued:
   the same as `.git/`, `target/` and `node_modules/`. That was the
   reasoning in `cache_path.rs`, and it does not survive being checked --
   those three are entirely machine-owned, which is exactly the property
-  `.tomet/` did not have.
+  @dir(.tomet/) did not have.
 - Putting the writ blueprint at the repository root, on the principle
   that configuration and schema sit at the root of what they govern. The
   root is a table of contents, not a classification. What earns a place
@@ -280,7 +280,7 @@ the search already accepts.
 git ls-files --others --ignored --exclude-standard .tomet
 ```
 
-Empty while nothing under `.tomet/` is ignored. It catches the failure
+Empty while nothing under @dir(.tomet/) is ignored. It catches the failure
 that actually happened -- a rule telling authors to write somewhere git
 was told to discard -- rather than trying to prove no tool ever writes
 into the tree.
@@ -343,7 +343,7 @@ Rejected, and worth naming because the code accepted all of them at once:
   tell a blueprint from the documents it describes.
 
 None of this was written down when `@blueprint` was implemented in
-`bb38aff`, and it appears nowhere in `docs/spec/`. That is the whole reason
+`bb38aff`, and it appears nowhere in @dir(docs/spec/). That is the whole reason
 this entry exists.
 
 ---[ Guard ]---
@@ -373,7 +373,7 @@ The test that separates the two:
 If a second spelling cannot be expanded into the first, it is not a
 shorthand, whatever it is called.
 
-`docs/why/dev.tmt` states the same thing as a commitment about the
+@file(docs/why/dev.tmt) states the same thing as a commitment about the
 language, for the people using it. This entry is the working rule: the
 test above, and what it has already caught here. Neither restates the
 other -- if this entry ever starts explaining *why the language is like
@@ -385,7 +385,7 @@ Every asymmetry this repository has had to remove was a duplicate that
 had been mistaken for a convenience.
 
 - `@meta{ type: }` beside `@kind(...)`. The same fact in two places; by
-  the time anyone counted, eleven files under `docs/` had drifted back to
+  the time anyone counted, eleven files under @dir(docs/) had drifted back to
   the old spelling.
 - `@blueprint`'s three argument forms -- positional, `target:`, `kind:`.
   Three ways to say one thing, none of them chosen.
@@ -438,9 +438,9 @@ to find out what they were holding.
 
 This rule exists because the decision had already been made and tooled --
 `promote_meta_type_to_kind`, and a `refactor` subcommand to run it -- and
-still lost ground. With no rule naming it, `docs/guide/` went on teaching
-the old spelling, `docs/spec/builtin-settings.tmt` was itself written in it,
-and eleven files under `docs/` had drifted back by the time anyone counted.
+still lost ground. With no rule naming it, @dir(docs/guide/) went on teaching
+the old spelling, @file(docs/spec/builtin-settings.tmt) was itself written in it,
+and eleven files under @dir(docs/) had drifted back by the time anyone counted.
 The migration existed; the rule did not.
 
 ---[ Guard ]---

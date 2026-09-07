@@ -2,9 +2,9 @@
 
 #[ Writ: docs ]
 
-Rules for `docs/` itself.
+Rules for @dir(docs/) itself.
 
-Scope is this directory. `docs/README.tmt` is the map -- what is where, and
+Scope is this directory. @file(docs/README.tmt) is the map -- what is where, and
 where to start reading. This is the rulebook behind it: it says nothing
 about what any document contains, only about where a document goes, what
 language it is in, and which files are written by a tool rather than a
@@ -36,7 +36,7 @@ about.
 
 The last two name a file rather than a directory, and they are the whole
 of it: `README.tmt`, `roadmap.tmt` and `.writ.tmt` are the only files at
-the root of `docs/`. Everything else is inside a directory this table
+the root of @dir(docs/). Everything else is inside a directory this table
 names. There is exactly one of each, so a directory for any of them would
 hold a single file and answer no question.
 
@@ -80,7 +80,7 @@ about how things *work* and a document is the truth about how they *should*.
 
 `why/` says what it does rather than claiming authority it does not have --
 the binding layer here is the writs. It also completes a reading anyone can
-follow: `spec/` is what, `guide/` is how, `why/` is why. `docs/README.tmt`
+follow: `spec/` is what, `guide/` is how, `why/` is why. @file(docs/README.tmt)
 had been describing it as the reason this format exists all along; only
 the directory name had not caught up.
 
@@ -174,7 +174,7 @@ The root's `tmtroot-output-not-edited` says the same thing for the files
 exported to the repository root. Two entries and not one because a writ is
 scoped to its own directory, so this one cannot reach `/AGENTS.md`.
 
-`docs/README.tmt` is still not exported, but every bug this entry has
+@file(docs/README.tmt) is still not exported, but every bug this entry has
 blamed for that is now gone. It named two export bugs -- backticks escaped
 in prose, and a `<div>` for the `@settings` header -- and then the fold
 that put an ASCII space into every hand-wrapped Japanese paragraph.
@@ -203,7 +203,7 @@ entirely, exits non-zero. Better than a rule asking people to remember not
 to hand-edit: the failure names the file and the fix is to re-run the same
 command without `--check`.
 
-It governs one file today, `tmtroot/readme.tmt` (it was
+It governs one file today, @file(tmtroot/readme.tmt) (it was
 `docs/exports/readme.tmt` until `f6a267b`). Nothing under `spec/` or
 `guide/` declares an output yet.
 
