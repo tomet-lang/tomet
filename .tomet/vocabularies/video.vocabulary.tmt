@@ -8,5 +8,5 @@
   }
 }[
   動画の一点についてのメモ。`[content]` が本文。
-  `docs/examples/video.memo.tmt` が使い方の見本。
+  @file(docs/examples/video.memo.tmt) が使い方の見本。
 ]

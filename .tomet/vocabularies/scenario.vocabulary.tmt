@@ -8,5 +8,5 @@
   }
 }[
   台詞ひとつ。`[content]` が台詞。
-  `docs/examples/scenario.tmt` が使い方の見本。
+  @file(docs/examples/scenario.tmt) が使い方の見本。
 ]

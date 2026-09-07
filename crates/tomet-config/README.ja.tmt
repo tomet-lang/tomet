@@ -6,7 +6,7 @@
 
 -. **設定ドメインの集約**:
    - `default.config.tmt` / `tomet.config.tmt` ファイル探索やインラインの `@config`/`@settings` ブロックからの設定構築を集約。
-   - 複数の下流クレート（`tomet-style`, `tomet-field-utils`, `tomet-printer`, `tomet-formatter`, `tomet-indexer`, `tomet-edit`, `tomet-tui`, `apps/cli`）が共通して参照します。
+   - 複数の下流クレート（`tomet-style`, `tomet-field-utils`, `tomet-printer`, `tomet-formatter`, `tomet-indexer`, `tomet-edit`, `tomet-tui`, @dir(apps/cli)）が共通して参照します。
 
 -. **主な機能モジュール**:
    - **設定探索・ロード (`find_config_file`, `load_config_from_file`, `load_config_from_str`)**:

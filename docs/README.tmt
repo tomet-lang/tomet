@@ -12,11 +12,11 @@
 [ @link(dir:./design/ideas/)[`design/ideas/`] ][ 未決のスケッチとメモ ][ 混在 ][ `.tmt` ]
 ]
 
-`docs/` の外に、二つ。
+@dir(docs/) の外に、二つ。
 
 - [ `/tests` — `tomet-tests` パッケージ。凍結された `.tmt` コーパス、クレート
-    横断の不変条件、変換のスナップショット。ここの fixture は `docs/` の文書を
-    複製したところから始まったが、同期は取っていない。`tests/README.md` を見る。
+    横断の不変条件、変換のスナップショット。ここの fixture は @dir(docs/) の文書を
+    複製したところから始まったが、同期は取っていない。@file(tests/README.md) を見る。
   ]
 - [ @link(file:../tests/SYNTAX.md)[`/tests/SYNTAX.md`] — パーサが今受け付ける
     構文の全部。例と、それが作る AST つき。`tomet-parser` 自身から生成され
@@ -26,10 +26,10 @@
     自体が読み取るべき情報。
   ]
 - [ `/default.config.tmt` — このリポジトリが実際に使っている設定。
-    `docs/examples/config.tmt` は `@version`/`@kind` ヘッダの書き方を見せる
+    @file(docs/examples/config.tmt) は `@version`/`@kind` ヘッダの書き方を見せる
     *見本*であって、同じファイルではない。名前を `default.config.tmt` から
     変えたのは、`find_config_file` が名前で vault の境界を探すので、見本が
-    本物として拾われて `docs/examples/` が独立した vault になっていたため。
+    本物として拾われて @dir(docs/examples/) が独立した vault になっていたため。
   ]
 
 #[ ここから読む ]
@@ -42,7 +42,7 @@
 
 #[ 文書を検査する ]
 
-`docs/` 以下の `.tmt` は本物の Tomet 文書なので、そのままドッグフーディングに
+@dir(docs/) 以下の `.tmt` は本物の Tomet 文書なので、そのままドッグフーディングに
 なっている。パースでき、書いている要素がどれも scope にある名前空間に実在し、
 整形されていることを確かめるには:
 
@@ -50,8 +50,8 @@
 just docs-check
 ```
 
-見る範囲は `docs/` に限らない。ワークスペースの索引を通すので、
-`workspace.ignore` が決める —— `.tomet/`、`tmtroot/`、`crates/` の `.tmt`、
+見る範囲は @dir(docs/) に限らない。ワークスペースの索引を通すので、
+`workspace.ignore` が決める —— @dir(.tomet/)、@dir(tmtroot/)、@dir(crates/) の `.tmt`、
 そしてどの階層の `.writ.tmt` も入り、凍結されたテスト入力
 （`tests/fixtures`、`tests/ref`、`tests/store`）は外れる。
 

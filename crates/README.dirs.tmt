@@ -12,7 +12,7 @@ centre (`semantics`, `format`, `workspace`) and two do not (`syntax`,
 `tomet-semantics*` in the first case and `tomet-convert-*` in the second
 -- the hyphen is present exactly when there is no bare centre to match.
 
-`crates/tomet-format` was `crates/tomet-formatter` until 2026-09-06, the
+@dir(crates/tomet-format) was `crates/tomet-formatter` until 2026-09-06, the
 one crate that did not follow this. The table below listed it as a member
 of `tomet-format-*` while the directory said otherwise, and `@layers` had
 been loosened to `tomet-format*` to cope -- a pattern that read like the
@@ -57,8 +57,8 @@ tree-sitter-tomet     host ecosystem's own naming convention
                          discoverable to serde/tree-sitter tooling.
 +++
 
-`tomet-tui` lives in `apps/tui`, not here -- it's consumed as a
-subcommand of `apps/cli`, not depended on by any other crate, so it's
+`tomet-tui` lives in @dir(apps/tui), not here -- it's consumed as a
+subcommand of @dir(apps/cli), not depended on by any other crate, so it's
 an application rather than a library.
 
 Moving a crate only requires updating its path in the root
@@ -72,7 +72,7 @@ sensitive to how many directories deep the crate sits, which a rename
 alone doesn't change, but a nesting depth change would.
 
 No crate in here does either of those anymore. The tests that used to
-(reaching up for the shared `.tmt` corpus) live in the `tests/` package
+(reaching up for the shared `.tmt` corpus) live in the @dir(tests/) package
 (`tomet-tests`) now, which owns that corpus outright -- see
-`tests/README.md`. Keep it that way: a test that needs the shared corpus
+@file(tests/README.md). Keep it that way: a test that needs the shared corpus
 belongs there, not in a crate reaching out of its own directory for it.
