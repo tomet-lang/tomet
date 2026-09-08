@@ -27,10 +27,10 @@
 <p>`{...}` は常にデータで、中身は書いた順の `Entry` の並び。裸の `(marker)[content]` も、名前つきの `@name` も同じ並びに入る。語彙が要素を宣言する形はこれが無いと書けない。</p>
 <div class="tm-element tm-element" data-value="card">カード一枚。<div class="tm-children">
 <div class="tm-element tm-args"><div class="tm-children">
-<div class="tm-element tm-param" data-value="id">通し番号。</div>
+<div class="tm-element tm-param" data-value="id" data-type="uint" data-positional="true">通し番号。</div>
 </div>
 </div>
-<div class="tm-element tm-data"></div>
+<div class="tm-element tm-data" data-open="false"></div>
 </div>
 </div>
 <p>行頭にあって行を終える要素はブロック配置になる。`[content]` の中と同じ規則で、 `@args` がブロック形だと宣言されているのはそのため。</p>
