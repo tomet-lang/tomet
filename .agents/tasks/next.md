@@ -19,7 +19,35 @@
    - `tmtroot/agents.tmt`（0 バイト）は未追跡のまま手元に残してある。
    - `cargo test --workspace` は 35 passed。
 
-## 残っている選択肢
+## パーサの欠陥 — `|` の作業中に出てきたもの
+
+`|` を入れる過程で、シジルの認識まわりに構造的な欠陥が 4 つ見つかった。
+一つずつ潰す。それぞれタスクファイルに測定結果ごと切り出してあるので、
+中断しても調べ直しは要らない。
+
+依存順に並べる。
+
+1. `colon-as-sigil.md` — **設計未決。ここが先。** `:` をシジルとして扱う。
+   決まると 2 の集合から `:` が消えて純粋になる。
+2. ~~`sigil-follow-set.md`~~ — **完了（2026-09-08）**。`46de207` で
+   `opens_group` に一本化し `every_sigil_takes_every_group_opener` を追加、
+   `76bccea` で `@name:` を family の書き位置だけに狭めた。棄却案（述語を
+   消して投機的パース）の理由は `opens_group` の doc comment に残した。
+   `-` と `-.` が `(` を取らない件だけ `KNOWN_GAPS` に残っている（→ 3 の 2a）。
+3. `list-recognition.md` — リストの 3 分割。`found_group` を返せば 1 つ消えて
+   3 → 2 になる（挙動変更なし）。残る `-(x)` と `- (x)` の非対称は、既存文書の
+   意味が変わるので走査してから。
+4. `duplicate-group-silently-dropped.md` — `@memo(a:1)(b:2)` が仕様どおりの
+   エラーにならず、黙って地の文に落ちてブロックからインラインに降格する。
+   規範層の話なので作者の決定が要る。
+5. `bare-entry-value-group.md` — `{...}` の中で裸のエントリだけ `{value}` を
+   取れない。`-[ x ]` と同種で、2 の構造の 4 例目。`colon-as-sigil.md` の
+   規則検証がここで止まっているので、2 と一緒に片付く可能性がある。
+
+いずれも「同じ構文が複数箇所で認識され、片方だけ更新されていない」という
+同じ形をしている。2 がその構造そのものを扱う。
+
+## そのほかの選択肢
 
 **A. `tomet refactor --value-dsl` の対象拡張**
 `normalize_meta_to_value_dsl`（`crates/tomet-transform/src/directive.rs:92`、
