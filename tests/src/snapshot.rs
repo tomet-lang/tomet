@@ -95,6 +95,33 @@ fn pandoc_output_matches_reference() {
     }
 }
 
+/// A sigil is a shape, not a name, and the Pandoc bridge must not turn
+/// one into the other.
+///
+/// `Sigil::Bare` used to travel in the `tomet-<name>` class like every
+/// named element, because `ElementKind::Bare::as_str()` is `"bare"`, and
+/// came back as an element *named* `bare`. No vocabulary declares that
+/// name, so the round-tripped document failed validation -- a conversion
+/// producing something the language rejects. It travels under a reserved
+/// key now.
+#[test]
+fn a_bare_entry_does_not_come_back_as_an_element_named_bare() {
+    let src = "@deck.card{ title: t, (a)[ x ] }\n";
+    let doc = tomet_parser::parse_document(src).unwrap();
+    let back = tomet_pandoc::from_pandoc(&tomet_pandoc::to_pandoc(&doc));
+
+    let mut names = Vec::new();
+    tomet_tree::for_each_element(&back, |el| {
+        if let Some(name) = el.sigil.name() {
+            names.push(name.name.clone());
+        }
+    });
+    assert!(
+        !names.iter().any(|n| n == "bare"),
+        "a sigil came back as a name: {names:?}"
+    );
+}
+
 #[test]
 fn pandoc_round_trip_is_stable() {
     // `.tmt` -> Pandoc -> `.tmt`. Lossy by design: Pandoc's `Attr` is

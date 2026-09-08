@@ -2,10 +2,10 @@
 
 use tomet_ast::{
     Block as TmBlock, Document, Element, ElementValue, Inline as TmInline, InterpExpr,
-    InterpExprKind, Literal, Placement, Value,
+    InterpExprKind, Literal, Placement, Sigil, Value,
 };
 use tomet_semantics::{
-    path_target,
+    ElementKind, path_target,
     TableRow, classify_std_lenient, document_meta, flatten_data, flatten_element_data, heading_level,
     is_directive, link_target, list_items, list_ordered, normalized_element_args, parse_table_rows,
 };
@@ -124,10 +124,7 @@ fn element_to_blocks(el: &Element) -> Vec<Block> {
         // Everything else -- including an inline-only kind that somehow
         // stands as a block -- becomes a `Div` carrying its data. The
         // class is what lets `from_pandoc` recognise it again.
-        _ => vec![Block::Div(
-            attr_of(el, &[&format!("tomet-{}", kind.as_str())]),
-            element_body_blocks(el),
-        )],
+        _ => vec![Block::Div(generic_attr(el, &kind), element_body_blocks(el))],
     }
 }
 
@@ -168,10 +165,7 @@ fn element_to_inlines(el: &Element) -> Vec<Inline> {
         // evaluated: resolving it needs the document and its config, and
         // the Typst writer already sets this precedent.
         "interp" => vec![Inline::Code(Attr::empty(), interp_source(el))],
-        _ => vec![Inline::Span(
-            attr_of(el, &[&format!("tomet-{}", kind.as_str())]),
-            content_to_inlines(el),
-        )],
+        _ => vec![Inline::Span(generic_attr(el, &kind), content_to_inlines(el))],
     }
 }
 
@@ -504,6 +498,34 @@ fn table_alignment(el: &Element) -> Alignment {
 }
 
 // ---- attributes ----------------------------------------------------
+
+/// The attribute key that records a sigil with no name of its own.
+///
+/// A `Sigil::Bare` entry has no name. Putting one in the `tomet-<name>`
+/// class anyway -- `ElementKind::Bare::as_str()` is `"bare"` -- made
+/// `from_pandoc` rebuild it as an element *named* `bare`, and `@bare` is
+/// not a builtin, so a round-tripped document stopped validating.
+///
+/// A key rather than another class, because a class collides: a document
+/// whose `@kind` names a vocabulary declaring `bare` writes `@bare`
+/// unqualified, and `tomet-bare` would then mean two things. `tomet-data`
+/// established the reserved-key convention this follows.
+pub(crate) const SIGIL_KEY: &str = "tomet-sigil";
+
+/// [`SIGIL_KEY`]'s value for `Sigil::Bare`.
+pub(crate) const BARE_SIGIL: &str = "bare";
+
+/// The `Attr` for an element Pandoc has no equivalent for: its data, plus
+/// either the class carrying its name or the key saying it has none.
+fn generic_attr(el: &Element, kind: &ElementKind) -> Attr {
+    if matches!(el.sigil, Sigil::Bare) {
+        let mut attr = attr_of(el, &[]);
+        attr.2
+            .push((SIGIL_KEY.to_string(), BARE_SIGIL.to_string()));
+        return attr;
+    }
+    attr_of(el, &[&format!("tomet-{}", kind.as_str())])
+}
 
 /// Builds a Pandoc `Attr` from an element's data.
 ///

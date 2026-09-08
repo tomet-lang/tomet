@@ -26,6 +26,8 @@ use tomet_ast::{
     Placement, Sigil, Span, Text, Value,
 };
 use tomet_semantics::EXACT_DATA_KEY;
+
+use crate::to_pandoc::{BARE_SIGIL, SIGIL_KEY};
 use tomet_tree::{ElementExt, element_list, element_list_item, element_new};
 
 use crate::ast::{Attr, Block, Inline, MetaValue, PandocDoc, Row, TableParts};
@@ -140,8 +142,7 @@ fn block_element(block: &Block) -> Element {
         Block::OrderedList(_, items) => return list_element(items, true),
         Block::Table(parts) => table_element(parts),
         Block::Div(attr, blocks) => {
-            let mut el =
-                named_element(&class_name(attr).unwrap_or_else(|| "div".to_string()), attr);
+            let mut el = element_from_attr(attr, || "div".to_string());
             el.content = Some(blocks_to_content(blocks));
             el
         }
@@ -336,14 +337,15 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
         }
         Inline::Span(attr, inner) => {
             // `mark` travelled as a span carrying that class.
-            let name = class_name(attr).unwrap_or_else(|| {
+            let mut el = element_from_attr(attr, || {
                 if attr.1.iter().any(|c| c == "mark") {
                     "mark".to_string()
                 } else {
                     "span".to_string()
                 }
             });
-            inline_element(&name, attr, inner)
+            el.content = Some(inlines_from_pandoc(inner));
+            TmInline::Element(el)
         }
     }
 }
@@ -386,6 +388,25 @@ fn inlines_to_text_tm(inlines: &[TmInline]) -> String {
 
 // ---- attributes ----------------------------------------------------
 
+/// Rebuilds the element an `Attr` describes.
+///
+/// A `Sigil::Bare` entry has no name to carry in a class, so
+/// [`crate::to_pandoc`] records the sigil under [`SIGIL_KEY`] instead.
+/// Reading it back here is what keeps `@deck.card{ (a)[ x ] }` from
+/// returning as an element named `bare` -- a name no vocabulary declares,
+/// which made the round-tripped document fail validation.
+fn element_from_attr(attr: &Attr, fallback: impl FnOnce() -> String) -> Element {
+    let mut el = named_element(&class_name(attr).unwrap_or_else(fallback), attr);
+    if attr
+        .2
+        .iter()
+        .any(|(k, v)| k == SIGIL_KEY && v == BARE_SIGIL)
+    {
+        el.sigil = Sigil::Bare;
+    }
+    el
+}
+
 /// The element name a `tomet-` class carries, if there is one.
 fn class_name(attr: &Attr) -> Option<String> {
     attr.1
@@ -423,7 +444,7 @@ fn named_element(name: &str, attr: &Attr) -> Element {
         entries.push(("id".to_string(), Value::String(attr.0.clone())));
     }
     for (k, v) in &attr.2 {
-        if k == EXACT_DATA_KEY {
+        if k == EXACT_DATA_KEY || k == SIGIL_KEY {
             continue;
         }
         entries.push((k.clone(), Value::String(v.clone())));
