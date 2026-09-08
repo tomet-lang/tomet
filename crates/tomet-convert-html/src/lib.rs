@@ -701,6 +701,7 @@ fn render_generic_element(
     let tag = if inline { "span" } else { "div" };
     out.push_str(&format!("<{tag} class=\"tm-element tm-{kind}\""));
     push_data_attrs(out, el.args.as_ref(), &[]);
+    push_value_data_attrs(out, el);
     out.push('>');
     if let Some(content) = &el.content {
         render_inlines(cx, content, out);
@@ -716,17 +717,9 @@ fn render_generic_element(
 
 fn render_element_value(cx: &RenderCtx, value: &ElementValue, out: &mut String) {
     match value {
-        // A group can hold both halves at once, so both are rendered:
-        // the pairs as a value span, the elements as children.
+        // Only the elements. A group's *pairs* are data and left the body
+        // for `data-*` beside `(args)`; see `push_value_data_attrs`.
         ElementValue::Group(_) => {
-            if let Some(data) = value.as_data() {
-                let text = value_to_plain(&data);
-                if !text.is_empty() {
-                    out.push_str("<span class=\"tm-value\">");
-                    out.push_str(&escape_html(&text));
-                    out.push_str("</span>");
-                }
-            }
             let children = value.as_children();
             if !children.is_empty() {
                 out.push_str("<div class=\"tm-children\">\n");
@@ -848,6 +841,40 @@ fn push_named_attrs(
 ///
 /// Before that, a nested map rendered as `data-m=""`: the key survived
 /// and its contents did not.
+/// A `{...}` group's pairs, as `data-*` beside the ones `(args)` gives.
+///
+/// `{}` has been "always data" since the uniform-group change, and this
+/// is where data goes in HTML -- the same shelf `(args)` already uses,
+/// invisible to the reader.
+///
+/// They used to be dropped in silence. `render_element_value` asked
+/// `value_to_plain` for a string to show in a `tm-value` span, and
+/// `as_data` returns a `Value::Map` for every group while `value_to_plain`
+/// answers `""` for every map, so the span's guard was never true. It
+/// appears nowhere in `tests/ref/`.
+///
+/// A key `(args)` already spent is skipped rather than written twice,
+/// which would be invalid HTML. `(args)` wins because it is the group the
+/// reader wrote closer to the name.
+fn push_value_data_attrs(out: &mut String, el: &Element) {
+    let Some(data) = el.value.as_ref().and_then(|v| v.as_data()) else {
+        return;
+    };
+    let taken: Vec<String> = el
+        .args
+        .as_ref()
+        .map(|a| {
+            flatten_data(Some(a), None)
+                .pairs
+                .into_iter()
+                .map(|(k, _)| k)
+                .collect()
+        })
+        .unwrap_or_default();
+    let skip: Vec<&str> = taken.iter().map(String::as_str).collect();
+    push_data_attrs(out, Some(&data), &skip);
+}
+
 fn push_data_attrs(out: &mut String, args: Option<&Value>, skip: &[&str]) {
     let Some(args) = args else {
         return;
