@@ -177,6 +177,17 @@ pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Resu
 ///
 /// `:` is deliberately not here. It opens nothing; it says where the group
 /// that follows belongs. See [`is_element_start`].
+///
+/// The alternative was to delete the recognizers instead: decide by
+/// parsing speculatively on a copy of the cursor, the way
+/// [`element_ends_line`] already does, which leaves one definition per
+/// sigil and makes the disagreement structurally impossible. It was
+/// rejected on cost. `document::is_heading_start` is called from
+/// `Stop::Paragraph`'s per-line lookahead, so trying a full parse there
+/// approaches quadratic on some inputs, and `parser-purity` in this
+/// crate's writ asks for the same tree from the same input *in
+/// predictable time*. Reconsider it if the lookahead ever stops being
+/// per-line; a shared set plus a guard buys the same safety until then.
 pub(crate) fn opens_group(c: Option<char>) -> bool {
     matches!(c, Some('(') | Some('[') | Some('{') | Some('|'))
 }
