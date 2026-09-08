@@ -104,6 +104,10 @@
           "named": true
         },
         {
+          "type": "strikeout",
+          "named": true
+        },
+        {
           "type": "strong",
           "named": true
         },
@@ -203,6 +207,10 @@
         },
         {
           "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "strikeout",
           "named": true
         },
         {
@@ -306,6 +314,10 @@
           },
           {
             "type": "punctuation",
+            "named": true
+          },
+          {
+            "type": "strikeout",
             "named": true
           },
           {
@@ -561,6 +573,10 @@
           "named": true
         },
         {
+          "type": "strikeout",
+          "named": true
+        },
+        {
           "type": "strong",
           "named": true
         },
@@ -605,6 +621,10 @@
         },
         {
           "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "strikeout",
           "named": true
         },
         {
@@ -705,6 +725,10 @@
           "named": true
         },
         {
+          "type": "strikeout",
+          "named": true
+        },
+        {
           "type": "strong",
           "named": true
         },
@@ -749,6 +773,10 @@
         },
         {
           "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "strikeout",
           "named": true
         },
         {
@@ -805,6 +833,53 @@
     }
   },
   {
+    "type": "strikeout",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "block_comment",
+          "named": true
+        },
+        {
+          "type": "code_span",
+          "named": true
+        },
+        {
+          "type": "element",
+          "named": true
+        },
+        {
+          "type": "emphasis",
+          "named": true
+        },
+        {
+          "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "mark",
+          "named": true
+        },
+        {
+          "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "strong",
+          "named": true
+        },
+        {
+          "type": "text",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "string",
     "named": true,
     "fields": {}
@@ -839,6 +914,10 @@
         },
         {
           "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "strikeout",
           "named": true
         },
         {
@@ -897,6 +976,10 @@
           },
           {
             "type": "punctuation",
+            "named": true
+          },
+          {
+            "type": "strikeout",
             "named": true
           },
           {
@@ -1005,6 +1088,10 @@
         },
         {
           "type": "punctuation",
+          "named": true
+        },
+        {
+          "type": "strikeout",
           "named": true
         },
         {
@@ -1182,6 +1269,10 @@
   },
   {
     "type": "}",
+    "named": false
+  },
+  {
+    "type": "~~",
     "named": false
   }
 ]

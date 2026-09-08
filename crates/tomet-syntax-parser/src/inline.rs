@@ -201,7 +201,7 @@ pub(crate) fn parse_inline_seq(
             text_start = cur.pos();
             continue;
         }
-        if matches!(cur.peek(), Some('*') | Some('_') | Some('=')) {
+        if matches!(cur.peek(), Some('*') | Some('_') | Some('=') | Some('~')) {
             let before = cur.pos();
             if let Some(el) = try_delimited(cur, allow_colon_connect)? {
                 flush_text_upto(&mut items, cur, &mut text_start, before, fold_pipes);
@@ -244,10 +244,13 @@ fn trim_edges(mut items: Vec<Inline>) -> Vec<Inline> {
     items
 }
 
-const DELIMITERS: [(&str, &str); 5] = [
+const DELIMITERS: [(&str, &str); 6] = [
     ("**", "strong"),
     ("__", "strong"),
     ("==", "mark"),
+    // GFM's spelling. `==` for `mark` is already a delimiter CommonMark
+    // does not have, so this is the same move for the one it does.
+    ("~~", "strikeout"),
     ("*", "em"),
     ("_", "em"),
 ];
@@ -289,7 +292,9 @@ fn try_one_delimited(
     }
     let mut probe = open;
     loop {
-        if probe.starts_with(delim) && (delim == "==" || !is_boundary(char_before(&probe))) {
+        if probe.starts_with(delim)
+            && (delim == "==" || delim == "~~" || !is_boundary(char_before(&probe)))
+        {
             break;
         }
         if probe.is_eof() {

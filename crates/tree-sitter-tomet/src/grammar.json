@@ -734,6 +734,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "strikeout"
+        },
+        {
+          "type": "SYMBOL",
           "name": "element"
         },
         {
@@ -761,14 +765,14 @@
     },
     "text": {
       "type": "PATTERN",
-      "value": "[^\\n`*_=@$#()\\[{\\]/|-]+"
+      "value": "[^\\n`*_=~@$#()\\[{\\]/|-]+"
     },
     "punctuation": {
       "type": "CHOICE",
       "members": [
         {
           "type": "PATTERN",
-          "value": "[()\\[{/<>|]"
+          "value": "[()\\[{/<>|~]"
         },
         {
           "type": "STRING",
@@ -898,6 +902,26 @@
         }
       ]
     },
+    "strikeout": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "~~"
+        },
+        {
+          "type": "REPEAT1",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_bracket_item_no_tilde"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "~~"
+        }
+      ]
+    },
     "_bracket_item_no_star": {
       "type": "CHOICE",
       "members": [
@@ -912,6 +936,10 @@
         {
           "type": "SYMBOL",
           "name": "mark"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "strikeout"
         },
         {
           "type": "SYMBOL",
@@ -933,7 +961,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`*=<@$()\\[{\\]/|]+"
+            "value": "[^\\n`*=~<@$()\\[{\\]/|]+"
           },
           "named": true,
           "value": "text"
@@ -957,6 +985,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "strikeout"
+        },
+        {
+          "type": "SYMBOL",
           "name": "element"
         },
         {
@@ -975,7 +1007,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`_=<@$()\\[{\\]/|]+"
+            "value": "[^\\n`_=~<@$()\\[{\\]/|]+"
           },
           "named": true,
           "value": "text"
@@ -1003,6 +1035,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "strikeout"
+        },
+        {
+          "type": "SYMBOL",
           "name": "element"
         },
         {
@@ -1021,7 +1057,57 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`*_=<@$()\\[{\\]/|]+"
+            "value": "[^\\n`*_=~<@$()\\[{\\]/|]+"
+          },
+          "named": true,
+          "value": "text"
+        }
+      ]
+    },
+    "_bracket_item_no_tilde": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "code_span"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "block_comment"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "emphasis"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "strong"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "mark"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "element"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "interpolation"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_newline"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "punctuation"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "PATTERN",
+            "value": "[^\\n`*_=~<@$()\\[{\\]/|]+"
           },
           "named": true,
           "value": "text"

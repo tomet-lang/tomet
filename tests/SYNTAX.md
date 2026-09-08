@@ -926,10 +926,10 @@ Block  @ul
 
 ## インライン記法
 
-### 強調・太字・マーク・コード
+### 強調・太字・マーク・取り消し線・コード
 
 ```tmt
-*em* と **strong** と ==mark== と `code`
+*em* と **strong** と ==mark== と ~~strikeout~~ と `code`
 ```
 
 ```
@@ -945,6 +945,10 @@ Paragraph
   Inline @mark
     content
       Text "mark"
+  Text " と "
+  Inline @strikeout
+    content
+      Text "strikeout"
   Text " と `code`"
 ```
 

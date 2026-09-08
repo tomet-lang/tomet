@@ -55,6 +55,11 @@ enum Frame {
         items: Vec<Element>,
     },
     Emphasis(Vec<Inline>),
+    /// GFM's `~~x~~`. Tomet spells it the same way, so the tildes used to
+    /// reach the output verbatim and be re-read by Tomet's own parser --
+    /// which produced the right file and the wrong `Document`, since
+    /// `from_markdown`'s own result held text rather than an element.
+    Strikeout(Vec<Inline>),
     Strong(Vec<Inline>),
     Link {
         dest: String,
@@ -110,6 +115,12 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
     options_flags.insert(Options::ENABLE_TABLES);
     options_flags.insert(Options::ENABLE_TASKLISTS);
     options_flags.insert(Options::ENABLE_GFM);
+    // Separate from `ENABLE_GFM`, which turns on GFM's block extensions
+    // and not this. Without it `~~x~~` reaches the output as tildes, and
+    // Tomet's parser reads them back as a `strikeout` -- the right file
+    // from the wrong `Document`, which anyone calling `from_markdown` as
+    // a library got the wrong half of.
+    options_flags.insert(Options::ENABLE_STRIKETHROUGH);
     let parser = Parser::new_ext(&preprocessed_body, options_flags);
     let mut stack: Vec<Frame> = vec![Frame::Blocks(Vec::new())];
 
@@ -204,6 +215,7 @@ fn start_frame(tag: Tag) -> Frame {
         },
         Tag::Emphasis => Frame::Emphasis(Vec::new()),
         Tag::Strong => Frame::Strong(Vec::new()),
+        Tag::Strikethrough => Frame::Strikeout(Vec::new()),
         Tag::Link { dest_url, .. } => Frame::Link {
             dest: dest_url.into_string(),
             inlines: Vec::new(),
@@ -428,6 +440,9 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
         }
         (Frame::Strong(inlines), TagEnd::Strong) => {
             push_inline(stack, wrap_inline("strong", inlines));
+        }
+        (Frame::Strikeout(inlines), TagEnd::Strikethrough) => {
+            push_inline(stack, wrap_inline("strikeout", inlines));
         }
         (Frame::Link { dest, inlines }, TagEnd::Link) => {
             // `target_scheme` (downstream, in `tomet-semantics`)
@@ -706,6 +721,7 @@ fn inline_target(stack: &mut [Frame]) -> Option<&mut Vec<Inline>> {
         Frame::Heading(_, v) => Some(v),
         Frame::Emphasis(v) => Some(v),
         Frame::Strong(v) => Some(v),
+        Frame::Strikeout(v) => Some(v),
         Frame::Link { inlines, .. } => Some(inlines),
         Frame::Image { alt, .. } => Some(alt),
         Frame::Item { content, .. } => Some(content),

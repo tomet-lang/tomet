@@ -323,9 +323,18 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
         Inline::Emph(inner) => inline_element("em", &Attr::empty(), inner),
         Inline::Underline(inner) => inline_element("em", &Attr::empty(), inner),
         Inline::Strong(inner) => inline_element("strong", &Attr::empty(), inner),
-        Inline::Strikeout(inner) | Inline::SmallCaps(inner) => {
-            inline_element("mark", &Attr::empty(), inner)
-        }
+        Inline::Strikeout(inner) => inline_element("strikeout", &Attr::empty(), inner),
+        // No element, and no lie either. Small caps is a way of drawing
+        // letters rather than something the words mean, so it is the one
+        // of these that is not worth an element -- the text comes back
+        // and the drawing does not. Recorded with the other losses in
+        // this module's doc.
+        Inline::SmallCaps(inner) => TmInline::Text(Text::from(inlines_to_text(inner))),
+        // Still `mark`, and still wrong: a superscript is not a
+        // highlight. Unlike small caps these two carry meaning -- `x²`
+        // and `H₂O` are not the same words as `x2` and `H2O` -- so
+        // dropping the decoration is not free either. They want elements.
+        // See `.agents/tasks/quote-and-inline-marks.md`.
         Inline::Superscript(inner) | Inline::Subscript(inner) => {
             inline_element("mark", &Attr::empty(), inner)
         }

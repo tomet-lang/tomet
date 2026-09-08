@@ -133,6 +133,7 @@ fn element_to_typst(el: &Element, inline: bool) -> String {
         "em" => format!("_{}_", content_to_typst(el)),
         "strong" => format!("*{}*", content_to_typst(el)),
         "mark" => format!("#highlight[{}]", content_to_typst(el)),
+        "strikeout" => format!("#strike[{}]", content_to_typst(el)),
         "codeblock" => render_code_block(el),
         "quote" => render_quote(el, inline),
         "callout" => render_callout(el),

@@ -138,6 +138,7 @@ fn element_to_inlines(el: &Element) -> Vec<Inline> {
     match kind.as_str() {
         "em" => vec![Inline::Emph(content_to_inlines(el))],
         "strong" => vec![Inline::Strong(content_to_inlines(el))],
+        "strikeout" => vec![Inline::Strikeout(content_to_inlines(el))],
         // Pandoc has no mark node. A `Span` with the class keeps it
         // recognisable in both directions, and writers that understand
         // classes (HTML, docx) can style it.
