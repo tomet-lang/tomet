@@ -7,7 +7,6 @@
 import type { AstroIntegration } from 'astro';
 import type { Loader, LoaderContext } from 'astro/loaders';
 import { existsSync, promises as fs } from 'node:fs';
-import { createRequire } from 'node:module';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import initWasm, {
@@ -27,25 +26,26 @@ let wasmReady: Promise<void> | null = null;
 export async function ensureWasm(): Promise<void> {
   if (wasmReady) return wasmReady;
   wasmReady = (async () => {
-    try {
-      // In bundlers (Vite/Astro) this will load the wasm via asset import / fetch
-      await initWasm();
-    } catch (_err) {
-      // In Node.js server/CLI contexts where URL-based loading may fail, load bytes directly
-      try {
-        const require = createRequire(import.meta.url);
-        const wasmPath = require.resolve('@tomet/tomet-wasm/wasm');
-        const wasmBytes = await fs.readFile(wasmPath);
-        await initWasm({ module_or_path: wasmBytes });
-      } catch (nodeErr) {
-        throw new Error(
-          `Failed to initialize @tomet/tomet-wasm: ${(nodeErr as Error).message}`,
-          { cause: nodeErr },
-        );
-      }
-    }
+    await initWasm();
   })();
   return wasmReady;
+}
+
+/**
+ * Render a single `.tmt` source string to an HTML body string in-process.
+ */
+export async function renderTomet(source: string, options?: ProcessOptions): Promise<string> {
+  await ensureWasm();
+  const res = processDocument(source, options);
+  return res.html;
+}
+
+/**
+ * Process a single `.tmt` source string to a `ProcessedDoc` in-process.
+ */
+export async function processTomet(source: string, options?: ProcessOptions): Promise<ProcessedDoc> {
+  await ensureWasm();
+  return processDocument(source, options);
 }
 
 export interface TometLoaderOptions {
