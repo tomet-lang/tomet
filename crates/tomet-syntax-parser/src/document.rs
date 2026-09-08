@@ -59,15 +59,15 @@ pub fn parse_document(src: &str) -> Result<Document> {
             blocks.push(Block::Element(parse_fenced_code_block(&mut cur)?));
             continue;
         }
-        if let Some((ordered, ..)) = peek_list_marker(&cur)? {
-            let items = parse_list(&mut cur, ordered)?;
+        if let Some(head) = peek_list_marker(&cur)? {
+            let items = parse_list(&mut cur, head.ordered)?;
             if !items.is_empty() {
                 let list_span = items
                     .first()
                     .unwrap()
                     .span
                     .union(&items.last().unwrap().span);
-                blocks.push(Block::Element(element_list(ordered, items, list_span)));
+                blocks.push(Block::Element(element_list(head.ordered, items, list_span)));
             }
             continue;
         }
