@@ -897,9 +897,23 @@ fn describe_kind(name: &str) -> &'static str {
 
 /// Provides autocompletion items for elements, keywords, and builtin compute functions.
 pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
-    let mut items = Vec::new();
+    completions_for_with_uri(text, pos, None)
+}
 
+/// Provides autocompletion items with document URI awareness for path completions.
+pub fn completions_for_with_uri(
+    text: &str,
+    pos: Position,
+    uri: Option<&Uri>,
+) -> Vec<CompletionItem> {
     let prefix = get_line_prefix(text, pos);
+
+    // If typing a path inside `file:`, `dir:`, or `./`, provide path completions.
+    if let Some(path_items) = path_completions(&prefix, uri) {
+        return path_items;
+    }
+
+    let mut items = Vec::new();
 
     // Driven by `BUILTIN_KINDS` rather than a hand-kept list. The old
     // list had drifted badly -- it offered `callout`/`warning`/`connect`,
@@ -1014,6 +1028,166 @@ fn get_line_prefix<'a>(text: &'a str, pos: Position) -> &'a str {
         current_utf16 += c.len_utf16();
     }
     &line[..byte_offset]
+}
+
+fn path_completions(prefix: &str, uri: Option<&Uri>) -> Option<Vec<CompletionItem>> {
+    let (raw_path, is_dir_only) = detect_path_context(prefix)?;
+
+    let current_dir = uri
+        .and_then(uri_to_file_path)
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .unwrap_or_else(|| {
+            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+        });
+
+    let (search_dir, base_prefix) = if let Some(stripped) = raw_path.strip_prefix('/') {
+        let root = find_project_root(&current_dir);
+        if let Some(last_slash) = stripped.rfind('/') {
+            let dir_part = &stripped[..=last_slash];
+            let base = &stripped[last_slash + 1..];
+            (root.join(dir_part), base.to_string())
+        } else {
+            (root, stripped.to_string())
+        }
+    } else if let Some(last_slash) = raw_path.rfind('/') {
+        let dir_part = &raw_path[..=last_slash];
+        let base = &raw_path[last_slash + 1..];
+        (current_dir.join(dir_part), base.to_string())
+    } else {
+        (current_dir, raw_path.to_string())
+    };
+
+    let entries = std::fs::read_dir(&search_dir).ok()?;
+    let mut dir_items = Vec::new();
+    let mut file_items = Vec::new();
+
+    for entry in entries.flatten() {
+        let file_name = entry.file_name().to_string_lossy().to_string();
+
+        if file_name.starts_with('.') && !base_prefix.starts_with('.') {
+            continue;
+        }
+
+        if !base_prefix.is_empty()
+            && !file_name
+                .to_lowercase()
+                .starts_with(&base_prefix.to_lowercase())
+        {
+            continue;
+        }
+
+        let file_type = match entry.file_type() {
+            Ok(ft) => ft,
+            Err(_) => continue,
+        };
+
+        if file_type.is_dir() {
+            if file_name == "target" || file_name == "node_modules" || file_name == ".git" {
+                continue;
+            }
+            dir_items.push(CompletionItem {
+                label: format!("{file_name}/"),
+                insert_text: Some(format!("{file_name}/")),
+                kind: Some(CompletionItemKind::FOLDER),
+                detail: Some("Directory".to_string()),
+                sort_text: Some(format!("0_{file_name}")),
+                ..CompletionItem::default()
+            });
+        } else if !is_dir_only && file_type.is_file() {
+            let detail = file_extension_detail(&file_name);
+            file_items.push(CompletionItem {
+                label: file_name.clone(),
+                insert_text: Some(file_name.clone()),
+                kind: Some(CompletionItemKind::FILE),
+                detail: Some(detail),
+                sort_text: Some(format!("1_{file_name}")),
+                ..CompletionItem::default()
+            });
+        }
+    }
+
+    dir_items.sort_by(|a, b| a.label.cmp(&b.label));
+    file_items.sort_by(|a, b| a.label.cmp(&b.label));
+
+    let mut all = dir_items;
+    all.extend(file_items);
+    Some(all)
+}
+
+fn detect_path_context(prefix: &str) -> Option<(&str, bool)> {
+    if let Some(idx) = prefix.rfind("dir:") {
+        let after = &prefix[idx + 4..];
+        if !after.contains(')') && !after.contains(']') && !after.contains('}') {
+            let trimmed = after.trim_start();
+            let path_str = trimmed.trim_matches(['"', '\'']);
+            return Some((path_str, true));
+        }
+    }
+
+    if let Some(idx) = prefix.rfind("@dir(") {
+        let after = &prefix[idx + 5..];
+        if !after.contains(')') && !after.contains(']') && !after.contains('}') {
+            let trimmed = after.trim_start();
+            let path_str = trimmed.trim_matches(['"', '\'']);
+            return Some((path_str, true));
+        }
+    }
+
+    if let Some(idx) = prefix.rfind("file:") {
+        let after = &prefix[idx + 5..];
+        if !after.contains(')') && !after.contains(']') && !after.contains('}') {
+            let trimmed = after.trim_start();
+            let path_str = trimmed.trim_matches(['"', '\'']);
+            return Some((path_str, false));
+        }
+    }
+
+    if let Some(idx) = prefix.rfind("./").or_else(|| prefix.rfind("../")) {
+        let before = &prefix[..idx];
+        if before.ends_with('(')
+            || before.ends_with(':')
+            || before.ends_with(',')
+            || before.ends_with(' ')
+            || before.ends_with('\t')
+            || before.ends_with('"')
+            || before.ends_with('\'')
+        {
+            let after = &prefix[idx..];
+            if !after.contains(')') && !after.contains(']') && !after.contains('}') {
+                let path_str = after.trim_matches(['"', '\'']);
+                return Some((path_str, false));
+            }
+        }
+    }
+
+    None
+}
+
+fn find_project_root(start: &std::path::Path) -> std::path::PathBuf {
+    let mut cur = start.to_path_buf();
+    loop {
+        if cur.join("default.config.tmt").exists() || cur.join(".git").exists() {
+            return cur;
+        }
+        if !cur.pop() {
+            break;
+        }
+    }
+    start.to_path_buf()
+}
+
+fn file_extension_detail(name: &str) -> String {
+    let path = std::path::Path::new(name);
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    match ext.to_lowercase().as_str() {
+        "tmt" | "tm" => "Tomet document".to_string(),
+        "md" | "markdown" => "Markdown document".to_string(),
+        "png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" => "Image".to_string(),
+        "typ" => "Typst document".to_string(),
+        "pdf" => "PDF document".to_string(),
+        "json" | "yaml" | "yml" | "toml" => "Data file".to_string(),
+        _ => "File".to_string(),
+    }
 }
 
 #[cfg(test)]
@@ -1434,5 +1608,58 @@ mod tests {
         let items = completions_for("@", Position::new(0, 1));
         assert!(items.iter().any(|i| i.label == "kind"));
         assert!(items.iter().any(|i| i.label == "version"));
+    }
+
+    #[test]
+    fn completions_for_file_path() {
+        let current = std::env::current_dir().unwrap();
+        let test_file = current.join("test_dummy.tmt");
+        let uri = Uri::from_str(&format!("file://{}", test_file.to_string_lossy())).unwrap();
+
+        let doc_text = "@link(file: ./";
+        let items = completions_for_with_uri(doc_text, Position::new(0, 14), Some(&uri));
+        assert!(!items.is_empty(), "path completions should return entries");
+        assert!(
+            items.iter().any(|i| i.label == "Cargo.toml"),
+            "should suggest Cargo.toml"
+        );
+        assert!(
+            items.iter().any(|i| i.label == "src/" && i.kind == Some(CompletionItemKind::FOLDER)),
+            "should suggest src/ directory"
+        );
+    }
+
+    #[test]
+    fn completions_for_dir_only_suggests_directories() {
+        let current = std::env::current_dir().unwrap();
+        let test_file = current.join("test_dummy.tmt");
+        let uri = Uri::from_str(&format!("file://{}", test_file.to_string_lossy())).unwrap();
+
+        let doc_text = "@dir(./";
+        let items = completions_for_with_uri(doc_text, Position::new(0, 7), Some(&uri));
+        assert!(!items.is_empty(), "dir completions should return directories");
+        assert!(
+            items.iter().any(|i| i.label == "src/"),
+            "should suggest src/ directory"
+        );
+        assert!(
+            !items.iter().any(|i| i.label == "Cargo.toml"),
+            "should NOT suggest Cargo.toml file for @dir"
+        );
+    }
+
+    #[test]
+    fn completions_for_nested_directory_path() {
+        let current = std::env::current_dir().unwrap();
+        let test_file = current.join("test_dummy.tmt");
+        let uri = Uri::from_str(&format!("file://{}", test_file.to_string_lossy())).unwrap();
+
+        let doc_text = "@link(file: ./src/";
+        let items = completions_for_with_uri(doc_text, Position::new(0, 18), Some(&uri));
+        assert!(!items.is_empty(), "nested directory should return entries");
+        assert!(
+            items.iter().any(|i| i.label == "lib.rs"),
+            "should suggest src/lib.rs"
+        );
     }
 }
