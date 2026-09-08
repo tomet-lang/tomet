@@ -2029,6 +2029,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomet-extract"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-cst",
+ "tomet-parser",
+ "tomet-tree",
+]
+
+[[package]]
 name = "tomet-field-utils"
 version = "0.1.0"
 dependencies = [

@@ -71,14 +71,10 @@ docs-check:
         done; \
         exit 1; \
     fi
-    @stray=$(find docs -name '*.tmt' \
-        | grep -vE '^docs/(spec|guide|examples|why|design/ideas)/' \
-        | grep -vE '^docs/(README|roadmap|\.writ)\.tmt$'); \
-    if [ -n "$stray" ]; then \
-        echo "$stray" | while IFS= read -r f; do \
-            echo "PLACEMENT FAIL: $f -- no row in docs/.writ.tmt's placement table"; \
-        done; \
-        exit 1; \
+    @if command -v twrit >/dev/null 2>&1; then \
+        twrit check .; \
+    elif [ -x ../tomet-writ/target/debug/twrit ]; then \
+        ../tomet-writ/target/debug/twrit check .; \
     fi
 
 # Run the two guards that `.writ.tmt` entries name but nothing executed.

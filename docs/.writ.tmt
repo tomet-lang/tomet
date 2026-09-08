@@ -16,7 +16,21 @@ proposes an edit here and stops.
 ##[ document-placement ]
 
 @rule(document-placement){
-  guard: { runs: "just docs-check" }
+  guard: { twrit: placement }
+
+  placement: {
+    within: "."
+    allow: [
+      "spec/**/*.tmt",
+      "guide/**/*.tmt",
+      "examples/**/*.tmt",
+      "why/**/*.tmt",
+      "design/ideas/**/*.tmt",
+      "README.tmt",
+      "roadmap.tmt",
+      ".writ.tmt"
+    ]
+  }
 }
 
 A new document goes where it belongs by what it *is*, not by what it is
@@ -101,22 +115,8 @@ else, which is the wrong way round for documentation.
 
 ---[ Guard ]---
 
-```bash
-find docs -name '*.tmt' \
-  | grep -vE '^docs/(spec|guide|examples|why|design/ideas)/' \
-  | grep -vE '^docs/(README|roadmap|\.writ)\.tmt$'
-```
-
-Empty while every document is somewhere the table names. Run by
-`just docs-check`.
-
-It asks the question per file rather than per directory, which is what
-makes it answerable: `design/` holds no document of its own, so a rule
-reading "every directory appears in the table" would have to carry an
-exception for it, and `guide/builtins/primitives/` would need one too.
-Naming the destinations a document may sit under has neither problem, and
-still fails on a directory nobody described -- `docs/twrit/` was the case
-that prompted this.
+`twrit check`. It validates that every file under @dir(docs/) matches an allowed
+placement pattern declared in `@rule(document-placement)`.
 
 ##[ docs-language ]
 

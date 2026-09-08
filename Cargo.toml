@@ -43,6 +43,9 @@ members = [
   "crates/tomet-convert-typst",
   "crates/tomet-convert-pandoc",
 
+  #[ Extract -- extraction of tomet from external source files / comments ]
+  "crates/tomet-extract",
+
   #[ Format -- .tmt source text production & formatting ]
   "crates/tomet-format",
   "crates/tomet-format-field-utils",
@@ -90,6 +93,8 @@ tomet-markdown = { path = "crates/tomet-convert-markdown" }
 tomet-html = { path = "crates/tomet-convert-html" }
 tomet-typst = { path = "crates/tomet-convert-typst" }
 tomet-pandoc = { path = "crates/tomet-convert-pandoc" }
+#[ Extract ]
+tomet-extract = { path = "crates/tomet-extract" }
 #[ Format ]
 tomet-field-utils = { path = "crates/tomet-format-field-utils" }
 tomet-style = { path = "crates/tomet-format-style" }
