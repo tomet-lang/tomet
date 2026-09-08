@@ -1,7 +1,7 @@
 //! Directive promotion and Value DSL normalization transformations.
 
 use tomet_ast::{Block, Document, Element, ElementValue, Sigil, Value};
-use tomet_semantics::{ElementKind, classify_std_lenient};
+use tomet_semantics::{ElementKind, classify_std_lenient, embedded::element_format};
 use tomet_tree::{DocumentExt, ElementExt, element_new, for_each_element_mut};
 
 /// Promotes a property `prop_key` from an element matching `source_filter` into a new top-level
@@ -109,25 +109,58 @@ fn body_is_data(el: &Element) -> bool {
 pub fn normalize_embedded_to_value_dsl(doc: &mut Document) -> bool {
     let mut changed = false;
     for_each_element_mut(doc, |el| {
-        if body_is_data(el) {
+        if !body_is_data(el) {
+            return;
+        }
+        // An element with no value declares a format for nothing, and
+        // this pass cannot tell what the author meant by it. Leave it:
+        // `@config(format: json)` is written that way in
+        // `docs/guide/cheatsheet.tmt`, and `format` is a real setting --
+        // `docs/spec/builtin-settings.tmt` makes it the nested container
+        // the formatter reads. An earlier attempt at this deleted it.
+        if el.value.is_none() {
+            return;
+        }
+        if matches!(el.value, Some(ElementValue::Raw(_))) {
+            materialize_raw_body(el);
+            // Still `Raw` means no declared format, or one whose body did
+            // not parse. Either way there is nothing to convert.
             if matches!(el.value, Some(ElementValue::Raw(_))) {
-                materialize_raw_body(el);
-                changed = !matches!(el.value, Some(ElementValue::Raw(_))) || changed;
+                return;
             }
-            if let Some(Value::Map(entries)) = &mut el.args {
+            changed = true;
+        }
+        // The value is data now -- either this pass made it so, or an
+        // earlier one did. `promote_meta_type_to_kind` runs first and
+        // materializes the body itself, so requiring `Raw` here would skip
+        // every element it had already touched.
+        //
+        // A scalar `format:` beside a data group describes nothing, so it
+        // goes. A `format:` holding a map is the setting container and is
+        // left alone; `element_format` only reads the scalar spelling.
+        if element_format(el).is_none() {
+            return;
+        }
+        changed = true;
+        match &mut el.args {
+            Some(Value::Map(entries)) => {
                 if let Some(pos) = entries.iter().position(|(k, _)| k == "format") {
                     entries.remove(pos);
-                    changed = true;
+                    // Only when `format` is what emptied it. An empty `()`
+                    // written on purpose stays: `docs/spec/syntax.tmt`
+                    // makes `@xxx()[]{}` every group explicitly empty,
+                    // distinct from leaving them off, and a todo marker is
+                    // `- ( )`.
+                    if entries.is_empty() {
+                        el.args = None;
+                    }
                 }
-                if entries.is_empty() {
-                    el.args = None;
-                    changed = true;
-                }
-            } else if matches!(&el.args, Some(Value::String(fmt)) if fmt == "yaml" || fmt == "json" || fmt == "toml")
-            {
-                el.args = None;
-                changed = true;
             }
+            // The positional spelling, `@meta(yaml)`.
+            Some(Value::String(fmt)) if fmt == "yaml" || fmt == "json" || fmt == "toml" => {
+                el.args = None;
+            }
+            _ => {}
         }
     });
     changed
