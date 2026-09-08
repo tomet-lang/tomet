@@ -17,9 +17,21 @@
 //! - **An element inside a `{...}` group returns as body content.**
 //!   Pandoc cannot say "this `Div` was a group entry rather than part of
 //!   the body", so `@deck.card{ title: x, (a)[y] }` comes back with the
-//!   entry in `[content]`, having lost its `Sigil::Bare` and reading as
-//!   an element named `bare` -- which does not validate. Tracked in
-//!   `.agents/tasks/group-entries-in-output.md`.
+//!   entry in `[content]`. The printer has no spelling for a bare sigil
+//!   there, so it writes `[y]{ value: a }` and that re-parses as text.
+//!
+//!   Accepted rather than fixed, and the reason is what this bridge is
+//!   for. It exists to reach the formats Pandoc reads and writes --
+//!   `tmt -> docx`, `docx -> tmt` -- and in that direction the entry
+//!   arrives as a `Div` in the body, which is visible and right: it is an
+//!   element, and elements are content. `tmt -> pandoc -> tmt` is nobody's
+//!   workflow; it is `pandoc_round_trip_is_stable`, a diagnostic. Making
+//!   it lossless would mean carrying the group's whole shape in an opaque
+//!   exact-copy, which is precisely the payload every other tool on the
+//!   far side cannot read.
+//!
+//!   The pairs beside it do survive, in `Attr` -- they are data, and
+//!   `Attr` is where data goes. Only the elements move.
 
 use tomet_ast::{
     Block as TmBlock, Document, Element, ElementValue, Entry, Inline as TmInline, Name, Paragraph,

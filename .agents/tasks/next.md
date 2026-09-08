@@ -40,9 +40,10 @@
    `- ( )` が末尾空白の有無によらずマーカーになる。
    下敷きにあった「full-form 分岐が `parse_groups` の読んだ `args` を
    捨てていた」バグも一緒に直した。`KNOWN_GAPS` は空。
-4. `duplicate-group-silently-dropped.md` — `@memo(a:1)(b:2)` が仕様どおりの
-   エラーにならず、黙って地の文に落ちてブロックからインラインに降格する。
-   規範層の話なので作者の決定が要る。
+4. ~~`duplicate-group-silently-dropped.md`~~ — **完了（2026-09-08）**。
+   `58d538e`。隣接して書かれた重複グループはエラー。空白を挟んだ
+   `@file(x) (説明)` は地の文のまま（最初の実装はこれを弾いて、
+   リポジトリの 89 文書のうち 2 つが落ちた）。
 5. ~~`bare-entry-value-group.md`~~ — **完了（2026-09-08）**。`cf4a4a4`。
    `parse_bare_element` が `(args)` と `[content]` しか読まない自前の
    パーサだったので `parse_groups` に通した。曖昧性は無く、差分は
@@ -63,13 +64,13 @@
 は要素の種類を見ていないので、ガードを「`format:` を宣言した Raw フェンス body
 を持つ要素」に広げるのが素直。前回の移行で手作業を強いられた箇所。
 
-**B. `{...}` グループの出力先** — `.agents/tasks/group-entries-in-output.md`
-前半（実バグ、単独で直せる）: `Sigil::Bare` が `to_pandoc.rs:128` と `:172` の
-`format!("tomet-{}", kind.as_str())` を通って `tomet-bare` クラスになり、
-戻ってきたとき `bare` という名前の要素になる。`@bare` は builtin ではないので
-ラウンドトリップ後の文書が validate に通らない。参照は
-`tests/ref/syntax/sigils.pandoc.roundtrip.tmt`。
-後半（グループ entry が body に落ちる）は Pandoc に表現がなく、設計判断が要る。
+**B. ~~`{...}` グループの出力先~~** — **完了（2026-09-08）**。
+
+- `ae6ba8c` シジルを名前として運ばない（予約キー `tomet-sigil`）
+- `49f1648` HTML が `{...}` の対を `data-*` に出す（黙って落ちていた）
+- Pandoc の tmt → tmt は要件でないと決定。entry が本文に移るのは
+  受け入れ済みの損失として `from_pandoc.rs` のモジュール doc に記録
+  （既存の 2 件と同じ棚）
 
 **D. `|` 継続構文 — 実装済み（2026-09-08）**
 `181b542` `-[ x ]` の非対称除去 / `0fc9e4b` パーサとテスト /
