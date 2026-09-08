@@ -19,10 +19,9 @@ use tomet_tree::{ElementExt, element_new};
 /// `[content]`. It only widens what may follow the name, never the sigil
 /// or the name itself:
 ///
-/// - anywhere: a group (`(`, `[`, `{`, or `|` for the bracket-less
-///   `[content]`), a `:` connect, or a `+++` fence must follow. This is
-///   what keeps `me@example.com` and a lone `@foo` in running prose as
-///   plain text.
+/// - anywhere: a group (see [`opens_group`]), a `:` connect, or a `+++`
+///   fence must follow. This is what keeps `me@example.com` and a lone
+///   `@foo` in running prose as plain text.
 /// - in block context only: end-of-line also counts, so `@memo` alone on
 ///   its line is an element. It then fails later, in `tomet-semantics`,
 ///   as an unknown bare name -- the intended report, and the reason no
@@ -44,10 +43,9 @@ pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
         return false;
     }
     skip_lookahead_gap(&mut look);
-    matches!(
-        look.peek(),
-        Some('(') | Some('[') | Some('{') | Some('|') | Some(':')
-    ) || is_fence_start(&look)
+    opens_group(look.peek())
+        || look.peek() == Some(':')
+        || is_fence_start(&look)
         || (block_context && matches!(look.peek(), None | Some('\n') | Some('\r')))
 }
 
@@ -154,6 +152,21 @@ pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Resu
     parse_groups(cur, &mut el, allow_colon_connect)?;
     el.span = cur.span_from(start_pos);
     Ok(el)
+}
+
+/// The characters that open one of an element's groups.
+///
+/// [`parse_groups`] is the only code that *reads* a group; every other site
+/// only asks whether one starts here, and each used to spell the set again.
+/// `|` had to be added to six independent spellings, and `-` was missing
+/// `[` and `{` from two of them from `2a99315` until `181b542`. One
+/// definition now, and `every_sigil_takes_every_group_opener` holds each
+/// sigil's recognizer and parser to it.
+///
+/// `:` is deliberately not here. It opens nothing; it says where the group
+/// that follows belongs. See [`is_element_start`].
+pub(crate) fn opens_group(c: Option<char>) -> bool {
+    matches!(c, Some('(') | Some('[') | Some('{') | Some('|'))
 }
 
 /// Reads an element's `(args)`, `[content]` and `{value}` groups -- in any

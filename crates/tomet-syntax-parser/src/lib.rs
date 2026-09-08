@@ -23,6 +23,81 @@ mod tests {
     };
     use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
 
+    /// Every sigil takes every group opener.
+    ///
+    /// "Does a group start here?" has one answer now
+    /// (`element::opens_group`), but each sigil still asks it twice --
+    /// once in a recognizer that decides dispatch, once in the parser
+    /// that consumes -- and nothing in the types forces the two to
+    /// agree. This table is what forces it.
+    ///
+    /// It is the guard `181b542` did not have. From `2a99315` until then,
+    /// `-` was missing `[` and `{` from both of its asks, so `-()[ x ]`
+    /// was an item and `-[ x ]` was a paragraph, and nothing said so.
+    #[test]
+    fn every_sigil_takes_every_group_opener() {
+        // The sigil as written, and the element the construct produces.
+        const SIGILS: &[(&str, &str)] = &[
+            ("@memo", "memo"),
+            ("#", "heading"),
+            ("-", "ul"),
+            ("-.", "ol"),
+        ];
+        // One opener each, written so the construct closes on its line.
+        const OPENERS: &[(char, &str)] = &[
+            ('(', "(a: 1)"),
+            ('[', "[ x ]"),
+            ('{', "{ a: 1 }"),
+            ('|', "| x"),
+        ];
+        // Openers a sigil does not take yet. Listed rather than skipped,
+        // so closing one forces its line out of here.
+        //
+        // `-(x)` alone: the marker probe has already tried `(x)` and
+        // rejected it, and `list.rs` then declines to read it as a fresh
+        // `args` group, so the line falls out as a paragraph while
+        // `#(id: a)` is a heading. See `list-recognition.md`, 2a.
+        const KNOWN_GAPS: &[(&str, char)] = &[("-", '('), ("-.", '(')];
+
+        fn produced(src: &str) -> Option<String> {
+            let doc = parse_document(src).ok()?;
+            match doc.blocks.first()? {
+                Block::Element(el) => el.sigil.name().map(|n| n.name.clone()),
+                Block::Paragraph(_) => None,
+            }
+        }
+
+        let mut unexpected_failures = Vec::new();
+        let mut closed_gaps = Vec::new();
+
+        for (sigil, expected) in SIGILS {
+            for (opener, group) in OPENERS {
+                let src = format!("{sigil}{group}\n");
+                let got = produced(&src);
+                let takes_it = got.as_deref() == Some(*expected);
+                let is_gap = KNOWN_GAPS.contains(&(sigil, *opener));
+
+                match (takes_it, is_gap) {
+                    (false, false) => unexpected_failures
+                        .push(format!("{sigil} does not take {opener}: {src:?} -> {got:?}")),
+                    (true, true) => closed_gaps.push(format!("{sigil} now takes {opener}")),
+                    _ => {}
+                }
+            }
+        }
+
+        assert!(
+            unexpected_failures.is_empty(),
+            "a sigil's recognizer and its parser disagree about an opener:\n  {}",
+            unexpected_failures.join("\n  ")
+        );
+        assert!(
+            closed_gaps.is_empty(),
+            "listed in KNOWN_GAPS but no longer a gap -- delete the line:\n  {}",
+            closed_gaps.join("\n  ")
+        );
+    }
+
     #[test]
     fn parses_flat_map() {
         let v = parse_value("title: value\ntags: [a, b]").unwrap();

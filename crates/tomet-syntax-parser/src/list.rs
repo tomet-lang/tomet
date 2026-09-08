@@ -13,6 +13,16 @@ use tomet_ast::{Element, Inline, Sigil, Text, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{element_list, element_list_item, element_new};
 
+/// The group openers left once an item's `(marker)` has been taken.
+///
+/// A second `(` would be a duplicate `args` group, which `parse_groups`
+/// refuses, so the two places that ask after the marker ask for this
+/// rather than for [`opens_group`]. Derived from it, so a fifth opener
+/// reaches both without being spelled again.
+fn opens_group_after_args(c: Option<char>) -> bool {
+    crate::element::opens_group(c) && c != Some('(')
+}
+
 pub(crate) fn eat_list_marker_with_indent(
     cur: &mut Cursor,
 ) -> Result<Option<(usize, bool, Option<Value>)>> {
@@ -50,10 +60,9 @@ pub(crate) fn eat_list_marker_with_indent(
         // the same args; only the sugar needs a space to separate the
         // marker from the text that follows it. `|` joins the group
         // openers because it is one -- `[content]` without the brackets.
-        if matches!(
-            probe.peek(),
-            Some(' ') | Some('\t') | Some('[') | Some('{') | Some('|')
-        ) {
+        if matches!(probe.peek(), Some(' ') | Some('\t'))
+            || opens_group_after_args(probe.peek())
+        {
             marker = Some(value);
             found_group = true;
             look = probe;
@@ -69,7 +78,12 @@ pub(crate) fn eat_list_marker_with_indent(
     // That is the asymmetry `2a99315` set out to remove and reached only
     // halfway -- it unified how the groups are *read* (`parse_groups`) and
     // left how the marker is *recognized* where it was.
-    if !found_group && matches!(look.peek(), Some('[') | Some('{') | Some('|')) {
+    //
+    // `(` is missing from the set on purpose, and only for now: the probe
+    // above has already tried it and failed, so accepting it here would
+    // make `-(x)` an item the way `#(id: a)` is a heading. That is a
+    // behaviour change with its own scan -- `list-recognition.md`, 2a.
+    if !found_group && opens_group_after_args(look.peek()) {
         found_group = true;
     }
 
@@ -111,7 +125,7 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
         let item_start = cur.pos();
         eat_list_marker_with_indent(cur)?;
 
-        let (content, attrs) = if matches!(cur.peek(), Some('[') | Some('{') | Some('|')) {
+        let (content, attrs) = if opens_group_after_args(cur.peek()) {
             // The full form: `- ()[ content ]{value}`. Groups are read by
             // the same code that reads `@name`'s, so `[content]` stops at
             // its closing bracket and `|content` at the end of its marked
