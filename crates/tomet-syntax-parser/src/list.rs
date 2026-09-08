@@ -6,6 +6,7 @@
 //! `"marker"` positional key by `tomet-semantics::positional`.
 
 use crate::element::{parse_groups, parse_paren_value, parse_sugar_body};
+use crate::heading::merge_values;
 use crate::error::Result;
 use crate::inline::{Stop, parse_inline_seq};
 use crate::value::skip_inline_ws;
@@ -95,11 +96,11 @@ pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
     // halfway -- it unified how the groups are *read* (`parse_groups`) and
     // left how the marker is *recognized* where it was.
     //
-    // `(` is missing from the set on purpose, and only for now: the probe
-    // above has already tried it and failed, so accepting it here would
-    // make `-(x)` an item the way `#(id: a)` is a heading. That is a
-    // behaviour change with its own scan -- `list-recognition.md`, 2a.
-    if !found_group && opens_group_after_args(look.peek()) {
+    // `(` belongs here too. The probe above has already tried it and
+    // declined it *as a marker*; that says nothing about whether it opens
+    // this item's `args`, which is what `#(id: a)` and `@memo(x: 1)` do
+    // with the same characters.
+    if !found_group && crate::element::opens_group(look.peek()) {
         found_group = true;
     }
 
@@ -109,11 +110,18 @@ pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
 
     skip_inline_ws(&mut look);
     cur.set_pos(look.pos());
+    // Once the probe has taken a `(marker)`, a second `(` would be a
+    // duplicate `args` group; until then it opens the first one.
+    let full_form = if marker.is_some() {
+        opens_group_after_args(look.peek())
+    } else {
+        crate::element::opens_group(look.peek())
+    };
     Ok(Some(ListMarker {
         indent,
         ordered,
         marker,
-        full_form: opens_group_after_args(look.peek()),
+        full_form,
     }))
 }
 
@@ -132,7 +140,7 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
         if head.indent < min_indent || head.ordered != ordered {
             break;
         }
-        let marker = head.marker;
+        let mut marker = head.marker;
         let item_start = cur.pos();
         eat_list_marker(cur)?;
 
@@ -145,6 +153,14 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
             // group to close rather than because spreading out is barred.
             let mut item = element_new(Sigil::Bare);
             parse_groups(cur, &mut item, false)?;
+            // An `(args)` group read here is the item's own -- the same
+            // slot the probe's `(marker)` fills, reached from the other
+            // side. `- (x)[ y ]` takes that path and `-(x)` this one, and
+            // dropping it here is what made `-(x)` an empty item once `(`
+            // could reach this branch at all.
+            if item.args.is_some() {
+                marker = merge_values(marker.as_ref(), item.args.as_ref());
+            }
             let attrs = item.value.and_then(|v| v.as_data());
             let mut content = item.content.unwrap_or_default();
             // Text after the groups belongs to the item, the way

@@ -51,13 +51,9 @@ mod tests {
             ('|', "| x"),
         ];
         // Openers a sigil does not take yet. Listed rather than skipped,
-        // so closing one forces its line out of here.
-        //
-        // `-(x)` alone: the marker probe has already tried `(x)` and
-        // rejected it, and `list.rs` then declines to read it as a fresh
-        // `args` group, so the line falls out as a paragraph while
-        // `#(id: a)` is a heading. See `list-recognition.md`, 2a.
-        const KNOWN_GAPS: &[(&str, char)] = &[("-", '('), ("-.", '(')];
+        // so closing one forces its line out of here. Empty since
+        // `-` and `-.` learned `(`.
+        const KNOWN_GAPS: &[(&str, char)] = &[];
 
         fn produced(src: &str) -> Option<String> {
             let doc = parse_document(src).ok()?;

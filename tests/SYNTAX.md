@@ -788,6 +788,28 @@ Block  @ul
         Text "マーカー"
 ```
 
+### `(...)` だけの項目。本文が続かなくてもマーカーになる。`#(id: a)` が引数つきの見出しになるのと同じ
+
+```tmt
+- ( )
+-(x)
+- (y)
+```
+
+```
+Block  @ul
+  group
+    Bare
+      args    {}
+      content
+    Bare
+      args    "x"
+      content
+    Bare
+      args    "y"
+      content
+```
+
 ### `--` は**ネストしない**。2行目は段落になる（未対応）
 
 ```tmt
