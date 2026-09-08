@@ -78,6 +78,16 @@
 					"patterns": [{ "include": "#inline" }]
 				},
 				{
+					"begin": "^[ \\t]*(#+)[ \\t]*(\\|)",
+					"beginCaptures": {
+						"1": { "name": "punctuation.definition.heading.tomet" },
+						"2": { "name": "punctuation.definition.pipe.tomet keyword.control.pipe.tomet" }
+					},
+					"end": "$",
+					"name": "markup.heading.tomet",
+					"patterns": [{ "include": "#inline" }]
+				},
+				{
 					"comment": "Bracket-less sugar. Requires the space: `#name` with no space is not a heading, and no longer an element either -- it falls back to prose, which is what keeps `#タグ` and a shell comment inside a fence as text.",
 					"begin": "^[ \\t]*(#+)(?=[ \\t]+\\S)",
 					"beginCaptures": {
@@ -116,7 +126,7 @@
 		"list-marker": {
 			"patterns": [
 				{
-					"match": "^\\s*(-\\.|-)(?=[ \\t])(?:\\s*(\\()([^()\\n]*)(\\)))?",
+					"match": "^\\s*(-\\.|-)(?=[ \\t\\[|(])(?:\\s*(\\()([^()\\n]*)(\\)))?",
 					"captures": {
 						"1": { "name": "punctuation.definition.list.begin.markdown markup.list.tomet keyword.control.list.tomet" },
 						"2": { "name": "punctuation.definition.marker.begin.tomet" },
@@ -129,10 +139,8 @@
 
 		"marked-content": {
 			"comment": "`|` opens a content group and closes at the end of its run. It goes where `[` can go (after an element or list item, or as table rows).",
-			"match": "(?:^[ \\t]*|(?<=[)\\]}A-Za-z0-9_-]))(\\|)(?=[ \\t\\[]|$)",
-			"captures": {
-				"1": { "name": "punctuation.definition.pipe.tomet keyword.operator.pipe.tomet" }
-			}
+			"match": "\\|",
+			"name": "punctuation.definition.pipe.tomet keyword.control.pipe.tomet"
 		},
 
 		"inline": {

@@ -181,6 +181,25 @@ fn fallback_tomet_highlight(src: &str) -> Vec<Line<'static>> {
             continue;
         }
 
+        if trimmed.starts_with('|') {
+            let prefix_len = line_str.find('|').unwrap_or(0);
+            let indent = &line_str[..prefix_len];
+            let rest = &line_str[prefix_len..];
+
+            let (marker, content) = rest.split_at(1);
+            lines.push(Line::from(vec![
+                Span::raw(indent.to_string()),
+                Span::styled(
+                    marker.to_string(),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(content.to_string()),
+            ]));
+            continue;
+        }
+
         if trimmed.starts_with("- ")
             || trimmed.starts_with("* ")
             || (trimmed.len() >= 3
@@ -323,6 +342,17 @@ fn highlight_tomet_line(line: &str) -> Line<'static> {
             continue;
         }
 
+        if ch == '|' {
+            spans.push(Span::styled(
+                "|".to_string(),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ));
+            i += 1;
+            continue;
+        }
+
         let start = i;
         while i < len
             && chars[i] != '@'
@@ -331,6 +361,7 @@ fn highlight_tomet_line(line: &str) -> Line<'static> {
             && chars[i] != '{'
             && chars[i] != '"'
             && chars[i] != '\''
+            && chars[i] != '|'
             && !(chars[i] == '$' && i + 1 < len && chars[i + 1] == '{')
         {
             i += 1;
