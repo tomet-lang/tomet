@@ -28,11 +28,31 @@ Two things went wrong.
   `tomet-<name>` class carries. `@bare` is not a builtin, so **the
   round-tripped document does not validate.**
 
-The second half is fixable on its own and worth doing first: a bare entry
-should not be given a name it cannot have. The first half needs a
-representation Pandoc does not have -- a reserved class that means "group
-entry", plus `from_pandoc` reassembling the group, is the obvious shape
-but it is a real design decision, not a patch.
+**The second half is fixed** (2026-09-08). `Sigil::Bare` travels under a
+reserved attribute key, `tomet-sigil: bare`, rather than in the
+`tomet-<name>` class -- a key and not another class because a class
+collides: a document whose `@kind` names a vocabulary declaring `bare`
+writes `@bare` unqualified. `a_bare_entry_does_not_come_back_as_an_element_named_bare`
+in `tests/src/snapshot.rs` holds it, and the round-tripped fixture's
+errors are now exactly the source fixture's.
+
+**It made the first half visible rather than smaller.** The entry still
+lands in `[content]`, where `Sigil::Bare` has no legal spelling, so the
+printer writes `[x]{ value: a }` and *that does not re-parse as an
+element* -- it comes back as the literal text `[x]{ value: a }`. Before,
+the entry survived re-parsing as `@bare[x]` and failed validation
+instead. So the round trip traded an invalid element for a lost one:
+
+    before   @bare[ひとつめ]{ value: "1" }   parses, does not validate
+    after    [ひとつめ]{ value: "1" }        validates, is text
+
+Both are the same underlying gap -- a group entry has nowhere to be in
+`[content]` -- and only the first half closes it.
+
+The first half needs a representation Pandoc does not have: a reserved
+class meaning "group entry", plus `from_pandoc` putting it back in
+`{value}` rather than in the body, is the obvious shape but it is a real
+design decision, not a patch.
 
 Pinned by `pandoc_round_trip_is_stable`; see
 `tests/ref/syntax/sigils.pandoc.roundtrip.tmt`.

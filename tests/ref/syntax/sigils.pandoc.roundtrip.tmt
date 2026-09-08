@@ -30,12 +30,12 @@ ASCII でない名前は要素にならない。
 
 #[`{}` は常にデータ]
 
-@links[@bare[ひとつめ]{ value: "1" }
+@links[[ひとつめ]{ value: "1" }
 
-@bare[ふたつめ]{ value: "2" }
+[ふたつめ]{ value: "2" }
 ]
 
-@deck.card[@bare[対と要素が同じ並びに入る]{ value: a }
+@deck.card[[対と要素が同じ並びに入る]{ value: a }
 ]{ title: 混在 }
 
 #[未完成の印]

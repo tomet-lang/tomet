@@ -464,13 +464,15 @@
             "c": [
               [
                 "",
-                [
-                  "tomet-bare"
-                ],
+                [],
                 [
                   [
                     "value",
                     "1"
+                  ],
+                  [
+                    "tomet-sigil",
+                    "bare"
                   ]
                 ]
               ],
@@ -492,13 +494,15 @@
             "c": [
               [
                 "",
-                [
-                  "tomet-bare"
-                ],
+                [],
                 [
                   [
                     "value",
                     "2"
+                  ],
+                  [
+                    "tomet-sigil",
+                    "bare"
                   ]
                 ]
               ],
@@ -539,13 +543,15 @@
             "c": [
               [
                 "",
-                [
-                  "tomet-bare"
-                ],
+                [],
                 [
                   [
                     "value",
                     "a"
+                  ],
+                  [
+                    "tomet-sigil",
+                    "bare"
                   ]
                 ]
               ],
