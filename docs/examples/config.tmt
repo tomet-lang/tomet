@@ -6,7 +6,7 @@
     heading: { space_inside_brackets: true }
     table: { adjust_width: auto, max_col_width: 20 }
     link: { no_space: true }
-    blockquote: { always_newline: true }
+    quote: { always_newline: true }
     callout: {
       style: { content: block }
     }

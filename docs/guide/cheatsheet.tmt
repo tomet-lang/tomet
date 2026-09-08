@@ -108,11 +108,11 @@ ls --help
 // byte-safe against an embedded "]" and newline-preserving (no inline
 // markup, no lazy-continuation folding). It replaced `(content:raw)[...]`,
 // which could not survive a bracket in its own body.
-@blockquote+++
+@quote+++
   don't forget: check [this] and [that]
 +++
 
-@blockquote[ 引用文 ]
+@quote[ 引用文 ]
 
 // @callout(caution)[
 //

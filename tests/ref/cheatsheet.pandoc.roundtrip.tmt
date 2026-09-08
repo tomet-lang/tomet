@@ -52,7 +52,7 @@ sudo whoami ls --help
 
 @memo[]
 
-@blockquote[引用文]
+@quote[引用文]
 
 - outline/list
 

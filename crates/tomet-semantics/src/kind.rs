@@ -103,7 +103,7 @@ pub enum ElementKind {
     Strong,
     Mark,
     Codeblock,
-    Blockquote,
+    Quote,
     /// `@callout(variant)[ ... ]` -- an admonition.
     ///
     /// Late to this list, and the list was the only thing that did not
@@ -189,7 +189,7 @@ impl ElementKind {
             ElementKind::Strong => "strong",
             ElementKind::Mark => "mark",
             ElementKind::Codeblock => "codeblock",
-            ElementKind::Blockquote => "blockquote",
+            ElementKind::Quote => "quote",
             ElementKind::Callout => "callout",
             ElementKind::Table => "table",
             ElementKind::Heading => "heading",
@@ -270,7 +270,7 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 34] = [
     ("strong", ElementKind::Strong),
     ("mark", ElementKind::Mark),
     ("codeblock", ElementKind::Codeblock),
-    ("blockquote", ElementKind::Blockquote),
+    ("quote", ElementKind::Quote),
     ("callout", ElementKind::Callout),
     ("table", ElementKind::Table),
     ("heading", ElementKind::Heading),
@@ -431,8 +431,8 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
         Meta | Config | Settings | Use | Include | References | Blueprint | Links | Hr
-        | Codeblock | Blockquote | Callout | Table | Heading | OrderedList | UnorderedList
-        | Kind | Version | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
+        | Codeblock | Callout | Table | Heading | OrderedList | UnorderedList | Kind | Version
+        | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
         Em | Strong | Mark => Shape::Inline,
         // Either shape. A link, an embed or an icon alone on a line is
         // not a structural error -- it is how you show one file, one
@@ -444,6 +444,13 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         // A path mention goes both ways too: inside a sentence, and alone
         // in a table cell where the cell is the reference.
         Link | Embed | Icon | File | Dir => return None,
+        // Either shape, and the reason the element is not called
+        // `blockquote`. HTML needs two names because `<blockquote>` and
+        // `<q>` are two elements; Tomet decides placement from position,
+        // so one name covers both and the prefix has nothing left to
+        // distinguish. Markdown never had an inline quote to distinguish
+        // it from either.
+        Quote => return None,
         // Either shape, for the same reason: a gap is sometimes a phrase
         // inside a sentence and sometimes a whole missing section.
         Draft | Fixme => return None,

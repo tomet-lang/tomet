@@ -37,7 +37,7 @@
 - 設定のドット記法を一般化する。`apply_entry`が`callout.style.content`のような
   キーごとに手書きの分岐を12本持っている。`.`で分割して入れ子にする一段を
   入れれば一本で済む。綴りは省略形なので重複ではないが、実装が重複している。
-- `format.blockquote.always_newline`と`migration`は`default.config.tmt`に
+- `format.quote.always_newline`と`migration`は`default.config.tmt`に
   書かれているが読む側が無い。実装するか消すか。
 - `@nocheck`                          // 検査の抑制。@draft/@fixme とは別の機能
                                       // (印を付けるのではなく、規則を止める)

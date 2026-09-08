@@ -11,6 +11,7 @@ use tomet_semantics::{
 };
 
 use crate::ast::{
+    QuoteType,
     Alignment, Attr, Block, Caption, Cell, ColSpec, ColWidth, Inline, ListAttributes, MetaValue,
     PandocDoc, Row, RowHeadColumns, TableBody, TableFoot, TableHead, TableParts, Target,
 };
@@ -94,7 +95,7 @@ fn element_to_blocks(el: &Element) -> Vec<Block> {
         )],
         "hr" => vec![Block::HorizontalRule],
         "codeblock" => vec![Block::CodeBlock(code_attr(el), content_to_plain_text(el))],
-        "blockquote" => vec![Block::BlockQuote(content_to_blocks(content_of(el)))],
+        "quote" => vec![Block::BlockQuote(content_to_blocks(content_of(el)))],
         "ol" | "ul" => vec![list_to_pandoc(el)],
         "table" => table_to_pandoc(el),
         // A path standing as a block is a listing row, so the
@@ -142,6 +143,14 @@ fn element_to_inlines(el: &Element) -> Vec<Inline> {
         // classes (HTML, docx) can style it.
         "mark" => vec![Inline::Span(
             Attr::with_class("mark"),
+            content_to_inlines(el),
+        )],
+        // Pandoc draws the same distinction Tomet draws by position:
+        // `BlockQuote` above for one standing alone, `Quoted` here for
+        // one inside a sentence. Double quotes, because that is what a
+        // quotation without a stated style is.
+        "quote" => vec![Inline::Quoted(
+            QuoteType::DoubleQuote,
             content_to_inlines(el),
         )],
         "link" => vec![Inline::Link(

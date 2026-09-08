@@ -945,9 +945,9 @@ mod tests {
         let md_plain = "> Plain quote text\n";
         let doc_plain = tomet_markdown::from_markdown(md_plain);
         let printed_plain = document_to_tm_with_config(&doc_plain, &PrinterConfig::default());
-        assert!(printed_plain.contains("@blockquote["));
+        assert!(printed_plain.contains("@quote["));
         assert!(printed_plain.contains("Plain quote text"));
-        assert!(!printed_plain.contains("@blockquote("));
+        assert!(!printed_plain.contains("@quote("));
     }
 
     #[test]

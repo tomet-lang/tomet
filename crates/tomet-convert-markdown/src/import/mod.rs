@@ -316,7 +316,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 push_block(stack, Block::Element(el));
             } else {
                 let el = Element {
-                    sigil: Sigil::named("blockquote"),
+                    sigil: Sigil::named("quote"),
                     placement: Placement::Block,
                     args: None,
                     content: Some(content),
@@ -1027,7 +1027,7 @@ mod tests {
         let doc = from_markdown("> quoted text\n");
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::named("blockquote"));
+                assert_eq!(el.sigil, Sigil::named("quote"));
                 assert_eq!(el.args, None);
                 assert_eq!(
                     el.content,
@@ -1049,7 +1049,7 @@ mod tests {
         let doc = from_markdown("> # Quoted Title\n>\n> more text\n");
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::named("blockquote"));
+                assert_eq!(el.sigil, Sigil::named("quote"));
                 let content = el.content.as_ref().expect("content");
                 assert!(
                     !content
@@ -1497,7 +1497,7 @@ mod tests {
         let Block::Element(el_plain) = &doc_plain.blocks[0] else {
             panic!("expected plain quote element");
         };
-        assert_eq!(el_plain.sigil, Sigil::named("blockquote"));
+        assert_eq!(el_plain.sigil, Sigil::named("quote"));
         assert_eq!(el_plain.args, None);
     }
 

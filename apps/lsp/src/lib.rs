@@ -871,7 +871,7 @@ fn describe_kind(name: &str) -> &'static str {
             "Declares the structure of one document kind, and what `tomet new` instantiates"
         }
         "codeblock" => "Verbatim code block",
-        "blockquote" => "Quote block",
+        "quote" => "Quote",
         "hr" => "Horizontal rule divider",
         "meta" => "Metadata key-value declaration",
         "config" => "Document-wide configuration",

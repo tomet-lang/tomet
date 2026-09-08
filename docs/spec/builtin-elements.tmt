@@ -219,21 +219,21 @@ kind の語彙も所有できず、共有語彙にすると穴のある文書す
 本文の骨格になる八つ。すべて block。
 
 @table[
-[ 要素         ][ region ][ display ][ singleton ][ 何であるか     ]
-[ `heading`    ][ body   ][ block   ][ ―         ][ 見出し         ]
-[ `ol`         ][ body   ][ block   ][ ―         ][ 順序つきリスト ]
-[ `ul`         ][ body   ][ block   ][ ―         ][ 順序なしリスト ]
-[ `table`      ][ body   ][ block   ][ ―         ][ 表             ]
-[ `codeblock`  ][ body   ][ block   ][ ―         ][ コードブロック ]
-[ `blockquote` ][ body   ][ block   ][ ―         ][ 引用           ]
-[ `callout`    ][ body   ][ block   ][ ―         ][ 注意書き       ]
-[ `hr`         ][ body   ][ block   ][ ―         ][ 水平線         ]
+[ 要素        ][ region ][ display    ][ singleton ][ 何であるか     ]
+[ `heading`   ][ body   ][ block      ][ ―         ][ 見出し         ]
+[ `ol`        ][ body   ][ block      ][ ―         ][ 順序つきリスト ]
+[ `ul`        ][ body   ][ block      ][ ―         ][ 順序なしリスト ]
+[ `table`     ][ body   ][ block      ][ ―         ][ 表             ]
+[ `codeblock` ][ body   ][ block      ][ ―         ][ コードブロック ]
+[ `quote`     ][ body   ][ どちらでも ][ ―         ][ 引用           ]
+[ `callout`   ][ body   ][ block      ][ ―         ][ 注意書き       ]
+[ `hr`        ][ body   ][ block      ][ ―         ][ 水平線         ]
 ]
 
 ```tm
 @heading(level: @int)[ display_name ]
 @codeblock(lang:@language)[ @code ]
-@blockquote[ @content ]
+@quote[ @content ]
 @callout(@variant)[ @content ]     // 位置引数は variant。`{title:}` も取る
 @callout(variant:info, title:@string)[ @content ]
 
