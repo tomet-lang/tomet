@@ -17,6 +17,7 @@
 | *x*          | em        |
 | **x**        | strong    |
 | ==x==        | mark      |
+
 [ 糖衣         ][ 要素      ]
 [ -            ][ ul        ]
 [ -.           ][ ol        ]
@@ -112,7 +113,7 @@
   ##[]{}
   @index()
   @codeblock()
-  @blockquote[]
+  @quote[]
 ]
 
 ##[ 例外 ]

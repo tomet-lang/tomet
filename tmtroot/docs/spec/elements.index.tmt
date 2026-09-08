@@ -1,0 +1,63 @@
+#[ Stable ]
+
+---[ Setting ]---
+
+```tm
+@version
+@meta
+@config
+@setting
+@kind
+@blueprint
+@vocabulary
+```
+
+---[ Expression ]---
+
+```tm
+@heading     | #
+@list        | - -.
+@embed
+@codeblock   | ```
+```
+
+---[ Literal ]---
+
+```tm
+@em          | *x*
+@strikeout   | ~~x~~
+@mark        | ==x==
+@fence       | `x`
+@quote
+```
+
+---[ Standard Vocabulary ]---
+
+```tm
+@callout
+```
+
+#[ Experimental ]
+
+```tm
+@table
+@references
+@id
+@links
+@file
+@dir
+@fixme
+@draft
+```
+
+#[ Draft ]
+
+```tm
+@crate
+@todo
+@tree
+@tag
+@index
+@latex
+@foot
+```
