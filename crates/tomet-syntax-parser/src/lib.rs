@@ -1523,16 +1523,28 @@ mod tests {
     }
 
     #[test]
-    fn a_second_args_group_is_parsed_as_subsequent_text() {
-        // The element does not end its line -- `(b:2)` trails it -- so the
-        // whole line is a paragraph holding the element plus that text.
-        let doc = parse_document("@T(a:1)(b:2)\n").unwrap();
+    fn a_second_group_written_against_the_first_is_an_error() {
+        // `docs/spec/syntax.tmt` calls a repeated group an error. It used
+        // to fall through instead: the group stayed where it stood and was
+        // read as prose, which also cost the element its block placement,
+        // so `@T(a:1)(b:2)` quietly became a paragraph.
+        let err = parse_document("@T(a:1)(b:2)\n").expect_err("a second (args) group should not parse");
+        assert!(err.message.contains("a second `(args)` group"), "{}", err.message);
+    }
+
+    #[test]
+    fn a_parenthesis_after_an_element_is_prose() {
+        // The narrowing that keeps ordinary sentences working: a group has
+        // to be written *against* the element to count as a second one.
+        // `@file(x) (it was ...)` is how `docs/.writ.tmt` and
+        // `tmtroot/agents.tmt` both write, and both parse.
+        let doc = parse_document("@T(a:1) (b:2)\n").unwrap();
         assert_eq!(doc.blocks.len(), 1);
         let Block::Paragraph(p) = &doc.blocks[0] else {
             panic!("expected a paragraph, got {:?}", doc.blocks[0]);
         };
         assert_eq!(p.content.len(), 2);
-        assert_eq!(&p.content[1], &Inline::Text("(b:2)".into()));
+        assert_eq!(&p.content[1], &Inline::Text(" (b:2)".into()));
         match &p.content[0] {
             Inline::Element(el) => {
                 assert_eq!(el.args, Some(Value::Map(vec![("a".into(), Value::Int(1))])));

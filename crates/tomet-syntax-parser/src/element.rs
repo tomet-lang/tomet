@@ -268,6 +268,47 @@ pub(crate) fn parse_groups(
                     el.value = Some(ElementValue::Raw(parse_fence(cur)?));
                     continue;
                 }
+                // A group whose slot is already filled. Every arm above
+                // guards on its slot being empty, so reaching here with an
+                // opener means a second one of the same kind. It used to
+                // fall through: the group was left where it stood and read
+                // as prose, which also cost the element its block
+                // placement, so `@memo(a: 1)(b: 2)` quietly became a
+                // paragraph. `docs/spec/syntax.tmt` calls it an error.
+                //
+                // `:` is the spelling for reaching a filled slot, and it
+                // merges rather than replaces -- see the connect branch
+                // above.
+                //
+                // Two things narrow this. The second group must be
+                // written *against* the first, with nothing skipped
+                // between them: `@file(x) (it was ...)` is an element and
+                // then a parenthesis in running prose, which `docs/.writ.tmt`
+                // and `tmtroot/agents.tmt` both do, and a `(` opening the
+                // next line is prose too. The spec's own example --
+                // `@xxx()(){}{}[][]` -- is adjacent, and adjacency is the
+                // only reading that leaves ordinary sentences alone.
+                //
+                // And `allow_colon_connect` is false in exactly the
+                // contexts where a trailing group may belong to something
+                // else -- a list item's own `{attrs}`, an entry inside a
+                // `{...}` group -- where this fall-through is what hands
+                // it over.
+                _ if allow_colon_connect && cur.pos() == checkpoint && opens_group(cur.peek()) => {
+                    let group = match cur.peek() {
+                        Some('(') => "(args)",
+                        Some('[') | Some('|') => "[content]",
+                        _ => "{value}",
+                    };
+                    return Err(err(
+                        cur,
+                        cur.pos(),
+                        format!(
+                            "a second `{group}` group: an element takes one of each. \
+                             Write `:` in front of it to merge into the one already there"
+                        ),
+                    ));
+                }
                 _ => {}
             }
         }
