@@ -342,11 +342,32 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
         let line = lines[i];
         let trimmed = line.trim();
 
-        // `#table` is the block form; `@table` is accepted too so an
-        // inline-written table still gets its columns laid out rather
-        // than being silently skipped.
-        if (trimmed.starts_with("@table") || trimmed.starts_with("@table")) && trimmed.contains('[')
-        {
+        let is_table_lead = trimmed.starts_with("@table");
+        let mut is_bracket_table = false;
+        let mut is_pipe_table = false;
+
+        if is_table_lead {
+            if trimmed.contains('[') {
+                is_bracket_table = true;
+            } else if trimmed.ends_with('|') {
+                is_pipe_table = true;
+            } else {
+                let mut next_idx = i + 1;
+                while next_idx < lines.len() && lines[next_idx].trim().is_empty() {
+                    next_idx += 1;
+                }
+                if next_idx < lines.len() {
+                    let next_trimmed = lines[next_idx].trim();
+                    if next_trimmed.starts_with('|') && extract_row_cells(lines[next_idx]).is_some() {
+                        is_pipe_table = true;
+                    } else if next_trimmed.starts_with('[') {
+                        is_bracket_table = true;
+                    }
+                }
+            }
+        }
+
+        if is_bracket_table || is_pipe_table {
             out_lines.push(line.to_string());
             i += 1;
 
@@ -356,11 +377,19 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
             while i < lines.len() {
                 let t_line = lines[i];
                 let t_trimmed = t_line.trim();
-                if t_trimmed == "]" || t_trimmed.starts_with("]{") || t_trimmed.starts_with("] ") {
-                    break;
+
+                if is_bracket_table {
+                    if t_trimmed == "]" || t_trimmed.starts_with("]{") || t_trimmed.starts_with("] ") {
+                        break;
+                    }
+                } else if is_pipe_table {
+                    if t_trimmed.is_empty() || !t_trimmed.starts_with('|') {
+                        break;
+                    }
                 }
-                if let Some((indent, cells)) = extract_row_cells(t_line) {
-                    table_rows.push((indent, cells));
+
+                if let Some((prefix, cells)) = extract_row_cells(t_line) {
+                    table_rows.push((prefix, cells));
                     raw_table_lines.push(None);
                 } else {
                     raw_table_lines.push(Some(t_line.to_string()));
@@ -411,7 +440,7 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
                     if let Some(other_line) = raw {
                         out_lines.push(other_line);
                     } else {
-                        let (indent, cells) = &table_rows[row_idx];
+                        let (prefix, cells) = &table_rows[row_idx];
                         row_idx += 1;
                         let mut formatted_cells = Vec::new();
                         for c_idx in 0..col_count {
@@ -452,12 +481,12 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
                             let right_str = " ".repeat(right_spaces);
                             formatted_cells.push(format!("[{left_str}{cell_text}{right_str}]"));
                         }
-                        out_lines.push(format!("{indent}{}", formatted_cells.join("")));
+                        out_lines.push(format!("{prefix}{}", formatted_cells.join("")));
                     }
                 }
             }
 
-            if i < lines.len() {
+            if is_bracket_table && i < lines.len() {
                 out_lines.push(lines[i].to_string());
                 i += 1;
             }
@@ -518,17 +547,28 @@ fn text_display_width(s: &str) -> usize {
 }
 
 fn extract_row_cells(line: &str) -> Option<(String, Vec<String>)> {
-    let trimmed = line.trim();
+    let indent_len = line.len() - line.trim_start().len();
+    let indent = &line[..indent_len];
+    let rest = &line[indent_len..];
+
+    let (prefix, cells_part) = if rest.starts_with('|') {
+        let after_pipe = &rest[1..];
+        let spaces_len = after_pipe.len() - after_pipe.trim_start().len();
+        let space_str = if spaces_len > 0 { &after_pipe[..spaces_len] } else { "" };
+        (format!("{indent}|{space_str}"), after_pipe.trim_start())
+    } else {
+        (indent.to_string(), rest)
+    };
+
+    let trimmed = cells_part.trim();
     if !trimmed.starts_with('[') || !trimmed.ends_with(']') {
         return None;
     }
-    let indent_len = line.len() - line.trim_start().len();
-    let indent = line[..indent_len].to_string();
 
     let mut cells = Vec::new();
     let mut depth = 0;
     let mut cell_start = 0;
-    let chars: Vec<(usize, char)> = line[indent_len..].char_indices().collect();
+    let chars: Vec<(usize, char)> = cells_part.char_indices().collect();
 
     for &(byte_idx, c) in &chars {
         if c == '[' {
@@ -539,14 +579,14 @@ fn extract_row_cells(line: &str) -> Option<(String, Vec<String>)> {
         } else if c == ']' {
             depth -= 1;
             if depth == 0 {
-                let cell_content = &line[indent_len..][cell_start..byte_idx];
+                let cell_content = &cells_part[cell_start..byte_idx];
                 cells.push(cell_content.to_string());
             }
         }
     }
 
     if depth == 0 && !cells.is_empty() {
-        Some((indent, cells))
+        Some((prefix, cells))
     } else {
         None
     }
@@ -856,5 +896,19 @@ mod tests {
         let out = format_source_with_config(src, &config);
         assert!(out.contains("[ 電子数 2n² ]"));
         assert!(out.contains("[          2 ]"));
+    }
+
+    #[test]
+    fn test_format_tables_with_pipe_syntax() {
+        let src = "@table\n|[ feature ][ lsp ][ vscode ][ zed ][ neovim ][ helix ]\n|[ highlight ][ o ][ o ][ o ][ o ][ o ]\n|[ suggestion ][ ][ ][ ][ ][ ]\n|[ auto complete ][ ][ ][ ][ ][ ]\n";
+        let mut config = PrinterConfig::default();
+        config.table_adjust_width = Some("auto".to_string());
+        config.table_max_col_width = Some(20);
+
+        let out = format_source_with_config(src, &config);
+        assert!(out.contains("|[ feature       ][ lsp ][ vscode ][ zed ][ neovim ][ helix ]"));
+        assert!(out.contains("|[ highlight     ][ o   ][ o      ][ o   ][ o      ][ o     ]"));
+        assert!(out.contains("|[ suggestion    ][     ][        ][     ][        ][       ]"));
+        assert!(out.contains("|[ auto complete ][     ][        ][     ][        ][       ]"));
     }
 }
