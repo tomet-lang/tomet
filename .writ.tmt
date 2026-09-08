@@ -20,7 +20,7 @@ does not relax the rule to fit the change it wanted to make.
   layers: {
     6: [ "apps/*", "bindings/*", "editors/*", "tests" ]
     5: [ "crates/tomet-workspace", "crates/tomet-workspace-indexer", "crates/tomet-workspace-links", "crates/tomet-load" ]
-    4: [ "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet" ]
+    4: [ "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet", "crates/tomet-extract" ]
     3: [ "crates/tomet-config" ]
     2: [ "crates/tomet-semantics*" ]
     1: [ "crates/tomet-syntax-*" ]
@@ -37,9 +37,9 @@ Layer 0 depends on no workspace member at all. Things may depend on it --
 is the hand-maintained grammar approximation and is only worth having while
 it stays independent of the parser.
 
-@dir(crates/serde_tomet) is listed by name in layer 4. It is an ecosystem
-adapter rather than a producer, and its name carries no layer prefix to
-match on.
+@dir(crates/serde_tomet) and @dir(crates/tomet-extract) are listed by name in layer 4. They are ecosystem
+adapters (external serialization and multi-language comment/markup extraction) rather than internal
+syntax or semantics producers, and their names carry no prefix shared with the producer groups.
 
 A pattern ending in `*` matches by prefix; every other pattern is exact.
 Patterns are directory paths relative to the workspace root, because the

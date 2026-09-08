@@ -1,0 +1,10 @@
+[package]
+name = "tomet-extract"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-cst = { workspace = true }
+tomet-tree = { workspace = true }
+tomet-parser = { workspace = true }
