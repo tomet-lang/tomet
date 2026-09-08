@@ -173,10 +173,26 @@ function updateDecorations(editor: vscode.TextEditor | undefined): void {
 	const colDecorations: vscode.DecorationOptions[][] = tableColumnDecorationTypes.map(() => []);
 
 	let inTable = false;
+	let tableKind: "bracket" | "pipe" | undefined;
 	let pendingTableHeader = false;
 	for (let lineIdx = 0; lineIdx < lineCount; lineIdx++) {
 		const line = doc.lineAt(lineIdx).text;
 		const trimmed = line.trim();
+
+		if (inTable) {
+			if (tableKind === "bracket") {
+				if (trimmed === "]" || trimmed.startsWith("]{") || trimmed.startsWith("] ")) {
+					inTable = false;
+					tableKind = undefined;
+					continue;
+				}
+			} else if (tableKind === "pipe") {
+				if (!trimmed.startsWith("|") || trimmed === "") {
+					inTable = false;
+					tableKind = undefined;
+				}
+			}
+		}
 
 		if (!inTable) {
 			if (
@@ -186,26 +202,34 @@ function updateDecorations(editor: vscode.TextEditor | undefined): void {
 				(trimmed.startsWith("<table") && trimmed.includes("["))
 			) {
 				inTable = true;
+				tableKind = "bracket";
+				pendingTableHeader = false;
+			} else if (trimmed.startsWith("@table|") || trimmed.startsWith("<table|")) {
+				inTable = true;
+				tableKind = "pipe";
 				pendingTableHeader = false;
 			} else if (trimmed.startsWith("@table") || trimmed.startsWith("<table")) {
 				pendingTableHeader = true;
 			} else if (pendingTableHeader) {
-				if (trimmed.includes("[")) {
+				if (trimmed.startsWith("|")) {
 					inTable = true;
+					tableKind = "pipe";
+					pendingTableHeader = false;
+				} else if (trimmed.includes("[")) {
+					inTable = true;
+					tableKind = "bracket";
 					pendingTableHeader = false;
 				} else if (!trimmed.startsWith("(") && !trimmed.endsWith(")") && !trimmed.includes(":")) {
 					pendingTableHeader = false;
 				}
 			}
-		} else {
-			if (trimmed === "]" || trimmed.startsWith("]{") || trimmed.startsWith("] ")) {
-				inTable = false;
-			} else {
-				const cellRanges = extractTableRowCells(line, lineIdx);
-				for (let c = 0; c < cellRanges.length; c++) {
-					const decIdx = c % tableColumnDecorationTypes.length;
-					colDecorations[decIdx].push({ range: cellRanges[c] });
-				}
+		}
+
+		if (inTable) {
+			const cellRanges = extractTableRowCells(line, lineIdx);
+			for (let c = 0; c < cellRanges.length; c++) {
+				const decIdx = c % tableColumnDecorationTypes.length;
+				colDecorations[decIdx].push({ range: cellRanges[c] });
 			}
 		}
 	}
@@ -250,10 +274,60 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				client = undefined;
 			}
 			await startClient();
+		}),
+		vscode.commands.registerTextEditorCommand("tomet.onEnterKey", (editor) => {
+			handleOnEnterKey(editor);
 		})
 	);
 
 	await startClient();
+}
+
+function handleOnEnterKey(editor: vscode.TextEditor): void {
+	const pos = editor.selection.active;
+	const line = editor.document.lineAt(pos.line);
+	const textBeforeCursor = line.text.slice(0, pos.character);
+	const textAfterCursor = line.text.slice(pos.character);
+
+	const indentMatch = textBeforeCursor.match(/^(\s*)/);
+	const indent = indentMatch ? indentMatch[1] : "";
+
+	// 1. Check if the line only has an empty marker -> exit list / pipe (clear marker)
+	const emptyMarkerRegex = /^(\s*)(-\s*\([^)]*\)\s*|-\.\s*|-\s*|\|\s*\[\s*\]?\s*|\|\s*)$/;
+	if (emptyMarkerRegex.test(textBeforeCursor) && textAfterCursor.trim().length === 0) {
+		editor.edit((editBuilder) => {
+			editBuilder.delete(line.range);
+			if (indent.length > 0) {
+				editBuilder.insert(line.range.start, indent);
+			}
+		});
+		return;
+	}
+
+	// 2. Check for continue list or pipe markers
+	let markerToAppend: string | undefined;
+
+	if (/^(\s*)\|\s*\[.+/.test(textBeforeCursor)) {
+		markerToAppend = "|[ ";
+	} else if (/^(\s*)\|\s+.+/.test(textBeforeCursor)) {
+		markerToAppend = "| ";
+	} else if (/^(\s*)-\s*\([^)]*\)\s+.+/.test(textBeforeCursor)) {
+		markerToAppend = "- ( ) ";
+	} else if (/^(\s*)-\.\s+.+/.test(textBeforeCursor)) {
+		markerToAppend = "-. ";
+	} else if (/^(\s*)-\s+.+/.test(textBeforeCursor)) {
+		markerToAppend = "- ";
+	}
+
+	if (markerToAppend) {
+		editor.edit((editBuilder) => {
+			editBuilder.insert(pos, "\n" + indent + markerToAppend);
+		});
+		return;
+	}
+
+	// Fallback: default newline behavior
+	vscode.commands.executeCommand("type", { source: "keyboard", text: "\n" });
 }
 
 async function startClient(): Promise<void> {
