@@ -145,6 +145,7 @@ fn element_to_md(cx: &RenderCtx, el: &Element, inline: bool) -> String {
         "em" => format!("*{}*", content_to_md(cx, el)),
         "strong" => format!("**{}**", content_to_md(cx, el)),
         "mark" => format!("<mark>{}</mark>", content_to_md(cx, el)),
+        "strikeout" => format!("~~{}~~", content_to_md(cx, el)),
         "codeblock" => render_code_block(el),
         "quote" => render_quote(cx, el, inline),
         "callout" => render_callout(cx, el),

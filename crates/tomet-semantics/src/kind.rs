@@ -102,6 +102,10 @@ pub enum ElementKind {
     Em,
     Strong,
     Mark,
+    /// `~~x~~` -- struck through. Says the words were withdrawn,
+    /// not how to draw them, which is why this is here and `smallcaps`
+    /// is not.
+    Strikeout,
     Codeblock,
     Quote,
     /// `@callout(variant)[ ... ]` -- an admonition.
@@ -188,6 +192,7 @@ impl ElementKind {
             ElementKind::Em => "em",
             ElementKind::Strong => "strong",
             ElementKind::Mark => "mark",
+            ElementKind::Strikeout => "strikeout",
             ElementKind::Codeblock => "codeblock",
             ElementKind::Quote => "quote",
             ElementKind::Callout => "callout",
@@ -231,7 +236,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 34] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -269,6 +274,7 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 34] = [
     ("em", ElementKind::Em),
     ("strong", ElementKind::Strong),
     ("mark", ElementKind::Mark),
+    ("strikeout", ElementKind::Strikeout),
     ("codeblock", ElementKind::Codeblock),
     ("quote", ElementKind::Quote),
     ("callout", ElementKind::Callout),
@@ -433,7 +439,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         Meta | Config | Settings | Use | Include | References | Blueprint | Links | Hr
         | Codeblock | Callout | Table | Heading | OrderedList | UnorderedList | Kind | Version
         | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
-        Em | Strong | Mark => Shape::Inline,
+        Em | Strong | Mark | Strikeout => Shape::Inline,
         // Either shape. A link, an embed or an icon alone on a line is
         // not a structural error -- it is how you show one file, one
         // image, one glyph. What `shape_mismatch` is for is the case

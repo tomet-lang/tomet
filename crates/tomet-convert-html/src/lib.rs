@@ -330,6 +330,10 @@ fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) 
         "icon" => render_icon_element(cx, el, out, inline),
         "hr" => render_hr_element(cx, el, out),
         "em" | "strong" | "mark" => render_wrapped_inline(cx, el, kind.as_str(), out),
+        // `<del>` rather than a `strikeout` tag: the element's name is
+        // Tomet's, and `<del>` is what GFM's `~~` renders as everywhere
+        // it is read.
+        "strikeout" => render_wrapped_inline(cx, el, "del", out),
         "codeblock" => render_codeblock_element(el, out),
         "quote" => render_quote_element(cx, el, out, inline),
         "table" => render_table_element(cx, el, out),

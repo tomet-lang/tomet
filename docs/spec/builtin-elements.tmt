@@ -1,6 +1,6 @@
 #[ 組み込み要素 ]
 
-34個。`tomet-semantics` の `BUILTIN_KINDS` が唯一の登録場所である。裸で書ける
+35個。`tomet-semantics` の `BUILTIN_KINDS` が唯一の登録場所である。裸で書ける
 名前はここにあるものと、その文書自身の `@kind` が指す語彙のものだけで、それ以外は
 名前空間を書くか `@use` で束縛する。
 
@@ -243,14 +243,15 @@ kind の語彙も所有できず、共有語彙にすると穴のある文書す
 
 ##[ 文字 ]
 
-地の文の中で一語や一字を扱う四つ。
+地の文の中で一語や一字を扱う五つ。
 
 @table[
-[ 要素     ][ region ][ display    ][ singleton ][ 何であるか ]
-[ `em`     ][ body   ][ inline     ][ ―         ][ 強調       ]
-[ `strong` ][ body   ][ inline     ][ ―         ][ 強い強調   ]
-[ `mark`   ][ body   ][ inline     ][ ―         ][ ハイライト ]
-[ `icon`   ][ body   ][ どちらでも ][ ―         ][ 字形ひとつ ]
+[ 要素        ][ region ][ display    ][ singleton ][ 何であるか ]
+[ `em`        ][ body   ][ inline     ][ ―         ][ 強調       ]
+[ `strong`    ][ body   ][ inline     ][ ―         ][ 強い強調   ]
+[ `mark`      ][ body   ][ inline     ][ ―         ][ ハイライト ]
+[ `strikeout` ][ body   ][ inline     ][ ―         ][ 取り消し線 ]
+[ `icon`      ][ body   ][ どちらでも ][ ―         ][ 字形ひとつ ]
 ]
 
 `icon` は組み込みの名前だが、アイコンを実際に引いて表示する処理はまだ無い。名前が

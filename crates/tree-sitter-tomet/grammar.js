@@ -285,6 +285,7 @@ module.exports = grammar({
 				$.emphasis,
 				$.strong,
 				$.mark,
+				$.strikeout,
 				$.element,
 				$.interpolation,
 				$.punctuation,
@@ -314,7 +315,7 @@ module.exports = grammar({
 		// back to `punctuation` like the others.
 		// `#` is excluded so `heading_marker` can win at a line start; `<`
 		// no longer needs excluding, since it is not a sigil any more.
-		text: (_$) => /[^\n`*_=@$#()\[{\]/|-]+/,
+		text: (_$) => /[^\n`*_=~@$#()\[{\]/|-]+/,
 
 		// `-` is a bare string literal alternative here, not folded into
 		// the character class like the others, so it's the *same* grammar
@@ -342,7 +343,7 @@ module.exports = grammar({
 		// `#` and `<` join the same fallback set: a `#` that does not
 		// start a heading or a block element, and any `<` at all, are
 		// ordinary prose and need something to reduce to.
-		punctuation: (_$) => choice(/[()\[{/<>|]/, "-", "$", "#"),
+		punctuation: (_$) => choice(/[()\[{/<>|~]/, "-", "$", "#"),
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -356,6 +357,9 @@ module.exports = grammar({
 				seq("__", repeat1($._bracket_item_no_underscore), "__"),
 			),
 		mark: ($) => seq("==", repeat1($._bracket_item_no_equals), "=="),
+		// GFM's spelling, and Tomet's. Same shape as `mark`: a paired
+		// delimiter with its own excluded character inside.
+		strikeout: ($) => seq("~~", repeat1($._bracket_item_no_tilde), "~~"),
 
 		// No nested `emphasis`/`strong` here (unlike `_bracket_item_no_equals`
 		// below) -- `*`/`**`/`_`/`__` all share a delimiter character, and
@@ -368,22 +372,24 @@ module.exports = grammar({
 				$.code_span,
 				$.block_comment,
 				$.mark,
+				$.strikeout,
 				$.element,
 				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*=<@$()\[{\]/|]+/, $.text),
+				alias(/[^\n`*=~<@$()\[{\]/|]+/, $.text),
 			),
 		_bracket_item_no_underscore: ($) =>
 			choice(
 				$.code_span,
 				$.block_comment,
 				$.mark,
+				$.strikeout,
 				$.element,
 				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`_=<@$()\[{\]/|]+/, $.text),
+				alias(/[^\n`_=~<@$()\[{\]/|]+/, $.text),
 			),
 		_bracket_item_no_equals: ($) =>
 			choice(
@@ -391,11 +397,25 @@ module.exports = grammar({
 				$.block_comment,
 				$.emphasis,
 				$.strong,
+				$.strikeout,
 				$.element,
 				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*_=<@$()\[{\]/|]+/, $.text),
+				alias(/[^\n`*_=~<@$()\[{\]/|]+/, $.text),
+			),
+		_bracket_item_no_tilde: ($) =>
+			choice(
+				$.code_span,
+				$.block_comment,
+				$.emphasis,
+				$.strong,
+				$.mark,
+				$.element,
+				$.interpolation,
+				$._newline,
+				$.punctuation,
+				alias(/[^\n`*_=~<@$()\[{\]/|]+/, $.text),
 			),
 
 		// ---- `${...}` interpolation ---------------------------------------

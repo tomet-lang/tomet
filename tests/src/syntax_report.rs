@@ -268,8 +268,8 @@ const CASES: &[Case] = &[
     // ---- inline markup ----------------------------------------------
     case(
         Some("インライン記法"),
-        "強調・太字・マーク・コード",
-        "*em* と **strong** と ==mark== と `code`\n",
+        "強調・太字・マーク・取り消し線・コード",
+        "*em* と **strong** と ==mark== と ~~strikeout~~ と `code`\n",
     ),
     case(None, "自動リンク", "見て https://example.com/x ください\n"),
     // ---- breaks and code --------------------------------------------
