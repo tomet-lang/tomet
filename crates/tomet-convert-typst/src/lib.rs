@@ -134,7 +134,7 @@ fn element_to_typst(el: &Element, inline: bool) -> String {
         "strong" => format!("*{}*", content_to_typst(el)),
         "mark" => format!("#highlight[{}]", content_to_typst(el)),
         "codeblock" => render_code_block(el),
-        "blockquote" => render_blockquote(el),
+        "quote" => render_quote(el, inline),
         "callout" => render_callout(el),
         "table" => render_table(el),
         "link" => render_link(el),
@@ -164,9 +164,13 @@ fn render_hr(el: &Element) -> String {
     }
 }
 
-/// Typst has no bare `>` blockquote markup shorthand -- `#quote(block:
-/// true)[...]` is the built-in function form.
-fn render_blockquote(el: &Element) -> String {
+/// Typst has no bare `>` markup shorthand; `#quote` is the built-in
+/// function, and its own `block:` parameter is exactly the distinction
+/// Tomet draws by position.
+fn render_quote(el: &Element, inline: bool) -> String {
+    if inline {
+        return format!("#quote[{}]", content_to_typst(el));
+    }
     format!("#quote(block: true)[{}]", content_to_typst(el))
 }
 
@@ -612,7 +616,7 @@ mod tests {
     #[test]
     fn renders_blockquote() {
         assert_eq!(
-            typst("@blockquote[ some quoted text ]\n"),
+            typst("@quote[ some quoted text ]\n"),
             "#quote(block: true)[some quoted text]\n\n"
         );
     }

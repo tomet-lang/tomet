@@ -58,7 +58,7 @@ sudo whoami ls --help
   don't forget: check [this] and [that]
 +++
 
-@blockquote[引用文]
+@quote[引用文]
 
 - outline/list
 

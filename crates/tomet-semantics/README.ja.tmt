@@ -9,7 +9,7 @@ AST 要素の意味分類・抽出および引数正規化を行う純粋セマ�
    - 下流クレート（`tomet-html`, `tomet-markdown`, `tomet-links`, `tomet-tui`, `tomet-lsp` など）がパーサーに依存することなく要素の分類と正規化を利用できます。
 
 -. **主な機能モジュール**:
-   - **要素分類 (`kind.rs`)**: 組み込み要素名（`@meta`, `@config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`, `codeblock`, `blockquote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`）の正統な判定 (`classify(&Element) -> ElementKind`)
+   - **要素分類 (`kind.rs`)**: 組み込み要素名（`@meta`, `@config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`, `codeblock`, `quote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`）の正統な判定 (`classify(&Element) -> ElementKind`)
    - **リンクターゲット抽出とスキーム判定 (`target.rs`)**: `target:` 引数および位置引数からのリンク先抽出 (`link_target`) とスキーム (`url`, `file`, `tm`, `id`, `ref`) の判定 (`target_scheme`)
    - **位置引数の正規化 (`positional.rs`)**: 組み込み要素や `@settings` によるカスタム要素スキーマに基づく位置引数 (`<codeblock>(rust)` -> `{lang: "rust"}`) の正規化と、パーサーの識別子分割により分離されたスキームプレフィックス (`tm:foo` など) の復元
    - **ドキュメント設定抽出 (`config.rs`)**: `@config` および `@settings` ブロックからエクスポート形式、出力先パス、テーブル幅調整などの設定を構造体 `DocumentConfig` に統合

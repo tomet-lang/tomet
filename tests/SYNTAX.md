@@ -712,13 +712,13 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 ### `|` は `[` が置ける位置に置ける。`]` の代わりに、`|` で始まる行の連なりの終わりで閉じる
 
 ```tmt
-@blockquote(A)
+@quote(A)
 | 一行目
 | 二行目
 ```
 
 ```
-Block  @blockquote
+Block  @quote
   args    "A"
   content
     Text "一行目二行目"
@@ -727,12 +727,12 @@ Block  @blockquote
 ### 同じものを括弧で書いた形。木は一致する
 
 ```tmt
-@blockquote(A)[ 一行目
+@quote(A)[ 一行目
   二行目 ]
 ```
 
 ```
-Block  @blockquote
+Block  @quote
   args    "A"
   content
     Text "一行目二行目"
@@ -741,11 +741,11 @@ Block  @blockquote
 ### 要素の行で開いてもよい
 
 ```tmt
-@blockquote| 本文
+@quote| 本文
 ```
 
 ```
-Block  @blockquote
+Block  @quote
   content
     Text "本文"
 ```

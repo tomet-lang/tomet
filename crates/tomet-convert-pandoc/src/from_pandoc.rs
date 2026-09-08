@@ -146,7 +146,7 @@ fn block_element(block: &Block) -> Element {
             el
         }
         Block::BlockQuote(blocks) => {
-            let mut el = element_new(Sigil::named("blockquote"));
+            let mut el = element_new(Sigil::named("quote"));
             el.content = Some(blocks_to_content(blocks));
             el
         }
@@ -164,7 +164,7 @@ fn block_element(block: &Block) -> Element {
             el
         }
         Block::LineBlock(lines) => {
-            let mut el = element_new(Sigil::named("blockquote"));
+            let mut el = element_new(Sigil::named("quote"));
             let mut content = Vec::new();
             for line in lines {
                 content.extend(inlines_from_pandoc(line));
@@ -329,7 +329,11 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
         Inline::Superscript(inner) | Inline::Subscript(inner) => {
             inline_element("mark", &Attr::empty(), inner)
         }
-        Inline::Quoted(_, inner) => inline_element("mark", &Attr::empty(), inner),
+        // A quotation is not a highlight. It used to become one: there
+        // was no inline quote element to give it, so it went to the
+        // nearest builtin, and `mark` is a builtin so the document
+        // validated and nobody saw it.
+        Inline::Quoted(_, inner) => inline_element("quote", &Attr::empty(), inner),
         Inline::Link(attr, text, target) => {
             let mut el = named_element("link", attr);
             merge_arg(&mut el, "target", Value::String(target.0.clone()));
@@ -343,7 +347,7 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
             TmInline::Element(el)
         }
         Inline::Note(blocks) => {
-            let mut el = element_new(Sigil::named("blockquote"));
+            let mut el = element_new(Sigil::named("quote"));
             el.content = Some(blocks_to_content(blocks));
             TmInline::Element(el)
         }

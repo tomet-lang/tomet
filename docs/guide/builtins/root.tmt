@@ -15,7 +15,7 @@
 [ 語彙     ][ 要素そのものを宣言する ][ `vocabulary` `element` `param` `args` `data` `content` ]
 [ 印       ][ 書きかけの箇所を印す   ][ `draft` `fixme` ]
 [ 外を指す ][ 外や、文書の別の場所へ ][ `references` `links` `link` `embed` ]
-[ 構造     ][ 本文の骨格を作る       ][ `heading` `ol` `ul` `table` `codeblock` `blockquote` `callout` `hr` ]
+[ 構造     ][ 本文の骨格を作る       ][ `heading` `ol` `ul` `table` `codeblock` `quote` `callout` `hr` ]
 [ 文字     ][ 地の文の中で一語を扱う ][ `em` `strong` `mark` `icon` ]
 ]
 
@@ -43,8 +43,8 @@
 [ `==x==`        ][ `mark`      ]
 ]
 
-残りの `blockquote` `table` `callout` `link` `embed` `icon` は名前で書く。
-`@blockquote[ ... ]` と書くことになる。
+残りの `quote` `table` `callout` `link` `embed` `icon` は名前で書く。
+`@quote[ ... ]` と書くことになる。
 
 `>` が引用の糖衣でないのは、方針ではなく綴りの都合である。`<` と `>` が単体で
 持つ属性は向きだけで、その札は `->`（矢印）、`->()->`（意味つき矢印）、
@@ -52,7 +52,7 @@
 単体の `<` `>` は向きを意味する ── そこに引用を混ぜると、その一貫性が崩れる。
 
 本文を行またぎで書きたいだけなら `|` がある。`[content]` を括弧なしで開く
-綴りで、`@blockquote| 一行目` の続きを次の行の `|` に書ける。
+綴りで、`@quote| 一行目` の続きを次の行の `|` に書ける。
 
 `---[ 見出し ]---` は heading ではなく、題のついた `hr` である。節を区切るが、
 文書の階層は作らない。

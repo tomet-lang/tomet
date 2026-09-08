@@ -331,7 +331,7 @@ fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) 
         "hr" => render_hr_element(cx, el, out),
         "em" | "strong" | "mark" => render_wrapped_inline(cx, el, kind.as_str(), out),
         "codeblock" => render_codeblock_element(el, out),
-        "blockquote" => render_blockquote_element(cx, el, out, inline),
+        "quote" => render_quote_element(cx, el, out, inline),
         "table" => render_table_element(cx, el, out),
         _ => render_generic_element(cx, el, kind.as_str(), out, inline),
     }
@@ -470,15 +470,20 @@ fn render_codeblock_element(el: &Element, out: &mut String) {
     out.push_str("</code></pre>\n");
 }
 
-/// `<blockquote>[...]` -- the Markdown importer's mapping for block
-/// quotes. Only single-block quotes round-trip cleanly; multi-block
-/// quotes are already flattened into one inline run on import.
-fn render_blockquote_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
-    out.push_str("<blockquote>");
+/// `<blockquote>` standing alone, `<q>` inside a sentence.
+///
+/// HTML needs two element names for this because it has two elements.
+/// Tomet has one, `@quote`, and decides which by position -- the same
+/// rule everything else here is placed by. Only single-block quotes
+/// round-trip cleanly; multi-block quotes are already flattened into one
+/// inline run on import.
+fn render_quote_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
+    let tag = if inline { "q" } else { "blockquote" };
+    out.push_str(&format!("<{tag}>"));
     if let Some(content) = &el.content {
         render_inlines(cx, content, out);
     }
-    out.push_str("</blockquote>");
+    out.push_str(&format!("</{tag}>"));
     if !inline {
         out.push('\n');
     }
@@ -996,7 +1001,7 @@ mod tests {
         // `render_element`'s generic rendering, keyed on its kind name.
         // (This used to be demonstrated with a nested `@heading`; headings
         // are block-shaped now, so an inline one is not expressible.)
-        let doc = parse_document("@blockquote[ @deck.badge(2)[Nested] ]\n").unwrap();
+        let doc = parse_document("@quote[ @deck.badge(2)[Nested] ]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,

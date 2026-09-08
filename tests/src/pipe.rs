@@ -25,18 +25,18 @@ use tomet_parser::parse_document;
 const SAME: &[(&str, &str, &str)] = &[
     (
         "a body opened on the line after the element",
-        "@blockquote(A)\n| alpha\n| beta\n",
-        "@blockquote(A)[ alpha\n  beta ]\n",
+        "@quote(A)\n| alpha\n| beta\n",
+        "@quote(A)[ alpha\n  beta ]\n",
     ),
     (
         "a body opened on the element's own line",
-        "@blockquote| alpha\n",
-        "@blockquote[ alpha ]\n",
+        "@quote| alpha\n",
+        "@quote[ alpha ]\n",
     ),
     (
         "wide characters fold with no space either way",
-        "@blockquote\n| 一行目\n| 二行目\n",
-        "@blockquote[ 一行目\n  二行目 ]\n",
+        "@quote\n| 一行目\n| 二行目\n",
+        "@quote[ 一行目\n  二行目 ]\n",
     ),
     (
         "a table's rows",
@@ -158,7 +158,7 @@ fn a_marker_with_nothing_to_continue_is_prose() {
 /// A blank line closes every block, and a run is no exception.
 #[test]
 fn a_blank_line_closes_a_run() {
-    let doc = parse_document("@blockquote\n| a\n| b\n\n| c\n").unwrap();
+    let doc = parse_document("@quote\n| a\n| b\n\n| c\n").unwrap();
     assert_eq!(doc.blocks.len(), 2);
     assert!(matches!(doc.blocks[0], Block::Element(_)));
     assert!(matches!(doc.blocks[1], Block::Paragraph(_)));

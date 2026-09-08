@@ -161,7 +161,7 @@ Cargo の `[workspace] members` と同じ形である。文字列ひとつは要
 `default.config.tmt` に書かれているが、今のところどこからも読まれない。
 
 @table[
-[ キー                               ][ 意図                                ]
-[ `format.blockquote.always_newline` ][ `@blockquote` の内容を改行で分ける  ]
-[ `migration`                        ][ Markdown から取り込むときの変換規則 ]
+[ キー                          ][ 意図                                ]
+[ `format.quote.always_newline` ][ `@quote` の内容を改行で分ける       ]
+[ `migration`                   ][ Markdown から取り込むときの変換規則 ]
 ]

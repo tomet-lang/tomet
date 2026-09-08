@@ -146,7 +146,7 @@ fn element_to_md(cx: &RenderCtx, el: &Element, inline: bool) -> String {
         "strong" => format!("**{}**", content_to_md(cx, el)),
         "mark" => format!("<mark>{}</mark>", content_to_md(cx, el)),
         "codeblock" => render_code_block(el),
-        "blockquote" => render_blockquote(cx, el),
+        "quote" => render_quote(cx, el, inline),
         "callout" => render_callout(cx, el),
         "table" => render_table(cx, el),
         "link" => render_link(cx, el),
@@ -319,8 +319,19 @@ fn fence_for(code: &str) -> String {
     "`".repeat((longest_run + 1).max(3))
 }
 
-fn render_blockquote(cx: &RenderCtx, el: &Element) -> String {
+/// `>` for a quote standing alone; quotation marks for one inside a
+/// sentence.
+///
+/// CommonMark has no inline quote -- `>` is the only quote construct it
+/// has, and it is block-only. The marks are the whole of what an inline
+/// quote is in Markdown, so that is what it becomes; a reader importing
+/// the result back sees text, which is what any Markdown reader would
+/// have seen anyway.
+fn render_quote(cx: &RenderCtx, el: &Element, inline: bool) -> String {
     let text = content_to_md(cx, el);
+    if inline {
+        return format!("\u{201c}{text}\u{201d}");
+    }
     text.lines()
         .map(|line| format!("> {line}"))
         .collect::<Vec<_>>()
@@ -599,7 +610,7 @@ fn is_common_html_tag(name: &str) -> bool {
             | "base"
             | "bdi"
             | "bdo"
-            | "blockquote"
+            | "quote"
             | "body"
             | "br"
             | "button"
