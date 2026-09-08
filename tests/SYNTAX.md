@@ -678,6 +678,35 @@ Block  @memo
 unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
+### 同じ種類のグループを続けて書くとエラー。`:` を前に置けば、既にあるほうへマージされる
+
+```tmt
+@memo(a: 1)(b: 2)
+```
+
+```
+parse error: 1:12: a second `(args)` group: an element takes one of each. Write `:` in front of it to merge into the one already there
+```
+
+### 空白を挟めば地の文の括弧。`@file(x) (説明)` が壊れないための線引き
+
+```tmt
+@memo(a: 1) (b: 2)
+```
+
+```
+Paragraph
+  Inline @memo
+    args    {a: 1}
+  Text " (b: 2)"
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
+```
+
 ## `|` で開く内容
 
 ### `|` は `[` が置ける位置に置ける。`]` の代わりに、`|` で始まる行の連なりの終わりで閉じる
