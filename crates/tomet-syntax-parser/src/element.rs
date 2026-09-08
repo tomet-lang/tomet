@@ -19,9 +19,9 @@ use tomet_tree::{ElementExt, element_new};
 /// `[content]`. It only widens what may follow the name, never the sigil
 /// or the name itself:
 ///
-/// - anywhere: a group (see [`opens_group`]), a `:` connect, or a `+++`
-///   fence must follow. This is what keeps `me@example.com` and a lone
-///   `@foo` in running prose as plain text.
+/// - anywhere: a group (see [`opens_group`]), a `:` that a `:name` family
+///   member follows, or a `+++` fence must follow. This is what keeps
+///   `me@example.com` and a lone `@foo` in running prose as plain text.
 /// - in block context only: end-of-line also counts, so `@memo` alone on
 ///   its line is an element. It then fails later, in `tomet-semantics`,
 ///   as an unknown bare name -- the intended report, and the reason no
@@ -43,10 +43,22 @@ pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
         return false;
     }
     skip_lookahead_gap(&mut look);
-    opens_group(look.peek())
-        || look.peek() == Some(':')
-        || is_fence_start(&look)
-        || (block_context && matches!(look.peek(), None | Some('\n') | Some('\r')))
+    if opens_group(look.peek()) || is_fence_start(&look) {
+        return true;
+    }
+    // A `:` right after the name only starts an element when a `:name`
+    // family member follows it. A bare one there can do nothing: `:` says
+    // "not a fresh group of this element", and right after the name every
+    // slot is still empty, so `@memo:{a:1}` was `@memo{a:1}` with a
+    // character in front of it -- a second spelling of one tree, which
+    // `explicit-form-first` in the workspace writ calls a duplicate.
+    // Nothing under `docs/`, `tests/fixtures/` or `tmtroot/` spelled it.
+    if look.peek() == Some(':') {
+        let mut after_colon = look;
+        after_colon.bump();
+        return is_name_start_at(&after_colon);
+    }
+    block_context && matches!(look.peek(), None | Some('\n') | Some('\r'))
 }
 
 /// Whether the element starting at `cur` ends its line.
