@@ -23,9 +23,25 @@ fn opens_group_after_args(c: Option<char>) -> bool {
     crate::element::opens_group(c) && c != Some('(')
 }
 
-pub(crate) fn eat_list_marker_with_indent(
-    cur: &mut Cursor,
-) -> Result<Option<(usize, bool, Option<Value>)>> {
+/// What reading a list marker found.
+///
+/// `full_form` used to be re-derived by `parse_list_internal` peeking at
+/// the same position a second time. It is answered here, where the marker
+/// was read and where whether its `(...)` was taken is still known, and
+/// handed over rather than asked again.
+pub(crate) struct ListMarker {
+    /// Columns of indentation before the `-`.
+    pub indent: usize,
+    /// `-.` rather than `-`.
+    pub ordered: bool,
+    /// The `(marker)` value, when the item carries one.
+    pub marker: Option<Value>,
+    /// A group opens on the marker, so the item takes the full
+    /// `()[]{}` form rather than the one-line sugar.
+    pub full_form: bool,
+}
+
+pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
     let mut look = *cur;
     let mut indent = 0;
     while matches!(look.peek(), Some(' ') | Some('\t')) {
@@ -93,21 +109,15 @@ pub(crate) fn eat_list_marker_with_indent(
 
     skip_inline_ws(&mut look);
     cur.set_pos(look.pos());
-    Ok(Some((indent, ordered, marker)))
+    Ok(Some(ListMarker {
+        indent,
+        ordered,
+        marker,
+        full_form: opens_group_after_args(look.peek()),
+    }))
 }
 
-pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<(bool, Option<Value>)>> {
-    Ok(eat_list_marker_with_indent(cur)?.map(|(_, ordered, marker)| (ordered, marker)))
-}
-
-pub(crate) fn peek_list_marker_with_indent(
-    cur: &Cursor,
-) -> Result<Option<(usize, bool, Option<Value>)>> {
-    let mut look = *cur;
-    eat_list_marker_with_indent(&mut look)
-}
-
-pub(crate) fn peek_list_marker(cur: &Cursor) -> Result<Option<(bool, Option<Value>)>> {
+pub(crate) fn peek_list_marker(cur: &Cursor) -> Result<Option<ListMarker>> {
     let mut look = *cur;
     eat_list_marker(&mut look)
 }
@@ -118,14 +128,15 @@ pub(crate) fn parse_list(cur: &mut Cursor, ordered: bool) -> Result<Vec<Element>
 
 fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Result<Vec<Element>> {
     let mut items = Vec::new();
-    while let Some((indent, item_ordered, marker)) = peek_list_marker_with_indent(cur)? {
-        if indent < min_indent || item_ordered != ordered {
+    while let Some(head) = peek_list_marker(cur)? {
+        if head.indent < min_indent || head.ordered != ordered {
             break;
         }
+        let marker = head.marker;
         let item_start = cur.pos();
-        eat_list_marker_with_indent(cur)?;
+        eat_list_marker(cur)?;
 
-        let (content, attrs) = if opens_group_after_args(cur.peek()) {
+        let (content, attrs) = if head.full_form {
             // The full form: `- ()[ content ]{value}`. Groups are read by
             // the same code that reads `@name`'s, so `[content]` stops at
             // its closing bracket and `|content` at the end of its marked
@@ -170,9 +181,9 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
         }
 
         let mut children = Vec::new();
-        while let Some((next_indent, next_ordered, ..)) = peek_list_marker_with_indent(cur)? {
-            if next_indent > indent {
-                let sub_items = parse_list_internal(cur, next_ordered, next_indent)?;
+        while let Some(next) = peek_list_marker(cur)? {
+            if next.indent > head.indent {
+                let sub_items = parse_list_internal(cur, next.ordered, next.indent)?;
                 if !sub_items.is_empty() {
                     let list_span = sub_items
                         .first()
@@ -180,7 +191,7 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
                         .span
                         .union(&sub_items.last().unwrap().span);
                     children.push(tomet_ast::Block::Element(element_list(
-                        next_ordered,
+                        next.ordered,
                         sub_items,
                         list_span,
                     )));
