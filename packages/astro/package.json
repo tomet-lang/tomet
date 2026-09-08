@@ -1,0 +1,40 @@
+{
+  "name": "@tomet/astro",
+  "version": "0.1.0",
+  "description": "Astro integration for Tomet: a content layer that turns a .tmt workspace into Astro pages, rendered by the Rust converter",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "tomet",
+    "astro",
+    "astro-integration",
+    "markup",
+    "ast",
+    "static-site"
+  ],
+  "license": "MIT OR Apache-2.0",
+  "peerDependencies": {
+    "astro": "^5.0.0"
+  },
+  "devDependencies": {
+    "astro": "^5.6.1",
+    "typescript": "^5.0.0"
+  }
+}

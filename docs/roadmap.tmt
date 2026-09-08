@@ -16,9 +16,7 @@
 
 - 一つのファイルで完結するようにする(blueprint, vocabulary)
 - プロパティの重複のワーニング
-- `@草案`
 - tasksもtmtで、雛形決めたほうが良さそう？
-- ハイライトがおかしい
 - mode。`commonmark`、`no_data`
 - export force
 - kindとrules?
@@ -33,7 +31,6 @@
 - idの種類にsha1追加
 - `@element`ではなくて、`@define`のほうが適切か？
 - checkのエラー個数指定`@`
-- yaml削除
 - 設定のドット記法を一般化する。`apply_entry`が`callout.style.content`のような
   キーごとに手書きの分岐を12本持っている。`.`で分割して入れ子にする一段を
   入れれば一本で済む。綴りは省略形なので重複ではないが、実装が重複している。
@@ -42,13 +39,7 @@
 - `@nocheck`                          // 検査の抑制。@draft/@fixme とは別の機能
                                       // (印を付けるのではなく、規則を止める)
 - 説明書を一ページにエクスポート(Crates.ioみたいな感じで。)
-- `@crate()`
-
 - 読み込みロード画面
-- index, directories
-- latex
-- typst (Document -> Typst変換は`tomet-convert-typst`で実装済み。import/PDF生成は未実装)
-- migration
 - 構文変更によるbindigsの乖離
 ---[ 構文を決定する ]---
 - ( ) リモート接続の綴り              // `<id:taskA>:{ priority: high }` は `<T>` の
@@ -65,7 +56,6 @@
                                       // `${gh(12)}` はまだ通る（移行が要る）
 - ( ) `${self.config.*}`               // path と filename だけ入っている
 - ( ) `${file("x.tmt").*}`             // 他の文書を引く。I/O なので resolver 側
-- ( ) `[]`のkey
 - ( ) 対の後ろの要素が文字列に飲まれる    // `@links{ (1)[a] note: x (2)[b] }` の
                                       // `note` が `"x (2)[b]"` になる。
                                       // 要素が先の順序は直っているが、
