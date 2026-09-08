@@ -47,6 +47,17 @@
 			{
 				"command": "tomet.restartServer",
 				"title": "Tomet: Restart Language Server"
+			},
+			{
+				"command": "tomet.onEnterKey",
+				"title": "Tomet: On Enter Key"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "tomet.onEnterKey",
+				"key": "enter",
+				"when": "editorTextFocus && !editorHasSelection && !editorHasMultipleSelections && !suggestWidgetVisible && editorLangId == 'tomet'"
 			}
 		],
 		"configuration": {

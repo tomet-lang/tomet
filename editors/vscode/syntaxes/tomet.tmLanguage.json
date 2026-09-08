@@ -10,6 +10,7 @@
 		{ "include": "#heading" },
 		{ "include": "#thematic-break" },
 		{ "include": "#list-marker" },
+		{ "include": "#marked-content" },
 		{ "include": "#inline" }
 	],
 	"repository": {
@@ -126,6 +127,14 @@
 			]
 		},
 
+		"marked-content": {
+			"comment": "`|` opens a content group and closes at the end of its run. It goes where `[` can go (after an element or list item, or as table rows).",
+			"match": "(?:^[ \\t]*|(?<=[)\\]}A-Za-z0-9_-]))(\\|)(?=[ \\t\\[]|$)",
+			"captures": {
+				"1": { "name": "punctuation.definition.pipe.tomet keyword.operator.pipe.tomet" }
+			}
+		},
+
 		"inline": {
 			"comment": "No `#string` here on purpose: a quote is only a string delimiter inside a `(args)`/`{value}` group, where `#value` supplies it. In prose `\"` is an ordinary character, so including it here turned `これは 5\" のディスク` into a string that ran to the end of the file.",
 			"patterns": [
@@ -138,6 +147,7 @@
 				{ "include": "#interpolation" },
 				{ "include": "#connect" },
 				{ "include": "#element" },
+				{ "include": "#marked-content" },
 				{ "include": "#groups" }
 			]
 		},
@@ -285,7 +295,7 @@
 			"patterns": [
 				{
 					"comment": "Mid-line: an element needs one of `( [ { :` or a `+++` fence after the name. Without one it is text -- `連絡は me@example.com まで` is a paragraph. The whitespace in the lookahead is what spec/syntax.tmt's `@name () [] {}` spelling needs; the group does not have to be flush against the name.",
-					"match": "(?<![A-Za-z0-9_])(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*(?:[(\\[{:]|\\+{3,}))",
+					"match": "(?<![A-Za-z0-9_])(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*(?:[(\\[{:|]|\\+{3,}))",
 					"captures": {
 						"1": { "name": "punctuation.definition.tag.tomet" },
 						"2": { "name": "entity.name.tag.tomet" }

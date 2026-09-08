@@ -20,5 +20,91 @@
 		["*", "*"],
 		["_", "_"],
 		["=", "="]
+	],
+	"onEnterRules": [
+		{
+			"beforeText": "^\\s*\\{[^}]*$",
+			"afterText": "^\\s*\\}",
+			"action": {
+				"indentAction": "indentOutdent"
+			}
+		},
+		{
+			"beforeText": "^\\s*\\[[^\\]]*$",
+			"afterText": "^\\s*\\]",
+			"action": {
+				"indentAction": "indentOutdent"
+			}
+		},
+		{
+			"beforeText": "^\\s*-\\s*\\([ xX✓~?-]?\\)\\s*$",
+			"action": {
+				"indentAction": "none",
+				"removeText": 6
+			}
+		},
+		{
+			"beforeText": "^\\s*-\\.\\s*$",
+			"action": {
+				"indentAction": "none",
+				"removeText": 3
+			}
+		},
+		{
+			"beforeText": "^\\s*-\\s*$",
+			"action": {
+				"indentAction": "none",
+				"removeText": 2
+			}
+		},
+		{
+			"beforeText": "^\\s*\\|\\s*\\[\\s*\\]?\\s*$",
+			"action": {
+				"indentAction": "none",
+				"removeText": 3
+			}
+		},
+		{
+			"beforeText": "^\\s*\\|\\s*$",
+			"action": {
+				"indentAction": "none",
+				"removeText": 2
+			}
+		},
+		{
+			"beforeText": "^\\s*-\\s*\\([^)]*\\)\\s+.+$",
+			"action": {
+				"indentAction": "none",
+				"appendText": "- ( ) "
+			}
+		},
+		{
+			"beforeText": "^\\s*-\\.\\s+.+$",
+			"action": {
+				"indentAction": "none",
+				"appendText": "-. "
+			}
+		},
+		{
+			"beforeText": "^\\s*-\\s+.+$",
+			"action": {
+				"indentAction": "none",
+				"appendText": "- "
+			}
+		},
+		{
+			"beforeText": "^\\s*\\|\\s*\\[.+$",
+			"action": {
+				"indentAction": "none",
+				"appendText": "|[ "
+			}
+		},
+		{
+			"beforeText": "^\\s*\\|\\s+.+$",
+			"action": {
+				"indentAction": "none",
+				"appendText": "| "
+			}
+		}
 	]
 }
