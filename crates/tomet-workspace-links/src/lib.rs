@@ -19,8 +19,10 @@ mod cache;
 mod cache_path;
 mod check;
 mod collect;
+mod resolver;
 
 pub use cache::{CacheOutcome, LinkCache, LinkCacheError};
 pub use cache_path::default_cache_path;
 pub use check::{BrokenLink, CheckReport, check_vault};
 pub use collect::{DocumentLink, LinkKind, collect_links};
+pub use resolver::VaultLinkIndex;

@@ -1,5 +1,0 @@
-- 「場所・探索を知る」: tomet-indexer（ファイルパス・ワークスペース走査）と tomet-ast::Span（ドキュメント内位置）が担当。
-- 「関係性・参照を知る」: tomet-links（リンク検証）と tomet-resolver（参照解決）が担当。
-- 「変更する」: tomet-transform（インメモリAST変換）と tomet-workspace（複数ファイル一括I/O適用）が担当。
-- 「出力・フォーマットする」: tomet-formatter / tomet-printer / tomet-style が担当。
-- 「他形式へ変換する」: tomet-html / tomet-markdown が担当。

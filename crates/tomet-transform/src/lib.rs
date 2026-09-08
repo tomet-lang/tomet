@@ -8,12 +8,14 @@
 
 pub mod blueprint;
 pub mod directive;
+pub mod links;
 pub mod macro_rewrite;
 pub mod meta;
 pub mod structural;
 
 pub use blueprint::*;
 pub use directive::*;
+pub use links::*;
 pub use macro_rewrite::*;
 pub use meta::*;
 pub use structural::*;

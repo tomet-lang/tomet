@@ -18,6 +18,8 @@ tomet-formatter = { workspace = true }
 tomet-printer = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-validator = { workspace = true }
+tomet-links = { workspace = true }
+tomet-transform = { workspace = true }
 
 wasm-bindgen = { workspace = true }
 serde-wasm-bindgen = { workspace = true }

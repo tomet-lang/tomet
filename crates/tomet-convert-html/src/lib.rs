@@ -503,17 +503,25 @@ fn render_quote_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: 
 /// needs the same treatment `@link` gets, not just a raw passthrough.
 fn render_embed_element(el: &Element, out: &mut String) {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
-    let (_, src) = target_scheme(&raw_target);
+    let (scheme, src) = target_scheme(&raw_target);
     let alt = el
         .content
         .as_ref()
         .map(|a| inlines_to_plain(a))
         .unwrap_or_default();
-    out.push_str(&format!(
-        "<img src=\"{}\" alt=\"{}\">\n",
-        escape_attr(src),
-        escape_attr(&alt)
-    ));
+    if scheme == TargetScheme::Unresolved {
+        out.push_str(&format!(
+            "<img class=\"tm-embed tm-embed-unresolved\" src=\"{}\" alt=\"{}\" aria-disabled=\"true\">\n",
+            escape_attr(src),
+            escape_attr(&alt)
+        ));
+    } else {
+        out.push_str(&format!(
+            "<img src=\"{}\" alt=\"{}\">\n",
+            escape_attr(src),
+            escape_attr(&alt)
+        ));
+    }
 }
 
 /// Flattens inline content to plain text -- used for the `alt` attribute,
@@ -591,14 +599,23 @@ fn render_link_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: b
     let (scheme, target) = target_scheme(&raw_target);
     let target = target.to_string();
 
-    let (class, href) = match scheme {
-        TargetScheme::Id => (
-            "tm-id".to_string(),
-            format!("#link-{}", escape_attr(&target)),
-        ),
-        other => (format!("tm-{}", other.as_str()), escape_attr(&target)),
-    };
-    out.push_str(&format!("<a class=\"{class}\" href=\"{href}\""));
+    match scheme {
+        TargetScheme::Unresolved | TargetScheme::Ref => {
+            out.push_str(&format!(
+                "<a class=\"tm-ref tm-ref-unresolved\" aria-disabled=\"true\" data-ref=\"{}\"",
+                escape_attr(&target)
+            ));
+        }
+        TargetScheme::Id => {
+            let href = format!("#link-{}", escape_attr(&target));
+            out.push_str(&format!("<a class=\"tm-id\" href=\"{href}\""));
+        }
+        other => {
+            let class = format!("tm-{}", other.as_str());
+            let href = escape_attr(&target);
+            out.push_str(&format!("<a class=\"{class}\" href=\"{href}\""));
+        }
+    }
     // Bare-scalar args (`@link(readme.md)`, `@link(https://example.com)`,
     // ...) are already fully captured by `target` above --
     // `push_data_attrs`'s non-map fallback would otherwise duplicate that
@@ -1288,6 +1305,16 @@ mod tests {
     }
 
     #[test]
+    fn renders_embed_unresolved() {
+        let doc = parse_document("@embed(target:\"unresolved:missing.png\")[missing cat]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<img class=\"tm-embed tm-embed-unresolved\" src=\"missing.png\" alt=\"missing cat\" aria-disabled=\"true\">\n"
+        );
+    }
+
+    #[test]
     fn renders_codeblock_with_lang() {
         let doc = parse_document("@codeblock(lang:rust)[fn main() {}]\n").unwrap();
         let body = render_body(&doc);
@@ -1454,6 +1481,16 @@ mod tests {
         assert_eq!(
             inline_body,
             "<p>Here is <span class=\"tm-element tm-icon tm-icon-sun tm-icon-lucide tm-icon-lucide-sun\" data-icon=\"sun\" data-pkg=\"lucide\" data-color=\"yellow\"></span> icon.</p>\n"
+        );
+    }
+
+    #[test]
+    fn test_renders_unresolved_link_placeholder() {
+        let doc = parse_document("- @link(\"unresolved:Future Note\")[Future Note]\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<ul>\n<li><a class=\"tm-ref tm-ref-unresolved\" aria-disabled=\"true\" data-ref=\"Future Note\">Future Note</a></li>\n</ul>\n"
         );
     }
 

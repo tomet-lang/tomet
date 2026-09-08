@@ -45,6 +45,7 @@ mkShell rec {
     haskellPackages.pandoc-cli
     #[ VS Code extension (apps/vscode-extension) ]
     nodejs
+    pnpm
     #[ Python bindings (bindings/python) ]
     python3
 

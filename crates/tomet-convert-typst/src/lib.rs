@@ -360,6 +360,13 @@ fn render_link(el: &Element) -> String {
             };
             format!("#link(<link-{target}>)[{text}]")
         }
+        TargetScheme::Unresolved => {
+            if text.is_empty() {
+                target.to_string()
+            } else {
+                text
+            }
+        }
         _ => {
             let text = if text.is_empty() {
                 target.to_string()

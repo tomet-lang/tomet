@@ -51,7 +51,7 @@ impl LinkKind {
                     TargetScheme::Dir => LinkKind::Dir,
                     TargetScheme::Tm => LinkKind::Tm,
                     TargetScheme::Ref => LinkKind::Ref,
-                    TargetScheme::Url | TargetScheme::Id => return None,
+                    TargetScheme::Url | TargetScheme::Id | TargetScheme::Unresolved => return None,
                 };
                 Some((link_kind, rest.to_string()))
             }

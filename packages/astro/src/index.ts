@@ -74,6 +74,14 @@ export interface TometLoaderOptions {
    * Return `false` to skip a file.
    */
   filter?: (relPath: string) => boolean;
+  /**
+   * URL prefix prepended to resolved `ref:` links (default: `'/docs'`).
+   */
+  urlPrefix?: string;
+  /**
+   * URL prefix prepended to resolved image/asset `@embed` targets (default: `'/vault'`).
+   */
+  assetPrefix?: string;
 }
 
 export interface TometEntryData {
@@ -107,29 +115,41 @@ async function mapConcurrent<T, R>(
   return results;
 }
 
+interface ScannedVault {
+  allFiles: string[];
+  docFiles: { absPath: string; relPath: string }[];
+}
+
 /**
- * Fast recursive file finder skipping hidden files, `.git`, `node_modules`, and `.writ.tmt`.
+ * Fast recursive vault scanner discovering both document files (.tmt/.tm)
+ * and all static asset files (.png/.jpg/.svg/...) for link and embed resolution.
  */
-async function findTmtFiles(dir: string, baseDir: string = dir): Promise<{ absPath: string; relPath: string }[]> {
-  if (!existsSync(dir)) return [];
+async function scanVault(dir: string, baseDir: string = dir): Promise<ScannedVault> {
+  if (!existsSync(dir)) return { allFiles: [], docFiles: [] };
   const entries = await fs.readdir(dir, { withFileTypes: true });
-  const files: { absPath: string; relPath: string }[] = [];
+  const allFiles: string[] = [];
+  const docFiles: { absPath: string; relPath: string }[] = [];
 
   for (const entry of entries) {
     const name = entry.name;
-    // Skip hidden files, system files, and rules
-    if (name.startsWith('.') || name === 'node_modules') continue;
+    // Skip hidden files, system files, and dependencies
+    if (name.startsWith('.') || name === 'node_modules' || name === 'dist') continue;
 
     const fullPath = join(dir, name);
     if (entry.isDirectory()) {
-      files.push(...(await findTmtFiles(fullPath, baseDir)));
-    } else if (entry.isFile() && (name.endsWith('.tmt') || name.endsWith('.tm'))) {
+      const sub = await scanVault(fullPath, baseDir);
+      allFiles.push(...sub.allFiles);
+      docFiles.push(...sub.docFiles);
+    } else if (entry.isFile()) {
       const relPath = relative(baseDir, fullPath).split('\\').join('/');
-      files.push({ absPath: fullPath, relPath });
+      allFiles.push(relPath);
+      if (name.endsWith('.tmt') || name.endsWith('.tm')) {
+        docFiles.push({ absPath: fullPath, relPath });
+      }
     }
   }
 
-  return files;
+  return { allFiles, docFiles };
 }
 
 /**
@@ -154,6 +174,8 @@ export function tometLoader(options: TometLoaderOptions): Loader {
     concurrency = 32,
     generateId,
     filter,
+    urlPrefix = '/docs',
+    assetPrefix = '/vault',
   } = options;
 
   return {
@@ -168,9 +190,11 @@ export function tometLoader(options: TometLoaderOptions): Loader {
         return;
       }
 
-      logger.info(`Scanning Tomet documents in ${baseDir}...`);
-      const allFiles = await findTmtFiles(baseDir);
+      logger.info(`Scanning Tomet documents and assets in ${baseDir}...`);
+      const scanned = await scanVault(baseDir);
+      const allFiles = scanned.docFiles;
       const matchedFiles = filter ? allFiles.filter((f) => filter(f.relPath)) : allFiles;
+      const vaultFiles = scanned.allFiles;
 
       const untouchedIds = new Set(store.keys());
 
@@ -203,6 +227,10 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             advanced,
             numberHeadings: advanced,
             autoSlugHeadings: advanced,
+            vaultFiles,
+            currentPath: file.relPath,
+            urlPrefix,
+            assetPrefix,
           });
 
           const fallbackTitle = basename(file.relPath).replace(/\.(tmt|tm)$/, '');
@@ -232,7 +260,8 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             digest,
           });
         } catch (err) {
-          logger.error(`Failed to process Tomet file ${file.absPath}: ${(err as Error).message}`);
+          const msg = (err as Error)?.message || String(err);
+          logger.error(`Failed to process Tomet file ${file.absPath}: ${msg}`);
         }
       }
 

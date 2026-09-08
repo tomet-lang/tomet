@@ -81,7 +81,7 @@
 (content_group "[" @punctuation.bracket)
 (content_group "]" @punctuation.bracket)
 (content_group) @variable.parameter @variable.other
-(marked_content "|" @punctuation.special)
+(marked_content "|" @punctuation.special @keyword.control)
 (value_group "{" @punctuation.bracket)
 (value_group "}" @punctuation.bracket)
 
