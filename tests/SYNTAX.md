@@ -528,6 +528,41 @@ Block  @deck.card
 `deck.card`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `@use(deck)`
 ```
 
+### 裸のエントリも名前つき要素と同じ三つのグループを取る。シジルが無いだけで、読む道は同じ
+
+```tmt
+@links{ (1)[ ひとつ ]{ id: a } }
+```
+
+```
+Block  @links
+  group
+    Bare
+      args    1
+      content
+        Text "ひとつ"
+      group
+        id: "a"
+```
+
+### グループを次の行に置いてもよい。`@name` と同じ
+
+```tmt
+@links{
+  (1)
+  [ ひとつ ]
+}
+```
+
+```
+Block  @links
+  group
+    Bare
+      args    1
+      content
+        Text "ひとつ"
+```
+
 ### 空のグループ
 
 ```tmt
@@ -1162,7 +1197,7 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 ```
 
 ```
-parse error: 1:6: a '{...}' group holds 'key: value' entries or elements; write a bare value in '(args)', or use a '+++' fence
+parse error: 1:7: a '{...}' group holds 'key: value' entries or elements; write a bare value in '(args)', or use a '+++' fence
 ```
 
 ### `{...}` に裸のスカラーも書けない
@@ -1172,7 +1207,7 @@ parse error: 1:6: a '{...}' group holds 'key: value' entries or elements; write 
 ```
 
 ```
-parse error: 1:6: a '{...}' group holds 'key: value' entries or elements; write a bare value in '(args)', or use a '+++' fence
+parse error: 1:7: a '{...}' group holds 'key: value' entries or elements; write a bare value in '(args)', or use a '+++' fence
 ```
 
 ### 閉じない `[`

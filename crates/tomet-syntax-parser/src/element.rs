@@ -477,11 +477,12 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
                 }));
             }
             _ => {
+                let entry_start = cur.pos();
                 let (key, value) = parse_one_entry(cur)?;
                 if key == POSITIONAL_ENTRY_KEY {
                     return Err(err(
                         cur,
-                        group_start,
+                        entry_start,
                         "a '{...}' group holds 'key: value' entries or elements; \
                          write a bare value in '(args)', or use a '+++' fence",
                     ));
@@ -501,18 +502,23 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
     Ok(ElementValue::Group(entries))
 }
 
+/// A `(marker)[content]` entry inside a `{...}` group -- an element whose
+/// type its container supplies, so it carries no name.
+///
+/// It reads its groups through [`parse_groups`], like every other sigil.
+/// It used to have a small parser of its own that took `(args)` and then
+/// an optional `[content]` and nothing else, which is exactly the second
+/// implementation `parse_groups`' own doc comment says a sigil must not
+/// grow: a bare entry could not take `{value}` or `|content` while the
+/// named entry beside it could, and `(1)` and `[a]` on separate lines was
+/// an error here and fine everywhere else.
+///
+/// `allow_colon_connect: false`, matching the named entry above -- there
+/// is no enclosing construct inside a group for a connect to reach.
 fn parse_bare_element(cur: &mut Cursor) -> Result<Element> {
     let start_pos = cur.pos();
-    let args = parse_paren_value(cur)?;
     let mut el = element_new(Sigil::Bare);
-    el.args = Some(args);
-    let checkpoint = cur.pos();
-    skip_inline_ws(cur);
-    if cur.peek() == Some('[') {
-        el.content = Some(parse_content(cur)?);
-    } else {
-        cur.set_pos(checkpoint);
-    }
+    parse_groups(cur, &mut el, false)?;
     el.span = cur.span_from(start_pos);
     Ok(el)
 }
