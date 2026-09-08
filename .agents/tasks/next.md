@@ -18,6 +18,10 @@
      （1788316716 → 1786384358）は取り込まず HEAD の値を維持した。
    - `tmtroot/agents.tmt`（0 バイト）は未追跡のまま手元に残してある。
    - `cargo test --workspace` は 35 passed。
+4. **`@tomet/astro` & WASM 拡張** — 2026-09-08 完了。
+   - `bindings/js`: `processDocument` を新設（HTML body、@meta、title fallback、TOC抽出、is_data_onlyの1パス高速処理）、`toHtml` のオプション対応、package.json のエクスポート修正。
+   - `@tomet/astro`: Astro 5 Content Layer Loader (`tometLoader`) を実装。WASM インプロセス実行と digest 差分キャッシュにより 50,000 ファイル規模に対応。
+   - `tomet-website`: `content.config.ts` で `tometLoader` を採用し、`[...slug].astro` と `docs/index.astro` を Content Collections に移行（ビルド確認済み、全ページ 1 秒以内）。
 
 ## パーサの欠陥 — `|` の作業中に出てきたもの
 
@@ -94,9 +98,6 @@
   無く、外部スキャナが要る。`KNOWN_TS_ERRORS` の `syntax/pipe-table.tmt`。
   `examples/dirs.tmt` などと同じ壁。
 
-**C. `@tomet/astro`** — `packages/astro/`、骨組み 33 行で未追跡。README の
-Prerequisites（`bindings/js` が名前で解決できない / `index.d.ts` が 1 破壊的
-コミット遅れ / workspace 層が JS から届かない / `ref:` 未解決 / title ルール
-なし / `DEFAULT_STYLE` が死んでいる）を外す作業が先に来る。重い。
+**C. ~~`@tomet/astro`~~** — **完了（2026-09-08）**。`bindings/js` の WASM 拡張（`processDocument`）とエクスポート修正、`packages/astro` の `tometLoader`（Astro 5 Content Layer API、50,000ファイル対応の digest キャッシュ）、`tomet-website` の移行まで完了。
 
 @crate and @todo

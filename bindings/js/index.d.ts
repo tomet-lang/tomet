@@ -81,10 +81,39 @@ export function parseDocument(source: string): Document;
  */
 export function parseValue(source: string): any;
 
+export interface ProcessOptions {
+  advanced?: boolean;
+  numberHeadings?: boolean;
+  autoSlugHeadings?: boolean;
+  lang?: string;
+}
+
+export interface TocItem {
+  id: string;
+  level: number;
+  text: string;
+}
+
+export interface ProcessedDoc {
+  title: string | null;
+  html: string;
+  meta: Value | null;
+  toc: TocItem[];
+  is_data_only: boolean;
+}
+
 /**
  * Convert `.tmt` source text or a `Document` AST object into an HTML string.
  */
-export function toHtml(sourceOrDoc: string | Document): string;
+export function toHtml(sourceOrDoc: string | Document, options?: ProcessOptions): string;
+
+/**
+ * Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
+ */
+export function processDocument(
+  sourceOrDoc: string | Document,
+  options?: ProcessOptions,
+): ProcessedDoc;
 
 /**
  * Convert `.tmt` source text or a `Document` AST object into a CommonMark Markdown string.
@@ -115,3 +144,13 @@ export function formatSource(source: string): string;
  * Validate `.tmt` source text and return an array of validation diagnostics.
  */
 export function validate(source: string): ValidationError[];
+
+/**
+ * Initialize the WebAssembly module.
+ */
+export default function init(module_or_path?: any): Promise<any>;
+
+/**
+ * Initialize the WebAssembly module synchronously.
+ */
+export function initSync(module?: any): any;

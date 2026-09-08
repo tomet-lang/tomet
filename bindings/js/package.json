@@ -2,12 +2,19 @@
   "name": "@tomet/tomet-wasm",
   "version": "0.1.0",
   "description": "High-performance JavaScript / WebAssembly bindings for Tomet markup and AST",
-  "main": "tomet_js.js",
-  "types": "index.d.ts",
+  "type": "module",
+  "main": "./pkg/tomet_js.js",
+  "module": "./pkg/tomet_js.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./pkg/tomet_js.js"
+    },
+    "./wasm": "./pkg/tomet_js_bg.wasm"
+  },
   "files": [
-    "tomet_js_bg.wasm",
-    "tomet_js.js",
-    "tomet_js.d.ts",
+    "pkg",
     "index.d.ts"
   ],
   "keywords": [
