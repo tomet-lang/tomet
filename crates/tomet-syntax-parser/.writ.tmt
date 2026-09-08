@@ -117,6 +117,23 @@ adding an element would be a grammar change -- `tree-sitter-tomet`'s
 hand-maintained approximation and every downstream consumer would have to
 move with it.
 
+What this rule protects is the space a user can extend, and nothing wider.
+`@name` is that space -- a vocabulary declares elements, which is why the
+parser may not know `codeblock`. Syntax the language owns and closes sits
+outside the rule: the parser may know the *shape* of `:name(...)`, because no
+vocabulary can add a member to that family. Closedness is the whole
+condition, and the moment a user can declare their own `:name` it is
+vocabulary again and this entry applies to it unchanged.
+
+Knowing the shape is still not knowing the meaning, and Rust is where that
+split is easiest to see. Its lexer emits one `Ident` for `as` and for `foo`;
+the parser decides which is a keyword by comparing against a closed table.
+Macros are where it stops knowing -- a token stream goes in, and the parser
+never learns what `println!` becomes. Shape uniform, meaning by table. The
+same split keeps the paragraph above intact: `:` plus a name plus groups is
+one grammar change, not one per member, so a member added later moves
+neither `tree-sitter-tomet` nor any consumer.
+
 The rejected alternative is worth writing down, because it is the one that
 keeps looking cheaper: special-case the element in the parser. That is what
 this parser used to do, in `is_codeblock`, `is_verbatim_content`,
