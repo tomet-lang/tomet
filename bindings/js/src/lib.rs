@@ -15,18 +15,160 @@ pub fn parse_value(source: &str) -> Result<JsValue, JsValue> {
     serde_wasm_bindgen::to_value(&val).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+/// Options controlling HTML rendering and document processing.
+#[derive(serde::Serialize, serde::Deserialize, Default, Debug, Clone)]
+pub struct ProcessOptions {
+    pub advanced: Option<bool>,
+    pub number_headings: Option<bool>,
+    pub auto_slug_headings: Option<bool>,
+    pub lang: Option<String>,
+}
+
+impl ProcessOptions {
+    fn to_render_options(&self) -> tomet_html::RenderOptions {
+        let advanced = self.advanced.unwrap_or(false);
+        tomet_html::RenderOptions {
+            number_headings: self.number_headings.unwrap_or(advanced),
+            auto_slug_headings: self.auto_slug_headings.unwrap_or(advanced),
+            lang: self.lang.clone(),
+        }
+    }
+}
+
+/// An entry in the document's table of contents.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct TocItem {
+    pub id: String,
+    pub level: u32,
+    pub text: String,
+}
+
+/// High-level output of processing a `.tmt` document.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ProcessedDoc {
+    pub title: Option<String>,
+    pub html: String,
+    pub meta: Option<tomet_ast::Value>,
+    pub toc: Vec<TocItem>,
+    pub is_data_only: bool,
+}
+
+pub fn process_document_internal(doc: &tomet_ast::Document, opts: &ProcessOptions) -> ProcessedDoc {
+    let render_opts = opts.to_render_options();
+    let html = tomet_html::render_body_with(doc, &render_opts);
+    let is_data_only = html.trim().is_empty();
+
+    // 1. Meta & Title from @meta{title}
+    let meta = tomet_semantics::document_meta(doc);
+    let meta_title = meta.as_ref().and_then(|v| match v {
+        tomet_ast::Value::Map(m) => m.iter().find_map(|(k, val)| {
+            if k == "title" {
+                match val {
+                    tomet_ast::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        }),
+        _ => None,
+    });
+
+    // 2. Headings and TOC from HTML
+    let mut first_h1: Option<String> = None;
+    let mut toc = Vec::new();
+
+    use std::sync::LazyLock;
+    static HEADING_RE: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r#"<h([1-6])\b([^>]*)>([\s\S]*?)</h([1-6])>"#).unwrap());
+    static ID_RE: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r#"id="([^"]*)""#).unwrap());
+    static HEADING_NUMBER_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r#"<span class="tm-heading-number">[^<]*</span>"#).unwrap()
+    });
+    static TAG_RE: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r#"<[^>]+>"#).unwrap());
+
+    for cap in HEADING_RE.captures_iter(&html) {
+        let open_level: u32 = cap[1].parse().unwrap_or(1);
+        let close_level: u32 = cap[4].parse().unwrap_or(1);
+        if open_level != close_level {
+            continue;
+        }
+        let level = open_level;
+        let attrs = &cap[2];
+        let inner = &cap[3];
+
+        let id = ID_RE
+            .captures(attrs)
+            .map(|c| c[1].to_string())
+            .unwrap_or_default();
+        let cleaned = HEADING_NUMBER_RE.replace_all(inner, "");
+        let text = TAG_RE.replace_all(&cleaned, "").trim().to_string();
+
+        if level == 1 && first_h1.is_none() && !text.is_empty() {
+            first_h1 = Some(text.clone());
+        }
+        if (level == 2 || level == 3) && !text.is_empty() {
+            toc.push(TocItem { id, level, text });
+        }
+    }
+
+    let title = meta_title.or(first_h1);
+
+    ProcessedDoc {
+        title,
+        html,
+        meta,
+        toc,
+        is_data_only,
+    }
+}
+
 /// Convert `.tmt` source text or a `Document` AST object into an HTML body string.
 #[wasm_bindgen(js_name = toHtml)]
-pub fn to_html(source_or_doc: &JsValue) -> Result<String, JsValue> {
+pub fn to_html(source_or_doc: &JsValue, options: Option<JsValue>) -> Result<String, JsValue> {
+    let opts: ProcessOptions = if let Some(opts_val) = options {
+        serde_wasm_bindgen::from_value(opts_val).map_err(|e| JsValue::from_str(&e.to_string()))?
+    } else {
+        ProcessOptions::default()
+    };
+    let render_opts = opts.to_render_options();
+
     if let Some(src) = source_or_doc.as_string() {
         let doc =
             tomet_parser::parse_document(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet_html::render_body(&doc))
+        Ok(tomet_html::render_body_with(&doc, &render_opts))
     } else {
         let doc: tomet_ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet_html::render_body(&doc))
+        Ok(tomet_html::render_body_with(&doc, &render_opts))
     }
+}
+
+/// Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
+#[wasm_bindgen(js_name = processDocument)]
+pub fn process_document(
+    source_or_doc: &JsValue,
+    options: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let opts: ProcessOptions = if let Some(opts_val) = options {
+        serde_wasm_bindgen::from_value(opts_val).map_err(|e| JsValue::from_str(&e.to_string()))?
+    } else {
+        ProcessOptions::default()
+    };
+
+    let processed = if let Some(src) = source_or_doc.as_string() {
+        let doc =
+            tomet_parser::parse_document(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        process_document_internal(&doc, &opts)
+    } else {
+        let doc: tomet_ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        process_document_internal(&doc, &opts)
+    };
+
+    serde_wasm_bindgen::to_value(&processed).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 /// Convert `.tmt` source text or a `Document` AST object into a CommonMark Markdown string.
@@ -148,5 +290,51 @@ mod tests {
         let src = "#[  Hello  ]\n\n";
         let formatted = format_source(src);
         assert_eq!(formatted, "#[  Hello  ]\n");
+    }
+
+    #[test]
+    fn test_process_document_with_meta_title() {
+        let src = "@meta{\n  title: \"My Meta Title\"\n}\n\n#[ Document Title ]\n\n##[ Section One ]\n\nContent.\n";
+        let doc = tomet_parser::parse_document(src).unwrap();
+        let opts = ProcessOptions {
+            advanced: Some(true),
+            ..Default::default()
+        };
+        let res = process_document_internal(&doc, &opts);
+        assert_eq!(res.title.as_deref(), Some("My Meta Title"));
+        assert!(!res.is_data_only);
+        assert_eq!(res.toc.len(), 1);
+        assert_eq!(res.toc[0].level, 2);
+        assert_eq!(res.toc[0].text, "Section One");
+        assert_eq!(res.toc[0].id, "section-one");
+    }
+
+    #[test]
+    fn test_process_document_with_h1_fallback() {
+        let src = "#[ First Heading Title ]\n\n##[ Section A ]\n\n###[ Sub Section ]\n";
+        let doc = tomet_parser::parse_document(src).unwrap();
+        let opts = ProcessOptions {
+            advanced: Some(true),
+            ..Default::default()
+        };
+        let res = process_document_internal(&doc, &opts);
+        assert_eq!(res.title.as_deref(), Some("First Heading Title"));
+        assert!(!res.is_data_only);
+        assert_eq!(res.toc.len(), 2);
+        assert_eq!(res.toc[0].text, "Section A");
+        assert_eq!(res.toc[0].level, 2);
+        assert_eq!(res.toc[1].text, "Sub Section");
+        assert_eq!(res.toc[1].level, 3);
+    }
+
+    #[test]
+    fn test_process_document_data_only() {
+        let src = "@version(1.0)\n@meta{\n  title: \"Just Config\"\n}\n";
+        let doc = tomet_parser::parse_document(src).unwrap();
+        let opts = ProcessOptions::default();
+        let res = process_document_internal(&doc, &opts);
+        assert_eq!(res.title.as_deref(), Some("Just Config"));
+        assert!(res.is_data_only);
+        assert!(res.toc.is_empty());
     }
 }

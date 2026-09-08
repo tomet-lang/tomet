@@ -105,15 +105,30 @@ export function printDocument(doc_val) {
 }
 
 /**
+ * Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
+ * @param {any} source_or_doc
+ * @param {any | null} [options]
+ * @returns {any}
+ */
+export function processDocument(source_or_doc, options) {
+    const ret = wasm.processDocument(source_or_doc, isLikeNone(options) ? 0 : addToExternrefTable0(options));
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
  * Convert `.tmt` source text or a `Document` AST object into an HTML body string.
  * @param {any} source_or_doc
+ * @param {any | null} [options]
  * @returns {string}
  */
-export function toHtml(source_or_doc) {
+export function toHtml(source_or_doc, options) {
     let deferred2_0;
     let deferred2_1;
     try {
-        const ret = wasm.toHtml(source_or_doc);
+        const ret = wasm.toHtml(source_or_doc, isLikeNone(options) ? 0 : addToExternrefTable0(options));
         var ptr1 = ret[0];
         var len1 = ret[1];
         if (ret[3]) {
@@ -185,6 +200,35 @@ export function validate(source) {
     const ptr0 = passStringToWasm0(source, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.validate(ptr0, len0);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * Validate `.tmt` source text against `std` plus the vocabularies given
+ * as source text.
+ *
+ * A host that has the vault's `@vocabulary(...)` files can pass their
+ * contents here. Without them, `validate` knows only `std`, so every
+ * element a vocabulary declares comes back as unknown -- correct, since
+ * nothing said it existed, but not useful in an editor that could have
+ * said so.
+ *
+ * A source that does not parse, or that carries no `@vocabulary(ns)`
+ * header, is skipped: it declares no namespace, so there is nothing to
+ * bind. Check vocabularies themselves with `tomet check`.
+ * @param {string} source
+ * @param {string[]} vocabularies
+ * @returns {any}
+ */
+export function validateWith(source, vocabularies) {
+    const ptr0 = passStringToWasm0(source, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayJsValueToWasm0(vocabularies, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.validateWith(ptr0, len0, ptr1, len1);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -288,6 +332,9 @@ function __wbg_get_imports() {
             const ret = Object.entries(arg0);
             return ret;
         },
+        __wbg_getRandomValues_ceb34d8ffce7e87f: function() { return handleError(function (arg0, arg1) {
+            globalThis.crypto.getRandomValues(getArrayU8FromWasm0(arg0, arg1));
+        }, arguments); },
         __wbg_get_3e9a707ab7d352eb: function() { return handleError(function (arg0, arg1) {
             const ret = Reflect.get(arg0, arg1);
             return ret;
@@ -538,6 +585,16 @@ function handleError(f, args) {
 
 function isLikeNone(x) {
     return x === undefined || x === null;
+}
+
+function passArrayJsValueToWasm0(array, malloc) {
+    const ptr = malloc(array.length * 4, 4) >>> 0;
+    for (let i = 0; i < array.length; i++) {
+        const add = addToExternrefTable0(array[i]);
+        getDataViewMemory0().setUint32(ptr + 4 * i, add, true);
+    }
+    WASM_VECTOR_LEN = array.length;
+    return ptr;
 }
 
 function passStringToWasm0(arg, malloc, realloc) {

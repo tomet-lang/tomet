@@ -33,7 +33,11 @@
   "peerDependencies": {
     "astro": "^5.0.0"
   },
+  "dependencies": {
+    "@tomet/tomet-wasm": "file:../../bindings/js"
+  },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "astro": "^5.6.1",
     "typescript": "^5.0.0"
   }

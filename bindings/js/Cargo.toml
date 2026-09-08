@@ -24,3 +24,4 @@ serde-wasm-bindgen = { workspace = true }
 serde = { workspace = true }
 js-sys = { workspace = true }
 getrandom = { version = "0.2", features = ["js"] }
+regex = { workspace = true }

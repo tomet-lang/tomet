@@ -32,9 +32,14 @@ export function parseValue(source: string): any;
 export function printDocument(doc_val: any): string;
 
 /**
+ * Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
+ */
+export function processDocument(source_or_doc: any, options?: any | null): any;
+
+/**
  * Convert `.tmt` source text or a `Document` AST object into an HTML body string.
  */
-export function toHtml(source_or_doc: any): string;
+export function toHtml(source_or_doc: any, options?: any | null): string;
 
 /**
  * Convert `.tmt` source text or a `Document` AST object into a CommonMark Markdown string.
@@ -51,6 +56,22 @@ export function toTypst(source_or_doc: any): string;
  */
 export function validate(source: string): any;
 
+/**
+ * Validate `.tmt` source text against `std` plus the vocabularies given
+ * as source text.
+ *
+ * A host that has the vault's `@vocabulary(...)` files can pass their
+ * contents here. Without them, `validate` knows only `std`, so every
+ * element a vocabulary declares comes back as unknown -- correct, since
+ * nothing said it existed, but not useful in an editor that could have
+ * said so.
+ *
+ * A source that does not parse, or that carries no `@vocabulary(ns)`
+ * header, is skipped: it declares no namespace, so there is nothing to
+ * bind. Check vocabularies themselves with `tomet check`.
+ */
+export function validateWith(source: string, vocabularies: string[]): any;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -61,10 +82,12 @@ export interface InitOutput {
     readonly parseDocument: (a: number, b: number) => [number, number, number];
     readonly parseValue: (a: number, b: number) => [number, number, number];
     readonly printDocument: (a: any) => [number, number, number, number];
-    readonly toHtml: (a: any) => [number, number, number, number];
+    readonly processDocument: (a: any, b: number) => [number, number, number];
+    readonly toHtml: (a: any, b: number) => [number, number, number, number];
     readonly toMarkdown: (a: any) => [number, number, number, number];
     readonly toTypst: (a: any) => [number, number, number, number];
     readonly validate: (a: number, b: number) => [number, number, number];
+    readonly validateWith: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

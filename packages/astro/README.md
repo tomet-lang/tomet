@@ -4,10 +4,27 @@ An Astro integration for Tomet: it turns a directory of `.tmt` files into
 Astro pages, with the bodies rendered by `tomet-convert-html` and the
 metadata, slugs and links coming from the Rust workspace layer.
 
-> **Status: skeleton.** The package builds and typechecks, but does not do
-> anything yet. Several prerequisites live in this repository outside this
-> directory and are listed under [Prerequisites](#prerequisites). Read
-> those before writing code here.
+> **Status: active.** Provides `tometLoader` for Astro 5 Content Collections,
+> compiling `.tmt` documents in-process via `@tomet/tomet-wasm` with
+> incremental digest caching capable of scaling to 50,000+ files.
+
+## Usage
+
+Define a content collection in `src/content.config.ts`:
+
+```typescript
+import { defineCollection } from 'astro:content';
+import { tometLoader } from '@tomet/astro';
+
+export const collections = {
+  docs: defineCollection({
+    loader: tometLoader({
+      base: '../docs',
+      advanced: true, // auto heading numbers & slug IDs
+    }),
+  }),
+};
+```
 
 ## Why this exists
 
