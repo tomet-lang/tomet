@@ -1,0 +1,12 @@
+@table
+|[ -------features------ ][ lsp ][ vscode ][ zed ][ neovim ][ helix ]
+|[ highlight             ][ o   ][ o      ][ o   ][ o      ][ o     ]
+|[ enter to remove empty ][     ][ o      ][     ][        ][       ]
+@table
+|[ -----suggestion------ ][ lsp ][ vscode ][ zed ][ neovim ][ helix ]
+|[ path                  ][ o   ][ lsp    ][ lsp ][ lsp    ][ lsp   ]
+@table
+|[ ----auto complete---- ][ lsp ][ vscode ][ zed ][ neovim ][ helix ]
+|[ table                 ][     ][ o      ][     ][        ][       ]
+|[ outline               ][     ][ o      ][     ][        ][       ]
+|[ multiline             ][     ][ o      ][     ][        ][       ]

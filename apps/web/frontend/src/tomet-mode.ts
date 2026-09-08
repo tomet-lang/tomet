@@ -165,15 +165,18 @@ function tokenBase(stream: StringStream, state: TometState): string | null {
 	if (stream.match(/^[,:]/)) {
 		return "punctuation";
 	}
+	if (stream.match("|")) {
+		return "controlKeyword";
+	}
 
 	if (state.emphasisStack.length > 0) {
-		if (stream.match(/^[^*_=`$@<\n\s(){}[\]:,]+/)) {
+		if (stream.match(/^[^*_=`$@<\n\s(){}[\]:,|]+/)) {
 			return emphasisTag(state.emphasisStack[state.emphasisStack.length - 1]);
 		}
 	}
 
 	// Consume a single plain word up to the next sigil or delimiter
-	if (stream.match(/^[^\s,()[\]{}:"`@<$=*_\\]+/)) {
+	if (stream.match(/^[^\s,()[\]{}:"`@<$=*_\\|]+/)) {
 		return null;
 	}
 
