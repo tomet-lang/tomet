@@ -10,7 +10,7 @@ use tomet_indexer::collect_tm_files_with_config;
 use tomet_parser::parse_document;
 use tomet_printer::document_to_tm_with_config;
 use tomet_transform::{
-    MacroSet, normalize_meta_to_value_dsl, promote_meta_type_to_kind,
+    MacroSet, normalize_embedded_to_value_dsl, promote_meta_type_to_kind,
     transform_link_targets_with_macros,
 };
 
@@ -62,7 +62,7 @@ pub fn refactor_document(
     }
 
     if options.meta_to_value_dsl {
-        if normalize_meta_to_value_dsl(doc) {
+        if normalize_embedded_to_value_dsl(doc) {
             total_changes += 1;
         }
     }

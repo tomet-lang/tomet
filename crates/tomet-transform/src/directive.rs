@@ -82,18 +82,34 @@ fn materialize_raw_body(el: &mut Element) {
     }
 }
 
-/// Normalizes `#meta` elements in `doc` from `format:yaml` (or another
-/// embedded format) to the native Value DSL.
+/// Whether an element's `+++` body is data that could have been written
+/// as a value group instead.
+///
+/// Everything but a code block. `@codeblock(yaml)+++a: 1+++` declares a
+/// format the same way `@meta(yaml)` does, and `embedded::element_data`
+/// will happily read it -- but that body is a *sample* of YAML, and
+/// rewriting it as a group deletes the thing its author was showing.
+///
+/// A blacklist rather than a list of kinds to include, so an element a
+/// vocabulary declares -- `@deck.note(format:yaml)+++...+++` -- is
+/// covered without being named here. Naming them was the old shape: this
+/// pass only saw `@meta`, so `@config`, `@settings` and every custom
+/// element had to be converted by hand.
+fn body_is_data(el: &Element) -> bool {
+    classify_std_lenient(el) != ElementKind::Codeblock
+}
+
+/// Normalizes elements in `doc` from `format:yaml` (or another embedded
+/// format) to the native Value DSL.
 ///
 /// Reads the body through `embedded::element_data` *before* stripping the
 /// `format` argument, and rewrites it as a native group -- otherwise the
 /// body stays an opaque `+++` fence with nothing left to say how to read
 /// it, and every later pass sees an element with no data.
-pub fn normalize_meta_to_value_dsl(doc: &mut Document) -> bool {
+pub fn normalize_embedded_to_value_dsl(doc: &mut Document) -> bool {
     let mut changed = false;
     for_each_element_mut(doc, |el| {
-        let kind = classify_std_lenient(el);
-        if kind == ElementKind::Meta {
+        if body_is_data(el) {
             if matches!(el.value, Some(ElementValue::Raw(_))) {
                 materialize_raw_body(el);
                 changed = !matches!(el.value, Some(ElementValue::Raw(_))) || changed;
