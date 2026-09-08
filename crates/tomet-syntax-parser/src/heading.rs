@@ -20,7 +20,7 @@ pub(crate) fn parse_heading(cur: &mut Cursor) -> Result<Element> {
     let mut el = element_new(Sigil::named("heading")).with_placement(Placement::Block);
 
     match cur.peek() {
-        Some('[') | Some('(') | Some('{') | Some('|') => {
+        _ if crate::element::opens_group(cur.peek()) => {
             // The full form. Groups are read by the same code that reads
             // `@name`'s, so `#` takes `(args)`, `[content]` and `{value}`
             // in any order, and its content -- bracketed or `|`-marked --

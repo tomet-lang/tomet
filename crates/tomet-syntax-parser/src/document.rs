@@ -106,7 +106,7 @@ pub(crate) fn is_heading_start(cur: &Cursor) -> bool {
     look.eat_while(|c| c == '#');
     // A group may follow the run directly: `#[ x ]`, `#(id: a)[ x ]`,
     // `#| x` -- the last being `[content]` without the brackets.
-    if matches!(look.peek(), Some('[') | Some('(') | Some('{') | Some('|')) {
+    if crate::element::opens_group(look.peek()) {
         return true;
     }
     // Otherwise the bracket-less sugar, which needs a space to separate
