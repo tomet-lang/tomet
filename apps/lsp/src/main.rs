@@ -24,7 +24,14 @@ fn main() -> anyhow::Result<()> {
         definition_provider: Some(OneOf::Left(true)),
         completion_provider: Some(CompletionOptions {
             resolve_provider: Some(false),
-            trigger_characters: Some(vec!["<".to_string(), "@".to_string(), "$".to_string()]),
+            trigger_characters: Some(vec![
+                "<".to_string(),
+                "@".to_string(),
+                "$".to_string(),
+                ":".to_string(),
+                "/".to_string(),
+                ".".to_string(),
+            ]),
             work_done_progress_options: Default::default(),
             all_commit_characters: None,
             completion_item: None,
@@ -104,10 +111,15 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         .send(Message::Response(Response::new_ok(req.id, result)))?;
                 } else if req.method == Completion::METHOD {
                     let params: lsp_types::CompletionParams = serde_json::from_value(req.params)?;
+                    let uri = &params.text_document_position.text_document.uri;
                     let items = documents
-                        .get(&params.text_document_position.text_document.uri)
+                        .get(uri)
                         .map(|text| {
-                            tomet_lsp::completions_for(text, params.text_document_position.position)
+                            tomet_lsp::completions_for_with_uri(
+                                text,
+                                params.text_document_position.position,
+                                Some(uri),
+                            )
                         })
                         .unwrap_or_default();
                     let result = serde_json::to_value(items)?;
