@@ -438,7 +438,7 @@ fn render_link(cx: &RenderCtx, el: &Element) -> String {
             };
             format!("[{text}](#link-{target})")
         }
-        TargetScheme::Ref => {
+        TargetScheme::Ref | TargetScheme::Unresolved => {
             if text.is_empty() || text == target {
                 format!("[[{target}]]")
             } else {

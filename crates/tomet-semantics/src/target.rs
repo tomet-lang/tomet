@@ -117,6 +117,8 @@ pub enum TargetScheme {
     /// `ref:...` -- resolved by searching the project for a file whose
     /// name/title matches the given string (the old "wikilink" resolution).
     Ref,
+    /// `unresolved:...` -- link target could not be resolved (stub/uncreated note).
+    Unresolved,
 }
 
 impl TargetScheme {
@@ -131,6 +133,7 @@ impl TargetScheme {
             TargetScheme::Tm => "tm",
             TargetScheme::Id => "id",
             TargetScheme::Ref => "ref",
+            TargetScheme::Unresolved => "unresolved",
         }
     }
 }
@@ -146,10 +149,11 @@ impl TargetScheme {
 /// `tm`, and recovering that means knowing which keys are schemes -- and
 /// it used to carry a hand-copied second copy that nothing held to this
 /// one.
-pub const EXPLICIT_SCHEMES: [(&str, TargetScheme); 6] = [
+pub const EXPLICIT_SCHEMES: [(&str, TargetScheme); 7] = [
     ("tm", TargetScheme::Tm),
     ("id", TargetScheme::Id),
     ("ref", TargetScheme::Ref),
+    ("unresolved", TargetScheme::Unresolved),
     ("file", TargetScheme::File),
     ("dir", TargetScheme::Dir),
     ("url", TargetScheme::Url),
@@ -272,6 +276,10 @@ mod tests {
         assert_eq!(
             target_scheme("ref:Some Page"),
             (TargetScheme::Ref, "Some Page")
+        );
+        assert_eq!(
+            target_scheme("unresolved:Future Note"),
+            (TargetScheme::Unresolved, "Future Note")
         );
         assert_eq!(target_scheme("file:x.md"), (TargetScheme::File, "x.md"));
         assert_eq!(target_scheme("dir:spec"), (TargetScheme::Dir, "spec"));

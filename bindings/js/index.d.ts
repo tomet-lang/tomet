@@ -86,6 +86,10 @@ export interface ProcessOptions {
   numberHeadings?: boolean;
   autoSlugHeadings?: boolean;
   lang?: string;
+  currentPath?: string;
+  urlPrefix?: string;
+  assetPrefix?: string;
+  vaultFiles?: string[];
 }
 
 export interface TocItem {

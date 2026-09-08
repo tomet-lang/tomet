@@ -17,11 +17,22 @@ pub fn parse_value(source: &str) -> Result<JsValue, JsValue> {
 
 /// Options controlling HTML rendering and document processing.
 #[derive(serde::Serialize, serde::Deserialize, Default, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessOptions {
     pub advanced: Option<bool>,
+    #[serde(alias = "number_headings")]
     pub number_headings: Option<bool>,
+    #[serde(alias = "auto_slug_headings")]
     pub auto_slug_headings: Option<bool>,
     pub lang: Option<String>,
+    #[serde(alias = "current_path")]
+    pub current_path: Option<String>,
+    #[serde(alias = "url_prefix")]
+    pub url_prefix: Option<String>,
+    #[serde(alias = "asset_prefix")]
+    pub asset_prefix: Option<String>,
+    #[serde(alias = "vault_files")]
+    pub vault_files: Option<Vec<String>>,
 }
 
 impl ProcessOptions {
@@ -33,6 +44,27 @@ impl ProcessOptions {
             lang: self.lang.clone(),
         }
     }
+}
+
+fn prepare_document_with_links(
+    mut doc: tomet_ast::Document,
+    opts: &ProcessOptions,
+) -> tomet_ast::Document {
+    if let Some(files) = &opts.vault_files {
+        let index = tomet_links::VaultLinkIndex::from_paths(files);
+        let from_path = opts.current_path.as_deref().map(std::path::Path::new);
+        let mode = tomet_transform::TargetMode::WebSlug {
+            url_prefix: opts.url_prefix.clone().unwrap_or_else(|| "/docs".into()),
+            asset_prefix: opts.asset_prefix.clone().unwrap_or_else(|| "/vault".into()),
+        };
+        tomet_transform::resolve_document_links(
+            &mut doc,
+            from_path,
+            |target, from| index.resolve_ref(target, from).map(|p| p.to_path_buf()),
+            &mode,
+        );
+    }
+    doc
 }
 
 /// An entry in the document's table of contents.
@@ -53,13 +85,19 @@ pub struct ProcessedDoc {
     pub is_data_only: bool,
 }
 
-pub fn process_document_internal(doc: &tomet_ast::Document, opts: &ProcessOptions) -> ProcessedDoc {
+pub fn process_document_internal(
+    mut doc: tomet_ast::Document,
+    opts: &ProcessOptions,
+) -> ProcessedDoc {
+    if opts.vault_files.is_some() {
+        doc = prepare_document_with_links(doc, opts);
+    }
     let render_opts = opts.to_render_options();
-    let html = tomet_html::render_body_with(doc, &render_opts);
+    let html = tomet_html::render_body_with(&doc, &render_opts);
     let is_data_only = html.trim().is_empty();
 
     // 1. Meta & Title from @meta{title}
-    let meta = tomet_semantics::document_meta(doc);
+    let meta = tomet_semantics::document_meta(&doc);
     let meta_title = meta.as_ref().and_then(|v| match v {
         tomet_ast::Value::Map(m) => m.iter().find_map(|(k, val)| {
             if k == "title" {
@@ -135,15 +173,17 @@ pub fn to_html(source_or_doc: &JsValue, options: Option<JsValue>) -> Result<Stri
     };
     let render_opts = opts.to_render_options();
 
-    if let Some(src) = source_or_doc.as_string() {
-        let doc =
-            tomet_parser::parse_document(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet_html::render_body_with(&doc, &render_opts))
+    let mut doc = if let Some(src) = source_or_doc.as_string() {
+        tomet_parser::parse_document(&src).map_err(|e| JsValue::from_str(&e.to_string()))?
     } else {
         let doc: tomet_ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet_html::render_body_with(&doc, &render_opts))
+        doc
+    };
+    if opts.vault_files.is_some() {
+        doc = prepare_document_with_links(doc, &opts);
     }
+    Ok(tomet_html::render_body_with(&doc, &render_opts))
 }
 
 /// Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
@@ -161,11 +201,11 @@ pub fn process_document(
     let processed = if let Some(src) = source_or_doc.as_string() {
         let doc =
             tomet_parser::parse_document(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        process_document_internal(&doc, &opts)
+        process_document_internal(doc, &opts)
     } else {
         let doc: tomet_ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        process_document_internal(&doc, &opts)
+        process_document_internal(doc, &opts)
     };
 
     serde_wasm_bindgen::to_value(&processed).map_err(|e| JsValue::from_str(&e.to_string()))
@@ -300,7 +340,7 @@ mod tests {
             advanced: Some(true),
             ..Default::default()
         };
-        let res = process_document_internal(&doc, &opts);
+        let res = process_document_internal(doc, &opts);
         assert_eq!(res.title.as_deref(), Some("My Meta Title"));
         assert!(!res.is_data_only);
         assert_eq!(res.toc.len(), 1);
@@ -317,7 +357,7 @@ mod tests {
             advanced: Some(true),
             ..Default::default()
         };
-        let res = process_document_internal(&doc, &opts);
+        let res = process_document_internal(doc, &opts);
         assert_eq!(res.title.as_deref(), Some("First Heading Title"));
         assert!(!res.is_data_only);
         assert_eq!(res.toc.len(), 2);
@@ -332,9 +372,27 @@ mod tests {
         let src = "@version(1.0)\n@meta{\n  title: \"Just Config\"\n}\n";
         let doc = tomet_parser::parse_document(src).unwrap();
         let opts = ProcessOptions::default();
-        let res = process_document_internal(&doc, &opts);
+        let res = process_document_internal(doc, &opts);
         assert_eq!(res.title.as_deref(), Some("Just Config"));
         assert!(res.is_data_only);
         assert!(res.toc.is_empty());
+    }
+
+    #[test]
+    fn test_process_document_with_resolved_links() {
+        let src = "- @link(\"ref:Linux\")[Go to Linux]\n- @link(\"ref:NonExistentNote\")[Missing]\n";
+        let doc = tomet_parser::parse_document(src).unwrap();
+        let opts = ProcessOptions {
+            vault_files: Some(vec![
+                "30-39 Knowledge/Linux.tmt".into(),
+                "10-19 Journal/daily/memo.tmt".into(),
+            ]),
+            url_prefix: Some("/docs".into()),
+            current_path: Some("10-19 Journal/daily/memo.tmt".into()),
+            ..Default::default()
+        };
+        let res = process_document_internal(doc, &opts);
+        assert!(res.html.contains("href=\"/docs/30-39 Knowledge/Linux\">Go to Linux</a>"));
+        assert!(res.html.contains("class=\"tm-ref tm-ref-unresolved\" aria-disabled=\"true\" data-ref=\"NonExistentNote\">Missing</a>"));
     }
 }
