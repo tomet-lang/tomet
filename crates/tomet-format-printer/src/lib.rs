@@ -319,10 +319,21 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 _ => None,
             })
             .unwrap_or_default();
-        let body = el
+        // The body arrives in either slot, and both are written back as
+        // a fence. A ``` block parses into `[content]`; `@codeblock(yaml)
+        // +++...+++` parses into a `Raw` value, and reading only the
+        // first is how that spelling used to print as an empty fence with
+        // its code deleted.
+        let from_content = el
             .content
             .as_ref()
             .map(|content| render_inlines(content, config))
+            .filter(|body| !body.is_empty());
+        let body = from_content
+            .or_else(|| match el.value.as_ref() {
+                Some(ElementValue::Raw(raw)) => Some(raw.clone()),
+                _ => None,
+            })
             .unwrap_or_default();
         // Grow the fence past any backtick run in the body, the same rule
         // the parser reads it back with.
@@ -1016,6 +1027,24 @@ mod tests {
         };
         let printed_nospace = document_to_tm_with_config(&doc, &cfg_nospace);
         assert!(printed_nospace.contains("@link(target:\"https://google.com\")[Google]"));
+    }
+
+    /// A code block's body reaches the printer in either slot, and both
+    /// have to come back out.
+    ///
+    /// ``` parses into `[content]`; `@codeblock(yaml)+++...+++` parses
+    /// into a `Raw` value. The printer read only the first, so the fence
+    /// spelling printed as an empty block with its code deleted -- and
+    /// anything that reprints a document, `tomet refactor` included,
+    /// deleted it in passing.
+    #[test]
+    fn a_fenced_codeblock_body_survives_printing() {
+        let doc = tomet_parser::parse_document("@codeblock(yaml)+++\na: 1\n+++\n").unwrap();
+        let printed = document_to_tm(&doc);
+        assert!(
+            printed.contains("a: 1"),
+            "the body was dropped:\n{printed}"
+        );
     }
 
     #[test]
