@@ -25,6 +25,7 @@
 - `[label]:link(https://)`
 - `[label]:style(color:#ffffff):link(https://)`
   - 今 > `@link[@color[asdfasdf](white)](https:///)`
+- `#`の意味の重複 カラーコード タグ ヘッダー
 - `->`
 - `\n`も統一？
 - tmtroot vs tmtdocs

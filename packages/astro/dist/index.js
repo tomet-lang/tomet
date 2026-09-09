@@ -164,6 +164,8 @@ export function tometLoader(options) {
                             metaObj = processed.meta;
                         }
                     }
+                    const kindMatch = content.match(/^@kind\(([^)]*)\)/m);
+                    const kind = processed.kind ?? (kindMatch ? kindMatch[1].trim() : null);
                     const entryData = {
                         title,
                         slug: id,
@@ -171,6 +173,7 @@ export function tometLoader(options) {
                         sourcePath: `docs/${file.relPath}`,
                         toc: processed.toc ?? [],
                         meta: metaObj,
+                        kind,
                         isDataOnly: processed.is_data_only,
                     };
                     const relToRoot = relative(rootDir, file.absPath).split('\\').join('/');
