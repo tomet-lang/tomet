@@ -17,6 +17,13 @@ pub(crate) fn is_interp_start(cur: &Cursor) -> bool {
     }
     if look.peek().is_some_and(is_interp_ident_start) {
         let _ = look.eat_while(is_interp_ident_char);
+        while look.peek() == Some('.') {
+            look.bump();
+            if !look.peek().is_some_and(is_interp_ident_start) {
+                return false;
+            }
+            let _ = look.eat_while(is_interp_ident_char);
+        }
         if look.peek() == Some('(') {
             return true;
         }
@@ -24,7 +31,7 @@ pub(crate) fn is_interp_start(cur: &Cursor) -> bool {
     false
 }
 
-/// `${ Expr }` or `$func(args)` -- structurally `Sigil::Dollar` with an `Interp` element value
+/// `${ Expr }` or `$func(args)` or `$macro.func(args)` -- structurally `Sigil::Dollar` with an `Interp` element value
 pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
     let start_pos = cur.pos();
     cur.eat_str("$");
@@ -50,14 +57,9 @@ pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
     } else {
         let ident_start = cur.pos();
         let name = eat_interp_ident(cur)?.to_string();
-        let callee = Box::new(InterpExpr {
+        let mut expr = InterpExpr {
             kind: InterpExprKind::Identifier(name),
             span: cur.span_from(ident_start),
-        });
-        let args = parse_interp_call_args(cur)?;
-        let mut expr = InterpExpr {
-            kind: InterpExprKind::Call { callee, args },
-            span: cur.span_from(start_pos),
         };
         loop {
             let mut look = *cur;

@@ -15,6 +15,12 @@ pub use document::parse_document;
 pub use error::{Error, Result};
 pub use value::parse_value;
 
+/// Parse a `$func(args)` or `${expr}` dollar element directly from a string slice.
+pub fn parse_dollar_element_str(source: &str) -> Result<tomet_ast::Element> {
+    let mut cur = tomet_lexer::Cursor::new(source);
+    interp::parse_dollar_element(&mut cur)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
