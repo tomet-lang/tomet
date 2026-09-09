@@ -2,6 +2,11 @@
 /* eslint-disable */
 
 /**
+ * Clears the cached link resolution index.
+ */
+export function clearVaultFiles(): void;
+
+/**
  * Format `.tmt` source text with lossless whitespace hygiene and span preservation.
  */
 export function formatSource(source: string): string;
@@ -35,6 +40,11 @@ export function printDocument(doc_val: any): string;
  * Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
  */
 export function processDocument(source_or_doc: any, options?: any | null): any;
+
+/**
+ * Pre-builds and caches the link resolution index in Wasm memory once for the entire vault.
+ */
+export function setVaultFiles(files: string[]): void;
 
 /**
  * Convert `.tmt` source text or a `Document` AST object into an HTML body string.
@@ -83,11 +93,13 @@ export interface InitOutput {
     readonly parseValue: (a: number, b: number) => [number, number, number];
     readonly printDocument: (a: any) => [number, number, number, number];
     readonly processDocument: (a: any, b: number) => [number, number, number];
+    readonly setVaultFiles: (a: number, b: number) => void;
     readonly toHtml: (a: any, b: number) => [number, number, number, number];
     readonly toMarkdown: (a: any) => [number, number, number, number];
     readonly toTypst: (a: any) => [number, number, number, number];
     readonly validate: (a: number, b: number) => [number, number, number];
     readonly validateWith: (a: number, b: number, c: number, d: number) => [number, number, number];
+    readonly clearVaultFiles: () => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

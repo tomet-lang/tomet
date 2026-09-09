@@ -33,6 +33,7 @@ pub struct ProcessOptions {
     pub asset_prefix: Option<String>,
     #[serde(alias = "vault_files")]
     pub vault_files: Option<Vec<String>>,
+    pub config: Option<String>,
 }
 
 impl ProcessOptions {
@@ -46,17 +47,72 @@ impl ProcessOptions {
     }
 }
 
-fn prepare_document_with_links(
+use std::sync::Mutex;
+use tomet_links::VaultLinkIndex;
+
+static GLOBAL_VAULT_INDEX: Mutex<Option<VaultLinkIndex>> = Mutex::new(None);
+
+/// Pre-builds and caches the link resolution index in Wasm memory once for the entire vault.
+#[wasm_bindgen(js_name = setVaultFiles)]
+pub fn set_vault_files(files: Vec<String>) {
+    let index = VaultLinkIndex::from_paths(&files);
+    let mut lock = GLOBAL_VAULT_INDEX.lock().unwrap();
+    *lock = Some(index);
+}
+
+/// Clears the cached link resolution index.
+#[wasm_bindgen(js_name = clearVaultFiles)]
+pub fn clear_vault_files() {
+    let mut lock = GLOBAL_VAULT_INDEX.lock().unwrap();
+    *lock = None;
+}
+
+fn prepare_document(
     mut doc: tomet_ast::Document,
     opts: &ProcessOptions,
 ) -> tomet_ast::Document {
-    if let Some(files) = &opts.vault_files {
-        let index = tomet_links::VaultLinkIndex::from_paths(files);
-        let from_path = opts.current_path.as_deref().map(std::path::Path::new);
-        let mode = tomet_transform::TargetMode::WebSlug {
-            url_prefix: opts.url_prefix.clone().unwrap_or_else(|| "/docs".into()),
-            asset_prefix: opts.asset_prefix.clone().unwrap_or_else(|| "/vault".into()),
-        };
+    // 1. Inject external workspace config (e.g. default.config.tmt) if provided
+    if let Some(cfg_src) = &opts.config {
+        if let Ok(cfg_doc) = tomet_parser::parse_document(cfg_src) {
+            let mut prefix_blocks = Vec::new();
+            for block in cfg_doc.blocks {
+                if let tomet_ast::Block::Element(el) = &block {
+                    let kind = tomet_semantics::classify_std_lenient(el);
+                    if kind == tomet_semantics::ElementKind::Config || kind.as_str() == "settings" {
+                        prefix_blocks.push(block);
+                    }
+                }
+            }
+            if !prefix_blocks.is_empty() {
+                prefix_blocks.append(&mut doc.blocks);
+                doc.blocks = prefix_blocks;
+            }
+        }
+    }
+
+    // 2. Expand macros in element arguments and interpolation expressions
+    let config = tomet_semantics::document_config(&doc);
+    tomet_transform::expand_document_macros(&mut doc, &config);
+
+    // 3. Resolve links against cached index or vault_files option
+    let lock = GLOBAL_VAULT_INDEX.lock().unwrap();
+    let maybe_index = lock.as_ref();
+
+    let from_path = opts.current_path.as_deref().map(std::path::Path::new);
+    let mode = tomet_transform::TargetMode::WebSlug {
+        url_prefix: opts.url_prefix.clone().unwrap_or_else(|| "/docs".into()),
+        asset_prefix: opts.asset_prefix.clone().unwrap_or_else(|| "/vault".into()),
+    };
+
+    if let Some(index) = maybe_index {
+        tomet_transform::resolve_document_links(
+            &mut doc,
+            from_path,
+            |target, from| index.resolve_ref(target, from).map(|p| p.to_path_buf()),
+            &mode,
+        );
+    } else if let Some(files) = &opts.vault_files {
+        let index = VaultLinkIndex::from_paths(files);
         tomet_transform::resolve_document_links(
             &mut doc,
             from_path,
@@ -89,9 +145,7 @@ pub fn process_document_internal(
     mut doc: tomet_ast::Document,
     opts: &ProcessOptions,
 ) -> ProcessedDoc {
-    if opts.vault_files.is_some() {
-        doc = prepare_document_with_links(doc, opts);
-    }
+    doc = prepare_document(doc, opts);
     let render_opts = opts.to_render_options();
     let html = tomet_html::render_body_with(&doc, &render_opts);
     let is_data_only = html.trim().is_empty();
@@ -180,9 +234,7 @@ pub fn to_html(source_or_doc: &JsValue, options: Option<JsValue>) -> Result<Stri
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         doc
     };
-    if opts.vault_files.is_some() {
-        doc = prepare_document_with_links(doc, &opts);
-    }
+    doc = prepare_document(doc, &opts);
     Ok(tomet_html::render_body_with(&doc, &render_opts))
 }
 
