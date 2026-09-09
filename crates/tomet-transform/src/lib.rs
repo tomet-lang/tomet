@@ -9,6 +9,7 @@
 pub mod blueprint;
 pub mod directive;
 pub mod links;
+pub mod macro_expand;
 pub mod macro_rewrite;
 pub mod meta;
 pub mod structural;
@@ -16,6 +17,7 @@ pub mod structural;
 pub use blueprint::*;
 pub use directive::*;
 pub use links::*;
+pub use macro_expand::*;
 pub use macro_rewrite::*;
 pub use meta::*;
 pub use structural::*;
@@ -24,6 +26,7 @@ pub use structural::*;
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use tomet_ast::{Block, Value};
 
     fn parse_doc(src: &str) -> tomet_ast::Document {
         tomet_parser::parse_document(src).expect("valid source")
@@ -65,5 +68,21 @@ mod tests {
         };
         let count = apply_structural_action(&mut doc, &action);
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_expand_document_macros() {
+        let mut doc = parse_doc("- @link($macro.https(\"www.kaggle.com\"))\n");
+        let mut config = tomet_semantics::DocumentConfig::default();
+        config.macros.insert("https".into(), "https://${1}".into());
+
+        expand_document_macros(&mut doc, &config);
+
+        let Block::Element(ul_el) = &doc.blocks[0] else { panic!() };
+        let items = ul_el.value.as_ref().unwrap().as_children();
+        let item_el = items[0];
+        let content = item_el.content.as_ref().unwrap();
+        let tomet_ast::Inline::Element(link_el) = &content[0] else { panic!() };
+        assert_eq!(link_el.args, Some(Value::String("https://www.kaggle.com".into())));
     }
 }
