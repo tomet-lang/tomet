@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use tomet_ast::{Document, Element, Value};
-use tomet_semantics::{ElementKind, TargetScheme, classify_std_lenient, link_target, target_scheme};
+use tomet_ast::{Document, Element, Inline, Text, Value};
+use tomet_semantics::{
+    ElementKind, TargetScheme, classify_std_lenient, link_target, target_scheme,
+};
 use tomet_tree::for_each_element_mut;
 
 /// Destination target format when rewriting `ref:` links and `@embed` assets.
@@ -134,7 +136,8 @@ pub fn resolve_document_links<F>(
         }
 
         // For embeds: resolve ref: or local file: targets (e.g. +hash.png, ./image.png)
-        if kind == ElementKind::Embed && scheme != TargetScheme::Ref && scheme != TargetScheme::File {
+        if kind == ElementKind::Embed && scheme != TargetScheme::Ref && scheme != TargetScheme::File
+        {
             return;
         }
 
@@ -143,12 +146,56 @@ pub fn resolve_document_links<F>(
             None => (rest, None),
         };
 
-        let new_target = match resolver(stem_or_name, from_path) {
-            Some(resolved_path) => mode.format_path(&resolved_path, fragment, from_path),
-            None => format!("unresolved:{rest}"),
+        let (new_target, fallback_label) = match resolver(stem_or_name, from_path) {
+            Some(resolved_path) => {
+                let formatted = mode.format_path(&resolved_path, fragment, from_path);
+                let stem = resolved_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(stem_or_name);
+                let label = if let Some(frag) = fragment {
+                    if !frag.is_empty() {
+                        format!("{stem}#{frag}")
+                    } else {
+                        stem.to_string()
+                    }
+                } else {
+                    stem.to_string()
+                };
+                (formatted, label)
+            }
+            None => {
+                let stem = Path::new(stem_or_name)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(stem_or_name);
+                let label = if let Some(frag) = fragment {
+                    if !frag.is_empty() {
+                        format!("{stem}#{frag}")
+                    } else {
+                        stem.to_string()
+                    }
+                } else {
+                    stem.to_string()
+                };
+                (format!("unresolved:{rest}"), label)
+            }
         };
 
         update_element_target(el, new_target);
+
+        if kind == ElementKind::Link {
+            let has_content = el.content.as_ref().is_some_and(|c| {
+                !c.is_empty()
+                    && c.iter().any(|inline| match inline {
+                        Inline::Text(t) => !t.value.trim().is_empty(),
+                        _ => true,
+                    })
+            });
+            if !has_content {
+                el.content = Some(vec![Inline::Text(Text::from(fallback_label))]);
+            }
+        }
     });
 }
 
@@ -243,15 +290,13 @@ mod tests {
 
         let resolver = |target: &str, _from: Option<&Path>| -> Option<PathBuf> {
             match target {
-                "+8c3002a8a891b78137b6547f600a88141a828640.png" => {
-                    Some(PathBuf::from("30-39 Knowledge/ミーム/-/+8c3002a8a891b78137b6547f600a88141a828640.png"))
-                }
-                "+700fe7be15805a34ad1044c351f7dde08c010ec1.png" => {
-                    Some(PathBuf::from("50-59 Sandbox/ゲーム/-/+700fe7be15805a34ad1044c351f7dde08c010ec1.png"))
-                }
-                "manual.pdf" => {
-                    Some(PathBuf::from("40-49 Master/manual.pdf"))
-                }
+                "+8c3002a8a891b78137b6547f600a88141a828640.png" => Some(PathBuf::from(
+                    "30-39 Knowledge/ミーム/-/+8c3002a8a891b78137b6547f600a88141a828640.png",
+                )),
+                "+700fe7be15805a34ad1044c351f7dde08c010ec1.png" => Some(PathBuf::from(
+                    "50-59 Sandbox/ゲーム/-/+700fe7be15805a34ad1044c351f7dde08c010ec1.png",
+                )),
+                "manual.pdf" => Some(PathBuf::from("40-49 Master/manual.pdf")),
                 _ => None,
             }
         };
@@ -273,11 +318,65 @@ mod tests {
         assert_eq!(
             targets,
             vec![
-                "/vault/30-39 Knowledge/ミーム/-/+8c3002a8a891b78137b6547f600a88141a828640.png".to_string(),
-                "/vault/50-59 Sandbox/ゲーム/-/+700fe7be15805a34ad1044c351f7dde08c010ec1.png".to_string(),
+                "/vault/30-39 Knowledge/ミーム/-/+8c3002a8a891b78137b6547f600a88141a828640.png"
+                    .to_string(),
+                "/vault/50-59 Sandbox/ゲーム/-/+700fe7be15805a34ad1044c351f7dde08c010ec1.png"
+                    .to_string(),
                 "https://example.com/cat.png".to_string(),
                 "unresolved:+missing.png".to_string(),
                 "/vault/40-49 Master/manual.pdf".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_resolve_links_empty_label_uses_file_stem() {
+        let mut doc = parse_doc(
+            r#"
+- @link("ref:Linux")
+- @link("ref:Linux#kernel")
+- @link("ref:MissingNote")
+- @link("ref:Linux")[Custom Label]
+"#,
+        );
+
+        let resolver = |target: &str, _from: Option<&Path>| -> Option<PathBuf> {
+            if target == "Linux" {
+                Some(PathBuf::from("30-39 Knowledge/Linux.tmt"))
+            } else {
+                None
+            }
+        };
+
+        let mode = TargetMode::WebSlug {
+            url_prefix: "/docs".into(),
+            asset_prefix: "/vault".into(),
+        };
+
+        resolve_document_links(&mut doc, None, resolver, &mode);
+
+        let mut labels = Vec::new();
+        for_each_element_mut(&mut doc, |el| {
+            if el.sigil.is_bare_named("link") {
+                let content_str = el.content.as_ref().map(|c| {
+                    c.iter()
+                        .map(|inline| match inline {
+                            Inline::Text(t) => t.value.as_str(),
+                            _ => "",
+                        })
+                        .collect::<String>()
+                });
+                labels.push(content_str);
+            }
+        });
+
+        assert_eq!(
+            labels,
+            vec![
+                Some("Linux".to_string()),
+                Some("Linux#kernel".to_string()),
+                Some("MissingNote".to_string()),
+                Some("Custom Label".to_string()),
             ]
         );
     }

@@ -78,11 +78,18 @@ mod tests {
 
         expand_document_macros(&mut doc, &config);
 
-        let Block::Element(ul_el) = &doc.blocks[0] else { panic!() };
+        let Block::Element(ul_el) = &doc.blocks[0] else {
+            panic!()
+        };
         let items = ul_el.value.as_ref().unwrap().as_children();
         let item_el = items[0];
         let content = item_el.content.as_ref().unwrap();
-        let tomet_ast::Inline::Element(link_el) = &content[0] else { panic!() };
-        assert_eq!(link_el.args, Some(Value::String("https://www.kaggle.com".into())));
+        let tomet_ast::Inline::Element(link_el) = &content[0] else {
+            panic!()
+        };
+        assert_eq!(
+            link_el.args,
+            Some(Value::String("https://www.kaggle.com".into()))
+        );
     }
 }

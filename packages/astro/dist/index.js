@@ -190,7 +190,7 @@ export function tometLoader(options) {
                         return;
                     }
                     // Generate digest using mtime, size, and workspace config mtime
-                    const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}:v4`);
+                    const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}:v5`);
                     const existing = store.get(id);
                     if (existing && existing.digest === digest) {
                         // Unchanged: cache hit!
