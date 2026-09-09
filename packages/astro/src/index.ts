@@ -96,6 +96,7 @@ export interface TometEntryData {
   sourcePath: string;
   toc: TocItem[];
   meta: Record<string, unknown> | null;
+  kind: string | null;
   isDataOnly: boolean;
   [key: string]: unknown;
 }
@@ -268,6 +269,9 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             }
           }
 
+          const kindMatch = content.match(/^@kind\(([^)]*)\)/m);
+          const kind = (processed as any).kind ?? (kindMatch ? kindMatch[1].trim() : null);
+
           const entryData: TometEntryData = {
             title,
             slug: id,
@@ -275,6 +279,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             sourcePath: `docs/${file.relPath}`,
             toc: processed.toc ?? [],
             meta: metaObj,
+            kind,
             isDataOnly: processed.is_data_only,
           };
 

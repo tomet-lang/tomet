@@ -69,6 +69,7 @@ export interface TometEntryData {
     sourcePath: string;
     toc: TocItem[];
     meta: Record<string, unknown> | null;
+    kind: string | null;
     isDataOnly: boolean;
     [key: string]: unknown;
 }
