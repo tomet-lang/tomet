@@ -181,7 +181,7 @@ Each source says so in its own output, from the macro rather than by
 hand:
 
 ```tmt
-${macro.generated_by(self.path)}
+$macro.generated_by(self.path)
 ```
 
 `.gitattributes` marks `/AGENTS.md` and `/README.ja.md`

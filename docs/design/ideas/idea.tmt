@@ -19,28 +19,13 @@
 - `> blockquote`
 - 傍点
 - `^`フック記法
+- vocabularyのmetaにelement指定可能にする。
 
 ```
-@goal[
-    characters: 100000
-]
+@goal(
+  characters: 100000
+)
 ```
-
-| 糖衣         | 要素      |
-| -            | ul        |
-| -.           | ol        |
-| ---          | hr        |
-| *x*          | em        |
-| **x**        | strong    |
-| ==x==        | mark      |
-
-[ 糖衣         ][ 要素      ]
-[ -            ][ ul        ]
-[ -.           ][ ol        ]
-[ ---          ][ hr        ]
-[ *x*          ][ em        ]
-[ **x**        ][ strong    ]
-[ ==x==        ][ mark      ]
 
 ---[ コネクト構文追加関数 ]---
 

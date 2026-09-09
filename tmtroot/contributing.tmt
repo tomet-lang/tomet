@@ -3,3 +3,28 @@
 #[ Idea ]
 
 #[ Commit ]
+
+##[ Commit Message ]
+
+`feat(crate): detail`
+
+@table
+|[ crate\   ][ chore ][ feat ][ docs ][ fix ][ refactor ]
+|[ lsp      ][       ][      ][      ][     ][          ]
+|[ astro    ][       ][      ][      ][     ][          ]
+|[ cli      ][       ][      ][      ][     ][          ]
+|[ tui      ][       ][      ][      ][     ][          ]
+|[ web      ][       ][      ][      ][     ][          ]
+|[ java     ][       ][      ][      ][     ][          ]
+|[ js       ][       ][      ][      ][     ][          ]
+|[ python   ][       ][      ][      ][     ][          ]
+|[ helix    ][       ][      ][      ][     ][          ]
+|[ neovim   ][       ][      ][      ][     ][          ]
+|[ vscode   ][       ][      ][      ][     ][          ]
+|[ zed      ][       ][      ][      ][     ][          ]
+|[ html     ][       ][      ][      ][     ][          ]
+|[ pandoc   ][       ][      ][      ][     ][          ]
+|[ typst    ][       ][      ][      ][     ][          ]
+|[ markdwon ][       ][      ][      ][     ][          ]
+|[ format   ][       ][      ][      ][     ][          ]
+|[ syntax   ][       ][      ][      ][     ][          ]

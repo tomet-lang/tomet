@@ -2,4 +2,38 @@
 
 #[ multiline ]
 
+```tmt
+@callout(info)
+| content
+```
+
+```tmt
+- | aaaa
+  | aaaa
+  | aaaa
+- | bbbb
+  | bbbb
+- | cccc
+- (x) | detail
+      | detail
+- (x) | content
+- ( ) | content2
+      | content2
+```
+
+```tmt
+@tree
+| @tree
+| | @tree
+| | | - outline
+| | | - outline
+| | @tree
+| | | - outline
+| | | - outline
+@tree
+| @tree
+| | - outline
+| | - outline
+```
+
 #[ raw fence ]
