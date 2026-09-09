@@ -90,6 +90,7 @@ export interface ProcessOptions {
   urlPrefix?: string;
   assetPrefix?: string;
   vaultFiles?: string[];
+  config?: string;
 }
 
 export interface TocItem {
@@ -158,3 +159,13 @@ export default function init(module_or_path?: any): Promise<any>;
  * Initialize the WebAssembly module synchronously.
  */
 export function initSync(module?: any): any;
+
+/**
+ * Pre-builds and caches the link resolution index in WebAssembly memory once for the entire vault.
+ */
+export function setVaultFiles(files: string[]): void;
+
+/**
+ * Clears the cached link resolution index.
+ */
+export function clearVaultFiles(): void;

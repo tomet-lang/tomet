@@ -1,6 +1,13 @@
 /* @ts-self-types="./tomet_js.d.ts" */
 
 /**
+ * Clears the cached link resolution index.
+ */
+export function clearVaultFiles() {
+    wasm.clearVaultFiles();
+}
+
+/**
  * Format `.tmt` source text with lossless whitespace hygiene and span preservation.
  * @param {string} source
  * @returns {string}
@@ -116,6 +123,16 @@ export function processDocument(source_or_doc, options) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * Pre-builds and caches the link resolution index in Wasm memory once for the entire vault.
+ * @param {string[]} files
+ */
+export function setVaultFiles(files) {
+    const ptr0 = passArrayJsValueToWasm0(files, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    wasm.setVaultFiles(ptr0, len0);
 }
 
 /**
