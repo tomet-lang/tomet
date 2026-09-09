@@ -148,9 +148,6 @@ export function tometLoader(options) {
                         assetPrefix,
                         config: workspaceConfig,
                     });
-                    const fallbackTitle = basename(file.relPath).replace(/\.(tmt|tm)$/, '');
-                    const title = processed.title ?? fallbackTitle;
-                    const section = file.relPath.split('/')[0] ?? '';
                     let metaObj = null;
                     if (processed.meta) {
                         if (typeof processed.meta.forEach === 'function') {
@@ -164,6 +161,9 @@ export function tometLoader(options) {
                             metaObj = processed.meta;
                         }
                     }
+                    const fallbackTitle = basename(file.relPath).replace(/\.(tmt|tm)$/, '');
+                    const title = metaObj?.title ?? fallbackTitle;
+                    const section = file.relPath.split('/')[0] ?? '';
                     const kindMatch = content.match(/^@kind\(([^)]*)\)/m);
                     const kind = processed.kind ?? (kindMatch ? kindMatch[1].trim() : null);
                     const entryData = {
