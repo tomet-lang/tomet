@@ -57,6 +57,10 @@ export interface TometLoaderOptions {
      * URL prefix prepended to resolved image/asset `@embed` targets (default: `'/vault'`).
      */
     assetPrefix?: string;
+    /**
+     * Optional path to the workspace configuration file (defaults to `default.config.tmt` under `base`).
+     */
+    configPath?: string;
 }
 export interface TometEntryData {
     title: string;

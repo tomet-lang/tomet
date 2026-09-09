@@ -11,6 +11,7 @@ import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import initWasm, {
   processDocument,
+  setVaultFiles,
   type ProcessOptions,
   type ProcessedDoc,
   type TocItem,
@@ -82,6 +83,10 @@ export interface TometLoaderOptions {
    * URL prefix prepended to resolved image/asset `@embed` targets (default: `'/vault'`).
    */
   assetPrefix?: string;
+  /**
+   * Optional path to the workspace configuration file (defaults to `default.config.tmt` under `base`).
+   */
+  configPath?: string;
 }
 
 export interface TometEntryData {
@@ -176,6 +181,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
     filter,
     urlPrefix = '/docs',
     assetPrefix = '/vault',
+    configPath,
   } = options;
 
   return {
@@ -190,11 +196,24 @@ export function tometLoader(options: TometLoaderOptions): Loader {
         return;
       }
 
+      // Read optional workspace default.config.tmt
+      const resolvedConfigPath = configPath
+        ? (isAbsolute(configPath) ? configPath : resolve(rootDir, configPath))
+        : join(baseDir, 'default.config.tmt');
+      const workspaceConfig = existsSync(resolvedConfigPath)
+        ? await fs.readFile(resolvedConfigPath, 'utf8')
+        : undefined;
+      const configStat = workspaceConfig ? await fs.stat(resolvedConfigPath).catch(() => null) : null;
+      const configKey = configStat ? `${configStat.mtimeMs}` : '';
+
       logger.info(`Scanning Tomet documents and assets in ${baseDir}...`);
       const scanned = await scanVault(baseDir);
       const allFiles = scanned.docFiles;
       const matchedFiles = filter ? allFiles.filter((f) => filter(f.relPath)) : allFiles;
-      const vaultFiles = scanned.allFiles;
+
+      // Pre-build link resolution index once in Wasm memory
+      logger.info(`Building link index for ${scanned.allFiles.length} files...`);
+      setVaultFiles(scanned.allFiles);
 
       const untouchedIds = new Set(store.keys());
 
@@ -213,8 +232,8 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             return;
           }
 
-          // Generate digest using mtime and size for instant caching
-          const digest = generateDigest(`${stat.mtimeMs}:${stat.size}`);
+          // Generate digest using mtime, size, and workspace config mtime
+          const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}`);
           const existing = store.get(id);
 
           if (existing && existing.digest === digest) {
@@ -227,10 +246,10 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             advanced,
             numberHeadings: advanced,
             autoSlugHeadings: advanced,
-            vaultFiles,
             currentPath: file.relPath,
             urlPrefix,
             assetPrefix,
+            config: workspaceConfig,
           });
 
           const fallbackTitle = basename(file.relPath).replace(/\.(tmt|tm)$/, '');
