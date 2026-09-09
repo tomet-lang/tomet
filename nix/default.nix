@@ -40,7 +40,8 @@ flake-parts.lib.mkFlake { inherit inputs; } {
           tomet-lsp
           tomet-web
           ;
-        twrit = inputs.twrit.packages.${pkgs.system}.twrit;
+        fenix = inputs.fenix.packages.${pkgs.stdenv.hostPlatform.system};
+        twrit = inputs.twrit.packages.${pkgs.stdenv.hostPlatform.system}.twrit;
       };
 
       treefmt = import ./formatter.nix {

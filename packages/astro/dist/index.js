@@ -132,7 +132,7 @@ export function tometLoader(options) {
                         return;
                     }
                     // Generate digest using mtime, size, and workspace config mtime
-                    const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}`);
+                    const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}:v2`);
                     const existing = store.get(id);
                     if (existing && existing.digest === digest) {
                         // Unchanged: cache hit!
@@ -151,13 +151,26 @@ export function tometLoader(options) {
                     const fallbackTitle = basename(file.relPath).replace(/\.(tmt|tm)$/, '');
                     const title = processed.title ?? fallbackTitle;
                     const section = file.relPath.split('/')[0] ?? '';
+                    let metaObj = null;
+                    if (processed.meta) {
+                        if (typeof processed.meta.forEach === 'function') {
+                            metaObj = {};
+                            processed.meta.forEach((v, k) => {
+                                if (v !== undefined)
+                                    metaObj[k] = v;
+                            });
+                        }
+                        else if (typeof processed.meta === 'object') {
+                            metaObj = processed.meta;
+                        }
+                    }
                     const entryData = {
                         title,
                         slug: id,
                         section,
                         sourcePath: `docs/${file.relPath}`,
                         toc: processed.toc ?? [],
-                        meta: processed.meta ?? null,
+                        meta: metaObj,
                         isDataOnly: processed.is_data_only,
                     };
                     const relToRoot = relative(rootDir, file.absPath).split('\\').join('/');
