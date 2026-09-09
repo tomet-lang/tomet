@@ -34,7 +34,7 @@
     "astro": "^5.0.0"
   },
   "dependencies": {
-    "@tomet/tomet-wasm": "file:../../bindings/js"
+    "@tomet/tomet-wasm": "git+https://github.com/tomet-lang/tomet.git#path:bindings/js"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
