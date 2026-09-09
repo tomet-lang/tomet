@@ -1,5 +1,5 @@
 import { existsSync, promises as fs } from 'node:fs';
-import { basename, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import initWasm, { processDocument, setVaultFiles, } from '@tomet/tomet-wasm';
 let wasmReady = null;
@@ -28,6 +28,56 @@ export async function renderTomet(source, options) {
 export async function processTomet(source, options) {
     await ensureWasm();
     return processDocument(source, options);
+}
+/**
+ * Resolves a raw asset reference (e.g. `@link(ref:+hash.png)`, `+hash.png`, `https://...`)
+ * to a browser-accessible URL.
+ */
+function resolveAssetUrl(raw, fileRelDir, assetMap, allFilesSet, assetPrefix) {
+    if (!raw || typeof raw !== 'string')
+        return null;
+    const s = raw.trim();
+    if (!s)
+        return null;
+    // 1. External URL (or markdown link [caption](https://...))
+    const urlMatch = s.match(/https?:\/\/[^\s)"]+/);
+    if (urlMatch)
+        return urlMatch[0];
+    // 2. Extract asset target
+    let target = s;
+    const refMatch = s.match(/ref:@?"?([^")]+)"?/);
+    if (refMatch) {
+        target = refMatch[1];
+    }
+    else {
+        const linkMatch = s.match(/@link\("?([^")]+)"?\)/);
+        if (linkMatch) {
+            target = linkMatch[1];
+        }
+    }
+    target = target.replace(/^@/, '').trim();
+    const targetBase = basename(target);
+    const prefix = assetPrefix.replace(/\/$/, '');
+    // 3. Check document's own folder first (e.g. dir/-/+hash.png or dir/+hash.png)
+    const localDash = fileRelDir ? `${fileRelDir}/-/${targetBase}` : `-/${targetBase}`;
+    if (allFilesSet.has(localDash)) {
+        return `${prefix}/${localDash}`;
+    }
+    const localSame = fileRelDir ? `${fileRelDir}/${targetBase}` : targetBase;
+    if (allFilesSet.has(localSame)) {
+        return `${prefix}/${localSame}`;
+    }
+    // 4. Global asset map lookup
+    if (assetMap.has(targetBase)) {
+        const found = assetMap.get(targetBase);
+        return `${prefix}/${found.replace(/^\//, '')}`;
+    }
+    // 5. Relative path check
+    if (target.startsWith('./') || target.startsWith('../')) {
+        const norm = normalize(join(fileRelDir, target)).replace(/\\/g, '/');
+        return `${prefix}/${norm.replace(/^\//, '')}`;
+    }
+    return null;
 }
 /**
  * Concurrency-limited promise pool runner.
@@ -118,6 +168,14 @@ export function tometLoader(options) {
             // Pre-build link resolution index once in Wasm memory
             logger.info(`Building link index for ${scanned.allFiles.length} files...`);
             setVaultFiles(scanned.allFiles);
+            const allFilesSet = new Set(scanned.allFiles);
+            const assetMap = new Map();
+            for (const f of scanned.allFiles) {
+                const b = basename(f);
+                if (!assetMap.has(b)) {
+                    assetMap.set(b, f);
+                }
+            }
             const untouchedIds = new Set(store.keys());
             async function processFile(file) {
                 const id = generateId
@@ -132,7 +190,7 @@ export function tometLoader(options) {
                         return;
                     }
                     // Generate digest using mtime, size, and workspace config mtime
-                    const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}:v3`);
+                    const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}:v4`);
                     const existing = store.get(id);
                     if (existing && existing.digest === digest) {
                         // Unchanged: cache hit!
@@ -166,6 +224,38 @@ export function tometLoader(options) {
                     const section = file.relPath.split('/')[0] ?? '';
                     const kindMatch = content.match(/^@kind\(([^)]*)\)/m);
                     const kind = processed.kind ?? (kindMatch ? kindMatch[1].trim() : null);
+                    // Resolve banner and images
+                    const fileRelDir = dirname(file.relPath).replace(/\\/g, '/');
+                    let rawBanner = metaObj?.banner;
+                    if (Array.isArray(rawBanner))
+                        rawBanner = rawBanner[0];
+                    const banner = resolveAssetUrl(rawBanner, fileRelDir, assetMap, allFilesSet, assetPrefix);
+                    const rawBannerY = metaObj?.['banner-y'] ?? metaObj?.bannerY;
+                    const bannerY = typeof rawBannerY === 'number'
+                        ? rawBannerY
+                        : rawBannerY
+                            ? parseInt(String(rawBannerY), 10)
+                            : null;
+                    let rawImages = [];
+                    if (Array.isArray(metaObj?.images)) {
+                        rawImages = metaObj.images;
+                    }
+                    else if (typeof metaObj?.images === 'string') {
+                        rawImages = [metaObj.images];
+                    }
+                    else if (metaObj?.image) {
+                        rawImages = Array.isArray(metaObj.image) ? metaObj.image : [metaObj.image];
+                    }
+                    const images = rawImages
+                        .map((img) => resolveAssetUrl(img, fileRelDir, assetMap, allFilesSet, assetPrefix))
+                        .filter((u) => Boolean(u));
+                    let thumbnail = images[0] ?? banner ?? null;
+                    if (!thumbnail && processed.html) {
+                        const match = processed.html.match(/<img[^>]+src=["']([^"']+)["']/i);
+                        if (match) {
+                            thumbnail = match[1];
+                        }
+                    }
                     const entryData = {
                         title,
                         slug: id,
@@ -175,6 +265,10 @@ export function tometLoader(options) {
                         meta: metaObj,
                         kind,
                         isDataOnly: processed.is_data_only,
+                        banner,
+                        bannerY,
+                        images,
+                        thumbnail,
                     };
                     const relToRoot = relative(rootDir, file.absPath).split('\\').join('/');
                     store.set({

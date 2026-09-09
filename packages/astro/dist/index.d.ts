@@ -71,6 +71,10 @@ export interface TometEntryData {
     meta: Record<string, unknown> | null;
     kind: string | null;
     isDataOnly: boolean;
+    banner?: string | null;
+    bannerY?: number | null;
+    images?: string[];
+    thumbnail?: string | null;
     [key: string]: unknown;
 }
 /**
