@@ -31,11 +31,10 @@
   ],
   "license": "MIT OR Apache-2.0",
   "peerDependencies": {
-    "astro": "^5.0.0"
+    "astro": "^5.0.0",
+    "@tomet/tomet-wasm": ">=0.1.0"
   },
-  "dependencies": {
-    "@tomet/tomet-wasm": "git+https://github.com/tomet-lang/tomet.git#path:bindings/js"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.0.0",
     "astro": "^5.6.1",
