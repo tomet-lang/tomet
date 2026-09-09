@@ -233,7 +233,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
           }
 
           // Generate digest using mtime, size, and workspace config mtime
-          const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}`);
+          const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}:v2`);
           const existing = store.get(id);
 
           if (existing && existing.digest === digest) {
@@ -256,13 +256,25 @@ export function tometLoader(options: TometLoaderOptions): Loader {
           const title = processed.title ?? fallbackTitle;
           const section = file.relPath.split('/')[0] ?? '';
 
+          let metaObj: Record<string, unknown> | null = null;
+          if (processed.meta) {
+            if (typeof (processed.meta as any).forEach === 'function') {
+              metaObj = {};
+              (processed.meta as any).forEach((v: unknown, k: string) => {
+                if (v !== undefined) (metaObj as any)[k] = v;
+              });
+            } else if (typeof processed.meta === 'object') {
+              metaObj = processed.meta as Record<string, unknown>;
+            }
+          }
+
           const entryData: TometEntryData = {
             title,
             slug: id,
             section,
             sourcePath: `docs/${file.relPath}`,
             toc: processed.toc ?? [],
-            meta: (processed.meta as Record<string, unknown>) ?? null,
+            meta: metaObj,
             isDataOnly: processed.is_data_only,
           };
 
