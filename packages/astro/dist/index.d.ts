@@ -58,6 +58,11 @@ export interface TometLoaderOptions {
      */
     assetPrefix?: string;
     /**
+     * Prefix prepended to `sourcePath` for each entry (default: `'docs'`).
+     * Set to empty string `''` to use the relative path directly from `base`.
+     */
+    sourcePathPrefix?: string;
+    /**
      * Optional path to the workspace configuration file (defaults to `default.config.tmt` under `base`).
      */
     configPath?: string;
@@ -71,12 +76,20 @@ export interface TometEntryData {
     meta: Record<string, unknown> | null;
     kind: string | null;
     isDataOnly: boolean;
+    description?: string | null;
+    tags?: string[];
+    date?: string | null;
     banner?: string | null;
     bannerY?: number | null;
     images?: string[];
     thumbnail?: string | null;
     [key: string]: unknown;
 }
+/**
+ * Resolves a raw asset reference (e.g. `@link(ref:+hash.png)`, `+hash.png`, `https://...`)
+ * to a browser-accessible URL.
+ */
+export declare function resolveAssetUrl(raw: unknown, fileRelDir: string, assetMap: Map<string, string>, allFilesSet: Set<string>, assetPrefix: string): string | null;
 /**
  * Astro 5 Content Layer Loader for Tomet documents.
  *

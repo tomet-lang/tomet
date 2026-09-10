@@ -19,7 +19,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsc && node --experimental-strip-types --test test/index.test.ts"
   },
   "keywords": [
     "tomet",
