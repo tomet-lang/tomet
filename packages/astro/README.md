@@ -75,81 +75,91 @@ repository: a change to the binding and the change it forces here belong
 in the same commit. Splitting it out later, once the AST settles, is easy;
 re-merging it would not be.
 
-## Prerequisites
+## Features & Architecture
 
-Work that has to happen elsewhere in this repository before this package
-can do its job. Roughly in dependency order.
+- **In-process WebAssembly compilation**: Uses `@tomet/tomet-wasm` to parse and render `.tmt` files in-process without spawning CLI sub-processes.
+- **Incremental Digest Caching**: Content digests combine file mtime, size, and workspace config mtime (`configKey`) to skip unchanged documents across builds.
+- **Proximity-aware Link & Asset Resolution**: Automatically resolves `ref:` links and `@embed` image references against the scanned vault and asset map.
+- **Rich Metadata & TOC**: Automatically surfaces document titles, headings (TOC), `@kind`, banners, thumbnails, tags, and custom metadata into `entry.data`.
+- **Live Dev Mode Synchronization**: The dev watcher tracks `.tmt` files, images, assets, and workspace configuration changes with live vault index re-indexing.
 
-1. **`@tomet/tomet-wasm` does not resolve.** `bindings/js/package.json`
-   declares `"main": "tomet_js.js"` and `"types": "index.d.ts"`, but
-   `tomet_js.js` is in `bindings/js/pkg/` and there is no `package.json`
-   there. Nothing can depend on the binding by name today, which is why it
-   is absent from this package's `dependencies`.
+## Loader Options
 
-2. **`bindings/js/index.d.ts` is stale.** It still describes the
-   nine-variant `Sigil` from `8a7c7db`, one breaking commit behind the
-   Rust. The checked-in `pkg/` build should be checked at the same time.
-   Generating these types from the Rust serde representation, rather than
-   maintaining them by hand, is what stops this recurring.
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `base` | `string` | *(required)* | Path to the directory containing `.tmt` documents (relative or absolute). |
+| `advanced` | `boolean` | `true` | Enables auto-numbering headings and generating slug IDs. |
+| `concurrency` | `number` | `32` | Maximum concurrent files to read and parse simultaneously. |
+| `urlPrefix` | `string` | `'/docs'` | URL prefix prepended to resolved `ref:` note links. |
+| `assetPrefix` | `string` | `'/vault'` | URL prefix prepended to resolved asset/image links. |
+| `sourcePathPrefix` | `string` | `'docs'` | Prefix prepended to `sourcePath` (e.g. `'docs'` -> `docs/path/to/file.tmt`). |
+| `configPath` | `string` | `default.config.tmt` | Path to the workspace configuration file. |
+| `filter` | `(relPath: string) => boolean` | — | Predicate to include or exclude specific documents. |
+| `generateId` | `(p: { relPath, absPath }) => string` | — | Custom entry ID generator (defaults to relative path without extension). |
 
-3. **The workspace layer is not exposed to the binding.** All of it exists
-   in Rust and none of it is reachable from JavaScript:
+## Entry Data (`TometEntryData`)
 
-   | Rust | Needed for |
-   | --- | --- |
-   | `collect_tm_files_with_config` | document discovery honoring `workspace.ignore` |
-   | `extract_metadata` | page metadata -- but it returns `BTreeMap<String, String>`, and a real workspace needs values, not strings (`topics` is a list of `@link`, `created` is a datetime) |
-   | `collect_links` | the link graph, backlinks |
-   | `WorkspaceIndex` / `FileTreeNode` | the nav tree |
+The loader injects parsed document metadata into Astro's `entry.data`:
 
-   Walking the filesystem from Node instead would mean reimplementing the
-   ignore rules in TypeScript, where they would drift from `.tmtconfig` --
-   the same mistake as a second parser.
+```typescript
+interface TometEntryData {
+  title: string;          // From @meta{title}, fallback to first h1 or filename
+  slug: string;           // Entry slug / ID
+  section: string;        // Top-level folder name
+  sourcePath: string;     // Source path (e.g. 'docs/intro.tmt')
+  toc: TocItem[];         // Headings with id, level (2 or 3), and text
+  meta: Record<string, unknown> | null; // Raw metadata object
+  kind: string | null;    // Document kind (from @kind(...) or meta)
+  isDataOnly: boolean;    // True if document produces no body HTML
+  description?: string;   // Meta description or auto-extracted excerpt
+  tags?: string[];        // Tags array normalized from metadata
+  date?: string;          // Creation / publication date
+  banner?: string;        // Resolved banner image URL
+  bannerY?: number;       // Vertical banner position offset
+  images?: string[];      // Resolved list of embedded images
+  thumbnail?: string;     // First image, banner, or extracted img src
+  [key: string]: unknown; // All custom properties declared in @meta are spread here
+}
+```
 
-4. **`ref:` links have no resolution.** `render_link_element` in
-   `crates/tomet-convert-html/src/lib.rs` emits
-   `<a class="tm-ref" href="X">` with the raw note name as the href.
-   Resolving that needs a name-to-path index, which is workspace state, so
-   it cannot live in the converter without giving up its
-   single-document, I/O-free shape. The `tm-ref` class is the hook: this
-   package resolves those hrefs against the index after rendering, and the
-   converter stays untouched.
+## Rendering in Astro Pages
 
-5. **A title rule.** `tomet-website` scrapes the first `<h1>` with a
-   regular expression because `meta_title` is private to the CLI crate.
-   Once metadata is reachable the rule should be explicit --
-   `@meta{title}`, then the first heading, then the filename. Filename
-   matters more than it looks: in a large vault the filename usually *is*
-   the title.
+In an Astro component (`src/pages/[...slug].astro`):
 
-6. **The default stylesheet is dead.** Every selector in
-   `DEFAULT_STYLE` (`crates/tomet-convert-html/src/lib.rs`) uses a `tmt-`
-   prefix while the renderer emits `tm-`, so it matches nothing.
-   `tomet-website/src/styles/global.css` is the only stylesheet that
-   actually works against the real class names. Whether that gets
-   upstreamed as a fixed `DEFAULT_STYLE` or offered here as an opt-in
-   import is an open decision -- but per the scope boundary above, it is
-   not a theme either way.
+```astro
+---
+import { getCollection, render } from 'astro:content';
 
-## Rendering does not need a subprocess
+export async function getStaticPaths() {
+  const docs = await getCollection('docs');
+  return docs.map((entry) => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
 
-`toHtml` in the wasm binding calls `tomet_html::render_body`, so it
-already returns a body fragment rather than a standalone page. Rendering
-happens in-process.
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+---
 
-This matters at scale. `tomet-website` shells out to the CLI once per
-document, which is fine for a few dozen files; the vault this package is
-being designed against has over twenty thousand, where one process per
-document is not viable. The binding removes that cost entirely, and it
-also removes the dependency on the CLI's `--body` flag.
+<article>
+  <h1>{entry.data.title}</h1>
+  {entry.data.banner && <img src={entry.data.banner} alt="" />}
+  <div class="prose">
+    <Fragment set:html={entry.rendered?.html} />
+  </div>
+</article>
+```
 
 ## Development
 
 ```bash
 npm install
 npm run typecheck
+npm test
 npm run build
 ```
 
 `node_modules/` and `dist/` are covered by the repository's root
 `.gitignore`.
+

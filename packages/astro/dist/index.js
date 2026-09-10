@@ -33,7 +33,7 @@ export async function processTomet(source, options) {
  * Resolves a raw asset reference (e.g. `@link(ref:+hash.png)`, `+hash.png`, `https://...`)
  * to a browser-accessible URL.
  */
-function resolveAssetUrl(raw, fileRelDir, assetMap, allFilesSet, assetPrefix) {
+export function resolveAssetUrl(raw, fileRelDir, assetMap, allFilesSet, assetPrefix) {
     if (!raw || typeof raw !== 'string')
         return null;
     const s = raw.trim();
@@ -141,7 +141,7 @@ async function scanVault(dir, baseDir = dir) {
  * ```
  */
 export function tometLoader(options) {
-    const { base, advanced = true, concurrency = 32, generateId, filter, urlPrefix = '/docs', assetPrefix = '/vault', configPath, } = options;
+    const { base, advanced = true, concurrency = 32, generateId, filter, urlPrefix = '/docs', assetPrefix = '/vault', sourcePathPrefix = 'docs', configPath, } = options;
     return {
         name: '@tomet/astro-loader',
         load: async ({ config, store, logger, generateDigest, watcher }) => {
@@ -156,11 +156,11 @@ export function tometLoader(options) {
             const resolvedConfigPath = configPath
                 ? (isAbsolute(configPath) ? configPath : resolve(rootDir, configPath))
                 : join(baseDir, 'default.config.tmt');
-            const workspaceConfig = existsSync(resolvedConfigPath)
+            let workspaceConfig = existsSync(resolvedConfigPath)
                 ? await fs.readFile(resolvedConfigPath, 'utf8')
                 : undefined;
             const configStat = workspaceConfig ? await fs.stat(resolvedConfigPath).catch(() => null) : null;
-            const configKey = configStat ? `${configStat.mtimeMs}` : '';
+            let configKey = configStat ? `${configStat.mtimeMs}` : '';
             logger.info(`Scanning Tomet documents and assets in ${baseDir}...`);
             const scanned = await scanVault(baseDir);
             const allFiles = scanned.docFiles;
@@ -256,15 +256,41 @@ export function tometLoader(options) {
                             thumbnail = match[1];
                         }
                     }
+                    let description = metaObj?.description ?? null;
+                    if (!description && processed.html) {
+                        const pMatch = processed.html.match(/<p>([\s\S]*?)<\/p>/i);
+                        if (pMatch) {
+                            const rawSnippet = pMatch[1].replace(/<[^>]+>/g, '').trim();
+                            if (rawSnippet) {
+                                description = rawSnippet.length > 200 ? `${rawSnippet.slice(0, 197)}...` : rawSnippet;
+                            }
+                        }
+                    }
+                    let tags;
+                    if (Array.isArray(metaObj?.tags)) {
+                        tags = metaObj.tags.map(String);
+                    }
+                    else if (typeof metaObj?.tags === 'string') {
+                        tags = metaObj.tags.split(',').map((t) => t.trim()).filter(Boolean);
+                    }
+                    const rawDate = metaObj?.date ?? metaObj?.created ?? metaObj?.publishDate;
+                    const date = rawDate ? String(rawDate) : null;
+                    const sourcePath = sourcePathPrefix
+                        ? `${sourcePathPrefix.replace(/\/$/, '')}/${file.relPath}`
+                        : file.relPath;
                     const entryData = {
+                        ...(metaObj ?? {}),
                         title,
                         slug: id,
                         section,
-                        sourcePath: `docs/${file.relPath}`,
+                        sourcePath,
                         toc: processed.toc ?? [],
                         meta: metaObj,
                         kind,
                         isDataOnly: processed.is_data_only,
+                        description,
+                        tags,
+                        date,
                         banner,
                         bannerY,
                         images,
@@ -297,19 +323,52 @@ export function tometLoader(options) {
             // Watcher for dev mode
             if (watcher) {
                 watcher.add(baseDir);
+                if (workspaceConfig && existsSync(resolvedConfigPath)) {
+                    watcher.add(resolvedConfigPath);
+                }
                 const handleUpdate = async (changedPath) => {
-                    if (!changedPath.endsWith('.tmt') && !changedPath.endsWith('.tm'))
+                    if (resolve(changedPath) === resolve(resolvedConfigPath)) {
+                        logger.info('Workspace config changed, reloading Tomet files...');
+                        try {
+                            workspaceConfig = await fs.readFile(resolvedConfigPath, 'utf8');
+                            const newStat = await fs.stat(resolvedConfigPath).catch(() => null);
+                            configKey = newStat ? `${newStat.mtimeMs}` : '';
+                            await mapConcurrent(matchedFiles, concurrency, processFile);
+                        }
+                        catch (err) {
+                            logger.error(`Failed to reload config ${resolvedConfigPath}: ${err}`);
+                        }
                         return;
+                    }
                     if (changedPath.startsWith(baseDir)) {
                         const relPath = relative(baseDir, changedPath).split('\\').join('/');
-                        if (filter && !filter(relPath))
+                        // Maintain vault asset and file index
+                        if (!allFilesSet.has(relPath)) {
+                            allFilesSet.add(relPath);
+                            scanned.allFiles.push(relPath);
+                            assetMap.set(basename(relPath), relPath);
+                            setVaultFiles(scanned.allFiles);
+                        }
+                        if (changedPath.endsWith('.tmt') && !changedPath.endsWith('.tm'))
                             return;
-                        await processFile({ absPath: changedPath, relPath });
+                        if (changedPath.endsWith('.tmt') || changedPath.endsWith('.tm')) {
+                            if (filter && !filter(relPath))
+                                return;
+                            await processFile({ absPath: changedPath, relPath });
+                        }
                     }
                 };
                 const handleUnlink = async (deletedPath) => {
                     if (deletedPath.startsWith(baseDir)) {
                         const relPath = relative(baseDir, deletedPath).split('\\').join('/');
+                        if (allFilesSet.has(relPath)) {
+                            allFilesSet.delete(relPath);
+                            const idx = scanned.allFiles.indexOf(relPath);
+                            if (idx !== -1)
+                                scanned.allFiles.splice(idx, 1);
+                            assetMap.delete(basename(relPath));
+                            setVaultFiles(scanned.allFiles);
+                        }
                         const id = generateId
                             ? generateId({ relPath, absPath: deletedPath })
                             : relPath.replace(/\.(tmt|tm)$/, '');
