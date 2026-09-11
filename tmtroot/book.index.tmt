@@ -1,0 +1,9 @@
+@kind(index)
+
+$filter(contains(path, "tmtroot/docs/moc/"), by(path))
+
+${filter(contains(path, "tmtroot/docs/why/"), by(path))}
+
+${filter(contains(path, "tmtroot/docs/spec/"), not(contains(filename, ".index.")), by(path))}
+
+${filter(contains(path, "tmtroot/docs/roadmap/"), by(path))}

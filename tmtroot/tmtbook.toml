@@ -1,0 +1,7 @@
+[book]
+title = "tomet docs"
+lang = "ja"
+dest = "dist"
+
+[build]
+kinds = ["*", "!config", "!index"]
