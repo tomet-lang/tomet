@@ -1,9 +1,18 @@
-@kind(index)
+@kind(doc.index)
 
-$filter(contains(path, "tmtroot/docs/moc/"), by(path))
+// 読む順。ここに並べた順と入れ子が、そのまま索引ページになる。
+// 手書きの @link(ref:"...") と ${filter(...)} は自由に混ぜてよい --
+// クエリは展開されると手書きと同じ @link(ref:"...") の並びになる。
+//
+// 仕様は索引そのもの(*.index.tmt)を除く -- 目次が目次を載せても仕方がない。
 
-${filter(contains(path, "tmtroot/docs/why/"), by(path))}
+- @link(ref:"readme")
+- @link(ref:"contributing")
+- @link(ref:"agents")
 
-${filter(contains(path, "tmtroot/docs/spec/"), not(contains(filename, ".index.")), by(path))}
-
-${filter(contains(path, "tmtroot/docs/roadmap/"), by(path))}
+- 何がどこにあるか
+  - ${filter(contains(path, "tmtroot/docs/moc/"), by(path))}
+- なぜあるのか
+  - ${filter(contains(path, "tmtroot/docs/why/"), by(path))}
+- 仕様
+  - ${filter(contains(path, "tmtroot/docs/spec/"), not(contains(filename, ".index.")), by(path))}
