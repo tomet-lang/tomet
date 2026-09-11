@@ -211,6 +211,105 @@ fn is_tm_file(p: &Path) -> bool {
         .unwrap_or(false)
 }
 
+/// One file's queryable facts, keyed by the dotted paths a
+/// `${filter(...)}` predicate writes: `path`, `filename`, `kind`, `meta`
+/// and everything under it.
+///
+/// The distinction from [`extract_metadata`] is the value type.
+/// `extract_metadata` collapses to `String` because its consumer is the
+/// TUI's batch metadata editor, where every field is about to be shown
+/// and typed into a text box. A predicate needs the value itself: a list
+/// of tags has to stay a list for `contains` to look inside it, and a
+/// number has to stay a number for `gt` to order it.
+///
+/// `@config` is deliberately absent. It configures export and printing,
+/// not what the document *is*, so filtering an index on it would be
+/// filtering on machinery.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileMetadata {
+    /// As found on disk.
+    pub path: PathBuf,
+    pub fields: BTreeMap<String, Value>,
+}
+
+/// Reads every `.tmt` under `path` and returns what each one can be
+/// queried on.
+///
+/// The walk is [`collect_tm_files_with_config`]'s, so `ignore`/`unswept`
+/// mean here exactly what they mean everywhere else. A file that does not
+/// parse contributes no row: `tomet check` is where a parse error is
+/// reported, and failing the whole index for one bad file elsewhere in
+/// the vault would be the wrong trade.
+///
+/// This is the only part of `${filter(...)}` that touches the disk. The
+/// pass that consumes the table is pure and lives a layer below, in
+/// `tomet-transform`.
+pub fn collect_metadata_table(
+    path: &Path,
+    config: &PrinterConfig,
+    config_root: &Path,
+) -> Vec<FileMetadata> {
+    collect_tm_files_with_config(path, config, config_root)
+        .into_iter()
+        .filter_map(|file| {
+            let src = std::fs::read_to_string(&file).ok()?;
+            let doc = parse_document(&src).ok()?;
+            let fields = document_fields(&doc, &file, config_root);
+            Some(FileMetadata { path: file, fields })
+        })
+        .collect()
+}
+
+/// The queryable facts of one already-parsed document. Pure -- split out
+/// from [`collect_metadata_table`] so the shape of a row can be tested
+/// without a directory on disk.
+///
+/// `path` is measured from the project root and written with forward
+/// slashes, which is the spelling [`resolve_document_relative`] reads back
+/// and the spelling a generated `@file(...)` has to carry.
+pub fn document_fields(
+    doc: &tomet_ast::Document,
+    file: &Path,
+    project_root: &Path,
+) -> BTreeMap<String, Value> {
+    let mut fields = BTreeMap::new();
+
+    let rel = file
+        .strip_prefix(project_root)
+        .unwrap_or(file)
+        .to_string_lossy()
+        .replace('\\', "/");
+    fields.insert("path".to_string(), Value::String(rel));
+    if let Some(name) = file.file_name().and_then(|n| n.to_str()) {
+        fields.insert("filename".to_string(), Value::String(name.to_string()));
+    }
+    if let Some(kind) = tomet_semantics::document_kind(doc) {
+        fields.insert("kind".to_string(), Value::String(kind));
+    }
+    if let Some(meta) = tomet_semantics::document_meta(doc) {
+        flatten_into("meta", &meta, &mut fields);
+    }
+
+    fields
+}
+
+/// Records `value` at `prefix`, then every path beneath it.
+///
+/// A `Map` is recorded *and* descended into, so both `meta` and
+/// `meta.title` are present -- the first is what `exists(meta)` asks
+/// about, the second what `eq(meta.title, "...")` does. A `Seq` is
+/// recorded and not descended into: `meta.tags` is the list itself,
+/// because `contains` is how a list is asked about and an index into one
+/// is not something a predicate can write.
+fn flatten_into(prefix: &str, value: &Value, out: &mut BTreeMap<String, Value>) {
+    out.insert(prefix.to_string(), value.clone());
+    if let Value::Map(entries) = value {
+        for (key, child) in entries {
+            flatten_into(&format!("{prefix}.{key}"), child, out);
+        }
+    }
+}
+
 pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
     if let Ok(doc) = parse_document(src) {
@@ -357,6 +456,83 @@ mod unswept_tests {
         assert!(
             is_path_ignored(foreign, Some(root), &cfg.ignore_files),
             "foreign is not referable"
+        );
+    }
+}
+
+#[cfg(test)]
+mod metadata_table_tests {
+    use super::*;
+
+    fn fields_of(src: &str) -> BTreeMap<String, Value> {
+        let doc = parse_document(src).expect("valid source");
+        document_fields(
+            &doc,
+            Path::new("/vault/docs/guide/cheatsheet.tmt"),
+            Path::new("/vault"),
+        )
+    }
+
+    #[test]
+    fn path_is_project_relative_with_forward_slashes() {
+        let fields = fields_of("#[ Title ]\n");
+        assert_eq!(
+            fields.get("path"),
+            Some(&Value::String("docs/guide/cheatsheet.tmt".to_string()))
+        );
+        assert_eq!(
+            fields.get("filename"),
+            Some(&Value::String("cheatsheet.tmt".to_string()))
+        );
+    }
+
+    #[test]
+    fn kind_comes_from_the_kind_element() {
+        let fields = fields_of("@kind(writ)\n\n#[ Title ]\n");
+        assert_eq!(fields.get("kind"), Some(&Value::String("writ".to_string())));
+        // No `@kind` means no row entry at all, which is what lets the
+        // query pass tell "absent here" from "nobody has this field".
+        assert_eq!(fields_of("#[ Title ]\n").get("kind"), None);
+    }
+
+    #[test]
+    fn a_list_stays_a_list() {
+        let fields = fields_of("@meta{ tags: [rust, cli] }\n\n#[ Title ]\n");
+        // Not the string "[rust, cli]" that `extract_metadata` produces --
+        // `contains` has to be able to look inside it.
+        assert_eq!(
+            fields.get("meta.tags"),
+            Some(&Value::Seq(vec![
+                Value::String("rust".to_string()),
+                Value::String("cli".to_string()),
+            ]))
+        );
+    }
+
+    #[test]
+    fn a_yaml_fenced_meta_is_read() {
+        // The spelling this repository's own documents use. It is invisible
+        // to `extract_metadata`, which reads `{...}` pairs only and sees an
+        // opaque `Raw` body here.
+        let fields = fields_of("@meta(format:yaml)+++\ntitle: Cheatsheet\ntags:\n  - rust\n+++\n");
+        assert_eq!(
+            fields.get("meta.title"),
+            Some(&Value::String("Cheatsheet".to_string()))
+        );
+        assert_eq!(
+            fields.get("meta.tags"),
+            Some(&Value::Seq(vec![Value::String("rust".to_string())]))
+        );
+    }
+
+    #[test]
+    fn a_nested_map_is_recorded_at_every_depth() {
+        let fields = fields_of("@meta{ url: { wiki: \"https://example.test\" } }\n\n#[ T ]\n");
+        assert!(matches!(fields.get("meta"), Some(Value::Map(_))));
+        assert!(matches!(fields.get("meta.url"), Some(Value::Map(_))));
+        assert_eq!(
+            fields.get("meta.url.wiki"),
+            Some(&Value::String("https://example.test".to_string()))
         );
     }
 }

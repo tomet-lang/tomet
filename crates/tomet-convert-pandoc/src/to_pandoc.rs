@@ -1,8 +1,8 @@
 //! `tomet_ast::Document` -> Pandoc's AST.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, ElementValue, Inline as TmInline, InterpExpr,
-    InterpExprKind, Literal, Placement, Sigil, Value,
+    Block as TmBlock, Document, Element, ElementValue, Inline as TmInline, Placement,
+    Sigil, Value,
 };
 use tomet_semantics::{
     ElementKind, path_target,
@@ -351,27 +351,8 @@ fn plain_text(inlines: &[TmInline]) -> String {
 
 fn interp_source(el: &Element) -> String {
     match &el.value {
-        Some(ElementValue::Interp(expr)) => format!("${{{}}}", interp_expr_source(expr)),
+        Some(ElementValue::Interp(expr)) => format!("${{{expr}}}"),
         _ => String::new(),
-    }
-}
-
-fn interp_expr_source(expr: &InterpExpr) -> String {
-    match &expr.kind {
-        InterpExprKind::Identifier(name) => name.clone(),
-        InterpExprKind::Literal(Literal::Int(i)) => i.to_string(),
-        InterpExprKind::Literal(Literal::Float(x)) => x.to_string(),
-        InterpExprKind::Literal(Literal::String(s)) => format!("{s:?}"),
-        InterpExprKind::Call { callee, args } => {
-            let args: Vec<String> = args.iter().map(interp_expr_source).collect();
-            format!("{}({})", interp_expr_source(callee), args.join(", "))
-        }
-        InterpExprKind::Member { object, member } => {
-            format!("{}.{member}", interp_expr_source(object))
-        }
-        InterpExprKind::NamedArg { name, value } => {
-            format!("{name}: {}", interp_expr_source(value))
-        }
     }
 }
 

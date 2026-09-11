@@ -34,7 +34,7 @@
 //!   than headings.
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
+    Block, Document, Element, ElementValue, Inline, Value,
 };
 use tomet_semantics::{
     path_target,
@@ -430,27 +430,8 @@ fn render_links_container(el: &Element) -> String {
 /// is kept inert here rather than evaluated.
 fn render_interp(el: &Element) -> String {
     match &el.value {
-        Some(ElementValue::Interp(expr)) => format!("`${{{}}}`", render_interp_expr(expr)),
+        Some(ElementValue::Interp(expr)) => format!("`${{{expr}}}`"),
         _ => String::new(),
-    }
-}
-
-fn render_interp_expr(expr: &InterpExpr) -> String {
-    match &expr.kind {
-        InterpExprKind::Identifier(name) => name.clone(),
-        InterpExprKind::Literal(Literal::Int(i)) => i.to_string(),
-        InterpExprKind::Literal(Literal::Float(x)) => x.to_string(),
-        InterpExprKind::Literal(Literal::String(s)) => format!("{s:?}"),
-        InterpExprKind::Call { callee, args } => {
-            let args = args.iter().map(render_interp_expr).collect::<Vec<_>>();
-            format!("{}({})", render_interp_expr(callee), args.join(", "))
-        }
-        InterpExprKind::Member { object, member } => {
-            format!("{}.{member}", render_interp_expr(object))
-        }
-        InterpExprKind::NamedArg { name, value } => {
-            format!("{name}: {}", render_interp_expr(value))
-        }
     }
 }
 

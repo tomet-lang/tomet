@@ -5,9 +5,13 @@
 //! - **[`directive`]**: Directive promotion (`@meta.type` -> `@kind`) and Value DSL normalization.
 //! - **[`structural`]**: Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
 //! - **[`meta`]**: Batch `@meta` key/value updates.
+//! - **[`index_query`]**: `${filter(...)}` in an `@kind(index)` document,
+//!   expanded into the `@file` entries it selects.
 
 pub mod blueprint;
 pub mod directive;
+pub mod index_query;
+pub mod interp;
 pub mod links;
 pub mod macro_expand;
 pub mod macro_rewrite;
@@ -16,6 +20,8 @@ pub mod structural;
 
 pub use blueprint::*;
 pub use directive::*;
+pub use index_query::*;
+pub use interp::*;
 pub use links::*;
 pub use macro_expand::*;
 pub use macro_rewrite::*;

@@ -10,7 +10,7 @@
 //! form and are dropped.
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
+    Block, Document, Element, ElementValue, Inline, Value,
 };
 use tomet_semantics::{
     path_target,
@@ -18,63 +18,40 @@ use tomet_semantics::{
     list_ordered, target_scheme,
 };
 
-struct RenderCtx<'a> {
-    doc: &'a Document,
-    config: tomet_semantics::DocumentConfig,
-    vars: tomet_compute::EvaluationContext,
-}
-
-/// Renders `doc`, knowing only what the document says about itself.
+/// Renders `doc` as CommonMark.
 ///
-/// A caller that can read the vault -- which means one allowed to do
-/// I/O -- should use [`to_markdown_with_context`]. The same split
-/// `validate_document`/`validate_document_with` uses, and for the same
-/// reason: a vault's macros and a document's own path both arrive from
-/// outside, and most callers here have no vault to ask.
+/// Takes no evaluation context. It used to -- `to_markdown_with_context`
+/// carried a `DocumentConfig` and an `EvaluationContext` for one purpose,
+/// evaluating `${...}`, and no converter does that any more. What a
+/// `${...}` means is settled before any of them sees the tree, by
+/// `tomet-transform`'s `resolve_interpolations` (reached through
+/// `tomet_load::Vault::prepare`), because four converters deciding it
+/// independently is how the same document came to produce three different
+/// answers.
 pub fn to_markdown(doc: &Document) -> String {
-    let config = tomet_semantics::document_config(doc);
-    to_markdown_with_context(doc, &config, &tomet_compute::EvaluationContext::default())
-}
-
-/// [`to_markdown`], with the config the vault contributes and the
-/// variables `${...}` may read (`self.path`, `self.filename`).
-///
-/// Without this the fourteen macros in a `default.config.tmt` expand
-/// nowhere: `document_config` reads a document's own `@config` and
-/// nothing else, so `${macro.gh(12)}` had no template to find.
-pub fn to_markdown_with_context(
-    doc: &Document,
-    config: &tomet_semantics::DocumentConfig,
-    vars: &tomet_compute::EvaluationContext,
-) -> String {
     let mut out = String::new();
-    let cx = RenderCtx {
-        doc,
-        config: config.clone(),
-        vars: vars.clone(),
-    };
     for block in &doc.blocks {
-        render_block(&cx, block, &mut out);
+        render_block(block, &mut out);
     }
     out
 }
 
-fn render_block(cx: &RenderCtx, block: &Block, out: &mut String) {
+fn render_block(block: &Block, out: &mut String) {
     match block {
         Block::Paragraph(p) => {
             // Same reasoning as `tomet-html`'s `render_block`: an
             // all-invisible-element paragraph (e.g. adjacent `@meta(...)`
             // lines with no blank line between them) must not leave a
             // stray blank paragraph behind.
-            let text = inline_to_md(cx, &p.content);
+            let text = inline_to_md(&p.content);
             if !text.trim().is_empty() {
                 out.push_str(&text);
                 out.push_str("\n\n");
             }
         }
-        Block::Element(el) if list_ordered(el).is_some() => render_list(cx, el, out),
+        Block::Element(el) if list_ordered(el).is_some() => render_list(el, out),
         Block::Element(el) => {
-            let text = element_to_md(cx, el, false);
+            let text = element_to_md(el, false);
             if !text.is_empty() {
                 out.push_str(&text);
                 out.push_str("\n\n");
@@ -83,12 +60,12 @@ fn render_block(cx: &RenderCtx, block: &Block, out: &mut String) {
     }
 }
 
-fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
-    render_list_with_indent(cx, el, 0, out);
+fn render_list(el: &Element, out: &mut String) {
+    render_list_with_indent(el, 0, out);
     out.push('\n');
 }
 
-fn render_list_with_indent(cx: &RenderCtx, el: &Element, indent: usize, out: &mut String) {
+fn render_list_with_indent(el: &Element, indent: usize, out: &mut String) {
     let ordered = list_ordered(el).unwrap_or(false);
     let indent_str = "  ".repeat(indent);
     for (i, item) in list_items(el).iter().enumerate() {
@@ -102,13 +79,13 @@ fn render_list_with_indent(cx: &RenderCtx, el: &Element, indent: usize, out: &mu
         // `args` (the `(...)` marker `Value`) has no CommonMark equivalent
         // -- dropped on export, same as this crate's other documented
         // lossy cases (see the module doc).
-        out.push_str(&inline_to_md(cx, item.content.as_deref().unwrap_or(&[])));
+        out.push_str(&inline_to_md(item.content.as_deref().unwrap_or(&[])));
         out.push('\n');
         if let Some(children) = &item.children {
             for child in children {
                 if let Block::Element(sub) = child {
                     if list_ordered(sub).is_some() {
-                        render_list_with_indent(cx, sub, indent + 1, out);
+                        render_list_with_indent(sub, indent + 1, out);
                     }
                 }
             }
@@ -116,18 +93,18 @@ fn render_list_with_indent(cx: &RenderCtx, el: &Element, indent: usize, out: &mu
     }
 }
 
-fn inline_to_md(cx: &RenderCtx, inlines: &[Inline]) -> String {
+fn inline_to_md(inlines: &[Inline]) -> String {
     let mut out = String::new();
     for inline in inlines {
         match inline {
             Inline::Text(t) => out.push_str(&escape_text(&t.value)),
-            Inline::Element(el) => out.push_str(&element_to_md(cx, el, true)),
+            Inline::Element(el) => out.push_str(&element_to_md(el, true)),
         }
     }
     out
 }
 
-fn element_to_md(cx: &RenderCtx, el: &Element, inline: bool) -> String {
+fn element_to_md(el: &Element, inline: bool) -> String {
     let kind = classify_std_lenient(el);
     match kind.as_str() {
         // Directives configure or annotate the document and have no
@@ -140,27 +117,27 @@ fn element_to_md(cx: &RenderCtx, el: &Element, inline: bool) -> String {
         // (`inline == true`) falls through to generic/custom rendering
         // instead, rather than emitting a bare `## text` mid-paragraph
         // (which wouldn't parse back as a heading anyway).
-        "heading" if !inline => render_heading(cx, el),
-        "hr" => render_hr(cx, el),
-        "em" => format!("*{}*", content_to_md(cx, el)),
-        "strong" => format!("**{}**", content_to_md(cx, el)),
-        "mark" => format!("<mark>{}</mark>", content_to_md(cx, el)),
-        "strikeout" => format!("~~{}~~", content_to_md(cx, el)),
+        "heading" if !inline => render_heading(el),
+        "hr" => render_hr(el),
+        "em" => format!("*{}*", content_to_md(el)),
+        "strong" => format!("**{}**", content_to_md(el)),
+        "mark" => format!("<mark>{}</mark>", content_to_md(el)),
+        "strikeout" => format!("~~{}~~", content_to_md(el)),
         "codeblock" => render_code_block(el),
-        "quote" => render_quote(cx, el, inline),
-        "callout" => render_callout(cx, el),
-        "table" => render_table(cx, el),
-        "link" => render_link(cx, el),
-        "file" | "dir" => render_path(cx, el, inline),
+        "quote" => render_quote(el, inline),
+        "callout" => render_callout(el),
+        "table" => render_table(el),
+        "link" => render_link(el),
+        "file" | "dir" => render_path(el, inline),
         "embed" => render_embed(el),
-        "links" => render_links_container(cx, el),
+        "links" => render_links_container(el),
         // Evaluate `${...}` interpolations and macros
-        "interp" => render_interp(cx, el),
-        _ => render_generic(cx, el, kind.as_str(), inline),
+        "interp" => render_interp(el),
+        _ => render_generic(el, kind.as_str(), inline),
     }
 }
 
-fn render_table(cx: &RenderCtx, el: &Element) -> String {
+fn render_table(el: &Element) -> String {
     let inlines = match &el.content {
         Some(content) => content,
         None => return String::new(),
@@ -185,7 +162,7 @@ fn render_table(cx: &RenderCtx, el: &Element) -> String {
     let mut header_line = String::from("|");
     for i in 0..col_count {
         let cell_md = if i < header_cells.len() {
-            inline_to_md(cx, &header_cells[i].content).replace('|', "\\|")
+            inline_to_md(&header_cells[i].content).replace('|', "\\|")
         } else {
             String::new()
         };
@@ -205,7 +182,7 @@ fn render_table(cx: &RenderCtx, el: &Element) -> String {
         let mut row_line = String::from("|");
         for i in 0..col_count {
             let cell_md = if i < row.cells.len() {
-                inline_to_md(cx, &row.cells[i].content).replace('|', "\\|")
+                inline_to_md(&row.cells[i].content).replace('|', "\\|")
             } else {
                 String::new()
             };
@@ -217,49 +194,24 @@ fn render_table(cx: &RenderCtx, el: &Element) -> String {
     lines.join("\n")
 }
 
-/// Evaluates `${...}` interpolation expressions and macro templates against the document.
-fn render_interp(cx: &RenderCtx, el: &Element) -> String {
+/// A `${...}` that reached here unresolved, written back as it was.
+///
+/// Reaching here at all means the document was not prepared -- a caller
+/// that went straight to this crate rather than through
+/// `tomet_load::Vault`. The honest output for that is the source
+/// spelling: rendering nothing would hide it, and evaluating it here is
+/// what this crate stopped doing.
+fn render_interp(el: &Element) -> String {
     match &el.value {
-        Some(ElementValue::Interp(expr)) => {
-            match tomet_compute::evaluate_with_context(cx.doc, expr, &cx.config, &cx.vars) {
-                Ok(val) => match val {
-                    Value::String(s) => s,
-                    Value::Int(i) => i.to_string(),
-                    Value::Float(f) => f.to_string(),
-                    Value::Bool(b) => b.to_string(),
-                    Value::Null => String::new(),
-                    other => format!("{other:?}"),
-                },
-                Err(_) => format!("${{{}}}", render_interp_expr(expr)),
-            }
-        }
+        Some(ElementValue::Interp(expr)) => format!("${{{expr}}}"),
         _ => String::new(),
     }
 }
 
-fn render_interp_expr(expr: &InterpExpr) -> String {
-    match &expr.kind {
-        InterpExprKind::Identifier(name) => name.clone(),
-        InterpExprKind::Literal(Literal::Int(i)) => i.to_string(),
-        InterpExprKind::Literal(Literal::Float(x)) => x.to_string(),
-        InterpExprKind::Literal(Literal::String(s)) => format!("{s:?}"),
-        InterpExprKind::Call { callee, args } => {
-            let args = args.iter().map(render_interp_expr).collect::<Vec<_>>();
-            format!("{}({})", render_interp_expr(callee), args.join(", "))
-        }
-        InterpExprKind::Member { object, member } => {
-            format!("{}.{member}", render_interp_expr(object))
-        }
-        InterpExprKind::NamedArg { name, value } => {
-            format!("{name}: {}", render_interp_expr(value))
-        }
-    }
-}
-
-fn content_to_md(cx: &RenderCtx, el: &Element) -> String {
+fn content_to_md(el: &Element) -> String {
     el.content
         .as_ref()
-        .map(|a| inline_to_md(cx, a))
+        .map(|a| inline_to_md(a))
         .unwrap_or_default()
 }
 
@@ -269,20 +221,20 @@ fn content_to_md(cx: &RenderCtx, el: &Element) -> String {
 /// `id`/`cssclass` attrs (`el.value`) have no CommonMark form and are
 /// dropped, same as before this was folded into the generic `Element`
 /// dispatch (see the module doc).
-fn render_heading(cx: &RenderCtx, el: &Element) -> String {
+fn render_heading(el: &Element) -> String {
     let level = heading_level(el).unwrap_or(1) as usize;
     let content = el.content.as_deref().unwrap_or(&[]);
-    format!("{} {}", "#".repeat(level), inline_to_md(cx, content))
+    format!("{} {}", "#".repeat(level), inline_to_md(content))
 }
 
-fn render_hr(cx: &RenderCtx, el: &Element) -> String {
+fn render_hr(el: &Element) -> String {
     match &el.content {
         // The blank line is load-bearing. `Title` immediately above `---`
         // is a setext heading in CommonMark, so without it a labelled
         // divider silently exports as an `<h2>` -- the one shape this is
         // trying not to be.
         Some(title) if !title.is_empty() => {
-            format!("**{}**\n\n---", inline_to_md(cx, title))
+            format!("**{}**\n\n---", inline_to_md(title))
         }
         _ => "---".to_string(),
     }
@@ -328,8 +280,8 @@ fn fence_for(code: &str) -> String {
 /// quote is in Markdown, so that is what it becomes; a reader importing
 /// the result back sees text, which is what any Markdown reader would
 /// have seen anyway.
-fn render_quote(cx: &RenderCtx, el: &Element, inline: bool) -> String {
-    let text = content_to_md(cx, el);
+fn render_quote(el: &Element, inline: bool) -> String {
+    let text = content_to_md(el);
     if inline {
         return format!("\u{201c}{text}\u{201d}");
     }
@@ -339,7 +291,7 @@ fn render_quote(cx: &RenderCtx, el: &Element, inline: bool) -> String {
         .join("\n")
 }
 
-fn render_callout(cx: &RenderCtx, el: &Element) -> String {
+fn render_callout(el: &Element) -> String {
     let mut variant = None;
     let mut title = None;
 
@@ -374,7 +326,7 @@ fn render_callout(cx: &RenderCtx, el: &Element) -> String {
     }
 
     let v = variant.unwrap_or_else(|| "note".to_string());
-    let body = content_to_md(cx, el);
+    let body = content_to_md(el);
     let mut lines = Vec::new();
 
     if let Some(t) = title {
@@ -404,10 +356,10 @@ fn render_callout(cx: &RenderCtx, el: &Element) -> String {
 /// exported Markdown byte-identical. The import direction cannot recover
 /// it -- a code span in Markdown is a code span, and nothing in it says
 /// whether the author meant a path.
-fn render_path(cx: &RenderCtx, el: &Element, inline: bool) -> String {
+fn render_path(el: &Element, inline: bool) -> String {
     let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let content = match &el.content {
-        Some(content) if !content.is_empty() => Some(inline_to_md(cx, content)),
+        Some(content) if !content.is_empty() => Some(inline_to_md(content)),
         _ => None,
     };
     if inline {
@@ -422,11 +374,11 @@ fn render_path(cx: &RenderCtx, el: &Element, inline: bool) -> String {
     }
 }
 
-fn render_link(cx: &RenderCtx, el: &Element) -> String {
+fn render_link(el: &Element) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let text = match &el.content {
-        Some(content) if !content.is_empty() => inline_to_md(cx, content),
+        Some(content) if !content.is_empty() => inline_to_md(content),
         _ => String::new(),
     };
     match scheme {
@@ -484,7 +436,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
     s
 }
 
-fn render_links_container(cx: &RenderCtx, el: &Element) -> String {
+fn render_links_container(el: &Element) -> String {
     let mut out = String::new();
     if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
         for (i, child) in children.iter().enumerate() {
@@ -495,7 +447,7 @@ fn render_links_container(cx: &RenderCtx, el: &Element) -> String {
             let content = child
                 .content
                 .as_ref()
-                .map(|a| inline_to_md(cx, a))
+                .map(|a| inline_to_md(a))
                 .unwrap_or_default();
             out.push_str(&format!("**{id}**: {content}"));
         }
@@ -507,7 +459,7 @@ fn render_links_container(cx: &RenderCtx, el: &Element) -> String {
 /// or `@name` element the importer never produces) passes through as raw
 /// HTML -- valid CommonMark, and matches `tomet-html`'s own
 /// generic div/span fallback in spirit.
-fn render_generic(cx: &RenderCtx, el: &Element, kind: &str, inline: bool) -> String {
+fn render_generic(el: &Element, kind: &str, inline: bool) -> String {
     let tag = if inline { "span" } else { "div" };
     let mut out = format!("<{tag} data-tm-kind=\"{}\"", escape_attr(kind));
     if let Some(args) = &el.args {
@@ -515,7 +467,7 @@ fn render_generic(cx: &RenderCtx, el: &Element, kind: &str, inline: bool) -> Str
     }
     out.push('>');
     if let Some(content) = &el.content {
-        out.push_str(&inline_to_md(cx, content));
+        out.push_str(&inline_to_md(content));
     }
     out.push_str(&format!("</{tag}>"));
     out
@@ -1128,12 +1080,25 @@ mod tests {
         );
     }
 
+    /// This crate does not evaluate `${...}` any more, and this test is
+    /// what is left of the one that said it did.
+    ///
+    /// It used to assert the expanded macro. That expansion now happens in
+    /// `tomet-transform`'s `resolve_interpolations`, before any converter
+    /// sees the tree, and is pinned there -- because four converters each
+    /// deciding it produced three different answers for the same document.
+    ///
+    /// What reaches here is a document nobody prepared, and the only
+    /// honest rendering of that is what was written.
     #[test]
-    fn macro_and_interp_exports_to_markdown() {
-        let doc = tomet_parser::parse_document("@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    copyright: \"(C) 2026 Tomet\"\n  }\n}\n\nIssue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
+    fn an_unprepared_interpolation_renders_as_its_own_source() {
+        let doc = tomet_parser::parse_document(
+            "Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n",
+        )
+        .unwrap();
         assert_eq!(
             to_markdown(&doc),
-            "Issue: https://github.com/tomet/tomet/issues/42 Footer: (C) 2026 Tomet Math: 15\n\n"
+            "Issue: ${gh(42)} Footer: ${copyright} Math: ${add(10, 5)}\n\n"
         );
     }
 }

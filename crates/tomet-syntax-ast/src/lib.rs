@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::fmt::{self, Write as _};
 
 pub mod cst_ast;
 pub use cst_ast::*;
@@ -646,6 +646,55 @@ pub enum InterpExprKind {
         name: String,
         value: Box<InterpExpr>,
     },
+}
+
+/// The source spelling of an interpolation expression -- the interior of
+/// `${...}`, without the surrounding `${` and `}`. The caller adds those,
+/// because `$name(args)` writes the same expression with no braces at all.
+///
+/// This belongs to the node rather than to any consumer. It was written
+/// five times -- once in the printer and once in each of the four convert
+/// crates -- and they disagreed: the converters escaped a string literal
+/// with Rust's `{:?}` and the printer wrapped it in bare quotes, so a
+/// string containing `"` printed back as source that will not parse.
+///
+/// Escaping here is exactly what `parse_quoted` reads back: `"`, `\`,
+/// newline and tab. Not `{:?}`, which also emits `\r` and `\u{...}`
+/// escapes the parser does not know -- it would turn a carriage return
+/// into the letter `r`.
+impl fmt::Display for InterpExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            InterpExprKind::Identifier(name) => f.write_str(name),
+            InterpExprKind::Literal(Literal::Int(i)) => write!(f, "{i}"),
+            InterpExprKind::Literal(Literal::Float(x)) => write!(f, "{x}"),
+            InterpExprKind::Literal(Literal::String(s)) => {
+                f.write_str("\"")?;
+                for c in s.chars() {
+                    match c {
+                        '"' => f.write_str("\\\"")?,
+                        '\\' => f.write_str("\\\\")?,
+                        '\n' => f.write_str("\\n")?,
+                        '\t' => f.write_str("\\t")?,
+                        other => f.write_char(other)?,
+                    }
+                }
+                f.write_str("\"")
+            }
+            InterpExprKind::Call { callee, args } => {
+                write!(f, "{callee}(")?;
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{arg}")?;
+                }
+                f.write_str(")")
+            }
+            InterpExprKind::Member { object, member } => write!(f, "{object}.{member}"),
+            InterpExprKind::NamedArg { name, value } => write!(f, "{name}: {value}"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

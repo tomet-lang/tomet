@@ -88,6 +88,43 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
         let bindings = vault.bindings(&doc);
         let diagnostics = tomet_validator::validate_document_with(&doc, &bindings);
         checked += 1;
+
+        // A `${...}` with no value is not an error: a document showing one
+        // as an example is a legitimate document, and `export` leaves it
+        // in the output as written. Saying so here is what tells that
+        // apart from a typo, which otherwise renders as itself and is
+        // never mentioned by anything.
+        //
+        // Run on a copy: this reports on the document as written, and
+        // `prepare` rewrites the tree.
+        let mut prepared = doc.clone();
+        let unresolved = vault
+            .prepare(&mut prepared, file)
+            .map(|report| report.unresolved)
+            .unwrap_or_default();
+        warned += unresolved.len();
+        if json {
+            for u in &unresolved {
+                json_files.push(serde_json::json!({
+                    "file": file.display().to_string(),
+                    "errors": [{
+                        "message": format!("unresolved ${{{}}}: {}", u.source, u.reason),
+                        "severity": "warning",
+                    }],
+                }));
+            }
+        } else {
+            for u in &unresolved {
+                eprintln!(
+                    "{}:{}: warning: unresolved ${{{}}} -- {}",
+                    file.display(),
+                    u.span.start.line,
+                    u.source,
+                    u.reason
+                );
+            }
+        }
+
         if diagnostics.is_empty() {
             continue;
         }

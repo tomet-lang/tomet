@@ -21,6 +21,15 @@ pub enum ComputeError {
         function: String,
         value: Value,
     },
+    /// An ordering was asked for between two values that have none --
+    /// `gt("a", 1)`. Distinct from [`ComputeError::NotNumeric`] because
+    /// the comparisons accept two strings as readily as two numbers, so
+    /// "expects a number" would name the wrong requirement.
+    NotComparable {
+        function: String,
+        left: Value,
+        right: Value,
+    },
     DivisionByZero,
 }
 
@@ -40,6 +49,14 @@ impl fmt::Display for ComputeError {
             ComputeError::NotNumeric { function, value } => {
                 write!(f, "`{function}` expects a number, got {value:?}")
             }
+            ComputeError::NotComparable {
+                function,
+                left,
+                right,
+            } => write!(
+                f,
+                "`{function}` cannot order {left:?} against {right:?} -- compare two numbers, or two strings"
+            ),
             ComputeError::DivisionByZero => write!(f, "division by zero"),
         }
     }

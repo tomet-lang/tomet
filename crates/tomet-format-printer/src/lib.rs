@@ -12,8 +12,7 @@
 //! in `tomet-field-utils`.
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, InterpExprKind, Literal,
-    Placement, Sigil, Value,
+    Block, Document, Element, ElementValue, Entry, Inline, Placement, Sigil, Value,
 };
 use tomet_config::PrinterConfig;
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
@@ -552,7 +551,7 @@ fn render_element_value_with_format(
             out.push_str(&fence);
             out
         }
-        ElementValue::Interp(expr) => format!("{{{}}}", render_interp_expr(expr)),
+        ElementValue::Interp(expr) => format!("{{{expr}}}"),
         ElementValue::Group(entries) => {
             format!("{{{}}}", render_group_entries(entries, config))
         }
@@ -640,33 +639,6 @@ fn value_to_json(val: &Value) -> serde_json::Value {
                 map.insert(k.clone(), value_to_json(v));
             }
             serde_json::Value::Object(map)
-        }
-    }
-}
-
-/// Re-renders an `InterpExpr` back to source text for round-tripping
-/// (the interior of `${...}`, no surrounding braces -- the caller already
-/// adds those as part of `Sigil::Dollar`'s generic `{value}` rendering).
-/// `String` is always quoted, unlike `render_value_inner`'s conditional
-/// quoting: unlike a `Value::String`, an `InterpExprKind::Literal(Literal::String(_))`
-/// only ever comes from an explicitly `"..."`-quoted source token
-/// (`document.rs::parse_interp_primary`), never a bare identifier, so it
-/// always needs the quotes back.
-pub fn render_interp_expr(expr: &InterpExpr) -> String {
-    match &expr.kind {
-        InterpExprKind::Identifier(name) => name.clone(),
-        InterpExprKind::Literal(Literal::Int(i)) => i.to_string(),
-        InterpExprKind::Literal(Literal::Float(f)) => f.to_string(),
-        InterpExprKind::Literal(Literal::String(s)) => format!("\"{s}\""),
-        InterpExprKind::Call { callee, args } => {
-            let rendered: Vec<_> = args.iter().map(render_interp_expr).collect();
-            format!("{}({})", render_interp_expr(callee), rendered.join(", "))
-        }
-        InterpExprKind::Member { object, member } => {
-            format!("{}.{member}", render_interp_expr(object))
-        }
-        InterpExprKind::NamedArg { name, value } => {
-            format!("{name}: {}", render_interp_expr(value))
         }
     }
 }
