@@ -31,8 +31,8 @@
 //! The four steps above produce the document *as written*. Something that
 //! is about to render it needs one more: the AST rewrites that have to
 //! happen before any converter sees the tree. An index document's
-//! `${filter(...)}` is one -- it expands into several `@file` elements,
-//! so it cannot be a renderer's job the way `${gh(12)}` can.
+//! `${filter(...)}` is one -- it expands into several `@link(ref:...)`
+//! entries, so it cannot be a renderer's job the way `${gh(12)}` can.
 //!
 //! That step is [`Vault::prepare`], and it is deliberately **not** part of
 //! [`Vault::document`]. It reads every `.tmt` in the vault, and a caller
@@ -70,7 +70,7 @@ use tomet_semantics::Bindings;
 
 mod index;
 
-pub use index::{IndexQueryError, VaultIndex, has_index_query};
+pub use index::{IndexQueryError, VaultIndex, is_index_document};
 pub use tomet_transform::Unresolved;
 
 /// What [`Vault::prepare`] did, and what it could not do.
@@ -103,9 +103,9 @@ pub struct Vault {
     /// vocabulary should not hide the state of every document.
     pub vocabulary_errors: Vec<String>,
     loaded: LoadedVocabularies,
-    /// Filled by the first [`Vault::prepare`] that meets a document
-    /// carrying a query, and shared by every one after it. A directory
-    /// export would otherwise re-read the whole vault per file.
+    /// Filled by the first [`Vault::prepare`] that meets an
+    /// `@kind(doc.index)` document, and shared by every one after it. A
+    /// directory export would otherwise re-read the whole vault per file.
     ///
     /// `OnceLock` rather than `OnceCell` so a `Vault` stays `Sync` and can
     /// be shared rather than rebuilt -- a server answering requests from
@@ -177,10 +177,11 @@ impl Vault {
     /// Two rewrites, in this order, because the first produces elements
     /// and the second turns expressions into text:
     ///
-    /// 1. index queries -- `${filter(...)}` becomes the `@file` entries it
-    ///    selects. The vault table this needs is built on the first
-    ///    document that carries a query and reused by every one after, so
-    ///    a document with none costs one walk of `doc.blocks` and no I/O.
+    /// 1. index queries -- `${filter(...)}` becomes the `@link(ref:...)`
+    ///    entries it selects. The vault table this needs is built on the
+    ///    first `@kind(doc.index)` document and reused by every one after,
+    ///    so a document that isn't one costs a single `document_kind` read
+    ///    and no I/O.
     /// 2. interpolation -- every remaining `${...}` becomes the text it
     ///    stands for, against this vault's macros and this document's
     ///    position.
@@ -194,7 +195,7 @@ impl Vault {
     /// interpolation was in before this existed.
     pub fn prepare(&self, doc: &mut Document, path: &Path) -> Result<Prepared, IndexQueryError> {
         let mut expanded_queries = 0;
-        if has_index_query(doc) {
+        if is_index_document(doc) {
             let index = self.index.get_or_init(|| VaultIndex::build(&self.root));
             expanded_queries = index.expand(doc)?;
         }
@@ -330,17 +331,22 @@ impl std::error::Error for LoadError {
 mod tests {
     use super::*;
     use std::fs;
-    use tomet_ast::{Block, Value};
+    use tomet_ast::Block;
 
-    /// The `target` of every block-level `@file`, in order.
+    /// The `ref:` path of every block-level `@link`, in order, with the
+    /// scheme prefix stripped.
     fn file_paths(doc: &Document) -> Vec<String> {
         doc.blocks
             .iter()
             .filter_map(|block| match block {
-                Block::Element(el) if el.sigil.is_bare_named("file") => match &el.args {
-                    Some(Value::String(path)) => Some(path.clone()),
-                    _ => None,
-                },
+                Block::Element(el) => {
+                    let (kind, target) = tomet_semantics::link_target_of(el)?;
+                    if kind != tomet_semantics::ElementKind::Link {
+                        return None;
+                    }
+                    let (scheme, rest) = tomet_semantics::target_scheme(&target);
+                    (scheme == tomet_semantics::TargetScheme::Ref).then(|| rest.to_string())
+                }
                 _ => None,
             })
             .collect()
@@ -370,7 +376,7 @@ mod tests {
         let root = vault_fixture("tomet_test_load_prepared");
         fs::write(
             root.join("index.tmt"),
-            "@kind(index)\n\n${filter(contains(meta.tags, \"rust\"), by(meta.created, \"desc\"))}\n",
+            "@kind(doc.index)\n\n${filter(contains(meta.tags, \"rust\"), by(meta.created, \"desc\"))}\n",
         )
         .expect("index");
 
@@ -416,7 +422,7 @@ mod tests {
         for name in ["a.tmt", "b.tmt"] {
             fs::write(
                 root.join(name),
-                "@kind(index)\n\n${filter(contains(meta.tags, \"go\"))}\n",
+                "@kind(doc.index)\n\n${filter(contains(meta.tags, \"go\"))}\n",
             )
             .expect("index");
         }
@@ -439,7 +445,7 @@ mod tests {
         let root = vault_fixture("tomet_test_load_bad_query");
         fs::write(
             root.join("index.tmt"),
-            "@kind(index)\n\n${filter(exists(meta.tgs))}\n",
+            "@kind(doc.index)\n\n${filter(exists(meta.tgs))}\n",
         )
         .expect("index");
 

@@ -43,4 +43,7 @@ pub use target::{
     target_scheme,
 };
 pub use tomet_tree::{ElementExt, ValueExt};
-pub use vocabulary::{Bindings, ElementDecl, ParamDecl, Region, Vocabulary};
+pub use vocabulary::{
+    Bindings, ElementDecl, ParamDecl, RESERVED_NAMESPACES, Region, Vocabulary,
+    builtin_doc_vocabularies,
+};

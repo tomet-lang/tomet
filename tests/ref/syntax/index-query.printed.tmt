@@ -1,4 +1,4 @@
-@kind(index)
+@kind(doc.index)
 
 @meta(format:yaml)+++
 id: doc-index-query
