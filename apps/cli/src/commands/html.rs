@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::util::{format_parse_error, meta_title};
+use crate::util::{format_parse_error, meta_title, vault_for};
 
 /// Shared by the `html` command and the `serve` command's per-request
 /// re-render (`commands::serve::render_handler`).
@@ -18,8 +18,13 @@ pub(crate) fn render_file(
     body: bool,
 ) -> anyhow::Result<String> {
     let src = fs::read_to_string(file)?;
-    let doc = tomet_parser::parse_document(&src)
+    let vault = vault_for(file);
+    let (mut doc, _bindings) = vault
+        .parse(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
+    vault
+        .prepare(&mut doc, file)
+        .map_err(|e| anyhow::anyhow!("{}: index query failed -- {e}", file.display()))?;
     let options = tomet_html::RenderOptions {
         number_headings: advanced,
         auto_slug_headings: advanced,

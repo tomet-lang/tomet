@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::util::{format_parse_error, read};
+use crate::util::{format_parse_error, read, vault_for};
 
 /// Writes a `.tmt` document as Pandoc's own AST, JSON-encoded.
 ///
@@ -13,8 +13,13 @@ use crate::util::{format_parse_error, read};
 /// ```
 pub(crate) fn to_pandoc(file: &PathBuf, out: &Option<PathBuf>) -> anyhow::Result<()> {
     let src = read(file)?;
-    let doc = tomet_parser::parse_document(&src)
+    let vault = vault_for(file);
+    let (mut doc, _bindings) = vault
+        .parse(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
+    vault
+        .prepare(&mut doc, file)
+        .map_err(|e| anyhow::anyhow!("{}: index query failed -- {e}", file.display()))?;
     let json = serde_json::to_string(&tomet_pandoc::to_pandoc(&doc))?;
     match out {
         Some(path) => fs::write(path, json)?,

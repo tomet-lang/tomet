@@ -12,7 +12,7 @@ ${vars.title}
 
 ${sum(1, 4)}
 
--1
+${sub(1, 2)}
 
 <div data-tm-kind="memo">`$name(args)` は本文の中にも置ける -- ${slug-of(title)} のように</div>
 

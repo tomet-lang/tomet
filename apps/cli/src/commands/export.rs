@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use tomet_semantics::{ExportType, document_config};
+use tomet_load::Vault;
 
 use crate::util::{format_parse_error, meta_title};
 
@@ -39,6 +40,7 @@ fn export_single_file(
 ) -> anyhow::Result<()> {
     let mut stale = StaleExports::default();
     let project_root = project_root_for(file_path);
+    let vault = Vault::discover(file_path);
     export_one(
         file_path,
         override_type,
@@ -47,6 +49,7 @@ fn export_single_file(
         check,
         &mut stale,
         &project_root,
+        &vault,
     )?;
     report_stale(&stale, check)
 }
@@ -98,10 +101,21 @@ fn export_one(
     check: bool,
     stale: &mut StaleExports,
     project_root: &Path,
+    vault: &Vault,
 ) -> anyhow::Result<()> {
     let src = fs::read_to_string(file_path)?;
-    let doc = tomet_parser::parse_document(&src)
+    // `vault.parse` and not `vault.document`, so the source text is still
+    // in hand for `format_parse_error`'s pointer-at-the-column report.
+    let (mut doc, _bindings) = vault
+        .parse(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file_path, &src, &e)))?;
+
+    // An index document's `${filter(...)}` is answered before anything
+    // renders, so every converter is handed the `@file` entries and none
+    // of them needs to know this feature exists.
+    vault
+        .prepare(&mut doc, file_path)
+        .map_err(|e| anyhow::anyhow!("{}: index query failed -- {e}", file_path.display()))?;
 
     let config = document_config(&doc);
 
@@ -168,10 +182,7 @@ fn export_one(
         };
 
         let rendered = match target {
-            ExportType::CommonMark => {
-                let (config, vars) = crate::util::render_context(&doc, file_path, project_root);
-                tomet_markdown::to_markdown_with_context(&doc, &config, &vars)
-            }
+            ExportType::CommonMark => tomet_markdown::to_markdown(&doc),
             // Pandoc's AST, not a rendering -- `pandoc -f json` turns it
             // into whatever format is actually wanted.
             ExportType::Pandoc => serde_json::to_string(&tomet_pandoc::to_pandoc(&doc))?,
@@ -233,6 +244,9 @@ fn export_directory(
 
     let mut exported_count = 0;
     let mut stale = StaleExports::default();
+    // Discovered once for the whole run; the metadata table inside it is
+    // filled by whichever document asks first -- see `export_one`.
+    let vault = Vault::discover(dir_path);
     for file in &files {
         let relative_out = if let Some(out_dir) = override_out {
             if let Ok(rel) = file.strip_prefix(dir_path) {
@@ -253,6 +267,7 @@ fn export_directory(
             check,
             &mut stale,
             &project_root,
+            &vault,
         ) {
             Ok(()) => exported_count += 1,
             Err(e) => eprintln!("Error exporting {}: {e}", file.display()),

@@ -2151,10 +2151,13 @@ name = "tomet-load"
 version = "0.1.0"
 dependencies = [
  "tomet-ast",
+ "tomet-compute",
  "tomet-config",
+ "tomet-indexer",
  "tomet-parser",
  "tomet-resolver",
  "tomet-semantics",
+ "tomet-transform",
 ]
 
 [[package]]
@@ -2318,6 +2321,7 @@ dependencies = [
  "tomet-compute",
  "tomet-parser",
  "tomet-semantics",
+ "tomet-style",
  "tomet-tree",
 ]
 

@@ -11,7 +11,7 @@
 //! children as a definition list of anchors.
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Value,
+    Block, Document, Element, ElementValue, Inline, Value,
 };
 use tomet_semantics::{
     EXACT_DATA_KEY, ElementKind, TargetScheme, classify_std_lenient, flatten_data, heading_level,
@@ -118,12 +118,7 @@ pub fn render_body_with_outline(
 ) -> (String, Vec<HeadingInfo>) {
     let mut out = String::new();
     let mut state = HeadingState::default();
-    let config = tomet_semantics::document_config(doc);
-    let cx = RenderCtx {
-        doc,
-        config,
-        options,
-    };
+    let cx = RenderCtx { options };
     for block in &doc.blocks {
         render_block(&cx, block, &mut out, &mut state);
     }
@@ -131,8 +126,6 @@ pub fn render_body_with_outline(
 }
 
 struct RenderCtx<'a> {
-    doc: &'a Document,
-    config: tomet_semantics::DocumentConfig,
     options: &'a RenderOptions,
 }
 
@@ -801,46 +794,23 @@ fn render_element_value(cx: &RenderCtx, value: &ElementValue, out: &mut String) 
             out.push_str(&escape_html(body));
             out.push_str("</pre>");
         }
+        // A `${...}` that reached here unresolved, written back as it was.
+        //
+        // Reaching here at all means the document was not prepared -- a
+        // caller that went straight to this crate rather than through
+        // `tomet_load::Vault`. Rendering nothing would hide it, and
+        // evaluating it here is what this crate stopped doing: what a
+        // `${...}` means is settled by `tomet-transform`'s
+        // `resolve_interpolations` before any converter sees the tree.
+        //
+        // This used to evaluate with `evaluate_with_config` -- no
+        // `EvaluationContext` and no vault config, so `${self.path}`
+        // resolved in CommonMark and not here, and `default.config.tmt`'s
+        // macros expanded in neither. No wrapper element is emitted now
+        // that the text is plain: `<span class="tm-interp">` carried no
+        // style and marked a distinction that no longer survives to here.
         ElementValue::Interp(expr) => {
-            let text = match tomet_compute::evaluate_with_config(cx.doc, expr, &cx.config) {
-                Ok(val) => match val {
-                    Value::String(s) => s,
-                    Value::Int(i) => i.to_string(),
-                    Value::Float(f) => f.to_string(),
-                    Value::Bool(b) => b.to_string(),
-                    Value::Null => String::new(),
-                    other => format!("{other:?}"),
-                },
-                Err(_) => render_interp_expr(expr),
-            };
-            out.push_str("<span class=\"tm-interp\">");
-            out.push_str(&escape_html(&text));
-            out.push_str("</span>");
-        }
-    }
-}
-
-/// Re-renders an `InterpExpr` back to `${...}`-shaped source text --
-/// evaluation (resolving an `Identifier`/`Member`, calling a `Call`)
-/// isn't implemented yet, so this is display-only, same treatment an
-/// unrecognized element gets. Not shared via `tomet-ast`: rendering
-/// back to text is each consumer's own job here, same as
-/// `render_value_inner`/`value_to_plain` already are for `Value`.
-fn render_interp_expr(expr: &InterpExpr) -> String {
-    match &expr.kind {
-        InterpExprKind::Identifier(name) => name.clone(),
-        InterpExprKind::Literal(Literal::Int(i)) => i.to_string(),
-        InterpExprKind::Literal(Literal::Float(x)) => x.to_string(),
-        InterpExprKind::Literal(Literal::String(s)) => format!("{s:?}"),
-        InterpExprKind::Call { callee, args } => {
-            let args = args.iter().map(render_interp_expr).collect::<Vec<_>>();
-            format!("{}({})", render_interp_expr(callee), args.join(", "))
-        }
-        InterpExprKind::Member { object, member } => {
-            format!("{}.{member}", render_interp_expr(object))
-        }
-        InterpExprKind::NamedArg { name, value } => {
-            format!("{name}: {}", render_interp_expr(value))
+            out.push_str(&escape_html(&format!("${{{expr}}}")));
         }
     }
 }
@@ -1535,13 +1505,27 @@ mod tests {
         );
     }
 
+    /// This crate does not evaluate `${...}` any more, and this test is
+    /// what is left of the one that said it did.
+    ///
+    /// It used to assert that `$gh(42)` came out as the expanded URL. Four
+    /// converters each decided that for themselves and three of them
+    /// decided differently -- this one evaluated without an
+    /// `EvaluationContext` or the vault's config, so `${self.path}`
+    /// resolved in CommonMark and not here. Evaluation moved to
+    /// `tomet-transform`'s `resolve_interpolations`, which runs before any
+    /// converter sees the tree; the expansion those assertions were about
+    /// is pinned there now.
+    ///
+    /// What reaches here is a document nobody prepared, and the only
+    /// honest rendering of that is what was written.
     #[test]
-    fn renders_interp_and_macros_to_html() {
-        let doc = parse_document("@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    copyright: \"(C) 2026 Tomet\"\n  }\n}\n\nIssue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
-        let body = render_body(&doc);
+    fn an_unprepared_interpolation_renders_as_its_own_source() {
+        let doc = parse_document("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n")
+            .unwrap();
         assert_eq!(
-            body,
-            "<p>Issue: <span class=\"tm-interp\">https://github.com/tomet/tomet/issues/42</span> Footer: <span class=\"tm-interp\">(C) 2026 Tomet</span> Math: <span class=\"tm-interp\">15</span></p>\n"
+            render_body(&doc),
+            "<p>Issue: ${gh(42)} Footer: ${copyright} Math: ${add(10, 5)}</p>\n"
         );
     }
 

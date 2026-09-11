@@ -1,0 +1,36 @@
+= 索引の問い合わせ
+
+\`\${filter(...)}\` は本文に直接置く。包む要素はない -- \`\${some\_id}\` が立てるのと同じ位置に立つ。文法としては入れ子の関数呼び出しでしかなく、 \`syntax/interpolation.tmt\` が押さえている形の組み合わせ。
+
+このコーパスは凍結されているので、ここで確かめられるのは構文と往復まで。問い合わせに答えるには vault 一つ分の表が要る -- そちらは \`tomet-workspace\` の \`index\` が実物のファイルで確かめている。
+
+== 述語だけ
+
+`${filter(contains(meta.tags, "rust"))}`
+
+== 述語は並べると and
+
+`${filter(contains(meta.tags, "rust"), not(exists(meta.draft)))}`
+
+== 並び
+
+方向を省くと昇順。
+
+`${filter(by(meta.created))}`
+
+`${filter(contains(meta.tags, "rust"), by(meta.created, "desc"))}`
+
+== 比較
+
+ISO-8601 の日付は文字列のまま正しく並ぶので、日付型を持ち出さずに書ける。
+
+`${filter(gte(meta.created, "2026-01-01"), lt(meta.created, "2027-01-01"))}`
+
+== 入れ子
+
+`${filter(or(contains(meta.tags, "rust"), contains(meta.tags, "go")))}`
+
+= 展開されないとき
+
+表を持たない経路 -- \`tomet fmt\` や、ここのスナップショット -- では \`\${filter(...)}\` はソースのまま残る。未知の関数を評価した結果として元の綴りに戻るので、落ちない。
+
