@@ -23,7 +23,8 @@ pub struct LoadedVocabularies {
     /// By the namespace each file names for itself.
     pub by_namespace: BTreeMap<String, Vocabulary>,
     /// Declared paths that are missing, unreadable, unparseable, headerless,
-    /// claim a namespace twice, or shadow a builtin name.
+    /// claim a namespace twice, claim a reserved namespace, or shadow a
+    /// builtin name.
     pub errors: Vec<String>,
 }
 
@@ -35,6 +36,16 @@ pub struct LoadedVocabularies {
 pub fn load_vocabularies(root: &Path, declared: &[String]) -> LoadedVocabularies {
     let mut loaded = LoadedVocabularies::default();
     let mut source: BTreeMap<String, String> = BTreeMap::new();
+
+    // Hardcoded, not read off disk -- the same reason `std`'s elements are
+    // a Rust table rather than a `@vocabulary(std)` document. Seeded first
+    // so the loop below reports a vault vocabulary that collides with one
+    // of these the same way it reports two vault vocabularies colliding
+    // with each other.
+    for builtin in tomet_semantics::builtin_doc_vocabularies() {
+        source.insert(builtin.namespace.clone(), "<builtin>".to_string());
+        loaded.by_namespace.insert(builtin.namespace.clone(), builtin);
+    }
 
     for declared in declared {
         let path = root.join(declared);
@@ -62,6 +73,18 @@ pub fn load_vocabularies(root: &Path, declared: &[String]) -> LoadedVocabularies
             ));
             continue;
         };
+
+        if let Some(reserved) = tomet_semantics::RESERVED_NAMESPACES
+            .iter()
+            .find(|ns| vocab.namespace == **ns || vocab.namespace.starts_with(&format!("{ns}.")))
+        {
+            loaded.errors.push(format!(
+                "{declared} declares itself `{}`, which is under the reserved `{reserved}` \
+                 namespace tomet already gives a hardcoded meaning",
+                vocab.namespace
+            ));
+            continue;
+        }
 
         // Reported here, once, rather than at every document that writes
         // the shadowed name.
@@ -94,4 +117,75 @@ pub fn load_vocabularies(root: &Path, declared: &[String]) -> LoadedVocabularies
 /// vocabularies it obtained some other way.
 pub fn bindings_for(doc: &Document, loaded: &LoadedVocabularies) -> Bindings {
     Bindings::for_document(doc, loaded.by_namespace.values().cloned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn scratch_dir(name: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(name);
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("temp dir");
+        root
+    }
+
+    #[test]
+    fn doc_index_resolves_with_no_declared_vocabularies_at_all() {
+        let root = scratch_dir("tomet_test_resolver_doc_index");
+        let loaded = load_vocabularies(&root, &[]);
+        assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
+        assert!(loaded.by_namespace.contains_key("doc.index"));
+
+        let doc = tomet_parser::parse_document("@kind(doc.index)\n\n#[ An index ]\n")
+            .expect("document parses");
+        let bindings = bindings_for(&doc, &loaded);
+        assert!(bindings.kind.is_some());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_vault_vocabulary_cannot_claim_the_reserved_doc_namespace() {
+        let root = scratch_dir("tomet_test_resolver_reserved_doc");
+        fs::write(
+            root.join("doc.vocabulary.tmt"),
+            "@kind(vocabulary)\n@vocabulary(doc){ version: \"1.0.0\" }\n",
+        )
+        .expect("vocabulary file");
+
+        let loaded = load_vocabularies(&root, &["doc.vocabulary.tmt".to_string()]);
+        assert!(
+            loaded
+                .errors
+                .iter()
+                .any(|e| e.contains("reserved") && e.contains("doc")),
+            "{:?}",
+            loaded.errors
+        );
+        // The hardcoded one is still there, untouched by the rejected file.
+        assert!(loaded.by_namespace.contains_key("doc.index"));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_vault_vocabulary_cannot_claim_doc_index_itself() {
+        let root = scratch_dir("tomet_test_resolver_reserved_doc_index");
+        fs::write(
+            root.join("index.vocabulary.tmt"),
+            "@kind(vocabulary)\n@vocabulary(doc.index){ version: \"1.0.0\" }\n",
+        )
+        .expect("vocabulary file");
+
+        let loaded = load_vocabularies(&root, &["index.vocabulary.tmt".to_string()]);
+        assert!(
+            loaded.errors.iter().any(|e| e.contains("reserved")),
+            "{:?}",
+            loaded.errors
+        );
+
+        let _ = fs::remove_dir_all(&root);
+    }
 }

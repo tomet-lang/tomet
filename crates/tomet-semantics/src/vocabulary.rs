@@ -120,6 +120,35 @@ pub struct Vocabulary {
     pub open: bool,
 }
 
+/// Namespaces no vault vocabulary may claim, because tomet already gives
+/// them a hardcoded meaning -- `std` conceptually, and now `doc`.
+///
+/// `std` is not actually checked here today (nothing ever compared a
+/// vocabulary's own namespace string against `"std"`; only individual
+/// element names were checked, via `shadowed_builtins`). `doc` is the first
+/// namespace this list actually enforces.
+pub const RESERVED_NAMESPACES: [&str; 1] = ["doc"];
+
+/// The vocabularies tomet ships hardcoded in Rust rather than as a vault's
+/// `@vocabulary(ns)` document -- the same reason `std`'s elements are a
+/// Rust table (`BUILTIN_KINDS`) rather than a `@vocabulary(std)` document:
+/// see `kind.rs`'s doc comment on why that is a limit of the vocabulary
+/// format, not a permanent design.
+///
+/// `doc.index` declares no elements: an index document's body is `std`
+/// (`ul`/`ol`/`@link`) plus `${filter(...)}`/`${by(...)}`, which are neither
+/// elements nor registered functions -- `tomet-transform::index_query`
+/// pattern-matches them directly, with no dependency on `Bindings` at all.
+/// This vocabulary exists purely so `@kind(doc.index)` resolves instead of
+/// being rejected as unknown.
+pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
+    vec![Vocabulary {
+        namespace: "doc.index".to_string(),
+        elements: BTreeMap::new(),
+        open: false,
+    }]
+}
+
 impl Vocabulary {
     /// Reads a parsed vocabulary document.
     ///
@@ -635,5 +664,27 @@ mod tests {
         assert_eq!(b.classify(&name("meta")), Ok(ElementKind::Meta));
         assert!(b.classify(&name("layers")).is_err());
         assert!(b.classify(&name("writ.layers")).is_err());
+    }
+
+    #[test]
+    fn builtin_doc_vocabularies_names_doc_index_and_declares_nothing() {
+        let vocabs = builtin_doc_vocabularies();
+        let index = vocabs
+            .iter()
+            .find(|v| v.namespace == "doc.index")
+            .expect("doc.index is among the builtin vocabularies");
+        assert!(index.elements.is_empty());
+        assert!(!index.open);
+    }
+
+    /// `@kind(doc.index)` resolves the same way `@kind(writ)` does once its
+    /// vocabulary is in `available` -- the hardcoded and vault-declared
+    /// paths meet at the same `Bindings::for_document`.
+    #[test]
+    fn kind_doc_index_binds_from_the_builtin_vocabulary() {
+        let doc = tomet_parser::parse_document("@kind(doc.index)\n\n#[ An index ]\n")
+            .expect("document parses");
+        let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
+        assert!(bound.kind.is_some());
     }
 }

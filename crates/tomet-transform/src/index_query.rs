@@ -1,6 +1,7 @@
-//! `${filter(...)}` -- the one query node an `@kind(index)` document
-//! writes, and the pass that replaces it with the `@file` entries it
-//! selects.
+//! `${filter(...)}` -- the one query node an `@kind(doc.index)` document
+//! may write, and the pass that replaces it with the `@link(ref:...)`
+//! entries it selects, in place among whatever else the author wrote by
+//! hand.
 //!
 //! # Why this is not a builtin function
 //!
@@ -40,14 +41,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, InterpExpr, InterpExprKind, Literal, Placement, Sigil,
-    Span, Value,
+    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, InterpExprKind, Literal,
+    Placement, Sigil, Span, Value,
 };
 use tomet_compute::EvaluationContext;
-use tomet_tree::element_new;
+use tomet_tree::{element_list_item, element_new};
 
 /// One candidate file, as `tomet-indexer::collect_metadata_table`
-/// produces it: the path a generated `@file(...)` will carry, and the
+/// produces it: the path a generated `@link(ref:...)` will carry, and the
 /// dotted field paths a predicate can ask about.
 #[derive(Debug, Clone, PartialEq)]
 pub struct IndexRow {
@@ -77,16 +78,23 @@ fn err(message: impl Into<String>) -> IndexQueryError {
     }
 }
 
-/// Replaces every block-level `${filter(...)}` in `doc` with the
-/// `@file(...)` elements it selects, in the order `by(...)` asks for.
+/// Replaces every `${filter(...)}` in `doc` with the `@link(ref:...)`
+/// entries it selects, in the order `by(...)` asks for -- in place,
+/// whether the query sat at the top level or as a list item nested
+/// arbitrarily deep under hand-written entries (see [`rewrite_blocks`]/
+/// [`rewrite_list_value`]).
 ///
-/// Returns how many query nodes were expanded, so a caller can tell an
-/// index document from an ordinary one without inspecting `@kind`.
+/// Returns how many query nodes were expanded. This is a count for a
+/// caller that wants one (`Prepared::expanded_queries`); whether to run
+/// this pass at all is [`is_index_document`]'s question, not this
+/// function's -- it rewrites whatever queries it finds regardless of
+/// `@kind`.
 ///
-/// Only block-level queries are expanded. A `${filter(...)}` sitting
-/// inside running text is left exactly as it is: it would have to expand
-/// into block elements in the middle of a sentence, and there is no
-/// sensible answer to what that means.
+/// Only a query that is a whole block, or a whole list item, is expanded.
+/// One sitting inside running text (`索引は ${filter(...)} で書く`) is left
+/// exactly as it is: it would have to expand into several elements in the
+/// middle of a sentence, or several list items in the middle of one, and
+/// there is no sensible answer to what that means.
 pub fn expand_index_queries(
     doc: &mut Document,
     rows: &[IndexRow],
@@ -99,46 +107,131 @@ pub fn expand_index_queries(
     let known = known_paths(rows);
 
     let mut expanded = 0;
-    let mut rewritten = Vec::with_capacity(doc.blocks.len());
-    for block in std::mem::take(&mut doc.blocks) {
-        let query = match filter_args(&block) {
-            Some(args) => Some(Query::parse(args)?),
-            None => None,
-        };
-        match query {
-            Some(query) => {
-                for path in query.run(&source, &config, rows, &known)? {
-                    rewritten.push(Block::Element(file_element(&path)));
-                }
-                expanded += 1;
-            }
-            None => rewritten.push(block),
-        }
-    }
-    doc.blocks = rewritten;
+    let blocks = std::mem::take(&mut doc.blocks);
+    doc.blocks = rewrite_blocks(blocks, &source, &config, rows, &known, &mut expanded)?;
     Ok(expanded)
 }
 
-/// Whether `doc` contains a block-level `${filter(...)}` at all.
+/// Rewrites a run of blocks -- the document's own top level, or a list
+/// item's nested children (a sub-list, or anything else an author put
+/// there) -- replacing every `${filter(...)}` with what it selects.
 ///
-/// The cheap question to ask before the expensive one. Building the table
-/// means parsing every `.tmt` in the vault, and a caller exporting a
-/// whole directory would otherwise pay that for documents that ask no
-/// question.
-///
-/// It is also what decides whether a document is treated as an index, in
-/// place of reading `@kind(index)` or the filename: a document with a
-/// query wants it answered, and one without is unaffected either way.
-pub fn has_index_query(doc: &Document) -> bool {
-    doc.blocks.iter().any(|block| filter_args(block).is_some())
+/// A list found here has its own items walked by [`rewrite_list_value`],
+/// since a query nested *inside* a list item is invisible at this level
+/// (it lives in the item's `content`, not as a `Block` of its own). A bare
+/// block-level query -- one not inside any list -- expands into
+/// block-level `@link` elements directly, preserving what this always did
+/// before entries were allowed to nest.
+fn rewrite_blocks(
+    blocks: Vec<Block>,
+    source: &Document,
+    config: &tomet_semantics::DocumentConfig,
+    rows: &[IndexRow],
+    known: &BTreeSet<String>,
+    expanded: &mut usize,
+) -> Result<Vec<Block>, IndexQueryError> {
+    let mut rewritten = Vec::with_capacity(blocks.len());
+    for block in blocks {
+        let Block::Element(mut el) = block else {
+            rewritten.push(block);
+            continue;
+        };
+
+        if tomet_semantics::list_ordered(&el).is_some() {
+            let value = el.value.take().unwrap_or_else(ElementValue::empty_group);
+            el.value = Some(rewrite_list_value(
+                value, source, config, rows, known, expanded,
+            )?);
+            rewritten.push(Block::Element(el));
+            continue;
+        }
+
+        match filter_args_of_element(&el) {
+            Some(args) => {
+                let query = Query::parse(args)?;
+                for path in query.run(source, config, rows, known)? {
+                    rewritten.push(Block::Element(link_block_element(&path)));
+                }
+                *expanded += 1;
+            }
+            None => rewritten.push(Block::Element(el)),
+        }
+    }
+    Ok(rewritten)
 }
 
-/// The argument list of a block-level `${filter(...)}`, if that is what
-/// this block is.
-fn filter_args(block: &Block) -> Option<&[InterpExpr]> {
-    let Block::Element(el) = block else {
-        return None;
+/// Rewrites one list's items in place: an item whose entire content is
+/// `${filter(...)}` is replaced by the sibling list items it selects
+/// (zero or more, at that same position); every surviving item's own
+/// nested children are walked by [`rewrite_blocks`] the same way, so a
+/// query nested arbitrarily deep under hand-written entries still expands.
+fn rewrite_list_value(
+    value: ElementValue,
+    source: &Document,
+    config: &tomet_semantics::DocumentConfig,
+    rows: &[IndexRow],
+    known: &BTreeSet<String>,
+    expanded: &mut usize,
+) -> Result<ElementValue, IndexQueryError> {
+    let ElementValue::Group(entries) = value else {
+        return Ok(value);
     };
+
+    let mut rewritten = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let Entry::Element(mut item) = entry else {
+            rewritten.push(entry);
+            continue;
+        };
+
+        let query_args = item
+            .content
+            .as_deref()
+            .and_then(filter_args_of_content)
+            .map(<[InterpExpr]>::to_vec);
+
+        if let Some(args) = query_args {
+            let query = Query::parse(&args)?;
+            for path in query.run(source, config, rows, known)? {
+                rewritten.push(Entry::Element(link_list_item(&path, item.span)));
+            }
+            *expanded += 1;
+            continue;
+        }
+
+        if let Some(children) = item.children.take() {
+            item.children = Some(rewrite_blocks(
+                children, source, config, rows, known, expanded,
+            )?);
+        }
+        rewritten.push(Entry::Element(item));
+    }
+    Ok(ElementValue::Group(rewritten))
+}
+
+/// Whether `doc` is an index document -- `@kind(doc.index)`, nothing else.
+///
+/// Not "does it contain a `${filter(...)}}`": an index document may be
+/// entirely hand-written `@link(ref:"...")` entries with no query in it at
+/// all, and that is still an index document. `@kind` is the one source of
+/// truth; the filename is not consulted here either (a caller that wants a
+/// cheap pre-parse filter, e.g. tomet-book's `.index.tmt` suffix, applies
+/// it before ever calling this).
+///
+/// This is also the cheap question to ask before the expensive one: a
+/// caller exporting a whole directory only pays for building the vault-wide
+/// metadata table (`VaultIndex::build`) for documents this returns `true`
+/// for.
+pub fn is_index_document(doc: &Document) -> bool {
+    tomet_semantics::document_kind(doc).as_deref() == Some("doc.index")
+}
+
+/// The argument list of a `${filter(...)}`, if `el` is exactly that --
+/// whether `el` sits as a block of its own or as a list item's entire
+/// inline content (see [`filter_args_of_content`]), the shape checked is
+/// the same: a `$`-sigil element whose value is an unevaluated call to
+/// `filter`.
+fn filter_args_of_element(el: &Element) -> Option<&[InterpExpr]> {
     if !matches!(el.sigil, Sigil::Dollar) {
         return None;
     }
@@ -152,6 +245,18 @@ fn filter_args(block: &Block) -> Option<&[InterpExpr]> {
         InterpExprKind::Identifier(name) if name == "filter" => Some(args),
         _ => None,
     }
+}
+
+/// The argument list of a `${filter(...)}`, if a list item's whole inline
+/// content is exactly that and nothing else -- `- ${filter(...)}}`, not
+/// `- some text ${filter(...)}}` (which has no sensible expansion: it
+/// would have to splice several list items into the middle of one, so it
+/// is left as source, same as an inline query is at the top level).
+fn filter_args_of_content(content: &[Inline]) -> Option<&[InterpExpr]> {
+    let [Inline::Element(el)] = content else {
+        return None;
+    };
+    filter_args_of_element(el)
 }
 
 struct SortKey {
@@ -425,14 +530,38 @@ fn identifier(name: &str) -> InterpExpr {
     }
 }
 
-/// `@file(path)` as a block. The path is a bare positional argument,
-/// which `builtin_positional_arg_keys` normalizes to `target` -- the same
-/// shape a hand-written `@file(docs/README.tmt)` parses to.
-fn file_element(path: &str) -> Element {
-    let mut el = element_new(Sigil::named("file"));
-    el.placement = Placement::Block;
-    el.args = Some(Value::String(path.to_string()));
+/// `@link(ref:path)`. The bare positional argument is `"ref:{path}"` --
+/// `link`'s single positional slot normalizes to `target`
+/// (`builtin_positional_arg_keys`), and `ref:` is one of `target`'s own
+/// recognized scheme prefixes (`TargetScheme::Ref`), so this reads back
+/// identically to a hand-written `@link(ref:"path")`.
+fn link_element(path: &str) -> Element {
+    let mut el = element_new(Sigil::named("link"));
+    el.args = Some(Value::String(format!("ref:{path}")));
     el
+}
+
+/// `@link(ref:path)` as a block of its own -- for a `${filter(...)}` that
+/// sits at the top level, outside any list (the shape this pass has
+/// always supported; entries nested under a hand-written list use
+/// [`link_list_item`] instead).
+fn link_block_element(path: &str) -> Element {
+    let mut el = link_element(path);
+    el.placement = Placement::Block;
+    el
+}
+
+/// One list item wrapping a single `@link(ref:path)` -- indistinguishable
+/// from `- @link(ref:"path")` typed by hand. `span` is the query's own
+/// span, reused since a generated item has no source position of its own.
+fn link_list_item(path: &str, span: Span) -> Element {
+    element_list_item(
+        vec![Inline::Element(link_element(path))],
+        None,
+        None,
+        Vec::new(),
+        span,
+    )
 }
 
 #[cfg(test)]
@@ -484,40 +613,77 @@ mod tests {
     fn expand(src: &str) -> Result<Vec<String>, IndexQueryError> {
         let mut doc = tomet_parser::parse_document(src).expect("valid source");
         expand_index_queries(&mut doc, &table())?;
-        Ok(file_paths(&doc))
+        Ok(link_paths(&doc))
     }
 
-    /// The `target` of every block-level `@file` in the document, in order.
-    fn file_paths(doc: &Document) -> Vec<String> {
+    /// The `ref:` path of every block-level `@link` in the document, in
+    /// order -- the shape a top-level (not inside any list) query expands
+    /// into.
+    fn link_paths(doc: &Document) -> Vec<String> {
         doc.blocks
             .iter()
             .filter_map(|block| match block {
-                Block::Element(el) if el.sigil.is_bare_named("file") => match &el.args {
-                    Some(Value::String(path)) => Some(path.clone()),
-                    _ => None,
-                },
+                Block::Element(el) => link_ref(el),
                 _ => None,
             })
             .collect()
     }
 
+    /// `el`'s `ref:` path, with the scheme prefix stripped -- `None` for
+    /// anything that isn't a `@link(ref:...)`.
+    fn link_ref(el: &Element) -> Option<String> {
+        let (kind, target) = tomet_semantics::link_target_of(el)?;
+        if kind != tomet_semantics::ElementKind::Link {
+            return None;
+        }
+        let (scheme, rest) = tomet_semantics::target_scheme(&target);
+        (scheme == tomet_semantics::TargetScheme::Ref).then(|| rest.to_string())
+    }
+
+    /// The `ref:` path of every list item directly under `list_el`, in
+    /// source order -- `None` where an item isn't a lone `@link`, so a
+    /// caller can tell a query-generated item from a hand-written label.
+    fn item_refs(list_el: &Element) -> Vec<Option<String>> {
+        tomet_semantics::list_items(list_el)
+            .into_iter()
+            .map(|item| {
+                let [Inline::Element(el)] = item.content.as_deref()? else {
+                    return None;
+                };
+                link_ref(el)
+            })
+            .collect()
+    }
+
+    /// The first top-level list in `doc` -- the `@kind` header sits before
+    /// it, so it is never simply `doc.blocks[0]`.
+    fn top_list(doc: &Document) -> &Element {
+        doc.blocks
+            .iter()
+            .find_map(|b| match b {
+                Block::Element(el) if tomet_semantics::list_ordered(el).is_some() => Some(el),
+                _ => None,
+            })
+            .expect("expected a top-level list")
+    }
+
     #[test]
     fn a_predicate_selects_and_paths_break_the_tie() {
-        let paths = expand("@kind(index)\n\n${filter(contains(meta.tags, \"rust\"))}\n").unwrap();
+        let paths = expand("@kind(doc.index)\n\n${filter(contains(meta.tags, \"rust\"))}\n").unwrap();
         assert_eq!(paths, ["docs/a.tmt", "docs/c.tmt"]);
     }
 
     #[test]
     fn several_arguments_are_anded_together() {
-        let src = "@kind(index)\n\n${filter(contains(meta.tags, \"rust\"), exists(meta.created))}\n";
+        let src = "@kind(doc.index)\n\n${filter(contains(meta.tags, \"rust\"), exists(meta.created))}\n";
         assert_eq!(expand(src).unwrap(), ["docs/a.tmt"]);
     }
 
     #[test]
     fn by_sorts_and_desc_reverses() {
-        let asc = expand("@kind(index)\n\n${filter(by(meta.created, \"asc\"))}\n").unwrap();
+        let asc = expand("@kind(doc.index)\n\n${filter(by(meta.created, \"asc\"))}\n").unwrap();
         assert_eq!(asc, ["docs/a.tmt", "docs/b.tmt", "docs/c.tmt"]);
-        let desc = expand("@kind(index)\n\n${filter(by(meta.created, \"desc\"))}\n").unwrap();
+        let desc = expand("@kind(doc.index)\n\n${filter(by(meta.created, \"desc\"))}\n").unwrap();
         // `c` has no `created` at all, so it stays last under both --
         // an index of recent notes should not open with the undated one.
         assert_eq!(desc, ["docs/b.tmt", "docs/a.tmt", "docs/c.tmt"]);
@@ -525,7 +691,7 @@ mod tests {
 
     #[test]
     fn a_query_with_no_predicate_takes_everything() {
-        let paths = expand("@kind(index)\n\n${filter(by(meta.created))}\n").unwrap();
+        let paths = expand("@kind(doc.index)\n\n${filter(by(meta.created))}\n").unwrap();
         assert_eq!(paths.len(), 3);
     }
 
@@ -533,9 +699,9 @@ mod tests {
     fn a_field_this_row_lacks_reads_as_absent_rather_than_failing() {
         // Only `docs/b.tmt` carries `meta.draft`; the other two have to
         // answer "no" instead of failing to resolve the name.
-        let src = "@kind(index)\n\n${filter(not(exists(meta.draft)))}\n";
+        let src = "@kind(doc.index)\n\n${filter(not(exists(meta.draft)))}\n";
         assert_eq!(expand(src).unwrap(), ["docs/a.tmt", "docs/c.tmt"]);
-        let src = "@kind(index)\n\n${filter(exists(meta.draft))}\n";
+        let src = "@kind(doc.index)\n\n${filter(exists(meta.draft))}\n";
         assert_eq!(expand(src).unwrap(), ["docs/b.tmt"]);
     }
 
@@ -543,7 +709,7 @@ mod tests {
     fn a_field_no_file_has_is_an_error() {
         // The typo case. Filling it in as `Null` too would turn
         // `meta.tgs` into a query that quietly matches nothing.
-        let err = expand("@kind(index)\n\n${filter(exists(meta.tgs))}\n").unwrap_err();
+        let err = expand("@kind(doc.index)\n\n${filter(exists(meta.tgs))}\n").unwrap_err();
         assert!(err.message.contains("meta.tgs"), "{}", err.message);
         // And it names the field, not whatever the resolver last tried to
         // look up -- the raw failure here is about an element id `meta`.
@@ -554,33 +720,33 @@ mod tests {
 
     #[test]
     fn an_unorderable_pair_is_reported_by_the_predicate() {
-        let err = expand("@kind(index)\n\n${filter(gt(meta.tags, 1))}\n").unwrap_err();
+        let err = expand("@kind(doc.index)\n\n${filter(gt(meta.tags, 1))}\n").unwrap_err();
         assert!(err.message.contains("cannot order"), "{}", err.message);
     }
 
     #[test]
     fn by_rejects_a_direction_it_does_not_know() {
-        let err = expand("@kind(index)\n\n${filter(by(meta.created, \"newest\"))}\n").unwrap_err();
+        let err = expand("@kind(doc.index)\n\n${filter(by(meta.created, \"newest\"))}\n").unwrap_err();
         assert!(err.message.contains("asc"), "{}", err.message);
     }
 
     #[test]
     fn an_inline_query_is_left_alone() {
         // It would have to expand into block elements mid-sentence.
-        let src = "@kind(index)\n\n索引は ${filter(exists(meta.created))} で書く。\n";
+        let src = "@kind(doc.index)\n\n索引は ${filter(exists(meta.created))} で書く。\n";
         let mut doc = tomet_parser::parse_document(src).expect("valid source");
         let expanded = expand_index_queries(&mut doc, &table()).unwrap();
         assert_eq!(expanded, 0);
-        assert!(file_paths(&doc).is_empty());
+        assert!(link_paths(&doc).is_empty());
     }
 
     #[test]
     fn surrounding_blocks_keep_their_positions() {
-        let src = "@kind(index)\n\n#[ Rust ]\n\n${filter(contains(meta.tags, \"rust\"))}\n\n#[ Go ]\n\n${filter(contains(meta.tags, \"go\"))}\n";
+        let src = "@kind(doc.index)\n\n#[ Rust ]\n\n${filter(contains(meta.tags, \"rust\"))}\n\n#[ Go ]\n\n${filter(contains(meta.tags, \"go\"))}\n";
         let mut doc = tomet_parser::parse_document(src).expect("valid source");
         assert_eq!(expand_index_queries(&mut doc, &table()).unwrap(), 2);
         assert_eq!(
-            file_paths(&doc),
+            link_paths(&doc),
             ["docs/a.tmt", "docs/c.tmt", "docs/b.tmt"]
         );
         // Two headings, still one on each side of the first expansion.
@@ -593,25 +759,78 @@ mod tests {
     }
 
     #[test]
-    fn a_generated_file_element_carries_a_bare_positional_path() {
-        // The shape a hand-written `@file(docs/b.tmt)` parses to, so the
-        // printer has nothing special to do with it. That it prints and
-        // re-parses is checked in `tomet-tests`, which is where a test
+    fn a_generated_link_element_carries_a_ref_target() {
+        // The shape a hand-written `@link(ref:"docs/b.tmt")` parses to, so
+        // the printer has nothing special to do with it. That it prints
+        // and re-parses is checked in `tomet-tests`, which is where a test
         // spanning the printer belongs.
-        let mut doc =
-            tomet_parser::parse_document("@kind(index)\n\n${filter(contains(meta.tags, \"go\"))}\n")
-                .expect("valid source");
+        let mut doc = tomet_parser::parse_document(
+            "@kind(doc.index)\n\n${filter(contains(meta.tags, \"go\"))}\n",
+        )
+        .expect("valid source");
         expand_index_queries(&mut doc, &table()).unwrap();
         let Some(Block::Element(el)) = doc.blocks.last() else {
             panic!("expected a generated element");
         };
-        assert!(el.sigil.is_bare_named("file"));
+        assert!(el.sigil.is_bare_named("link"));
         assert_eq!(el.placement, Placement::Block);
         assert_eq!(
             tomet_semantics::normalized_element_args(el)
                 .as_ref()
                 .and_then(|args| args.get("target")),
-            Some(&Value::String("docs/b.tmt".to_string()))
+            Some(&Value::String("ref:docs/b.tmt".to_string()))
         );
+    }
+
+    #[test]
+    fn a_query_nested_in_a_manual_entry_expands_as_children() {
+        // `- @link(ref:"a")` with a query as its own sub-list: the parent
+        // stays hand-written, its children come from the query.
+        let src = "@kind(doc.index)\n\n- @link(ref:\"docs/a.tmt\")\n  - ${filter(contains(meta.tags, \"go\"))}\n";
+        let mut doc = tomet_parser::parse_document(src).expect("valid source");
+        assert_eq!(expand_index_queries(&mut doc, &table()).unwrap(), 1);
+
+        let list = top_list(&doc);
+        let top = tomet_semantics::list_items(list);
+        assert_eq!(top.len(), 1);
+        assert_eq!(
+            top[0].content.as_deref().and_then(|c| match c {
+                [Inline::Element(el)] => link_ref(el),
+                _ => None,
+            }),
+            Some("docs/a.tmt".to_string())
+        );
+
+        let Some(Block::Element(nested)) = top[0].children.as_deref().and_then(|c| c.first())
+        else {
+            panic!("expected the query to have expanded into a nested list");
+        };
+        assert_eq!(item_refs(nested), [Some("docs/b.tmt".to_string())]);
+    }
+
+    #[test]
+    fn a_query_interleaves_with_manual_entries_at_the_same_level() {
+        let src = "@kind(doc.index)\n\n- @link(ref:\"docs/a.tmt\")\n- ${filter(contains(meta.tags, \"go\"))}\n- @link(ref:\"docs/c.tmt\")\n";
+        let mut doc = tomet_parser::parse_document(src).expect("valid source");
+        assert_eq!(expand_index_queries(&mut doc, &table()).unwrap(), 1);
+
+        assert_eq!(
+            item_refs(top_list(&doc)),
+            [
+                Some("docs/a.tmt".to_string()),
+                Some("docs/b.tmt".to_string()),
+                Some("docs/c.tmt".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_query_matching_nothing_leaves_no_artifact() {
+        let src =
+            "@kind(doc.index)\n\n- @link(ref:\"docs/a.tmt\")\n- ${filter(contains(meta.tags, \"nope\"))}\n";
+        let mut doc = tomet_parser::parse_document(src).expect("valid source");
+        assert_eq!(expand_index_queries(&mut doc, &table()).unwrap(), 1);
+
+        assert_eq!(item_refs(top_list(&doc)), [Some("docs/a.tmt".to_string())]);
     }
 }

@@ -10,14 +10,15 @@
 //!
 //! Building the table parses every `.tmt` in the vault, which is why
 //! [`Vault`](crate::Vault) holds it behind a `OnceLock` and fills it on
-//! the first document that actually carries a query.
+//! the first `@kind(doc.index)` document, rather than for every document
+//! in an export run.
 
 use std::path::Path;
 
 use tomet_ast::{Document, Value};
 use tomet_transform::{IndexRow, expand_index_queries};
 
-pub use tomet_transform::{IndexQueryError, has_index_query};
+pub use tomet_transform::{IndexQueryError, is_index_document};
 
 /// Every document in one vault, as `${filter(...)}` can query them.
 pub struct VaultIndex {
@@ -39,10 +40,10 @@ impl VaultIndex {
             .map(|file| IndexRow {
                 // `document_fields` already measured this from the project
                 // root and wrote it with forward slashes, which is the
-                // spelling a generated `@file(...)` has to carry. Falling
-                // back to the absolute path would produce a link that
-                // resolves only on this machine, so it is worth taking the
-                // one the table computed.
+                // spelling a generated `@link(ref:...)` has to carry.
+                // Falling back to the absolute path would produce a link
+                // that resolves only on this machine, so it is worth taking
+                // the one the table computed.
                 path: match file.fields.get("path") {
                     Some(Value::String(path)) => path.clone(),
                     _ => file.path.to_string_lossy().replace('\\', "/"),
