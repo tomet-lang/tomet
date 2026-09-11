@@ -7,6 +7,8 @@
   tomet,
   tomet-lsp,
   tomet-web,
+  twrit,
+  tmtbook,
   ...
 }:
 let
@@ -27,7 +29,9 @@ mkShell rec {
     tomet
     tomet-lsp
     tomet-web
-    # twrit
+    twrit
+    tmtbook
+    pagefind
 
     #[ CMake ]
     cmake

@@ -42,6 +42,7 @@ flake-parts.lib.mkFlake { inherit inputs; } {
           ;
         fenix = inputs.fenix.packages.${pkgs.stdenv.hostPlatform.system};
         twrit = inputs.twrit.packages.${pkgs.stdenv.hostPlatform.system}.twrit;
+        tmtbook = inputs.tmtbook.packages.${pkgs.stdenv.hostPlatform.system}.tmtbook;
       };
 
       treefmt = import ./formatter.nix {
