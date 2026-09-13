@@ -1,6 +1,6 @@
 #[ 組み込み要素 ]
 
-35個。`tomet-semantics` の `BUILTIN_KINDS` が唯一の登録場所である。裸で書ける
+36個。`tomet-semantics` の `BUILTIN_KINDS` が唯一の登録場所である。裸で書ける
 名前はここにあるものと、その文書自身の `@kind` が指す語彙のものだけで、それ以外は
 名前空間を書くか `@use` で束縛する。
 
@@ -216,7 +216,7 @@ kind の語彙も所有できず、共有語彙にすると穴のある文書す
 
 ##[ 構造 ]
 
-本文の骨格になる八つ。すべて block。
+本文の骨格になる九つ。すべて block。
 
 @table[
 [ 要素        ][ region ][ display    ][ singleton ][ 何であるか     ]
@@ -227,6 +227,7 @@ kind の語彙も所有できず、共有語彙にすると穴のある文書す
 [ `codeblock` ][ body   ][ block      ][ ―         ][ コードブロック ]
 [ `quote`     ][ body   ][ どちらでも ][ ―         ][ 引用           ]
 [ `callout`   ][ body   ][ block      ][ ―         ][ 注意書き       ]
+[ `card`      ][ body   ][ block      ][ ―         ][ 題名つきの区画 ]
 [ `hr`        ][ body   ][ block      ][ ―         ][ 水平線         ]
 ]
 
@@ -236,6 +237,11 @@ kind の語彙も所有できず、共有語彙にすると穴のある文書す
 @quote[ @content ]
 @callout(@variant)[ @content ]     // 位置引数は variant。`{title:}` も取る
 @callout(variant:info, title:@string)[ @content ]
+
+// card は分類を持たない、ただの題名+本文の区画。callout のように
+// variant を持たない代わりに、位置引数もない — title は常に named。
+@card[ @content ]
+@card(title:@string)[ @content ]
 
 - (marker:@string) content         // ul
 -. (marker:@string) content        // ol
