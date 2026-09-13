@@ -98,11 +98,35 @@ module.exports = grammar({
 					),
 					seq(/[ \t]+/, field("content", repeat1($._line_item))),
 				),
+				// Either the existing bare `:{...}` merge, or one or more
+				// `:name(...)` connects (`#[ h ]:rule(allow:list(card))`) --
+				// not both combined, unlike the real parser (which reuses
+				// `parse_groups` fully and so allows any mix/order of
+				// groups and connects). This grammar's `heading` rule was
+				// already a simplification before connects existed (single
+				// `{value}`, `(args)` only before content) -- extending it
+				// to the real parser's full "any order, any number, mixed"
+				// generality is future work if a fixture ever needs it.
+				//
+				// `prec(1, ...)`: the bracket-less sugar body just above
+				// (`repeat1($._line_item)`) can also end here, and once
+				// `:` is excluded from `text` (so `connect`/the bare merge
+				// are reachable at all -- see `text`'s own comment), a
+				// trailing `:` is otherwise ambiguous between "one more
+				// `_line_item` via `punctuation`" and "this optional
+				// trailing block starts here." Prefer the latter, the
+				// same way `args_group`'s own opening brackets already
+				// prefer starting a group over becoming stray punctuation.
 				optional(
-					seq(
-						optional($._blank_gap),
-						optional(":"),
-						field("attrs", $.value_group),
+					prec(
+						1,
+						seq(
+							optional($._blank_gap),
+							choice(
+								seq(optional(token(prec(1, ":"))), field("attrs", $.value_group)),
+								repeat1($.connect),
+							),
+						),
 					),
 				),
 				$._newline,
@@ -315,7 +339,18 @@ module.exports = grammar({
 		// back to `punctuation` like the others.
 		// `#` is excluded so `heading_marker` can win at a line start; `<`
 		// no longer needs excluding, since it is not a sigil any more.
-		text: (_$) => /[^\n`*_=~@$#()\[{\]/|-]+/,
+		// `:` is excluded for the same longest-match reason as the rest of
+		// this list: `:name(...)` (`connect`) and the bare `:(`/`:{` merge
+		// both start with a single-character `":"` token, but right after
+		// an element, `text`'s regex is free to keep matching straight
+		// through a `:` into whatever ordinary words follow it (`:as`,
+		// `:rule`, ...) -- unlike the *bracket* characters above, `:` has
+		// no excluded character stopping that run early, so without this,
+		// the longer `text` match always won and no `:name(...)` (or even
+		// a bare `:{`/`:(` right after certain groups) was ever reachable.
+		// A bare `:` with nothing to attach to falls back to `punctuation`,
+		// same as the other excluded characters.
+		text: (_$) => /[^\n`*_=~@$#:()\[{\]/|-]+/,
 
 		// `-` is a bare string literal alternative here, not folded into
 		// the character class like the others, so it's the *same* grammar
@@ -343,7 +378,15 @@ module.exports = grammar({
 		// `#` and `<` join the same fallback set: a `#` that does not
 		// start a heading or a block element, and any `<` at all, are
 		// ordinary prose and need something to reduce to.
-		punctuation: (_$) => choice(/[()\[{/<>|~]/, "-", "$", "#"),
+		// `:` joins it too, now that `text` excludes it: a bare `:` with
+		// no `connect`/bare-merge/`map_entry` to attach to (an ordinary
+		// prose colon, or one immediately followed by whitespace/EOL) has
+		// nothing else to reduce to and would otherwise dead-end. This
+		// re-introduces exactly the tie `args_group`'s `(` already had to
+		// win against this same rule's `(` alternative -- `_element_group`/
+		// `connect`'s own `":"` is `token(prec(1, ":"))` for the same
+		// reason `args_group`'s opening paren is.
+		punctuation: (_$) => choice(/[()\[{/<>|~]/, "-", "$", "#", ":"),
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -475,7 +518,7 @@ module.exports = grammar({
 				seq(
 					"@",
 					optional(field("name", $._element_name)),
-					repeat($._element_group),
+					repeat(choice($._element_group, $.connect)),
 				),
 			),
 		// Two adjacent `optional($._blank_gap)` around an optional middle
@@ -562,15 +605,85 @@ module.exports = grammar({
 		// lone newline can't be told apart from "no content_group at all" with
 		// only one token of lookahead.
 		bare_element: ($) => seq($.args_group, optional($.content_group)),
+		// A group opener with no leading `:` at all -- what a connect's
+		// own body may take (see `connect`, below). Not the same list as
+		// `_element_group`'s (just below) because a connect's own groups
+		// permit neither spelling of a leading `:` (matching
+		// `parse_groups(cur, &mut connect_el, false)` in the real parser:
+		// `allow_colon_connect` gates the *whole* colon-anything branch,
+		// bare merge included, not just the named-connect check inside
+		// it).
+		_plain_group: ($) =>
+			choice(
+				$.args_group,
+				$.content_group,
+				$.marked_content,
+				$.value_group,
+				$.raw_fence,
+			),
+		// The original, unchanged bare-merge/plain-group form -- kept
+		// exactly as it was (a flat `seq`, not nested inside a further
+		// `choice`) because `inline_element`'s own `prec.right(3, ...)`
+		// was tuned against this exact shape; wrapping it changed which
+		// LALR states got merged and silently broke the bare `:{...}`/
+		// `:(...)` merge even after a preceding group (verified: it did,
+		// empirically, during this feature's own development -- see
+		// `.agents/tasks/rule-connect-mvp.md`). `connect` (below) is
+		// therefore added as a *sibling* choice at each `repeat(...)`
+		// call site instead of being folded into this rule.
+		// `token(prec(1, ":"))`, not a bare `":"`: the same reason
+		// `args_group`'s opening `(` is wrapped the same way -- `:` is
+		// now excluded from `text` (see that rule's comment) so it can
+		// start a group/connect at all, but `punctuation` accepts a bare
+		// `:` too (as the fallback for one with nothing to attach to),
+		// an equal-length match this token must outrank or lose every
+		// tie to it.
 		_element_group: ($) =>
 			seq(
-				optional(":"),
+				optional(token(prec(1, ":"))),
 				choice(
 					$.args_group,
 					$.content_group,
 					$.marked_content,
 					$.value_group,
 					$.raw_fence,
+				),
+			),
+		// `:name(...)` -- one member of a closed family attached after an
+		// element (`@x(...):as(y):rule(...)`), e.g. `:rule(allow:list(card))`.
+		// Structurally an element in its own right (its own `args`/
+		// `content`/`value`), just introduced by `:` instead of `@` --
+		// mirrors `tomet-parser::element::parse_groups`'s named-connect
+		// branch, which reuses its own recursive call for exactly this
+		// reason.
+		//
+		// Takes `repeat($._plain_group)`, not `repeat(choice($._element_group,
+		// $.connect))`: a connect must not itself swallow a *sibling*
+		// connect, nor a bare merge of its own (both would need a `:`
+		// that `_plain_group` never matches), so this repeat naturally
+		// stops right before the next `:`, leaving it for whichever
+		// *outer* rule holds the sibling `repeat(...)` to pick up.
+		//
+		// `prec.right(4, ...)` (higher than `inline_element`'s own
+		// `prec.right(3, ...)`): a bare group right after `:name` --
+		// `:rule(1)` -- is otherwise genuinely ambiguous between "the
+		// connect's own group" and "a fresh, colon-less group the
+		// *outer* element's repeat happens to also accept" (both are
+		// valid parses of the same text, differing only in which node
+		// owns it), the same shift/reduce shape `inline_element`'s own
+		// comment already describes for a trailing value group. The real
+		// parser has no such ambiguity -- `parse_groups`'s recursive call
+		// for a connect greedily consumes every immediately-adjacent
+		// group before returning control -- so the higher precedence
+		// here reproduces that greediness: prefer extending the connect
+		// over ending it early.
+		connect: ($) =>
+			prec.right(
+				4,
+				seq(
+					token(prec(1, ":")),
+					field("name", $._element_name),
+					repeat($._plain_group),
 				),
 			),
 		// The whole fence -- opener, body and closer -- is one token from
@@ -651,7 +764,64 @@ module.exports = grammar({
 					field("value", $.braced_map),
 				),
 			),
-		_entry_value: ($) => choice($.seq, $.string, $.braced_map, $._value_scalar),
+		// `$._element_name` is also listed bare (not just inside `$.call`):
+		// once its token wins the lexer's length-tie against
+		// `_value_scalar` for an identifier-shaped word (see `call`'s own
+		// comment), the *only* thing that could reduce it at all -- with
+		// no `(` following -- has to be a plain, paren-less value alias
+		// living at this same choice, or an ordinary bare word (`variant:
+		// info`) turns into a dead end instead of a scalar. Aliased to
+		// `$.scalar`, the same node `_value_scalar` already produces, so
+		// this is invisible in the tree either way.
+		// `name(arg, arg, ...)` -- an immediately-resolved literal
+		// (`list(card, ns.mycard)`), mirroring `tomet_ast::Value::Call`.
+		// Deliberately a *plain*, unprecedented regex -- not `_element_name`
+		// (which is `token(prec(1, ...))`, aliased to `$.identifier`, this
+		// grammar's declared `word` token) and not wrapped in `token(prec(...))`
+		// itself. Both were tried and both broke a real, pre-existing case:
+		// `url:https://example.com` -- `_value_scalar`'s colon-inclusive
+		// regex matches the whole scheme URI, strictly longer than the
+		// bare word `https` a precedence-boosted (or `word`-aliased)
+		// callee token would match up to its `:` -- and longest match is
+		// supposed to always win regardless of precedence, but empirically
+		// did not once either of those was in play (suspected interaction
+		// with tree-sitter's `word`/keyword-extraction fast path, not
+		// fully root-caused -- this plain-token form is the confirmed
+		// workaround, not a chosen design). Confirmed clean now: a bare
+		// scheme URI still parses as one scalar, and `list(card)` still
+		// reaches this rule -- see this crate's own tests and
+		// `.agents/tasks/rule-connect-mvp.md` for what was actually tried.
+		//
+		// Reuses no shared name-token at all for the same reason; matches
+		// `_element_name`'s *pattern* (an ASCII identifier, optionally
+		// `.`-separated) without matching its *token*, since sharing the
+		// token is what caused the regression above.
+		call: ($) =>
+			seq(
+				field("name", alias(/[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*/, $.identifier)),
+				"(",
+				optional(seq($._entry_value, repeat(seq(",", $._entry_value)))),
+				")",
+			),
+		// `_entry_value`'s own plain-word fallback: once `call`'s callee
+		// token is a live alternative here, an argument or value that is
+		// just a bare word with nothing following it (`variant: info`,
+		// or `list(card)`'s own `card`) needs *something* to reduce to,
+		// or it dead-ends instead of becoming a scalar -- aliased to
+		// `$.scalar`, the same node `_value_scalar` already produces, so
+		// this is invisible in the tree either way. Whether a bare word is
+		// read as *this* or as the start of `call` is then an ordinary,
+		// unambiguous one-token-lookahead decision: shift `(` to continue
+		// into a call, or reduce on anything else.
+		_entry_value: ($) =>
+			choice(
+				$.call,
+				$.seq,
+				$.string,
+				$.braced_map,
+				$._value_scalar,
+				alias(/[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*/, $.scalar),
+			),
 		braced_map: ($) =>
 			seq(
 				token(prec(1, "{")),

@@ -212,8 +212,29 @@ pub(crate) fn parse_groups(
         let checkpoint = cur.pos();
         let newlines = skip_element_gap(cur);
         if newlines <= 1 {
+            let colon_pos = cur.pos();
             if allow_colon_connect && cur.eat_str(":") {
                 skip_inline_ws(cur);
+                // `:name(...)` -- a connect, not the bare merge below. A
+                // name is checked for *before* `(`/`{` so this wins the
+                // ambiguity: a name right after `:` can never be the
+                // start of a bare merge's own group. Read with the same
+                // `parse_groups` every other sigil uses, so a connect
+                // takes `(args)`/`[content]`/`{value}` in any order just
+                // like `@name` does -- but with `allow_colon_connect:
+                // false`, so it does not itself swallow a *sibling*
+                // `:xxx(...)`; that is left for this same loop's next
+                // iteration, which is what turns `@x():as(y):rule(z)`
+                // into two flat `connects` entries rather than one
+                // nested inside the other.
+                if is_name_start_at(cur) {
+                    let name = eat_name(cur).expect("is_name_start_at just confirmed a name");
+                    let mut connect_el = element_new(Sigil::Named(name));
+                    parse_groups(cur, &mut connect_el, false)?;
+                    connect_el.span = cur.span_from(colon_pos);
+                    el.connects.push(connect_el);
+                    continue;
+                }
                 match cur.peek() {
                     Some('(') => {
                         let conn_args = parse_paren_value(cur)?;

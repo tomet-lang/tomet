@@ -351,6 +351,10 @@ fn value_to_string(v: &Value) -> String {
                 .collect();
             format!("{{{}}}", s.join(", "))
         }
+        Value::Call(name, args) => {
+            let s: Vec<_> = args.iter().map(value_to_string).collect();
+            format!("{name}({})", s.join(", "))
+        }
     }
 }
 

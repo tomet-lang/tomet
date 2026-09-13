@@ -43,6 +43,10 @@ path = "src/pipe.rs"
 name = "syntax_report"
 path = "src/syntax_report.rs"
 
+[[test]]
+name = "rule"
+path = "src/rule.rs"
+
 [dependencies]
 tomet-ast = { workspace = true }
 tomet-compute = { workspace = true }

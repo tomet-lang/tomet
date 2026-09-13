@@ -145,6 +145,10 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                 parts.join(", ")
             }
         }
+        Value::Call(name, args) => {
+            let rendered: Vec<_> = args.iter().map(|a| render_nested(a, config)).collect();
+            format!("{name}({})", rendered.join(", "))
+        }
     }
 }
 
@@ -313,6 +317,17 @@ mod tests {
     #[test]
     fn a_top_level_map_is_still_wrapped_once() {
         assert_eq!(render_value(&map(&[("a", Value::Int(1))])), "{a: 1}");
+    }
+
+    #[test]
+    fn a_call_renders_as_name_and_parenthesized_args() {
+        assert_eq!(
+            render_value_inner(&Value::Call(
+                "list".into(),
+                vec![Value::String("card".into())]
+            )),
+            "list(card)"
+        );
     }
 
     #[test]

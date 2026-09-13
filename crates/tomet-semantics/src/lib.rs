@@ -8,6 +8,7 @@
 
 mod config;
 mod connect;
+mod connect_member;
 pub mod embedded;
 pub mod flatten;
 mod heading;
@@ -21,6 +22,7 @@ pub mod vocabulary;
 
 pub use config::{DocumentConfig, ExportType, document_config};
 pub use connect::merge_connected_values;
+pub use connect_member::{CONNECT_MEMBERS, ConnectMember, UnknownConnectMember, classify_connect_member};
 pub use flatten::{
     EXACT_DATA_KEY, FlatData, POSITIONAL_KEY, flatten_data, flatten_element_data, scalar_string,
     value_to_json,

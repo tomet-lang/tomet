@@ -245,6 +245,62 @@ fn eat_scalar_raw<'a>(cur: &mut Cursor<'a>) -> &'a str {
     &cur.src()[start..cur.pos()]
 }
 
+/// `name(arg, arg, ...)` -- an immediately-resolved literal such as
+/// `list(card, ns.mycard)`. Recognized by "a bare identifier immediately
+/// followed by `(`, no gap" -- deliberately the same, narrower recognizer
+/// `@name`/`:name` use ([`eat_name_segment`]), not the wider map-key
+/// charset [`eat_ident`] accepts (which allows `-`/`.`): a call's callee
+/// is a single plain word -- `list`, `enum`, a typo -- never namespaced,
+/// and the parser does not judge which callees are real (that is
+/// `tomet-semantics`' closed table, the same split `:name(...)` connects
+/// use).
+///
+/// Returns `None` and leaves `cur` untouched when the shape doesn't
+/// match, so a bare-scalar fallback can still run unaffected (`card-name`
+/// with no trailing `(` is not a call). A call's own arguments are
+/// positional only -- each parsed the same way a value after `key:` is
+/// ([`parse_entry_value`]), recursively, so nested calls
+/// (`list(a, list(b))`) and namespaced argument text (`ns.mycard`) both
+/// fall out for free without this function needing to know about either.
+fn try_parse_call(cur: &mut Cursor) -> Option<Result<Value>> {
+    let mut look = *cur;
+    let name = eat_name_segment(&mut look)?.to_string();
+    if look.peek() != Some('(') {
+        return None;
+    }
+    *cur = look;
+    cur.bump();
+    let mut args = Vec::new();
+    loop {
+        skip_ws_newlines_and_comments(cur);
+        if cur.peek() == Some(')') {
+            break;
+        }
+        match parse_entry_value(cur) {
+            Ok(v) => args.push(v),
+            Err(e) => return Some(Err(e)),
+        }
+        skip_ws_newlines_and_comments(cur);
+        match cur.peek() {
+            Some(',') => {
+                cur.bump();
+            }
+            Some(')') => break,
+            _ => {
+                return Some(Err(err(
+                    cur,
+                    cur.pos(),
+                    "expected ',' or ')' in call arguments",
+                )));
+            }
+        }
+    }
+    if !cur.eat_str(")") {
+        return Some(Err(err(cur, cur.pos(), "expected ')'")));
+    }
+    Some(Ok(Value::Call(name, args)))
+}
+
 fn scalar_from_text(s: &str) -> Value {
     match s {
         "" | "null" => return Value::Null,
@@ -343,6 +399,9 @@ pub(crate) fn parse_one_entry(cur: &mut Cursor) -> Result<(String, Value)> {
         }
     }
     cur.set_pos(checkpoint);
+    if let Some(call) = try_parse_call(cur) {
+        return Ok((POSITIONAL_ENTRY_KEY.to_string(), call?));
+    }
     let raw = eat_scalar_raw(cur).trim();
     if raw.is_empty() {
         return Err(err(cur, checkpoint, "expected a value"));
@@ -395,6 +454,9 @@ fn parse_map_body(cur: &mut Cursor) -> Result<Value> {
 /// be misread as a nested key.
 fn parse_entry_value(cur: &mut Cursor) -> Result<Value> {
     skip_ws_newlines_and_comments(cur);
+    if let Some(result) = try_parse_call(cur) {
+        return result;
+    }
     match cur.peek() {
         Some('[') => parse_seq(cur),
         Some('"') => Ok(Value::String(parse_quoted(cur)?)),

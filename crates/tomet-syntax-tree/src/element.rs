@@ -290,6 +290,7 @@ pub fn element_new(sigil: Sigil) -> Element {
         content: None,
         children: None,
         value: None,
+        connects: Vec::new(),
         span: Span::default(),
     }
 }
@@ -307,6 +308,7 @@ pub fn element_list(ordered: bool, items: Vec<Element>, span: Span) -> Element {
         content: None,
         children: None,
         value: Some(ElementValue::from_children(items)),
+        connects: Vec::new(),
         span,
     }
 }
@@ -330,6 +332,7 @@ pub fn element_list_item(
             Some(children)
         },
         value: attrs.map(ElementValue::from_map),
+        connects: Vec::new(),
         span,
     }
 }

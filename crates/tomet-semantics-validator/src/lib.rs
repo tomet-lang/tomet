@@ -1,9 +1,11 @@
 pub mod blueprint;
 mod diagnostic;
 mod id;
+mod rule;
 
 pub use blueprint::*;
 pub use diagnostic::{CstValidationError, Diagnostic, Severity};
+pub use rule::{RuleArgs, decode_rule_args};
 
 use id::{collect_ids, collect_ids_cst};
 use tomet_ast::Document;
@@ -78,6 +80,7 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Diagno
     check_retired_settings_keys(doc, &mut errors);
     check_arguments(doc, bindings, &mut errors);
     check_unfinished(doc, &mut errors);
+    check_rule_connects(doc, bindings, &mut errors);
 
     for (id, span) in collect_ids(doc) {
         if let Some((_, first)) = seen.iter().find(|(seen_id, _)| *seen_id == id) {
@@ -272,6 +275,98 @@ fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnos
     });
 }
 
+/// Enforces every `:rule(allow:list(...))` connect found anywhere in the
+/// document, and reports an unrecognized connect name (`:xxx(...)` where
+/// `xxx` is not in `tomet_semantics::CONNECT_MEMBERS`).
+///
+/// Needs `bindings`, unlike the parser or `tomet-semantics-resolver`:
+/// `allow:list(ns.mycard)` can name a namespaced identifier, and deciding
+/// whether a descendant actually *is* `ns.mycard` requires the document's
+/// resolved vocabulary. This is why the check lives here rather than
+/// earlier in the pipeline.
+///
+/// Only iterates each visited element's own `connects` -- never recurses
+/// into a connect's internals beyond that, and `tomet_tree::for_each_element`
+/// itself never descends into `connects` either (see its sibling
+/// `for_each_descendant`'s doc comment), so a connect element is never
+/// misclassified as an ordinary document element.
+fn check_rule_connects(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+    tomet_tree::for_each_element(doc, |el| {
+        for connect in &el.connects {
+            let Some(connect_name) = connect.sigil.name() else {
+                continue;
+            };
+            let member = match tomet_semantics::classify_connect_member(connect_name) {
+                Ok(member) => member,
+                Err(unknown) => {
+                    errors.push(Diagnostic::UnknownConnect {
+                        name: unknown.name,
+                        span: connect.span,
+                    });
+                    continue;
+                }
+            };
+            match member {
+                tomet_semantics::ConnectMember::Rule => {
+                    check_one_rule(el, connect, bindings, errors);
+                }
+            }
+        }
+    });
+}
+
+/// One `:rule(...)` connect's contribution to [`check_rule_connects`]:
+/// decode its args, then walk `el`'s descendants (or just its immediate
+/// children, if `direct:true`) checking each one's classified name
+/// against the rule's `allow` list.
+///
+/// Compares against the *classified* name (`ElementKind::as_str()`), not
+/// the name as literally written -- these agree for `std` names and for
+/// an explicitly namespaced one (`ns.mycard`), which covers everything
+/// this MVP's own examples use. They can diverge for a bare name that
+/// resolves through the document's *own* `@kind` vocabulary, which
+/// `Bindings::classify` normalizes to `namespace.name` even though it was
+/// written bare -- a pre-existing quirk of that classification (not
+/// introduced here), not yet worth a special case until real usage shows
+/// it matters.
+fn check_one_rule(
+    el: &tomet_ast::Element,
+    connect: &tomet_ast::Element,
+    bindings: &Bindings,
+    errors: &mut Vec<Diagnostic>,
+) {
+    let Some(rule_args) = decode_rule_args(connect) else {
+        // Malformed `:rule(...)` args -- an MVP-scoped, author-confirmed
+        // no-op (see `rule::decode_rule_args`'s doc comment).
+        return;
+    };
+
+    let allowed_display: Vec<String> = rule_args.allow.iter().map(|n| n.to_string()).collect();
+
+    tomet_tree::for_each_descendant(el, rule_args.direct, |descendant| {
+        let kind_name = match classify_in(descendant, bindings) {
+            Ok(kind) => kind.as_str().to_string(),
+            // An unknown descendant is `check_arguments`'/the top-level
+            // loop's diagnostic to report, not this one's -- avoid
+            // reporting the same element twice under two different
+            // rules.
+            Err(_) => return,
+        };
+        let is_allowed = rule_args
+            .allow
+            .iter()
+            .any(|name| name.to_string() == kind_name);
+        if !is_allowed {
+            errors.push(Diagnostic::DisallowedByRule {
+                name: kind_name,
+                allowed: allowed_display.clone(),
+                rule_span: connect.span,
+                span: descendant.span,
+            });
+        }
+    });
+}
+
 /// Reports `@settings`/`@config` keys that have been retired.
 ///
 /// One key so far, `elements:`, plus the `types:` map that sat beside it.
@@ -394,6 +489,93 @@ mod tests {
             &errors[0],
             Diagnostic::DuplicateSingleton { name, .. } if name == "spread"
         ));
+    }
+
+    /// These test `check_rule_connects` directly rather than through
+    /// `validate_document`, so the assertions stay about `:rule` alone --
+    /// nesting a block-shaped element (`@card`/`@heading`) inside another
+    /// element's `[content]` also trips the unrelated, pre-existing
+    /// `ShapeMismatch` check (inline position vs. block-required kind),
+    /// which is real but has nothing to do with what these tests check.
+    fn rule_errors(doc: &Document, bindings: &Bindings) -> Vec<Diagnostic> {
+        let mut errors = Vec::new();
+        check_rule_connects(doc, bindings, &mut errors);
+        errors
+    }
+
+    #[test]
+    fn a_rule_with_only_allowed_descendants_is_clean() {
+        let doc = parse(
+            "@section[ @card(title:\"a\")[ x ] @card(title:\"b\")[ y ] ]:rule(allow:list(card))\n",
+        );
+        assert_eq!(rule_errors(&doc, &Bindings::default()), vec![]);
+    }
+
+    #[test]
+    fn a_disallowed_descendant_is_reported() {
+        let doc =
+            parse("@section[ @card(title:\"a\")[ x ] @heading[ y ] ]:rule(allow:list(card))\n");
+        let errors = rule_errors(&doc, &Bindings::default());
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(matches!(
+            &errors[0],
+            Diagnostic::DisallowedByRule { name, .. } if name == "heading"
+        ));
+    }
+
+    #[test]
+    fn direct_true_does_not_recurse_past_the_first_level() {
+        let doc = parse("@section[ @card[ @heading[ z ] ] ]:rule(allow:list(card), direct:true)\n");
+        let errors = rule_errors(&doc, &Bindings::default());
+        assert_eq!(
+            errors,
+            vec![],
+            "direct:true should not see the nested heading"
+        );
+    }
+
+    #[test]
+    fn without_direct_the_same_nested_heading_is_reported() {
+        let doc = parse("@section[ @card[ @heading[ z ] ] ]:rule(allow:list(card))\n");
+        let errors = rule_errors(&doc, &Bindings::default());
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(matches!(
+            &errors[0],
+            Diagnostic::DisallowedByRule { name, .. } if name == "heading"
+        ));
+    }
+
+    #[test]
+    fn a_typoed_connect_name_is_reported() {
+        let doc = parse("@section[ x ]:rulle(allow:list(card))\n");
+        let errors = rule_errors(&doc, &Bindings::default());
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(matches!(
+            &errors[0],
+            Diagnostic::UnknownConnect { name, .. } if name == "rulle"
+        ));
+    }
+
+    /// `allow:` can name a namespaced identifier (`ns.mycard`); checking
+    /// a descendant against it needs the document's resolved `Bindings`,
+    /// not just the parser's own view -- this is the scenario that
+    /// requires this check to live in the validator rather than earlier.
+    #[test]
+    fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
+        let vocab = tomet_parser::parse_document(
+            "@kind(vocabulary)\n@vocabulary(ns)\n\n@element(mycard){}\n",
+        )
+        .expect("vocabulary parses");
+        let bindings = Bindings {
+            used: std::collections::BTreeMap::from([(
+                "ns".to_string(),
+                tomet_semantics::Vocabulary::from_document(&vocab).expect("valid vocabulary"),
+            )]),
+            ..Bindings::default()
+        };
+
+        let doc = parse("@section[ @ns.mycard{} @card[a] ]:rule(allow:list(card, ns.mycard))\n");
+        assert_eq!(rule_errors(&doc, &bindings), vec![]);
     }
 
     /// The preamble is the run of preamble-region elements at the top.

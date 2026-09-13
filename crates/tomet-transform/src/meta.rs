@@ -29,6 +29,7 @@ pub fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_
                 key.to_string(),
                 Value::String(new_val.to_string()),
             )]))),
+            connects: Vec::new(),
             span: Default::default(),
         };
         doc.blocks.insert(0, Block::Element(new_el));

@@ -292,6 +292,24 @@ const CASES: &[Case] = &[
         "@task[ A ]:{ id: t1 }\n",
     ),
     case(None, "`:(...)` は args をマージ", "@task(a: 1):(b: 2)\n"),
+    case(
+        Some("名前付きコネクト `:name(...)`"),
+        "`:` の直後に名前があれば、マージではなく別の要素として `connects` に積まれる。\
+         現時点で唯一のメンバーは `rule`",
+        "@section[ x ]:rule(allow: list(card))\n",
+    ),
+    case(
+        None,
+        "複数のコネクトを重ねられる。それぞれ独立した `connects` の要素になる",
+        "@x(a: 1):as(y):rule(allow: list(card))\n",
+    ),
+    case(None, "見出しにも付けられる", "#[ h ]:rule(allow: list(card))\n"),
+    case(
+        None,
+        "`list(...)`/`enum(...)` は即座に確定するリテラル呼び出し。\
+         コネクトの名前と同じく、パーサは呼び出し名を判断しない",
+        "@x(a: list(card, ns.mycard))\n",
+    ),
     // ---- comments ---------------------------------------------------
     case(Some("コメント"), "行コメント", "// 消える\n本文\n"),
     case(None, "ブロックコメント", "本文 /* 消える */ の続き\n"),
@@ -553,6 +571,11 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
             dump_block(out, child, depth + 2);
         }
     }
+    for connect in &el.connects {
+        indent(out, depth + 1);
+        out.push_str("connect\n");
+        dump_element(out, connect, depth + 2);
+    }
 }
 
 /// The element's head line in the dump: its placement, then its name.
@@ -598,6 +621,10 @@ fn value_str(v: &Value) -> String {
                 })
                 .collect();
             format!("{{{}}}", inner.join(", "))
+        }
+        Value::Call(name, args) => {
+            let inner: Vec<String> = args.iter().map(value_str).collect();
+            format!("{name}({})", inner.join(", "))
         }
     }
 }

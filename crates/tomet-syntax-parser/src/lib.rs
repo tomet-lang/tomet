@@ -125,6 +125,49 @@ mod tests {
     }
 
     #[test]
+    fn parses_call_syntax() {
+        assert_eq!(
+            parse_value("list(card)").unwrap(),
+            Value::Call("list".into(), vec![Value::String("card".into())])
+        );
+        assert_eq!(
+            parse_value("list(card, ns.mycard)").unwrap(),
+            Value::Call(
+                "list".into(),
+                vec![
+                    Value::String("card".into()),
+                    Value::String("ns.mycard".into())
+                ]
+            )
+        );
+        assert_eq!(
+            parse_value("list(a, list(b))").unwrap(),
+            Value::Call(
+                "list".into(),
+                vec![
+                    Value::String("a".into()),
+                    Value::Call("list".into(), vec![Value::String("b".into())])
+                ]
+            )
+        );
+        assert_eq!(
+            parse_value("allow: list(card)").unwrap(),
+            Value::Map(vec![(
+                "allow".into(),
+                Value::Call("list".into(), vec![Value::String("card".into())])
+            )])
+        );
+    }
+
+    #[test]
+    fn a_name_without_a_trailing_paren_is_still_a_plain_scalar() {
+        assert_eq!(
+            parse_value("card-name").unwrap(),
+            Value::String("card-name".into())
+        );
+    }
+
+    #[test]
     fn preserves_colon_in_url_values() {
         let v = parse_value("url: https://example.com/path").unwrap();
         assert_eq!(
@@ -1659,6 +1702,77 @@ mod tests {
                 );
             }
             other => panic!("expected remote id element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn named_connect_reads_into_connects() {
+        let doc = parse_document("@section[ x ]:rule(allow: list(card))\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.sigil, Sigil::named("section"));
+                assert_eq!(el.connects.len(), 1);
+                let rule = &el.connects[0];
+                assert_eq!(rule.sigil, Sigil::named("rule"));
+                assert_eq!(
+                    rule.args,
+                    Some(Value::Map(vec![(
+                        "allow".into(),
+                        Value::Call("list".into(), vec![Value::String("card".into())])
+                    )]))
+                );
+            }
+            other => panic!("expected element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn multiple_named_connects_stack_flat_not_nested() {
+        let doc = parse_document("@x(a: 1):as(y):rule(allow: list(card))\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(el.connects.len(), 2);
+                assert_eq!(el.connects[0].sigil, Sigil::named("as"));
+                assert!(el.connects[0].connects.is_empty());
+                assert_eq!(el.connects[1].sigil, Sigil::named("rule"));
+                assert!(el.connects[1].connects.is_empty());
+            }
+            other => panic!("expected element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bare_colon_merge_is_unaffected_by_named_connect_support() {
+        // No name after the colon -- must still take the old bare-merge
+        // path, not be misread as a nameless connect.
+        let doc = parse_document("@memo(a:1):{b:2}\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert!(el.connects.is_empty());
+                assert_eq!(
+                    el.value,
+                    Some(ElementValue::from_map(Value::Map(vec![(
+                        "b".into(),
+                        Value::Int(2)
+                    )])))
+                );
+            }
+            other => panic!("expected element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn heading_supports_named_connect() {
+        // Headings reuse `parse_groups` with `allow_colon_connect: true`,
+        // so they get named connects "for free".
+        let doc = parse_document("#[ h ]:rule(allow: list(card))\n").unwrap();
+        match &doc.blocks[0] {
+            Block::Element(el) => {
+                assert_eq!(classify_std_lenient(el), ElementKind::Heading);
+                assert_eq!(el.connects.len(), 1);
+                assert_eq!(el.connects[0].sigil, Sigil::named("rule"));
+            }
+            other => panic!("expected heading, got {other:?}"),
         }
     }
 

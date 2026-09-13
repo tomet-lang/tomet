@@ -1,0 +1,4 @@
+@section[@card[First entry.]{ title: Alpha }
+
+@heading(1)[This is disallowed.]
+]{ id: entries }

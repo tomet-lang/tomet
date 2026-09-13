@@ -49,6 +49,48 @@
     }
   },
   {
+    "type": "call",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "braced_map",
+          "named": true
+        },
+        {
+          "type": "call",
+          "named": true
+        },
+        {
+          "type": "scalar",
+          "named": true
+        },
+        {
+          "type": "seq",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "children",
     "named": true,
     "fields": {},
@@ -62,6 +104,48 @@
         },
         {
           "type": "inline_element",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "connect",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "args_group",
+          "named": true
+        },
+        {
+          "type": "content_group",
+          "named": true
+        },
+        {
+          "type": "marked_content",
+          "named": true
+        },
+        {
+          "type": "raw_fence",
+          "named": true
+        },
+        {
+          "type": "value_group",
           "named": true
         }
       ]
@@ -340,6 +424,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "connect",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -363,6 +457,10 @@
       "types": [
         {
           "type": "args_group",
+          "named": true
+        },
+        {
+          "type": "connect",
           "named": true
         },
         {
@@ -522,6 +620,10 @@
         "types": [
           {
             "type": "braced_map",
+            "named": true
+          },
+          {
+            "type": "call",
             "named": true
           },
           {
@@ -815,6 +917,10 @@
       "types": [
         {
           "type": "braced_map",
+          "named": true
+        },
+        {
+          "type": "call",
           "named": true
         },
         {

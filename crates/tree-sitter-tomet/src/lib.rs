@@ -347,6 +347,116 @@ mod tests {
         }
     }
 
+    /// `has_error()` alone is a weak check here (arbitrary prose parses
+    /// error-free too -- a `:name(...)` that fell through to plain text
+    /// would still pass it), so this also confirms a `connect` node
+    /// genuinely exists as a *child of the element*, not just that the
+    /// line parsed somehow. Regression coverage for the bug this feature
+    /// hit during development: a `:` right after a *closed* group
+    /// (`(a: 1)`/`[ a ]`) used to lose the lexer's tie against plain
+    /// `text` and never reach `_element_group`/`connect` at all -- see
+    /// `text`/`_element_group`/`connect`'s own comments in `grammar.js`.
+    #[test]
+    fn named_connect_reaches_the_grammar_after_a_closed_group() {
+        for src in ["@x(a: 1):as(y)\n", "@x[ a ]:as(y)\n", "@x:as(y)\n"] {
+            let tree = parse(src);
+            let root = tree.root_node();
+            assert!(!root.has_error(), "expected no errors for {src:?}");
+            let element = root
+                .named_child(0)
+                .unwrap()
+                .named_child(0)
+                .unwrap()
+                .named_child(0)
+                .unwrap();
+            assert_eq!(element.kind(), "inline_element", "for {src:?}");
+            let has_connect = (0..element.named_child_count() as u32)
+                .any(|i| element.named_child(i).unwrap().kind() == "connect");
+            assert!(has_connect, "expected a connect child for {src:?}");
+        }
+    }
+
+    /// `@x():as(y):rule(z)` must produce *two* `connect` nodes as
+    /// siblings, not one nested inside the other -- matching the real
+    /// parser's `parse_groups(cur, &mut connect_el, false)`, which stops
+    /// a connect's own repeat before it can swallow a sibling connect.
+    #[test]
+    fn stacked_connects_are_flat_siblings_not_nested() {
+        let tree = parse("@x(a: 1):as(y):rule(z)\n");
+        let root = tree.root_node();
+        assert!(!root.has_error());
+        let element = root
+            .named_child(0)
+            .unwrap()
+            .named_child(0)
+            .unwrap()
+            .named_child(0)
+            .unwrap();
+        let connects: Vec<Node> = (0..element.named_child_count() as u32)
+            .map(|i| element.named_child(i).unwrap())
+            .filter(|n| n.kind() == "connect")
+            .collect();
+        assert_eq!(connects.len(), 2, "expected two sibling connects");
+        for connect in &connects {
+            let nested = (0..connect.named_child_count() as u32)
+                .any(|i| connect.named_child(i).unwrap().kind() == "connect");
+            assert!(!nested, "a connect must not itself contain a connect");
+        }
+    }
+
+    #[test]
+    fn heading_supports_named_connect() {
+        let tree = parse("#[ h ]:rule(allow: list(card))\n");
+        let root = tree.root_node();
+        assert!(!root.has_error());
+        let heading = root.named_child(0).unwrap();
+        assert_eq!(heading.kind(), "heading");
+        let has_connect = (0..heading.named_child_count() as u32)
+            .any(|i| heading.named_child(i).unwrap().kind() == "connect");
+        assert!(has_connect);
+    }
+
+    /// `list(...)`/`enum(...)` -- an immediately-resolved call literal,
+    /// mirroring `tomet_ast::Value::Call`. Also regression coverage: an
+    /// earlier version of this rule broke `url:https://example.com`
+    /// (a scheme URI, real and common in `.tmt` fixtures) by giving the
+    /// call's callee token a precedence boost / reusing `_element_name`
+    /// (this grammar's `word` token) -- either let a short, high-priority
+    /// identifier match preempt `_value_scalar`'s otherwise-longer match
+    /// for the same text. See `call`'s own comment in `grammar.js`.
+    #[test]
+    fn parses_call_syntax_in_values() {
+        for src in [
+            "@x(a: list(card))\n",
+            "@x(a: list(card, ns.mycard))\n",
+            "@x(a: list(b, list(c)))\n",
+        ] {
+            let tree = parse(src);
+            let root = tree.root_node();
+            assert!(!root.has_error(), "expected no errors for {src:?}");
+            assert!(
+                tree_contains_kind(root, "call"),
+                "expected a call node for {src:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn scheme_uri_values_still_parse_as_one_scalar_alongside_call_syntax() {
+        let tree = parse("@(url:https://example.com)[Wiki]\n");
+        let root = tree.root_node();
+        assert!(!root.has_error());
+        assert!(!tree_contains_kind(root, "ERROR"));
+    }
+
+    fn tree_contains_kind(node: Node, kind: &str) -> bool {
+        if node.kind() == kind {
+            return true;
+        }
+        (0..node.named_child_count() as u32)
+            .any(|i| tree_contains_kind(node.named_child(i).unwrap(), kind))
+    }
+
     #[test]
     fn parses_interpolation_path_and_call() {
         for src in [

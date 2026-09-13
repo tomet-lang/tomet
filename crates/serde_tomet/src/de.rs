@@ -29,6 +29,10 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
                 iter: entries.into_iter(),
                 value: None,
             }),
+            Value::Call(name, args) => Err(Error::msg(format!(
+                "call syntax `{name}(...)` has no serde equivalent (got {} arg(s))",
+                args.len()
+            ))),
         }
     }
 

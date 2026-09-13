@@ -160,6 +160,69 @@ fn walk_element_mut<B>(element: &mut Element, visitor: &mut impl VisitorMut<B>) 
     ControlFlow::Continue(())
 }
 
+/// Every descendant of `el` (not `el` itself), in document order --
+/// `content`, `children`, and `ElementValue::Group` entries, the same
+/// three sites [`walk_element`] recurses into.
+///
+/// Deliberately never looks at `el.connects`: a connect (`Sigil::Named`
+/// carrying `:name(...)`'s own args/content/value, e.g. `:rule(...)`)
+/// is not a descendant of the document `el` sits in -- it is metadata
+/// about `el` itself, consumed only by the dedicated check that
+/// understands the closed set of connect names. Feeding it through here
+/// would let it reach the same classification a real document element
+/// gets, which is exactly the confusion a `:rule(...)` element being
+/// reported as an unknown element would be.
+///
+/// `direct_only` restricts to immediate children only -- one level of
+/// `content`/`children`/`ElementValue::Group`, not recursed further --
+/// for `:rule(direct:true)`; `false` walks every descendant at any
+/// depth, same as [`walk_element`].
+pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&Element)) {
+    if direct_only {
+        if let Some(content) = &el.content {
+            for inline in content {
+                if let Inline::Element(child) = inline {
+                    f(child);
+                }
+            }
+        }
+        if let Some(children) = &el.children {
+            for block in children {
+                if let Block::Element(child) = block {
+                    f(child);
+                }
+            }
+        }
+        if let Some(ElementValue::Group(entries)) = &el.value {
+            for entry in entries {
+                if let Entry::Element(child) = entry {
+                    f(child);
+                }
+            }
+        }
+        return;
+    }
+    let mut visitor = |child: &Element| -> ControlFlow<()> {
+        f(child);
+        ControlFlow::Continue(())
+    };
+    if let Some(content) = &el.content {
+        let _ = walk_inlines(content, &mut visitor);
+    }
+    if let Some(children) = &el.children {
+        for block in children {
+            let _ = walk_block(block, &mut visitor);
+        }
+    }
+    if let Some(ElementValue::Group(entries)) = &el.value {
+        for entry in entries {
+            if let Entry::Element(child) = entry {
+                let _ = walk_element(child, &mut visitor);
+            }
+        }
+    }
+}
+
 /// Mutates all elements in `doc` matching `filter` by applying `transform`.
 /// Returns the number of elements transformed.
 pub fn transform_elements<F, T>(doc: &mut Document, mut filter: F, mut transform: T) -> usize
@@ -176,4 +239,52 @@ where
         }
     });
     count
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tomet_ast::Block;
+
+    fn element_of(doc: &Document) -> &Element {
+        match &doc.blocks[0] {
+            Block::Element(el) => el,
+            other => panic!("expected an element, got {other:?}"),
+        }
+    }
+
+    fn names(el: &Element, direct_only: bool) -> Vec<String> {
+        let mut out = Vec::new();
+        for_each_descendant(el, direct_only, |child| {
+            out.push(
+                child
+                    .sigil
+                    .name()
+                    .map(|n| n.name.clone())
+                    .unwrap_or_default(),
+            );
+        });
+        out
+    }
+
+    #[test]
+    fn direct_only_stops_at_the_first_level() {
+        let doc = tomet_parser::parse_document("@outer[ @mid[ @inner[ text ] ] ]\n").unwrap();
+        let outer = element_of(&doc);
+        assert_eq!(names(outer, true), vec!["mid"]);
+    }
+
+    #[test]
+    fn every_descendant_walks_every_depth() {
+        let doc = tomet_parser::parse_document("@outer[ @mid[ @inner[ text ] ] ]\n").unwrap();
+        let outer = element_of(&doc);
+        assert_eq!(names(outer, false), vec!["mid", "inner"]);
+    }
+
+    #[test]
+    fn descendant_walk_never_visits_the_element_itself() {
+        let doc = tomet_parser::parse_document("@outer[ @mid[ text ] ]\n").unwrap();
+        let outer = element_of(&doc);
+        assert!(!names(outer, false).contains(&"outer".to_string()));
+    }
 }

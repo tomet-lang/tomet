@@ -38,6 +38,7 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [区切りとコードブロック](#区切りとコードブロック)
 - [補間 `${...}`](#補間-)
 - [コネクト `:`](#コネクト-)
+- [名前付きコネクト `:name(...)`](#名前付きコネクト-name)
 - [コメント](#コメント)
 - [撤去された構文](#撤去された構文)
 - [綴りを失ったまま、代わりが未決のもの](#綴りを失ったまま、代わりが未決のもの)
@@ -1088,6 +1089,86 @@ Block  @task
 
 ```
 unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
+```
+
+## 名前付きコネクト `:name(...)`
+
+### `:` の直後に名前があれば、マージではなく別の要素として `connects` に積まれる。現時点で唯一のメンバーは `rule`
+
+```tmt
+@section[ x ]:rule(allow: list(card))
+```
+
+```
+Block  @section
+  content
+    Text "x"
+  connect
+    Inline @rule
+      args    {allow: list("card")}
+```
+
+検証:
+
+```
+unknown element `section`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.section`), or declare the vocabulary that has it and bind it with `@use`
+```
+
+### 複数のコネクトを重ねられる。それぞれ独立した `connects` の要素になる
+
+```tmt
+@x(a: 1):as(y):rule(allow: list(card))
+```
+
+```
+Block  @x
+  args    {a: 1}
+  connect
+    Inline @as
+      args    "y"
+  connect
+    Inline @rule
+      args    {allow: list("card")}
+```
+
+検証:
+
+```
+unknown element `x`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `@use`
+unknown connect `:as`; only a closed set may follow `:` (currently: rule)
+```
+
+### 見出しにも付けられる
+
+```tmt
+#[ h ]:rule(allow: list(card))
+```
+
+```
+Block  @heading
+  args    1
+  content
+    Text "h"
+  connect
+    Inline @rule
+      args    {allow: list("card")}
+```
+
+### `list(...)`/`enum(...)` は即座に確定するリテラル呼び出し。コネクトの名前と同じく、パーサは呼び出し名を判断しない
+
+```tmt
+@x(a: list(card, ns.mycard))
+```
+
+```
+Block  @x
+  args    {a: list("card", "ns.mycard")}
+```
+
+検証:
+
+```
+unknown element `x`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ## コメント
