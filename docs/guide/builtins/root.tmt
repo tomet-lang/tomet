@@ -1,6 +1,6 @@
 #[ 組み込み要素の地図 ]
 
-組み込み要素は35個ある。全部を覚える必要はない。六つの群のどれかに入ると知って
+組み込み要素は36個ある。全部を覚える必要はない。六つの群のどれかに入ると知って
 いれば、探しているものがどのあたりにあるか見当がつく。
 
 正確な引数と全一覧は
@@ -15,7 +15,7 @@
 [ 語彙     ][ 要素そのものを宣言する ][ `vocabulary` `element` `param` `args` `data` `content` ]
 [ 印       ][ 書きかけの箇所を印す   ][ `draft` `fixme` ]
 [ 外を指す ][ 外や、文書の別の場所へ ][ `references` `links` `link` `embed` ]
-[ 構造     ][ 本文の骨格を作る       ][ `heading` `ol` `ul` `table` `codeblock` `quote` `callout` `hr` ]
+[ 構造     ][ 本文の骨格を作る       ][ `heading` `ol` `ul` `table` `codeblock` `quote` `callout` `card` `hr` ]
 [ 文字     ][ 地の文の中で一語を扱う ][ `em` `strong` `mark` `strikeout` `icon` ]
 ]
 
@@ -44,7 +44,7 @@
 [ `~~x~~`        ][ `strikeout` ]
 ]
 
-残りの `quote` `table` `callout` `link` `embed` `icon` は名前で書く。
+残りの `quote` `table` `callout` `card` `link` `embed` `icon` は名前で書く。
 `@quote[ ... ]` と書くことになる。
 
 `>` が引用の糖衣でないのは、方針ではなく綴りの都合である。`<` と `>` が単体で
@@ -91,7 +91,11 @@
 
 ##[ 構造 ]
 
-本文の骨格。八つとも block で、地の文の中には置けない。
+本文の骨格。九つとも block で、地の文の中には置けない。
+
+`callout` と `card` はどちらも題名+本文の箱だが、選ぶ基準は見た目ではなく
+読者に伝えたいことの有無。info/warning/tip のような分類を読者に伝えたいなら
+`callout`、ただ区切りたいだけなら `card`。
 
 ##[ 文字 ]
 

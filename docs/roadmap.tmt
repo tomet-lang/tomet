@@ -18,6 +18,7 @@
 - `[[  ]]`を`@link(ref:)`の糖衣構文(ただし、labelは設定不可能にする。)
 - `{{}}`を`${}`の糖衣構文。
 - vocabularyマネージャー？
+- calloutってcardじゃね？？
 - 一つのファイルで完結するようにする(blueprint, vocabulary)
 - プロパティの重複のワーニング
 - tasksもtmtで、雛形決めたほうが良さそう？

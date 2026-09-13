@@ -129,6 +129,15 @@ pub enum ElementKind {
     /// still undecided -- `docs/spec/builtin-elements.tmt` used to say it
     /// was not built in at all, which was the part that was false.
     Callout,
+    /// `Sigil::named("card")` -- a plain title + content box, with no
+    /// admonition semantics (no `variant`, no color/icon). Exists
+    /// alongside [`ElementKind::Callout`] rather than as a `variant` of
+    /// it: callout's whole value is signaling a category to the reader
+    /// (info/warning/tip), and a "neutral" callout would ask a reader to
+    /// notice the *absence* of that signal, which is a worse interface
+    /// than a differently-named element for the case where there is
+    /// nothing to signal.
+    Card,
     Table,
     Heading,
     Icon,
@@ -196,6 +205,7 @@ impl ElementKind {
             ElementKind::Codeblock => "codeblock",
             ElementKind::Quote => "quote",
             ElementKind::Callout => "callout",
+            ElementKind::Card => "card",
             ElementKind::Table => "table",
             ElementKind::Heading => "heading",
             ElementKind::OrderedList => "ol",
@@ -236,7 +246,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -278,6 +288,7 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
     ("codeblock", ElementKind::Codeblock),
     ("quote", ElementKind::Quote),
     ("callout", ElementKind::Callout),
+    ("card", ElementKind::Card),
     ("table", ElementKind::Table),
     ("heading", ElementKind::Heading),
     ("ol", ElementKind::OrderedList),
@@ -437,7 +448,8 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
         Meta | Config | Settings | Use | Include | References | Blueprint | Links | Hr
-        | Codeblock | Callout | Table | Heading | OrderedList | UnorderedList | Kind | Version
+        | Codeblock | Callout | Card | Table | Heading | OrderedList | UnorderedList | Kind
+        | Version
         | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
         Em | Strong | Mark | Strikeout => Shape::Inline,
         // Either shape. A link, an embed or an icon alone on a line is

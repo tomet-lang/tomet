@@ -54,6 +54,8 @@ sudo whoami ls --help
 
 @quote[引用文]
 
+@card[分類を持たない、題名+本文の区画]{ title: 題名 }
+
 - outline/list
 
 -. number1

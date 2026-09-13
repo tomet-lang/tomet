@@ -52,6 +52,9 @@ sudo whoami ls --help
 
 #quote(block: true)[引用文]
 
+// tomet:card
+分類を持たない、題名+本文の区画
+
 - outline/list
 
 1. number1

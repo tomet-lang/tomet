@@ -54,6 +54,8 @@ sudo whoami ls --help
 
 > 引用文
 
+<div data-tm-kind="card" data-title="題名">分類を持たない、題名+本文の区画</div>
+
 - outline/list
 
 1. number1
