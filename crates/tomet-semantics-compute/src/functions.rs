@@ -436,6 +436,8 @@ fn truthy(value: &Value) -> bool {
         Value::String(s) => !s.is_empty(),
         Value::Seq(items) => !items.is_empty(),
         Value::Map(entries) => !entries.is_empty(),
+        // A call is a literal, not a container with an "empty" state.
+        Value::Call(..) => true,
     }
 }
 

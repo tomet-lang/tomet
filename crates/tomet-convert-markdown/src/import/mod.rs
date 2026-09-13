@@ -256,6 +256,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 content: Some(inlines),
                 children: None,
                 value: None,
+                connects: Vec::new(),
                 span: Span::dummy(),
             }),
         ),
@@ -323,6 +324,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     content: Some(content),
                     children: None,
                     value: None,
+                    connects: Vec::new(),
                     span: Span::dummy(),
                 };
                 push_block(stack, Block::Element(el));
@@ -334,6 +336,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     content: Some(content),
                     children: None,
                     value: None,
+                    connects: Vec::new(),
                     span: Span::dummy(),
                 };
                 push_block(stack, Block::Element(el));
@@ -355,6 +358,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 content: Some(vec![Inline::Text(Text::new(text, Span::dummy()))]),
                 children: None,
                 value: None,
+                connects: Vec::new(),
                 span: Span::dummy(),
             };
             push_block(stack, Block::Element(el));
@@ -459,6 +463,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 content: Some(inlines),
                 children: None,
                 value: None,
+                connects: Vec::new(),
                 span: Span::dummy(),
             };
             push_inline(stack, Inline::Element(el));
@@ -475,6 +480,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 content,
                 children: None,
                 value: None,
+                connects: Vec::new(),
                 span: Span::dummy(),
             };
             push_inline(stack, Inline::Element(el));
@@ -676,6 +682,7 @@ fn wrap_inline(tag: &str, content: Vec<Inline>) -> Inline {
         content: Some(content),
         children: None,
         value: None,
+        connects: Vec::new(),
         span: Span::dummy(),
     })
 }

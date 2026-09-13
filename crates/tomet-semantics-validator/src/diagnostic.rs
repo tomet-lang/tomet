@@ -116,6 +116,24 @@ pub enum Diagnostic {
     Draft { note: String, span: Span },
     /// `@fixme[ ... ]` -- there is text here and it needs revisiting.
     Fixme { note: String, span: Span },
+    /// A `:name(...)` connect whose name is not in the closed set
+    /// `tomet_semantics::CONNECT_MEMBERS` declares (`rule` is the only
+    /// member so far). Distinct from [`Diagnostic::UnknownElement`]: a
+    /// connect is never fed through vocabulary resolution at all (see
+    /// `tomet_tree::for_each_descendant`'s doc comment), so this is its
+    /// own diagnostic rather than a special case of that one.
+    UnknownConnect { name: String, span: Span },
+    /// A descendant found inside an element carrying an active
+    /// `:rule(allow:list(...))` whose classified name is not in that
+    /// rule's `allow` list. `span` is the offending descendant's own
+    /// span; `rule_span` is where the `:rule(...)` itself was written,
+    /// so a reader can see both "found here" and "restricted here".
+    DisallowedByRule {
+        name: String,
+        allowed: Vec<String>,
+        rule_span: Span,
+        span: Span,
+    },
     /// A top-level `@settings`/`@config` key that has been retired.
     ///
     /// `elements:` described what a custom element takes -- its `args`,
@@ -139,6 +157,8 @@ impl Diagnostic {
             Diagnostic::MissingRequiredMetaKey { span, .. } => *span,
             Diagnostic::MissingRequiredSection { span, .. } => *span,
             Diagnostic::UnknownElement { span, .. } => *span,
+            Diagnostic::UnknownConnect { span, .. } => *span,
+            Diagnostic::DisallowedByRule { span, .. } => *span,
             Diagnostic::ShapeMismatch { span, .. } => *span,
             Diagnostic::DuplicateSingleton { duplicate, .. } => *duplicate,
             Diagnostic::OutsidePreamble { span, .. } => *span,
@@ -206,6 +226,31 @@ impl fmt::Display for Diagnostic {
                         name: name.clone(),
                         unbound_namespace: unbound_namespace.clone(),
                     }
+                )
+            }
+            Diagnostic::UnknownConnect { name, .. } => {
+                // One wording, in `tomet_semantics::UnknownConnectMember`,
+                // for the same reason `UnknownElement` above delegates to
+                // `UnknownName`: a second copy of the message here would
+                // drift from the first change made to that one.
+                write!(
+                    f,
+                    "{}",
+                    tomet_semantics::UnknownConnectMember { name: name.clone() }
+                )
+            }
+            Diagnostic::DisallowedByRule {
+                name,
+                allowed,
+                rule_span,
+                ..
+            } => {
+                write!(
+                    f,
+                    "`{name}` is not allowed here; the `:rule(allow:...)` at {}:{} permits only {}",
+                    rule_span.start.line,
+                    rule_span.start.column,
+                    allowed.join(", ")
                 )
             }
             Diagnostic::DuplicateSingleton { name, first, .. } => {

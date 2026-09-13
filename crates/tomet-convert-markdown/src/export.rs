@@ -687,6 +687,9 @@ fn value_to_plain(v: &Value) -> String {
             .collect::<Vec<_>>()
             .join(", "),
         Value::Map(_) => String::new(),
+        // A call is validation-only (e.g. `:rule`'s `allow:list(...)`)
+        // and has no rendered form.
+        Value::Call(..) => String::new(),
     }
 }
 
@@ -786,6 +789,7 @@ mod tests {
                     "key".to_string(),
                     Value::String("value".to_string()),
                 )]))),
+                connects: Vec::new(),
                 span: Span::dummy(),
             }
         }
@@ -819,6 +823,7 @@ mod tests {
             content: Some(content),
             children: None,
             value: None,
+            connects: Vec::new(),
             span: Span::dummy(),
         }
     }
@@ -907,6 +912,7 @@ mod tests {
                         content: Some(vec![Inline::Text(Text::new("a", Span::dummy()))]),
                         children: None,
                         value: None,
+                        connects: Vec::new(),
                         span: Span::dummy(),
                     }),
                     Inline::Text(Text::new(" ", Span::dummy())),
@@ -917,6 +923,7 @@ mod tests {
                         content: Some(vec![Inline::Text(Text::new("b", Span::dummy()))]),
                         children: None,
                         value: None,
+                        connects: Vec::new(),
                         span: Span::dummy(),
                     }),
                 ],
@@ -939,6 +946,7 @@ mod tests {
             content: Some(vec![Inline::Text(Text::new("Wiki", Span::dummy()))]),
             children: None,
             value: None,
+            connects: Vec::new(),
             span: Span::dummy(),
         };
         let doc = Document {
@@ -963,6 +971,7 @@ mod tests {
             content: Some(vec![Inline::Text(Text::new("a cat", Span::dummy()))]),
             children: None,
             value: None,
+            connects: Vec::new(),
             span: Span::dummy(),
         };
         let doc = Document {
@@ -987,6 +996,7 @@ mod tests {
             content: Some(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))]),
             children: None,
             value: None,
+            connects: Vec::new(),
             span: Span::dummy(),
         };
         let doc = Document {

@@ -1,0 +1,4 @@
+@section(id:"entries")[
+  @card(title:"Alpha")[ First entry. ]
+  @card(title:"Beta")[ Second entry. ]
+]:rule(allow:list(card))

@@ -92,6 +92,22 @@ pub enum Value {
     /// Insertion-ordered key/value pairs (a `.tmt` map has no inherent
     /// sort order, so preserve whatever order the source used).
     Map(Vec<(String, Value)>),
+    /// `name(arg, arg, ...)` -- an immediately-resolved literal, e.g.
+    /// `list(card, ns.mycard)`. Positional-only: a call's arguments are
+    /// never `key: value` pairs, an ordered sequence is enough for what
+    /// this exists to express. The callee is an uninterpreted `String`;
+    /// the parser accepts any identifier here without judging whether
+    /// `list`/`enum`/a typo is real, the same way it never judges a
+    /// `:name(...)` connect's name -- only `tomet-semantics` knows which
+    /// callees are real.
+    ///
+    /// Deliberately not the same mechanism as `${func(args)}`'s
+    /// `InterpExprKind::Call`: that callee can itself be a path
+    /// expression and is evaluated later, while this is a literal fixed
+    /// at parse time. Sharing surface syntax (`name(args)`) is coincidence,
+    /// not kinship -- conflating the two would blur which one is
+    /// evaluated for a reader of either.
+    Call(String, Vec<Value>),
 }
 
 impl Serialize for Value {
@@ -121,10 +137,21 @@ impl Serialize for Value {
                 }
                 m.end()
             }
+            Value::Call(name, args) => {
+                use serde::ser::SerializeMap;
+                let mut m = serializer.serialize_map(Some(2))?;
+                m.serialize_entry("call", name)?;
+                m.serialize_entry("args", args)?;
+                m.end()
+            }
         }
     }
 }
 
+// Deliberately no `Value::Call` arm below: a call is only ever produced
+// by `tomet-syntax-parser` reading `name(...)` source text, never by
+// deserializing inbound data (there is no `visit_call` -- nothing in
+// serde's data model looks like one). This is not an oversight.
 impl<'de> Deserialize<'de> for Value {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -453,6 +480,12 @@ pub enum Placement {
 
 /// `(args)` / `[content]` / `{value}`, each optional and at most one of each,
 /// in any order in the source.
+///
+/// `connects` is unrelated to those three: it is the `:name(...)` family
+/// stacked after them (`@x(...):as(y):rule(...)`), zero or more, each its
+/// own full `Element` (with its own `args`/`content`/`value`, but never
+/// its own `connects` -- a connect does not itself take further connects
+/// in this parser). Order-preserving, empty when nothing follows.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Element {
     pub sigil: Sigil,
@@ -461,6 +494,7 @@ pub struct Element {
     pub content: Option<Vec<Inline>>,
     pub children: Option<Vec<Block>>,
     pub value: Option<ElementValue>,
+    pub connects: Vec<Element>,
     pub span: Span,
 }
 

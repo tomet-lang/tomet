@@ -635,6 +635,9 @@ fn macro_hover(
                 Value::Seq(seq) => format!("{seq:?}"),
                 Value::Map(map) => format!("{map:?}"),
                 Value::Null => "null".to_string(),
+                // `${...}` evaluation never produces a call literal itself
+                // (that's parse-time-only syntax), but stay exhaustive.
+                Value::Call(name, args) => format!("{name:?}({args:?})"),
             };
             let trimmed = rendered.trim();
             if is_web_url(trimmed) {

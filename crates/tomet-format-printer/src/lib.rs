@@ -138,6 +138,7 @@ fn render_heading_element(el: &Element, config: &PrinterConfig, out: &mut String
         out.push(' ');
         out.push_str(&render_value(&v));
     }
+    out.push_str(&render_connects(&el.connects, config));
     out.push('\n');
 }
 
@@ -228,6 +229,7 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
                 out.push(' ');
                 out.push_str(&render_value(&attrs));
             }
+            out.push_str(&render_connects(&item.connects, config));
             out.push('\n');
         } else {
             out.push_str(&head_prefix);
@@ -236,6 +238,7 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
                 out.push(' ');
                 out.push_str(&render_value(&attrs));
             }
+            out.push_str(&render_connects(&item.connects, config));
             out.push('\n');
         }
         if let Some(children) = &item.children {
@@ -248,6 +251,45 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
             }
         }
     }
+}
+
+/// Prints each of `connects` as `:name(...)`/`:name[...]`/`:name{...}`,
+/// stacked in source order right after whatever comes before it -- a
+/// connect is structurally an ordinary `Element` (its own `args`/
+/// `content`/`value`), just introduced by `:` instead of `@`, so this
+/// reuses the same group renderers [`render_element`]'s own generic tail
+/// does. No connect nests further connects (the parser never lets one),
+/// so this does not recurse into `connect.connects`.
+///
+/// No leading space or newline: a connect attaches directly to what
+/// precedes it, the same tight style `(args)[content]{value}` already
+/// print in.
+fn render_connects(connects: &[Element], config: &PrinterConfig) -> String {
+    let mut out = String::new();
+    for connect in connects {
+        out.push(':');
+        if let Some(name) = connect.sigil.name() {
+            out.push_str(&name.to_string());
+        }
+        if let Some(args) = &connect.args {
+            out.push('(');
+            out.push_str(&render_args_with_config(args, config));
+            out.push(')');
+        }
+        if let Some(content) = &connect.content {
+            out.push('[');
+            out.push_str(&render_inlines(content, config));
+            out.push(']');
+        }
+        if let Some(value) = &connect.value {
+            out.push_str(&render_element_value_with_format(
+                value,
+                get_format_from_args(connect.args.as_ref()),
+                config,
+            ));
+        }
+    }
+    out
 }
 
 /// Renders a run of inlines.
@@ -284,15 +326,21 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     {
         if el.sigil.is_bare_named("hr") && el.args.is_none() && el.value.is_none() {
             if let Some(content) = &el.content {
-                return format!("---[{}]---", render_inlines(content, config));
+                return format!(
+                    "---[{}]---{}",
+                    render_inlines(content, config),
+                    render_connects(&el.connects, config)
+                );
             } else {
-                return "---".to_string();
+                return format!("---{}", render_connects(&el.connects, config));
             }
         }
     }
 
     if el.sigil.is_bare_named("meta") {
-        return tomet_style::render_meta_element(el, config);
+        let mut out = tomet_style::render_meta_element(el, config);
+        out.push_str(&render_connects(&el.connects, config));
+        return out;
     }
 
     // A codeblock is written back as a ``` fence, which is the form it
@@ -350,6 +398,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             out.push('\n');
         }
         out.push_str(&fence);
+        out.push_str(&render_connects(&el.connects, config));
         return out;
     }
 
@@ -375,6 +424,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 if let Some(value) = &el.value {
                     out.push_str(&render_element_value(value, config));
                 }
+                out.push_str(&render_connects(&el.connects, config));
                 return out;
             } else if style == "block" {
                 let mut out = String::from("@callout");
@@ -411,6 +461,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 if let Some(value) = &el.value {
                     out.push_str(&render_element_value(value, config));
                 }
+                out.push_str(&render_connects(&el.connects, config));
                 return out;
             } else if style == "box" {
                 let mut out = String::from("@callout");
@@ -450,6 +501,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 if let Some(value) = &el.value {
                     out.push_str(&render_element_value(value, config));
                 }
+                out.push_str(&render_connects(&el.connects, config));
                 return out;
             }
         }
@@ -490,6 +542,8 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             config,
         ));
     }
+
+    out.push_str(&render_connects(&el.connects, config));
 
     out
 }
@@ -640,6 +694,15 @@ fn value_to_json(val: &Value) -> serde_json::Value {
             }
             serde_json::Value::Object(map)
         }
+        Value::Call(name, args) => {
+            let mut map = serde_json::Map::new();
+            map.insert("call".to_string(), serde_json::Value::String(name.clone()));
+            map.insert(
+                "args".to_string(),
+                serde_json::Value::Array(args.iter().map(value_to_json).collect()),
+            );
+            serde_json::Value::Object(map)
+        }
     }
 }
 
@@ -672,6 +735,75 @@ mod tests {
         let printed = document_to_tm(&doc);
         assert!(!printed.contains("##["), "got: {printed:?}");
         assert!(printed.contains("@heading(2)[Nested]"), "got: {printed:?}");
+    }
+
+    #[test]
+    fn a_named_connect_round_trips_on_a_plain_element() {
+        let doc =
+            tomet_parser::parse_document("@section[ x ]:rule(allow: list(card))\n").unwrap();
+        let printed = document_to_tm(&doc);
+        assert!(
+            printed.contains(":rule(allow: list(card))"),
+            "got: {printed:?}"
+        );
+    }
+
+    #[test]
+    fn stacked_connects_round_trip_in_order() {
+        let doc = tomet_parser::parse_document("@x(a: 1):as(y):rule(allow: list(card))\n").unwrap();
+        let printed = document_to_tm(&doc);
+        assert!(printed.contains(":as(y):rule(allow: list(card))"), "got: {printed:?}");
+    }
+
+    #[test]
+    fn a_named_connect_round_trips_on_a_heading() {
+        let doc = tomet_parser::parse_document("#[ h ]:rule(allow: list(card))\n").unwrap();
+        let printed = document_to_tm(&doc);
+        assert!(
+            printed.contains(":rule(allow: list(card))"),
+            "got: {printed:?}"
+        );
+    }
+
+    /// Defensive coverage for the four early-returning special cases in
+    /// `render_element` (`hr`/`meta`/`codeblock`/`callout`), which would
+    /// otherwise silently drop a `connects` field the parser never
+    /// actually attaches to them in practice today -- a `:rule(...)`
+    /// after e.g. a codeblock is syntactically legal even if unlikely.
+    #[test]
+    fn connects_survive_the_four_specially_printed_kinds() {
+        for src in [
+            "@hr:rule(allow: list(card))\n",
+            "@meta{a: 1}:rule(allow: list(card))\n",
+            "@codeblock[x]:rule(allow: list(card))\n",
+        ] {
+            let doc = tomet_parser::parse_document(src).unwrap();
+            let el = match &doc.blocks[0] {
+                Block::Element(el) => el,
+                other => panic!("expected element, got {other:?}"),
+            };
+            assert_eq!(el.connects.len(), 1, "source: {src:?}, doc: {doc:?}");
+            let printed = document_to_tm(&doc);
+            assert!(
+                printed.contains(":rule(allow: list(card))"),
+                "source: {src:?}, got: {printed:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn connects_survive_a_specially_styled_callout() {
+        let doc =
+            tomet_parser::parse_document("@callout(info)[x]:rule(allow: list(card))\n").unwrap();
+        let cfg = PrinterConfig {
+            callout_content_style: Some("block".to_string()),
+            ..Default::default()
+        };
+        let printed = document_to_tm_with_config(&doc, &cfg);
+        assert!(
+            printed.contains(":rule(allow: list(card))"),
+            "got: {printed:?}"
+        );
     }
 
     #[test]

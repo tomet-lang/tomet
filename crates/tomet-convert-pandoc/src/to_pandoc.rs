@@ -64,6 +64,9 @@ fn meta_value(v: &Value) -> MetaValue {
                 .map(|(k, v)| (k.clone(), meta_value(v)))
                 .collect(),
         ),
+        // A call (e.g. `:rule`'s `allow:list(...)`) has no meaning as
+        // document metadata; nothing writes one into `@meta` today.
+        Value::Call(..) => MetaValue::MetaString(String::new()),
     }
 }
 

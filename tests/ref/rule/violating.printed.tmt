@@ -1,0 +1,4 @@
+@section(id: entries)[@card(title: Alpha)[First entry.]
+
+@heading[This is disallowed.]
+]:rule(allow: list(card))

@@ -103,4 +103,22 @@ mod tests {
         assert_eq!(from_str::<Wrapper>(&to_string(&a).unwrap()).unwrap(), a);
         assert_eq!(from_str::<Wrapper>(&to_string(&b).unwrap()).unwrap(), b);
     }
+
+    #[test]
+    fn call_syntax_has_no_serde_equivalent() {
+        let err =
+            de::from_value::<i32>(Value::Call("list".into(), vec![Value::String("card".into())]))
+                .unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("call syntax"), "unexpected message: {msg}");
+    }
+
+    #[test]
+    fn call_syntax_prints_back_as_a_call() {
+        let v = Value::Call(
+            "list".into(),
+            vec![Value::String("card".into()), Value::Int(2)],
+        );
+        assert_eq!(print::print_value(&v), "list(card, 2)");
+    }
 }

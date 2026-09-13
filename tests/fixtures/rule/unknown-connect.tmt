@@ -1,0 +1,3 @@
+@section(id:"entries")[
+  @card(title:"Alpha")[ First entry. ]
+]:rulle(allow:list(card))

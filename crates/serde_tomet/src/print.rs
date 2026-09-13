@@ -29,6 +29,17 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
         Value::Float(f) => out.push_str(&f.to_string()),
         Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
         Value::Null => out.push_str("null"),
+        Value::Call(name, args) => {
+            out.push_str(name);
+            out.push('(');
+            for (i, arg) in args.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                write_value(arg, out, false);
+            }
+            out.push(')');
+        }
     }
 }
 

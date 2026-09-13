@@ -131,6 +131,9 @@ pub fn scalar_string(v: &Value) -> Option<String> {
             Some(parts?.join(", "))
         }
         Value::Map(_) => None,
+        // A call is a structured literal like a map, not a scalar --
+        // there is no single string it collapses to.
+        Value::Call(..) => None,
     }
 }
 
@@ -156,6 +159,15 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
                 .map(|(k, v)| (k.clone(), value_to_json(v)))
                 .collect(),
         ),
+        Value::Call(name, args) => {
+            let mut obj = serde_json::Map::new();
+            obj.insert("call".to_string(), serde_json::Value::String(name.clone()));
+            obj.insert(
+                "args".to_string(),
+                serde_json::Value::Array(args.iter().map(value_to_json).collect()),
+            );
+            serde_json::Value::Object(obj)
+        }
     }
 }
 
