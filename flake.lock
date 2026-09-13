@@ -860,11 +860,11 @@
         "treefmt-nix": "treefmt-nix_4"
       },
       "locked": {
-        "lastModified": 1789125685,
-        "narHash": "sha256-0QXPLU8I254/IUy95BsciqbrlVDjer0zj7d8myyp8BQ=",
+        "lastModified": 1789153297,
+        "narHash": "sha256-BQBcub0O2oRgkRG4uIzY7TfjcweYREV4IIgplQzwMxQ=",
         "ref": "refs/heads/main",
-        "rev": "c8ae078c2cceff4e0faa5fb99dabdee4b92103bd",
-        "revCount": 58,
+        "rev": "7cc38e7a8290aeff4a4352d4ff64d4e0978dcefb",
+        "revCount": 64,
         "type": "git",
         "url": "https://github.com/tomet-lang/tomet-book.git"
       },
