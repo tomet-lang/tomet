@@ -1,6 +1,6 @@
 #[ 組み込み要素の地図 ]
 
-組み込み要素は36個ある。全部を覚える必要はない。六つの群のどれかに入ると知って
+組み込み要素は37個ある。全部を覚える必要はない。六つの群のどれかに入ると知って
 いれば、探しているものがどのあたりにあるか見当がつく。
 
 正確な引数と全一覧は
@@ -16,7 +16,7 @@
 [ 印       ][ 書きかけの箇所を印す   ][ `draft` `fixme` ]
 [ 外を指す ][ 外や、文書の別の場所へ ][ `references` `links` `link` `embed` ]
 [ 構造     ][ 本文の骨格を作る       ][ `heading` `ol` `ul` `table` `codeblock` `quote` `callout` `card` `hr` ]
-[ 文字     ][ 地の文の中で一語を扱う ][ `em` `strong` `mark` `strikeout` `icon` ]
+[ 文字     ][ 地の文の中で一語を扱う ][ `em` `strong` `mark` `strikeout` `icon` `ruby` ]
 ]
 
 ##[ 群が分かると三つ分かる ]
@@ -99,9 +99,10 @@
 
 ##[ 文字 ]
 
-地の文の中の一語や一字。`em` `strong` `mark` `strikeout` は inline 専用で、
+地の文の中の一語や一字。`em` `strong` `mark` `strikeout` `ruby` は inline 専用で、
 単独の行には置けない。
 `icon` は名前が通るだけで、アイコンを引く処理はまだ無い。
+`ruby` は `[content]` が本文、`rt` エントリが読み ── `@ruby[漢字](rt:"かんじ")`。
 
 ##[ まだ解説の無い要素 ]
 
