@@ -17,6 +17,7 @@
 - `[[  ]]`を`@link(ref:)`の糖衣構文(ただし、labelは設定不可能にする。)
 - `{{}}`を`${}`の糖衣構文。
 - vocabularyマネージャー？
+- 日本語対応、組版
 - calloutってcardじゃね？？
 - 一つのファイルで完結するようにする(blueprint, vocabulary)
 - プロパティの重複のワーニング
@@ -31,7 +32,9 @@
   - 今 > `@link[@color[asdfasdf](white)](https:///)`
 - `#`の意味の重複 カラーコード タグ ヘッダー
 - `->`
-- `\n`も統一？
+- `\n`の統一は決着（`Inline::SoftBreak`/`LineBreak`/`Raw`、`tomet-syntax-ast`）。
+  残るのはhardbreak（`LineBreak`）の記法だけ ── 今は誰も書けない
+- blueprint統合と#[ heading ]:rule
 - tmtroot vs tmtdocs
 - idの種類にsha1追加
 - `@element`ではなくて、`@define`のほうが適切か？

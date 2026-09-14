@@ -517,6 +517,18 @@ fn dump_inline(out: &mut String, inline: &Inline, depth: usize) {
             indent(out, depth);
             let _ = writeln!(out, "Text {:?}", t.value);
         }
+        Inline::Raw(t) => {
+            indent(out, depth);
+            let _ = writeln!(out, "Raw {:?}", t.value);
+        }
+        Inline::SoftBreak(_) => {
+            indent(out, depth);
+            let _ = writeln!(out, "SoftBreak");
+        }
+        Inline::LineBreak(_) => {
+            indent(out, depth);
+            let _ = writeln!(out, "LineBreak");
+        }
         Inline::Element(el) => dump_element(out, el, depth),
     }
 }

@@ -10,7 +10,8 @@
 
 # インライン要素
 
-文中の [リンク](https://example.com) と <span data-tm-kind="deck.badge">名前空間つきインライン</span> は行の途中でも要素になる。
+文中の [リンク](https://example.com) と
+<span data-tm-kind="deck.badge">名前空間つきインライン</span> は行の途中でも要素になる。
 
 # 本文に落ちる `#`
 
@@ -35,11 +36,13 @@ ASCII でない名前は要素にならない。
 
 # 未完成の印
 
-文書が自分について言う印。`@draft` はそこに文章が無いこと、`@fixme` は文章はあるが直すこと。どちらも警告で、`tomet check` は通る。
+文書が自分について言う印。`@draft` はそこに文章が無いこと、`@fixme` は
+文章はあるが直すこと。どちらも警告で、`tomet check` は通る。
 
 <div data-tm-kind="draft">ここに書く予定の節</div>
 
-段落の途中にも置ける。<span data-tm-kind="fixme">この例は古い</span> のように、行を占有しなくてもよい。どちらの配置でも形の誤りにはならない。
+段落の途中にも置ける。<span data-tm-kind="fixme">この例は古い</span> のように、
+行を占有しなくてもよい。どちらの配置でも形の誤りにはならない。
 
 # 取り消し線
 

@@ -305,6 +305,17 @@ fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> String {
     for inline in inlines {
         match inline {
             Inline::Text(t) => s.push_str(&t.value),
+            Inline::Raw(t) => s.push_str(&t.value),
+            // A literal newline, not `softbreak_join`'s space/nothing.
+            // Several callers (`render_list_with_indent`'s
+            // `list_multiline_style_content`, `render_callout`'s
+            // `callout_content_style`) split this function's output on
+            // `'\n'` to lay wrapped content out across multiple indented
+            // lines -- a feature that used to ride on markdown import
+            // embedding a literal `'\n'` straight into `Text.value` for a
+            // softbreak. Folding to a space here would silently turn that
+            // into always-one-line output.
+            Inline::SoftBreak(_) | Inline::LineBreak(_) => s.push('\n'),
             Inline::Element(el) => {
                 let block = el.placement == Placement::Block;
                 if block && !s.is_empty() && !s.ends_with('\n') {

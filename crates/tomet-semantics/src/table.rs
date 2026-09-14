@@ -21,61 +21,41 @@ pub fn parse_table_rows(inlines: &[Inline]) -> Vec<TableRow> {
     let mut in_cell = false;
     let mut bracket_depth = 0usize;
 
-    let flush_text = |cell: &mut Vec<Inline>, buf: &mut String| {
-        if !buf.is_empty() {
-            cell.push(Inline::Text(Text::from(std::mem::take(buf))));
-        }
-    };
-
-    let finish_cell = |cell: &mut Vec<Inline>, buf: &mut String, row: &mut Vec<TableCell>| {
-        flush_text(cell, buf);
-        let mut trimmed_cell = std::mem::take(cell);
-        trim_inlines(&mut trimmed_cell);
-        row.push(TableCell {
-            content: trimmed_cell,
-        });
-    };
-
-    let finish_row = |row: &mut Vec<TableCell>, rows: &mut Vec<TableRow>| {
-        if !row.is_empty() {
-            rows.push(TableRow {
-                cells: std::mem::take(row),
-            });
-        }
-    };
-
-    for inline in inlines {
+    for (idx, inline) in inlines.iter().enumerate() {
         match inline {
-            Inline::Text(t) => {
-                for c in t.value.chars() {
-                    if in_cell {
-                        if c == '[' {
-                            bracket_depth += 1;
-                            current_text_buf.push(c);
-                        } else if c == ']' {
-                            if bracket_depth > 1 {
-                                bracket_depth -= 1;
-                                current_text_buf.push(c);
-                            } else {
-                                finish_cell(
-                                    &mut current_cell,
-                                    &mut current_text_buf,
-                                    &mut current_row,
-                                );
-                                in_cell = false;
-                                bracket_depth = 0;
-                            }
-                        } else {
-                            current_text_buf.push(c);
-                        }
-                    } else if c == '[' {
-                        in_cell = true;
-                        bracket_depth = 1;
-                        current_cell.clear();
-                        current_text_buf.clear();
-                    } else if c.is_whitespace() {
-                        finish_row(&mut current_row, &mut rows);
-                    }
+            Inline::Text(t) => scan_chars(
+                &t.value,
+                &mut in_cell,
+                &mut bracket_depth,
+                &mut current_text_buf,
+                &mut current_cell,
+                &mut current_row,
+                &mut rows,
+            ),
+            Inline::Raw(t) => scan_chars(
+                &t.value,
+                &mut in_cell,
+                &mut bracket_depth,
+                &mut current_text_buf,
+                &mut current_cell,
+                &mut current_row,
+                &mut rows,
+            ),
+            Inline::SoftBreak(_) | Inline::LineBreak(_) => {
+                // A break here folds exactly like any other line break in
+                // running text did before breaks got their own AST nodes: a
+                // joining space (nothing, between two East-Asian-wide
+                // characters) inside a cell, or a cell/row separator outside
+                // one, the same as any other whitespace character. Only the
+                // immediate next item is consulted for the wide-character
+                // check, matching the old fold, which only ever saw the
+                // characters within its own text run.
+                if in_cell {
+                    let before = current_text_buf.chars().last();
+                    let after = inlines.get(idx + 1).and_then(Inline::first_char);
+                    current_text_buf.push_str(tomet_ast::softbreak_join(before, after));
+                } else {
+                    finish_row(&mut current_row, &mut rows);
                 }
             }
             Inline::Element(el) => {
@@ -93,6 +73,66 @@ pub fn parse_table_rows(inlines: &[Inline]) -> Vec<TableRow> {
     finish_row(&mut current_row, &mut rows);
 
     rows
+}
+
+fn scan_chars(
+    value: &str,
+    in_cell: &mut bool,
+    bracket_depth: &mut usize,
+    current_text_buf: &mut String,
+    current_cell: &mut Vec<Inline>,
+    current_row: &mut Vec<TableCell>,
+    rows: &mut Vec<TableRow>,
+) {
+    for c in value.chars() {
+        if *in_cell {
+            if c == '[' {
+                *bracket_depth += 1;
+                current_text_buf.push(c);
+            } else if c == ']' {
+                if *bracket_depth > 1 {
+                    *bracket_depth -= 1;
+                    current_text_buf.push(c);
+                } else {
+                    finish_cell(current_cell, current_text_buf, current_row);
+                    *in_cell = false;
+                    *bracket_depth = 0;
+                }
+            } else {
+                current_text_buf.push(c);
+            }
+        } else if c == '[' {
+            *in_cell = true;
+            *bracket_depth = 1;
+            current_cell.clear();
+            current_text_buf.clear();
+        } else if c.is_whitespace() {
+            finish_row(current_row, rows);
+        }
+    }
+}
+
+fn flush_text(cell: &mut Vec<Inline>, buf: &mut String) {
+    if !buf.is_empty() {
+        cell.push(Inline::Text(Text::from(std::mem::take(buf))));
+    }
+}
+
+fn finish_cell(cell: &mut Vec<Inline>, buf: &mut String, row: &mut Vec<TableCell>) {
+    flush_text(cell, buf);
+    let mut trimmed_cell = std::mem::take(cell);
+    trim_inlines(&mut trimmed_cell);
+    row.push(TableCell {
+        content: trimmed_cell,
+    });
+}
+
+fn finish_row(row: &mut Vec<TableCell>, rows: &mut Vec<TableRow>) {
+    if !row.is_empty() {
+        rows.push(TableRow {
+            cells: std::mem::take(row),
+        });
+    }
 }
 
 fn trim_inlines(inlines: &mut Vec<Inline>) {

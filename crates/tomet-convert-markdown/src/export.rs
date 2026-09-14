@@ -98,6 +98,23 @@ fn inline_to_md(inlines: &[Inline]) -> String {
     for inline in inlines {
         match inline {
             Inline::Text(t) => out.push_str(&escape_text(&t.value)),
+            Inline::Raw(t) => out.push_str(&escape_text(&t.value)),
+            // A literal newline, not `softbreak_join`'s space/nothing: a
+            // softbreak is CommonMark-legal either way (both parse back to
+            // the same `Event::SoftBreak`), and a real line break is the
+            // one that keeps the output readable rather than merging a
+            // whole wrapped paragraph onto one line. It is also what
+            // markdown *import* already produces for a source softbreak
+            // (`Event::SoftBreak` -> `Inline::SoftBreak` below), so a
+            // document round-tripped through this crate keeps its line
+            // breaks rather than gaining reflowed ones only on export.
+            Inline::SoftBreak(_) => out.push('\n'),
+            // CommonMark's hardbreak: a backslash before the newline.
+            // Backslash is chosen over the "two trailing spaces" spelling
+            // because trailing whitespace is invisible and routinely
+            // stripped by editors/tools -- the same reason that spelling
+            // was rejected for tomet's own source syntax.
+            Inline::LineBreak(_) => out.push_str("\\\n"),
             Inline::Element(el) => out.push_str(&element_to_md(el, true)),
         }
     }
@@ -440,9 +457,16 @@ fn render_embed(el: &Element) -> String {
 
 fn inlines_to_plain(inlines: &[Inline]) -> String {
     let mut s = String::new();
-    for inline in inlines {
+    for (idx, inline) in inlines.iter().enumerate() {
         match inline {
             Inline::Text(t) => s.push_str(&t.value),
+            Inline::Raw(t) => s.push_str(&t.value),
+            Inline::SoftBreak(_) => {
+                let before = s.chars().last();
+                let after = inlines.get(idx + 1).and_then(Inline::first_char);
+                s.push_str(tomet_ast::softbreak_join(before, after));
+            }
+            Inline::LineBreak(_) => s.push(' '),
             Inline::Element(el) => {
                 if let Some(content) = &el.content {
                     s.push_str(&inlines_to_plain(content));
@@ -1128,13 +1152,19 @@ mod tests {
     /// honest rendering of that is what was written.
     #[test]
     fn an_unprepared_interpolation_renders_as_its_own_source() {
+        // The source's own line wrapping survives to the markdown output
+        // now (`inline_to_md` renders a `SoftBreak` as a literal newline,
+        // not a space -- see its own comment) rather than being folded
+        // into one long line, which is what happened while `tomet-parser`
+        // still folded a wrapped line into a space before this crate ever
+        // saw it.
         let doc = tomet_parser::parse_document(
             "Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n",
         )
         .unwrap();
         assert_eq!(
             to_markdown(&doc),
-            "Issue: ${gh(42)} Footer: ${copyright} Math: ${add(10, 5)}\n\n"
+            "Issue: ${gh(42)}\nFooter: ${copyright}\nMath: ${add(10, 5)}\n\n"
         );
     }
 }

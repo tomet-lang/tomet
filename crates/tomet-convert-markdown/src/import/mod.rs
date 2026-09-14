@@ -15,7 +15,9 @@
 //! `Vec<Block>`), so a list inside a quote has its items' content
 //! flattened into that run too. A nested list under a plain (non-quote)
 //! list item is not lossy -- it's kept as that item's own `children`. HTML
-//! blocks and inline HTML are dropped; hard breaks collapse to a space.
+//! blocks are dropped; inline HTML round-trips as literal text. Soft and
+//! hard breaks map to `Inline::SoftBreak`/`Inline::LineBreak` respectively,
+//! not collapsed into a space -- see those types' doc comments.
 //!
 //! YAML frontmatter extraction lives in `frontmatter`; `[[wiki]]`/bare-URL
 //! detection and sigil-escaping (both post-processing passes over
@@ -25,7 +27,8 @@
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, Paragraph, Placement, Sigil, Span, Text, Value,
+    Block, Document, Element, ElementValue, Inline, LineBreak, Paragraph, Placement, RawText,
+    Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::{ElementKind, classify_std_lenient, list_ordered};
 use tomet_tree::{ElementExt, element_list, element_list_item, element_new};
@@ -169,12 +172,18 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
                 }
             }
             Event::Html(_) => {}
-            Event::SoftBreak => {
-                push_inline(&mut stack, Inline::Text(Text::new("\n", Span::dummy())))
-            }
-            Event::HardBreak => {
-                push_inline(&mut stack, Inline::Text(Text::new("\n", Span::dummy())))
-            }
+            Event::SoftBreak => push_inline(
+                &mut stack,
+                Inline::SoftBreak(SoftBreak {
+                    span: Span::dummy(),
+                }),
+            ),
+            Event::HardBreak => push_inline(
+                &mut stack,
+                Inline::LineBreak(LineBreak {
+                    span: Span::dummy(),
+                }),
+            ),
             Event::Rule => push_block(&mut stack, Block::Element(element_new(Sigil::named("hr")))),
             _ => {}
         }
@@ -265,29 +274,26 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             let mut variant = String::new();
             let mut title = None;
 
-            if let Some(first_inline) = content.first_mut() {
-                if let Inline::Text(t) = first_inline {
-                    let val_trimmed = t.value.trim_start();
-                    if val_trimmed.starts_with("[!") {
-                        if let Some(end_bracket) = val_trimmed.find(']') {
-                            let kind_str = val_trimmed[2..end_bracket].trim().to_lowercase();
-                            if !kind_str.is_empty() {
-                                is_callout = true;
-                                variant = kind_str;
-                                let after_bracket = &val_trimmed[end_bracket + 1..];
-                                let (first_line, rest_lines) = match after_bracket.find('\n') {
-                                    Some(idx) => (&after_bracket[..idx], &after_bracket[idx + 1..]),
-                                    None => (after_bracket, ""),
-                                };
-                                let clean_title = first_line
-                                    .trim_start_matches(|c| {
-                                        c == ' ' || c == '-' || c == '+' || c == '|'
-                                    })
-                                    .trim();
-                                if !clean_title.is_empty() {
-                                    title = Some(clean_title.to_string());
-                                }
-                                t.value = rest_lines.trim_start_matches(['\r', '\n']).to_string();
+            // `[!type] title` is a whole line: with a source line break now
+            // its own `SoftBreak` node rather than a `'\n'` embedded in
+            // this `Text` (see `Inline::SoftBreak`), the entire title line
+            // lives in this one first `Text` -- nothing to split on `\n`
+            // for any more. The title line itself, and the `SoftBreak`
+            // right after it if there is one, get dropped below rather
+            // than truncated in place.
+            if let Some(Inline::Text(t)) = content.first() {
+                let val_trimmed = t.value.trim_start();
+                if val_trimmed.starts_with("[!") {
+                    if let Some(end_bracket) = val_trimmed.find(']') {
+                        let kind_str = val_trimmed[2..end_bracket].trim().to_lowercase();
+                        if !kind_str.is_empty() {
+                            is_callout = true;
+                            variant = kind_str;
+                            let clean_title = val_trimmed[end_bracket + 1..]
+                                .trim_start_matches(|c| c == ' ' || c == '-' || c == '+' || c == '|')
+                                .trim();
+                            if !clean_title.is_empty() {
+                                title = Some(clean_title.to_string());
                             }
                         }
                     }
@@ -295,14 +301,22 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             }
 
             if is_callout {
+                content.remove(0);
+                // Everything between the title line and the real content --
+                // the `SoftBreak` right after the title, a blank
+                // blockquote line's own empty `Text`/`SoftBreak` pair, any
+                // number of them -- is whitespace-equivalent and gets
+                // dropped, the same as leading whitespace anywhere else.
                 while let Some(first_inline) = content.first() {
-                    if let Inline::Text(t) = first_inline {
-                        if t.value.trim().is_empty() {
+                    match first_inline {
+                        Inline::SoftBreak(_) => {
                             content.remove(0);
-                            continue;
                         }
+                        Inline::Text(t) if t.value.trim().is_empty() => {
+                            content.remove(0);
+                        }
+                        _ => break,
                     }
-                    break;
                 }
                 if let Some(Inline::Text(t)) = content.first_mut() {
                     t.value = t.value.trim_start().to_string();
@@ -355,7 +369,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 sigil: Sigil::named("codeblock"),
                 placement: Placement::Block,
                 args,
-                content: Some(vec![Inline::Text(Text::new(text, Span::dummy()))]),
+                content: Some(vec![Inline::Raw(RawText::new(text, Span::dummy()))]),
                 children: None,
                 value: None,
                 connects: Vec::new(),
@@ -536,6 +550,15 @@ fn inlines_display_width(inlines: &[Inline]) -> usize {
                     len += char_display_width(c);
                 }
             }
+            Inline::Raw(t) => {
+                for c in t.value.chars() {
+                    len += char_display_width(c);
+                }
+            }
+            // A table cell's content doesn't span source lines in practice,
+            // but if it did, a fold is a joining space -- one column.
+            Inline::SoftBreak(_) => len += 1,
+            Inline::LineBreak(_) => {}
             Inline::Element(el) => {
                 if let Some(content) = &el.content {
                     len += inlines_display_width(content);
@@ -1038,7 +1061,7 @@ mod tests {
                 );
                 assert_eq!(
                     el.content,
-                    Some(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))])
+                    Some(vec![Inline::Raw(RawText::new("fn main() {}", Span::dummy()))])
                 );
             }
             other => panic!("expected pre element, got {other:?}"),
@@ -1480,6 +1503,13 @@ mod tests {
 
     #[test]
     fn test_multiline_paragraph_linebreaks_preserved() {
+        // "Preserved" now means kept as their own `SoftBreak` nodes rather
+        // than folded into a space -- not, as before `SoftBreak` existed,
+        // merged into one `Text` with a literal `'\n'` character. The
+        // latter was already a small lie: a real softbreak is whitespace,
+        // renderers are free to realize it as a space instead of a newline
+        // (see `Inline::SoftBreak`'s doc comment), so baking one spelling
+        // into `Text.value` overclaimed what was actually preserved.
         let md = "Line 1\nLine 2\nLine 3\n";
         let doc = from_markdown(md);
         assert_eq!(doc.blocks.len(), 1);
@@ -1488,10 +1518,17 @@ mod tests {
         };
         assert_eq!(
             p.content,
-            vec![Inline::Text(Text::new(
-                "Line 1\nLine 2\nLine 3",
-                Span::dummy()
-            ))]
+            vec![
+                Inline::Text(Text::new("Line 1", Span::dummy())),
+                Inline::SoftBreak(SoftBreak {
+                    span: Span::dummy()
+                }),
+                Inline::Text(Text::new("Line 2", Span::dummy())),
+                Inline::SoftBreak(SoftBreak {
+                    span: Span::dummy()
+                }),
+                Inline::Text(Text::new("Line 3", Span::dummy())),
+            ]
         );
     }
 
