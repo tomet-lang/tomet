@@ -134,6 +134,7 @@ fn element_to_typst(el: &Element, inline: bool) -> String {
         "strong" => format!("*{}*", content_to_typst(el)),
         "mark" => format!("#highlight[{}]", content_to_typst(el)),
         "strikeout" => format!("#strike[{}]", content_to_typst(el)),
+        "ruby" => render_ruby(el),
         "codeblock" => render_code_block(el),
         "quote" => render_quote(el, inline),
         "callout" => render_callout(el),
@@ -454,6 +455,26 @@ fn render_generic(el: &Element, kind: &str, inline: bool) -> String {
     }
 }
 
+/// `@ruby[漢字](rt:"かんじ")` -- Typst has no built-in ruby annotation, and
+/// unlike [`render_generic`]'s inline fallback, `rt` can't just be dropped:
+/// it's the reading, meaningful content rather than decoration. Renders as
+/// `base(reading)`, the least-lossy plain-text approximation.
+fn render_ruby(el: &Element) -> String {
+    let args = normalized_element_args(el);
+    let rt = args
+        .as_ref()
+        .and_then(as_map)
+        .and_then(|m| map_get(m, "rt"))
+        .map(value_to_plain)
+        .unwrap_or_default();
+    let content = content_to_typst(el);
+    if rt.is_empty() {
+        content
+    } else {
+        format!("{content}({rt})")
+    }
+}
+
 fn content_to_typst(el: &Element) -> String {
     el.content
         .as_ref()
@@ -570,6 +591,14 @@ mod tests {
         assert_eq!(
             typst("a *em* b **strong** c ==mark==\n"),
             "a _em_ b *strong* c #highlight[mark]\n\n"
+        );
+    }
+
+    #[test]
+    fn renders_ruby_as_base_and_reading() {
+        assert_eq!(
+            typst("a @ruby[漢字](rt:\"かんじ\") b\n"),
+            "a 漢字(かんじ) b\n\n"
         );
     }
 

@@ -15,7 +15,7 @@ use tomet_ast::{
 use tomet_semantics::{
     path_target,
     TargetScheme, classify_std_lenient, heading_level, is_directive, link_target, list_items,
-    list_ordered, target_scheme,
+    list_ordered, normalized_element_args, target_scheme,
 };
 
 /// Renders `doc` as CommonMark.
@@ -123,6 +123,7 @@ fn element_to_md(el: &Element, inline: bool) -> String {
         "strong" => format!("**{}**", content_to_md(el)),
         "mark" => format!("<mark>{}</mark>", content_to_md(el)),
         "strikeout" => format!("~~{}~~", content_to_md(el)),
+        "ruby" => render_ruby(el),
         "codeblock" => render_code_block(el),
         "quote" => render_quote(el, inline),
         "callout" => render_callout(el),
@@ -206,6 +207,22 @@ fn render_interp(el: &Element) -> String {
         Some(ElementValue::Interp(expr)) => format!("${{{expr}}}"),
         _ => String::new(),
     }
+}
+
+/// `@ruby[漢字](rt:"かんじ")` -- no CommonMark ruby syntax exists, so this
+/// falls back to raw inline `<ruby>`/`<rt>` HTML, same as `mark` above.
+fn render_ruby(el: &Element) -> String {
+    let args = normalized_element_args(el);
+    let rt = args
+        .as_ref()
+        .and_then(as_map)
+        .and_then(|m| map_get(m, "rt"))
+        .and_then(|v| match v {
+            Value::String(s) => Some(s.as_str()),
+            _ => None,
+        })
+        .unwrap_or("");
+    format!("<ruby>{}<rt>{rt}</rt></ruby>", content_to_md(el))
 }
 
 fn content_to_md(el: &Element) -> String {
@@ -720,6 +737,15 @@ mod tests {
         assert_eq!(
             to_markdown(&doc).trim(),
             "地の文に `code` と `spec/` があります。"
+        );
+    }
+
+    #[test]
+    fn ruby_exports_as_raw_html() {
+        let doc = tomet_parser::parse_document("a @ruby[漢字](rt:\"かんじ\") b\n").unwrap();
+        assert_eq!(
+            to_markdown(&doc).trim(),
+            "a <ruby>漢字<rt>かんじ</rt></ruby> b"
         );
     }
 

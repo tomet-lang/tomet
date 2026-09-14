@@ -106,6 +106,12 @@ pub enum ElementKind {
     /// not how to draw them, which is why this is here and `smallcaps`
     /// is not.
     Strikeout,
+    /// `@ruby[漢字](rt:"かんじ")` -- a reading annotation. `[content]` is
+    /// the base text, `rt` the reading, mirroring `@link(target:...)[title]`'s
+    /// "named entry + content" shape rather than the shortcut-inline family
+    /// (`em`/`strong`/`mark`/`strikeout`), since no comparable CommonMark
+    /// spelling exists to shortcut against.
+    Ruby,
     Codeblock,
     Quote,
     /// `@callout(variant)[ ... ]` -- an admonition.
@@ -202,6 +208,7 @@ impl ElementKind {
             ElementKind::Strong => "strong",
             ElementKind::Mark => "mark",
             ElementKind::Strikeout => "strikeout",
+            ElementKind::Ruby => "ruby",
             ElementKind::Codeblock => "codeblock",
             ElementKind::Quote => "quote",
             ElementKind::Callout => "callout",
@@ -246,7 +253,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 37] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -285,6 +292,7 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
     ("strong", ElementKind::Strong),
     ("mark", ElementKind::Mark),
     ("strikeout", ElementKind::Strikeout),
+    ("ruby", ElementKind::Ruby),
     ("codeblock", ElementKind::Codeblock),
     ("quote", ElementKind::Quote),
     ("callout", ElementKind::Callout),
@@ -451,7 +459,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         | Codeblock | Callout | Card | Table | Heading | OrderedList | UnorderedList | Kind
         | Version
         | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
-        Em | Strong | Mark | Strikeout => Shape::Inline,
+        Em | Strong | Mark | Strikeout | Ruby => Shape::Inline,
         // Either shape. A link, an embed or an icon alone on a line is
         // not a structural error -- it is how you show one file, one
         // image, one glyph. What `shape_mismatch` is for is the case
@@ -625,6 +633,17 @@ mod tests {
             Value::String("https://example.com".to_string()),
         )]));
         assert_eq!(classify_std_lenient(&el), ElementKind::Link);
+    }
+
+    #[test]
+    fn named_at_sigil_with_ruby_name_is_recognized() {
+        let mut el = element_new(Sigil::named("ruby"));
+        el.args = Some(Value::Map(vec![(
+            "rt".to_string(),
+            Value::String("かんじ".to_string()),
+        )]));
+        assert_eq!(classify_std_lenient(&el), ElementKind::Ruby);
+        assert_eq!(required_shape(&ElementKind::Ruby), Some(Shape::Inline));
     }
 
     #[test]

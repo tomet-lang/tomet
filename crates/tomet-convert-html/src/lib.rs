@@ -371,6 +371,7 @@ fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) 
         // Tomet's, and `<del>` is what GFM's `~~` renders as everywhere
         // it is read.
         "strikeout" => render_wrapped_inline(cx, el, "del", out),
+        "ruby" => render_ruby_element(cx, el, out),
         "codeblock" => render_codeblock_element(el, out),
         "quote" => render_quote_element(cx, el, out, inline),
         "table" => render_table_element(cx, el, out),
@@ -470,6 +471,31 @@ fn render_wrapped_inline(cx: &RenderCtx, el: &Element, tag: &str, out: &mut Stri
         render_inlines(cx, content, out);
     }
     out.push_str(&format!("</{tag}>"));
+}
+
+/// `@ruby[漢字](rt:"かんじ")` -- real `<ruby>`/`<rt>` markup, not the
+/// generic `<span data-rt=...>` `render_generic_element` would fall back to.
+/// `rt` is meaningful content (the reading), not decoration, so it has to
+/// reach the output as text a reader/screen-reader sees.
+fn render_ruby_element(cx: &RenderCtx, el: &Element, out: &mut String) {
+    let args = normalized_element_args(el);
+    let rt = args
+        .as_ref()
+        .and_then(as_map)
+        .and_then(|m| map_get(m, "rt"))
+        .and_then(|v| match v {
+            Value::String(s) => Some(s.as_str()),
+            _ => None,
+        })
+        .unwrap_or("");
+
+    out.push_str("<ruby>");
+    if let Some(content) = &el.content {
+        render_inlines(cx, content, out);
+    }
+    out.push_str("<rt>");
+    out.push_str(&escape_html(rt));
+    out.push_str("</rt></ruby>");
 }
 
 /// `@codeblock(lang:xxx)[code]` -- the Markdown importer's mapping for
@@ -1308,6 +1334,13 @@ mod tests {
             body,
             "<p>a <em>em</em> b <strong>strong</strong> c <mark>mark</mark></p>\n"
         );
+    }
+
+    #[test]
+    fn renders_ruby() {
+        let doc = parse_document("a @ruby[漢字](rt:\"かんじ\") b\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(body, "<p>a <ruby>漢字<rt>かんじ</rt></ruby> b</p>\n");
     }
 
     #[test]
