@@ -141,12 +141,55 @@ pub const RESERVED_NAMESPACES: [&str; 1] = ["doc"];
 /// pattern-matches them directly, with no dependency on `Bindings` at all.
 /// This vocabulary exists purely so `@kind(doc.index)` resolves instead of
 /// being rejected as unknown.
+///
+/// `doc` (bare namespace, not `doc.index`) is the opposite case: it
+/// declares exactly one element, `icon`, and exists so `@doc.icon(...)`
+/// resolves as running text. `std` used to have its own `icon`, recognized
+/// but never drawing anything (`docs/spec/builtin-elements.tmt`'s old
+/// "recognized, does nothing" table) -- worse than not having it, the same
+/// way `@config(style:)` is worse than unimplemented, because a bare
+/// `@icon` looked like the real spelling while doing nothing. `doc.icon`
+/// replaces it under a namespace that says the opposite by construction:
+/// Tomet resolves and draws nothing here, on purpose, forever -- an
+/// external renderer implements this notation to make it into a picture.
+/// `params` exists so `check_arguments` still catches a typo'd key; it is
+/// not a step toward Tomet ever reading `name`/`pkg` itself.
 pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
-    vec![Vocabulary {
-        namespace: "doc.index".to_string(),
-        elements: BTreeMap::new(),
-        open: false,
-    }]
+    vec![
+        Vocabulary {
+            namespace: "doc.index".to_string(),
+            elements: BTreeMap::new(),
+            open: false,
+        },
+        Vocabulary {
+            namespace: "doc".to_string(),
+            elements: BTreeMap::from([(
+                "icon".to_string(),
+                ElementDecl {
+                    display: Some(Shape::Inline),
+                    region: Region::Body,
+                    singleton: false,
+                    params: vec![
+                        ParamDecl {
+                            name: "name".to_string(),
+                            ty: None,
+                            required: true,
+                            positional: true,
+                            default: None,
+                        },
+                        ParamDecl {
+                            name: "pkg".to_string(),
+                            ty: None,
+                            required: false,
+                            positional: false,
+                            default: None,
+                        },
+                    ],
+                },
+            )]),
+            open: false,
+        },
+    ]
 }
 
 impl Vocabulary {
@@ -233,7 +276,23 @@ impl Bindings {
             .and_then(|kind| by_namespace.get(&kind))
             .cloned();
 
-        let mut used = BTreeMap::new();
+        // A namespace under `RESERVED_NAMESPACES` (`doc`, `doc.index`, ...)
+        // is tomet's own, the same way `std` is -- no vault vocabulary may
+        // ever claim it (`load_vocabularies` enforces that), so there is
+        // nothing for a document to `@use` in the first place. Binding it
+        // unconditionally is what makes `@doc.icon(...)` resolve with no
+        // declaration anywhere, mirroring `classify()`'s hardcoded `"std"`
+        // branch below rather than adding a third lookup path next to
+        // `kind`/`used`.
+        let mut used: BTreeMap<String, Vocabulary> = by_namespace
+            .iter()
+            .filter(|(namespace, _)| {
+                RESERVED_NAMESPACES
+                    .iter()
+                    .any(|ns| *namespace == ns || namespace.starts_with(&format!("{ns}.")))
+            })
+            .map(|(namespace, vocab)| (namespace.clone(), vocab.clone()))
+            .collect();
         for namespace in used_namespaces(doc) {
             if let Some(vocab) = by_namespace.get(&namespace) {
                 used.insert(namespace, vocab.clone());
@@ -686,5 +745,49 @@ mod tests {
             .expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert!(bound.kind.is_some());
+    }
+
+    /// Unlike `deck` in
+    /// [`an_available_vocabulary_is_not_in_scope_unless_the_document_asks`],
+    /// `doc` never needs `@use`: it is reserved, so no vault vocabulary may
+    /// ever claim it, which is what makes binding it unconditionally safe.
+    #[test]
+    fn doc_icon_resolves_with_no_use_or_vocabulary_declaration() {
+        let doc = tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n")
+            .expect("document parses");
+        let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
+        assert_eq!(
+            bound.classify(&name("doc.icon")),
+            Ok(ElementKind::Custom("doc.icon".to_string()))
+        );
+    }
+
+    /// `doc` declares only `icon` -- a typo'd or invented name under it is
+    /// still an error, not a silent `Custom`. Tomet not resolving `icon`
+    /// itself is a different question from tomet not checking the name at
+    /// all.
+    #[test]
+    fn doc_rejects_a_name_it_does_not_declare() {
+        let doc = tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n")
+            .expect("document parses");
+        let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
+        assert!(bound.classify(&name("doc.glyph")).is_err());
+    }
+
+    /// `name` (positional, required) and `pkg` (named, optional) reach
+    /// `check_arguments` through the same `declaration()` a vault
+    /// vocabulary's `@param`s would, even though nothing declared a
+    /// `@vocabulary(doc)` document anywhere.
+    #[test]
+    fn doc_icon_declares_name_and_pkg() {
+        let doc = tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n")
+            .expect("document parses");
+        let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
+        let decl = bound
+            .declaration(&name("doc.icon"))
+            .expect("doc.icon has a declaration");
+        assert_eq!(decl.positional_keys(), vec!["name".to_string()]);
+        assert!(decl.param("name").is_some_and(|p| p.required));
+        assert!(decl.param("pkg").is_some_and(|p| !p.required));
     }
 }

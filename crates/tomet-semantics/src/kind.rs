@@ -146,7 +146,6 @@ pub enum ElementKind {
     Card,
     Table,
     Heading,
-    Icon,
     /// `Element { sigil: Named("ol"), .. }` -- a `-.` (auto-numbered) list.
     /// See `crate::list`.
     OrderedList,
@@ -202,7 +201,6 @@ impl ElementKind {
             ElementKind::Dir => "dir",
             ElementKind::Link => "link",
             ElementKind::Embed => "embed",
-            ElementKind::Icon => "icon",
             ElementKind::Hr => "hr",
             ElementKind::Em => "em",
             ElementKind::Strong => "strong",
@@ -253,7 +251,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 37] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -286,7 +284,6 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 37] = [
     ("dir", ElementKind::Dir),
     ("link", ElementKind::Link),
     ("embed", ElementKind::Embed),
-    ("icon", ElementKind::Icon),
     ("hr", ElementKind::Hr),
     ("em", ElementKind::Em),
     ("strong", ElementKind::Strong),
@@ -460,16 +457,15 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         | Version
         | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
         Em | Strong | Mark | Strikeout | Ruby => Shape::Inline,
-        // Either shape. A link, an embed or an icon alone on a line is
-        // not a structural error -- it is how you show one file, one
-        // image, one glyph. What `shape_mismatch` is for is the case
-        // that breaks something: a `heading` inside a paragraph, or
-        // `*emphasis*` standing as a block. Constraining these three
-        // caught nothing but ordinary writing, in this repository's own
-        // `.writ.tmt` among other places.
+        // Either shape. A link or an embed alone on a line is not a
+        // structural error -- it is how you show one file or one image.
+        // What `shape_mismatch` is for is the case that breaks something:
+        // a `heading` inside a paragraph, or `*emphasis*` standing as a
+        // block. Constraining these caught nothing but ordinary writing,
+        // in this repository's own `.writ.tmt` among other places.
         // A path mention goes both ways too: inside a sentence, and alone
         // in a table cell where the cell is the reference.
-        Link | Embed | Icon | File | Dir => return None,
+        Link | Embed | File | Dir => return None,
         // Either shape, and the reason the element is not called
         // `blockquote`. HTML needs two names because `<blockquote>` and
         // `<q>` are two elements; Tomet decides placement from position,
