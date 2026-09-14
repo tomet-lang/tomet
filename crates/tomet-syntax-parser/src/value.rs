@@ -381,8 +381,19 @@ pub(crate) const POSITIONAL_ENTRY_KEY: &str = "";
 /// `identifier:` rule, `://` as the sole exception -- see
 /// `is_scheme_uri_colon` -- and a leading `/` as the sole
 /// always-bare-scalar exception, see `starts_absolute_path`), or, if
-/// neither of those shapes matches, a bare value with no key at all,
-/// tagged with [`POSITIONAL_ENTRY_KEY`].
+/// neither of those shapes matches, a bare positional value with no key at
+/// all, tagged with [`POSITIONAL_ENTRY_KEY`].
+///
+/// The positional case delegates to [`parse_entry_value`] rather than
+/// reading a raw scalar directly, so `(a, "b")` and `("a", b)` parse the
+/// quoted entry the same way a `key: "b"` value would (`Value::String`,
+/// unescaped) regardless of which position it sits in. It used to call
+/// `eat_scalar_raw` unconditionally, which does not know about quoting at
+/// all -- a positional value was only ever unescaped when it happened to
+/// be the sole value in the group, via [`parse_value_at`]'s old fast path
+/// for a leading `"`; anywhere else `"star"` came back as the four-character
+/// *text* `"star"`, quote marks included, rather than the three-letter
+/// string `star`.
 pub(crate) fn parse_one_entry(cur: &mut Cursor) -> Result<(String, Value)> {
     let checkpoint = cur.pos();
     if !starts_absolute_path(cur) {
@@ -399,14 +410,8 @@ pub(crate) fn parse_one_entry(cur: &mut Cursor) -> Result<(String, Value)> {
         }
     }
     cur.set_pos(checkpoint);
-    if let Some(call) = try_parse_call(cur) {
-        return Ok((POSITIONAL_ENTRY_KEY.to_string(), call?));
-    }
-    let raw = eat_scalar_raw(cur).trim();
-    if raw.is_empty() {
-        return Err(err(cur, checkpoint, "expected a value"));
-    }
-    Ok((POSITIONAL_ENTRY_KEY.to_string(), scalar_from_text(raw)))
+    let value = parse_entry_value(cur)?;
+    Ok((POSITIONAL_ENTRY_KEY.to_string(), value))
 }
 
 /// A map body is one or more entries, separated by commas and/or
@@ -481,13 +486,15 @@ fn parse_entry_value(cur: &mut Cursor) -> Result<Value> {
 
 /// Shared prefix for both group-body and single-item value parsing: the
 /// three self-delimiting shapes (`[...]` seq, `"..."` quoted string,
-/// `{...}` nested map) are handled identically either way. `fallback`
-/// covers everything else, where the two contexts genuinely differ: a
-/// group body ([`parse_value_at`]) may collect several comma-separated
-/// entries into one `Value::Map`, but a single sequence item
-/// ([`parse_seq_item`]) must parse *exactly* one value and leave any
-/// following `,` for `parse_seq`'s own loop to see -- otherwise `[a, b]`
-/// would collapse into one two-entry map instead of two separate items.
+/// `{...}` nested map) are handled identically for [`parse_seq_item`],
+/// which is the only caller left: each stops right after that one value,
+/// never looking past it for a `,` (`[a, b]` must stay two items, not
+/// collapse into one two-entry map). [`parse_value_at`] used to share this
+/// same fast path and, with it, the same "stop right after" behavior --
+/// which was wrong there: a leading `"star"` in `("star", pkg:"x")` isn't
+/// the whole group, so it went straight to expecting `)` and choked on the
+/// `,`. It calls [`parse_map_body_or_scalar`] directly now, which reads a
+/// leading quoted/seq/map value as entry zero and keeps going.
 fn parse_value_shape(
     cur: &mut Cursor,
     fallback: impl FnOnce(&mut Cursor) -> Result<Value>,
@@ -515,7 +522,7 @@ fn parse_value_shape(
 /// values) into one `Value::Map`. Not used for sequence items -- see
 /// [`parse_seq_item`].
 pub(crate) fn parse_value_at(cur: &mut Cursor) -> Result<Value> {
-    parse_value_shape(cur, parse_map_body_or_scalar)
+    parse_map_body_or_scalar(cur)
 }
 
 /// A single item inside `[...]`: exactly one value (a `key: value` pair

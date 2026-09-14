@@ -147,6 +147,24 @@ mod tests {
     }
 
     #[test]
+    fn doc_icon_resolves_with_no_declared_vocabularies_at_all() {
+        let root = scratch_dir("tomet_test_resolver_doc_icon");
+        let loaded = load_vocabularies(&root, &[]);
+        assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
+        assert!(loaded.by_namespace.contains_key("doc"));
+
+        let doc = tomet_parser::parse_document("a @doc.icon(\"star\", pkg:\"lucide\") b\n")
+            .expect("document parses");
+        let bindings = bindings_for(&doc, &loaded);
+        assert_eq!(
+            bindings.classify(&tomet_ast::Name::namespaced("doc", "icon")),
+            Ok(tomet_semantics::ElementKind::Custom("doc.icon".to_string()))
+        );
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
     fn a_vault_vocabulary_cannot_claim_the_reserved_doc_namespace() {
         let root = scratch_dir("tomet_test_resolver_reserved_doc");
         fs::write(

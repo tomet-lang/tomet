@@ -893,7 +893,6 @@ fn describe_kind(name: &str) -> &'static str {
         "links" => "Link reference definitions table",
         "link" => "Link to a url, file, or document",
         "embed" => "Embed another document or asset",
-        "icon" => "Inline icon",
         "table" => "Table",
         "heading" => "Section heading",
         "em" => "Emphasis",

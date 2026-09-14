@@ -124,6 +124,31 @@ mod tests {
         );
     }
 
+    /// A quoted positional value used to parse correctly only when it was
+    /// the group's sole value (`parse_value_at`'s old fast path for a
+    /// leading `"`). Anywhere else -- first among several entries, or
+    /// after a `key:` entry -- it either failed outright (leading quote,
+    /// `expected ')'` on the following `,`) or came back with its quote
+    /// marks baked into the string (`eat_scalar_raw` does not know about
+    /// quoting). `@doc.icon("star", pkg:"lucide")` is exactly this shape.
+    #[test]
+    fn quoted_positional_value_parses_the_same_regardless_of_position() {
+        assert_eq!(
+            parse_value(r#""star", pkg:"lucide""#).unwrap(),
+            Value::Map(vec![
+                ("".into(), Value::String("star".into())),
+                ("pkg".into(), Value::String("lucide".into())),
+            ])
+        );
+        assert_eq!(
+            parse_value(r#"pkg:"lucide", "star""#).unwrap(),
+            Value::Map(vec![
+                ("pkg".into(), Value::String("lucide".into())),
+                ("".into(), Value::String("star".into())),
+            ])
+        );
+    }
+
     #[test]
     fn parses_scalars() {
         assert_eq!(parse_value("42").unwrap(), Value::Int(42));

@@ -371,7 +371,6 @@ fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) 
         "link" => render_link_element(cx, el, out, inline),
         "file" | "dir" => render_path_element(cx, el, out, inline),
         "embed" => render_embed_element(el, out),
-        "icon" => render_icon_element(cx, el, out, inline),
         "hr" => render_hr_element(cx, el, out),
         "em" | "strong" | "mark" => render_wrapped_inline(cx, el, kind.as_str(), out),
         // `<del>` rather than a `strikeout` tag: the element's name is
@@ -712,81 +711,6 @@ fn render_content_or_fallback(cx: &RenderCtx, el: &Element, fallback: &str, out:
     match &el.content {
         Some(content) if !content.is_empty() => render_inlines(cx, content, out),
         _ => out.push_str(&escape_html(fallback)),
-    }
-}
-
-fn render_icon_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
-    let tag = if inline { "span" } else { "div" };
-    let name = match &el.args {
-        Some(Value::String(s)) => s.as_str(),
-        Some(Value::Map(entries)) => entries
-            .iter()
-            .find(|(k, _)| k == "name")
-            .and_then(|(_, v)| match v {
-                Value::String(s) => Some(s.as_str()),
-                _ => None,
-            })
-            .unwrap_or(""),
-        _ => "",
-    };
-    let pkg = match &el.args {
-        Some(Value::Map(entries)) => entries
-            .iter()
-            .find(|(k, _)| k == "pkg" || k == "package")
-            .and_then(|(_, v)| match v {
-                Value::String(s) => Some(s.as_str()),
-                _ => None,
-            })
-            .unwrap_or(""),
-        _ => "",
-    };
-
-    let mut class_str = format!("tm-element tm-icon");
-    if !name.is_empty() {
-        class_str.push_str(&format!(" tm-icon-{name}"));
-    }
-    if !pkg.is_empty() {
-        class_str.push_str(&format!(" tm-icon-{pkg}"));
-        if !name.is_empty() {
-            class_str.push_str(&format!(" tm-icon-{pkg}-{name}"));
-        }
-    }
-
-    let value_data = match &el.value {
-        Some(v) => v.as_data(),
-        _ => None,
-    };
-    let (id, custom_class, data) = split_attrs(value_data.as_ref());
-    if let Some(c) = custom_class {
-        class_str.push(' ');
-        class_str.push_str(&c);
-    }
-
-    out.push_str(&format!("<{tag} class=\"{class_str}\""));
-    if let Some(id_str) = id {
-        out.push_str(&format!(" id=\"{}\"", escape_attr(&id_str)));
-    }
-    if !name.is_empty() {
-        out.push_str(&format!(" data-icon=\"{}\"", escape_attr(name)));
-    }
-    if !pkg.is_empty() {
-        out.push_str(&format!(" data-pkg=\"{}\"", escape_attr(pkg)));
-    }
-    for (k, v) in data {
-        out.push_str(&format!(
-            " data-{}=\"{}\"",
-            escape_attr(&k),
-            escape_attr(&v)
-        ));
-    }
-    push_data_attrs(out, el.args.as_ref(), &["name", "pkg", "package"]);
-    out.push('>');
-    if let Some(content) = &el.content {
-        render_inlines(cx, content, out);
-    }
-    out.push_str(&format!("</{tag}>"));
-    if !inline {
-        out.push('\n');
     }
 }
 
@@ -1521,27 +1445,6 @@ mod tests {
 </tr>\n\
 </tbody>\n\
 </table>\n"
-        );
-    }
-
-    #[test]
-    fn renders_icon_element_to_html() {
-        let doc =
-            parse_document("@icon(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"}\n").unwrap();
-        let body = render_body(&doc);
-        assert_eq!(
-            body,
-            "<div class=\"tm-element tm-icon tm-icon-sun tm-icon-lucide tm-icon-lucide-sun\" data-icon=\"sun\" data-pkg=\"lucide\" data-color=\"yellow\"></div>\n"
-        );
-
-        let inline_doc = parse_document(
-            "Here is @icon(name: \"sun\", pkg: \"lucide\"){color: \"yellow\"} icon.\n",
-        )
-        .unwrap();
-        let inline_body = render_body(&inline_doc);
-        assert_eq!(
-            inline_body,
-            "<p>Here is <span class=\"tm-element tm-icon tm-icon-sun tm-icon-lucide tm-icon-lucide-sun\" data-icon=\"sun\" data-pkg=\"lucide\" data-color=\"yellow\"></span> icon.</p>\n"
         );
     }
 
