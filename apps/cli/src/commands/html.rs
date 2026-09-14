@@ -29,6 +29,7 @@ pub(crate) fn render_file(
         number_headings: advanced,
         auto_slug_headings: advanced,
         lang,
+        ..Default::default()
     };
     if body {
         return Ok(tomet_html::render_body_with(&doc, &options));

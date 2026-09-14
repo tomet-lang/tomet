@@ -10,12 +10,16 @@
 //! carries no visible content, and `@links{}` containers render their bare
 //! children as a definition list of anchors.
 
+use std::fmt;
+use std::sync::Arc;
+
 use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, Value,
 };
 use tomet_semantics::{
-    EXACT_DATA_KEY, ElementKind, TargetScheme, classify_std_lenient, flatten_data, heading_level,
-    is_directive, link_target, list_items, list_ordered, normalized_element_args, path_target,
+    Bindings, EXACT_DATA_KEY, ElementKind, TargetScheme, builtin_doc_vocabularies,
+    classify_std_lenient, flatten_data, heading_level, is_directive, link_target, list_items,
+    list_ordered, normalized_element_args, normalized_element_args_in, path_target,
     target_scheme,
 };
 
@@ -54,6 +58,52 @@ pub struct RenderOptions {
     /// default so nothing changes for existing callers; `Some(lang)`
     /// overrides it (e.g. `Some("en".to_string())`).
     pub lang: Option<String>,
+    /// A hook for element kinds this crate assigns no built-in meaning to
+    /// -- `ElementKind::Custom`, most often a namespaced embedded-vocabulary
+    /// element like `doc.icon`, which `tomet_semantics` resolves but
+    /// deliberately never draws (see
+    /// `tomet_semantics::builtin_doc_vocabularies`). `None` keeps every
+    /// existing caller's output unchanged (the generic `<span>`/`<div>`
+    /// fallback); a hook that returns `None` for a given element falls
+    /// back to that same rendering, so it only needs to answer for the
+    /// kinds it actually knows.
+    pub custom_element: Option<CustomElementRenderer>,
+}
+
+/// What a [`RenderOptions::custom_element`] hook sees for one element.
+pub struct CustomElementCtx<'a> {
+    /// The dotted or bare name [`classify_std_lenient`] fell back to
+    /// (`"doc.icon"`, `"my-widget"`, ...).
+    pub kind: &'a str,
+    /// `args`, normalized against the same vocabularies this crate binds
+    /// for rendering (`builtin_doc_vocabularies`), so a positional first
+    /// argument -- `doc.icon`'s `name` -- is already keyed by name rather
+    /// than left under the parser's positional sentinel.
+    pub args: Option<&'a Value>,
+    /// The element's bracketed `[content]`, already parsed as inline nodes.
+    pub content: Option<&'a [Inline]>,
+    /// Whether this element sits inline in running text (`span`) or as a
+    /// block (`div`) -- the same distinction `render_generic_element` uses.
+    pub inline: bool,
+}
+
+/// A [`RenderOptions::custom_element`] hook. A newtype (not a bare
+/// `Box<dyn Fn>` field) because `RenderOptions` derives `Debug`/`Clone`,
+/// and trait objects need a hand-written `Debug` and an `Arc` (not `Box`)
+/// to be `Clone`.
+#[derive(Clone)]
+pub struct CustomElementRenderer(Arc<dyn Fn(CustomElementCtx) -> Option<String> + Send + Sync>);
+
+impl CustomElementRenderer {
+    pub fn new(f: impl Fn(CustomElementCtx) -> Option<String> + Send + Sync + 'static) -> Self {
+        Self(Arc::new(f))
+    }
+}
+
+impl fmt::Debug for CustomElementRenderer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("CustomElementRenderer(..)")
+    }
 }
 
 /// Render a full standalone HTML document with the plain (unnumbered)
@@ -118,7 +168,16 @@ pub fn render_body_with_outline(
 ) -> (String, Vec<HeadingInfo>) {
     let mut out = String::new();
     let mut state = HeadingState::default();
-    let cx = RenderCtx { options };
+    // Only `doc.*` needs binding here -- a document's own `@vocabulary`
+    // declarations have no bearing on this crate's syntactic, semantics-free
+    // rendering, but `doc.icon`'s positional `name` still has to resolve to
+    // that key (not the parser's positional sentinel) for `custom_element`
+    // hooks to read it by name.
+    let bindings = Bindings::for_document(doc, builtin_doc_vocabularies());
+    let cx = RenderCtx {
+        options,
+        bindings: &bindings,
+    };
     for block in &doc.blocks {
         render_block(&cx, block, &mut out, &mut state);
     }
@@ -127,6 +186,7 @@ pub fn render_body_with_outline(
 
 struct RenderCtx<'a> {
     options: &'a RenderOptions,
+    bindings: &'a Bindings,
 }
 
 /// Per-document state threaded through heading rendering: the nesting
@@ -381,8 +441,36 @@ fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) 
         "codeblock" => render_codeblock_element(el, out),
         "quote" => render_quote_element(cx, el, out, inline),
         "table" => render_table_element(cx, el, out),
-        _ => render_generic_element(cx, el, kind.as_str(), out, inline),
+        _ => render_custom_or_generic_element(cx, el, kind.as_str(), out, inline),
     }
+}
+
+/// The fallback for a kind [`render_element`] has no dedicated handling
+/// for: try [`RenderOptions::custom_element`] first, since a namespaced
+/// embedded-vocabulary element like `doc.icon` reaches here too (Tomet
+/// resolves it but never draws it), then fall back to
+/// [`render_generic_element`] for anything the hook doesn't claim.
+fn render_custom_or_generic_element(
+    cx: &RenderCtx,
+    el: &Element,
+    kind: &str,
+    out: &mut String,
+    inline: bool,
+) {
+    if let Some(renderer) = &cx.options.custom_element {
+        let args = normalized_element_args_in(el, cx.bindings);
+        let html = (renderer.0)(CustomElementCtx {
+            kind,
+            args: args.as_ref(),
+            content: el.content.as_deref(),
+            inline,
+        });
+        if let Some(html) = html {
+            out.push_str(&html);
+            return;
+        }
+    }
+    render_generic_element(cx, el, kind, out, inline);
 }
 
 fn render_table_element(cx: &RenderCtx, el: &Element, out: &mut String) {
@@ -1279,6 +1367,57 @@ mod tests {
         let doc = parse_document("a @ruby[漢字](rt:\"かんじ\") b\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "<p>a <ruby>漢字<rt>かんじ</rt></ruby> b</p>\n");
+    }
+
+    /// `doc.icon` is `ElementKind::Custom("doc.icon")` -- this crate has no
+    /// dedicated handling for it, so it only draws anything when a caller
+    /// installs `RenderOptions::custom_element`. Also proves the hook sees
+    /// `name`/`pkg` already resolved by key, not the parser's positional
+    /// sentinel -- `doc.icon`'s `name` is a bare positional argument, and
+    /// nothing in this document declares `doc`'s vocabulary (it can't:
+    /// `doc` is a `RESERVED_NAMESPACES` entry).
+    #[test]
+    fn custom_element_hook_renders_doc_icon() {
+        let doc = parse_document("a @doc.icon(\"star\", pkg:\"lucide\") b\n").unwrap();
+        let options = RenderOptions {
+            custom_element: Some(CustomElementRenderer::new(|ctx| {
+                if ctx.kind != "doc.icon" {
+                    return None;
+                }
+                let get = |key: &str| {
+                    let Some(Value::Map(entries)) = ctx.args else {
+                        return None;
+                    };
+                    entries.iter().find(|(k, _)| k == key).and_then(|(_, v)| match v {
+                        Value::String(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                };
+                let name = get("name")?;
+                let pkg = get("pkg").unwrap_or_default();
+                Some(format!("<i data-icon=\"{name}\" data-pkg=\"{pkg}\"></i>"))
+            })),
+            ..RenderOptions::default()
+        };
+        let body = render_body_with(&doc, &options);
+        assert_eq!(
+            body,
+            "<p>a <i data-icon=\"star\" data-pkg=\"lucide\"></i> b</p>\n"
+        );
+    }
+
+    /// A hook that declines an element (returns `None`) falls back to the
+    /// existing generic rendering, same as having no hook at all.
+    #[test]
+    fn custom_element_hook_falling_through_matches_generic_rendering() {
+        let doc = parse_document("@doc.icon(\"star\", pkg:\"lucide\")\n").unwrap();
+        let without_hook = render_body(&doc);
+        let options = RenderOptions {
+            custom_element: Some(CustomElementRenderer::new(|_ctx| None)),
+            ..RenderOptions::default()
+        };
+        let with_declining_hook = render_body_with(&doc, &options);
+        assert_eq!(with_declining_hook, without_hook);
     }
 
     #[test]
