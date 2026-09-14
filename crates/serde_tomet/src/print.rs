@@ -40,6 +40,42 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
             }
             out.push(')');
         }
+        // Only ever reached by re-printing a `Value` that came from
+        // parsing real `.tmt` source (never from serializing a Rust
+        // value -- serde's data model has nothing that produces one, see
+        // `tomet_ast::Value`'s `Deserialize` impl). `(args)`-only by
+        // construction (the parser rejects `[content]`/`{value}` there).
+        Value::Element(el) => {
+            out.push('@');
+            out.push_str(&el.sigil.name().map(|n| n.to_string()).unwrap_or_default());
+            if let Some(args) = &el.args {
+                out.push('(');
+                write_args(args, out);
+                out.push(')');
+            }
+        }
+    }
+}
+
+/// `(args)`'s bare `key: value, ...` body -- distinct from [`write_map`],
+/// which always wraps in `{ }` when not top-level: `(args)` never does,
+/// and a positional entry (an empty key -- the parser's sentinel for one,
+/// since a real key is never empty) prints as a bare value with no `key:`
+/// prefix at all.
+fn write_args(value: &Value, out: &mut String) {
+    let Value::Map(entries) = value else {
+        write_value(value, out, false);
+        return;
+    };
+    for (i, (key, v)) in entries.iter().enumerate() {
+        if i > 0 {
+            out.push_str(", ");
+        }
+        if !key.is_empty() {
+            out.push_str(key);
+            out.push_str(": ");
+        }
+        write_value(v, out, false);
     }
 }
 

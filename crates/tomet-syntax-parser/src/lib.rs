@@ -124,6 +124,39 @@ mod tests {
         );
     }
 
+    /// `@name(...)` in a value position parses to `Value::Element`, not
+    /// the inert `Value::Call` `list(...)`/`enum(...)` use -- the `@`
+    /// is what says "a real, classifiable element", and `try_parse_call`
+    /// never matches it anyway (`@` isn't a name-start character).
+    #[test]
+    fn at_sigiled_call_in_a_value_position_is_an_element() {
+        let v = parse_value(r#"icon: @doc.icon("triangle", pkg:"lucide")"#).unwrap();
+        let Value::Map(entries) = v else {
+            panic!("expected a map, got {v:?}");
+        };
+        let Value::Element(el) = &entries[0].1 else {
+            panic!("expected an embedded element, got {:?}", entries[0].1);
+        };
+        assert_eq!(el.sigil, Sigil::Named(tomet_ast::Name::namespaced("doc", "icon")));
+        assert_eq!(
+            el.args,
+            Some(Value::Map(vec![
+                ("".to_string(), Value::String("triangle".to_string())),
+                ("pkg".to_string(), Value::String("lucide".to_string())),
+            ]))
+        );
+    }
+
+    /// MVP scope, enforced at parse time: a value-embedded element may
+    /// only take `(args)`. `[content]`/`{value}`/children are rejected
+    /// rather than silently accepted and then printed wrong (`tomet-style`
+    /// has no inline-content renderer for one).
+    #[test]
+    fn an_embedded_element_with_content_is_rejected() {
+        let err = parse_value(r#"icon: @doc.icon("triangle")[extra]"#).unwrap_err();
+        assert!(err.to_string().contains("(args)"), "{err}");
+    }
+
     /// A quoted positional value used to parse correctly only when it was
     /// the group's sole value (`parse_value_at`'s old fast path for a
     /// leading `"`). Anywhere else -- first among several entries, or

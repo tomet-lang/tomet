@@ -67,6 +67,10 @@ fn meta_value(v: &Value) -> MetaValue {
         // A call (e.g. `:rule`'s `allow:list(...)`) has no meaning as
         // document metadata; nothing writes one into `@meta` today.
         Value::Call(..) => MetaValue::MetaString(String::new()),
+        // Same treatment as `Call`: Pandoc's `MetaValue` has no element
+        // concept, and `@meta(icon: @doc.icon("x"))`'s whole point is that
+        // nothing resolves or renders the embedded element anyway.
+        Value::Element(_) => MetaValue::MetaString(String::new()),
     }
 }
 

@@ -24,35 +24,36 @@
   `tmtroot/docs/spec/connects.index.tmt`/`connects/rule.tmt`、
   `tmtroot/docs/spec/features/rule.tmt`
 
+## 決まったこと
+
+**`{...}`/`(...)` グループの中で `:` は使えない。** 確定。`@links{ (1)[a]
+:{z: 3} }` は今後もエラーのまま — `parse_bare_element`・値グループ内の
+`parse_element` の `allow_colon_connect: false` はこのまま変えない。値の中に
+要素を埋め込む機能(`Value::Element`、別の設計ログで進行中)が入っても、この
+制限には触れない。
+
 ## まだ決まっていないこと
 
-**1. `{...}` グループの中で `:` を使えるようにするか。**
-
-`@links{ (1)[a] :{z: 3} }` は今もエラー（`parse_bare_element`・値グループ内の
-`parse_element` はどちらも `allow_colon_connect: false` で呼ばれる）。`:rule`
-の実装はこの制限に触れていない — 値グループの中に `:name(...)` を書きたい
-という要求が出たときに決める。
-
-**2. `:name(...):name(...)` の重複時の意味論。**
+**1. `:name(...):name(...)` の重複時の意味論。**
 
 パーサは両方を `connects` に積むだけ（重複をエラーにしない）。
 `:rule(...):rule(...)` や `:as(x):as(y)` を「複数あってよい」とするか
 「エラー」とするかは、`:xxx` のメンバーが `rule` の一つしかない今は判断
 材料が無い。次のメンバー（`:as` など）が決まってから判断する。
 
-**3. `enum(...)` が具体的に何をするのか。**
+**2. `enum(...)` が具体的に何をするのか。**
 
 `list(...)` と同じ呼び出し構文で書ける（パーサは呼び出し名を判断しない）が、
 `enum` という名前に対応する意味論は何も無い。`:rule` の MVP は `list(...)`
 しか使っていない。
 
-**4. `allow:` に書いた名前自体を検証するか。**
+**3. `allow:` に書いた名前自体を検証するか。**
 
 `allow:list(ns.mycard)` の `ns.mycard` が実在する宣言済みの名前かどうかは
 今は見ない（MVP の意図的なスコープ）。検証を足すなら
 `tomet-semantics-validator::check_rule_connects` に手を入れる。
 
-**5. blueprint のテンプレート本体に書いた `:rule` が、実体化後の文書でも
+**4. blueprint のテンプレート本体に書いた `:rule` が、実体化後の文書でも
 生き残って効き続けるのか。**
 
 未検証。`tomet new` の実体化パスと `:rule` の相互作用は一度も試していない。

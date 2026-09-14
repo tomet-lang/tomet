@@ -561,6 +561,12 @@ fn value_to_plain(v: &Value) -> String {
         // A call is validation-only (e.g. `:rule`'s `allow:list(...)`)
         // and has no rendered form.
         Value::Call(..) => String::new(),
+        // An embedded element has no scalar form either -- same as `Map`.
+        // Typst has no path from here into `element_to_typst` (this
+        // function only ever reads a plain arg like `lang`/`pkg`, never a
+        // whole nested element), so this stays unrendered rather than
+        // half-rendering it out of context.
+        Value::Element(_) => String::new(),
     }
 }
 

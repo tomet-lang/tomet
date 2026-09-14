@@ -438,6 +438,9 @@ fn truthy(value: &Value) -> bool {
         Value::Map(entries) => !entries.is_empty(),
         // A call is a literal, not a container with an "empty" state.
         Value::Call(..) => true,
+        // Same reasoning as `Call`: an embedded element is a literal, not
+        // an emptiable container.
+        Value::Element(_) => true,
     }
 }
 

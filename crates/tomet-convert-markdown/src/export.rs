@@ -731,6 +731,8 @@ fn value_to_plain(v: &Value) -> String {
         // A call is validation-only (e.g. `:rule`'s `allow:list(...)`)
         // and has no rendered form.
         Value::Call(..) => String::new(),
+        // An embedded element has no scalar form either -- same as `Map`.
+        Value::Element(_) => String::new(),
     }
 }
 

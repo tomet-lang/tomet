@@ -134,6 +134,9 @@ pub fn scalar_string(v: &Value) -> Option<String> {
         // A call is a structured literal like a map, not a scalar --
         // there is no single string it collapses to.
         Value::Call(..) => None,
+        // An embedded element is a whole element, not a scalar -- same
+        // bucket as `Map`/`Call`.
+        Value::Element(_) => None,
     }
 }
 
@@ -166,6 +169,25 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
                 "args".to_string(),
                 serde_json::Value::Array(args.iter().map(value_to_json).collect()),
             );
+            serde_json::Value::Object(obj)
+        }
+        // Same shape as `Call` above (a tagged object), since JSON has no
+        // element concept either. Only `sigil`/`args` carry over -- a
+        // value-embedded element's own `content`/`value`/`children` are
+        // rare enough in practice (`@doc.icon("x")` uses none of them)
+        // that this isn't worth widening `serde_json` conversions for
+        // `Inline`/`ElementValue`, which don't have one anywhere else.
+        Value::Element(el) => {
+            let mut obj = serde_json::Map::new();
+            let name = el
+                .sigil
+                .name()
+                .map(|n| n.to_string())
+                .unwrap_or_default();
+            obj.insert("element".to_string(), serde_json::Value::String(name));
+            if let Some(args) = &el.args {
+                obj.insert("args".to_string(), value_to_json(args));
+            }
             serde_json::Value::Object(obj)
         }
     }
