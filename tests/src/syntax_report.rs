@@ -638,6 +638,17 @@ fn value_str(v: &Value) -> String {
             let inner: Vec<String> = args.iter().map(value_str).collect();
             format!("{name}({})", inner.join(", "))
         }
+        Value::Element(el) => {
+            let name = el
+                .sigil
+                .name()
+                .map(|n| n.to_string())
+                .unwrap_or_default();
+            match &el.args {
+                Some(args) => format!("@{name}({})", value_str(args)),
+                None => format!("@{name}"),
+            }
+        }
     }
 }
 

@@ -108,6 +108,27 @@ pub enum Value {
     /// not kinship -- conflating the two would blur which one is
     /// evaluated for a reader of either.
     Call(String, Vec<Value>),
+    /// A real, `@`-sigiled element sitting where a value goes --
+    /// `@meta(icon: @doc.icon("triangle"))`. Unlike [`Value::Call`], this
+    /// is the same [`Element`] any other position produces: it has a
+    /// `sigil`, classifies and validates through `Bindings` like any other
+    /// element (an unregistered name is still an error here), and can
+    /// itself carry `args`/`content`/`value`. What distinguishes it from a
+    /// call is exactly the `@` -- a call is inert, uninterpreted data
+    /// (`tomet-semantics` never looks inside a `Value::Call`); an embedded
+    /// element is a first-class element that happens to sit in a value
+    /// slot, which is why [`crate::Entry::Element`] already lets one stand
+    /// as a bare, keyless entry in a `{...}` group -- this variant is what
+    /// lets the same thing be a named `key: @name(...)` value, and a
+    /// `[...]` sequence item, too, since `Value` is the type all three
+    /// positions share.
+    ///
+    /// Parsed with `allow_colon_connect: false`, same as
+    /// [`crate::Entry::Element`] -- `:name(...)` stays unavailable inside
+    /// any value position, deliberately: a `{...}`/`(...)` group is data,
+    /// and a connect changes what the *enclosing* element means, which
+    /// has no sense for an element that is itself sitting inside a value.
+    Element(Box<Element>),
 }
 
 impl Serialize for Value {
@@ -144,14 +165,16 @@ impl Serialize for Value {
                 m.serialize_entry("args", args)?;
                 m.end()
             }
+            Value::Element(el) => el.serialize(serializer),
         }
     }
 }
 
-// Deliberately no `Value::Call` arm below: a call is only ever produced
-// by `tomet-syntax-parser` reading `name(...)` source text, never by
-// deserializing inbound data (there is no `visit_call` -- nothing in
-// serde's data model looks like one). This is not an oversight.
+// Deliberately no `Value::Call` or `Value::Element` arm below: both are only
+// ever produced by `tomet-syntax-parser` reading source text (`name(...)` /
+// `@name(...)`), never by deserializing inbound data -- there is no
+// `visit_call` and nothing in serde's data model looks like an `Element`
+// either. This is not an oversight.
 impl<'de> Deserialize<'de> for Value {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

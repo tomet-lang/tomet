@@ -167,6 +167,25 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // Named elements inside a group do parse -- that is what `children`
     // gained when the real parser learned `@element(c){ @args{ ... } }`.
     ("syntax/groups.tmt", &[ANY_ERROR]),
+    // Two unrelated gaps, both new to `tomet-parser` and neither ported to
+    // `grammar.js` yet:
+    //
+    // 1. `Value::Element` (`@name(...)` sitting where a value goes,
+    //    e.g. `@meta(icon: @doc.icon("triangle"))`) has no grammar.js
+    //    counterpart at all -- `_entry_value`/the seq-item rule offer no
+    //    "element" alternative, so even the single-`@doc.icon` case
+    //    errors.
+    // 2. A positional entry mixed with named ones inside `(args)`
+    //    (`@ns.thing(a, pkg:"lucide")`) -- pre-existing and unrelated to
+    //    `Value::Element`, just never exercised against the grammar
+    //    before this fixture: `tomet-parser`'s `(a, key:value)` support
+    //    predates it, but nothing in the corpus used that shape until
+    //    now.
+    //
+    // Fixing either needs `tree-sitter generate` to turn a `grammar.js`
+    // edit into `src/parser.c`, and that CLI was not available where this
+    // was written -- recorded rather than guessed at.
+    ("syntax/value-element.tmt", &[ANY_ERROR]),
 ];
 
 /// Records a fixture as drifting wholesale, without pinning the text of

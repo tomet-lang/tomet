@@ -124,7 +124,13 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                     let mut parts = Vec::new();
                     for (idx, (k, val)) in entries.iter().enumerate() {
                         let val_str = render_nested(val, config);
-                        if idx == 0 && (k == "variant" || k == "lang" || k == "format") {
+                        // An empty key is the parser's positional-entry
+                        // sentinel (`k.is_empty()`, since a real map key
+                        // can never be empty -- `eat_ident` never matches
+                        // one): `(a, key:value)` mixes a bare positional
+                        // value with named ones, and the bare one prints
+                        // bare too, not as `: a`.
+                        if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang" || k == "format")) {
                             parts.push(val_str);
                         } else {
                             parts.push(format!("{k}: {val_str}"));
@@ -136,7 +142,10 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                 let mut parts = Vec::new();
                 for (idx, (k, val)) in entries.iter().enumerate() {
                     let val_str = render_nested(val, config);
-                    if idx == 0 && (k == "variant" || k == "lang" || k == "format") {
+                    // See the matching comment in the single-entry branch
+                    // above -- an empty key is a positional entry, printed
+                    // bare rather than as `: value`.
+                    if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang" || k == "format")) {
                         parts.push(val_str);
                     } else {
                         parts.push(format!("{k}: {val_str}"));
@@ -149,6 +158,21 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
             let rendered: Vec<_> = args.iter().map(|a| render_nested(a, config)).collect();
             format!("{name}({})", rendered.join(", "))
         }
+        // `parse_entry_value` only ever produces one of these with `args`
+        // set and `content`/`value`/`children` all `None` (an MVP scope
+        // limit enforced at parse time, not just convention) -- so `args`
+        // alone is the whole element to print back.
+        Value::Element(el) => match &el.args {
+            Some(args) => format!(
+                "@{}({})",
+                el.sigil.name().map(ToString::to_string).unwrap_or_default(),
+                render_args_with_config(args, config)
+            ),
+            None => format!(
+                "@{}",
+                el.sigil.name().map(ToString::to_string).unwrap_or_default()
+            ),
+        },
     }
 }
 

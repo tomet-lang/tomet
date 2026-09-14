@@ -663,6 +663,44 @@ mod tests {
         );
     }
 
+    /// The whole point of `Value::Element`/`doc.icon`: an element embedded
+    /// as another element's *argument value* (not its own `(args)`/
+    /// `[content]`) still gets classified and checked, because
+    /// `tomet_tree::for_each_element` now descends into `el.args` too.
+    /// `validate_document` (no vault, `Bindings::default()`) is the exact
+    /// path that motivated `doc` resolving unconditionally in
+    /// `Bindings::classify`.
+    #[test]
+    fn an_element_embedded_in_another_elements_args_is_still_checked() {
+        let doc = parse("@meta(icon: @doc.icon(pkg:\"lucide\"))\n");
+        let errors = validate_document(&doc);
+        assert!(
+            errors.iter().any(|e| matches!(
+                e,
+                Diagnostic::MissingRequiredArgument { argument, .. } if argument == "name"
+            )),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn a_valid_embedded_doc_icon_has_no_errors() {
+        let doc = parse("@meta(icon: @doc.icon(\"triangle\", pkg:\"lucide\"))\n");
+        assert_eq!(validate_document(&doc), vec![]);
+    }
+
+    #[test]
+    fn an_unregistered_name_under_doc_is_still_unknown_when_embedded() {
+        let doc = parse("@meta(icon: @doc.glyph(\"triangle\"))\n");
+        let errors = validate_document(&doc);
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "doc.glyph")),
+            "{errors:?}"
+        );
+    }
+
     /// An element whose declaration has no `@args` says nothing about its
     /// arguments. Saying it takes none is a different statement, and one
     /// the vocabulary has no spelling for yet.

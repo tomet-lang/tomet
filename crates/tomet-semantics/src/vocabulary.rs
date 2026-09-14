@@ -6,7 +6,7 @@
 //! `tomet-semantics-resolver` finds `.tomet/vocabularies/<ns>.vocabulary.tmt`
 //! and reads it, because this layer may not do I/O.
 //!
-//! See `docs/spec/vocabulary.tmt` for the normative description. Two
+//! See `docs/spec/vocabulary.tmt` for the normative description. Three
 //! rules from it are enforced here:
 //!
 //! - Exactly two namespaces may be written bare -- `std`, because the
@@ -17,8 +17,14 @@
 //!   that declares a name already in [`BUILTIN_KINDS`] is rejected at the
 //!   declaration rather than at each use site, which is one error instead
 //!   of many.
+//! - `doc` (`RESERVED_NAMESPACES`) is a second namespace tomet carries
+//!   itself, resolved the same unconditional way `std` is in
+//!   [`Bindings::classify`]/[`Bindings::declaration`] -- but, unlike
+//!   `std`, never written bare: `@doc.icon(...)` needs its full name, just
+//!   never an `@use(doc)` in front of it.
 
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
 use tomet_ast::{Block, Document, Element, Name, Value};
 use tomet_tree::ValueExt;
@@ -192,6 +198,22 @@ pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
     ]
 }
 
+/// The `doc` vocabulary alone, cached -- `Bindings::classify`/`declaration`
+/// need it unconditionally, the same way they call `builtin()` for `std`
+/// unconditionally, so it can't wait for `Bindings::for_document`'s
+/// `available` (a caller using `Bindings::default()`, which most of this
+/// crate's own tests do, never populates that at all). `std` gets this for
+/// free from `BUILTIN_KINDS` being a `const`; `doc` needs a static instead
+/// because it is real [`Vocabulary`] data, built once by
+/// [`builtin_doc_vocabularies`] and reused rather than reallocated on every
+/// lookup.
+static DOC_VOCAB: LazyLock<Vocabulary> = LazyLock::new(|| {
+    builtin_doc_vocabularies()
+        .into_iter()
+        .find(|v| v.namespace == "doc")
+        .expect("doc is among the builtin vocabularies")
+});
+
 impl Vocabulary {
     /// Reads a parsed vocabulary document.
     ///
@@ -276,23 +298,7 @@ impl Bindings {
             .and_then(|kind| by_namespace.get(&kind))
             .cloned();
 
-        // A namespace under `RESERVED_NAMESPACES` (`doc`, `doc.index`, ...)
-        // is tomet's own, the same way `std` is -- no vault vocabulary may
-        // ever claim it (`load_vocabularies` enforces that), so there is
-        // nothing for a document to `@use` in the first place. Binding it
-        // unconditionally is what makes `@doc.icon(...)` resolve with no
-        // declaration anywhere, mirroring `classify()`'s hardcoded `"std"`
-        // branch below rather than adding a third lookup path next to
-        // `kind`/`used`.
-        let mut used: BTreeMap<String, Vocabulary> = by_namespace
-            .iter()
-            .filter(|(namespace, _)| {
-                RESERVED_NAMESPACES
-                    .iter()
-                    .any(|ns| *namespace == ns || namespace.starts_with(&format!("{ns}.")))
-            })
-            .map(|(namespace, vocab)| (namespace.clone(), vocab.clone()))
-            .collect();
+        let mut used = BTreeMap::new();
         for namespace in used_namespaces(doc) {
             if let Some(vocab) = by_namespace.get(&namespace) {
                 used.insert(namespace, vocab.clone());
@@ -335,6 +341,19 @@ impl Bindings {
             return builtin(&name.name).ok_or_else(unknown);
         }
 
+        // `doc` is tomet's own second reserved namespace, resolved the
+        // same unconditional way as `std` just above -- no `@use`, no
+        // `@vocabulary(doc)` document, works even with `Bindings::default()`.
+        // Still a real, closed vocabulary: `doc.glyph` (undeclared) is
+        // `unknown()`, not silently accepted.
+        if namespace == "doc" {
+            return if DOC_VOCAB.has(&name.name) {
+                Ok(ElementKind::Custom(name.to_string()))
+            } else {
+                Err(unknown())
+            };
+        }
+
         let vocab = match self.kind.as_ref() {
             Some(kind) if kind.namespace == namespace => Some(kind),
             _ => self.used.get(namespace),
@@ -351,6 +370,10 @@ impl Bindings {
     pub fn declaration(&self, name: &Name) -> Option<&ElementDecl> {
         let vocab = match name.namespace.as_deref() {
             None | Some("std") => self.kind.as_ref()?,
+            // Unconditional, like `classify`'s `"doc"` branch -- `doc.icon`
+            // has a real declaration (`name`/`pkg`) regardless of what, if
+            // anything, `self.kind`/`self.used` hold.
+            Some("doc") => &DOC_VOCAB,
             Some(namespace) => match self.kind.as_ref() {
                 Some(kind) if kind.namespace == namespace => kind,
                 _ => self.used.get(namespace)?,
@@ -745,6 +768,24 @@ mod tests {
             .expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert!(bound.kind.is_some());
+    }
+
+    /// `Bindings::default()` -- what `tomet_validator::validate_document`
+    /// (no vault, no vocabularies loaded at all) actually uses -- has to
+    /// resolve `doc.icon` too, not just a `Bindings` built through
+    /// `for_document` with `builtin_doc_vocabularies()` handed in. This is
+    /// exactly why `classify`/`declaration` special-case `"doc"`
+    /// unconditionally, the same as `"std"`, rather than `for_document`
+    /// populating `used` with it: `used` only exists on a `Bindings` that
+    /// went through `for_document`, and `default()` never does.
+    #[test]
+    fn doc_icon_resolves_even_with_bindings_default() {
+        let bindings = Bindings::default();
+        assert_eq!(
+            bindings.classify(&name("doc.icon")),
+            Ok(ElementKind::Custom("doc.icon".to_string()))
+        );
+        assert!(bindings.declaration(&name("doc.icon")).is_some());
     }
 
     /// Unlike `deck` in

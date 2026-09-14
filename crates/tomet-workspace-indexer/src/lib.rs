@@ -355,6 +355,13 @@ fn value_to_string(v: &Value) -> String {
             let s: Vec<_> = args.iter().map(value_to_string).collect();
             format!("{name}({})", s.join(", "))
         }
+        Value::Element(el) => {
+            let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
+            match &el.args {
+                Some(args) => format!("@{name}({})", value_to_string(args)),
+                None => format!("@{name}"),
+            }
+        }
     }
 }
 

@@ -1,0 +1,17 @@
+@kind(fixture)
+
+@meta{icon: @doc.icon(triangle), icons: [@doc.icon(a), @doc.icon(b, pkg: lucide)], mixed: @doc.icon(pkg: lucide, triangle)}
+
+#[値の中の要素]
+
+`@`付きの要素は `(args)`/`{value}`/`[...]` のどこでも値として書ける(上の
+`@meta` を参照)。裸の `list(...)`/`enum(...)` 呼び出し(評価されない
+データ)とは違い、本物の要素として分類・検証される。
+
+#[位置引数と名前付き引数の混在]
+
+クォート付きの位置引数は、先頭でもそれ以外の位置でも同じ文字列として読める
+(`@meta` の `mixed` を参照)。これは要素をvalueに埋め込む機能とは独立の
+パーサ修正で、`(args)` 一般に効く。
+
+@ns.thing(icon: @doc.icon(triangle, pkg: lucide))

@@ -638,6 +638,13 @@ fn macro_hover(
                 // `${...}` evaluation never produces a call literal itself
                 // (that's parse-time-only syntax), but stay exhaustive.
                 Value::Call(name, args) => format!("{name:?}({args:?})"),
+                // Evaluation can surface one via a field reference to data
+                // that holds one (`${meta.icon}` where `icon: @doc.icon(...)`).
+                Value::Element(el) => format!(
+                    "@{}({:?})",
+                    el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
+                    el.args
+                ),
             };
             let trimmed = rendered.trim();
             if is_web_url(trimmed) {

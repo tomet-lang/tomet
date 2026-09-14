@@ -714,6 +714,20 @@ fn value_to_json(val: &Value) -> serde_json::Value {
             );
             serde_json::Value::Object(map)
         }
+        // Same tagged-object shape as `Call` above -- JSON has no element
+        // concept, and this is only reached via `+++`-fenced `format:json`
+        // export, not the normal `.tmt` printer path (see
+        // `tomet_style::render_value_inner_with_config`'s `Value::Element`
+        // arm for that one).
+        Value::Element(el) => {
+            let mut map = serde_json::Map::new();
+            let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
+            map.insert("element".to_string(), serde_json::Value::String(name));
+            if let Some(args) = &el.args {
+                map.insert("args".to_string(), value_to_json(args));
+            }
+            serde_json::Value::Object(map)
+        }
     }
 }
 

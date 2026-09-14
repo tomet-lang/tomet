@@ -33,6 +33,10 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
                 "call syntax `{name}(...)` has no serde equivalent (got {} arg(s))",
                 args.len()
             ))),
+            Value::Element(el) => Err(Error::msg(format!(
+                "an embedded element (`@{}(...)`) has no serde equivalent",
+                el.sigil.name().map(|n| n.to_string()).unwrap_or_default()
+            ))),
         }
     }
 

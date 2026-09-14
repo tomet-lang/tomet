@@ -1,7 +1,7 @@
 //! Generic recursive traversal of a [`tomet_ast::Document`]'s tree.
 
 use std::ops::ControlFlow;
-use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline};
+use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline, Value};
 
 /// Called at every [`Element`] `walk_document` visits, in document order.
 pub trait Visitor<B> {
@@ -71,6 +71,9 @@ fn walk_inlines<B>(inlines: &[Inline], visitor: &mut impl Visitor<B>) -> Control
 
 fn walk_element<B>(element: &Element, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
     propagate!(visitor.visit(element));
+    if let Some(args) = &element.args {
+        propagate!(walk_value(args, visitor));
+    }
     if let Some(content) = &element.content {
         propagate!(walk_inlines(content, visitor));
     }
@@ -81,12 +84,47 @@ fn walk_element<B>(element: &Element, visitor: &mut impl Visitor<B>) -> ControlF
     }
     if let Some(ElementValue::Group(entries)) = &element.value {
         for entry in entries {
-            if let Entry::Element(child) = entry {
-                propagate!(walk_element(child, visitor));
+            match entry {
+                Entry::Element(child) => propagate!(walk_element(child, visitor)),
+                Entry::Pair(_, v) => propagate!(walk_value(v, visitor)),
             }
         }
     }
     ControlFlow::Continue(())
+}
+
+/// Descends into a [`Value`] for any [`Value::Element`] nested inside it --
+/// directly, or under a [`Value::Seq`]/[`Value::Map`]/[`Value::Call`] that
+/// contains one. Every other position an element can sit in (`[content]`,
+/// `{value}`'s bare [`Entry::Element`], `children`) already had a walker
+/// before `Value::Element` existed; this is the one `element.args` and
+/// `Entry::Pair`'s value needed, since neither was ever visited at all
+/// while `Value` had no element-shaped variant to visit.
+fn walk_value<B>(value: &Value, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
+    match value {
+        Value::Element(el) => walk_element(el, visitor),
+        Value::Seq(items) => {
+            for item in items {
+                propagate!(walk_value(item, visitor));
+            }
+            ControlFlow::Continue(())
+        }
+        Value::Map(entries) => {
+            for (_, v) in entries {
+                propagate!(walk_value(v, visitor));
+            }
+            ControlFlow::Continue(())
+        }
+        Value::Call(_, args) => {
+            for a in args {
+                propagate!(walk_value(a, visitor));
+            }
+            ControlFlow::Continue(())
+        }
+        Value::Null | Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::String(_) => {
+            ControlFlow::Continue(())
+        }
+    }
 }
 
 /// Mutable counterpart of [`Visitor`] -- called at every `&mut Element`
@@ -142,6 +180,9 @@ fn walk_inlines_mut<B>(inlines: &mut [Inline], visitor: &mut impl VisitorMut<B>)
 
 fn walk_element_mut<B>(element: &mut Element, visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
     propagate!(visitor.visit_mut(element));
+    if let Some(args) = &mut element.args {
+        propagate!(walk_value_mut(args, visitor));
+    }
     if let Some(content) = &mut element.content {
         propagate!(walk_inlines_mut(content, visitor));
     }
@@ -152,26 +193,63 @@ fn walk_element_mut<B>(element: &mut Element, visitor: &mut impl VisitorMut<B>) 
     }
     if let Some(ElementValue::Group(entries)) = &mut element.value {
         for entry in entries {
-            if let Entry::Element(child) = entry {
-                propagate!(walk_element_mut(child, visitor));
+            match entry {
+                Entry::Element(child) => propagate!(walk_element_mut(child, visitor)),
+                Entry::Pair(_, v) => propagate!(walk_value_mut(v, visitor)),
             }
         }
     }
     ControlFlow::Continue(())
 }
 
+/// Mutable counterpart of [`walk_value`].
+fn walk_value_mut<B>(value: &mut Value, visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
+    match value {
+        Value::Element(el) => walk_element_mut(el, visitor),
+        Value::Seq(items) => {
+            for item in items {
+                propagate!(walk_value_mut(item, visitor));
+            }
+            ControlFlow::Continue(())
+        }
+        Value::Map(entries) => {
+            for (_, v) in entries {
+                propagate!(walk_value_mut(v, visitor));
+            }
+            ControlFlow::Continue(())
+        }
+        Value::Call(_, args) => {
+            for a in args {
+                propagate!(walk_value_mut(a, visitor));
+            }
+            ControlFlow::Continue(())
+        }
+        Value::Null | Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::String(_) => {
+            ControlFlow::Continue(())
+        }
+    }
+}
+
 /// Every descendant of `el` (not `el` itself), in document order --
-/// `content`, `children`, and `ElementValue::Group` entries, the same
-/// three sites [`walk_element`] recurses into.
+/// `content`, `children`, and `ElementValue::Group` entries. `:rule`'s own
+/// use is the only caller, so "descendant" means what `:rule(allow:...)`
+/// means by it: content and children the reader encounters *underneath*
+/// `el`, not configuration carried *on* `el`.
 ///
-/// Deliberately never looks at `el.connects`: a connect (`Sigil::Named`
-/// carrying `:name(...)`'s own args/content/value, e.g. `:rule(...)`)
-/// is not a descendant of the document `el` sits in -- it is metadata
-/// about `el` itself, consumed only by the dedicated check that
-/// understands the closed set of connect names. Feeding it through here
-/// would let it reach the same classification a real document element
-/// gets, which is exactly the confusion a `:rule(...)` element being
-/// reported as an unknown element would be.
+/// That is also why this deliberately never looks at `el.args`, even
+/// though [`walk_element`] does (`args` can hold a [`Value::Element`]
+/// since elements were allowed to sit in value position): an element
+/// embedded in `el`'s own `(args)` -- `@thing(icon: @doc.icon("x"))` --
+/// describes `thing`, the same way `el.connects` does, so it is exempt
+/// for the same reason. `el.connects` itself is skipped for a related but
+/// distinct reason: a connect (`Sigil::Named` carrying `:name(...)`'s own
+/// args/content/value, e.g. `:rule(...)`) is not a descendant of the
+/// document `el` sits in at all -- it is metadata about `el` itself,
+/// consumed only by the dedicated check that understands the closed set
+/// of connect names. Feeding either through here would let it reach the
+/// same classification a real document element gets, which is exactly the
+/// confusion a `:rule(...)` element (or an `@doc.icon` describing `thing`)
+/// being reported as a disallowed *descendant* would be.
 ///
 /// `direct_only` restricts to immediate children only -- one level of
 /// `content`/`children`/`ElementValue::Group`, not recursed further --

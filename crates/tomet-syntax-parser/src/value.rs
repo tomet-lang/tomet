@@ -459,6 +459,39 @@ fn parse_map_body(cur: &mut Cursor) -> Result<Value> {
 /// be misread as a nested key.
 fn parse_entry_value(cur: &mut Cursor) -> Result<Value> {
     skip_ws_newlines_and_comments(cur);
+    // A real, `@`-sigiled element sitting in a value slot -- see
+    // `Value::Element`'s doc comment for what distinguishes this from
+    // `try_parse_call` below (an inert, uninterpreted literal). Checked
+    // first: `try_parse_call`'s `eat_name_segment` never matches `@`
+    // anyway (it isn't a name-start character), so this can't shadow it,
+    // but the element check is the one whose intent this states.
+    // `allow_colon_connect: false`, same as a bare element inside a
+    // `{...}` group's `Entry::Element` -- a value position never takes
+    // `:name(...)`. `Placement` is left at `parse_element`'s own default
+    // (`Inline`): an embedded value is never promoted to a block just
+    // because it happens to start a source line, the way a bare `{...}`
+    // entry or a document-level element can be.
+    if cur.peek() == Some('@') && crate::element::is_element_start(cur, false) {
+        let start = cur.pos();
+        let el = crate::element::parse_element(cur, false)?;
+        // MVP scope: `(args)` only, no `[content]`/`{value}`/children. The
+        // motivating case (`@doc.icon("triangle")`) never needs them, and
+        // printing one back out (`tomet-format-style`) would need its own
+        // inline-content renderer with sigil-escaping -- real work that
+        // belongs with a caller that actually wants it, not invented
+        // speculatively here. Rejected rather than silently accepted and
+        // printed wrong: a round-trip that doesn't reparse to the same
+        // tree is worse than an error at the source that caused it.
+        if el.content.is_some() || el.value.is_some() || el.children.is_some() {
+            return Err(err(
+                cur,
+                start,
+                "an element embedded in a value may only take (args) -- \
+                 [content]/{value} on a value-embedded element isn't supported yet",
+            ));
+        }
+        return Ok(Value::Element(Box::new(el)));
+    }
     if let Some(result) = try_parse_call(cur) {
         return result;
     }
