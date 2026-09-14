@@ -132,6 +132,7 @@ async fn parse_handler(Json(req): Json<ApiParseRequest>) -> impl IntoResponse {
                 number_headings: advanced,
                 auto_slug_headings: advanced,
                 lang: None,
+                ..Default::default()
             };
             let html = tomet_html::render_page_with(&doc, "Tomet Web", &options);
             let ast = format!("{doc:#?}");

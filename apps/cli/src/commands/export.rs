@@ -196,6 +196,7 @@ fn export_one(
                     number_headings: advanced,
                     auto_slug_headings: advanced,
                     lang: None,
+                    ..Default::default()
                 };
                 tomet_html::render_page_with(&doc, &title, &options)
             }

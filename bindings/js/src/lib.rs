@@ -43,6 +43,7 @@ impl ProcessOptions {
             number_headings: self.number_headings.unwrap_or(advanced),
             auto_slug_headings: self.auto_slug_headings.unwrap_or(advanced),
             lang: self.lang.clone(),
+            ..Default::default()
         }
     }
 }
