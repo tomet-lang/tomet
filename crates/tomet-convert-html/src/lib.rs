@@ -71,20 +71,50 @@ pub struct RenderOptions {
 }
 
 /// What a [`RenderOptions::custom_element`] hook sees for one element.
+///
+/// Every fallback element in the document reaches the hook -- most books
+/// have far more `card`/`callout`/custom-vocabulary elements than `doc.*`
+/// ones -- so [`CustomElementCtx::normalized_args`] is lazy and behind a
+/// method rather than a plain field: a hook is expected to check `kind`
+/// and return `None` immediately for anything it does not recognize,
+/// and elements it declines should never pay for normalizing args they
+/// were never going to use.
 pub struct CustomElementCtx<'a> {
     /// The dotted or bare name [`classify_std_lenient`] fell back to
     /// (`"doc.icon"`, `"my-widget"`, ...).
     pub kind: &'a str,
-    /// `args`, normalized against the same vocabularies this crate binds
-    /// for rendering (`builtin_doc_vocabularies`), so a positional first
-    /// argument -- `doc.icon`'s `name` -- is already keyed by name rather
-    /// than left under the parser's positional sentinel.
-    pub args: Option<&'a Value>,
     /// The element's bracketed `[content]`, already parsed as inline nodes.
     pub content: Option<&'a [Inline]>,
     /// Whether this element sits inline in running text (`span`) or as a
     /// block (`div`) -- the same distinction `render_generic_element` uses.
     pub inline: bool,
+    normalize_args: Box<dyn Fn() -> Option<Value> + 'a>,
+}
+
+impl<'a> CustomElementCtx<'a> {
+    pub fn new(
+        kind: &'a str,
+        content: Option<&'a [Inline]>,
+        inline: bool,
+        normalize_args: impl Fn() -> Option<Value> + 'a,
+    ) -> Self {
+        Self {
+            kind,
+            content,
+            inline,
+            normalize_args: Box::new(normalize_args),
+        }
+    }
+
+    /// `args`, normalized against the same vocabularies this crate binds
+    /// for rendering (`builtin_doc_vocabularies`), so a positional first
+    /// argument -- `doc.icon`'s `name` -- is already keyed by name rather
+    /// than left under the parser's positional sentinel. Clones the args
+    /// map on every call; see the type-level doc for why that cost is
+    /// opt-in rather than paid up front for every element.
+    pub fn normalized_args(&self) -> Option<Value> {
+        (self.normalize_args)()
+    }
 }
 
 /// A [`RenderOptions::custom_element`] hook. A newtype (not a bare
@@ -458,14 +488,11 @@ fn render_custom_or_generic_element(
     inline: bool,
 ) {
     if let Some(renderer) = &cx.options.custom_element {
-        let args = normalized_element_args_in(el, cx.bindings);
-        let html = (renderer.0)(CustomElementCtx {
-            kind,
-            args: args.as_ref(),
-            content: el.content.as_deref(),
-            inline,
+        let bindings = cx.bindings;
+        let ctx = CustomElementCtx::new(kind, el.content.as_deref(), inline, || {
+            normalized_element_args_in(el, bindings)
         });
-        if let Some(html) = html {
+        if let Some(html) = (renderer.0)(ctx) {
             out.push_str(&html);
             return;
         }
@@ -1384,8 +1411,9 @@ mod tests {
                 if ctx.kind != "doc.icon" {
                     return None;
                 }
+                let args = ctx.normalized_args();
                 let get = |key: &str| {
-                    let Some(Value::Map(entries)) = ctx.args else {
+                    let Some(Value::Map(entries)) = &args else {
                         return None;
                     };
                     entries.iter().find(|(k, _)| k == key).and_then(|(_, v)| match v {
