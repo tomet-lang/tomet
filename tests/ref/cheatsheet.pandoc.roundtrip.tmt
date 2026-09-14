@@ -32,7 +32,9 @@ type = "location"
 
 @link(target: "ref:1")[]
 
-@[](url:https://) @[](file:/readme.md) @[](ref:2)
+@[](url:https://)
+@[](file:/readme.md)
+@[](ref:2)
 
 #[heading] {id: "1"}
 
@@ -68,7 +70,11 @@ sudo whoami ls --help
 
 1. aaaa
 
-@strong[aaaa] @em[aaaa] @mark[aaaa] @em[aaaa] `aaaa`
+@strong[aaaa]
+@em[aaaa]
+@mark[aaaa]
+@em[aaaa]
+`aaaa`
 
 ```(lang:sh)
 ```

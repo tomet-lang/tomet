@@ -32,7 +32,9 @@ https://
 
 [[1]]
 
-`@`\[\](url:https://) `@`\[\](file:/readme.md) `@`\[\](ref:2)
+`@`\[\](url:https://)
+`@`\[\](file:/readme.md)
+`@`\[\](ref:2)
 
 # heading
 
@@ -64,7 +66,11 @@ sudo whoami ls --help
 
 1. aaaa
 
-**aaaa** *aaaa* \<mark>aaaa</mark> *aaaa* `aaaa`
+**aaaa**
+*aaaa*
+\<mark>aaaa</mark>
+*aaaa*
+`aaaa`
 
 ```(lang:sh)
 

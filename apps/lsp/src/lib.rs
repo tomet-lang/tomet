@@ -748,9 +748,16 @@ fn list_item_marker_text(item: &Element) -> String {
 
 fn extract_inlines_text(inlines: &[Inline]) -> String {
     let mut out = String::new();
-    for inline in inlines {
+    for (idx, inline) in inlines.iter().enumerate() {
         match inline {
             Inline::Text(t) => out.push_str(&t.value),
+            Inline::Raw(t) => out.push_str(&t.value),
+            Inline::SoftBreak(_) => {
+                let before = out.chars().last();
+                let after = inlines.get(idx + 1).and_then(Inline::first_char);
+                out.push_str(tomet_ast::softbreak_join(before, after));
+            }
+            Inline::LineBreak(_) => out.push(' '),
             Inline::Element(el) => out.push_str(&sigil_display_name(&el.sigil)),
         }
     }

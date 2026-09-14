@@ -342,9 +342,16 @@ fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
 }
 
 fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut String) {
-    for inline in inlines {
+    for (idx, inline) in inlines.iter().enumerate() {
         match inline {
             Inline::Text(t) => out.push_str(&escape_html(&t.value)),
+            Inline::Raw(t) => out.push_str(&escape_html(&t.value)),
+            Inline::SoftBreak(_) => {
+                let before = out.chars().last();
+                let after = inlines.get(idx + 1).and_then(Inline::first_char);
+                out.push_str(tomet_ast::softbreak_join(before, after));
+            }
+            Inline::LineBreak(_) => out.push_str("<br>"),
             Inline::Element(el) => render_element(cx, el, out, true),
         }
     }
@@ -591,9 +598,16 @@ fn render_embed_element(el: &Element, out: &mut String) {
 /// which can't itself carry markup.
 fn inlines_to_plain(inlines: &[Inline]) -> String {
     let mut s = String::new();
-    for inline in inlines {
+    for (idx, inline) in inlines.iter().enumerate() {
         match inline {
             Inline::Text(t) => s.push_str(&t.value),
+            Inline::Raw(t) => s.push_str(&t.value),
+            Inline::SoftBreak(_) => {
+                let before = s.chars().last();
+                let after = inlines.get(idx + 1).and_then(Inline::first_char);
+                s.push_str(tomet_ast::softbreak_join(before, after));
+            }
+            Inline::LineBreak(_) => s.push(' '),
             Inline::Element(el) => {
                 if let Some(content) = &el.content {
                     s.push_str(&inlines_to_plain(content));

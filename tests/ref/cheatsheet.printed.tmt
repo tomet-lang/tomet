@@ -36,7 +36,9 @@ ${sum(a, b)}
 
 @link(ref: 1)[]
 
-@[](url:https://) @[](file:/readme.md) @[](ref:2)
+@[](url:https://)
+@[](file:/readme.md)
+@[](ref:2)
 
 #[heading] {id: 1}
 
@@ -51,7 +53,8 @@ ${sum(a, b)}
 @embed(ref: 3)[alt]
 
 ```sh
-sudo whoami ls --help
+sudo whoami
+ls --help
 ```
 
 @memo+++
@@ -74,7 +77,11 @@ sudo whoami ls --help
 
 1. aaaa
 
-@strong[aaaa] @em[aaaa] @mark[aaaa] @em[aaaa] `aaaa`
+@strong[aaaa]
+@em[aaaa]
+@mark[aaaa]
+@em[aaaa]
+`aaaa`
 
 ```(lang:sh)
 ```
@@ -87,4 +94,6 @@ sudo whoami ls --help
 
 ---[💫]---
 
-@table(align: center)[[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ] [ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ] [ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]]{}
+@table(align: center)[[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]
+[ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]
+[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]]{}

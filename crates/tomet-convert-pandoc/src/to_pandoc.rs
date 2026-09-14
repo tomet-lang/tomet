@@ -208,6 +208,9 @@ fn content_to_blocks(inlines: &[TmInline]) -> Vec<Block> {
             }
             TmInline::Element(el) => run.extend(element_to_inlines(el)),
             TmInline::Text(t) => run.extend(text_to_inlines(&t.value)),
+            TmInline::Raw(t) => run.extend(text_to_inlines(&t.value)),
+            TmInline::SoftBreak(_) => run.push(Inline::SoftBreak),
+            TmInline::LineBreak(_) => run.push(Inline::LineBreak),
         }
     }
     flush_run(&mut run, &mut blocks);
@@ -240,6 +243,9 @@ fn inlines_to_pandoc(inlines: &[TmInline]) -> Vec<Inline> {
     for item in inlines {
         match item {
             TmInline::Text(t) => out.extend(text_to_inlines(&t.value)),
+            TmInline::Raw(t) => out.extend(text_to_inlines(&t.value)),
+            TmInline::SoftBreak(_) => out.push(Inline::SoftBreak),
+            TmInline::LineBreak(_) => out.push(Inline::LineBreak),
             TmInline::Element(el) => out.extend(element_to_inlines(el)),
         }
     }
@@ -252,6 +258,12 @@ fn inlines_to_pandoc(inlines: &[TmInline]) -> Vec<Inline> {
 /// `Space` node and a line break inside a paragraph is a `SoftBreak`.
 /// Writers rely on that to re-wrap, so emitting one big `Str` would be
 /// accepted but would come back out badly formatted.
+///
+/// A tomet `Text.value` is guaranteed not to contain `'\n'`/`'\r'` (source
+/// line breaks are `TmInline::SoftBreak`/`TmInline::LineBreak` nodes, mapped
+/// 1:1 above, not characters) -- this function's own `'\n'` handling is only
+/// live for the one caller that feeds it `RawText.value` instead, where a
+/// literal newline can legitimately appear.
 fn text_to_inlines(s: &str) -> Vec<Inline> {
     let mut out = Vec::new();
     let mut word = String::new();
@@ -343,9 +355,16 @@ fn content_to_plain_text(el: &Element) -> String {
 
 fn plain_text(inlines: &[TmInline]) -> String {
     let mut out = String::new();
-    for item in inlines {
+    for (idx, item) in inlines.iter().enumerate() {
         match item {
             TmInline::Text(t) => out.push_str(&t.value),
+            TmInline::Raw(t) => out.push_str(&t.value),
+            TmInline::SoftBreak(_) => {
+                let before = out.chars().last();
+                let after = inlines.get(idx + 1).and_then(TmInline::first_char);
+                out.push_str(tomet_ast::softbreak_join(before, after));
+            }
+            TmInline::LineBreak(_) => out.push('\n'),
             TmInline::Element(el) => out.push_str(&plain_text(content_of(el))),
         }
     }
@@ -586,17 +605,17 @@ mod tests {
     }
 
     #[test]
-    fn a_wrapped_line_becomes_a_space() {
-        // The parser folds a source line break inside a paragraph into a
-        // space before the AST is built, so there is no newline left here
-        // to become a `SoftBreak`. `text_to_inlines` still handles one
-        // for text that does carry it.
+    fn a_wrapped_line_becomes_a_softbreak() {
+        // `tomet_ast::Inline::SoftBreak` maps 1:1 to Pandoc's own
+        // `SoftBreak` (`content_to_blocks`) -- no longer `Space`, now that
+        // the parser keeps a source line break as its own node instead of
+        // folding it away before the AST is even built.
         let blocks = convert("one\ntwo\n");
         assert_eq!(
             blocks,
             vec![Block::Para(vec![
                 Inline::Str("one".into()),
-                Inline::Space,
+                Inline::SoftBreak,
                 Inline::Str("two".into()),
             ])]
         );

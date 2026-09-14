@@ -36,21 +36,35 @@
           "c": "+++"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
-          "c": "ブックマークのメモ改行を保持できる"
+          "c": "ブックマークの"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Str",
+          "c": "メモ"
+        },
+        {
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Str",
+          "c": "改行を保持できる"
+        },
+        {
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
           "c": "+++"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Span",
@@ -79,21 +93,21 @@
           "c": "+++"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
           "c": "メモ"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
           "c": "+++"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Span",
@@ -122,21 +136,21 @@
           "c": "+++"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
           "c": "メモ"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
           "c": "+++"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Span",
@@ -165,21 +179,21 @@
           "c": "+++"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
           "c": "メモ"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
           "c": "+++"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Span",
@@ -208,21 +222,21 @@
           "c": "+++"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
           "c": "メモ"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
           "c": "+++"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Span",
@@ -251,14 +265,14 @@
           "c": "+++"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
           "c": "メモ"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",

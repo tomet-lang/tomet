@@ -25,9 +25,18 @@ pub fn parse_dollar_element_str(source: &str) -> Result<tomet_ast::Element> {
 mod tests {
     use super::*;
     use tomet_ast::{
-        Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Sigil, Value,
+        Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Sigil,
+        SoftBreak, Span, Value,
     };
     use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
+
+    /// A `SoftBreak` for test expectations -- span never matters, `Span`'s
+    /// `PartialEq` always returns `true` (see its own doc comment).
+    fn sb() -> Inline {
+        Inline::SoftBreak(SoftBreak {
+            span: Span::dummy(),
+        })
+    }
 
     /// Every sigil takes every group opener.
     ///
@@ -648,14 +657,29 @@ mod tests {
         }
     }
 
-    /// The one `Inline::Text` of the document's first paragraph.
+    /// The document's first paragraph, rendered as plain text -- folding
+    /// each `SoftBreak` the way a renderer (e.g. the printer) does, via
+    /// `softbreak_join`, rather than asserting the paragraph parses to a
+    /// single merged `Text` (it no longer does; see `Inline::SoftBreak`).
     fn paragraph_text(src: &str) -> String {
         let doc = parse_document(src).unwrap();
         match &doc.blocks[0] {
-            Block::Paragraph(p) => match &p.content[..] {
-                [Inline::Text(t)] => t.value.clone(),
-                other => panic!("expected a single text run, got {other:?}"),
-            },
+            Block::Paragraph(p) => {
+                let items = &p.content;
+                let mut out = String::new();
+                for (idx, item) in items.iter().enumerate() {
+                    match item {
+                        Inline::Text(t) => out.push_str(&t.value),
+                        Inline::SoftBreak(_) => {
+                            let before = out.chars().last();
+                            let after = items.get(idx + 1).and_then(Inline::first_char);
+                            out.push_str(tomet_ast::softbreak_join(before, after));
+                        }
+                        other => panic!("expected only text/softbreaks, got {other:?}"),
+                    }
+                }
+                out
+            }
             other => panic!("expected paragraph, got {other:?}"),
         }
     }
@@ -911,10 +935,11 @@ mod tests {
         let doc = parse_document("first line\n${id} second line\n").unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
-                assert_eq!(p.content.len(), 3);
+                assert_eq!(p.content.len(), 4);
                 assert!(matches!(p.content[0], Inline::Text(_)));
-                assert!(matches!(p.content[1], Inline::Element(_)));
-                assert!(matches!(p.content[2], Inline::Text(_)));
+                assert!(matches!(p.content[1], Inline::SoftBreak(_)));
+                assert!(matches!(p.content[2], Inline::Element(_)));
+                assert!(matches!(p.content[3], Inline::Text(_)));
             }
             other => panic!("expected a single paragraph, got {other:?}"),
         }
@@ -1030,11 +1055,12 @@ mod tests {
         assert_eq!(doc.blocks.len(), 1);
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
-                assert_eq!(p.content.len(), 2);
-                // The newline is folded into the text as a space, the way
-                // any wrapped line is.
-                assert_eq!(&p.content[0], &Inline::Text("text ".into()));
-                match &p.content[1] {
+                assert_eq!(p.content.len(), 3);
+                // The newline is a `SoftBreak`, the way any wrapped line is
+                // now -- not folded into the text as a space.
+                assert_eq!(&p.content[0], &Inline::Text("text".into()));
+                assert_eq!(&p.content[1], &sb());
+                match &p.content[2] {
                     Inline::Element(el) => {
                         assert_eq!(el.sigil, Sigil::named("meta"));
                         assert_eq!(el.placement, tomet_ast::Placement::Inline);
@@ -1113,16 +1139,14 @@ mod tests {
         let doc = parse_document("keep /* drop this */ also keep\n").unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
-                // The comment's source is excluded entirely, but the text
-                // flushed before it and after it stay as separate `Inline`
-                // chunks (flushing doesn't merge adjacent text runs).
-                assert_eq!(
-                    &p.content,
-                    &vec![
-                        Inline::Text("keep ".into()),
-                        Inline::Text(" also keep".into())
-                    ]
-                );
+                // The comment's source is excluded entirely, and the text
+                // flushed before it and after it are merged back into one
+                // `Text` (`push_text` in `inline.rs`) -- two adjacent
+                // `Text`s with nothing between them would otherwise be
+                // indistinguishable from a genuine `SoftBreak`, which
+                // deliberately does not rely on bare adjacency to mean
+                // anything.
+                assert_eq!(&p.content, &vec![Inline::Text("keep  also keep".into())]);
             }
             other => panic!("expected paragraph, got {other:?}"),
         }
@@ -1133,13 +1157,7 @@ mod tests {
         let doc = parse_document("@caution[ keep /* drop */ this ]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(
-                    el.content,
-                    Some(vec![
-                        Inline::Text("keep ".into()),
-                        Inline::Text(" this".into())
-                    ])
-                );
+                assert_eq!(el.content, Some(vec![Inline::Text("keep  this".into())]));
             }
             other => panic!("expected element, got {other:?}"),
         }
@@ -1191,7 +1209,16 @@ mod tests {
         let doc = parse_document("@caution[ keep // drop this\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.content, Some(vec![Inline::Text("keep ".into())]));
+                // The comment's own trailing newline (left in place by
+                // `skip_line_comment`, which stops before it) flushes as
+                // its own `SoftBreak`, which `trim_edges` then drops as
+                // trailing whitespace -- exposing "keep "'s own trailing
+                // space as the new true edge, which gets trimmed too. No
+                // trailing space survives, unlike before `SoftBreak`
+                // existed: back then that lone newline folded straight
+                // into a literal `" "` `Text`, and `trim_edges` only ever
+                // trimmed `Text`, so it stopped one node short.
+                assert_eq!(el.content, Some(vec![Inline::Text("keep".into())]));
             }
             other => panic!("expected element, got {other:?}"),
         }
@@ -1206,12 +1233,13 @@ mod tests {
         let doc = parse_document("@caution[\n  keep\n  // drop this line\n  keep2\n]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
+                // Two flushes (before/after the elided comment line) each
+                // end/start with a break; `push_soft_break` merges them
+                // into the one `SoftBreak` a reader actually sees between
+                // `keep` and `keep2`, rather than leaving two adjacent ones.
                 assert_eq!(
                     el.content,
-                    Some(vec![
-                        Inline::Text("keep ".into()),
-                        Inline::Text(" keep2".into())
-                    ])
+                    Some(vec![Inline::Text("keep".into()), sb(), Inline::Text("keep2".into())])
                 );
             }
             other => panic!("expected element, got {other:?}"),
@@ -1318,9 +1346,11 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(
                     el.content,
-                    Some(vec![Inline::Text(
-                        "line one line two with * and [brackets] inside".into()
-                    )])
+                    Some(vec![
+                        Inline::Text("line one".into()),
+                        sb(),
+                        Inline::Text("line two with * and [brackets] inside".into()),
+                    ])
                 );
             }
             other => panic!("expected an element, got {other:?}"),
@@ -1406,7 +1436,11 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(
                     el.content,
-                    Some(vec![Inline::Text("line one line two".into())])
+                    Some(vec![
+                        Inline::Text("line one".into()),
+                        sb(),
+                        Inline::Text("line two".into()),
+                    ])
                 );
             }
             other => panic!("expected an element, got {other:?}"),
@@ -1426,7 +1460,7 @@ mod tests {
                         Value::String("rust".to_string())
                     )]))
                 );
-                assert_eq!(el.content, Some(vec![Inline::Text("fn main() {}".into())]));
+                assert_eq!(el.content, Some(vec![Inline::Raw("fn main() {}".into())]));
             }
             other => panic!("expected a codeblock element, got {other:?}"),
         }
@@ -1439,7 +1473,7 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::named("codeblock"));
                 assert_eq!(el.args, None);
-                assert_eq!(el.content, Some(vec![Inline::Text("plain".into())]));
+                assert_eq!(el.content, Some(vec![Inline::Raw("plain".into())]));
             }
             other => panic!("expected a codeblock element, got {other:?}"),
         }
@@ -1447,14 +1481,27 @@ mod tests {
 
     #[test]
     fn fenced_code_block_and_bracket_codeblock_produce_the_same_ast() {
+        // No longer *identical* content: the fenced spelling is always
+        // captured verbatim (`Inline::Raw`, can hold real newlines), while
+        // `@codeblock(...)[...]` is ordinary `[content]` -- the parser
+        // does not special-case lexing by element name (see
+        // `content_raw_is_now_just_an_ordinary_argument`), so it still goes
+        // through the usual inline grammar and comes back as `Inline::Text`.
+        // The two happened to produce byte-identical `Inline::Text` before
+        // `Inline::Raw` existed only because this example has no markup
+        // characters and fits on one line; a multi-line bracket body would
+        // already have shown the gap (its line breaks fold/`SoftBreak`
+        // like any other prose, not staying verbatim). What still matches
+        // is sigil/args/value and the rendered text.
         let fenced = parse_document("```rust\nfn main() {}\n```\n").unwrap();
         let bracket = parse_document("@codeblock(lang:rust)[fn main() {}]\n").unwrap();
         match (&fenced.blocks[0], &bracket.blocks[0]) {
             (Block::Element(a), Block::Element(b)) => {
                 assert_eq!(a.sigil, b.sigil);
                 assert_eq!(a.args, b.args);
-                assert_eq!(a.content, b.content);
                 assert_eq!(a.value, b.value);
+                assert_eq!(a.content, Some(vec![Inline::Raw("fn main() {}".into())]));
+                assert_eq!(b.content, Some(vec![Inline::Text("fn main() {}".into())]));
             }
             other => panic!("expected two codeblock elements, got {other:?}"),
         }
@@ -1470,7 +1517,7 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(
                     el.content,
-                    Some(vec![Inline::Text("code\n```\nmore code".into())])
+                    Some(vec![Inline::Raw("code\n```\nmore code".into())])
                 );
             }
             other => panic!("expected a codeblock element, got {other:?}"),
@@ -1482,7 +1529,7 @@ mod tests {
         let doc = parse_document("```\ncode\n`````\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.content, Some(vec![Inline::Text("code".into())]));
+                assert_eq!(el.content, Some(vec![Inline::Raw("code".into())]));
             }
             other => panic!("expected a codeblock element, got {other:?}"),
         }
@@ -1495,7 +1542,7 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(
                     el.content,
-                    Some(vec![Inline::Text("see `foo` and ``bar``".into())])
+                    Some(vec![Inline::Raw("see `foo` and ``bar``".into())])
                 );
             }
             other => panic!("expected a codeblock element, got {other:?}"),
@@ -1512,7 +1559,7 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(
                     el.content,
-                    Some(vec![Inline::Text("line one\nline two".into())])
+                    Some(vec![Inline::Raw("line one\nline two".into())])
                 );
             }
             other => panic!("expected a codeblock element, got {other:?}"),

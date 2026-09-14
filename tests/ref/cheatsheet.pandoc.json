@@ -117,14 +117,14 @@
           "c": "@[](url:https://)"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
           "c": "@[](file:/readme.md)"
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Str",
@@ -458,7 +458,7 @@
           ]
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Emph",
@@ -470,7 +470,7 @@
           ]
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Span",
@@ -491,7 +491,7 @@
           ]
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Emph",
@@ -503,7 +503,7 @@
           ]
         },
         {
-          "t": "Space"
+          "t": "SoftBreak"
         },
         {
           "t": "Code",

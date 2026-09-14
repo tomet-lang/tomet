@@ -277,17 +277,128 @@ impl Paragraph {
 pub enum Inline {
     Text(Text),
     Element(Element),
+    /// A source line break that is semantically whitespace. Unlike the old
+    /// behavior of folding it into a literal `' '` (or nothing, between two
+    /// East-Asian-wide characters) at parse time, this keeps the break's
+    /// existence in the tree instead of destroying it -- there is no way to
+    /// recover "the author wrapped a line" from a plain space once it has
+    /// been baked into a `Text.value`. How it is realized (a space, a literal
+    /// newline, nothing) is left to whichever consumer renders the tree, the
+    /// same way CommonMark's own softbreak leaves that choice to the
+    /// renderer.
+    SoftBreak(SoftBreak),
+    /// A real forced line break: always rendered as one, never folded.
+    LineBreak(LineBreak),
+    /// Verbatim text that may legitimately contain `'\n'`/`'\r'` (currently
+    /// only fenced code block bodies). Kept as its own variant so `Text`
+    /// carries a real invariant: it never contains a raw newline.
+    Raw(RawText),
 }
 
 impl Inline {
+    /// The first character of this node's own text, if it has one -- `Text`
+    /// and `Raw` do, `Element`/`SoftBreak`/`LineBreak` don't.
+    ///
+    /// Used by renderers reproducing [`softbreak_join`]'s wide-character
+    /// check against whatever inline follows a `SoftBreak`: only the
+    /// immediate next item is consulted, deliberately not skipping past an
+    /// `Element` to find text beyond it, matching the fold's old behavior of
+    /// only ever seeing characters within its own text run.
+    pub fn first_char(&self) -> Option<char> {
+        match self {
+            Inline::Text(t) => t.value.chars().next(),
+            Inline::Raw(t) => t.value.chars().next(),
+            Inline::Element(_) | Inline::SoftBreak(_) | Inline::LineBreak(_) => None,
+        }
+    }
+
     pub fn span(&self) -> Span {
         match self {
             Inline::Text(t) => t.span,
             Inline::Element(e) => e.span,
+            Inline::SoftBreak(b) => b.span,
+            Inline::LineBreak(b) => b.span,
+            Inline::Raw(t) => t.span,
         }
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct SoftBreak {
+    pub span: Span,
+}
+
+/// What a [`SoftBreak`] renders as when it is folded into plain running
+/// text, given the character immediately before and after it.
+///
+/// This is the fold rule tomet has always applied when joining a wrapped
+/// line: a space, except between two East-Asian-wide characters, where a
+/// space would open a visible gap in the middle of a sentence. It lives
+/// here, shared, because it used to be baked into the parser and is now
+/// needed by several independent call sites instead: HTML, Typst, and
+/// Pandoc export always fold this way, and so do the plain-text-only
+/// corners of the printer and Markdown export (an image's `alt`, a
+/// codeblock's extracted text) that cannot themselves contain a literal
+/// newline. The printer's and Markdown export's own *prose* rendering
+/// chooses differently -- a real `'\n'`, to keep a wrapped line looking
+/// wrapped -- which is exactly the point of leaving this choice to the
+/// renderer instead of deciding it once in the parser.
+pub fn softbreak_join(before: Option<char>, after: Option<char>) -> &'static str {
+    fn is_wide(c: char) -> bool {
+        unicode_width::UnicodeWidthChar::width(c) == Some(2)
+    }
+    if before.is_some_and(is_wide) && after.is_some_and(is_wide) {
+        ""
+    } else {
+        " "
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct LineBreak {
+    pub span: Span,
+}
+
+/// Verbatim text, captured byte-for-byte from source. See
+/// [`Inline::Raw`] for why this is a separate type from [`Text`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RawText {
+    pub value: String,
+    pub span: Span,
+}
+
+impl RawText {
+    pub fn new(value: impl Into<String>, span: Span) -> Self {
+        Self {
+            value: value.into(),
+            span,
+        }
+    }
+}
+
+impl From<String> for RawText {
+    fn from(value: String) -> Self {
+        Self {
+            value,
+            span: Span::dummy(),
+        }
+    }
+}
+
+impl From<&str> for RawText {
+    fn from(value: &str) -> Self {
+        Self {
+            value: value.to_string(),
+            span: Span::dummy(),
+        }
+    }
+}
+
+/// A run of prose text, folded from source the way any wrapped inline
+/// content is. Invariant: `value` never contains `'\n'` or `'\r'` -- a source
+/// line break becomes an [`Inline::SoftBreak`] or [`Inline::LineBreak`]
+/// instead of a character here. Verbatim text that may contain real newlines
+/// (code block bodies) is [`RawText`], not this.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Text {
     pub value: String,

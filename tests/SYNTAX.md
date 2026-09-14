@@ -250,7 +250,8 @@ Paragraph
 
 ```
 Paragraph
-  Text "この言語の名前は "
+  Text "この言語の名前は"
+  SoftBreak
   Inline @link
     args    {target: "https://example.com"}
     content
@@ -722,7 +723,9 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 Block  @quote
   args    "A"
   content
-    Text "一行目二行目"
+    Text "一行目"
+    SoftBreak
+    Text "二行目"
 ```
 
 ### 同じものを括弧で書いた形。木は一致する
@@ -736,7 +739,9 @@ Block  @quote
 Block  @quote
   args    "A"
   content
-    Text "一行目二行目"
+    Text "一行目"
+    SoftBreak
+    Text "二行目"
 ```
 
 ### 要素の行で開いてもよい
@@ -764,7 +769,9 @@ Block  @ul
     Bare
       args    "x"
       content
-        Text "一行目二行目"
+        Text "一行目"
+        SoftBreak
+        Text "二行目"
 ```
 
 ### 見出しも同じ
@@ -778,7 +785,9 @@ Block  @ul
 Block  @heading
   args    1
   content
-    Text "一行目二行目"
+    Text "一行目"
+    SoftBreak
+    Text "二行目"
 ```
 
 ### 継続する先が無い `|` は地の文。地の文にエスケープが無いので、行頭の `|` は綴れなければならない
@@ -1003,7 +1012,7 @@ let y = @T; *ptr
 Block  @codeblock
   args    {lang: "rust"}
   content
-    Text "let y = @T; *ptr"
+    Raw "let y = @T; *ptr"
 ```
 
 ## 補間 `${...}`
@@ -1193,8 +1202,7 @@ Paragraph
 
 ```
 Paragraph
-  Text "本文 "
-  Text " の続き"
+  Text "本文  の続き"
 ```
 
 ## 撤去された構文
@@ -1291,7 +1299,9 @@ unknown element `id`: only `std` and this document's own `@kind` may be written 
 Block  @memo
   args    {content: "raw"}
   content
-    Text "1行目 2行目"
+    Text "1行目"
+    SoftBreak
+    Text "2行目"
 ```
 
 検証:

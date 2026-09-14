@@ -34,8 +34,8 @@
 //!   `Attr` is where data goes. Only the elements move.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, ElementValue, Entry, Inline as TmInline, Name, Paragraph,
-    Placement, Sigil, Span, Text, Value,
+    Block as TmBlock, Document, Element, ElementValue, Entry, Inline as TmInline, LineBreak, Name,
+    Paragraph, Placement, Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::EXACT_DATA_KEY;
 
@@ -313,7 +313,12 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
     match inline {
         Inline::Str(s) => TmInline::Text(Text::from(s.clone())),
         Inline::Space => TmInline::Text(Text::from(" ".to_string())),
-        Inline::SoftBreak | Inline::LineBreak => TmInline::Text(Text::from(" ".to_string())),
+        Inline::SoftBreak => TmInline::SoftBreak(SoftBreak {
+            span: Span::dummy(),
+        }),
+        Inline::LineBreak => TmInline::LineBreak(LineBreak {
+            span: Span::dummy(),
+        }),
         // Tomet has no code element: `` `x` `` is protected text, so the
         // backticks go back in as characters. This is the inverse of
         // `to_pandoc`'s `Code` mapping.
@@ -382,25 +387,21 @@ fn inline_element(name: &str, attr: &Attr, inner: &[Inline]) -> TmInline {
 }
 
 fn inlines_to_text(inlines: &[Inline]) -> String {
-    let mut out = String::new();
-    for inline in inlines {
-        match inline_from_pandoc(inline) {
-            TmInline::Text(t) => out.push_str(&t.value),
-            TmInline::Element(el) => {
-                if let Some(content) = &el.content {
-                    out.push_str(&inlines_to_text_tm(content));
-                }
-            }
-        }
-    }
-    out
+    inlines_to_text_tm(&inlines_from_pandoc(inlines))
 }
 
 fn inlines_to_text_tm(inlines: &[TmInline]) -> String {
     let mut out = String::new();
-    for inline in inlines {
+    for (idx, inline) in inlines.iter().enumerate() {
         match inline {
             TmInline::Text(t) => out.push_str(&t.value),
+            TmInline::Raw(t) => out.push_str(&t.value),
+            TmInline::SoftBreak(_) => {
+                let before = out.chars().last();
+                let after = inlines.get(idx + 1).and_then(TmInline::first_char);
+                out.push_str(tomet_ast::softbreak_join(before, after));
+            }
+            TmInline::LineBreak(_) => out.push(' '),
             TmInline::Element(el) => {
                 if let Some(content) = &el.content {
                     out.push_str(&inlines_to_text_tm(content));

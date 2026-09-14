@@ -128,6 +128,9 @@ fn resolve_inlines(
         .into_iter()
         .map(|inline| match inline {
             Inline::Text(t) => Inline::Text(t),
+            Inline::Raw(t) => Inline::Raw(t),
+            Inline::SoftBreak(b) => Inline::SoftBreak(b),
+            Inline::LineBreak(b) => Inline::LineBreak(b),
             Inline::Element(el) => match interp_of(&el) {
                 Some(expr) => {
                     let span = el.span;
@@ -234,6 +237,8 @@ mod tests {
             for inline in items {
                 match inline {
                     Inline::Text(t) => out.push_str(&t.value),
+                    Inline::Raw(t) => out.push_str(&t.value),
+                    Inline::SoftBreak(_) | Inline::LineBreak(_) => {}
                     Inline::Element(el) => {
                         if let Some(content) = &el.content {
                             walk(out, content);

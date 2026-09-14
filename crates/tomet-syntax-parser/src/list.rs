@@ -8,9 +8,9 @@
 use crate::element::{parse_groups, parse_paren_value, parse_sugar_body};
 use crate::heading::merge_values;
 use crate::error::Result;
-use crate::inline::{Stop, parse_inline_seq};
+use crate::inline::{Stop, extend_merging, parse_inline_seq, push_text};
 use crate::value::skip_inline_ws;
-use tomet_ast::{Element, Inline, Sigil, Text, Value};
+use tomet_ast::{Element, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{element_list, element_list_item, element_new};
 
@@ -175,14 +175,16 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
                 // one: the space that separated the group from the text
                 // has to be put back by hand. Not when the group was
                 // empty, though -- `- [ ] text` has nothing to separate
-                // the text from.
+                // the text from. `push_text`/`extend_merging` fold that
+                // space (and the parsed sequence's own leading `Text`, if
+                // it has one) into `content`'s last item rather than
+                // leaving separate nodes at the seam that mean nothing on
+                // their own -- same reasoning as `inline.rs`'s comment
+                // elision.
                 if cur.pos() != after_groups && !content.is_empty() {
-                    content.push(Inline::Text(Text {
-                        value: " ".to_string(),
-                        span: cur.span_from(after_groups),
-                    }));
+                    push_text(&mut content, " ".to_string(), cur.span_from(after_groups));
                 }
-                content.extend(parse_inline_seq(cur, Stop::Line, false)?);
+                extend_merging(&mut content, parse_inline_seq(cur, Stop::Line, false)?);
             }
             (content, attrs)
         } else {

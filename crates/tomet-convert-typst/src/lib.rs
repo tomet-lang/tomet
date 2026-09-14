@@ -109,9 +109,16 @@ fn render_list_with_indent(el: &Element, indent: usize, out: &mut String) {
 
 fn inline_to_typst(inlines: &[Inline]) -> String {
     let mut out = String::new();
-    for inline in inlines {
+    for (idx, inline) in inlines.iter().enumerate() {
         match inline {
             Inline::Text(t) => out.push_str(&escape_text(&t.value)),
+            Inline::Raw(t) => out.push_str(&escape_text(&t.value)),
+            Inline::SoftBreak(_) => {
+                let before = out.chars().last();
+                let after = inlines.get(idx + 1).and_then(Inline::first_char);
+                out.push_str(tomet_ast::softbreak_join(before, after));
+            }
+            Inline::LineBreak(_) => out.push_str("\\\n"),
             Inline::Element(el) => out.push_str(&element_to_typst(el, true)),
         }
     }
@@ -486,9 +493,16 @@ fn content_to_typst(el: &Element) -> String {
 /// itself carry markup (a raw code block's contents, an image's `alt`).
 fn inlines_to_plain(inlines: &[Inline]) -> String {
     let mut s = String::new();
-    for inline in inlines {
+    for (idx, inline) in inlines.iter().enumerate() {
         match inline {
             Inline::Text(t) => s.push_str(&t.value),
+            Inline::Raw(t) => s.push_str(&t.value),
+            Inline::SoftBreak(_) => {
+                let before = s.chars().last();
+                let after = inlines.get(idx + 1).and_then(Inline::first_char);
+                s.push_str(tomet_ast::softbreak_join(before, after));
+            }
+            Inline::LineBreak(_) => s.push(' '),
             Inline::Element(el) => {
                 if let Some(content) = &el.content {
                     s.push_str(&inlines_to_plain(content));
