@@ -1,19 +1,17 @@
 //! `tomet_ast::Document` -> Pandoc's AST.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, ElementValue, Inline as TmInline, Placement,
-    Sigil, Value,
+    Block as TmBlock, Document, Element, ElementValue, Inline as TmInline, Placement, Sigil, Value,
 };
 use tomet_semantics::{
-    ElementKind, path_target,
-    TableRow, classify_std_lenient, document_meta, flatten_data, flatten_element_data, heading_level,
-    is_directive, link_target, list_items, list_ordered, normalized_element_args, parse_table_rows,
+    ElementKind, TableRow, classify_std_lenient, document_meta, flatten_data, flatten_element_data,
+    heading_level, is_directive, link_target, list_items, list_ordered, normalized_element_args,
+    parse_table_rows, path_target,
 };
 
 use crate::ast::{
-    QuoteType,
     Alignment, Attr, Block, Caption, Cell, ColSpec, ColWidth, Inline, ListAttributes, MetaValue,
-    PandocDoc, Row, RowHeadColumns, TableBody, TableFoot, TableHead, TableParts, Target,
+    PandocDoc, QuoteType, Row, RowHeadColumns, TableBody, TableFoot, TableHead, TableParts, Target,
 };
 
 /// Converts a Tomet document to Pandoc's AST.
@@ -182,7 +180,10 @@ fn element_to_inlines(el: &Element) -> Vec<Inline> {
         // evaluated: resolving it needs the document and its config, and
         // the Typst writer already sets this precedent.
         "interp" => vec![Inline::Code(Attr::empty(), interp_source(el))],
-        _ => vec![Inline::Span(generic_attr(el, &kind), content_to_inlines(el))],
+        _ => vec![Inline::Span(
+            generic_attr(el, &kind),
+            content_to_inlines(el),
+        )],
     }
 }
 
@@ -537,8 +538,7 @@ pub(crate) const BARE_SIGIL: &str = "bare";
 fn generic_attr(el: &Element, kind: &ElementKind) -> Attr {
     if matches!(el.sigil, Sigil::Bare) {
         let mut attr = attr_of(el, &[]);
-        attr.2
-            .push((SIGIL_KEY.to_string(), BARE_SIGIL.to_string()));
+        attr.2.push((SIGIL_KEY.to_string(), BARE_SIGIL.to_string()));
         return attr;
     }
     attr_of(el, &[&format!("tomet-{}", kind.as_str())])
@@ -714,6 +714,18 @@ mod tests {
         );
         // ...and it still produces no body block.
         assert_eq!(pandoc.blocks.len(), 1);
+
+        // list(...) call literal converts identically to [a, b]
+        let doc_call =
+            parse_document("@meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n").unwrap();
+        let pandoc_call = to_pandoc(&doc_call);
+        assert_eq!(
+            pandoc_call.meta.get("tags"),
+            Some(&MetaValue::MetaList(vec![
+                MetaValue::MetaInlines(vec![Inline::Str("a".into())]),
+                MetaValue::MetaInlines(vec![Inline::Str("b".into())]),
+            ]))
+        );
     }
 
     #[test]

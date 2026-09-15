@@ -224,37 +224,41 @@ pub fn normalized_element_args_in(el: &Element, bindings: &Bindings) -> Option<V
     let args = el.args.as_ref()?;
     let positional_keys = positional_keys(&el.sigil, bindings);
 
-    match args {
+    let result = match args {
         Value::Map(entries) => {
             if positional_keys.is_empty() {
-                return Some(Value::Map(entries.clone()));
+                Some(Value::Map(entries.clone()))
+            } else {
+                let recovered = recover_target_scheme_entry(
+                    positional_keys.first().map(String::as_str),
+                    entries.clone(),
+                );
+                let Value::Map(recovered_entries) = recovered else {
+                    unreachable!("recover_target_scheme_entry always returns Value::Map")
+                };
+                Some(fill_positional_slots(&positional_keys, recovered_entries))
             }
-            let recovered = recover_target_scheme_entry(
-                positional_keys.first().map(String::as_str),
-                entries.clone(),
-            );
-            let Value::Map(recovered_entries) = recovered else {
-                unreachable!("recover_target_scheme_entry always returns Value::Map")
-            };
-            Some(fill_positional_slots(&positional_keys, recovered_entries))
         }
         Value::Seq(seq) => {
             if positional_keys.is_empty() {
-                return Some(args.clone());
-            }
-            let mut entries = Vec::new();
-            for (idx, val) in seq.iter().enumerate() {
-                if idx < positional_keys.len() {
-                    entries.push((positional_keys[idx].clone(), val.clone()));
+                Some(args.clone())
+            } else {
+                let mut entries = Vec::new();
+                for (idx, val) in seq.iter().enumerate() {
+                    if idx < positional_keys.len() {
+                        entries.push((positional_keys[idx].clone(), val.clone()));
+                    }
                 }
+                Some(Value::Map(entries))
             }
-            Some(Value::Map(entries))
         }
         scalar => match positional_keys.first() {
             Some(first) => Some(Value::Map(vec![(first.clone(), scalar.clone())])),
             None => Some(scalar.clone()),
         },
-    }
+    };
+
+    result.map(crate::normalize::normalize_data_value)
 }
 
 #[cfg(test)]

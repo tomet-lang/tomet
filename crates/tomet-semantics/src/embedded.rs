@@ -262,9 +262,10 @@ pub fn element_format(el: &tomet_ast::Element) -> Option<EmbeddedFormat> {
 /// consumer has to know whether the author wrote `{a: 1}` or
 /// `(format:yaml)+++a: 1+++`.
 pub fn element_data(el: &tomet_ast::Element) -> Option<Value> {
-    match el.value.as_ref()? {
+    let data = match el.value.as_ref()? {
         tomet_ast::ElementValue::Group(_) => el.value.as_ref()?.as_data(),
         tomet_ast::ElementValue::Raw(body) => parse_raw_body(body, element_format(el)?).ok(),
         tomet_ast::ElementValue::Interp(_) => None,
-    }
+    }?;
+    Some(crate::normalize::normalize_data_value(data))
 }

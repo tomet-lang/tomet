@@ -130,6 +130,10 @@ pub fn scalar_string(v: &Value) -> Option<String> {
             let parts: Option<Vec<String>> = items.iter().map(scalar_string).collect();
             Some(parts?.join(", "))
         }
+        Value::Call(name, args) if name == "list" => {
+            let parts: Option<Vec<String>> = args.iter().map(scalar_string).collect();
+            Some(parts?.join(", "))
+        }
         Value::Map(_) => None,
         // A call is a structured literal like a map, not a scalar --
         // there is no single string it collapses to.
@@ -162,6 +166,9 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
                 .map(|(k, v)| (k.clone(), value_to_json(v)))
                 .collect(),
         ),
+        Value::Call(name, args) if name == "list" => {
+            serde_json::Value::Array(args.iter().map(value_to_json).collect())
+        }
         Value::Call(name, args) => {
             let mut obj = serde_json::Map::new();
             obj.insert("call".to_string(), serde_json::Value::String(name.clone()));
@@ -179,11 +186,7 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
         // `Inline`/`ElementValue`, which don't have one anywhere else.
         Value::Element(el) => {
             let mut obj = serde_json::Map::new();
-            let name = el
-                .sigil
-                .name()
-                .map(|n| n.to_string())
-                .unwrap_or_default();
+            let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
             obj.insert("element".to_string(), serde_json::Value::String(name));
             if let Some(args) = &el.args {
                 obj.insert("args".to_string(), value_to_json(args));
@@ -295,6 +298,21 @@ mod tests {
         assert_eq!(
             scalar_string(&Value::Seq(vec![map(&[("k", Value::Int(1))])])),
             None
+        );
+    }
+
+    #[test]
+    fn list_call_projects_like_a_sequence() {
+        let call = Value::Call(
+            "list".to_string(),
+            vec![Value::String("a".into()), Value::String("b".into())],
+        );
+        assert_eq!(scalar_string(&call), Some("a, b".to_string()));
+
+        let json = value_to_json(&call);
+        assert_eq!(
+            json,
+            serde_json::json!(["a", "b"])
         );
     }
 }
