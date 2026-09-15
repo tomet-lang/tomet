@@ -5,9 +5,8 @@ use std::path::Path;
 
 use tomet_parser::parse_document;
 use tomet_printer::document_to_tm;
-use tomet_transform::{
-    StructuralAction, StructuralQuery, apply_structural_action, count_structural_matches,
-};
+use tomet_search::{StructuralQuery, count_structural_matches};
+use tomet_transform::{StructuralAction, apply_structural_action};
 
 use crate::diff::FileDiff;
 

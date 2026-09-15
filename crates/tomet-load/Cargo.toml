@@ -9,6 +9,7 @@ tomet-config = { workspace = true }
 tomet-indexer = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-resolver = { workspace = true }
+tomet-search = { workspace = true }
 tomet-compute = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-transform = { workspace = true }

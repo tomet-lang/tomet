@@ -36,47 +36,17 @@
 //! fails to resolve. That is the typo case: `meta.tgs` should say so
 //! rather than quietly match nothing.
 
-use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt;
+use std::collections::BTreeSet;
+
+pub use tomet_search::filter::{
+    IndexQueryError, IndexRow, Query, SortKey, is_index_document, known_paths,
+};
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, InterpExprKind, Literal,
-    Placement, Sigil, Span, Value,
+    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, InterpExprKind, Placement,
+    Sigil, Span, Value,
 };
-use tomet_compute::EvaluationContext;
 use tomet_tree::{element_list_item, element_new};
-
-/// One candidate file, as `tomet-indexer::collect_metadata_table`
-/// produces it: the path a generated `@link(ref:...)` will carry, and the
-/// dotted field paths a predicate can ask about.
-#[derive(Debug, Clone, PartialEq)]
-pub struct IndexRow {
-    /// Measured from the project root, forward slashes -- the spelling
-    /// `tomet-indexer::resolve_document_relative` reads back.
-    pub path: String,
-    pub fields: BTreeMap<String, Value>,
-}
-
-/// A query that could not be read, or could not be run against a row.
-#[derive(Debug, Clone, PartialEq)]
-pub struct IndexQueryError {
-    pub message: String,
-}
-
-impl fmt::Display for IndexQueryError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
-    }
-}
-
-impl std::error::Error for IndexQueryError {}
-
-fn err(message: impl Into<String>) -> IndexQueryError {
-    IndexQueryError {
-        message: message.into(),
-    }
-}
 
 /// Replaces every `${filter(...)}` in `doc` with the `@link(ref:...)`
 /// entries it selects, in the order `by(...)` asks for -- in place,
@@ -217,14 +187,6 @@ fn rewrite_list_value(
 /// truth; the filename is not consulted here either (a caller that wants a
 /// cheap pre-parse filter, e.g. tomet-book's `.index.tmt` suffix, applies
 /// it before ever calling this).
-///
-/// This is also the cheap question to ask before the expensive one: a
-/// caller exporting a whole directory only pays for building the vault-wide
-/// metadata table (`VaultIndex::build`) for documents this returns `true`
-/// for.
-pub fn is_index_document(doc: &Document) -> bool {
-    tomet_semantics::document_kind(doc).as_deref() == Some("doc.index")
-}
 
 /// The argument list of a `${filter(...)}`, if `el` is exactly that --
 /// whether `el` sits as a block of its own or as a list item's entire
@@ -257,277 +219,6 @@ fn filter_args_of_content(content: &[Inline]) -> Option<&[InterpExpr]> {
         return None;
     };
     filter_args_of_element(el)
-}
-
-struct SortKey {
-    path: String,
-    descending: bool,
-}
-
-struct Query {
-    /// Every non-`by` argument, wrapped in a synthetic `and(...)`.
-    ///
-    /// Wrapping rather than looping and testing each result keeps one
-    /// definition of what counts as a match: `and`'s, in
-    /// `tomet-compute`'s `functions.rs`. A second truthiness rule written
-    /// here is a rule that can drift from the one authors actually see.
-    predicate: Option<InterpExpr>,
-    sort: Vec<SortKey>,
-}
-
-impl Query {
-    fn parse(args: &[InterpExpr]) -> Result<Self, IndexQueryError> {
-        let mut predicates = Vec::new();
-        let mut sort = Vec::new();
-        for arg in args {
-            match sort_key(arg)? {
-                Some(key) => sort.push(key),
-                None => predicates.push(arg.clone()),
-            }
-        }
-        let predicate = (!predicates.is_empty()).then(|| InterpExpr {
-            kind: InterpExprKind::Call {
-                callee: Box::new(identifier("and")),
-                args: predicates,
-            },
-            span: Span::default(),
-        });
-        Ok(Query { predicate, sort })
-    }
-
-    fn run(
-        &self,
-        doc: &Document,
-        config: &tomet_semantics::DocumentConfig,
-        rows: &[IndexRow],
-        known: &BTreeSet<String>,
-    ) -> Result<Vec<String>, IndexQueryError> {
-        let mut matched = Vec::new();
-        for row in rows {
-            if self.matches(doc, config, row, known)? {
-                matched.push(row);
-            }
-        }
-        matched.sort_by(|a, b| self.order(a, b));
-        Ok(matched.into_iter().map(|row| row.path.clone()).collect())
-    }
-
-    fn matches(
-        &self,
-        doc: &Document,
-        config: &tomet_semantics::DocumentConfig,
-        row: &IndexRow,
-        known: &BTreeSet<String>,
-    ) -> Result<bool, IndexQueryError> {
-        // No predicate at all -- `${filter(by(meta.created))}` is a
-        // legitimate "everything, in this order".
-        let Some(predicate) = &self.predicate else {
-            return Ok(true);
-        };
-        let ctx = context_for(row, known);
-        match tomet_compute::evaluate_with_context(doc, predicate, config, &ctx) {
-            Ok(Value::Bool(matched)) => Ok(matched),
-            // `and` always answers with a `Bool`, so this is only
-            // reachable if that ever stops being true.
-            Ok(other) => Err(err(format!(
-                "a filter predicate answered with {other:?} rather than yes or no, \
-                 evaluating {}",
-                row.path
-            ))),
-            // A field nobody has is left out of the context deliberately
-            // (see this module's header), so it arrives here as whatever
-            // the resolver says about a name it could not find -- which
-            // talks about document ids and names the wrong half of the
-            // path. Say what actually went wrong instead.
-            Err(e) => {
-                let unknown = unknown_fields(predicate, known);
-                if unknown.is_empty() {
-                    Err(err(format!("{}: {e}", row.path)))
-                } else {
-                    Err(err(format!(
-                        "no file in the vault has {} -- check the spelling",
-                        unknown.join(", ")
-                    )))
-                }
-            }
-        }
-    }
-
-    fn order(&self, a: &IndexRow, b: &IndexRow) -> Ordering {
-        for key in &self.sort {
-            let left = sort_value(a, &key.path);
-            let right = sort_value(b, &key.path);
-            let ordering = match (left, right) {
-                // A file the sort key says nothing about goes last, and
-                // stays last under `desc` -- the direction is applied to
-                // the comparison, not to this. An index of recent notes
-                // should not open with the ones carrying no date.
-                (None, None) => Ordering::Equal,
-                (None, Some(_)) => Ordering::Greater,
-                (Some(_), None) => Ordering::Less,
-                (Some(x), Some(y)) => {
-                    let ordering = value_order(x, y);
-                    if key.descending {
-                        ordering.reverse()
-                    } else {
-                        ordering
-                    }
-                }
-            };
-            if ordering != Ordering::Equal {
-                return ordering;
-            }
-        }
-        // Path last, so the output of a query never depends on the order
-        // the table happened to be walked in.
-        a.path.cmp(&b.path)
-    }
-}
-
-/// Reads one `by(field)` / `by(field, "asc"|"desc")` argument. `Ok(None)`
-/// means this argument is a predicate, not a sort key.
-fn sort_key(expr: &InterpExpr) -> Result<Option<SortKey>, IndexQueryError> {
-    let InterpExprKind::Call { callee, args } = &expr.kind else {
-        return Ok(None);
-    };
-    let InterpExprKind::Identifier(name) = &callee.kind else {
-        return Ok(None);
-    };
-    if name != "by" {
-        return Ok(None);
-    }
-
-    let (field, order) = match args.as_slice() {
-        [field] => (field, None),
-        [field, order] => (field, Some(order)),
-        other => {
-            return Err(err(format!(
-                "`by` takes a field and an optional \"asc\"/\"desc\", got {} argument(s)",
-                other.len()
-            )));
-        }
-    };
-
-    let path = dotted_path(field)
-        .ok_or_else(|| err("`by`'s first argument has to name a field, like `by(meta.created)`"))?;
-
-    let descending = match order {
-        None => false,
-        Some(order) => match &order.kind {
-            InterpExprKind::Literal(Literal::String(s)) if s == "asc" => false,
-            InterpExprKind::Literal(Literal::String(s)) if s == "desc" => true,
-            _ => {
-                return Err(err(format!(
-                    "`by({path}, ...)`'s direction has to be \"asc\" or \"desc\""
-                )));
-            }
-        },
-    };
-
-    Ok(Some(SortKey { path, descending }))
-}
-
-/// `meta.created` -> `"meta.created"`. `None` for anything that is not a
-/// plain identifier or member chain.
-fn dotted_path(expr: &InterpExpr) -> Option<String> {
-    match &expr.kind {
-        InterpExprKind::Identifier(name) => Some(name.clone()),
-        InterpExprKind::Member { object, member } => Some(format!("{}.{member}", dotted_path(object)?)),
-        _ => None,
-    }
-}
-
-/// The field paths a predicate reads that no file in the table has.
-///
-/// A function name is not a field: only the *arguments* of a call are
-/// walked, never its callee, or `exists` and `and` would themselves be
-/// reported as misspelt fields.
-fn unknown_fields(predicate: &InterpExpr, known: &BTreeSet<String>) -> Vec<String> {
-    let mut referenced = BTreeSet::new();
-    collect_field_paths(predicate, &mut referenced);
-    referenced
-        .into_iter()
-        .filter(|path| !known.contains(path))
-        .collect()
-}
-
-fn collect_field_paths(expr: &InterpExpr, out: &mut BTreeSet<String>) {
-    match &expr.kind {
-        InterpExprKind::Call { args, .. } => {
-            for arg in args {
-                collect_field_paths(arg, out);
-            }
-        }
-        InterpExprKind::NamedArg { value, .. } => collect_field_paths(value, out),
-        InterpExprKind::Identifier(_) | InterpExprKind::Member { .. } => {
-            if let Some(path) = dotted_path(expr) {
-                out.insert(path);
-            }
-        }
-        InterpExprKind::Literal(_) => {}
-    }
-}
-
-/// Every field path any row carries.
-fn known_paths(rows: &[IndexRow]) -> BTreeSet<String> {
-    rows.iter()
-        .flat_map(|row| row.fields.keys().cloned())
-        .collect()
-}
-
-/// One row as an evaluation context: every known path bound, `Null` for
-/// the ones this row does not have. See this module's header.
-fn context_for(row: &IndexRow, known: &BTreeSet<String>) -> EvaluationContext {
-    let mut ctx = EvaluationContext::new();
-    for path in known {
-        let value = row.fields.get(path).cloned().unwrap_or(Value::Null);
-        ctx.vars.insert(path.clone(), value);
-    }
-    ctx
-}
-
-/// The value a sort key reads, with `Null` treated as absent -- a field
-/// explicitly set to nothing sorts with the files that never had it.
-fn sort_value<'a>(row: &'a IndexRow, path: &str) -> Option<&'a Value> {
-    row.fields
-        .get(path)
-        .filter(|value| !matches!(value, Value::Null))
-}
-
-/// Ordering for a sort key: two numbers numerically, two strings
-/// bytewise (so an ISO-8601 date sorts correctly as text).
-///
-/// Anything else compares equal rather than erroring. Sorting is a
-/// pairwise question asked across a whole table, and one odd pair should
-/// not fail a query that is otherwise answerable; the path tiebreak in
-/// [`Query::order`] keeps the result deterministic either way. This is
-/// deliberately laxer than the `gt`/`lt` predicates, which do report a
-/// mixed pair -- there, the comparison *is* the answer.
-fn value_order(a: &Value, b: &Value) -> Ordering {
-    match (a, b) {
-        (Value::Int(x), Value::Int(y)) => x.cmp(y),
-        (Value::String(x), Value::String(y)) => x.cmp(y),
-        (Value::Bool(x), Value::Bool(y)) => x.cmp(y),
-        _ => match (as_f64(a), as_f64(b)) {
-            (Some(x), Some(y)) => x.partial_cmp(&y).unwrap_or(Ordering::Equal),
-            _ => Ordering::Equal,
-        },
-    }
-}
-
-fn as_f64(value: &Value) -> Option<f64> {
-    match value {
-        Value::Int(i) => Some(*i as f64),
-        Value::Float(f) => Some(*f),
-        _ => None,
-    }
-}
-
-fn identifier(name: &str) -> InterpExpr {
-    InterpExpr {
-        kind: InterpExprKind::Identifier(name.to_string()),
-        span: Span::default(),
-    }
 }
 
 /// `@link(ref:path)`. The bare positional argument is `"ref:{path}"` --
@@ -669,13 +360,15 @@ mod tests {
 
     #[test]
     fn a_predicate_selects_and_paths_break_the_tie() {
-        let paths = expand("@kind(doc.index)\n\n${filter(contains(meta.tags, \"rust\"))}\n").unwrap();
+        let paths =
+            expand("@kind(doc.index)\n\n${filter(contains(meta.tags, \"rust\"))}\n").unwrap();
         assert_eq!(paths, ["docs/a.tmt", "docs/c.tmt"]);
     }
 
     #[test]
     fn several_arguments_are_anded_together() {
-        let src = "@kind(doc.index)\n\n${filter(contains(meta.tags, \"rust\"), exists(meta.created))}\n";
+        let src =
+            "@kind(doc.index)\n\n${filter(contains(meta.tags, \"rust\"), exists(meta.created))}\n";
         assert_eq!(expand(src).unwrap(), ["docs/a.tmt"]);
     }
 
@@ -726,7 +419,8 @@ mod tests {
 
     #[test]
     fn by_rejects_a_direction_it_does_not_know() {
-        let err = expand("@kind(doc.index)\n\n${filter(by(meta.created, \"newest\"))}\n").unwrap_err();
+        let err =
+            expand("@kind(doc.index)\n\n${filter(by(meta.created, \"newest\"))}\n").unwrap_err();
         assert!(err.message.contains("asc"), "{}", err.message);
     }
 
@@ -745,10 +439,7 @@ mod tests {
         let src = "@kind(doc.index)\n\n#[ Rust ]\n\n${filter(contains(meta.tags, \"rust\"))}\n\n#[ Go ]\n\n${filter(contains(meta.tags, \"go\"))}\n";
         let mut doc = tomet_parser::parse_document(src).expect("valid source");
         assert_eq!(expand_index_queries(&mut doc, &table()).unwrap(), 2);
-        assert_eq!(
-            link_paths(&doc),
-            ["docs/a.tmt", "docs/c.tmt", "docs/b.tmt"]
-        );
+        assert_eq!(link_paths(&doc), ["docs/a.tmt", "docs/c.tmt", "docs/b.tmt"]);
         // Two headings, still one on each side of the first expansion.
         let headings = doc
             .blocks
@@ -826,8 +517,7 @@ mod tests {
 
     #[test]
     fn a_query_matching_nothing_leaves_no_artifact() {
-        let src =
-            "@kind(doc.index)\n\n- @link(ref:\"docs/a.tmt\")\n- ${filter(contains(meta.tags, \"nope\"))}\n";
+        let src = "@kind(doc.index)\n\n- @link(ref:\"docs/a.tmt\")\n- ${filter(contains(meta.tags, \"nope\"))}\n";
         let mut doc = tomet_parser::parse_document(src).expect("valid source");
         assert_eq!(expand_index_queries(&mut doc, &table()).unwrap(), 1);
 

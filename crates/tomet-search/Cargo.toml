@@ -1,13 +1,13 @@
 [package]
-name = "tomet-transform"
+name = "tomet-search"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }
 tomet-compute = { workspace = true }
-tomet-parser = { workspace = true }
-tomet-search = { workspace = true }
 tomet-semantics = { workspace = true }
-tomet-style = { workspace = true }
 tomet-tree = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

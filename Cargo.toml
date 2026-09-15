@@ -37,6 +37,9 @@ members = [
   #[ Transform -- in-memory AST transformations & macros ]
   "crates/tomet-transform",
 
+  #[ Search -- in-memory structural search & filter queries ]
+  "crates/tomet-search",
+
   #[ Convert -- conversion to/from external document formats ]
   "crates/tomet-convert-markdown",
   "crates/tomet-convert-html",
@@ -88,6 +91,8 @@ tomet-compute = { path = "crates/tomet-semantics-compute" }
 tomet-resolver = { path = "crates/tomet-semantics-resolver" }
 #[ Transform ]
 tomet-transform = { path = "crates/tomet-transform" }
+#[ Search ]
+tomet-search = { path = "crates/tomet-search" }
 #[ Convert ]
 tomet-markdown = { path = "crates/tomet-convert-markdown" }
 tomet-html = { path = "crates/tomet-convert-html" }

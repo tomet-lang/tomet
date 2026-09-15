@@ -16,9 +16,10 @@
 use std::path::Path;
 
 use tomet_ast::{Document, Value};
-use tomet_transform::{IndexRow, expand_index_queries};
+use tomet_search::IndexRow;
+use tomet_transform::expand_index_queries;
 
-pub use tomet_transform::{IndexQueryError, is_index_document};
+pub use tomet_search::{IndexQueryError, is_index_document};
 
 /// Every document in one vault, as `${filter(...)}` can query them.
 pub struct VaultIndex {
