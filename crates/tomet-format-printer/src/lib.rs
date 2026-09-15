@@ -11,9 +11,7 @@
 //! AST directly), built on the pure generate/validate/convert helpers
 //! in `tomet-field-utils`.
 
-use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, Placement, Sigil, Value,
-};
+use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline, Placement, Sigil, Value};
 use tomet_config::PrinterConfig;
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
@@ -764,8 +762,7 @@ mod tests {
 
     #[test]
     fn a_named_connect_round_trips_on_a_plain_element() {
-        let doc =
-            tomet_parser::parse_document("@section[ x ]:rule(allow: list(card))\n").unwrap();
+        let doc = tomet_parser::parse_document("@section[ x ]:rule(allow: list(card))\n").unwrap();
         let printed = document_to_tm(&doc);
         assert!(
             printed.contains(":rule(allow: list(card))"),
@@ -777,7 +774,10 @@ mod tests {
     fn stacked_connects_round_trip_in_order() {
         let doc = tomet_parser::parse_document("@x(a: 1):as(y):rule(allow: list(card))\n").unwrap();
         let printed = document_to_tm(&doc);
-        assert!(printed.contains(":as(y):rule(allow: list(card))"), "got: {printed:?}");
+        assert!(
+            printed.contains(":as(y):rule(allow: list(card))"),
+            "got: {printed:?}"
+        );
     }
 
     #[test]
@@ -1170,10 +1170,7 @@ mod tests {
     fn a_fenced_codeblock_body_survives_printing() {
         let doc = tomet_parser::parse_document("@codeblock(yaml)+++\na: 1\n+++\n").unwrap();
         let printed = document_to_tm(&doc);
-        assert!(
-            printed.contains("a: 1"),
-            "the body was dropped:\n{printed}"
-        );
+        assert!(printed.contains("a: 1"), "the body was dropped:\n{printed}");
     }
 
     #[test]

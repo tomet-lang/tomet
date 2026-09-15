@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use tomet_semantics::{ExportType, document_config};
 use tomet_load::Vault;
+use tomet_semantics::{ExportType, document_config};
 
 use crate::util::{format_parse_error, meta_title};
 

@@ -290,7 +290,9 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                             is_callout = true;
                             variant = kind_str;
                             let clean_title = val_trimmed[end_bracket + 1..]
-                                .trim_start_matches(|c| c == ' ' || c == '-' || c == '+' || c == '|')
+                                .trim_start_matches(|c| {
+                                    c == ' ' || c == '-' || c == '+' || c == '|'
+                                })
                                 .trim();
                             if !clean_title.is_empty() {
                                 title = Some(clean_title.to_string());
@@ -1061,7 +1063,10 @@ mod tests {
                 );
                 assert_eq!(
                     el.content,
-                    Some(vec![Inline::Raw(RawText::new("fn main() {}", Span::dummy()))])
+                    Some(vec![Inline::Raw(RawText::new(
+                        "fn main() {}",
+                        Span::dummy()
+                    ))])
                 );
             }
             other => panic!("expected pre element, got {other:?}"),

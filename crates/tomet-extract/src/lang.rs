@@ -24,8 +24,14 @@ pub enum Language {
 impl Language {
     /// Detects language from a file path based on its extension or filename.
     pub fn from_path(path: &Path) -> Option<Self> {
-        let ext = path.extension().and_then(|e| e.to_str()).map(|s| s.to_ascii_lowercase());
-        let file_name = path.file_name().and_then(|n| n.to_str()).map(|s| s.to_ascii_lowercase());
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|s| s.to_ascii_lowercase());
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|s| s.to_ascii_lowercase());
 
         if let Some(name) = file_name.as_deref() {
             match name {
@@ -128,13 +134,34 @@ mod tests {
 
     #[test]
     fn test_language_detection() {
-        assert_eq!(Language::from_path(Path::new("src/lib.rs")), Some(Language::Rust));
-        assert_eq!(Language::from_path(Path::new("app/main.py")), Some(Language::Python));
-        assert_eq!(Language::from_path(Path::new("web/index.ts")), Some(Language::TypeScript));
-        assert_eq!(Language::from_path(Path::new("web/index.js")), Some(Language::JavaScript));
-        assert_eq!(Language::from_path(Path::new("server/App.java")), Some(Language::Java));
-        assert_eq!(Language::from_path(Path::new("script.sh")), Some(Language::Shell));
-        assert_eq!(Language::from_path(Path::new("config.toml")), Some(Language::Toml));
+        assert_eq!(
+            Language::from_path(Path::new("src/lib.rs")),
+            Some(Language::Rust)
+        );
+        assert_eq!(
+            Language::from_path(Path::new("app/main.py")),
+            Some(Language::Python)
+        );
+        assert_eq!(
+            Language::from_path(Path::new("web/index.ts")),
+            Some(Language::TypeScript)
+        );
+        assert_eq!(
+            Language::from_path(Path::new("web/index.js")),
+            Some(Language::JavaScript)
+        );
+        assert_eq!(
+            Language::from_path(Path::new("server/App.java")),
+            Some(Language::Java)
+        );
+        assert_eq!(
+            Language::from_path(Path::new("script.sh")),
+            Some(Language::Shell)
+        );
+        assert_eq!(
+            Language::from_path(Path::new("config.toml")),
+            Some(Language::Toml)
+        );
         assert_eq!(Language::from_path(Path::new("unknown.xyz")), None);
     }
 }

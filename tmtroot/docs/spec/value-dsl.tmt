@@ -1,0 +1,11 @@
+@table
+|[ literal         ][ sugar  ]
+|[ `string()`      ][ ""     ]
+|[ `int()`         ][ 1, ... ]
+|[ `list()`        ][        ]
+|[ `enum()`        ][        ]
+|[ `true`, `false` ][        ]
+|[ `@name`         ][        ]
+|[ `var.xxx`       ][        ]
+|[ `self.meta`     ][        ]
+|[ `self.xxx`      ][        ]

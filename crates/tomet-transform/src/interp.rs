@@ -89,7 +89,10 @@ fn resolve_block(
             Some(expr) => {
                 let span = el.span;
                 let text = resolve_one(expr, span, source, config, ctx, unresolved);
-                Block::Paragraph(Paragraph::new(vec![Inline::Text(Text { value: text, span })], span))
+                Block::Paragraph(Paragraph::new(
+                    vec![Inline::Text(Text { value: text, span })],
+                    span,
+                ))
             }
             None => Block::Element(resolve_element(el, source, config, ctx, unresolved)),
         },
@@ -311,7 +314,11 @@ mod tests {
     #[test]
     fn a_block_level_interpolation_becomes_a_paragraph() {
         let config = config(&[("copyright", "(C) 2026 Tomet")]);
-        let (doc, _) = resolve("#[ T ]\n\n${copyright}\n", &config, &EvaluationContext::new());
+        let (doc, _) = resolve(
+            "#[ T ]\n\n${copyright}\n",
+            &config,
+            &EvaluationContext::new(),
+        );
         assert!(
             matches!(doc.blocks.last(), Some(Block::Paragraph(p))
                 if matches!(p.content.as_slice(), [Inline::Text(t)] if t.value == "(C) 2026 Tomet")),

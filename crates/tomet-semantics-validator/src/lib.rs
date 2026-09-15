@@ -694,9 +694,9 @@ mod tests {
         let doc = parse("@meta(icon: @doc.glyph(\"triangle\"))\n");
         let errors = validate_document(&doc);
         assert!(
-            errors
-                .iter()
-                .any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "doc.glyph")),
+            errors.iter().any(
+                |e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "doc.glyph")
+            ),
             "{errors:?}"
         );
     }

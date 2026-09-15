@@ -303,7 +303,11 @@ const CASES: &[Case] = &[
         "複数のコネクトを重ねられる。それぞれ独立した `connects` の要素になる",
         "@x(a: 1):as(y):rule(allow: list(card))\n",
     ),
-    case(None, "見出しにも付けられる", "#[ h ]:rule(allow: list(card))\n"),
+    case(
+        None,
+        "見出しにも付けられる",
+        "#[ h ]:rule(allow: list(card))\n",
+    ),
     case(
         None,
         "`list(...)`/`enum(...)` は即座に確定するリテラル呼び出し。\
@@ -467,8 +471,7 @@ fn anchor(section: &str) -> String {
         .filter(|c| {
             !matches!(
                 c,
-                '`' | '(' | ')' | '{' | '}' | '[' | ']' | '.' | '+' | '$' | '#' | '@' | ':'
-                    | '|'
+                '`' | '(' | ')' | '{' | '}' | '[' | ']' | '.' | '+' | '$' | '#' | '@' | ':' | '|'
             )
         })
         .map(|c| if c == ' ' { '-' } else { c })
@@ -639,11 +642,7 @@ fn value_str(v: &Value) -> String {
             format!("{name}({})", inner.join(", "))
         }
         Value::Element(el) => {
-            let name = el
-                .sigil
-                .name()
-                .map(|n| n.to_string())
-                .unwrap_or_default();
+            let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
             match &el.args {
                 Some(args) => format!("@{name}({})", value_str(args)),
                 None => format!("@{name}"),

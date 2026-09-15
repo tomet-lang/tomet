@@ -28,7 +28,9 @@ mod tests {
         Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Sigil,
         SoftBreak, Span, Value,
     };
-    use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
+    use tomet_semantics::{
+        ElementKind, classify_std_lenient, heading_level, list_items, list_ordered,
+    };
 
     /// A `SoftBreak` for test expectations -- span never matters, `Span`'s
     /// `PartialEq` always returns `true` (see its own doc comment).
@@ -89,8 +91,9 @@ mod tests {
                 let is_gap = KNOWN_GAPS.contains(&(sigil, *opener));
 
                 match (takes_it, is_gap) {
-                    (false, false) => unexpected_failures
-                        .push(format!("{sigil} does not take {opener}: {src:?} -> {got:?}")),
+                    (false, false) => unexpected_failures.push(format!(
+                        "{sigil} does not take {opener}: {src:?} -> {got:?}"
+                    )),
                     (true, true) => closed_gaps.push(format!("{sigil} now takes {opener}")),
                     _ => {}
                 }
@@ -137,7 +140,10 @@ mod tests {
         let Value::Element(el) = &entries[0].1 else {
             panic!("expected an embedded element, got {:?}", entries[0].1);
         };
-        assert_eq!(el.sigil, Sigil::Named(tomet_ast::Name::namespaced("doc", "icon")));
+        assert_eq!(
+            el.sigil,
+            Sigil::Named(tomet_ast::Name::namespaced("doc", "icon"))
+        );
         assert_eq!(
             el.args,
             Some(Value::Map(vec![
@@ -1297,7 +1303,11 @@ mod tests {
                 // `keep` and `keep2`, rather than leaving two adjacent ones.
                 assert_eq!(
                     el.content,
-                    Some(vec![Inline::Text("keep".into()), sb(), Inline::Text("keep2".into())])
+                    Some(vec![
+                        Inline::Text("keep".into()),
+                        sb(),
+                        Inline::Text("keep2".into())
+                    ])
                 );
             }
             other => panic!("expected element, got {other:?}"),
@@ -1682,8 +1692,13 @@ mod tests {
         // to fall through instead: the group stayed where it stood and was
         // read as prose, which also cost the element its block placement,
         // so `@T(a:1)(b:2)` quietly became a paragraph.
-        let err = parse_document("@T(a:1)(b:2)\n").expect_err("a second (args) group should not parse");
-        assert!(err.message.contains("a second `(args)` group"), "{}", err.message);
+        let err =
+            parse_document("@T(a:1)(b:2)\n").expect_err("a second (args) group should not parse");
+        assert!(
+            err.message.contains("a second `(args)` group"),
+            "{}",
+            err.message
+        );
     }
 
     #[test]

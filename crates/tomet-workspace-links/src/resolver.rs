@@ -28,11 +28,7 @@ impl VaultLinkIndex {
     }
 
     /// Creates an index by walking the project root honoring `.gitignore` and `workspace.ignore`.
-    pub fn from_vault(
-        project_root: &Path,
-        config: &PrinterConfig,
-        config_root: &Path,
-    ) -> Self {
+    pub fn from_vault(project_root: &Path, config: &PrinterConfig, config_root: &Path) -> Self {
         let all_paths =
             tomet_indexer::collect_all_paths_with_config(project_root, config, config_root);
         let mut index = Self::default();
@@ -70,7 +66,9 @@ impl VaultLinkIndex {
         }
 
         // 0. Relative path resolution from current document's folder (e.g. "./image.png", "../image.png")
-        if (clean_target.starts_with("./") || clean_target.starts_with("../")) && from_path.is_some() {
+        if (clean_target.starts_with("./") || clean_target.starts_with("../"))
+            && from_path.is_some()
+        {
             let from = from_path.unwrap();
             if let Some(parent) = from.parent() {
                 let joined = parent.join(clean_target);
@@ -88,7 +86,11 @@ impl VaultLinkIndex {
                     }
                 }
                 let norm_str = normalized.to_string_lossy().replace('\\', "/");
-                if let Some(pos) = self.paths.iter().position(|p| p.to_string_lossy().replace('\\', "/") == norm_str) {
+                if let Some(pos) = self
+                    .paths
+                    .iter()
+                    .position(|p| p.to_string_lossy().replace('\\', "/") == norm_str)
+                {
                     return Some(&self.paths[pos]);
                 }
             }
@@ -128,7 +130,11 @@ impl VaultLinkIndex {
         self.pick_best_candidate(candidates, from_path)
     }
 
-    fn pick_best_candidate(&self, candidate_indices: &[usize], from_path: Option<&Path>) -> Option<&Path> {
+    fn pick_best_candidate(
+        &self,
+        candidate_indices: &[usize],
+        from_path: Option<&Path>,
+    ) -> Option<&Path> {
         if candidate_indices.is_empty() {
             return None;
         }
@@ -248,7 +254,9 @@ mod tests {
         let note = Path::new("30-39 Knowledge/38 Geograph/ミーム/大沢たかお祭り.tmt");
         assert_eq!(
             index.resolve_ref("+8c3002a8a891b78137b6547f600a88141a828640.png", Some(note)),
-            Some(Path::new("30-39 Knowledge/38 Geograph/ミーム/-/+8c3002a8a891b78137b6547f600a88141a828640.png"))
+            Some(Path::new(
+                "30-39 Knowledge/38 Geograph/ミーム/-/+8c3002a8a891b78137b6547f600a88141a828640.png"
+            ))
         );
     }
 

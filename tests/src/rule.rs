@@ -21,7 +21,12 @@ fn passing_fixture_has_no_rule_diagnostics() {
     let errors = validate_document(&doc);
     let rule_errors: Vec<_> = errors
         .iter()
-        .filter(|e| matches!(e, Diagnostic::DisallowedByRule { .. } | Diagnostic::UnknownConnect { .. }))
+        .filter(|e| {
+            matches!(
+                e,
+                Diagnostic::DisallowedByRule { .. } | Diagnostic::UnknownConnect { .. }
+            )
+        })
         .collect();
     assert_eq!(rule_errors, Vec::<&Diagnostic>::new(), "{errors:?}");
 }
@@ -62,7 +67,12 @@ fn heading_connect_fixture_has_no_rule_diagnostics() {
     let errors = validate_document(&doc);
     let rule_errors: Vec<_> = errors
         .iter()
-        .filter(|e| matches!(e, Diagnostic::DisallowedByRule { .. } | Diagnostic::UnknownConnect { .. }))
+        .filter(|e| {
+            matches!(
+                e,
+                Diagnostic::DisallowedByRule { .. } | Diagnostic::UnknownConnect { .. }
+            )
+        })
         .collect();
     assert_eq!(rule_errors, Vec::<&Diagnostic>::new(), "{errors:?}");
 }

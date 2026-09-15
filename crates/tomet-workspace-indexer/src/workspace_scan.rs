@@ -26,7 +26,6 @@ use std::path::{Path, PathBuf};
 use ignore::WalkBuilder;
 use tomet_config::PrinterConfig;
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EntryKind {
     Dir,

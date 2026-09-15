@@ -794,8 +794,8 @@ mod tests {
     /// ever claim it, which is what makes binding it unconditionally safe.
     #[test]
     fn doc_icon_resolves_with_no_use_or_vocabulary_declaration() {
-        let doc = tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n")
-            .expect("document parses");
+        let doc =
+            tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert_eq!(
             bound.classify(&name("doc.icon")),
@@ -809,8 +809,8 @@ mod tests {
     /// all.
     #[test]
     fn doc_rejects_a_name_it_does_not_declare() {
-        let doc = tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n")
-            .expect("document parses");
+        let doc =
+            tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert!(bound.classify(&name("doc.glyph")).is_err());
     }
@@ -821,8 +821,8 @@ mod tests {
     /// `@vocabulary(doc)` document anywhere.
     #[test]
     fn doc_icon_declares_name_and_pkg() {
-        let doc = tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n")
-            .expect("document parses");
+        let doc =
+            tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         let decl = bound
             .declaration(&name("doc.icon"))

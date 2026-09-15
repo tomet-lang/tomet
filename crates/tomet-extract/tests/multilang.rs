@@ -1,5 +1,5 @@
 use std::path::Path;
-use tomet_extract::{collect_comment_elements, CommentKind};
+use tomet_extract::{CommentKind, collect_comment_elements};
 
 #[test]
 fn test_python_hash_comments_and_docstrings() {
