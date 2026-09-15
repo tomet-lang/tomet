@@ -147,4 +147,23 @@ mod tests {
         let doc3 = parse_document("@meta{\n  title: Test\n}\n").unwrap();
         assert_eq!(document_version(&doc3), None);
     }
+
+    #[test]
+    fn normalizes_list_call_in_meta_value_to_seq() {
+        let doc = parse_document("@meta{\n  tags: list(rust, tomet)\n}\n").unwrap();
+        let value = document_meta(&doc).expect("expected @meta value");
+        match value {
+            Value::Map(entries) => {
+                let tags = entries.iter().find(|(k, _)| k == "tags").map(|(_, v)| v);
+                assert_eq!(
+                    tags,
+                    Some(&Value::Seq(vec![
+                        Value::String("rust".to_string()),
+                        Value::String("tomet".to_string())
+                    ]))
+                );
+            }
+            other => panic!("expected a map, got {other:?}"),
+        }
+    }
 }
