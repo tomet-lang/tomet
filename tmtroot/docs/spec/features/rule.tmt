@@ -1,0 +1,24 @@
+`:rule(allow:list(...), direct:@bool)` — 一つの文書（や blueprint）の中の
+特定の箇所に「ここの中身はこれしか許さない」を直接書く機能。
+
+`@element`/`@content{allow:}` が要素の**型**を宣言する側（vocabulary）
+なのに対し、こちらは文書の**特定の位置**に効く制約。vocabulary とは別軸
+なので、`elements.index.tmt`/`vocabulary` 側にではなく、この feature に
+属する。
+
+現状（MVP、`rule` connect の一号）:
+
+- 検証対象は既定で子孫全部。`direct:true` で直下の子だけに絞れる。
+- |`allow:` は `list(...)` で書く（`enum(...)` も同じ形。パーサは呼び出し名を
+  |判断しない、`tomet-semantics` の閉じた表の仕事）。
+- |`allow:` に書いた名前自体は検証しない。descendant が実際に何に
+  |classify されるかとだけ突き合わせる。
+- |具体的な綴りは `connects/rule.tmt`、設計の経緯は
+  |`.agents/tasks/colon-as-sigil.md`（折り込み後は削除される可能性あり）。
+
+まだ決まっていないこと:
+
+- `:rule(...):rule(...)` のように同じコネクトを重ねたときの意味論。
+- |blueprint のテンプレート本体に書いた `:rule` が、実体化後の文書でも
+  |効き続けるか。
+- `allow:` に書いた名前を検証するかどうか。

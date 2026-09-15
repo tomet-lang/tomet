@@ -426,10 +426,8 @@ mod signature_tests {
     /// nothing, when they had not run.
     #[test]
     fn a_cache_from_another_collector_is_dropped() {
-        let path = std::env::temp_dir().join(format!(
-            "tm_collector_sig_{}.sqlite",
-            uuid::Uuid::new_v4()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("tm_collector_sig_{}.sqlite", uuid::Uuid::new_v4()));
 
         {
             let cache = LinkCache::open(&path).unwrap();

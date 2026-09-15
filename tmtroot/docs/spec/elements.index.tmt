@@ -1,6 +1,10 @@
-#[ Stable ]
+#[ std vocabulary ]
+
+Tometの仕様、Markdownの基本的な記法
 
 ---[ Setting ]---
+
+言語を制御するうえで必要な語彙
 
 ```tm
 @version
@@ -14,14 +18,21 @@
 
 ---[ Expression ]---
 
+構造を作る。
+
 ```tm
 @heading     | #
 @list        | - -.
+@link
 @embed
 @codeblock   | ```
+@callout
+@card
 ```
 
 ---[ Literal ]---
+
+文字の見た目や挙動
 
 ```tm
 @em          | *x*
@@ -29,23 +40,36 @@
 @mark        | ==x==
 @fence       | `x`
 @quote
+@ruby
 ```
 
----[ Standard Vocabulary ]---
+---[ Vocabulary ]---
+
+その文字の役割を明確化する
 
 ```tm
-@callout
+@file
+@dir
+```
+
+#[ Doc vocabulary ]
+
+Tometは構文を持つが、実際の振る舞いはアプリに任せる。
+
+```tm
+@doc.icon
+@doc.index
 ```
 
 #[ Experimental ]
+
+現在試験的に入れいているもので、今後記法が変わる場合がある。
 
 ```tm
 @table
 @references
 @id
 @links
-@file
-@dir
 @fixme
 @draft
 ```
@@ -57,8 +81,9 @@
 @todo
 @tree
 @tag
-@index
-@latex
+@doc.latex
+@doc.typst
 @foot
 @language
+@grid
 ```

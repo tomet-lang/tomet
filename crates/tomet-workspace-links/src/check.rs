@@ -102,7 +102,10 @@ fn exists_as(
     existing: &HashSet<PathBuf>,
     wanted: fn(&Path) -> bool,
 ) -> bool {
-    let path = rebase_on_project_root(resolve_file_target(from, target, project_root), project_root);
+    let path = rebase_on_project_root(
+        resolve_file_target(from, target, project_root),
+        project_root,
+    );
     existing.contains(&path) && wanted(&path)
 }
 
@@ -273,8 +276,20 @@ mod kind_tests {
         // `.exists()` proves neither.
         let (root, existing) = vault();
         let source = root.join("README.tmt");
-        assert!(!exists_as("./spec/", &source, &root, &existing, Path::is_file));
-        assert!(exists_as("./spec/", &source, &root, &existing, Path::is_dir));
+        assert!(!exists_as(
+            "./spec/",
+            &source,
+            &root,
+            &existing,
+            Path::is_file
+        ));
+        assert!(exists_as(
+            "./spec/",
+            &source,
+            &root,
+            &existing,
+            Path::is_dir
+        ));
         std::fs::remove_dir_all(&root).ok();
     }
 
@@ -293,7 +308,13 @@ mod kind_tests {
     fn a_trailing_slash_changes_nothing_for_dir() {
         let (root, existing) = vault();
         let source = root.join("README.tmt");
-        assert!(exists_as("./spec/", &source, &root, &existing, Path::is_dir));
+        assert!(exists_as(
+            "./spec/",
+            &source,
+            &root,
+            &existing,
+            Path::is_dir
+        ));
         assert!(exists_as("./spec", &source, &root, &existing, Path::is_dir));
         std::fs::remove_dir_all(&root).ok();
     }
@@ -305,7 +326,13 @@ mod kind_tests {
         let (root, existing) = vault();
         let source = root.join("README.tmt");
         std::fs::create_dir_all(root.join("ignored")).unwrap();
-        assert!(!exists_as("./ignored/", &source, &root, &existing, Path::is_dir));
+        assert!(!exists_as(
+            "./ignored/",
+            &source,
+            &root,
+            &existing,
+            Path::is_dir
+        ));
         std::fs::remove_dir_all(&root).ok();
     }
 }

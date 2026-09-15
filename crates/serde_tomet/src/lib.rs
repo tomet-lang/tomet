@@ -106,9 +106,11 @@ mod tests {
 
     #[test]
     fn call_syntax_has_no_serde_equivalent() {
-        let err =
-            de::from_value::<i32>(Value::Call("list".into(), vec![Value::String("card".into())]))
-                .unwrap_err();
+        let err = de::from_value::<i32>(Value::Call(
+            "list".into(),
+            vec![Value::String("card".into())],
+        ))
+        .unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("call syntax"), "unexpected message: {msg}");
     }

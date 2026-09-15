@@ -33,13 +33,10 @@
 //!   convention, which is likewise anchored to `@links{}` entries rather
 //!   than headings.
 
-use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, Value,
-};
+use tomet_ast::{Block, Document, Element, ElementValue, Inline, Value};
 use tomet_semantics::{
-    path_target,
     TargetScheme, classify_std_lenient, heading_level, is_directive, link_target, list_items,
-    list_ordered, normalized_element_args, parse_table_rows, target_scheme,
+    list_ordered, normalized_element_args, parse_table_rows, path_target, target_scheme,
 };
 
 pub fn to_typst(doc: &Document) -> String {

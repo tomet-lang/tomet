@@ -1,0 +1,7 @@
+@table
+|[ html                               ][ tomet                      ][ markdown         ]
+|[ `<a href="">`                      ][ `@link(target:"")`         ][ `[]()`, `[[]]`   ]
+|[ `<ul><li>list</li></ul>`           ][ `- list`                   ][ `- list`         ]
+|[ `<ruby>label<rt>label</rt></ruby>` ][ `@ruby[label](rt:"label")` ][                  ]
+|[ `<q>label<\q>`                     ][ `@quote[label]`            ][ `>`              ]
+|[ `<><>`                             ][ `@table|[][][]`            ][ `| header | | |` ]

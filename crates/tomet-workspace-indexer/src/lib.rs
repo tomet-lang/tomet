@@ -457,8 +457,14 @@ mod unswept_tests {
         let frozen = Path::new("/vault/tests/fixtures/x.tmt");
         let foreign = Path::new("/vault/vendor/y.tmt");
 
-        assert!(is_path_unswept(frozen, Some(root), &cfg), "frozen is not swept");
-        assert!(is_path_unswept(foreign, Some(root), &cfg), "foreign is not swept");
+        assert!(
+            is_path_unswept(frozen, Some(root), &cfg),
+            "frozen is not swept"
+        );
+        assert!(
+            is_path_unswept(foreign, Some(root), &cfg),
+            "foreign is not swept"
+        );
 
         assert!(
             !is_path_ignored(frozen, Some(root), &cfg.ignore_files),

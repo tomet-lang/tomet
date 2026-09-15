@@ -75,10 +75,7 @@ impl CommentSourceMap {
 
     /// Maps a [`Span`] from the extracted comment text back to original source file coordinates.
     pub fn map_span(&self, span: Span) -> Span {
-        Span::new(
-            self.map_position(span.start),
-            self.map_position(span.end),
-        )
+        Span::new(self.map_position(span.start), self.map_position(span.end))
     }
 }
 
@@ -180,10 +177,7 @@ pub fn collect_comment_elements_for_lang(
 }
 
 /// Collects all Tomet elements found in comments, auto-detecting language from `file`.
-pub fn collect_comment_elements(
-    source: &str,
-    file: &Path,
-) -> Vec<(Element, Span, CommentKind)> {
+pub fn collect_comment_elements(source: &str, file: &Path) -> Vec<(Element, Span, CommentKind)> {
     let lang = Language::from_path(file).unwrap_or(Language::Rust);
     // For Rust, default to doc comments only; for others include regular comments if no dedicated doc prefix exists
     let doc_only = !lang.syntax().doc_line_prefixes.is_empty();
@@ -219,7 +213,10 @@ fn bar() {}
         let blocks = extract_rust_comments(src, Path::new("lib.rs"));
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].kind, CommentKind::InnerDoc);
-        assert_eq!(blocks[0].text, "Module header line 1\nModule header line 2\n");
+        assert_eq!(
+            blocks[0].text,
+            "Module header line 1\nModule header line 2\n"
+        );
         assert_eq!(blocks[0].source_map.lines, vec![(1, 5), (2, 5)]);
     }
 

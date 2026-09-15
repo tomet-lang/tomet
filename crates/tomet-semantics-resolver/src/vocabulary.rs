@@ -44,7 +44,9 @@ pub fn load_vocabularies(root: &Path, declared: &[String]) -> LoadedVocabularies
     // with each other.
     for builtin in tomet_semantics::builtin_doc_vocabularies() {
         source.insert(builtin.namespace.clone(), "<builtin>".to_string());
-        loaded.by_namespace.insert(builtin.namespace.clone(), builtin);
+        loaded
+            .by_namespace
+            .insert(builtin.namespace.clone(), builtin);
     }
 
     for declared in declared {

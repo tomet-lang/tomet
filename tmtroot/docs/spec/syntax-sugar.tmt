@@ -1,0 +1,18 @@
+@table
+|[ element                            ][ sugar                                     ][ why           ]
+|[ `@em[label]`                       ][ `*label*`                                 ][ from markdown ]
+|[ `@strikeout[label]`                ][ `~~label~~`                               ][ from markdown ]
+|[ `@mark[label]`                     ][ `==label==`                               ][ from markdown ]
+|[ `@fence[label]`                    ][ `\`label\``                               ][ from markdown ]
+|[ `@heading(level:<int>)[ label ]{}` ][ `#[ label ]{}`, `# label :{}`             ][ from markdown ]
+|[ `@list()[ content ]{}`             ][ `- [ content ]{}`, `- content :{}`        ][ from markdown ]
+|[ `@codeblock`                       ][ `\`\`\`(lang:<string>)`, `\`\`\`<string>` ][ from markdown ]
+
+#[ draft ]
+
+@table
+|[ element                       ][ sugar                ][ why                    ]
+|[ `\(space)`, `\(newline)`      ][ `\n`, `\t`, `\s`     ][ defact standard        ]
+|[ `@tag(label)`                 ][ `#(label)`, `#label` ][ from markdown          ]
+|[ `@link[label](ref:file_name)` ][ `[[filename]]`       ][ from markdown          ]
+|[ `${}`                         ][ `{{}}`               ][ some template language ]

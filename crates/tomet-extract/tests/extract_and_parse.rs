@@ -1,5 +1,5 @@
 use std::path::Path;
-use tomet_extract::{extract_rust_comments, collect_comment_elements, CommentKind};
+use tomet_extract::{CommentKind, collect_comment_elements, extract_rust_comments};
 
 #[test]
 fn test_indented_and_multiline_elements() {

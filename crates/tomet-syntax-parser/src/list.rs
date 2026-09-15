@@ -6,8 +6,8 @@
 //! `"marker"` positional key by `tomet-semantics::positional`.
 
 use crate::element::{parse_groups, parse_paren_value, parse_sugar_body};
-use crate::heading::merge_values;
 use crate::error::Result;
+use crate::heading::merge_values;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_text};
 use crate::value::skip_inline_ws;
 use tomet_ast::{Element, Sigil, Value};
@@ -77,9 +77,7 @@ pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
         // the same args; only the sugar needs a space to separate the
         // marker from the text that follows it. `|` joins the group
         // openers because it is one -- `[content]` without the brackets.
-        if matches!(probe.peek(), Some(' ') | Some('\t'))
-            || opens_group_after_args(probe.peek())
-        {
+        if matches!(probe.peek(), Some(' ') | Some('\t')) || opens_group_after_args(probe.peek()) {
             marker = Some(value);
             found_group = true;
             look = probe;

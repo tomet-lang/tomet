@@ -21,7 +21,9 @@ pub(crate) enum Stop {
     /// A `|`-prefixed run: `[content]` spelled without brackets. `col` is
     /// the 1-based column of the opening `|`, and a following line stays in
     /// the run only when its own `|` stands in that same column.
-    PipeRun { col: usize },
+    PipeRun {
+        col: usize,
+    },
 }
 
 /// `allow_colon_connect` is threaded straight through to every element
@@ -504,7 +506,13 @@ pub(crate) fn push_soft_break(items: &mut Vec<Inline>, span: Span) {
 /// output differs: the swallowed gap becomes a `SoftBreak` node spanning it,
 /// not a character. Deciding what that node renders as (a space, nothing,
 /// a real newline) is left to whoever consumes the tree.
-fn split_softbreaks(items: &mut Vec<Inline>, cur: &Cursor, raw: &str, base: usize, fold_pipes: bool) {
+fn split_softbreaks(
+    items: &mut Vec<Inline>,
+    cur: &Cursor,
+    raw: &str,
+    base: usize,
+    fold_pipes: bool,
+) {
     let mut text_start = 0usize;
     let mut chars = raw.char_indices().peekable();
     while let Some((i, c)) = chars.next() {
@@ -541,10 +549,7 @@ fn split_softbreaks(items: &mut Vec<Inline>, cur: &Cursor, raw: &str, base: usiz
                 }
             }
         }
-        let span = Span::new(
-            cur.position_at(base + i),
-            cur.position_at(base + gap_end),
-        );
+        let span = Span::new(cur.position_at(base + i), cur.position_at(base + gap_end));
         push_soft_break(items, span);
         text_start = gap_end;
     }

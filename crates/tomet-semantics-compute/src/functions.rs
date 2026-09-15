@@ -396,7 +396,10 @@ fn compare(name: &str, a: &Value, b: &Value) -> Result<Ordering, ComputeError> {
     if let (Some(x), Some(y)) = (number_of(a), number_of(b)) {
         // `partial_cmp` is `None` only for a NaN operand, which has no
         // place in an ordering either.
-        return x.as_f64().partial_cmp(&y.as_f64()).ok_or_else(not_comparable);
+        return x
+            .as_f64()
+            .partial_cmp(&y.as_f64())
+            .ok_or_else(not_comparable);
     }
     match (a, b) {
         (Value::String(x), Value::String(y)) => Ok(x.cmp(y)),
@@ -547,8 +550,12 @@ mod tests {
 
     #[test]
     fn contains_reads_the_container_shape() {
-        assert!(b(call("contains", &[seq(&["rust", "cli"]), s("rust")]).unwrap()));
-        assert!(!b(call("contains", &[seq(&["rust", "cli"]), s("go")]).unwrap()));
+        assert!(b(
+            call("contains", &[seq(&["rust", "cli"]), s("rust")]).unwrap()
+        ));
+        assert!(!b(
+            call("contains", &[seq(&["rust", "cli"]), s("go")]).unwrap()
+        ));
         assert!(b(call("contains", &[s("readme.tmt"), s(".tmt")]).unwrap()));
         let map = Value::Map(vec![("title".to_string(), s("Index"))]);
         assert!(b(call("contains", &[map.clone(), s("title")]).unwrap()));
@@ -607,6 +614,9 @@ mod tests {
     #[test]
     fn arithmetic_still_rejects_a_non_number() {
         let err = call("add", &[s("a"), Value::Int(1)]).unwrap_err();
-        assert!(matches!(err, ComputeError::NotNumeric { .. }), "got {err:?}");
+        assert!(
+            matches!(err, ComputeError::NotNumeric { .. }),
+            "got {err:?}"
+        );
     }
 }

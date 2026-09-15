@@ -68,10 +68,7 @@ pub fn clear_vault_files() {
     *lock = None;
 }
 
-fn prepare_document(
-    mut doc: tomet_ast::Document,
-    opts: &ProcessOptions,
-) -> tomet_ast::Document {
+fn prepare_document(mut doc: tomet_ast::Document, opts: &ProcessOptions) -> tomet_ast::Document {
     // 1. Inject external workspace config (e.g. default.config.tmt) if provided
     if let Some(cfg_src) = &opts.config {
         if let Ok(cfg_doc) = tomet_parser::parse_document(cfg_src) {
@@ -433,7 +430,8 @@ mod tests {
 
     #[test]
     fn test_process_document_with_resolved_links() {
-        let src = "- @link(\"ref:Linux\")[Go to Linux]\n- @link(\"ref:NonExistentNote\")[Missing]\n";
+        let src =
+            "- @link(\"ref:Linux\")[Go to Linux]\n- @link(\"ref:NonExistentNote\")[Missing]\n";
         let doc = tomet_parser::parse_document(src).unwrap();
         let opts = ProcessOptions {
             vault_files: Some(vec![
@@ -445,7 +443,10 @@ mod tests {
             ..Default::default()
         };
         let res = process_document_internal(doc, &opts);
-        assert!(res.html.contains("href=\"/docs/30-39 Knowledge/Linux\">Go to Linux</a>"));
+        assert!(
+            res.html
+                .contains("href=\"/docs/30-39 Knowledge/Linux\">Go to Linux</a>")
+        );
         assert!(res.html.contains("class=\"tm-ref tm-ref-unresolved\" aria-disabled=\"true\" data-ref=\"NonExistentNote\">Missing</a>"));
     }
 }

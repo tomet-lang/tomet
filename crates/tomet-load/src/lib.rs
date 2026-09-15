@@ -435,7 +435,10 @@ mod tests {
 
         assert_eq!(file_paths(&first.0), ["notes/go.tmt"]);
         assert_eq!(file_paths(&second.0), ["notes/go.tmt"]);
-        assert_eq!(built, reused, "the table was rebuilt for the second document");
+        assert_eq!(
+            built, reused,
+            "the table was rebuilt for the second document"
+        );
 
         let _ = fs::remove_dir_all(&root);
     }

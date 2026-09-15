@@ -252,12 +252,12 @@ kind の語彙も所有できず、共有語彙にすると穴のある文書す
 地の文の中で一語や一字を扱う五つ。
 
 @table[
-[ 要素        ][ region ][ display    ][ singleton ][ 何であるか ]
-[ `em`        ][ body   ][ inline     ][ ―         ][ 強調       ]
-[ `strong`    ][ body   ][ inline     ][ ―         ][ 強い強調   ]
-[ `mark`      ][ body   ][ inline     ][ ―         ][ ハイライト ]
-[ `strikeout` ][ body   ][ inline     ][ ―         ][ 取り消し線 ]
-[ `ruby`      ][ body   ][ inline     ][ ―         ][ 読み仮名   ]
+[ 要素        ][ region ][ display ][ singleton ][ 何であるか ]
+[ `em`        ][ body   ][ inline  ][ ―         ][ 強調       ]
+[ `strong`    ][ body   ][ inline  ][ ―         ][ 強い強調   ]
+[ `mark`      ][ body   ][ inline  ][ ―         ][ ハイライト ]
+[ `strikeout` ][ body   ][ inline  ][ ―         ][ 取り消し線 ]
+[ `ruby`      ][ body   ][ inline  ][ ―         ][ 読み仮名   ]
 ]
 
 `@ruby[漢字](rt:"かんじ")` -- `[content]` が本文、`rt` エントリが読み。`em` などと

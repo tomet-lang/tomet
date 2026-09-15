@@ -13,14 +13,11 @@
 use std::fmt;
 use std::sync::Arc;
 
-use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, Value,
-};
+use tomet_ast::{Block, Document, Element, ElementValue, Inline, Value};
 use tomet_semantics::{
     Bindings, EXACT_DATA_KEY, ElementKind, TargetScheme, builtin_doc_vocabularies,
     classify_std_lenient, flatten_data, heading_level, is_directive, link_target, list_items,
-    list_ordered, normalized_element_args, normalized_element_args_in, path_target,
-    target_scheme,
+    list_ordered, normalized_element_args, normalized_element_args_in, path_target, target_scheme,
 };
 
 const DEFAULT_STYLE: &str = "\
@@ -1418,10 +1415,13 @@ mod tests {
                     let Some(Value::Map(entries)) = &args else {
                         return None;
                     };
-                    entries.iter().find(|(k, _)| k == key).and_then(|(_, v)| match v {
-                        Value::String(s) => Some(s.clone()),
-                        _ => None,
-                    })
+                    entries
+                        .iter()
+                        .find(|(k, _)| k == key)
+                        .and_then(|(_, v)| match v {
+                            Value::String(s) => Some(s.clone()),
+                            _ => None,
+                        })
                 };
                 let name = get("name")?;
                 let pkg = get("pkg").unwrap_or_default();
@@ -1643,8 +1643,8 @@ mod tests {
     /// honest rendering of that is what was written.
     #[test]
     fn an_unprepared_interpolation_renders_as_its_own_source() {
-        let doc = parse_document("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n")
-            .unwrap();
+        let doc =
+            parse_document("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
         assert_eq!(
             render_body(&doc),
             "<p>Issue: ${gh(42)} Footer: ${copyright} Math: ${add(10, 5)}</p>\n"

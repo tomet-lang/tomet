@@ -9,13 +9,10 @@
 //! valid CommonMark. Heading `id`/`cssclass` attrs have no CommonMark
 //! form and are dropped.
 
-use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, Value,
-};
+use tomet_ast::{Block, Document, Element, ElementValue, Inline, Value};
 use tomet_semantics::{
-    path_target,
     TargetScheme, classify_std_lenient, heading_level, is_directive, link_target, list_items,
-    list_ordered, normalized_element_args, target_scheme,
+    list_ordered, normalized_element_args, path_target, target_scheme,
 };
 
 /// Renders `doc` as CommonMark.

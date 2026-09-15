@@ -358,7 +358,8 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
                 }
                 if next_idx < lines.len() {
                     let next_trimmed = lines[next_idx].trim();
-                    if next_trimmed.starts_with('|') && extract_row_cells(lines[next_idx]).is_some() {
+                    if next_trimmed.starts_with('|') && extract_row_cells(lines[next_idx]).is_some()
+                    {
                         is_pipe_table = true;
                     } else if next_trimmed.starts_with('[') {
                         is_bracket_table = true;
@@ -379,7 +380,10 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
                 let t_trimmed = t_line.trim();
 
                 if is_bracket_table {
-                    if t_trimmed == "]" || t_trimmed.starts_with("]{") || t_trimmed.starts_with("] ") {
+                    if t_trimmed == "]"
+                        || t_trimmed.starts_with("]{")
+                        || t_trimmed.starts_with("] ")
+                    {
                         break;
                     }
                 } else if is_pipe_table {
@@ -554,7 +558,11 @@ fn extract_row_cells(line: &str) -> Option<(String, Vec<String>)> {
     let (prefix, cells_part) = if rest.starts_with('|') {
         let after_pipe = &rest[1..];
         let spaces_len = after_pipe.len() - after_pipe.trim_start().len();
-        let space_str = if spaces_len > 0 { &after_pipe[..spaces_len] } else { "" };
+        let space_str = if spaces_len > 0 {
+            &after_pipe[..spaces_len]
+        } else {
+            ""
+        };
         (format!("{indent}|{space_str}"), after_pipe.trim_start())
     } else {
         (indent.to_string(), rest)

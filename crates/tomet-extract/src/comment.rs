@@ -40,7 +40,9 @@ pub fn extract_comments(
         let leading_spaces = line.len() - trimmed_start.len();
 
         // 1. Check for block comment delimiters first
-        if let Some((kind, start_delim, end_delim)) = match_block_comment_start(trimmed_start, &syntax, options) {
+        if let Some((kind, start_delim, end_delim)) =
+            match_block_comment_start(trimmed_start, &syntax, options)
+        {
             let start_col = leading_spaces + start_delim.len();
             let after_start = &trimmed_start[start_delim.len()..];
 
@@ -67,7 +69,8 @@ pub fn extract_comments(
             let mut source_lines = Vec::new();
 
             // First line content after start delimiter
-            let (first_line_content, first_line_col) = strip_boundary_whitespace(after_start, start_col);
+            let (first_line_content, first_line_col) =
+                strip_boundary_whitespace(after_start, start_col);
             if !first_line_content.trim().is_empty() {
                 block_text.push_str(first_line_content);
                 block_text.push('\n');
@@ -127,7 +130,9 @@ pub fn extract_comments(
                 let cur_trimmed = cur_line.trim_start();
                 let cur_leading = cur_line.len() - cur_trimmed.len();
 
-                if let Some((cur_kind, cur_prefix)) = match_line_comment_start(cur_trimmed, &syntax, options) {
+                if let Some((cur_kind, cur_prefix)) =
+                    match_line_comment_start(cur_trimmed, &syntax, options)
+                {
                     if cur_kind != kind || cur_prefix != prefix {
                         break;
                     }
@@ -225,7 +230,10 @@ fn clean_block_comment_line<'a>(line: &'a str, start_delim: &str) -> (String, us
     let leading = line.len() - trimmed.len();
 
     // If block starts with `/*` or `/**`, multiline inner lines often begin with `*` or `* `
-    if (start_delim.starts_with("/*") || start_delim.starts_with("/**")) && trimmed.starts_with('*') && !trimmed.starts_with("*/") {
+    if (start_delim.starts_with("/*") || start_delim.starts_with("/**"))
+        && trimmed.starts_with('*')
+        && !trimmed.starts_with("*/")
+    {
         let after_star = &trimmed[1..];
         if let Some(rest) = after_star.strip_prefix(' ') {
             (rest.to_string(), leading + 2)

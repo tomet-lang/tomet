@@ -1640,7 +1640,9 @@ mod tests {
             "should suggest Cargo.toml"
         );
         assert!(
-            items.iter().any(|i| i.label == "src/" && i.kind == Some(CompletionItemKind::FOLDER)),
+            items
+                .iter()
+                .any(|i| i.label == "src/" && i.kind == Some(CompletionItemKind::FOLDER)),
             "should suggest src/ directory"
         );
     }
@@ -1653,7 +1655,10 @@ mod tests {
 
         let doc_text = "@dir(./";
         let items = completions_for_with_uri(doc_text, Position::new(0, 7), Some(&uri));
-        assert!(!items.is_empty(), "dir completions should return directories");
+        assert!(
+            !items.is_empty(),
+            "dir completions should return directories"
+        );
         assert!(
             items.iter().any(|i| i.label == "src/"),
             "should suggest src/ directory"
