@@ -310,9 +310,6 @@ mod tests {
         assert_eq!(scalar_string(&call), Some("a, b".to_string()));
 
         let json = value_to_json(&call);
-        assert_eq!(
-            json,
-            serde_json::json!(["a", "b"])
-        );
+        assert_eq!(json, serde_json::json!(["a", "b"]));
     }
 }
