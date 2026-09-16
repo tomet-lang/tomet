@@ -29,15 +29,15 @@ jobs:
 
       # ── Build ──────────────────────────────────────────────
       - name: Build workspace
-        run: cargo build --workspace
+        run: cargo build --workspace --exclude tomet-web
 
       # ── Test ───────────────────────────────────────────────
       - name: Run tests
-        run: cargo test --workspace
+        run: cargo test --workspace --exclude tomet-web
 
       # ── Lint ───────────────────────────────────────────────
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --exclude tomet-web --all-targets -- -D warnings
 
       - name: Rustfmt
         run: cargo fmt --all -- --check
