@@ -149,13 +149,15 @@ impl ElementExt for Element {
 
     fn get_attr<'a>(&'a self, key: &str) -> Option<&'a Value> {
         if let Some(value) = &self.value
-            && let Some(found) = value.get(key) {
-                return Some(found);
-            }
+            && let Some(found) = value.get(key)
+        {
+            return Some(found);
+        }
         if let Some(Value::Map(entries)) = &self.args
-            && let Some((_, val)) = entries.iter().find(|(k, _)| k == key) {
-                return Some(val);
-            }
+            && let Some((_, val)) = entries.iter().find(|(k, _)| k == key)
+        {
+            return Some(val);
+        }
         None
     }
 
@@ -166,9 +168,10 @@ impl ElementExt for Element {
             return self.value.as_mut().and_then(|v| v.get_mut(key));
         }
         if let Some(Value::Map(entries)) = &mut self.args
-            && let Some((_, val)) = entries.iter_mut().find(|(k, _)| k == key) {
-                return Some(val);
-            }
+            && let Some((_, val)) = entries.iter_mut().find(|(k, _)| k == key)
+        {
+            return Some(val);
+        }
         None
     }
 
@@ -178,15 +181,17 @@ impl ElementExt for Element {
 
     fn set_prop(&mut self, key: &str, new_val: Value) {
         if let Some(value) = &mut self.value
-            && let Some(slot) = value.get_mut(key) {
-                *slot = new_val;
-                return;
-            }
+            && let Some(slot) = value.get_mut(key)
+        {
+            *slot = new_val;
+            return;
+        }
         if let Some(Value::Map(entries)) = &mut self.args
-            && let Some((_, val)) = entries.iter_mut().find(|(k, _)| k == key) {
-                *val = new_val;
-                return;
-            }
+            && let Some((_, val)) = entries.iter_mut().find(|(k, _)| k == key)
+        {
+            *val = new_val;
+            return;
+        }
         if let Some(value @ ElementValue::Group(_)) = &mut self.value {
             value.push_pair(key, new_val);
         } else if let Some(Value::Map(entries)) = &mut self.args {
@@ -247,13 +252,15 @@ impl ElementExt for Element {
 
     fn remove_prop(&mut self, key: &str) -> Option<Value> {
         if let Some(value) = &mut self.value
-            && let Some(removed) = value.remove(key) {
-                return Some(removed);
-            }
+            && let Some(removed) = value.remove(key)
+        {
+            return Some(removed);
+        }
         if let Some(Value::Map(entries)) = &mut self.args
-            && let Some(idx) = entries.iter().position(|(k, _)| k == key) {
-                return Some(entries.remove(idx).1);
-            }
+            && let Some(idx) = entries.iter().position(|(k, _)| k == key)
+        {
+            return Some(entries.remove(idx).1);
+        }
         None
     }
 

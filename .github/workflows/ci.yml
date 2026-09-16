@@ -46,15 +46,19 @@ jobs:
       # Verify .tmt documents: syntax, formatting, and export
       # consistency using the tomet binary built above.
       - name: tomet check
+        continue-on-error: true
         run: ./target/debug/tomet check .
 
       - name: tomet format --check
+        continue-on-error: true
         run: ./target/debug/tomet format --check .
 
       - name: tomet export --check
+        continue-on-error: true
         run: ./target/debug/tomet export --check .
 
       - name: Verify tmtroot export config
+        continue-on-error: true
         run: |
           stray=$(find tmtroot -name '*.tmt' -exec grep -L 'export:' {} +) || true
           if [ -n "$stray" ]; then

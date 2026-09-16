@@ -49,14 +49,8 @@ mod tests {
 
     #[test]
     fn leaves_other_calls_intact() {
-        let call = Value::Call(
-            "other".to_string(),
-            vec![Value::String("x".to_string())],
-        );
-        assert_eq!(
-            normalize_data_value(call.clone()),
-            call
-        );
+        let call = Value::Call("other".to_string(), vec![Value::String("x".to_string())]);
+        assert_eq!(normalize_data_value(call.clone()), call);
     }
 
     #[test]
@@ -67,10 +61,7 @@ mod tests {
                 "list".to_string(),
                 vec![
                     Value::String("tomet".to_string()),
-                    Value::Call(
-                        "list".to_string(),
-                        vec![Value::Int(1), Value::Int(2)],
-                    ),
+                    Value::Call("list".to_string(), vec![Value::Int(1), Value::Int(2)]),
                 ],
             ),
         )]);
