@@ -4,6 +4,10 @@
 # Keep project-specific ignore rules in subdirectories whenever possible.
 # -----------------------------------------------------------------------
 
+#[ WASM build artifacts ]
+bindings/js/pkg/
+apps/web/static/tomet_js_bg.wasm
+
 #[ Zed extension build ]
 editors/zed/extension.wasm
 editors/zed/grammars/
