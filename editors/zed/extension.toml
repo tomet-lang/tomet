@@ -2,7 +2,7 @@ id = "tomet"
 name = "Tomet"
 version = "0.1.0"
 schema_version = 1
-authors = ["tomet-lang"]
+authors = ["kakusika"]
 description = "Syntax highlighting and language server support for Tomet (.tmt) files."
 repository = "https://github.com/tomet-lang/tomet.git"
 
