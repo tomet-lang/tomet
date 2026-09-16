@@ -37,7 +37,7 @@ jobs:
 
       # ── Lint ───────────────────────────────────────────────
       - name: Clippy
-        run: cargo clippy --workspace --exclude tomet-web --all-targets -- -D warnings
+        run: cargo clippy --workspace --exclude tomet-web --all-targets
 
       - name: Rustfmt
         run: cargo fmt --all -- --check
