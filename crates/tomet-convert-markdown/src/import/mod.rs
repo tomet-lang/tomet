@@ -1602,7 +1602,7 @@ mod tests {
 
     #[test]
     fn test_bare_url_with_query_param_no_backticks() {
-        let md = "- http://127.0.0.1:8888/search?lang=ja&q=@query\n- <redacted-internal-url>/search?lang=ja&q=@query\n";
+        let md = "- http://127.0.0.1:8888/search?lang=ja&q=@query\n- https://example.com:1011/search?lang=ja&q=@query\n";
         let doc = from_markdown(md);
         let exported = crate::export::to_markdown(&doc);
         assert_eq!(exported.trim(), md.trim());
