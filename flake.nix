@@ -14,8 +14,14 @@
     crane.url = "github:ipetkov/crane";
 
     #[ Dev ]
-    twrit.url = "github:tomet-lang/tomet-writ";
-    tmtbook.url = "github:tomet-lang/tomet-book";
+    twrit = {
+      url = "github:tomet-lang/tomet-writ";
+      inputs.tomet.follows = "";
+    };
+    tmtbook = {
+      url = "github:tomet-lang/tomet-book";
+      inputs.tomet.follows = "";
+    };
   };
 
   outputs = inputs: import ./nix inputs;
