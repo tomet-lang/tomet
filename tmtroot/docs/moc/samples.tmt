@@ -23,4 +23,6 @@
 #[ Example ]
 
 @card(title: "tomet-sandbox")
-| Wikipediaなどをtometで置き換え、tomet-bookで表示。
+| Wikipediaなどの実際に運用されている膨大な情報を拝借し、
+| Tometの耐久性を試したり、バグを見つけ、
+| 改善を試みるサンドボックス

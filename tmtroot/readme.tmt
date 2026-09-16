@@ -9,7 +9,11 @@
   id: doc-gCzNE6yl
 }
 
-${macro.generated_by(self.path)}
+$macro.generated_by(self.path)
+
+@callout(warning)
+|Tometは現在開発中であり、日々構文や仕様が大きく変わっています。
+|試す際には、バックアップを取り実運用をしないでください。
 
 #[ Tomet ]
 
