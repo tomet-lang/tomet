@@ -14,8 +14,8 @@
     crane.url = "github:ipetkov/crane";
 
     #[ Dev ]
-    twrit.url = "git+https://github.com/tomet-lang/tomet-writ.git";
-    tmtbook.url = "git+https://github.com/tomet-lang/tomet-book.git";
+    twrit.url = "github:tomet-lang/tomet-writ";
+    tmtbook.url = "github:tomet-lang/tomet-book";
   };
 
   outputs = inputs: import ./nix inputs;
