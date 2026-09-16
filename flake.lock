@@ -69,7 +69,7 @@
     "fenix_2": {
       "inputs": {
         "nixpkgs": [
-          "tmtbook",
+          "tomet-book",
           "nixpkgs"
         ],
         "rust-analyzer-src": "rust-analyzer-src_2"
@@ -311,7 +311,7 @@
         "fenix": "fenix",
         "flake-parts": "flake-parts",
         "nixpkgs": "nixpkgs",
-        "tmtbook": "tmtbook",
+        "tomet-book": "tomet-book",
         "treefmt-nix": "treefmt-nix_2",
         "twrit": "twrit"
       }
@@ -367,7 +367,7 @@
         "type": "github"
       }
     },
-    "tmtbook": {
+    "tomet-book": {
       "inputs": {
         "crane": "crane_2",
         "fenix": "fenix_2",
