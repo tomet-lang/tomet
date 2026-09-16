@@ -1,3 +1,5 @@
+#![allow(clippy::large_enum_variant)]
+
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Write as _};
 
@@ -202,7 +204,7 @@ impl<'de> Deserialize<'de> for Value {
             }
 
             fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E> {
-                Ok(Value::Float(f64::from(v)))
+                Ok(Value::Float(v))
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> {
@@ -536,7 +538,7 @@ impl fmt::Display for Name {
 /// decided placement) and `tomet-semantics`' `required_shape` already knew
 /// each builtin's shape, so the sigil only restated it. `#` is the heading
 /// marker now, and nothing else.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Sigil {
     /// `@name` -- an element. The name is mandatory.
     ///
@@ -549,6 +551,7 @@ pub enum Sigil {
     /// No sigil at all. Only legal as an entry inside another element's
     /// value group (e.g. the `(1)[...]` entries inside `@links{ ... }`),
     /// where the container already supplies the type.
+    #[default]
     Bare,
     /// `${...}` interpolation -- structurally just a sigil with a
     /// mandatory `{value}` group, same shape as `@name{value}`, so it
@@ -630,12 +633,6 @@ pub struct Element {
     pub value: Option<ElementValue>,
     pub connects: Vec<Element>,
     pub span: Span,
-}
-
-impl Default for Sigil {
-    fn default() -> Self {
-        Sigil::Bare
-    }
 }
 
 /// One entry inside an element's `{value}` group: either a `key: value`

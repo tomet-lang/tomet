@@ -310,11 +310,10 @@ where
 {
     let mut count = 0;
     for_each_element_mut(doc, |el| {
-        if filter(el) {
-            if transform(el) {
+        if filter(el)
+            && transform(el) {
                 count += 1;
             }
-        }
     });
     count
 }
