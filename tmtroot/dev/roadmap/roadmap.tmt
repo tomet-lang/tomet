@@ -15,9 +15,10 @@
 └──────────────────────────┴────────────────────────────────────┘
 
 - iconの設定colorとconfig。
+- cliの色付け
+- $の影響範囲を大幅拡大。
 - []リストを排除、list()に置き換え。
 - ==
-- workspace-search
 - githubのreadme
 - `[[  ]]`を`@link(ref:)`の糖衣構文(ただし、labelは設定不可能にする。)
 - `{{}}`を`${}`の糖衣構文。
@@ -27,6 +28,8 @@
 - 一つのファイルで完結するようにする(blueprint, vocabulary)
 - プロパティの重複のワーニング
 - tasksもtmtで、雛形決めたほうが良さそう？
+- Tometファイルの補助スクリプト
+- リンクの拡張 (関係性,ドメイン(Youtube))
 - mode。`commonmark`、`no_data`
 - export force
 - kindとrules?
@@ -76,7 +79,6 @@
 - ( ) `allow: (link, em)` がリストにならない // `_entry_value` に括弧の形が無く
                                       // 文字列になる。spec/vocabulary.tmt の
                                       // `@content{ allow: ... }` が書けない
-- ( ) コネクト構文2                    // `:(){}[]`
 - ( ) `@tomet(version: 1)` or features.
 - ( ) 全角ブレースを黙って地の文にしない   // パーサは ASCII `{}` しか取らないので
                                       // `@bookmark(...)｛...｝` は要素ではなく
