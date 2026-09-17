@@ -5,7 +5,7 @@ Astro pages, with the bodies rendered by `tomet-convert-html` and the
 metadata, slugs and links coming from the Rust workspace layer.
 
 > **Status: active.** Provides `tometLoader` for Astro 5 Content Collections,
-> compiling `.tmt` documents in-process via `@tomet/tomet-wasm` with
+> compiling `.tmt` documents in-process via `@tomet/wasm` with
 > incremental digest caching capable of scaling to 50,000+ files.
 
 ## Usage
@@ -77,7 +77,7 @@ re-merging it would not be.
 
 ## Features & Architecture
 
-- **In-process WebAssembly compilation**: Uses `@tomet/tomet-wasm` to parse and render `.tmt` files in-process without spawning CLI sub-processes.
+- **In-process WebAssembly compilation**: Uses `@tomet/wasm` to parse and render `.tmt` files in-process without spawning CLI sub-processes.
 - **Incremental Digest Caching**: Content digests combine file mtime, size, and workspace config mtime (`configKey`) to skip unchanged documents across builds.
 - **Proximity-aware Link & Asset Resolution**: Automatically resolves `ref:` links and `@embed` image references against the scanned vault and asset map.
 - **Rich Metadata & TOC**: Automatically surfaces document titles, headings (TOC), `@kind`, banners, thumbnails, tags, and custom metadata into `entry.data`.

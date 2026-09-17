@@ -44,11 +44,12 @@ export default function Page({ documentAst }) {
 }
 ```
 
-### 2. Client-side Live Parsing with `@tomet/tomet-wasm`
+### 2. Client-side Live Parsing with `@tomet/wasm`
 
 ```tsx
+import React, { useState } from 'react';
 import { Tomet } from '@tomet/react';
-import { parseDocument } from '@tomet/tomet-wasm';
+import { parseDocument } from '@tomet/wasm';
 
 export function LivePreview({ sourceText }: { sourceText: string }) {
   return (

@@ -2,7 +2,7 @@
  * Astro integration & Content Layer Loader for Tomet.
  *
  * Provides `tometLoader` for Astro 5 Content Collections, rendering `.tmt` documents
- * in-process via `@tomet/tomet-wasm` with incremental caching designed for up to 50,000+ files.
+ * in-process via `@tomet/wasm` with incremental caching designed for up to 50,000+ files.
  */
 import type { AstroIntegration } from 'astro';
 import type { Loader, LoaderContext } from 'astro/loaders';
@@ -15,7 +15,7 @@ import initWasm, {
   type ProcessOptions,
   type ProcessedDoc,
   type TocItem,
-} from '@tomet/tomet-wasm';
+} from '@tomet/wasm';
 
 export type { ProcessOptions, ProcessedDoc, TocItem };
 

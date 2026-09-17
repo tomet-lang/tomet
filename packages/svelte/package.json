@@ -1,6 +1,6 @@
 {
   "name": "@tomet/svelte",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "High-performance Svelte 5 components for Tomet markup and AST rendering with custom element overrides",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,7 +19,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/*.svelte dist/",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
@@ -31,7 +31,14 @@
     "markdown",
     "components"
   ],
+  "author": "Tomet Project",
   "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tomet-lang/tomet.git",
+    "directory": "packages/svelte"
+  },
+  "homepage": "https://github.com/tomet-lang/tomet#readme",
   "peerDependencies": {
     "svelte": "^5.0.0"
   },

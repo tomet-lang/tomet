@@ -33,10 +33,11 @@
   "license": "MIT OR Apache-2.0",
   "peerDependencies": {
     "astro": "^5.0.0",
-    "@tomet/tomet-wasm": ">=0.1.0"
+    "@tomet/wasm": ">=0.1.0"
   },
   "dependencies": {},
   "devDependencies": {
+    "@tomet/wasm": "file:../../bindings/js",
     "@types/node": "^22.0.0",
     "astro": "^5.6.1",
     "typescript": "^5.0.0"
