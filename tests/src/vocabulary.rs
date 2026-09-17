@@ -62,11 +62,11 @@ struct Case {
 /// made a vocabulary lookup visible in the tree.
 const CASES: &[Case] = &[
     Case {
-        label: "`#codeblock`'s content is not parsed differently from any \
+        label: "`#raw`'s content is not parsed differently from any \
                 other element's (was codeblock.rs `is_codeblock`)",
-        known: "@codeblock[ *a* ]",
+        known: "@raw[ *a* ]",
         unknown: "@zzz[ *a* ]",
-        known_ident: "codeblock",
+        known_ident: "raw",
         unknown_ident: "zzz",
         kind: Ident::ElementName,
     },

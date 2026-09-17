@@ -465,7 +465,7 @@ fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) 
         // it is read.
         "strikeout" => render_wrapped_inline(cx, el, "del", out),
         "ruby" => render_ruby_element(cx, el, out),
-        "codeblock" => render_codeblock_element(el, out),
+        "raw" => render_raw_element(el, out, inline),
         "quote" => render_quote_element(cx, el, out, inline),
         "table" => render_table_element(cx, el, out),
         _ => render_custom_or_generic_element(cx, el, kind.as_str(), out, inline),
@@ -616,17 +616,10 @@ fn render_ruby_element(cx: &RenderCtx, el: &Element, out: &mut String) {
     out.push_str("</rt></ruby>");
 }
 
-/// `@codeblock(lang:xxx)[code]` -- the Markdown importer's mapping for
-/// fenced (and indented) code blocks, since `tomet_ast` has no
-/// dedicated code-block variant. `lang`
-/// is a display-only syntax-highlighting hint, never a parse-mode switch
-/// (unrelated to the generic `format` key other elements use for their
-/// `{value}`). Code lives in `[content]`, parsed as raw verbatim text (see
-/// `document.rs::parse_raw_content`) rather than the usual inline grammar, so
-/// real source containing `*`/`<`/`@`/backticks stays literal. `{value}`,
-/// if present, is `id`/`cssclass` metadata -- same convention as a
-/// heading's `{ id:x, cssclass:y }`, not code content.
-fn render_codeblock_element(el: &Element, out: &mut String) {
+/// `@raw(lang:xxx)[code]` -- raw verbatim text. Standing alone as a block,
+/// it renders `<pre><code>...</code></pre>`. Inside running text (`inline == true`),
+/// it renders `<code class="...">...</code>`.
+fn render_raw_element(el: &Element, out: &mut String, inline: bool) {
     let args = normalized_element_args(el);
     let lang = args
         .as_ref()
@@ -644,6 +637,19 @@ fn render_codeblock_element(el: &Element, out: &mut String) {
         _ => None,
     };
     let (id, class, data) = split_attrs(attrs.as_ref());
+
+    if inline {
+        out.push_str("<code");
+        push_named_attrs(out, &id, &class, &data);
+        if !lang.is_empty() {
+            out.push_str(&format!(" class=\"language-{}\"", escape_attr(&lang)));
+        }
+        out.push('>');
+        out.push_str(&escape_html(&code));
+        out.push_str("</code>");
+        return;
+    }
+
     out.push_str("<pre");
     push_named_attrs(out, &id, &class, &data);
     out.push_str("><code");
@@ -1469,8 +1475,8 @@ mod tests {
     }
 
     #[test]
-    fn renders_codeblock_with_lang() {
-        let doc = parse_document("@codeblock(lang:rust)[fn main() {}]\n").unwrap();
+    fn renders_raw_with_lang() {
+        let doc = parse_document("@raw(lang:rust)[fn main() {}]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1479,7 +1485,7 @@ mod tests {
     }
 
     #[test]
-    fn fenced_code_block_renders_the_same_as_bracket_codeblock() {
+    fn fenced_raw_block_renders_the_same_as_bracket_raw() {
         let doc = parse_document("```rust\nfn main() {}\n```\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
@@ -1489,12 +1495,7 @@ mod tests {
     }
 
     #[test]
-    fn codeblock_content_stays_literal_not_interpreted_as_markup() {
-        // A ``` fence is the raw form. `#codeblock[...]` used to be raw
-        // too, via a hardcoded name check in the parser -- one of the four
-        // places the parser consulted an element vocabulary, and now gone.
-        // Real code containing `*`/`@`/backticks must not be reinterpreted
-        // as em/strong/element triggers/code spans.
+    fn raw_content_stays_literal_not_interpreted_as_markup() {
         let doc = parse_document("```rust\nlet x = *ptr; let y = @T; @deco `q`\n```\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
@@ -1504,12 +1505,32 @@ mod tests {
     }
 
     #[test]
-    fn codeblock_with_a_nested_bracket_is_not_truncated_early() {
-        let doc = parse_document("@codeblock(lang:rust)[let v = [1, 2, 3];]\n").unwrap();
+    fn raw_with_a_nested_bracket_is_not_truncated_early() {
+        let doc = parse_document("@raw(lang:rust)[let v = [1, 2, 3];]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
             "<pre><code class=\"language-rust\">let v = [1, 2, 3];</code></pre>\n"
+        );
+    }
+
+    #[test]
+    fn renders_inline_backtick_as_code() {
+        let doc = parse_document("call `foo()` and `@kind(doc.index)` now\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<p>call <code>foo()</code> and <code>@kind(doc.index)</code> now</p>\n"
+        );
+    }
+
+    #[test]
+    fn renders_explicit_inline_raw() {
+        let doc = parse_document("use @raw[Ctrl+C] or @raw(rust)[x = 1] here\n").unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<p>use <code>Ctrl+C</code> or <code class=\"language-rust\">x = 1</code> here</p>\n"
         );
     }
 
@@ -1546,9 +1567,9 @@ mod tests {
     }
 
     #[test]
-    fn codeblock_value_group_is_id_cssclass_metadata_not_code() {
+    fn raw_value_group_is_id_cssclass_metadata_not_code() {
         let doc =
-            parse_document("@codeblock(lang:rust){id:snippet1, cssclass:card}[fn main() {}]\n")
+            parse_document("@raw(lang:rust){id:snippet1, cssclass:card}[fn main() {}]\n")
                 .unwrap();
         let body = render_body(&doc);
         assert_eq!(
@@ -1558,8 +1579,8 @@ mod tests {
     }
 
     #[test]
-    fn renders_codeblock_with_positional_lang_arg() {
-        let doc = parse_document("@codeblock(\"rust\")[fn main() {}]\n").unwrap();
+    fn renders_raw_with_positional_lang_arg() {
+        let doc = parse_document("@raw(\"rust\")[fn main() {}]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,

@@ -41,7 +41,7 @@ pub(crate) fn parse_fenced_code_block(cur: &mut Cursor) -> Result<Element> {
         Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
     };
     let content_span = Span::new(cur.position_at(body_start), cur.position_at(body_end));
-    let mut el = element_new(Sigil::named("codeblock"))
+    let mut el = element_new(Sigil::named("raw"))
         .with_placement(Placement::Block)
         .with_span(cur.span_from(start_pos))
         .with_content(vec![Inline::Raw(RawText::new(code, content_span))]);

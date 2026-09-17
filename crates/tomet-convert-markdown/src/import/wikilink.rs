@@ -44,7 +44,7 @@ fn post_process_block_wikilinks(block: &mut Block) {
 }
 
 fn post_process_element_wikilinks(el: &mut Element) {
-    if el.sigil.is_bare_named("codeblock") {
+    if el.sigil.is_bare_named("raw") {
         return;
     }
     if let Some(content) = el.content.take() {

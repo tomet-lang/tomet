@@ -22,7 +22,7 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
     match name.name.as_str() {
         "kind" => &["kind"],
         "version" => &["version"],
-        "codeblock" => &["lang"],
+        "raw" => &["lang"],
         "embed" | "link" => &["target"],
         // A path mention names one thing, so its single positional slot
         // is the path. The element name says file or directory; unlike
@@ -268,8 +268,8 @@ mod tests {
     use tomet_tree::element_new;
 
     #[test]
-    fn normalizes_codeblock_positional_arg() {
-        let mut el = element_new(Sigil::named("codeblock"));
+    fn normalizes_raw_positional_arg() {
+        let mut el = element_new(Sigil::named("raw"));
         el.args = Some(Value::String("rust".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn leaves_map_args_unchanged() {
-        let mut el = element_new(Sigil::named("codeblock"));
+        let mut el = element_new(Sigil::named("raw"));
         let map_val = Value::Map(vec![(
             "lang".to_string(),
             Value::String("rust".to_string()),

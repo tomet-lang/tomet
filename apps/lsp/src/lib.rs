@@ -887,7 +887,7 @@ fn describe_kind(name: &str) -> &'static str {
         "blueprint" => {
             "Declares the structure of one document kind, and what `tomet new` instantiates"
         }
-        "codeblock" => "Verbatim code block",
+        "raw" => "Raw verbatim block or inline text",
         "quote" => "Quote",
         "hr" => "Horizontal rule divider",
         "meta" => "Metadata key-value declaration",

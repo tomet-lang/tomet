@@ -1,18 +1,18 @@
 <h1>シジルは形を表す</h1>
-<p>`@` はインライン、`#` はブロック。名前空間が出自を表す。</p>
+<p><code>@</code> はインライン、<code>#</code> はブロック。名前空間が出自を表す。</p>
 <h1>ブロック要素</h1>
-<div class="tm-element tm-memo">名前は `#` の直後に続く。空白があると本文になる</div>
+<div class="tm-element tm-memo">名前は <code>#</code> の直後に続く。空白があると本文になる</div>
 <div class="tm-element tm-deck.bookmark" data-name="foo" data-count="3">名前空間つき</div>
 <h1>インライン要素</h1>
 <p>文中の <a class="tm-url" href="https://example.com">リンク</a> と <span class="tm-element tm-deck.badge" data-value="2">名前空間つきインライン</span> は行の途中でも要素になる。</p>
-<h1>本文に落ちる `#`</h1>
-<p>これは #タグ ではない。`#` の直後に空白もグループも無ければ、ただの文字。</p>
+<h1>本文に落ちる <code>#</code></h1>
+<p>これは #タグ ではない。<code>#</code> の直後に空白もグループも無ければ、ただの文字。</p>
 <p>ASCII でない名前は要素にならない。</p>
 <h1>見出しの三つの形</h1>
 <h1>空白のあとに本文を書けば見出し（糖衣）</h1>
 <h1>グループを書けば完全形</h1>
 <h1 data-tag="syntax">引数も値も取れる</h1>
-<h1>`{}` は常にデータ</h1>
+<h1><code>{}</code> は常にデータ</h1>
 <dl class="tm-links">
 <dt id="link-1">1</dt>
 <dd>ひとつめ</dd>
@@ -24,9 +24,9 @@
 </div>
 </div>
 <h1>未完成の印</h1>
-<p>文書が自分について言う印。`@draft` はそこに文章が無いこと、`@fixme` は文章はあるが直すこと。どちらも警告で、`tomet check` は通る。</p>
+<p>文書が自分について言う印。<code>@draft</code> はそこに文章が無いこと、<code>@fixme</code> は文章はあるが直すこと。どちらも警告で、<code>tomet check</code> は通る。</p>
 <div class="tm-element tm-draft">ここに書く予定の節</div>
 <p>段落の途中にも置ける。<span class="tm-element tm-fixme">この例は古い</span> のように、行を占有しなくてもよい。どちらの配置でも形の誤りにはならない。</p>
 <h1>取り消し線</h1>
-<p>GFM と同じ綴りで、`==印==` と同じ形の対になった区切り。</p>
+<p>GFM と同じ綴りで、<code>==印==</code> と同じ形の対になった区切り。</p>
 <p>これは <del>取り消した</del> 文で、<em>強調</em> や <mark>印</mark> と並べても混ざらない。</p>

@@ -1,10 +1,10 @@
 <h1>補間の識別子は要素の識別子と同じ形</h1>
-<p>`-` を含められる。要素の引数で `@kind(node-graph)` と書けるものが、補間の中でも同じように書ける。</p>
+<p><code>-</code> を含められる。要素の引数で <code>@kind(node-graph)</code> と書けるものが、補間の中でも同じように書ける。</p>
 ${ref(id(node-graph))}${filename}${vars.title}<h1>呼び出し</h1>
-${sum(1, 4)}${sub(1, 2)}<div class="tm-element tm-memo">`$name(args)` は本文の中にも置ける -- ${slug-of(title)} のように</div>
+${sum(1, 4)}${sub(1, 2)}<div class="tm-element tm-memo"><code>$name(args)</code> は本文の中にも置ける -- ${slug-of(title)} のように</div>
 <h1>引数の中の識別子</h1>
-${ref(id(asdf-asdfa).contents(dafault))}${outer(inner-name, "quoted-string", 42)}<h1>`-` で始まるものは識別子ではない</h1>
-<p>先頭は英字か `_` のみ。次の行はただの本文で、補間ではない。</p>
+${ref(id(asdf-asdfa).contents(dafault))}${outer(inner-name, "quoted-string", 42)}<h1><code>-</code> で始まるものは識別子ではない</h1>
+<p>先頭は英字か <code>_</code> のみ。次の行はただの本文で、補間ではない。</p>
 <ul>
-<li>箇条書きの `-` は今までどおり</li>
+<li>箇条書きの <code>-</code> は今までどおり</li>
 </ul>

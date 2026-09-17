@@ -186,7 +186,7 @@ const CASES: &[Case] = &[
         "`key: value`",
         "@memo(a: 1, b: two)\n",
     ),
-    case(None, "位置引数（キーなし）", "@codeblock(rust)\n"),
+    case(None, "位置引数（キーなし）", "@raw(rust)\n"),
     case(None, "列", "@memo(xs: [1, 2, 3])\n"),
     case(None, "入れ子のマップ", "@memo(m: { x: 1 })\n"),
     case(None, "引用符つき文字列", "@memo(s: \"a, b: c\")\n"),

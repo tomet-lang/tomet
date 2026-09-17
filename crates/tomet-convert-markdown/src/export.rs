@@ -138,7 +138,7 @@ fn element_to_md(el: &Element, inline: bool) -> String {
         "mark" => format!("<mark>{}</mark>", content_to_md(el)),
         "strikeout" => format!("~~{}~~", content_to_md(el)),
         "ruby" => render_ruby(el),
-        "codeblock" => render_code_block(el),
+        "raw" => render_raw(el, inline),
         "quote" => render_quote(el, inline),
         "callout" => render_callout(el),
         "table" => render_table(el),
@@ -271,24 +271,45 @@ fn render_hr(el: &Element) -> String {
     }
 }
 
-/// `codeblock`'s `{value}` (`id`/`cssclass` metadata, if present -- see
-/// `tomet-html`'s `render_codeblock_element`) has no CommonMark
+/// `raw`'s `{value}` (`id`/`cssclass` metadata, if present -- see
+/// `tomet-html`'s `render_raw_element`) has no CommonMark
 /// form, same as a heading's attrs, so it's dropped on export.
-fn render_code_block(el: &Element) -> String {
-    let lang = el
-        .args
-        .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, "lang"))
-        .map(value_to_plain)
-        .unwrap_or_default();
+fn render_raw(el: &Element, inline: bool) -> String {
     let code = el
         .content
         .as_ref()
         .map(|a| inlines_to_plain(a))
         .unwrap_or_default();
-    let fence = fence_for(&code);
-    format!("{fence}{lang}\n{code}\n{fence}")
+    if inline {
+        render_inline_raw(&code)
+    } else {
+        let lang = el
+            .args
+            .as_ref()
+            .and_then(as_map)
+            .and_then(|m| map_get(m, "lang"))
+            .map(value_to_plain)
+            .unwrap_or_default();
+        let fence = fence_for(&code);
+        format!("{fence}{lang}\n{code}\n{fence}")
+    }
+}
+
+fn render_inline_raw(code: &str) -> String {
+    if !code.contains('`') {
+        return format!("`{code}`");
+    }
+    let mut run_len = 2;
+    while code.contains(&"`".repeat(run_len)) {
+        run_len += 1;
+    }
+    let delim = "`".repeat(run_len);
+    let pad = if code.starts_with('`') || code.ends_with('`') {
+        " "
+    } else {
+        ""
+    };
+    format!("{delim}{pad}{code}{pad}{delim}")
 }
 
 /// Fenced code blocks need a fence at least one backtick longer than the
@@ -747,7 +768,7 @@ fn map_get<'a>(map: &'a [(String, Value)], key: &str) -> Option<&'a Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Paragraph, Placement, Sigil, Span, Text};
+    use tomet_ast::{Paragraph, Placement, RawText, Sigil, Span, Text};
 
     #[test]
     fn a_backtick_span_survives_export_unescaped() {
@@ -1034,9 +1055,9 @@ mod tests {
     }
 
     #[test]
-    fn code_block_uses_fence_and_lang() {
+    fn raw_block_uses_fence_and_lang() {
         let el = Element {
-            sigil: Sigil::named("codeblock"),
+            sigil: Sigil::named("raw"),
             placement: Placement::Block,
             args: Some(Value::Map(vec![(
                 "lang".to_string(),
@@ -1053,6 +1074,32 @@ mod tests {
             span: Span::dummy(),
         };
         assert_eq!(to_markdown(&doc), "```rust\nfn main() {}\n```\n\n");
+    }
+
+    #[test]
+    fn raw_inline_uses_backticks() {
+        let el = Element {
+            sigil: Sigil::named("raw"),
+            placement: Placement::Inline,
+            args: None,
+            content: Some(vec![Inline::Raw(RawText::new("foo()", Span::dummy()))]),
+            children: None,
+            value: None,
+            connects: Vec::new(),
+            span: Span::dummy(),
+        };
+        let doc = Document {
+            blocks: vec![Block::Paragraph(Paragraph::new(
+                vec![
+                    Inline::Text(Text::new("call ", Span::dummy())),
+                    Inline::Element(el),
+                    Inline::Text(Text::new(" now", Span::dummy())),
+                ],
+                Span::dummy(),
+            ))],
+            span: Span::dummy(),
+        };
+        assert_eq!(to_markdown(&doc), "call `foo()` now\n\n");
     }
 
     #[test]
