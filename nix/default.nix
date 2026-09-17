@@ -18,7 +18,6 @@ flake-parts.lib.mkFlake { inherit inputs; } {
       craneLib = inputs.crane.mkLib pkgs;
       tomet = pkgs.callPackage ./pkgs/tomet.nix { inherit craneLib; };
       tomet-lsp = pkgs.callPackage ./pkgs/tomet-lsp.nix { inherit craneLib; };
-      tomet-web = pkgs.callPackage ./pkgs/tomet-web.nix { inherit craneLib; };
       vscodeExtension = pkgs.callPackage ./pkgs/vscode-extension.nix { };
     in
     {
@@ -27,7 +26,6 @@ flake-parts.lib.mkFlake { inherit inputs; } {
         inherit
           tomet
           tomet-lsp
-          tomet-web
           vscodeExtension
           ;
       };
@@ -38,7 +36,6 @@ flake-parts.lib.mkFlake { inherit inputs; } {
           craneLib
           tomet
           tomet-lsp
-          tomet-web
           ;
         fenix = inputs.fenix.packages.${pkgs.stdenv.hostPlatform.system};
         twrit = inputs.twrit.packages.${pkgs.stdenv.hostPlatform.system}.twrit;

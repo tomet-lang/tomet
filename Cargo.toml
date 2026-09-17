@@ -2,9 +2,8 @@
 resolver = "3"
 
 members = [
-  #[ CLI & Web ]
+  #[ CLI ]
   "apps/cli",
-  "apps/web",
   "apps/lsp",
 
   #[ Bindings ]
@@ -129,7 +128,7 @@ crossterm = "0.28"
 directories = "6.0"
 ignore = "0.4"
 jni = "0.21"
-js-sys = "=0.3.98"
+js-sys = "0.3"
 lsp-server = "0.10"
 lsp-types = "0.97"
 pulldown-cmark = "0.13"
@@ -153,5 +152,5 @@ nanoid = "0.4"
 unicode-width = "0.2"
 uuid = { version = "1.23", features = ["v4", "js"] }
 walkdir = "2"
-wasm-bindgen = "=0.2.121"
+wasm-bindgen = "=0.2.127"
 zed_extension_api = "0.7"
