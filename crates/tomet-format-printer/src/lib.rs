@@ -352,63 +352,77 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         return out;
     }
 
-    // A codeblock is written back as a ``` fence, which is the form it
-    // was parsed from and the only one that keeps its body verbatim.
-    // `@codeblock[...]` would not survive a round trip: `[content]` is
-    // ordinary markup now, so code containing Tomet syntax -- a `+++`
-    // fence, say -- would be reparsed as that syntax.
-    if el.sigil.is_bare_named("codeblock") {
-        let lang = el
-            .args
-            .as_ref()
-            .and_then(|args| match args {
-                Value::String(s) => Some(s.clone()),
-                Value::Map(entries) => {
-                    entries
-                        .iter()
-                        .find(|(k, _)| k == "lang")
-                        .and_then(|(_, v)| match v {
-                            Value::String(s) => Some(s.clone()),
-                            _ => None,
-                        })
-                }
-                _ => None,
-            })
-            .unwrap_or_default();
-        // The body arrives in either slot, and both are written back as
-        // a fence. A ``` block parses into `[content]`; `@codeblock(yaml)
-        // +++...+++` parses into a `Raw` value, and reading only the
-        // first is how that spelling used to print as an empty fence with
-        // its code deleted.
-        let from_content = el
-            .content
-            .as_ref()
-            .map(|content| render_inlines(content, config))
-            .filter(|body| !body.is_empty());
-        let body = from_content
-            .or_else(|| match el.value.as_ref() {
-                Some(ElementValue::Raw(raw)) => Some(raw.clone()),
-                _ => None,
-            })
-            .unwrap_or_default();
-        // Grow the fence past any backtick run in the body, the same rule
-        // the parser reads it back with.
-        let longest = body
-            .lines()
-            .map(|l| l.trim_end())
-            .filter(|l| !l.is_empty() && l.chars().all(|c| c == '`'))
-            .map(str::len)
-            .max()
-            .unwrap_or(0);
-        let fence = "`".repeat(longest.max(2) + 1);
-        let mut out = format!("{fence}{lang}\n");
-        out.push_str(&body);
-        if !body.is_empty() && !body.ends_with('\n') {
-            out.push('\n');
+    if el.sigil.is_bare_named("raw") {
+        if el.placement == Placement::Inline
+            && el.args.is_none()
+            && el.value.is_none()
+            && el.connects.is_empty()
+        {
+            let from_content = el
+                .content
+                .as_ref()
+                .map(|content| render_inlines(content, config));
+            let body = from_content.unwrap_or_default();
+            let longest = body
+                .split(|c| c != '`')
+                .map(|run| run.len())
+                .max()
+                .unwrap_or(0);
+            let fence = "`".repeat(longest + 1);
+            let pad = if body.starts_with('`') || body.ends_with('`') {
+                " "
+            } else {
+                ""
+            };
+            return format!("{fence}{pad}{body}{pad}{fence}");
         }
-        out.push_str(&fence);
-        out.push_str(&render_connects(&el.connects, config));
-        return out;
+
+        if el.placement == Placement::Block {
+            let lang = el
+                .args
+                .as_ref()
+                .and_then(|args| match args {
+                    Value::String(s) => Some(s.clone()),
+                    Value::Map(entries) => {
+                        entries
+                            .iter()
+                            .find(|(k, _)| k == "lang")
+                            .and_then(|(_, v)| match v {
+                                Value::String(s) => Some(s.clone()),
+                                _ => None,
+                            })
+                    }
+                    _ => None,
+                })
+                .unwrap_or_default();
+            let from_content = el
+                .content
+                .as_ref()
+                .map(|content| render_inlines(content, config))
+                .filter(|body| !body.is_empty());
+            let body = from_content
+                .or_else(|| match el.value.as_ref() {
+                    Some(ElementValue::Raw(raw)) => Some(raw.clone()),
+                    _ => None,
+                })
+                .unwrap_or_default();
+            let longest = body
+                .lines()
+                .map(|l| l.trim_end())
+                .filter(|l| !l.is_empty() && l.chars().all(|c| c == '`'))
+                .map(str::len)
+                .max()
+                .unwrap_or(0);
+            let fence = "`".repeat(longest.max(2) + 1);
+            let mut out = format!("{fence}{lang}\n");
+            out.push_str(&body);
+            if !body.is_empty() && !body.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push_str(&fence);
+            out.push_str(&render_connects(&el.connects, config));
+            return out;
+        }
     }
 
     if el.sigil.is_bare_named("callout") {
@@ -800,7 +814,7 @@ mod tests {
         for src in [
             "@hr:rule(allow: list(card))\n",
             "@meta{a: 1}:rule(allow: list(card))\n",
-            "@codeblock[x]:rule(allow: list(card))\n",
+            "@raw[x]:rule(allow: list(card))\n",
         ] {
             let doc = tomet_parser::parse_document(src).unwrap();
             let el = match &doc.blocks[0] {
@@ -1158,19 +1172,23 @@ mod tests {
         assert!(printed_nospace.contains("@link(target:\"https://google.com\")[Google]"));
     }
 
-    /// A code block's body reaches the printer in either slot, and both
+    /// A raw block's body reaches the printer in either slot, and both
     /// have to come back out.
     ///
-    /// ``` parses into `[content]`; `@codeblock(yaml)+++...+++` parses
-    /// into a `Raw` value. The printer read only the first, so the fence
-    /// spelling printed as an empty block with its code deleted -- and
-    /// anything that reprints a document, `tomet refactor` included,
-    /// deleted it in passing.
+    /// ``` parses into `[content]`; `@raw(yaml)+++...+++` parses
+    /// into a `Raw` value.
     #[test]
-    fn a_fenced_codeblock_body_survives_printing() {
-        let doc = tomet_parser::parse_document("@codeblock(yaml)+++\na: 1\n+++\n").unwrap();
+    fn a_fenced_raw_body_survives_printing() {
+        let doc = tomet_parser::parse_document("@raw(yaml)+++\na: 1\n+++\n").unwrap();
         let printed = document_to_tm(&doc);
         assert!(printed.contains("a: 1"), "the body was dropped:\n{printed}");
+    }
+
+    #[test]
+    fn inline_raw_prints_as_backticks() {
+        let doc = tomet_parser::parse_document("call `foo()` now\n").unwrap();
+        let printed = document_to_tm(&doc);
+        assert_eq!(printed.trim(), "call `foo()` now");
     }
 
     #[test]

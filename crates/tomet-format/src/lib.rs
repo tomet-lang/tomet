@@ -608,7 +608,7 @@ pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
 }
 
 fn is_raw_element(el: &Element) -> bool {
-    if el.sigil.is_bare_named("codeblock") {
+    if el.sigil.is_bare_named("raw") {
         return true;
     }
     if let Some(Value::Map(entries)) = &el.args {
@@ -795,8 +795,8 @@ mod tests {
     }
 
     #[test]
-    fn codeblock_content_is_preserved_losslessly() {
-        let src = "@codeblock(lang:rust)[\nfn foo() {\n    let a = 1;  \n\n    let b = 2;\n}\n]\n";
+    fn raw_content_in_brackets_is_preserved_losslessly() {
+        let src = "@raw(lang:rust)[\nfn foo() {\n    let a = 1;  \n\n    let b = 2;\n}\n]\n";
         assert_eq!(format_source(src), src);
     }
 

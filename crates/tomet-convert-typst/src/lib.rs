@@ -139,7 +139,7 @@ fn element_to_typst(el: &Element, inline: bool) -> String {
         "mark" => format!("#highlight[{}]", content_to_typst(el)),
         "strikeout" => format!("#strike[{}]", content_to_typst(el)),
         "ruby" => render_ruby(el),
-        "codeblock" => render_code_block(el),
+        "raw" => render_raw(el, inline),
         "quote" => render_quote(el, inline),
         "callout" => render_callout(el),
         "table" => render_table(el),
@@ -233,16 +233,12 @@ fn callout_variant_and_title(el: &Element) -> (String, Option<String>) {
     (variant.unwrap_or_else(|| "note".to_string()), title)
 }
 
-/// `<codeblock>(lang:xxx)[code]` -- Typst uses the same triple-backtick
-/// raw-block fence syntax as CommonMark, so this reuses the same
-/// backtick-run-counting fence logic `tomet-convert-markdown`'s
-/// `fence_for` uses, for the same reason: a fence must be at least one
-/// backtick longer than the longest backtick run already inside the code,
-/// or it would terminate early on re-parse. Reads `lang` via
-/// `normalized_element_args` (not raw `el.args`) so a positional lang
-/// arg (`<codeblock>("rust")[...]`) resolves the same as a named
-/// `lang:rust` one.
-fn render_code_block(el: &Element) -> String {
+/// `<raw>(lang:xxx)[code]` -- Typst uses the same triple-backtick
+/// raw-block fence syntax as CommonMark for blocks, and single backticks
+/// or `#raw(...)` for inlines. Reads `lang` via `normalized_element_args`
+/// (not raw `el.args`) so a positional lang arg (`<raw>("rust")[...]`)
+/// resolves the same as a named `lang:rust` one.
+fn render_raw(el: &Element, inline: bool) -> String {
     let args = normalized_element_args(el);
     let lang = args
         .as_ref()
@@ -255,8 +251,18 @@ fn render_code_block(el: &Element) -> String {
         .as_ref()
         .map(|a| inlines_to_plain(a))
         .unwrap_or_default();
-    let fence = fence_for(&code);
-    format!("{fence}{lang}\n{code}\n{fence}")
+    if inline {
+        if lang.is_empty() && !code.contains('`') {
+            format!("`{code}`")
+        } else if lang.is_empty() {
+            format!("#raw({code:?})")
+        } else {
+            format!("#raw({code:?}, lang: {lang:?})")
+        }
+    } else {
+        let fence = fence_for(&code);
+        format!("{fence}{lang}\n{code}\n{fence}")
+    }
 }
 
 fn fence_for(code: &str) -> String {
@@ -626,19 +632,24 @@ mod tests {
     }
 
     #[test]
-    fn renders_codeblock_with_lang_using_a_safe_fence() {
+    fn renders_raw_with_lang_using_a_safe_fence() {
         assert_eq!(
-            typst("@codeblock(lang:rust)[fn main() {}]\n"),
+            typst("@raw(lang:rust)[fn main() {}]\n"),
             "```rust\nfn main() {}\n```\n\n"
         );
     }
 
     #[test]
-    fn renders_codeblock_with_positional_lang_arg() {
+    fn renders_raw_with_positional_lang_arg() {
         assert_eq!(
-            typst("@codeblock(\"rust\")[fn main() {}]\n"),
+            typst("@raw(\"rust\")[fn main() {}]\n"),
             "```rust\nfn main() {}\n```\n\n"
         );
+    }
+
+    #[test]
+    fn renders_inline_raw_as_backtick_span() {
+        assert_eq!(typst("call `foo()` now\n"), "call `foo()` now\n\n");
     }
 
     #[test]

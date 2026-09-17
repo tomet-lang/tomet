@@ -6,7 +6,7 @@
 //! exist for Tomet's own native shorthand (`em`/`strong`/`hr`, list
 //! elements -- see `Element::list`/`Element::list_item`). Constructs with
 //! no native equivalent (fenced/indented code, block quotes) go through
-//! the generic named-element escape hatch -- `@codeblock` and
+//! the generic named-element escape hatch -- `@raw` and
 //! `@blockquote`, which are ordinary elements rather than AST variants.
 //!
 //! One thing is structurally lossy on import: a block
@@ -159,7 +159,10 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
                 if !matches!(stack.last(), Some(Frame::Discard)) {
                     push_inline(
                         &mut stack,
-                        Inline::Text(Text::new(backticked(&code), Span::dummy())),
+                        wrap_inline(
+                            "raw",
+                            vec![Inline::Raw(RawText::new(code.to_string(), Span::dummy()))],
+                        ),
                     );
                 }
             }
@@ -368,7 +371,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
             };
             let el = Element {
-                sigil: Sigil::named("codeblock"),
+                sigil: Sigil::named("raw"),
                 placement: Placement::Block,
                 args,
                 content: Some(vec![Inline::Raw(RawText::new(text, Span::dummy()))]),
@@ -767,31 +770,7 @@ fn inline_target(stack: &mut [Frame]) -> Option<&mut Vec<Inline>> {
 /// result, break) to whichever frame is currently accumulating inlines.
 /// List items can receive these directly (CommonMark "tight" lists put
 /// inline content straight under `Item`, with no `Paragraph` wrapper).
-/// Adjacent `Text` nodes are merged (e.g. plain text either side of an
-/// inline code span) rather than left as separate fragments.
-/// Re-wraps a code span's content in backticks, growing the fence past any
-/// run inside it -- the same rule `tomet-printer` uses for a ``` fence and
-/// the parser uses for `+++`.
-///
-/// Tomet's AST has no code-span node, so an imported span becomes `Text`
-/// carrying its own backticks. A fixed pair silently flattened
-/// ``` ``a`b`` ``` to `` `a`b` ``, which is a different span.
-fn backticked(code: &str) -> String {
-    let longest = code
-        .split(|c| c != '`')
-        .map(|run| run.len())
-        .max()
-        .unwrap_or(0);
-    let fence = "`".repeat(longest + 1);
-    // A space keeps a leading or trailing backtick from joining the fence,
-    // which is CommonMark's own rule for the same collision.
-    let pad = if code.starts_with('`') || code.ends_with('`') {
-        " "
-    } else {
-        ""
-    };
-    format!("{fence}{pad}{code}{pad}{fence}")
-}
+
 
 fn push_inline(stack: &mut [Frame], inline: Inline) {
     let Some(target) = inline_target(stack) else {
@@ -1053,7 +1032,7 @@ mod tests {
         let doc = from_markdown("```rust\nfn main() {}\n```\n");
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::named("codeblock"));
+                assert_eq!(el.sigil, Sigil::named("raw"));
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
@@ -1120,37 +1099,51 @@ mod tests {
     }
 
     #[test]
-    fn inline_code_span_survives_as_backticked_text() {
+    fn inline_code_span_becomes_raw_element() {
         let doc = from_markdown("call `foo()` now\n");
         assert_eq!(
             doc.blocks[0],
             Block::Paragraph(Paragraph::new(
-                vec![Inline::Text(Text::new("call `foo()` now", Span::dummy()))],
+                vec![
+                    Inline::Text(Text::new("call ", Span::dummy())),
+                    wrap_inline(
+                        "raw",
+                        vec![Inline::Raw(RawText::new("foo()", Span::dummy()))],
+                    ),
+                    Inline::Text(Text::new(" now", Span::dummy())),
+                ],
                 Span::dummy()
             ))
         );
     }
 
-    /// The sigil guard has to leave a code span alone. It runs over the
-    /// whole document after the events are collected, and by then a code
-    /// span is just backticked text -- so `` `//!` `` used to come back as
-    /// ``` ``//`!` ```, protected twice.
+    /// The sigil guard has to leave a code span alone. It is an `@raw` element
+    /// whose content is `Inline::Raw`, so sigils inside it stay untouched.
     #[test]
     fn a_code_span_keeps_the_sigils_inside_it() {
-        for src in [
-            "the `//!` module doc\n",
-            "the `//` doc\n",
-            "the `/*` and `*/` pair\n",
-            "write to `@x` please\n",
+        for (src, expected_code) in [
+            ("the `//!` module doc\n", "//!"),
+            ("the `//` doc\n", "//"),
+            ("the `/*` and `*/` pair\n", "/*"),
+            ("write to `@x` please\n", "@x"),
         ] {
             let doc = from_markdown(src);
             let Block::Paragraph(p) = &doc.blocks[0] else {
                 panic!("expected a paragraph for {src:?}")
             };
-            let Inline::Text(t) = &p.content[0] else {
-                panic!("expected text for {src:?}")
-            };
-            assert_eq!(t.value, src.trim_end(), "for {src:?}");
+            let has_raw = p.content.iter().any(|inl| match inl {
+                Inline::Element(el) if el.sigil.is_bare_named("raw") => {
+                    el.content.as_ref().map_or(false, |c| match &c[0] {
+                        Inline::Raw(r) => r.value == expected_code,
+                        _ => false,
+                    })
+                }
+                _ => false,
+            });
+            assert!(
+                has_raw,
+                "expected raw element with {expected_code:?} for {src:?}"
+            );
         }
     }
 
@@ -1168,16 +1161,16 @@ mod tests {
         assert_eq!(t.value, "a bare `//` comment");
     }
 
-    /// The re-wrap grows its fence past a backtick in the content, the
-    /// same rule the printer uses. A fixed pair flattened ``` ``a`b`` ```
-    /// into `` `a`b` ``, which is a different span.
     #[test]
-    fn a_code_span_holding_a_backtick_keeps_its_fence() {
-        assert_eq!(backticked("a`b"), "``a`b``");
-        assert_eq!(backticked("x"), "`x`");
-        // A leading or trailing backtick needs the padding space, or it
-        // would join the fence and change the run length.
-        assert_eq!(backticked("`"), "`` ` ``");
+    fn a_code_span_holding_a_backtick_survives_import() {
+        let doc = from_markdown("``a`b``\n");
+        let Block::Paragraph(p) = &doc.blocks[0] else {
+            panic!("expected a paragraph");
+        };
+        assert_eq!(
+            p.content[0],
+            wrap_inline("raw", vec![Inline::Raw(RawText::new("a`b", Span::dummy()))])
+        );
     }
 
     #[test]

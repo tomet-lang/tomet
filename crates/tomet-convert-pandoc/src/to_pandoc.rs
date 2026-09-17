@@ -99,7 +99,7 @@ fn element_to_blocks(el: &Element) -> Vec<Block> {
             content_to_inlines(el),
         )],
         "hr" => vec![Block::HorizontalRule],
-        "codeblock" => vec![Block::CodeBlock(code_attr(el), content_to_plain_text(el))],
+        "raw" => vec![Block::CodeBlock(code_attr(el), content_to_plain_text(el))],
         "quote" => vec![Block::BlockQuote(content_to_blocks(content_of(el)))],
         "ol" | "ul" => vec![list_to_pandoc(el)],
         "table" => table_to_pandoc(el),
@@ -180,6 +180,7 @@ fn element_to_inlines(el: &Element) -> Vec<Inline> {
         // evaluated: resolving it needs the document and its config, and
         // the Typst writer already sets this precedent.
         "interp" => vec![Inline::Code(Attr::empty(), interp_source(el))],
+        "raw" => vec![Inline::Code(code_attr(el), content_to_plain_text(el))],
         _ => vec![Inline::Span(
             generic_attr(el, &kind),
             content_to_inlines(el),

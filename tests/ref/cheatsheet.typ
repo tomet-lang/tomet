@@ -67,7 +67,7 @@ sudo whoami ls --help
 
 1. aaaa
 
-*aaaa* _aaaa_ #highlight[aaaa] _aaaa_ \`aaaa\`
+*aaaa* _aaaa_ #highlight[aaaa] _aaaa_ `aaaa`
 
 ```(lang:sh)
 

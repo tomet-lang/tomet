@@ -85,8 +85,8 @@ fn materialize_raw_body(el: &mut Element) {
 /// Whether an element's `+++` body is data that could have been written
 /// as a value group instead.
 ///
-/// Everything but a code block. `@codeblock(yaml)+++a: 1+++` declares a
-/// format the same way `@meta(yaml)` does, and `embedded::element_data`
+/// Everything but a raw block. `@raw(yaml)+++a: 1+++` declares a
+/// format for syntax highlighting and serde_json / serde_yaml
 /// will happily read it -- but that body is a *sample* of YAML, and
 /// rewriting it as a group deletes the thing its author was showing.
 ///
@@ -96,7 +96,7 @@ fn materialize_raw_body(el: &mut Element) {
 /// pass only saw `@meta`, so `@config`, `@settings` and every custom
 /// element had to be converted by hand.
 fn body_is_data(el: &Element) -> bool {
-    classify_std_lenient(el) != ElementKind::Codeblock
+    classify_std_lenient(el) != ElementKind::Raw
 }
 
 /// Normalizes elements in `doc` from `format:yaml` (or another embedded

@@ -95,13 +95,13 @@ ${sum(a, b)}
 @embed[alt](ref:3)
 // 現在のコードでは、src:になってしまっているので、要変更
 
-@codeblock(lang:sh)[
+@raw(lang:sh)[
 sudo whoami
 ls --help
 ]
 
 // content:raw: opts any element's [content] into raw/verbatim text, same
-// treatment as codeblock -- byte-safe against an embedded "]" and
+// treatment as raw -- byte-safe against an embedded "]" and
 // newline-preserving (no inline markup, no lazy-continuation folding).
 @memo+++
   don't forget: check [this] and [that]

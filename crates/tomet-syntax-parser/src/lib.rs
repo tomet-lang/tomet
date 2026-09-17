@@ -1520,7 +1520,7 @@ mod tests {
         let doc = parse_document("```rust\nfn main() {}\n```\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::named("codeblock"));
+                assert_eq!(el.sigil, Sigil::named("raw"));
                 assert_eq!(
                     el.args,
                     Some(Value::Map(vec![(
@@ -1530,7 +1530,7 @@ mod tests {
                 );
                 assert_eq!(el.content, Some(vec![Inline::Raw("fn main() {}".into())]));
             }
-            other => panic!("expected a codeblock element, got {other:?}"),
+            other => panic!("expected a raw element, got {other:?}"),
         }
     }
 
@@ -1539,11 +1539,11 @@ mod tests {
         let doc = parse_document("```\nplain\n```\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::named("codeblock"));
+                assert_eq!(el.sigil, Sigil::named("raw"));
                 assert_eq!(el.args, None);
                 assert_eq!(el.content, Some(vec![Inline::Raw("plain".into())]));
             }
-            other => panic!("expected a codeblock element, got {other:?}"),
+            other => panic!("expected a raw element, got {other:?}"),
         }
     }
 
@@ -1551,7 +1551,7 @@ mod tests {
     fn fenced_code_block_and_bracket_codeblock_produce_the_same_ast() {
         // No longer *identical* content: the fenced spelling is always
         // captured verbatim (`Inline::Raw`, can hold real newlines), while
-        // `@codeblock(...)[...]` is ordinary `[content]` -- the parser
+        // `@raw(...)[...]` is ordinary `[content]` -- the parser
         // does not special-case lexing by element name (see
         // `content_raw_is_now_just_an_ordinary_argument`), so it still goes
         // through the usual inline grammar and comes back as `Inline::Text`.
@@ -1562,7 +1562,7 @@ mod tests {
         // like any other prose, not staying verbatim). What still matches
         // is sigil/args/value and the rendered text.
         let fenced = parse_document("```rust\nfn main() {}\n```\n").unwrap();
-        let bracket = parse_document("@codeblock(lang:rust)[fn main() {}]\n").unwrap();
+        let bracket = parse_document("@raw(lang:rust)[fn main() {}]\n").unwrap();
         match (&fenced.blocks[0], &bracket.blocks[0]) {
             (Block::Element(a), Block::Element(b)) => {
                 assert_eq!(a.sigil, b.sigil);
@@ -1571,7 +1571,7 @@ mod tests {
                 assert_eq!(a.content, Some(vec![Inline::Raw("fn main() {}".into())]));
                 assert_eq!(b.content, Some(vec![Inline::Text("fn main() {}".into())]));
             }
-            other => panic!("expected two codeblock elements, got {other:?}"),
+            other => panic!("expected two raw elements, got {other:?}"),
         }
     }
 
@@ -1588,7 +1588,7 @@ mod tests {
                     Some(vec![Inline::Raw("code\n```\nmore code".into())])
                 );
             }
-            other => panic!("expected a codeblock element, got {other:?}"),
+            other => panic!("expected a raw element, got {other:?}"),
         }
     }
 
@@ -1599,7 +1599,7 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(el.content, Some(vec![Inline::Raw("code".into())]));
             }
-            other => panic!("expected a codeblock element, got {other:?}"),
+            other => panic!("expected a raw element, got {other:?}"),
         }
     }
 
@@ -1613,13 +1613,13 @@ mod tests {
                     Some(vec![Inline::Raw("see `foo` and ``bar``".into())])
                 );
             }
-            other => panic!("expected a codeblock element, got {other:?}"),
+            other => panic!("expected a raw element, got {other:?}"),
         }
     }
 
     #[test]
     fn unterminated_fenced_code_block_runs_to_eof_without_error() {
-        // Deliberately asymmetric with `<codeblock>[...]`'s hard EOF error
+        // Deliberately asymmetric with `<raw>[...]`'s hard EOF error
         // (see `parse_fenced_code_block`'s doc comment) -- matches
         // CommonMark's own spec for an unclosed fence.
         let doc = parse_document("```\nline one\nline two").unwrap();
@@ -1630,7 +1630,7 @@ mod tests {
                     Some(vec![Inline::Raw("line one\nline two".into())])
                 );
             }
-            other => panic!("expected a codeblock element, got {other:?}"),
+            other => panic!("expected a raw element, got {other:?}"),
         }
     }
 
@@ -1657,7 +1657,17 @@ mod tests {
         let doc = parse_document("call `foo()` now\n").unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
-                assert_eq!(&p.content, &vec![Inline::Text("call `foo()` now".into())]);
+                assert_eq!(p.content.len(), 3);
+                assert_eq!(p.content[0], Inline::Text("call ".into()));
+                match &p.content[1] {
+                    Inline::Element(el) => {
+                        assert_eq!(el.sigil, Sigil::named("raw"));
+                        assert_eq!(el.placement, tomet_ast::Placement::Inline);
+                        assert_eq!(el.content, Some(vec![Inline::Raw("foo()".into())]));
+                    }
+                    other => panic!("expected inline @raw element, got {other:?}"),
+                }
+                assert_eq!(p.content[2], Inline::Text(" now".into()));
             }
             other => panic!("expected a paragraph, got {other:?}"),
         }
@@ -1750,9 +1760,9 @@ mod tests {
         match (&doc.blocks[0], &doc.blocks[1]) {
             (Block::Paragraph(p), Block::Element(el)) => {
                 assert_eq!(&p.content, &vec![Inline::Text("text".into())]);
-                assert_eq!(el.sigil, Sigil::named("codeblock"));
+                assert_eq!(el.sigil, Sigil::named("raw"));
             }
-            other => panic!("expected paragraph then codeblock, got {other:?}"),
+            other => panic!("expected paragraph then raw, got {other:?}"),
         }
     }
 
@@ -2014,10 +2024,18 @@ mod tests {
         let doc = parse_document("`https://example.com`\n").unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
-                assert_eq!(
-                    p.content,
-                    vec![Inline::Text("`https://example.com`".into())]
-                );
+                assert_eq!(p.content.len(), 1);
+                match &p.content[0] {
+                    Inline::Element(el) => {
+                        assert_eq!(el.sigil, Sigil::named("raw"));
+                        assert_eq!(el.placement, tomet_ast::Placement::Inline);
+                        assert_eq!(
+                            el.content,
+                            Some(vec![Inline::Raw("https://example.com".into())])
+                        );
+                    }
+                    other => panic!("expected inline @raw element, got {other:?}"),
+                }
             }
             other => panic!("expected paragraph, got {other:?}"),
         }

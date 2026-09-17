@@ -112,7 +112,7 @@ pub enum ElementKind {
     /// (`em`/`strong`/`mark`/`strikeout`), since no comparable CommonMark
     /// spelling exists to shortcut against.
     Ruby,
-    Codeblock,
+    Raw,
     Quote,
     /// `@callout(variant)[ ... ]` -- an admonition.
     ///
@@ -207,7 +207,7 @@ impl ElementKind {
             ElementKind::Mark => "mark",
             ElementKind::Strikeout => "strikeout",
             ElementKind::Ruby => "ruby",
-            ElementKind::Codeblock => "codeblock",
+            ElementKind::Raw => "raw",
             ElementKind::Quote => "quote",
             ElementKind::Callout => "callout",
             ElementKind::Card => "card",
@@ -290,7 +290,7 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
     ("mark", ElementKind::Mark),
     ("strikeout", ElementKind::Strikeout),
     ("ruby", ElementKind::Ruby),
-    ("codeblock", ElementKind::Codeblock),
+    ("raw", ElementKind::Raw),
     ("quote", ElementKind::Quote),
     ("callout", ElementKind::Callout),
     ("card", ElementKind::Card),
@@ -453,7 +453,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
         Meta | Config | Settings | Use | Include | References | Blueprint | Links | Hr
-        | Codeblock | Callout | Card | Table | Heading | OrderedList | UnorderedList | Kind
+        | Callout | Card | Table | Heading | OrderedList | UnorderedList | Kind
         | Version | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
         Em | Strong | Mark | Strikeout | Ruby => Shape::Inline,
         // Either shape. A link or an embed alone on a line is not a
@@ -465,6 +465,9 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         // A path mention goes both ways too: inside a sentence, and alone
         // in a table cell where the cell is the reference.
         Link | Embed | File | Dir => return None,
+        // Either shape. Standing alone it renders <pre><code>, inside running
+        // text it renders <code>.
+        Raw => return None,
         // Either shape, and the reason the element is not called
         // `blockquote`. HTML needs two names because `<blockquote>` and
         // `<q>` are two elements; Tomet decides placement from position,
@@ -610,8 +613,8 @@ mod tests {
 
     #[test]
     fn type_sigil_with_builtin_name_is_recognized() {
-        let el = element_new(Sigil::named("codeblock"));
-        assert_eq!(classify_std_lenient(&el), ElementKind::Codeblock);
+        let el = element_new(Sigil::named("raw"));
+        assert_eq!(classify_std_lenient(&el), ElementKind::Raw);
     }
 
     #[test]

@@ -35,7 +35,7 @@
 
 use tomet_ast::{
     Block as TmBlock, Document, Element, ElementValue, Entry, Inline as TmInline, LineBreak, Name,
-    Paragraph, Placement, Sigil, SoftBreak, Span, Text, Value,
+    Paragraph, Placement, RawText, Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::EXACT_DATA_KEY;
 
@@ -121,7 +121,7 @@ fn block_element(block: &Block) -> Element {
         }
         Block::HorizontalRule => element_new(Sigil::named("hr")),
         Block::CodeBlock(attr, code) => {
-            let mut el = named_element("codeblock", attr);
+            let mut el = named_element("raw", attr);
             // The language travelled as the first class; put it back in
             // `lang:` where `to_pandoc` looks for it.
             if let Some(lang) = attr.1.iter().find(|c| !c.starts_with(CLASS_PREFIX)) {
@@ -130,19 +130,19 @@ fn block_element(block: &Block) -> Element {
                     Value::String(lang.clone()),
                 )]));
             }
-            el.content = Some(vec![TmInline::Text(Text::from(code.clone()))]);
+            el.content = Some(vec![TmInline::Raw(RawText::new(code.clone(), Span::dummy()))]);
             el
         }
         Block::RawBlock(format, text) => {
             // No Tomet spelling for "raw output in some other format", so
             // it lands as a code block tagged with the format rather than
             // being dropped.
-            let mut el = element_new(Sigil::named("codeblock"));
+            let mut el = element_new(Sigil::named("raw"));
             el.args = Some(Value::Map(vec![(
                 "lang".to_string(),
                 Value::String(format.clone()),
             )]));
-            el.content = Some(vec![TmInline::Text(Text::from(text.clone()))]);
+            el.content = Some(vec![TmInline::Raw(RawText::new(text.clone(), Span::dummy()))]);
             el
         }
         Block::BlockQuote(blocks) => {
@@ -319,10 +319,12 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
         Inline::LineBreak => TmInline::LineBreak(LineBreak {
             span: Span::dummy(),
         }),
-        // Tomet has no code element: `` `x` `` is protected text, so the
-        // backticks go back in as characters. This is the inverse of
-        // `to_pandoc`'s `Code` mapping.
-        Inline::Code(_, code) => TmInline::Text(Text::from(format!("`{code}`"))),
+        Inline::Code(attr, code) => {
+            let mut el = named_element("raw", attr);
+            el.placement = Placement::Inline;
+            el.content = Some(vec![TmInline::Raw(RawText::new(code.clone(), Span::dummy()))]);
+            TmInline::Element(el)
+        }
         Inline::Math(_, text) => TmInline::Text(Text::from(text.clone())),
         Inline::RawInline(_, text) => TmInline::Text(Text::from(text.clone())),
         Inline::Emph(inner) => inline_element("em", &Attr::empty(), inner),

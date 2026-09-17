@@ -604,11 +604,11 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 ### 位置引数（キーなし）
 
 ```tmt
-@codeblock(rust)
+@raw(rust)
 ```
 
 ```
-Block  @codeblock
+Block  @raw
   args    "rust"
 ```
 
@@ -959,7 +959,10 @@ Paragraph
   Inline @strikeout
     content
       Text "strikeout"
-  Text " と `code`"
+  Text " と "
+  Inline @raw
+    content
+      Raw "code"
 ```
 
 ### 自動リンク
@@ -1009,7 +1012,7 @@ let y = @T; *ptr
 ```
 
 ```
-Block  @codeblock
+Block  @raw
   args    {lang: "rust"}
   content
     Raw "let y = @T; *ptr"

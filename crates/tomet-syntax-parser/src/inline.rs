@@ -7,7 +7,7 @@ use crate::heading::{is_thematic_break, is_titled_thematic_break_start};
 use crate::interp::{is_interp_start, parse_dollar_element};
 use crate::list::peek_list_marker;
 use crate::value::{err, skip_block_comment, skip_inline_ws, skip_line_comment};
-use tomet_ast::{Element, Inline, Placement, Sigil, SoftBreak, Span, Text, Value};
+use tomet_ast::{Element, Inline, Placement, RawText, Sigil, SoftBreak, Span, Text, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -125,24 +125,41 @@ pub(crate) fn parse_inline_seq(
             }
         }
         if cur.peek() == Some('`') {
+            let before = cur.pos();
             let mut probe = *cur;
-            probe.bump();
+            let fence_len = probe.eat_while(|c| c == '`').len();
+            let inner_start = probe.pos();
             let mut closed = false;
+            let mut inner_end = inner_start;
             while let Some(c) = probe.peek() {
-                match c {
-                    '`' => {
-                        probe.bump();
+                if c == '\n' || c == '\r' {
+                    break;
+                }
+                if c == '`' {
+                    let run_start = probe.pos();
+                    let run_len = probe.eat_while(|ch| ch == '`').len();
+                    if run_len == fence_len {
+                        inner_end = run_start;
                         closed = true;
                         break;
                     }
-                    '\n' | '\r' => break,
-                    _ => {
-                        probe.bump();
-                    }
+                } else {
+                    probe.bump();
                 }
             }
             if closed {
+                flush_text_upto(&mut items, cur, &mut text_start, before, fold_pipes);
+                let inner_text = cur.src()[inner_start..inner_end].to_string();
+                let span = cur.span_from(before);
+                let content_span =
+                    Span::new(cur.position_at(inner_start), cur.position_at(inner_end));
+                let el = element_new(Sigil::named("raw"))
+                    .with_placement(Placement::Inline)
+                    .with_span(span)
+                    .with_content(vec![Inline::Raw(RawText::new(inner_text, content_span))]);
+                items.push(Inline::Element(el));
                 cur.set_pos(probe.pos());
+                text_start = cur.pos();
                 continue;
             }
         }
