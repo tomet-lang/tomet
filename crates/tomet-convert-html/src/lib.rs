@@ -414,7 +414,6 @@ fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
         }
         render_inlines(cx, item.content.as_deref().unwrap_or(&[]), out);
         if let Some(children) = &item.children {
-            out.push('\n');
             for child in children {
                 if let Block::Element(sub) = child {
                     if list_ordered(sub).is_some() {
