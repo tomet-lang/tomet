@@ -5,7 +5,6 @@
 
   tomet,
   tomet-lsp,
-  tomet-web,
   twrit,
   tmtbook,
   ...
@@ -27,7 +26,6 @@ mkShell rec {
   buildInputs = with pkgs; [
     tomet
     tomet-lsp
-    tomet-web
     twrit
     tmtbook
     pagefind

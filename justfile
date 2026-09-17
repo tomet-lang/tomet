@@ -29,10 +29,6 @@ gen-treesitter:
     cd crates/tree-sitter-tomet && npx -y tree-sitter-cli@0.26.12 generate
     cargo test -p tree-sitter-tomet
 
-# Launch the Web Real-Time Playground.
-playground port="8787":
-    cargo run -p tomet -- playground --port {{port}}
-
 # Launch the TUI workbench.
 tui path=".":
     cargo run -p tomet -- tui {{path}}
