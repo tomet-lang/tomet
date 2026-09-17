@@ -4,7 +4,7 @@
 
 @card(title:"tomet-cli")
 | TUI操作やCommand経由で、Tometを対応フォーマットに変換、編集、検索が可能。
-@card(title:"tomet-web")
+@card(title:"tomet-web-editor")
 | Webからtometのエディタを使用できる。
 @card(title:"tomet-book (tmtbook)")
 | tometを使用した本の見た目を求めた静的サイトジェネレータ。
