@@ -202,7 +202,7 @@ export interface TometProps {
   className?: string;
 
   /**
-   * Optional parser function (e.g. from @tomet/tomet-wasm parseDocument).
+   * Optional parser function (e.g. from @tomet/wasm parseDocument).
    */
   parse?: (source: string) => Document;
 

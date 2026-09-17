@@ -233,8 +233,8 @@ export function evaluateInterpExpr(expr: any, macros?: Record<string, string>): 
       const evaluatedArgs = args.map((a: any) => evaluateInterpExpr(a, macros));
 
       if (calleeName === 'add') {
-        const nums = evaluatedArgs.map(Number);
-        return String(nums.reduce((a, b) => a + b, 0));
+        const nums: number[] = evaluatedArgs.map(Number);
+        return String(nums.reduce((a: number, b: number) => a + b, 0));
       }
       if (calleeName === 'sub') {
         const [a, b] = evaluatedArgs.map(Number);

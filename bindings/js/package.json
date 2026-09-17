@@ -1,6 +1,6 @@
 {
-  "name": "@tomet/tomet-wasm",
-  "version": "0.1.0",
+  "name": "@tomet/wasm",
+  "version": "0.1.1",
   "description": "High-performance JavaScript / WebAssembly bindings for Tomet markup and AST",
   "type": "module",
   "main": "./index.js",
@@ -9,7 +9,9 @@
   "exports": {
     ".": {
       "types": "./index.d.ts",
-      "import": "./index.js"
+      "browser": "./pkg/tomet_js.js",
+      "import": "./index.js",
+      "default": "./index.js"
     },
     "./wasm": "./pkg/tomet_js_bg.wasm"
   },
@@ -26,5 +28,12 @@
     "wasm",
     "markdown"
   ],
-  "license": "MIT OR Apache-2.0"
+  "author": "Tomet Project",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tomet-lang/tomet.git",
+    "directory": "bindings/js"
+  },
+  "homepage": "https://github.com/tomet-lang/tomet#readme"
 }

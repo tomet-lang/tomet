@@ -30,12 +30,12 @@ pnpm add @tomet/svelte
 <Tomet ast={documentAst} {components} />
 ```
 
-### 2. Live Client-side Parsing with `@tomet/tomet-wasm`
+### 2. Live Client-side Parsing with `@tomet/wasm`
 
 ```svelte
 <script lang="ts">
   import { Tomet } from '@tomet/svelte';
-  import { parseDocument } from '@tomet/tomet-wasm';
+  import { parseDocument } from '@tomet/wasm';
 
   let sourceText = $state('#[ Hello Svelte 5 ]\n\n<task>(done: true)[Explore Tomet]');
 </script>

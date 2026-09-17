@@ -1,7 +1,7 @@
 import { existsSync, promises as fs } from 'node:fs';
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import initWasm, { processDocument, setVaultFiles, } from '@tomet/tomet-wasm';
+import initWasm, { processDocument, setVaultFiles, } from '@tomet/wasm';
 let wasmReady = null;
 /**
  * Ensures the WebAssembly engine is loaded and initialized.
