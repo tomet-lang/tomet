@@ -80,13 +80,18 @@ pub fn read_fixture(rel: &Path) -> String {
 /// reality exactly, so a fixture that starts or stops parsing shows up as
 /// a failure rather than silently changing which files get covered.
 ///
-/// Currently empty. `cheatsheet.tmt` used to be the sole entry: it is a
-/// frozen copy of `docs/guide/cheatsheet.tmt` and exercised constructs the
-/// parser did not accept. The sigil rework fixed the last of them -- the
-/// `(format:...)` brace scanner that ended a body early at an unquoted
-/// `}` -- so it now parses, and the entry is gone rather than kept as a
-/// permanent carve-out.
-pub const KNOWN_UNPARSEABLE: &[&str] = &[];
+/// `cheatsheet.tmt` used to be the sole entry: it is a frozen copy of
+/// `docs/guide/cheatsheet.tmt` and exercised constructs the parser did not
+/// accept. The sigil rework fixed the last of them -- the `(format:...)`
+/// brace scanner that ended a body early at an unquoted `}` -- so it now
+/// parses, and the entry was gone until the two below.
+///
+/// Both use the retired `[a, b]` list literal (`list(...)` is the sole
+/// surviving spelling); per this crate's own README, a fixture exercising
+/// retired syntax is regression coverage, not a bug, so it stays rather
+/// than being edited to the new spelling. `tests/fixtures/syntax/list-call.tmt`
+/// covers the replacement.
+pub const KNOWN_UNPARSEABLE: &[&str] = &["examples/bookmark.tmt", "syntax/value-element.tmt"];
 
 /// Fixtures the tree-sitter grammar is known to mis-parse, and the text
 /// of the error nodes it produces for each.
@@ -186,6 +191,15 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // edit into `src/parser.c`, and that CLI was not available where this
     // was written -- recorded rather than guessed at.
     ("syntax/value-element.tmt", &[ANY_ERROR]),
+    // Same underlying gap as `syntax/value-element.tmt` just above
+    // (`Value::Element` has no `grammar.js` counterpart) -- this fixture
+    // is its `list(...)`-based replacement, so it inherits the same
+    // drift rather than a new one.
+    ("syntax/list-call.tmt", &[ANY_ERROR]),
+    // The retired `[a, b]` list literal -- `tags:[ a, a ]` -- is now a
+    // missing-token error in both grammars alike (`tomet-parser` rejects
+    // it outright; see `KNOWN_UNPARSEABLE` above for this same fixture).
+    ("examples/bookmark.tmt", &[MISSING_NODE]),
 ];
 
 /// Records a fixture as drifting wholesale, without pinning the text of

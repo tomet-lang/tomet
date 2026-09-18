@@ -358,9 +358,9 @@ mod tests {
         fs::create_dir_all(root.join("notes")).expect("temp dirs");
         fs::write(root.join("default.config.tmt"), "@kind(config)\n").expect("config");
         for (file, tags, created) in [
-            ("rust.tmt", "[rust]", "2026-01-01"),
-            ("cli.tmt", "[rust, cli]", "2026-05-01"),
-            ("go.tmt", "[go]", "2026-09-01"),
+            ("rust.tmt", "list(rust)", "2026-01-01"),
+            ("cli.tmt", "list(rust, cli)", "2026-05-01"),
+            ("go.tmt", "list(go)", "2026-09-01"),
         ] {
             fs::write(
                 root.join("notes").join(file),

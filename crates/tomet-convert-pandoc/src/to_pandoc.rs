@@ -699,7 +699,7 @@ mod tests {
     #[test]
     fn meta_feeds_the_document_metadata_map() {
         let doc =
-            parse_document("@meta{title: Hello, draft: true, tags: [a, b]}\n\n本文\n").unwrap();
+            parse_document("@meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n").unwrap();
         let pandoc = to_pandoc(&doc);
         assert_eq!(
             pandoc.meta.get("title"),
@@ -789,7 +789,7 @@ mod tests {
 
     #[test]
     fn an_id_goes_in_the_identifier_slot_not_the_pairs() {
-        let blocks = convert("@deck.card{ id: c1, tags: [a, b] }\n");
+        let blocks = convert("@deck.card{ id: c1, tags: list(a, b) }\n");
         let Block::Div(attr, _) = &blocks[0] else {
             panic!("expected a Div, got {:?}", blocks[0]);
         };

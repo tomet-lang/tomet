@@ -187,7 +187,11 @@ const CASES: &[Case] = &[
         "@memo(a: 1, b: two)\n",
     ),
     case(None, "位置引数（キーなし）", "@raw(rust)\n"),
-    case(None, "列", "@memo(xs: [1, 2, 3])\n"),
+    case(
+        None,
+        "列。`list(...)` の一つの綴りしかない -- `[...]` は撤去された",
+        "@memo(xs: list(1, 2, 3))\n",
+    ),
     case(None, "入れ子のマップ", "@memo(m: { x: 1 })\n"),
     case(None, "引用符つき文字列", "@memo(s: \"a, b: c\")\n"),
     case(
@@ -341,6 +345,12 @@ const REJECTED: &[Case] = &[
     case(None, "`@[ ... ]` も同じ", "@[ x ]\n"),
     case(
         None,
+        "`[a, b]` 列リテラルも撤去。`[`/`]` は既に `[content]` の意味を\
+         持つので、値の中の列は `list(...)` の一つの綴りしかない",
+        "@memo(xs: [1, 2, 3])\n",
+    ),
+    case(
+        None,
         "`#name` のブロックシジルも撤去。形はシジルではなく位置が決めるので、\
          `#` は見出し専用に戻った",
         "#memo[ x ]\n",
@@ -359,10 +369,9 @@ const REJECTED: &[Case] = &[
     ),
     case(
         Some("受け付けない書き方"),
-        "`{...}` に列は書けない。`+++` フェンスを使う",
-        "@memo{[1, 2, 3]}\n",
+        "`{...}` に裸のスカラーも書けない",
+        "@memo{hello}\n",
     ),
-    case(None, "`{...}` に裸のスカラーも書けない", "@memo{hello}\n"),
     case(None, "閉じない `[`", "@memo[ 閉じない\n"),
     case(
         Some("仕様にあるが未実装"),

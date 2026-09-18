@@ -76,7 +76,7 @@
 //!   that body as-is to `serde_json`/`serde_yaml`/`toml` (see
 //!   `tomet-parser::embedded_format`), but this grammar has no idea a
 //!   `{value}` group's content might be a different language -- it still
-//!   tries its own `map`/`seq`/`scalar` rules. A quoted JSON key
+//!   tries its own `map`/`scalar` rules. A quoted JSON key
 //!   (`{ "key": "value" }`, needed since JSON has no bare-identifier keys
 //!   -- see `tests/fixtures/readme.tmt`'s `@meta(format:json)` block) doesn't
 //!   match `map_entry`'s bare-identifier `key` field, so the nested
@@ -92,6 +92,19 @@
 //!   correctly accepts any run of 3+. See
 //!   `more_than_three_dashes_are_only_partially_consumed_by_thematic_break`
 //!   below for the pinned exact shape.
+//! - **A bare `list(...)` occupying the *whole* `(args)`/`{value}`
+//!   doesn't parse as `call`, unlike the same call under a named key
+//!   (`a: list(...)`, which works fine).** `@id(list(a, b))` and
+//!   `@meta{list(a, b)}` both land in an `ERROR` even with `$.call`
+//!   added as an alternative to `args_group`/`value_group`'s shared
+//!   `value` rule -- tried and reverted, since it changed nothing:
+//!   whatever conflicts an identifier-then-`(` at that exact position
+//!   with, it isn't decided by `value`'s own alternatives. Not
+//!   root-caused. `tomet-parser` accepts it (`value.rs::try_parse_call`
+//!   runs before `parse_value_at`'s map/scalar fallback); the DSL/list
+//!   retirement (`[a, b]` -> `list(...)`) is what exposed this, since
+//!   `[a, b]` in that same bare position used to reach the now-removed
+//!   `$.seq` alternative just fine.
 //!
 //! `scanner.c` (see its own module doc) resolves what used to be listed
 //! here as a known limitation: a bare, colon-less, identifier-shaped
@@ -337,7 +350,16 @@ mod tests {
             "#[ Title ]:{ id: intro, tag: main }\n",
             "@task[ Task A ]:{ id: taskA, priority: high }\n",
             "@id(taskA):{ priority: high, tag: dev }\n",
-            "@id([taskA, taskB]):{ tag: house }\n",
+            // A bare positional `list(...)` occupying the whole
+            // `(args)` value -- as opposed to `a: list(...)` under a
+            // named key, which already works (see
+            // `parses_call_syntax_in_values`) -- doesn't reach `call`
+            // in this grammar yet (`args_group`'s own `value` rule,
+            // unlike `_entry_value`, still trips over it). Genuine
+            // `tomet-parser` syntax, not covered here: named-key form
+            // exercises the same `list(...)` + colon-connect
+            // interaction without hitting that gap.
+            "@id(ids: list(taskA, taskB)):{ tag: house }\n",
         ] {
             let tree = parse(src);
             assert!(

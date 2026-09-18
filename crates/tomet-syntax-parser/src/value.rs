@@ -1,7 +1,12 @@
-//! Parsing for `Value`: map bodies (`key: value`), `[..]` sequences,
-//! `"..."` strings, and bare scalars. Shared by the data-only entry point
-//! (`parse_value`) and by `document.rs` for `(args)` groups and
-//! data-shaped `{value}` groups.
+//! Parsing for `Value`: map bodies (`key: value`), `"..."` strings, and
+//! bare scalars. Shared by the data-only entry point (`parse_value`) and
+//! by `document.rs` for `(args)` groups and data-shaped `{value}` groups.
+//!
+//! A list value has one spelling, `list(...)` (a `Value::Call`,
+//! normalized downstream) -- the `[a, b]` literal this module used to
+//! also accept was retired: `[`/`]` already mean `[content]` at the
+//! element level, and having them mean something else in a value
+//! position was a wart, not a feature.
 
 use crate::error::{Error, Result};
 use tomet_ast::{Name, Value};
@@ -341,33 +346,6 @@ pub(crate) fn parse_quoted(cur: &mut Cursor) -> Result<String> {
     Ok(out)
 }
 
-fn parse_seq(cur: &mut Cursor) -> Result<Value> {
-    let start = cur.pos();
-    if !cur.eat_str("[") {
-        return Err(err(cur, start, "expected '['"));
-    }
-    let mut items = Vec::new();
-    loop {
-        skip_ws_newlines_and_comments(cur);
-        if cur.peek() == Some(']') {
-            break;
-        }
-        items.push(parse_seq_item(cur)?);
-        skip_ws_newlines_and_comments(cur);
-        match cur.peek() {
-            Some(',') => {
-                cur.bump();
-            }
-            Some(']') => break,
-            _ => return Err(err(cur, cur.pos(), "expected ',' or ']' in sequence")),
-        }
-    }
-    if !cur.eat_str("]") {
-        return Err(err(cur, cur.pos(), "expected ']'"));
-    }
-    Ok(Value::Seq(items))
-}
-
 /// Sentinel key for a positional (unkeyed) entry inside a map body --
 /// never producible as a real user-written key (a real key always needs
 /// at least one identifier character; `eat_ident` never matches empty).
@@ -492,11 +470,24 @@ fn parse_entry_value(cur: &mut Cursor) -> Result<Value> {
         }
         return Ok(Value::Element(Box::new(el)));
     }
+    // `$name(args)`/`${...}` sitting where a value goes -- evaluated
+    // later by `tomet-transform::interp`, same as one in prose. Wrapped
+    // in the same `Value::Element` an `@`-element uses above: a dollar
+    // element never carries content/children, so none of that arm's
+    // MVP-scope restriction applies here.
+    if cur.peek() == Some('$') && crate::interp::is_interp_start(cur) {
+        let el = crate::interp::parse_dollar_element(cur)?;
+        return Ok(Value::Element(Box::new(el)));
+    }
     if let Some(result) = try_parse_call(cur) {
         return result;
     }
     match cur.peek() {
-        Some('[') => parse_seq(cur),
+        Some('[') => Err(err(
+            cur,
+            cur.pos(),
+            "'[...]' list literal was removed -- write 'list(...)' instead",
+        )),
         Some('"') => Ok(Value::String(parse_quoted(cur)?)),
         Some('{') => {
             cur.bump();
@@ -517,60 +508,12 @@ fn parse_entry_value(cur: &mut Cursor) -> Result<Value> {
     }
 }
 
-/// Shared prefix for both group-body and single-item value parsing: the
-/// three self-delimiting shapes (`[...]` seq, `"..."` quoted string,
-/// `{...}` nested map) are handled identically for [`parse_seq_item`],
-/// which is the only caller left: each stops right after that one value,
-/// never looking past it for a `,` (`[a, b]` must stay two items, not
-/// collapse into one two-entry map). [`parse_value_at`] used to share this
-/// same fast path and, with it, the same "stop right after" behavior --
-/// which was wrong there: a leading `"star"` in `("star", pkg:"x")` isn't
-/// the whole group, so it went straight to expecting `)` and choked on the
-/// `,`. It calls [`parse_map_body_or_scalar`] directly now, which reads a
-/// leading quoted/seq/map value as entry zero and keeps going.
-fn parse_value_shape(
-    cur: &mut Cursor,
-    fallback: impl FnOnce(&mut Cursor) -> Result<Value>,
-) -> Result<Value> {
-    skip_ws_newlines_and_comments(cur);
-    match cur.peek() {
-        Some('[') => parse_seq(cur),
-        Some('"') => Ok(Value::String(parse_quoted(cur)?)),
-        Some('{') => {
-            cur.bump();
-            let v = parse_map_body(cur)?;
-            skip_ws_newlines_and_comments(cur);
-            if !cur.eat_str("}") {
-                return Err(err(cur, cur.pos(), "expected '}'"));
-            }
-            Ok(v)
-        }
-        _ => fallback(cur),
-    }
-}
-
 /// A "fresh" value position: the whole content of `(...)`/top-level
 /// `{...}` data, or the entire data-only document -- may collect several
 /// comma-separated entries (`key: value` pairs and/or bare positional
-/// values) into one `Value::Map`. Not used for sequence items -- see
-/// [`parse_seq_item`].
+/// values) into one `Value::Map`.
 pub(crate) fn parse_value_at(cur: &mut Cursor) -> Result<Value> {
     parse_map_body_or_scalar(cur)
-}
-
-/// A single item inside `[...]`: exactly one value (a `key: value` pair
-/// wrapped in a one-entry map, or a bare positional value returned
-/// as-is), never consuming a following `,` -- that belongs to
-/// `parse_seq`'s own loop, not this function.
-fn parse_seq_item(cur: &mut Cursor) -> Result<Value> {
-    parse_value_shape(cur, |cur| {
-        let (key, value) = parse_one_entry(cur)?;
-        if key == POSITIONAL_ENTRY_KEY {
-            Ok(value)
-        } else {
-            Ok(Value::Map(vec![(key, value)]))
-        }
-    })
 }
 
 /// A leading `/` can never start a map key (`is_ident_char` excludes it),
