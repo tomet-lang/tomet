@@ -400,15 +400,23 @@ fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
                         ));
                     }
                 }
+                Value::Element(_) => {}
                 other => out.push_str(&format!(
                     " data-marker=\"{}\"",
                     escape_attr(&value_to_plain(other))
                 )),
             }
             out.push('>');
-            let text = value_to_plain(marker);
-            if !text.is_empty() {
-                out.push_str(&format!("[{}]", escape_html(&text)));
+            match marker {
+                Value::Element(el) => {
+                    render_element(cx, el, out, true);
+                }
+                other => {
+                    let text = value_to_plain(other);
+                    if !text.is_empty() {
+                        out.push_str(&format!("[{}]", escape_html(&text)));
+                    }
+                }
             }
             out.push_str("</span> ");
         }
@@ -1562,6 +1570,17 @@ mod tests {
         assert_eq!(
             body,
             "<ul>\n<li><span class=\"tm-list-marker\" data-color=\"red\" data-priority=\"high\"></span> content</li>\n</ul>\n"
+        );
+    }
+
+    #[test]
+    fn renders_list_marker_with_embedded_element() {
+        let doc = parse_document("- (@em[Important]) content\n- (@link(https://example.com)[Wiki]) docs\n")
+            .unwrap();
+        let body = render_body(&doc);
+        assert_eq!(
+            body,
+            "<ul>\n<li><span class=\"tm-list-marker\"><em>Important</em></span> content</li>\n<li><span class=\"tm-list-marker\"><a class=\"tm-url\" href=\"https://example.com\">Wiki</a></span> docs</li>\n</ul>\n"
         );
     }
 

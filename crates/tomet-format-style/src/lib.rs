@@ -15,7 +15,7 @@
 //! `tomet-printer` since it recurses into inline/child content and
 //! is genuinely part of rebuilding a whole document from its AST.
 
-use tomet_ast::{Element, ElementValue, Entry, Sigil, Value};
+use tomet_ast::{Element, ElementValue, Entry, Inline, Sigil, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_field_utils::is_iso8601;
 
@@ -198,17 +198,64 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
             },
             Some(ElementValue::Raw(_)) | None => String::new(),
         },
-        Value::Element(el) => match &el.args {
-            Some(args) => format!(
-                "@{}({})",
-                el.sigil.name().map(ToString::to_string).unwrap_or_default(),
-                render_args_with_config(args, config)
-            ),
-            None => format!(
-                "@{}",
-                el.sigil.name().map(ToString::to_string).unwrap_or_default()
-            ),
-        },
+        Value::Element(el) => {
+            let mut s = match &el.args {
+                Some(args) => format!(
+                    "@{}({})",
+                    el.sigil.name().map(ToString::to_string).unwrap_or_default(),
+                    render_args_with_config(args, config)
+                ),
+                None => format!(
+                    "@{}",
+                    el.sigil.name().map(ToString::to_string).unwrap_or_default()
+                ),
+            };
+            if let Some(content) = &el.content {
+                s.push('[');
+                for inline in content {
+                    match inline {
+                        Inline::Text(t) => s.push_str(&t.value),
+                        Inline::Raw(r) => s.push_str(&r.value),
+                        Inline::LineBreak(_) => s.push('\n'),
+                        Inline::SoftBreak(_) => s.push(' '),
+                        Inline::Element(child_el) => {
+                            let child_val = Value::Element(Box::new(child_el.clone()));
+                            s.push_str(&render_nested(&child_val, config));
+                        }
+                    }
+                }
+                s.push(']');
+            }
+            if let Some(val) = &el.value {
+                match val {
+                    ElementValue::Group(entries) => {
+                        s.push('{');
+                        for (i, entry) in entries.iter().enumerate() {
+                            if i > 0 {
+                                s.push_str(", ");
+                            }
+                            match entry {
+                                Entry::Pair(k, v) => {
+                                    s.push_str(&format!("{k}: {}", render_nested(v, config)));
+                                }
+                                Entry::Element(nested_el) => {
+                                    let nested_val = Value::Element(Box::new(nested_el.clone()));
+                                    s.push_str(&render_nested(&nested_val, config));
+                                }
+                            }
+                        }
+                        s.push('}');
+                    }
+                    ElementValue::Raw(raw) => {
+                        s.push_str(&format!("+++{raw}+++"));
+                    }
+                    ElementValue::Interp(expr) => {
+                        s.push_str(&format!("${{{expr}}}"));
+                    }
+                }
+            }
+            s
+        }
     }
 }
 

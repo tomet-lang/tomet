@@ -738,6 +738,17 @@ fn value_to_json(val: &Value) -> serde_json::Value {
             if let Some(args) = &el.args {
                 map.insert("args".to_string(), value_to_json(args));
             }
+            if let Some(content) = &el.content {
+                let text: String = content
+                    .iter()
+                    .filter_map(|i| match i {
+                        Inline::Text(t) => Some(t.value.as_str()),
+                        Inline::Raw(r) => Some(r.value.as_str()),
+                        _ => None,
+                    })
+                    .collect();
+                map.insert("content".to_string(), serde_json::Value::String(text));
+            }
             serde_json::Value::Object(map)
         }
     }

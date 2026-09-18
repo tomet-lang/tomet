@@ -169,14 +169,19 @@ mod tests {
         );
     }
 
-    /// MVP scope, enforced at parse time: a value-embedded element may
-    /// only take `(args)`. `[content]`/`{value}`/children are rejected
-    /// rather than silently accepted and then printed wrong (`tomet-style`
-    /// has no inline-content renderer for one).
+    /// An embedded element can take `[content]` and `(args)`.
     #[test]
-    fn an_embedded_element_with_content_is_rejected() {
-        let err = parse_value(r#"icon: @doc.icon("triangle")[extra]"#).unwrap_err();
-        assert!(err.to_string().contains("(args)"), "{err}");
+    fn an_embedded_element_with_content_is_accepted() {
+        let v = parse_value(r#"link: @link(ref:"doc")[Guide]"#).unwrap();
+        let Value::Map(entries) = v else {
+            panic!("expected map");
+        };
+        let Value::Element(el) = &entries[0].1 else {
+            panic!("expected element");
+        };
+        assert_eq!(el.sigil, Sigil::named("link"));
+        assert!(el.args.is_some());
+        assert!(el.content.is_some());
     }
 
     /// A quoted positional value used to parse correctly only when it was
