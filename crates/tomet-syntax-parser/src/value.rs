@@ -452,20 +452,12 @@ fn parse_entry_value(cur: &mut Cursor) -> Result<Value> {
     if cur.peek() == Some('@') && crate::element::is_element_start(cur, false) {
         let start = cur.pos();
         let el = crate::element::parse_element(cur, false)?;
-        // MVP scope: `(args)` only, no `[content]`/`{value}`/children. The
-        // motivating case (`@doc.icon("triangle")`) never needs them, and
-        // printing one back out (`tomet-format-style`) would need its own
-        // inline-content renderer with sigil-escaping -- real work that
-        // belongs with a caller that actually wants it, not invented
-        // speculatively here. Rejected rather than silently accepted and
-        // printed wrong: a round-trip that doesn't reparse to the same
-        // tree is worse than an error at the source that caused it.
-        if el.content.is_some() || el.value.is_some() || el.children.is_some() {
+        // An element embedded in a value position cannot carry block children.
+        if el.children.is_some() {
             return Err(err(
                 cur,
                 start,
-                "an element embedded in a value may only take (args) -- \
-                 [content]/{value} on a value-embedded element isn't supported yet",
+                "an element embedded in a value may not take block children",
             ));
         }
         return Ok(Value::Element(Box::new(el)));
