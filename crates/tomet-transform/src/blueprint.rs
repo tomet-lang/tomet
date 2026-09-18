@@ -217,6 +217,25 @@ fn evaluate_value_recursively(
                 changed = true;
             }
         }
+        // `${uuid}` in a value position (`@meta{uuid: ${uuid}}`) now
+        // parses directly to this, rather than to a `Value::String`
+        // `expand_interpolations_in_string` has to re-parse -- evaluate
+        // it in place and splice in the resolved value, same as that
+        // string path does, rather than leave the `$` wrapper for
+        // `for_each_element_mut`'s own top-level-interp branch below to
+        // mutate a second, incompatible way. Replacing `*val` here runs
+        // before `walk_element_mut` descends into it (`visit_mut` on the
+        // parent element runs to completion first), so that branch never
+        // gets a turn on an already-resolved value.
+        Value::Element(el) if matches!(el.sigil, Sigil::Dollar) => {
+            if let Some(ElementValue::Interp(expr)) = &el.value {
+                if let Ok(evaluated) = tomet_compute::evaluate_with_context(doc, expr, config, ctx)
+                {
+                    *val = evaluated;
+                    changed = true;
+                }
+            }
+        }
         Value::Seq(items) => {
             for item in items {
                 if evaluate_value_recursively(item, doc, config, ctx) {

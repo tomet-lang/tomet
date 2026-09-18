@@ -6,13 +6,8 @@
   ],
   "meta": {
     "uuid": {
-      "t": "MetaInlines",
-      "c": [
-        {
-          "t": "Str",
-          "c": "${uuid}"
-        }
-      ]
+      "t": "MetaString",
+      "c": ""
     }
   },
   "blocks": [

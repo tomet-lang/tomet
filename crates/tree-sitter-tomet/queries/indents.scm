@@ -17,8 +17,8 @@
 (braced_map
   "}" @end) @indent
 
-(seq
-  "]" @end) @indent
+(call
+  ")" @end) @indent
 
 (unordered_list) @indent
 (ordered_list) @indent

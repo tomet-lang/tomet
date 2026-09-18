@@ -80,10 +80,6 @@
           "named": true
         },
         {
-          "type": "seq",
-          "named": true
-        },
-        {
           "type": "string",
           "named": true
         }
@@ -631,10 +627,6 @@
             "named": true
           },
           {
-            "type": "seq",
-            "named": true
-          },
-          {
             "type": "string",
             "named": true
           }
@@ -906,37 +898,6 @@
     "type": "scalar",
     "named": true,
     "fields": {}
-  },
-  {
-    "type": "seq",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "braced_map",
-          "named": true
-        },
-        {
-          "type": "call",
-          "named": true
-        },
-        {
-          "type": "scalar",
-          "named": true
-        },
-        {
-          "type": "seq",
-          "named": true
-        },
-        {
-          "type": "string",
-          "named": true
-        }
-      ]
-    }
   },
   {
     "type": "strikeout",
@@ -1225,10 +1186,6 @@
         },
         {
           "type": "scalar",
-          "named": true
-        },
-        {
-          "type": "seq",
           "named": true
         },
         {

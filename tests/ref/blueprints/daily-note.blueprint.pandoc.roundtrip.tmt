@@ -1,4 +1,4 @@
-@meta{uuid: ${uuid}}
+@meta{uuid: ""}
 
 #[TODO] {id: todo}
 

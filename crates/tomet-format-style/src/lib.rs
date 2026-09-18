@@ -15,7 +15,7 @@
 //! `tomet-printer` since it recurses into inline/child content and
 //! is genuinely part of rebuilding a whole document from its AST.
 
-use tomet_ast::{Element, Value};
+use tomet_ast::{Element, ElementValue, Entry, Sigil, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_field_utils::is_iso8601;
 
@@ -107,12 +107,15 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
         Value::String(s) => quote_scalar_string(s),
+        // `list(...)` is the only surviving list-value spelling -- `[...]`
+        // was retired since it already means `[content]` at the element
+        // level.
         Value::Seq(items) => {
             let rendered: Vec<_> = items
                 .iter()
                 .map(|item| render_nested(item, config))
                 .collect();
-            format!("[{}]", rendered.join(", "))
+            format!("list({})", rendered.join(", "))
         }
         Value::Map(entries) => {
             if entries.len() == 1 {
@@ -166,6 +169,35 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
         // set and `content`/`value`/`children` all `None` (an MVP scope
         // limit enforced at parse time, not just convention) -- so `args`
         // alone is the whole element to print back.
+        // A `$name(args)`/`${...}` sitting in a value slot. Unresolved,
+        // it is written back in the `${...}` form (`InterpExpr`'s own
+        // `Display`), the same normalization `tomet-transform::interp`
+        // uses for one left unresolved in prose. A pass that already
+        // evaluated it in place (`tomet-transform::blueprint::instantiate_blueprint`,
+        // which mutates a dollar element's `value` rather than replacing
+        // the `Value::Element` node with the plain result) leaves the
+        // resolved value wrapped back through `ElementValue::from_map` --
+        // unwrap that and print the value itself, as if the `$` wrapper
+        // had never been there.
+        Value::Element(el) if el.sigil == Sigil::Dollar => match &el.value {
+            Some(ElementValue::Interp(expr)) => format!("${{{expr}}}"),
+            Some(ElementValue::Group(entries)) => match entries.as_slice() {
+                [Entry::Pair(k, v)] if k.is_empty() => render_nested(v, config),
+                _ => {
+                    let map = Value::Map(
+                        entries
+                            .iter()
+                            .filter_map(|e| match e {
+                                Entry::Pair(k, v) => Some((k.clone(), v.clone())),
+                                Entry::Element(_) => None,
+                            })
+                            .collect(),
+                    );
+                    render_nested(&map, config)
+                }
+            },
+            Some(ElementValue::Raw(_)) | None => String::new(),
+        },
         Value::Element(el) => match &el.args {
             Some(args) => format!(
                 "@{}({})",
@@ -200,6 +232,7 @@ fn render_meta_field_value(
     v: &Value,
     field_cfg: Option<&FieldConfig>,
     config: &PrinterConfig,
+    foreign_format: bool,
 ) -> String {
     if let Value::Null = v {
         return String::new();
@@ -219,7 +252,7 @@ fn render_meta_field_value(
                 let mut s = String::new();
                 for item in items {
                     s.push_str("\n    - ");
-                    s.push_str(&render_value_inner_with_config(item, config));
+                    s.push_str(&render_meta_value(item, config, foreign_format));
                 }
                 return s;
             }
@@ -227,8 +260,26 @@ fn render_meta_field_value(
     }
     match v {
         Value::String(s) if is_iso8601(s) => s.clone(),
-        _ => render_value_inner_with_config(v, config),
+        _ => render_meta_value(v, config, foreign_format),
     }
+}
+
+/// A meta field's value: `.tmt` syntax (`list(...)`, same as
+/// `render_value_inner_with_config`) for the native `@meta{...}` group,
+/// or foreign-format syntax for a `format:`-fenced body, where the
+/// target language (YAML/JSON/TOML) spells a sequence `[...]`, not
+/// `list(...)` -- that spelling is `tomet_parser`'s, not theirs.
+fn render_meta_value(v: &Value, config: &PrinterConfig, foreign_format: bool) -> String {
+    if foreign_format {
+        if let Value::Seq(items) = v {
+            let rendered: Vec<_> = items
+                .iter()
+                .map(|item| render_meta_value(item, config, true))
+                .collect();
+            return format!("[{}]", rendered.join(", "));
+        }
+    }
+    render_value_inner_with_config(v, config)
 }
 
 /// Renders an `@meta(...){...}` element per `config`'s meta format
@@ -270,10 +321,11 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
                 Some(ref fmt) => (format!("@meta(format:{fmt})+++\n"), "+++", ""),
                 None => (String::from("@meta{\n"), "}", "  "),
             };
+            let is_foreign_format = effective_format.is_some();
             let mut out = open;
             for (k, v) in &entries {
                 let field_cfg = config.meta_fields.get(k);
-                let val_str = render_meta_field_value(v, field_cfg, config);
+                let val_str = render_meta_field_value(v, field_cfg, config, is_foreign_format);
                 out.push_str(indent);
                 out.push_str(k);
                 if val_str.starts_with('\n') || val_str.is_empty() {
@@ -338,7 +390,7 @@ mod tests {
                 map(&[("k", Value::Int(1))]),
                 Value::Int(2),
             ])),
-            "[{k: 1}, 2]"
+            "list({k: 1}, 2)"
         );
     }
 

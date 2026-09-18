@@ -52,8 +52,9 @@ pub enum Region {
 /// `param` and not `arg`: parameter is the declaration side, argument is
 /// the call side, so `(args)` needs no rename.
 ///
-/// **`ty` is read but never checked.** It is kept as the parser produced
-/// it -- `uint` arrives as a string, `[string]` as a sequence -- because
+/// **`ty` is read but never checked.** It is kept as `element_data`
+/// produces it -- `uint` arrives as a string, `list(string)` as a
+/// sequence -- because
 /// checking a value against it needs a type language this project has not
 /// settled: `@param(name)`'s own type is an identifier rather than a
 /// string, `default:`'s type depends on `type:`, and `type:`'s type is a
@@ -574,7 +575,7 @@ mod tests {
   display: block
   @args{
     @param(id){ type: uint, positional: true, required: true }[ 通し番号。 ]
-    @param(tags){ type: [string] }[ タグ。 ]
+    @param(tags){ type: list(string) }[ タグ。 ]
   }
 }[
   カード一枚。
@@ -684,7 +685,7 @@ mod tests {
     /// all along.
     #[test]
     fn a_caller_that_cannot_read_files_can_pass_the_vocabularies_in() {
-        let doc = tomet_parser::parse_document("@kind(writ)\n\n@layers{ 1: [ \"a\" ] }\n")
+        let doc = tomet_parser::parse_document("@kind(writ)\n\n@layers{ 1: list(\"a\") }\n")
             .expect("document parses");
 
         // Nothing in scope: `std` only, so the kind's element is unknown.

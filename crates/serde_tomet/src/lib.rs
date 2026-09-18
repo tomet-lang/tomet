@@ -1,7 +1,7 @@
 //! `serde` support for Tomet's data subset (`tomet_ast::Value`):
-//! plain `key: value`, nested `{ }`/`[ ]`, and scalars -- the part of the
-//! grammar with a direct mapping to Rust structs, the same role
-//! `serde_yaml`/`serde_json` play for their formats.
+//! plain `key: value`, nested `{ }`, `list(...)` sequences, and scalars --
+//! the part of the grammar with a direct mapping to Rust structs, the
+//! same role `serde_yaml`/`serde_json` play for their formats.
 //!
 //! Headings, prose, and links (the rest of `tomet_ast::Document`) have
 //! no serde equivalent and aren't handled here; `to_string`/`from_str`
@@ -17,8 +17,36 @@ pub use tomet_ast::Value;
 
 /// Parse a data-only `.tmt` document into `T`.
 pub fn from_str<T: for<'de> serde::Deserialize<'de>>(src: &str) -> Result<T> {
-    let value = tomet_parser::parse_value(src)?;
+    let value = normalize_list_calls(tomet_parser::parse_value(src)?);
     de::from_value(value)
+}
+
+/// `list(...)` is the sole surviving list-value spelling (`tomet_parser`
+/// parses it to `Value::Call`, same as any other call -- the "list"/"enum"
+/// distinction is `tomet-semantics`' job, not the parser's), but a `Vec`
+/// field's `Deserialize` impl asks for a sequence. Rewriting `list(...)`
+/// to `Value::Seq` here, once, right after parsing, is `tomet-semantics::normalize_data_value`'s
+/// same single rule kept local -- not worth a dependency on that crate for
+/// one match arm, and scoped to text parsed through `from_str` alone so
+/// `de::from_value`'s own treatment of a raw `Value::Call` as opaque
+/// (see `call_syntax_has_no_serde_equivalent`) is unaffected.
+fn normalize_list_calls(value: Value) -> Value {
+    match value {
+        Value::Call(name, args) if name == "list" => {
+            Value::Seq(args.into_iter().map(normalize_list_calls).collect())
+        }
+        Value::Call(name, args) => {
+            Value::Call(name, args.into_iter().map(normalize_list_calls).collect())
+        }
+        Value::Seq(items) => Value::Seq(items.into_iter().map(normalize_list_calls).collect()),
+        Value::Map(entries) => Value::Map(
+            entries
+                .into_iter()
+                .map(|(k, v)| (k, normalize_list_calls(v)))
+                .collect(),
+        ),
+        other => other,
+    }
 }
 
 /// Render `T` as a data-only `.tmt` document.

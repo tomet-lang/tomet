@@ -130,7 +130,7 @@ fn format_edits_formats_tables() {
 
 #[test]
 fn hover_on_table_header_cell() {
-    let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
+    let text = "@table(align: list(left, right, right, left))[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
     // Position on line 1, inside "[ 電子数 2n² ]" (e.g. character 25)
     let hover =
         hover_for(text, Position::new(1, 25), None).expect("hover found for table header");
@@ -147,7 +147,7 @@ fn hover_on_table_header_cell() {
 
 #[test]
 fn hover_on_table_data_cell() {
-    let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
+    let text = "@table(align: list(left, right, right, left))[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
     // Position on line 2, inside "[ 2 ]" (column 3, character 15)
     let hover =
         hover_for(text, Position::new(2, 15), None).expect("hover found for table data cell");
@@ -164,7 +164,7 @@ fn hover_on_table_data_cell() {
 
 #[test]
 fn hover_on_table_overview() {
-    let text = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
+    let text = "@table(align: list(left, right, right, left))[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
     let hover =
         hover_for(text, Position::new(0, 2), None).expect("hover found for table overview");
     if let HoverContents::Markup(m) = hover.contents {

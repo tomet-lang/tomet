@@ -114,16 +114,32 @@ mod tests {
 
     #[test]
     fn parses_flat_map() {
-        let v = parse_value("title: value\ntags: [a, b]").unwrap();
+        let v = parse_value("title: value\ntags: list(a, b)").unwrap();
         assert_eq!(
             v,
             Value::Map(vec![
                 ("title".into(), Value::String("value".into())),
                 (
                     "tags".into(),
-                    Value::Seq(vec![Value::String("a".into()), Value::String("b".into())])
+                    Value::Call(
+                        "list".into(),
+                        vec![Value::String("a".into()), Value::String("b".into())]
+                    )
                 ),
             ])
+        );
+    }
+
+    /// The `[a, b]` list literal was retired -- `list(...)` is the sole
+    /// spelling now, since `[`/`]` already mean `[content]` at the
+    /// element level.
+    #[test]
+    fn a_bracket_list_literal_in_a_value_position_is_a_parse_error() {
+        let err = parse_value("tags: [a, b]").unwrap_err();
+        assert!(
+            err.message.contains("list(...)"),
+            "expected the error to point at 'list(...)', got: {}",
+            err.message
         );
     }
 
@@ -1352,11 +1368,14 @@ mod tests {
     }
 
     #[test]
-    fn own_line_comment_works_inside_a_sequence() {
-        let v = parse_value("[\n  a,\n  // a note\n  b,\n]").unwrap();
+    fn own_line_comment_works_inside_a_call() {
+        let v = parse_value("list(\n  a,\n  // a note\n  b,\n)").unwrap();
         assert_eq!(
             v,
-            Value::Seq(vec![Value::String("a".into()), Value::String("b".into())])
+            Value::Call(
+                "list".into(),
+                vec![Value::String("a".into()), Value::String("b".into())]
+            )
         );
     }
 

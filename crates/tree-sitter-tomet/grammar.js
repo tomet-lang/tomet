@@ -717,7 +717,12 @@ module.exports = grammar({
 		// ---- data value grammar (mirrors `value.rs`, simplified) --------
 		// Newlines aren't in `extras` (they're structurally significant at
 		// the block level), so groups that tolerate embedded blank lines
-		value: ($) => choice($.map, $.seq, $.string, $.scalar),
+		//
+		// No `$.call` alternative here (see this crate's module doc for
+		// why `@id(list(a, b))`/`@meta{list(a, b)}` -- a bare `list(...)`
+		// occupying the *whole* `(args)`/`{value}` -- still errors,
+		// unlike `a: list(...)` under a named key).
+		value: ($) => choice($.map, $.string, $.scalar),
 		// Entries are separated by a comma, one-or-more newlines, or both --
 		// but never consumed by `map_entry` itself (unlike a trailing comma
 		// after the *last* entry, which belongs to whatever encloses the
@@ -813,10 +818,13 @@ module.exports = grammar({
 		// read as *this* or as the start of `call` is then an ordinary,
 		// unambiguous one-token-lookahead decision: shift `(` to continue
 		// into a call, or reduce on anything else.
+		// `[a, b]` (a `$.seq` rule) used to be a third alternative here.
+		// Retired in `tomet-parser`: `[`/`]` already mean `[content]` at
+		// the element level, and `list(...)` (already `$.call`) is the
+		// sole surviving list-value spelling.
 		_entry_value: ($) =>
 			choice(
 				$.call,
-				$.seq,
 				$.string,
 				$.braced_map,
 				$._value_scalar,
@@ -828,19 +836,6 @@ module.exports = grammar({
 				optional(seq(optional($._blank_gap), $.map)),
 				optional($._blank_gap),
 				"}",
-			),
-		seq: ($) =>
-			seq(
-				"[",
-				optional(
-					seq(
-						optional($._blank_gap),
-						$._entry_value,
-						repeat(seq(",", optional($._blank_gap), $._entry_value)),
-					),
-				),
-				optional($._blank_gap),
-				"]",
 			),
 		string: (_$) => choice(/"([^"\\]|\\.)*"/, /'[^'\n]*'/),
 		// The literal `[` in `_value_scalar`/`scalar`'s classes below (and

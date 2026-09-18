@@ -1,7 +1,8 @@
 //! Renders a `Value` back into `.tmt` data-mode text: a top-level map is
 //! written as bare `key: value` lines (no enclosing braces), matching what
-//! `tomet_parser::parse_value` accepts as a whole document; nested
-//! maps/sequences use `{ }`/`[ ]`.
+//! `tomet_parser::parse_value` accepts as a whole document; nested maps
+//! use `{ }`, and a sequence prints as `list(...)` -- the sole surviving
+//! list-value spelling, matching `tomet_style::render_value_inner`.
 
 use tomet_ast::Value;
 
@@ -15,14 +16,14 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
     match value {
         Value::Map(entries) => write_map(entries, out, top_level),
         Value::Seq(items) => {
-            out.push('[');
+            out.push_str("list(");
             for (i, item) in items.iter().enumerate() {
                 if i > 0 {
                     out.push_str(", ");
                 }
                 write_value(item, out, false);
             }
-            out.push(']');
+            out.push(')');
         }
         Value::String(s) => tomet_style::write_scalar_string(s, out),
         Value::Int(i) => out.push_str(&i.to_string()),

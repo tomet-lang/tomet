@@ -244,7 +244,11 @@ fn table_hover(text: &str, pos: Position, el: &Element) -> Option<Hover> {
         .saturating_sub(1)
         .min(lines.len().saturating_sub(1));
 
-    let aligns = extract_table_aligns_from_args(el.args.as_ref());
+    // `normalized_element_args`, not raw `el.args`: `align: list(...)` is
+    // a `Value::Call` until normalized, and `extract_table_aligns_from_args`
+    // only recognizes `Value::Seq`.
+    let normalized_args = normalized_element_args(el);
+    let aligns = extract_table_aligns_from_args(normalized_args.as_ref());
 
     let mut table_rows: Vec<(usize, Vec<CellInfo>)> = Vec::new();
     for line_idx in start_line..=end_line {

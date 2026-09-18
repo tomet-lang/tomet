@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn parses_grouped_export_config_with_sequence_and_map_paths() {
         let doc = parse_document(
-            "@config(\n  export: {\n    type: [commonmark, html]\n    path: {\n      commonmark: \"README.md\"\n      html: \"index.html\"\n    }\n  }\n)\n",
+            "@config(\n  export: {\n    type: list(commonmark, html)\n    path: {\n      commonmark: \"README.md\"\n      html: \"index.html\"\n    }\n  }\n)\n",
         )
         .unwrap();
 

@@ -612,15 +612,15 @@ Block  @raw
   args    "rust"
 ```
 
-### 列
+### 列。`list(...)` の一つの綴りしかない -- `[...]` は撤去された
 
 ```tmt
-@memo(xs: [1, 2, 3])
+@memo(xs: list(1, 2, 3))
 ```
 
 ```
 Block  @memo
-  args    {xs: [1, 2, 3]}
+  args    {xs: list(1, 2, 3)}
 ```
 
 検証:
@@ -1251,6 +1251,16 @@ Paragraph
 
 > **パースは通る。** 上が実際の結果。
 
+### `[a, b]` 列リテラルも撤去。`[`/`]` は既に `[content]` の意味を持つので、値の中の列は `list(...)` の一つの綴りしかない
+
+```tmt
+@memo(xs: [1, 2, 3])
+```
+
+```
+parse error: 1:11: '[...]' list literal was removed -- write 'list(...)' instead
+```
+
 ### `#name` のブロックシジルも撤去。形はシジルではなく位置が決めるので、`#` は見出し専用に戻った
 
 ```tmt
@@ -1316,16 +1326,6 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 > **パースは通る。** 上が実際の結果。
 
 ## 受け付けない書き方
-
-### `{...}` に列は書けない。`+++` フェンスを使う
-
-```tmt
-@memo{[1, 2, 3]}
-```
-
-```
-parse error: 1:7: a '{...}' group holds 'key: value' entries or elements; write a bare value in '(args)', or use a '+++' fence
-```
 
 ### `{...}` に裸のスカラーも書けない
 
