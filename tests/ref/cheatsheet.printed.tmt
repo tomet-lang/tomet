@@ -78,9 +78,9 @@ ls --help
 1. aaaa
 
 @strong[aaaa]
-@em[aaaa]
-@mark[aaaa]
-@em[aaaa]
+\@em[aaaa]
+\@mark[aaaa]
+\@em[aaaa]
 `aaaa`
 
 ```(lang:sh)

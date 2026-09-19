@@ -95,6 +95,38 @@ pub fn document_to_tm_with_config(doc: &Document, config: &PrinterConfig) -> Str
 
 fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
     match block {
+        // A heading or list joined into a paragraph by an explicit `\`
+        // continuation trigger (`docs/spec/syntax.tmt`'s `##[ 継続 ]`) --
+        // rare, and flagged by `tomet-semantics::shape_mismatch` as a
+        // kind that cannot actually be inline, but still round-trips.
+        // It still sits at the document's own top level, at a genuine
+        // line start, not buried inside another element's content the
+        // way `nested_inline_heading_does_not_reserialize_as_hash_sugar`
+        // guards against. So its sugar is still valid to print here: only
+        // the placement, not the sugar, has changed. `render_inlines`
+        // (shared with truly-nested content) has no heading/list arm and
+        // would otherwise fall back to the full `@heading(...)`/
+        // `@list(...)` form for exactly this case.
+        Block::Paragraph(p)
+            if matches!(
+                p.content.first(),
+                Some(Inline::Element(el)) if el.placement == Placement::Inline
+                    && (list_ordered(el).is_some() || classify_std_lenient(el) == ElementKind::Heading)
+            ) =>
+        {
+            let Some(Inline::Element(first)) = p.content.first() else {
+                unreachable!()
+            };
+            let mut head = String::new();
+            if list_ordered(first).is_some() {
+                render_list(first, config, &mut head);
+            } else {
+                render_heading_element(first, config, &mut head);
+            }
+            out.push_str(head.trim_end_matches('\n'));
+            out.push_str(&render_inlines(&p.content[1..], config));
+            out.push('\n');
+        }
         Block::Paragraph(p) => {
             let inlines_text = render_inlines(&p.content, config);
             if !inlines_text.trim().is_empty() {
@@ -113,10 +145,13 @@ fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
     }
 }
 
-/// Called only from `render_block`'s top-level dispatch, never from the
-/// shared, recursively-called `render_element` (which `render_inlines`/
-/// `ElementValue::Children` both call for nested/inline elements) -- a
-/// nested/inline `@heading(...)` must not round-trip back to `#`-sugar,
+/// Called only from `render_block`'s two top-level dispatch arms (a
+/// standalone `Block::Element`, or the first item of a `Block::Paragraph`
+/// it joined by the default placement rule), never from the shared,
+/// recursively-called `render_element` (which `render_inlines`/
+/// `ElementValue::Children` both call for genuinely nested/inline
+/// elements) -- a nested `@heading(...)` must not round-trip back to
+/// `#`-sugar,
 /// consistent with `tomet-html`/`tomet-markdown`'s
 /// equivalent gating for the same resolved decision.
 fn render_heading_element(el: &Element, config: &PrinterConfig, out: &mut String) {
@@ -300,7 +335,7 @@ fn render_connects(connects: &[Element], config: &PrinterConfig) -> String {
 /// part of the running text.
 fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> String {
     let mut s = String::new();
-    for inline in inlines {
+    for (i, inline) in inlines.iter().enumerate() {
         match inline {
             Inline::Text(t) => s.push_str(&t.value),
             Inline::Raw(t) => s.push_str(&t.value),
@@ -319,7 +354,25 @@ fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> String {
                 if block && !s.is_empty() && !s.ends_with('\n') {
                     s.push('\n');
                 }
-                s.push_str(&render_element(el, config));
+                let rendered = render_element(el, config);
+                // A joined element (`Placement::Inline` reached here only
+                // via an explicit `\` continuation trigger --
+                // `docs/spec/syntax.tmt`'s `##[ 継続 ]`) that opens a
+                // fresh output line needs the trigger re-emitted, or a
+                // reparse would isolate it back into its own block --
+                // except the very first item, which nothing precedes
+                // there, so no marker is ever needed for that one. Only a
+                // `@name(...)`-shaped rendering is ever at risk of being
+                // misread as a bare element opening its own line;
+                // raw/backtick spans and other non-`@` sugar cannot be.
+                if !block
+                    && i > 0
+                    && (s.is_empty() || s.ends_with('\n'))
+                    && rendered.starts_with('@')
+                {
+                    s.push('\\');
+                }
+                s.push_str(&rendered);
                 if block {
                     s.push('\n');
                 }

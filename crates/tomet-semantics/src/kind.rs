@@ -540,6 +540,19 @@ pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
 /// author's sigil against the same table, which made the report about
 /// spelling (`#em`) rather than about the document.
 ///
+/// `Placement::Inline` on a `Block`-required kind is always a mismatch,
+/// with no exception for directives or for column 1: the parser only
+/// ever produces that shape when the author wrote an explicit `\`
+/// continuation trigger (`docs/spec/syntax.tmt`'s `##[ 継続 ]`) to join a
+/// bare element into a paragraph, and the parser stays kind-oblivious
+/// about what it joined (heading, directive, or anything else) -- this
+/// function is where a join that made no sense for that kind gets
+/// reported back, same as it always has.
+///
+/// The reverse (`Inline`-required found as `Block`) has no exception
+/// either: nothing about the join rule ever makes an inline-only element
+/// isolated, so `Placement::Block` there is exactly as wrong as always.
+///
 /// Returns `Some((found, expected))` when they disagree.
 pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {
     if matches!(el.sigil, Sigil::Bare | Sigil::Dollar) {

@@ -19,7 +19,7 @@ id: doc-sigils
 #[インライン要素]
 
 文中の @link(target: "https://example.com")[リンク] と
-@deck.badge(2)[名前空間つきインライン] は行の途中でも要素になる。
+\@deck.badge(2)[名前空間つきインライン] は行の途中でも要素になる。
 
 #[本文に落ちる `#`]
 
