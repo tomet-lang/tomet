@@ -13,7 +13,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Value};
+use tomet_ast::{Block, Document, Element, ElementValue, Inline, Span, Value};
 use tomet_semantics::{
     Bindings, EXACT_DATA_KEY, ElementKind, TargetScheme, builtin_doc_vocabularies,
     classify_std_lenient, flatten_data, heading_level, is_directive, link_target, list_items,
@@ -65,6 +65,20 @@ pub struct RenderOptions {
     /// back to that same rendering, so it only needs to answer for the
     /// kinds it actually knows.
     pub custom_element: Option<CustomElementRenderer>,
+    /// Tag every editable leaf block -- a paragraph, a heading, a list
+    /// item, or any other top-level block (table, quote, hr, ...) -- with
+    /// `data-tmt-start`/`data-tmt-end` holding that node's `Span` byte
+    /// offsets in the source document. `false` keeps every existing
+    /// caller's output byte-for-byte unchanged; a consumer that needs to
+    /// map a rendered element back to its source range (e.g. an in-page
+    /// editor splicing an edit into the `.tmt` file) opts in.
+    ///
+    /// A list/table is not itself tagged, only its items/rows-as-a-whole
+    /// -- see the `render_list`/`render_block` doc comments for what
+    /// "leaf" means for each block kind, including the current gap around
+    /// table cells (`tomet_semantics::parse_table_rows` does not track
+    /// offsets, so `@table` is tagged as a single leaf, not per-cell).
+    pub emit_source_spans: bool,
 }
 
 /// What a [`RenderOptions::custom_element`] hook sees for one element.
@@ -299,6 +313,19 @@ fn slugify(text: &str) -> String {
     slug
 }
 
+/// Dispatches one top-level document block, and -- when
+/// `RenderOptions::emit_source_spans` is set -- tags whatever it emits as
+/// one editable "leaf" with `data-tmt-start`/`data-tmt-end`.
+///
+/// What counts as a leaf here: a paragraph or heading is tagged as itself;
+/// a list is not tagged at all, only each of its items (`render_list`
+/// tags those individually, at item granularity, including any nested
+/// sub-list inside an item -- editing an item edits its whole subtree's
+/// source text); everything else (table, quote, hr, raw block, generic
+/// element, ...) is tagged as a single opaque leaf covering its entire
+/// rendered output, since none of those currently expose finer-grained
+/// spans (a table's cells, notably, do not -- see `RenderOptions::
+/// emit_source_spans`'s doc comment).
 fn render_block(cx: &RenderCtx, block: &Block, out: &mut String, state: &mut HeadingState) {
     match block {
         Block::Paragraph(p) => {
@@ -311,7 +338,9 @@ fn render_block(cx: &RenderCtx, block: &Block, out: &mut String, state: &mut Hea
             let mut inner = String::new();
             render_inlines(cx, &p.content, &mut inner);
             if !inner.trim().is_empty() {
-                out.push_str("<p>");
+                out.push_str("<p");
+                push_span_attrs(cx, out, p.span);
+                out.push('>');
                 out.push_str(&inner);
                 out.push_str("</p>\n");
             }
@@ -320,7 +349,52 @@ fn render_block(cx: &RenderCtx, block: &Block, out: &mut String, state: &mut Hea
         Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading => {
             render_heading_element(cx, el, out, state)
         }
-        Block::Element(el) => render_element(cx, el, out, false),
+        Block::Element(el) => {
+            // The catch-all: dispatches into whichever of `render_element`'s
+            // many branches (table/quote/hr/raw/embed/link/ruby/generic)
+            // this element's kind matches. Rather than threading a "tag
+            // your own opening tag" parameter through every one of those,
+            // splice the attributes into the first tag the call actually
+            // produced -- safe because `escape_attr` never lets a literal
+            // `>` reach an attribute value, so the first `>` after this
+            // point is that tag's own close.
+            let start = out.len();
+            render_element(cx, el, out, false);
+            if cx.options.emit_source_spans && out.len() > start {
+                splice_span_attrs(out, start, el.span);
+            }
+        }
+    }
+}
+
+/// Appends ` data-tmt-start="…" data-tmt-end="…"` (the byte offsets from
+/// `span`) when `RenderOptions::emit_source_spans` is set, otherwise
+/// nothing. Call this after an opening tag's other attributes and before
+/// its closing `>`.
+fn push_span_attrs(cx: &RenderCtx, out: &mut String, span: Span) {
+    if cx.options.emit_source_spans {
+        out.push_str(&format!(
+            " data-tmt-start=\"{}\" data-tmt-end=\"{}\"",
+            span.start.offset, span.end.offset
+        ));
+    }
+}
+
+/// Like `push_span_attrs`, but for output already written: inserts the
+/// attributes right before the first `>` found at or after byte `start`
+/// of `out`. Only sound when `out[start..]` begins with a fresh opening
+/// tag with no attribute value containing a literal `>` -- see the call
+/// site in `render_block` for why that holds here.
+fn splice_span_attrs(out: &mut String, start: usize, span: Span) {
+    if let Some(rel_gt) = out[start..].find('>') {
+        let gt = start + rel_gt;
+        out.insert_str(
+            gt,
+            &format!(
+                " data-tmt-start=\"{}\" data-tmt-end=\"{}\"",
+                span.start.offset, span.end.offset
+            ),
+        );
     }
 }
 
@@ -351,6 +425,7 @@ fn render_heading_element(
     }
     out.push_str(&format!("<h{level}"));
     push_named_attrs(out, &id, &class, &data);
+    push_span_attrs(cx, out, el.span);
     out.push('>');
     let mut number = None;
     if cx.options.number_headings {
@@ -387,6 +462,7 @@ fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
         let (id, class, data) = split_attrs(attrs.as_ref());
         out.push_str("<li");
         push_named_attrs(out, &id, &class, &data);
+        push_span_attrs(cx, out, item.span);
         out.push('>');
         if let Some(marker) = &item.args {
             out.push_str("<span class=\"tm-list-marker\"");
@@ -1785,5 +1861,98 @@ mod tests {
             &RenderOptions::default(),
         );
         assert!(outline.is_empty());
+    }
+
+    /// Pulls every `data-tmt-start`/`data-tmt-end` pair out of rendered HTML,
+    /// in document order, as `(start, end)` byte offsets.
+    fn extract_spans(html: &str) -> Vec<(usize, usize)> {
+        let mut spans = Vec::new();
+        let mut rest = html;
+        while let Some(idx) = rest.find("data-tmt-start=\"") {
+            rest = &rest["data-tmt-start=\"".len() + idx..];
+            let (start_str, after) = rest.split_once('"').unwrap();
+            let start: usize = start_str.parse().unwrap();
+            let after = after.strip_prefix(" data-tmt-end=\"").unwrap();
+            let (end_str, after) = after.split_once('"').unwrap();
+            let end: usize = end_str.parse().unwrap();
+            spans.push((start, end));
+            rest = after;
+        }
+        spans
+    }
+
+    #[test]
+    fn spans_are_absent_unless_opted_in() {
+        let doc = parse_document("hello world\n").unwrap();
+        let html = render_body(&doc);
+        assert!(!html.contains("data-tmt-start"));
+    }
+
+    #[test]
+    fn a_paragraph_is_tagged_with_its_own_span() {
+        let src = "hello world\n";
+        let doc = parse_document(src).unwrap();
+        let options = RenderOptions {
+            emit_source_spans: true,
+            ..RenderOptions::default()
+        };
+        let html = render_body_with(&doc, &options);
+        let spans = extract_spans(&html);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(&src[spans[0].0..spans[0].1], "hello world");
+    }
+
+    #[test]
+    fn a_heading_and_the_paragraph_after_it_each_get_their_own_span() {
+        let src = "#[ Title ]\n\nbody text\n";
+        let doc = parse_document(src).unwrap();
+        let options = RenderOptions {
+            emit_source_spans: true,
+            ..RenderOptions::default()
+        };
+        let html = render_body_with(&doc, &options);
+        let spans = extract_spans(&html);
+        assert_eq!(spans.len(), 2, "expected one span for the heading and one for the paragraph, got {html:?}");
+        // Each span reaches through its own trailing newline, up to (not
+        // including) the blank line that separates it from the next block.
+        assert_eq!(&src[spans[0].0..spans[0].1], "#[ Title ]\n");
+        // The final block's span stops at its own content -- there's no
+        // following block for it to reach a separating blank line toward.
+        assert_eq!(&src[spans[1].0..spans[1].1], "body text");
+    }
+
+    #[test]
+    fn list_items_are_tagged_individually_and_the_list_itself_is_not() {
+        let src = "- one\n- two\n";
+        let doc = parse_document(src).unwrap();
+        let options = RenderOptions {
+            emit_source_spans: true,
+            ..RenderOptions::default()
+        };
+        let html = render_body_with(&doc, &options);
+        assert!(
+            !html.starts_with("<ul data-tmt-start"),
+            "the list wrapper itself must not carry a span: {html:?}"
+        );
+        let spans = extract_spans(&html);
+        assert_eq!(spans.len(), 2);
+        // Each item's span covers its whole source line, marker included --
+        // exactly the raw text an editor would want to seed a textarea with.
+        assert_eq!(&src[spans[0].0..spans[0].1], "- one\n");
+        assert_eq!(&src[spans[1].0..spans[1].1], "- two\n");
+    }
+
+    #[test]
+    fn a_non_list_non_heading_block_is_tagged_as_one_opaque_leaf() {
+        let src = "@quote[ said something ]\n";
+        let doc = parse_document(src).unwrap();
+        let options = RenderOptions {
+            emit_source_spans: true,
+            ..RenderOptions::default()
+        };
+        let html = render_body_with(&doc, &options);
+        let spans = extract_spans(&html);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(&src[spans[0].0..spans[0].1], src.trim_end());
     }
 }
