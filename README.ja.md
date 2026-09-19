@@ -1,6 +1,14 @@
-<!-- Generated from tmtroot/readme.tmt. Edit that, then `tomet export .`. -->
+${macro.generated\_by(self.path)}
+
+> [!warning]
+> Tometは現在開発中であり、日々構文や仕様が大きく変わっています。
+> 試す際には、バックアップを取り実運用をしないでください。
 
 # Tomet
+
+[![license](https://img.shields.io/github/license/tomet-lang/tomet?style=flat-square&color=brightgreen)](https://github.com/tomet-lang/tomet)
+[![downloads](https://img.shields.io/github/downloads/tomet-lang/tomet/total?style=flat-square&color=orange)](https://github.com/tomet-lang/tomet/releases)
+[![npm](https://img.shields.io/npm/v/@tomet/wasm?style=flat-square&color=blue)](https://www.npmjs.com/package/@tomet/wasm)
 
 Tome to me!!
 
@@ -21,7 +29,8 @@ Tome to me!!
 5. リテラルを保持
 
 > [!note]
-> MDXやAstroコンポーネントのように、文書の中に型付きデータやコンポーネントを埋め込みたいエンジニア向け ObsidianのDataviewやBasesのように、メタデータとノートを高度に連携させたいKB作成向け
+> MDXやAstroコンポーネントのように、文書の中に型付きデータやコンポーネントを埋め込みたいエンジニア向け
+> ObsidianのDataviewやBasesのように、メタデータとノートを高度に連携させたいKB作成向け
 
 **vs json**
 
