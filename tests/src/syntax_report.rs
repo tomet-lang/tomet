@@ -235,6 +235,50 @@ const CASES: &[Case] = &[
          行頭の `|` は綴れなければならない",
         "| a | b |\n",
     ),
+    // ---- `\` continuation ---------------------------------------------
+    case(
+        Some("`\\` による段落継続"),
+        "既定は孤立。行頭の `\\` は、直前のブロックへ畳み込んで段落を続ける",
+        "@link(target: \"https://a.example\")[a]\n\\@link(target: \"https://b.example\")[b]\n",
+    ),
+    case(
+        None,
+        "行末の `\\` でも同じ木になる",
+        "@link(target: \"https://a.example\")[a] \\\n@link(target: \"https://b.example\")[b]\n",
+    ),
+    case(
+        None,
+        "継ぎ目を一度越えれば、以降は `\\` なしで続く",
+        "@link(target: \"https://a.example\")[a]\n\
+         \\@link(target: \"https://b.example\")[b]\n\
+         @link(target: \"https://c.example\")[c]\n",
+    ),
+    case(
+        None,
+        "冗長な `\\` は黙って許容される",
+        "@link(target: \"https://a.example\")[a] \\\n\
+         \\@link(target: \"https://b.example\")[b] \\\n\
+         \\@link(target: \"https://c.example\")[c]\n",
+    ),
+    case(
+        None,
+        "`\\` を書かなければ、今まで通り別々のブロックに割れる",
+        "@link(target: \"https://a.example\")[a]\n@link(target: \"https://b.example\")[b]\n",
+    ),
+    case(
+        None,
+        "パーサーは種類を知らずに `\\` を解釈するので、既に解析済みの\
+         どんな `Block::Element`（水平線など）も同じように畳み込める。\
+         ただし `hr` は `required_shape` が常に `Block` なので、\
+         `tomet check` の `shape_mismatch` に引っかかる -- 稀にしか\
+         起きない、明示的な誤用でしかない",
+        "text\n\n---\n\\joined\n",
+    ),
+    case(
+        None,
+        "継ぐ先が無い `\\` は黙って消費される（構文エラーにはならない）",
+        "\\@link(target: \"https://a.example\")[dangling]\n",
+    ),
     // ---- lists ------------------------------------------------------
     case(
         Some("リスト"),

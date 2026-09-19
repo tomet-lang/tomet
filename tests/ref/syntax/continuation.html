@@ -1,0 +1,23 @@
+<h1><code>\</code> は段落の継続トリガー</h1>
+<p><code>display: どちらでも</code> の要素（<code>link</code> <code>embed</code> <code>file</code> <code>dir</code> <code>draft</code> <code>fixme</code>）が行だけで浮くと、周囲の改行が暗黙にブロックへ昇格し、意図せず複数のブロックに割れることがある。<code>\</code> は「この行は直前の段落に続く」と明示するトリガーで、行頭でも行末でも、どちらか片方だけで成立する。</p>
+<p><a class="tm-url" href="https://a.example">a</a> <a class="tm-url" href="https://b.example">b</a></p>
+<p>上と同じ木になる、行末で書く形。</p>
+<p><a class="tm-url" href="https://a.example">a</a> <a class="tm-url" href="https://b.example">b</a></p>
+<h1>一度継ぎ目を越えれば、以降の行は <code>\</code> なしで続く</h1>
+<p><a class="tm-url" href="https://a.example">a</a> <a class="tm-url" href="https://b.example">b</a> <a class="tm-url" href="https://c.example">c</a></p>
+<h1>冗長な <code>\</code> は黙って許容される</h1>
+<p>行頭・行末どちらにも、繰り返し書いてよい。</p>
+<p><a class="tm-url" href="https://a.example">a</a> <a class="tm-url" href="https://b.example">b</a> <a class="tm-url" href="https://c.example">c</a></p>
+<h1>既定は変わらない</h1>
+<p><code>\</code> を書かなければ、今まで通り別々のブロックに割れる。 <code>docs/examples/dirs.tmt</code> のディレクトリ一覧のような、意図してこうなる用法を壊さないため。</p>
+<a class="tm-url" href="https://a.example">a</a>
+<a class="tm-url" href="https://b.example">b</a>
+<h1>見出しやリストなど、専用の綴りを持つ構文にも同じ規則が及ぶ</h1>
+<p>パーサーは種類を知らずに位置だけで配置を決めるので、<code>\</code> は既に解析済みのどんな <code>Block::Element</code>（見出し・リスト・水平線・フェンスコード……）でも同じように畳み込める——ただし <code>hr</code> は <code>required_shape</code> が常に <code>Block</code> なので、この形は <code>tomet-semantics::shape_mismatch</code> に引っかかる。稀にしか起きない、書いた人の誤用というだけの話。</p>
+<p>text</p>
+<p><hr>
+ joined into the thematic break above</p>
+<h1>継ぐ先が無い <code>\</code> はダングリング</h1>
+<p>行頭の <code>\</code> の上に <code>Block::Element</code> が無い場合（文書の先頭、または空行の直後）と、行末の <code>\</code> の後に何も続かない場合は、パーサーは <code>\</code> を黙って消費して何もしない。構文エラーにはならない。</p>
+<a class="tm-url" href="https://a.example">dangling-leading</a>
+<p><a class="tm-url" href="https://a.example">dangling-trailing</a></p>

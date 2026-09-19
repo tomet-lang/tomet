@@ -1,7 +1,7 @@
 //! Parsing for inline sequences, text normalization, and inline delimiters (`*em*`, `**strong**`, `==mark==`).
 
 use crate::codeblock::is_fenced_code_block_start;
-use crate::element::{element_ends_line, is_element_start, parse_element};
+use crate::element::{LineEnd, element_ends_line, is_element_start, parse_element};
 use crate::error::Result;
 use crate::heading::{is_thematic_break, is_titled_thematic_break_start};
 use crate::interp::{is_interp_start, parse_dollar_element};
@@ -75,27 +75,54 @@ pub(crate) fn parse_inline_seq(
                     break;
                 }
                 if cur.peek() == Some('\n') {
+                    // A trailing `\` right before this newline is a
+                    // continuation marker -- possibly redundant, since
+                    // this run may already be open, in which case it is
+                    // this element's own trailing form of the same
+                    // marker `document.rs`'s generic `@`-element branch
+                    // never gets a chance to see or consume, because an
+                    // element already inside an open run is parsed with
+                    // no trailing-marker awareness at all. Either way it
+                    // must never show up as literal text: strip it from
+                    // what gets flushed, whether the run ends here or
+                    // continues.
+                    let pending = &cur.src()[text_start..cur.pos()];
+                    let trimmed = pending.trim_end_matches([' ', '\t']);
+                    if let Some(content) = trimmed.strip_suffix('\\') {
+                        let content_end =
+                            text_start + content.trim_end_matches([' ', '\t']).len();
+                        flush_text_upto(&mut items, cur, &mut text_start, content_end, fold_pipes);
+                        text_start = cur.pos();
+                    }
+
                     let mut look = *cur;
                     look.bump();
                     skip_inline_ws(&mut look);
-                    // An element on a continuation line does *not* end the
-                    // paragraph. A line inside a paragraph is not block
-                    // context, so the element belongs to the running text:
-                    // wrapping a sentence so that `@link(…)[Tomet]` lands
-                    // at a line start used to split one paragraph into
-                    // three blocks. A block is opened by a blank line
-                    // first, which is what the checks below still detect.
-                    if look.is_eof()
-                        || look.peek() == Some('\n')
-                        || (look.peek() == Some('#') && crate::document::is_heading_start(&look))
-                        || matches!(peek_list_marker(&look), Ok(Some(_)))
-                        || look.starts_with("//")
-                        || look.starts_with("/*")
-                        || is_titled_thematic_break_start(&look)
-                        || is_thematic_break(&look)
-                        || is_fenced_code_block_start(&look)
-                    {
+                    // A leading `\` on the next line is likewise
+                    // redundant here for the same reason -- fold it away
+                    // below the same way `|`'s own repeated marker never
+                    // becomes literal text.
+                    let redundant_leading = look.peek() == Some('\\');
+                    if redundant_leading {
+                        look.bump();
+                        skip_inline_ws(&mut look);
+                    }
+                    if paragraph_breaks_here(&look) {
                         break;
+                    }
+                    if redundant_leading {
+                        // Flush up to (and including, as a `SoftBreak`)
+                        // the newline, then silently skip the marker so
+                        // it never shows up as literal text either.
+                        let break_start = cur.pos();
+                        flush_text(&mut items, cur, &mut text_start, fold_pipes);
+                        cur.bump();
+                        skip_inline_ws(cur);
+                        cur.bump();
+                        skip_inline_ws(cur);
+                        push_soft_break(&mut items, cur.span_from(break_start));
+                        text_start = cur.pos();
+                        continue;
                     }
                 }
             }
@@ -194,6 +221,23 @@ pub(crate) fn parse_inline_seq(
         // `stop` at all: its continuation lines are *inside* running text,
         // so a line start there is not block context. Treating it as one
         // is what used to tear a wrapped sentence into separate blocks.
+        //
+        // A leading `\` continuation trigger (`docs/spec/syntax.tmt`'s
+        // `##[ 継続 ]`) demotes the previous element -- still the last
+        // thing pushed to `items` at this point, nothing has flushed the
+        // gap between them yet -- from `Placement::Block` to `Inline`,
+        // joining it to what follows. Dangling (nothing before it, or it
+        // is already `Inline`) is a silent no-op, which also covers a
+        // redundant repeated marker.
+        if matches!(stop, Stop::Bracket(_)) && at_line_start(cur) && cur.peek() == Some('\\') {
+            if let Some(Inline::Element(prev)) = items.last_mut() {
+                prev.placement = Placement::Inline;
+            }
+            cur.bump();
+            skip_inline_ws(cur);
+            text_start = cur.pos();
+            continue;
+        }
         if cur.peek() == Some('@') {
             let block_context = match stop {
                 Stop::Bracket(_) => at_line_start(cur),
@@ -201,14 +245,27 @@ pub(crate) fn parse_inline_seq(
                 _ => false,
             };
             if is_element_start(cur, block_context) {
-                let block = block_context && element_ends_line(cur);
+                let line_end = if block_context {
+                    element_ends_line(cur)
+                } else {
+                    LineEnd::No
+                };
+                // Join/isolate rule (`docs/spec/syntax.tmt`'s
+                // `##[ 継続 ]`): a bare element that opens its own line
+                // isolates by default (`Placement::Block`) the same way
+                // it does at the top level; only an explicit trailing
+                // `\` joins it to what follows.
                 flush_text(&mut items, cur, &mut text_start, fold_pipes);
                 let el = parse_element(cur, allow_colon_connect)?;
-                items.push(Inline::Element(if block {
-                    el.with_placement(Placement::Block)
+                if line_end == LineEnd::Continuation {
+                    crate::element::consume_trailing_continuation(cur);
+                }
+                let placement = if line_end == LineEnd::Bare {
+                    Placement::Block
                 } else {
-                    el
-                }));
+                    Placement::Inline
+                };
+                items.push(Inline::Element(el.with_placement(placement)));
                 text_start = cur.pos();
                 continue;
             }
@@ -234,6 +291,29 @@ pub(crate) fn parse_inline_seq(
     }
     flush_text(&mut items, cur, &mut text_start, fold_pipes);
     Ok(trim_edges(items))
+}
+
+/// Whether a paragraph ends right after the newline `look` is already
+/// positioned past, with inline whitespace also already skipped.
+///
+/// This is the stopping condition for a run already open (from genuine
+/// prose, or from an explicit `\` continuation trigger --
+/// `docs/spec/syntax.tmt`'s `##[ 継続 ]`): a blank line, a heading, a list
+/// marker, a comment, a thematic break, or a fenced code block all start
+/// something with its own identity, not more of this paragraph. It is not
+/// consulted to decide whether a fresh bare element joins what precedes
+/// it -- that is opt-in now, via the trigger, not a default this
+/// look-ahead governs.
+pub(crate) fn paragraph_breaks_here(look: &Cursor) -> bool {
+    look.is_eof()
+        || look.peek() == Some('\n')
+        || (look.peek() == Some('#') && crate::document::is_heading_start(look))
+        || matches!(peek_list_marker(look), Ok(Some(_)))
+        || look.starts_with("//")
+        || look.starts_with("/*")
+        || is_titled_thematic_break_start(look)
+        || is_thematic_break(look)
+        || is_fenced_code_block_start(look)
 }
 
 /// Trims leading/trailing whitespace from a finished inline sequence.

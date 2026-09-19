@@ -61,35 +61,101 @@ pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
     block_context && matches!(look.peek(), None | Some('\n') | Some('\r'))
 }
 
-/// Whether the element starting at `cur` ends its line.
+/// What follows the element starting at `cur`, for the join/isolate
+/// decision (`docs/spec/syntax.tmt`'s `##[ 継続 ]`).
 ///
-/// The second half of the placement rule: an element in block context is a
-/// block only if nothing but inline whitespace and comments follows it
-/// before the line break. `@link(…)[Tomet] は…` therefore opens a
-/// paragraph instead of being torn out of one.
-///
+/// The default is isolation: a bare element that opens its own line
+/// stands as its own block, whether or not a blank line follows --
+/// `docs/examples/dirs.tmt`'s file listing depends on this. Joining is
+/// opt-in, via an explicit `\` trigger, because it is the rarer intent
+/// (three consecutive badge links flowing into one row) and silently
+/// swallowing unrelated adjacent content into one paragraph is the wrong
+/// default for everything else.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LineEnd {
+    /// Ends with just the element: isolates as its own block.
+    Bare,
+    /// Ends with the element followed by an explicit trailing `\`: joins
+    /// whatever follows, regardless of adjacency.
+    Continuation,
+    /// Something else follows: not a candidate. Ordinary running text.
+    No,
+}
+
 /// The element is parsed speculatively on a copy of the cursor and the
 /// copy is thrown away -- the same probe `eat_list_marker_with_indent`
 /// uses for a list marker's `(...)` form.
-pub(crate) fn element_ends_line(cur: &Cursor) -> bool {
+pub(crate) fn element_ends_line(cur: &Cursor) -> LineEnd {
     let mut probe = *cur;
     if parse_element(&mut probe, true).is_err() {
-        return false;
+        return LineEnd::No;
     }
     skip_inline_ws(&mut probe);
     while probe.starts_with("//") || probe.starts_with("/*") {
         if probe.starts_with("//") {
             skip_line_comment(&mut probe);
         } else if skip_block_comment(&mut probe).is_err() {
-            return false;
+            return LineEnd::No;
         }
+        skip_inline_ws(&mut probe);
+    }
+    let continues = probe.peek() == Some('\\');
+    if continues {
+        probe.bump();
         skip_inline_ws(&mut probe);
     }
     // A `+++` fence swallows its own closing line, newline included, so
     // the probe can already sit at the start of the *next* line. That
     // still means the element ended its line.
-    matches!(probe.peek(), None | Some('\n') | Some('\r'))
+    if matches!(probe.peek(), None | Some('\n') | Some('\r'))
         || probe.src()[..probe.pos()].ends_with(['\n', '\r'])
+    {
+        if continues {
+            LineEnd::Continuation
+        } else {
+            LineEnd::Bare
+        }
+    } else {
+        LineEnd::No
+    }
+}
+
+/// Consumes the trailing `\` continuation trigger a line ends with, plus
+/// the inline whitespace/comments before it and the whitespace after it
+/// -- the same shape [`element_ends_line`]'s probe already recognized.
+///
+/// Call only once `element_ends_line` has returned [`LineEnd::Continuation`]
+/// for this position; it assumes the shape is there and does not re-check.
+pub(crate) fn consume_trailing_continuation(cur: &mut Cursor) {
+    skip_inline_ws(cur);
+    loop {
+        if cur.starts_with("//") {
+            skip_line_comment(cur);
+        } else if cur.starts_with("/*") {
+            let _ = skip_block_comment(cur);
+        } else {
+            break;
+        }
+        skip_inline_ws(cur);
+    }
+    cur.bump();
+    skip_inline_ws(cur);
+}
+
+/// Whether a fresh line start at `cur` begins with the `\` continuation
+/// trigger, and if so, the cursor position right after it (and the
+/// inline whitespace following it) -- ready to parse whatever it joins
+/// to the previous block. Purely lexical: it does not judge whether
+/// there is anything valid to join to, the same way
+/// [`consume_trailing_continuation`] does not.
+pub(crate) fn leading_continuation<'a>(cur: &Cursor<'a>) -> Option<Cursor<'a>> {
+    if cur.peek() != Some('\\') {
+        return None;
+    }
+    let mut after = *cur;
+    after.bump();
+    skip_inline_ws(&mut after);
+    Some(after)
 }
 
 fn skip_element_gap(cur: &mut Cursor) -> u8 {
@@ -529,8 +595,15 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
             // `@element(x){ ... }` is what that is for -- `required_shape`
             // calls those six block elements, and placement is what it is
             // compared against.
+            //
+            // `{value}` groups are a flat list of entries, not prose, so
+            // there is no paragraph for `;` to isolate from here -- the
+            // separator (`docs/spec/syntax.tmt`'s `##[ 区切り ]`) is out
+            // of scope for this position on purpose. `Separated` collapses
+            // into "not a block" the same as `No`, unchanged from
+            // `element_ends_line`'s old boolean behavior.
             _ if is_element_start(cur, at_line_start(cur)) => {
-                let block = at_line_start(cur) && element_ends_line(cur);
+                let block = at_line_start(cur) && element_ends_line(cur) == LineEnd::Bare;
                 let el = parse_element(cur, false)?;
                 entries.push(Entry::Element(if block {
                     el.with_placement(Placement::Block)

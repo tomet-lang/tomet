@@ -33,6 +33,7 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [`{...}` グループ](#-グループ)
 - [`(args)` と値の文法](#args-と値の文法)
 - [`|` で開く内容](#-で開く内容)
+- [`\` による段落継続](#\-による段落継続)
 - [リスト](#リスト)
 - [インライン記法](#インライン記法)
 - [区切りとコードブロック](#区切りとコードブロック)
@@ -799,6 +800,155 @@ Block  @heading
 ```
 Paragraph
   Text "| a | b |"
+```
+
+## `\` による段落継続
+
+### 既定は孤立。行頭の `\` は、直前のブロックへ畳み込んで段落を続ける
+
+```tmt
+@link(target: "https://a.example")[a]
+\@link(target: "https://b.example")[b]
+```
+
+```
+Paragraph
+  Inline @link
+    args    {target: "https://a.example"}
+    content
+      Text "a"
+  SoftBreak
+  Inline @link
+    args    {target: "https://b.example"}
+    content
+      Text "b"
+```
+
+### 行末の `\` でも同じ木になる
+
+```tmt
+@link(target: "https://a.example")[a] \
+@link(target: "https://b.example")[b]
+```
+
+```
+Paragraph
+  Inline @link
+    args    {target: "https://a.example"}
+    content
+      Text "a"
+  SoftBreak
+  Inline @link
+    args    {target: "https://b.example"}
+    content
+      Text "b"
+```
+
+### 継ぎ目を一度越えれば、以降は `\` なしで続く
+
+```tmt
+@link(target: "https://a.example")[a]
+\@link(target: "https://b.example")[b]
+@link(target: "https://c.example")[c]
+```
+
+```
+Paragraph
+  Inline @link
+    args    {target: "https://a.example"}
+    content
+      Text "a"
+  SoftBreak
+  Inline @link
+    args    {target: "https://b.example"}
+    content
+      Text "b"
+  SoftBreak
+  Inline @link
+    args    {target: "https://c.example"}
+    content
+      Text "c"
+```
+
+### 冗長な `\` は黙って許容される
+
+```tmt
+@link(target: "https://a.example")[a] \
+\@link(target: "https://b.example")[b] \
+\@link(target: "https://c.example")[c]
+```
+
+```
+Paragraph
+  Inline @link
+    args    {target: "https://a.example"}
+    content
+      Text "a"
+  SoftBreak
+  Inline @link
+    args    {target: "https://b.example"}
+    content
+      Text "b"
+  SoftBreak
+  Inline @link
+    args    {target: "https://c.example"}
+    content
+      Text "c"
+```
+
+### `\` を書かなければ、今まで通り別々のブロックに割れる
+
+```tmt
+@link(target: "https://a.example")[a]
+@link(target: "https://b.example")[b]
+```
+
+```
+Block  @link
+  args    {target: "https://a.example"}
+  content
+    Text "a"
+Block  @link
+  args    {target: "https://b.example"}
+  content
+    Text "b"
+```
+
+### パーサーは種類を知らずに `\` を解釈するので、既に解析済みのどんな `Block::Element`（水平線など）も同じように畳み込める。ただし `hr` は `required_shape` が常に `Block` なので、`tomet check` の `shape_mismatch` に引っかかる -- 稀にしか起きない、明示的な誤用でしかない
+
+```tmt
+text
+
+---
+\joined
+```
+
+```
+Paragraph
+  Text "text"
+Paragraph
+  Inline @hr
+  SoftBreak
+  Text "joined"
+```
+
+検証:
+
+```
+`hr` is a block element, but is written as an inline element; shape comes from position -- give it a line of its own, in block context
+```
+
+### 継ぐ先が無い `\` は黙って消費される（構文エラーにはならない）
+
+```tmt
+\@link(target: "https://a.example")[dangling]
+```
+
+```
+Block  @link
+  args    {target: "https://a.example"}
+  content
+    Text "dangling"
 ```
 
 ## リスト
