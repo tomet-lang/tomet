@@ -36,6 +36,101 @@ pub fn for_each_element_in_block(block: &Block, mut f: impl FnMut(&Element)) {
     let _ = walk_block(block, &mut visitor);
 }
 
+/// Visits every element a reader would find by scanning only the top of
+/// the document, in document order.
+///
+/// Before `docs/spec/syntax.tmt`'s `##[ 区切り ]`, that was simply every
+/// `Block::Element` in `doc.blocks` -- a bare element with nothing
+/// adjacent to join always stood alone, so `@kind`/`@blueprint`/`@meta`/
+/// `@vocabulary`/... were always found this way, and more than one
+/// caller across the workspace grew its own copy of that same loop. Now
+/// one can join an adjacent paragraph instead (no blank line, no `;`
+/// separator) and come back as an `Inline::Element` inside a
+/// `Block::Paragraph`, a tree-shape choice that says nothing about
+/// whether it still opened its own line -- so this visits both: every
+/// `Block::Element`, and every `Inline::Element` sitting directly in a
+/// `Block::Paragraph`'s own content (not recursed into that element's
+/// *own* content/children -- something nested three levels deep inside
+/// unrelated prose was never a document-level declaration and still
+/// is not).
+///
+/// This is the one place that decision lives. A caller that wants "the
+/// declarations at the top of this document" should call this instead of
+/// walking `doc.blocks` by hand -- that hand-rolled loop is exactly what
+/// stopped finding a joined `@blueprint`/`@vocabulary`/`@meta` the moment
+/// this rule shipped, in more than one crate at once.
+pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
+    for block in &doc.blocks {
+        match block {
+            Block::Element(el) => f(el),
+            Block::Paragraph(p) => {
+                for inline in &p.content {
+                    if let Inline::Element(el) = inline {
+                        f(el);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// [`for_each_top_level_element`], mutably -- for a caller that rewrites a
+/// top-level declaration in place (`@blueprint(x)` becoming `@kind(x)`,
+/// say) without changing how many elements are there.
+pub fn for_each_top_level_element_mut(doc: &mut Document, mut f: impl FnMut(&mut Element)) {
+    for block in &mut doc.blocks {
+        match block {
+            Block::Element(el) => f(el),
+            Block::Paragraph(p) => {
+                for inline in &mut p.content {
+                    if let Inline::Element(el) = inline {
+                        f(el);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// [`for_each_top_level_element`], removing every one `keep` rejects --
+/// from `doc.blocks` directly for a `Block::Element`, or from a
+/// `Block::Paragraph`'s own content for an `Inline::Element` found there.
+/// A removal from inside a paragraph closes the gap it leaves the same
+/// way the normal parse path already would: the `SoftBreak` immediately
+/// before the removed item goes with it (so two joined items never end up
+/// separated by two adjacent `SoftBreak`s), and a `SoftBreak` left
+/// leading the paragraph (the removed item was first) is dropped too, the
+/// same trim [`parse_inline_seq`] already applies to a freshly parsed
+/// paragraph's edges.
+///
+/// The paragraph itself is never dropped, even if this empties it --
+/// nothing downstream needs that (`render_block` already treats an
+/// all-whitespace paragraph as producing nothing), and deciding that here
+/// would be a second place holding a rule a printer already holds.
+pub fn retain_top_level_elements(doc: &mut Document, mut keep: impl FnMut(&Element) -> bool) {
+    doc.blocks.retain_mut(|block| match block {
+        Block::Element(el) => keep(el),
+        Block::Paragraph(p) => {
+            let mut kept: Vec<Inline> = Vec::with_capacity(p.content.len());
+            for inline in std::mem::take(&mut p.content) {
+                match &inline {
+                    Inline::Element(el) if !keep(el) => {
+                        if matches!(kept.last(), Some(Inline::SoftBreak(_))) {
+                            kept.pop();
+                        }
+                    }
+                    _ => kept.push(inline),
+                }
+            }
+            while matches!(kept.first(), Some(Inline::SoftBreak(_))) {
+                kept.remove(0);
+            }
+            p.content = kept;
+            true
+        }
+    });
+}
+
 macro_rules! propagate {
     ($e:expr) => {
         match $e {

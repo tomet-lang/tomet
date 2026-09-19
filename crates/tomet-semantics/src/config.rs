@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use tomet_ast::{Block, Document, Element, Value};
+use tomet_ast::{Document, Element, Value};
 use tomet_tree::ValueExt;
 
 use crate::{ElementKind, classify_std_lenient, normalized_element_args};
@@ -81,18 +81,21 @@ impl DocumentConfig {
     }
 }
 
-/// Returns this document's `@config` and `@settings` settings merged from all configuration elements in the document.
+/// Returns this document's `@config` and `@settings` settings merged from
+/// all configuration elements in the document -- top-level per
+/// [`tomet_tree::for_each_top_level_element`], which still counts a
+/// `@config`/`@settings` that joined an adjacent paragraph
+/// (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), not just a raw `doc.blocks`
+/// walk.
 pub fn document_config(doc: &Document) -> DocumentConfig {
     let mut config = DocumentConfig::default();
 
-    for block in &doc.blocks {
-        if let Block::Element(el) = block {
-            let kind = classify_std_lenient(el);
-            if kind == ElementKind::Config || kind.as_str() == "settings" {
-                extract_config_from_element(el, &mut config);
-            }
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        let kind = classify_std_lenient(el);
+        if kind == ElementKind::Config || kind.as_str() == "settings" {
+            extract_config_from_element(el, &mut config);
         }
-    }
+    });
 
     // Deduplicate export_type list while preserving order
     let mut seen = std::collections::HashSet::new();

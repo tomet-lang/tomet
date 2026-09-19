@@ -1,8 +1,8 @@
 //! Blueprint structural validation against a target document.
 
-use tomet_ast::{Block, Document, Element, Inline, Span, Value};
+use tomet_ast::{Document, Element, Inline, Span, Value};
 use tomet_semantics::{ElementKind, classify_std_lenient};
-use tomet_tree::ValueExt;
+use tomet_tree::{ValueExt, for_each_top_level_element};
 
 use crate::Diagnostic;
 
@@ -28,71 +28,74 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
     let mut required_sections = Vec::new();
     let mut found_blueprint = false;
 
-    for block in &blueprint.blocks {
-        if let Block::Element(el) = block {
-            let kind = classify_std_lenient(el);
-            // `@blueprint` only. This used to accept any `@kind` too,
-            // which meant every ordinary document read as a blueprint of
-            // itself and nothing could tell the two apart. A document is a
-            // blueprint because it says `@kind(blueprint)` and carries
-            // `@blueprint(target)`, not because it has a kind at all.
-            if kind == ElementKind::Blueprint {
-                found_blueprint = true;
-                if let Some(Value::String(k)) = &el.args {
-                    target_kind = k.clone();
-                } else if let Some(Value::Map(entries)) = &el.args {
-                    if let Some((_, v)) = entries.iter().find(|(k, _)| k == "target" || k == "kind")
-                    {
-                        if let Some(s) = v.as_str() {
-                            target_kind = s.to_string();
-                        }
+    // Top-level per `for_each_top_level_element`, not a raw `blueprint.blocks`
+    // walk: `@blueprint`/`@meta` may have joined an adjacent paragraph
+    // (`docs/spec/syntax.tmt`'s `##[ 区切り ]`, as a real blueprint's own
+    // preamble commonly does -- `@kind(blueprint)` right above
+    // `@blueprint(...)` right above `@meta{...}`, no blank lines) and come
+    // back as `Inline::Element` there instead of its own `Block::Element`
+    // -- still top-level, just a different tree shape.
+    for_each_top_level_element(blueprint, |el| {
+        let kind = classify_std_lenient(el);
+        // `@blueprint` only. This used to accept any `@kind` too,
+        // which meant every ordinary document read as a blueprint of
+        // itself and nothing could tell the two apart. A document is a
+        // blueprint because it says `@kind(blueprint)` and carries
+        // `@blueprint(target)`, not because it has a kind at all.
+        if kind == ElementKind::Blueprint {
+            found_blueprint = true;
+            if let Some(Value::String(k)) = &el.args {
+                target_kind = k.clone();
+            } else if let Some(Value::Map(entries)) = &el.args {
+                if let Some((_, v)) = entries.iter().find(|(k, _)| k == "target" || k == "kind") {
+                    if let Some(s) = v.as_str() {
+                        target_kind = s.to_string();
                     }
                 }
-            } else if kind == ElementKind::Meta {
-                if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
-                    for (k, _) in entries {
+            }
+        } else if kind == ElementKind::Meta {
+            if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
+                for (k, _) in entries {
+                    required_meta_keys.push((k.clone(), el.span));
+                }
+            }
+            if let Some(Value::Map(entries)) = &el.args {
+                for (k, _) in entries {
+                    if k != "format" {
                         required_meta_keys.push((k.clone(), el.span));
                     }
                 }
-                if let Some(Value::Map(entries)) = &el.args {
-                    for (k, _) in entries {
-                        if k != "format" {
-                            required_meta_keys.push((k.clone(), el.span));
-                        }
+            }
+        } else if kind == ElementKind::Heading {
+            let id = el
+                .args
+                .as_ref()
+                .and_then(|a| a.get("id"))
+                .and_then(|v| v.as_str())
+                .or_else(|| {
+                    if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>())
+                    {
+                        entries
+                            .iter()
+                            .find(|(k, _)| *k == "id")
+                            .and_then(|(_, v)| v.as_str())
+                    } else {
+                        None
                     }
-                }
-            } else if kind == ElementKind::Heading {
-                let id = el
-                    .args
-                    .as_ref()
-                    .and_then(|a| a.get("id"))
-                    .and_then(|v| v.as_str())
-                    .or_else(|| {
-                        if let Some(entries) =
-                            el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>())
-                        {
-                            entries
-                                .iter()
-                                .find(|(k, _)| *k == "id")
-                                .and_then(|(_, v)| v.as_str())
-                        } else {
-                            None
-                        }
-                    })
-                    .map(String::from);
+                })
+                .map(String::from);
 
-                // If the heading has an explicit ID or is defined in blueprint, treat as structural section
-                let title = extract_element_title(el);
-                if id.is_some() || !title.is_empty() {
-                    required_sections.push(RequiredSection {
-                        title,
-                        id,
-                        span: el.span,
-                    });
-                }
+            // If the heading has an explicit ID or is defined in blueprint, treat as structural section
+            let title = extract_element_title(el);
+            if id.is_some() || !title.is_empty() {
+                required_sections.push(RequiredSection {
+                    title,
+                    id,
+                    span: el.span,
+                });
             }
         }
-    }
+    });
 
     if found_blueprint {
         Some(BlueprintSchema {
@@ -118,25 +121,23 @@ pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<D
     let mut doc_meta_keys = Vec::new();
     let mut doc_meta_span = doc_span;
 
-    for block in &doc.blocks {
-        if let Block::Element(el) = block {
-            if classify_std_lenient(el) == ElementKind::Meta {
-                doc_meta_span = el.span;
-                if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
-                    for (k, _) in entries {
-                        doc_meta_keys.push(k.clone());
-                    }
+    for_each_top_level_element(doc, |el| {
+        if classify_std_lenient(el) == ElementKind::Meta {
+            doc_meta_span = el.span;
+            if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
+                for (k, _) in entries {
+                    doc_meta_keys.push(k.clone());
                 }
-                if let Some(Value::Map(entries)) = &el.args {
-                    for (k, _) in entries {
-                        if k != "format" {
-                            doc_meta_keys.push(k.clone());
-                        }
+            }
+            if let Some(Value::Map(entries)) = &el.args {
+                for (k, _) in entries {
+                    if k != "format" {
+                        doc_meta_keys.push(k.clone());
                     }
                 }
             }
         }
-    }
+    });
 
     for (req_key, _) in &schema.required_meta_keys {
         if !doc_meta_keys.contains(req_key) {
@@ -151,33 +152,30 @@ pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<D
     // 2. Verify required sections
     let mut doc_headings: Vec<(String, Option<String>)> = Vec::new();
 
-    for block in &doc.blocks {
-        if let Block::Element(el) = block {
-            if classify_std_lenient(el) == ElementKind::Heading {
-                let id = el
-                    .args
-                    .as_ref()
-                    .and_then(|a| a.get("id"))
-                    .and_then(|v| v.as_str())
-                    .or_else(|| {
-                        if let Some(entries) =
-                            el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>())
-                        {
-                            entries
-                                .iter()
-                                .find(|(k, _)| *k == "id")
-                                .and_then(|(_, v)| v.as_str())
-                        } else {
-                            None
-                        }
-                    })
-                    .map(String::from);
+    for_each_top_level_element(doc, |el| {
+        if classify_std_lenient(el) == ElementKind::Heading {
+            let id = el
+                .args
+                .as_ref()
+                .and_then(|a| a.get("id"))
+                .and_then(|v| v.as_str())
+                .or_else(|| {
+                    if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>())
+                    {
+                        entries
+                            .iter()
+                            .find(|(k, _)| *k == "id")
+                            .and_then(|(_, v)| v.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .map(String::from);
 
-                let title = extract_element_title(el);
-                doc_headings.push((title, id));
-            }
+            let title = extract_element_title(el);
+            doc_headings.push((title, id));
         }
-    }
+    });
 
     for req_sec in &schema.required_sections {
         let is_present = doc_headings.iter().any(|(doc_title, doc_id)| {

@@ -109,7 +109,7 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Diagno
 /// and anything preamble-only after that point, or nested inside
 /// content, is out of place.
 fn check_singletons_and_regions(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
-    use tomet_ast::Block;
+    use tomet_ast::{Block, Inline};
     use tomet_semantics::Region;
 
     let constraints = |el: &tomet_ast::Element| -> Option<(String, bool, Region)> {
@@ -165,9 +165,41 @@ fn check_singletons_and_regions(doc: &Document, bindings: &Bindings, errors: &mu
                     in_preamble = false;
                 }
             }
-            other => {
-                in_preamble = false;
-                tomet_tree::for_each_element_in_block(other, |el| visit(el, false));
+            // A bare element that joins adjacent flow (no blank line, no
+            // `;` -- `docs/spec/syntax.tmt`'s `##[ 区切り ]`) lands here
+            // as `Inline::Element` instead of a top-level `Block::Element`,
+            // but that is a tree-shape choice about how the parser grouped
+            // it, not a statement about where it sits: it still opened its
+            // own line, and `@kind`/`@meta`/... reading that column, not
+            // `Placement`, is exactly what this loop already does for a
+            // top-level `Block::Element` above. So each item directly in
+            // the paragraph's own content is checked the same way,
+            // in order, still carrying `in_preamble` forward across it --
+            // only real prose (non-whitespace `Text`) or a paragraph that
+            // is not still all-preamble actually ends the preamble.
+            // Anything nested *inside* one of those elements' own content
+            // is a different question -- that was never a place the
+            // preamble could reach either way -- so it keeps the original
+            // `in_place: false` treatment via `for_each_descendant`.
+            Block::Paragraph(p) => {
+                for inline in &p.content {
+                    match inline {
+                        Inline::Element(el) => {
+                            let still_preamble = constraints(el)
+                                .map(|(_, _, region)| region == Region::Preamble)
+                                .unwrap_or(false);
+                            visit(el, in_preamble);
+                            if !still_preamble {
+                                in_preamble = false;
+                            }
+                            tomet_tree::for_each_descendant(el, false, |el| visit(el, false));
+                        }
+                        Inline::Text(t) if !t.value.trim().is_empty() => {
+                            in_preamble = false;
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
     }
@@ -375,21 +407,24 @@ fn check_one_rule(
 /// question now. See [`Diagnostic::RetiredSettingsKey`] for why this
 /// is an error and not a silent skip.
 ///
-/// Top-level blocks only, matching what a settings loader would actually
-/// read: an `@settings` buried in a paragraph is already reported by the
-/// region rule above.
+/// Top-level per `for_each_top_level_element`, not a raw `doc.blocks`
+/// walk: `@settings`/`@config` is a directive (`is_directive`), exempt
+/// from `shape_mismatch` when it joins an adjacent paragraph while still
+/// at column 1 (`docs/spec/syntax.tmt`'s `##[ 区切り ]`) -- so an
+/// `@kind(settings)` immediately followed by `@settings(...)`, the
+/// ordinary shape of a settings file, is silent there and must still be
+/// read here.
 fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>) {
-    use tomet_ast::{Block, Value};
+    use tomet_ast::Value;
 
     const RETIRED: [&str; 2] = ["elements", "types"];
 
-    for block in &doc.blocks {
-        let Block::Element(el) = block else { continue };
+    tomet_tree::for_each_top_level_element(doc, |el| {
         if !el.sigil.is_bare_named("settings") && !el.sigil.is_bare_named("config") {
-            continue;
+            return;
         }
         let Some(Value::Map(entries)) = tomet_semantics::embedded::element_data(el) else {
-            continue;
+            return;
         };
         for key in RETIRED {
             if entries.iter().any(|(k, _)| k == key) {
@@ -399,7 +434,7 @@ fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>) {
                 });
             }
         }
-    }
+    });
 }
 
 /// Runs all validation rules directly against a Concrete Syntax Tree ([`SyntaxNode`])

@@ -22,7 +22,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use tomet_ast::{Block, Value};
+use tomet_ast::Value;
 use tomet_compute::EvaluationContext;
 use tomet_config::PrinterConfig;
 use tomet_semantics::{ElementKind, ValueExt, classify_std_lenient, normalized_element_args};
@@ -93,21 +93,23 @@ pub fn find_blueprint(root: &Path, name: &str, config: &PrinterConfig) -> Option
 fn blueprint_name(path: &Path) -> Option<String> {
     let src = fs::read_to_string(path).ok()?;
     let doc = tomet_parser::parse_document(&src).ok()?;
-    doc.blocks.iter().find_map(|block| {
-        let Block::Element(el) = block else {
-            return None;
+    let mut found = None;
+    tomet_tree::for_each_top_level_element(&doc, |el| {
+        if found.is_some() || classify_std_lenient(el) != ElementKind::Blueprint {
+            return;
+        }
+        let Some(args) = normalized_element_args(el) else {
+            return;
         };
-        if classify_std_lenient(el) != ElementKind::Blueprint {
-            return None;
-        }
-        let args = normalized_element_args(el)?;
-        if let Some(s) = args.as_str() {
-            return Some(s.to_string());
-        }
-        args.get("target")
-            .and_then(|v| v.as_str())
-            .map(str::to_string)
-    })
+        found = if let Some(s) = args.as_str() {
+            Some(s.to_string())
+        } else {
+            args.get("target")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+        };
+    });
+    found
 }
 
 /// Instantiates a blueprint file into formatted Tomet source text for `output_path`.

@@ -1,4 +1,4 @@
-use tomet_ast::{Block, Document, Element, Value};
+use tomet_ast::{Document, Element, Value};
 use tomet_tree::ValueExt;
 
 use crate::{ElementKind, classify_std_lenient};
@@ -14,11 +14,19 @@ use crate::{ElementKind, classify_std_lenient};
 /// -- `@meta` is documented as `singleton: true` (see
 /// `docs/spec/builtin-settings.tmt`), so a well-formed document
 /// never has more than one anyway.
+///
+/// "Top-level" is [`tomet_tree::for_each_top_level_element`], not a raw
+/// `doc.blocks` walk: `@meta` still counts as top-level after joining an
+/// adjacent paragraph (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), a
+/// tree-shape choice unrelated to whether it opened its own line.
 pub fn document_meta(doc: &Document) -> Option<Value> {
-    doc.blocks.iter().find_map(|block| match block {
-        Block::Element(el) if classify_std_lenient(el) == ElementKind::Meta => meta_data(el),
-        _ => None,
-    })
+    let mut found = None;
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        if found.is_none() && classify_std_lenient(el) == ElementKind::Meta {
+            found = meta_data(el);
+        }
+    });
+    found
 }
 
 fn meta_data(el: &Element) -> Option<Value> {
@@ -30,55 +38,57 @@ use crate::positional::normalized_element_args;
 /// Returns this document's declared kind string (e.g. `"j.daily"`, `"config"`, `"image_note"`),
 /// resolved strictly from top-level `@kind(...)` / `<kind>(...)` elements.
 pub fn document_kind(doc: &Document) -> Option<String> {
-    for block in &doc.blocks {
-        if let Block::Element(el) = block {
-            if classify_std_lenient(el) == ElementKind::Kind {
-                if let Some(val) = normalized_element_args(el) {
-                    if let Some(s) = val.get("kind").and_then(|v| v.as_str()) {
-                        return Some(s.to_string());
-                    }
-                    if let Some(s) = val.as_str() {
-                        return Some(s.to_string());
-                    }
-                }
-                if let Some(val) = crate::embedded::element_data(el) {
-                    if let Some(s) = val.get("kind").and_then(|v| v.as_str()) {
-                        return Some(s.to_string());
-                    }
-                    if let Some(s) = val.as_str() {
-                        return Some(s.to_string());
-                    }
-                }
+    let mut found = None;
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        if found.is_some() || classify_std_lenient(el) != ElementKind::Kind {
+            return;
+        }
+        if let Some(val) = normalized_element_args(el) {
+            if let Some(s) = val.get("kind").and_then(|v| v.as_str()) {
+                found = Some(s.to_string());
+                return;
+            }
+            if let Some(s) = val.as_str() {
+                found = Some(s.to_string());
+                return;
             }
         }
-    }
-
-    None
+        if let Some(val) = crate::embedded::element_data(el) {
+            if let Some(s) = val.get("kind").and_then(|v| v.as_str()) {
+                found = Some(s.to_string());
+                return;
+            }
+            if let Some(s) = val.as_str() {
+                found = Some(s.to_string());
+            }
+        }
+    });
+    found
 }
 
 /// Returns this document's declared language/syntax version (e.g. `"1.0"`),
 /// resolved strictly from top-level `@version(...)` / `<version>(...)` elements.
 pub fn document_version(doc: &Document) -> Option<String> {
-    for block in &doc.blocks {
-        if let Block::Element(el) = block {
-            if classify_std_lenient(el) == ElementKind::Version {
-                if let Some(val) = normalized_element_args(el) {
-                    if let Some(v) = val.get("version") {
-                        return Some(value_to_version_string(v));
-                    }
-                    return Some(value_to_version_string(&val));
-                }
-                if let Some(val) = crate::embedded::element_data(el) {
-                    if let Some(v) = val.get("version") {
-                        return Some(value_to_version_string(v));
-                    }
-                    return Some(value_to_version_string(&val));
-                }
-            }
+    let mut found = None;
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        if found.is_some() || classify_std_lenient(el) != ElementKind::Version {
+            return;
         }
-    }
-
-    None
+        if let Some(val) = normalized_element_args(el) {
+            found = Some(match val.get("version") {
+                Some(v) => value_to_version_string(v),
+                None => value_to_version_string(&val),
+            });
+            return;
+        }
+        if let Some(val) = crate::embedded::element_data(el) {
+            found = Some(match val.get("version") {
+                Some(v) => value_to_version_string(v),
+                None => value_to_version_string(&val),
+            });
+        }
+    });
+    found
 }
 
 fn value_to_version_string(v: &Value) -> String {
