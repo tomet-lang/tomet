@@ -2,7 +2,9 @@
 
 use tomet_ast::{Block, Document, Element, ElementValue, Sigil, Value};
 use tomet_semantics::{ElementKind, classify_std_lenient, embedded::element_format};
-use tomet_tree::{DocumentExt, ElementExt, element_new, for_each_element_mut};
+use tomet_tree::{
+    DocumentExt, ElementExt, element_new, for_each_element_mut, for_each_top_level_element_mut,
+};
 
 /// Promotes a property `prop_key` from an element matching `source_filter` into a new top-level
 /// directive `@target_directive_name(val)` (or `@target_directive_name{...}`), inserting it at `target_index`
@@ -20,22 +22,26 @@ pub fn promote_prop_to_directive<F>(
 where
     F: FnMut(&Element) -> bool,
 {
+    // Top-level per `for_each_top_level_element_mut`, not a raw
+    // `doc.blocks` walk: the source element (`@meta`, typically) may have
+    // joined an adjacent paragraph (`docs/spec/syntax.tmt`'s
+    // `##[ 区切り ]`) and come back as `Inline::Element` there instead of
+    // its own `Block::Element` -- still top-level, just a different
+    // tree shape.
     let mut extracted_val = None;
-    for block in &mut doc.blocks {
-        if let Block::Element(el) = block {
-            if source_filter(el) {
-                // A `+++` fence body is opaque text, so there is no key to
-                // remove from it. Read it through its declared `format:`
-                // and rewrite it as a native group first -- otherwise this
-                // silently finds nothing whenever the source element was
-                // written as a fence, and depends on the value-DSL
-                // normalization happening to have run first.
-                materialize_raw_body(el);
-                extracted_val = el.remove_prop(prop_key);
-                break;
-            }
+    for_each_top_level_element_mut(doc, |el| {
+        if extracted_val.is_some() || !source_filter(el) {
+            return;
         }
-    }
+        // A `+++` fence body is opaque text, so there is no key to
+        // remove from it. Read it through its declared `format:`
+        // and rewrite it as a native group first -- otherwise this
+        // silently finds nothing whenever the source element was
+        // written as a fence, and depends on the value-DSL
+        // normalization happening to have run first.
+        materialize_raw_body(el);
+        extracted_val = el.remove_prop(prop_key);
+    });
 
     let Some(prop_val) = extracted_val else {
         return false;

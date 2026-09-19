@@ -60,9 +60,21 @@ mod tests {
 
     #[test]
     fn test_promote_meta_type_to_kind() {
+        // `@version` and `@meta` sit on adjacent lines with no blank line
+        // or `;` between them, so they join into one `Block::Paragraph`
+        // under the default placement rule (`docs/spec/syntax.tmt`'s
+        // `##[ 区切り ]`) -- `doc.blocks.len()` no longer tracks "how many
+        // top-level declarations", only `for_each_top_level_element` does.
         let mut doc = parse_doc("@version(1.0)\n@meta{\n  type: task\n  id: doc-1\n}\n");
         assert!(promote_meta_type_to_kind(&mut doc));
-        assert_eq!(doc.blocks.len(), 3);
+
+        let mut sigils = Vec::new();
+        tomet_tree::for_each_top_level_element(&doc, |el| {
+            sigils.push(el.sigil.clone());
+        });
+        assert!(sigils.iter().any(|s| s.is_bare_named("kind")));
+        assert!(sigils.iter().any(|s| s.is_bare_named("version")));
+        assert!(sigils.iter().any(|s| s.is_bare_named("meta")));
     }
 
     #[test]

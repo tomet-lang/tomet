@@ -26,7 +26,7 @@
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
-use tomet_ast::{Block, Document, Element, Name, Value};
+use tomet_ast::{Document, Element, Name, Value};
 use tomet_tree::ValueExt;
 
 use crate::kind::{BUILTIN_KINDS, ElementKind, Shape, UnknownName, classify_std_lenient};
@@ -230,16 +230,15 @@ impl Vocabulary {
             open,
         };
 
-        for block in &doc.blocks {
-            let Block::Element(el) = block else { continue };
+        tomet_tree::for_each_top_level_element(doc, |el| {
             if classify_std_lenient(el) != ElementKind::Element {
-                continue;
+                return;
             }
             let Some(name) = positional_name(el) else {
-                continue;
+                return;
             };
             vocab.elements.insert(name, decl_from_element(el));
-        }
+        });
 
         Some(vocab)
     }
@@ -398,13 +397,12 @@ impl Bindings {
 /// been trimming a filename stem and hoping.
 fn used_namespaces(doc: &Document) -> Vec<String> {
     let mut names = Vec::new();
-    for block in &doc.blocks {
-        let Block::Element(el) = block else { continue };
+    tomet_tree::for_each_top_level_element(doc, |el| {
         if classify_std_lenient(el) != ElementKind::Use {
-            continue;
+            return;
         }
         let Some(args) = normalized_element_args(el) else {
-            continue;
+            return;
         };
         let namespace = args.as_str().map(str::to_string).or_else(|| {
             args.get("target")
@@ -414,7 +412,7 @@ fn used_namespaces(doc: &Document) -> Vec<String> {
         if let Some(namespace) = namespace {
             names.push(namespace);
         }
-    }
+    });
     names
 }
 
@@ -427,19 +425,20 @@ fn builtin(name: &str) -> Option<ElementKind> {
 
 /// The namespace a `@vocabulary(ns)` header names, and whether it is open.
 fn header(doc: &Document) -> Option<(String, bool)> {
-    doc.blocks.iter().find_map(|block| {
-        let Block::Element(el) = block else {
-            return None;
-        };
-        if classify_std_lenient(el) != ElementKind::Vocabulary {
-            return None;
+    let mut found = None;
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        if found.is_some() || classify_std_lenient(el) != ElementKind::Vocabulary {
+            return;
         }
-        let name = positional_name(el)?;
+        let Some(name) = positional_name(el) else {
+            return;
+        };
         let open = crate::embedded::element_data(el)
             .and_then(|data| data.get("open").and_then(|v| v.as_bool()))
             .unwrap_or(false);
-        Some((name, open))
-    })
+        found = Some((name, open));
+    });
+    found
 }
 
 /// The positional argument of `@vocabulary(x)` / `@element(x)`, however
