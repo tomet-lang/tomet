@@ -4,18 +4,22 @@
     path: "README.ja.md"
   }
 )
-
-@meta{
-  id: doc-gCzNE6yl
-}
+@meta{ id: doc-gCzNE6yl }
 
 $macro.generated_by(self.path)
 
 @callout(warning)
-|Tometは現在開発中であり、日々構文や仕様が大きく変わっています。
-|試す際には、バックアップを取り実運用をしないでください。
+| Tometは現在開発中であり、日々構文や仕様が大きく変わっています。
+| 試す際には、バックアップを取り実運用をしないでください。
 
 #[ Tomet ]
+
+@link("https://github.com/tomet-lang/tomet")
+| @embed(url:"https://img.shields.io/github/license/tomet-lang/tomet?style=flat-square&color=brightgreen")[license]
+\@link("https://github.com/tomet-lang/tomet/releases")
+| @embed(url:"https://img.shields.io/github/downloads/tomet-lang/tomet/total?style=flat-square&color=orange")[downloads]
+\@link("https://www.npmjs.com/package/@tomet/wasm")
+| @embed(url:"https://img.shields.io/npm/v/@tomet/wasm?style=flat-square&color=blue")[npm]
 
 Tome to me!!
 
