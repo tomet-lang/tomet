@@ -7,7 +7,7 @@
 
 use crate::element::{parse_groups, parse_paren_value, parse_sugar_body};
 use crate::error::Result;
-use crate::heading::merge_values;
+use crate::section::merge_values;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_text};
 use crate::value::skip_inline_ws;
 use tomet_ast::{Element, Sigil, Value};

@@ -56,10 +56,8 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 ```
 
 ```
-Block  @heading
-  args    1
-  content
-    Text "タイトル"
+Paragraph
+  Text "#[ タイトル ]"
 ```
 
 ### `#` の数がレベル
@@ -69,10 +67,8 @@ Block  @heading
 ```
 
 ```
-Block  @heading
-  args    2
-  content
-    Text "節"
+Paragraph
+  Text "##[ 節 ]"
 ```
 
 ### `#` に空白が続けば、括弧なしでも見出しになる（糖衣）
@@ -82,10 +78,8 @@ Block  @heading
 ```
 
 ```
-Block  @heading
-  args    1
-  content
-    Text "見出しになる"
+Paragraph
+  Text "# 見出しになる"
 ```
 
 ### `#` は `(args)` も `{value}` も取る。レベルは `#` の数
@@ -95,12 +89,17 @@ Block  @heading
 ```
 
 ```
-Block  @heading
-  args    {id: "sec", level: 2}
-  content
-    Text "見出し"
-  group
-    tag: "syntax"
+Paragraph
+  Text "#"
+  Inline @tag
+    args    {id: "sec"}
+  Text "[ 見出し ]{ tag: syntax }"
+```
+
+検証:
+
+```
+unknown element `tag`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.tag`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### 末尾の `{...}` は属性
@@ -110,12 +109,8 @@ Block  @heading
 ```
 
 ```
-Block  @heading
-  args    1
-  content
-    Text "タイトル"
-  group
-    id: "intro"
+Paragraph
+  Text "#[ タイトル ]{ id: intro }"
 ```
 
 ### `:` を挟んでも同じ
@@ -125,12 +120,8 @@ Block  @heading
 ```
 
 ```
-Block  @heading
-  args    1
-  content
-    Text "タイトル"
-  group
-    id: "intro"
+Paragraph
+  Text "#[ タイトル ]:{ id: intro }"
 ```
 
 ## ブロック配置の要素
@@ -783,12 +774,10 @@ Block  @ul
 ```
 
 ```
-Block  @heading
-  args    1
-  content
-    Text "一行目"
-    SoftBreak
-    Text "二行目"
+Paragraph
+  Text "#| 一行目"
+  SoftBreak
+  Text "| 二行目"
 ```
 
 ### 継続する先が無い `|` は地の文。地の文にエスケープが無いので、行頭の `|` は綴れなければならない
@@ -1101,11 +1090,7 @@ Paragraph
   Inline @strong
     content
       Text "strong"
-  Text " と "
-  Inline @mark
-    content
-      Text "mark"
-  Text " と "
+  Text " と ==mark== と "
   Inline @strikeout
     content
       Text "strikeout"
@@ -1307,13 +1292,8 @@ unknown connect `:as`; only a closed set may follow `:` (currently: rule)
 ```
 
 ```
-Block  @heading
-  args    1
-  content
-    Text "h"
-  connect
-    Inline @rule
-      args    {allow: list("card")}
+Paragraph
+  Text "#[ h ]:rule(allow: list(card))"
 ```
 
 ### `list(...)`/`enum(...)` は即座に確定するリテラル呼び出し。コネクトの名前と同じく、パーサは呼び出し名を判断しない

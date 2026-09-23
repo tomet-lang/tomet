@@ -564,6 +564,22 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
             }
         }
         Block::Element(el) => dump_element(out, el, depth),
+        Block::Section(sec) => {
+            indent(out, depth);
+            let _ = writeln!(out, "Section level={}", sec.level);
+            indent(out, depth + 1);
+            out.push_str("Title:\n");
+            for inline in &sec.title {
+                dump_inline(out, inline, depth + 2);
+            }
+            if !sec.blocks.is_empty() {
+                indent(out, depth + 1);
+                out.push_str("Blocks:\n");
+                for child in &sec.blocks {
+                    dump_block(out, child, depth + 2);
+                }
+            }
+        }
     }
 }
 

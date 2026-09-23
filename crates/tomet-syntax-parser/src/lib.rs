@@ -4,7 +4,7 @@ mod document;
 mod element;
 mod error;
 mod fence;
-mod heading;
+mod section;
 mod inline;
 mod interp;
 mod list;
@@ -28,9 +28,7 @@ mod tests {
         Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Sigil,
         SoftBreak, Span, Value,
     };
-    use tomet_semantics::{
-        ElementKind, classify_std_lenient, heading_level, list_items, list_ordered,
-    };
+    use tomet_semantics::{list_items, list_ordered};
 
     /// A `SoftBreak` for test expectations -- span never matters, `Span`'s
     /// `PartialEq` always returns `true` (see its own doc comment).
@@ -56,7 +54,7 @@ mod tests {
         // The sigil as written, and the element the construct produces.
         const SIGILS: &[(&str, &str)] = &[
             ("@memo", "memo"),
-            ("#", "heading"),
+            ("=", "section"),
             ("-", "ul"),
             ("-.", "ol"),
         ];
@@ -76,6 +74,7 @@ mod tests {
             let doc = parse_document(src).ok()?;
             match doc.blocks.first()? {
                 Block::Element(el) => el.sigil.name().map(|n| n.name.clone()),
+                Block::Section(_) => Some("section".into()),
                 Block::Paragraph(_) => None,
             }
         }
@@ -274,22 +273,21 @@ mod tests {
     }
 
     #[test]
-    fn parses_heading_with_attrs() {
-        let doc = parse_document("#[ Hello ]{ id:header1 }\n").unwrap();
+    fn parses_section_with_attrs() {
+        let doc = parse_document("=[ Hello ]{ id:header1 }\n").unwrap();
         match &doc.blocks[0] {
-            Block::Element(el) => {
-                assert_eq!(classify_std_lenient(el), ElementKind::Heading);
-                assert_eq!(heading_level(el), Some(1));
-                assert_eq!(el.content, Some(vec![Inline::Text("Hello".into())]));
+            Block::Section(s) => {
+                assert_eq!(s.level, 1);
+                assert_eq!(s.title, vec![Inline::Text("Hello".into())]);
                 assert_eq!(
-                    el.value,
+                    s.value,
                     Some(ElementValue::from_map(Value::Map(vec![(
                         "id".into(),
                         Value::String("header1".into())
                     )])))
                 );
             }
-            other => panic!("expected heading, got {other:?}"),
+            other => panic!("expected section, got {other:?}"),
         }
     }
 
@@ -681,8 +679,8 @@ mod tests {
     }
 
     #[test]
-    fn parses_emphasis_and_strong_and_mark() {
-        let doc = parse_document("a *em* b **strong** c _em2_ d __strong2__ e ==mark==\n").unwrap();
+    fn parses_emphasis_and_strong() {
+        let doc = parse_document("a *em* b **strong** c _em2_ d __strong2__\n").unwrap();
         match &doc.blocks[0] {
             Block::Paragraph(p) => {
                 let kinds: Vec<_> = p
@@ -705,10 +703,6 @@ mod tests {
                         (
                             Sigil::named("strong"),
                             Some(vec![Inline::Text("strong2".into())])
-                        ),
-                        (
-                            Sigil::named("mark"),
-                            Some(vec![Inline::Text("mark".into())])
                         ),
                     ]
                 );
@@ -1031,8 +1025,8 @@ mod tests {
     }
 
     #[test]
-    fn interpolation_inside_element_content_and_heading() {
-        let doc = parse_document("@memo[ total: ${sum(a, b)} ]\n\n#[ ${x} ]\n").unwrap();
+    fn interpolation_inside_element_content_and_section() {
+        let doc = parse_document("@memo[ total: ${sum(a, b)} ]\n\n=[ ${x} ]\n").unwrap();
         match &doc.blocks[0] {
             Block::Element(el) => {
                 let content = el.content.as_ref().expect("content");
@@ -1044,15 +1038,13 @@ mod tests {
             other => panic!("expected element, got {other:?}"),
         }
         match &doc.blocks[1] {
-            Block::Element(el) => {
-                assert_eq!(classify_std_lenient(el), ElementKind::Heading);
-                let content = el.content.as_ref().expect("content");
-                assert!(content.iter().any(|i| matches!(
+            Block::Section(sec) => {
+                assert!(sec.title.iter().any(|i| matches!(
                     i,
                     Inline::Element(e) if e.sigil == Sigil::Dollar
                 )));
             }
-            other => panic!("expected heading, got {other:?}"),
+            other => panic!("expected section, got {other:?}"),
         }
     }
 
@@ -1074,42 +1066,31 @@ mod tests {
         // like a blank line already does (e.g. two `-` runs separated by a
         // blank line are two `Block::List`s, not one) -- it doesn't merge
         // into either neighbor, it just produces no block of its own.
-        let doc = parse_document("#[ one ]\n// skip this\n#[ two ]\n").unwrap();
+        let doc = parse_document("=[ one ]\n// skip this\n=[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
         match (&doc.blocks[0], &doc.blocks[1]) {
-            (Block::Element(a), Block::Element(b))
-                if classify_std_lenient(a) == ElementKind::Heading
-                    && classify_std_lenient(b) == ElementKind::Heading =>
-            {
-                assert_eq!(a.content, Some(vec![Inline::Text("one".into())]));
-                assert_eq!(b.content, Some(vec![Inline::Text("two".into())]));
+            (Block::Section(a), Block::Section(b)) => {
+                assert_eq!(a.title, vec![Inline::Text("one".into())]);
+                assert_eq!(b.title, vec![Inline::Text("two".into())]);
             }
-            other => panic!("expected two headings, got {other:?}"),
+            other => panic!("expected two sections, got {other:?}"),
         }
     }
 
     #[test]
     fn indented_line_comment_is_recognized_at_block_level() {
-        let doc = parse_document("#[ one ]\n\n  // indented note\n\n#[ two ]\n").unwrap();
+        let doc = parse_document("=[ one ]\n\n  // indented note\n\n=[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
-        assert!(
-            matches!(&doc.blocks[0], Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading)
-        );
-        assert!(
-            matches!(&doc.blocks[1], Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading)
-        );
+        assert!(matches!(&doc.blocks[0], Block::Section(_)));
+        assert!(matches!(&doc.blocks[1], Block::Section(_)));
     }
 
     #[test]
     fn indented_block_comment_is_recognized_at_block_level() {
-        let doc = parse_document("#[ one ]\n\n  /* indented note */\n\n#[ two ]\n").unwrap();
+        let doc = parse_document("=[ one ]\n\n  /* indented note */\n\n=[ two ]\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
-        assert!(
-            matches!(&doc.blocks[0], Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading)
-        );
-        assert!(
-            matches!(&doc.blocks[1], Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading)
-        );
+        assert!(matches!(&doc.blocks[0], Block::Section(_)));
+        assert!(matches!(&doc.blocks[1], Block::Section(_)));
     }
 
     #[test]
@@ -1861,20 +1842,19 @@ mod tests {
     }
 
     #[test]
-    fn heading_supports_inline_colon_connection() {
-        let doc = parse_document("#[ Overview ]:{ id: intro, tag: main }\n").unwrap();
+    fn section_supports_inline_colon_connection() {
+        let doc = parse_document("=[ Overview ]:{ id: intro, tag: main }\n").unwrap();
         match &doc.blocks[0] {
-            Block::Element(el) => {
-                assert_eq!(classify_std_lenient(el), ElementKind::Heading);
+            Block::Section(s) => {
                 assert_eq!(
-                    el.value,
+                    s.value,
                     Some(ElementValue::from_map(Value::Map(vec![
                         ("id".into(), Value::String("intro".into())),
                         ("tag".into(), Value::String("main".into())),
                     ])))
                 );
             }
-            other => panic!("expected heading, got {other:?}"),
+            other => panic!("expected section, got {other:?}"),
         }
     }
 
@@ -1972,17 +1952,14 @@ mod tests {
     }
 
     #[test]
-    fn heading_supports_named_connect() {
-        // Headings reuse `parse_groups` with `allow_colon_connect: true`,
-        // so they get named connects "for free".
-        let doc = parse_document("#[ h ]:rule(allow: list(card))\n").unwrap();
+    fn section_supports_named_connect() {
+        let doc = parse_document("=[ h ]:rule(allow: list(card))\n").unwrap();
         match &doc.blocks[0] {
-            Block::Element(el) => {
-                assert_eq!(classify_std_lenient(el), ElementKind::Heading);
-                assert_eq!(el.connects.len(), 1);
-                assert_eq!(el.connects[0].sigil, Sigil::named("rule"));
+            Block::Section(s) => {
+                assert_eq!(s.connects.len(), 1);
+                assert_eq!(s.connects[0].sigil, Sigil::named("rule"));
             }
-            other => panic!("expected heading, got {other:?}"),
+            other => panic!("expected section, got {other:?}"),
         }
     }
 
@@ -2199,4 +2176,107 @@ mod tests {
             other => panic!("expected element, got {other:?}"),
         }
     }
+
+    #[test]
+    fn parses_nested_section_tree() {
+        let src = "= Intro\nIntro text.\n\n== Background\nBackground text.\n\n=== Details\nDetail text.\n\n== Goals\nGoal text.\n\n= Next Chapter\nNext text.\n";
+        let doc = parse_document(src).unwrap();
+        // Top level has two sections: "Intro" and "Next Chapter"
+        assert_eq!(doc.blocks.len(), 2);
+
+        // First section: Intro
+        let Block::Section(intro) = &doc.blocks[0] else {
+            panic!("expected intro section");
+        };
+        assert_eq!(intro.level, 1);
+        assert_eq!(intro.title, vec![Inline::Text("Intro".into())]);
+        // intro contains: Paragraph("Intro text."), Section("Background"), Section("Goals")
+        assert_eq!(intro.blocks.len(), 3);
+        assert!(matches!(&intro.blocks[0], Block::Paragraph(_)));
+
+        // Background
+        let Block::Section(bg) = &intro.blocks[1] else {
+            panic!("expected background section");
+        };
+        assert_eq!(bg.level, 2);
+        assert_eq!(bg.title, vec![Inline::Text("Background".into())]);
+        // bg contains: Paragraph("Background text."), Section("Details")
+        assert_eq!(bg.blocks.len(), 2);
+        let Block::Section(details) = &bg.blocks[1] else {
+            panic!("expected details section");
+        };
+        assert_eq!(details.level, 3);
+        assert_eq!(details.title, vec![Inline::Text("Details".into())]);
+        assert_eq!(details.blocks.len(), 1);
+
+        // Goals
+        let Block::Section(goals) = &intro.blocks[2] else {
+            panic!("expected goals section");
+        };
+        assert_eq!(goals.level, 2);
+        assert_eq!(goals.title, vec![Inline::Text("Goals".into())]);
+        assert_eq!(goals.blocks.len(), 1);
+
+        // Second section: Next Chapter
+        let Block::Section(next) = &doc.blocks[1] else {
+            panic!("expected next chapter section");
+        };
+        assert_eq!(next.level, 1);
+        assert_eq!(next.title, vec![Inline::Text("Next Chapter".into())]);
+        assert_eq!(next.blocks.len(), 1);
+    }
+
+    #[test]
+    fn section_sugar_and_bracket_forms_match() {
+        let sugar = parse_document("= Hello World\nParagraph\n").unwrap();
+        let bracket = parse_document("=[ Hello World ]\nParagraph\n").unwrap();
+        assert_eq!(sugar.blocks.len(), 1);
+        assert_eq!(bracket.blocks.len(), 1);
+
+        let Block::Section(s_sec) = &sugar.blocks[0] else { panic!() };
+        let Block::Section(b_sec) = &bracket.blocks[0] else { panic!() };
+
+        assert_eq!(s_sec.level, b_sec.level);
+        assert_eq!(s_sec.title, b_sec.title);
+        assert_eq!(s_sec.blocks.len(), b_sec.blocks.len());
+    }
+
+    #[test]
+    fn parses_tag_sugar_syntax() {
+        let doc = parse_document("Prose with #(rust, parser, tomet) tags.\n").unwrap();
+        let Block::Paragraph(p) = &doc.blocks[0] else { panic!() };
+        assert_eq!(p.content.len(), 3);
+        assert_eq!(p.content[0], Inline::Text("Prose with ".into()));
+
+        let Inline::Element(tag_el) = &p.content[1] else {
+            panic!("expected tag element, got {:?}", p.content[1]);
+        };
+        assert_eq!(tag_el.sigil, Sigil::named("tag"));
+        assert_eq!(
+            tag_el.args,
+            Some(Value::Map(vec![
+                ("".into(), Value::String("rust".into())),
+                ("".into(), Value::String("parser".into())),
+                ("".into(), Value::String("tomet".into())),
+            ]))
+        );
+        assert_eq!(p.content[2], Inline::Text(" tags.".into()));
+    }
+
+    #[test]
+    fn double_equal_is_plain_text_not_mark() {
+        let doc = parse_document("This is ==not highlighted== text.\n").unwrap();
+        let Block::Paragraph(p) = &doc.blocks[0] else { panic!() };
+        // Contains no Element, just Text
+        assert_eq!(p.content, vec![Inline::Text("This is ==not highlighted== text.".into())]);
+    }
+
+    #[test]
+    fn old_hash_heading_is_plain_paragraph() {
+        let doc = parse_document("# Old Heading\n\n#[ Another Heading ]\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+        assert!(matches!(&doc.blocks[0], Block::Paragraph(_)));
+        assert!(matches!(&doc.blocks[1], Block::Paragraph(_)));
+    }
 }
+

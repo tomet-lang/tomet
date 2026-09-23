@@ -8,7 +8,7 @@ pub use diagnostic::{CstValidationError, Diagnostic, Severity};
 pub use rule::{RuleArgs, decode_rule_args};
 
 use id::{collect_ids, collect_ids_cst};
-use tomet_ast::Document;
+use tomet_ast::{Block, Document, Element, Inline};
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::{Bindings, Shape};
 
@@ -200,6 +200,57 @@ fn check_singletons_and_regions(doc: &Document, bindings: &Bindings, errors: &mu
                         _ => {}
                     }
                 }
+            }
+            Block::Section(s) => {
+                in_preamble = false;
+                for conn in &s.connects {
+                    visit(conn, false);
+                    tomet_tree::for_each_descendant(conn, false, |el| visit(el, false));
+                }
+                for inline in &s.title {
+                    if let Inline::Element(el) = inline {
+                        visit(el, false);
+                        tomet_tree::for_each_descendant(el, false, |el| visit(el, false));
+                    }
+                }
+                for child in &s.blocks {
+                    validate_section_block(child, &mut visit);
+                }
+            }
+        }
+    }
+}
+
+fn validate_section_block(
+    block: &Block,
+    visit: &mut impl FnMut(&Element, bool),
+) {
+    match block {
+        Block::Element(el) => {
+            visit(el, false);
+            tomet_tree::for_each_descendant(el, false, |desc| visit(desc, false));
+        }
+        Block::Paragraph(p) => {
+            for inline in &p.content {
+                if let Inline::Element(el) = inline {
+                    visit(el, false);
+                    tomet_tree::for_each_descendant(el, false, |desc| visit(desc, false));
+                }
+            }
+        }
+        Block::Section(s) => {
+            for conn in &s.connects {
+                visit(conn, false);
+                tomet_tree::for_each_descendant(conn, false, |desc| visit(desc, false));
+            }
+            for inline in &s.title {
+                if let Inline::Element(el) = inline {
+                    visit(el, false);
+                    tomet_tree::for_each_descendant(el, false, |desc| visit(desc, false));
+                }
+            }
+            for child in &s.blocks {
+                validate_section_block(child, visit);
             }
         }
     }
@@ -474,13 +525,13 @@ mod tests {
 
     #[test]
     fn unique_ids_is_fine() {
-        let doc = parse("#[ one ]{id:a}\n#[ two ]{id:b}\n");
+        let doc = parse("=[ one ]{id:a}\n=[ two ]{id:b}\n");
         assert_eq!(validate_document(&doc), vec![]);
     }
 
     #[test]
     fn duplicate_top_level_ids_are_reported() {
-        let doc = parse("#[ one ]{id:a}\n#[ two ]{id:a}\n");
+        let doc = parse("=[ one ]{id:a}\n=[ two ]{id:a}\n");
         let errors = validate_document(&doc);
         assert_eq!(errors.len(), 1);
         assert!(matches!(
@@ -886,7 +937,7 @@ mod tests {
         // making it visible here at all.
         // `deck.task` is namespaced and `deck` is in scope, so the only
         // rule left to fire is the one being tested.
-        let doc = parse("#[ one ]{id:a}\n\n@deck.task(id:a)\n");
+        let doc = parse("=[ one ]{id:a}\n\n@deck.task(id:a)\n");
         let errors = validate_document_with(&doc, &with_deck());
         assert_eq!(errors.len(), 1);
         assert!(matches!(
@@ -900,7 +951,7 @@ mod tests {
         // The second `id:a` is on an element embedded inline inside a
         // paragraph's content, not a top-level block -- exercises the
         // `visit_inlines` recursion, not just top-level `Block`s.
-        let doc = parse("#[ one ]{id:a}\n\ntext @deck.ref(id:a) more text\n");
+        let doc = parse("=[ one ]{id:a}\n\ntext @deck.ref(id:a) more text\n");
         let errors = validate_document_with(&doc, &with_deck());
         assert_eq!(errors.len(), 1);
         assert!(matches!(
@@ -911,7 +962,7 @@ mod tests {
 
     #[test]
     fn duplicate_id_with_integer_values_is_reported() {
-        let doc = parse("#[ one ]{id: 42}\n#[ two ]{id: 42}\n");
+        let doc = parse("=[ one ]{id: 42}\n=[ two ]{id: 42}\n");
         let errors = validate_document(&doc);
         assert_eq!(errors.len(), 1);
         assert!(matches!(
@@ -926,7 +977,7 @@ mod tests {
 
     #[test]
     fn test_validate_cst_exact_range() {
-        let src = "#[ one ]{id: duplicate}\n\n#[ two ]{id: duplicate}\n";
+        let src = "=[ one ]{id: duplicate}\n\n=[ two ]{id: duplicate}\n";
         let cst = tomet_parser::parse_cst(src);
         let errors = validate_cst(&cst);
         assert_eq!(errors.len(), 1);

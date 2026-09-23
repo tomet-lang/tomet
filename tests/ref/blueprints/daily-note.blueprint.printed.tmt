@@ -6,10 +6,10 @@
 
 @meta{uuid: ${uuid}}
 
-#[TODO] {id: todo}
+=[TODO] {id: todo}
 
-#[Review] {id: review}
+=[Review] {id: review}
 
-#[Feadback] {id: feadback}
+=[Feadback] {id: feadback}
 
-#[Timeline] {id: timeline}
+=[Timeline] {id: timeline}

@@ -70,6 +70,7 @@ pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
                     }
                 }
             }
+            Block::Section(_) => {}
         }
     }
 }
@@ -88,6 +89,7 @@ pub fn for_each_top_level_element_mut(doc: &mut Document, mut f: impl FnMut(&mut
                     }
                 }
             }
+            Block::Section(_) => {}
         }
     }
 }
@@ -128,6 +130,7 @@ pub fn retain_top_level_elements(doc: &mut Document, mut keep: impl FnMut(&Eleme
             p.content = kept;
             true
         }
+        Block::Section(_) => true,
     });
 }
 
@@ -152,6 +155,16 @@ fn walk_block<B>(block: &Block, visitor: &mut impl Visitor<B>) -> ControlFlow<B>
     match block {
         Block::Paragraph(paragraph) => walk_inlines(&paragraph.content, visitor),
         Block::Element(element) => walk_element(element, visitor),
+        Block::Section(section) => {
+            propagate!(walk_inlines(&section.title, visitor));
+            for conn in &section.connects {
+                propagate!(walk_element(conn, visitor));
+            }
+            for child in &section.blocks {
+                propagate!(walk_block(child, visitor));
+            }
+            ControlFlow::Continue(())
+        }
     }
 }
 
@@ -261,6 +274,16 @@ fn walk_block_mut<B>(block: &mut Block, visitor: &mut impl VisitorMut<B>) -> Con
     match block {
         Block::Paragraph(paragraph) => walk_inlines_mut(&mut paragraph.content, visitor),
         Block::Element(element) => walk_element_mut(element, visitor),
+        Block::Section(section) => {
+            propagate!(walk_inlines_mut(&mut section.title, visitor));
+            for conn in &mut section.connects {
+                propagate!(walk_element_mut(conn, visitor));
+            }
+            for child in &mut section.blocks {
+                propagate!(walk_block_mut(child, visitor));
+            }
+            ControlFlow::Continue(())
+        }
     }
 }
 

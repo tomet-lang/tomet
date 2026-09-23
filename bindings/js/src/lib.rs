@@ -377,14 +377,14 @@ mod tests {
 
     #[test]
     fn test_format_source() {
-        let src = "#[  Hello  ]\n\n";
+        let src = "=[  Hello  ]\n\n";
         let formatted = format_source(src);
-        assert_eq!(formatted, "#[  Hello  ]\n");
+        assert_eq!(formatted, "=[  Hello  ]\n");
     }
 
     #[test]
     fn test_process_document_with_meta_title() {
-        let src = "@meta{\n  title: \"My Meta Title\"\n}\n\n#[ Document Title ]\n\n##[ Section One ]\n\nContent.\n";
+        let src = "@meta{\n  title: \"My Meta Title\"\n}\n\n=[ Document Title ]\n\n==[ Section One ]\n\nContent.\n";
         let doc = tomet_parser::parse_document(src).unwrap();
         let opts = ProcessOptions {
             advanced: Some(true),
@@ -401,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_process_document_with_h1_fallback() {
-        let src = "#[ First Heading Title ]\n\n##[ Section A ]\n\n###[ Sub Section ]\n";
+        let src = "=[ First Heading Title ]\n\n==[ Section A ]\n\n===[ Sub Section ]\n";
         let doc = tomet_parser::parse_document(src).unwrap();
         let opts = ProcessOptions {
             advanced: Some(true),

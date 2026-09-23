@@ -24,7 +24,7 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "heading"
+          "name": "section"
         },
         {
           "type": "SYMBOL",
@@ -71,7 +71,7 @@
         "name": "_newline"
       }
     },
-    "heading": {
+    "section": {
       "type": "SEQ",
       "members": [
         {
@@ -79,7 +79,7 @@
           "name": "marker",
           "content": {
             "type": "SYMBOL",
-            "name": "heading_marker"
+            "name": "section_marker"
           }
         },
         {
@@ -255,14 +255,14 @@
         }
       ]
     },
-    "heading_marker": {
+    "section_marker": {
       "type": "TOKEN",
       "content": {
         "type": "PREC",
         "value": 1,
         "content": {
           "type": "PATTERN",
-          "value": "#+"
+          "value": "=+"
         }
       }
     },
@@ -758,11 +758,11 @@
         },
         {
           "type": "SYMBOL",
-          "name": "mark"
+          "name": "strikeout"
         },
         {
           "type": "SYMBOL",
-          "name": "strikeout"
+          "name": "tag"
         },
         {
           "type": "SYMBOL",
@@ -817,6 +817,10 @@
         {
           "type": "STRING",
           "value": ":"
+        },
+        {
+          "type": "STRING",
+          "value": "="
         }
       ]
     },
@@ -914,25 +918,35 @@
         }
       ]
     },
-    "mark": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "=="
-        },
-        {
-          "type": "REPEAT1",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_bracket_item_no_equals"
+    "tag": {
+      "type": "PREC",
+      "value": 2,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "marker",
+            "content": {
+              "type": "ALIAS",
+              "content": {
+                "type": "STRING",
+                "value": "#"
+              },
+              "named": true,
+              "value": "tag_marker"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "args",
+            "content": {
+              "type": "SYMBOL",
+              "name": "args_group"
+            }
           }
-        },
-        {
-          "type": "STRING",
-          "value": "=="
-        }
-      ]
+        ]
+      }
     },
     "strikeout": {
       "type": "SEQ",
@@ -967,11 +981,11 @@
         },
         {
           "type": "SYMBOL",
-          "name": "mark"
+          "name": "strikeout"
         },
         {
           "type": "SYMBOL",
-          "name": "strikeout"
+          "name": "tag"
         },
         {
           "type": "SYMBOL",
@@ -1013,11 +1027,11 @@
         },
         {
           "type": "SYMBOL",
-          "name": "mark"
+          "name": "strikeout"
         },
         {
           "type": "SYMBOL",
-          "name": "strikeout"
+          "name": "tag"
         },
         {
           "type": "SYMBOL",
@@ -1046,56 +1060,6 @@
         }
       ]
     },
-    "_bracket_item_no_equals": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "SYMBOL",
-          "name": "code_span"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "block_comment"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "emphasis"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "strong"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "strikeout"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "element"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "interpolation"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_newline"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "punctuation"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "PATTERN",
-            "value": "[^\\n`*_=~<@$()\\[{\\]/|]+"
-          },
-          "named": true,
-          "value": "text"
-        }
-      ]
-    },
     "_bracket_item_no_tilde": {
       "type": "CHOICE",
       "members": [
@@ -1117,7 +1081,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "mark"
+          "name": "tag"
         },
         {
           "type": "SYMBOL",
@@ -2060,7 +2024,7 @@
   ],
   "conflicts": [
     [
-      "heading"
+      "section"
     ],
     [
       "map"

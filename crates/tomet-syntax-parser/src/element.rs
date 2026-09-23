@@ -2,7 +2,7 @@
 
 use crate::error::Result;
 use crate::fence::{is_fence_start, parse_fence};
-use crate::heading::{merge_values, parse_braced_value};
+use crate::section::{merge_values, parse_braced_value};
 use crate::inline::{Stop, at_line_start, parse_inline_seq};
 use crate::value::{
     POSITIONAL_ENTRY_KEY, eat_name, err, is_name_start_at, parse_one_entry, parse_value_at,
@@ -497,7 +497,7 @@ pub(crate) fn parse_sugar_body(cur: &mut Cursor) -> Result<(Vec<Inline>, Option<
         // and its surrounding whitespace, neither of which needs to
         // survive as an AST node.
         cur.set_pos(brace_pos);
-        let attrs = crate::heading::parse_braced_value(cur)?;
+        let attrs = parse_braced_value(cur)?;
         Ok((content, Some(attrs)))
     } else {
         Ok((parse_inline_seq(cur, Stop::Line, false)?, None))

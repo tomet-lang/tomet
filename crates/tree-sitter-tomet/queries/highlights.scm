@@ -17,12 +17,12 @@
 ; delimiters below), so without an explicit capture here they'd just
 ; inherit `heading`'s own `@title` below -- same color as the content,
 ; not as `heading_marker`. Capturing them to match `heading_marker`
-; instead keeps "structural" (`#`/`[`/`]`) and "content" visually
+; instead keeps "structural" (`=`/`[`/`]`) and "content" visually
 ; distinct, without touching the content's own color.
-(heading_marker) @markup.heading.marker @punctuation.special
-(heading "[" @punctuation.special)
-(heading "]" @punctuation.special)
-(heading) @markup.heading @title
+(section_marker) @markup.heading.marker @punctuation.special
+(section "[" @punctuation.special)
+(section "]" @punctuation.special)
+(section) @markup.heading @title
 
 (thematic_break) @punctuation.special
 
@@ -41,7 +41,6 @@
 
 (emphasis) @markup.italic @emphasis
 (strong) @markup.bold @emphasis.strong
-(mark) @markup.strikethrough
 
 (code_span) @markup.raw.inline @text.literal
 
@@ -95,6 +94,11 @@
 (inline_element (content_group "]" @tag))
 (inline_element (value_group "{" @tag))
 (inline_element (value_group "}" @tag))
+
+; Tag sugar (#(tag1, tag2))
+(tag_marker) @tag
+(tag (args_group "(" @tag))
+(tag (args_group ")" @tag))
 
 ; well-known `@(url:..)`/`@(file:..)`/`@(ref:..)` link-shaped elements
 ; render as links even though the grammar doesn't special-case them

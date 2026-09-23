@@ -1,6 +1,6 @@
 @kind(node-graph)
 
-#[ Nodes ]
+=[ Nodes ]
 
 @node(type:textarea)
 {id:dsaf-asdf, x:123, y:456}
@@ -19,4 +19,4 @@
 @node(type:export)
 {id:dsaf-asdf, x:123, y:456}
 
-#[ Links ]
+=[ Links ]

@@ -80,6 +80,17 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
     match block {
         TmBlock::Paragraph(p) => content_to_blocks(&p.content),
         TmBlock::Element(el) => element_to_blocks(el),
+        TmBlock::Section(sec) => {
+            let mut blocks = vec![Block::Header(
+                sec.level.max(1) as i64,
+                section_attr(sec),
+                inlines_to_pandoc(&sec.title),
+            )];
+            for child in &sec.blocks {
+                blocks.extend(block_to_pandoc(child));
+            }
+            blocks
+        }
     }
 }
 
@@ -556,6 +567,12 @@ fn attr_of(el: &Element, classes: &[&str]) -> Attr {
     attr_from(flatten_element_data(el).into_pairs(), classes)
 }
 
+fn section_attr(sec: &tomet_ast::Section) -> Attr {
+    let args = sec.args.as_ref();
+    let value = sec.value.as_ref().and_then(|v| v.as_data());
+    attr_from(flatten_data(args, value.as_ref()).into_pairs(), &[])
+}
+
 /// Like [`attr_of`], but ignoring `(args)`.
 ///
 /// For the builtins whose args the mapping already consumed into a
@@ -661,7 +678,7 @@ mod tests {
     #[test]
     fn a_heading_carries_its_level() {
         assert_eq!(
-            convert("##[ Section ]\n"),
+            convert("==[ Section ]\n"),
             vec![Block::Header(
                 2,
                 Attr::empty(),
@@ -673,7 +690,7 @@ mod tests {
     #[test]
     fn emphasis_maps_to_pandoc_nodes() {
         assert_eq!(
-            convert("*a* **b** ==c==\n"),
+            convert("*a* **b** @mark[c]\n"),
             vec![Block::Para(vec![
                 Inline::Emph(vec![Inline::Str("a".into())]),
                 Inline::Space,

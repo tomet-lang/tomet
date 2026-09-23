@@ -102,29 +102,34 @@ fn rewrite_blocks(
 ) -> Result<Vec<Block>, IndexQueryError> {
     let mut rewritten = Vec::with_capacity(blocks.len());
     for block in blocks {
-        let Block::Element(mut el) = block else {
-            rewritten.push(block);
-            continue;
-        };
-
-        if tomet_semantics::list_ordered(&el).is_some() {
-            let value = el.value.take().unwrap_or_else(ElementValue::empty_group);
-            el.value = Some(rewrite_list_value(
-                value, source, config, rows, known, expanded,
-            )?);
-            rewritten.push(Block::Element(el));
-            continue;
-        }
-
-        match filter_args_of_element(&el) {
-            Some(args) => {
-                let query = Query::parse(args)?;
-                for path in query.run(source, config, rows, known)? {
-                    rewritten.push(Block::Element(link_block_element(&path)));
-                }
-                *expanded += 1;
+        match block {
+            Block::Section(mut sec) => {
+                sec.blocks =
+                    rewrite_blocks(sec.blocks, source, config, rows, known, expanded)?;
+                rewritten.push(Block::Section(sec));
             }
-            None => rewritten.push(Block::Element(el)),
+            Block::Element(mut el) => {
+                if tomet_semantics::list_ordered(&el).is_some() {
+                    let value = el.value.take().unwrap_or_else(ElementValue::empty_group);
+                    el.value = Some(rewrite_list_value(
+                        value, source, config, rows, known, expanded,
+                    )?);
+                    rewritten.push(Block::Element(el));
+                    continue;
+                }
+
+                match filter_args_of_element(&el) {
+                    Some(args) => {
+                        let query = Query::parse(args)?;
+                        for path in query.run(source, config, rows, known)? {
+                            rewritten.push(Block::Element(link_block_element(&path)));
+                        }
+                        *expanded += 1;
+                    }
+                    None => rewritten.push(Block::Element(el)),
+                }
+            }
+            other => rewritten.push(other),
         }
     }
     Ok(rewritten)
@@ -311,13 +316,22 @@ mod tests {
     /// order -- the shape a top-level (not inside any list) query expands
     /// into.
     fn link_paths(doc: &Document) -> Vec<String> {
-        doc.blocks
-            .iter()
-            .filter_map(|block| match block {
-                Block::Element(el) => link_ref(el),
-                _ => None,
-            })
-            .collect()
+        let mut paths = Vec::new();
+        fn collect_blocks(blocks: &[Block], paths: &mut Vec<String>) {
+            for block in blocks {
+                match block {
+                    Block::Element(el) => {
+                        if let Some(path) = link_ref(el) {
+                            paths.push(path);
+                        }
+                    }
+                    Block::Section(sec) => collect_blocks(&sec.blocks, paths),
+                    _ => {}
+                }
+            }
+        }
+        collect_blocks(&doc.blocks, &mut paths);
+        paths
     }
 
     /// `el`'s `ref:` path, with the scheme prefix stripped -- `None` for
@@ -436,17 +450,17 @@ mod tests {
 
     #[test]
     fn surrounding_blocks_keep_their_positions() {
-        let src = "@kind(doc.index)\n\n#[ Rust ]\n\n${filter(contains(meta.tags, \"rust\"))}\n\n#[ Go ]\n\n${filter(contains(meta.tags, \"go\"))}\n";
+        let src = "@kind(doc.index)\n\n=[ Rust ]\n\n${filter(contains(meta.tags, \"rust\"))}\n\n=[ Go ]\n\n${filter(contains(meta.tags, \"go\"))}\n";
         let mut doc = tomet_parser::parse_document(src).expect("valid source");
         assert_eq!(expand_index_queries(&mut doc, &table()).unwrap(), 2);
         assert_eq!(link_paths(&doc), ["docs/a.tmt", "docs/c.tmt", "docs/b.tmt"]);
-        // Two headings, still one on each side of the first expansion.
-        let headings = doc
+        // Two sections, each containing their expanded links.
+        let sections = doc
             .blocks
             .iter()
-            .filter(|b| matches!(b, Block::Element(el) if el.sigil.is_bare_named("heading")))
+            .filter(|b| matches!(b, Block::Section(_)))
             .count();
-        assert_eq!(headings, 2);
+        assert_eq!(sections, 2);
     }
 
     #[test]

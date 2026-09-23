@@ -31,7 +31,7 @@ mod tests {
         let src_file = temp_dir.join("test_doc.tmt");
         let out_file = temp_dir.join("test_out.typ");
 
-        fs::write(&src_file, "#[ Hello Typst ]\n").unwrap();
+        fs::write(&src_file, "=[ Hello Typst ]\n").unwrap();
 
         let res = to_typst(&src_file, &Some(out_file.clone()));
         assert!(res.is_ok());

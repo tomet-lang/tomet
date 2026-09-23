@@ -33,10 +33,10 @@ fn test_blueprint_end_to_end_lifecycle() {
   title: ${title}
 }
 
-#[ Goals for ${date("YYYY-MM-DD")} ] {id: goals}
+=[ Goals for ${date("YYYY-MM-DD")} ] {id: goals}
 - ( ) First goal
 
-#[ Review ] {id: review}
+=[ Review ] {id: review}
 "#;
 
     let blueprint_file = tmpl_dir.join("daily-note.blueprint.tmt");
@@ -87,7 +87,7 @@ fn test_blueprint_end_to_end_lifecycle() {
 
     // 5. Test validation failure when a required section is removed
     let corrupted_src = doc_content
-        .replace("#[ Review ]", "#[ Freeform Notes ]")
+        .replace("=[ Review ]", "=[ Freeform Notes ]")
         .replace("{id: review}", "{id: notes}")
         .replace("Review", "Freeform Notes");
     let corrupted_ast = tomet_parser::parse_document(&corrupted_src).unwrap();

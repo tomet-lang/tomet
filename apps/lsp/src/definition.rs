@@ -53,39 +53,106 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
     let target_id = id_finder.ref_id?;
 
     // Find the node that defines this id
-    struct DefFinder {
-        target_id: String,
-        found_span: Option<Span>,
-    }
+    let found_span = find_def_in_blocks(&doc.blocks, &target_id);
 
-    impl Visitor<()> for DefFinder {
-        fn visit(&mut self, el: &Element) -> ControlFlow<()> {
-            if let Some(Value::Map(entries)) = el.attrs_view() {
-                for (k, v) in entries {
-                    if k == "id" {
-                        if let Value::String(s) = v {
-                            if s == self.target_id {
-                                self.found_span = Some(el.span);
-                                return ControlFlow::Break(());
-                            }
-                        }
-                    }
-                }
-            }
-            ControlFlow::Continue(())
-        }
-    }
-
-    let mut def_finder = DefFinder {
-        target_id,
-        found_span: None,
-    };
-    let _ = walk_document(&doc, &mut def_finder);
-
-    def_finder.found_span.map(|span| {
+    found_span.map(|span| {
         GotoDefinitionResponse::Scalar(Location {
             uri: uri.clone(),
             range: span_to_range(&span),
         })
     })
+}
+
+fn find_def_in_blocks(blocks: &[tomet_ast::Block], target_id: &str) -> Option<Span> {
+    for block in blocks {
+        match block {
+            tomet_ast::Block::Section(sec) => {
+                if let Some(Value::Map(entries)) = section_attrs(sec) {
+                    for (k, v) in entries {
+                        if k == "id" {
+                            if let Value::String(s) = v {
+                                if s == target_id {
+                                    return Some(sec.span);
+                                }
+                            }
+                        }
+                    }
+                }
+                for conn in &sec.connects {
+                    if let Some(span) = find_def_in_element(conn, target_id) {
+                        return Some(span);
+                    }
+                }
+                if let Some(span) = find_def_in_blocks(&sec.blocks, target_id) {
+                    return Some(span);
+                }
+            }
+            tomet_ast::Block::Element(el) => {
+                if let Some(span) = find_def_in_element(el, target_id) {
+                    return Some(span);
+                }
+            }
+            tomet_ast::Block::Paragraph(p) => {
+                for inline in &p.content {
+                    if let tomet_ast::Inline::Element(el) = inline {
+                        if let Some(span) = find_def_in_element(el, target_id) {
+                            return Some(span);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn find_def_in_element(el: &Element, target_id: &str) -> Option<Span> {
+    if let Some(Value::Map(entries)) = el.attrs_view() {
+        for (k, v) in entries {
+            if k == "id" {
+                if let Value::String(s) = v {
+                    if s == target_id {
+                        return Some(el.span);
+                    }
+                }
+            }
+        }
+    }
+    if let Some(content) = &el.content {
+        for inline in content {
+            if let tomet_ast::Inline::Element(child_el) = inline {
+                if let Some(span) = find_def_in_element(child_el, target_id) {
+                    return Some(span);
+                }
+            }
+        }
+    }
+    if let Some(children) = &el.children {
+        if let Some(span) = find_def_in_blocks(children, target_id) {
+            return Some(span);
+        }
+    }
+    for conn in &el.connects {
+        if let Some(span) = find_def_in_element(conn, target_id) {
+            return Some(span);
+        }
+    }
+    None
+}
+
+fn section_attrs(sec: &tomet_ast::Section) -> Option<Value> {
+    match (&sec.args, &sec.value) {
+        (Some(args), Some(val)) => match (args, val.as_data()) {
+            (Value::Map(m1), Some(Value::Map(m2))) => {
+                let mut merged = m1.clone();
+                merged.extend(m2);
+                Some(Value::Map(merged))
+            }
+            (_, Some(val)) => Some(val),
+            (args, None) => Some(args.clone()),
+        },
+        (Some(args), None) => Some(args.clone()),
+        (None, Some(val)) => val.as_data(),
+        (None, None) => None,
+    }
 }

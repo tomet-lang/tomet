@@ -3,7 +3,7 @@
 use crate::codeblock::is_fenced_code_block_start;
 use crate::element::{LineEnd, element_ends_line, is_element_start, parse_element};
 use crate::error::Result;
-use crate::heading::{is_thematic_break, is_titled_thematic_break_start};
+use crate::section::{is_thematic_break, is_titled_thematic_break_start};
 use crate::interp::{is_interp_start, parse_dollar_element};
 use crate::list::peek_list_marker;
 use crate::value::{err, skip_block_comment, skip_inline_ws, skip_line_comment};
@@ -130,7 +130,7 @@ pub(crate) fn parse_inline_seq(
                 if cur.is_eof() {
                     return Err(err(cur, cur.pos(), format!("unterminated, expected '{d}'")));
                 }
-                if cur.starts_with(d) && (d == "==" || !is_boundary(char_before(cur))) {
+                if cur.starts_with(d) && !is_boundary(char_before(cur)) {
                     break;
                 }
                 if cur.peek() == Some('\n') {
@@ -276,7 +276,13 @@ pub(crate) fn parse_inline_seq(
             text_start = cur.pos();
             continue;
         }
-        if matches!(cur.peek(), Some('*') | Some('_') | Some('=') | Some('~')) {
+        if cur.starts_with("#(") {
+            flush_text(&mut items, cur, &mut text_start, fold_pipes);
+            items.push(Inline::Element(parse_tag_sugar(cur)?));
+            text_start = cur.pos();
+            continue;
+        }
+        if matches!(cur.peek(), Some('*') | Some('_') | Some('~')) {
             let before = cur.pos();
             if let Some(el) = try_delimited(cur, allow_colon_connect)? {
                 flush_text_upto(&mut items, cur, &mut text_start, before, fold_pipes);
@@ -307,7 +313,7 @@ pub(crate) fn parse_inline_seq(
 pub(crate) fn paragraph_breaks_here(look: &Cursor) -> bool {
     look.is_eof()
         || look.peek() == Some('\n')
-        || (look.peek() == Some('#') && crate::document::is_heading_start(look))
+        || (look.peek() == Some('=') && crate::section::is_section_start(look))
         || matches!(peek_list_marker(look), Ok(Some(_)))
         || look.starts_with("//")
         || look.starts_with("/*")
@@ -373,12 +379,21 @@ fn trim_edges(mut items: Vec<Inline>) -> Vec<Inline> {
     items
 }
 
-const DELIMITERS: [(&str, &str); 6] = [
+fn parse_tag_sugar(cur: &mut Cursor) -> Result<Element> {
+    let start_pos = cur.pos();
+    cur.bump(); // eat '#'
+    let args = crate::element::parse_paren_value(cur)?;
+    let span = cur.span_from(start_pos);
+    let mut el = element_new(Sigil::named("tag"))
+        .with_placement(Placement::Inline)
+        .with_span(span);
+    el.args = Some(args);
+    Ok(el)
+}
+
+const DELIMITERS: [(&str, &str); 5] = [
     ("**", "strong"),
     ("__", "strong"),
-    ("==", "mark"),
-    // GFM's spelling. `==` for `mark` is already a delimiter CommonMark
-    // does not have, so this is the same move for the one it does.
     ("~~", "strikeout"),
     ("*", "em"),
     ("_", "em"),
@@ -422,7 +437,7 @@ fn try_one_delimited(
     let mut probe = open;
     loop {
         if probe.starts_with(delim)
-            && (delim == "==" || delim == "~~" || !is_boundary(char_before(&probe)))
+            && (delim == "~~" || !is_boundary(char_before(&probe)))
         {
             break;
         }

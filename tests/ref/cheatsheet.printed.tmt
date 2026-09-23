@@ -40,60 +40,40 @@ ${sum(a, b)}
 @[](file:/readme.md)
 @[](ref:2)
 
-#[heading] {id: 1}
-
-##[heading] {id: 2}
-
-###[heading] {id: 3}
-
+=[heading] {id: 1}
+==[heading] {id: 2}
+===[heading] {id: 3}
 @embed(url: "https://")[alt]
-
 @embed(file: /readme.md)[alt]
-
 @embed(ref: 3)[alt]
-
 ```sh
 sudo whoami
 ls --help
 ```
-
 @memo+++
   don't forget: check [this] and [that]
 +++
-
 @quote[引用文]
-
 @card(title: 題名)[分類を持たない、題名+本文の区画]
-
 - outline/list
-
 -. number1
 -. number2
-
 - (x) check {id: aaaaaa}
 - () none
 - () custom?
 - (TODO) custom
-
 1. aaaa
-
 @strong[aaaa]
 \@em[aaaa]
 \@mark[aaaa]
 \@em[aaaa]
 `aaaa`
-
 ```(lang:sh)
 ```
-
 ---
-
 ---
-
 ---[Title]---
-
 ---[💫]---
-
 @table(align: center)[[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]
 [ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]
 [ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]]{}

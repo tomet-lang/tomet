@@ -35,7 +35,7 @@
 
 use tomet_ast::{
     Block as TmBlock, Document, Element, ElementValue, Entry, Inline as TmInline, LineBreak, Name,
-    Paragraph, Placement, RawText, Sigil, SoftBreak, Span, Text, Value,
+    Paragraph, Placement, RawText, Section, Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::EXACT_DATA_KEY;
 
@@ -57,7 +57,49 @@ pub fn from_pandoc(doc: &PandocDoc) -> Document {
     for block in &doc.blocks {
         blocks.push(block_from_pandoc(block));
     }
-    Document::new(blocks, Span::dummy())
+    Document::new(structure_sections(blocks), Span::dummy())
+}
+
+fn structure_sections(blocks: Vec<TmBlock>) -> Vec<TmBlock> {
+    let mut doc_blocks = Vec::new();
+    let mut stack: Vec<Section> = Vec::new();
+
+    for block in blocks {
+        match block {
+            TmBlock::Section(sec) => {
+                while let Some(top) = stack.last() {
+                    if top.level >= sec.level {
+                        let finished = stack.pop().unwrap();
+                        if let Some(parent) = stack.last_mut() {
+                            parent.blocks.push(TmBlock::Section(finished));
+                        } else {
+                            doc_blocks.push(TmBlock::Section(finished));
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                stack.push(sec);
+            }
+            other => {
+                if let Some(top) = stack.last_mut() {
+                    top.blocks.push(other);
+                } else {
+                    doc_blocks.push(other);
+                }
+            }
+        }
+    }
+
+    while let Some(finished) = stack.pop() {
+        if let Some(parent) = stack.last_mut() {
+            parent.blocks.push(TmBlock::Section(finished));
+        } else {
+            doc_blocks.push(TmBlock::Section(finished));
+        }
+    }
+
+    doc_blocks
 }
 
 /// Rebuilds `@meta{...}` from Pandoc's metadata map.
@@ -103,6 +145,14 @@ fn meta_value_to_value(v: &MetaValue) -> Value {
 
 fn block_from_pandoc(block: &Block) -> TmBlock {
     match block {
+        Block::Header(level, attr, inlines) => {
+            let title = inlines_from_pandoc(inlines);
+            let mut sec = Section::new(*level as usize, title, Span::dummy());
+            let (args, value) = extract_data_from_attr(attr);
+            sec.args = args;
+            sec.value = value;
+            TmBlock::Section(sec)
+        }
         Block::Para(inlines) | Block::Plain(inlines) => {
             TmBlock::Paragraph(Paragraph::new(inlines_from_pandoc(inlines), Span::dummy()))
         }
@@ -446,25 +496,16 @@ fn class_name(attr: &Attr) -> Option<String> {
 ///
 /// When [`EXACT_DATA_KEY`] is present it wins outright: it is the whole
 /// of the original `(args)` and `{value}`, so both groups come back
-/// exactly. Otherwise only the flat projection survived, and it all lands
-/// in `{value}` -- `{}` is always data, and there is nothing left in the
-/// attribute map to say which pair came from which group.
-fn named_element(name: &str, attr: &Attr) -> Element {
-    let mut el = element_new(Sigil::Named(parse_name(name)));
-
+fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<ElementValue>) {
     let exact = attr
         .2
         .iter()
         .find(|(k, _)| k == EXACT_DATA_KEY)
         .and_then(|(_, json)| serde_json::from_str(json).ok());
     if let Some(serde_json::Value::Object(obj)) = exact {
-        if let Some(args) = obj.get("args") {
-            el.args = Some(json_to_value(args));
-        }
-        if let Some(value) = obj.get("value") {
-            el.value = Some(ElementValue::from_map(json_to_value(value)));
-        }
-        return el;
+        let args = obj.get("args").map(json_to_value);
+        let value = obj.get("value").map(|v| ElementValue::from_map(json_to_value(v)));
+        return (args, value);
     }
 
     let mut entries: Vec<(String, Value)> = Vec::new();
@@ -477,9 +518,22 @@ fn named_element(name: &str, attr: &Attr) -> Element {
         }
         entries.push((k.clone(), Value::String(v.clone())));
     }
-    if !entries.is_empty() {
-        el.value = Some(ElementValue::from_map(Value::Map(entries)));
-    }
+    let value = if !entries.is_empty() {
+        Some(ElementValue::from_map(Value::Map(entries)))
+    } else {
+        None
+    };
+    (None, value)
+}
+
+/// exactly. Otherwise only the flat projection survived, and it all lands
+/// in `{value}` -- `{}` is always data, and there is nothing left in the
+/// attribute map to say which pair came from which group.
+fn named_element(name: &str, attr: &Attr) -> Element {
+    let mut el = element_new(Sigil::Named(parse_name(name)));
+    let (args, value) = extract_data_from_attr(attr);
+    el.args = args;
+    el.value = value;
     el
 }
 
@@ -546,19 +600,15 @@ mod tests {
 
     #[test]
     fn prose_and_headings_survive_a_round_trip() {
-        // The printed form is the printer's business (it writes `#[Title]`
-        // without the padding by default), so the assertion is about the
-        // tree this crate is responsible for.
         let back = from_pandoc(&to_pandoc(
-            &parse_document("#[ Title ]\n\n本文です。\n").unwrap(),
+            &parse_document("=[ Title ]\n\n本文です。\n").unwrap(),
         ));
-        let TmBlock::Element(heading) = &back.blocks[0] else {
-            panic!("expected a heading, got {:?}", back.blocks[0]);
+        let TmBlock::Section(sec) = &back.blocks[0] else {
+            panic!("expected a section, got {:?}", back.blocks[0]);
         };
-        assert!(heading.sigil.is_bare_named("heading"));
-        assert_eq!(heading.args, Some(Value::Int(1)));
-        assert_eq!(heading.placement, Placement::Block);
-        assert!(matches!(&back.blocks[1], TmBlock::Paragraph(_)));
+        assert_eq!(sec.level, 1);
+        assert_eq!(sec.blocks.len(), 1);
+        assert!(matches!(&sec.blocks[0], TmBlock::Paragraph(_)));
     }
 
     #[test]

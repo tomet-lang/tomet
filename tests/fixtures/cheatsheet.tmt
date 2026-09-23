@@ -83,9 +83,9 @@ ${sum(a, b)}
 @[](file:/readme.md)
 @[](ref:2)
 
-#[ heading ]{ id:1 }
-##[ heading ]{ id:2 }
-###[ heading ]{ id:3 }
+=[ heading ]{ id:1 }
+==[ heading ]{ id:2 }
+===[ heading ]{ id:3 }
 
 // @index(){}
 // @icon()
@@ -130,7 +130,7 @@ ls --help
 
 **aaaa**
 *aaaa*
-==aaaa==
+@mark[aaaa]
 _aaaa_
 `aaaa`
 

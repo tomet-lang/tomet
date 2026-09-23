@@ -9,7 +9,7 @@
 //! valid CommonMark. Heading `id`/`cssclass` attrs have no CommonMark
 //! form and are dropped.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Value};
+use tomet_ast::{Block, Document, Element, ElementValue, Inline, Section, Value};
 use tomet_semantics::{
     TargetScheme, classify_std_lenient, heading_level, is_directive, link_target, list_items,
     list_ordered, normalized_element_args, path_target, target_scheme,
@@ -54,6 +54,19 @@ fn render_block(block: &Block, out: &mut String) {
                 out.push_str("\n\n");
             }
         }
+        Block::Section(sec) => render_section(sec, out),
+    }
+}
+
+fn render_section(sec: &Section, out: &mut String) {
+    let marker = "#".repeat(sec.level.clamp(1, 6));
+    let text = inline_to_md(&sec.title);
+    out.push_str(&marker);
+    out.push(' ');
+    out.push_str(&text);
+    out.push_str("\n\n");
+    for child in &sec.blocks {
+        render_block(child, out);
     }
 }
 

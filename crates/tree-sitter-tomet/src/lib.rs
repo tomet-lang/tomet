@@ -184,8 +184,8 @@ mod tests {
     /// the known, documented cases rather than just counting them.
 
     #[test]
-    fn parses_a_heading() {
-        let tree = parse("#[ Hello ]{ id:header1 }\n");
+    fn parses_a_section() {
+        let tree = parse("=[ Hello ]{ id:header1 }\n");
         assert!(!tree.root_node().has_error());
     }
 
@@ -347,7 +347,7 @@ mod tests {
     #[test]
     fn parses_colon_connect_syntax() {
         for src in [
-            "#[ Title ]:{ id: intro, tag: main }\n",
+            "=[ Title ]:{ id: intro, tag: main }\n",
             "@task[ Task A ]:{ id: taskA, priority: high }\n",
             "@id(taskA):{ priority: high, tag: dev }\n",
             // A bare positional `list(...)` occupying the whole
@@ -427,14 +427,14 @@ mod tests {
     }
 
     #[test]
-    fn heading_supports_named_connect() {
-        let tree = parse("#[ h ]:rule(allow: list(card))\n");
+    fn section_supports_named_connect() {
+        let tree = parse("=[ h ]:rule(allow: list(card))\n");
         let root = tree.root_node();
         assert!(!root.has_error());
-        let heading = root.named_child(0).unwrap();
-        assert_eq!(heading.kind(), "heading");
-        let has_connect = (0..heading.named_child_count() as u32)
-            .any(|i| heading.named_child(i).unwrap().kind() == "connect");
+        let section = root.named_child(0).unwrap();
+        assert_eq!(section.kind(), "section");
+        let has_connect = (0..section.named_child_count() as u32)
+            .any(|i| section.named_child(i).unwrap().kind() == "connect");
         assert!(has_connect);
     }
 

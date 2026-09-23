@@ -100,7 +100,7 @@ mod tests {
             .collect();
         assert_eq!(items.len(), 1);
         items[0].ensure_loaded();
-        assert!(items[0].tomet_src.contains("#[Migration Test]"));
+        assert!(items[0].tomet_src.contains("=[Migration Test]"));
 
         items[0].selected = true;
         let count = MigrationEngine::execute(&mut items, false).unwrap();

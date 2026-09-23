@@ -13,7 +13,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Span, Value};
+use tomet_ast::{Block, Document, Element, ElementValue, Inline, Section, Span, Value};
 use tomet_semantics::{
     Bindings, EXACT_DATA_KEY, ElementKind, TargetScheme, builtin_doc_vocabularies,
     classify_std_lenient, flatten_data, heading_level, is_directive, link_target, list_items,
@@ -364,6 +364,51 @@ fn render_block(cx: &RenderCtx, block: &Block, out: &mut String, state: &mut Hea
                 splice_span_attrs(out, start, el.span);
             }
         }
+        Block::Section(sec) => render_section(cx, sec, out, state),
+    }
+}
+
+fn render_section(
+    cx: &RenderCtx,
+    sec: &Section,
+    out: &mut String,
+    state: &mut HeadingState,
+) {
+    let level = (sec.level as u8).clamp(1, 6);
+    let value_data = match &sec.value {
+        Some(v) => v.as_data(),
+        _ => None,
+    };
+    let (mut id, class, data) = split_attrs(value_data.as_ref());
+    let text = inlines_to_plain(&sec.title);
+    if id.is_none() && cx.options.auto_slug_headings {
+        let slug = state.slugs.slug_for(&text);
+        if !slug.is_empty() {
+            id = Some(slug);
+        }
+    }
+    out.push_str(&format!("<h{level}"));
+    push_named_attrs(out, &id, &class, &data);
+    push_span_attrs(cx, out, sec.span);
+    out.push('>');
+    let mut number = None;
+    if cx.options.number_headings {
+        let label = state.counters.advance(level);
+        out.push_str(&format!("<span class=\"tm-heading-number\">{label}</span>"));
+        number = Some(label);
+    }
+    render_inlines(cx, &sec.title, out);
+    out.push_str(&format!("</h{level}>\n"));
+
+    state.outline.push(HeadingInfo {
+        level,
+        id,
+        text,
+        number,
+    });
+
+    for child in &sec.blocks {
+        render_block(cx, child, out, state);
     }
 }
 
@@ -1189,7 +1234,7 @@ mod tests {
 
     #[test]
     fn renders_heading_with_id_and_cssclass() {
-        let doc = parse_document("#[ Hello ]{ id:header1, cssclass:card }\n").unwrap();
+        let doc = parse_document("=[ Hello ]{ id:header1, cssclass:card }\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(body, "<h1 id=\"header1\" class=\"card\">Hello</h1>\n");
     }
@@ -1212,7 +1257,7 @@ mod tests {
 
     #[test]
     fn default_options_leave_headings_unnumbered() {
-        let doc = parse_document("#[ One ]\n").unwrap();
+        let doc = parse_document("=[ One ]\n").unwrap();
         assert_eq!(
             render_body_with(&doc, &RenderOptions::default()),
             render_body(&doc),
@@ -1222,7 +1267,7 @@ mod tests {
 
     #[test]
     fn auto_slug_headings_generates_ids_from_text() {
-        let doc = parse_document("#[ Hello World ]\n").unwrap();
+        let doc = parse_document("=[ Hello World ]\n").unwrap();
         let body = render_body_with(
             &doc,
             &RenderOptions {
@@ -1235,7 +1280,7 @@ mod tests {
 
     #[test]
     fn auto_slug_headings_keeps_non_ascii_letters() {
-        let doc = parse_document("#[ 見出し テスト ]\n").unwrap();
+        let doc = parse_document("=[ 見出し テスト ]\n").unwrap();
         let body = render_body_with(
             &doc,
             &RenderOptions {
@@ -1248,7 +1293,7 @@ mod tests {
 
     #[test]
     fn auto_slug_headings_disambiguates_duplicates() {
-        let doc = parse_document("#[ Intro ]\n##[ Intro ]\n##[ Intro ]\n").unwrap();
+        let doc = parse_document("=[ Intro ]\n==[ Intro ]\n==[ Intro ]\n").unwrap();
         let body = render_body_with(
             &doc,
             &RenderOptions {
@@ -1266,7 +1311,7 @@ mod tests {
 
     #[test]
     fn auto_slug_headings_never_overrides_an_explicit_id() {
-        let doc = parse_document("#[ Hello World ]{ id:custom }\n").unwrap();
+        let doc = parse_document("=[ Hello World ]{ id:custom }\n").unwrap();
         let body = render_body_with(
             &doc,
             &RenderOptions {
@@ -1279,7 +1324,7 @@ mod tests {
 
     #[test]
     fn render_page_defaults_to_japanese_lang() {
-        let doc = parse_document("#[ One ]\n").unwrap();
+        let doc = parse_document("=[ One ]\n").unwrap();
         let page = render_page(&doc, "Title");
         assert!(
             page.contains("<html lang=\"ja\">"),
@@ -1289,7 +1334,7 @@ mod tests {
 
     #[test]
     fn render_page_with_honors_lang_override() {
-        let doc = parse_document("#[ One ]\n").unwrap();
+        let doc = parse_document("=[ One ]\n").unwrap();
         let page = render_page_with(
             &doc,
             "Title",
@@ -1307,7 +1352,7 @@ mod tests {
     #[test]
     fn numbers_headings_by_nesting_level() {
         let doc = parse_document(
-            "#[ One ]\n##[ One One ]\n##[ One Two ]\n#[ Two ]\n##[ Two One ]\n###[ Two One One ]\n",
+            "=[ One ]\n==[ One One ]\n==[ One Two ]\n=[ Two ]\n==[ Two One ]\n===[ Two One One ]\n",
         )
         .unwrap();
         let body = render_body_with(
@@ -1426,7 +1471,7 @@ mod tests {
         // than leaking a stray whitespace-only `<p>` -- garbage in,
         // harmless out.
         let doc = parse_document(
-            "@meta(format:json)+++\n{\"key\":\"value\"}\n+++\n@meta(format:yaml)+++\nkey:value\n+++\n@meta(format:toml)+++\nkey = \"value\"\n+++\n\n#[ next ]\n",
+            "@meta(format:json)+++\n{\"key\":\"value\"}\n+++\n@meta(format:yaml)+++\nkey:value\n+++\n@meta(format:toml)+++\nkey = \"value\"\n+++\n\n=[ next ]\n",
         )
         .unwrap();
         let body = render_body(&doc);
@@ -1469,7 +1514,7 @@ mod tests {
 
     #[test]
     fn renders_emphasis_strong_and_mark() {
-        let doc = parse_document("a *em* b **strong** c ==mark==\n").unwrap();
+        let doc = parse_document("a *em* b **strong** c @mark[mark]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1774,7 +1819,7 @@ mod tests {
     #[test]
     fn the_outline_reports_level_text_and_order() {
         let outline = outline_of(
-            "#[ First ]\n\n##[ Nested ]\n\n#[ Second ]\n",
+            "=[ First ]\n\n==[ Nested ]\n\n=[ Second ]\n",
             &RenderOptions::default(),
         );
 
@@ -1786,11 +1831,11 @@ mod tests {
 
     #[test]
     fn the_outline_carries_the_id_the_heading_was_rendered_with() {
-        let explicit = outline_of("#[ Hello ]{ id:header1 }\n", &RenderOptions::default());
+        let explicit = outline_of("=[ Hello ]{ id:header1 }\n", &RenderOptions::default());
         assert_eq!(explicit[0].id.as_deref(), Some("header1"));
 
         let generated = outline_of(
-            "#[ Hello World ]\n",
+            "=[ Hello World ]\n",
             &RenderOptions {
                 auto_slug_headings: true,
                 ..RenderOptions::default()
@@ -1802,7 +1847,7 @@ mod tests {
     #[test]
     fn duplicate_slugs_are_reported_as_rendered() {
         let outline = outline_of(
-            "#[ Same ]\n\n#[ Same ]\n",
+            "=[ Same ]\n\n=[ Same ]\n",
             &RenderOptions {
                 auto_slug_headings: true,
                 ..RenderOptions::default()
@@ -1815,7 +1860,7 @@ mod tests {
     #[test]
     fn numbering_is_reported_separately_from_the_text() {
         let outline = outline_of(
-            "#[ One ]\n\n##[ One A ]\n\n##[ One B ]\n\n#[ Two ]\n",
+            "=[ One ]\n\n==[ One A ]\n\n==[ One B ]\n\n=[ Two ]\n",
             &RenderOptions {
                 number_headings: true,
                 ..RenderOptions::default()
@@ -1830,7 +1875,7 @@ mod tests {
 
     #[test]
     fn inline_markup_is_flattened_in_the_outline_text() {
-        let outline = outline_of("#[ **bold** and plain ]\n", &RenderOptions::default());
+        let outline = outline_of("=[ **bold** and plain ]\n", &RenderOptions::default());
         assert_eq!(outline[0].text, "bold and plain");
     }
 
@@ -1842,7 +1887,7 @@ mod tests {
     #[test]
     fn the_outline_does_not_change_the_html() {
         // render_body_with is now a thin wrapper; guard against it drifting.
-        let doc = parse_document("#[ One ]\n\n##[ Two ]\n\ntext\n").unwrap();
+        let doc = parse_document("=[ One ]\n\n==[ Two ]\n\ntext\n").unwrap();
         let options = RenderOptions {
             number_headings: true,
             auto_slug_headings: true,
@@ -1904,7 +1949,7 @@ mod tests {
 
     #[test]
     fn a_heading_and_the_paragraph_after_it_each_get_their_own_span() {
-        let src = "#[ Title ]\n\nbody text\n";
+        let src = "=[ Title ]\n\nbody text\n";
         let doc = parse_document(src).unwrap();
         let options = RenderOptions {
             emit_source_spans: true,
@@ -1915,7 +1960,7 @@ mod tests {
         assert_eq!(spans.len(), 2, "expected one span for the heading and one for the paragraph, got {html:?}");
         // Each span reaches through its own trailing newline, up to (not
         // including) the blank line that separates it from the next block.
-        assert_eq!(&src[spans[0].0..spans[0].1], "#[ Title ]\n");
+        assert_eq!(&src[spans[0].0..spans[0].1], "=[ Title ]\n");
         // The final block's span stops at its own content -- there's no
         // following block for it to reach a separating blank line toward.
         assert_eq!(&src[spans[1].0..spans[1].1], "body text");

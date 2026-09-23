@@ -213,7 +213,7 @@ mod tests {
         assert!(res.is_ok());
         assert!(out_file.exists());
         let tmt_text = fs::read_to_string(&out_file).unwrap();
-        assert!(tmt_text.contains("#[Title]"));
+        assert!(tmt_text.contains("=[Title]"));
 
         let _ = fs::remove_dir_all(&temp_dir);
     }

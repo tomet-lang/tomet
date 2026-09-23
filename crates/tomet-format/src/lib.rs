@@ -700,6 +700,19 @@ fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                 }
             }
             Block::Element(el) => walk_element(el, out),
+            Block::Section(sec) => {
+                for inline in &sec.title {
+                    if let Inline::Element(el) = inline {
+                        walk_element(el, out);
+                    }
+                }
+                for conn in &sec.connects {
+                    walk_element(conn, out);
+                }
+                for child in &sec.blocks {
+                    walk_block(child, out);
+                }
+            }
         }
     }
 

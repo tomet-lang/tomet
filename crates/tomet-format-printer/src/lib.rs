@@ -11,7 +11,9 @@
 //! AST directly), built on the pure generate/validate/convert helpers
 //! in `tomet-field-utils`.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline, Placement, Sigil, Value};
+use tomet_ast::{
+    Block, Document, Element, ElementValue, Entry, Inline, Placement, Section, Sigil, Value,
+};
 use tomet_config::PrinterConfig;
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
@@ -142,6 +144,36 @@ fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
             out.push_str(&render_element(el, config));
             out.push('\n');
         }
+        Block::Section(sec) => render_section(sec, config, out),
+    }
+}
+
+fn render_section(sec: &Section, config: &PrinterConfig, out: &mut String) {
+    let level = sec.level.max(1);
+    out.push_str(&"=".repeat(level));
+    if config.heading_space_inside_brackets {
+        out.push_str("[ ");
+        out.push_str(&render_inlines(&sec.title, config));
+        out.push_str(" ]");
+    } else {
+        out.push('[');
+        out.push_str(&render_inlines(&sec.title, config));
+        out.push(']');
+    }
+    if let Some(args) = &sec.args {
+        out.push('(');
+        out.push_str(&render_args_with_config(args, config));
+        out.push(')');
+    }
+    if let Some(v) = sec.value.as_ref().and_then(|v| v.as_data()) {
+        out.push(' ');
+        out.push_str(&render_value(&v));
+    }
+    out.push_str(&render_connects(&sec.connects, config));
+    out.push('\n');
+
+    for child in &sec.blocks {
+        render_block(child, config, out);
     }
 }
 
@@ -815,13 +847,13 @@ mod tests {
 
     #[test]
     fn test_printer_config_space_inside_brackets() {
-        let doc = tomet_parser::parse_document("#[Title]\n").unwrap();
+        let doc = tomet_parser::parse_document("=[Title]\n").unwrap();
         let cfg = PrinterConfig {
             heading_space_inside_brackets: true,
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc, &cfg);
-        assert!(printed.contains("#[ Title ]"));
+        assert!(printed.contains("=[ Title ]"));
     }
 
     #[test]
@@ -860,7 +892,7 @@ mod tests {
 
     #[test]
     fn a_named_connect_round_trips_on_a_heading() {
-        let doc = tomet_parser::parse_document("#[ h ]:rule(allow: list(card))\n").unwrap();
+        let doc = tomet_parser::parse_document("=[ h ]:rule(allow: list(card))\n").unwrap();
         let printed = document_to_tm(&doc);
         assert!(
             printed.contains(":rule(allow: list(card))"),

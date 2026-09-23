@@ -275,6 +275,7 @@ pub enum Block {
     /// merged into that item `Element`'s `args`, and any nested sub-lists
     /// or indented blocks live in that item `Element`'s `children`.
     Element(Element),
+    Section(Section),
 }
 
 impl Block {
@@ -282,6 +283,38 @@ impl Block {
         match self {
             Block::Paragraph(p) => p.span,
             Block::Element(e) => e.span,
+            Block::Section(s) => s.span,
+        }
+    }
+}
+
+/// A hierarchical section: introduced by `=`, `==`, etc.
+///
+/// Contains its nesting level (`=` is 1, `==` is 2, etc.), title inlines,
+/// optional arguments (`(id: intro)`), optional value group (`{attrs}`),
+/// connects (`:as(...)`), and child blocks (paragraphs, lists, sub-sections)
+/// scoped to this section.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Section {
+    pub level: usize,
+    pub title: Vec<Inline>,
+    pub args: Option<Value>,
+    pub value: Option<ElementValue>,
+    pub connects: Vec<Element>,
+    pub blocks: Vec<Block>,
+    pub span: Span,
+}
+
+impl Section {
+    pub fn new(level: usize, title: Vec<Inline>, span: Span) -> Self {
+        Self {
+            level,
+            title,
+            args: None,
+            value: None,
+            connects: Vec::new(),
+            blocks: Vec::new(),
+            span,
         }
     }
 }

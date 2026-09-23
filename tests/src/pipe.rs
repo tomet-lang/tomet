@@ -53,7 +53,7 @@ const SAME: &[(&str, &str, &str)] = &[
         "- | alpha\n  | beta\n",
         "- [ alpha\n  beta ]\n",
     ),
-    ("a heading", "#| alpha\n | beta\n", "#[ alpha\n  beta ]\n"),
+    ("a heading", "=| alpha\n | beta\n", "=[ alpha\n  beta ]\n"),
     (
         "a group opening directly on the list marker, with no space",
         "-| alpha\n | beta\n",

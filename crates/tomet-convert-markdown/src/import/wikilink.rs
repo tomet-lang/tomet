@@ -40,6 +40,12 @@ fn post_process_block_wikilinks(block: &mut Block) {
         Block::Element(el) => {
             post_process_element_wikilinks(el);
         }
+        Block::Section(sec) => {
+            sec.title = post_process_inlines_wikilinks(std::mem::take(&mut sec.title));
+            for child in &mut sec.blocks {
+                post_process_block_wikilinks(child);
+            }
+        }
     }
 }
 

@@ -70,6 +70,7 @@ fn settings_block(doc: &Document) -> Option<Value> {
             Inline::Element(el) => settings_value(el),
             _ => None,
         }),
+        Block::Section(_) => None,
     })
 }
 

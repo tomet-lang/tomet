@@ -7,7 +7,7 @@
 		{ "include": "#comments" },
 		{ "include": "#fenced-code-block" },
 		{ "include": "#raw-fence" },
-		{ "include": "#heading" },
+		{ "include": "#section" },
 		{ "include": "#thematic-break" },
 		{ "include": "#list-marker" },
 		{ "include": "#marked-content" },
@@ -48,12 +48,12 @@
 			"name": "markup.raw.block.fenced.tomet"
 		},
 
-		"heading": {
-			"comment": "`#` is the heading marker and nothing else -- it stopped being a block-element sigil when the shape axis was retracted. The run's length is the level. Three spellings: `#[ ... ]`, `#(args)[ ... ]`, and the bracket-less `# text` sugar.",
+		"section": {
+			"comment": "`=` is the section marker. The run's length is the level. Patterns: `=[ ... ]`, `=(args)[ ... ]`, `=| text`, and bracket-less `= text` sugar.",
 			"patterns": [
 				{
-					"comment": "`##(id: sec)[ 見出し ]` -- a heading takes `(args)` and a trailing `{value}` like any element.",
-					"begin": "^[ \\t]*(#+)(?=[ \\t]*\\()",
+					"comment": "`==(id: sec)[ 見出し ]` -- a section takes `(args)` and a trailing `{value}` like an element.",
+					"begin": "^[ \\t]*(=+)(?=[ \\t]*\\()",
 					"beginCaptures": {
 						"1": { "name": "punctuation.definition.heading.tomet" }
 					},
@@ -65,7 +65,7 @@
 					]
 				},
 				{
-					"begin": "^[ \\t]*(#+)[ \\t]*(\\[)",
+					"begin": "^[ \\t]*(=+)[ \\t]*(\\[)",
 					"beginCaptures": {
 						"1": { "name": "punctuation.definition.heading.tomet" },
 						"2": { "name": "punctuation.section.brackets.begin.tomet" }
@@ -78,7 +78,7 @@
 					"patterns": [{ "include": "#inline" }]
 				},
 				{
-					"begin": "^[ \\t]*(#+)[ \\t]*(\\|)",
+					"begin": "^[ \\t]*(=+)[ \\t]*(\\|)",
 					"beginCaptures": {
 						"1": { "name": "punctuation.definition.heading.tomet" },
 						"2": { "name": "punctuation.definition.pipe.tomet keyword.control.pipe.tomet" }
@@ -88,8 +88,8 @@
 					"patterns": [{ "include": "#inline" }]
 				},
 				{
-					"comment": "Bracket-less sugar. Requires the space: `#name` with no space is not a heading, and no longer an element either -- it falls back to prose, which is what keeps `#タグ` and a shell comment inside a fence as text.",
-					"begin": "^[ \\t]*(#+)(?=[ \\t]+\\S)",
+					"comment": "Bracket-less sugar. Requires whitespace after `=`.",
+					"begin": "^[ \\t]*(=+)(?=[ \\t]+\\S)",
 					"beginCaptures": {
 						"1": { "name": "punctuation.definition.heading.tomet" }
 					},
@@ -151,7 +151,7 @@
 				{ "include": "#autolink" },
 				{ "include": "#strong" },
 				{ "include": "#emphasis" },
-				{ "include": "#mark" },
+				{ "include": "#tag-sugar" },
 				{ "include": "#interpolation" },
 				{ "include": "#connect" },
 				{ "include": "#element" },
@@ -165,6 +165,7 @@
 				{ "include": "#comments" },
 				{ "include": "#code-span" },
 				{ "include": "#autolink" },
+				{ "include": "#tag-sugar" },
 				{ "include": "#interpolation" },
 				{ "include": "#connect" },
 				{ "include": "#element" },
@@ -212,12 +213,19 @@
 			]
 		},
 
-		"mark": {
-			"comment": "`==x==` is a highlight, not a deletion. It used to carry `markup.strikethrough`, which every theme renders as struck-through text.",
-			"begin": "==(?=\\S)",
-			"end": "==|^(?=[ \\t]*$)",
-			"name": "markup.highlight.tomet markup.inserted.tomet",
-			"patterns": [{ "include": "#inline-basic" }]
+		"tag-sugar": {
+			"comment": "`#(tag1, tag2)` sugar for `@tag(tag1, tag2)`",
+			"begin": "(?<![A-Za-z0-9_])(#)(\\()",
+			"beginCaptures": {
+				"1": { "name": "entity.name.tag.sigil.tomet entity.name.tag.tomet" },
+				"2": { "name": "punctuation.definition.tag.bracket.round.begin.tomet punctuation.section.group.round.begin.tomet entity.name.tag.bracket.tomet entity.name.tag.tomet" }
+			},
+			"end": "\\)",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.tag.bracket.round.end.tomet punctuation.section.group.round.end.tomet entity.name.tag.bracket.tomet entity.name.tag.tomet" }
+			},
+			"name": "meta.tag.sugar.tomet",
+			"patterns": [{ "include": "#value" }]
 		},
 
 		"connect": {

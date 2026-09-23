@@ -1,19 +1,83 @@
-use tomet_ast::{Document, Span, Value};
-use tomet_tree::{ElementExt, ValueExt, for_each_element};
+use tomet_ast::{Block, Document, Element, Inline, Section, Span, Value};
+use tomet_tree::{ElementExt, ValueExt};
 
 /// Walks every node in `doc` and returns `(id, span)` for each `id` key
 /// found in an attached `Value::Map` (see `ElementExt::attrs_view`), in document order.
 pub(crate) fn collect_ids(doc: &Document) -> Vec<(String, Span)> {
     let mut ids = Vec::new();
-    for_each_element(doc, |el| {
-        if el.sigil.is_bare_named("link") {
-            return;
+    for block in &doc.blocks {
+        collect_block_ids(block, &mut ids);
+    }
+    ids
+}
+
+fn collect_block_ids(block: &Block, ids: &mut Vec<(String, Span)>) {
+    match block {
+        Block::Section(sec) => {
+            if let Some(id) = id_from_value(section_attrs(sec)) {
+                ids.push((id, sec.span));
+            }
+            for inline in &sec.title {
+                collect_inline_ids(inline, ids);
+            }
+            for conn in &sec.connects {
+                collect_element_ids(conn, ids);
+            }
+            for child in &sec.blocks {
+                collect_block_ids(child, ids);
+            }
         }
+        Block::Element(el) => collect_element_ids(el, ids),
+        Block::Paragraph(p) => {
+            for inline in &p.content {
+                collect_inline_ids(inline, ids);
+            }
+        }
+    }
+}
+
+fn collect_element_ids(el: &Element, ids: &mut Vec<(String, Span)>) {
+    if !el.sigil.is_bare_named("link") {
         if let Some(id) = id_from_value(el.attrs_view()) {
             ids.push((id, el.span));
         }
-    });
-    ids
+    }
+    if let Some(content) = &el.content {
+        for inline in content {
+            collect_inline_ids(inline, ids);
+        }
+    }
+    if let Some(children) = &el.children {
+        for child in children {
+            collect_block_ids(child, ids);
+        }
+    }
+    for conn in &el.connects {
+        collect_element_ids(conn, ids);
+    }
+}
+
+fn collect_inline_ids(inline: &Inline, ids: &mut Vec<(String, Span)>) {
+    if let Inline::Element(el) = inline {
+        collect_element_ids(el, ids);
+    }
+}
+
+fn section_attrs(sec: &Section) -> Option<Value> {
+    match (&sec.args, &sec.value) {
+        (Some(args), Some(val)) => match (args, val.as_data()) {
+            (Value::Map(m1), Some(Value::Map(m2))) => {
+                let mut merged = m1.clone();
+                merged.extend(m2);
+                Some(Value::Map(merged))
+            }
+            (_, Some(val)) => Some(val),
+            (args, None) => Some(args.clone()),
+        },
+        (Some(args), None) => Some(args.clone()),
+        (None, Some(val)) => val.as_data(),
+        (None, None) => None,
+    }
 }
 
 /// Looks up an `id` key in a `Value::Map` and renders it to a comparable

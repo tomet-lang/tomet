@@ -176,10 +176,6 @@
           "named": true
         },
         {
-          "type": "mark",
-          "named": true
-        },
-        {
           "type": "punctuation",
           "named": true
         },
@@ -189,6 +185,10 @@
         },
         {
           "type": "strong",
+          "named": true
+        },
+        {
+          "type": "tag",
           "named": true
         },
         {
@@ -216,10 +216,6 @@
           "named": true
         },
         {
-          "type": "heading",
-          "named": true
-        },
-        {
           "type": "line_comment",
           "named": true
         },
@@ -229,6 +225,10 @@
         },
         {
           "type": "paragraph",
+          "named": true
+        },
+        {
+          "type": "section",
           "named": true
         },
         {
@@ -282,15 +282,15 @@
           "named": true
         },
         {
-          "type": "mark",
-          "named": true
-        },
-        {
           "type": "punctuation",
           "named": true
         },
         {
           "type": "strikeout",
+          "named": true
+        },
+        {
+          "type": "tag",
           "named": true
         },
         {
@@ -331,102 +331,6 @@
       "types": [
         {
           "type": "fence_marker",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "heading",
-    "named": true,
-    "fields": {
-      "args": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "args_group",
-            "named": true
-          }
-        ]
-      },
-      "attrs": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "value_group",
-            "named": true
-          }
-        ]
-      },
-      "content": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "block_comment",
-            "named": true
-          },
-          {
-            "type": "code_span",
-            "named": true
-          },
-          {
-            "type": "element",
-            "named": true
-          },
-          {
-            "type": "emphasis",
-            "named": true
-          },
-          {
-            "type": "interpolation",
-            "named": true
-          },
-          {
-            "type": "mark",
-            "named": true
-          },
-          {
-            "type": "marked_content",
-            "named": true
-          },
-          {
-            "type": "punctuation",
-            "named": true
-          },
-          {
-            "type": "strikeout",
-            "named": true
-          },
-          {
-            "type": "strong",
-            "named": true
-          },
-          {
-            "type": "text",
-            "named": true
-          }
-        ]
-      },
-      "marker": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "heading_marker",
-            "named": true
-          }
-        ]
-      }
-    },
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "connect",
           "named": true
         }
       ]
@@ -635,53 +539,6 @@
     }
   },
   {
-    "type": "mark",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "block_comment",
-          "named": true
-        },
-        {
-          "type": "code_span",
-          "named": true
-        },
-        {
-          "type": "element",
-          "named": true
-        },
-        {
-          "type": "emphasis",
-          "named": true
-        },
-        {
-          "type": "interpolation",
-          "named": true
-        },
-        {
-          "type": "punctuation",
-          "named": true
-        },
-        {
-          "type": "strikeout",
-          "named": true
-        },
-        {
-          "type": "strong",
-          "named": true
-        },
-        {
-          "type": "text",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "marked_content",
     "named": true,
     "fields": {},
@@ -710,10 +567,6 @@
           "named": true
         },
         {
-          "type": "mark",
-          "named": true
-        },
-        {
           "type": "punctuation",
           "named": true
         },
@@ -723,6 +576,10 @@
         },
         {
           "type": "strong",
+          "named": true
+        },
+        {
+          "type": "tag",
           "named": true
         },
         {
@@ -811,10 +668,6 @@
           "named": true
         },
         {
-          "type": "mark",
-          "named": true
-        },
-        {
           "type": "punctuation",
           "named": true
         },
@@ -824,6 +677,10 @@
         },
         {
           "type": "strong",
+          "named": true
+        },
+        {
+          "type": "tag",
           "named": true
         },
         {
@@ -862,10 +719,6 @@
           "named": true
         },
         {
-          "type": "mark",
-          "named": true
-        },
-        {
           "type": "punctuation",
           "named": true
         },
@@ -875,6 +728,10 @@
         },
         {
           "type": "strong",
+          "named": true
+        },
+        {
+          "type": "tag",
           "named": true
         },
         {
@@ -898,6 +755,102 @@
     "type": "scalar",
     "named": true,
     "fields": {}
+  },
+  {
+    "type": "section",
+    "named": true,
+    "fields": {
+      "args": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "args_group",
+            "named": true
+          }
+        ]
+      },
+      "attrs": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "value_group",
+            "named": true
+          }
+        ]
+      },
+      "content": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "block_comment",
+            "named": true
+          },
+          {
+            "type": "code_span",
+            "named": true
+          },
+          {
+            "type": "element",
+            "named": true
+          },
+          {
+            "type": "emphasis",
+            "named": true
+          },
+          {
+            "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "marked_content",
+            "named": true
+          },
+          {
+            "type": "punctuation",
+            "named": true
+          },
+          {
+            "type": "strikeout",
+            "named": true
+          },
+          {
+            "type": "strong",
+            "named": true
+          },
+          {
+            "type": "tag",
+            "named": true
+          },
+          {
+            "type": "text",
+            "named": true
+          }
+        ]
+      },
+      "marker": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "section_marker",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "connect",
+          "named": true
+        }
+      ]
+    }
   },
   {
     "type": "strikeout",
@@ -928,15 +881,15 @@
           "named": true
         },
         {
-          "type": "mark",
-          "named": true
-        },
-        {
           "type": "punctuation",
           "named": true
         },
         {
           "type": "strong",
+          "named": true
+        },
+        {
+          "type": "tag",
           "named": true
         },
         {
@@ -976,10 +929,6 @@
           "named": true
         },
         {
-          "type": "mark",
-          "named": true
-        },
-        {
           "type": "punctuation",
           "named": true
         },
@@ -988,10 +937,40 @@
           "named": true
         },
         {
+          "type": "tag",
+          "named": true
+        },
+        {
           "type": "text",
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "tag",
+    "named": true,
+    "fields": {
+      "args": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "args_group",
+            "named": true
+          }
+        ]
+      },
+      "marker": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "tag_marker",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -1038,10 +1017,6 @@
             "named": true
           },
           {
-            "type": "mark",
-            "named": true
-          },
-          {
             "type": "punctuation",
             "named": true
           },
@@ -1051,6 +1026,10 @@
           },
           {
             "type": "strong",
+            "named": true
+          },
+          {
+            "type": "tag",
             "named": true
           },
           {
@@ -1150,10 +1129,6 @@
           "named": true
         },
         {
-          "type": "mark",
-          "named": true
-        },
-        {
           "type": "punctuation",
           "named": true
         },
@@ -1163,6 +1138,10 @@
         },
         {
           "type": "strong",
+          "named": true
+        },
+        {
+          "type": "tag",
           "named": true
         },
         {
@@ -1263,7 +1242,7 @@
     "named": false
   },
   {
-    "type": "==",
+    "type": "=",
     "named": false
   },
   {
@@ -1299,10 +1278,6 @@
     "named": true
   },
   {
-    "type": "heading_marker",
-    "named": true
-  },
-  {
     "type": "identifier",
     "named": true
   },
@@ -1312,6 +1287,14 @@
   },
   {
     "type": "number",
+    "named": true
+  },
+  {
+    "type": "section_marker",
+    "named": true
+  },
+  {
+    "type": "tag_marker",
     "named": true
   },
   {

@@ -28,7 +28,7 @@
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use tomet_ast::{
     Block, Document, Element, ElementValue, Inline, LineBreak, Paragraph, Placement, RawText,
-    Sigil, SoftBreak, Span, Text, Value,
+    Section, Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::{ElementKind, classify_std_lenient, list_ordered};
 use tomet_tree::{ElementExt, element_list, element_list_item, element_new};
@@ -194,11 +194,53 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
 
     let root = stack.pop().expect("root frame always present");
     let mut doc = match root {
-        Frame::Blocks(blocks) => Document::new(blocks, Span::dummy()),
+        Frame::Blocks(blocks) => Document::new(structure_sections(blocks), Span::dummy()),
         _ => Document::default(),
     };
     wikilink::post_process_document_wikilinks(&mut doc);
     doc
+}
+
+fn structure_sections(blocks: Vec<Block>) -> Vec<Block> {
+    let mut doc_blocks = Vec::new();
+    let mut stack: Vec<Section> = Vec::new();
+
+    for block in blocks {
+        match block {
+            Block::Section(sec) => {
+                while let Some(top) = stack.last() {
+                    if top.level >= sec.level {
+                        let finished = stack.pop().unwrap();
+                        if let Some(parent) = stack.last_mut() {
+                            parent.blocks.push(Block::Section(finished));
+                        } else {
+                            doc_blocks.push(Block::Section(finished));
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                stack.push(sec);
+            }
+            other => {
+                if let Some(top) = stack.last_mut() {
+                    top.blocks.push(other);
+                } else {
+                    doc_blocks.push(other);
+                }
+            }
+        }
+    }
+
+    while let Some(finished) = stack.pop() {
+        if let Some(parent) = stack.last_mut() {
+            parent.blocks.push(Block::Section(finished));
+        } else {
+            doc_blocks.push(Block::Section(finished));
+        }
+    }
+
+    doc_blocks
 }
 
 fn start_frame(tag: Tag) -> Frame {
@@ -259,18 +301,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
         ),
         (Frame::Heading(level, inlines), TagEnd::Heading(_)) => push_block(
             stack,
-            Block::Element(Element {
-                sigil: Sigil::named("heading"),
-                placement: Placement::Block,
-                // Imported headings never carry `id`/`cssclass` -- CommonMark
-                // has nothing to import them from.
-                args: Some(Value::Int(level as i64)),
-                content: Some(inlines),
-                children: None,
-                value: None,
-                connects: Vec::new(),
-                span: Span::dummy(),
-            }),
+            Block::Section(Section::new(level as usize, inlines, Span::dummy())),
         ),
         (Frame::BlockQuote(mut content), TagEnd::BlockQuote(_)) => {
             let mut is_callout = false;
@@ -838,6 +869,12 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
             }
             content.push(Inline::Element(el));
         }
+        Block::Section(sec) => {
+            extend_spaced(content, sec.title);
+            for child in sec.blocks {
+                merge_block_into(content, child);
+            }
+        }
     }
 }
 
@@ -856,25 +893,25 @@ mod tests {
     #[test]
     fn heading_and_paragraph() {
         let doc = from_markdown("# Title\n\nHello world.\n");
-        assert_eq!(doc.blocks.len(), 2);
+        assert_eq!(doc.blocks.len(), 1);
         match &doc.blocks[0] {
-            Block::Element(el) => {
-                assert_eq!(classify_std_lenient(el), ElementKind::Heading);
-                assert_eq!(tomet_semantics::heading_level(el), Some(1));
+            Block::Section(sec) => {
+                assert_eq!(sec.level, 1);
                 assert_eq!(
-                    el.content,
-                    Some(vec![Inline::Text(Text::new("Title", Span::dummy()))])
+                    sec.title,
+                    vec![Inline::Text(Text::new("Title", Span::dummy()))]
+                );
+                assert_eq!(sec.blocks.len(), 1);
+                assert_eq!(
+                    sec.blocks[0],
+                    Block::Paragraph(Paragraph::new(
+                        vec![Inline::Text(Text::new("Hello world.", Span::dummy()))],
+                        Span::dummy()
+                    ))
                 );
             }
-            other => panic!("expected heading, got {other:?}"),
+            other => panic!("expected section, got {other:?}"),
         }
-        assert_eq!(
-            doc.blocks[1],
-            Block::Paragraph(Paragraph::new(
-                vec![Inline::Text(Text::new("Hello world.", Span::dummy()))],
-                Span::dummy()
-            ))
-        );
     }
 
     #[test]

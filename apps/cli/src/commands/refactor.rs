@@ -106,8 +106,8 @@ mod tests {
         let _ = fs::remove_dir_all(&temp_dir);
         let _ = fs::create_dir_all(&temp_dir);
 
-        fs::write(temp_dir.join("fine.tmt"), "@kind(note)\n\n#[ Title ]\n").unwrap();
-        fs::write(temp_dir.join("broken.tmt"), "#[ unterminated\n").unwrap();
+        fs::write(temp_dir.join("fine.tmt"), "@kind(note)\n\n=[ Title ]\n").unwrap();
+        fs::write(temp_dir.join("broken.tmt"), "=[ unterminated\n").unwrap();
 
         let res = refactor_cmd(&temp_dir, false, false, false, false, true);
         assert!(

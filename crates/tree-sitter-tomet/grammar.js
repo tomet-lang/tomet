@@ -41,7 +41,7 @@ module.exports = grammar({
 	// so this needs GLR resolution rather than a lookahead-free CFG
 	// rewrite (there isn't one: the ambiguity is in the language, not the
 	// grammar's phrasing).
-	conflicts: ($) => [[$.heading], [$.map], [$.children]],
+	conflicts: ($) => [[$.section], [$.map], [$.children]],
 
 	rules: {
 		document: ($) => repeat(choice($._block, $._newline)),
@@ -64,7 +64,7 @@ module.exports = grammar({
 		// content.
 		_block: ($) =>
 			choice(
-				$.heading,
+				$.section,
 				$.titled_thematic_break,
 				$.thematic_break,
 				$.fenced_code_block,
@@ -77,14 +77,13 @@ module.exports = grammar({
 		_newline: (_$) => /\r?\n/,
 		_blank_gap: ($) => repeat1($._newline),
 
-		// ---- headings ----------------------------------------------------
-		// `#` is a sigil like `@name` and `-`: it takes `(args)`,
-		// `[content]` and `{value}`. The bracket-less sugar (`# title`)
-		// needs whitespace after the run -- that space is the whole
-		// reason `#tag` stays prose.
-		heading: ($) =>
+		// ---- sections ----------------------------------------------------
+		// `=` is a sigil for sections: it takes `(args)`, `[content]` and
+		// `{value}`. The bracket-less sugar (`= title`) needs whitespace after
+		// the run.
+		section: ($) =>
 			seq(
-				field("marker", $.heading_marker),
+				field("marker", $.section_marker),
 				choice(
 					seq(
 						optional(field("args", $.args_group)),
@@ -98,25 +97,6 @@ module.exports = grammar({
 					),
 					seq(/[ \t]+/, field("content", repeat1($._line_item))),
 				),
-				// Either the existing bare `:{...}` merge, or one or more
-				// `:name(...)` connects (`#[ h ]:rule(allow:list(card))`) --
-				// not both combined, unlike the real parser (which reuses
-				// `parse_groups` fully and so allows any mix/order of
-				// groups and connects). This grammar's `heading` rule was
-				// already a simplification before connects existed (single
-				// `{value}`, `(args)` only before content) -- extending it
-				// to the real parser's full "any order, any number, mixed"
-				// generality is future work if a fixture ever needs it.
-				//
-				// `prec(1, ...)`: the bracket-less sugar body just above
-				// (`repeat1($._line_item)`) can also end here, and once
-				// `:` is excluded from `text` (so `connect`/the bare merge
-				// are reachable at all -- see `text`'s own comment), a
-				// trailing `:` is otherwise ambiguous between "one more
-				// `_line_item` via `punctuation`" and "this optional
-				// trailing block starts here." Prefer the latter, the
-				// same way `args_group`'s own opening brackets already
-				// prefer starting a group over becoming stray punctuation.
 				optional(
 					prec(
 						1,
@@ -131,10 +111,7 @@ module.exports = grammar({
 				),
 				$._newline,
 			),
-		// Outranks `punctuation`'s bare `#`, which is the fallback for a
-		// `#` that does not start a heading. `#` has no other meaning, so
-		// this marker no longer competes with an element sigil for it.
-		heading_marker: (_$) => token(prec(1, /#+/)),
+		section_marker: (_$) => token(prec(1, /=+/)),
 
 		// ---- thematic break -----------------------------------------------
 		// `_dash_run` is shared with `titled_thematic_break` below so the
@@ -308,8 +285,8 @@ module.exports = grammar({
 				$.block_comment,
 				$.emphasis,
 				$.strong,
-				$.mark,
 				$.strikeout,
+				$.tag,
 				$.element,
 				$.interpolation,
 				$.punctuation,
@@ -337,8 +314,8 @@ module.exports = grammar({
 		// `/* ... */` needs to win over a `text` run that would otherwise
 		// swallow it whole, so a bare `/` (not opening a comment) falls
 		// back to `punctuation` like the others.
-		// `#` is excluded so `heading_marker` can win at a line start; `<`
-		// no longer needs excluding, since it is not a sigil any more.
+		// `#` is excluded so `tag`'s `#(tag)` can win; `=` is excluded
+		// so `section_marker` can win.
 		// `:` is excluded for the same longest-match reason as the rest of
 		// this list: `:name(...)` (`connect`) and the bare `:(`/`:{` merge
 		// both start with a single-character `":"` token, but right after
@@ -352,41 +329,7 @@ module.exports = grammar({
 		// same as the other excluded characters.
 		text: (_$) => /[^\n`*_=~@$#:()\[{\]/|-]+/,
 
-		// `-` is a bare string literal alternative here, not folded into
-		// the character class like the others, so it's the *same* grammar
-		// symbol as the literal `"-"` used to start `unordered_list_item`
-		// (tree-sitter interns identical string literals as one shared
-		// token everywhere they appear, same trick `_dash_run` already
-		// uses to stay a single token between `thematic_break`/
-		// `titled_thematic_break`). Without this, `-` existed as two
-		// *different* token definitions that happened to match the same
-		// text, and choosing between them was a lexer-level tie tree-
-		// sitter resolves deterministically with no runtime choice point
-		// -- see `unordered_list_item`'s own comment for why that
-		// mattered. Sharing the token instead resolves it via ordinary
-		// reduce logic once the parser tries to continue past `-` and
-		// finds no valid `list_marker`/gap: it backs out to this
-		// `punctuation` reading instead of the dead end an unshared
-		// marker token forced it into, with no `conflicts`/GLR needed
-		// (confirmed by `npx tree-sitter-cli generate` itself flagging a
-		// `[$.list, $.paragraph]` conflicts entry as unnecessary).
-		// `$` is included here (not folded into `text`'s character class)
-		// for the same reason `-`/`/` are: a bare `$` not immediately
-		// followed by `{` (so `interpolation`'s higher-precedence `${`
-		// token doesn't win) has nothing else to reduce to and would
-		// otherwise dead-end into `ERROR` once excluded from `text`.
-		// `#` and `<` join the same fallback set: a `#` that does not
-		// start a heading or a block element, and any `<` at all, are
-		// ordinary prose and need something to reduce to.
-		// `:` joins it too, now that `text` excludes it: a bare `:` with
-		// no `connect`/bare-merge/`map_entry` to attach to (an ordinary
-		// prose colon, or one immediately followed by whitespace/EOL) has
-		// nothing else to reduce to and would otherwise dead-end. This
-		// re-introduces exactly the tie `args_group`'s `(` already had to
-		// win against this same rule's `(` alternative -- `_element_group`/
-		// `connect`'s own `":"` is `token(prec(1, ":"))` for the same
-		// reason `args_group`'s opening paren is.
-		punctuation: (_$) => choice(/[()\[{/<>|~]/, "-", "$", "#", ":"),
+		punctuation: (_$) => choice(/[()\[{/<>|~]/, "-", "$", "#", ":", "="),
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -399,23 +342,23 @@ module.exports = grammar({
 				seq("**", repeat1($._bracket_item_no_star), "**"),
 				seq("__", repeat1($._bracket_item_no_underscore), "__"),
 			),
-		mark: ($) => seq("==", repeat1($._bracket_item_no_equals), "=="),
-		// GFM's spelling, and Tomet's. Same shape as `mark`: a paired
-		// delimiter with its own excluded character inside.
+		tag: ($) =>
+			prec(
+				2,
+				seq(
+					field("marker", alias("#", $.tag_marker)),
+					field("args", $.args_group),
+				),
+			),
+		// GFM's spelling, and Tomet's. Paired delimiter with excluded character inside.
 		strikeout: ($) => seq("~~", repeat1($._bracket_item_no_tilde), "~~"),
 
-		// No nested `emphasis`/`strong` here (unlike `_bracket_item_no_equals`
-		// below) -- `*`/`**`/`_`/`__` all share a delimiter character, and
-		// letting them nest inside each other is exactly the classic
-		// Markdown emphasis/strong ambiguity that needs real flanking-rule
-		// lookahead (or an external scanner) to resolve; simplified away for
-		// v1, see the module doc in `src/lib.rs`.
 		_bracket_item_no_star: ($) =>
 			choice(
 				$.code_span,
 				$.block_comment,
-				$.mark,
 				$.strikeout,
+				$.tag,
 				$.element,
 				$.interpolation,
 				$._newline,
@@ -426,26 +369,13 @@ module.exports = grammar({
 			choice(
 				$.code_span,
 				$.block_comment,
-				$.mark,
 				$.strikeout,
+				$.tag,
 				$.element,
 				$.interpolation,
 				$._newline,
 				$.punctuation,
 				alias(/[^\n`_=~<@$()\[{\]/|]+/, $.text),
-			),
-		_bracket_item_no_equals: ($) =>
-			choice(
-				$.code_span,
-				$.block_comment,
-				$.emphasis,
-				$.strong,
-				$.strikeout,
-				$.element,
-				$.interpolation,
-				$._newline,
-				$.punctuation,
-				alias(/[^\n`*_=~<@$()\[{\]/|]+/, $.text),
 			),
 		_bracket_item_no_tilde: ($) =>
 			choice(
@@ -453,7 +383,7 @@ module.exports = grammar({
 				$.block_comment,
 				$.emphasis,
 				$.strong,
-				$.mark,
+				$.tag,
 				$.element,
 				$.interpolation,
 				$._newline,

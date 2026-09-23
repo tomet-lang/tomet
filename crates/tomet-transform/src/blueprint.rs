@@ -119,15 +119,19 @@ pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> boo
     let doc_snapshot = doc.clone();
     let config = tomet_semantics::document_config(&doc_snapshot);
 
-    // Step 2: Evaluate element values, args, and content (e.g. in @meta { ... }, #[ Heading ], etc.)
+    // Step 2: Evaluate element values, args, and block-level Interp (e.g. in @meta { ... })
     for_each_element_mut(doc, |el| {
-        if let Some(ElementValue::Interp(expr)) = &el.value {
-            if let Ok(val) = tomet_compute::evaluate_with_context(&doc_snapshot, expr, &config, ctx)
-            {
-                el.value = Some(ElementValue::from_map(val));
-                changed = true;
+        if el.placement == tomet_ast::Placement::Block {
+            if let Some(ElementValue::Interp(expr)) = &el.value {
+                if let Ok(val) =
+                    tomet_compute::evaluate_with_context(&doc_snapshot, expr, &config, ctx)
+                {
+                    el.value = Some(ElementValue::from_map(val));
+                    changed = true;
+                }
             }
-        } else if let Some(value) = &mut el.value {
+        }
+        if let Some(value) = &mut el.value {
             // A group holds its data as separate entries, so each pair's
             // value is walked on its own rather than one `Value` tree.
             for (_, val) in value.pairs_mut() {
@@ -142,23 +146,64 @@ pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> boo
                 changed = true;
             }
         }
-
-        if let Some(inlines) = &mut el.content {
-            if evaluate_inlines(inlines, &doc_snapshot, &config, ctx) {
-                changed = true;
-            }
-        }
     });
 
-    // Step 3: Evaluate inline expressions inside top-level paragraphs
-    for block in &mut doc.blocks {
-        if let Block::Paragraph(p) = block {
-            if evaluate_inlines(&mut p.content, &doc_snapshot, &config, ctx) {
-                changed = true;
+    // Step 3: Evaluate inlines inside blocks recursively
+    if evaluate_blocks(&mut doc.blocks, &doc_snapshot, &config, ctx) {
+        changed = true;
+    }
+
+    changed
+}
+
+fn evaluate_blocks(
+    blocks: &mut [Block],
+    doc: &Document,
+    config: &tomet_semantics::DocumentConfig,
+    ctx: &EvaluationContext,
+) -> bool {
+    let mut changed = false;
+    for block in blocks {
+        match block {
+            Block::Paragraph(p) => {
+                if evaluate_inlines(&mut p.content, doc, config, ctx) {
+                    changed = true;
+                }
+            }
+            Block::Section(sec) => {
+                if evaluate_inlines(&mut sec.title, doc, config, ctx) {
+                    changed = true;
+                }
+                if let Some(args_val) = &mut sec.args {
+                    if evaluate_value_recursively(args_val, doc, config, ctx) {
+                        changed = true;
+                    }
+                }
+                if let Some(value) = &mut sec.value {
+                    for (_, val) in value.pairs_mut() {
+                        if evaluate_value_recursively(val, doc, config, ctx) {
+                            changed = true;
+                        }
+                    }
+                }
+                if evaluate_blocks(&mut sec.blocks, doc, config, ctx) {
+                    changed = true;
+                }
+            }
+            Block::Element(el) => {
+                if let Some(inlines) = &mut el.content {
+                    if evaluate_inlines(inlines, doc, config, ctx) {
+                        changed = true;
+                    }
+                }
+                if let Some(children) = &mut el.children {
+                    if evaluate_blocks(children, doc, config, ctx) {
+                        changed = true;
+                    }
+                }
             }
         }
     }
-
     changed
 }
 

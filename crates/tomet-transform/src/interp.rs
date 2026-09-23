@@ -96,6 +96,20 @@ fn resolve_block(
             }
             None => Block::Element(resolve_element(el, source, config, ctx, unresolved)),
         },
+        Block::Section(mut sec) => {
+            sec.title = resolve_inlines(sec.title, source, config, ctx, unresolved);
+            sec.connects = sec
+                .connects
+                .into_iter()
+                .map(|conn| resolve_element(conn, source, config, ctx, unresolved))
+                .collect();
+            sec.blocks = sec
+                .blocks
+                .into_iter()
+                .map(|b| resolve_block(b, source, config, ctx, unresolved))
+                .collect();
+            Block::Section(sec)
+        }
     }
 }
 
@@ -250,16 +264,25 @@ mod tests {
                 }
             }
         }
-        let mut out = String::new();
-        for block in &doc.blocks {
+        fn walk_block(out: &mut String, block: &Block) {
             match block {
-                Block::Paragraph(p) => walk(&mut out, &p.content),
+                Block::Paragraph(p) => walk(out, &p.content),
                 Block::Element(el) => {
                     if let Some(content) = &el.content {
-                        walk(&mut out, content);
+                        walk(out, content);
+                    }
+                }
+                Block::Section(sec) => {
+                    walk(out, &sec.title);
+                    for child in &sec.blocks {
+                        walk_block(out, child);
                     }
                 }
             }
+        }
+        let mut out = String::new();
+        for block in &doc.blocks {
+            walk_block(&mut out, block);
         }
         out
     }

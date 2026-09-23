@@ -1,6 +1,6 @@
 //! Blueprint structural validation against a target document.
 
-use tomet_ast::{Document, Element, Inline, Span, Value};
+use tomet_ast::{Block, Document, Element, Inline, Section, Span, Value};
 use tomet_semantics::{ElementKind, classify_std_lenient};
 use tomet_tree::{ValueExt, for_each_top_level_element};
 
@@ -97,6 +97,8 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
         }
     });
 
+    walk_blueprint_sections(&blueprint.blocks, &mut required_sections);
+
     if found_blueprint {
         Some(BlueprintSchema {
             target_kind,
@@ -177,6 +179,8 @@ pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<D
         }
     });
 
+    walk_doc_sections(&doc.blocks, &mut doc_headings);
+
     for req_sec in &schema.required_sections {
         let is_present = doc_headings.iter().any(|(doc_title, doc_id)| {
             if let (Some(req_id), Some(d_id)) = (&req_sec.id, doc_id) {
@@ -214,6 +218,62 @@ fn extract_element_title(el: &Element) -> String {
     title
 }
 
+fn section_id(sec: &Section) -> Option<String> {
+    sec.args
+        .as_ref()
+        .and_then(|a| a.get("id"))
+        .and_then(|v| v.as_str())
+        .or_else(|| {
+            if let Some(entries) = sec.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
+                entries
+                    .iter()
+                    .find(|(k, _)| *k == "id")
+                    .and_then(|(_, v)| v.as_str())
+            } else {
+                None
+            }
+        })
+        .map(String::from)
+}
+
+fn extract_section_title(title_inlines: &[Inline]) -> String {
+    let mut title = String::new();
+    for inline in title_inlines {
+        if let Inline::Text(t) = inline {
+            title.push_str(&t.value);
+        }
+    }
+    title
+}
+
+fn walk_blueprint_sections(blocks: &[Block], required_sections: &mut Vec<RequiredSection>) {
+    for block in blocks {
+        if let Block::Section(sec) = block {
+            let id = section_id(sec);
+            let title = extract_section_title(&sec.title);
+            if id.is_some() || !title.is_empty() {
+                required_sections.push(RequiredSection {
+                    title,
+                    id,
+                    span: sec.span,
+                });
+            }
+            walk_blueprint_sections(&sec.blocks, required_sections);
+        }
+    }
+}
+
+fn walk_doc_sections(blocks: &[Block], doc_headings: &mut Vec<(String, Option<String>)>) {
+    for block in blocks {
+        if let Block::Section(sec) = block {
+            let id = section_id(sec);
+            let title = extract_section_title(&sec.title);
+            doc_headings.push((title, id));
+            walk_doc_sections(&sec.blocks, doc_headings);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,7 +291,7 @@ mod tests {
     #[test]
     fn a_plain_kind_document_is_not_a_blueprint() {
         let doc = tomet_parser::parse_document(
-            "@kind(daily-note)\n@meta{\n  id: doc-1\n}\n\n#[ Plan ] {id: plan}\n",
+            "@kind(daily-note)\n@meta{\n  id: doc-1\n}\n\n=[ Plan ] {id: plan}\n",
         )
         .unwrap();
         assert!(
@@ -243,7 +303,7 @@ mod tests {
     #[test]
     fn a_blueprint_still_extracts_its_schema() {
         let doc = tomet_parser::parse_document(
-            "@kind(blueprint)\n@blueprint(daily-note)\n\n#[ Plan ] {id: plan}\n",
+            "@kind(blueprint)\n@blueprint(daily-note)\n\n=[ Plan ] {id: plan}\n",
         )
         .unwrap();
         assert!(
@@ -255,10 +315,10 @@ mod tests {
     #[test]
     fn validates_matching_document_successfully() {
         let blueprint = parse(
-            "@blueprint(daily-note)\n@meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n#[ Plan ] {id: plan}\n\n#[ Review ] {id: review}\n",
+            "@blueprint(daily-note)\n@meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n=[ Plan ] {id: plan}\n\n=[ Review ] {id: review}\n",
         );
         let doc = parse(
-            "@kind(daily-note)\n@meta{\n  id: doc-123\n  date: 2026-09-01\n}\n\n#[ Plan ] {id: plan}\n- ( ) My task\n\n#[ Review ] {id: review}\nGood day.\n",
+            "@kind(daily-note)\n@meta{\n  id: doc-123\n  date: 2026-09-01\n}\n\n=[ Plan ] {id: plan}\n- ( ) My task\n\n=[ Review ] {id: review}\nGood day.\n",
         );
 
         let errors = validate_against_blueprint(&doc, &blueprint);
@@ -268,11 +328,11 @@ mod tests {
     #[test]
     fn reports_missing_meta_key_and_missing_section() {
         let blueprint = parse(
-            "@blueprint(daily-note)\n@meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n#[ Plan ] {id: plan}\n\n#[ Review ] {id: review}\n",
+            "@blueprint(daily-note)\n@meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n=[ Plan ] {id: plan}\n\n=[ Review ] {id: review}\n",
         );
-        // doc is missing `@meta.date` and `#[ Review ] {id: review}`
+        // doc is missing `@meta.date` and `=[ Review ] {id: review}`
         let doc = parse(
-            "@kind(daily-note)\n@meta{\n  id: doc-123\n}\n\n#[ Plan ] {id: plan}\n- ( ) My task\n",
+            "@kind(daily-note)\n@meta{\n  id: doc-123\n}\n\n=[ Plan ] {id: plan}\n- ( ) My task\n",
         );
 
         let errors = validate_against_blueprint(&doc, &blueprint);

@@ -44,16 +44,16 @@ fn hover_returns_element_info() {
 
 #[test]
 fn document_symbols_returns_headings_and_elements() {
-    let text = "#[ Heading ]\n\n@info[ Note ]\n";
+    let text = "=[ Heading ]\n\n@info[ Note ]\n";
     let symbols = document_symbols_for(text);
     assert_eq!(symbols.len(), 2);
-    assert_eq!(symbols[0].name, "# Heading");
+    assert_eq!(symbols[0].name, "= Heading");
     assert_eq!(symbols[1].name, "@info");
 }
 
 #[test]
 fn definition_finds_matching_id() {
-    let text = "#[ Target ]{id: target1}\n\n@deck.ref(id: target1)\n";
+    let text = "=[ Target ]{id: target1}\n\n@deck.ref(id: target1)\n";
     let uri = Uri::from_str("file:///test.tmt").unwrap();
     let def = definition_for(text, Position::new(2, 4), &uri);
     assert!(def.is_some());

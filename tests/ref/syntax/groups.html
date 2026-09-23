@@ -1,5 +1,5 @@
 <h1>シジルは同じグループを取る</h1>
-<p><code>@name</code> も <code>-</code> も <code>#</code> も、<code>(args)</code> <code>[content]</code> <code>{value}</code> を取る。省略できるところと、書ける形は同じ。</p>
+<p><code>@name</code> も <code>-</code> も <code>=</code> も、<code>(args)</code> <code>[content]</code> <code>{value}</code> を取る。省略できるところと、書ける形は同じ。</p>
 <h1>リスト項目の完全形</h1>
 <ul>
 <li><span class="tm-list-marker"></span> 括弧を書けば内容はグループになる</li>
@@ -17,12 +17,12 @@
 <li id="sugar"><span class="tm-list-marker" data-12="1"></span> マーカーつきの糖衣</li>
 <li>グループ のあとに続く地の文も項目に残る</li>
 </ul>
-<h1>見出しの糖衣</h1>
+<h1>セクションの糖衣</h1>
 <h1>空白のあとに本文を書けば見出しになる</h1>
 <h1>グループを書けば完全形</h1>
 <h1 data-tag="groups">引数も値も取れる</h1>
-<h1>見出しにならないもの</h1>
-<p>これは #タグ ではない。<code>#</code> の直後に空白もグループも無ければただの文字。</p>
+<h1>セクションにならないもの</h1>
+<p>これは =イコール ではない。<code>=</code> の直後に空白もグループも無ければただの文字。</p>
 <h1><code>{...}</code> は名前つき要素も取る</h1>
 <p><code>{...}</code> は常にデータで、中身は書いた順の <code>Entry</code> の並び。裸の <code>(marker)[content]</code> も、名前つきの <code>@name</code> も同じ並びに入る。語彙が要素を宣言する形はこれが無いと書けない。</p>
 <div class="tm-element tm-element" data-value="card">カード一枚。<div class="tm-children">

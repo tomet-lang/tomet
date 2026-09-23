@@ -33,7 +33,7 @@
 //!   convention, which is likewise anchored to `@links{}` entries rather
 //!   than headings.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Value};
+use tomet_ast::{Block, Document, Element, ElementValue, Inline, Section, Value};
 use tomet_semantics::{
     TargetScheme, classify_std_lenient, heading_level, is_directive, link_target, list_items,
     list_ordered, normalized_element_args, parse_table_rows, path_target, target_scheme,
@@ -68,6 +68,19 @@ fn render_block(block: &Block, out: &mut String) {
                 out.push_str("\n\n");
             }
         }
+        Block::Section(sec) => render_section(sec, out),
+    }
+}
+
+fn render_section(sec: &Section, out: &mut String) {
+    let marker = "=".repeat(sec.level.max(1));
+    let title = inline_to_typst(&sec.title);
+    out.push_str(&marker);
+    out.push(' ');
+    out.push_str(&title);
+    out.push_str("\n\n");
+    for child in &sec.blocks {
+        render_block(child, out);
     }
 }
 
@@ -595,8 +608,8 @@ mod tests {
 
     #[test]
     fn renders_headings_by_level() {
-        assert_eq!(typst("#[ One ]\n"), "= One\n\n");
-        assert_eq!(typst("##[ Two ]\n"), "== Two\n\n");
+        assert_eq!(typst("=[ One ]\n"), "= One\n\n");
+        assert_eq!(typst("==[ Two ]\n"), "== Two\n\n");
     }
 
     #[test]
@@ -612,7 +625,7 @@ mod tests {
     #[test]
     fn renders_emphasis_strong_and_mark() {
         assert_eq!(
-            typst("a *em* b **strong** c ==mark==\n"),
+            typst("a *em* b **strong** c @mark[mark]\n"),
             "a _em_ b *strong* c #highlight[mark]\n\n"
         );
     }
