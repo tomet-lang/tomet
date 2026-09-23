@@ -68,12 +68,14 @@ fn render_block(cx: &MarkdownCtx, block: &Block, out: &mut String) {
 }
 
 fn render_section(cx: &MarkdownCtx, sec: &Section, out: &mut String) {
-    let marker = "#".repeat(sec.level.clamp(1, 6));
-    let text = inline_to_md(cx, &sec.title);
-    out.push_str(&marker);
-    out.push(' ');
-    out.push_str(&text);
-    out.push_str("\n\n");
+    if !sec.title.is_empty() {
+        let marker = "#".repeat(sec.level.clamp(1, 6));
+        let text = inline_to_md(cx, &sec.title);
+        out.push_str(&marker);
+        out.push(' ');
+        out.push_str(&text);
+        out.push_str("\n\n");
+    }
     for child in &sec.blocks {
         render_block(cx, child, out);
     }

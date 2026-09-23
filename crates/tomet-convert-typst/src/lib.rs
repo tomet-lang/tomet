@@ -104,12 +104,14 @@ fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
 }
 
 fn render_section(cx: &TypstCtx, sec: &Section, out: &mut String) {
-    let marker = "=".repeat(sec.level.max(1));
-    let title = inline_to_typst(cx, &sec.title);
-    out.push_str(&marker);
-    out.push(' ');
-    out.push_str(&title);
-    out.push_str("\n\n");
+    if !sec.title.is_empty() {
+        let marker = "=".repeat(sec.level.max(1));
+        let title = inline_to_typst(cx, &sec.title);
+        out.push_str(&marker);
+        out.push(' ');
+        out.push_str(&title);
+        out.push_str("\n\n");
+    }
     for child in &sec.blocks {
         render_block(cx, child, out);
     }

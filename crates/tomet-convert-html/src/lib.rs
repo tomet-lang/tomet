@@ -397,25 +397,27 @@ fn render_section(
     if cx.options.wrap_sections {
         out.push_str(&format!("<section class=\"tmt-section level-{level}\">\n"));
     }
-    out.push_str(&format!("<h{level}"));
-    push_named_attrs(out, &id, &class, &data);
-    push_span_attrs(cx, out, sec.span);
-    out.push('>');
-    let mut number = None;
-    if cx.options.number_headings {
-        let label = state.counters.advance(level);
-        out.push_str(&format!("<span class=\"tm-heading-number\">{label}</span>"));
-        number = Some(label);
-    }
-    render_inlines(cx, &sec.title, out);
-    out.push_str(&format!("</h{level}>\n"));
+    if !sec.title.is_empty() {
+        out.push_str(&format!("<h{level}"));
+        push_named_attrs(out, &id, &class, &data);
+        push_span_attrs(cx, out, sec.span);
+        out.push('>');
+        let mut number = None;
+        if cx.options.number_headings {
+            let label = state.counters.advance(level);
+            out.push_str(&format!("<span class=\"tm-heading-number\">{label}</span>"));
+            number = Some(label);
+        }
+        render_inlines(cx, &sec.title, out);
+        out.push_str(&format!("</h{level}>\n"));
 
-    state.outline.push(HeadingInfo {
-        level,
-        id,
-        text,
-        number,
-    });
+        state.outline.push(HeadingInfo {
+            level,
+            id,
+            text,
+            number,
+        });
+    }
 
     for child in &sec.blocks {
         render_block(cx, child, out, state);

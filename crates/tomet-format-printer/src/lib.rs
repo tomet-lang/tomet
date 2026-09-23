@@ -151,14 +151,16 @@ fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
 fn render_section(sec: &Section, config: &PrinterConfig, out: &mut String) {
     let level = sec.level.max(1);
     out.push_str(&"=".repeat(level));
-    if config.heading_space_inside_brackets {
-        out.push_str("[ ");
-        out.push_str(&render_inlines(&sec.title, config));
-        out.push_str(" ]");
-    } else {
-        out.push('[');
-        out.push_str(&render_inlines(&sec.title, config));
-        out.push(']');
+    if !sec.title.is_empty() {
+        if config.heading_space_inside_brackets {
+            out.push_str("[ ");
+            out.push_str(&render_inlines(&sec.title, config));
+            out.push_str(" ]");
+        } else {
+            out.push('[');
+            out.push_str(&render_inlines(&sec.title, config));
+            out.push(']');
+        }
     }
     if let Some(args) = &sec.args {
         out.push('(');
@@ -1424,5 +1426,24 @@ mod tests {
         let doc = Document::new(vec![Block::Section(sec)], tomet_ast::Span::dummy());
         let printed = document_to_tm(&doc);
         assert_eq!(printed, "=[Title]\nParagraph 1\nParagraph 2\n");
+    }
+
+    #[test]
+    fn test_headingless_section_printing() {
+        let sec = Section {
+            level: 1,
+            title: Vec::new(),
+            args: None,
+            value: None,
+            connects: Vec::new(),
+            blocks: vec![Block::Paragraph(tomet_ast::Paragraph::new(
+                vec![Inline::Text("Content".into())],
+                tomet_ast::Span::dummy(),
+            ))],
+            span: tomet_ast::Span::dummy(),
+        };
+        let doc = Document::new(vec![Block::Section(sec)], tomet_ast::Span::dummy());
+        let printed = document_to_tm(&doc);
+        assert_eq!(printed, "=\nContent\n");
     }
 }

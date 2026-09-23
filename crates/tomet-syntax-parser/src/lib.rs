@@ -2372,5 +2372,89 @@ mod tests {
             vec![Inline::Text("Math x^2 and bare ^word here.".into())]
         );
     }
+
+    #[test]
+    fn parses_headingless_section_syntax() {
+        let doc = parse_document("=[ heading ]\n\nsection\n\n=\n\nafter\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+
+        // First section: =[ heading ]
+        let Block::Section(s1) = &doc.blocks[0] else { panic!() };
+        assert_eq!(s1.level, 1);
+        assert_eq!(s1.title, vec![Inline::Text("heading".into())]);
+        assert_eq!(s1.blocks.len(), 1);
+        let Block::Paragraph(p1) = &s1.blocks[0] else { panic!() };
+        assert_eq!(p1.content, vec![Inline::Text("section".into())]);
+
+        // Second section: bare '='
+        let Block::Section(s2) = &doc.blocks[1] else { panic!() };
+        assert_eq!(s2.level, 1);
+        assert!(s2.title.is_empty());
+        assert_eq!(s2.blocks.len(), 1);
+        let Block::Paragraph(p2) = &s2.blocks[0] else { panic!() };
+        assert_eq!(p2.content, vec![Inline::Text("after".into())]);
+    }
+
+    #[test]
+    fn parses_bare_section_at_eof() {
+        let doc = parse_document("=[ heading ]\n\nsection\n\n=\n").unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+
+        let Block::Section(s1) = &doc.blocks[0] else { panic!() };
+        assert_eq!(s1.level, 1);
+        assert_eq!(s1.title, vec![Inline::Text("heading".into())]);
+        assert_eq!(s1.blocks.len(), 1);
+
+        let Block::Section(s2) = &doc.blocks[1] else { panic!() };
+        assert_eq!(s2.level, 1);
+        assert!(s2.title.is_empty());
+        assert!(s2.blocks.is_empty());
+    }
+
+    #[test]
+    fn parses_nested_headingless_sections() {
+        let src = "=\nIntro\n\n==\nSub\n\n=\nOutro\n";
+        let doc = parse_document(src).unwrap();
+        assert_eq!(doc.blocks.len(), 2);
+
+        let Block::Section(s1) = &doc.blocks[0] else { panic!() };
+        assert_eq!(s1.level, 1);
+        assert!(s1.title.is_empty());
+        assert_eq!(s1.blocks.len(), 2); // Paragraph("Intro"), Section(level 2)
+
+        let Block::Section(sub) = &s1.blocks[1] else { panic!() };
+        assert_eq!(sub.level, 2);
+        assert!(sub.title.is_empty());
+        assert_eq!(sub.blocks.len(), 1);
+
+        let Block::Section(s2) = &doc.blocks[1] else { panic!() };
+        assert_eq!(s2.level, 1);
+        assert!(s2.title.is_empty());
+        assert_eq!(s2.blocks.len(), 1);
+    }
+
+    #[test]
+    fn parses_headingless_section_with_comment_and_attrs() {
+        let doc1 = parse_document("= // comment\nParagraph\n").unwrap();
+        assert_eq!(doc1.blocks.len(), 1);
+        let Block::Section(s1) = &doc1.blocks[0] else { panic!() };
+        assert_eq!(s1.level, 1);
+        assert!(s1.title.is_empty());
+
+        let doc2 = parse_document("={ id: intro }\nParagraph\n").unwrap();
+        assert_eq!(doc2.blocks.len(), 1);
+        let Block::Section(s2) = &doc2.blocks[0] else { panic!() };
+        assert_eq!(s2.level, 1);
+        assert!(s2.title.is_empty());
+        assert!(s2.value.is_some());
+    }
+
+    #[test]
+    fn bare_equal_with_attached_chars_is_plain_text() {
+        let doc = parse_document("=abc is text.\n").unwrap();
+        assert_eq!(doc.blocks.len(), 1);
+        let Block::Paragraph(p) = &doc.blocks[0] else { panic!() };
+        assert_eq!(p.content, vec![Inline::Text("=abc is text.".into())]);
+    }
 }
 
