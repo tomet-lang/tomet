@@ -55,7 +55,7 @@
 					"comment": "`==(id: sec)[ 見出し ]` -- a section takes `(args)` and a trailing `{value}` like an element.",
 					"begin": "^[ \\t]*(=+)(?=[ \\t]*\\()",
 					"beginCaptures": {
-						"1": { "name": "punctuation.definition.heading.tomet" }
+						"1": { "name": "punctuation.definition.section.tomet" }
 					},
 					"end": "(?<=\\])",
 					"name": "markup.heading.tomet",
@@ -67,12 +67,13 @@
 				{
 					"begin": "^[ \\t]*(=+)[ \\t]*(\\[)",
 					"beginCaptures": {
-						"1": { "name": "punctuation.definition.heading.tomet" },
+						"1": { "name": "punctuation.definition.section.tomet" },
 						"2": { "name": "punctuation.section.brackets.begin.tomet" }
 					},
-					"end": "\\]",
+					"end": "(\\])(?:[ \\t]*(=+))?",
 					"endCaptures": {
-						"0": { "name": "punctuation.section.brackets.end.tomet" }
+						"1": { "name": "punctuation.section.brackets.end.tomet" },
+						"2": { "name": "punctuation.definition.section.tomet" }
 					},
 					"name": "markup.heading.tomet",
 					"patterns": [{ "include": "#inline" }]
@@ -80,7 +81,7 @@
 				{
 					"begin": "^[ \\t]*(=+)[ \\t]*(\\|)",
 					"beginCaptures": {
-						"1": { "name": "punctuation.definition.heading.tomet" },
+						"1": { "name": "punctuation.definition.section.tomet" },
 						"2": { "name": "punctuation.definition.pipe.tomet keyword.control.pipe.tomet" }
 					},
 					"end": "$",
@@ -88,14 +89,33 @@
 					"patterns": [{ "include": "#inline" }]
 				},
 				{
+					"comment": "Section with `{value}` attrs but without bracketed content.",
+					"begin": "^[ \\t]*(=+)[ \\t]*(?=\\{)",
+					"beginCaptures": {
+						"1": { "name": "punctuation.definition.section.tomet" }
+					},
+					"end": "(?<=\\})",
+					"name": "markup.heading.tomet",
+					"patterns": [
+						{ "include": "#curly-group" }
+					]
+				},
+				{
 					"comment": "Bracket-less sugar. Requires whitespace after `=`.",
 					"begin": "^[ \\t]*(=+)(?=[ \\t]+\\S)",
 					"beginCaptures": {
-						"1": { "name": "punctuation.definition.heading.tomet" }
+						"1": { "name": "punctuation.definition.section.tomet" }
 					},
 					"end": "$",
 					"name": "markup.heading.tomet",
 					"patterns": [{ "include": "#inline" }]
+				},
+				{
+					"comment": "Heading-less section marker (`=`, `==`, etc.).",
+					"match": "^[ \\t]*(=+)[ \\t]*(?=$|//|/\\*)",
+					"captures": {
+						"1": { "name": "punctuation.definition.section.tomet markup.heading.tomet" }
+					}
 				}
 			]
 		},
@@ -105,20 +125,20 @@
 				{
 					"begin": "^\\s*(-{3,})\\s*(\\[)",
 					"beginCaptures": {
-						"1": { "name": "punctuation.definition.thematic-break.tomet keyword.control.thematic-break.tomet" },
+						"1": { "name": "punctuation.definition.thematic-break.tomet meta.separator.tomet" },
 						"2": { "name": "punctuation.section.brackets.begin.tomet" }
 					},
 					"end": "(\\])\\s*(-{3,})\\s*$",
 					"endCaptures": {
 						"1": { "name": "punctuation.section.brackets.end.tomet" },
-						"2": { "name": "punctuation.definition.thematic-break.tomet keyword.control.thematic-break.tomet" }
+						"2": { "name": "punctuation.definition.thematic-break.tomet meta.separator.tomet" }
 					},
 					"name": "markup.heading.thematic-break.tomet",
 					"patterns": [{ "include": "#inline" }]
 				},
 				{
 					"match": "^\\s*-{3,}\\s*$",
-					"name": "punctuation.definition.thematic-break.tomet keyword.control.thematic-break.tomet"
+					"name": "punctuation.definition.thematic-break.tomet meta.separator.tomet"
 				}
 			]
 		},
@@ -126,12 +146,32 @@
 		"list-marker": {
 			"patterns": [
 				{
-					"match": "^\\s*(-\\.|-)(?=[ \\t\\[|(])(?:\\s*(\\()([^()\\n]*)(\\)))?",
+					"comment": "List marker with args: `- (marker)` or `-. (args)`. Matches `-` and parses `(args)` with #value.",
+					"begin": "^[ \\t]*(-\\.|-)(?=[ \\t]*\\()",
+					"beginCaptures": {
+						"1": { "name": "punctuation.definition.list.marker.tomet punctuation.definition.list.begin.markdown markup.list.marker.tomet" }
+					},
+					"end": "(?<=\\))",
+					"patterns": [
+						{
+							"begin": "\\(",
+							"beginCaptures": {
+								"0": { "name": "punctuation.definition.list.marker.begin.tomet punctuation.definition.list.begin.markdown markup.list.marker.tomet" }
+							},
+							"end": "\\)",
+							"endCaptures": {
+								"0": { "name": "punctuation.definition.list.marker.end.tomet punctuation.definition.list.begin.markdown markup.list.marker.tomet" }
+							},
+							"name": "meta.group.round.tomet",
+							"patterns": [{ "include": "#value" }]
+						}
+					]
+				},
+				{
+					"comment": "Plain list marker `-` or `-.` followed by whitespace, content group, or EOL.",
+					"match": "^[ \\t]*(-\\.|-)(?=[ \\t\\[|]|$)",
 					"captures": {
-						"1": { "name": "punctuation.definition.list.begin.markdown markup.list.tomet keyword.control.list.tomet" },
-						"2": { "name": "punctuation.definition.marker.begin.tomet punctuation.definition.list.begin.markdown markup.list.tomet keyword.control.list.tomet" },
-						"3": { "name": "variable.parameter.marker.tomet variable.parameter.tomet variable.other.property.tomet constant.other.marker.tomet keyword.operator.marker.tomet markup.list.marker.tomet" },
-						"4": { "name": "punctuation.definition.marker.end.tomet punctuation.definition.list.begin.markdown markup.list.tomet keyword.control.list.tomet" }
+						"1": { "name": "punctuation.definition.list.marker.tomet punctuation.definition.list.begin.markdown markup.list.marker.tomet" }
 					}
 				}
 			]
