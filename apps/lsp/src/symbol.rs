@@ -22,7 +22,11 @@ fn collect_block_symbols(block: &Block, symbols: &mut Vec<DocumentSymbol>) {
         Block::Section(sec) => {
             let range = span_to_range(&sec.span);
             let title = extract_inlines_text(&sec.title);
-            let name = format!("{} {}", "=".repeat(sec.level), title);
+            let name = if title.is_empty() {
+                "=".repeat(sec.level)
+            } else {
+                format!("{} {}", "=".repeat(sec.level), title)
+            };
             #[allow(deprecated)]
             symbols.push(DocumentSymbol {
                 name,

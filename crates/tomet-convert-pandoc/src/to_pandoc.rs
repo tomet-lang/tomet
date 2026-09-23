@@ -81,11 +81,15 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
         TmBlock::Paragraph(p) => content_to_blocks(&p.content),
         TmBlock::Element(el) => element_to_blocks(el),
         TmBlock::Section(sec) => {
-            let mut blocks = vec![Block::Header(
-                sec.level.max(1) as i64,
-                section_attr(sec),
-                inlines_to_pandoc(&sec.title),
-            )];
+            let mut blocks = if !sec.title.is_empty() {
+                vec![Block::Header(
+                    sec.level.max(1) as i64,
+                    section_attr(sec),
+                    inlines_to_pandoc(&sec.title),
+                )]
+            } else {
+                Vec::new()
+            };
             for child in &sec.blocks {
                 blocks.extend(block_to_pandoc(child));
             }

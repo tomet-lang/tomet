@@ -17,11 +17,15 @@ pub(crate) fn is_section_start(cur: &Cursor) -> bool {
     if crate::element::opens_group(look.peek()) {
         return true;
     }
-    if !matches!(look.peek(), Some(' ') | Some('\t')) {
-        return false;
-    }
+    let had_ws = matches!(look.peek(), Some(' ') | Some('\t'));
     skip_inline_ws(&mut look);
-    !matches!(look.peek(), None | Some('\n') | Some('\r'))
+    if matches!(look.peek(), None | Some('\n') | Some('\r'))
+        || look.starts_with("//")
+        || look.starts_with("/*")
+    {
+        return true;
+    }
+    had_ws
 }
 
 pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
@@ -55,16 +59,26 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
                 }
             }
         }
-        _ if had_ws => {
+        _ if cur.starts_with("//") || cur.starts_with("/*") => {
+            // A heading-less section with a trailing comment.
+        }
+        _ if had_ws && !matches!(cur.peek(), None | Some('\n') | Some('\r')) => {
             let (mut content, attrs) = parse_sugar_body(cur)?;
             trim_trailing_equals(&mut content);
             el.content = Some(content);
             el.value = attrs.map(ElementValue::from_map);
         }
+        None | Some('\n') | Some('\r') => {
+            // A heading-less section (`=` or `==` alone on its line).
+            // `el.content` remains `None`, so `title` will default to empty.
+        }
         _ => return Err(err(cur, cur.pos(), "expected '[' or a space after '='")),
     }
 
     skip_inline_ws(cur);
+    if cur.starts_with("//") {
+        crate::value::skip_line_comment(cur);
+    }
     if matches!(cur.peek(), Some('\n') | Some('\r')) {
         cur.bump();
     }
