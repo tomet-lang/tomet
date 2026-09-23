@@ -14,7 +14,7 @@
 use tomet_ast::{
     Block, Document, Element, ElementValue, Entry, Inline, Placement, Section, Sigil, Value,
 };
-use tomet_config::PrinterConfig;
+use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
 use tomet_style::{render_args_with_config, render_nested, render_value};
@@ -437,6 +437,14 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         return out;
     }
 
+    if el.sigil.is_bare_named("tag") && el.content.is_none() && el.value.is_none() {
+        if let Some(args) = &el.args {
+            let mut out = format!("#({})", render_args_with_config(args, config));
+            out.push_str(&render_connects(&el.connects, config));
+            return out;
+        }
+    }
+
     if el.sigil.is_bare_named("raw") {
         if el.placement == Placement::Inline
             && el.args.is_none()
@@ -637,16 +645,33 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         }
     }
 
-    if let Some(args) = &el.args {
-        out.push('(');
-        out.push_str(&render_args_with_config(args, config));
-        out.push(')');
-    }
+    let render_args = |out: &mut String| {
+        if let Some(args) = &el.args {
+            out.push('(');
+            out.push_str(&render_args_with_config(args, config));
+            out.push(')');
+        }
+    };
 
-    if let Some(content) = &el.content {
-        out.push('[');
-        out.push_str(&render_inlines(content, config));
-        out.push(']');
+    let render_content = |out: &mut String| {
+        if let Some(content) = &el.content {
+            out.push('[');
+            out.push_str(&render_inlines(content, config));
+            out.push(']');
+        }
+    };
+
+    let elem_name = el.sigil.name().map(|n| n.name.as_str()).unwrap_or("");
+    let order = config.element_group_order(elem_name).unwrap_or(GroupOrder::ArgsFirst);
+    match order {
+        GroupOrder::ArgsFirst => {
+            render_args(&mut out);
+            render_content(&mut out);
+        }
+        GroupOrder::ContentFirst => {
+            render_content(&mut out);
+            render_args(&mut out);
+        }
     }
 
     if let Some(value) = &el.value {
@@ -1344,5 +1369,60 @@ mod tests {
         // Verify re-parsing
         let re_parsed = tomet_parser::parse_document(&printed).expect("valid doc");
         assert_eq!(re_parsed.blocks.len(), 1);
+    }
+
+    #[test]
+    fn test_group_order_content_first() {
+        let mut el = element_new(Sigil::named("link"));
+        el.args = Some(Value::String("https://example.com".to_string()));
+        el.content = Some(vec![Inline::Text("Example".into())]);
+
+        let doc = Document::new(vec![Block::Element(el)], tomet_ast::Span::dummy());
+
+        let mut config = PrinterConfig::default();
+        config.group_order = Some(GroupOrder::ContentFirst);
+        let printed = document_to_tm_with_config(&doc, &config);
+        assert_eq!(printed.trim(), "@link[Example](\"https://example.com\")");
+
+        config.group_order = Some(GroupOrder::ArgsFirst);
+        let printed_args_first = document_to_tm_with_config(&doc, &config);
+        assert_eq!(printed_args_first.trim(), "@link(\"https://example.com\")[Example]");
+
+        let mut config_link_only = PrinterConfig::default();
+        config_link_only.link_group_order = Some(GroupOrder::ContentFirst);
+        let printed_link_only = document_to_tm_with_config(&doc, &config_link_only);
+        assert_eq!(printed_link_only.trim(), "@link[Example](\"https://example.com\")");
+    }
+
+    #[test]
+    fn test_tag_sugar_printing() {
+        let doc = tomet_parser::parse_document("#(rust, tomet)\n").expect("valid doc");
+        let printed = document_to_tm(&doc);
+        assert_eq!(printed.trim(), "#(rust, tomet)");
+    }
+
+    #[test]
+    fn test_section_blocks_blank_lines() {
+        let sec = Section {
+            level: 1,
+            title: vec![Inline::Text("Title".into())],
+            args: None,
+            value: None,
+            connects: Vec::new(),
+            blocks: vec![
+                Block::Paragraph(tomet_ast::Paragraph::new(
+                    vec![Inline::Text("Paragraph 1".into())],
+                    tomet_ast::Span::dummy(),
+                )),
+                Block::Paragraph(tomet_ast::Paragraph::new(
+                    vec![Inline::Text("Paragraph 2".into())],
+                    tomet_ast::Span::dummy(),
+                )),
+            ],
+            span: tomet_ast::Span::dummy(),
+        };
+        let doc = Document::new(vec![Block::Section(sec)], tomet_ast::Span::dummy());
+        let printed = document_to_tm(&doc);
+        assert_eq!(printed, "=[Title]\nParagraph 1\nParagraph 2\n");
     }
 }

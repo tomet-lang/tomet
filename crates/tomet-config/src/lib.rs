@@ -23,6 +23,13 @@ pub struct FieldConfig {
     pub overwrite: Option<bool>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GroupOrder {
+    #[default]
+    ArgsFirst,    // @link(args)[content]{value}
+    ContentFirst, // @link[content](args){value}
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PrinterConfig {
     pub meta_always_newline: bool,
@@ -30,6 +37,8 @@ pub struct PrinterConfig {
     pub meta_format: Option<String>,
     pub meta_fields: std::collections::BTreeMap<String, FieldConfig>,
     pub link_no_space: bool,
+    pub link_group_order: Option<GroupOrder>,
+    pub group_order: Option<GroupOrder>,
     /// `workspace.ignore` -- paths that are not part of this vault.
     /// Neither swept nor resolvable: a reference to one is broken,
     /// because as far as this vault is concerned it is not there.
@@ -88,6 +97,17 @@ impl PrinterConfig {
     pub fn from_doc(doc: &Document) -> Self {
         let config = tomet_semantics::document_config(doc);
         Self::from_document_config(&config)
+    }
+
+    /// Returns the configured group order for a specific element name (e.g. "link"),
+    /// falling back to the global `group_order`.
+    pub fn element_group_order(&self, element_name: &str) -> Option<GroupOrder> {
+        if element_name == "link" || element_name == "wikilink" {
+            if let Some(order) = self.link_group_order {
+                return Some(order);
+            }
+        }
+        self.group_order
     }
 
     pub fn from_document_config(config: &tomet_semantics::DocumentConfig) -> Self {
@@ -151,7 +171,29 @@ impl PrinterConfig {
                 }
             }
             "link" | "wikilink" => {
-                if let Some(no_space) = value.get("no_space") {
+                if let Value::Map(map) = value {
+                    for (k, v) in map {
+                        if k == "no_space" {
+                            if let Some(b) = v.as_bool() {
+                                cfg.link_no_space = b;
+                            } else if let Some(s) = v.as_str() {
+                                cfg.link_no_space = s == "true" || s == "1";
+                            }
+                        } else if k == "group_order" || k == "order" {
+                            if let Some(s) = v.as_str() {
+                                cfg.link_group_order = match s {
+                                    "content_first" | "content_args" | "[]()" | "content" => {
+                                        Some(GroupOrder::ContentFirst)
+                                    }
+                                    "args_first" | "args_content" | "()[]" | "args" => {
+                                        Some(GroupOrder::ArgsFirst)
+                                    }
+                                    _ => None,
+                                };
+                            }
+                        }
+                    }
+                } else if let Some(no_space) = value.get("no_space") {
                     if let Some(b) = no_space.as_bool() {
                         cfg.link_no_space = b;
                     } else if let Some(s) = no_space.as_str() {
@@ -159,11 +201,56 @@ impl PrinterConfig {
                     }
                 }
             }
+            "link.group_order" | "link.order" | "wikilink.group_order" | "wikilink.order" => {
+                if let Some(s) = value.as_str() {
+                    cfg.link_group_order = match s {
+                        "content_first" | "content_args" | "[]()" | "content" => {
+                            Some(GroupOrder::ContentFirst)
+                        }
+                        "args_first" | "args_content" | "()[]" | "args" => {
+                            Some(GroupOrder::ArgsFirst)
+                        }
+                        _ => None,
+                    };
+                }
+            }
             "link.no_space" | "wikilink.no_space" => {
                 if let Some(b) = value.as_bool() {
                     cfg.link_no_space = b;
                 } else if let Some(s) = value.as_str() {
                     cfg.link_no_space = s == "true" || s == "1";
+                }
+            }
+            "element" => {
+                if let Value::Map(map) = value {
+                    for (k, v) in map {
+                        if k == "group_order" || k == "order" {
+                            if let Some(s) = v.as_str() {
+                                cfg.group_order = match s {
+                                    "content_first" | "content_args" | "[]()" | "content" => {
+                                        Some(GroupOrder::ContentFirst)
+                                    }
+                                    "args_first" | "args_content" | "()[]" | "args" => {
+                                        Some(GroupOrder::ArgsFirst)
+                                    }
+                                    _ => None,
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            "element.group_order" | "element.order" | "group_order" => {
+                if let Some(s) = value.as_str() {
+                    cfg.group_order = match s {
+                        "content_first" | "content_args" | "[]()" | "content" => {
+                            Some(GroupOrder::ContentFirst)
+                        }
+                        "args_first" | "args_content" | "()[]" | "args" => {
+                            Some(GroupOrder::ArgsFirst)
+                        }
+                        _ => None,
+                    };
                 }
             }
             "callout" => {
@@ -629,5 +716,60 @@ mod tests {
         let cfg = load_config_from_str(src).expect("failed to parse config");
         assert!(cfg.heading_space_inside_brackets);
         assert!(cfg.link_no_space);
+    }
+
+    #[test]
+    fn test_group_order_config() {
+        let src1 = r#"@config(
+  format: {
+    element: { group_order: "content_first" }
+  }
+)
+"#;
+        let cfg1 = load_config_from_str(src1).expect("failed to parse config");
+        assert_eq!(cfg1.group_order, Some(GroupOrder::ContentFirst));
+
+        let src2 = r#"@config(
+  format: {
+    group_order: "[]()"
+  }
+)
+"#;
+        let cfg2 = load_config_from_str(src2).expect("failed to parse config");
+        assert_eq!(cfg2.group_order, Some(GroupOrder::ContentFirst));
+
+        let src3 = r#"@config(
+  format: {
+    group_order: "args_first"
+  }
+)
+"#;
+        let cfg3 = load_config_from_str(src3).expect("failed to parse config");
+        assert_eq!(cfg3.group_order, Some(GroupOrder::ArgsFirst));
+
+        let src4 = r#"@config(
+  format: {
+    link: { group_order: "content_first" }
+  }
+)
+"#;
+        let cfg4 = load_config_from_str(src4).expect("failed to parse config");
+        assert_eq!(cfg4.link_group_order, Some(GroupOrder::ContentFirst));
+        assert_eq!(cfg4.group_order, None);
+        assert_eq!(cfg4.element_group_order("link"), Some(GroupOrder::ContentFirst));
+        assert_eq!(cfg4.element_group_order("other"), None);
+
+        let src5 = r#"@config(
+  format: {
+    element: { group_order: "args_first" }
+    link: { group_order: "[]()" }
+  }
+)
+"#;
+        let cfg5 = load_config_from_str(src5).expect("failed to parse config");
+        assert_eq!(cfg5.group_order, Some(GroupOrder::ArgsFirst));
+        assert_eq!(cfg5.link_group_order, Some(GroupOrder::ContentFirst));
+        assert_eq!(cfg5.element_group_order("link"), Some(GroupOrder::ContentFirst));
+        assert_eq!(cfg5.element_group_order("image"), Some(GroupOrder::ArgsFirst));
     }
 }
