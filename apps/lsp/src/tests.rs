@@ -6,7 +6,7 @@ use lsp_types::{
 
 use crate::{
     completions_for, completions_for_with_uri, definition_for, diagnostics_for,
-    document_symbols_for, format_edits, hover_for,
+    document_symbols_for, folding_ranges_for, format_edits, hover_for,
 };
 
 #[test]
@@ -481,3 +481,67 @@ fn completions_for_nested_directory_path() {
         "should suggest src/lib.rs"
     );
 }
+
+#[test]
+fn folding_ranges_for_hierarchical_sections() {
+    let doc_text = r#"= Section 1
+Paragraph in section 1.
+
+== Section 1.1
+Paragraph in section 1.1.
+
+= Section 2
+Paragraph in section 2.
+"#;
+    let ranges = folding_ranges_for(doc_text);
+    assert!(!ranges.is_empty(), "should find folding ranges for sections");
+
+    // Section 1: line 0 to line 4
+    let sec1 = ranges.iter().find(|r| r.start_line == 0);
+    assert!(sec1.is_some(), "Section 1 should have a folding range starting at line 0");
+    assert_eq!(sec1.unwrap().end_line, 4);
+
+    // Section 1.1: line 3 to line 4
+    let sec1_1 = ranges.iter().find(|r| r.start_line == 3);
+    assert!(sec1_1.is_some(), "Section 1.1 should have a folding range starting at line 3");
+    assert_eq!(sec1_1.unwrap().end_line, 4);
+
+    // Section 2: line 6 to line 7
+    let sec2 = ranges.iter().find(|r| r.start_line == 6);
+    assert!(sec2.is_some(), "Section 2 should have a folding range starting at line 6");
+    assert_eq!(sec2.unwrap().end_line, 7);
+}
+
+#[test]
+fn folding_ranges_for_comments_and_elements() {
+    let doc_text = r#"/*
+ multi-line
+ block comment
+*/
+
+// line comment 1
+// line comment 2
+
+```rust
+fn main() {
+    println!("hello");
+}
+```
+"#;
+    let ranges = folding_ranges_for(doc_text);
+    // Block comment: line 0 to 3
+    let comment_range = ranges.iter().find(|r| r.start_line == 0);
+    assert!(comment_range.is_some());
+    assert_eq!(comment_range.unwrap().end_line, 3);
+
+    // Line comments: line 5 to 6
+    let line_comments = ranges.iter().find(|r| r.start_line == 5);
+    assert!(line_comments.is_some());
+    assert_eq!(line_comments.unwrap().end_line, 6);
+
+    // Codeblock element: line 8 to 12
+    let code_range = ranges.iter().find(|r| r.start_line == 8);
+    assert!(code_range.is_some());
+    assert_eq!(code_range.unwrap().end_line, 12);
+}
+

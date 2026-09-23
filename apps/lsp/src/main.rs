@@ -6,11 +6,13 @@ use lsp_types::notification::{
     PublishDiagnostics,
 };
 use lsp_types::request::{
-    Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest, Request as _,
+    Completion, DocumentSymbolRequest, FoldingRangeRequest, Formatting, GotoDefinition,
+    HoverRequest, Request as _,
 };
 use lsp_types::{
-    CompletionOptions, HoverProviderCapability, InitializeParams, OneOf, PublishDiagnosticsParams,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
+    CompletionOptions, FoldingRangeProviderCapability, HoverProviderCapability, InitializeParams,
+    OneOf, PublishDiagnosticsParams, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind, Uri,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -22,6 +24,7 @@ fn main() -> anyhow::Result<()> {
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
         definition_provider: Some(OneOf::Left(true)),
+        folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
         completion_provider: Some(CompletionOptions {
             resolve_provider: Some(false),
             trigger_characters: Some(vec![
@@ -123,6 +126,17 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         })
                         .unwrap_or_default();
                     let result = serde_json::to_value(items)?;
+                    connection
+                        .sender
+                        .send(Message::Response(Response::new_ok(req.id, result)))?;
+                } else if req.method == FoldingRangeRequest::METHOD {
+                    let params: lsp_types::FoldingRangeParams =
+                        serde_json::from_value(req.params)?;
+                    let ranges = documents
+                        .get(&params.text_document.uri)
+                        .map(|text| tomet_lsp::folding_ranges_for(text))
+                        .unwrap_or_default();
+                    let result = serde_json::to_value(ranges)?;
                     connection
                         .sender
                         .send(Message::Response(Response::new_ok(req.id, result)))?;

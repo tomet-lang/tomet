@@ -755,6 +755,13 @@ mod tests {
     }
 
     #[test]
+    fn folds_query_is_valid() {
+        let query_src = include_str!("../queries/folds.scm");
+        tree_sitter::Query::new(&LANGUAGE.into(), query_src)
+            .expect("queries/folds.scm should be a valid query against this grammar");
+    }
+
+    #[test]
     fn parses_single_quoted_strings() {
         let src = "@settings(title: 'my title') { path: 'foo/bar' }\n";
         let tree = parse(src);

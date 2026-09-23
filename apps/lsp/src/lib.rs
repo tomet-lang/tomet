@@ -5,6 +5,7 @@
 pub mod completion;
 pub mod definition;
 pub mod diagnostic;
+pub mod folding;
 pub mod format;
 pub mod hover;
 pub mod position;
@@ -13,6 +14,7 @@ pub mod symbol;
 pub use completion::{completions_for, completions_for_with_uri};
 pub use definition::definition_for;
 pub use diagnostic::diagnostics_for;
+pub use folding::folding_ranges_for;
 pub use format::{format_edits, resolve_effective_config};
 pub use hover::hover_for;
 pub use position::{span_to_range, text_range_to_lsp_range};
