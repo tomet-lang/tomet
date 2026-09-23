@@ -1,8 +1,8 @@
-# tomet-field-utils
+= tomet-field-utils
 
 `FieldConfig` に基づく `@meta` フィールド値（ID、日時）の純粋ユーティリティを提供するクレート。
 
-## 責務と機能
+== 責務と機能
 
 -. **ID 生成・検証**:
    - `generate_id_for_field`: 設定されたプレフィックスとアルゴリズム（`nanoid`, `uuid`）による一意 ID の生成。

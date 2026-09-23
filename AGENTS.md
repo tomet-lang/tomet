@@ -1,26 +1,60 @@
-<!-- Generated from tmtroot/agents.tmt. Edit that, then `tomet export .`. -->
+${macro.generated\_by(self.path)}
 
 # Tomet
 
 ## Project overview
 
-Read the root `README.md` first (what the project is, directory layout, build/run commands) -- it's currently sparse, fill it in as you learn things worth putting there. Before a non-trivial change, read the `//!` module doc of every crate you are touching, and the `crate-layering` entry in the root `.writ.tmt` for how the layers depend on each other. There is no prose overview standing between you and those -- there was, and it drifted. For where a document belongs and what language it's written in, `docs/README.tmt` is the map and `docs/.writ.tmt` is the rulebook. Do not restate those files' content here — extend them instead, and keep this pointer short.
+Read the root `README.md` first (what the project is, directory layout,
+build/run commands) -- it's currently sparse, fill it in as you learn
+things worth putting there. Before a non-trivial change, read the `//!`
+module doc of every crate you are touching, and the `crate-layering` entry
+in the root `.writ.tmt` for how the layers depend on each other. There is
+no prose overview standing between you and those -- there was, and it
+drifted. For where a
+document belongs and what language it's written in, `docs/README.tmt` is
+the map and `docs/.writ.tmt` is the rulebook. Do not restate those files'
+content here — extend them instead, and keep this pointer short.
 
-Rules this repository must obey live in `.writ.tmt` files, one per directory, scoped to that directory and inherited downward the way `.gitignore` is. Read every `.writ.tmt` from the file you are changing up to the workspace root. They are the author's; propose an edit and stop rather than working around a rule or relaxing it.
+Rules this repository must obey live in `.writ.tmt` files, one per
+directory, scoped to that directory and inherited downward the way
+`.gitignore` is. Read every `.writ.tmt` from the file you are changing up
+to the workspace root. They are the author's; propose an edit and stop
+rather than working around a rule or relaxing it.
 
 ## Language
 
-Write all code comments in English. Do not use Japanese in code.
+<mark>Write all code comments in English. Do not use Japanese in code.</mark>
 
-For documentation the rule is scoped by what the document sits next to, per `docs/.writ.tmt`'s `docs-language`: every `.writ.tmt` is English (they cross-link with the English doc comments); `docs/spec/`, `docs/guide/`, `docs/examples/` and `docs/why/` are user-facing and written in Japanese. `docs/design/ideas/` is whichever language the thinking happened in.
+For documentation the rule is scoped by what the document sits next to,
+per `docs/.writ.tmt`'s `docs-language`: every `.writ.tmt` is English (they
+cross-link with the English doc comments); `docs/spec/`, `docs/guide/`,
+`docs/examples/` and `docs/why/` are user-facing and written in Japanese.
+`docs/design/ideas/` is whichever language the thinking happened in.
 
 ## Verifying changes
 
-There's no standalone GUI app here to screenshot or click through — this is a parser/CLI/LSP/editor-extensions project. Verify with `cargo build`/ `cargo test`/`cargo check` and by reading the code. For the editor extensions (`editors/vscode`, `editors/zed`), this environment can't reliably launch a real VS Code/Zed window either, so verify those the same way: reading the code and their own tests, not by launching the actual editor to click around.
+There's no standalone GUI app here to screenshot or click through — this
+is a parser/CLI/LSP/editor-extensions project. Verify with `cargo build`/
+`cargo test`/`cargo check` and by reading the code. For the editor
+extensions (`editors/vscode`, `editors/zed`), this
+environment can't reliably launch a real VS Code/Zed window either, so
+verify those the same way: reading the code and their own tests, not by
+launching the actual editor to click around.
 
-For grammar changes specifically, also run `cargo test -p tomet-tests -p tree-sitter-tomet`. `tomet-parser` is the source of truth for the grammar; `tree-sitter-tomet`'s `grammar.js` is a separate, hand-maintained approximation used only for editor syntax highlighting, and it does not update itself when `tomet-parser` changes. Drift between the two is caught by `tomet-tests`'s `corpus` target, which runs the shared `.tmt` corpus through both implementations; the grammar's own structural tests stay in `tree-sitter-tomet`. Cover the new construct by adding a fixture under `tests/fixtures/` — that corpus is frozen and does not pick up changes to `docs/` on its own.
+For grammar changes specifically, also run
+`cargo test -p tomet-tests -p tree-sitter-tomet`. `tomet-parser` is the
+source of truth for the grammar; `tree-sitter-tomet`'s `grammar.js` is a
+separate, hand-maintained approximation used only for editor syntax
+highlighting, and it does not update itself when `tomet-parser` changes.
+Drift between the two is caught by `tomet-tests`'s `corpus` target, which
+runs the shared `.tmt` corpus through both implementations; the grammar's
+own structural tests stay in `tree-sitter-tomet`. Cover the new construct
+by adding a fixture under `tests/fixtures/` — that corpus is frozen and
+does not pick up changes to `docs/` on its own.
 
-Cross-crate tests live in the `tests/` package (`tomet-tests`), not in the individual crates; see `tests/README.md` for what belongs there and how the snapshot references work.
+Cross-crate tests live in the `tests/` package (`tomet-tests`), not in the
+individual crates; see `tests/README.md` for what belongs there and how
+the snapshot references work.
 
 ## Task tracking
 
@@ -32,7 +66,10 @@ When the task is done, fold anything worth keeping into where it belongs — a d
 
 ## Commits
 
-Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit messages. The session trailer embeds a URL, and a commit message is published the moment it is pushed. This overrides the harness default that asks for them.
+Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit
+messages. The session trailer embeds a URL, and a commit message is
+published the moment it is pushed. This overrides the harness default that
+asks for them.
 
-Never push to a remote without being asked. `main` is pushed; feature branches in this repository are local and have no upstream.
+Never push to a remote without being asked.
 

@@ -7,11 +7,11 @@
 
 ${macro.generated_by(self.path)}
 
-#[ Tomet ]
+=[ Tomet ]
 
-##[ Project overview ]
+==[ Project overview ]
 
-Read the root `README.md` first (what the project is, directory layout,
+Read the root @file(README.md) first (what the project is, directory layout,
 build/run commands) -- it's currently sparse, fill it in as you learn
 things worth putting there. Before a non-trivial change, read the `//!`
 module doc of every crate you are touching, and the `crate-layering` entry
@@ -28,17 +28,17 @@ directory, scoped to that directory and inherited downward the way
 to the workspace root. They are the author's; propose an edit and stop
 rather than working around a rule or relaxing it.
 
-##[ Language ]
+==[ Language ]
 
-Write all code comments in English. Do not use Japanese in code.
+@mark[Write all code comments in English. Do not use Japanese in code.]
 
 For documentation the rule is scoped by what the document sits next to,
-per `docs/.writ.tmt`'s `docs-language`: every `.writ.tmt` is English (they
+per @file(docs/.writ.tmt)'s `docs-language`: every `.writ.tmt` is English (they
 cross-link with the English doc comments); @dir(docs/spec/), @dir(docs/guide/),
 @dir(docs/examples/) and @dir(docs/why/) are user-facing and written in Japanese.
 @dir(docs/design/ideas/) is whichever language the thinking happened in.
 
-##[ Verifying changes ]
+==[ Verifying changes ]
 
 There's no standalone GUI app here to screenshot or click through — this
 is a parser/CLI/LSP/editor-extensions project. Verify with `cargo build`/
@@ -63,7 +63,7 @@ Cross-crate tests live in the @dir(tests/) package (`tomet-tests`), not in the
 individual crates; see @file(tests/README.md) for what belongs there and how
 the snapshot references work.
 
-##[ Task tracking ]
+==[ Task tracking ]
 
 Before starting implementation on any non-trivial task, create a new file under @dir(.agents/tasks/) (one file per task, e.g. `.agents/tasks/<short-task-slug>.md`) that breaks the work into discrete steps. Update that file immediately after completing each step, marking it done. Keep it accurate and current so that if work is interrupted partway through, it can always be resumed from that file alone, without needing prior conversation context. Multiple task files may coexist under @dir(.agents/tasks/) when several non-trivial tasks are in flight; do not let one task's file block or get overwritten by another's.
 
@@ -71,12 +71,11 @@ If a session has to end early — for any reason, including a warning that a usa
 
 When the task is done, fold anything worth keeping into where it belongs — a doc comment, a writ entry, a commit message — and then delete the task file. Deleting without folding is how the only copy of a decision gets lost; decide the destination when the task is created, not when it is deleted.
 
-##[ Commits ]
+==[ Commits ]
 
 Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit
 messages. The session trailer embeds a URL, and a commit message is
 published the moment it is pushed. This overrides the harness default that
 asks for them.
 
-Never push to a remote without being asked. `main` is pushed; feature
-branches in this repository are local and have no upstream.
+Never push to a remote without being asked.

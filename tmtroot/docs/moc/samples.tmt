@@ -1,6 +1,6 @@
-#[ Sample ]
+=[ Sample ]
 
-#[ Application ]
+=[ Application ]
 
 @card(title:"tomet-cli")
 | TUI操作やCommand経由で、Tometを対応フォーマットに変換、編集、検索が可能。
@@ -14,13 +14,13 @@
 @card(title:"oneline")
 | tometの一部の構文を活かし、"一行に意味をもたせる"をモットウにした、派生記法。
 
-#[ Website ]
+=[ Website ]
 
 @card(title: "tomet-website")
 | 公式ウェブサイト
 | tometとAstroを使用。
 
-#[ Example ]
+=[ Example ]
 
 @card(title: "tomet-sandbox")
 | Wikipediaなどの実際に運用されている膨大な情報を拝借し、

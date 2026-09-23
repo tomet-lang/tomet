@@ -1,4 +1,4 @@
-#[ Tomet のドキュメント ]
+=[ Tomet のドキュメント ]
 
 何がどこにあるかの地図。探しものがここから辿れないなら、間違っているのは
 このページのほう。別の場所に二つ目の索引を作らず、ここを直すこと。
@@ -32,7 +32,7 @@
     本物として拾われて @dir(docs/examples/) が独立した vault になっていたため。
   ]
 
-#[ ここから読む ]
+=[ ここから読む ]
 
 - 言語をはじめて触る: @link(file:./guide/cheatsheet.tmt)[`guide/cheatsheet.tmt`]
 - なぜこのフォーマットがあるのか: @link(file:./why/root.tmt)[`why/root.tmt`]
@@ -40,7 +40,7 @@
 - パーサが今日*実際に*受け付けるものを確かめる: @link(file:../tests/SYNTAX.md)[`/tests/SYNTAX.md`]
 - ドキュメントを書く・動かす: @link(file:./.writ.tmt)[`docs/.writ.tmt`]
 
-#[ 文書を検査する ]
+=[ 文書を検査する ]
 
 @dir(docs/) 以下の `.tmt` は本物の Tomet 文書なので、そのままドッグフーディングに
 なっている。パースでき、書いている要素がどれも scope にある名前空間に実在し、

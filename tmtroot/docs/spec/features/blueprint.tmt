@@ -7,7 +7,7 @@
 
 綴りは `blueprint` ひとつ。`template` という語は使わない。
 
-#[ 1. @blueprint による定義 ]
+=[ 1. @blueprint による定義 ]
 
 ブループリントは、先頭に `@kind(blueprint)` と `@blueprint(target-kind)` を宣言した通常の `.tmt` ファイルです。
 
@@ -35,7 +35,7 @@ blueprints: [
 ]
 ```
 
-#[ 2. ブループリントからのドキュメント生成 (CLI) ]
+=[ 2. ブループリントからのドキュメント生成 (CLI) ]
 
 `tomet new` は、宣言されたブループリントを名前で引いて文書を作る。
 
@@ -50,7 +50,7 @@ tomet new docs/rfcs/001-auth.tmt --blueprint rfc --var title="OAuth2 Support"
 tomet new --list
 ```
 
-#[ 3. 動的変数と組み込み関数 ]
+=[ 3. 動的変数と組み込み関数 ]
 
 ブループリント内では `${...}` 式を使用して、生成時に動的な値を展開できます。
 
@@ -61,7 +61,7 @@ tomet new --list
 - `${title}`: ファイル名や引数から推定されるタイトル。
 - `${vars.@name}`: CLIの `--var @name=@value` で渡されたカスタム変数。
 
-#[ 4. 構造検証（ブループリント検証） ]
+=[ 4. 構造検証（ブループリント検証） ]
 
 生成されたドキュメントは `@kind(daily-note)` を持ちます。`tomet-validator` および LSP は、プロジェクト内の `@blueprint(daily-note)` と照合し、以下の構造整合性を検証します。
 

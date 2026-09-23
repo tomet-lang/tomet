@@ -1,4 +1,4 @@
-#[ crates/ directory layout ]
+=[ crates/ directory layout ]
 
 This directory is flat. Grouping is expressed through the crate name's
 prefix family, not through subdirectories -- see

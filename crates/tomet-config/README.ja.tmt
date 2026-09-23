@@ -1,22 +1,22 @@
-# tomet-config
+= tomet-config
 
 プロジェクト設定ファイル探索・読み込みおよびフォーマット・メタデータルール定義（`PrinterConfig`, `FieldConfig`）を提供するクレート。
 
-## 責務とアーキテクチャ
+== 責務とアーキテクチャ
 
--. **設定ドメインの集約**:
-   - `default.config.tmt` / `tomet.config.tmt` ファイル探索やインラインの `@config`/`@settings` ブロックからの設定構築を集約。
-   - 複数の下流クレート（`tomet-style`, `tomet-field-utils`, `tomet-printer`, `tomet-formatter`, `tomet-indexer`, `tomet-edit`, `tomet-tui`, @dir(apps/cli)）が共通して参照します。
+-.| **設定ドメインの集約**:
+  | - `default.config.tmt` / `tomet.config.tmt` ファイル探索やインラインの `@config`/`@settings` ブロックからの設定構築を集約。
+  | - 複数の下流クレート（`tomet-style`, `tomet-field-utils`, `tomet-printer`, `tomet-formatter`, `tomet-indexer`, `tomet-edit`, `tomet-tui`, @dir(apps/cli)）が共通して参照します。
 
--. **主な機能モジュール**:
-   - **設定探索・ロード (`find_config_file`, `load_config_from_file`, `load_config_from_str`)**:
-     - 親ディレクトリを遡って `default.config.tmt` または `tomet.config.tmt` を自動探索。
-   - **プリンタ設定 (`PrinterConfig`)**:
-     - `meta_format`: メタデータ埋め込み形式（`yaml`, `json`, `toml`）
-     - `meta_always_newline`: メタデータ項目の改行配置
-     - `heading_space_inside_brackets`: 見出し括弧内の余白ルール（`#[ Title ]` vs `#[Title]`）
-     - `link_no_space`: リンク引数前後のスペース有無
-     - `callout_content_style` / `list_multiline_style_content`: コールアウトやリストの整形スタイル
-     - `ignore_files`: ディレクトリ走査除外対象ファイル・プレフィックス
-   - **フィールド単位メタデータ設定 (`FieldConfig`)**:
-     - `meta_fields`: フィールド名ごとの ID 生成/検証ルール（`field_type`, `format`, `offset`, `length`, `prefix`, `force`, `overwrite`）
+-.| **主な機能モジュール**:
+  | - **設定探索・ロード (`find_config_file`, `load_config_from_file`, `load_config_from_str`)**:
+  |   - 親ディレクトリを遡って `default.config.tmt` または `tomet.config.tmt` を自動探索。
+  | - **プリンタ設定 (`PrinterConfig`)**:
+  |   - `meta_format`: メタデータ埋め込み形式（`yaml`, `json`, `toml`）
+  |   - `meta_always_newline`: メタデータ項目の改行配置
+  |   - `heading_space_inside_brackets`: 見出し括弧内の余白ルール（`#[ Title ]` vs `#[Title]`）
+  |   - `link_no_space`: リンク引数前後のスペース有無
+  |   - `callout_content_style` / `list_multiline_style_content`: コールアウトやリストの整形スタイル
+  |   - `ignore_files`: ディレクトリ走査除外対象ファイル・プレフィックス
+  | - **フィールド単位メタデータ設定 (`FieldConfig`)**:
+  |   - `meta_fields`: フィールド名ごとの ID 生成/検証ルール（`field_type`, `format`, `offset`, `length`, `prefix`, `force`, `overwrite`）

@@ -1,6 +1,7 @@
-#[ Experimental ]
+=[ Experimental ]
 
 ```tm
 :as()
 :rule()
+:section()
 ```

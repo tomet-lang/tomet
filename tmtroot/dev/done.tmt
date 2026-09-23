@@ -1,4 +1,4 @@
-#[ 構文 ]
+=[ 構文 ]
 - (x) 設定
 - (x) 要素設定 (.config.tmt, json, yaml)
 - (x) Table記法
@@ -17,17 +17,17 @@
 - (x) 基本要素 (heading, list, horizontal line)
 - (x) 名前 (element, arg, content, value)
 - (x) 基本AST (`@name()[]{}`)
-#[ 機能 ]
+=[ 機能 ]
 - (x) to_from_markdown ()
 - (x) export (`export:{type: commonmark, path: ...}`)
-#[ CLI ]
+=[ CLI ]
 - (x) TUI (Explorer, Migration, Grep)
-#[ TUI ]
+=[ TUI ]
 - (x) 移行 (Markdown)
 - (x) エクスプローラー
-#[ LSP ]
+=[ LSP ]
 - (x) マクロ結果をホバーに表示
-#[ Integration ]
+=[ Integration ]
 - (x) Svelte
 - (x) React
 - (x) Java

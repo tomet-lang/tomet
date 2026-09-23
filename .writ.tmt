@@ -1,6 +1,6 @@
 @kind(writ)
 
-#[ Writ: workspace root ]
+=[ Writ: workspace root ]
 
 Rules the whole repository obeys.
 
@@ -12,19 +12,19 @@ Only the author edits this file. An agent that finds a rule in its way
 proposes an edit here and stops. It does not work around the rule, and it
 does not relax the rule to fit the change it wanted to make.
 
-##[ crate-layering ]
+==[ crate-layering ]
 
 @rule(crate-layering){
   guard: { twrit: layers }
 
   layers: {
-    6: [ "apps/*", "bindings/*", "editors/*", "tests" ]
-    5: [ "crates/tomet-workspace*", "crates/tomet-load" ]
-    4: [ "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet", "crates/tomet-extract", "crates/tomet-search" ]
-    3: [ "crates/tomet-config" ]
-    2: [ "crates/tomet-semantics*" ]
-    1: [ "crates/tomet-syntax-*" ]
-    0: [ "crates/tree-sitter-tomet" ]
+    6: list( "apps/*", "bindings/*", "editors/*", "tests" )
+    5: list( "crates/tomet-workspace*", "crates/tomet-load" )
+    4: list( "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet", "crates/tomet-extract", "crates/tomet-search" )
+    3: list( "crates/tomet-config" )
+    2: list( "crates/tomet-semantics*" )
+    1: list( "crates/tomet-syntax-*" )
+    0: list( "crates/tree-sitter-tomet" )
   }
 }
 
@@ -81,7 +81,7 @@ unclassified member is a failure rather than a silence.
 no layer, a member matching two, an upward edge, or anything `crates/
 tree-sitter-tomet` comes to depend on.
 
-##[ tmtroot-mirrors-the-root ]
+==[ tmtroot-mirrors-the-root ]
 
 @rule(tmtroot-mirrors-the-root){
   guard: { runs: "just docs-check" }
@@ -168,7 +168,7 @@ reports "this document declares no output": `tomet export` prints such a
 file to stdout and `--check` only compares outputs that were declared.
 Tighten it when one does.
 
-##[ tmtroot-output-not-edited ]
+==[ tmtroot-output-not-edited ]
 
 @rule(tmtroot-output-not-edited){
   guard: { runs: "just docs-check" }
@@ -210,7 +210,7 @@ it goes stale the moment the file moves. The wording lives once, in
 `tomet export --check .`, the same one as above: a hand-edit makes the
 output disagree with its source, which is exactly what that reports.
 
-##[ dot-tomet-is-authored ]
+==[ dot-tomet-is-authored ]
 
 @rule(dot-tomet-is-authored){
   guard: { runs: "just writ-check" }
@@ -285,7 +285,7 @@ that actually happened -- a rule telling authors to write somewhere git
 was told to discard -- rather than trying to prove no tool ever writes
 into the tree.
 
-##[ blueprint-shape ]
+==[ blueprint-shape ]
 
 @rule(blueprint-shape){
   guard: { none: "checkable in two halves, neither written yet" }
@@ -352,7 +352,7 @@ None yet. Two halves are checkable: no document carries `@blueprint`
 without `@kind(blueprint)`, and `@blueprint`'s args are a bare positional
 rather than a `target:`/`kind:` map.
 
-##[ explicit-form-first ]
+==[ explicit-form-first ]
 
 @rule(explicit-form-first){
   guard: { none: "no mechanical check for the general rule" }
@@ -419,7 +419,7 @@ a shorthand must have a formatter expansion, and a test that the
 expansion round-trips. A shorthand `tomet fmt` cannot expand is a second
 spelling wearing the word.
 
-##[ kind-not-meta-type ]
+==[ kind-not-meta-type ]
 
 @rule(kind-not-meta-type){
   guard: { runs: "tomet refactor --check --meta-kind" }
@@ -451,22 +451,22 @@ carries the old spelling.
 Known gap: files that fail to parse are skipped with a warning rather than
 failing the run, so a broken file is also an unguarded one.
 
-##[ file-io-doors ]
+==[ file-io-doors ]
 
 @rule(file-io-doors){
   guard: { twrit: door }
 
   door: {
-    names: [ "std::fs" ]
-    within: [ "crates/*" ]
-    allowed: [
+    names: list( "std::fs" )
+    within: list( "crates/*" )
+    allowed: list(
       "crates/tomet-semantics-resolver",
       "crates/tomet-config",
       "crates/tomet-load",
       "crates/tomet-workspace",
       "crates/tomet-workspace-indexer",
       "crates/tomet-workspace-links"
-    ]
+    )
   }
 }
 

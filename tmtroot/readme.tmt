@@ -12,7 +12,7 @@ $macro.generated_by(self.path)
 | Tometは現在開発中であり、日々構文や仕様が大きく変わっています。
 | 試す際には、バックアップを取り実運用をしないでください。
 
-#[ Tomet ]
+=[ Tomet ]
 
 @link("https://github.com/tomet-lang/tomet")
 | @embed(url:"https://img.shields.io/github/license/tomet-lang/tomet?style=flat-square&color=brightgreen")[license]
@@ -23,7 +23,7 @@ $macro.generated_by(self.path)
 
 Tome to me!!
 
-##[ What is tomet? ]
+==[ What is tomet? ]
 
 -. 人間工学的見やすさ。
 -. パーサーにも優しい。
@@ -31,7 +31,7 @@ Tome to me!!
 -. key:valueを重視
 -. 私は、研究目的。
 
-##[ なぜtometを使用するのか？ ]
+==[ なぜtometを使用するのか？ ]
 
 -. 非曖昧な構文
 -. リンクと変数に特化。
@@ -62,19 +62,19 @@ Tome to me!!
 - テキストファースト
 - PDF無理
 - HTML/Markdown、他の記法を組み込める。
-- ==文書を美しく組版するための言語==
+- @mark[文書を美しく組版するための言語]
 - 意味を持った構造を記述し、それを様々な方法で消費できる言語
 - データとしての読み書き可能。
 
 ---[ vs mdx ]---
 - Javascript非依存
 
-##[ 構造上の弱点 ]
+==[ 構造上の弱点 ]
 
 -. 視覚的ノイズとタイピング摩擦。記号の渋滞 (LSP機能を大切に)
 -. Markdown非完全互換
 
-#[ Supported Editors ]
+=[ Supported Editors ]
 
 - Helix
 - Neovim

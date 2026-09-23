@@ -1,8 +1,8 @@
-#[ `#heading(level:)[]{}` ]
+=[ `#heading(level:)[]{}` ]
 
 - `#[]{}`
 
-#[ `@link(target:"scheme:address")` ]
+=[ `@link(target:"scheme:address")` ]
 
 - target
 -- "tm:tmfile"
@@ -16,7 +16,7 @@
 
 - targetを省略した記法。最初がtarget:と推論される。これは、argsの中で、targetのみ。
 
-#[ その他 ]
+=[ その他 ]
 
 ```(tm)
 ```
