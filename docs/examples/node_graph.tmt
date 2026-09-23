@@ -1,6 +1,6 @@
 @kind(node-graph)
 
-#[ Nodes ]
+=[ Nodes ]
 
 @node(type:textarea)
 {id:node-1, x:123, y:456}
@@ -19,4 +19,4 @@
 @node(type:export)
 {id:node-4, x:123, y:456}
 
-#[ Links ]
+=[ Links ]

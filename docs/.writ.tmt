@@ -1,6 +1,6 @@
 @kind(writ)
 
-#[ Writ: docs ]
+=[ Writ: docs ]
 
 Rules for @dir(docs/) itself.
 
@@ -13,7 +13,7 @@ person.
 Only the author edits this file. An agent that finds a rule in its way
 proposes an edit here and stops.
 
-##[ document-placement ]
+==[ document-placement ]
 
 @rule(document-placement){
   guard: { twrit: placement }
@@ -118,7 +118,7 @@ else, which is the wrong way round for documentation.
 `twrit check`. It validates that every file under @dir(docs/) matches an allowed
 placement pattern declared in `@rule(document-placement)`.
 
-##[ docs-language ]
+==[ docs-language ]
 
 @rule(docs-language){
   guard: { runs: "just writ-check" }
@@ -152,7 +152,7 @@ find . -name '.writ.tmt' -not -path './target/*' \
   -exec grep -lP '[\x{3040}-\x{30ff}]' {} +
 ```
 
-##[ generated-md-not-edited ]
+==[ generated-md-not-edited ]
 
 @rule(generated-md-not-edited){
   guard: { runs: "just docs-check" }

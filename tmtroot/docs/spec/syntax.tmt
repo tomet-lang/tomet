@@ -1,6 +1,6 @@
-#[ base ]
+=[ base ]
 
-#[ multiline ]
+=[ multiline ]
 
 ```tmt
 @callout(info)
@@ -36,9 +36,19 @@
 | | - outline
 ```
 
-#[ raw fence ]
+=[ raw fence ]
 
-#[ break ]
+=[ break ]
 
 - soft break
 - hard line break
+
+=[ section ]
+
+`=`, `==`, ...
+
+=[ tag ]
+
+`#(tag, tag2)`
+
+=[ hook ]

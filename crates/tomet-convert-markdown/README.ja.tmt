@@ -1,8 +1,8 @@
-# tomet-markdown
+= tomet-markdown
 
 CommonMark / Markdown と Tomet AST 間の双方向変換を提供するクレート。
 
-## 責務と機能
+== 責務と機能
 
 -. **Markdown からのインポート (`from_markdown`)**:
    - `pulldown-cmark` による CommonMark のパース。

@@ -1,4 +1,4 @@
-#[ std vocabulary ]
+=[ std vocabulary ]
 
 Tometの仕様、Markdownの基本的な記法
 
@@ -52,7 +52,7 @@ Tometの仕様、Markdownの基本的な記法
 @dir
 ```
 
-#[ Doc vocabulary ]
+=[ Doc vocabulary ]
 
 Tometは構文を持つが、実際の振る舞いはアプリに任せる。
 
@@ -61,7 +61,7 @@ Tometは構文を持つが、実際の振る舞いはアプリに任せる。
 @doc.index
 ```
 
-#[ Experimental ]
+=[ Experimental ]
 
 現在試験的に入れいているもので、今後記法が変わる場合がある。
 
@@ -74,7 +74,7 @@ Tometは構文を持つが、実際の振る舞いはアプリに任せる。
 @draft
 ```
 
-#[ Draft ]
+=[ Draft ]
 
 ```tm
 @crate

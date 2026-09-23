@@ -1,6 +1,6 @@
-#[ Supported ]
+=[ Supported ]
 
-##[ Heading ]
+==[ Heading ]
 
 ```tm
 # heading
@@ -9,7 +9,7 @@
 #[ heading ]{}
 ```
 
-##[ Outline ]
+==[ Outline ]
 
 ```tm
 - outline
@@ -23,7 +23,7 @@
 -. sorted
 ```
 
-##[ Link ]
+==[ Link ]
 
 ```tm
 [display](path)
@@ -33,7 +33,7 @@
 @link(target:"ref:file_name")
 ```
 
-##[ Embed ]
+==[ Embed ]
 
 ```tm
 ![embed](path)
@@ -43,7 +43,7 @@
 @embed(ref:file_name)
 ```
 
-##[ Blockquote ]
+==[ Blockquote ]
 
 ```tm
 > blockquote
@@ -52,7 +52,7 @@
 [ blockquote ]
 ```
 
-##[ Callout ]
+==[ Callout ]
 
 ```tm
 > [!info] Title
@@ -92,7 +92,7 @@ _torikesi_
 ----[💫]----
 ```
 
-##[ Table ]
+==[ Table ]
 
 ```tm
 | table | ---- | ---- |
@@ -105,4 +105,4 @@ _torikesi_
 ]{}
 ```
 
-#[ Unsupported ]
+=[ Unsupported ]

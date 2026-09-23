@@ -1,12 +1,12 @@
-# tomet-ast
+= tomet-ast
 
 Tomet ツールチェーン全体の基礎となるデータモデル (`Document`, `Block`, `Inline`, `Element`, `Value`, `Position`, `Span`) の型定義および構造アクセサメソッドを提供するクレート。
 
-##[ 含まれる主要データ型 ]
+==[ 含まれる主要データ型 ]
 - 純粋データ型: `Value` (Null / Bool / Int / Float / String / Seq / Map)
 - AST マークアップ構造: `Document` / `Block` / `Paragraph` / `Inline` / `Text` / `Sigil` / `Element` / `ElementValue` / `InterpExpr`
 
-##[ 設計方針 (Design Policy) ]
+==[ 設計方針 (Design Policy) ]
 
 -. **データモデルと構造アクセサに限定する (Pure Data & Structural Accessors)**:
   - `tomet-ast` は全てのクレートから参照される基盤ライブラリであり、外部依存関係を持たない純粋なクレートとして維持する。

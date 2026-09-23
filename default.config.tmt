@@ -1,7 +1,5 @@
 @kind(config)
-@meta{
-  id: doc-kWBcIUUz
-}
+@meta{id: doc-kWBcIUUz}
 @config{
   macros: {
     gh: "https://github.com/tomet/tomet/issues/${1}"
@@ -24,7 +22,10 @@
     meta: { always_newline: true, format: yaml }
     heading: { space_inside_brackets: true }
     table: { adjust_width: auto, max_col_width: 50 }
-    link: { no_space: true }
+    link: {
+      no_space: true
+      group_order: "[]()"
+    }
     quote: { always_newline: true }
     callout: {
       style: { content: block }
@@ -44,22 +45,22 @@
     url.source: { type: list, always_newline: true }
     url.main: { type: list, always_newline: true }
   }
-  blueprints: [
+  blueprints: list(
     ".tomet/blueprints/writ.blueprint.tmt",
     "docs/examples/blueprints/daily-note.blueprint.tmt",
     "docs/examples/blueprints/rfc.blueprint.tmt",
-  ]
-  vocabularies: [
+  )
+  vocabularies: list(
     ".tomet/vocabularies/writ.vocabulary.tmt",
     ".tomet/vocabularies/bookmark.vocabulary.tmt",
     ".tomet/vocabularies/node-graph.vocabulary.tmt",
     ".tomet/vocabularies/scenario.vocabulary.tmt",
     ".tomet/vocabularies/video.vocabulary.tmt",
     ".tomet/vocabularies/idea.vocabulary.tmt",
-  ]
+  )
   workspace: {
-    ignore: [ "00-09 System/01 Apps/obsidian" ]
-    unswept: [ "tests/fixtures", "tests/ref", "tests/store" ]
+    ignore: list( "00-09 System/01 Apps/obsidian" )
+    unswept: list( "tests/fixtures", "tests/ref", "tests/store" )
   }
   migration: {
     meta: {

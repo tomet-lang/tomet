@@ -30,26 +30,24 @@ mkShell rec {
     tmtbook
     pagefind
 
-    #[ CMake ]
+    #[ Develop ]
+    python3
+    ##[ CMake ]
     cmake
     ninja
-
-    #[ Rust ]
+    ##[ Rust ]
     rust-toolchain
     cargo-edit
     cargo-outdated
     cargo-nextest
     wasm-bindgen-cli
-
-    #[ Pandoc ]
+    ##[ Pandoc ]
     haskellPackages.pandoc-cli
-    #[ VS Code extension (apps/vscode-extension) ]
+    ##[ VS Code extension @dir(apps/vscode-extension) ]
     nodejs
     pnpm
-    #[ Python bindings (bindings/python) ]
-    python3
 
-    #[ Misc ]
+    #[ Runtime ]
     pkg-config
   ];
 

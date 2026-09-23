@@ -12,7 +12,7 @@ target: "https://..."         // @link / @embed が指す先。キーはこの�
                               // @link("https://...") と書ける。
 ```
 
-##[ target の接頭辞 ]
+==[ target の接頭辞 ]
 
 @table[
 [ 接頭辞             ][ 指すもの ]
@@ -23,7 +23,7 @@ target: "https://..."         // @link / @embed が指す先。キーはこの�
 [ `ref:`             ][ ファイル名・タイトルでプロジェクト内を検索して解決 ]
 ]
 
-##[ 旧い per-scheme キー ]
+==[ 旧い per-scheme キー ]
 
 `target` に一本化する前は接頭辞ではなくキーで書いていた。`url` / `file` /
 `tm` / `id` / `ref` の五つだけが `target` に回収される
@@ -38,7 +38,7 @@ target: "https://..."         // @link / @embed が指す先。キーはこの�
 された。@link(file:docs/spec/syntax.tmt)[`spec/syntax.tmt`] の「撤去済み」を
 参照。
 
-##[ 未実装 ]
+==[ 未実装 ]
 
 ```tm
 // format: kdl              // kdl は embedded format として認識されない

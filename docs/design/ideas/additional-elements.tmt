@@ -1,6 +1,6 @@
 @kind(idea)
 
-#[ blueprintに必要 ]
+=[ blueprintに必要 ]
 
 $only(header,primitives)
 $allow(header,primitives)

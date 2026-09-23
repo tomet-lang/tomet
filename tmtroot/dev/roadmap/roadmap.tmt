@@ -14,17 +14,17 @@
 │ DocBook, AsciiDoc, Typst │ block / inline とそのまま          │
 └──────────────────────────┴────────────────────────────────────┘
 
-- iconの設定colorとconfig。
+- `tellme`, `show`
+- `details` and `summary`
+- `:ignore`, `:nocheck`
+- `$generate.uuid`
 - cliの色付け
-- $の影響範囲を大幅拡大。
-- []リストを排除、list()に置き換え。
-- ==
+- `+++`の削除
 - githubのreadme
 - `[[  ]]`を`@link(ref:)`の糖衣構文(ただし、labelは設定不可能にする。)
 - `{{}}`を`${}`の糖衣構文。
 - vocabularyマネージャー？
 - 日本語対応、組版
-- calloutってcardじゃね？？
 - 一つのファイルで完結するようにする(blueprint, vocabulary)
 - プロパティの重複のワーニング
 - tasksもtmtで、雛形決めたほうが良さそう？
@@ -33,12 +33,14 @@
 - mode。`commonmark`、`no_data`
 - export force
 - kindとrules?
+- markerの種類にorderedを入れる。
+- `==`の折りたたみ、後ろに装飾の`==`をつけることが可能
 - export後のパスの整合性
 - フォーマッタが効かない。
 - `[label]:link(https://)`
 - `[label]:style(color:#ffffff):link(https://)`
   - 今 > `@link[@color[asdfasdf](white)](https:///)`
-- `#`の意味の重複 カラーコード タグ ヘッダー
+- `#`の意味の重複 カラーコード タグ
 - `->`
 - `\n`の統一は決着（`Inline::SoftBreak`/`LineBreak`/`Raw`、`tomet-syntax-ast`）。
   残るのはhardbreak（`LineBreak`）の記法だけ ── 今は誰も書けない

@@ -8,7 +8,7 @@
 |[ `@list()[ content ]{}`             ][ `- [ content ]{}`, `- content :{}`        ][ from markdown ]
 |[ `@codeblock`                       ][ `\`\`\`(lang:<string>)`, `\`\`\`<string>` ][ from markdown ]
 
-#[ draft ]
+=[ draft ]
 
 @table
 |[ element                       ][ sugar                ][ why                    ]

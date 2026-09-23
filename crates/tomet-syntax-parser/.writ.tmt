@@ -1,6 +1,6 @@
 @kind(writ)
 
-#[ Writ: tomet-syntax-parser ]
+=[ Writ: tomet-syntax-parser ]
 
 Rules this crate must obey.
 
@@ -12,7 +12,7 @@ Only the author edits this file. An agent that finds a rule in its way
 proposes an edit here and stops. It does not work around the rule, and it
 does not relax the rule to fit the change it wanted to make.
 
-##[ parser-purity ]
+==[ parser-purity ]
 
 @rule(parser-purity){
   guard: { twrit: pure }
@@ -88,7 +88,7 @@ parsing two sources and comparing the trees; if parsing could consult the
 filesystem, the same input could produce different trees and the comparison
 would mean nothing.
 
-##[ no-vocabulary ]
+==[ no-vocabulary ]
 
 @rule(no-vocabulary){
   guard: { test: "tests/src/vocabulary.rs" }

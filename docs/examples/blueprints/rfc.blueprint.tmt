@@ -13,10 +13,10 @@
   status: draft
 }
 
-#[ Summary ] {id: summary}
+=[ Summary ] {id: summary}
 
-#[ Motivation ] {id: motivation}
+=[ Motivation ] {id: motivation}
 
-#[ Detailed Design ] {id: design}
+=[ Detailed Design ] {id: design}
 
-#[ Drawbacks ] {id: drawbacks}
+=[ Drawbacks ] {id: drawbacks}

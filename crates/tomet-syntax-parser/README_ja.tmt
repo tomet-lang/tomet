@@ -1,8 +1,8 @@
-# tomet-parser
+= tomet-parser
 
 Tomet 言語の文法実装および再帰下降パーサー (`&str -> Document / Value`) を提供するクレート。言語仕様の正統な定義（Source of Truth）となります。
 
-## 責務とアーキテクチャ
+== 責務とアーキテクチャ
 
 -. **決定論的静的パーサー境界 (Deterministic Static Parser Boundary)**:
    - `tomet-parser` は純粋関数型かつ副作用のない決定論的静的パーサーです。I/O（ファイル読み込みやネットワーク）、外部解決、動的実行は一切行いません。

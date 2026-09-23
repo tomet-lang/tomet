@@ -10,7 +10,7 @@
    このページは `tomet-config` の `PrinterConfig::apply_entry` が実際に読む
    キーだけを載せる。読む側が無いキーはそう書く。 */
 
-#[ 全体の形 ]
+=[ 全体の形 ]
 
 `@settings` と `@config` は同じキー空間を読む。値は `{...}` でも `+++` の
 中の JSON / TOML / YAML でもよい。

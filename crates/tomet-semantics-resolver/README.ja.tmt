@@ -1,8 +1,8 @@
-# tomet-resolver
+= tomet-resolver
 
 外部設定ファイルの読み込み解決、リモート属性コネクション、および `${id}` 参照解決を担うプリプロセッサ／リンカー層クレート。
 
-## 責務とアーキテクチャ
+== 責務とアーキテクチャ
 
 -. **プリプロセッサ／リンカー境界 (I/O 許可ゾーン)**:
    - `tomet-parser` は純粋な静的パーサーとしてファイル I/O を行わない（Deterministic Static Parser Boundary）ため、外部ファイルの読み込みと解決は本クレート（`tomet-resolver`）が担当します。

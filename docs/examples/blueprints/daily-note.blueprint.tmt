@@ -6,9 +6,9 @@
   title: ${title}
 }
 
-#[ TODO ] {id: todo}
+=[ TODO ] {id: todo}
 - ( )
 
-#[ Review ] {id: review}
+=[ Review ] {id: review}
 
-#[ Timeline ] {id: timeline}
+=[ Timeline ] {id: timeline}
