@@ -683,6 +683,31 @@ mod tests {
     }
 
     #[test]
+    fn highlights_captures_call_and_brackets_as_function() {
+        use tree_sitter::StreamingIterator;
+        let src = "@meta(tags: list(1, 2))\n";
+        let tree = parse(src);
+        let query_src = include_str!("../queries/highlights.scm");
+        let query = tree_sitter::Query::new(&LANGUAGE.into(), query_src).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), src.as_bytes());
+
+        let mut captured: Vec<(String, String)> = Vec::new();
+        while let Some(m) = matches.next() {
+            for c in m.captures {
+                let name = query.capture_names()[c.index as usize].to_string();
+                let text = &src[c.node.byte_range()];
+                captured.push((name, text.to_string()));
+            }
+        }
+
+        // Verify that "list", "(", and ")" inside the call are captured as "function"
+        assert!(captured.contains(&("function".into(), "list".into())));
+        assert!(captured.contains(&("function".into(), "(".into())));
+        assert!(captured.contains(&("function".into(), ")".into())));
+    }
+
+    #[test]
     fn indents_query_is_valid() {
         let query_src = include_str!("../queries/indents.scm");
         tree_sitter::Query::new(&LANGUAGE.into(), query_src)

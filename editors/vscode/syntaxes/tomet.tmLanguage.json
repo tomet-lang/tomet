@@ -129,9 +129,9 @@
 					"match": "^\\s*(-\\.|-)(?=[ \\t\\[|(])(?:\\s*(\\()([^()\\n]*)(\\)))?",
 					"captures": {
 						"1": { "name": "punctuation.definition.list.begin.markdown markup.list.tomet keyword.control.list.tomet" },
-						"2": { "name": "punctuation.definition.marker.begin.tomet" },
+						"2": { "name": "punctuation.definition.marker.begin.tomet punctuation.definition.list.begin.markdown markup.list.tomet keyword.control.list.tomet" },
 						"3": { "name": "keyword.operator.marker.tomet markup.list.marker.tomet" },
-						"4": { "name": "punctuation.definition.marker.end.tomet" }
+						"4": { "name": "punctuation.definition.marker.end.tomet punctuation.definition.list.begin.markdown markup.list.tomet keyword.control.list.tomet" }
 					}
 				}
 			]
@@ -468,6 +468,7 @@
 				{ "include": "#comments" },
 				{ "include": "#element" },
 				{ "include": "#autolink" },
+				{ "include": "#call" },
 				{ "include": "#map-entry" },
 				{ "include": "#string" },
 				{ "include": "#interpolation" },
@@ -487,6 +488,7 @@
 				{ "include": "#comments" },
 				{ "include": "#element" },
 				{ "include": "#autolink" },
+				{ "include": "#call" },
 				{ "include": "#string" },
 				{ "include": "#interpolation" },
 				{ "include": "#value-groups" },
@@ -523,6 +525,23 @@
 			"end": "\"|^(?=[ \\t]*$)",
 			"patterns": [
 				{ "match": "\\\\.", "name": "constant.character.escape.tomet" }
+			]
+		},
+
+		"call": {
+			"comment": "`name(arg, ...)` call literal (such as `list(...)`) in values",
+			"begin": "(?<![A-Za-z0-9_.-])([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)\\s*(\\()",
+			"beginCaptures": {
+				"1": { "name": "support.function.tomet entity.name.function.tomet" },
+				"2": { "name": "punctuation.definition.parameters.begin.tomet entity.name.function.tomet" }
+			},
+			"end": "\\)",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.parameters.end.tomet entity.name.function.tomet" }
+			},
+			"name": "meta.call.tomet",
+			"patterns": [
+				{ "include": "#value" }
 			]
 		}
 	}

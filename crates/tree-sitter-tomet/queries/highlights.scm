@@ -74,6 +74,12 @@
 (interp_call member: (identifier) @function)
 (interp_call "(" @function)
 (interp_call ")" @function)
+
+; Call syntax in values (`list(...)`, `enum(...)`): callee and delimiters share @function
+(call name: (identifier) @function)
+(call "(" @function)
+(call ")" @function)
+
 (number) @number
 
 ; `(args)`/`[content]`/`{value}` group delimiters.
