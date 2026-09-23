@@ -4,7 +4,7 @@ use crate::element::{parse_groups, parse_sugar_body};
 use crate::error::Result;
 use crate::inline::{Stop, parse_inline_seq};
 use crate::value::{err, parse_value_at, skip_inline_ws, skip_ws_newlines_and_comments};
-use tomet_ast::{Element, ElementValue, Placement, Section, Sigil, Value};
+use tomet_ast::{Element, ElementValue, Inline, Placement, Section, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -40,9 +40,24 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
             // in any order, and its content -- bracketed or `|`-marked --
             // may span lines.
             parse_groups(cur, &mut el, true)?;
+            skip_inline_ws(cur);
+            if cur.peek() == Some('=') {
+                cur.eat_while(|c| c == '=');
+                skip_inline_ws(cur);
+                // Allow groups (e.g. `{ attrs }`) to follow decorative '='
+                if crate::element::opens_group(cur.peek()) {
+                    parse_groups(cur, &mut el, true)?;
+                    skip_inline_ws(cur);
+                    if cur.peek() == Some('=') {
+                        cur.eat_while(|c| c == '=');
+                        skip_inline_ws(cur);
+                    }
+                }
+            }
         }
         _ if had_ws => {
-            let (content, attrs) = parse_sugar_body(cur)?;
+            let (mut content, attrs) = parse_sugar_body(cur)?;
+            trim_trailing_equals(&mut content);
             el.content = Some(content);
             el.value = attrs.map(ElementValue::from_map);
         }
@@ -192,3 +207,19 @@ fn merge_values_inner(direct: &Value, connected: &Value) -> Value {
         (direct_val, _) => direct_val.clone(),
     }
 }
+
+fn trim_trailing_equals(inlines: &mut Vec<Inline>) {
+    if let Some(Inline::Text(t)) = inlines.last_mut() {
+        let trimmed = t.value.trim_end();
+        if trimmed.ends_with('=') {
+            let before_eq = trimmed.trim_end_matches('=');
+            if before_eq.is_empty() || before_eq.ends_with(char::is_whitespace) {
+                t.value = before_eq.trim_end().to_string();
+                if t.value.is_empty() {
+                    inlines.pop();
+                }
+            }
+        }
+    }
+}
+
