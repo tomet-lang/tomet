@@ -16,7 +16,7 @@ use std::sync::Arc;
 use tomet_ast::{Block, Document, Element, ElementValue, Inline, Section, Span, Value};
 use tomet_semantics::{
     Bindings, EXACT_DATA_KEY, ElementKind, FootnoteRegistry, TargetScheme, builtin_doc_vocabularies,
-    classify_std_lenient, flatten_data, heading_level, is_directive, link_target, list_items,
+    classify_std_lenient, extract_tags, flatten_data, heading_level, is_directive, link_target, list_items,
     list_ordered, normalized_element_args, normalized_element_args_in, path_target, target_scheme,
 };
 
@@ -79,6 +79,9 @@ pub struct RenderOptions {
     /// table cells (`tomet_semantics::parse_table_rows` does not track
     /// offsets, so `@table` is tagged as a single leaf, not per-cell).
     pub emit_source_spans: bool,
+    /// Wrap hierarchical sections in `<section class="tmt-section level-{level}">` tags.
+    /// Default is `false` (plain unnested `<hN>` headings).
+    pub wrap_sections: bool,
 }
 
 /// What a [`RenderOptions::custom_element`] hook sees for one element.
@@ -391,6 +394,9 @@ fn render_section(
             id = Some(slug);
         }
     }
+    if cx.options.wrap_sections {
+        out.push_str(&format!("<section class=\"tmt-section level-{level}\">\n"));
+    }
     out.push_str(&format!("<h{level}"));
     push_named_attrs(out, &id, &class, &data);
     push_span_attrs(cx, out, sec.span);
@@ -413,6 +419,10 @@ fn render_section(
 
     for child in &sec.blocks {
         render_block(cx, child, out, state);
+    }
+
+    if cx.options.wrap_sections {
+        out.push_str("</section>\n");
     }
 }
 
@@ -618,7 +628,37 @@ fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) 
         "raw" => render_raw_element(el, out, inline),
         "quote" => render_quote_element(cx, el, out, inline),
         "table" => render_table_element(cx, el, out),
+        "tag" => render_tag_element(cx, el, out, inline),
         _ => render_custom_or_generic_element(cx, el, kind.as_str(), out, inline),
+    }
+}
+
+fn render_tag_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
+    let tags = extract_tags(el);
+    if tags.is_empty() {
+        return;
+    }
+
+    let tag_spans: Vec<String> = tags
+        .iter()
+        .map(|t| {
+            let label = if t.starts_with('#') {
+                escape_html(t)
+            } else {
+                format!("#{}", escape_html(t))
+            };
+            format!("<span class=\"tmt-tag\">{}</span>", label)
+        })
+        .collect();
+
+    let tag = if inline { "span" } else { "div" };
+    out.push_str(&format!("<{} class=\"tmt-tag-list\"", tag));
+    push_span_attrs(cx, out, el.span);
+    out.push('>');
+    out.push_str(&tag_spans.join(" "));
+    out.push_str(&format!("</{}>", tag));
+    if !inline {
+        out.push('\n');
     }
 }
 
@@ -2116,5 +2156,27 @@ mod tests {
             html.contains("<li id=\"fn-1\">\n<p>Shared footnote explanation. <span class=\"footnote-backrefs\"><a href=\"#fnref-1-1\" role=\"doc-backlink\" class=\"footnote-backref\">^1</a> <a href=\"#fnref-1-2\" role=\"doc-backlink\" class=\"footnote-backref\">^2</a></span></p>\n</li>"),
             "expected shared footnote item with multiple backlinks: {html}"
         );
+    }
+
+    #[test]
+    fn test_renders_wrap_sections() {
+        let src = "=[ Chapter 1 ]\n\nParagraph in chapter.\n\n==[ Section 1.1 ]\n\nNested paragraph.\n";
+        let doc = parse_document(src).unwrap();
+        let options = RenderOptions {
+            wrap_sections: true,
+            ..RenderOptions::default()
+        };
+        let html = render_body_with(&doc, &options);
+
+        assert!(html.contains("<section class=\"tmt-section level-1\">\n<h1>Chapter 1</h1>\n<p>Paragraph in chapter.</p>\n<section class=\"tmt-section level-2\">\n<h2>Section 1.1</h2>\n<p>Nested paragraph.</p>\n</section>\n</section>\n"), "got {html}");
+    }
+
+    #[test]
+    fn test_renders_tag_element() {
+        let src = "Prose with #(rust, tomet) tags.\n";
+        let doc = parse_document(src).unwrap();
+        let html = render_body(&doc);
+
+        assert!(html.contains("<span class=\"tmt-tag-list\"><span class=\"tmt-tag\">#rust</span> <span class=\"tmt-tag\">#tomet</span></span>"), "got {html}");
     }
 }

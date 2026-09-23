@@ -9,11 +9,15 @@
 //! valid CommonMark. Heading `id`/`cssclass` attrs have no CommonMark
 //! form and are dropped.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Section, Value};
+use tomet_ast::{Block, Document, Element, ElementValue, Inline, Placement, Section, Value};
 use tomet_semantics::{
-    TargetScheme, classify_std_lenient, heading_level, is_directive, link_target, list_items,
-    list_ordered, normalized_element_args, path_target, target_scheme,
+    FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level, is_directive,
+    link_target, list_items, list_ordered, normalized_element_args, path_target, target_scheme,
 };
+
+struct MarkdownCtx<'a> {
+    footnotes: &'a FootnoteRegistry,
+}
 
 /// Renders `doc` as CommonMark.
 ///
@@ -26,56 +30,61 @@ use tomet_semantics::{
 /// independently is how the same document came to produce three different
 /// answers.
 pub fn to_markdown(doc: &Document) -> String {
+    let footnotes = FootnoteRegistry::from_document(doc);
+    let cx = MarkdownCtx {
+        footnotes: &footnotes,
+    };
     let mut out = String::new();
     for block in &doc.blocks {
-        render_block(block, &mut out);
+        render_block(&cx, block, &mut out);
     }
+    render_footnotes(&cx, &mut out);
     out
 }
 
-fn render_block(block: &Block, out: &mut String) {
+fn render_block(cx: &MarkdownCtx, block: &Block, out: &mut String) {
     match block {
         Block::Paragraph(p) => {
             // Same reasoning as `tomet-html`'s `render_block`: an
             // all-invisible-element paragraph (e.g. adjacent `@meta(...)`
             // lines with no blank line between them) must not leave a
             // stray blank paragraph behind.
-            let text = inline_to_md(&p.content);
+            let text = inline_to_md(cx, &p.content);
             if !text.trim().is_empty() {
                 out.push_str(&text);
                 out.push_str("\n\n");
             }
         }
-        Block::Element(el) if list_ordered(el).is_some() => render_list(el, out),
+        Block::Element(el) if list_ordered(el).is_some() => render_list(cx, el, out),
         Block::Element(el) => {
-            let text = element_to_md(el, false);
+            let text = element_to_md(cx, el, false);
             if !text.is_empty() {
                 out.push_str(&text);
                 out.push_str("\n\n");
             }
         }
-        Block::Section(sec) => render_section(sec, out),
+        Block::Section(sec) => render_section(cx, sec, out),
     }
 }
 
-fn render_section(sec: &Section, out: &mut String) {
+fn render_section(cx: &MarkdownCtx, sec: &Section, out: &mut String) {
     let marker = "#".repeat(sec.level.clamp(1, 6));
-    let text = inline_to_md(&sec.title);
+    let text = inline_to_md(cx, &sec.title);
     out.push_str(&marker);
     out.push(' ');
     out.push_str(&text);
     out.push_str("\n\n");
     for child in &sec.blocks {
-        render_block(child, out);
+        render_block(cx, child, out);
     }
 }
 
-fn render_list(el: &Element, out: &mut String) {
-    render_list_with_indent(el, 0, out);
+fn render_list(cx: &MarkdownCtx, el: &Element, out: &mut String) {
+    render_list_with_indent(cx, el, 0, out);
     out.push('\n');
 }
 
-fn render_list_with_indent(el: &Element, indent: usize, out: &mut String) {
+fn render_list_with_indent(cx: &MarkdownCtx, el: &Element, indent: usize, out: &mut String) {
     let ordered = list_ordered(el).unwrap_or(false);
     let indent_str = "  ".repeat(indent);
     for (i, item) in list_items(el).iter().enumerate() {
@@ -89,13 +98,13 @@ fn render_list_with_indent(el: &Element, indent: usize, out: &mut String) {
         // `args` (the `(...)` marker `Value`) has no CommonMark equivalent
         // -- dropped on export, same as this crate's other documented
         // lossy cases (see the module doc).
-        out.push_str(&inline_to_md(item.content.as_deref().unwrap_or(&[])));
+        out.push_str(&inline_to_md(cx, item.content.as_deref().unwrap_or(&[])));
         out.push('\n');
         if let Some(children) = &item.children {
             for child in children {
                 if let Block::Element(sub) = child {
                     if list_ordered(sub).is_some() {
-                        render_list_with_indent(sub, indent + 1, out);
+                        render_list_with_indent(cx, sub, indent + 1, out);
                     }
                 }
             }
@@ -103,7 +112,7 @@ fn render_list_with_indent(el: &Element, indent: usize, out: &mut String) {
     }
 }
 
-fn inline_to_md(inlines: &[Inline]) -> String {
+fn inline_to_md(cx: &MarkdownCtx, inlines: &[Inline]) -> String {
     let mut out = String::new();
     for inline in inlines {
         match inline {
@@ -125,13 +134,13 @@ fn inline_to_md(inlines: &[Inline]) -> String {
             // stripped by editors/tools -- the same reason that spelling
             // was rejected for tomet's own source syntax.
             Inline::LineBreak(_) => out.push_str("\\\n"),
-            Inline::Element(el) => out.push_str(&element_to_md(el, true)),
+            Inline::Element(el) => out.push_str(&element_to_md(cx, el, true)),
         }
     }
     out
 }
 
-fn element_to_md(el: &Element, inline: bool) -> String {
+fn element_to_md(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
     let kind = classify_std_lenient(el);
     match kind.as_str() {
         // Directives configure or annotate the document and have no
@@ -144,28 +153,47 @@ fn element_to_md(el: &Element, inline: bool) -> String {
         // (`inline == true`) falls through to generic/custom rendering
         // instead, rather than emitting a bare `## text` mid-paragraph
         // (which wouldn't parse back as a heading anyway).
-        "heading" if !inline => render_heading(el),
-        "hr" => render_hr(el),
-        "em" => format!("*{}*", content_to_md(el)),
-        "strong" => format!("**{}**", content_to_md(el)),
-        "mark" => format!("<mark>{}</mark>", content_to_md(el)),
-        "strikeout" => format!("~~{}~~", content_to_md(el)),
-        "ruby" => render_ruby(el),
+        "heading" if !inline => render_heading(cx, el),
+        "hr" => render_hr(cx, el),
+        "em" => format!("*{}*", content_to_md(cx, el)),
+        "strong" => format!("**{}**", content_to_md(cx, el)),
+        "mark" => format!("<mark>{}</mark>", content_to_md(cx, el)),
+        "strikeout" => format!("~~{}~~", content_to_md(cx, el)),
+        "ruby" => render_ruby(cx, el),
         "raw" => render_raw(el, inline),
-        "quote" => render_quote(el, inline),
-        "callout" => render_callout(el),
-        "table" => render_table(el),
-        "link" => render_link(el),
-        "file" | "dir" => render_path(el, inline),
+        "quote" => render_quote(cx, el, inline),
+        "callout" => render_callout(cx, el),
+        "table" => render_table(cx, el),
+        "link" => render_link(cx, el),
+        "file" | "dir" => render_path(cx, el, inline),
         "embed" => render_embed(el),
-        "links" => render_links_container(el),
+        "links" => render_links_container(cx, el),
+        "footnote" => {
+            if inline || el.placement == Placement::Inline {
+                if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
+                    format!("[^{idx}]")
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            }
+        }
+        "caret" => {
+            if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
+                format!("[^{idx}]")
+            } else {
+                String::new()
+            }
+        }
+        "tag" => render_tag(el),
         // Evaluate `${...}` interpolations and macros
         "interp" => render_interp(el),
-        _ => render_generic(el, kind.as_str(), inline),
+        _ => render_generic(cx, el, kind.as_str(), inline),
     }
 }
 
-fn render_table(el: &Element) -> String {
+fn render_table(cx: &MarkdownCtx, el: &Element) -> String {
     let inlines = match &el.content {
         Some(content) => content,
         None => return String::new(),
@@ -190,7 +218,7 @@ fn render_table(el: &Element) -> String {
     let mut header_line = String::from("|");
     for i in 0..col_count {
         let cell_md = if i < header_cells.len() {
-            inline_to_md(&header_cells[i].content).replace('|', "\\|")
+            inline_to_md(cx, &header_cells[i].content).replace('|', "\\|")
         } else {
             String::new()
         };
@@ -210,7 +238,7 @@ fn render_table(el: &Element) -> String {
         let mut row_line = String::from("|");
         for i in 0..col_count {
             let cell_md = if i < row.cells.len() {
-                inline_to_md(&row.cells[i].content).replace('|', "\\|")
+                inline_to_md(cx, &row.cells[i].content).replace('|', "\\|")
             } else {
                 String::new()
             };
@@ -238,7 +266,7 @@ fn render_interp(el: &Element) -> String {
 
 /// `@ruby[漢字](rt:"かんじ")` -- no CommonMark ruby syntax exists, so this
 /// falls back to raw inline `<ruby>`/`<rt>` HTML, same as `mark` above.
-fn render_ruby(el: &Element) -> String {
+fn render_ruby(cx: &MarkdownCtx, el: &Element) -> String {
     let args = normalized_element_args(el);
     let rt = args
         .as_ref()
@@ -249,13 +277,13 @@ fn render_ruby(el: &Element) -> String {
             _ => None,
         })
         .unwrap_or("");
-    format!("<ruby>{}<rt>{rt}</rt></ruby>", content_to_md(el))
+    format!("<ruby>{}<rt>{rt}</rt></ruby>", content_to_md(cx, el))
 }
 
-fn content_to_md(el: &Element) -> String {
+fn content_to_md(cx: &MarkdownCtx, el: &Element) -> String {
     el.content
         .as_ref()
-        .map(|a| inline_to_md(a))
+        .map(|a| inline_to_md(cx, a))
         .unwrap_or_default()
 }
 
@@ -265,20 +293,20 @@ fn content_to_md(el: &Element) -> String {
 /// `id`/`cssclass` attrs (`el.value`) have no CommonMark form and are
 /// dropped, same as before this was folded into the generic `Element`
 /// dispatch (see the module doc).
-fn render_heading(el: &Element) -> String {
+fn render_heading(cx: &MarkdownCtx, el: &Element) -> String {
     let level = heading_level(el).unwrap_or(1) as usize;
     let content = el.content.as_deref().unwrap_or(&[]);
-    format!("{} {}", "#".repeat(level), inline_to_md(content))
+    format!("{} {}", "#".repeat(level), inline_to_md(cx, content))
 }
 
-fn render_hr(el: &Element) -> String {
+fn render_hr(cx: &MarkdownCtx, el: &Element) -> String {
     match &el.content {
         // The blank line is load-bearing. `Title` immediately above `---`
         // is a setext heading in CommonMark, so without it a labelled
         // divider silently exports as an `<h2>` -- the one shape this is
         // trying not to be.
         Some(title) if !title.is_empty() => {
-            format!("**{}**\n\n---", inline_to_md(title))
+            format!("**{}**\n\n---", inline_to_md(cx, title))
         }
         _ => "---".to_string(),
     }
@@ -345,8 +373,8 @@ fn fence_for(code: &str) -> String {
 /// quote is in Markdown, so that is what it becomes; a reader importing
 /// the result back sees text, which is what any Markdown reader would
 /// have seen anyway.
-fn render_quote(el: &Element, inline: bool) -> String {
-    let text = content_to_md(el);
+fn render_quote(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
+    let text = content_to_md(cx, el);
     if inline {
         return format!("\u{201c}{text}\u{201d}");
     }
@@ -356,7 +384,7 @@ fn render_quote(el: &Element, inline: bool) -> String {
         .join("\n")
 }
 
-fn render_callout(el: &Element) -> String {
+fn render_callout(cx: &MarkdownCtx, el: &Element) -> String {
     let mut variant = None;
     let mut title = None;
 
@@ -391,7 +419,7 @@ fn render_callout(el: &Element) -> String {
     }
 
     let v = variant.unwrap_or_else(|| "note".to_string());
-    let body = content_to_md(el);
+    let body = content_to_md(cx, el);
     let mut lines = Vec::new();
 
     if let Some(t) = title {
@@ -421,10 +449,10 @@ fn render_callout(el: &Element) -> String {
 /// exported Markdown byte-identical. The import direction cannot recover
 /// it -- a code span in Markdown is a code span, and nothing in it says
 /// whether the author meant a path.
-fn render_path(el: &Element, inline: bool) -> String {
+fn render_path(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
     let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let content = match &el.content {
-        Some(content) if !content.is_empty() => Some(inline_to_md(content)),
+        Some(content) if !content.is_empty() => Some(inline_to_md(cx, content)),
         _ => None,
     };
     if inline {
@@ -439,11 +467,11 @@ fn render_path(el: &Element, inline: bool) -> String {
     }
 }
 
-fn render_link(el: &Element) -> String {
+fn render_link(cx: &MarkdownCtx, el: &Element) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let text = match &el.content {
-        Some(content) if !content.is_empty() => inline_to_md(content),
+        Some(content) if !content.is_empty() => inline_to_md(cx, content),
         _ => String::new(),
     };
     match scheme {
@@ -508,7 +536,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
     s
 }
 
-fn render_links_container(el: &Element) -> String {
+fn render_links_container(cx: &MarkdownCtx, el: &Element) -> String {
     let mut out = String::new();
     if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
         for (i, child) in children.iter().enumerate() {
@@ -519,7 +547,7 @@ fn render_links_container(el: &Element) -> String {
             let content = child
                 .content
                 .as_ref()
-                .map(|a| inline_to_md(a))
+                .map(|a| inline_to_md(cx, a))
                 .unwrap_or_default();
             out.push_str(&format!("**{id}**: {content}"));
         }
@@ -527,11 +555,64 @@ fn render_links_container(el: &Element) -> String {
     out
 }
 
+fn render_tag(el: &Element) -> String {
+    let tags = extract_tags(el);
+    if tags.is_empty() {
+        return String::new();
+    }
+    let formatted: Vec<String> = tags
+        .into_iter()
+        .map(|t| {
+            if t.starts_with('#') {
+                t
+            } else {
+                format!("#{t}")
+            }
+        })
+        .collect();
+    formatted.join(" ")
+}
+
+fn render_footnotes(cx: &MarkdownCtx, out: &mut String) {
+    if cx.footnotes.items.is_empty() {
+        return;
+    }
+    for item in &cx.footnotes.items {
+        out.push_str(&format!("[^{}]: ", item.index));
+        let mut def_text = String::new();
+        if let Some(def_el) = &item.definition {
+            if let Some(content) = &def_el.content {
+                def_text.push_str(&inline_to_md(cx, content));
+            }
+            if let Some(children) = &def_el.children {
+                for child in children {
+                    let mut child_text = String::new();
+                    render_block(cx, child, &mut child_text);
+                    let trimmed = child_text.trim();
+                    if !trimmed.is_empty() {
+                        if !def_text.is_empty() {
+                            def_text.push_str("\n\n");
+                        }
+                        let indented = trimmed
+                            .lines()
+                            .map(|l| if l.is_empty() { String::new() } else { format!("    {l}") })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        def_text.push_str(&indented);
+                    }
+                }
+            }
+        }
+        out.push_str(&def_text);
+        out.push_str("\n\n");
+    }
+}
+
 /// Anything with no dedicated CommonMark mapping (a hand-authored `<T>`
 /// or `@name` element the importer never produces) passes through as raw
 /// HTML -- valid CommonMark, and matches `tomet-html`'s own
 /// generic div/span fallback in spirit.
-fn render_generic(el: &Element, kind: &str, inline: bool) -> String {
+fn render_generic(cx: &MarkdownCtx, el: &Element, kind: &str, inline: bool) -> String {
     let tag = if inline { "span" } else { "div" };
     let mut out = format!("<{tag} data-tm-kind=\"{}\"", escape_attr(kind));
     if let Some(args) = &el.args {
@@ -539,7 +620,7 @@ fn render_generic(el: &Element, kind: &str, inline: bool) -> String {
     }
     out.push('>');
     if let Some(content) = &el.content {
-        out.push_str(&inline_to_md(content));
+        out.push_str(&inline_to_md(cx, content));
     }
     out.push_str(&format!("</{tag}>"));
     out
@@ -1225,5 +1306,48 @@ mod tests {
             to_markdown(&doc),
             "Issue: ${gh(42)}\nFooter: ${copyright}\nMath: ${add(10, 5)}\n\n"
         );
+    }
+
+    #[test]
+    fn inline_footnote_exports_to_markdown() {
+        let doc = tomet_parser::parse_document("This has a footnote @footnote[a short note] in text.\n")
+            .unwrap();
+        let md = to_markdown(&doc);
+        assert!(
+            md.contains("This has a footnote [^1] in text."),
+            "got: {md}"
+        );
+        assert!(md.contains("[^1]: a short note"), "got: {md}");
+    }
+
+    #[test]
+    fn separated_footnote_with_multiple_carets() {
+        let src = "\
+Prose A ^(shared).
+Prose B ^(shared).
+
+@footnote(shared)[Shared footnote explanation.]
+";
+        let doc = tomet_parser::parse_document(src).unwrap();
+        let md = to_markdown(&doc);
+        assert!(md.contains("Prose A [^1]."), "got: {md}");
+        assert!(md.contains("Prose B [^1]."), "got: {md}");
+        assert!(
+            md.contains("[^1]: Shared footnote explanation."),
+            "got: {md}"
+        );
+        // Ensure definition block was not rendered in place
+        assert!(
+            !md.contains("@footnote"),
+            "got: {md}"
+        );
+    }
+
+    #[test]
+    fn tag_sugar_and_element_export_to_markdown() {
+        let src = "#(rust, tomet) and @tag(spec)\n";
+        let doc = tomet_parser::parse_document(src).unwrap();
+        let md = to_markdown(&doc);
+        assert_eq!(md.trim(), "#rust #tomet and #spec");
     }
 }

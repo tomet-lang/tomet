@@ -96,12 +96,6 @@ Paragraph
   Text "[ 見出し ]{ tag: syntax }"
 ```
 
-検証:
-
-```
-unknown element `tag`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.tag`), or declare the vocabulary that has it and bind it with `@use`
-```
-
 ### 末尾の `{...}` は属性
 
 ```tmt

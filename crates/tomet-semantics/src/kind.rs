@@ -174,6 +174,8 @@ pub enum ElementKind {
     Footnote,
     /// `Sigil::Caret` -- `^(id)` or `^name(id)` reference pin.
     Caret,
+    /// `@tag` or `#(tag)` -- topic/category tag.
+    Tag,
 }
 
 impl ElementKind {
@@ -224,6 +226,7 @@ impl ElementKind {
             ElementKind::Interp => "interp",
             ElementKind::Footnote => "footnote",
             ElementKind::Caret => "caret",
+            ElementKind::Tag => "tag",
         }
     }
 }
@@ -257,7 +260,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 37] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 38] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -305,6 +308,7 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 37] = [
     ("ol", ElementKind::OrderedList),
     ("ul", ElementKind::UnorderedList),
     ("footnote", ElementKind::Footnote),
+    ("tag", ElementKind::Tag),
 ];
 
 fn builtin_kind(name: &str) -> Option<ElementKind> {
@@ -487,6 +491,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         // inside a sentence and sometimes a whole missing section.
         Draft | Fixme => return None,
         Footnote => return None,
+        Tag => return None,
         Custom(_) | Bare | Interp => return None,
     })
 }

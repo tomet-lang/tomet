@@ -19,6 +19,7 @@ mod meta;
 mod normalize;
 mod positional;
 mod table;
+pub mod tag;
 mod target;
 pub mod vocabulary;
 
@@ -46,6 +47,7 @@ pub use positional::{
     normalized_element_args_in, normalized_list_marker,
 };
 pub use table::{TableCell, TableRow, parse_table_rows};
+pub use tag::extract_tags;
 pub use target::{
     EXPLICIT_SCHEMES, TargetScheme, link_target, link_target_of, path_target, path_target_of,
     target_scheme,

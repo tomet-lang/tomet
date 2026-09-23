@@ -33,63 +33,94 @@
 //!   convention, which is likewise anchored to `@links{}` entries rather
 //!   than headings.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Section, Value};
+use std::cell::RefCell;
+use std::collections::HashSet;
+
+use tomet_ast::{Block, Document, Element, ElementValue, Inline, Placement, Section, Value};
 use tomet_semantics::{
-    TargetScheme, classify_std_lenient, heading_level, is_directive, link_target, list_items,
-    list_ordered, normalized_element_args, parse_table_rows, path_target, target_scheme,
+    FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level, is_directive,
+    link_target, list_items, list_ordered, normalized_element_args, parse_table_rows, path_target,
+    target_scheme,
 };
 
+struct TypstCtx<'a> {
+    footnotes: &'a FootnoteRegistry,
+    rendered_footnotes: RefCell<HashSet<usize>>,
+}
+
 pub fn to_typst(doc: &Document) -> String {
+    let footnotes = FootnoteRegistry::from_document(doc);
+    let cx = TypstCtx {
+        footnotes: &footnotes,
+        rendered_footnotes: RefCell::new(HashSet::new()),
+    };
     let mut out = String::new();
     for block in &doc.blocks {
-        render_block(block, &mut out);
+        render_block(&cx, block, &mut out);
     }
+    render_leftover_footnotes(&cx, &mut out);
     out
 }
 
-fn render_block(block: &Block, out: &mut String) {
+fn render_leftover_footnotes(cx: &TypstCtx, out: &mut String) {
+    for item in &cx.footnotes.items {
+        if cx.rendered_footnotes.borrow_mut().insert(item.index) {
+            let mut def_text = String::new();
+            if let Some(def_el) = &item.definition {
+                if let Some(content) = &def_el.content {
+                    def_text.push_str(&inline_to_typst(cx, content));
+                }
+            }
+            if !def_text.is_empty() {
+                out.push_str(&format!("#footnote[{def_text}]\n\n"));
+            }
+        }
+    }
+}
+
+fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
     match block {
         Block::Paragraph(p) => {
             // Same reasoning as `tomet-convert-markdown`'s `render_block`:
             // an all-invisible-element paragraph (e.g. adjacent
             // `@meta(...)` lines with no blank line between them) must
             // not leave a stray blank paragraph behind.
-            let text = inline_to_typst(&p.content);
+            let text = inline_to_typst(cx, &p.content);
             if !text.trim().is_empty() {
                 out.push_str(&text);
                 out.push_str("\n\n");
             }
         }
-        Block::Element(el) if list_ordered(el).is_some() => render_list(el, out),
+        Block::Element(el) if list_ordered(el).is_some() => render_list(cx, el, out),
         Block::Element(el) => {
-            let text = element_to_typst(el, false);
+            let text = element_to_typst(cx, el, false);
             if !text.is_empty() {
                 out.push_str(&text);
                 out.push_str("\n\n");
             }
         }
-        Block::Section(sec) => render_section(sec, out),
+        Block::Section(sec) => render_section(cx, sec, out),
     }
 }
 
-fn render_section(sec: &Section, out: &mut String) {
+fn render_section(cx: &TypstCtx, sec: &Section, out: &mut String) {
     let marker = "=".repeat(sec.level.max(1));
-    let title = inline_to_typst(&sec.title);
+    let title = inline_to_typst(cx, &sec.title);
     out.push_str(&marker);
     out.push(' ');
     out.push_str(&title);
     out.push_str("\n\n");
     for child in &sec.blocks {
-        render_block(child, out);
+        render_block(cx, child, out);
     }
 }
 
-fn render_list(el: &Element, out: &mut String) {
-    render_list_with_indent(el, 0, out);
+fn render_list(cx: &TypstCtx, el: &Element, out: &mut String) {
+    render_list_with_indent(cx, el, 0, out);
     out.push('\n');
 }
 
-fn render_list_with_indent(el: &Element, indent: usize, out: &mut String) {
+fn render_list_with_indent(cx: &TypstCtx, el: &Element, indent: usize, out: &mut String) {
     let ordered = list_ordered(el).unwrap_or(false);
     let indent_str = "  ".repeat(indent);
     for (i, item) in list_items(el).iter().enumerate() {
@@ -103,13 +134,13 @@ fn render_list_with_indent(el: &Element, indent: usize, out: &mut String) {
         // `args` (the `(...)` marker `Value`) has no Typst markup
         // equivalent -- dropped on export, same as this crate's other
         // documented lossy cases (see the module doc).
-        out.push_str(&inline_to_typst(item.content.as_deref().unwrap_or(&[])));
+        out.push_str(&inline_to_typst(cx, item.content.as_deref().unwrap_or(&[])));
         out.push('\n');
         if let Some(children) = &item.children {
             for child in children {
                 if let Block::Element(sub) = child {
                     if list_ordered(sub).is_some() {
-                        render_list_with_indent(sub, indent + 1, out);
+                        render_list_with_indent(cx, sub, indent + 1, out);
                     }
                 }
             }
@@ -117,7 +148,7 @@ fn render_list_with_indent(el: &Element, indent: usize, out: &mut String) {
     }
 }
 
-fn inline_to_typst(inlines: &[Inline]) -> String {
+fn inline_to_typst(cx: &TypstCtx, inlines: &[Inline]) -> String {
     let mut out = String::new();
     for (idx, inline) in inlines.iter().enumerate() {
         match inline {
@@ -129,13 +160,13 @@ fn inline_to_typst(inlines: &[Inline]) -> String {
                 out.push_str(tomet_ast::softbreak_join(before, after));
             }
             Inline::LineBreak(_) => out.push_str("\\\n"),
-            Inline::Element(el) => out.push_str(&element_to_typst(el, true)),
+            Inline::Element(el) => out.push_str(&element_to_typst(cx, el, true)),
         }
     }
     out
 }
 
-fn element_to_typst(el: &Element, inline: bool) -> String {
+fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
     let kind = classify_std_lenient(el);
     match kind.as_str() {
         // Directives -- see `tomet_semantics::is_directive`.
@@ -145,39 +176,130 @@ fn element_to_typst(el: &Element, inline: bool) -> String {
         // (`inline == true`) falls through to the generic fallback
         // instead of emitting a bare `= text` mid-paragraph (which
         // wouldn't parse back as a heading anyway).
-        "heading" if !inline => render_heading(el),
-        "hr" => render_hr(el),
-        "em" => format!("_{}_", content_to_typst(el)),
-        "strong" => format!("*{}*", content_to_typst(el)),
-        "mark" => format!("#highlight[{}]", content_to_typst(el)),
-        "strikeout" => format!("#strike[{}]", content_to_typst(el)),
-        "ruby" => render_ruby(el),
+        "heading" if !inline => render_heading(cx, el),
+        "hr" => render_hr(cx, el),
+        "em" => format!("_{}_", content_to_typst(cx, el)),
+        "strong" => format!("*{}*", content_to_typst(cx, el)),
+        "mark" => format!("#highlight[{}]", content_to_typst(cx, el)),
+        "strikeout" => format!("#strike[{}]", content_to_typst(cx, el)),
+        "ruby" => render_ruby(cx, el),
         "raw" => render_raw(el, inline),
-        "quote" => render_quote(el, inline),
-        "callout" => render_callout(el),
-        "table" => render_table(el),
-        "link" => render_link(el),
-        "file" | "dir" => render_path(el, inline),
+        "quote" => render_quote(cx, el, inline),
+        "callout" => render_callout(cx, el),
+        "table" => render_table(cx, el),
+        "link" => render_link(cx, el),
+        "file" | "dir" => render_path(cx, el, inline),
         "embed" => render_embed(el),
-        "links" => render_links_container(el),
+        "links" => render_links_container(cx, el),
+        "footnote" => {
+            if inline || el.placement == Placement::Inline {
+                if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
+                    render_footnote_ref_or_def(cx, idx, el.content.as_deref())
+                } else if let Some(content) = &el.content {
+                    let text = inline_to_typst(cx, content);
+                    format!("#footnote[{text}]")
+                } else {
+                    String::new()
+                }
+            } else {
+                // Block footnote definition: will be rendered at caret pin location or leftover
+                String::new()
+            }
+        }
+        "caret" => {
+            if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
+                render_footnote_ref_or_def(cx, idx, None)
+            } else {
+                String::new()
+            }
+        }
+        "tag" => render_tag(el),
         "interp" => render_interp(el),
-        _ => render_generic(el, kind.as_str(), inline),
+        _ => render_generic(cx, el, kind.as_str(), inline),
     }
 }
 
-fn render_heading(el: &Element) -> String {
+fn render_footnote_ref_or_def(cx: &TypstCtx, idx: usize, inline_content: Option<&[Inline]>) -> String {
+    let item = cx.footnotes.items.iter().find(|it| it.index == idx);
+    let Some(item) = item else {
+        return String::new();
+    };
+
+    let is_first = cx.rendered_footnotes.borrow_mut().insert(idx);
+    if is_first {
+        let mut def_text = String::new();
+        if let Some(content) = inline_content {
+            def_text = inline_to_typst(cx, content);
+        } else if let Some(def_el) = &item.definition {
+            if let Some(content) = &def_el.content {
+                def_text = inline_to_typst(cx, content);
+            }
+            if let Some(children) = &def_el.children {
+                for child in children {
+                    let mut child_text = String::new();
+                    render_block(cx, child, &mut child_text);
+                    if !child_text.trim().is_empty() {
+                        if !def_text.is_empty() {
+                            def_text.push(' ');
+                        }
+                        def_text.push_str(child_text.trim());
+                    }
+                }
+            }
+        }
+        let label = item
+            .id
+            .as_deref()
+            .map(|id| format!("fn-{id}"))
+            .unwrap_or_else(|| format!("fn-{}", item.index));
+        if item.backlinks.len() > 1 {
+            format!("#footnote[{def_text}] <{label}>")
+        } else {
+            format!("#footnote[{def_text}]")
+        }
+    } else {
+        let label = item
+            .id
+            .as_deref()
+            .map(|id| format!("fn-{id}"))
+            .unwrap_or_else(|| format!("fn-{}", item.index));
+        format!("#footnote(<{label}>)")
+    }
+}
+
+fn render_tag(el: &Element) -> String {
+    let tags = extract_tags(el);
+    if tags.is_empty() {
+        return String::new();
+    }
+    let boxes: Vec<String> = tags
+        .into_iter()
+        .map(|t| {
+            let label = if t.starts_with('#') {
+                &t[1..]
+            } else {
+                &t
+            };
+            let escaped = escape_text(label);
+            format!("#box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#{escaped}]")
+        })
+        .collect();
+    boxes.join(" ")
+}
+
+fn render_heading(cx: &TypstCtx, el: &Element) -> String {
     let level = heading_level(el).unwrap_or(1) as usize;
     let content = el.content.as_deref().unwrap_or(&[]);
-    format!("{} {}", "=".repeat(level), inline_to_typst(content))
+    format!("{} {}", "=".repeat(level), inline_to_typst(cx, content))
 }
 
 /// A bare `---` break renders as a full-width rule; a titled one
 /// (`---[ Title ]---`) has no single-construct Typst equivalent, so it's
 /// lossy: the title text on its own line followed by the rule.
-fn render_hr(el: &Element) -> String {
+fn render_hr(cx: &TypstCtx, el: &Element) -> String {
     match &el.content {
         Some(title) if !title.is_empty() => {
-            format!("{}\n#line(length: 100%)", inline_to_typst(title))
+            format!("{}\n#line(length: 100%)", inline_to_typst(cx, title))
         }
         _ => "#line(length: 100%)".to_string(),
     }
@@ -186,11 +308,11 @@ fn render_hr(el: &Element) -> String {
 /// Typst has no bare `>` markup shorthand; `#quote` is the built-in
 /// function, and its own `block:` parameter is exactly the distinction
 /// Tomet draws by position.
-fn render_quote(el: &Element, inline: bool) -> String {
+fn render_quote(cx: &TypstCtx, el: &Element, inline: bool) -> String {
     if inline {
-        return format!("#quote[{}]", content_to_typst(el));
+        return format!("#quote[{}]", content_to_typst(cx, el));
     }
-    format!("#quote(block: true)[{}]", content_to_typst(el))
+    format!("#quote(block: true)[{}]", content_to_typst(cx, el))
 }
 
 /// No dedicated `callout` `ElementKind` exists (it classifies as
@@ -199,9 +321,9 @@ fn render_quote(el: &Element, inline: bool) -> String {
 /// Typst has no built-in admonition/callout construct, so this renders a
 /// plain bordered block with a bold `[variant] title` header line -- a
 /// first-pass approximation, not a byte-for-byte callout package match.
-fn render_callout(el: &Element) -> String {
+fn render_callout(cx: &TypstCtx, el: &Element) -> String {
     let (variant, title) = callout_variant_and_title(el);
-    let body = content_to_typst(el);
+    let body = content_to_typst(cx, el);
     let header = match title {
         Some(t) => format!("*[{variant}] {t}*"),
         None => format!("*[{variant}]*"),
@@ -291,7 +413,7 @@ fn fence_for(code: &str) -> String {
 /// treated as a header (its cells bolded) unless `header:false` is set,
 /// same default/opt-out convention `tomet-convert-html`'s
 /// `render_table_element` uses for its `<thead>` split.
-fn render_table(el: &Element) -> String {
+fn render_table(cx: &TypstCtx, el: &Element) -> String {
     let inlines = match &el.content {
         Some(content) => content,
         None => return String::new(),
@@ -325,7 +447,7 @@ fn render_table(el: &Element) -> String {
         let mut cells = Vec::new();
         for ci in 0..col_count {
             let text = if ci < row.cells.len() {
-                inline_to_typst(&row.cells[ci].content)
+                inline_to_typst(cx, &row.cells[ci].content)
             } else {
                 String::new()
             };
@@ -353,10 +475,10 @@ fn render_table(el: &Element) -> String {
 /// target.
 /// `@file(x)`/`@dir(x)` -> Typst raw text, the same shape CommonMark
 /// gets. A path is named, not navigated to, so there is no `#link` here.
-fn render_path(el: &Element, inline: bool) -> String {
+fn render_path(cx: &TypstCtx, el: &Element, inline: bool) -> String {
     let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let content = match &el.content {
-        Some(content) if !content.is_empty() => Some(inline_to_typst(content)),
+        Some(content) if !content.is_empty() => Some(inline_to_typst(cx, content)),
         _ => None,
     };
     if inline {
@@ -368,11 +490,11 @@ fn render_path(el: &Element, inline: bool) -> String {
     }
 }
 
-fn render_link(el: &Element) -> String {
+fn render_link(cx: &TypstCtx, el: &Element) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let text = match &el.content {
-        Some(content) if !content.is_empty() => inline_to_typst(content),
+        Some(content) if !content.is_empty() => inline_to_typst(cx, content),
         _ => String::new(),
     };
     match scheme {
@@ -429,7 +551,7 @@ fn render_embed(el: &Element) -> String {
 /// label so `render_link`'s `id:`-scheme case has something to resolve
 /// against, mirroring `tomet-convert-html`'s `<dt id="link-{id}">`
 /// anchor convention.
-fn render_links_container(el: &Element) -> String {
+fn render_links_container(cx: &TypstCtx, el: &Element) -> String {
     let mut out = String::new();
     if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
         for (i, child) in children.iter().enumerate() {
@@ -440,7 +562,7 @@ fn render_links_container(el: &Element) -> String {
             let content = child
                 .content
                 .as_ref()
-                .map(|a| inline_to_typst(a))
+                .map(|a| inline_to_typst(cx, a))
                 .unwrap_or_default();
             out.push_str(&format!("- *{id}*: {content} <link-{id}>"));
         }
@@ -466,8 +588,8 @@ fn render_interp(el: &Element) -> String {
 /// `args`/`kind` metadata can't be preserved in the output itself. In
 /// block position only (never inline, to avoid corrupting running text) a
 /// leading `// tomet:{kind}` line comment records what was dropped.
-fn render_generic(el: &Element, kind: &str, inline: bool) -> String {
-    let content = content_to_typst(el);
+fn render_generic(cx: &TypstCtx, el: &Element, kind: &str, inline: bool) -> String {
+    let content = content_to_typst(cx, el);
     if content.is_empty() {
         return String::new();
     }
@@ -482,7 +604,7 @@ fn render_generic(el: &Element, kind: &str, inline: bool) -> String {
 /// unlike [`render_generic`]'s inline fallback, `rt` can't just be dropped:
 /// it's the reading, meaningful content rather than decoration. Renders as
 /// `base(reading)`, the least-lossy plain-text approximation.
-fn render_ruby(el: &Element) -> String {
+fn render_ruby(cx: &TypstCtx, el: &Element) -> String {
     let args = normalized_element_args(el);
     let rt = args
         .as_ref()
@@ -490,7 +612,7 @@ fn render_ruby(el: &Element) -> String {
         .and_then(|m| map_get(m, "rt"))
         .map(value_to_plain)
         .unwrap_or_default();
-    let content = content_to_typst(el);
+    let content = content_to_typst(cx, el);
     if rt.is_empty() {
         content
     } else {
@@ -498,10 +620,10 @@ fn render_ruby(el: &Element) -> String {
     }
 }
 
-fn content_to_typst(el: &Element) -> String {
+fn content_to_typst(cx: &TypstCtx, el: &Element) -> String {
     el.content
         .as_ref()
-        .map(|a| inline_to_typst(a))
+        .map(|a| inline_to_typst(cx, a))
         .unwrap_or_default()
 }
 
@@ -743,6 +865,47 @@ mod tests {
         assert_eq!(
             typst("Footer: ${copyright}\n"),
             "Footer: `${copyright}`\n\n"
+        );
+    }
+
+    #[test]
+    fn renders_inline_footnote() {
+        let src = "Prose with @footnote[a note] here.\n";
+        assert_eq!(
+            typst(src),
+            "Prose with #footnote[a note] here.\n\n"
+        );
+    }
+
+    #[test]
+    fn renders_separated_footnote_with_multiple_carets() {
+        let src = "\
+Prose A ^(shared).
+Prose B ^(shared).
+
+@footnote(shared)[Shared footnote explanation.]
+";
+        let out = typst(src);
+        assert!(
+            out.contains("Prose A #footnote[Shared footnote explanation.] <fn-shared>."),
+            "got: {out}"
+        );
+        assert!(
+            out.contains("Prose B #footnote(<fn-shared>)."),
+            "got: {out}"
+        );
+        assert!(
+            !out.contains("@footnote"),
+            "got: {out}"
+        );
+    }
+
+    #[test]
+    fn renders_tag_sugar_and_element() {
+        let src = "#(rust, tomet) and @tag(spec)\n";
+        assert_eq!(
+            typst(src),
+            "#box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#rust] #box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#tomet] and #box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#spec]\n\n"
         );
     }
 }
