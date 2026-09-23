@@ -2249,6 +2249,59 @@ mod tests {
     }
 
     #[test]
+    fn parses_section_with_decorative_trailing_equals() {
+        // Bracket form with trailing equals (no space and with space)
+        let doc1 = parse_document("==[ Title ]==\nParagraph\n").unwrap();
+        let Block::Section(s1) = &doc1.blocks[0] else { panic!() };
+        assert_eq!(s1.level, 2);
+        assert_eq!(s1.title, vec![Inline::Text("Title".into())]);
+        assert_eq!(s1.blocks.len(), 1);
+        let Block::Paragraph(p1) = &s1.blocks[0] else { panic!() };
+        assert_eq!(p1.content, vec![Inline::Text("Paragraph".into())]);
+
+        let doc2 = parse_document("==[ Title ] ==\nParagraph\n").unwrap();
+        let Block::Section(s2) = &doc2.blocks[0] else { panic!() };
+        assert_eq!(s2.title, vec![Inline::Text("Title".into())]);
+        assert_eq!(s2.blocks.len(), 1);
+
+        // Bracket form with attrs
+        let doc3 = parse_document("==[ Title ]{ id: intro }==\nParagraph\n").unwrap();
+        let Block::Section(s3) = &doc3.blocks[0] else { panic!() };
+        assert_eq!(s3.title, vec![Inline::Text("Title".into())]);
+        assert!(s3.value.is_some());
+        assert_eq!(s3.blocks.len(), 1);
+
+        let doc4 = parse_document("==[ Title ]=={ id: intro }\nParagraph\n").unwrap();
+        let Block::Section(s4) = &doc4.blocks[0] else { panic!() };
+        assert_eq!(s4.title, vec![Inline::Text("Title".into())]);
+        assert!(s4.value.is_some());
+        assert_eq!(s4.blocks.len(), 1);
+
+        // Sugar form with trailing equals
+        let doc5 = parse_document("== Title ==\nParagraph\n").unwrap();
+        let Block::Section(s5) = &doc5.blocks[0] else { panic!() };
+        assert_eq!(s5.level, 2);
+        assert_eq!(s5.title, vec![Inline::Text("Title".into())]);
+        assert_eq!(s5.blocks.len(), 1);
+
+        let doc6 = parse_document("== Title ===\nParagraph\n").unwrap();
+        let Block::Section(s6) = &doc6.blocks[0] else { panic!() };
+        assert_eq!(s6.title, vec![Inline::Text("Title".into())]);
+        assert_eq!(s6.blocks.len(), 1);
+
+        // Heading with internal '='
+        let doc7 = parse_document("== Math: 1 + 1 = 2 ==\nParagraph\n").unwrap();
+        let Block::Section(s7) = &doc7.blocks[0] else { panic!() };
+        assert_eq!(s7.title, vec![Inline::Text("Math: 1 + 1 = 2".into())]);
+        assert_eq!(s7.blocks.len(), 1);
+
+        let doc8 = parse_document("==[ Math: 1 + 1 = 2 ]==\nParagraph\n").unwrap();
+        let Block::Section(s8) = &doc8.blocks[0] else { panic!() };
+        assert_eq!(s8.title, vec![Inline::Text("Math: 1 + 1 = 2".into())]);
+        assert_eq!(s8.blocks.len(), 1);
+    }
+
+    #[test]
     fn parses_tag_sugar_syntax() {
         let doc = parse_document("Prose with #(rust, parser, tomet) tags.\n").unwrap();
         let Block::Paragraph(p) = &doc.blocks[0] else { panic!() };
