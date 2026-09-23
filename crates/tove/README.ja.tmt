@@ -1,0 +1,42 @@
+---
+title: tove
+---
+
+# tove (Tomet Object & Value Expression)
+
+TOVE は、Tomet のための軽量で表現力豊かなデータ言語パーサークレートです。
+
+## 主な機能
+
+- **純粋データ構文の解析**: スカラー値、文字列、マップ（`key: value` および `{ ... }`）、リスト（`list(...)`）、式コールを `tomet_ast::Value` へ解析
+- **Serde 連携**: `toml` や `ron` クレートのように、`tove::from_str` と `tove::to_string` で Rust 構造体の双方向シリアライズ/デシリアライズを提供
+- **拡張性**: `tomet-syntax-parser` などのホスト構文から埋め込み値（`@element` や `$interp`）をフック可能
+
+## 使用例
+
+```rust
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct Config {
+    title: String,
+    port: u16,
+    enabled: bool,
+    tags: Vec<String>,
+}
+
+fn main() {
+    let text = r#"
+        title: "My Service"
+        port: 8080
+        enabled: true
+        tags: list("web", "api")
+    "#;
+
+    let config: Config = tove::from_str(text).unwrap();
+    println!("{config:?}");
+
+    let rendered = tove::to_string(&config).unwrap();
+    println!("{rendered}");
+}
+```

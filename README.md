@@ -2,16 +2,26 @@
 
 Tome to me!!
 
-Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and Rust toolchain designed as a modern alternative to Markdown and JSON metadata formats.
+Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and Rust toolchain designed as a modern alternative.
 
-## Features
+## Example
 
-- **Unified Element Syntax**: Standardized element format `<T>(args)[content]{value}` for attributes, raw/rendered content areas, and structured data.
-- **Embedded Formats**: Seamlessly embed JSON, YAML, or TOML inside `{value}` blocks via `format: json|yaml|toml`.
-- **Inferred References**: Compact `@` syntax for URLs (`@(url:...)`), files (`@(file:...)`), and reference links.
-- **Bidirectional CommonMark Support**: Import from and export to CommonMark.
-- **Serde Integration**: `serde_tomet` for data-only `.tmt` documents and `{value}` structures.
-- **Toolchain & Integrations**: CLI tool (`tomet`), Language Server Protocol (`tomet-lsp`), tree-sitter parser, and VS Code / Zed editor integrations.
+```tm
+@meta{id: doc-asdfadsf}
+
+=[ heading ]
+
+- list #(tag, tag2, tag3, tag4)
+  -. orderd
+
+@table
+|[][][]
+
+@callout(info)
+| content
+
+=
+```
 
 ## Repository Layout
 
@@ -30,7 +40,7 @@ tomet/
 │   ├── tomet-convert-*   # Document format converters: html, markdown, typst
 │   ├── tomet-format-*    # Source output: formatter, printer, style, field-utils
 │   ├── tomet-workspace*  # Multi-file I/O: workspace, indexer, links, config
-│   ├── serde_tomet/      # Serde deserializer/serializer for Tomet Value model
+│   ├── tove/             # TOVE data language parser and Serde adapter
 │   └── tree-sitter-tomet/# Tree-sitter grammar for editor syntax highlighting
 └── docs/                 # Architecture notes, spec, and documentation
 ```

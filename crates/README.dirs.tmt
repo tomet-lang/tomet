@@ -50,11 +50,11 @@ tomet-workspace*     workspace (bare, no suffix),
                          Multi-file batch I/O, directory scanning, and link checking.
                          Config discovery is tomet-config, which sits below these.
 
-serde_tomet,          external-ecosystem adapters. Follow their
-tree-sitter-tomet     host ecosystem's own naming convention
-                         (serde_*, tree-sitter-*) rather than
-                         tomet's -- that's what makes them
-                         discoverable to serde/tree-sitter tooling.
+tove,                 data language parser and Serde adapter (Tomet Object &
+tree-sitter-tomet     Value Expression). Follow their
+                         host ecosystem's own naming convention
+                         rather than
+                         tomet's.
 +++
 
 `tomet-tui` lives in @dir(apps/tui), not here -- it's consumed as a

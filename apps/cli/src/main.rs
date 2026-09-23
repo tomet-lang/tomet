@@ -1,5 +1,5 @@
 //! A small CLI for manually checking that `tomet-parser`/
-//! `serde_tomet` actually work against a real `.tmt` file, instead of
+//! `tove` actually work against a real `.tmt` file, instead of
 //! only trusting `cargo test`'s unit tests.
 
 mod cli;

@@ -9,13 +9,13 @@ pub(crate) fn roundtrip(file: &PathBuf) -> anyhow::Result<()> {
     // Deserialize type" here, since it can hold any shape without a
     // fixed struct -- a real caller (e.g. tomet) would use its own
     // `#[derive(Serialize, Deserialize)]` struct instead.
-    let value: serde_json::Value = serde_tomet::from_str(&src)?;
+    let value: serde_json::Value = tove::from_str(&src)?;
     println!("parsed:\n{}", serde_json::to_string_pretty(&value)?);
 
-    let rendered = serde_tomet::to_string(&value)?;
+    let rendered = tove::to_string(&value)?;
     println!("\nrendered back:\n{rendered}");
 
-    let reparsed: serde_json::Value = serde_tomet::from_str(&rendered)?;
+    let reparsed: serde_json::Value = tove::from_str(&rendered)?;
     if reparsed == value {
         println!("\nround-trip OK");
         Ok(())

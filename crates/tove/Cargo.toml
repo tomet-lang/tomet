@@ -1,12 +1,12 @@
 [package]
-name = "serde_tomet"
+name = "tove"
 version.workspace = true
 edition.workspace = true
+description = "Tomet Object & Value Expression (TOVE) parser and serialization format"
 
 [dependencies]
 tomet-ast = { workspace = true }
-tomet-parser = { workspace = true }
-tomet-style = { workspace = true }
+tomet-lexer = { workspace = true }
 
 #[ Crates.io ]
 serde = { workspace = true }

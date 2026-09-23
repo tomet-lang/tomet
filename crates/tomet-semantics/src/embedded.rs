@@ -188,7 +188,7 @@ fn yaml_number_to_value(n: &serde_yaml::Number) -> Value {
 }
 
 /// YAML mapping keys are arbitrary `Value`s, not just strings -- unlike
-/// `serde_tomet::ser`'s `value_to_key_string` this can't fail, since an
+/// `tove::ser`'s `value_to_key_string` this can't fail, since an
 /// embedded-YAML body isn't going through a typed `Deserialize` that could
 /// reject an odd key: any scalar renders to its natural text, and a
 /// non-scalar key (a sequence/mapping key, legal but exotic YAML) falls

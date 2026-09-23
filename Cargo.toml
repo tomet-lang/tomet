@@ -60,7 +60,7 @@ members = [
   "crates/tomet-workspace-links",
 
   #[ Public -- external ecosystem adapters ]
-  "crates/serde_tomet",
+  "crates/tove",
   "crates/tree-sitter-tomet",
 
   #[ Apps ]
@@ -111,7 +111,7 @@ tomet-links = { path = "crates/tomet-workspace-links" }
 tomet-config = { path = "crates/tomet-config" }
 tomet-load = { path = "crates/tomet-load" }
 #[ Public ]
-serde_tomet = { path = "crates/serde_tomet" }
+tove = { path = "crates/tove" }
 tree-sitter-tomet = { path = "crates/tree-sitter-tomet" }
 #[ Apps ]
 tomet-tui = { path = "apps/tui" }

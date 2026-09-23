@@ -8,6 +8,7 @@ tomet-ast = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-lexer = { workspace = true }
 tomet-tree = { workspace = true }
+tove = { workspace = true }
 
 #[ Crates.io ]
 unicode-width = { workspace = true }

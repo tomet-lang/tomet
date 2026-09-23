@@ -43,7 +43,7 @@ pub enum Command {
         data: bool,
     },
     /// Parse a data file into a generic value, then render it back out
-    /// through `serde_tomet` and reparse that -- confirms the
+    /// through `tove` and reparse that -- confirms the
     /// save/load round trip is lossless.
     Roundtrip { file: PathBuf },
     /// Convert a `.tmt` file to HTML: a standalone page, or just the

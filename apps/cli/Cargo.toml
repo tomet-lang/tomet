@@ -8,7 +8,7 @@ name = "tomet"
 path = "src/main.rs"
 
 [dependencies]
-serde_tomet = { workspace = true }
+tove = { workspace = true }
 tomet-ast = { workspace = true }
 tomet-compute = { workspace = true }
 tomet-config = { workspace = true }
