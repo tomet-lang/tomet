@@ -67,12 +67,14 @@
 ; A `+++` fence body is verbatim text, like a code block's.
 (raw_fence) @string.special
 
-; `${...}` interpolation -- sigil/brace treated like other structural
-; delimiters (`@punctuation.special`, matching `heading_marker`/
-; `fence_marker` above), the call name colored like a function call.
+; `${...}` / `$call(...)` interpolation
 (interpolation "${" @punctuation.special)
 (interpolation "}" @punctuation.special)
+(interpolation "$" @function)
 (interp_call name: (identifier) @function)
+(interp_call member: (identifier) @function)
+(interp_call "(" @function)
+(interp_call ")" @function)
 (number) @number
 
 ; `(args)`/`[content]`/`{value}` group delimiters.
@@ -84,6 +86,15 @@
 (marked_content "|" @punctuation.special @keyword.control)
 (value_group "{" @punctuation.bracket)
 (value_group "}" @punctuation.bracket)
+
+; Element framing: element delimiters share @tag with the sigil and name,
+; keeping the element shell visually unified while content/args keep their own colors.
+(inline_element (args_group "(" @tag))
+(inline_element (args_group ")" @tag))
+(inline_element (content_group "[" @tag))
+(inline_element (content_group "]" @tag))
+(inline_element (value_group "{" @tag))
+(inline_element (value_group "}" @tag))
 
 ; well-known `@(url:..)`/`@(file:..)`/`@(ref:..)` link-shaped elements
 ; render as links even though the grammar doesn't special-case them

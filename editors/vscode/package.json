@@ -40,7 +40,8 @@
 		"configurationDefaults": {
 			"[tomet]": {
 				"editor.wordWrap": "on",
-				"editor.formatOnSave": true
+				"editor.formatOnSave": true,
+				"editor.bracketPairColorization.enabled": false
 			}
 		},
 		"commands": [

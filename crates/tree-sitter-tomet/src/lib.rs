@@ -642,6 +642,47 @@ mod tests {
     }
 
     #[test]
+    fn highlights_captures_element_brackets_as_tag() {
+        use tree_sitter::StreamingIterator;
+        let src = "@link[content](args)\n";
+        let tree = parse(src);
+        let query_src = include_str!("../queries/highlights.scm");
+        let query = tree_sitter::Query::new(&LANGUAGE.into(), query_src).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), src.as_bytes());
+
+        let mut captured: Vec<(String, String)> = Vec::new();
+        while let Some(m) = matches.next() {
+            for c in m.captures {
+                let name = query.capture_names()[c.index as usize].to_string();
+                let text = &src[c.node.byte_range()];
+                captured.push((name, text.to_string()));
+            }
+        }
+
+        // Verify that "[" and "]" and "(" and ")" inside the element are captured as "tag"
+        assert!(captured.contains(&("tag".into(), "[".into())));
+        assert!(captured.contains(&("tag".into(), "]".into())));
+        assert!(captured.contains(&("tag".into(), "(".into())));
+        assert!(captured.contains(&("tag".into(), ")".into())));
+
+        // Plain brackets outside element are punctuation.bracket, not tag
+        let plain_src = "plain [brackets] and (parens)\n";
+        let plain_tree = parse(plain_src);
+        let mut plain_matches = cursor.matches(&query, plain_tree.root_node(), plain_src.as_bytes());
+        let mut plain_captured: Vec<(String, String)> = Vec::new();
+        while let Some(m) = plain_matches.next() {
+            for c in m.captures {
+                let name = query.capture_names()[c.index as usize].to_string();
+                let text = &plain_src[c.node.byte_range()];
+                plain_captured.push((name, text.to_string()));
+            }
+        }
+        assert!(!plain_captured.contains(&("tag".into(), "[".into())));
+        assert!(!plain_captured.contains(&("tag".into(), "(".into())));
+    }
+
+    #[test]
     fn indents_query_is_valid() {
         let query_src = include_str!("../queries/indents.scm");
         tree_sitter::Query::new(&LANGUAGE.into(), query_src)
