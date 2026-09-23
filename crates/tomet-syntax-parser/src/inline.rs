@@ -4,6 +4,7 @@ use crate::codeblock::is_fenced_code_block_start;
 use crate::element::{LineEnd, element_ends_line, is_element_start, parse_element};
 use crate::error::Result;
 use crate::section::{is_thematic_break, is_titled_thematic_break_start};
+use crate::caret::{is_caret_start, parse_caret_element};
 use crate::interp::{is_interp_start, parse_dollar_element};
 use crate::list::peek_list_marker;
 use crate::value::{err, skip_block_comment, skip_inline_ws, skip_line_comment};
@@ -279,6 +280,12 @@ pub(crate) fn parse_inline_seq(
         if cur.starts_with("#(") {
             flush_text(&mut items, cur, &mut text_start, fold_pipes);
             items.push(Inline::Element(parse_tag_sugar(cur)?));
+            text_start = cur.pos();
+            continue;
+        }
+        if cur.peek() == Some('^') && is_caret_start(cur) {
+            flush_text(&mut items, cur, &mut text_start, fold_pipes);
+            items.push(Inline::Element(parse_caret_element(cur, allow_colon_connect)?));
             text_start = cur.pos();
             continue;
         }

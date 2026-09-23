@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use tomet_ast::{Block, Document, Element, ElementValue, Inline, Section, Span, Value};
 use tomet_semantics::{
-    Bindings, EXACT_DATA_KEY, ElementKind, TargetScheme, builtin_doc_vocabularies,
+    Bindings, EXACT_DATA_KEY, ElementKind, FootnoteRegistry, TargetScheme, builtin_doc_vocabularies,
     classify_std_lenient, flatten_data, heading_level, is_directive, link_target, list_items,
     list_ordered, normalized_element_args, normalized_element_args_in, path_target, target_scheme,
 };
@@ -215,19 +215,23 @@ pub fn render_body_with_outline(
     // that key (not the parser's positional sentinel) for `custom_element`
     // hooks to read it by name.
     let bindings = Bindings::for_document(doc, builtin_doc_vocabularies());
+    let footnotes = FootnoteRegistry::from_document(doc);
     let cx = RenderCtx {
         options,
         bindings: &bindings,
+        footnotes: &footnotes,
     };
     for block in &doc.blocks {
         render_block(&cx, block, &mut out, &mut state);
     }
+    render_footnotes(&cx, &mut out);
     (out, state.outline)
 }
 
 struct RenderCtx<'a> {
     options: &'a RenderOptions,
     bindings: &'a Bindings,
+    footnotes: &'a FootnoteRegistry,
 }
 
 /// Per-document state threaded through heading rendering: the nesting
@@ -582,6 +586,24 @@ fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) 
                 render_element_value(cx, value, out);
             }
         }
+        "footnote" => {
+            if inline || el.placement == tomet_ast::Placement::Inline {
+                if let Some((idx, backlink)) = cx.footnotes.get_ref(&el.span) {
+                    out.push_str(&format!(
+                        "<sup><a href=\"#fn-{}\" id=\"{}\" class=\"footnote-ref\">[{}]</a></sup>",
+                        idx, backlink, idx
+                    ));
+                }
+            }
+        }
+        "caret" => {
+            if let Some((idx, backlink)) = cx.footnotes.get_ref(&el.span) {
+                out.push_str(&format!(
+                    "<sup><a href=\"#fn-{}\" id=\"{}\" class=\"footnote-ref\">[{}]</a></sup>",
+                    idx, backlink, idx
+                ));
+            }
+        }
         "links" => render_links_container(cx, el, out),
         "link" => render_link_element(cx, el, out, inline),
         "file" | "dir" => render_path_element(cx, el, out, inline),
@@ -598,6 +620,61 @@ fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) 
         "table" => render_table_element(cx, el, out),
         _ => render_custom_or_generic_element(cx, el, kind.as_str(), out, inline),
     }
+}
+
+fn render_footnotes(cx: &RenderCtx, out: &mut String) {
+    if cx.footnotes.items.is_empty() {
+        return;
+    }
+    out.push_str("<section role=\"doc-endnotes\" class=\"footnotes\">\n<hr>\n<ol>\n");
+    for item in &cx.footnotes.items {
+        out.push_str(&format!("<li id=\"fn-{}\">\n", item.index));
+        let mut content_html = String::new();
+        if let Some(def_el) = &item.definition {
+            if let Some(content) = &def_el.content {
+                render_inlines(cx, content, &mut content_html);
+            }
+            if let Some(children) = &def_el.children {
+                for child in children {
+                    let mut dummy_state = HeadingState::default();
+                    render_block(cx, child, &mut content_html, &mut dummy_state);
+                }
+            }
+        }
+
+        let backlink_html = if item.backlinks.len() == 1 {
+            format!(
+                " <a href=\"#{}\" role=\"doc-backlink\" class=\"footnote-backref\">↩</a>",
+                item.backlinks[0]
+            )
+        } else {
+            let links: Vec<String> = item
+                .backlinks
+                .iter()
+                .enumerate()
+                .map(|(i, id)| {
+                    format!(
+                        "<a href=\"#{}\" role=\"doc-backlink\" class=\"footnote-backref\">^{}</a>",
+                        id,
+                        i + 1
+                    )
+                })
+                .collect();
+            format!(" <span class=\"footnote-backrefs\">{}</span>", links.join(" "))
+        };
+
+        if content_html.trim().is_empty() {
+            out.push_str(&format!("<p>{}</p>\n", backlink_html.trim_start()));
+        } else if content_html.ends_with("</p>\n") {
+            let pos = content_html.rfind("</p>\n").unwrap();
+            content_html.insert_str(pos, &backlink_html);
+            out.push_str(&content_html);
+        } else {
+            out.push_str(&format!("<p>{}{}</p>\n", content_html, backlink_html));
+        }
+        out.push_str("</li>\n");
+    }
+    out.push_str("</ol>\n</section>\n");
 }
 
 /// The fallback for a kind [`render_element`] has no dedicated handling
@@ -1999,5 +2076,45 @@ mod tests {
         let spans = extract_spans(&html);
         assert_eq!(spans.len(), 1);
         assert_eq!(&src[spans[0].0..spans[0].1], src.trim_end());
+    }
+
+    #[test]
+    fn test_renders_inline_footnote() {
+        let src = "Prose with @footnote[a short note] here.\n";
+        let doc = parse_document(src).unwrap();
+        let html = render_body(&doc);
+
+        assert!(
+            html.contains("<sup><a href=\"#fn-1\" id=\"fnref-1-1\" class=\"footnote-ref\">[1]</a></sup>"),
+            "expected footnote link in body: {html}"
+        );
+        assert!(
+            html.contains("<section role=\"doc-endnotes\" class=\"footnotes\">"),
+            "expected footnotes section: {html}"
+        );
+        assert!(
+            html.contains("<li id=\"fn-1\">\n<p>a short note <a href=\"#fnref-1-1\" role=\"doc-backlink\" class=\"footnote-backref\">↩</a></p>\n</li>"),
+            "expected footnote item with backlink: {html}"
+        );
+    }
+
+    #[test]
+    fn test_renders_separated_footnote_with_multiple_references() {
+        let src = "Prose A^(note1) and Prose B^footnote(note1).\n\n@footnote(note1)[Shared footnote explanation.]\n";
+        let doc = parse_document(src).unwrap();
+        let html = render_body(&doc);
+
+        assert!(
+            html.contains("Prose A<sup><a href=\"#fn-1\" id=\"fnref-1-1\" class=\"footnote-ref\">[1]</a></sup>"),
+            "expected first footnote ref: {html}"
+        );
+        assert!(
+            html.contains("Prose B<sup><a href=\"#fn-1\" id=\"fnref-1-2\" class=\"footnote-ref\">[1]</a></sup>"),
+            "expected second footnote ref: {html}"
+        );
+        assert!(
+            html.contains("<li id=\"fn-1\">\n<p>Shared footnote explanation. <span class=\"footnote-backrefs\"><a href=\"#fnref-1-1\" role=\"doc-backlink\" class=\"footnote-backref\">^1</a> <a href=\"#fnref-1-2\" role=\"doc-backlink\" class=\"footnote-backref\">^2</a></span></p>\n</li>"),
+            "expected shared footnote item with multiple backlinks: {html}"
+        );
     }
 }

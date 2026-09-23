@@ -13,6 +13,9 @@ use crate::vocabulary::{Bindings, ElementDecl};
 /// it is a widely used custom element in the docs and dropping its
 /// positional key would silently change how `(warning)` reads.
 pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
+    if sigil.is_caret() {
+        return &["id"];
+    }
     let Some(name) = sigil.name() else {
         return &[];
     };
@@ -20,6 +23,7 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         return &[];
     }
     match name.name.as_str() {
+        "footnote" => &["id"],
         "kind" => &["kind"],
         "version" => &["version"],
         "raw" => &["lang"],

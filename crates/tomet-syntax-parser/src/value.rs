@@ -7,7 +7,7 @@ use tomet_ast::Value;
 use tomet_lexer::Cursor;
 
 pub(crate) use tove::{
-    POSITIONAL_ENTRY_KEY, eat_ident, eat_name, is_ident_char, is_name_start_at, skip_inline_ws,
+    POSITIONAL_ENTRY_KEY, eat_name, is_name_start_at, skip_inline_ws,
     skip_line_comment, skip_ws_and_newlines, skip_ws_newlines_and_comments,
 };
 

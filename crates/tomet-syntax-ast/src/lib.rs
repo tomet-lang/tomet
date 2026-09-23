@@ -593,6 +593,10 @@ pub enum Sigil {
     /// `InterpExpr` inside the `ElementValue::Interp` value group carries
     /// its own path/call name.
     Dollar,
+    /// `^` or `^name` reference pin -- structurally a sigil that introduces
+    /// an element cross-reference or hook pin, optionally filtered by a target
+    /// element kind name (e.g. `^footnote(...)` or `^fig(...)`).
+    Caret(Option<Name>),
 }
 
 impl Sigil {
@@ -600,7 +604,25 @@ impl Sigil {
     pub fn name(&self) -> Option<&Name> {
         match self {
             Sigil::Named(name) => Some(name),
-            Sigil::Bare | Sigil::Dollar => None,
+            Sigil::Bare | Sigil::Dollar | Sigil::Caret(_) => None,
+        }
+    }
+
+    /// Creates a Caret sigil with an optional target kind name.
+    pub fn caret(name: Option<impl Into<String>>) -> Self {
+        Sigil::Caret(name.map(|n| Name::bare(n)))
+    }
+
+    /// Whether this sigil is a Caret (`^` or `^name`).
+    pub fn is_caret(&self) -> bool {
+        matches!(self, Sigil::Caret(_))
+    }
+
+    /// The target kind name of a Caret sigil, if filtered (e.g. `Some("footnote")` for `^footnote(...)`).
+    pub fn caret_target_kind(&self) -> Option<&Name> {
+        match self {
+            Sigil::Caret(Some(name)) => Some(name),
+            _ => None,
         }
     }
 
@@ -923,5 +945,21 @@ mod tests {
 
         assert_eq!(span, dummy);
         assert!(!span.exact_eq(&dummy));
+    }
+
+    #[test]
+    fn test_sigil_caret() {
+        let bare_caret = Sigil::caret(None::<&str>);
+        assert!(bare_caret.is_caret());
+        assert_eq!(bare_caret.name(), None);
+        assert_eq!(bare_caret.caret_target_kind(), None);
+
+        let named_caret = Sigil::caret(Some("footnote"));
+        assert!(named_caret.is_caret());
+        assert_eq!(named_caret.name(), None);
+        assert_eq!(
+            named_caret.caret_target_kind().map(|n| n.name.as_str()),
+            Some("footnote")
+        );
     }
 }

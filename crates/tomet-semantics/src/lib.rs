@@ -12,6 +12,7 @@ mod connect_member;
 pub mod embedded;
 pub mod flatten;
 mod heading;
+pub mod footnote;
 mod kind;
 mod list;
 mod meta;
@@ -30,6 +31,7 @@ pub use flatten::{
     EXACT_DATA_KEY, FlatData, POSITIONAL_KEY, flatten_data, flatten_element_data, scalar_string,
     value_to_json,
 };
+pub use footnote::{FootnoteItem, FootnoteRegistry};
 pub use heading::heading_level;
 pub use kind::{
     BUILTIN_KINDS, ElementKind, Shape, UnknownName, builtin_region, builtin_singleton,

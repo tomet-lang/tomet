@@ -170,6 +170,10 @@ pub enum ElementKind {
     /// syntax with fixed grammar-level meaning, not an arbitrary
     /// user-chosen element name.
     Interp,
+    /// `@footnote` -- an inline or block footnote definition.
+    Footnote,
+    /// `Sigil::Caret` -- `^(id)` or `^name(id)` reference pin.
+    Caret,
 }
 
 impl ElementKind {
@@ -218,6 +222,8 @@ impl ElementKind {
             ElementKind::Custom(name) => name,
             ElementKind::Bare => "bare",
             ElementKind::Interp => "interp",
+            ElementKind::Footnote => "footnote",
+            ElementKind::Caret => "caret",
         }
     }
 }
@@ -251,7 +257,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 37] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -298,6 +304,7 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
     ("heading", ElementKind::Heading),
     ("ol", ElementKind::OrderedList),
     ("ul", ElementKind::UnorderedList),
+    ("footnote", ElementKind::Footnote),
 ];
 
 fn builtin_kind(name: &str) -> Option<ElementKind> {
@@ -412,6 +419,7 @@ pub fn classify_std(el: &Element) -> Result<ElementKind, UnknownName> {
         Sigil::Named(name) => classify_std_name(name),
         Sigil::Bare => Ok(ElementKind::Bare),
         Sigil::Dollar => Ok(ElementKind::Interp),
+        Sigil::Caret(_) => Ok(ElementKind::Caret),
     }
 }
 
@@ -455,7 +463,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         Meta | Config | Settings | Use | Include | References | Blueprint | Links | Hr
         | Callout | Card | Table | Heading | OrderedList | UnorderedList | Kind
         | Version | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
-        Em | Strong | Mark | Strikeout | Ruby => Shape::Inline,
+        Em | Strong | Mark | Strikeout | Ruby | Caret => Shape::Inline,
         // Either shape. A link or an embed alone on a line is not a
         // structural error -- it is how you show one file or one image.
         // What `shape_mismatch` is for is the case that breaks something:
@@ -478,6 +486,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         // Either shape, for the same reason: a gap is sometimes a phrase
         // inside a sentence and sometimes a whole missing section.
         Draft | Fixme => return None,
+        Footnote => return None,
         Custom(_) | Bare | Interp => return None,
     })
 }

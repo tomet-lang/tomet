@@ -152,5 +152,9 @@ pub(crate) fn sigil_display_name(sigil: &Sigil) -> String {
         Sigil::Named(name) => format!("@{name}"),
         Sigil::Bare => "(bare)".to_string(),
         Sigil::Dollar => "${...}".to_string(),
+        Sigil::Caret(name) => match name {
+            Some(n) => format!("^{n}"),
+            None => "^(...)".to_string(),
+        },
     }
 }

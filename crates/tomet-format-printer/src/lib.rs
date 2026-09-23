@@ -629,6 +629,12 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         Sigil::Dollar => {
             out.push('$');
         }
+        Sigil::Caret(name) => {
+            out.push('^');
+            if let Some(name) = name {
+                out.push_str(&name.to_string());
+            }
+        }
     }
 
     if let Some(args) = &el.args {
