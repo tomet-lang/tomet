@@ -130,7 +130,7 @@
 					"captures": {
 						"1": { "name": "punctuation.definition.list.begin.markdown markup.list.tomet keyword.control.list.tomet" },
 						"2": { "name": "punctuation.definition.marker.begin.tomet punctuation.definition.list.begin.markdown markup.list.tomet keyword.control.list.tomet" },
-						"3": { "name": "keyword.operator.marker.tomet markup.list.marker.tomet" },
+						"3": { "name": "variable.parameter.marker.tomet variable.parameter.tomet variable.other.property.tomet constant.other.marker.tomet keyword.operator.marker.tomet markup.list.marker.tomet" },
 						"4": { "name": "punctuation.definition.marker.end.tomet punctuation.definition.list.begin.markdown markup.list.tomet keyword.control.list.tomet" }
 					}
 				}
@@ -153,6 +153,9 @@
 				{ "include": "#emphasis" },
 				{ "include": "#tag-sugar" },
 				{ "include": "#interpolation" },
+				{ "include": "#footnote-hook" },
+				{ "include": "#named-connect" },
+				{ "include": "#bare-connect" },
 				{ "include": "#connect" },
 				{ "include": "#element" },
 				{ "include": "#marked-content" },
@@ -167,6 +170,9 @@
 				{ "include": "#autolink" },
 				{ "include": "#tag-sugar" },
 				{ "include": "#interpolation" },
+				{ "include": "#footnote-hook" },
+				{ "include": "#named-connect" },
+				{ "include": "#bare-connect" },
 				{ "include": "#connect" },
 				{ "include": "#element" },
 				{ "include": "#groups" }
@@ -226,6 +232,128 @@
 			},
 			"name": "meta.tag.sugar.tomet",
 			"patterns": [{ "include": "#value" }]
+		},
+
+		"named-connect": {
+			"comment": "Named connect syntax: `:name(...)`, `:name[...]`, `:name{...}`. Subdued punctuation gray styling.",
+			"begin": "(?<![A-Za-z0-9_.-])(:)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*[(\\[{])",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.connect.sigil.tomet punctuation.definition.tag.tomet" },
+				"2": { "name": "punctuation.definition.connect.name.tomet punctuation.definition.tag.tomet" }
+			},
+			"end": "(?<=\\]|\\)|\\})(?![ \\t]*[(\\[{])|^(?=[ \\t]*$)",
+			"patterns": [
+				{ "include": "#connect-round-group" },
+				{ "include": "#connect-square-group" },
+				{ "include": "#connect-curly-group" }
+			]
+		},
+
+		"bare-connect": {
+			"comment": "Bare (nameless) connect syntax: `:()`, `:{...}`, `:(){...}`. Highlighted with distinct keyword/operator/storage color.",
+			"begin": "(?<![A-Za-z0-9_.-])(:)(?=[ \\t]*[(\\[{])",
+			"beginCaptures": {
+				"1": { "name": "keyword.operator.connect.bare.tomet keyword.control.connect.tomet storage.type.connect.tomet" }
+			},
+			"end": "(?<=\\]|\\)|\\})(?![ \\t]*[(\\[{])|^(?=[ \\t]*$)",
+			"patterns": [
+				{ "include": "#bare-connect-round-group" },
+				{ "include": "#bare-connect-square-group" },
+				{ "include": "#bare-connect-curly-group" }
+			]
+		},
+
+		"footnote-hook": {
+			"comment": "Footnote hook syntax: `^name(...)`, `^(...)`. Subdued punctuation gray styling.",
+			"begin": "(?<![A-Za-z0-9_.-])(\\^)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)?(?=[ \\t]*[(\\[{])",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.footnote.sigil.tomet punctuation.definition.tag.tomet" },
+				"2": { "name": "punctuation.definition.footnote.name.tomet punctuation.definition.tag.tomet" }
+			},
+			"end": "(?<=\\]|\\)|\\})(?![ \\t]*[(\\[{])|^(?=[ \\t]*$)",
+			"patterns": [
+				{ "include": "#connect-round-group" },
+				{ "include": "#connect-square-group" },
+				{ "include": "#connect-curly-group" }
+			]
+		},
+
+		"connect-round-group": {
+			"begin": "\\(",
+			"beginCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.round.begin.tomet punctuation.definition.tag.tomet" }
+			},
+			"end": "\\)",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.round.end.tomet punctuation.definition.tag.tomet" }
+			},
+			"name": "meta.group.connect.round.tomet",
+			"patterns": [{ "include": "#value" }]
+		},
+
+		"connect-square-group": {
+			"begin": "\\[",
+			"beginCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.square.begin.tomet punctuation.definition.tag.tomet" }
+			},
+			"end": "\\]",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.square.end.tomet punctuation.definition.tag.tomet" }
+			},
+			"name": "meta.group.connect.square.tomet",
+			"patterns": [{ "include": "#inline" }]
+		},
+
+		"connect-curly-group": {
+			"begin": "\\{",
+			"beginCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.curly.begin.tomet punctuation.definition.tag.tomet" }
+			},
+			"end": "\\}",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.curly.end.tomet punctuation.definition.tag.tomet" }
+			},
+			"name": "meta.group.connect.curly.tomet",
+			"patterns": [{ "include": "#value" }, { "include": "#element" }]
+		},
+
+		"bare-connect-round-group": {
+			"begin": "\\(",
+			"beginCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.round.begin.tomet keyword.operator.connect.bare.tomet keyword.control.connect.tomet storage.type.connect.tomet" }
+			},
+			"end": "\\)",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.round.end.tomet keyword.operator.connect.bare.tomet keyword.control.connect.tomet storage.type.connect.tomet" }
+			},
+			"name": "meta.group.bare-connect.round.tomet",
+			"patterns": [{ "include": "#value" }]
+		},
+
+		"bare-connect-square-group": {
+			"begin": "\\[",
+			"beginCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.square.begin.tomet keyword.operator.connect.bare.tomet keyword.control.connect.tomet storage.type.connect.tomet" }
+			},
+			"end": "\\]",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.square.end.tomet keyword.operator.connect.bare.tomet keyword.control.connect.tomet storage.type.connect.tomet" }
+			},
+			"name": "meta.group.bare-connect.square.tomet",
+			"patterns": [{ "include": "#inline" }]
+		},
+
+		"bare-connect-curly-group": {
+			"begin": "\\{",
+			"beginCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.curly.begin.tomet keyword.operator.connect.bare.tomet keyword.control.connect.tomet storage.type.connect.tomet" }
+			},
+			"end": "\\}",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.connect.bracket.curly.end.tomet keyword.operator.connect.bare.tomet keyword.control.connect.tomet storage.type.connect.tomet" }
+			},
+			"name": "meta.group.bare-connect.curly.tomet",
+			"patterns": [{ "include": "#value" }, { "include": "#element" }]
 		},
 
 		"connect": {

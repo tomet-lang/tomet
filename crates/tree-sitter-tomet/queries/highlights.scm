@@ -106,6 +106,20 @@
 (tag (args_group "(" @tag))
 (tag (args_group ")" @tag))
 
+; Connect framing: named connects (:rule()) use subdued punctuation gray
+(connect ":" @punctuation.special)
+(connect name: (identifier) @punctuation.special)
+(connect (args_group "(" @punctuation.special))
+(connect (args_group ")" @punctuation.special))
+(connect (content_group "[" @punctuation.special))
+(connect (content_group "]" @punctuation.special))
+(connect (value_group "{" @punctuation.special))
+(connect (value_group "}" @punctuation.special))
+
+; Bare colons on inline elements and sections (:(), :{}) use distinct keyword color
+(inline_element ":" @keyword.control)
+(section ":" @keyword.control)
+
 ; well-known `@(url:..)`/`@(file:..)`/`@(ref:..)` link-shaped elements
 ; render as links even though the grammar doesn't special-case them
 ; structurally (that inference is `tomet-html`'s job, not the

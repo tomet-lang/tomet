@@ -708,6 +708,32 @@ mod tests {
     }
 
     #[test]
+    fn highlights_captures_named_connect_as_punctuation() {
+        use tree_sitter::StreamingIterator;
+        let src = "@doc:rule(allow)\n";
+        let tree = parse(src);
+        let query_src = include_str!("../queries/highlights.scm");
+        let query = tree_sitter::Query::new(&LANGUAGE.into(), query_src).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), src.as_bytes());
+
+        let mut captured: Vec<(String, String)> = Vec::new();
+        while let Some(m) = matches.next() {
+            for c in m.captures {
+                let name = query.capture_names()[c.index as usize].to_string();
+                let text = &src[c.node.byte_range()];
+                captured.push((name, text.to_string()));
+            }
+        }
+
+        // Verify that ":", "rule", "(", and ")" in :rule() are captured as "punctuation.special"
+        assert!(captured.contains(&("punctuation.special".into(), ":".into())));
+        assert!(captured.contains(&("punctuation.special".into(), "rule".into())));
+        assert!(captured.contains(&("punctuation.special".into(), "(".into())));
+        assert!(captured.contains(&("punctuation.special".into(), ")".into())));
+    }
+
+    #[test]
     fn indents_query_is_valid() {
         let query_src = include_str!("../queries/indents.scm");
         tree_sitter::Query::new(&LANGUAGE.into(), query_src)
