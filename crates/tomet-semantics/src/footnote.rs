@@ -138,13 +138,18 @@ impl FootnoteRegistry {
 
 fn get_element_id(el: &Element) -> Option<String> {
     let args = normalized_element_args(el)?;
-    if let Some(id) = args.get("id").and_then(|v| v.as_str()) {
-        return Some(id.to_string());
+    if let Some(id) = args.get("id") {
+        return value_to_id(id);
     }
-    if let Some(s) = args.as_str() {
-        return Some(s.to_string());
+    value_to_id(&args)
+}
+
+fn value_to_id(val: &tomet_ast::Value) -> Option<String> {
+    match val {
+        tomet_ast::Value::String(s) => Some(s.clone()),
+        tomet_ast::Value::Int(i) => Some(i.to_string()),
+        _ => None,
     }
-    None
 }
 
 #[cfg(test)]
@@ -182,6 +187,22 @@ mod tests {
         assert_eq!(registry.items[1].index, 2);
         assert_eq!(registry.items[1].id.as_deref(), Some("other"));
         assert_eq!(registry.items[1].backlinks.len(), 1);
+        assert!(registry.items[1].definition.is_some());
+    }
+
+    #[test]
+    fn test_numeric_footnote_id_resolution() {
+        let src = "Item ^(1) and ^(2).\n\n@footnote(1)[Note 1]\n@footnote(2)[Note 2]\n";
+        let doc = parse_document(src).unwrap();
+        let registry = FootnoteRegistry::from_document(&doc);
+
+        assert_eq!(registry.items.len(), 2);
+        assert_eq!(registry.items[0].index, 1);
+        assert_eq!(registry.items[0].id.as_deref(), Some("1"));
+        assert!(registry.items[0].definition.is_some());
+
+        assert_eq!(registry.items[1].index, 2);
+        assert_eq!(registry.items[1].id.as_deref(), Some("2"));
         assert!(registry.items[1].definition.is_some());
     }
 }
