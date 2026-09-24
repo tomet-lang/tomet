@@ -122,6 +122,22 @@
                 {
                   "type": "STRING",
                   "value": "]"
+                },
+                {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "FIELD",
+                      "name": "close_marker",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "section_marker"
+                      }
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
                 }
               ]
             },
@@ -155,22 +171,29 @@
               ]
             },
             {
-              "type": "SEQ",
+              "type": "FIELD",
+              "name": "content",
+              "content": {
+                "type": "REPEAT1",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_line_item"
+                }
+              }
+            },
+            {
+              "type": "CHOICE",
               "members": [
                 {
-                  "type": "PATTERN",
-                  "value": "[ \\t]+"
+                  "type": "FIELD",
+                  "name": "args",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "args_group"
+                  }
                 },
                 {
-                  "type": "FIELD",
-                  "name": "content",
-                  "content": {
-                    "type": "REPEAT1",
-                    "content": {
-                      "type": "SYMBOL",
-                      "name": "_line_item"
-                    }
-                  }
+                  "type": "BLANK"
                 }
               ]
             }

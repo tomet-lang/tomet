@@ -190,6 +190,40 @@ mod tests {
     }
 
     #[test]
+    fn parses_headingless_sections() {
+        for src in [
+            "=\n",
+            "==\n",
+            "===\n",
+            "=   \n",
+            "={ id: sec }\n",
+            "=(args)\n",
+            "=(id: sec){ id: sec }\n",
+            "==[ Title ]==\n",
+        ] {
+            let tree = parse(src);
+            let root = tree.root_node();
+            assert!(!root.has_error(), "failed to parse {src:?}");
+            assert_eq!(
+                root.named_child(0).unwrap().kind(),
+                "section",
+                "expected section node for {src:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn parses_section_with_decorative_trailing_equals() {
+        let tree = parse("==[ Title ]==\n");
+        let root = tree.root_node();
+        assert!(!root.has_error());
+        let sec = root.named_child(0).unwrap();
+        assert_eq!(sec.kind(), "section");
+        assert_eq!(sec.child_by_field_name("marker").unwrap().kind(), "section_marker");
+        assert_eq!(sec.child_by_field_name("close_marker").unwrap().kind(), "section_marker");
+    }
+
+    #[test]
     fn parses_a_titled_thematic_break() {
         let tree = parse("---[ Title ]---\n");
         let root = tree.root_node();
