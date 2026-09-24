@@ -80,7 +80,8 @@ module.exports = grammar({
 		// ---- sections ----------------------------------------------------
 		// `=` is a sigil for sections: it takes `(args)`, `[content]` and
 		// `{value}`. The bracket-less sugar (`= title`) needs whitespace after
-		// the run.
+		// the run. Heading-less sections (`=`, `==` with optional args/attrs)
+		// are also supported.
 		section: ($) =>
 			seq(
 				field("marker", $.section_marker),
@@ -90,12 +91,14 @@ module.exports = grammar({
 						"[",
 						field("content", repeat($._bracket_item)),
 						"]",
+						optional(field("close_marker", $.section_marker)),
 					),
 					seq(
 						optional(field("args", $.args_group)),
 						field("content", $.marked_content),
 					),
-					seq(/[ \t]+/, field("content", repeat1($._line_item))),
+					field("content", repeat1($._line_item)),
+					optional(field("args", $.args_group)),
 				),
 				optional(
 					prec(

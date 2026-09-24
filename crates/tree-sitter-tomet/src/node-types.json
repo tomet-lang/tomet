@@ -780,6 +780,16 @@
           }
         ]
       },
+      "close_marker": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "section_marker",
+            "named": true
+          }
+        ]
+      },
       "content": {
         "multiple": true,
         "required": false,
