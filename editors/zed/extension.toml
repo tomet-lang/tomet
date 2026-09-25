@@ -4,11 +4,11 @@ version = "0.1.0"
 schema_version = 1
 authors = ["kakusika"]
 description = "Syntax highlighting and language server support for Tomet (.tmt) files."
-repository = "https://github.com/tomet-lang/tomet.git"
+repository = "https://github.com/tomet-lang/tomet"
 
 [grammars.tomet]
 repository = "https://github.com/tomet-lang/tomet"
-rev = "main"
+rev = "96d243ba60e7f93a3b146f6d433a21a1620216b5"
 path = "crates/tree-sitter-tomet"
 
 [language_servers.tomet-lsp]
