@@ -10,6 +10,7 @@ pub mod new;
 pub mod refactor;
 pub mod roundtrip;
 pub mod serve;
+pub mod stats;
 pub mod to_md;
 pub mod to_pandoc;
 pub mod to_typst;

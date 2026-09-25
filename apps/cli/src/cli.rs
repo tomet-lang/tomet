@@ -36,6 +36,24 @@ pub enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Print statistics for a `.tmt` file, or every one under a directory:
+    /// how many characters, elements, links and headings it holds.
+    ///
+    /// Characters are the prose a reader sees -- text inside `[...]`,
+    /// headings included, whitespace and code block bodies left out.
+    /// `(args)` and `{value}` are data and are not counted. Elements are
+    /// split by sigil (named, `${}`, `^`, and list items) and the named ones
+    /// by name. Links are the ones `check-links` looks at. A directory is
+    /// swept the way `check` sweeps one, and an unreadable file does not stop
+    /// the sweep; the run exits non-zero at the end.
+    Stats {
+        /// File or directory to measure (defaults to ".").
+        #[arg(default_value = ".")]
+        path: PathBuf,
+        /// Print the statistics as JSON instead of human-readable text.
+        #[arg(long)]
+        json: bool,
+    },
     /// Parse a file and pretty-print the resulting AST.
     Ast {
         file: PathBuf,

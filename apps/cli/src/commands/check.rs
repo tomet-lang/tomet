@@ -2,6 +2,59 @@ use std::path::{Path, PathBuf};
 
 use crate::util::{format_parse_error, read};
 
+/// What checking finds in one document that parsed: the validator's
+/// diagnostics, and the `${...}` that had no value.
+///
+/// It is what `check` reports and what `stats` counts, so the two agree
+/// about which documents fail and how many warnings there are.
+pub(crate) struct Findings {
+    pub(crate) diagnostics: Vec<tomet_validator::Diagnostic>,
+    pub(crate) unresolved: Vec<tomet_load::Unresolved>,
+}
+
+impl Findings {
+    pub(crate) fn of(vault: &tomet_load::Vault, file: &Path, doc: &tomet_ast::Document) -> Self {
+        let bindings = vault.bindings(doc);
+        let diagnostics = tomet_validator::validate_document_with(doc, &bindings);
+
+        // A `${...}` with no value is not an error: a document showing one
+        // as an example is a legitimate document, and `export` leaves it
+        // in the output as written. Saying so here is what tells that
+        // apart from a typo, which otherwise renders as itself and is
+        // never mentioned by anything.
+        //
+        // Run on a copy: this reports on the document as written, and
+        // `prepare` rewrites the tree.
+        let mut prepared = doc.clone();
+        let unresolved = vault
+            .prepare(&mut prepared, file)
+            .map(|report| report.unresolved)
+            .unwrap_or_default();
+
+        Findings {
+            diagnostics,
+            unresolved,
+        }
+    }
+
+    /// Whether `check` fails this document.
+    pub(crate) fn has_errors(&self) -> bool {
+        self.diagnostics.iter().any(is_error)
+    }
+
+    /// How many warnings `check` reports for this document.
+    pub(crate) fn warnings(&self) -> usize {
+        self.unresolved.len() + self.diagnostics.iter().filter(|d| !is_error(d)).count()
+    }
+}
+
+/// A warning is the document telling you about itself -- `@draft`,
+/// `@fixme`. It is reported and does not fail the run: marking a gap has
+/// to stay cheaper than leaving it unmarked.
+fn is_error(d: &tomet_validator::Diagnostic) -> bool {
+    d.severity() == tomet_validator::Severity::Error
+}
+
 /// Checks one file, or every `.tmt` under a directory.
 ///
 /// Checking is not parsing. This used to return OK the moment a document
@@ -85,24 +138,14 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
             }
         };
 
-        let bindings = vault.bindings(&doc);
-        let diagnostics = tomet_validator::validate_document_with(&doc, &bindings);
+        let findings = Findings::of(&vault, file, &doc);
         checked += 1;
-
-        // A `${...}` with no value is not an error: a document showing one
-        // as an example is a legitimate document, and `export` leaves it
-        // in the output as written. Saying so here is what tells that
-        // apart from a typo, which otherwise renders as itself and is
-        // never mentioned by anything.
-        //
-        // Run on a copy: this reports on the document as written, and
-        // `prepare` rewrites the tree.
-        let mut prepared = doc.clone();
-        let unresolved = vault
-            .prepare(&mut prepared, file)
-            .map(|report| report.unresolved)
-            .unwrap_or_default();
-        warned += unresolved.len();
+        warned += findings.warnings();
+        let has_errors = findings.has_errors();
+        let Findings {
+            diagnostics,
+            unresolved,
+        } = findings;
         if json {
             for u in &unresolved {
                 json_files.push(serde_json::json!({
@@ -129,15 +172,9 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
             continue;
         }
 
-        // A warning is the document telling you about itself -- `@draft`,
-        // `@fixme`. It is reported and does not fail the run: marking a
-        // gap has to stay cheaper than leaving it unmarked.
-        let is_error =
-            |d: &tomet_validator::Diagnostic| d.severity() == tomet_validator::Severity::Error;
-        if diagnostics.iter().any(is_error) {
+        if has_errors {
             failed += 1;
         }
-        warned += diagnostics.iter().filter(|d| !is_error(d)).count();
 
         if json {
             json_files.push(serde_json::json!({

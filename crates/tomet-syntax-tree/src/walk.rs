@@ -26,6 +26,76 @@ pub fn for_each_element(doc: &Document, mut f: impl FnMut(&Element)) {
     let _ = walk_document(doc, &mut visitor);
 }
 
+/// Traverses every [`Inline`] in `doc` in document order: paragraph
+/// content, section titles, and every element's `[content]`.
+///
+/// It covers exactly the positions [`walk_document`] covers -- an element
+/// reached there has its inlines reached here -- so a count taken over
+/// elements and a count taken over text describe the same part of the tree.
+/// An `Inline::Element` is itself passed to `f`, and then descended into.
+pub fn for_each_inline(doc: &Document, mut f: impl FnMut(&Inline)) {
+    for block in &doc.blocks {
+        inlines_in_block(block, &mut f);
+    }
+}
+
+fn inlines_in_block(block: &Block, f: &mut dyn FnMut(&Inline)) {
+    match block {
+        Block::Paragraph(paragraph) => inlines_in(&paragraph.content, f),
+        Block::Element(element) => inlines_in_element(element, f),
+        Block::Section(section) => {
+            inlines_in(&section.title, f);
+            for conn in &section.connects {
+                inlines_in_element(conn, f);
+            }
+            for child in &section.blocks {
+                inlines_in_block(child, f);
+            }
+        }
+    }
+}
+
+fn inlines_in(inlines: &[Inline], f: &mut dyn FnMut(&Inline)) {
+    for inline in inlines {
+        f(inline);
+        if let Inline::Element(element) = inline {
+            inlines_in_element(element, f);
+        }
+    }
+}
+
+fn inlines_in_element(element: &Element, f: &mut dyn FnMut(&Inline)) {
+    if let Some(args) = &element.args {
+        inlines_in_value(args, f);
+    }
+    if let Some(content) = &element.content {
+        inlines_in(content, f);
+    }
+    if let Some(children) = &element.children {
+        for child in children {
+            inlines_in_block(child, f);
+        }
+    }
+    if let Some(ElementValue::Group(entries)) = &element.value {
+        for entry in entries {
+            match entry {
+                Entry::Element(child) => inlines_in_element(child, f),
+                Entry::Pair(_, v) => inlines_in_value(v, f),
+            }
+        }
+    }
+}
+
+fn inlines_in_value(value: &Value, f: &mut dyn FnMut(&Inline)) {
+    match value {
+        Value::Element(el) => inlines_in_element(el, f),
+        Value::Seq(items) => items.iter().for_each(|item| inlines_in_value(item, f)),
+        Value::Map(entries) => entries.iter().for_each(|(_, v)| inlines_in_value(v, f)),
+        Value::Call(_, args) => args.iter().for_each(|a| inlines_in_value(a, f)),
+        Value::Null | Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::String(_) => {}
+    }
+}
+
 /// [`for_each_element`] over one [`Block`], for callers that walk the
 /// document's own top level themselves and need the elements below it.
 pub fn for_each_element_in_block(block: &Block, mut f: impl FnMut(&Element)) {

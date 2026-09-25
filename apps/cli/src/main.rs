@@ -22,6 +22,7 @@ use commands::html::html;
 use commands::refactor::refactor_cmd;
 use commands::roundtrip::roundtrip;
 use commands::serve::serve;
+use commands::stats::stats_cmd;
 use commands::to_md::to_md;
 use commands::to_pandoc::to_pandoc;
 use commands::to_typst::to_typst;
@@ -101,6 +102,7 @@ fn main() -> ExitCode {
             force,
             vars,
         } => commands::new::new_cmd(path, blueprint.as_deref(), *list, *force, vars),
+        Command::Stats { path, json } => stats_cmd(path, *json),
         Command::CheckLinks { .. } => unreachable!("handled above, before this match"),
     };
 
