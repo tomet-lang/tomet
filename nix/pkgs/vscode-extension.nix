@@ -9,7 +9,7 @@ let
   # specifically expects `$out/share/vscode/extensions/${vscodeExtUniqueId}`
   # to hold the extension's files.
   vscodeExtPublisher = "tomet-lang";
-  vscodeExtName = "tomet-vscode";
+  vscodeExtName = "tomet";
   vscodeExtUniqueId = "${vscodeExtPublisher}.${vscodeExtName}";
 in
 buildNpmPackage {

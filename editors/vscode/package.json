@@ -1,5 +1,5 @@
 {
-	"name": "tomet-vscode",
+	"name": "tomet",
 	"displayName": "Tomet",
 	"description": "Syntax highlighting and language server support for Tomet (.tmt) files.",
 	"version": "0.1.0",
