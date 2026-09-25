@@ -30,12 +30,12 @@ impl MetaFileEntry {
     }
 
     pub fn ensure_loaded(&mut self) {
-        if self.original_src.is_empty() {
-            if let Ok(src) = fs::read_to_string(&self.path) {
-                self.metadata = extract_metadata(&src);
-                self.modified_src = src.clone();
-                self.original_src = src;
-            }
+        if self.original_src.is_empty()
+            && let Ok(src) = fs::read_to_string(&self.path)
+        {
+            self.metadata = extract_metadata(&src);
+            self.modified_src = src.clone();
+            self.original_src = src;
         }
     }
 }

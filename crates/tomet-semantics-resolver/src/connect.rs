@@ -38,13 +38,13 @@ fn extract_and_remove_references_connections(blocks: &mut Vec<Block>) -> Vec<Rem
     let mut connections = Vec::new();
     let mut i = 0;
     while i < blocks.len() {
-        if let Block::Element(el) = &blocks[i] {
-            if is_references_element(el) {
-                let extracted = extract_connections_from_references(el);
-                connections.extend(extracted);
-                blocks.remove(i);
-                continue;
-            }
+        if let Block::Element(el) = &blocks[i]
+            && is_references_element(el)
+        {
+            let extracted = extract_connections_from_references(el);
+            connections.extend(extracted);
+            blocks.remove(i);
+            continue;
         }
         i += 1;
     }
@@ -61,10 +61,10 @@ fn extract_connections_from_references(el: &Element) -> Vec<RemoteConnection> {
     // Check `el.content` (e.g. `@references[ <id:taskA>:{...} ]`)
     if let Some(content) = &el.content {
         for inline in content {
-            if let Inline::Element(child_el) = inline {
-                if let Some(conn) = parse_remote_connection_element(child_el) {
-                    connections.push(conn);
-                }
+            if let Inline::Element(child_el) = inline
+                && let Some(conn) = parse_remote_connection_element(child_el)
+            {
+                connections.push(conn);
             }
         }
     }

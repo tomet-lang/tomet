@@ -27,10 +27,10 @@ fn expand_value_macros(doc: &Document, value: &mut Value, config: &DocumentConfi
         // `try_eval_dollar_expr` has to re-parse -- evaluate it in place
         // and splice in the result, same as that string path does.
         Value::Element(el) if el.sigil == Sigil::Dollar => {
-            if let Some(ElementValue::Interp(expr)) = &el.value {
-                if let Ok(evaluated) = tomet_compute::evaluate_with_config(doc, expr, config) {
-                    *value = evaluated;
-                }
+            if let Some(ElementValue::Interp(expr)) = &el.value
+                && let Ok(evaluated) = tomet_compute::evaluate_with_config(doc, expr, config)
+            {
+                *value = evaluated;
             }
         }
         Value::Seq(items) => {

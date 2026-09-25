@@ -70,21 +70,21 @@ pub fn clear_vault_files() {
 
 fn prepare_document(mut doc: tomet_ast::Document, opts: &ProcessOptions) -> tomet_ast::Document {
     // 1. Inject external workspace config (e.g. default.config.tmt) if provided
-    if let Some(cfg_src) = &opts.config {
-        if let Ok(cfg_doc) = tomet_parser::parse_document(cfg_src) {
-            let mut prefix_blocks = Vec::new();
-            for block in cfg_doc.blocks {
-                if let tomet_ast::Block::Element(el) = &block {
-                    let kind = tomet_semantics::classify_std_lenient(el);
-                    if kind == tomet_semantics::ElementKind::Config || kind.as_str() == "settings" {
-                        prefix_blocks.push(block);
-                    }
+    if let Some(cfg_src) = &opts.config
+        && let Ok(cfg_doc) = tomet_parser::parse_document(cfg_src)
+    {
+        let mut prefix_blocks = Vec::new();
+        for block in cfg_doc.blocks {
+            if let tomet_ast::Block::Element(el) = &block {
+                let kind = tomet_semantics::classify_std_lenient(el);
+                if kind == tomet_semantics::ElementKind::Config || kind.as_str() == "settings" {
+                    prefix_blocks.push(block);
                 }
             }
-            if !prefix_blocks.is_empty() {
-                prefix_blocks.append(&mut doc.blocks);
-                doc.blocks = prefix_blocks;
-            }
+        }
+        if !prefix_blocks.is_empty() {
+            prefix_blocks.append(&mut doc.blocks);
+            doc.blocks = prefix_blocks;
         }
     }
 

@@ -6,17 +6,11 @@ use crate::lang::{CommentSyntax, Language};
 use crate::{CommentKind, CommentSourceMap, ExtractedCommentBlock};
 
 /// Options for comment extraction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ExtractOptions {
     /// When true, only comments considered documentation (e.g. `///`, `//!`, `/**`, `"""`)
     /// are extracted. When false, regular comments (`//`, `#`, `/*`) are also included.
     pub doc_only: bool,
-}
-
-impl Default for ExtractOptions {
-    fn default() -> Self {
-        Self { doc_only: false }
-    }
 }
 
 /// Extracts comments from source code based on language syntax.
@@ -173,9 +167,9 @@ pub fn extract_comments(
     blocks
 }
 
-fn match_block_comment_start<'a>(
+fn match_block_comment_start(
     trimmed: &str,
-    syntax: &'a CommentSyntax,
+    syntax: &CommentSyntax,
     options: ExtractOptions,
 ) -> Option<(CommentKind, &'static str, &'static str)> {
     for (start, end) in &syntax.doc_block_delimiters {
@@ -225,7 +219,7 @@ fn strip_boundary_whitespace(s: &str, base_col: usize) -> (&str, usize) {
 }
 
 /// Cleans a line inside a multiline block comment (e.g. strips leading ` * ` in C-style comments).
-fn clean_block_comment_line<'a>(line: &'a str, start_delim: &str) -> (String, usize) {
+fn clean_block_comment_line(line: &str, start_delim: &str) -> (String, usize) {
     let trimmed = line.trim_start();
     let leading = line.len() - trimmed.len();
 

@@ -68,12 +68,13 @@ pub(crate) fn percent_decode_str(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(b) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
-                out.push(b);
-                i += 3;
-                continue;
-            }
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let Ok(b) = u8::from_str_radix(&s[i + 1..i + 3], 16)
+        {
+            out.push(b);
+            i += 3;
+            continue;
         }
         out.push(bytes[i]);
         i += 1;
@@ -81,7 +82,7 @@ pub(crate) fn percent_decode_str(s: &str) -> String {
     String::from_utf8_lossy(&out).to_string()
 }
 
-pub(crate) fn get_line_prefix<'a>(text: &'a str, pos: Position) -> &'a str {
+pub(crate) fn get_line_prefix(text: &str, pos: Position) -> &str {
     let line = text.lines().nth(pos.line as usize).unwrap_or("");
     let target_utf16 = pos.character as usize;
     let mut current_utf16 = 0;

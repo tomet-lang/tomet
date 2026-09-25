@@ -150,17 +150,17 @@ pub fn transform_link_targets_with_macros(doc: &mut Document, macro_set: &MacroS
             let mut changed = false;
 
             if let Some(target_val) = el.get_attr("target") {
-                if let Value::String(url) = target_val {
-                    if let Some(macro_call) = macro_set.rewrite_url(url) {
-                        el.transform_prop("target", |_| Value::String(macro_call));
-                        changed = true;
-                    }
-                }
-            } else if let Some(Value::String(url)) = &el.args {
-                if let Some(macro_call) = macro_set.rewrite_url(url) {
-                    el.args = Some(Value::String(macro_call));
+                if let Value::String(url) = target_val
+                    && let Some(macro_call) = macro_set.rewrite_url(url)
+                {
+                    el.transform_prop("target", |_| Value::String(macro_call));
                     changed = true;
                 }
+            } else if let Some(Value::String(url)) = &el.args
+                && let Some(macro_call) = macro_set.rewrite_url(url)
+            {
+                el.args = Some(Value::String(macro_call));
+                changed = true;
             }
 
             changed

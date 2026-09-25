@@ -136,7 +136,7 @@ mod tests {
 
         // And what the config-aware pass produces is what --check accepts.
         fs::write(&doc, &with_config).unwrap();
-        assert!(format_cmd(&[doc.clone()], false, true).is_ok());
+        assert!(format_cmd(std::slice::from_ref(&doc), false, true).is_ok());
 
         fs::write(&doc, ragged).unwrap();
         assert!(

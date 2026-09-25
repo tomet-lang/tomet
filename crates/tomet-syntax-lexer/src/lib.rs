@@ -72,11 +72,11 @@ impl<'a> Cursor<'a> {
 
     /// Advance past the current character if `pred` holds for it, returning it.
     pub fn eat_if(&mut self, pred: impl FnOnce(char) -> bool) -> Option<char> {
-        if let Some(c) = self.peek() {
-            if pred(c) {
-                self.bump();
-                return Some(c);
-            }
+        if let Some(c) = self.peek()
+            && pred(c)
+        {
+            self.bump();
+            return Some(c);
         }
         None
     }
@@ -307,7 +307,7 @@ pub fn tokenize(src: &str) -> Vec<(SyntaxKind, &str)> {
             '0'..='9' => {
                 cursor.eat_while(|ch| ch.is_ascii_digit());
                 if cursor.peek() == Some('.')
-                    && cursor.peek_at(1).map_or(false, |ch| ch.is_ascii_digit())
+                    && cursor.peek_at(1).is_some_and(|ch| ch.is_ascii_digit())
                 {
                     cursor.bump(); // consume '.'
                     cursor.eat_while(|ch| ch.is_ascii_digit());

@@ -260,16 +260,16 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
 }
 
 pub fn render_args_with_config(v: &Value, config: &PrinterConfig) -> String {
-    if let Value::Map(entries) = v {
-        if entries.len() == 1 {
-            let key = &entries[0].0;
-            if key == "target" {
-                let space = if config.link_no_space { "" } else { " " };
-                return format!(
-                    "{key}:{space}{}",
-                    render_value_inner_with_config(&entries[0].1, config)
-                );
-            }
+    if let Value::Map(entries) = v
+        && entries.len() == 1
+    {
+        let key = &entries[0].0;
+        if key == "target" {
+            let space = if config.link_no_space { "" } else { " " };
+            return format!(
+                "{key}:{space}{}",
+                render_value_inner_with_config(&entries[0].1, config)
+            );
         }
     }
     render_value_inner_with_config(v, config)
@@ -285,24 +285,24 @@ fn render_meta_field_value(
         return String::new();
     }
     if let Some(cfg) = field_cfg {
-        if cfg.format.as_deref() == Some("rfc3339") || cfg.field_type.as_deref() == Some("datetime")
+        if (cfg.format.as_deref() == Some("rfc3339")
+            || cfg.field_type.as_deref() == Some("datetime"))
+            && let Value::String(s) = v
         {
-            if let Value::String(s) = v {
-                return tomet_field_utils::format_rfc3339(s, cfg.offset.as_deref());
-            }
+            return tomet_field_utils::format_rfc3339(s, cfg.offset.as_deref());
         }
-        if cfg.always_newline {
-            if let Value::Seq(items) = v {
-                if items.is_empty() {
-                    return "[]".to_string();
-                }
-                let mut s = String::new();
-                for item in items {
-                    s.push_str("\n    - ");
-                    s.push_str(&render_meta_value(item, config, foreign_format));
-                }
-                return s;
+        if cfg.always_newline
+            && let Value::Seq(items) = v
+        {
+            if items.is_empty() {
+                return "[]".to_string();
             }
+            let mut s = String::new();
+            for item in items {
+                s.push_str("\n    - ");
+                s.push_str(&render_meta_value(item, config, foreign_format));
+            }
+            return s;
         }
     }
     match v {
@@ -317,14 +317,12 @@ fn render_meta_field_value(
 /// target language (YAML/JSON/TOML) spells a sequence `[...]`, not
 /// `list(...)` -- that spelling is `tomet_parser`'s, not theirs.
 fn render_meta_value(v: &Value, config: &PrinterConfig, foreign_format: bool) -> String {
-    if foreign_format {
-        if let Value::Seq(items) = v {
-            let rendered: Vec<_> = items
-                .iter()
-                .map(|item| render_meta_value(item, config, true))
-                .collect();
-            return format!("[{}]", rendered.join(", "));
-        }
+    if foreign_format && let Value::Seq(items) = v {
+        let rendered: Vec<_> = items
+            .iter()
+            .map(|item| render_meta_value(item, config, true))
+            .collect();
+        return format!("[{}]", rendered.join(", "));
     }
     render_value_inner_with_config(v, config)
 }
@@ -343,10 +341,10 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
         .and_then(|args| {
             if let Value::Map(entries) = args {
                 entries.iter().find_map(|(k, v)| {
-                    if k == "format" {
-                        if let Value::String(fmt) = v {
-                            return Some(fmt.clone());
-                        }
+                    if k == "format"
+                        && let Value::String(fmt) = v
+                    {
+                        return Some(fmt.clone());
                     }
                     None
                 })

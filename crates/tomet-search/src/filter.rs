@@ -340,17 +340,14 @@ mod tests {
         let config = tomet_semantics::document_config(&doc);
         let mut filter_args = None;
         for block in &doc.blocks {
-            if let tomet_ast::Block::Element(el) = block {
-                if let Some(tomet_ast::ElementValue::Interp(expr)) = &el.value {
-                    if let InterpExprKind::Call { callee, args } = &expr.kind {
-                        if let InterpExprKind::Identifier(name) = &callee.kind {
-                            if name == "filter" {
-                                filter_args = Some(args.clone());
-                                break;
-                            }
-                        }
-                    }
-                }
+            if let tomet_ast::Block::Element(el) = block
+                && let Some(tomet_ast::ElementValue::Interp(expr)) = &el.value
+                && let InterpExprKind::Call { callee, args } = &expr.kind
+                && let InterpExprKind::Identifier(name) = &callee.kind
+                && name == "filter"
+            {
+                filter_args = Some(args.clone());
+                break;
             }
         }
         let args = filter_args.expect("filter query in source");
@@ -419,12 +416,11 @@ mod tests {
         let doc = parse_document("${filter(by(meta.created, \"newest\"))}\n").unwrap();
         let mut filter_args = None;
         for block in &doc.blocks {
-            if let tomet_ast::Block::Element(el) = block {
-                if let Some(tomet_ast::ElementValue::Interp(expr)) = &el.value {
-                    if let InterpExprKind::Call { args, .. } = &expr.kind {
-                        filter_args = Some(args.clone());
-                    }
-                }
+            if let tomet_ast::Block::Element(el) = block
+                && let Some(tomet_ast::ElementValue::Interp(expr)) = &el.value
+                && let InterpExprKind::Call { args, .. } = &expr.kind
+            {
+                filter_args = Some(args.clone());
             }
         }
         let err = Query::parse(&filter_args.unwrap()).unwrap_err();

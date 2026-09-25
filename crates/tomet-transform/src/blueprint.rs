@@ -43,11 +43,11 @@ pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
             for (k, v) in entries {
                 if k == "description" {
                     description = v.as_str().map(String::from);
-                } else if k == "vars" {
-                    if let Value::Map(var_entries) = v {
-                        for (vk, vv) in var_entries {
-                            vars_schema.insert(vk.clone(), vv.clone());
-                        }
+                } else if k == "vars"
+                    && let Value::Map(var_entries) = v
+                {
+                    for (vk, vv) in var_entries {
+                        vars_schema.insert(vk.clone(), vv.clone());
                     }
                 }
             }
@@ -121,15 +121,12 @@ pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> boo
 
     // Step 2: Evaluate element values, args, and block-level Interp (e.g. in @meta { ... })
     for_each_element_mut(doc, |el| {
-        if el.placement == tomet_ast::Placement::Block {
-            if let Some(ElementValue::Interp(expr)) = &el.value {
-                if let Ok(val) =
-                    tomet_compute::evaluate_with_context(&doc_snapshot, expr, &config, ctx)
-                {
-                    el.value = Some(ElementValue::from_map(val));
-                    changed = true;
-                }
-            }
+        if el.placement == tomet_ast::Placement::Block
+            && let Some(ElementValue::Interp(expr)) = &el.value
+            && let Ok(val) = tomet_compute::evaluate_with_context(&doc_snapshot, expr, &config, ctx)
+        {
+            el.value = Some(ElementValue::from_map(val));
+            changed = true;
         }
         if let Some(value) = &mut el.value {
             // A group holds its data as separate entries, so each pair's
@@ -141,10 +138,10 @@ pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> boo
             }
         }
 
-        if let Some(args_val) = &mut el.args {
-            if evaluate_value_recursively(args_val, &doc_snapshot, &config, ctx) {
-                changed = true;
-            }
+        if let Some(args_val) = &mut el.args
+            && evaluate_value_recursively(args_val, &doc_snapshot, &config, ctx)
+        {
+            changed = true;
         }
     });
 
@@ -174,10 +171,10 @@ fn evaluate_blocks(
                 if evaluate_inlines(&mut sec.title, doc, config, ctx) {
                     changed = true;
                 }
-                if let Some(args_val) = &mut sec.args {
-                    if evaluate_value_recursively(args_val, doc, config, ctx) {
-                        changed = true;
-                    }
+                if let Some(args_val) = &mut sec.args
+                    && evaluate_value_recursively(args_val, doc, config, ctx)
+                {
+                    changed = true;
                 }
                 if let Some(value) = &mut sec.value {
                     for (_, val) in value.pairs_mut() {
@@ -191,15 +188,15 @@ fn evaluate_blocks(
                 }
             }
             Block::Element(el) => {
-                if let Some(inlines) = &mut el.content {
-                    if evaluate_inlines(inlines, doc, config, ctx) {
-                        changed = true;
-                    }
+                if let Some(inlines) = &mut el.content
+                    && evaluate_inlines(inlines, doc, config, ctx)
+                {
+                    changed = true;
                 }
-                if let Some(children) = &mut el.children {
-                    if evaluate_blocks(children, doc, config, ctx) {
-                        changed = true;
-                    }
+                if let Some(children) = &mut el.children
+                    && evaluate_blocks(children, doc, config, ctx)
+                {
+                    changed = true;
                 }
             }
         }
@@ -218,15 +215,15 @@ fn evaluate_inlines(
     for inline in inlines.iter() {
         match inline {
             Inline::Element(el) if classify_std_lenient(el) == ElementKind::Interp => {
-                if let Some(ElementValue::Interp(expr)) = &el.value {
-                    if let Ok(val) = tomet_compute::evaluate_with_context(doc, expr, config, ctx) {
-                        new_content.push(Inline::Text(Text {
-                            value: value_to_display_string(&val),
-                            span: Span::default(),
-                        }));
-                        changed = true;
-                        continue;
-                    }
+                if let Some(ElementValue::Interp(expr)) = &el.value
+                    && let Ok(val) = tomet_compute::evaluate_with_context(doc, expr, config, ctx)
+                {
+                    new_content.push(Inline::Text(Text {
+                        value: value_to_display_string(&val),
+                        span: Span::default(),
+                    }));
+                    changed = true;
+                    continue;
                 }
                 new_content.push(inline.clone());
             }
@@ -235,7 +232,7 @@ fn evaluate_inlines(
                 if expanded != t.value {
                     new_content.push(Inline::Text(Text {
                         value: expanded,
-                        span: t.span.clone(),
+                        span: t.span,
                     }));
                     changed = true;
                 } else {
@@ -275,12 +272,11 @@ fn evaluate_value_recursively(
         // parent element runs to completion first), so that branch never
         // gets a turn on an already-resolved value.
         Value::Element(el) if matches!(el.sigil, Sigil::Dollar) => {
-            if let Some(ElementValue::Interp(expr)) = &el.value {
-                if let Ok(evaluated) = tomet_compute::evaluate_with_context(doc, expr, config, ctx)
-                {
-                    *val = evaluated;
-                    changed = true;
-                }
+            if let Some(ElementValue::Interp(expr)) = &el.value
+                && let Ok(evaluated) = tomet_compute::evaluate_with_context(doc, expr, config, ctx)
+            {
+                *val = evaluated;
+                changed = true;
             }
         }
         Value::Seq(items) => {
@@ -317,18 +313,15 @@ fn expand_interpolations_in_string(
         if let Some(end_idx) = after_start.find('}') {
             let expr_str = &after_start[..end_idx];
             let parsed_interp = format!("${{{expr_str}}}");
-            if let Ok(parsed_doc) = tomet_parser::parse_document(&parsed_interp) {
-                if let Some(Block::Element(el)) = parsed_doc.blocks.first() {
-                    if let Some(ElementValue::Interp(expr)) = &el.value {
-                        if let Ok(evaluated_val) =
-                            tomet_compute::evaluate_with_context(doc, expr, config, ctx)
-                        {
-                            result.push_str(&value_to_display_string(&evaluated_val));
-                            rest = &after_start[end_idx + 1..];
-                            continue;
-                        }
-                    }
-                }
+            if let Ok(parsed_doc) = tomet_parser::parse_document(&parsed_interp)
+                && let Some(Block::Element(el)) = parsed_doc.blocks.first()
+                && let Some(ElementValue::Interp(expr)) = &el.value
+                && let Ok(evaluated_val) =
+                    tomet_compute::evaluate_with_context(doc, expr, config, ctx)
+            {
+                result.push_str(&value_to_display_string(&evaluated_val));
+                rest = &after_start[end_idx + 1..];
+                continue;
             }
             // If evaluation failed or couldn't parse, fall back to literal
             result.push_str("${");
@@ -381,10 +374,10 @@ mod tests {
         // walk.
         let mut kinds = Vec::new();
         tomet_tree::for_each_top_level_element(&doc, |el| {
-            if classify_std_lenient(el) == ElementKind::Kind {
-                if let Some(s) = el.args.as_ref().and_then(|v| v.as_str()) {
-                    kinds.push(s.to_string());
-                }
+            if classify_std_lenient(el) == ElementKind::Kind
+                && let Some(s) = el.args.as_ref().and_then(|v| v.as_str())
+            {
+                kinds.push(s.to_string());
             }
         });
         assert_eq!(kinds, vec!["daily-note".to_string()]);

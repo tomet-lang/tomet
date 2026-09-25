@@ -53,11 +53,11 @@ impl<'a> CstParser<'a> {
         self.builder.start_node(SyntaxKind::ROOT.into());
 
         while !self.is_eof() {
-            if let Some(kind) = self.current_kind() {
-                if kind.is_trivia() {
-                    self.bump();
-                    continue;
-                }
+            if let Some(kind) = self.current_kind()
+                && kind.is_trivia()
+            {
+                self.bump();
+                continue;
             }
             self.parse_block();
         }

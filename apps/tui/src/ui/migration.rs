@@ -62,13 +62,13 @@ pub(super) fn render_migration_view(f: &mut Frame, app: &mut App, area: Rect) {
                     .migration_items
                     .iter()
                     .find(|i| i.source_path == node.path)
-                    .map_or(false, |i| i.selected);
+                    .is_some_and(|i| i.selected);
 
                 let is_converted = app
                     .migration_items
                     .iter()
                     .find(|i| i.source_path == node.path)
-                    .map_or(false, |i| i.converted);
+                    .is_some_and(|i| i.converted);
 
                 let checkbox = if is_selected { "[x] " } else { "[ ] " };
                 let status = if is_converted { " (DONE)" } else { "" };

@@ -108,10 +108,10 @@ pub fn evaluate_with_context(
             }
         }
         InterpExprKind::Member { .. } => {
-            if let Some(path) = expr_to_path(expr) {
-                if let Some(val) = ctx.get_var(&path) {
-                    return Ok(val.clone());
-                }
+            if let Some(path) = expr_to_path(expr)
+                && let Some(val) = ctx.get_var(&path)
+            {
+                return Ok(val.clone());
             }
             Ok(tomet_resolver::resolve_reference(doc, expr)?)
         }
@@ -147,17 +147,17 @@ fn evaluate_call(
     // `functions::call` misses, so a macro named like a builtin loses
     // silently -- the fallback `docs/spec/builtin-functions.tmt` rejects.
     // Unknown under `macro.` is an error, not a fall-through.
-    if let InterpExprKind::Member { object, member } = &callee.kind {
-        if matches!(&object.kind, InterpExprKind::Identifier(ns) if ns == "macro") {
-            let Some(template) = config.macros.get(member) else {
-                return Err(ComputeError::UnknownFunction(format!("macro.{member}")));
-            };
-            let values = args
-                .iter()
-                .map(|arg| evaluate_with_context(doc, arg, config, ctx))
-                .collect::<Result<Vec<_>, _>>()?;
-            return Ok(Value::String(expand_macro_template(template, &values)));
-        }
+    if let InterpExprKind::Member { object, member } = &callee.kind
+        && matches!(&object.kind, InterpExprKind::Identifier(ns) if ns == "macro")
+    {
+        let Some(template) = config.macros.get(member) else {
+            return Err(ComputeError::UnknownFunction(format!("macro.{member}")));
+        };
+        let values = args
+            .iter()
+            .map(|arg| evaluate_with_context(doc, arg, config, ctx))
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(Value::String(expand_macro_template(template, &values)));
     }
 
     let InterpExprKind::Identifier(name) = &callee.kind else {

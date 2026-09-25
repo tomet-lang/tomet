@@ -225,25 +225,24 @@ fn fallback_tomet_highlight(src: &str) -> Vec<Line<'static>> {
             continue;
         }
 
-        if let Some((k, v)) = line_str.split_once(':') {
-            if !k.contains(' ')
-                && !k.starts_with("http")
-                && (v.trim_start().starts_with('"')
-                    || v.trim_start().starts_with('{')
-                    || v.trim_start().starts_with('[')
-                    || !v.trim().is_empty())
-            {
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("{k}:"),
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::raw(v.to_string()),
-                ]));
-                continue;
-            }
+        if let Some((k, v)) = line_str.split_once(':')
+            && !k.contains(' ')
+            && !k.starts_with("http")
+            && (v.trim_start().starts_with('"')
+                || v.trim_start().starts_with('{')
+                || v.trim_start().starts_with('[')
+                || !v.trim().is_empty())
+        {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("{k}:"),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(v.to_string()),
+            ]));
+            continue;
         }
 
         lines.push(Line::from(Span::raw(line_str.to_string())));

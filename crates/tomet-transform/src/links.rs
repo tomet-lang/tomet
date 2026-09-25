@@ -62,11 +62,11 @@ impl TargetMode {
                     }
                 };
 
-                if let Some(frag) = fragment {
-                    if !frag.is_empty() {
-                        res.push('#');
-                        res.push_str(frag);
-                    }
+                if let Some(frag) = fragment
+                    && !frag.is_empty()
+                {
+                    res.push('#');
+                    res.push_str(frag);
                 }
                 res
             }
@@ -90,11 +90,11 @@ impl TargetMode {
                     p_str
                 };
 
-                if let Some(frag) = fragment {
-                    if !frag.is_empty() {
-                        res.push('#');
-                        res.push_str(frag);
-                    }
+                if let Some(frag) = fragment
+                    && !frag.is_empty()
+                {
+                    res.push('#');
+                    res.push_str(frag);
                 }
                 res
             }

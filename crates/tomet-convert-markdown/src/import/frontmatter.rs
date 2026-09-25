@@ -33,7 +33,7 @@ pub(super) fn extract_yaml_frontmatter(src: &str) -> (Option<Vec<(String, Value)
             return (None, src);
         };
 
-    let remaining_src = rest[after_closing_idx..].trim_start_matches(|c| c == '\r' || c == '\n');
+    let remaining_src = rest[after_closing_idx..].trim_start_matches(['\r', '\n']);
 
     if let Ok(serde_yaml::Value::Mapping(map)) =
         serde_yaml::from_str::<serde_yaml::Value>(yaml_text)

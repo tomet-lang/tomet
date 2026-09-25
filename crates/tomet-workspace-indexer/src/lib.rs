@@ -146,7 +146,7 @@ pub fn collect_tm_files_with_config(
             .git_ignore(true)
             .build()
             .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().map_or(false, |ft| ft.is_file()))
+            .filter(|e| e.file_type().is_some_and(|ft| ft.is_file()))
         {
             let p = entry.path();
             if is_path_unswept(p, Some(config_root), config) {

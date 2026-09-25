@@ -78,7 +78,7 @@ pub(crate) fn render_path_element(cx: &RenderCtx, el: &Element, out: &mut String
         escape_html(&path)
     ));
     if let Some(content) = content {
-        out.push_str(" ");
+        out.push(' ');
         out.push_str(&content);
     }
     out.push_str("</div>\n");

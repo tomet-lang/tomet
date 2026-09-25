@@ -348,8 +348,8 @@ fn enclose_sigils_in_backticks(text: &str) -> String {
             '_' => {
                 let prev = out.chars().next_back();
                 let next = chars.peek().copied();
-                if prev.map_or(true, |c| !c.is_alphanumeric())
-                    && next.map_or(false, |c| c.is_alphanumeric())
+                if prev.is_none_or(|c| !c.is_alphanumeric())
+                    && next.is_some_and(|c| c.is_alphanumeric())
                 {
                     out.push_str("`_`");
                 } else {

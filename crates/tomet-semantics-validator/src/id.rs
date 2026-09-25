@@ -37,10 +37,10 @@ fn collect_block_ids(block: &Block, ids: &mut Vec<(String, Span)>) {
 }
 
 fn collect_element_ids(el: &Element, ids: &mut Vec<(String, Span)>) {
-    if !el.sigil.is_bare_named("link") {
-        if let Some(id) = id_from_value(el.attrs_view()) {
-            ids.push((id, el.span));
-        }
+    if !el.sigil.is_bare_named("link")
+        && let Some(id) = id_from_value(el.attrs_view())
+    {
+        ids.push((id, el.span));
     }
     if let Some(content) = &el.content {
         for inline in content {

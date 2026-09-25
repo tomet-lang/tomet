@@ -18,10 +18,8 @@ pub(crate) fn is_caret_start(cur: &Cursor) -> bool {
         return true;
     }
     // ^name(...)
-    if is_name_start_at(&look) && eat_name(&mut look).is_some() {
-        if look.peek() == Some('(') {
-            return true;
-        }
+    if is_name_start_at(&look) && eat_name(&mut look).is_some() && look.peek() == Some('(') {
+        return true;
     }
     false
 }

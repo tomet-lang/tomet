@@ -106,22 +106,22 @@ pub(crate) fn parse_interp_expr(cur: &mut Cursor) -> Result<InterpExpr> {
 
     // Check if this is `name: expr` (NamedArg)
     let mut look = *cur;
-    if look.peek().is_some_and(is_interp_ident_start) {
-        if let Ok(name) = eat_interp_ident(&mut look) {
+    if look.peek().is_some_and(is_interp_ident_start)
+        && let Ok(name) = eat_interp_ident(&mut look)
+    {
+        skip_inline_ws(&mut look);
+        if look.peek() == Some(':') && look.peek_at(1) != Some('/') {
+            look.bump(); // consume ':'
             skip_inline_ws(&mut look);
-            if look.peek() == Some(':') && look.peek_at(1) != Some('/') {
-                look.bump(); // consume ':'
-                skip_inline_ws(&mut look);
-                *cur = look;
-                let val_expr = parse_interp_expr(cur)?;
-                return Ok(InterpExpr {
-                    kind: InterpExprKind::NamedArg {
-                        name: name.to_string(),
-                        value: Box::new(val_expr),
-                    },
-                    span: cur.span_from(start_pos),
-                });
-            }
+            *cur = look;
+            let val_expr = parse_interp_expr(cur)?;
+            return Ok(InterpExpr {
+                kind: InterpExprKind::NamedArg {
+                    name: name.to_string(),
+                    value: Box::new(val_expr),
+                },
+                span: cur.span_from(start_pos),
+            });
         }
     }
 

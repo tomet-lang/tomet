@@ -46,12 +46,11 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
             found_blueprint = true;
             if let Some(Value::String(k)) = &el.args {
                 target_kind = k.clone();
-            } else if let Some(Value::Map(entries)) = &el.args {
-                if let Some((_, v)) = entries.iter().find(|(k, _)| k == "target" || k == "kind") {
-                    if let Some(s) = v.as_str() {
-                        target_kind = s.to_string();
-                    }
-                }
+            } else if let Some(Value::Map(entries)) = &el.args
+                && let Some((_, v)) = entries.iter().find(|(k, _)| k == "target" || k == "kind")
+                && let Some(s) = v.as_str()
+            {
+                target_kind = s.to_string();
             }
         } else if kind == ElementKind::Meta {
             if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
@@ -209,9 +208,8 @@ fn extract_element_title(el: &Element) -> String {
     let mut title = String::new();
     if let Some(inlines) = &el.content {
         for inline in inlines {
-            match inline {
-                Inline::Text(t) => title.push_str(&t.value),
-                _ => {}
+            if let Inline::Text(t) = inline {
+                title.push_str(&t.value)
             }
         }
     }

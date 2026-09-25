@@ -357,23 +357,23 @@ fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
     match val {
         Value::String(s) => {
             let trimmed = s.trim();
-            if trimmed.starts_with('$') {
-                if let Ok(parsed) = tomet_parser::parse_document(trimmed) {
-                    struct InterpFinder(Option<tomet_ast::InterpExpr>);
-                    impl Visitor<()> for InterpFinder {
-                        fn visit(&mut self, el: &Element) -> ControlFlow<()> {
-                            if let Some(ElementValue::Interp(expr)) = &el.value {
-                                self.0 = Some(expr.clone());
-                                return ControlFlow::Break(());
-                            }
-                            ControlFlow::Continue(())
+            if trimmed.starts_with('$')
+                && let Ok(parsed) = tomet_parser::parse_document(trimmed)
+            {
+                struct InterpFinder(Option<tomet_ast::InterpExpr>);
+                impl Visitor<()> for InterpFinder {
+                    fn visit(&mut self, el: &Element) -> ControlFlow<()> {
+                        if let Some(ElementValue::Interp(expr)) = &el.value {
+                            self.0 = Some(expr.clone());
+                            return ControlFlow::Break(());
                         }
+                        ControlFlow::Continue(())
                     }
-                    let mut finder = InterpFinder(None);
-                    let _ = walk_document(&parsed, &mut finder);
-                    if finder.0.is_some() {
-                        return finder.0;
-                    }
+                }
+                let mut finder = InterpFinder(None);
+                let _ = walk_document(&parsed, &mut finder);
+                if finder.0.is_some() {
+                    return finder.0;
                 }
             }
             None

@@ -38,13 +38,13 @@ impl MigrationItem {
     }
 
     pub fn ensure_loaded_with_config(&mut self, config: &PrinterConfig) {
-        if self.markdown_src.is_empty() {
-            if let Ok(src) = fs::read_to_string(&self.source_path) {
-                let mut doc = tomet_markdown::from_markdown(&src);
-                tomet_printer::ensure_document_id_with_config(&mut doc, config);
-                self.tomet_src = document_to_tm_with_config(&doc, config);
-                self.markdown_src = src;
-            }
+        if self.markdown_src.is_empty()
+            && let Ok(src) = fs::read_to_string(&self.source_path)
+        {
+            let mut doc = tomet_markdown::from_markdown(&src);
+            tomet_printer::ensure_document_id_with_config(&mut doc, config);
+            self.tomet_src = document_to_tm_with_config(&doc, config);
+            self.markdown_src = src;
         }
     }
 }

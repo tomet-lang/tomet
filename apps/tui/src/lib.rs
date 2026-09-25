@@ -66,13 +66,13 @@ fn load_app_with_progress<B: ratatui::backend::Backend>(
     loop {
         terminal.draw(|f| ui::draw_loading(f, tick, "Scanning workspace..."))?;
 
-        if event::poll(Duration::from_millis(0))? {
-            if let Event::Key(key) = event::read()? {
-                let is_ctrl_c = key.modifiers.contains(KeyModifiers::CONTROL)
-                    && matches!(key.code, KeyCode::Char('c') | KeyCode::Char('C'));
-                if is_ctrl_c || key.code == KeyCode::Esc {
-                    return Ok(None);
-                }
+        if event::poll(Duration::from_millis(0))?
+            && let Event::Key(key) = event::read()?
+        {
+            let is_ctrl_c = key.modifiers.contains(KeyModifiers::CONTROL)
+                && matches!(key.code, KeyCode::Char('c') | KeyCode::Char('C'));
+            if is_ctrl_c || key.code == KeyCode::Esc {
+                return Ok(None);
             }
         }
 
@@ -396,13 +396,13 @@ fn run_app<B: ratatui::backend::Backend>(
                                 } else {
                                     None
                                 };
-                                if let Some(real_idx) = vis_idx {
-                                    if let Some(node) = app.tree_nodes.get_mut(real_idx) {
-                                        if node.is_dir && node.expanded {
-                                            node.expanded = false;
-                                            handled = true;
-                                        }
-                                    }
+                                if let Some(real_idx) = vis_idx
+                                    && let Some(node) = app.tree_nodes.get_mut(real_idx)
+                                    && node.is_dir
+                                    && node.expanded
+                                {
+                                    node.expanded = false;
+                                    handled = true;
                                 }
                                 if !handled {
                                     app.previous_tab();
@@ -421,13 +421,13 @@ fn run_app<B: ratatui::backend::Backend>(
                                 } else {
                                     None
                                 };
-                                if let Some(real_idx) = vis_idx {
-                                    if let Some(node) = app.tree_nodes.get_mut(real_idx) {
-                                        if node.is_dir && !node.expanded {
-                                            node.expanded = true;
-                                            handled = true;
-                                        }
-                                    }
+                                if let Some(real_idx) = vis_idx
+                                    && let Some(node) = app.tree_nodes.get_mut(real_idx)
+                                    && node.is_dir
+                                    && !node.expanded
+                                {
+                                    node.expanded = true;
+                                    handled = true;
                                 }
                                 if !handled {
                                     app.focused_pane = FocusedPane::Preview;

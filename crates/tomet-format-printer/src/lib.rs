@@ -33,37 +33,37 @@ pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig
 
     let mut meta_found = false;
     for block in &mut doc.blocks {
-        if let Block::Element(el) = block {
-            if el.sigil.is_bare_named("meta") {
-                meta_found = true;
-                if let Some(ElementValue::Group(entries)) = &mut el.value {
-                    let existing_idx =
-                        entries
-                            .iter()
-                            .enumerate()
-                            .find_map(|(idx, entry)| match entry {
-                                Entry::Pair(k, v) if k == "id" => Some((idx, v.clone())),
-                                _ => None,
-                            });
+        if let Block::Element(el) = block
+            && el.sigil.is_bare_named("meta")
+        {
+            meta_found = true;
+            if let Some(ElementValue::Group(entries)) = &mut el.value {
+                let existing_idx =
+                    entries
+                        .iter()
+                        .enumerate()
+                        .find_map(|(idx, entry)| match entry {
+                            Entry::Pair(k, v) if k == "id" => Some((idx, v.clone())),
+                            _ => None,
+                        });
 
-                    if let Some((idx, val)) = existing_idx {
-                        if overwrite {
-                            let existing_str = match &val {
-                                Value::String(s) => s.as_str(),
-                                _ => "",
-                            };
-                            if !is_valid_id_format(existing_str, id_cfg) {
-                                let new_id = generate_id_for_field(id_cfg);
-                                entries[idx] = Entry::Pair("id".to_string(), Value::String(new_id));
-                            }
+                if let Some((idx, val)) = existing_idx {
+                    if overwrite {
+                        let existing_str = match &val {
+                            Value::String(s) => s.as_str(),
+                            _ => "",
+                        };
+                        if !is_valid_id_format(existing_str, id_cfg) {
+                            let new_id = generate_id_for_field(id_cfg);
+                            entries[idx] = Entry::Pair("id".to_string(), Value::String(new_id));
                         }
-                    } else if force || overwrite {
-                        let new_id = generate_id_for_field(id_cfg);
-                        entries.insert(0, Entry::Pair("id".to_string(), Value::String(new_id)));
                     }
+                } else if force || overwrite {
+                    let new_id = generate_id_for_field(id_cfg);
+                    entries.insert(0, Entry::Pair("id".to_string(), Value::String(new_id)));
                 }
-                break;
             }
+            break;
         }
     }
 
@@ -310,10 +310,10 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
         }
         if let Some(children) = &item.children {
             for child in children {
-                if let Block::Element(sub) = child {
-                    if list_ordered(sub).is_some() {
-                        render_list_with_indent(sub, indent + 1, config, out);
-                    }
+                if let Block::Element(sub) = child
+                    && list_ordered(sub).is_some()
+                {
+                    render_list_with_indent(sub, indent + 1, config, out);
                 }
             }
         }
@@ -439,12 +439,14 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         return out;
     }
 
-    if el.sigil.is_bare_named("tag") && el.content.is_none() && el.value.is_none() {
-        if let Some(args) = &el.args {
-            let mut out = format!("#({})", render_args_with_config(args, config));
-            out.push_str(&render_connects(&el.connects, config));
-            return out;
-        }
+    if el.sigil.is_bare_named("tag")
+        && el.content.is_none()
+        && el.value.is_none()
+        && let Some(args) = &el.args
+    {
+        let mut out = format!("#({})", render_args_with_config(args, config));
+        out.push_str(&render_connects(&el.connects, config));
+        return out;
     }
 
     if el.sigil.is_bare_named("raw") {
@@ -520,108 +522,108 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         }
     }
 
-    if el.sigil.is_bare_named("callout") {
-        if let Some(style) = config.callout_content_style.as_deref() {
-            if style == "expanded" {
-                let mut out = String::from("@callout");
-                if let Some(args) = &el.args {
-                    out.push('(');
-                    out.push_str(&render_args_with_config(args, config));
-                    out.push(')');
+    if el.sigil.is_bare_named("callout")
+        && let Some(style) = config.callout_content_style.as_deref()
+    {
+        if style == "expanded" {
+            let mut out = String::from("@callout");
+            if let Some(args) = &el.args {
+                out.push('(');
+                out.push_str(&render_args_with_config(args, config));
+                out.push(')');
+            }
+            if let Some(content) = &el.content {
+                let inlines_text = render_inlines(content, config);
+                out.push_str("[\n");
+                for line in inlines_text.lines() {
+                    out.push_str("  ");
+                    out.push_str(line);
+                    out.push('\n');
                 }
-                if let Some(content) = &el.content {
-                    let inlines_text = render_inlines(content, config);
-                    out.push_str("[\n");
-                    for line in inlines_text.lines() {
-                        out.push_str("  ");
-                        out.push_str(line);
-                        out.push('\n');
+                out.push(']');
+            }
+            if let Some(value) = &el.value {
+                out.push_str(&render_element_value(value, config));
+            }
+            out.push_str(&render_connects(&el.connects, config));
+            return out;
+        } else if style == "block" {
+            let mut out = String::from("@callout");
+            if let Some(args) = &el.args {
+                out.push('(');
+                out.push_str(&render_args_with_config(args, config));
+                out.push(')');
+            }
+            if let Some(content) = &el.content {
+                let inlines_text = render_inlines(content, config);
+                let lines: Vec<&str> = inlines_text.lines().collect();
+                out.push('\n');
+                if lines.is_empty() {
+                    out.push_str("[ ]");
+                } else if lines.len() == 1 {
+                    out.push_str("[ ");
+                    out.push_str(lines[0]);
+                    out.push_str(" ]");
+                } else {
+                    for (idx, line) in lines.iter().enumerate() {
+                        if idx == 0 {
+                            out.push_str("[ ");
+                            out.push_str(line);
+                            out.push('\n');
+                        } else {
+                            out.push_str("  ");
+                            out.push_str(line);
+                            out.push('\n');
+                        }
                     }
                     out.push(']');
                 }
-                if let Some(value) = &el.value {
-                    out.push_str(&render_element_value(value, config));
-                }
-                out.push_str(&render_connects(&el.connects, config));
-                return out;
-            } else if style == "block" {
-                let mut out = String::from("@callout");
-                if let Some(args) = &el.args {
-                    out.push('(');
-                    out.push_str(&render_args_with_config(args, config));
-                    out.push(')');
-                }
-                if let Some(content) = &el.content {
-                    let inlines_text = render_inlines(content, config);
-                    let lines: Vec<&str> = inlines_text.lines().collect();
-                    out.push('\n');
-                    if lines.is_empty() {
-                        out.push_str("[ ]");
-                    } else if lines.len() == 1 {
-                        out.push_str("[ ");
-                        out.push_str(lines[0]);
-                        out.push_str(" ]");
-                    } else {
-                        for (idx, line) in lines.iter().enumerate() {
-                            if idx == 0 {
-                                out.push_str("[ ");
-                                out.push_str(line);
-                                out.push('\n');
-                            } else {
-                                out.push_str("  ");
-                                out.push_str(line);
-                                out.push('\n');
-                            }
-                        }
-                        out.push(']');
-                    }
-                }
-                if let Some(value) = &el.value {
-                    out.push_str(&render_element_value(value, config));
-                }
-                out.push_str(&render_connects(&el.connects, config));
-                return out;
-            } else if style == "box" {
-                let mut out = String::from("@callout");
-                if let Some(args) = &el.args {
-                    out.push('(');
-                    out.push_str(&render_args_with_config(args, config));
-                    out.push(')');
-                }
-                if let Some(content) = &el.content {
-                    let inlines_text = render_inlines(content, config);
-                    let lines: Vec<&str> = inlines_text.lines().collect();
-                    out.push('\n');
-                    if lines.is_empty() {
-                        out.push_str("[ ]");
-                    } else if lines.len() == 1 {
-                        out.push_str("[ ");
-                        out.push_str(lines[0]);
-                        out.push_str(" ]");
-                    } else {
-                        for (idx, line) in lines.iter().enumerate() {
-                            if idx == 0 {
-                                out.push_str("[ ");
-                                out.push_str(line);
-                                out.push('\n');
-                            } else if idx == lines.len() - 1 {
-                                out.push_str("  ");
-                                out.push_str(line);
-                                out.push_str(" ]");
-                            } else {
-                                out.push_str("  ");
-                                out.push_str(line);
-                                out.push('\n');
-                            }
-                        }
-                    }
-                }
-                if let Some(value) = &el.value {
-                    out.push_str(&render_element_value(value, config));
-                }
-                out.push_str(&render_connects(&el.connects, config));
-                return out;
             }
+            if let Some(value) = &el.value {
+                out.push_str(&render_element_value(value, config));
+            }
+            out.push_str(&render_connects(&el.connects, config));
+            return out;
+        } else if style == "box" {
+            let mut out = String::from("@callout");
+            if let Some(args) = &el.args {
+                out.push('(');
+                out.push_str(&render_args_with_config(args, config));
+                out.push(')');
+            }
+            if let Some(content) = &el.content {
+                let inlines_text = render_inlines(content, config);
+                let lines: Vec<&str> = inlines_text.lines().collect();
+                out.push('\n');
+                if lines.is_empty() {
+                    out.push_str("[ ]");
+                } else if lines.len() == 1 {
+                    out.push_str("[ ");
+                    out.push_str(lines[0]);
+                    out.push_str(" ]");
+                } else {
+                    for (idx, line) in lines.iter().enumerate() {
+                        if idx == 0 {
+                            out.push_str("[ ");
+                            out.push_str(line);
+                            out.push('\n');
+                        } else if idx == lines.len() - 1 {
+                            out.push_str("  ");
+                            out.push_str(line);
+                            out.push_str(" ]");
+                        } else {
+                            out.push_str("  ");
+                            out.push_str(line);
+                            out.push('\n');
+                        }
+                    }
+                }
+            }
+            if let Some(value) = &el.value {
+                out.push_str(&render_element_value(value, config));
+            }
+            out.push_str(&render_connects(&el.connects, config));
+            return out;
         }
     }
 
@@ -713,23 +715,23 @@ fn render_element_value_with_format(
     format: Option<&str>,
     config: &PrinterConfig,
 ) -> String {
-    if let (ElementValue::Group(_), Some(fmt)) = (value, format) {
-        if let Some(data) = value.as_data() {
-            let json = value_to_json(&data);
-            let serialized = match fmt {
-                "json" => serde_json::to_string_pretty(&json).ok(),
-                "yaml" => serde_yaml::to_string(&json).ok(),
-                "toml" => toml::to_string_pretty(&json).ok(),
-                _ => None,
-            };
-            if let Some(body) = serialized {
-                let body = body.trim_end();
-                return format!(
-                    "{}\n{body}\n{}",
-                    "+".repeat(fence_len_for(body)),
-                    "+".repeat(fence_len_for(body))
-                );
-            }
+    if let (ElementValue::Group(_), Some(fmt)) = (value, format)
+        && let Some(data) = value.as_data()
+    {
+        let json = value_to_json(&data);
+        let serialized = match fmt {
+            "json" => serde_json::to_string_pretty(&json).ok(),
+            "yaml" => serde_yaml::to_string(&json).ok(),
+            "toml" => toml::to_string_pretty(&json).ok(),
+            _ => None,
+        };
+        if let Some(body) = serialized {
+            let body = body.trim_end();
+            return format!(
+                "{}\n{body}\n{}",
+                "+".repeat(fence_len_for(body)),
+                "+".repeat(fence_len_for(body))
+            );
         }
     }
     match value {
@@ -810,10 +812,10 @@ fn fence_len_for(body: &str) -> usize {
 fn get_format_from_args(args: Option<&Value>) -> Option<&str> {
     if let Some(Value::Map(entries)) = args {
         for (k, v) in entries {
-            if k == "format" {
-                if let Value::String(fmt) = v {
-                    return Some(fmt.as_str());
-                }
+            if k == "format"
+                && let Value::String(fmt) = v
+            {
+                return Some(fmt.as_str());
             }
         }
     }
