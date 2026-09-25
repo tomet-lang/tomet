@@ -4,6 +4,7 @@
 	"description": "Syntax highlighting and language server support for Tomet (.tmt) files.",
 	"version": "0.1.0",
 	"publisher": "tomet-lang",
+	"license": "MIT OR Apache-2.0",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/tomet-lang/tomet.git"
