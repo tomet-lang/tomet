@@ -50,6 +50,9 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn main_loop(connection: Connection) -> anyhow::Result<()> {
+    // `Uri` holds `Cell`s inside, which is what clippy objects to, but its
+    // `Hash` and `Eq` compare the text alone, so it is safe as a key.
+    #[allow(clippy::mutable_key_type)]
     let mut documents: HashMap<Uri, String> = HashMap::new();
     for msg in &connection.receiver {
         match msg {

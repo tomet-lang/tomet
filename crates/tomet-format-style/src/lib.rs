@@ -480,8 +480,10 @@ mod tests {
             "target: \"ref:name\""
         );
 
-        let mut cfg_no_space = PrinterConfig::default();
-        cfg_no_space.link_no_space = true;
+        let cfg_no_space = PrinterConfig {
+            link_no_space: true,
+            ..Default::default()
+        };
         assert_eq!(
             render_args_with_config(&reference, &cfg_no_space),
             "target:\"ref:name\""
@@ -506,8 +508,10 @@ mod tests {
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )])));
-        let mut cfg = PrinterConfig::default();
-        cfg.meta_format = Some("yaml".to_string());
+        let cfg = PrinterConfig {
+            meta_format: Some("yaml".to_string()),
+            ..Default::default()
+        };
         assert_eq!(
             render_meta_element(&el, &cfg),
             "@meta(format:yaml)+++\nid: doc-12345678\n+++"

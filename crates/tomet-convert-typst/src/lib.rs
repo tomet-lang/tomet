@@ -281,7 +281,7 @@ fn render_tag(el: &Element) -> String {
     let boxes: Vec<String> = tags
         .into_iter()
         .map(|t| {
-            let label = if t.starts_with('#') { &t[1..] } else { &t };
+            let label = t.strip_prefix('#').unwrap_or(&t);
             let escaped = escape_text(label);
             format!("#box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#{escaped}]")
         })

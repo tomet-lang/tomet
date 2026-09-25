@@ -16,13 +16,13 @@ struct ServeState {
 }
 
 pub(crate) fn serve(
-    file: &PathBuf,
+    file: &Path,
     port: u16,
     advanced: bool,
     lang: Option<String>,
 ) -> anyhow::Result<()> {
     let state = ServeState {
-        file: file.clone(),
+        file: file.to_path_buf(),
         advanced,
         lang,
     };

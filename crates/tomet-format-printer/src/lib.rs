@@ -1385,8 +1385,10 @@ mod tests {
 
         let doc = Document::new(vec![Block::Element(el)], tomet_ast::Span::dummy());
 
-        let mut config = PrinterConfig::default();
-        config.group_order = Some(GroupOrder::ContentFirst);
+        let mut config = PrinterConfig {
+            group_order: Some(GroupOrder::ContentFirst),
+            ..Default::default()
+        };
         let printed = document_to_tm_with_config(&doc, &config);
         assert_eq!(printed.trim(), "@link[Example](\"https://example.com\")");
 
@@ -1397,8 +1399,10 @@ mod tests {
             "@link(\"https://example.com\")[Example]"
         );
 
-        let mut config_link_only = PrinterConfig::default();
-        config_link_only.link_group_order = Some(GroupOrder::ContentFirst);
+        let config_link_only = PrinterConfig {
+            link_group_order: Some(GroupOrder::ContentFirst),
+            ..Default::default()
+        };
         let printed_link_only = document_to_tm_with_config(&doc, &config_link_only);
         assert_eq!(
             printed_link_only.trim(),

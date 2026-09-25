@@ -67,9 +67,7 @@ impl MacroPattern {
                 args.push(captured.to_string());
                 current_pos = url.len();
             } else {
-                let Some(sep_pos) = url[current_pos..].find(next_sep) else {
-                    return None;
-                };
+                let sep_pos = url[current_pos..].find(next_sep)?;
                 let captured = &url[current_pos..current_pos + sep_pos];
                 if captured.is_empty() {
                     return None;

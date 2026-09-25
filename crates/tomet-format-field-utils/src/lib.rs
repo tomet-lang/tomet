@@ -105,9 +105,9 @@ pub fn format_rfc3339(s: &str, offset: Option<&str>) -> String {
             format!("{base}T00:00:00{off}")
         } else if base.len() == 16 {
             format!("{base}:00{off}")
-        } else if base.len() == 19 {
-            format!("{base}{off}")
         } else {
+            // A full date-time (19 characters) already has its seconds, and
+            // anything else is left as it came: only the offset is added.
             format!("{base}{off}")
         }
     } else {

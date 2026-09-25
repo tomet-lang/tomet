@@ -260,7 +260,7 @@ fn raw_tree_from_entries(root: &Path, entries: &BTreeMap<PathBuf, EntryKind>) ->
     assemble(root, &mut children_map)
 }
 
-fn compact_raw_nodes(nodes: &mut Vec<RawNode>) {
+fn compact_raw_nodes(nodes: &mut [RawNode]) {
     for node in nodes.iter_mut() {
         if node.is_dir {
             compact_raw_nodes(&mut node.children);

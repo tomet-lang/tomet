@@ -445,39 +445,38 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
                         let (prefix, cells) = &table_rows[row_idx];
                         row_idx += 1;
                         let mut formatted_cells = Vec::new();
-                        for c_idx in 0..col_count {
+                        for (c_idx, &target) in target_widths.iter().enumerate() {
                             let cell_text = cells.get(c_idx).map(|s| s.trim()).unwrap_or("");
                             let cell_len = text_display_width(cell_text);
                             let col_align = aligns.get(c_idx).map(|s| s.as_str()).unwrap_or("left");
 
-                            let (left_spaces, right_spaces) =
-                                if let Some(target_w) = target_widths[c_idx] {
-                                    let target_width = target_w + 2;
-                                    let extra = if target_width > cell_len {
-                                        target_width - cell_len
-                                    } else {
-                                        2
-                                    };
-                                    match col_align {
-                                        "right" => {
-                                            let left = extra.saturating_sub(1);
-                                            let right = 1;
-                                            (left, right)
-                                        }
-                                        "center" => {
-                                            let left = extra / 2;
-                                            let right = extra - left;
-                                            (left, right)
-                                        }
-                                        _ => {
-                                            let left = 1;
-                                            let right = extra.saturating_sub(1);
-                                            (left, right)
-                                        }
-                                    }
+                            let (left_spaces, right_spaces) = if let Some(target_w) = target {
+                                let target_width = target_w + 2;
+                                let extra = if target_width > cell_len {
+                                    target_width - cell_len
                                 } else {
-                                    (1, 1)
+                                    2
                                 };
+                                match col_align {
+                                    "right" => {
+                                        let left = extra.saturating_sub(1);
+                                        let right = 1;
+                                        (left, right)
+                                    }
+                                    "center" => {
+                                        let left = extra / 2;
+                                        let right = extra - left;
+                                        (left, right)
+                                    }
+                                    _ => {
+                                        let left = 1;
+                                        let right = extra.saturating_sub(1);
+                                        (left, right)
+                                    }
+                                }
+                            } else {
+                                (1, 1)
+                            };
 
                             let left_str = " ".repeat(left_spaces);
                             let right_str = " ".repeat(right_spaces);
@@ -1070,10 +1069,12 @@ mod tests {
     #[test]
     fn test_format_tables_with_config_left_align() {
         let src = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p @br(2+6) ]\n]\n";
-        let mut config = PrinterConfig::default();
-        config.table_adjust_width = Some("auto".to_string());
-        config.table_max_col_width = Some(20);
-        config.table_align = Some("left".to_string());
+        let config = PrinterConfig {
+            table_adjust_width: Some("auto".to_string()),
+            table_max_col_width: Some(20),
+            table_align: Some("left".to_string()),
+            ..Default::default()
+        };
 
         let out = format_source_with_config(src, &config);
         assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][ 小軌道         ]"));
@@ -1083,10 +1084,12 @@ mod tests {
     #[test]
     fn test_format_tables_with_config_right_align() {
         let src = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p @br(2+6) ]\n]\n";
-        let mut config = PrinterConfig::default();
-        config.table_adjust_width = Some("auto".to_string());
-        config.table_max_col_width = Some(20);
-        config.table_align = Some("right".to_string());
+        let config = PrinterConfig {
+            table_adjust_width: Some("auto".to_string()),
+            table_max_col_width: Some(20),
+            table_align: Some("right".to_string()),
+            ..Default::default()
+        };
 
         let out = format_source_with_config(src, &config);
         assert!(out.contains("[  殻 ][ 主量子数 n ][ 電子数 2n² ][         小軌道 ]"));
@@ -1096,10 +1099,12 @@ mod tests {
     #[test]
     fn test_format_tables_with_config_center_align() {
         let src = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p @br(2+6) ]\n]\n";
-        let mut config = PrinterConfig::default();
-        config.table_adjust_width = Some("auto".to_string());
-        config.table_max_col_width = Some(20);
-        config.table_align = Some("center".to_string());
+        let config = PrinterConfig {
+            table_adjust_width: Some("auto".to_string()),
+            table_max_col_width: Some(20),
+            table_align: Some("center".to_string()),
+            ..Default::default()
+        };
 
         let out = format_source_with_config(src, &config);
         assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][     小軌道     ]"));
@@ -1109,9 +1114,11 @@ mod tests {
     #[test]
     fn test_format_tables_with_per_table_align_arg() {
         let src = "@table(align: [left, right, right, left])[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
-        let mut config = PrinterConfig::default();
-        config.table_adjust_width = Some("auto".to_string());
-        config.table_max_col_width = Some(20);
+        let config = PrinterConfig {
+            table_adjust_width: Some("auto".to_string()),
+            table_max_col_width: Some(20),
+            ..Default::default()
+        };
 
         let out = format_source_with_config(src, &config);
         assert!(out.contains("[ 殻  ][ 主量子数 n ][ 電子数 2n² ][ 小軌道    ]"));
@@ -1121,9 +1128,11 @@ mod tests {
     #[test]
     fn test_format_tables_unicode_superscript_and_cjk_width() {
         let src = "@table(align: [right])[\n[ 電子数 2n² ]\n[ 2 ]\n]\n";
-        let mut config = PrinterConfig::default();
-        config.table_adjust_width = Some("auto".to_string());
-        config.table_max_col_width = Some(20);
+        let config = PrinterConfig {
+            table_adjust_width: Some("auto".to_string()),
+            table_max_col_width: Some(20),
+            ..Default::default()
+        };
 
         let out = format_source_with_config(src, &config);
         assert!(out.contains("[ 電子数 2n² ]"));
@@ -1133,9 +1142,11 @@ mod tests {
     #[test]
     fn test_format_tables_with_pipe_syntax() {
         let src = "@table\n|[ feature ][ lsp ][ vscode ][ zed ][ neovim ][ helix ]\n|[ highlight ][ o ][ o ][ o ][ o ][ o ]\n|[ suggestion ][ ][ ][ ][ ][ ]\n|[ auto complete ][ ][ ][ ][ ][ ]\n";
-        let mut config = PrinterConfig::default();
-        config.table_adjust_width = Some("auto".to_string());
-        config.table_max_col_width = Some(20);
+        let config = PrinterConfig {
+            table_adjust_width: Some("auto".to_string()),
+            table_max_col_width: Some(20),
+            ..Default::default()
+        };
 
         let out = format_source_with_config(src, &config);
         assert!(out.contains("|[ feature       ][ lsp ][ vscode ][ zed ][ neovim ][ helix ]"));
@@ -1147,8 +1158,10 @@ mod tests {
     #[test]
     fn test_format_element_group_order_content_first() {
         let src = "@link(\"https://example.com\")[Example]\n";
-        let mut config = PrinterConfig::default();
-        config.group_order = Some(GroupOrder::ContentFirst);
+        let config = PrinterConfig {
+            group_order: Some(GroupOrder::ContentFirst),
+            ..Default::default()
+        };
         let out = format_source_with_config(src, &config);
         assert_eq!(out, "@link[Example](\"https://example.com\")\n");
     }
@@ -1156,8 +1169,10 @@ mod tests {
     #[test]
     fn test_format_element_group_order_args_first() {
         let src = "@link[Example](\"https://example.com\")\n";
-        let mut config = PrinterConfig::default();
-        config.group_order = Some(GroupOrder::ArgsFirst);
+        let config = PrinterConfig {
+            group_order: Some(GroupOrder::ArgsFirst),
+            ..Default::default()
+        };
         let out = format_source_with_config(src, &config);
         assert_eq!(out, "@link(\"https://example.com\")[Example]\n");
     }
@@ -1177,8 +1192,10 @@ mod tests {
     #[test]
     fn test_format_element_group_order_nested() {
         let src = "@parent(p_arg)[\n  @child(c_arg)[Child Text]\n]\n";
-        let mut config = PrinterConfig::default();
-        config.group_order = Some(GroupOrder::ContentFirst);
+        let config = PrinterConfig {
+            group_order: Some(GroupOrder::ContentFirst),
+            ..Default::default()
+        };
         let out = format_source_with_config(src, &config);
         assert_eq!(out, "@parent[\n  @child[Child Text](c_arg)\n](p_arg)\n");
     }
@@ -1186,8 +1203,10 @@ mod tests {
     #[test]
     fn test_format_element_group_order_with_value_and_connects() {
         let src = "@link(\"https://example.com\")[Example]{rel: \"nofollow\"}:as(button)\n";
-        let mut config = PrinterConfig::default();
-        config.group_order = Some(GroupOrder::ContentFirst);
+        let config = PrinterConfig {
+            group_order: Some(GroupOrder::ContentFirst),
+            ..Default::default()
+        };
         let out = format_source_with_config(src, &config);
         assert_eq!(
             out,
@@ -1198,8 +1217,10 @@ mod tests {
     #[test]
     fn test_format_element_group_order_preserves_code_blocks() {
         let src = "```tomet\n@link(\"url\")[text]\n```\n";
-        let mut config = PrinterConfig::default();
-        config.group_order = Some(GroupOrder::ContentFirst);
+        let config = PrinterConfig {
+            group_order: Some(GroupOrder::ContentFirst),
+            ..Default::default()
+        };
         let out = format_source_with_config(src, &config);
         assert_eq!(out, src);
     }
@@ -1207,8 +1228,10 @@ mod tests {
     #[test]
     fn test_format_element_group_order_link_only() {
         let src = "@link(\"https://example.com\")[Example]\n\n@card(foo: 1)[Bar Content]\n";
-        let mut config = PrinterConfig::default();
-        config.link_group_order = Some(GroupOrder::ContentFirst);
+        let config = PrinterConfig {
+            link_group_order: Some(GroupOrder::ContentFirst),
+            ..Default::default()
+        };
         let out = format_source_with_config(src, &config);
         assert_eq!(
             out,
@@ -1219,9 +1242,11 @@ mod tests {
     #[test]
     fn test_format_element_group_order_link_override_global() {
         let src = "@link(\"https://example.com\")[Example]\n\n@card[Bar Content](foo: 1)\n";
-        let mut config = PrinterConfig::default();
-        config.group_order = Some(GroupOrder::ArgsFirst);
-        config.link_group_order = Some(GroupOrder::ContentFirst);
+        let config = PrinterConfig {
+            group_order: Some(GroupOrder::ArgsFirst),
+            link_group_order: Some(GroupOrder::ContentFirst),
+            ..Default::default()
+        };
         let out = format_source_with_config(src, &config);
         assert_eq!(
             out,

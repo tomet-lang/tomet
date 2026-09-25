@@ -325,7 +325,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                         is_callout = true;
                         variant = kind_str;
                         let clean_title = val_trimmed[end_bracket + 1..]
-                            .trim_start_matches(|c| c == ' ' || c == '-' || c == '+' || c == '|')
+                            .trim_start_matches([' ', '-', '+', '|'])
                             .trim();
                         if !clean_title.is_empty() {
                             title = Some(clean_title.to_string());
@@ -669,7 +669,7 @@ fn build_table_element(
     content_inlines.push(Inline::Text(Text::new("\n", Span::dummy())));
 
     for row in &rows {
-        for c_idx in 0..col_count {
+        for (c_idx, &target) in target_widths.iter().enumerate() {
             let cell_inlines = row.get(c_idx).cloned().unwrap_or_default();
             let cell_len = inlines_display_width(&cell_inlines);
 
@@ -683,7 +683,7 @@ fn build_table_element(
                 })
                 .unwrap_or(default_align);
 
-            let (left_spaces, right_spaces) = if let Some(target_w) = target_widths[c_idx] {
+            let (left_spaces, right_spaces) = if let Some(target_w) = target {
                 let target_width = target_w + 2;
                 let extra = if target_width > cell_len {
                     target_width - cell_len
@@ -801,7 +801,6 @@ fn inline_target(stack: &mut [Frame]) -> Option<&mut Vec<Inline>> {
 /// result, break) to whichever frame is currently accumulating inlines.
 /// List items can receive these directly (CommonMark "tight" lists put
 /// inline content straight under `Item`, with no `Paragraph` wrapper).
-
 fn push_inline(stack: &mut [Frame], inline: Inline) {
     let Some(target) = inline_target(stack) else {
         return;
