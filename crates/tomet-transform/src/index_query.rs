@@ -183,15 +183,6 @@ fn rewrite_list_value(
     Ok(ElementValue::Group(rewritten))
 }
 
-/// Whether `doc` is an index document -- `@kind(doc.index)`, nothing else.
-///
-/// Not "does it contain a `${filter(...)}}`": an index document may be
-/// entirely hand-written `@link(ref:"...")` entries with no query in it at
-/// all, and that is still an index document. `@kind` is the one source of
-/// truth; the filename is not consulted here either (a caller that wants a
-/// cheap pre-parse filter, e.g. tomet-book's `.index.tmt` suffix, applies
-/// it before ever calling this).
-
 /// The argument list of a `${filter(...)}`, if `el` is exactly that --
 /// whether `el` sits as a block of its own or as a list item's entire
 /// inline content (see [`filter_args_of_content`]), the shape checked is

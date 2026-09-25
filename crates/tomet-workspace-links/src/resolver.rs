@@ -67,32 +67,30 @@ impl VaultLinkIndex {
 
         // 0. Relative path resolution from current document's folder (e.g. "./image.png", "../image.png")
         if (clean_target.starts_with("./") || clean_target.starts_with("../"))
-            && from_path.is_some()
+            && let Some(from) = from_path
+            && let Some(parent) = from.parent()
         {
-            let from = from_path.unwrap();
-            if let Some(parent) = from.parent() {
-                let joined = parent.join(clean_target);
-                let mut normalized = PathBuf::new();
-                for comp in joined.components() {
-                    match comp {
-                        std::path::Component::CurDir => {}
-                        std::path::Component::ParentDir => {
-                            normalized.pop();
-                        }
-                        std::path::Component::Normal(c) => {
-                            normalized.push(c);
-                        }
-                        _ => {}
+            let joined = parent.join(clean_target);
+            let mut normalized = PathBuf::new();
+            for comp in joined.components() {
+                match comp {
+                    std::path::Component::CurDir => {}
+                    std::path::Component::ParentDir => {
+                        normalized.pop();
                     }
+                    std::path::Component::Normal(c) => {
+                        normalized.push(c);
+                    }
+                    _ => {}
                 }
-                let norm_str = normalized.to_string_lossy().replace('\\', "/");
-                if let Some(pos) = self
-                    .paths
-                    .iter()
-                    .position(|p| p.to_string_lossy().replace('\\', "/") == norm_str)
-                {
-                    return Some(&self.paths[pos]);
-                }
+            }
+            let norm_str = normalized.to_string_lossy().replace('\\', "/");
+            if let Some(pos) = self
+                .paths
+                .iter()
+                .position(|p| p.to_string_lossy().replace('\\', "/") == norm_str)
+            {
+                return Some(&self.paths[pos]);
             }
         }
 

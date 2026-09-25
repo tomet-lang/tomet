@@ -372,7 +372,7 @@ pub fn parse_map_body_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Resu
                 cur.bump();
             }
             Some('\n') | Some('\r') => {}
-            other if matches!(other, None | Some(')') | Some('}') | Some(']')) => break,
+            None | Some(')' | '}' | ']') => break,
             _ => {
                 return Err(err(
                     cur,

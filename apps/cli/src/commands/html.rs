@@ -40,7 +40,7 @@ pub(crate) fn render_file(
 }
 
 pub(crate) fn html(
-    file: &PathBuf,
+    file: &Path,
     out: &Option<PathBuf>,
     advanced: bool,
     lang: Option<String>,

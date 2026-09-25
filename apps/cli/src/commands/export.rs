@@ -41,16 +41,14 @@ fn export_single_file(
     let mut stale = StaleExports::default();
     let project_root = project_root_for(file_path);
     let vault = Vault::discover(file_path);
-    export_one(
-        file_path,
+    let settings = ExportSettings {
         override_type,
-        override_out,
         advanced,
         check,
-        &mut stale,
-        &project_root,
-        &vault,
-    )?;
+        project_root: &project_root,
+        vault: &vault,
+    };
+    export_one(&settings, file_path, override_out, &mut stale)?;
     report_stale(&stale, check)
 }
 
@@ -93,16 +91,29 @@ pub(crate) fn report_stale(stale: &StaleExports, check: bool) -> anyhow::Result<
     ))
 }
 
-fn export_one(
-    file_path: &Path,
-    override_type: Option<&str>,
-    override_out: Option<&Path>,
+/// What stays the same for every file of one export run.
+#[derive(Clone, Copy)]
+struct ExportSettings<'a> {
+    override_type: Option<&'a str>,
     advanced: bool,
     check: bool,
+    project_root: &'a Path,
+    vault: &'a Vault,
+}
+
+fn export_one(
+    settings: &ExportSettings,
+    file_path: &Path,
+    override_out: Option<&Path>,
     stale: &mut StaleExports,
-    project_root: &Path,
-    vault: &Vault,
 ) -> anyhow::Result<()> {
+    let ExportSettings {
+        override_type,
+        advanced,
+        check,
+        project_root,
+        vault,
+    } = *settings;
     let src = fs::read_to_string(file_path)?;
     // `vault.parse` and not `vault.document`, so the source text is still
     // in hand for `format_parse_error`'s pointer-at-the-column report.
@@ -248,6 +259,13 @@ fn export_directory(
     // Discovered once for the whole run; the metadata table inside it is
     // filled by whichever document asks first -- see `export_one`.
     let vault = Vault::discover(dir_path);
+    let settings = ExportSettings {
+        override_type,
+        advanced,
+        check,
+        project_root: &project_root,
+        vault: &vault,
+    };
     for file in &files {
         let relative_out = if let Some(out_dir) = override_out {
             if let Ok(rel) = file.strip_prefix(dir_path) {
@@ -260,16 +278,7 @@ fn export_directory(
             None
         };
 
-        match export_one(
-            file,
-            override_type,
-            relative_out.as_deref(),
-            advanced,
-            check,
-            &mut stale,
-            &project_root,
-            &vault,
-        ) {
+        match export_one(&settings, file, relative_out.as_deref(), &mut stale) {
             Ok(()) => exported_count += 1,
             Err(e) => eprintln!("Error exporting {}: {e}", file.display()),
         }

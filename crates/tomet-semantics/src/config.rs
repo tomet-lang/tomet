@@ -214,11 +214,10 @@ fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
         "export_type" => process_export_type(v, config),
         "export_path" => process_export_path(v, config),
         _ if k.starts_with("macros.") || k.starts_with("macro.") => {
-            let mname = if k.starts_with("macros.") {
-                &k["macros.".len()..]
-            } else {
-                &k["macro.".len()..]
-            };
+            let mname = k
+                .strip_prefix("macros.")
+                .or_else(|| k.strip_prefix("macro."))
+                .unwrap_or(k);
             if let Some(template) = v.as_str() {
                 config
                     .macros
