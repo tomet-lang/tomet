@@ -1,5 +1,8 @@
 # Tomet
 
+[![VS Code Marketplace](https://vsmarketplacebadges.dev/version/tomet-lang.tomet.svg)](https://marketplace.visualstudio.com/items?itemName=tomet-lang.tomet)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/tomet-lang.tomet.svg)](https://marketplace.visualstudio.com/items?itemName=tomet-lang.tomet)
+
 Tome to me!!
 
 Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and Rust toolchain designed as a modern alternative.
