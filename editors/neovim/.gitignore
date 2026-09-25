@@ -1,0 +1,2 @@
+# Compiled tree-sitter parser: build output, embeds local paths.
+parser/*.so
