@@ -38,9 +38,9 @@ use std::collections::HashSet;
 
 use tomet_ast::{Block, Document, Element, ElementValue, Inline, Placement, Section, Value};
 use tomet_semantics::{
-    FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level, is_directive,
-    link_target, list_items, list_ordered, normalized_element_args, parse_table_rows, path_target,
-    target_scheme,
+    FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
+    is_directive, link_target, list_items, list_ordered, normalized_element_args, parse_table_rows,
+    path_target, target_scheme,
 };
 
 struct TypstCtx<'a> {
@@ -221,7 +221,11 @@ fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
     }
 }
 
-fn render_footnote_ref_or_def(cx: &TypstCtx, idx: usize, inline_content: Option<&[Inline]>) -> String {
+fn render_footnote_ref_or_def(
+    cx: &TypstCtx,
+    idx: usize,
+    inline_content: Option<&[Inline]>,
+) -> String {
     let item = cx.footnotes.items.iter().find(|it| it.index == idx);
     let Some(item) = item else {
         return String::new();
@@ -277,11 +281,7 @@ fn render_tag(el: &Element) -> String {
     let boxes: Vec<String> = tags
         .into_iter()
         .map(|t| {
-            let label = if t.starts_with('#') {
-                &t[1..]
-            } else {
-                &t
-            };
+            let label = if t.starts_with('#') { &t[1..] } else { &t };
             let escaped = escape_text(label);
             format!("#box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#{escaped}]")
         })
@@ -873,10 +873,7 @@ mod tests {
     #[test]
     fn renders_inline_footnote() {
         let src = "Prose with @footnote[a note] here.\n";
-        assert_eq!(
-            typst(src),
-            "Prose with #footnote[a note] here.\n\n"
-        );
+        assert_eq!(typst(src), "Prose with #footnote[a note] here.\n\n");
     }
 
     #[test]
@@ -896,10 +893,7 @@ Prose B ^(shared).
             out.contains("Prose B #footnote(<fn-shared>)."),
             "got: {out}"
         );
-        assert!(
-            !out.contains("@footnote"),
-            "got: {out}"
-        );
+        assert!(!out.contains("@footnote"), "got: {out}");
     }
 
     #[test]

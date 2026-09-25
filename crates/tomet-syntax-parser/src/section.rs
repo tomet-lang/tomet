@@ -236,4 +236,3 @@ fn trim_trailing_equals(inlines: &mut Vec<Inline>) {
         }
     }
 }
-

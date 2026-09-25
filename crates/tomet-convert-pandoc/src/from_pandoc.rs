@@ -180,7 +180,10 @@ fn block_element(block: &Block) -> Element {
                     Value::String(lang.clone()),
                 )]));
             }
-            el.content = Some(vec![TmInline::Raw(RawText::new(code.clone(), Span::dummy()))]);
+            el.content = Some(vec![TmInline::Raw(RawText::new(
+                code.clone(),
+                Span::dummy(),
+            ))]);
             el
         }
         Block::RawBlock(format, text) => {
@@ -192,7 +195,10 @@ fn block_element(block: &Block) -> Element {
                 "lang".to_string(),
                 Value::String(format.clone()),
             )]));
-            el.content = Some(vec![TmInline::Raw(RawText::new(text.clone(), Span::dummy()))]);
+            el.content = Some(vec![TmInline::Raw(RawText::new(
+                text.clone(),
+                Span::dummy(),
+            ))]);
             el
         }
         Block::BlockQuote(blocks) => {
@@ -372,7 +378,10 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
         Inline::Code(attr, code) => {
             let mut el = named_element("raw", attr);
             el.placement = Placement::Inline;
-            el.content = Some(vec![TmInline::Raw(RawText::new(code.clone(), Span::dummy()))]);
+            el.content = Some(vec![TmInline::Raw(RawText::new(
+                code.clone(),
+                Span::dummy(),
+            ))]);
             TmInline::Element(el)
         }
         Inline::Math(_, text) => TmInline::Text(Text::from(text.clone())),
@@ -504,7 +513,9 @@ fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<ElementValue>) 
         .and_then(|(_, json)| serde_json::from_str(json).ok());
     if let Some(serde_json::Value::Object(obj)) = exact {
         let args = obj.get("args").map(json_to_value);
-        let value = obj.get("value").map(|v| ElementValue::from_map(json_to_value(v)));
+        let value = obj
+            .get("value")
+            .map(|v| ElementValue::from_map(json_to_value(v)));
         return (args, value);
     }
 

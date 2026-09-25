@@ -26,7 +26,7 @@ pub struct FieldConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum GroupOrder {
     #[default]
-    ArgsFirst,    // @link(args)[content]{value}
+    ArgsFirst, // @link(args)[content]{value}
     ContentFirst, // @link[content](args){value}
 }
 
@@ -756,7 +756,10 @@ mod tests {
         let cfg4 = load_config_from_str(src4).expect("failed to parse config");
         assert_eq!(cfg4.link_group_order, Some(GroupOrder::ContentFirst));
         assert_eq!(cfg4.group_order, None);
-        assert_eq!(cfg4.element_group_order("link"), Some(GroupOrder::ContentFirst));
+        assert_eq!(
+            cfg4.element_group_order("link"),
+            Some(GroupOrder::ContentFirst)
+        );
         assert_eq!(cfg4.element_group_order("other"), None);
 
         let src5 = r#"@config(
@@ -769,7 +772,13 @@ mod tests {
         let cfg5 = load_config_from_str(src5).expect("failed to parse config");
         assert_eq!(cfg5.group_order, Some(GroupOrder::ArgsFirst));
         assert_eq!(cfg5.link_group_order, Some(GroupOrder::ContentFirst));
-        assert_eq!(cfg5.element_group_order("link"), Some(GroupOrder::ContentFirst));
-        assert_eq!(cfg5.element_group_order("image"), Some(GroupOrder::ArgsFirst));
+        assert_eq!(
+            cfg5.element_group_order("link"),
+            Some(GroupOrder::ContentFirst)
+        );
+        assert_eq!(
+            cfg5.element_group_order("image"),
+            Some(GroupOrder::ArgsFirst)
+        );
     }
 }

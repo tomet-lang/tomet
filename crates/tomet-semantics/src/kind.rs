@@ -465,8 +465,8 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
         Meta | Config | Settings | Use | Include | References | Blueprint | Links | Hr
-        | Callout | Card | Table | Heading | OrderedList | UnorderedList | Kind
-        | Version | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
+        | Callout | Card | Table | Heading | OrderedList | UnorderedList | Kind | Version
+        | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
         Em | Strong | Mark | Strikeout | Ruby | Caret => Shape::Inline,
         // Either shape. A link or an embed alone on a line is not a
         // structural error -- it is how you show one file or one image.

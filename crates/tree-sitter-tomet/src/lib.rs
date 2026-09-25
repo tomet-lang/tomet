@@ -219,8 +219,14 @@ mod tests {
         assert!(!root.has_error());
         let sec = root.named_child(0).unwrap();
         assert_eq!(sec.kind(), "section");
-        assert_eq!(sec.child_by_field_name("marker").unwrap().kind(), "section_marker");
-        assert_eq!(sec.child_by_field_name("close_marker").unwrap().kind(), "section_marker");
+        assert_eq!(
+            sec.child_by_field_name("marker").unwrap().kind(),
+            "section_marker"
+        );
+        assert_eq!(
+            sec.child_by_field_name("close_marker").unwrap().kind(),
+            "section_marker"
+        );
     }
 
     #[test]
@@ -703,7 +709,8 @@ mod tests {
         // Plain brackets outside element are punctuation.bracket, not tag
         let plain_src = "plain [brackets] and (parens)\n";
         let plain_tree = parse(plain_src);
-        let mut plain_matches = cursor.matches(&query, plain_tree.root_node(), plain_src.as_bytes());
+        let mut plain_matches =
+            cursor.matches(&query, plain_tree.root_node(), plain_src.as_bytes());
         let mut plain_captured: Vec<(String, String)> = Vec::new();
         while let Some(m) = plain_matches.next() {
             for c in m.captures {

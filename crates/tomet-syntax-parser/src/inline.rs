@@ -1,12 +1,12 @@
 //! Parsing for inline sequences, text normalization, and inline delimiters (`*em*`, `**strong**`, `==mark==`).
 
+use crate::caret::{is_caret_start, parse_caret_element};
 use crate::codeblock::is_fenced_code_block_start;
 use crate::element::{LineEnd, element_ends_line, is_element_start, parse_element};
 use crate::error::Result;
-use crate::section::{is_thematic_break, is_titled_thematic_break_start};
-use crate::caret::{is_caret_start, parse_caret_element};
 use crate::interp::{is_interp_start, parse_dollar_element};
 use crate::list::peek_list_marker;
+use crate::section::{is_thematic_break, is_titled_thematic_break_start};
 use crate::value::{err, skip_block_comment, skip_inline_ws, skip_line_comment};
 use tomet_ast::{Element, Inline, Placement, RawText, Sigil, SoftBreak, Span, Text, Value};
 use tomet_lexer::Cursor;
@@ -90,8 +90,7 @@ pub(crate) fn parse_inline_seq(
                     let pending = &cur.src()[text_start..cur.pos()];
                     let trimmed = pending.trim_end_matches([' ', '\t']);
                     if let Some(content) = trimmed.strip_suffix('\\') {
-                        let content_end =
-                            text_start + content.trim_end_matches([' ', '\t']).len();
+                        let content_end = text_start + content.trim_end_matches([' ', '\t']).len();
                         flush_text_upto(&mut items, cur, &mut text_start, content_end, fold_pipes);
                         text_start = cur.pos();
                     }
@@ -285,7 +284,10 @@ pub(crate) fn parse_inline_seq(
         }
         if cur.peek() == Some('^') && is_caret_start(cur) {
             flush_text(&mut items, cur, &mut text_start, fold_pipes);
-            items.push(Inline::Element(parse_caret_element(cur, allow_colon_connect)?));
+            items.push(Inline::Element(parse_caret_element(
+                cur,
+                allow_colon_connect,
+            )?));
             text_start = cur.pos();
             continue;
         }
@@ -443,9 +445,7 @@ fn try_one_delimited(
     }
     let mut probe = open;
     loop {
-        if probe.starts_with(delim)
-            && (delim == "~~" || !is_boundary(char_before(&probe)))
-        {
+        if probe.starts_with(delim) && (delim == "~~" || !is_boundary(char_before(&probe))) {
             break;
         }
         if probe.is_eof() {

@@ -11,8 +11,9 @@
 
 use tomet_ast::{Block, Document, Element, ElementValue, Inline, Placement, Section, Value};
 use tomet_semantics::{
-    FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level, is_directive,
-    link_target, list_items, list_ordered, normalized_element_args, path_target, target_scheme,
+    FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
+    is_directive, link_target, list_items, list_ordered, normalized_element_args, path_target,
+    target_scheme,
 };
 
 struct MarkdownCtx<'a> {
@@ -597,7 +598,13 @@ fn render_footnotes(cx: &MarkdownCtx, out: &mut String) {
                         }
                         let indented = trimmed
                             .lines()
-                            .map(|l| if l.is_empty() { String::new() } else { format!("    {l}") })
+                            .map(|l| {
+                                if l.is_empty() {
+                                    String::new()
+                                } else {
+                                    format!("    {l}")
+                                }
+                            })
                             .collect::<Vec<_>>()
                             .join("\n");
                         def_text.push_str(&indented);
@@ -1312,8 +1319,9 @@ mod tests {
 
     #[test]
     fn inline_footnote_exports_to_markdown() {
-        let doc = tomet_parser::parse_document("This has a footnote @footnote[a short note] in text.\n")
-            .unwrap();
+        let doc =
+            tomet_parser::parse_document("This has a footnote @footnote[a short note] in text.\n")
+                .unwrap();
         let md = to_markdown(&doc);
         assert!(
             md.contains("This has a footnote [^1] in text."),
@@ -1339,10 +1347,7 @@ Prose B ^(shared).
             "got: {md}"
         );
         // Ensure definition block was not rendered in place
-        assert!(
-            !md.contains("@footnote"),
-            "got: {md}"
-        );
+        assert!(!md.contains("@footnote"), "got: {md}");
     }
 
     #[test]

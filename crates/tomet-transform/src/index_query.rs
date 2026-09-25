@@ -104,8 +104,7 @@ fn rewrite_blocks(
     for block in blocks {
         match block {
             Block::Section(mut sec) => {
-                sec.blocks =
-                    rewrite_blocks(sec.blocks, source, config, rows, known, expanded)?;
+                sec.blocks = rewrite_blocks(sec.blocks, source, config, rows, known, expanded)?;
                 rewritten.push(Block::Section(sec));
             }
             Block::Element(mut el) => {
