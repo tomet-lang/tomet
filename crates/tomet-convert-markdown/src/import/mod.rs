@@ -802,7 +802,6 @@ fn inline_target(stack: &mut [Frame]) -> Option<&mut Vec<Inline>> {
 /// List items can receive these directly (CommonMark "tight" lists put
 /// inline content straight under `Item`, with no `Paragraph` wrapper).
 
-
 fn push_inline(stack: &mut [Frame], inline: Inline) {
     let Some(target) = inline_target(stack) else {
         return;

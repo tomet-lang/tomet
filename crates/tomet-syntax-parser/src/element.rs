@@ -2,8 +2,8 @@
 
 use crate::error::Result;
 use crate::fence::{is_fence_start, parse_fence};
-use crate::section::{merge_values, parse_braced_value};
 use crate::inline::{Stop, at_line_start, parse_inline_seq};
+use crate::section::{merge_values, parse_braced_value};
 use crate::value::{
     POSITIONAL_ENTRY_KEY, eat_name, err, is_name_start_at, parse_one_entry, parse_value_at,
     skip_block_comment, skip_inline_ws, skip_line_comment, skip_ws_newlines_and_comments,

@@ -664,7 +664,9 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     };
 
     let elem_name = el.sigil.name().map(|n| n.name.as_str()).unwrap_or("");
-    let order = config.element_group_order(elem_name).unwrap_or(GroupOrder::ArgsFirst);
+    let order = config
+        .element_group_order(elem_name)
+        .unwrap_or(GroupOrder::ArgsFirst);
     match order {
         GroupOrder::ArgsFirst => {
             render_args(&mut out);
@@ -1388,12 +1390,18 @@ mod tests {
 
         config.group_order = Some(GroupOrder::ArgsFirst);
         let printed_args_first = document_to_tm_with_config(&doc, &config);
-        assert_eq!(printed_args_first.trim(), "@link(\"https://example.com\")[Example]");
+        assert_eq!(
+            printed_args_first.trim(),
+            "@link(\"https://example.com\")[Example]"
+        );
 
         let mut config_link_only = PrinterConfig::default();
         config_link_only.link_group_order = Some(GroupOrder::ContentFirst);
         let printed_link_only = document_to_tm_with_config(&doc, &config_link_only);
-        assert_eq!(printed_link_only.trim(), "@link[Example](\"https://example.com\")");
+        assert_eq!(
+            printed_link_only.trim(),
+            "@link[Example](\"https://example.com\")"
+        );
     }
 
     #[test]

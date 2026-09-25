@@ -1,14 +1,14 @@
+mod caret;
 mod codeblock;
 pub mod cst;
 mod document;
 mod element;
 mod error;
 mod fence;
-mod section;
 mod inline;
 mod interp;
-mod caret;
 mod list;
+mod section;
 mod value;
 
 pub use cst::parse_cst;
@@ -1192,7 +1192,10 @@ mod tests {
                         _ => None,
                     })
                     .collect();
-                assert_eq!(elements, vec![Sigil::named("meta"), Sigil::named("settings")]);
+                assert_eq!(
+                    elements,
+                    vec![Sigil::named("meta"), Sigil::named("settings")]
+                );
             }
             other => panic!("expected one paragraph, got {other:?}"),
         }
@@ -2240,8 +2243,12 @@ mod tests {
         assert_eq!(sugar.blocks.len(), 1);
         assert_eq!(bracket.blocks.len(), 1);
 
-        let Block::Section(s_sec) = &sugar.blocks[0] else { panic!() };
-        let Block::Section(b_sec) = &bracket.blocks[0] else { panic!() };
+        let Block::Section(s_sec) = &sugar.blocks[0] else {
+            panic!()
+        };
+        let Block::Section(b_sec) = &bracket.blocks[0] else {
+            panic!()
+        };
 
         assert_eq!(s_sec.level, b_sec.level);
         assert_eq!(s_sec.title, b_sec.title);
@@ -2252,51 +2259,69 @@ mod tests {
     fn parses_section_with_decorative_trailing_equals() {
         // Bracket form with trailing equals (no space and with space)
         let doc1 = parse_document("==[ Title ]==\nParagraph\n").unwrap();
-        let Block::Section(s1) = &doc1.blocks[0] else { panic!() };
+        let Block::Section(s1) = &doc1.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s1.level, 2);
         assert_eq!(s1.title, vec![Inline::Text("Title".into())]);
         assert_eq!(s1.blocks.len(), 1);
-        let Block::Paragraph(p1) = &s1.blocks[0] else { panic!() };
+        let Block::Paragraph(p1) = &s1.blocks[0] else {
+            panic!()
+        };
         assert_eq!(p1.content, vec![Inline::Text("Paragraph".into())]);
 
         let doc2 = parse_document("==[ Title ] ==\nParagraph\n").unwrap();
-        let Block::Section(s2) = &doc2.blocks[0] else { panic!() };
+        let Block::Section(s2) = &doc2.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s2.title, vec![Inline::Text("Title".into())]);
         assert_eq!(s2.blocks.len(), 1);
 
         // Bracket form with attrs
         let doc3 = parse_document("==[ Title ]{ id: intro }==\nParagraph\n").unwrap();
-        let Block::Section(s3) = &doc3.blocks[0] else { panic!() };
+        let Block::Section(s3) = &doc3.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s3.title, vec![Inline::Text("Title".into())]);
         assert!(s3.value.is_some());
         assert_eq!(s3.blocks.len(), 1);
 
         let doc4 = parse_document("==[ Title ]=={ id: intro }\nParagraph\n").unwrap();
-        let Block::Section(s4) = &doc4.blocks[0] else { panic!() };
+        let Block::Section(s4) = &doc4.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s4.title, vec![Inline::Text("Title".into())]);
         assert!(s4.value.is_some());
         assert_eq!(s4.blocks.len(), 1);
 
         // Sugar form with trailing equals
         let doc5 = parse_document("== Title ==\nParagraph\n").unwrap();
-        let Block::Section(s5) = &doc5.blocks[0] else { panic!() };
+        let Block::Section(s5) = &doc5.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s5.level, 2);
         assert_eq!(s5.title, vec![Inline::Text("Title".into())]);
         assert_eq!(s5.blocks.len(), 1);
 
         let doc6 = parse_document("== Title ===\nParagraph\n").unwrap();
-        let Block::Section(s6) = &doc6.blocks[0] else { panic!() };
+        let Block::Section(s6) = &doc6.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s6.title, vec![Inline::Text("Title".into())]);
         assert_eq!(s6.blocks.len(), 1);
 
         // Heading with internal '='
         let doc7 = parse_document("== Math: 1 + 1 = 2 ==\nParagraph\n").unwrap();
-        let Block::Section(s7) = &doc7.blocks[0] else { panic!() };
+        let Block::Section(s7) = &doc7.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s7.title, vec![Inline::Text("Math: 1 + 1 = 2".into())]);
         assert_eq!(s7.blocks.len(), 1);
 
         let doc8 = parse_document("==[ Math: 1 + 1 = 2 ]==\nParagraph\n").unwrap();
-        let Block::Section(s8) = &doc8.blocks[0] else { panic!() };
+        let Block::Section(s8) = &doc8.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s8.title, vec![Inline::Text("Math: 1 + 1 = 2".into())]);
         assert_eq!(s8.blocks.len(), 1);
     }
@@ -2304,7 +2329,9 @@ mod tests {
     #[test]
     fn parses_tag_sugar_syntax() {
         let doc = parse_document("Prose with #(rust, parser, tomet) tags.\n").unwrap();
-        let Block::Paragraph(p) = &doc.blocks[0] else { panic!() };
+        let Block::Paragraph(p) = &doc.blocks[0] else {
+            panic!()
+        };
         assert_eq!(p.content.len(), 3);
         assert_eq!(p.content[0], Inline::Text("Prose with ".into()));
 
@@ -2326,9 +2353,14 @@ mod tests {
     #[test]
     fn double_equal_is_plain_text_not_mark() {
         let doc = parse_document("This is ==not highlighted== text.\n").unwrap();
-        let Block::Paragraph(p) = &doc.blocks[0] else { panic!() };
+        let Block::Paragraph(p) = &doc.blocks[0] else {
+            panic!()
+        };
         // Contains no Element, just Text
-        assert_eq!(p.content, vec![Inline::Text("This is ==not highlighted== text.".into())]);
+        assert_eq!(
+            p.content,
+            vec![Inline::Text("This is ==not highlighted== text.".into())]
+        );
     }
 
     #[test]
@@ -2342,18 +2374,24 @@ mod tests {
     #[test]
     fn parses_caret_reference_elements() {
         let doc = parse_document("See ^(note1) and ^footnote(note2).\n").unwrap();
-        let Block::Paragraph(p) = &doc.blocks[0] else { panic!() };
+        let Block::Paragraph(p) = &doc.blocks[0] else {
+            panic!()
+        };
         // "See ", Element(^(note1)), " and ", Element(^footnote(note2)), "."
         assert_eq!(p.content.len(), 5);
         assert_eq!(p.content[0], Inline::Text("See ".into()));
 
-        let Inline::Element(caret1) = &p.content[1] else { panic!() };
+        let Inline::Element(caret1) = &p.content[1] else {
+            panic!()
+        };
         assert_eq!(caret1.sigil, Sigil::Caret(None));
         assert!(caret1.args.is_some());
 
         assert_eq!(p.content[2], Inline::Text(" and ".into()));
 
-        let Inline::Element(caret2) = &p.content[3] else { panic!() };
+        let Inline::Element(caret2) = &p.content[3] else {
+            panic!()
+        };
         assert_eq!(
             caret2.sigil,
             Sigil::Caret(Some(tomet_ast::Name::bare("footnote")))
@@ -2366,7 +2404,9 @@ mod tests {
     #[test]
     fn caret_without_parens_is_plain_text() {
         let doc = parse_document("Math x^2 and bare ^word here.\n").unwrap();
-        let Block::Paragraph(p) = &doc.blocks[0] else { panic!() };
+        let Block::Paragraph(p) = &doc.blocks[0] else {
+            panic!()
+        };
         assert_eq!(
             p.content,
             vec![Inline::Text("Math x^2 and bare ^word here.".into())]
@@ -2379,19 +2419,27 @@ mod tests {
         assert_eq!(doc.blocks.len(), 2);
 
         // First section: =[ heading ]
-        let Block::Section(s1) = &doc.blocks[0] else { panic!() };
+        let Block::Section(s1) = &doc.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s1.level, 1);
         assert_eq!(s1.title, vec![Inline::Text("heading".into())]);
         assert_eq!(s1.blocks.len(), 1);
-        let Block::Paragraph(p1) = &s1.blocks[0] else { panic!() };
+        let Block::Paragraph(p1) = &s1.blocks[0] else {
+            panic!()
+        };
         assert_eq!(p1.content, vec![Inline::Text("section".into())]);
 
         // Second section: bare '='
-        let Block::Section(s2) = &doc.blocks[1] else { panic!() };
+        let Block::Section(s2) = &doc.blocks[1] else {
+            panic!()
+        };
         assert_eq!(s2.level, 1);
         assert!(s2.title.is_empty());
         assert_eq!(s2.blocks.len(), 1);
-        let Block::Paragraph(p2) = &s2.blocks[0] else { panic!() };
+        let Block::Paragraph(p2) = &s2.blocks[0] else {
+            panic!()
+        };
         assert_eq!(p2.content, vec![Inline::Text("after".into())]);
     }
 
@@ -2400,12 +2448,16 @@ mod tests {
         let doc = parse_document("=[ heading ]\n\nsection\n\n=\n").unwrap();
         assert_eq!(doc.blocks.len(), 2);
 
-        let Block::Section(s1) = &doc.blocks[0] else { panic!() };
+        let Block::Section(s1) = &doc.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s1.level, 1);
         assert_eq!(s1.title, vec![Inline::Text("heading".into())]);
         assert_eq!(s1.blocks.len(), 1);
 
-        let Block::Section(s2) = &doc.blocks[1] else { panic!() };
+        let Block::Section(s2) = &doc.blocks[1] else {
+            panic!()
+        };
         assert_eq!(s2.level, 1);
         assert!(s2.title.is_empty());
         assert!(s2.blocks.is_empty());
@@ -2417,17 +2469,23 @@ mod tests {
         let doc = parse_document(src).unwrap();
         assert_eq!(doc.blocks.len(), 2);
 
-        let Block::Section(s1) = &doc.blocks[0] else { panic!() };
+        let Block::Section(s1) = &doc.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s1.level, 1);
         assert!(s1.title.is_empty());
         assert_eq!(s1.blocks.len(), 2); // Paragraph("Intro"), Section(level 2)
 
-        let Block::Section(sub) = &s1.blocks[1] else { panic!() };
+        let Block::Section(sub) = &s1.blocks[1] else {
+            panic!()
+        };
         assert_eq!(sub.level, 2);
         assert!(sub.title.is_empty());
         assert_eq!(sub.blocks.len(), 1);
 
-        let Block::Section(s2) = &doc.blocks[1] else { panic!() };
+        let Block::Section(s2) = &doc.blocks[1] else {
+            panic!()
+        };
         assert_eq!(s2.level, 1);
         assert!(s2.title.is_empty());
         assert_eq!(s2.blocks.len(), 1);
@@ -2437,13 +2495,17 @@ mod tests {
     fn parses_headingless_section_with_comment_and_attrs() {
         let doc1 = parse_document("= // comment\nParagraph\n").unwrap();
         assert_eq!(doc1.blocks.len(), 1);
-        let Block::Section(s1) = &doc1.blocks[0] else { panic!() };
+        let Block::Section(s1) = &doc1.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s1.level, 1);
         assert!(s1.title.is_empty());
 
         let doc2 = parse_document("={ id: intro }\nParagraph\n").unwrap();
         assert_eq!(doc2.blocks.len(), 1);
-        let Block::Section(s2) = &doc2.blocks[0] else { panic!() };
+        let Block::Section(s2) = &doc2.blocks[0] else {
+            panic!()
+        };
         assert_eq!(s2.level, 1);
         assert!(s2.title.is_empty());
         assert!(s2.value.is_some());
@@ -2453,8 +2515,9 @@ mod tests {
     fn bare_equal_with_attached_chars_is_plain_text() {
         let doc = parse_document("=abc is text.\n").unwrap();
         assert_eq!(doc.blocks.len(), 1);
-        let Block::Paragraph(p) = &doc.blocks[0] else { panic!() };
+        let Block::Paragraph(p) = &doc.blocks[0] else {
+            panic!()
+        };
         assert_eq!(p.content, vec![Inline::Text("=abc is text.".into())]);
     }
 }
-

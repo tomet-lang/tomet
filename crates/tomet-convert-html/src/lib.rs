@@ -15,9 +15,10 @@ use std::sync::Arc;
 
 use tomet_ast::{Block, Document, Element, ElementValue, Inline, Section, Span, Value};
 use tomet_semantics::{
-    Bindings, EXACT_DATA_KEY, ElementKind, FootnoteRegistry, TargetScheme, builtin_doc_vocabularies,
-    classify_std_lenient, extract_tags, flatten_data, heading_level, is_directive, link_target, list_items,
-    list_ordered, normalized_element_args, normalized_element_args_in, path_target, target_scheme,
+    Bindings, EXACT_DATA_KEY, ElementKind, FootnoteRegistry, TargetScheme,
+    builtin_doc_vocabularies, classify_std_lenient, extract_tags, flatten_data, heading_level,
+    is_directive, link_target, list_items, list_ordered, normalized_element_args,
+    normalized_element_args_in, path_target, target_scheme,
 };
 
 const DEFAULT_STYLE: &str = "\
@@ -375,12 +376,7 @@ fn render_block(cx: &RenderCtx, block: &Block, out: &mut String, state: &mut Hea
     }
 }
 
-fn render_section(
-    cx: &RenderCtx,
-    sec: &Section,
-    out: &mut String,
-    state: &mut HeadingState,
-) {
+fn render_section(cx: &RenderCtx, sec: &Section, out: &mut String, state: &mut HeadingState) {
     let level = (sec.level as u8).clamp(1, 6);
     let value_data = match &sec.value {
         Some(v) => v.as_data(),
@@ -702,7 +698,10 @@ fn render_footnotes(cx: &RenderCtx, out: &mut String) {
                     )
                 })
                 .collect();
-            format!(" <span class=\"footnote-backrefs\">{}</span>", links.join(" "))
+            format!(
+                " <span class=\"footnote-backrefs\">{}</span>",
+                links.join(" ")
+            )
         };
 
         if content_html.trim().is_empty() {
@@ -1815,8 +1814,10 @@ mod tests {
 
     #[test]
     fn renders_list_marker_with_embedded_element() {
-        let doc = parse_document("- (@em[Important]) content\n- (@link(https://example.com)[Wiki]) docs\n")
-            .unwrap();
+        let doc = parse_document(
+            "- (@em[Important]) content\n- (@link(https://example.com)[Wiki]) docs\n",
+        )
+        .unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -1827,8 +1828,7 @@ mod tests {
     #[test]
     fn raw_value_group_is_id_cssclass_metadata_not_code() {
         let doc =
-            parse_document("@raw(lang:rust){id:snippet1, cssclass:card}[fn main() {}]\n")
-                .unwrap();
+            parse_document("@raw(lang:rust){id:snippet1, cssclass:card}[fn main() {}]\n").unwrap();
         let body = render_body(&doc);
         assert_eq!(
             body,
@@ -2076,7 +2076,11 @@ mod tests {
         };
         let html = render_body_with(&doc, &options);
         let spans = extract_spans(&html);
-        assert_eq!(spans.len(), 2, "expected one span for the heading and one for the paragraph, got {html:?}");
+        assert_eq!(
+            spans.len(),
+            2,
+            "expected one span for the heading and one for the paragraph, got {html:?}"
+        );
         // Each span reaches through its own trailing newline, up to (not
         // including) the blank line that separates it from the next block.
         assert_eq!(&src[spans[0].0..spans[0].1], "=[ Title ]\n");
@@ -2127,7 +2131,9 @@ mod tests {
         let html = render_body(&doc);
 
         assert!(
-            html.contains("<sup><a href=\"#fn-1\" id=\"fnref-1-1\" class=\"footnote-ref\">[1]</a></sup>"),
+            html.contains(
+                "<sup><a href=\"#fn-1\" id=\"fnref-1-1\" class=\"footnote-ref\">[1]</a></sup>"
+            ),
             "expected footnote link in body: {html}"
         );
         assert!(
@@ -2162,7 +2168,8 @@ mod tests {
 
     #[test]
     fn test_renders_wrap_sections() {
-        let src = "=[ Chapter 1 ]\n\nParagraph in chapter.\n\n==[ Section 1.1 ]\n\nNested paragraph.\n";
+        let src =
+            "=[ Chapter 1 ]\n\nParagraph in chapter.\n\n==[ Section 1.1 ]\n\nNested paragraph.\n";
         let doc = parse_document(src).unwrap();
         let options = RenderOptions {
             wrap_sections: true,

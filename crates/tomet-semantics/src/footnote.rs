@@ -1,10 +1,10 @@
 //! Footnote collection, sequential numbering, and cross-reference resolution.
 
+use crate::kind::{ElementKind, classify_std_lenient};
+use crate::positional::normalized_element_args;
 use std::collections::HashMap;
 use tomet_ast::{Document, Element, Placement, Span};
 use tomet_tree::{ValueExt, for_each_element};
-use crate::kind::{ElementKind, classify_std_lenient};
-use crate::positional::normalized_element_args;
 
 /// An individual footnote entry resolved within a document.
 #[derive(Debug, Clone)]
@@ -55,7 +55,8 @@ impl FootnoteRegistry {
                 ElementKind::Footnote => {
                     // Block-placed footnote with ID is a separated definition block,
                     // not an in-text reference occurrence.
-                    let is_block_def = el.placement == Placement::Block && get_element_id(el).is_some();
+                    let is_block_def =
+                        el.placement == Placement::Block && get_element_id(el).is_some();
                     if is_block_def {
                         return;
                     }
@@ -79,7 +80,9 @@ impl FootnoteRegistry {
                         let ref_num = item.backlinks.len() + 1;
                         let backlink_id = format!("fnref-{}-{}", index, ref_num);
                         item.backlinks.push(backlink_id.clone());
-                        registry.span_to_ref.insert(span_key(&el.span), (index, backlink_id));
+                        registry
+                            .span_to_ref
+                            .insert(span_key(&el.span), (index, backlink_id));
                     } else {
                         // Unnamed inline footnote: always a fresh sequential number
                         let index = registry.items.len() + 1;
@@ -90,7 +93,9 @@ impl FootnoteRegistry {
                             definition: Some(el.clone()),
                             backlinks: vec![backlink_id.clone()],
                         });
-                        registry.span_to_ref.insert(span_key(&el.span), (index, backlink_id));
+                        registry
+                            .span_to_ref
+                            .insert(span_key(&el.span), (index, backlink_id));
                     }
                 }
                 ElementKind::Caret => {
@@ -120,7 +125,9 @@ impl FootnoteRegistry {
                         let ref_num = item.backlinks.len() + 1;
                         let backlink_id = format!("fnref-{}-{}", index, ref_num);
                         item.backlinks.push(backlink_id.clone());
-                        registry.span_to_ref.insert(span_key(&el.span), (index, backlink_id));
+                        registry
+                            .span_to_ref
+                            .insert(span_key(&el.span), (index, backlink_id));
                     }
                 }
                 _ => {}
@@ -132,7 +139,9 @@ impl FootnoteRegistry {
 
     /// Look up reference info (index, backlink_id) by element span.
     pub fn get_ref(&self, span: &Span) -> Option<(usize, &str)> {
-        self.span_to_ref.get(&span_key(span)).map(|(idx, backlink)| (*idx, backlink.as_str()))
+        self.span_to_ref
+            .get(&span_key(span))
+            .map(|(idx, backlink)| (*idx, backlink.as_str()))
     }
 }
 

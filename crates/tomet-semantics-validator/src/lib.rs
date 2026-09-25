@@ -221,10 +221,7 @@ fn check_singletons_and_regions(doc: &Document, bindings: &Bindings, errors: &mu
     }
 }
 
-fn validate_section_block(
-    block: &Block,
-    visit: &mut impl FnMut(&Element, bool),
-) {
+fn validate_section_block(block: &Block, visit: &mut impl FnMut(&Element, bool)) {
     match block {
         Block::Element(el) => {
             visit(el, false);

@@ -1,8 +1,6 @@
 use std::str::FromStr;
 
-use lsp_types::{
-    CompletionItemKind, DiagnosticSeverity, HoverContents, Position, Uri,
-};
+use lsp_types::{CompletionItemKind, DiagnosticSeverity, HoverContents, Position, Uri};
 
 use crate::{
     completions_for, completions_for_with_uri, definition_for, diagnostics_for,
@@ -132,8 +130,7 @@ fn format_edits_formats_tables() {
 fn hover_on_table_header_cell() {
     let text = "@table(align: list(left, right, right, left))[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
     // Position on line 1, inside "[ 電子数 2n² ]" (e.g. character 25)
-    let hover =
-        hover_for(text, Position::new(1, 25), None).expect("hover found for table header");
+    let hover = hover_for(text, Position::new(1, 25), None).expect("hover found for table header");
     if let HoverContents::Markup(m) = hover.contents {
         assert!(m.value.contains("Table Header (Column 3)"));
         assert!(m.value.contains("電子数 2n²"));
@@ -165,8 +162,7 @@ fn hover_on_table_data_cell() {
 #[test]
 fn hover_on_table_overview() {
     let text = "@table(align: list(left, right, right, left))[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n]\n";
-    let hover =
-        hover_for(text, Position::new(0, 2), None).expect("hover found for table overview");
+    let hover = hover_for(text, Position::new(0, 2), None).expect("hover found for table overview");
     if let HoverContents::Markup(m) = hover.contents {
         assert!(m.value.contains("Table"));
         assert!(m.value.contains("Rows"));
@@ -201,7 +197,9 @@ fn hover_on_macro_evaluation() {
     let hover = hover_for(text, Position::new(8, 2), None).expect("hover found for $gh");
     if let HoverContents::Markup(m) = hover.contents {
         assert!(m.value.contains("Macro Result"));
-        assert!(m.value.contains("[https://github.com/tomet/tomet/issues/42](https://github.com/tomet/tomet/issues/42)"));
+        assert!(m.value.contains(
+            "[https://github.com/tomet/tomet/issues/42](https://github.com/tomet/tomet/issues/42)"
+        ));
     } else {
         panic!("expected markup contents");
     }
@@ -216,8 +214,7 @@ fn hover_on_macro_evaluation() {
     }
 
     // Hover on ${copyright} (line 12, char 3)
-    let hover3 =
-        hover_for(text, Position::new(12, 3), None).expect("hover found for ${copyright}");
+    let hover3 = hover_for(text, Position::new(12, 3), None).expect("hover found for ${copyright}");
     if let HoverContents::Markup(m) = hover3.contents {
         assert!(m.value.contains("Macro Result"));
         assert!(m.value.contains("(C) 2026 Tomet Projects"));
@@ -326,8 +323,7 @@ fn hover_on_macro_auto_discovered_from_workspace_config() {
     let doc_path = dir.join("10-19 Journal/12 Daily/2024/12/$2024-12-26.tmt");
     std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
     let doc_text = "@embed($youtube_video(\"Pm_h6FnF8HU\"))[Low]\n\n@embed($twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n";
-    let uri =
-        Uri::from_str(&format!("file://{}", doc_path.display()).replace(' ', "%20")).unwrap();
+    let uri = Uri::from_str(&format!("file://{}", doc_path.display()).replace(' ', "%20")).unwrap();
 
     // Hover on youtube_video
     let hover = hover_for(doc_text, Position::new(0, 10), Some(&uri))
@@ -405,8 +401,7 @@ fn hover_on_kind_and_version() {
         panic!("expected markup contents");
     }
 
-    let hover_kind =
-        hover_for(doc_text, Position::new(1, 3), None).expect("hover found for #kind");
+    let hover_kind = hover_for(doc_text, Position::new(1, 3), None).expect("hover found for #kind");
     if let HoverContents::Markup(m) = hover_kind.contents {
         assert!(m.value.contains("Document Kind"));
         assert!(m.value.contains("j.daily"));
@@ -494,21 +489,33 @@ Paragraph in section 1.1.
 Paragraph in section 2.
 "#;
     let ranges = folding_ranges_for(doc_text);
-    assert!(!ranges.is_empty(), "should find folding ranges for sections");
+    assert!(
+        !ranges.is_empty(),
+        "should find folding ranges for sections"
+    );
 
     // Section 1: line 0 to line 4
     let sec1 = ranges.iter().find(|r| r.start_line == 0);
-    assert!(sec1.is_some(), "Section 1 should have a folding range starting at line 0");
+    assert!(
+        sec1.is_some(),
+        "Section 1 should have a folding range starting at line 0"
+    );
     assert_eq!(sec1.unwrap().end_line, 4);
 
     // Section 1.1: line 3 to line 4
     let sec1_1 = ranges.iter().find(|r| r.start_line == 3);
-    assert!(sec1_1.is_some(), "Section 1.1 should have a folding range starting at line 3");
+    assert!(
+        sec1_1.is_some(),
+        "Section 1.1 should have a folding range starting at line 3"
+    );
     assert_eq!(sec1_1.unwrap().end_line, 4);
 
     // Section 2: line 6 to line 7
     let sec2 = ranges.iter().find(|r| r.start_line == 6);
-    assert!(sec2.is_some(), "Section 2 should have a folding range starting at line 6");
+    assert!(
+        sec2.is_some(),
+        "Section 2 should have a folding range starting at line 6"
+    );
     assert_eq!(sec2.unwrap().end_line, 7);
 }
 
@@ -544,4 +551,3 @@ fn main() {
     assert!(code_range.is_some());
     assert_eq!(code_range.unwrap().end_line, 12);
 }
-

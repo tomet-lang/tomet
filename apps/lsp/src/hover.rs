@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
 use tomet_ast::{Document, Element, ElementValue, Value};
-use tomet_semantics::{classify_std_lenient, heading_level, normalized_element_args, ElementKind};
+use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, normalized_element_args};
 use tomet_tree::{ValueExt, Visitor, walk_document};
 
 use crate::format::resolve_effective_config;

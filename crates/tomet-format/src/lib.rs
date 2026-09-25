@@ -750,8 +750,7 @@ fn try_swap_element_groups(
             pos = close + 1;
         } else {
             while pos < end
-                && (bytes[pos].is_ascii_alphanumeric()
-                    || matches!(bytes[pos], b'_' | b'-' | b'.'))
+                && (bytes[pos].is_ascii_alphanumeric() || matches!(bytes[pos], b'_' | b'-' | b'.'))
             {
                 pos += 1;
             }
@@ -1185,10 +1184,7 @@ mod tests {
         let mut config = PrinterConfig::default();
         config.group_order = Some(GroupOrder::ContentFirst);
         let out = format_source_with_config(src, &config);
-        assert_eq!(
-            out,
-            "@parent[\n  @child[Child Text](c_arg)\n](p_arg)\n"
-        );
+        assert_eq!(out, "@parent[\n  @child[Child Text](c_arg)\n](p_arg)\n");
     }
 
     #[test]

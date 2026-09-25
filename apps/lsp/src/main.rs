@@ -130,8 +130,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         .sender
                         .send(Message::Response(Response::new_ok(req.id, result)))?;
                 } else if req.method == FoldingRangeRequest::METHOD {
-                    let params: lsp_types::FoldingRangeParams =
-                        serde_json::from_value(req.params)?;
+                    let params: lsp_types::FoldingRangeParams = serde_json::from_value(req.params)?;
                     let ranges = documents
                         .get(&params.text_document.uri)
                         .map(|text| tomet_lsp::folding_ranges_for(text))
