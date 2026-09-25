@@ -164,7 +164,7 @@ mod tests {
         assert_eq!(parse_value("true").unwrap(), Value::Bool(true));
         assert_eq!(parse_value("false").unwrap(), Value::Bool(false));
         assert_eq!(parse_value("123").unwrap(), Value::Int(123));
-        assert_eq!(parse_value("3.14").unwrap(), Value::Float(3.14));
+        assert_eq!(parse_value("2.5").unwrap(), Value::Float(2.5));
         assert_eq!(
             parse_value("\"hello world\"").unwrap(),
             Value::String("hello world".into())
