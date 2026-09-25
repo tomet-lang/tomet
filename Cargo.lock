@@ -1972,6 +1972,7 @@ dependencies = [
  "tomet-printer",
  "tomet-resolver",
  "tomet-semantics",
+ "tomet-tree",
  "tomet-tui",
  "tomet-typst",
  "tomet-validator",

@@ -25,6 +25,7 @@ tomet-pandoc = { workspace = true }
 tomet-resolver = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-validator = { workspace = true }
+tomet-tree = { workspace = true }
 tomet-tui = { workspace = true }
 tomet-workspace = { workspace = true }
 
