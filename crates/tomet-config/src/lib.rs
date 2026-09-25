@@ -76,18 +76,18 @@ fn collect_paths(value: &Value, out: &mut Vec<String>) {
     match value {
         Value::Seq(items) => {
             for item in items {
-                if let Some(path) = item.as_str() {
-                    if !out.iter().any(|p| p == path) {
-                        out.push(path.to_string());
-                    }
+                if let Some(path) = item.as_str()
+                    && !out.iter().any(|p| p == path)
+                {
+                    out.push(path.to_string());
                 }
             }
         }
         other => {
-            if let Some(path) = other.as_str() {
-                if !out.iter().any(|p| p == path) {
-                    out.push(path.to_string());
-                }
+            if let Some(path) = other.as_str()
+                && !out.iter().any(|p| p == path)
+            {
+                out.push(path.to_string());
             }
         }
     }
@@ -102,10 +102,10 @@ impl PrinterConfig {
     /// Returns the configured group order for a specific element name (e.g. "link"),
     /// falling back to the global `group_order`.
     pub fn element_group_order(&self, element_name: &str) -> Option<GroupOrder> {
-        if element_name == "link" || element_name == "wikilink" {
-            if let Some(order) = self.link_group_order {
-                return Some(order);
-            }
+        if (element_name == "link" || element_name == "wikilink")
+            && let Some(order) = self.link_group_order
+        {
+            return Some(order);
         }
         self.group_order
     }
@@ -179,18 +179,18 @@ impl PrinterConfig {
                             } else if let Some(s) = v.as_str() {
                                 cfg.link_no_space = s == "true" || s == "1";
                             }
-                        } else if k == "group_order" || k == "order" {
-                            if let Some(s) = v.as_str() {
-                                cfg.link_group_order = match s {
-                                    "content_first" | "content_args" | "[]()" | "content" => {
-                                        Some(GroupOrder::ContentFirst)
-                                    }
-                                    "args_first" | "args_content" | "()[]" | "args" => {
-                                        Some(GroupOrder::ArgsFirst)
-                                    }
-                                    _ => None,
-                                };
-                            }
+                        } else if (k == "group_order" || k == "order")
+                            && let Some(s) = v.as_str()
+                        {
+                            cfg.link_group_order = match s {
+                                "content_first" | "content_args" | "[]()" | "content" => {
+                                    Some(GroupOrder::ContentFirst)
+                                }
+                                "args_first" | "args_content" | "()[]" | "args" => {
+                                    Some(GroupOrder::ArgsFirst)
+                                }
+                                _ => None,
+                            };
                         }
                     }
                 } else if let Some(no_space) = value.get("no_space") {
@@ -224,18 +224,18 @@ impl PrinterConfig {
             "element" => {
                 if let Value::Map(map) = value {
                     for (k, v) in map {
-                        if k == "group_order" || k == "order" {
-                            if let Some(s) = v.as_str() {
-                                cfg.group_order = match s {
-                                    "content_first" | "content_args" | "[]()" | "content" => {
-                                        Some(GroupOrder::ContentFirst)
-                                    }
-                                    "args_first" | "args_content" | "()[]" | "args" => {
-                                        Some(GroupOrder::ArgsFirst)
-                                    }
-                                    _ => None,
-                                };
-                            }
+                        if (k == "group_order" || k == "order")
+                            && let Some(s) = v.as_str()
+                        {
+                            cfg.group_order = match s {
+                                "content_first" | "content_args" | "[]()" | "content" => {
+                                    Some(GroupOrder::ContentFirst)
+                                }
+                                "args_first" | "args_content" | "()[]" | "args" => {
+                                    Some(GroupOrder::ArgsFirst)
+                                }
+                                _ => None,
+                            };
                         }
                     }
                 }
@@ -338,19 +338,19 @@ impl PrinterConfig {
             "workspace" => {
                 if let Some(items) = value.get("ignore").and_then(|f| f.as_seq()) {
                     for item in items {
-                        if let Some(s) = item.as_str() {
-                            if !cfg.ignore_files.contains(&s.to_string()) {
-                                cfg.ignore_files.push(s.to_string());
-                            }
+                        if let Some(s) = item.as_str()
+                            && !cfg.ignore_files.contains(&s.to_string())
+                        {
+                            cfg.ignore_files.push(s.to_string());
                         }
                     }
                 }
                 if let Some(items) = value.get("unswept").and_then(|f| f.as_seq()) {
                     for item in items {
-                        if let Some(s) = item.as_str() {
-                            if !cfg.unswept_files.contains(&s.to_string()) {
-                                cfg.unswept_files.push(s.to_string());
-                            }
+                        if let Some(s) = item.as_str()
+                            && !cfg.unswept_files.contains(&s.to_string())
+                        {
+                            cfg.unswept_files.push(s.to_string());
                         }
                     }
                 }
@@ -358,10 +358,10 @@ impl PrinterConfig {
             "ignore" => {
                 if let Some(items) = value.get("files").and_then(|f| f.as_seq()) {
                     for item in items {
-                        if let Some(s) = item.as_str() {
-                            if !cfg.ignore_files.contains(&s.to_string()) {
-                                cfg.ignore_files.push(s.to_string());
-                            }
+                        if let Some(s) = item.as_str()
+                            && !cfg.ignore_files.contains(&s.to_string())
+                        {
+                            cfg.ignore_files.push(s.to_string());
                         }
                     }
                 }
@@ -369,10 +369,10 @@ impl PrinterConfig {
             "ignore.files" => {
                 if let Some(items) = value.as_seq() {
                     for item in items {
-                        if let Some(s) = item.as_str() {
-                            if !cfg.ignore_files.contains(&s.to_string()) {
-                                cfg.ignore_files.push(s.to_string());
-                            }
+                        if let Some(s) = item.as_str()
+                            && !cfg.ignore_files.contains(&s.to_string())
+                        {
+                            cfg.ignore_files.push(s.to_string());
                         }
                     }
                 }
@@ -457,15 +457,15 @@ impl PrinterConfig {
                 cfg.table_adjust_width = Some(s.to_string());
             }
         }
-        if let Some(max_col_width) = map.get("max_col_width") {
-            if let Some(n) = max_col_width.as_i64() {
-                cfg.table_max_col_width = Some(n as usize);
-            }
+        if let Some(max_col_width) = map.get("max_col_width")
+            && let Some(n) = max_col_width.as_i64()
+        {
+            cfg.table_max_col_width = Some(n as usize);
         }
-        if let Some(align) = map.get("align") {
-            if let Some(s) = align.as_str() {
-                cfg.table_align = Some(s.to_string());
-            }
+        if let Some(align) = map.get("align")
+            && let Some(s) = align.as_str()
+        {
+            cfg.table_align = Some(s.to_string());
         }
     }
 }
@@ -546,10 +546,10 @@ pub fn load_config_from_str(src: &str) -> Result<PrinterConfig, ConfigError> {
 /// `always_newline` all live in this repository's own config, the two
 /// disagreed on real documents.
 pub fn config_for(path: Option<&std::path::Path>, src: &str) -> PrinterConfig {
-    if let Some(path) = path {
-        if let Some((cfg, _, _)) = find_config_file(path) {
-            return cfg;
-        }
+    if let Some(path) = path
+        && let Some((cfg, _, _)) = find_config_file(path)
+    {
+        return cfg;
     }
     tomet_parser::parse_document(src)
         .map(|doc| PrinterConfig::from_doc(&doc))
@@ -574,24 +574,24 @@ pub fn find_config_file(
             current.join("tomet.config.tm"),
         ];
         for candidate in candidates {
-            if candidate.exists() {
-                if let Ok(cfg) = load_config_from_file(&candidate) {
-                    // Popping a relative path bottoms out at `""`, which
-                    // is where a config in the current directory is found
-                    // from any relative start. `""` is not a usable root:
-                    // it is neither a file nor a directory, so walking it
-                    // yields nothing and every caller that enumerates from
-                    // it silently gets an empty answer.
-                    // `tomet check-links docs/README.tmt` reported all
-                    // twelve of its links broken for exactly this reason --
-                    // the file set it compared them against was empty.
-                    let root = if current.as_os_str().is_empty() {
-                        std::path::PathBuf::from(".")
-                    } else {
-                        current
-                    };
-                    return Some((cfg, candidate, root));
-                }
+            if candidate.exists()
+                && let Ok(cfg) = load_config_from_file(&candidate)
+            {
+                // Popping a relative path bottoms out at `""`, which
+                // is where a config in the current directory is found
+                // from any relative start. `""` is not a usable root:
+                // it is neither a file nor a directory, so walking it
+                // yields nothing and every caller that enumerates from
+                // it silently gets an empty answer.
+                // `tomet check-links docs/README.tmt` reported all
+                // twelve of its links broken for exactly this reason --
+                // the file set it compared them against was empty.
+                let root = if current.as_os_str().is_empty() {
+                    std::path::PathBuf::from(".")
+                } else {
+                    current
+                };
+                return Some((cfg, candidate, root));
             }
         }
         if !current.pop() {
@@ -643,7 +643,7 @@ mod tests {
 
 +++"#;
         let cfg = load_config_from_str(settings_src).unwrap();
-        assert_eq!(cfg.meta_fields.get("aliases").unwrap().always_newline, true);
+        assert!(cfg.meta_fields.get("aliases").unwrap().always_newline);
         assert_eq!(
             cfg.meta_fields.get("created").unwrap().format.as_deref(),
             Some("rfc3339")

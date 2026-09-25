@@ -29,28 +29,25 @@ pub fn resolve_effective_config(
     let file_path_opt = uri.and_then(uri_to_file_path);
 
     // 1. Merge macros from workspace config file (e.g. default.config.tmt / tomet.config.tmt)
-    if let Some(fp) = &file_path_opt {
-        if let Some((_, cfg_path, _)) = tomet_config::find_config_file(fp) {
-            if let Ok(src) = std::fs::read_to_string(&cfg_path) {
-                if let Ok(cfg_doc) = tomet_parser::parse_document(&src) {
-                    let ext_cfg = tomet_semantics::document_config(&cfg_doc);
-                    for (k, v) in ext_cfg.macros {
-                        config.macros.entry(k).or_insert(v);
-                    }
-                }
-            }
+    if let Some(fp) = &file_path_opt
+        && let Some((_, cfg_path, _)) = tomet_config::find_config_file(fp)
+        && let Ok(src) = std::fs::read_to_string(&cfg_path)
+        && let Ok(cfg_doc) = tomet_parser::parse_document(&src)
+    {
+        let ext_cfg = tomet_semantics::document_config(&cfg_doc);
+        for (k, v) in ext_cfg.macros {
+            config.macros.entry(k).or_insert(v);
         }
     }
 
     // 2. Merge macros from explicit @config(import: ...) / @settings references in the document
     let mut import_targets = config.imports.clone();
     for block in &doc.blocks {
-        if let tomet_ast::Block::Element(el) = block {
-            if let Some(target) = tomet_resolver::config_import_ref(el) {
-                if !import_targets.iter().any(|t| t == target) {
-                    import_targets.push(target.to_string());
-                }
-            }
+        if let tomet_ast::Block::Element(el) = block
+            && let Some(target) = tomet_resolver::config_import_ref(el)
+            && !import_targets.iter().any(|t| t == target)
+        {
+            import_targets.push(target.to_string());
         }
     }
 
@@ -76,12 +73,12 @@ pub fn resolve_effective_config(
         };
         for p in candidate_paths {
             if p.exists() {
-                if let Ok(src) = std::fs::read_to_string(&p) {
-                    if let Ok(ext_doc) = tomet_parser::parse_document(&src) {
-                        let ext_cfg = tomet_semantics::document_config(&ext_doc);
-                        for (k, v) in ext_cfg.macros {
-                            config.macros.entry(k).or_insert(v);
-                        }
+                if let Ok(src) = std::fs::read_to_string(&p)
+                    && let Ok(ext_doc) = tomet_parser::parse_document(&src)
+                {
+                    let ext_cfg = tomet_semantics::document_config(&ext_doc);
+                    for (k, v) in ext_cfg.macros {
+                        config.macros.entry(k).or_insert(v);
                     }
                 }
                 break;

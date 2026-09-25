@@ -173,14 +173,12 @@ fn populate_entries(
         if crate::is_path_unswept(p, Some(config_root), config) {
             continue;
         }
-        let is_dir = entry.file_type().map_or(false, |ft| ft.is_dir());
-        let is_file = entry.file_type().map_or(false, |ft| ft.is_file());
+        let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
+        let is_file = entry.file_type().is_some_and(|ft| ft.is_file());
         if is_dir {
             out.insert(p.to_path_buf(), EntryKind::Dir);
-        } else if is_file {
-            if let Some(kind) = classify_file(p) {
-                out.insert(p.to_path_buf(), kind);
-            }
+        } else if is_file && let Some(kind) = classify_file(p) {
+            out.insert(p.to_path_buf(), kind);
         }
     }
 }

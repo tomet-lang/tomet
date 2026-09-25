@@ -211,18 +211,18 @@ fn normalize(doc: &mut Document, ident: &str, kind: Ident) {
 }
 
 fn rename_element(el: &mut Element, ident: &str) {
-    if let Some(name) = sigil_name_mut(&mut el.sigil) {
-        if name.name == ident {
-            name.name = PLACEHOLDER.to_string();
-        }
+    if let Some(name) = sigil_name_mut(&mut el.sigil)
+        && name.name == ident
+    {
+        name.name = PLACEHOLDER.to_string();
     }
 }
 
 fn rename_namespace(el: &mut Element, ident: &str) {
-    if let Some(name) = sigil_name_mut(&mut el.sigil) {
-        if name.namespace.as_deref() == Some(ident) {
-            name.namespace = Some(PLACEHOLDER.to_string());
-        }
+    if let Some(name) = sigil_name_mut(&mut el.sigil)
+        && name.namespace.as_deref() == Some(ident)
+    {
+        name.namespace = Some(PLACEHOLDER.to_string());
     }
 }
 

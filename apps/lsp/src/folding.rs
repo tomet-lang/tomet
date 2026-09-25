@@ -171,16 +171,16 @@ fn collect_comment_folding_ranges(text: &str, ranges: &mut Vec<FoldingRange>) {
         }
     }
 
-    if let Some(start) = line_comment_start {
-        if last_line_comment > start {
-            ranges.push(FoldingRange {
-                start_line: start,
-                start_character: None,
-                end_line: last_line_comment,
-                end_character: None,
-                kind: Some(FoldingRangeKind::Comment),
-                collapsed_text: None,
-            });
-        }
+    if let Some(start) = line_comment_start
+        && last_line_comment > start
+    {
+        ranges.push(FoldingRange {
+            start_line: start,
+            start_character: None,
+            end_line: last_line_comment,
+            end_character: None,
+            kind: Some(FoldingRangeKind::Comment),
+            collapsed_text: None,
+        });
     }
 }

@@ -317,20 +317,18 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             // than truncated in place.
             if let Some(Inline::Text(t)) = content.first() {
                 let val_trimmed = t.value.trim_start();
-                if val_trimmed.starts_with("[!") {
-                    if let Some(end_bracket) = val_trimmed.find(']') {
-                        let kind_str = val_trimmed[2..end_bracket].trim().to_lowercase();
-                        if !kind_str.is_empty() {
-                            is_callout = true;
-                            variant = kind_str;
-                            let clean_title = val_trimmed[end_bracket + 1..]
-                                .trim_start_matches(|c| {
-                                    c == ' ' || c == '-' || c == '+' || c == '|'
-                                })
-                                .trim();
-                            if !clean_title.is_empty() {
-                                title = Some(clean_title.to_string());
-                            }
+                if val_trimmed.starts_with("[!")
+                    && let Some(end_bracket) = val_trimmed.find(']')
+                {
+                    let kind_str = val_trimmed[2..end_bracket].trim().to_lowercase();
+                    if !kind_str.is_empty() {
+                        is_callout = true;
+                        variant = kind_str;
+                        let clean_title = val_trimmed[end_bracket + 1..]
+                            .trim_start_matches(|c| c == ' ' || c == '-' || c == '+' || c == '|')
+                            .trim();
+                        if !clean_title.is_empty() {
+                            title = Some(clean_title.to_string());
                         }
                     }
                 }
@@ -432,52 +430,54 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 // `tomet-ast` only, not `tomet-parser`), so its
                 // inner text becomes a bare string marker rather than a
                 // fully parsed `Value`.
-                if marker.is_none() {
-                    if let Some(Inline::Text(t)) = content.first_mut() {
-                        let s = t.value.trim_start();
-                        if s.starts_with('(') {
-                            if let Some(close_idx) = s.find(')') {
-                                if close_idx >= 1 && s[close_idx..].starts_with(") ") {
-                                    let inner = &s[1..close_idx];
-                                    marker = Some(Value::String(inner.to_string()));
-                                    let remainder = s[close_idx + 2..].to_string();
-                                    t.value = remainder;
-                                }
+                if marker.is_none()
+                    && let Some(Inline::Text(t)) = content.first_mut()
+                {
+                    let s = t.value.trim_start();
+                    if s.starts_with('(') {
+                        if let Some(close_idx) = s.find(')')
+                            && close_idx >= 1
+                            && s[close_idx..].starts_with(") ")
+                        {
+                            let inner = &s[1..close_idx];
+                            marker = Some(Value::String(inner.to_string()));
+                            let remainder = s[close_idx + 2..].to_string();
+                            t.value = remainder;
+                        }
+                    } else if s.starts_with('[')
+                        && let Some(close_idx) = s.find(']')
+                    {
+                        let is_marker = if close_idx >= 1 {
+                            if s[close_idx..].starts_with("] ") {
+                                Some(close_idx + 2)
+                            } else if close_idx == s.len() - 1 {
+                                Some(close_idx + 1)
+                            } else {
+                                None
                             }
-                        } else if s.starts_with('[') {
-                            if let Some(close_idx) = s.find(']') {
-                                let is_marker = if close_idx >= 1 {
-                                    if s[close_idx..].starts_with("] ") {
-                                        Some(close_idx + 2)
-                                    } else if close_idx == s.len() - 1 {
-                                        Some(close_idx + 1)
-                                    } else {
-                                        None
-                                    }
+                        } else {
+                            None
+                        };
+                        if let Some(after_idx) = is_marker {
+                            let inner = &s[1..close_idx];
+                            if !inner.starts_with('[') {
+                                let marker_val = if inner.is_empty() || inner == " " {
+                                    " "
                                 } else {
-                                    None
+                                    inner
                                 };
-                                if let Some(after_idx) = is_marker {
-                                    let inner = &s[1..close_idx];
-                                    if !inner.starts_with('[') {
-                                        let marker_val = if inner.is_empty() || inner == " " {
-                                            " "
-                                        } else {
-                                            inner
-                                        };
-                                        marker = Some(Value::String(marker_val.to_string()));
-                                        let remainder = s[after_idx..].to_string();
-                                        t.value = remainder;
-                                    }
-                                }
+                                marker = Some(Value::String(marker_val.to_string()));
+                                let remainder = s[after_idx..].to_string();
+                                t.value = remainder;
                             }
                         }
                     }
                 }
-                if let Some(Inline::Text(t)) = content.first() {
-                    if t.value.is_empty() && content.len() > 1 {
-                        content.remove(0);
-                    }
+                if let Some(Inline::Text(t)) = content.first()
+                    && t.value.is_empty()
+                    && content.len() > 1
+                {
+                    content.remove(0);
                 }
                 items.push(element_list_item(
                     content,
@@ -1169,7 +1169,7 @@ mod tests {
             };
             let has_raw = p.content.iter().any(|inl| match inl {
                 Inline::Element(el) if el.sigil.is_bare_named("raw") => {
-                    el.content.as_ref().map_or(false, |c| match &c[0] {
+                    el.content.as_ref().is_some_and(|c| match &c[0] {
                         Inline::Raw(r) => r.value == expected_code,
                         _ => false,
                     })

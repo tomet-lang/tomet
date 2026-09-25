@@ -57,7 +57,7 @@ pub(super) fn render_explorer_view(f: &mut Frame, app: &mut App, area: Rect) {
                     .migration_items
                     .iter()
                     .find(|i| i.source_path == node.path)
-                    .map_or(false, |i| i.converted);
+                    .is_some_and(|i| i.converted);
                 let status = if converted { " (DONE)" } else { "" };
                 vec![
                     Span::raw(indent),

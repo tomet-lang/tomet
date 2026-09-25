@@ -38,10 +38,10 @@ impl FootnoteRegistry {
         // Pass 1: Collect definitions (@footnote(id))
         let mut defs: HashMap<String, Element> = HashMap::new();
         for_each_element(doc, |el| {
-            if classify_std_lenient(el) == ElementKind::Footnote {
-                if let Some(id) = get_element_id(el) {
-                    defs.insert(id, el.clone());
-                }
+            if classify_std_lenient(el) == ElementKind::Footnote
+                && let Some(id) = get_element_id(el)
+            {
+                defs.insert(id, el.clone());
             }
         });
 
@@ -101,10 +101,10 @@ impl FootnoteRegistry {
                 ElementKind::Caret => {
                     // Check target kind filter: None or "footnote"
                     let target_kind = el.sigil.caret_target_kind();
-                    if let Some(target) = target_kind {
-                        if target.name != "footnote" {
-                            return;
-                        }
+                    if let Some(target) = target_kind
+                        && target.name != "footnote"
+                    {
+                        return;
                     }
                     if let Some(id_str) = get_element_id(el) {
                         let index = if let Some(&idx) = id_to_index.get(&id_str) {

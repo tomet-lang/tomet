@@ -67,12 +67,11 @@ impl App {
             return None;
         }
         let vis = self.visible_tree_indices();
-        if let Some(&real_idx) = vis.get(self.tree_index) {
-            if let Some(node) = self.tree_nodes.get(real_idx) {
-                if !node.is_dir {
-                    return Some(node.path.clone());
-                }
-            }
+        if let Some(&real_idx) = vis.get(self.tree_index)
+            && let Some(node) = self.tree_nodes.get(real_idx)
+            && !node.is_dir
+        {
+            return Some(node.path.clone());
         }
         None
     }
@@ -99,12 +98,11 @@ impl App {
     }
 
     pub(super) fn explorer_toggle_select(&mut self) {
-        if let Some(&real_idx) = self.visible_tree_indices().get(self.tree_index) {
-            if let Some(node) = self.tree_nodes.get_mut(real_idx) {
-                if node.is_dir {
-                    node.expanded = !node.expanded;
-                }
-            }
+        if let Some(&real_idx) = self.visible_tree_indices().get(self.tree_index)
+            && let Some(node) = self.tree_nodes.get_mut(real_idx)
+            && node.is_dir
+        {
+            node.expanded = !node.expanded;
         }
         self.refresh_status();
     }

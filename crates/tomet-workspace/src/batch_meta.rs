@@ -30,12 +30,12 @@ impl MetaFile {
 
     /// Loads source content and extracts metadata lazily if not already loaded.
     pub fn ensure_loaded(&mut self) {
-        if self.original_src.is_empty() {
-            if let Ok(src) = fs::read_to_string(&self.path) {
-                self.metadata = extract_metadata(&src);
-                self.modified_src = src.clone();
-                self.original_src = src;
-            }
+        if self.original_src.is_empty()
+            && let Ok(src) = fs::read_to_string(&self.path)
+        {
+            self.metadata = extract_metadata(&src);
+            self.modified_src = src.clone();
+            self.original_src = src;
         }
     }
 
@@ -76,11 +76,11 @@ impl BatchMetaEngine {
     ) {
         for file in files.iter_mut() {
             file.ensure_loaded();
-            if let Ok(mut doc) = parse_document(&file.original_src) {
-                if set_meta_in_doc(&mut doc, target_element, key, new_value) {
-                    file.modified_src = document_to_tm(&doc);
-                    file.metadata = extract_metadata(&file.modified_src);
-                }
+            if let Ok(mut doc) = parse_document(&file.original_src)
+                && set_meta_in_doc(&mut doc, target_element, key, new_value)
+            {
+                file.modified_src = document_to_tm(&doc);
+                file.metadata = extract_metadata(&file.modified_src);
             }
         }
     }

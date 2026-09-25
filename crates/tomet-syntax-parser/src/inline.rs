@@ -654,17 +654,15 @@ fn split_softbreaks(
                 break;
             }
         }
-        if fold_pipes {
-            if let Some(&(j, '|')) = chars.peek() {
-                gap_end = j + '|'.len_utf8();
-                chars.next();
-                while let Some(&(k, wc)) = chars.peek() {
-                    if matches!(wc, ' ' | '\t') {
-                        gap_end = k + wc.len_utf8();
-                        chars.next();
-                    } else {
-                        break;
-                    }
+        if fold_pipes && let Some(&(j, '|')) = chars.peek() {
+            gap_end = j + '|'.len_utf8();
+            chars.next();
+            while let Some(&(k, wc)) = chars.peek() {
+                if matches!(wc, ' ' | '\t') {
+                    gap_end = k + wc.len_utf8();
+                    chars.next();
+                } else {
+                    break;
                 }
             }
         }

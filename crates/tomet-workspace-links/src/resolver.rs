@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn test_single_candidate_resolution() {
-        let index = VaultLinkIndex::from_paths(&[
+        let index = VaultLinkIndex::from_paths([
             "30-39 Knowledge/Linux.tmt",
             "10-19 Journal/daily/2026-09-09.tmt",
         ]);
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn test_proximity_matching_for_duplicate_names() {
-        let index = VaultLinkIndex::from_paths(&[
+        let index = VaultLinkIndex::from_paths([
             "00-09 System/memo.tmt",
             "10-19 Journal/daily/memo.tmt",
             "50-59 Sandbox/memo.tmt",
@@ -238,13 +238,13 @@ mod tests {
 
     #[test]
     fn test_unresolved_returns_none() {
-        let index = VaultLinkIndex::from_paths(&["30-39 Knowledge/Linux.tmt"]);
+        let index = VaultLinkIndex::from_paths(["30-39 Knowledge/Linux.tmt"]);
         assert_eq!(index.resolve_ref("NonExistentNote", None), None);
     }
 
     #[test]
     fn test_image_and_proximity_resolution() {
-        let index = VaultLinkIndex::from_paths(&[
+        let index = VaultLinkIndex::from_paths([
             "30-39 Knowledge/38 Geograph/ミーム/大沢たかお祭り.tmt",
             "30-39 Knowledge/38 Geograph/ミーム/-/+8c3002a8a891b78137b6547f600a88141a828640.png",
             "50-59 Sandbox/51 Database/ゲーム/Dorfromantik.tmt",
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_relative_path_resolution() {
-        let index = VaultLinkIndex::from_paths(&[
+        let index = VaultLinkIndex::from_paths([
             "docs/guide/index.tmt",
             "docs/guide/images/diagram.png",
             "docs/assets/logo.svg",

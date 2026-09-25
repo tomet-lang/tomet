@@ -28,13 +28,13 @@ pub(crate) fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inl
             }
         }
         "footnote" => {
-            if inline || el.placement == tomet_ast::Placement::Inline {
-                if let Some((idx, backlink)) = cx.footnotes.get_ref(&el.span) {
-                    out.push_str(&format!(
-                        "<sup><a href=\"#fn-{}\" id=\"{}\" class=\"footnote-ref\">[{}]</a></sup>",
-                        idx, backlink, idx
-                    ));
-                }
+            if (inline || el.placement == tomet_ast::Placement::Inline)
+                && let Some((idx, backlink)) = cx.footnotes.get_ref(&el.span)
+            {
+                out.push_str(&format!(
+                    "<sup><a href=\"#fn-{}\" id=\"{}\" class=\"footnote-ref\">[{}]</a></sup>",
+                    idx, backlink, idx
+                ));
             }
         }
         "caret" => {

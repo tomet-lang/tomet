@@ -105,10 +105,10 @@ fn render_list_with_indent(cx: &MarkdownCtx, el: &Element, indent: usize, out: &
         out.push('\n');
         if let Some(children) = &item.children {
             for child in children {
-                if let Block::Element(sub) = child {
-                    if list_ordered(sub).is_some() {
-                        render_list_with_indent(cx, sub, indent + 1, out);
-                    }
+                if let Block::Element(sub) = child
+                    && list_ordered(sub).is_some()
+                {
+                    render_list_with_indent(cx, sub, indent + 1, out);
                 }
             }
         }
@@ -400,16 +400,17 @@ fn render_callout(cx: &MarkdownCtx, el: &Element) -> String {
                         if let Value::String(s) = v {
                             variant = Some(s.clone());
                         }
-                    } else if k == "title" {
-                        if let Value::String(s) = v {
-                            title = Some(s.clone());
-                        }
+                    } else if k == "title"
+                        && let Value::String(s) = v
+                    {
+                        title = Some(s.clone());
                     }
                 }
-                if variant.is_none() && !entries.is_empty() {
-                    if let Value::String(s) = &entries[0].1 {
-                        variant = Some(s.clone());
-                    }
+                if variant.is_none()
+                    && !entries.is_empty()
+                    && let Value::String(s) = &entries[0].1
+                {
+                    variant = Some(s.clone());
                 }
             }
             Value::Seq(items) => {

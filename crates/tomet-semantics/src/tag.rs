@@ -9,12 +9,12 @@ pub fn extract_tags(el: &Element) -> Vec<String> {
     if let Some(args) = &el.args {
         extract_tags_from_value(args, &mut tags);
     }
-    if tags.is_empty() {
-        if let Some(content) = &el.content {
-            let s = inlines_to_plain(content);
-            if !s.trim().is_empty() {
-                tags.push(s.trim().to_string());
-            }
+    if tags.is_empty()
+        && let Some(content) = &el.content
+    {
+        let s = inlines_to_plain(content);
+        if !s.trim().is_empty() {
+            tags.push(s.trim().to_string());
         }
     }
     tags

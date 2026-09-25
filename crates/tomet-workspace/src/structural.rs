@@ -35,12 +35,12 @@ impl StructuralEngine {
         let paths = tomet_indexer::collect_tm_files_with_config(dir, config, config_root);
 
         for path in paths {
-            if let Ok(src) = fs::read_to_string(&path) {
-                if let Ok(doc) = parse_document(&src) {
-                    let count = count_structural_matches(&doc, query);
-                    if count > 0 {
-                        matches.push(FileDiff::new(path, src.clone(), src, count));
-                    }
+            if let Ok(src) = fs::read_to_string(&path)
+                && let Ok(doc) = parse_document(&src)
+            {
+                let count = count_structural_matches(&doc, query);
+                if count > 0 {
+                    matches.push(FileDiff::new(path, src.clone(), src, count));
                 }
             }
         }

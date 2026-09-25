@@ -59,25 +59,22 @@ pub fn is_iso8601(s: &str) -> bool {
         if bytes.len() == 10 {
             return true;
         }
-        if bytes[10] == b'T' || bytes[10] == b' ' {
-            if bytes.len() >= 16 && bytes[13] == b':' {
-                let is_hh_mm = s[11..13].chars().all(|c| c.is_ascii_digit())
-                    && s[14..16].chars().all(|c| c.is_ascii_digit());
-                if !is_hh_mm {
-                    return false;
-                }
-                if bytes.len() == 16 {
-                    return true;
-                }
-                if bytes.len() >= 19 && bytes[16] == b':' {
-                    let is_ss = s[17..19].chars().all(|c| c.is_ascii_digit());
-                    return is_ss;
-                }
-                // Also true for YYYY-MM-DDTHH:MM+09:00 or similar
-                if bytes.len() > 16 && (bytes[16] == b'+' || bytes[16] == b'-' || bytes[16] == b'Z')
-                {
-                    return true;
-                }
+        if (bytes[10] == b'T' || bytes[10] == b' ') && bytes.len() >= 16 && bytes[13] == b':' {
+            let is_hh_mm = s[11..13].chars().all(|c| c.is_ascii_digit())
+                && s[14..16].chars().all(|c| c.is_ascii_digit());
+            if !is_hh_mm {
+                return false;
+            }
+            if bytes.len() == 16 {
+                return true;
+            }
+            if bytes.len() >= 19 && bytes[16] == b':' {
+                let is_ss = s[17..19].chars().all(|c| c.is_ascii_digit());
+                return is_ss;
+            }
+            // Also true for YYYY-MM-DDTHH:MM+09:00 or similar
+            if bytes.len() > 16 && (bytes[16] == b'+' || bytes[16] == b'-' || bytes[16] == b'Z') {
+                return true;
             }
         }
     }

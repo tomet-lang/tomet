@@ -28,31 +28,33 @@ pub struct StructuralMatch {
 /// Checks if a single element matches `query`.
 pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
     let kind = classify_std_lenient(el);
-    if let Some(target_tag) = &query.tag {
-        if !target_tag.is_empty() && !kind.as_str().eq_ignore_ascii_case(target_tag) {
-            return false;
-        }
+    if let Some(target_tag) = &query.tag
+        && !target_tag.is_empty()
+        && !kind.as_str().eq_ignore_ascii_case(target_tag)
+    {
+        return false;
     }
 
-    if let Some(target_key) = &query.key {
-        if !target_key.is_empty() && !el.has_prop_key(target_key) {
-            return false;
-        }
+    if let Some(target_key) = &query.key
+        && !target_key.is_empty()
+        && !el.has_prop_key(target_key)
+    {
+        return false;
     }
 
-    if let Some(sub) = &query.value_contains {
-        if !sub.is_empty() {
-            let in_args = el.args.as_ref().is_some_and(|v| value_contains_str(v, sub));
-            let in_val = el.value.as_ref().is_some_and(|v| match v {
-                ElementValue::Group(_) => v
-                    .as_data()
-                    .is_some_and(|data| value_contains_str(&data, sub)),
-                ElementValue::Raw(body) => body.contains(sub),
-                ElementValue::Interp(_) => false,
-            });
-            if !in_args && !in_val {
-                return false;
-            }
+    if let Some(sub) = &query.value_contains
+        && !sub.is_empty()
+    {
+        let in_args = el.args.as_ref().is_some_and(|v| value_contains_str(v, sub));
+        let in_val = el.value.as_ref().is_some_and(|v| match v {
+            ElementValue::Group(_) => v
+                .as_data()
+                .is_some_and(|data| value_contains_str(&data, sub)),
+            ElementValue::Raw(body) => body.contains(sub),
+            ElementValue::Interp(_) => false,
+        });
+        if !in_args && !in_val {
+            return false;
         }
     }
 

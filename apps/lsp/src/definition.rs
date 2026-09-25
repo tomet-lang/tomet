@@ -25,18 +25,18 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
                 // Check whether it carries an `id` arg
                 if let Some(Value::Map(entries)) = &el.args {
                     for (k, v) in entries {
-                        if k == "id" {
-                            if let Value::String(s) = v {
-                                self.ref_id = Some(s.clone());
-                            }
+                        if k == "id"
+                            && let Value::String(s) = v
+                        {
+                            self.ref_id = Some(s.clone());
                         }
                     }
                 }
                 // Or if it's an interpolation expression ${id}
-                if let Some(ElementValue::Interp(expr)) = &el.value {
-                    if let InterpExprKind::Identifier(id) = &expr.kind {
-                        self.ref_id = Some(id.clone());
-                    }
+                if let Some(ElementValue::Interp(expr)) = &el.value
+                    && let InterpExprKind::Identifier(id) = &expr.kind
+                {
+                    self.ref_id = Some(id.clone());
                 }
             }
             ControlFlow::Continue(())
@@ -69,12 +69,11 @@ fn find_def_in_blocks(blocks: &[tomet_ast::Block], target_id: &str) -> Option<Sp
             tomet_ast::Block::Section(sec) => {
                 if let Some(Value::Map(entries)) = section_attrs(sec) {
                     for (k, v) in entries {
-                        if k == "id" {
-                            if let Value::String(s) = v {
-                                if s == target_id {
-                                    return Some(sec.span);
-                                }
-                            }
+                        if k == "id"
+                            && let Value::String(s) = v
+                            && s == target_id
+                        {
+                            return Some(sec.span);
                         }
                     }
                 }
@@ -94,10 +93,10 @@ fn find_def_in_blocks(blocks: &[tomet_ast::Block], target_id: &str) -> Option<Sp
             }
             tomet_ast::Block::Paragraph(p) => {
                 for inline in &p.content {
-                    if let tomet_ast::Inline::Element(el) = inline {
-                        if let Some(span) = find_def_in_element(el, target_id) {
-                            return Some(span);
-                        }
+                    if let tomet_ast::Inline::Element(el) = inline
+                        && let Some(span) = find_def_in_element(el, target_id)
+                    {
+                        return Some(span);
                     }
                 }
             }
@@ -109,28 +108,27 @@ fn find_def_in_blocks(blocks: &[tomet_ast::Block], target_id: &str) -> Option<Sp
 fn find_def_in_element(el: &Element, target_id: &str) -> Option<Span> {
     if let Some(Value::Map(entries)) = el.attrs_view() {
         for (k, v) in entries {
-            if k == "id" {
-                if let Value::String(s) = v {
-                    if s == target_id {
-                        return Some(el.span);
-                    }
-                }
+            if k == "id"
+                && let Value::String(s) = v
+                && s == target_id
+            {
+                return Some(el.span);
             }
         }
     }
     if let Some(content) = &el.content {
         for inline in content {
-            if let tomet_ast::Inline::Element(child_el) = inline {
-                if let Some(span) = find_def_in_element(child_el, target_id) {
-                    return Some(span);
-                }
+            if let tomet_ast::Inline::Element(child_el) = inline
+                && let Some(span) = find_def_in_element(child_el, target_id)
+            {
+                return Some(span);
             }
         }
     }
-    if let Some(children) = &el.children {
-        if let Some(span) = find_def_in_blocks(children, target_id) {
-            return Some(span);
-        }
+    if let Some(children) = &el.children
+        && let Some(span) = find_def_in_blocks(children, target_id)
+    {
+        return Some(span);
     }
     for conn in &el.connects {
         if let Some(span) = find_def_in_element(conn, target_id) {

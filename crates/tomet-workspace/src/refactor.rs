@@ -55,16 +55,12 @@ pub fn refactor_document(
         total_changes += transform_link_targets_with_macros(doc, &macro_set);
     }
 
-    if options.meta_type_to_kind {
-        if promote_meta_type_to_kind(doc) {
-            total_changes += 1;
-        }
+    if options.meta_type_to_kind && promote_meta_type_to_kind(doc) {
+        total_changes += 1;
     }
 
-    if options.meta_to_value_dsl {
-        if normalize_embedded_to_value_dsl(doc) {
-            total_changes += 1;
-        }
+    if options.meta_to_value_dsl && normalize_embedded_to_value_dsl(doc) {
+        total_changes += 1;
     }
 
     total_changes

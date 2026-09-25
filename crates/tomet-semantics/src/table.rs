@@ -139,18 +139,18 @@ fn trim_inlines(inlines: &mut Vec<Inline>) {
     if let Some(Inline::Text(t)) = inlines.first_mut() {
         t.value = t.value.trim_start().to_string();
     }
-    if let Some(Inline::Text(t)) = inlines.first() {
-        if t.value.is_empty() {
-            inlines.remove(0);
-        }
+    if let Some(Inline::Text(t)) = inlines.first()
+        && t.value.is_empty()
+    {
+        inlines.remove(0);
     }
     if let Some(Inline::Text(t)) = inlines.last_mut() {
         t.value = t.value.trim_end().to_string();
     }
-    if let Some(Inline::Text(t)) = inlines.last() {
-        if t.value.is_empty() {
-            inlines.pop();
-        }
+    if let Some(Inline::Text(t)) = inlines.last()
+        && t.value.is_empty()
+    {
+        inlines.pop();
     }
 }
 

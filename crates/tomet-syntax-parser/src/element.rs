@@ -464,10 +464,8 @@ pub(crate) fn peek_trailing_attrs(cur: &Cursor) -> Option<(usize, usize)> {
     // guess) is the only way to know without duplicating
     // `parse_element`'s own claiming logic.
     let mut probe = *cur;
-    let landed_at_pos = matches!(
-        parse_inline_seq(&mut probe, Stop::Offset(content_stop), false),
-        Ok(_) if probe.pos() == content_stop
-    );
+    let landed_at_pos = parse_inline_seq(&mut probe, Stop::Offset(content_stop), false).is_ok()
+        && (probe.pos() == content_stop);
     if !landed_at_pos {
         return None;
     }

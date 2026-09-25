@@ -36,7 +36,7 @@ fn parses_list_value_markers_and_trailing_attrs() {
             assert_eq!(items[0].content, Some(vec![Inline::Text("todo".into())]));
             assert_eq!(items[0].args, Some(Value::String("T".into())));
             assert_eq!(
-                item_attrs(&items[0]),
+                item_attrs(items[0]),
                 Some(Value::Map(vec![(
                     "tag".into(),
                     Value::String("dev".into())
@@ -49,7 +49,7 @@ fn parses_list_value_markers_and_trailing_attrs() {
             );
             assert_eq!(items[1].args, Some(Value::String("?".into())));
             assert_eq!(
-                item_attrs(&items[1]),
+                item_attrs(items[1]),
                 Some(Value::Map(vec![(
                     "id".into(),
                     Value::String("task1".into())
@@ -90,7 +90,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
         Block::Element(list) => {
             let items = list_items(list);
             assert_eq!(items.len(), 1, "{bare:?}");
-            assert_eq!(item_attrs(&items[0]), None, "{bare:?}");
+            assert_eq!(item_attrs(items[0]), None, "{bare:?}");
             match items[0].content.as_deref() {
                 Some([Inline::Element(link)]) => {
                     assert_eq!(link.sigil, Sigil::named("link"), "{bare:?}");
@@ -119,7 +119,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
                 let items = list_items(list);
                 assert_eq!(items.len(), 1, "{src:?}");
                 assert_eq!(
-                    item_attrs(&items[0]),
+                    item_attrs(items[0]),
                     Some(Value::Map(vec![(
                         "id".into(),
                         Value::String("breakfast".into())
@@ -159,7 +159,7 @@ fn list_item_colon_connect_supports_an_empty_braced_value() {
             let items = list_items(list);
             assert_eq!(items.len(), 1);
             assert_eq!(items[0].content, Some(vec![Inline::Text("xxxxxx".into())]));
-            assert_eq!(item_attrs(&items[0]), Some(Value::Map(vec![])));
+            assert_eq!(item_attrs(items[0]), Some(Value::Map(vec![])));
         }
         other => panic!("expected list, got {other:?}"),
     }

@@ -146,9 +146,9 @@ fn find_next_format_yaml_body(s: &str) -> Option<(usize, usize)> {
             if run >= 3 {
                 let head_end = close_paren + 1 + run;
                 // Skip to just past the newline ending the head line.
-                let body_start = match s[head_end..].find('\n') {
-                    Some(nl) => head_end + nl + 1,
-                    None => return None,
+                let body_start = {
+                    let nl = s[head_end..].find('\n')?;
+                    head_end + nl + 1
                 };
                 let closer = "+".repeat(run);
                 let mut scan = body_start;
@@ -386,10 +386,8 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
                     {
                         break;
                     }
-                } else if is_pipe_table {
-                    if t_trimmed.is_empty() || !t_trimmed.starts_with('|') {
-                        break;
-                    }
+                } else if is_pipe_table && (t_trimmed.is_empty() || !t_trimmed.starts_with('|')) {
+                    break;
                 }
 
                 if let Some((prefix, cells)) = extract_row_cells(t_line) {
@@ -509,36 +507,36 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
 
 fn extract_table_alignments(header_line: &str, default_align: Option<&str>) -> Vec<String> {
     let def = default_align.unwrap_or("left");
-    if let Some(args_start) = header_line.find('(') {
-        if let Some(args_end) = header_line[args_start..].find(')') {
-            let args = &header_line[args_start + 1..args_start + args_end];
-            if let Some(pos) = args.find("align:") {
-                let val = args[pos + 6..].trim();
-                if val.starts_with('[') {
-                    if let Some(end_bracket) = val.find(']') {
-                        let inner = &val[1..end_bracket];
-                        let mut aligns = Vec::new();
-                        for item in inner.split(',') {
-                            let a = item.trim().trim_matches('"').trim_matches('\'');
-                            if !a.is_empty() {
-                                aligns.push(a.to_string());
-                            }
-                        }
-                        if !aligns.is_empty() {
-                            return aligns;
+    if let Some(args_start) = header_line.find('(')
+        && let Some(args_end) = header_line[args_start..].find(')')
+    {
+        let args = &header_line[args_start + 1..args_start + args_end];
+        if let Some(pos) = args.find("align:") {
+            let val = args[pos + 6..].trim();
+            if val.starts_with('[') {
+                if let Some(end_bracket) = val.find(']') {
+                    let inner = &val[1..end_bracket];
+                    let mut aligns = Vec::new();
+                    for item in inner.split(',') {
+                        let a = item.trim().trim_matches('"').trim_matches('\'');
+                        if !a.is_empty() {
+                            aligns.push(a.to_string());
                         }
                     }
-                } else {
-                    let a = val
-                        .split(',')
-                        .next()
-                        .unwrap_or("")
-                        .trim()
-                        .trim_matches('"')
-                        .trim_matches('\'');
-                    if !a.is_empty() {
-                        return vec![a.to_string(); 50];
+                    if !aligns.is_empty() {
+                        return aligns;
                     }
+                }
+            } else {
+                let a = val
+                    .split(',')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'');
+                if !a.is_empty() {
+                    return vec![a.to_string(); 50];
                 }
             }
         }
@@ -555,8 +553,7 @@ fn extract_row_cells(line: &str) -> Option<(String, Vec<String>)> {
     let indent = &line[..indent_len];
     let rest = &line[indent_len..];
 
-    let (prefix, cells_part) = if rest.starts_with('|') {
-        let after_pipe = &rest[1..];
+    let (prefix, cells_part) = if let Some(after_pipe) = rest.strip_prefix('|') {
         let spaces_len = after_pipe.len() - after_pipe.trim_start().len();
         let space_str = if spaces_len > 0 {
             &after_pipe[..spaces_len]
@@ -686,19 +683,19 @@ fn find_swap_in_inline(inline: &Inline, src: &str, config: &PrinterConfig) -> Op
 fn check_and_swap_element(el: &Element, src: &str, config: &PrinterConfig) -> Option<String> {
     // 1. Check if this element itself needs swapping
     let elem_name = el.sigil.name().map(|n| n.name.as_str()).unwrap_or("");
-    if let Some(order) = config.element_group_order(elem_name) {
-        if matches!(el.sigil, Sigil::Named(_) | Sigil::Caret(_))
-            && el.args.is_some()
-            && el.content.is_some()
-            && !el.span.is_dummy()
+    if let Some(order) = config.element_group_order(elem_name)
+        && matches!(el.sigil, Sigil::Named(_) | Sigil::Caret(_))
+        && el.args.is_some()
+        && el.content.is_some()
+        && !el.span.is_dummy()
+    {
+        let start = el.span.start.offset;
+        let end = el.span.end.offset;
+        if start < end
+            && end <= src.len()
+            && let Some(swapped) = try_swap_element_groups(src, start, end, order)
         {
-            let start = el.span.start.offset;
-            let end = el.span.end.offset;
-            if start < end && end <= src.len() {
-                if let Some(swapped) = try_swap_element_groups(src, start, end, order) {
-                    return Some(swapped);
-                }
-            }
+            return Some(swapped);
         }
     }
 
@@ -826,13 +823,12 @@ fn is_raw_element(el: &Element) -> bool {
     if el.sigil.is_bare_named("raw") {
         return true;
     }
-    if let Some(Value::Map(entries)) = &el.args {
-        if entries
+    if let Some(Value::Map(entries)) = &el.args
+        && entries
             .iter()
             .any(|(k, v)| k == "content" && matches!(v, Value::String(s) if s == "raw"))
-        {
-            return true;
-        }
+    {
+        return true;
     }
     false
 }
@@ -876,13 +872,13 @@ fn collect_fence_spans(src: &str, out: &mut Vec<(usize, usize)>) {
 
 fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
     fn walk_element(el: &Element, out: &mut Vec<(usize, usize)>) {
-        if is_raw_element(el) {
-            if let Some(inlines) = &el.content {
-                for inline in inlines {
-                    let span = inline.span();
-                    if span.start.offset < span.end.offset {
-                        out.push((span.start.offset, span.end.offset));
-                    }
+        if is_raw_element(el)
+            && let Some(inlines) = &el.content
+        {
+            for inline in inlines {
+                let span = inline.span();
+                if span.start.offset < span.end.offset {
+                    out.push((span.start.offset, span.end.offset));
                 }
             }
         }

@@ -198,31 +198,29 @@ impl App {
             return;
         }
         let vis = self.visible_tree_indices();
-        if let Some(&real_idx) = vis.get(self.tree_index) {
-            if let Some(node) = self.tree_nodes.get(real_idx) {
-                if !node.is_dir {
-                    if let Ok(src) = std::fs::read_to_string(&node.path) {
-                        let lines: Vec<String> = src.lines().map(|s| s.to_string()).collect();
-                        let lines = if lines.is_empty() {
-                            vec![String::new()]
-                        } else {
-                            lines
-                        };
-                        self.inline_editor = Some(InlineEditor {
-                            file_path: node.path.clone(),
-                            lines,
-                            cursor_row: 0,
-                            cursor_col: 0,
-                            is_dirty: false,
-                        });
-                        self.focused_pane = FocusedPane::Preview;
-                        self.status_message = format!(
-                            "EDITING {}: Press [Ctrl+S] Save, [Esc] Exit edit mode.",
-                            node.name
-                        );
-                    }
-                }
-            }
+        if let Some(&real_idx) = vis.get(self.tree_index)
+            && let Some(node) = self.tree_nodes.get(real_idx)
+            && !node.is_dir
+            && let Ok(src) = std::fs::read_to_string(&node.path)
+        {
+            let lines: Vec<String> = src.lines().map(|s| s.to_string()).collect();
+            let lines = if lines.is_empty() {
+                vec![String::new()]
+            } else {
+                lines
+            };
+            self.inline_editor = Some(InlineEditor {
+                file_path: node.path.clone(),
+                lines,
+                cursor_row: 0,
+                cursor_col: 0,
+                is_dirty: false,
+            });
+            self.focused_pane = FocusedPane::Preview;
+            self.status_message = format!(
+                "EDITING {}: Press [Ctrl+S] Save, [Esc] Exit edit mode.",
+                node.name
+            );
         }
     }
 
@@ -260,15 +258,14 @@ impl App {
     }
 
     pub fn stop_inline_editor(&mut self, force_discard: bool) {
-        if !force_discard {
-            if let Some(editor) = &self.inline_editor {
-                if editor.is_dirty {
-                    self.pending_confirm = Some(PendingConfirm {
-                        message: "Unsaved changes! Discard changes and exit edit mode?".to_string(),
-                    });
-                    return;
-                }
-            }
+        if !force_discard
+            && let Some(editor) = &self.inline_editor
+            && editor.is_dirty
+        {
+            self.pending_confirm = Some(PendingConfirm {
+                message: "Unsaved changes! Discard changes and exit edit mode?".to_string(),
+            });
+            return;
         }
         self.inline_editor = None;
         self.refresh_status();
