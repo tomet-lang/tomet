@@ -114,6 +114,20 @@ pub fn is_path_unswept(p: &Path, config_root: Option<&Path>, config: &PrinterCon
         || is_path_ignored(p, config_root, &config.unswept_files)
 }
 
+/// Whether the sweep would leave `path` alone under `config`, judged the
+/// same way whether the path came from a walk or from the command line.
+///
+/// Both sides are made absolute first, so a relative argument and a
+/// relative `config_root` cannot disagree about where the file is. A
+/// caller that writes to files it was handed by name (`format -i`,
+/// `refactor -i`) asks this before touching one: the sweep's exclusions
+/// only protect what the sweep finds.
+pub fn is_excluded_by_config(path: &Path, config_root: &Path, config: &PrinterConfig) -> bool {
+    let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let root = std::fs::canonicalize(config_root).unwrap_or_else(|_| config_root.to_path_buf());
+    is_path_unswept(&path, Some(&root), config)
+}
+
 /// Collects every `.tmt`/`.tmt` file under `path` (or just `path` itself
 /// if it's a single file), auto-discovering the nearest
 /// `default.config.tmt`/`tomet.config.tmt` for `ignore_files` rules.
