@@ -7,17 +7,9 @@ edition.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-tomet-ast = { workspace = true }
+tomet = { workspace = true, features = ["html", "markdown", "typst", "format", "printer"] }
 tomet-cst = { workspace = true }
 tomet-lexer = { workspace = true }
-tomet-parser = { workspace = true }
-tomet-html = { workspace = true }
-tomet-markdown = { workspace = true }
-tomet-typst = { workspace = true }
-tomet-formatter = { workspace = true }
-tomet-printer = { workspace = true }
-tomet-semantics = { workspace = true }
-tomet-validator = { workspace = true }
 tomet-links = { workspace = true }
 tomet-transform = { workspace = true }
 

@@ -1,17 +1,30 @@
+use tomet::config::PrinterConfig;
+use tomet::vault::Vault;
 use wasm_bindgen::prelude::*;
+
+/// Parses `source` against a vault with no vocabularies of its own.
+///
+/// The facade has no bare parse on purpose (see `tomet`'s crate doc), and
+/// nothing here but `validateWith` needs one: reading a document as `std`
+/// alone is exactly what an empty vault does.
+fn parse_plain(source: &str) -> Result<tomet::Document, String> {
+    Vault::from_sources(PrinterConfig::default(), ".", &[])
+        .parse(source)
+        .map(|(doc, _bindings)| doc)
+        .map_err(|e| e.to_string())
+}
 
 /// Parse `.tmt` markup source text into a JavaScript `Document` AST object.
 #[wasm_bindgen(js_name = parseDocument)]
 pub fn parse_document(source: &str) -> Result<JsValue, JsValue> {
-    let doc =
-        tomet_parser::parse_document(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let doc = parse_plain(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
     serde_wasm_bindgen::to_value(&doc).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 /// Parse a data-only `.tmt` document into a native JavaScript object/primitive.
 #[wasm_bindgen(js_name = parseValue)]
 pub fn parse_value(source: &str) -> Result<JsValue, JsValue> {
-    let val = tomet_parser::parse_value(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let val = tomet::parse_value(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
     serde_wasm_bindgen::to_value(&val).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
@@ -37,9 +50,9 @@ pub struct ProcessOptions {
 }
 
 impl ProcessOptions {
-    fn to_render_options(&self) -> tomet_html::RenderOptions {
+    fn to_render_options(&self) -> tomet::html::RenderOptions {
         let advanced = self.advanced.unwrap_or(false);
-        tomet_html::RenderOptions {
+        tomet::html::RenderOptions {
             number_headings: self.number_headings.unwrap_or(advanced),
             auto_slug_headings: self.auto_slug_headings.unwrap_or(advanced),
             lang: self.lang.clone(),
@@ -68,16 +81,16 @@ pub fn clear_vault_files() {
     *lock = None;
 }
 
-fn prepare_document(mut doc: tomet_ast::Document, opts: &ProcessOptions) -> tomet_ast::Document {
+fn prepare_document(mut doc: tomet::ast::Document, opts: &ProcessOptions) -> tomet::ast::Document {
     // 1. Inject external workspace config (e.g. default.config.tmt) if provided
     if let Some(cfg_src) = &opts.config
-        && let Ok(cfg_doc) = tomet_parser::parse_document(cfg_src)
+        && let Ok(cfg_doc) = parse_plain(cfg_src)
     {
         let mut prefix_blocks = Vec::new();
         for block in cfg_doc.blocks {
-            if let tomet_ast::Block::Element(el) = &block {
-                let kind = tomet_semantics::classify_std_lenient(el);
-                if kind == tomet_semantics::ElementKind::Config || kind.as_str() == "settings" {
+            if let tomet::ast::Block::Element(el) = &block {
+                let kind = tomet::semantics::classify_std_lenient(el);
+                if kind == tomet::semantics::ElementKind::Config || kind.as_str() == "settings" {
                     prefix_blocks.push(block);
                 }
             }
@@ -89,7 +102,7 @@ fn prepare_document(mut doc: tomet_ast::Document, opts: &ProcessOptions) -> tome
     }
 
     // 2. Expand macros in element arguments and interpolation expressions
-    let config = tomet_semantics::document_config(&doc);
+    let config = tomet::semantics::document_config(&doc);
     tomet_transform::expand_document_macros(&mut doc, &config);
 
     // 3. Resolve links against cached index or vault_files option
@@ -134,27 +147,27 @@ pub struct TocItem {
 pub struct ProcessedDoc {
     pub title: Option<String>,
     pub html: String,
-    pub meta: Option<tomet_ast::Value>,
+    pub meta: Option<tomet::ast::Value>,
     pub toc: Vec<TocItem>,
     pub is_data_only: bool,
 }
 
 pub fn process_document_internal(
-    mut doc: tomet_ast::Document,
+    mut doc: tomet::ast::Document,
     opts: &ProcessOptions,
 ) -> ProcessedDoc {
     doc = prepare_document(doc, opts);
     let render_opts = opts.to_render_options();
-    let html = tomet_html::render_body_with(&doc, &render_opts);
+    let html = tomet::html::render_body_with(&doc, &render_opts);
     let is_data_only = html.trim().is_empty();
 
     // 1. Meta & Title from @meta{title}
-    let meta = tomet_semantics::document_meta(&doc);
+    let meta = tomet::semantics::document_meta(&doc);
     let meta_title = meta.as_ref().and_then(|v| match v {
-        tomet_ast::Value::Map(m) => m.iter().find_map(|(k, val)| {
+        tomet::ast::Value::Map(m) => m.iter().find_map(|(k, val)| {
             if k == "title" {
                 match val {
-                    tomet_ast::Value::String(s) => Some(s.clone()),
+                    tomet::ast::Value::String(s) => Some(s.clone()),
                     _ => None,
                 }
             } else {
@@ -226,14 +239,14 @@ pub fn to_html(source_or_doc: &JsValue, options: Option<JsValue>) -> Result<Stri
     let render_opts = opts.to_render_options();
 
     let mut doc = if let Some(src) = source_or_doc.as_string() {
-        tomet_parser::parse_document(&src).map_err(|e| JsValue::from_str(&e.to_string()))?
+        parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?
     } else {
-        let doc: tomet_ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
+        let doc: tomet::ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         doc
     };
     doc = prepare_document(doc, &opts);
-    Ok(tomet_html::render_body_with(&doc, &render_opts))
+    Ok(tomet::html::render_body_with(&doc, &render_opts))
 }
 
 /// Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
@@ -249,11 +262,10 @@ pub fn process_document(
     };
 
     let processed = if let Some(src) = source_or_doc.as_string() {
-        let doc =
-            tomet_parser::parse_document(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let doc = parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
         process_document_internal(doc, &opts)
     } else {
-        let doc: tomet_ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
+        let doc: tomet::ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         process_document_internal(doc, &opts)
     };
@@ -265,13 +277,12 @@ pub fn process_document(
 #[wasm_bindgen(js_name = toMarkdown)]
 pub fn to_markdown(source_or_doc: &JsValue) -> Result<String, JsValue> {
     if let Some(src) = source_or_doc.as_string() {
-        let doc =
-            tomet_parser::parse_document(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet_markdown::to_markdown(&doc))
+        let doc = parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(tomet::markdown::to_markdown(&doc))
     } else {
-        let doc: tomet_ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
+        let doc: tomet::ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet_markdown::to_markdown(&doc))
+        Ok(tomet::markdown::to_markdown(&doc))
     }
 }
 
@@ -279,35 +290,34 @@ pub fn to_markdown(source_or_doc: &JsValue) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = toTypst)]
 pub fn to_typst(source_or_doc: &JsValue) -> Result<String, JsValue> {
     if let Some(src) = source_or_doc.as_string() {
-        let doc =
-            tomet_parser::parse_document(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet_typst::to_typst(&doc))
+        let doc = parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(tomet::typst::to_typst(&doc))
     } else {
-        let doc: tomet_ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
+        let doc: tomet::ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet_typst::to_typst(&doc))
+        Ok(tomet::typst::to_typst(&doc))
     }
 }
 
 /// Parse CommonMark Markdown text into a `Document` AST object.
 #[wasm_bindgen(js_name = fromMarkdown)]
 pub fn from_markdown(markdown: &str) -> Result<JsValue, JsValue> {
-    let doc = tomet_markdown::from_markdown(markdown);
+    let doc = tomet::markdown::from_markdown(markdown);
     serde_wasm_bindgen::to_value(&doc).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 /// Serialize a `Document` AST object back into formatted `.tmt` source code.
 #[wasm_bindgen(js_name = printDocument)]
 pub fn print_document(doc_val: &JsValue) -> Result<String, JsValue> {
-    let doc: tomet_ast::Document = serde_wasm_bindgen::from_value(doc_val.clone())
+    let doc: tomet::ast::Document = serde_wasm_bindgen::from_value(doc_val.clone())
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
-    Ok(tomet_printer::document_to_tm(&doc))
+    Ok(tomet::printer::document_to_tm(&doc))
 }
 
 /// Format `.tmt` source text with lossless whitespace hygiene and span preservation.
 #[wasm_bindgen(js_name = formatSource)]
 pub fn format_source(source: &str) -> String {
-    tomet_formatter::format_source(source)
+    tomet::format::format_source(source)
 }
 
 pub mod highlight;
@@ -316,9 +326,8 @@ pub use highlight::{HighlightSpan, compute_highlight_spans};
 /// Validate `.tmt` source text and return an array of validation diagnostics.
 #[wasm_bindgen(js_name = validate)]
 pub fn validate(source: &str) -> Result<JsValue, JsValue> {
-    let doc =
-        tomet_parser::parse_document(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
-    let diagnostics = tomet_validator::validate_document(&doc);
+    let doc = parse_plain(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let diagnostics = tomet::validator::validate_document(&doc);
     serde_wasm_bindgen::to_value(&diagnostics).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
@@ -331,28 +340,26 @@ pub fn validate(source: &str) -> Result<JsValue, JsValue> {
 /// nothing said it existed, but not useful in an editor that could have
 /// said so.
 ///
-/// A source that does not parse, or that carries no `@vocabulary(ns)`
-/// header, is skipped: it declares no namespace, so there is nothing to
-/// bind. Check vocabularies themselves with `tomet check`.
+/// A source that does not parse, carries no `@vocabulary(ns)` header, or
+/// claims a reserved or already-taken namespace is skipped: it declares no
+/// namespace, so there is nothing to bind. `doc.index` is always known, as
+/// it is to the CLI. Check vocabularies themselves with `tomet check`.
 #[wasm_bindgen(js_name = validateWith)]
 pub fn validate_with(source: &str, vocabularies: Vec<String>) -> Result<JsValue, JsValue> {
-    let doc =
-        tomet_parser::parse_document(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
-    let bindings = bindings_from_sources(&doc, &vocabularies);
-    let diagnostics = tomet_validator::validate_document_with(&doc, &bindings);
+    let labels: Vec<String> = (0..vocabularies.len())
+        .map(|i| format!("vocabularies[{i}]"))
+        .collect();
+    let sources: Vec<(&str, &str)> = labels
+        .iter()
+        .map(String::as_str)
+        .zip(vocabularies.iter().map(String::as_str))
+        .collect();
+    let vault = Vault::from_sources(PrinterConfig::default(), ".", &sources);
+    let (doc, bindings) = vault
+        .parse(source)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let diagnostics = tomet::validator::validate_document_with(&doc, &bindings);
     serde_wasm_bindgen::to_value(&diagnostics).map_err(|e| JsValue::from_str(&e.to_string()))
-}
-
-fn bindings_from_sources(
-    doc: &tomet_ast::Document,
-    vocabularies: &[String],
-) -> tomet_semantics::Bindings {
-    let parsed = vocabularies.iter().filter_map(|src| {
-        tomet_parser::parse_document(src)
-            .ok()
-            .and_then(|d| tomet_semantics::Vocabulary::from_document(&d))
-    });
-    tomet_semantics::Bindings::for_document(doc, parsed)
 }
 
 /// Compute syntax highlight token spans for CodeMirror and other editors.
@@ -369,8 +376,8 @@ mod tests {
     #[test]
     fn test_parse_and_html_roundtrip() {
         let src = "#[ Hello World ]\n\n<task>(done: true)[Buy milk]\n";
-        let doc = tomet_parser::parse_document(src).unwrap();
-        let html = tomet_html::render_body(&doc);
+        let doc = parse_plain(src).unwrap();
+        let html = tomet::html::render_body(&doc);
         assert!(html.contains("Hello World"));
         assert!(html.contains("Buy milk"));
     }
@@ -385,7 +392,7 @@ mod tests {
     #[test]
     fn test_process_document_with_meta_title() {
         let src = "@meta{\n  title: \"My Meta Title\"\n}\n\n=[ Document Title ]\n\n==[ Section One ]\n\nContent.\n";
-        let doc = tomet_parser::parse_document(src).unwrap();
+        let doc = parse_plain(src).unwrap();
         let opts = ProcessOptions {
             advanced: Some(true),
             ..Default::default()
@@ -402,7 +409,7 @@ mod tests {
     #[test]
     fn test_process_document_with_h1_fallback() {
         let src = "=[ First Heading Title ]\n\n==[ Section A ]\n\n===[ Sub Section ]\n";
-        let doc = tomet_parser::parse_document(src).unwrap();
+        let doc = parse_plain(src).unwrap();
         let opts = ProcessOptions {
             advanced: Some(true),
             ..Default::default()
@@ -420,7 +427,7 @@ mod tests {
     #[test]
     fn test_process_document_data_only() {
         let src = "@version(1.0)\n@meta{\n  title: \"Just Config\"\n}\n";
-        let doc = tomet_parser::parse_document(src).unwrap();
+        let doc = parse_plain(src).unwrap();
         let opts = ProcessOptions::default();
         let res = process_document_internal(doc, &opts);
         assert_eq!(res.title.as_deref(), Some("Just Config"));
@@ -432,7 +439,7 @@ mod tests {
     fn test_process_document_with_resolved_links() {
         let src =
             "- @link(\"ref:Linux\")[Go to Linux]\n- @link(\"ref:NonExistentNote\")[Missing]\n";
-        let doc = tomet_parser::parse_document(src).unwrap();
+        let doc = parse_plain(src).unwrap();
         let opts = ProcessOptions {
             vault_files: Some(vec![
                 "30-39 Knowledge/Linux.tmt".into(),
