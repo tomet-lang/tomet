@@ -69,6 +69,9 @@ members = [
   #[ Apps ]
   "apps/tui",
 
+  #[ Facade -- the one crate a Rust consumer depends on ]
+  "crates/tomet",
+
   #[ Tests -- cross-crate corpus, round-trip, and snapshot suites ]
   "tests",
 ]
@@ -118,6 +121,8 @@ tomet-load = { path = "crates/tomet-load" }
 #[ Public ]
 tove = { path = "crates/tove" }
 tree-sitter-tomet = { path = "crates/tree-sitter-tomet" }
+#[ Facade ]
+tomet = { path = "crates/tomet" }
 #[ Apps ]
 tomet-tui = { path = "apps/tui" }
 

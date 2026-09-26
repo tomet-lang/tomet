@@ -18,7 +18,7 @@ does not relax the rule to fit the change it wanted to make.
   guard: { twrit: layers }
 
   layers: {
-    6: list( "apps/*", "bindings/*", "editors/*", "tests" )
+    6: list( "apps/*", "bindings/*", "editors/*", "tests", "crates/tomet" )
     5: list( "crates/tomet-workspace*", "crates/tomet-load" )
     4: list( "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet", "crates/tomet-extract", "crates/tomet-search", "crates/tomet-vault" )
     3: list( "crates/tomet-config" )
@@ -42,6 +42,8 @@ adapters and pure in-memory query engines rather than internal syntax or semanti
 with the producer groups.
 
 @dir(crates/tomet-vault) is likewise listed by name: it is the disk-free half of what `tomet-load` assembles (a vault's config and vocabularies, parse, bind, prepare), so that a caller with no filesystem can use it. `tomet-load` sits above it and adds the reading.
+
+@dir(crates/tomet) is the public facade over every layer below it. It sits in layer 6 with the applications, is listed by name because its name shares no prefix with the crates it re-exports, and holds no logic of its own.
 
 A pattern ending in `*` matches by prefix; every other pattern is exact.
 Patterns are directory paths relative to the workspace root, because the

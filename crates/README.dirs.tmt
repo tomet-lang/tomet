@@ -40,6 +40,7 @@ tomet-transform      pure in-memory AST refactoring & macro rewrite rules.
 
 tomet-vault          a vault's config + vocabularies, parse/bind/prepare, no disk.
 tomet-load           finds a vault on disk and reads files in it (builds on tomet-vault).
+tomet                the public facade over the crates above; re-exports only.
 
 tomet-convert-*      html, markdown, pandoc, typst.
                          Conversion to/from *external* document formats.
