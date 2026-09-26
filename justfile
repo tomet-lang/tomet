@@ -31,7 +31,7 @@ gen-treesitter:
 
 # Launch the TUI workbench.
 tui path=".":
-    cargo run -p tomet -- tui {{path}}
+    cargo run -p tomet-cli -- tui {{path}}
 
 # Check formatting across workspace.
 format-check:
@@ -56,7 +56,7 @@ format-check:
 # layout, not a rule of the language. It is `twrit`'s job when `twrit`
 # reads `.writ.tmt` itself.
 docs-check:
-    cargo build -p tomet
+    cargo build -p tomet-cli
     ./target/debug/tomet check .
     ./target/debug/tomet format --check .
     ./target/debug/tomet export --check .
