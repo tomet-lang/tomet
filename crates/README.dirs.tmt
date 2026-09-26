@@ -38,6 +38,9 @@ tomet-semantics*     semantics (bare, no suffix -- the crate IS the category),
 
 tomet-transform      pure in-memory AST refactoring & macro rewrite rules.
 
+tomet-vault          a vault's config + vocabularies, parse/bind/prepare, no disk.
+tomet-load           finds a vault on disk and reads files in it (builds on tomet-vault).
+
 tomet-convert-*      html, markdown, pandoc, typst.
                          Conversion to/from *external* document formats.
 

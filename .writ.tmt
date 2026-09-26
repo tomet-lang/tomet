@@ -20,7 +20,7 @@ does not relax the rule to fit the change it wanted to make.
   layers: {
     6: list( "apps/*", "bindings/*", "editors/*", "tests" )
     5: list( "crates/tomet-workspace*", "crates/tomet-load" )
-    4: list( "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet", "crates/tomet-extract", "crates/tomet-search" )
+    4: list( "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet", "crates/tomet-extract", "crates/tomet-search", "crates/tomet-vault" )
     3: list( "crates/tomet-config" )
     2: list( "crates/tomet-semantics*" )
     1: list( "crates/tomet-syntax-*" )
@@ -40,6 +40,8 @@ it stays independent of the parser.
 @dir(crates/serde_tomet), @dir(crates/tomet-extract) and @dir(crates/tomet-search) are listed by name in layer 4. They are ecosystem
 adapters and pure in-memory query engines rather than internal syntax or semantics producers, and their names carry no prefix shared
 with the producer groups.
+
+@dir(crates/tomet-vault) is likewise listed by name: it is the disk-free half of what `tomet-load` assembles (a vault's config and vocabularies, parse, bind, prepare), so that a caller with no filesystem can use it. `tomet-load` sits above it and adds the reading.
 
 A pattern ending in `*` matches by prefix; every other pattern is exact.
 Patterns are directory paths relative to the workspace root, because the
