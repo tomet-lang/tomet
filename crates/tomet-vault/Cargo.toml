@@ -1,15 +1,14 @@
 [package]
-name = "tomet-load"
+name = "tomet-vault"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }
+tomet-compute = { workspace = true }
 tomet-config = { workspace = true }
-tomet-indexer = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-resolver = { workspace = true }
 tomet-search = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-transform = { workspace = true }
-tomet-vault = { workspace = true }

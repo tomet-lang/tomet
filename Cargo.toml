@@ -39,6 +39,9 @@ members = [
   #[ Search -- in-memory structural search & filter queries ]
   "crates/tomet-search",
 
+  #[ Vault -- a vault's config and vocabularies, no disk ]
+  "crates/tomet-vault",
+
   #[ Convert -- conversion to/from external document formats ]
   "crates/tomet-convert-markdown",
   "crates/tomet-convert-html",
@@ -92,6 +95,8 @@ tomet-resolver = { path = "crates/tomet-semantics-resolver" }
 tomet-transform = { path = "crates/tomet-transform" }
 #[ Search ]
 tomet-search = { path = "crates/tomet-search" }
+#[ Vault ]
+tomet-vault = { path = "crates/tomet-vault" }
 #[ Convert ]
 tomet-markdown = { path = "crates/tomet-convert-markdown" }
 tomet-html = { path = "crates/tomet-convert-html" }

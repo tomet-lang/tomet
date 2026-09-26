@@ -60,49 +60,35 @@
 //! case -- it prepares a copy to report what could not be resolved, and
 //! validates the original.
 
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use tomet_ast::Document;
 use tomet_config::PrinterConfig;
-use tomet_resolver::{LoadedVocabularies, bindings_for, load_vocabularies};
+use tomet_resolver::load_vocabularies;
 use tomet_semantics::Bindings;
 
 mod index;
 
 pub use index::{IndexQueryError, VaultIndex, is_index_document};
-pub use tomet_transform::Unresolved;
+pub use tomet_vault::{Prepared, Unresolved};
 
-/// What [`Vault::prepare`] did, and what it could not do.
+/// A vault found on disk: `tomet_vault::Vault` plus the parts that need
+/// a filesystem.
 ///
-/// `unresolved` is not an error: an expression with no value is left in
-/// the output as written, so a document showing `${...}` as an example
-/// still renders. `tomet check` reports the list as warnings, which is
-/// what tells a typo apart from an example.
-#[derive(Debug, Default)]
-pub struct Prepared {
-    pub expanded_queries: usize,
-    pub unresolved: Vec<Unresolved>,
-}
-
-/// A vault's config and the vocabularies it declares, resolved once.
+/// Everything that is only computation -- [`parse`](tomet_vault::Vault::parse),
+/// [`bindings`](tomet_vault::Vault::bindings), the `config`/`root` fields --
+/// is the inner vault's, reached through `Deref`. What is added here is
+/// finding it ([`Vault::discover`]), reading a file in it
+/// ([`Vault::document`]), and the vault-wide table an index query is
+/// answered from, which is a walk of the disk.
 ///
 /// "Vault" is the directory the config file sits in: `find_config_file`
 /// walks up until it finds one, and that file's position is what says
 /// where the vault begins.
 pub struct Vault {
-    /// The config governing this vault, or the defaults when no config
-    /// file was found.
-    pub config: PrinterConfig,
-    /// The directory the config file was found in, or the starting
-    /// directory when there was none. Declared vocabulary paths are
-    /// relative to this.
-    pub root: PathBuf,
-    /// Vocabularies that were declared but could not be read. Not fatal:
-    /// a caller reports them and carries on, because one unreadable
-    /// vocabulary should not hide the state of every document.
-    pub vocabulary_errors: Vec<String>,
-    loaded: LoadedVocabularies,
+    core: tomet_vault::Vault,
     /// Filled by the first [`Vault::prepare`] that meets an
     /// `@kind(doc.index)` document, and shared by every one after it. A
     /// directory export would otherwise re-read the whole vault per file.
@@ -112,6 +98,14 @@ pub struct Vault {
     /// one vault is the obvious caller, and `serve` builds a fresh one per
     /// request today only because nothing made it cheap to keep.
     index: OnceLock<VaultIndex>,
+}
+
+impl Deref for Vault {
+    type Target = tomet_vault::Vault;
+
+    fn deref(&self) -> &tomet_vault::Vault {
+        &self.core
+    }
 }
 
 impl Vault {
@@ -134,29 +128,9 @@ impl Vault {
 
         let loaded = load_vocabularies(&root, &config.vocabularies);
         Self {
-            config,
-            root,
-            vocabulary_errors: loaded.errors.clone(),
-            loaded,
+            core: tomet_vault::Vault::new(config, root, loaded),
             index: OnceLock::new(),
         }
-    }
-
-    /// The names in scope for `doc`: `std`, the document's own `@kind`,
-    /// and anything it brings in with `@use`.
-    ///
-    /// This is what makes an element name mean something. Matching on a
-    /// bare `Sigil::Named` instead is the shortcut that drops the
-    /// namespaced spelling of the same element.
-    pub fn bindings(&self, doc: &Document) -> Bindings {
-        bindings_for(doc, &self.loaded)
-    }
-
-    /// Parses `src` and binds its names against this vault.
-    pub fn parse(&self, src: &str) -> Result<(Document, Bindings), tomet_parser::Error> {
-        let doc = tomet_parser::parse_document(src)?;
-        let bindings = self.bindings(&doc);
-        Ok((doc, bindings))
     }
 
     /// Reads, parses, and binds one file in this vault.
@@ -172,85 +146,17 @@ impl Vault {
     }
 
     /// The fifth step: rewrites `doc` into the shape a converter should
-    /// see.
-    ///
-    /// Two rewrites, in this order, because the first produces elements
-    /// and the second turns expressions into text:
-    ///
-    /// 1. index queries -- `${filter(...)}` becomes the `@link(ref:...)`
-    ///    entries it selects. The vault table this needs is built on the
-    ///    first `@kind(doc.index)` document and reused by every one after,
-    ///    so a document that isn't one costs a single `document_kind` read
-    ///    and no I/O.
-    /// 2. interpolation -- every remaining `${...}` becomes the text it
-    ///    stands for, against this vault's macros and this document's
-    ///    position.
-    ///
-    /// `path` is where the document sits, which is what `${self.path}`
-    /// and `${self.filename}` are about.
-    ///
-    /// Call this and not the underlying passes directly. A caller reaching
-    /// past it for one rewrite is how a rewrite ends up applied in three
-    /// commands and missing from the fourth -- which is the state
-    /// interpolation was in before this existed.
+    /// see. What the rewrites are is `tomet_vault::Vault::prepare`'s doc;
+    /// this supplies the vault-wide table it needs, building it on the
+    /// first `@kind(doc.index)` document and reusing it for every one
+    /// after, so a document that isn't one costs a single `document_kind`
+    /// read and no I/O.
     pub fn prepare(&self, doc: &mut Document, path: &Path) -> Result<Prepared, IndexQueryError> {
-        let mut expanded_queries = 0;
-        if is_index_document(doc) {
-            let index = self.index.get_or_init(|| VaultIndex::build(&self.root));
-            expanded_queries = index.expand(doc)?;
-        }
-
-        let config = self.evaluation_config(doc);
-        let vars = self.evaluation_vars(path);
-        let unresolved = tomet_transform::resolve_interpolations(doc, &config, &vars);
-
-        Ok(Prepared {
-            expanded_queries,
-            unresolved,
+        self.core.prepare(doc, path, || {
+            self.index
+                .get_or_init(|| VaultIndex::build(&self.core.root))
+                .rows()
         })
-    }
-
-    /// The macros in scope for `doc`: its own `@config`, then the vault's
-    /// for every name it did not claim.
-    ///
-    /// The document wins a collision, which is the direction every other
-    /// scope in this format runs. Before this lived here it lived in the
-    /// CLI, so a macro reached CommonMark and nothing else.
-    fn evaluation_config(&self, doc: &Document) -> tomet_semantics::DocumentConfig {
-        let mut config = tomet_semantics::document_config(doc);
-        for (name, template) in &self.config.macros {
-            config
-                .macros
-                .entry(name.clone())
-                .or_insert_with(|| template.clone());
-        }
-        config
-    }
-
-    /// `${self.path}` and `${self.filename}`.
-    ///
-    /// `path` is measured from this vault's root, `filename` is the
-    /// basename. Two fields and not one: naming either for the other's
-    /// meaning is how a field starts lying.
-    fn evaluation_vars(&self, path: &Path) -> tomet_compute::EvaluationContext {
-        let rel = path
-            .strip_prefix(&self.root)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .replace('\\', "/");
-        let rel = rel.strip_prefix("./").unwrap_or(&rel).to_string();
-        let filename = path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-
-        tomet_compute::EvaluationContext::new().with_var(
-            "self",
-            tomet_ast::Value::Map(vec![
-                ("path".to_string(), tomet_ast::Value::String(rel)),
-                ("filename".to_string(), tomet_ast::Value::String(filename)),
-            ]),
-        )
     }
 
     /// [`Vault::document`] followed by [`Vault::prepare`] -- what anything
