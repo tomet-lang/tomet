@@ -60,6 +60,7 @@ docs-check:
     ./target/debug/tomet check .
     ./target/debug/tomet format --check .
     ./target/debug/tomet export --check .
+    ./target/debug/tomet cli-docs --check --out tmtroot/generated/cli.tmt
     @stray=$(find tmtroot -name '*.tmt' -exec grep -L 'export:' {} +); \
     if [ -n "$stray" ]; then \
         echo "$stray" | while IFS= read -r f; do \
