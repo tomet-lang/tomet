@@ -1,0 +1,27 @@
+[package]
+name = "tomet"
+version.workspace = true
+edition.workspace = true
+
+[features]
+html = ["dep:tomet-html"]
+markdown = ["dep:tomet-markdown"]
+typst = ["dep:tomet-typst"]
+pandoc = ["dep:tomet-pandoc"]
+format = ["dep:tomet-formatter"]
+printer = ["dep:tomet-printer"]
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-config = { workspace = true }
+tomet-load = { workspace = true }
+tomet-parser = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-validator = { workspace = true }
+tomet-vault = { workspace = true }
+tomet-html = { workspace = true, optional = true }
+tomet-markdown = { workspace = true, optional = true }
+tomet-typst = { workspace = true, optional = true }
+tomet-pandoc = { workspace = true, optional = true }
+tomet-formatter = { workspace = true, optional = true }
+tomet-printer = { workspace = true, optional = true }
