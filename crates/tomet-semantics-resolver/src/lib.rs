@@ -31,4 +31,6 @@ pub use interp::resolve_reference;
 pub use settings::{
     config_import_ref, resolve_settings_file, resolve_settings_ref, settings_file_ref,
 };
-pub use vocabulary::{LoadedVocabularies, bindings_for, load_vocabularies};
+pub use vocabulary::{
+    LoadedVocabularies, bindings_for, load_vocabularies, load_vocabulary_sources,
+};
