@@ -180,6 +180,19 @@ pub enum Command {
         force: bool,
     },
 
+    /// Write the CLI reference -- every subcommand with its usage, arguments
+    /// and options -- as a `.tmt`, generated from the clap definitions.
+    /// Prints to stdout unless `--out` is given; with `--check` it exits
+    /// non-zero when that file is not what would be written.
+    CliDocs {
+        /// Write to this file instead of stdout.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+        /// Fail if `--out`'s file is missing or out of date, without writing.
+        #[arg(long, requires = "out")]
+        check: bool,
+    },
+
     /// Launch the interactive TUI workbench for Markdown migration,
     /// batch metadata editing, and structural AST refactoring.
     Tui {

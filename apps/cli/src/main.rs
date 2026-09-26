@@ -14,6 +14,7 @@ use cli::{Cli, Command};
 use commands::ast::ast;
 use commands::check::check;
 use commands::check_links::check_links_cmd;
+use commands::cli_docs::cli_docs_cmd;
 use commands::export::export_cmd;
 use commands::format::format_cmd;
 use commands::from_md::from_md_cmd;
@@ -80,6 +81,7 @@ fn main() -> ExitCode {
             check,
             force,
         } => format_cmd(paths, *in_place, *check, *force),
+        Command::CliDocs { out, check } => cli_docs_cmd(out.as_deref(), *check),
         Command::Tui { path, config } => tomet_tui::run_tui(path.clone(), config.clone()),
         Command::Export {
             path,

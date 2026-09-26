@@ -1,6 +1,7 @@
 pub mod ast;
 pub mod check;
 pub mod check_links;
+pub mod cli_docs;
 pub mod export;
 pub mod format;
 pub mod from_md;
