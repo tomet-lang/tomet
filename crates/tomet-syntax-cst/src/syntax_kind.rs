@@ -60,7 +60,16 @@ pub enum SyntaxKind {
     DOCUMENT,
     BLOCK_ELEMENT,
     INLINE_ELEMENT,
+    /// Legacy `#` heading. Current headings are [`SyntaxKind::SECTION`].
     HEADING,
+    /// `=`-run heading plus every block up to the next section of the same or
+    /// a shallower level. Sections nest by level; the first child is the
+    /// [`SyntaxKind::SECTION_HEADING`].
+    SECTION,
+    /// The `=[ title ]` / `== title` line of a section, without its body.
+    SECTION_HEADING,
+    /// `---` or `---[ title ]---`.
+    THEMATIC_BREAK,
     PARAGRAPH,
     LIST,
     LIST_ITEM,
@@ -69,6 +78,10 @@ pub enum SyntaxKind {
     SIGIL,
     ARGS,
     CONTENT,
+    /// `:name(...)`, `:(...)`, `:{...}` -- a group joined to the preceding element.
+    CONNECT,
+    /// A `+++ ... +++` fenced body of an element.
+    FENCE,
     VALUE_DATA,
     VALUE_CHILDREN,
     MAP_ENTRY,

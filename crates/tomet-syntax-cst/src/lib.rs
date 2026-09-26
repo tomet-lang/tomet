@@ -2,6 +2,11 @@
 //!
 //! Provides a lossless, resilient, green/red syntax tree representation where
 //! 100% of characters (including whitespace, newlines, and comments) are preserved.
+//!
+//! This crate defines only the vocabulary ([`SyntaxKind`]) and the rowan glue;
+//! `tomet-parser::parse_cst` builds the tree and documents its shape. The tree
+//! is structured down to sections (nested by level), elements and their groups,
+//! and `key: value` entries -- but not emphasis or `|` content runs.
 
 pub mod syntax_kind;
 

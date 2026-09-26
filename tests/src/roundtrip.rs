@@ -144,3 +144,64 @@ fn parses_the_repo_spec_examples() {
     tomet_parser::parse_document(&read_fixture(Path::new("readme.tmt"))).unwrap();
     tomet_parser::parse_document(&read_fixture(Path::new("examples/image.meta.tmt"))).unwrap();
 }
+
+// ---------------------------------------------------------------------
+// CST
+// ---------------------------------------------------------------------
+
+#[test]
+fn cst_is_lossless_across_the_corpus() {
+    // Runs over every fixture including the ones the parser rejects: the
+    // CST parser never fails, and keeping every byte on malformed input is
+    // what an editor relies on.
+    for rel in corpus() {
+        let src = read_fixture(&rel);
+        let cst = tomet_parser::parse_cst(&src);
+        assert_eq!(
+            cst.text().to_string(),
+            src,
+            "CST lost bytes for {}",
+            rel.display()
+        );
+    }
+}
+
+/// Levels of every section in `blocks`, in document order.
+fn ast_section_levels(blocks: &[tomet_ast::Block], out: &mut Vec<usize>) {
+    for block in blocks {
+        if let tomet_ast::Block::Section(s) = block {
+            out.push(s.level);
+            ast_section_levels(&s.blocks, out);
+        }
+    }
+}
+
+#[test]
+fn cst_sections_match_the_ast_across_the_corpus() {
+    // The CST and the AST are two parsers over one grammar. If a section
+    // form is added to one and not the other, the levels they report for
+    // the same source disagree.
+    for (rel, src) in parseable_corpus() {
+        let doc = tomet_parser::parse_document(&src).expect("parseable corpus parses");
+        let mut expected = Vec::new();
+        ast_section_levels(&doc.blocks, &mut expected);
+
+        let cst = tomet_parser::parse_cst(&src);
+        let actual: Vec<usize> = cst
+            .descendants()
+            .filter(|n| n.kind() == tomet_cst::SyntaxKind::SECTION_HEADING)
+            .map(|n| {
+                n.children_with_tokens()
+                    .filter_map(|e| e.into_token())
+                    .take_while(|t| t.kind() == tomet_cst::SyntaxKind::EQUAL)
+                    .count()
+            })
+            .collect();
+        assert_eq!(
+            actual,
+            expected,
+            "CST and AST disagree on sections for {}",
+            rel.display()
+        );
+    }
+}

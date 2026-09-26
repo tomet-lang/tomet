@@ -13,3 +13,9 @@ Rowan による Tomet の完全可逆・具象構文木（CST: Concrete Syntax T
    - `TometLanguage`: `rowan::Language` トレイト実装。
    - `SyntaxNode`, `SyntaxToken`, `SyntaxElement`: バイトオフセット計算とツリー走査ハンドル。
    - `TextRange`, `TextSize`: LSP 診断やリファクタリング用の精密なバイト範囲。
+
+-. **木の形** (`tomet-parser::parse_cst` が組み立てる。詳細はその `//!`):
+   - `SECTION` (先頭に `SECTION_HEADING`) は `=` の数で入れ子になる。中身のブロックは `THEMATIC_BREAK`、`PARAGRAPH`、`LIST`、`CODE_BLOCK`、`BLOCK_ELEMENT`。`HEADING` は旧 `#` 見出し。
+   - 要素は `SIGIL` に `ARGS` / `VALUE_DATA` / `CONTENT`、`CONNECT` (`:name(...)`)、`FENCE` (`+++`) が続く。本文中の `@x` `^x` `$x` は `INLINE_ELEMENT`、`${...}` は `INTERP_EXPR`。
+   - グループの中身は `MAP_ENTRY` / `SEQ_ITEM`。入れ子の値は `MAP_LITERAL` / `SEQ_LITERAL`。
+
