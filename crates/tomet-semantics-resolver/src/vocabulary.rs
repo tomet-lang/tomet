@@ -11,104 +11,54 @@
 //! use -- so a path that rotted is reported where it is written instead
 //! of at every document that wanted it.
 
-use std::collections::BTreeMap;
 use std::path::Path;
 
 use tomet_ast::Document;
-use tomet_semantics::{Bindings, Vocabulary};
+use tomet_semantics::Bindings;
 
-/// Every vocabulary `config` declares, with whatever went wrong.
-#[derive(Debug, Default)]
-pub struct LoadedVocabularies {
-    /// By the namespace each file names for itself.
-    pub by_namespace: BTreeMap<String, Vocabulary>,
-    /// Declared paths that are missing, unreadable, unparseable, headerless,
-    /// claim a namespace twice, claim a reserved namespace, or shadow a
-    /// builtin name.
-    pub errors: Vec<String>,
-}
+pub use tomet_semantics::LoadedVocabularies;
 
 /// Reads every vocabulary in `declared`, as paths relative to `root`.
 ///
 /// Takes the paths rather than a `PrinterConfig`, because a config lives
 /// a layer above this one -- and because this does not need to know what
-/// a config is, only where the files are.
+/// a config is, only where the files are. Reading and parsing are all it
+/// does; whether a vocabulary is acceptable is
+/// [`LoadedVocabularies::add`], in `tomet-semantics`.
 pub fn load_vocabularies(root: &Path, declared: &[String]) -> LoadedVocabularies {
     let mut loaded = LoadedVocabularies::default();
-    let mut source: BTreeMap<String, String> = BTreeMap::new();
-
-    // Hardcoded, not read off disk -- the same reason `std`'s elements are
-    // a Rust table rather than a `@vocabulary(std)` document. Seeded first
-    // so the loop below reports a vault vocabulary that collides with one
-    // of these the same way it reports two vault vocabularies colliding
-    // with each other.
-    for builtin in tomet_semantics::builtin_doc_vocabularies() {
-        source.insert(builtin.namespace.clone(), "<builtin>".to_string());
-        loaded
-            .by_namespace
-            .insert(builtin.namespace.clone(), builtin);
-    }
 
     for declared in declared {
         let path = root.join(declared);
-        let src = match std::fs::read_to_string(&path) {
-            Ok(src) => src,
-            Err(e) => {
-                loaded
-                    .errors
-                    .push(format!("declared vocabulary {declared}: {e}"));
-                continue;
-            }
-        };
-        let doc = match tomet_parser::parse_document(&src) {
-            Ok(doc) => doc,
-            Err(e) => {
-                loaded
-                    .errors
-                    .push(format!("declared vocabulary {declared}: {e}"));
-                continue;
-            }
-        };
-        let Some(vocab) = Vocabulary::from_document(&doc) else {
-            loaded.errors.push(format!(
-                "declared vocabulary names no namespace -- it needs `@vocabulary(<ns>)`: {declared}"
-            ));
-            continue;
-        };
-
-        if let Some(reserved) = tomet_semantics::RESERVED_NAMESPACES
-            .iter()
-            .find(|ns| vocab.namespace == **ns || vocab.namespace.starts_with(&format!("{ns}.")))
-        {
-            loaded.errors.push(format!(
-                "{declared} declares itself `{}`, which is under the reserved `{reserved}` \
-                 namespace tomet already gives a hardcoded meaning",
-                vocab.namespace
-            ));
-            continue;
+        match std::fs::read_to_string(&path) {
+            Ok(src) => add_source(&mut loaded, declared, &src),
+            Err(e) => loaded
+                .errors
+                .push(format!("declared vocabulary {declared}: {e}")),
         }
-
-        // Reported here, once, rather than at every document that writes
-        // the shadowed name.
-        for shadowed in vocab.shadowed_builtins() {
-            loaded.errors.push(format!(
-                "{declared} declares `{shadowed}`, which is already a built-in name; \
-                 std wins, so a vocabulary may not take one"
-            ));
-        }
-
-        if let Some(first) = source.get(&vocab.namespace) {
-            loaded.errors.push(format!(
-                "two vocabularies both call themselves `{}`: {first} and {declared}",
-                vocab.namespace
-            ));
-            continue;
-        }
-        source.insert(vocab.namespace.clone(), declared.clone());
-        loaded.by_namespace.insert(vocab.namespace.clone(), vocab);
     }
 
     loaded
+}
+
+/// The same as [`load_vocabularies`] for sources the caller already holds,
+/// as `(label, source text)` pairs. Touches nothing outside memory, so a
+/// host with no filesystem gets the same verdicts as one with a vault.
+pub fn load_vocabulary_sources(sources: &[(&str, &str)]) -> LoadedVocabularies {
+    let mut loaded = LoadedVocabularies::default();
+    for (label, src) in sources {
+        add_source(&mut loaded, label, src);
+    }
+    loaded
+}
+
+fn add_source(loaded: &mut LoadedVocabularies, label: &str, src: &str) {
+    match tomet_parser::parse_document(src) {
+        Ok(doc) => loaded.add(label, &doc),
+        Err(e) => loaded
+            .errors
+            .push(format!("declared vocabulary {label}: {e}")),
+    }
 }
 
 /// The namespaces `doc` has in scope, from what was loaded off disk.
@@ -118,7 +68,7 @@ pub fn load_vocabularies(root: &Path, declared: &[String]) -> LoadedVocabularies
 /// cannot read one -- a wasm host, say -- can call that directly with
 /// vocabularies it obtained some other way.
 pub fn bindings_for(doc: &Document, loaded: &LoadedVocabularies) -> Bindings {
-    Bindings::for_document(doc, loaded.by_namespace.values().cloned())
+    loaded.bindings_for(doc)
 }
 
 #[cfg(test)]

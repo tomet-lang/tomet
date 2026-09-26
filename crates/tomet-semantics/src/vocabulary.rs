@@ -264,6 +264,100 @@ impl Vocabulary {
     }
 }
 
+/// Every vocabulary a vault declares, with whatever went wrong.
+///
+/// The rules for accepting one live in [`LoadedVocabularies::add`], and
+/// they are pure: a caller hands over a parsed document and the label it
+/// wants errors reported under. Where the document came from -- a file
+/// `tomet-resolver` read, or source text a wasm host was given -- is not
+/// this type's business, so both get the same verdicts.
+#[derive(Debug)]
+pub struct LoadedVocabularies {
+    /// By the namespace each one names for itself.
+    pub by_namespace: BTreeMap<String, Vocabulary>,
+    /// Declared vocabularies that are missing, unreadable, unparseable,
+    /// headerless, claim a namespace twice, claim a reserved namespace,
+    /// or shadow a builtin name.
+    pub errors: Vec<String>,
+    /// The label each accepted namespace was declared under, so a
+    /// duplicate can name both sides.
+    declared_as: BTreeMap<String, String>,
+}
+
+impl Default for LoadedVocabularies {
+    /// Seeded with the hardcoded vocabularies, so [`add`](Self::add)
+    /// reports a vault vocabulary colliding with one of them the same way
+    /// it reports two vault vocabularies colliding with each other.
+    fn default() -> Self {
+        let mut loaded = LoadedVocabularies {
+            by_namespace: BTreeMap::new(),
+            errors: Vec::new(),
+            declared_as: BTreeMap::new(),
+        };
+        for builtin in builtin_doc_vocabularies() {
+            loaded
+                .declared_as
+                .insert(builtin.namespace.clone(), "<builtin>".to_string());
+            loaded
+                .by_namespace
+                .insert(builtin.namespace.clone(), builtin);
+        }
+        loaded
+    }
+}
+
+impl LoadedVocabularies {
+    /// Accepts the vocabulary `doc` declares, or records why not.
+    ///
+    /// `label` is how the declaration is named in an error -- a path, for
+    /// the vault that read it off disk.
+    pub fn add(&mut self, label: &str, doc: &Document) {
+        let Some(vocab) = Vocabulary::from_document(doc) else {
+            self.errors.push(format!(
+                "declared vocabulary names no namespace -- it needs `@vocabulary(<ns>)`: {label}"
+            ));
+            return;
+        };
+
+        if let Some(reserved) = RESERVED_NAMESPACES
+            .iter()
+            .find(|ns| vocab.namespace == **ns || vocab.namespace.starts_with(&format!("{ns}.")))
+        {
+            self.errors.push(format!(
+                "{label} declares itself `{}`, which is under the reserved `{reserved}` \
+                 namespace tomet already gives a hardcoded meaning",
+                vocab.namespace
+            ));
+            return;
+        }
+
+        // Reported here, once, rather than at every document that writes
+        // the shadowed name.
+        for shadowed in vocab.shadowed_builtins() {
+            self.errors.push(format!(
+                "{label} declares `{shadowed}`, which is already a built-in name; \
+                 std wins, so a vocabulary may not take one"
+            ));
+        }
+
+        if let Some(first) = self.declared_as.get(&vocab.namespace) {
+            self.errors.push(format!(
+                "two vocabularies both call themselves `{}`: {first} and {label}",
+                vocab.namespace
+            ));
+            return;
+        }
+        self.declared_as
+            .insert(vocab.namespace.clone(), label.to_string());
+        self.by_namespace.insert(vocab.namespace.clone(), vocab);
+    }
+
+    /// The namespaces `doc` has in scope out of what was accepted.
+    pub fn bindings_for(&self, doc: &Document) -> Bindings {
+        Bindings::for_document(doc, self.by_namespace.values().cloned())
+    }
+}
+
 /// The namespaces in scope for one document.
 #[derive(Debug, Clone, Default)]
 pub struct Bindings {
@@ -830,5 +924,49 @@ mod tests {
         assert_eq!(decl.positional_keys(), vec!["name".to_string()]);
         assert!(decl.param("name").is_some_and(|p| p.required));
         assert!(decl.param("pkg").is_some_and(|p| !p.required));
+    }
+
+    fn parsed(src: &str) -> Document {
+        tomet_parser::parse_document(src).expect("document parses")
+    }
+
+    fn vocab_src(ns: &str) -> String {
+        format!("@kind(vocabulary)\n@vocabulary({ns}){{ version: \"1.0.0\" }}\n")
+    }
+
+    #[test]
+    fn add_accepts_a_vocabulary_and_binds_it() {
+        let mut loaded = LoadedVocabularies::default();
+        loaded.add("a.tmt", &parsed(&vocab_src("acme")));
+        assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
+        assert!(loaded.by_namespace.contains_key("acme"));
+        // The hardcoded ones are there without anything declared.
+        assert!(loaded.by_namespace.contains_key("doc.index"));
+    }
+
+    #[test]
+    fn add_rejects_a_reserved_namespace_and_keeps_the_builtin() {
+        let mut loaded = LoadedVocabularies::default();
+        loaded.add("doc.tmt", &parsed(&vocab_src("doc")));
+        loaded.add("index.tmt", &parsed(&vocab_src("doc.index")));
+        assert_eq!(loaded.errors.len(), 2, "{:?}", loaded.errors);
+        assert!(loaded.errors.iter().all(|e| e.contains("reserved")));
+        assert!(loaded.by_namespace.contains_key("doc.index"));
+    }
+
+    #[test]
+    fn add_names_both_sides_of_a_duplicate_namespace() {
+        let mut loaded = LoadedVocabularies::default();
+        loaded.add("a.tmt", &parsed(&vocab_src("acme")));
+        loaded.add("b.tmt", &parsed(&vocab_src("acme")));
+        assert_eq!(loaded.errors.len(), 1, "{:?}", loaded.errors);
+        assert!(loaded.errors[0].contains("a.tmt") && loaded.errors[0].contains("b.tmt"));
+    }
+
+    #[test]
+    fn add_rejects_a_document_with_no_vocabulary_header() {
+        let mut loaded = LoadedVocabularies::default();
+        loaded.add("plain.tmt", &parsed("just prose\n"));
+        assert!(loaded.errors[0].contains("plain.tmt"), "{:?}", loaded.errors);
     }
 }
