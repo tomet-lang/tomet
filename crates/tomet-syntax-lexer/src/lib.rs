@@ -172,7 +172,14 @@ pub fn tokenize(src: &str) -> Vec<(SyntaxKind, &str)> {
                 cursor.eat_while(|ch| ch == ' ' || ch == '\t' || ch == '\r');
                 tokens.push((SyntaxKind::WHITESPACE, cursor.slice_from(start)));
             }
-            '/' if cursor.starts_with("//") => {
+            // `//` starts a comment only after whitespace (or at the start of
+            // the source), as in the inline parser: `https://x` is not one.
+            '/' if cursor.starts_with("//")
+                && src[..start]
+                    .chars()
+                    .next_back()
+                    .is_none_or(|p| matches!(p, ' ' | '\t' | '\n' | '\r')) =>
+            {
                 cursor.eat_while(|ch| ch != '\n');
                 tokens.push((SyntaxKind::COMMENT, cursor.slice_from(start)));
             }
@@ -288,11 +295,25 @@ pub fn tokenize(src: &str) -> Vec<(SyntaxKind, &str)> {
                 cursor.bump();
                 tokens.push((SyntaxKind::SEMI, cursor.slice_from(start)));
             }
+            // An apostrophe inside a word (`don't`) is text, not a quote.
+            '\'' if src[..start]
+                .chars()
+                .next_back()
+                .is_some_and(char::is_alphanumeric) =>
+            {
+                cursor.bump();
+                tokens.push((SyntaxKind::TEXT_CHUNK, cursor.slice_from(start)));
+            }
+            // A string ends at its closing quote or, unterminated, at the end
+            // of the line: a stray quote must not swallow the rest of the file.
             '"' | '\'' => {
                 let quote = c;
                 cursor.bump();
                 let mut escaped = false;
                 while let Some(ch) = cursor.peek() {
+                    if ch == '\n' {
+                        break;
+                    }
                     cursor.bump();
                     if escaped {
                         escaped = false;
@@ -347,6 +368,27 @@ fn is_ident_continue(c: char) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn double_slash_is_a_comment_only_after_a_boundary() {
+        let kinds =
+            |src| -> Vec<SyntaxKind> { tokenize(src).into_iter().map(|(k, _)| k).collect() };
+        assert!(kinds("a // c").contains(&SyntaxKind::COMMENT));
+        assert!(kinds("// c").contains(&SyntaxKind::COMMENT));
+        assert!(!kinds("https://x").contains(&SyntaxKind::COMMENT));
+    }
+
+    #[test]
+    fn strings_stop_at_the_line_and_apostrophes_in_words_are_text() {
+        let toks = tokenize("\"open\nnext");
+        assert_eq!(toks[0], (SyntaxKind::STRING_LITERAL, "\"open"));
+        assert_eq!(toks[1].0, SyntaxKind::NEWLINE);
+        assert!(
+            tokenize("don't")
+                .iter()
+                .all(|(k, _)| *k != SyntaxKind::STRING_LITERAL)
+        );
+    }
+
     use super::*;
 
     #[test]

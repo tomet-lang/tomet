@@ -95,44 +95,57 @@ fn id_from_value(value: Option<Value>) -> Option<String> {
 
 use tomet_cst::{SyntaxKind, SyntaxNode, TextRange};
 
-/// Scans `root` for all `id: <value>` property occurrences and returns their exact [`TextRange`]s.
+/// Scans `root` for the `id` attribute of every element and returns the
+/// exact [`TextRange`] of each value, in document order.
+///
+/// Mirrors [`collect_ids`]: only an `id` entry sitting directly in an
+/// element's `(args)` or `{value}` counts -- not one nested in a map or a
+/// call -- and `@link`'s own `id` does not.
 pub(crate) fn collect_ids_cst(root: &SyntaxNode) -> Vec<(String, TextRange)> {
-    let mut ids = Vec::new();
-    let tokens: Vec<_> = root
-        .descendants_with_tokens()
-        .filter_map(|el| el.into_token())
-        .collect();
+    use SyntaxKind as K;
 
-    let mut i = 0;
-    while i < tokens.len() {
-        if tokens[i].kind() == SyntaxKind::IDENT && tokens[i].text() == "id" {
-            let mut j = i + 1;
-            while j < tokens.len() && tokens[j].kind().is_trivia() {
-                j += 1;
+    root.descendants()
+        .filter(|entry| entry.kind() == K::MAP_ENTRY)
+        .filter_map(|entry| {
+            let group = entry
+                .parent()
+                .filter(|g| matches!(g.kind(), K::ARGS | K::VALUE_DATA))?;
+            let owner = group.parent()?;
+            if !matches!(
+                owner.kind(),
+                K::BLOCK_ELEMENT
+                    | K::INLINE_ELEMENT
+                    | K::SECTION_HEADING
+                    | K::HEADING
+                    | K::LIST_ITEM
+                    | K::THEMATIC_BREAK
+                    | K::CONNECT
+            ) {
+                return None;
             }
-            if j < tokens.len() && tokens[j].kind() == SyntaxKind::COLON {
-                let mut k = j + 1;
-                while k < tokens.len() && tokens[k].kind().is_trivia() {
-                    k += 1;
-                }
-                if k < tokens.len() {
-                    let val_token = &tokens[k];
-                    let kind = val_token.kind();
-                    if kind == SyntaxKind::IDENT
-                        || kind == SyntaxKind::INT_NUMBER
-                        || kind == SyntaxKind::STRING_LITERAL
-                    {
-                        let text = val_token
-                            .text()
-                            .trim_matches('"')
-                            .trim_matches('\'')
-                            .to_string();
-                        ids.push((text, val_token.text_range()));
-                    }
-                }
+            let is_link = owner
+                .children()
+                .find(|n| n.kind() == K::SIGIL)
+                .is_some_and(|sigil| sigil.text() == "@link");
+            if is_link {
+                return None;
             }
-        }
-        i += 1;
-    }
-    ids
+
+            let mut tokens = entry.children_with_tokens().filter_map(|e| e.into_token());
+            let key = tokens.next()?;
+            if key.kind() != K::IDENT || key.text() != "id" {
+                return None;
+            }
+            let value = tokens.find(|t| !t.kind().is_trivia() && t.kind() != K::COLON)?;
+            if !matches!(value.kind(), K::IDENT | K::INT_NUMBER | K::STRING_LITERAL) {
+                return None;
+            }
+            let text = value
+                .text()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_string();
+            Some((text, value.text_range()))
+        })
+        .collect()
 }

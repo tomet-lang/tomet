@@ -2312,6 +2312,7 @@ dependencies = [
  "tomet-transform",
  "tomet-tree",
  "tomet-typst",
+ "tomet-cst",
  "tomet-validator",
  "tomet-workspace",
  "tree-sitter",

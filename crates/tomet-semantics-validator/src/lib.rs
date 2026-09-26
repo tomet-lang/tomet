@@ -984,4 +984,16 @@ mod tests {
         let err_slice = &src[usize::from(err.range().start())..usize::from(err.range().end())];
         assert_eq!(err_slice, "duplicate"); // Exact token!
     }
+
+    #[test]
+    fn validate_cst_counts_only_an_elements_own_id() {
+        // A nested map's `id` and `@link`'s `id` are not element ids.
+        let src = "@a{id: x}\n@b{meta: {id: x}}\n@link[t](id: x)\n";
+        let cst = tomet_parser::parse_cst(src);
+        assert!(validate_cst(&cst).is_empty());
+
+        let src = "@a{id: x}\ntext @b[t](id: x)\n";
+        let cst = tomet_parser::parse_cst(src);
+        assert_eq!(validate_cst(&cst).len(), 1);
+    }
 }
