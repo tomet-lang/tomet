@@ -1951,6 +1951,34 @@ dependencies = [
 name = "tomet"
 version = "0.1.0"
 dependencies = [
+ "tomet-ast",
+ "tomet-config",
+ "tomet-formatter",
+ "tomet-html",
+ "tomet-load",
+ "tomet-markdown",
+ "tomet-pandoc",
+ "tomet-parser",
+ "tomet-printer",
+ "tomet-semantics",
+ "tomet-typst",
+ "tomet-validator",
+ "tomet-vault",
+]
+
+[[package]]
+name = "tomet-ast"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tomet-cst",
+ "unicode-width 0.2.0",
+]
+
+[[package]]
+name = "tomet-cli"
+version = "0.1.0"
+dependencies = [
  "anyhow",
  "axum",
  "clap",
@@ -1983,15 +2011,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tomet-ast"
-version = "0.1.0"
-dependencies = [
- "serde",
- "tomet-cst",
- "unicode-width 0.2.0",
-]
-
-[[package]]
 name = "tomet-compute"
 version = "0.1.0"
 dependencies = [
@@ -2018,6 +2037,16 @@ name = "tomet-cst"
 version = "0.1.0"
 dependencies = [
  "rowan",
+]
+
+[[package]]
+name = "tomet-edit"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-cst",
+ "tomet-parser",
+ "tomet-tree",
 ]
 
 [[package]]
@@ -2079,15 +2108,7 @@ dependencies = [
  "jni",
  "serde",
  "serde_json",
- "tomet-ast",
- "tomet-formatter",
- "tomet-html",
- "tomet-markdown",
- "tomet-parser",
- "tomet-printer",
- "tomet-semantics",
- "tomet-typst",
- "tomet-validator",
+ "tomet",
 ]
 
 [[package]]
@@ -2099,19 +2120,11 @@ dependencies = [
  "regex",
  "serde",
  "serde-wasm-bindgen",
- "tomet-ast",
+ "tomet",
  "tomet-cst",
- "tomet-formatter",
- "tomet-html",
  "tomet-lexer",
  "tomet-links",
- "tomet-markdown",
- "tomet-parser",
- "tomet-printer",
- "tomet-semantics",
  "tomet-transform",
- "tomet-typst",
- "tomet-validator",
  "wasm-bindgen",
 ]
 
@@ -2143,7 +2156,6 @@ name = "tomet-load"
 version = "0.1.0"
 dependencies = [
  "tomet-ast",
- "tomet-compute",
  "tomet-config",
  "tomet-indexer",
  "tomet-parser",
@@ -2151,6 +2163,7 @@ dependencies = [
  "tomet-search",
  "tomet-semantics",
  "tomet-transform",
+ "tomet-vault",
 ]
 
 [[package]]
@@ -2239,15 +2252,7 @@ dependencies = [
  "pyo3",
  "pythonize",
  "serde",
- "tomet-ast",
- "tomet-formatter",
- "tomet-html",
- "tomet-markdown",
- "tomet-parser",
- "tomet-printer",
- "tomet-semantics",
- "tomet-typst",
- "tomet-validator",
+ "tomet",
 ]
 
 [[package]]
@@ -2302,6 +2307,7 @@ dependencies = [
  "tomet-ast",
  "tomet-compute",
  "tomet-config",
+ "tomet-cst",
  "tomet-formatter",
  "tomet-html",
  "tomet-markdown",
@@ -2312,7 +2318,6 @@ dependencies = [
  "tomet-transform",
  "tomet-tree",
  "tomet-typst",
- "tomet-cst",
  "tomet-validator",
  "tomet-workspace",
  "tree-sitter",
@@ -2382,6 +2387,20 @@ dependencies = [
  "tomet-parser",
  "tomet-semantics",
  "tomet-tree",
+]
+
+[[package]]
+name = "tomet-vault"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-compute",
+ "tomet-config",
+ "tomet-parser",
+ "tomet-resolver",
+ "tomet-search",
+ "tomet-semantics",
+ "tomet-transform",
 ]
 
 [[package]]
