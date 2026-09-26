@@ -13,7 +13,42 @@ fn format_file(path: &Path, src: &str) -> String {
     tomet_formatter::format_source_with_config(src, &config)
 }
 
-pub(crate) fn format_cmd(paths: &[PathBuf], write: bool, check: bool) -> anyhow::Result<()> {
+/// Whether the config governing `path` leaves it alone
+/// (`workspace.ignore` / `workspace.unswept`).
+///
+/// A directory sweep already skips such files, but a path named on the
+/// command line used to be taken as-is. That made `tomet format -i` over an
+/// explicit file list -- `git ls-files`, a shell glob -- rewrite the frozen
+/// corpus and its references, which exist to be left exactly as they are.
+fn is_excluded_by_config(path: &Path) -> bool {
+    tomet_config::find_config_file(path)
+        .is_some_and(|(config, _, root)| tomet_indexer::is_excluded_by_config(path, &root, &config))
+}
+
+/// Every `.tmt` file under `dir`; with `force`, the config's exclusions
+/// (`ignore`, `unswept`) are not applied. `.gitignore` still is.
+fn collect_dir(dir: &Path, force: bool) -> Vec<PathBuf> {
+    if !force {
+        return tomet_indexer::collect_tm_files(dir);
+    }
+    let (mut config, _, root) = tomet_config::find_config_file(dir).unwrap_or_else(|| {
+        (
+            tomet_config::PrinterConfig::default(),
+            dir.to_path_buf(),
+            dir.to_path_buf(),
+        )
+    });
+    config.ignore_files.clear();
+    config.unswept_files.clear();
+    tomet_indexer::collect_tm_files_with_config(dir, &config, &root)
+}
+
+pub(crate) fn format_cmd(
+    paths: &[PathBuf],
+    write: bool,
+    check: bool,
+    force: bool,
+) -> anyhow::Result<()> {
     if paths.is_empty() {
         return Ok(());
     }
@@ -26,18 +61,30 @@ pub(crate) fn format_cmd(paths: &[PathBuf], write: bool, check: bool) -> anyhow:
     }
 
     let mut files = Vec::new();
+    let mut skipped = 0usize;
     for path in paths {
         if path.is_file() {
-            files.push(path.clone());
+            if !force && is_excluded_by_config(path) {
+                eprintln!(
+                    "skipped {}: excluded by the project config (workspace.ignore / \
+                     workspace.unswept); pass --force to include it",
+                    path.display()
+                );
+                skipped += 1;
+            } else {
+                files.push(path.clone());
+            }
         } else if path.is_dir() {
-            files.extend(tomet_indexer::collect_tm_files(path));
+            files.extend(collect_dir(path, force));
         } else {
             return Err(anyhow::anyhow!("path '{}' does not exist", path.display()));
         }
     }
 
     if files.is_empty() {
-        println!("No .tmt files found");
+        if skipped == 0 {
+            println!("No .tmt files found");
+        }
         return Ok(());
     }
 
@@ -136,11 +183,11 @@ mod tests {
 
         // And what the config-aware pass produces is what --check accepts.
         fs::write(&doc, &with_config).unwrap();
-        assert!(format_cmd(std::slice::from_ref(&doc), false, true).is_ok());
+        assert!(format_cmd(std::slice::from_ref(&doc), false, true, false).is_ok());
 
         fs::write(&doc, ragged).unwrap();
         assert!(
-            format_cmd(&[doc], false, true).is_err(),
+            format_cmd(&[doc], false, true, false).is_err(),
             "--check must reject a file the config-aware formatter would rewrite"
         );
 
@@ -159,7 +206,7 @@ mod tests {
         fs::write(&file2, "# Heading 2   \n").unwrap();
 
         let paths = vec![file1.clone(), file2.clone()];
-        format_cmd(&paths, true, false).unwrap();
+        format_cmd(&paths, true, false, false).unwrap();
 
         let res1 = fs::read_to_string(&file1).unwrap();
         let res2 = fs::read_to_string(&file2).unwrap();
@@ -179,11 +226,51 @@ mod tests {
 
         fs::write(&file, "# Heading   \n").unwrap();
         let paths = vec![file.clone()];
-        assert!(format_cmd(&paths, false, true).is_err());
+        assert!(format_cmd(&paths, false, true, false).is_err());
 
-        format_cmd(&paths, true, false).unwrap();
-        assert!(format_cmd(&paths, false, true).is_ok());
+        format_cmd(&paths, true, false, false).unwrap();
+        assert!(format_cmd(&paths, false, true, false).is_ok());
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    /// A file named on the command line is held to the same exclusions as a
+    /// directory sweep, and `--force` lifts them.
+    #[test]
+    fn an_explicit_file_the_config_leaves_alone_is_skipped_until_forced() {
+        let vault =
+            std::env::temp_dir().join(format!("tomet_test_fmt_unswept_{}", nanoid::nanoid!()));
+        let frozen_dir = vault.join("tests").join("fixtures");
+        let _ = fs::create_dir_all(&frozen_dir);
+        fs::write(
+            vault.join("default.config.tmt"),
+            "@kind(config)\n@config(format:json)+++\n{ \"workspace\": { \"unswept\": [\"tests/fixtures\"] } }\n+++\n",
+        )
+        .unwrap();
+        let frozen = frozen_dir.join("f.tmt");
+        let normal = vault.join("n.tmt");
+        let ragged = "# Heading   \n";
+        fs::write(&frozen, ragged).unwrap();
+        fs::write(&normal, ragged).unwrap();
+
+        // Both named explicitly: only the ordinary one is rewritten.
+        format_cmd(&[frozen.clone(), normal.clone()], true, false, false).unwrap();
+        assert_eq!(fs::read_to_string(&frozen).unwrap(), ragged);
+        assert_eq!(fs::read_to_string(&normal).unwrap(), "# Heading\n");
+
+        // `--check` does not count a skipped file against the run.
+        assert!(format_cmd(std::slice::from_ref(&frozen), false, true, false).is_ok());
+
+        // A directory sweep skips it too, and `--force` reaches it either way.
+        format_cmd(std::slice::from_ref(&vault), true, false, false).unwrap();
+        assert_eq!(fs::read_to_string(&frozen).unwrap(), ragged);
+        format_cmd(std::slice::from_ref(&frozen), true, false, true).unwrap();
+        assert_eq!(fs::read_to_string(&frozen).unwrap(), "# Heading\n");
+
+        fs::write(&frozen, ragged).unwrap();
+        format_cmd(std::slice::from_ref(&vault), true, false, true).unwrap();
+        assert_eq!(fs::read_to_string(&frozen).unwrap(), "# Heading\n");
+
+        let _ = fs::remove_dir_all(&vault);
     }
 }

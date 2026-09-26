@@ -78,7 +78,8 @@ fn main() -> ExitCode {
             paths,
             in_place,
             check,
-        } => format_cmd(paths, *in_place, *check),
+            force,
+        } => format_cmd(paths, *in_place, *check, *force),
         Command::Tui { path, config } => tomet_tui::run_tui(path.clone(), config.clone()),
         Command::Export {
             path,
@@ -94,7 +95,16 @@ fn main() -> ExitCode {
             meta_kind,
             value_dsl,
             check,
-        } => refactor_cmd(path, *in_place, *url_macros, *meta_kind, *value_dsl, *check),
+            force,
+        } => refactor_cmd(
+            path,
+            *in_place,
+            *url_macros,
+            *meta_kind,
+            *value_dsl,
+            *check,
+            *force,
+        ),
         Command::New {
             path,
             blueprint,

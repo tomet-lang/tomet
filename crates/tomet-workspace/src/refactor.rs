@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use tomet_ast::Document;
 use tomet_config::{PrinterConfig, find_config_file};
 use tomet_formatter::format_source;
-use tomet_indexer::collect_tm_files_with_config;
+use tomet_indexer::{collect_tm_files_with_config, is_excluded_by_config};
 use tomet_parser::parse_document;
 use tomet_printer::document_to_tm_with_config;
 use tomet_transform::{
@@ -25,6 +25,10 @@ pub struct RefactorOptions {
     pub meta_type_to_kind: bool,
     /// Normalize `@meta(format:yaml)` to native Value DSL `@meta`.
     pub meta_to_value_dsl: bool,
+    /// Also refactor files and directories the project config excludes
+    /// (`workspace.ignore`, `workspace.unswept`). Off by default: a file
+    /// named explicitly is held to the same exclusions as one a sweep finds.
+    pub force: bool,
 }
 
 impl Default for RefactorOptions {
@@ -33,6 +37,7 @@ impl Default for RefactorOptions {
             url_to_macros: true,
             meta_type_to_kind: true,
             meta_to_value_dsl: true,
+            force: false,
         }
     }
 }
@@ -119,27 +124,39 @@ pub struct RefactorReport {
     /// Path and error message, one per file that could not be read or
     /// parsed.
     pub errors: Vec<(PathBuf, String)>,
+    /// A file named explicitly that the config excludes, left untouched
+    /// because `force` was off.
+    pub skipped: Vec<PathBuf>,
 }
 
 pub fn refactor_workspace(
     target_path: &Path,
     options: &RefactorOptions,
 ) -> anyhow::Result<RefactorReport> {
-    let (config, _, config_root) = find_config_file(target_path).unwrap_or_else(|| {
+    let (mut config, _, config_root) = find_config_file(target_path).unwrap_or_else(|| {
         (
             PrinterConfig::default(),
             target_path.to_path_buf(),
             target_path.to_path_buf(),
         )
     });
+    let mut report = RefactorReport::default();
+
+    if options.force {
+        config.ignore_files.clear();
+        config.unswept_files.clear();
+    }
 
     let files = if target_path.is_file() {
-        vec![target_path.to_path_buf()]
+        if is_excluded_by_config(target_path, &config_root, &config) {
+            report.skipped.push(target_path.to_path_buf());
+            Vec::new()
+        } else {
+            vec![target_path.to_path_buf()]
+        }
     } else {
         collect_tm_files_with_config(target_path, &config, &config_root)
     };
-
-    let mut report = RefactorReport::default();
 
     for path in files {
         let original_src = match fs::read_to_string(&path) {

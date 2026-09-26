@@ -158,8 +158,10 @@ pub enum Command {
     /// whitespace, blank lines, final newline). A directory formats every
     /// `.tmt`/`.tmt` file found under it (same file discovery as `export`/
     /// `check-links`: honors `.gitignore` and the project config's
-    /// `ignore_files`). Prints to stdout by default; see
-    /// `--in-place`/`--check`.
+    /// `ignore_files`). A file named explicitly is held to the same rule: one
+    /// the config excludes (`workspace.ignore`/`workspace.unswept`, e.g. the
+    /// frozen test corpus) is skipped with a warning unless `--force` is
+    /// given. Prints to stdout by default; see `--in-place`/`--check`.
     Format {
         /// Target file(s) or directory/directories to format.
         #[arg(required = true)]
@@ -171,6 +173,11 @@ pub enum Command {
         /// formatted, without writing or printing anything.
         #[arg(long, conflicts_with = "in_place")]
         check: bool,
+        /// Format files and directories the project config excludes
+        /// (`workspace.ignore`, `workspace.unswept`) as well. `.gitignore`
+        /// still applies.
+        #[arg(long)]
+        force: bool,
     },
 
     /// Launch the interactive TUI workbench for Markdown migration,
@@ -241,6 +248,12 @@ pub enum Command {
         /// Check/dry-run mode without modifying files (exits non-zero if changes are needed).
         #[arg(long, conflicts_with = "in_place")]
         check: bool,
+        /// Refactor files and directories the project config excludes
+        /// (`workspace.ignore`, `workspace.unswept`) as well. Without it, a
+        /// file named explicitly that the config excludes is skipped with a
+        /// warning, as it would be in a directory sweep.
+        #[arg(long)]
+        force: bool,
     },
     /// Create a new .tmt document from a blueprint.
     New {

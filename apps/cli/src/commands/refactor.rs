@@ -7,6 +7,7 @@ pub(crate) fn refactor_cmd(
     meta_kind: bool,
     value_dsl: bool,
     check: bool,
+    force: bool,
 ) -> anyhow::Result<()> {
     let options = if !url_macros && !meta_kind && !value_dsl {
         tomet_workspace::RefactorOptions::default()
@@ -15,10 +16,19 @@ pub(crate) fn refactor_cmd(
             url_to_macros: url_macros,
             meta_type_to_kind: meta_kind,
             meta_to_value_dsl: value_dsl,
+            ..tomet_workspace::RefactorOptions::default()
         }
     };
+    let options = tomet_workspace::RefactorOptions { force, ..options };
 
     let mut report = tomet_workspace::refactor_workspace(path, &options)?;
+    for file in &report.skipped {
+        eprintln!(
+            "skipped {}: excluded by the project config (workspace.ignore / \
+             workspace.unswept); pass --force to include it",
+            file.display()
+        );
+    }
     let results = &report.diffs;
     let changed_files: Vec<_> = results.iter().filter(|r| r.is_changed()).collect();
 
@@ -109,7 +119,7 @@ mod tests {
         fs::write(temp_dir.join("fine.tmt"), "@kind(note)\n\n=[ Title ]\n").unwrap();
         fs::write(temp_dir.join("broken.tmt"), "=[ unterminated\n").unwrap();
 
-        let res = refactor_cmd(&temp_dir, false, false, false, false, true);
+        let res = refactor_cmd(&temp_dir, false, false, false, false, true, false);
         assert!(
             res.is_err(),
             "--check must not pass while a file could not be parsed"
@@ -139,7 +149,7 @@ title: My Title
 "#;
         fs::write(&src_file, src_content).unwrap();
 
-        let res = refactor_cmd(&src_file, true, false, false, false, false);
+        let res = refactor_cmd(&src_file, true, false, false, false, false, false);
         assert!(res.is_ok());
 
         let refactored = fs::read_to_string(&src_file).unwrap();
@@ -148,5 +158,35 @@ title: My Title
         assert!(!refactored.contains("format:yaml"));
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    /// `refactor -i` rewrites files from the AST, so it must not be pointed
+    /// at the frozen corpus just because the path was spelled out.
+    #[test]
+    fn an_explicit_file_the_config_leaves_alone_is_skipped_until_forced() {
+        let vault =
+            std::env::temp_dir().join(format!("tomet_test_refactor_unswept_{}", nanoid::nanoid!()));
+        let frozen_dir = vault.join("tests").join("fixtures");
+        let _ = fs::create_dir_all(&frozen_dir);
+        fs::write(
+            vault.join("default.config.tmt"),
+            "@kind(config)\n@config(format:json)+++\n{ \"workspace\": { \"unswept\": [\"tests/fixtures\"] } }\n+++\n",
+        )
+        .unwrap();
+        let frozen = frozen_dir.join("f.tmt");
+        let old = "@meta(format:yaml)+++\ntype: note\n+++\n";
+        fs::write(&frozen, old).unwrap();
+
+        refactor_cmd(&frozen, true, false, false, false, false, false).unwrap();
+        assert_eq!(fs::read_to_string(&frozen).unwrap(), old, "left alone");
+
+        refactor_cmd(&frozen, true, false, false, false, false, true).unwrap();
+        assert_ne!(
+            fs::read_to_string(&frozen).unwrap(),
+            old,
+            "--force reaches it"
+        );
+
+        let _ = fs::remove_dir_all(&vault);
     }
 }
