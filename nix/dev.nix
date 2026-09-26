@@ -41,6 +41,8 @@ mkShell rec {
     cargo-outdated
     cargo-nextest
     wasm-bindgen-cli
+    binaryen # wasm-opt: the size a browser downloads is after this
+    twiggy # which crates the wasm size is spent in
     ##[ Pandoc ]
     haskellPackages.pandoc-cli
     ##[ VS Code extension @dir(apps/vscode-extension) ]
