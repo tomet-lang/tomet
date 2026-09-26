@@ -1,19 +1,31 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use tomet_crate::config::PrinterConfig;
+use tomet_crate::vault::Vault;
+
+/// Parses `source` against a vault with no vocabularies of its own.
+///
+/// The facade has no bare parse on purpose (see `tomet`'s crate doc), and
+/// nothing here needs one: everything except `validate_with` reads a
+/// document as `std` alone, which is exactly what an empty vault is.
+fn parse(source: &str) -> PyResult<tomet_crate::Document> {
+    Vault::from_sources(PrinterConfig::default(), ".", &[])
+        .parse(source)
+        .map(|(doc, _bindings)| doc)
+        .map_err(|e| PyValueError::new_err(e.to_string()))
+}
 
 /// Parse a data-only `.tmt` document into native Python objects (dict, list, str, int, float, bool, None).
 #[pyfunction]
 fn loads<'py>(py: Python<'py>, source: &str) -> PyResult<Bound<'py, PyAny>> {
-    let val =
-        tomet_parser::parse_value(source).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let val = tomet_crate::parse_value(source).map_err(|e| PyValueError::new_err(e.to_string()))?;
     pythonize::pythonize(py, &val).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 /// Parse a full `.tmt` markup source text into a Python dict representing the Document AST.
 #[pyfunction]
 fn parse_document<'py>(py: Python<'py>, source: &str) -> PyResult<Bound<'py, PyAny>> {
-    let doc =
-        tomet_parser::parse_document(source).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let doc = parse(source)?;
     pythonize::pythonize(py, &doc).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
@@ -21,13 +33,12 @@ fn parse_document<'py>(py: Python<'py>, source: &str) -> PyResult<Bound<'py, PyA
 #[pyfunction]
 fn to_html(_py: Python<'_>, source_or_doc: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(src) = source_or_doc.extract::<String>() {
-        let doc =
-            tomet_parser::parse_document(&src).map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(tomet_html::render_body(&doc))
+        let doc = parse(&src)?;
+        Ok(tomet_crate::html::render_body(&doc))
     } else {
-        let doc: tomet_ast::Document = pythonize::depythonize(source_or_doc)
+        let doc: tomet_crate::Document = pythonize::depythonize(source_or_doc)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(tomet_html::render_body(&doc))
+        Ok(tomet_crate::html::render_body(&doc))
     }
 }
 
@@ -35,13 +46,12 @@ fn to_html(_py: Python<'_>, source_or_doc: &Bound<'_, PyAny>) -> PyResult<String
 #[pyfunction]
 fn to_markdown(_py: Python<'_>, source_or_doc: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(src) = source_or_doc.extract::<String>() {
-        let doc =
-            tomet_parser::parse_document(&src).map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(tomet_markdown::to_markdown(&doc))
+        let doc = parse(&src)?;
+        Ok(tomet_crate::markdown::to_markdown(&doc))
     } else {
-        let doc: tomet_ast::Document = pythonize::depythonize(source_or_doc)
+        let doc: tomet_crate::Document = pythonize::depythonize(source_or_doc)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(tomet_markdown::to_markdown(&doc))
+        Ok(tomet_crate::markdown::to_markdown(&doc))
     }
 }
 
@@ -49,43 +59,41 @@ fn to_markdown(_py: Python<'_>, source_or_doc: &Bound<'_, PyAny>) -> PyResult<St
 #[pyfunction]
 fn to_typst(_py: Python<'_>, source_or_doc: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(src) = source_or_doc.extract::<String>() {
-        let doc =
-            tomet_parser::parse_document(&src).map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(tomet_typst::to_typst(&doc))
+        let doc = parse(&src)?;
+        Ok(tomet_crate::typst::to_typst(&doc))
     } else {
-        let doc: tomet_ast::Document = pythonize::depythonize(source_or_doc)
+        let doc: tomet_crate::Document = pythonize::depythonize(source_or_doc)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(tomet_typst::to_typst(&doc))
+        Ok(tomet_crate::typst::to_typst(&doc))
     }
 }
 
 /// Parse CommonMark Markdown text into a `Document` AST dict.
 #[pyfunction]
 fn from_markdown<'py>(py: Python<'py>, markdown: &str) -> PyResult<Bound<'py, PyAny>> {
-    let doc = tomet_markdown::from_markdown(markdown);
+    let doc = tomet_crate::markdown::from_markdown(markdown);
     pythonize::pythonize(py, &doc).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 /// Serialize a `Document` AST dict back into formatted `.tmt` source code.
 #[pyfunction]
 fn print_document(_py: Python<'_>, doc_obj: &Bound<'_, PyAny>) -> PyResult<String> {
-    let doc: tomet_ast::Document =
+    let doc: tomet_crate::Document =
         pythonize::depythonize(doc_obj).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    Ok(tomet_printer::document_to_tm(&doc))
+    Ok(tomet_crate::printer::document_to_tm(&doc))
 }
 
 /// Format `.tmt` source text with lossless whitespace hygiene and span preservation.
 #[pyfunction]
 fn format(source: &str) -> String {
-    tomet_formatter::format_source(source)
+    tomet_crate::format::format_source(source)
 }
 
 /// Validate `.tmt` source text and return a list of validation errors.
 #[pyfunction]
 fn validate<'py>(py: Python<'py>, source: &str) -> PyResult<Bound<'py, PyAny>> {
-    let doc =
-        tomet_parser::parse_document(source).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    let diagnostics = tomet_validator::validate_document(&doc);
+    let doc = parse(source)?;
+    let diagnostics = tomet_crate::validator::validate_document(&doc);
     pythonize::pythonize(py, &diagnostics).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
@@ -94,23 +102,29 @@ fn validate<'py>(py: Python<'py>, source: &str) -> PyResult<Bound<'py, PyAny>> {
 ///
 /// Without them, `validate` knows only `std`, so every element a
 /// vocabulary declares comes back as unknown. A source that does not
-/// parse, or has no `@vocabulary(ns)` header, is skipped -- it binds no
-/// namespace. Check vocabularies themselves with `tomet check`.
+/// parse, has no `@vocabulary(ns)` header, or claims a reserved or
+/// already-taken namespace is skipped -- it binds no namespace. `doc.index`
+/// is always known, as it is to the CLI. Check vocabularies themselves with
+/// `tomet check`.
 #[pyfunction]
 fn validate_with<'py>(
     py: Python<'py>,
     source: &str,
     vocabularies: Vec<String>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let doc =
-        tomet_parser::parse_document(source).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    let parsed = vocabularies.iter().filter_map(|src| {
-        tomet_parser::parse_document(src)
-            .ok()
-            .and_then(|d| tomet_semantics::Vocabulary::from_document(&d))
-    });
-    let bindings = tomet_semantics::Bindings::for_document(&doc, parsed);
-    let diagnostics = tomet_validator::validate_document_with(&doc, &bindings);
+    let labels: Vec<String> = (0..vocabularies.len())
+        .map(|i| format!("vocabularies[{i}]"))
+        .collect();
+    let sources: Vec<(&str, &str)> = labels
+        .iter()
+        .map(String::as_str)
+        .zip(vocabularies.iter().map(String::as_str))
+        .collect();
+    let vault = Vault::from_sources(PrinterConfig::default(), ".", &sources);
+    let (doc, bindings) = vault
+        .parse(source)
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let diagnostics = tomet_crate::validator::validate_document_with(&doc, &bindings);
     pythonize::pythonize(py, &diagnostics).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
