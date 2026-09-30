@@ -10,7 +10,7 @@ tomet-lexer = { workspace = true }
 tomet-tree = { workspace = true }
 tove = { workspace = true }
 
-#[ Crates.io ]
+#= Crates.io
 unicode-width = { workspace = true }
 
 [dev-dependencies]

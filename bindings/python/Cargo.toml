@@ -14,8 +14,15 @@ extension-module = ["pyo3/extension-module"]
 [dependencies]
 # The facade's package is `tomet`, which is also this library's own name,
 # so the dependency is renamed.
-tomet-crate = { package = "tomet", path = "../../crates/tomet", features = ["html", "markdown", "typst", "format", "printer"] }
+tomet-crate = { package = "tomet", path = "../../crates/tomet", features = [
+  "html",
+  "markdown",
+  "typst",
+  "format",
+  "printer",
+] }
 
+#= Crates.io
 pyo3 = { workspace = true, features = ["auto-initialize"] }
 pythonize = { workspace = true }
 serde = { workspace = true }

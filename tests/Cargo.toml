@@ -57,13 +57,15 @@ tomet-html = { workspace = true }
 tomet-markdown = { workspace = true }
 tomet-pandoc = { workspace = true }
 tomet-parser = { workspace = true }
-tomet-semantics = { workspace = true }
 tomet-printer = { workspace = true }
+tomet-semantics = { workspace = true }
 tomet-transform = { workspace = true }
 tomet-tree = { workspace = true }
 tomet-typst = { workspace = true }
 tomet-validator = { workspace = true }
 tomet-workspace = { workspace = true }
 tree-sitter-tomet = { workspace = true }
-tree-sitter = { workspace = true }
+
+#= Crates.io
 serde_json = { workspace = true }
+tree-sitter = { workspace = true }

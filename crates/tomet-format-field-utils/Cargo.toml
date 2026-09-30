@@ -6,6 +6,6 @@ edition.workspace = true
 [dependencies]
 tomet-config = { workspace = true }
 
-#[ Crates.io ]
+#= Crates.io
 nanoid = { workspace = true }
 uuid = { workspace = true }

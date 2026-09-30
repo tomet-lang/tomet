@@ -967,6 +967,10 @@ mod tests {
     fn add_rejects_a_document_with_no_vocabulary_header() {
         let mut loaded = LoadedVocabularies::default();
         loaded.add("plain.tmt", &parsed("just prose\n"));
-        assert!(loaded.errors[0].contains("plain.tmt"), "{:?}", loaded.errors);
+        assert!(
+            loaded.errors[0].contains("plain.tmt"),
+            "{:?}",
+            loaded.errors
+        );
     }
 }

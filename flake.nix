@@ -1,25 +1,32 @@
 {
-  description = "Rust Environment with Fenix and Crane";
+  description = "Tomet - A structured markup language for thought and document graphs";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    treefmt-nix.url = "github:numtide/treefmt-nix";
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
-    #[ Rust ]
+    #= Rust
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    crane.url = "github:ipetkov/crane";
+    crane = {
+      url = "github:ipetkov/crane";
+    };
 
-    #[ Tool ]
+    #= Tool
     twrit = {
       url = "github:tomet-lang/tomet-writ";
+      inputs.nixpkgs.follows = "nixpkgs";
       inputs.tomet.follows = "";
     };
     tomet-book = {
       url = "github:tomet-lang/tomet-book";
+      inputs.nixpkgs.follows = "nixpkgs";
       inputs.tomet.follows = "";
     };
   };

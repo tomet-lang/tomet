@@ -2,80 +2,82 @@
 resolver = "3"
 
 members = [
-  #[ CLI ]
+  #= CLI
   "apps/cli",
   "apps/lsp",
 
-  #[ Bindings ]
+  #= Apps
+  "apps/tui",
+
+  #= Bindings
   "bindings/java",
   "bindings/js",
   "bindings/python",
 
-  #[ Editor Support ]
+  #= Editor Support
   "editors/zed",
 
-  #[ Syntax -- grammar/parsing ]
+  #= Facade -- the one crate a Rust consumer depends on
+  "crates/tomet",
+
+  #= Public -- external ecosystem adapters
+  "crates/tove",
+  "crates/tree-sitter-tomet",
+
+  #= Syntax -- grammar/parsing
   "crates/tomet-syntax-cst",
   "crates/tomet-syntax-ast",
   "crates/tomet-syntax-tree",
   "crates/tomet-syntax-lexer",
   "crates/tomet-syntax-parser",
 
-  #[ Semantics -- classification/validation/eval/resolve ]
+  #= Semantics -- classification/validation/eval/resolve
   "crates/tomet-semantics",
   "crates/tomet-semantics-validator",
   "crates/tomet-semantics-compute",
   "crates/tomet-semantics-resolver",
 
-  #[ Config -- PrinterConfig discovery & loading; the producers sit on this ]
+  #= Config -- PrinterConfig discovery & loading; the producers sit on this
   "crates/tomet-config",
 
-  #[ Load -- the front door: config + vocabularies + parse + bind ]
+  #= Load -- the front door: config + vocabularies + parse + bind
   "crates/tomet-load",
 
-  #[ Transform -- in-memory AST transformations & macros ]
+  #= Transform -- in-memory AST transformations & macros
   "crates/tomet-transform",
 
-  #[ Search -- in-memory structural search & filter queries ]
+  #= Search -- in-memory structural search & filter queries
   "crates/tomet-search",
 
-  #[ Edit -- backend-neutral editable model for collaborative editing ]
+  #= Edit -- backend-neutral editable model for collaborative editing
   "crates/tomet-edit",
 
-  #[ Vault -- a vault's config and vocabularies, no disk ]
+  #= Vault -- a vault's config and vocabularies, no disk
   "crates/tomet-vault",
 
-  #[ Convert -- conversion to/from external document formats ]
+  #= Convert -- conversion to/from external document formats
   "crates/tomet-convert-markdown",
   "crates/tomet-convert-html",
   "crates/tomet-convert-typst",
   "crates/tomet-convert-pandoc",
 
-  #[ Extract -- extraction of tomet from external source files / comments ]
+  #= Extract -- extraction of tomet from external source files / comments
   "crates/tomet-extract",
 
-  #[ Format -- .tmt source text production & formatting ]
+  #= Format -- .tmt source text production & formatting
   "crates/tomet-format",
   "crates/tomet-format-field-utils",
   "crates/tomet-format-style",
   "crates/tomet-format-printer",
 
-  #[ Workspace -- multi-file/disk operations & config discovery ]
+  #= Workspace -- multi-file/disk operations & config discovery
   "crates/tomet-workspace",
   "crates/tomet-workspace-indexer",
   "crates/tomet-workspace-links",
+  "crates/tomet-config",
+  "crates/tomet-load",
 
-  #[ Public -- external ecosystem adapters ]
-  "crates/tove",
-  "crates/tree-sitter-tomet",
-
-  #[ Apps ]
-  "apps/tui",
-
-  #[ Facade -- the one crate a Rust consumer depends on ]
-  "crates/tomet",
-
-  #[ Tests -- cross-crate corpus, round-trip, and snapshot suites ]
+  #= Tests -- cross-crate corpus, round-trip, and snapshot suites
   "tests",
 ]
 
@@ -84,68 +86,70 @@ default-members = ["apps/cli"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 
 [workspace.dependencies]
-#[ Syntax ]
-tomet-cst = { path = "crates/tomet-syntax-cst" }
+#= Syntax
 tomet-ast = { path = "crates/tomet-syntax-ast" }
-tomet-tree = { path = "crates/tomet-syntax-tree" }
+tomet-cst = { path = "crates/tomet-syntax-cst" }
 tomet-lexer = { path = "crates/tomet-syntax-lexer" }
 tomet-parser = { path = "crates/tomet-syntax-parser" }
-#[ Semantics ]
-tomet-semantics = { path = "crates/tomet-semantics" }
-tomet-validator = { path = "crates/tomet-semantics-validator" }
+tomet-tree = { path = "crates/tomet-syntax-tree" }
+#= Semantics
 tomet-compute = { path = "crates/tomet-semantics-compute" }
 tomet-resolver = { path = "crates/tomet-semantics-resolver" }
-#[ Transform ]
+tomet-semantics = { path = "crates/tomet-semantics" }
+tomet-validator = { path = "crates/tomet-semantics-validator" }
+#= Transform
 tomet-transform = { path = "crates/tomet-transform" }
-#[ Search ]
+#= Search
 tomet-search = { path = "crates/tomet-search" }
-#[ Edit ]
+#= Edit
 tomet-edit = { path = "crates/tomet-edit" }
-#[ Vault ]
+#= Vault
 tomet-vault = { path = "crates/tomet-vault" }
-#[ Convert ]
-tomet-markdown = { path = "crates/tomet-convert-markdown" }
+#= Convert
 tomet-html = { path = "crates/tomet-convert-html" }
-tomet-typst = { path = "crates/tomet-convert-typst" }
+tomet-markdown = { path = "crates/tomet-convert-markdown" }
 tomet-pandoc = { path = "crates/tomet-convert-pandoc" }
-#[ Extract ]
+tomet-typst = { path = "crates/tomet-convert-typst" }
+#= Extract
 tomet-extract = { path = "crates/tomet-extract" }
-#[ Format ]
+#= Format
 tomet-field-utils = { path = "crates/tomet-format-field-utils" }
-tomet-style = { path = "crates/tomet-format-style" }
-tomet-printer = { path = "crates/tomet-format-printer" }
 tomet-formatter = { path = "crates/tomet-format" }
-#[ Workspace ]
-tomet-workspace = { path = "crates/tomet-workspace" }
+tomet-printer = { path = "crates/tomet-format-printer" }
+tomet-style = { path = "crates/tomet-format-style" }
+#= Workspace
+tomet-config = { path = "crates/tomet-config" }
 tomet-indexer = { path = "crates/tomet-workspace-indexer" }
 tomet-links = { path = "crates/tomet-workspace-links" }
-tomet-config = { path = "crates/tomet-config" }
 tomet-load = { path = "crates/tomet-load" }
-#[ Public ]
+tomet-workspace = { path = "crates/tomet-workspace" }
+#= Public
 tove = { path = "crates/tove" }
 tree-sitter-tomet = { path = "crates/tree-sitter-tomet" }
-#[ Facade ]
+#= Facade
 tomet = { path = "crates/tomet" }
-#[ Apps ]
+#= Apps
 tomet-tui = { path = "apps/tui" }
 
-#[ Crates.io ]
+#= Crates.io
 anyhow = "1"
 axum = { version = "0.8", default-features = false, features = [
   "http1",
   "tokio",
 ] }
 clap = { version = "4.6", features = ["derive"] }
-cxx = "1"
 crossterm = "0.28"
+cxx = "1"
 directories = "6.0"
 ignore = "0.4"
 jni = "0.21"
 js-sys = "0.3"
 lsp-server = "0.10"
 lsp-types = "0.97"
+nanoid = "0.4"
 pulldown-cmark = "0.13"
 pyo3 = { version = "0.23", features = ["serde"] }
 pythonize = "0.23"
@@ -163,9 +167,11 @@ tokio = "1"
 toml = { version = "0.9", features = ["preserve_order"] }
 tree-sitter = "0.26"
 tree-sitter-language = "0.1"
-nanoid = "0.4"
 unicode-width = "0.2"
 uuid = { version = "1.23", features = ["v4", "js"] }
 walkdir = "2"
 wasm-bindgen = "=0.2.127"
 zed_extension_api = "0.7"
+
+[profile.dev.package."*"]
+opt-level = 3

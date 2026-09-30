@@ -18,7 +18,7 @@ craneLib.buildPackage (
   // {
     inherit cargoArtifacts;
 
-    cargoExtraArgs = "-p tomet";
+    cargoExtraArgs = "-p tomet-cli";
 
     doCheck = true;
   }

@@ -16,5 +16,5 @@ tomet-semantics = { workspace = true }
 tomet-transform = { workspace = true }
 tomet-tree = { workspace = true }
 
-#[ Crates.io ]
+#= Crates.io
 anyhow = { workspace = true }

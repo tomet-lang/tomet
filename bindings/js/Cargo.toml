@@ -7,15 +7,22 @@ edition.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-tomet = { workspace = true, features = ["html", "markdown", "typst", "format", "printer"] }
+tomet = { workspace = true, features = [
+  "html",
+  "markdown",
+  "typst",
+  "format",
+  "printer",
+] }
 tomet-cst = { workspace = true }
 tomet-lexer = { workspace = true }
 tomet-links = { workspace = true }
 tomet-transform = { workspace = true }
 
-wasm-bindgen = { workspace = true }
-serde-wasm-bindgen = { workspace = true }
-serde = { workspace = true }
-js-sys = { workspace = true }
+#= Crates.io
 getrandom = { version = "0.2", features = ["js"] }
+js-sys = { workspace = true }
 regex = { workspace = true }
+serde = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+wasm-bindgen = { workspace = true }

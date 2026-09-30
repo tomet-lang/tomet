@@ -5,5 +5,7 @@ edition.workspace = true
 
 [dependencies]
 tomet-cst = { workspace = true }
+
+#= Crates.io
 serde = { workspace = true }
 unicode-width = { workspace = true }

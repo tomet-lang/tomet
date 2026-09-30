@@ -8,8 +8,15 @@ name = "tomet_java"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-tomet = { workspace = true, features = ["html", "markdown", "typst", "format", "printer"] }
+tomet = { workspace = true, features = [
+  "html",
+  "markdown",
+  "typst",
+  "format",
+  "printer",
+] }
 
+#= Crates.io
 jni = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

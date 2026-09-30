@@ -8,28 +8,28 @@ name = "tomet"
 path = "src/main.rs"
 
 [dependencies]
-tove = { workspace = true }
 tomet-ast = { workspace = true }
 tomet-compute = { workspace = true }
 tomet-config = { workspace = true }
-tomet-load = { workspace = true }
 tomet-formatter = { workspace = true }
+tomet-html = { workspace = true }
 tomet-indexer = { workspace = true }
 tomet-links = { workspace = true }
+tomet-load = { workspace = true }
 tomet-markdown = { workspace = true }
+tomet-pandoc = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-printer = { workspace = true }
-tomet-html = { workspace = true }
-tomet-typst = { workspace = true }
-tomet-pandoc = { workspace = true }
 tomet-resolver = { workspace = true }
 tomet-semantics = { workspace = true }
-tomet-validator = { workspace = true }
 tomet-tree = { workspace = true }
 tomet-tui = { workspace = true }
+tomet-typst = { workspace = true }
+tomet-validator = { workspace = true }
 tomet-workspace = { workspace = true }
+tove = { workspace = true }
 
-#[ Crates.io ]
+#= Crates.io
 anyhow = { workspace = true }
 axum = { workspace = true, features = ["json"] }
 clap = { workspace = true }

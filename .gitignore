@@ -1,26 +1,27 @@
 # -----------------------------------------------------------------------
 # Files ignored by Git.
 #
-# Keep project-specific ignore rules in subdirectories whenever possible.
+# Keep project-specific ignore rules in the top section.
 # -----------------------------------------------------------------------
 
-#[ WASM build artifacts ]
+#= WASM build
 bindings/js/pkg/
 
-#[ Zed extension build ]
+#= Zed extension build
 editors/zed/extension.wasm
 editors/zed/grammars/
 
-#[ npm ]
+#= npm
 node_modules/
 
-# -----------------------------------------------------------------------
-
-#[ Test output ]
-# Actual snapshot output, written only when it differs from tests/ref/.
+#= Test output
 tests/store/
 
-#[ Build file ]
+# -----------------------------------------------------------------------
+# Shared ignore rules
+# -----------------------------------------------------------------------
+
+#= Build
 build/
 dist/
 package/
@@ -28,19 +29,22 @@ result
 result-*
 target/
 
-#[ Dev ]
+#= Develop
 .direnv/
 .claude/
-.cargo/
+.cargo/config.toml
 .idea/
 .zed/
+.vscode/
+*.swp
+*~
 
-#[ User's variable ]
+#= Environment
 .env
 .env.*
 !.env.example
 
-#[ OS ]
+#= OS
 .DS_Store
 Desktop.ini
 Thumbs.db

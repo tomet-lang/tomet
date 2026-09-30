@@ -8,5 +8,5 @@ description = "Tomet Object & Value Expression (TOVE) parser and serialization f
 tomet-ast = { workspace = true }
 tomet-lexer = { workspace = true }
 
-#[ Crates.io ]
+#= Crates.io
 serde = { workspace = true }

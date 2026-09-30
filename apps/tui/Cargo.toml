@@ -16,7 +16,7 @@ tomet-tree = { workspace = true }
 tomet-workspace = { workspace = true }
 tree-sitter-tomet = { workspace = true }
 
-#[ Crates.io ]
+#= Crates.io
 anyhow = { workspace = true }
 crossterm = { workspace = true }
 ratatui = { workspace = true }

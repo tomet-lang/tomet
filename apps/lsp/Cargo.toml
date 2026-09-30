@@ -19,7 +19,7 @@ tomet-semantics = { workspace = true }
 tomet-tree = { workspace = true }
 tomet-validator = { workspace = true }
 
-#[ Crates.io ]
+#= Crates.io
 anyhow = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
