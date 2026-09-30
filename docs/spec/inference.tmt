@@ -60,5 +60,5 @@ list item の `(...)` マーカーは `marker` に正規化される
 `elements.<名前>.positional: [ ... ]` で、カスタム要素の位置引数の並びを
 設定側から与えられた。撤去した。引数の宣言が既に持っている順序を別の場所に
 もう一度書くもので、しかも実際にはどこからも読まれていなかった。
-@link(file:docs/spec/vocabulary.tmt)[`spec/vocabulary.tmt`] の `@param` が
+@link[`spec/vocabulary.tmt`](file:docs/spec/vocabulary.tmt) の `@param` が
 置き換えである。

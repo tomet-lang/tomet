@@ -35,7 +35,7 @@ target: "https://..."         // @link / @embed が指す先。キーはこの�
 ```
 
 キー名から要素の種別を推論する短縮（`@(url:...)` が link になる）は撤去
-された。@link(file:docs/spec/syntax.tmt)[`spec/syntax.tmt`] の「撤去済み」を
+された。@link[`spec/syntax.tmt`](file:docs/spec/syntax.tmt) の「撤去済み」を
 参照。
 
 ==[ 未実装 ]

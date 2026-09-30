@@ -4,7 +4,7 @@
 いれば、探しているものがどのあたりにあるか見当がつく。
 
 正確な引数と全一覧は
-@link(file:../../spec/builtin-elements.tmt)[`spec/builtin-elements.tmt`] にある。
+@link[`spec/builtin-elements.tmt`](file:../../spec/builtin-elements.tmt) にある。
 この頁は地図のほうで、群が分かると何が分かるかを書く。
 
 ==[ 六つの群 ]
@@ -63,10 +63,10 @@
 文書の頭で、これが何の文書で、どう扱われるかを決める。ここを間違えると本文が
 どれだけ正しくても通らないので、最初に読むところ。
 
-- @link(file:./primitives/kind.tmt)[`kind`] — 何の文書か。語彙もこれで決まる
-- @link(file:./primitives/meta.tmt)[`meta`] — 文書についてのデータ
-- @link(file:./primitives/config.tmt)[`config`] — 文書の処理設定。エクスポート先もここ
-- @link(file:./primitives/settings.tmt)[`settings`] — 整形とマクロと vault の設定
+- @link[`kind`](file:./primitives/kind.tmt) — 何の文書か。語彙もこれで決まる
+- @link[`meta`](file:./primitives/meta.tmt) — 文書についてのデータ
+- @link[`config`](file:./primitives/config.tmt) — 文書の処理設定。エクスポート先もここ
+- @link[`settings`](file:./primitives/settings.tmt) — 整形とマクロと vault の設定
 
 `use` は語彙を scope に入れる。`include` は名前が通るだけで、まだ何も差し込まない。
 
@@ -76,7 +76,7 @@
 `@content` で三つのスロットを説明し、`@param` で項目に型を与える。
 
 スロットに何を書けるかは
-@link(file:./args.tmt)[`args.tmt`] を見る。
+@link[`args.tmt`](file:./args.tmt) を見る。
 
 ==[ 印 ]
 

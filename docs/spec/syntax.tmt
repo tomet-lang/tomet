@@ -125,7 +125,7 @@ ${xxx}                // 実装済み: `${id}` / `${a.b}` / `${sum(a, b)}` の�
 
 省略が許されるのは `std` と、その文書の `@kind` が名乗る名前空間の二つだけ。
 どちらも読者が文書を出ずに解決できる。詳細は
-@link(file:./vocabulary.tmt)[`spec/vocabulary.tmt`]。
+@link[`spec/vocabulary.tmt`](file:./vocabulary.tmt)。
 
 ---[ 撤去済み ]---
 

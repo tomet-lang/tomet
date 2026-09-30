@@ -50,7 +50,7 @@ $name(args)
 
 `()` の中のキー名から種別を推論する短縮（`@(url:...)` が link になる）は
 撤去された。名前を省いた `@(...)` は要素にならない。
-@link(file:docs/spec/syntax.tmt)[`spec/syntax.tmt`] の「撤去済み」を参照。
+@link[`spec/syntax.tmt`](file:docs/spec/syntax.tmt) の「撤去済み」を参照。
 
 ==[ コネクト ]
 

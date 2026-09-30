@@ -26,7 +26,7 @@
 +++
 ```
 
-キーの一覧は @link(file:docs/spec/builtin-settings.tmt)[`spec/builtin-settings.tmt`]
+キーの一覧は @link[`spec/builtin-settings.tmt`](file:docs/spec/builtin-settings.tmt)
 にある。
 
 #[ 要素はここには書かない ]
@@ -46,7 +46,7 @@
 ]
 ```
 
-@link(file:docs/spec/vocabulary.tmt)[`spec/vocabulary.tmt`] を参照。
+@link[`spec/vocabulary.tmt`](file:docs/spec/vocabulary.tmt) を参照。
 
 #[ 未実装 ]
 

@@ -10,7 +10,7 @@
 「文脈変数 → 文書内参照 → config のマクロ」、呼び出しなら「組み込み関数 →
 config のマクロ」を順に試し、当たったものを黙って採る。これは要素名で
 `builtin_kind(name).unwrap_or_else(|| Custom(name))` が起こしていたのと
-同じ暗黙のフォールバックで、@link(file:docs/spec/vocabulary.tmt)[`spec/vocabulary.tmt`]
+同じ暗黙のフォールバックで、@link[`spec/vocabulary.tmt`](file:docs/spec/vocabulary.tmt)
 が名前空間を入れて潰したものである。
 
 `${add(1,2)}` と `${gh(12)}` は見た目が同じで、別の機構を通る。ユーザが

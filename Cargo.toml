@@ -39,6 +39,9 @@ members = [
   #[ Search -- in-memory structural search & filter queries ]
   "crates/tomet-search",
 
+  #[ Edit -- backend-neutral editable model for collaborative editing ]
+  "crates/tomet-edit",
+
   #[ Vault -- a vault's config and vocabularies, no disk ]
   "crates/tomet-vault",
 
@@ -98,6 +101,8 @@ tomet-resolver = { path = "crates/tomet-semantics-resolver" }
 tomet-transform = { path = "crates/tomet-transform" }
 #[ Search ]
 tomet-search = { path = "crates/tomet-search" }
+#[ Edit ]
+tomet-edit = { path = "crates/tomet-edit" }
 #[ Vault ]
 tomet-vault = { path = "crates/tomet-vault" }
 #[ Convert ]

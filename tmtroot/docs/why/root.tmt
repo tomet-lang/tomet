@@ -150,9 +150,9 @@ tomet はすべて要素でできている、要素の集合体である。
 三つの場所は増えない。
 
 綴りそのものはここには書かない。正確な定義は
-@link(file:docs/spec/syntax.tmt)[`spec/syntax.tmt`]、
+@link[`spec/syntax.tmt`](file:docs/spec/syntax.tmt)、
 実装が今日受け付けるものは
-@link(file:tests/SYNTAX.md)[`/tests/SYNTAX.md`] にある。
+@link[`/tests/SYNTAX.md`](file:tests/SYNTAX.md) にある。
 綴りは変わりうるが、三つの場所は変わらない。ここが引き受けるのは後者である。
 
 ==[ リンク ]

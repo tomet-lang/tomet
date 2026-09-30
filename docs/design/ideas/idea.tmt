@@ -42,7 +42,7 @@
 
 ---[ マルチライン記法 / 名前付きスロット ]---
 
-@link(file:./syntax-continuation.tmt)[`syntax-continuation.tmt`] へ移した。
+@link[`syntax-continuation.tmt`](file:./syntax-continuation.tmt) へ移した。
 `|` が継続を引き取れば一つ目は解決し、名前付きスロットは `:` 側に残る。
 
 ---[ ? ]---

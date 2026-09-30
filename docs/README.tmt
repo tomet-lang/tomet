@@ -5,11 +5,11 @@
 
 @table[
 [ ディレクトリ                                ][ 内容 ][ 言語 ][ 形式 ]
-[ @link(dir:./why/)[`why/`]                   ][ Tomet が何のためにあるか。理念と、他フォーマットとの棲み分け ][ 日本語 ][ `.tmt` ]
-[ @link(dir:./spec/)[`spec/`]                 ][ 言語仕様。文法、型、推論、組み込みの要素・関数・設定 ][ 日本語 ][ `.tmt` ]
-[ @link(dir:./guide/)[`guide/`]               ][ 使い方。チートシート、CLI、設定、機能、組み込み ][ 日本語 ][ `.tmt` ]
-[ @link(dir:./examples/)[`examples/`]         ][ 実際に動く `.tmt` のサンプルとテンプレート ][ 日本語 ][ `.tmt` ]
-[ @link(dir:./design/ideas/)[`design/ideas/`] ][ 未決のスケッチとメモ ][ 混在 ][ `.tmt` ]
+[ @link[`why/`](dir:./why/)                   ][ Tomet が何のためにあるか。理念と、他フォーマットとの棲み分け ][ 日本語 ][ `.tmt` ]
+[ @link[`spec/`](dir:./spec/)                 ][ 言語仕様。文法、型、推論、組み込みの要素・関数・設定 ][ 日本語 ][ `.tmt` ]
+[ @link[`guide/`](dir:./guide/)               ][ 使い方。チートシート、CLI、設定、機能、組み込み ][ 日本語 ][ `.tmt` ]
+[ @link[`examples/`](dir:./examples/)         ][ 実際に動く `.tmt` のサンプルとテンプレート ][ 日本語 ][ `.tmt` ]
+[ @link[`design/ideas/`](dir:./design/ideas/) ][ 未決のスケッチとメモ ][ 混在 ][ `.tmt` ]
 ]
 
 @dir(docs/) の外に、二つ。
@@ -18,7 +18,7 @@
     横断の不変条件、変換のスナップショット。ここの fixture は @dir(docs/) の文書を
     複製したところから始まったが、同期は取っていない。@file(tests/README.md) を見る。
   ]
-- [ @link(file:../tests/SYNTAX.md)[`/tests/SYNTAX.md`] — パーサが今受け付ける
+- [ @link[`/tests/SYNTAX.md`](file:../tests/SYNTAX.md) — パーサが今受け付ける
     構文の全部。例と、それが作る AST つき。`tomet-parser` 自身から生成され
     `cargo test` で検証されるので、`spec/` と違って乖離しようがない。`spec/` は
     規範的（言語が何を受け付ける*べき*か）で手書き、こちらは記述的（実装が何を
@@ -34,11 +34,11 @@
 
 =[ ここから読む ]
 
-- 言語をはじめて触る: @link(file:./guide/cheatsheet.tmt)[`guide/cheatsheet.tmt`]
-- なぜこのフォーマットがあるのか: @link(file:./why/root.tmt)[`why/root.tmt`]
-- 正確な構文を引く: @link(file:./spec/syntax.tmt)[`spec/syntax.tmt`]
-- パーサが今日*実際に*受け付けるものを確かめる: @link(file:../tests/SYNTAX.md)[`/tests/SYNTAX.md`]
-- ドキュメントを書く・動かす: @link(file:./.writ.tmt)[`docs/.writ.tmt`]
+- 言語をはじめて触る: @link[`guide/cheatsheet.tmt`](file:./guide/cheatsheet.tmt)
+- なぜこのフォーマットがあるのか: @link[`why/root.tmt`](file:./why/root.tmt)
+- 正確な構文を引く: @link[`spec/syntax.tmt`](file:./spec/syntax.tmt)
+- パーサが今日*実際に*受け付けるものを確かめる: @link[`/tests/SYNTAX.md`](file:../tests/SYNTAX.md)
+- ドキュメントを書く・動かす: @link[`docs/.writ.tmt`](file:./.writ.tmt)
 
 =[ 文書を検査する ]
 

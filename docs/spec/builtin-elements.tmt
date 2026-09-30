@@ -293,7 +293,7 @@ content」の形にそのまま乗れるため。`rt` は必須で、文字列�
 =[ 補間 ]
 
 `${...}` と `$...` は要素ではなく式である。組み込み関数と名前空間は
-@link(file:docs/spec/builtin-functions.tmt)[`spec/builtin-functions.tmt`] を見る。
+@link[`spec/builtin-functions.tmt`](file:docs/spec/builtin-functions.tmt) を見る。
 
 ```tm
 ${func(args) ...}

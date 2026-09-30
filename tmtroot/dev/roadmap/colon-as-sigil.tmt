@@ -1,0 +1,26 @@
+@kind(todo)
+
+// `:rule` の MVP は実装済み。ここには `:` まわりのまだ決まっていないことだけを置く。
+// 実装済みの部分はコードを見ること:
+//   `tomet-syntax-parser` の `parse_groups`（`:` の解決）、
+//   `tomet-semantics` の `ConnectMember`、
+//   `tomet-semantics-validator` の `check_rule_connects`、
+//   `tomet-syntax-parser` の `try_parse_call`（`list(...)`）
+
+- ( ) `:name(...):name(...)` の重複時の意味論   // パーサは両方を `connects` に積むだけで
+                                      // 重複をエラーにしない。`:rule(...):rule(...)` や
+                                      // `:as(x):as(y)` を「複数あってよい」とするか
+                                      // 「エラー」とするか。メンバーが `rule` 一つの今は
+                                      // 判断材料が無い。`:as` など次のメンバーが
+                                      // 決まってから判断する
+- ( ) `enum(...)` が何をするのか             // `list(...)` と同じ呼び出し構文で書けるが
+                                      // (パーサは呼び出し名を判断しない)、`enum` に
+                                      // 対応する意味論は何も無い。`:rule` の MVP は
+                                      // `list(...)` しか使っていない
+- ( ) `allow:` に書いた名前自体の検証         // `allow:list(ns.mycard)` の `ns.mycard` が
+                                      // 宣言済みの名前かどうかは見ていない
+                                      // (MVP の意図的なスコープ)。足すなら
+                                      // `check_rule_connects` に手を入れる
+- ( ) blueprint のテンプレート本体の `:rule`   // 実体化後の文書でも生き残って効き続けるのか。
+                                      // `tomet new` の実体化パスと `:rule` の相互作用は
+                                      // 一度も試していない
