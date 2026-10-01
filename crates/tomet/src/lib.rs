@@ -54,6 +54,7 @@
 //! | `pandoc`   | [`pandoc`]        | `tomet-pandoc`       |
 //! | `format`   | [`mod@format`]    | `tomet-formatter`    |
 //! | `printer`  | [`printer`]       | `tomet-printer`      |
+//! | `stats`    | [`stats`]         | `tomet-stats`        |
 //!
 //! Output-producing conversions want a document that has been through
 //! [`Vault::prepare`] first; see `tomet-load` for why that is a separate
@@ -90,5 +91,14 @@ pub use tomet_markdown as markdown;
 pub use tomet_pandoc as pandoc;
 #[cfg(feature = "printer")]
 pub use tomet_printer as printer;
+#[cfg(feature = "stats")]
+pub use tomet_stats as stats;
 #[cfg(feature = "typst")]
 pub use tomet_typst as typst;
+
+/// Measures statistics for a single document on disk.
+#[cfg(feature = "stats")]
+pub fn measure_document(path: &std::path::Path) -> Result<tomet_stats::Stats, LoadError> {
+    let (doc, _) = load_document(path)?;
+    Ok(tomet_stats::measure(&doc))
+}

@@ -9,6 +9,7 @@ html = ["dep:tomet-html"]
 markdown = ["dep:tomet-markdown"]
 pandoc = ["dep:tomet-pandoc"]
 printer = ["dep:tomet-printer"]
+stats = ["dep:tomet-stats"]
 typst = ["dep:tomet-typst"]
 
 [dependencies]
@@ -26,4 +27,5 @@ tomet-html = { workspace = true, optional = true }
 tomet-markdown = { workspace = true, optional = true }
 tomet-pandoc = { workspace = true, optional = true }
 tomet-printer = { workspace = true, optional = true }
+tomet-stats = { workspace = true, optional = true }
 tomet-typst = { workspace = true, optional = true }

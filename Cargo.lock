@@ -1961,6 +1961,7 @@ dependencies = [
  "tomet-parser",
  "tomet-printer",
  "tomet-semantics",
+ "tomet-stats",
  "tomet-typst",
  "tomet-validator",
  "tomet-vault",
@@ -2000,6 +2001,7 @@ dependencies = [
  "tomet-printer",
  "tomet-resolver",
  "tomet-semantics",
+ "tomet-stats",
  "tomet-tree",
  "tomet-tui",
  "tomet-typst",
@@ -2286,6 +2288,18 @@ dependencies = [
  "tomet-parser",
  "tomet-tree",
  "toml",
+]
+
+[[package]]
+name = "tomet-stats"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-tree",
 ]
 
 [[package]]

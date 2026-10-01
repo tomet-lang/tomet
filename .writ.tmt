@@ -20,7 +20,17 @@ does not relax the rule to fit the change it wanted to make.
   layers: {
     6: list( "apps/*", "bindings/*", "editors/*", "tests", "crates/tomet" )
     5: list( "crates/tomet-workspace*", "crates/tomet-load" )
-    4: list( "crates/tomet-format*", "crates/tomet-convert-*", "crates/tomet-transform", "crates/serde_tomet", "crates/tomet-extract", "crates/tomet-search", "crates/tomet-edit", "crates/tomet-vault" )
+    4: list( 
+        "crates/serde_tomet",
+        "crates/tomet-format*",
+        "crates/tomet-convert-*",
+        "crates/tomet-transform",
+        "crates/tomet-extract",
+        "crates/tomet-search",
+        "crates/tomet-edit",
+        "crates/tomet-stats",
+        "crates/tomet-vault"
+       )
     3: list( "crates/tomet-config" )
     2: list( "crates/tomet-semantics*" )
     1: list( "crates/tomet-syntax-*" )
@@ -43,6 +53,8 @@ with the producer groups.
 
 @dir(crates/tomet-edit) is likewise listed by name: it is a backend-neutral in-memory editing model that apps bridge to external
 editing runtimes, and it shares no prefix with the producer groups.
+
+@dir(crates/tomet-stats) is likewise listed by name: it is pure in-memory document statistics and metrics calculation over a parsed AST, and it shares no prefix with the producer groups.
 
 @dir(crates/tomet-vault) is likewise listed by name: it is the disk-free half of what `tomet-load` assembles (a vault's config and vocabularies, parse, bind, prepare), so that a caller with no filesystem can use it. `tomet-load` sits above it and adds the reading.
 

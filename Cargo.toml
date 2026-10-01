@@ -52,6 +52,9 @@ members = [
   #= Edit -- backend-neutral editable model for collaborative editing
   "crates/tomet-edit",
 
+  #= Stats -- pure in-memory document statistics & metrics
+  "crates/tomet-stats",
+
   #= Vault -- a vault's config and vocabularies, no disk
   "crates/tomet-vault",
 
@@ -106,6 +109,8 @@ tomet-transform = { path = "crates/tomet-transform" }
 tomet-search = { path = "crates/tomet-search" }
 #= Edit
 tomet-edit = { path = "crates/tomet-edit" }
+#= Stats
+tomet-stats = { path = "crates/tomet-stats" }
 #= Vault
 tomet-vault = { path = "crates/tomet-vault" }
 #= Convert
