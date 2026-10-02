@@ -427,14 +427,14 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 ### 要素の並び
 
 ```tmt
-@links{
+@memo{
   (1)[ ひとつ ]
   (2)[ ふたつ ]
 }
 ```
 
 ```
-Block  @links
+Block  @memo
   group
     Bare
       args    1
@@ -444,6 +444,12 @@ Block  @links
       args    2
       content
         Text "ふたつ"
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### 対と要素の混在。並び順は保たれる
@@ -472,11 +478,11 @@ Block  @deck.card
 ### 裸のエントリも名前つき要素と同じ三つのグループを取る。シジルが無いだけで、読む道は同じ
 
 ```tmt
-@links{ (1)[ ひとつ ]{ id: a } }
+@memo{ (1)[ ひとつ ]{ id: a } }
 ```
 
 ```
-Block  @links
+Block  @memo
   group
     Bare
       args    1
@@ -486,22 +492,34 @@ Block  @links
         id: "a"
 ```
 
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
+```
+
 ### グループを次の行に置いてもよい。`@name` と同じ
 
 ```tmt
-@links{
+@memo{
   (1)
   [ ひとつ ]
 }
 ```
 
 ```
-Block  @links
+Block  @memo
   group
     Bare
       args    1
       content
         Text "ひとつ"
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### 空のグループ

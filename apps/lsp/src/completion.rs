@@ -315,7 +315,6 @@ fn describe_kind(name: &str) -> &'static str {
         "include" => "Splice another document in at this point",
         "references" => "Remote connection container",
         "id" => "Attach attributes to a remote element by id",
-        "links" => "Link reference definitions table",
         "link" => "Link to a url, file, or document",
         "embed" => "Embed another document or asset",
         "table" => "Table",

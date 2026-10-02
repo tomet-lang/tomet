@@ -170,7 +170,6 @@ fn element_to_md(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
         "link" => render_link(cx, el),
         "file" | "dir" => render_path(cx, el, inline),
         "embed" => render_embed(el),
-        "links" => render_links_container(cx, el),
         "footnote" => {
             if inline || el.placement == Placement::Inline {
                 if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
@@ -485,7 +484,7 @@ fn render_link(cx: &MarkdownCtx, el: &Element) -> String {
             } else {
                 text
             };
-            format!("[{text}](#link-{target})")
+            format!("[{text}](#{target})")
         }
         TargetScheme::Ref | TargetScheme::Unresolved => {
             if text.is_empty() || text == target {
@@ -538,25 +537,6 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
         }
     }
     s
-}
-
-fn render_links_container(cx: &MarkdownCtx, el: &Element) -> String {
-    let mut out = String::new();
-    if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
-        for (i, child) in children.iter().enumerate() {
-            if i > 0 {
-                out.push('\n');
-            }
-            let id = child.args.as_ref().map(value_to_plain).unwrap_or_default();
-            let content = child
-                .content
-                .as_ref()
-                .map(|a| inline_to_md(cx, a))
-                .unwrap_or_default();
-            out.push_str(&format!("**{id}**: {content}"));
-        }
-    }
-    out
 }
 
 fn render_tag(el: &Element) -> String {

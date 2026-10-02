@@ -71,7 +71,6 @@ pub enum ElementKind {
     /// `@fixme[ what is wrong ]` -- there is text here and it needs
     /// revisiting. See [`Draft`](ElementKind::Draft) for the difference.
     Fixme,
-    Links,
     /// The one officially-supported link element, `@link(target:...)`
     /// (or the positional `@link(...)` shorthand -- see
     /// `crate::positional::builtin_positional_arg_key`). What kind of
@@ -202,7 +201,6 @@ impl ElementKind {
             ElementKind::Content => "content",
             ElementKind::Draft => "draft",
             ElementKind::Fixme => "fixme",
-            ElementKind::Links => "links",
             ElementKind::File => "file",
             ElementKind::Dir => "dir",
             ElementKind::Link => "link",
@@ -260,7 +258,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 38] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 37] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -288,7 +286,6 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 38] = [
     // anything that re-prints from the tree.
     ("draft", ElementKind::Draft),
     ("fixme", ElementKind::Fixme),
-    ("links", ElementKind::Links),
     ("file", ElementKind::File),
     ("dir", ElementKind::Dir),
     ("link", ElementKind::Link),
@@ -464,7 +461,7 @@ pub fn is_directive(kind: &ElementKind) -> bool {
 pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
-        Meta | Config | Settings | Use | Include | References | Blueprint | Links | Hr
+        Meta | Config | Settings | Use | Include | References | Blueprint | Hr
         | Callout | Card | Table | Heading | OrderedList | UnorderedList | Kind | Version
         | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
         Em | Strong | Mark | Strikeout | Ruby | Caret => Shape::Inline,

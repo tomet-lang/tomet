@@ -34,7 +34,7 @@
 //!   `Attr` is where data goes. Only the elements move.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, ElementValue, Entry, Inline as TmInline, LineBreak, Name,
+    Block as TmBlock, Document, Element, ElementValue, Inline as TmInline, LineBreak, Name,
     Paragraph, Placement, RawText, Section, Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::EXACT_DATA_KEY;
@@ -55,7 +55,9 @@ pub fn from_pandoc(doc: &PandocDoc) -> Document {
         blocks.push(TmBlock::Element(meta_element(&doc.meta)));
     }
     for block in &doc.blocks {
-        blocks.push(block_from_pandoc(block));
+        if let Some(b) = block_from_pandoc(block) {
+            blocks.push(b);
+        }
     }
     Document::new(structure_sections(blocks), Span::dummy())
 }
@@ -143,7 +145,7 @@ fn meta_value_to_value(v: &MetaValue) -> Value {
 
 // ---- blocks --------------------------------------------------------
 
-fn block_from_pandoc(block: &Block) -> TmBlock {
+fn block_from_pandoc(block: &Block) -> Option<TmBlock> {
     match block {
         Block::Header(level, attr, inlines) => {
             let title = inlines_from_pandoc(inlines);
@@ -151,12 +153,20 @@ fn block_from_pandoc(block: &Block) -> TmBlock {
             let (args, value) = extract_data_from_attr(attr);
             sec.args = args;
             sec.value = value;
-            TmBlock::Section(sec)
+            Some(TmBlock::Section(sec))
         }
-        Block::Para(inlines) | Block::Plain(inlines) => {
-            TmBlock::Paragraph(Paragraph::new(inlines_from_pandoc(inlines), Span::dummy()))
-        }
-        other => TmBlock::Element(block_element(other)),
+        Block::Para(inlines) | Block::Plain(inlines) => Some(TmBlock::Paragraph(Paragraph::new(
+            inlines_from_pandoc(inlines),
+            Span::dummy(),
+        ))),
+        // No tomet spelling is decided yet for a term/definition pair --
+        // the `@definition` element is still on hold. This used to land
+        // in `@links`, which had the right shape by accident; `@links`
+        // was a different, now-removed feature (reference-link
+        // definitions) and is not a stand-in for a real definition list,
+        // so this is dropped rather than forced into it.
+        Block::DefinitionList(_) => None,
+        other => Some(TmBlock::Element(block_element(other))),
     }
 }
 
@@ -228,24 +238,6 @@ fn block_element(block: &Block) -> Element {
             el.content = Some(content);
             el
         }
-        Block::DefinitionList(items) => {
-            let mut el = element_new(Sigil::named("links"));
-            let entries: Vec<Entry> = items
-                .iter()
-                .map(|(term, defs)| {
-                    let mut item = element_new(Sigil::Bare);
-                    item.args = Some(Value::String(inlines_to_text(term)));
-                    let mut content = Vec::new();
-                    for def in defs {
-                        content.extend(blocks_to_content(def));
-                    }
-                    item.content = Some(content);
-                    Entry::Element(item)
-                })
-                .collect();
-            el.value = Some(ElementValue::Group(entries));
-            el
-        }
         // Handled by `block_from_pandoc`; reached only if this is called
         // directly with one.
         Block::Para(inlines) | Block::Plain(inlines) => {
@@ -253,6 +245,9 @@ fn block_element(block: &Block) -> Element {
             el.content = Some(inlines_from_pandoc(inlines));
             el
         }
+        // Dropped by both callers (`block_from_pandoc`, `blocks_to_content`)
+        // before it ever reaches here -- see `block_from_pandoc`'s own arm.
+        Block::DefinitionList(_) => unreachable!("DefinitionList is dropped before block_element"),
     };
     el.with_placement(Placement::Block)
 }
@@ -341,6 +336,9 @@ fn blocks_to_content(blocks: &[Block]) -> Vec<TmInline> {
             Block::Para(inlines) | Block::Plain(inlines) => {
                 out.extend(inlines_from_pandoc(inlines))
             }
+            // See `block_from_pandoc`'s own `DefinitionList` arm: dropped
+            // here too, for the same reason.
+            Block::DefinitionList(_) => {}
             other => out.push(TmInline::Element(block_element(other))),
         }
     }

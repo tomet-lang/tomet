@@ -2,9 +2,7 @@
 //! `<div>`/`<span>` rendering of the ones with no fixed meaning.
 
 use crate::block::{push_span_attrs, render_inlines};
-use crate::link::{
-    render_embed_element, render_link_element, render_links_container, render_path_element,
-};
+use crate::link::{render_embed_element, render_link_element, render_path_element};
 use crate::table::render_table_element;
 use crate::text::{
     render_hr_element, render_quote_element, render_raw_element, render_ruby_element,
@@ -45,7 +43,6 @@ pub(crate) fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inl
                 ));
             }
         }
-        "links" => render_links_container(cx, el, out),
         "link" => render_link_element(cx, el, out, inline),
         "file" | "dir" => render_path_element(cx, el, out, inline),
         "embed" => render_embed_element(el, out),

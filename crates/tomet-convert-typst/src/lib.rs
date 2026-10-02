@@ -27,11 +27,10 @@
 //!   against `=`/`-`/`+`/`/` at the very start of a line being
 //!   misinterpreted as heading/list/term-list syntax -- a known gap, not
 //!   yet hit by any of this crate's own tests.
-//! - Same-document `id:` links only resolve against `@links{}` container
-//!   entries (which emit a matching Typst label), not against arbitrary
-//!   element ids -- mirroring `tomet-convert-html`'s `#link-{id}`
-//!   convention, which is likewise anchored to `@links{}` entries rather
-//!   than headings.
+//! - Same-document `id:` links emit a bare `<{id}>` Typst label
+//!   reference, but nothing on the producing side emits a matching
+//!   label yet -- no element carries its own id as Typst label output.
+//!   A known gap, pending the real element-id design.
 
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -192,7 +191,6 @@ fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
         "link" => render_link(cx, el),
         "file" | "dir" => render_path(cx, el, inline),
         "embed" => render_embed(el),
-        "links" => render_links_container(cx, el),
         "footnote" => {
             if inline || el.placement == Placement::Inline {
                 if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
@@ -469,13 +467,13 @@ fn render_table(cx: &TypstCtx, el: &Element) -> String {
 
 /// `@link(target:..)` -- the target string's own scheme prefix (see
 /// `tomet_semantics::target_scheme`) decides which shape it exports as:
-/// a same-document label reference (`id:`, resolving against a
-/// `@links{}` entry's emitted label -- see `render_links_container`) or
-/// a plain `#link("target")[text]` for everything else (Typst has no
-/// separate wikilink-style shorthand for `ref:` targets, so those fall
-/// into the same general case). The scheme prefix itself is stripped
-/// before rendering -- it's addressing metadata, not part of the visible
-/// target.
+/// a same-document label reference (`id:`, emitted as a bare `<id>`
+/// Typst label -- see this module's doc comment for the matching-label
+/// gap) or a plain `#link("target")[text]` for everything else (Typst
+/// has no separate wikilink-style shorthand for `ref:` targets, so
+/// those fall into the same general case). The scheme prefix itself is
+/// stripped before rendering -- it's addressing metadata, not part of
+/// the visible target.
 /// `@file(x)`/`@dir(x)` -> Typst raw text, the same shape CommonMark
 /// gets. A path is named, not navigated to, so there is no `#link` here.
 fn render_path(cx: &TypstCtx, el: &Element, inline: bool) -> String {
@@ -507,7 +505,7 @@ fn render_link(cx: &TypstCtx, el: &Element) -> String {
             } else {
                 text
             };
-            format!("#link(<link-{target}>)[{text}]")
+            format!("#link(<{target}>)[{text}]")
         }
         TargetScheme::Unresolved => {
             if text.is_empty() {
@@ -549,29 +547,6 @@ fn render_embed(el: &Element) -> String {
     }
 }
 
-/// `@links{}` definition entries have no Typst equivalent construct, so
-/// this renders a bullet list -- each entry also carries a `<link-{id}>`
-/// label so `render_link`'s `id:`-scheme case has something to resolve
-/// against, mirroring `tomet-convert-html`'s `<dt id="link-{id}">`
-/// anchor convention.
-fn render_links_container(cx: &TypstCtx, el: &Element) -> String {
-    let mut out = String::new();
-    if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
-        for (i, child) in children.iter().enumerate() {
-            if i > 0 {
-                out.push('\n');
-            }
-            let id = child.args.as_ref().map(value_to_plain).unwrap_or_default();
-            let content = child
-                .content
-                .as_ref()
-                .map(|a| inline_to_typst(cx, a))
-                .unwrap_or_default();
-            out.push_str(&format!("- *{id}*: {content} <link-{id}>"));
-        }
-    }
-    out
-}
 
 /// Re-renders an `InterpExpr` back to `${...}`-shaped source text, wrapped
 /// in a raw span (`` `${...}` ``) so Typst's own `$`-prefixed math mode
@@ -817,18 +792,10 @@ mod tests {
     }
 
     #[test]
-    fn renders_id_link_against_links_container_label() {
+    fn renders_id_link_as_a_bare_label_reference() {
         assert_eq!(
             typst("@link(target:id:greeting)[Hello]\n"),
-            "#link(<link-greeting>)[Hello]\n\n"
-        );
-    }
-
-    #[test]
-    fn renders_links_container_as_labeled_bullet_list() {
-        assert_eq!(
-            typst("@links {\n  (greeting)[ note ]\n}\n"),
-            "- *greeting*: note <link-greeting>\n\n"
+            "#link(<greeting>)[Hello]\n\n"
         );
     }
 

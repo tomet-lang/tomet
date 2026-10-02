@@ -1,24 +1,23 @@
 <h1>シジルは形を表す</h1>
-<p><code>@</code> はインライン、<code>#</code> はブロック。名前空間が出自を表す。</p>
+<p>シジルは <code>@</code> ひとつだけ。<code>#</code> はもう何の意味も持たない、ただの文字。名前空間が出自を表す。</p>
 <h1>ブロック要素</h1>
-<div class="tm-element tm-memo">名前は <code>#</code> の直後に続く。空白があると本文になる</div>
+<div class="tm-element tm-memo">行だけで終われば要素。それ以外は段落の一部</div>
 <div class="tm-element tm-deck.bookmark" data-name="foo" data-count="3">名前空間つき</div>
 <h1>インライン要素</h1>
 <p>文中の <a class="tm-url" href="https://example.com">リンク</a> と <span class="tm-element tm-deck.badge" data-value="2">名前空間つきインライン</span> は行の途中でも要素になる。</p>
 <h1>本文に落ちる <code>#</code></h1>
-<p>これは #タグ ではない。<code>#</code> の直後に空白もグループも無ければ、ただの文字。</p>
+<p>これは #タグ ではない。<code>#</code> はどんな綴りでも、常にただの文字。</p>
 <p>ASCII でない名前は要素にならない。</p>
 <h1>セクションの三つの形</h1>
 <h1>空白のあとに本文を書けばセクション（糖衣）</h1>
 <h1>グループを書けば完全形</h1>
 <h1 data-tag="syntax">引数も値も取れる</h1>
 <h1><code>{}</code> は常にデータ</h1>
-<dl class="tm-links">
-<dt id="link-1">1</dt>
-<dd>ひとつめ</dd>
-<dt id="link-2">2</dt>
-<dd>ふたつめ</dd>
-</dl>
+<div class="tm-element tm-memo"><div class="tm-children">
+<div class="tm-element tm-bare" data-value="1">ひとつめ</div>
+<div class="tm-element tm-bare" data-value="2">ふたつめ</div>
+</div>
+</div>
 <div class="tm-element tm-deck.card" data-title="混在"><div class="tm-children">
 <div class="tm-element tm-bare" data-value="a">対と要素が同じ並びに入る</div>
 </div>

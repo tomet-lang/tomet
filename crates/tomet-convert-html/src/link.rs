@@ -1,9 +1,9 @@
-//! Links, embeds and paths, and the `@links{}` container.
+//! Links, embeds and paths.
 
 use crate::RenderCtx;
 use crate::block::render_inlines;
 use crate::element::render_content_or_fallback;
-use crate::util::{escape_attr, escape_html, inlines_to_plain, push_data_attrs, value_to_plain};
+use crate::util::{escape_attr, escape_html, inlines_to_plain, push_data_attrs};
 use tomet_ast::{Element, Value};
 use tomet_semantics::{
     TargetScheme, classify_std_lenient, link_target, normalized_element_args, path_target,
@@ -103,7 +103,7 @@ pub(crate) fn render_link_element(cx: &RenderCtx, el: &Element, out: &mut String
             ));
         }
         TargetScheme::Id => {
-            let href = format!("#link-{}", escape_attr(&target));
+            let href = format!("#{}", escape_attr(&target));
             out.push_str(&format!("<a class=\"tm-id\" href=\"{href}\""));
         }
         other => {
@@ -131,22 +131,3 @@ pub(crate) fn render_link_element(cx: &RenderCtx, el: &Element, out: &mut String
     }
 }
 
-pub(crate) fn render_links_container(cx: &RenderCtx, el: &Element, out: &mut String) {
-    out.push_str("<dl class=\"tm-links\">\n");
-    if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
-        for child in children {
-            let id = child.args.as_ref().map(value_to_plain).unwrap_or_default();
-            out.push_str(&format!(
-                "<dt id=\"link-{}\">{}</dt>\n",
-                escape_attr(&id),
-                escape_html(&id)
-            ));
-            out.push_str("<dd>");
-            if let Some(content) = &child.content {
-                render_inlines(cx, content, out);
-            }
-            out.push_str("</dd>\n");
-        }
-    }
-    out.push_str("</dl>\n");
-}

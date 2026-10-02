@@ -1,16 +1,6 @@
 use super::*;
 
 #[test]
-fn renders_links_container_as_definition_list() {
-    let doc = parse_document("@links {\n  (1)[ note ]\n  (anotation1)[ note2 ]\n}\n").unwrap();
-    let body = render_body(&doc);
-    assert_eq!(
-        body,
-        "<dl class=\"tm-links\">\n<dt id=\"link-1\">1</dt>\n<dd>note</dd>\n<dt id=\"link-anotation1\">anotation1</dt>\n<dd>note2</dd>\n</dl>\n"
-    );
-}
-
-#[test]
 fn renders_link_with_explicit_target_key() {
     let doc = parse_document("@link(target:https://example.com)[Wiki]\n").unwrap();
     let body = render_body(&doc);
@@ -51,7 +41,7 @@ fn renders_id_link_as_a_same_document_anchor() {
     let body = render_body(&doc);
     assert_eq!(
         body,
-        "<a class=\"tm-id\" href=\"#link-greeting\">Hello</a>\n"
+        "<a class=\"tm-id\" href=\"#greeting\">Hello</a>\n"
     );
 }
 
