@@ -100,6 +100,7 @@ module.exports = grammar({
 					field("content", repeat1($._line_item)),
 					optional(field("args", $.args_group)),
 				),
+				optional(field("id", $.id_group)),
 				optional(
 					prec(
 						1,
@@ -316,9 +317,13 @@ module.exports = grammar({
 		// `/* ... */` needs to win over a `text` run that would otherwise
 		// swallow it whole, so a bare `/` (not opening a comment) falls
 		// back to `punctuation` like the others.
-		// `=` is excluded so `section_marker` can win. `#` carries no
-		// syntax at all now -- not even a heading marker -- so it needs no
-		// exclusion and falls straight into `text` like any other letter.
+		// `=` is excluded so `section_marker` can win. `#` is excluded for
+		// the same longest-match reason as the bracket characters above:
+		// `id_group`'s `#(` needs to win over a `text` run that would
+		// otherwise swallow it (e.g. "#(myid)" read as one word). A bare
+		// `#` with nothing to open still falls back to `punctuation`, the
+		// same as the other excluded characters -- it has no syntax at
+		// all on its own, only `#(` does.
 		// `:` is excluded for the same longest-match reason as the rest of
 		// this list: `:name(...)` (`connect`) and the bare `:(`/`:{` merge
 		// both start with a single-character `":"` token, but right after
@@ -330,9 +335,9 @@ module.exports = grammar({
 		// a bare `:{`/`:(` right after certain groups) was ever reachable.
 		// A bare `:` with nothing to attach to falls back to `punctuation`,
 		// same as the other excluded characters.
-		text: (_$) => /[^\n`*_=~@$:()\[{\]/|-]+/,
+		text: (_$) => /[^\n`*_=~@$#:()\[{\]/|-]+/,
 
-		punctuation: (_$) => choice(/[()\[{/<>|~]/, "-", "$", ":", "="),
+		punctuation: (_$) => choice(/[()\[{/<>|~]/, "-", "$", "#", ":", "="),
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -415,12 +420,15 @@ module.exports = grammar({
 		// ---- `@name` elements ---------------------------------------------
 		//
 		// One sigil, whatever the element's placement. `#` and `<T>` were
-		// both tried here and both carried no information; `#` carries no
-		// syntax at all now and is free. Whether an element stands
-		// as a block or belongs to running text is decided by position
-		// (does it occupy its own line), which is a question for
-		// `tomet-parser`, not for syntax highlighting -- so this grammar
-		// has one element rule.
+		// both tried here and both carried no information as a *second
+		// sigil*; `#(id)` isn't one either -- it's a slot on the one `@`
+		// element, same family as `_element_group`, just read as a
+		// sibling choice here rather than folded into it (an id must not
+		// take the `:` prefix a bare merge/connect does). Whether an
+		// element stands as a block or belongs to running text is decided
+		// by position (does it occupy its own line), which is a question
+		// for `tomet-parser`, not for syntax highlighting -- so this
+		// grammar has one element rule.
 		element: ($) => $.inline_element,
 		// `prec.right(3, ...)` wraps the *whole* rule (not just the trailing
 		// `repeat($._element_group)`, unlike an earlier revision) --
@@ -440,7 +448,7 @@ module.exports = grammar({
 				seq(
 					"@",
 					optional(field("name", $._element_name)),
-					repeat(choice($._element_group, $.connect)),
+					repeat(choice($._element_group, $.connect, $.id_group)),
 				),
 			),
 		// Two adjacent `optional($._blank_gap)` around an optional middle
@@ -579,12 +587,17 @@ module.exports = grammar({
 		// branch, which reuses its own recursive call for exactly this
 		// reason.
 		//
-		// Takes `repeat($._plain_group)`, not `repeat(choice($._element_group,
-		// $.connect))`: a connect must not itself swallow a *sibling*
-		// connect, nor a bare merge of its own (both would need a `:`
-		// that `_plain_group` never matches), so this repeat naturally
-		// stops right before the next `:`, leaving it for whichever
-		// *outer* rule holds the sibling `repeat(...)` to pick up.
+		// Takes `repeat(choice($._plain_group, $.id_group))`, not
+		// `repeat(choice($._element_group, $.connect))`: a connect must
+		// not itself swallow a *sibling* connect, nor a bare merge of its
+		// own (both would need a `:` that `_plain_group` never matches),
+		// so this repeat naturally stops right before the next `:`,
+		// leaving it for whichever *outer* rule holds the sibling
+		// `repeat(...)` to pick up. `id_group` is included alongside it
+		// because a connect is structurally an element in its own right
+		// (see below) and can carry its own id the same way one does --
+		// `tomet-parser::cst.rs::parse_connect` claims an adjacent
+		// `#(...)` for itself the same way its own group-reading does.
 		//
 		// `prec.right(4, ...)` (higher than `inline_element`'s own
 		// `prec.right(3, ...)`): a bare group right after `:name` --
@@ -605,9 +618,17 @@ module.exports = grammar({
 				seq(
 					token(prec(1, ":")),
 					field("name", $._element_name),
-					repeat($._plain_group),
+					repeat(choice($._plain_group, $.id_group)),
 				),
 			),
+		// `#(foobar)` -- an element's (or a connect's) own id, read after
+		// its `(args)[content]{value}` but before any following connect
+		// -- mirrors `tomet-parser::element::parse_hash_id`. The `#` is
+		// wrapped in `token(prec(1, ...))` for the same longest-match
+		// reason `connect`'s own `:` is: `punctuation` also matches a
+		// bare `#` (the fallback for one with nothing to open), an
+		// equal-length tie this token must win.
+		id_group: ($) => seq(token(prec(1, "#")), "(", $.value, ")"),
 		// The whole fence -- opener, body and closer -- is one token from
 		// the external scanner. See `src/scanner.c` for why it is taken
 		// whole rather than split into three.

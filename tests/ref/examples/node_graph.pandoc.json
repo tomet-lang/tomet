@@ -27,7 +27,7 @@
       "t": "Div",
       "c": [
         [
-          "dsaf-asdf",
+          "",
           [
             "tomet-node"
           ],
@@ -35,6 +35,10 @@
             [
               "type",
               "textarea"
+            ],
+            [
+              "id",
+              "dsaf-asdf"
             ],
             [
               "x",
@@ -63,7 +67,7 @@
       "t": "Div",
       "c": [
         [
-          "dsaf-asdf",
+          "",
           [
             "tomet-node"
           ],
@@ -71,6 +75,10 @@
             [
               "type",
               "textarea"
+            ],
+            [
+              "id",
+              "dsaf-asdf"
             ],
             [
               "x",
@@ -113,7 +121,7 @@
       "t": "Div",
       "c": [
         [
-          "dsaf-asdf",
+          "",
           [
             "tomet-node"
           ],
@@ -121,6 +129,10 @@
             [
               "type",
               "number"
+            ],
+            [
+              "id",
+              "dsaf-asdf"
             ],
             [
               "x",
@@ -139,7 +151,7 @@
       "t": "Div",
       "c": [
         [
-          "dsaf-asdf",
+          "",
           [
             "tomet-node"
           ],
@@ -147,6 +159,10 @@
             [
               "type",
               "export"
+            ],
+            [
+              "id",
+              "dsaf-asdf"
             ],
             [
               "x",

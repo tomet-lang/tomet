@@ -2,7 +2,7 @@
 
 use tomet_ast::{Block, Document, Element, ElementValue, Inline, Value};
 use tomet_semantics::merge_connected_values;
-use tomet_tree::{ElementExt, for_each_element_mut};
+use tomet_tree::for_each_element_mut;
 
 /// A remote attribute connection definition targeting one or more element IDs.
 #[derive(Debug, Clone)]
@@ -129,14 +129,7 @@ fn parse_target_ids_from_str(s: &str) -> Vec<String> {
 /// module doc for why the traversal itself lives there rather than being
 /// hand-rolled here.
 fn element_has_id(el: &Element, target_id: &str) -> bool {
-    let Some(id_val) = el.get_attr("id") else {
-        return false;
-    };
-    match id_val {
-        Value::String(s) => s == target_id,
-        Value::Int(i) => i.to_string() == target_id,
-        _ => false,
-    }
+    el.id.as_ref().is_some_and(|id| id.0 == target_id)
 }
 
 /// The `Element` half of [`ConnectionApplier`]'s merge -- recursion into

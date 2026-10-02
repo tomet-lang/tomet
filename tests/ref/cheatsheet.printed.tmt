@@ -40,9 +40,9 @@ ${sum(a, b)}
 @[](file:/readme.md)
 @[](ref:2)
 
-=[heading] {id: 1}
-==[heading] {id: 2}
-===[heading] {id: 3}
+=[heading] #("1")
+==[heading] #("2")
+===[heading] #("3")
 @embed(url: "https://")[alt]
 @embed(file: /readme.md)[alt]
 @embed(ref: 3)[alt]
@@ -58,7 +58,7 @@ ls --help
 - outline/list
 -. number1
 -. number2
-- (x) check {id: aaaaaa}
+- (x) check #(aaaaaa)
 - () none
 - () custom?
 - (TODO) custom

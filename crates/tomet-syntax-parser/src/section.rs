@@ -14,7 +14,7 @@ pub(crate) fn is_section_start(cur: &Cursor) -> bool {
     }
     let mut look = *cur;
     look.eat_while(|c| c == '=');
-    if crate::element::opens_group(look.peek()) {
+    if crate::element::opens_group(&look) {
         return true;
     }
     let had_ws = matches!(look.peek(), Some(' ') | Some('\t'));
@@ -38,7 +38,7 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
     let mut el = element_new(Sigil::named("section")).with_placement(Placement::Block);
 
     match cur.peek() {
-        _ if crate::element::opens_group(cur.peek()) => {
+        _ if crate::element::opens_group(cur) => {
             // The full form. Groups are read by the same code that reads
             // `@name`'s, so `=` takes `(args)`, `[content]` and `{value}`
             // in any order, and its content -- bracketed or `|`-marked --
@@ -49,7 +49,7 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
                 cur.eat_while(|c| c == '=');
                 skip_inline_ws(cur);
                 // Allow groups (e.g. `{ attrs }`) to follow decorative '='
-                if crate::element::opens_group(cur.peek()) {
+                if crate::element::opens_group(cur) {
                     parse_groups(cur, &mut el, true)?;
                     skip_inline_ws(cur);
                     if cur.peek() == Some('=') {
@@ -63,10 +63,11 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
             // A heading-less section with a trailing comment.
         }
         _ if had_ws && !matches!(cur.peek(), None | Some('\n') | Some('\r')) => {
-            let (mut content, attrs) = parse_sugar_body(cur)?;
+            let (mut content, attrs, id) = parse_sugar_body(cur)?;
             trim_trailing_equals(&mut content);
             el.content = Some(content);
             el.value = attrs.map(ElementValue::from_map);
+            el.id = id;
         }
         None | Some('\n') | Some('\r') => {
             // A heading-less section (`=` or `==` alone on its line).
@@ -91,6 +92,7 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
         title,
         args: el.args,
         value: el.value,
+        id: el.id,
         connects: el.connects,
         blocks: Vec::new(),
         span,

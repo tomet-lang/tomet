@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn renders_heading_with_id_and_cssclass() {
-    let doc = parse_document("=[ Hello ]{ id:header1, cssclass:card }\n").unwrap();
+    let doc = parse_document("=[ Hello ]#(header1){ cssclass:card }\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "<h1 id=\"header1\" class=\"card\">Hello</h1>\n");
 }
@@ -79,7 +79,7 @@ fn auto_slug_headings_disambiguates_duplicates() {
 
 #[test]
 fn auto_slug_headings_never_overrides_an_explicit_id() {
-    let doc = parse_document("=[ Hello World ]{ id:custom }\n").unwrap();
+    let doc = parse_document("=[ Hello World ]#(custom)\n").unwrap();
     let body = render_body_with(
         &doc,
         &RenderOptions {
@@ -134,7 +134,7 @@ fn the_outline_reports_level_text_and_order() {
 
 #[test]
 fn the_outline_carries_the_id_the_heading_was_rendered_with() {
-    let explicit = outline_of("=[ Hello ]{ id:header1 }\n", &RenderOptions::default());
+    let explicit = outline_of("=[ Hello ]#(header1)\n", &RenderOptions::default());
     assert_eq!(explicit[0].id.as_deref(), Some("header1"));
 
     let generated = outline_of(

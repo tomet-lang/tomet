@@ -943,6 +943,7 @@ mod tests {
                     "key".to_string(),
                     Value::String("value".to_string()),
                 )]))),
+                id: None,
                 connects: Vec::new(),
                 span: Span::dummy(),
             }
@@ -977,6 +978,7 @@ mod tests {
             content: Some(content),
             children: None,
             value: None,
+            id: None,
             connects: Vec::new(),
             span: Span::dummy(),
         }
@@ -1036,11 +1038,13 @@ mod tests {
                         vec![Inline::Text(Text::new("one", Span::dummy()))],
                         None,
                         None,
+                        None,
                         Vec::new(),
                         Span::dummy(),
                     ),
                     tomet_tree::element_list_item(
                         vec![Inline::Text(Text::new("two", Span::dummy()))],
+                        None,
                         None,
                         None,
                         Vec::new(),
@@ -1066,6 +1070,7 @@ mod tests {
                         content: Some(vec![Inline::Text(Text::new("a", Span::dummy()))]),
                         children: None,
                         value: None,
+                        id: None,
                         connects: Vec::new(),
                         span: Span::dummy(),
                     }),
@@ -1077,6 +1082,7 @@ mod tests {
                         content: Some(vec![Inline::Text(Text::new("b", Span::dummy()))]),
                         children: None,
                         value: None,
+                        id: None,
                         connects: Vec::new(),
                         span: Span::dummy(),
                     }),
@@ -1100,6 +1106,7 @@ mod tests {
             content: Some(vec![Inline::Text(Text::new("Wiki", Span::dummy()))]),
             children: None,
             value: None,
+            id: None,
             connects: Vec::new(),
             span: Span::dummy(),
         };
@@ -1125,6 +1132,7 @@ mod tests {
             content: Some(vec![Inline::Text(Text::new("a cat", Span::dummy()))]),
             children: None,
             value: None,
+            id: None,
             connects: Vec::new(),
             span: Span::dummy(),
         };
@@ -1150,6 +1158,7 @@ mod tests {
             content: Some(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))]),
             children: None,
             value: None,
+            id: None,
             connects: Vec::new(),
             span: Span::dummy(),
         };
@@ -1169,6 +1178,7 @@ mod tests {
             content: Some(vec![Inline::Raw(RawText::new("foo()", Span::dummy()))]),
             children: None,
             value: None,
+            id: None,
             connects: Vec::new(),
             span: Span::dummy(),
         };

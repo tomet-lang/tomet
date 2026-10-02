@@ -12,12 +12,12 @@
 //! in `tomet-field-utils`.
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, Placement, Section, Sigil, Value,
+    Block, Document, Element, ElementValue, Entry, Id, Inline, Placement, Section, Sigil, Value,
 };
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
-use tomet_style::{render_args_with_config, render_nested, render_value};
+use tomet_style::{quote_scalar_string, render_args_with_config, render_nested, render_value};
 use tomet_tree::element_new;
 
 pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig) {
@@ -171,6 +171,10 @@ fn render_section(sec: &Section, config: &PrinterConfig, out: &mut String) {
         out.push(' ');
         out.push_str(&render_value(&v));
     }
+    if sec.id.is_some() {
+        out.push(' ');
+    }
+    out.push_str(&render_id(sec.id.as_ref()));
     out.push_str(&render_connects(&sec.connects, config));
     out.push('\n');
 
@@ -205,6 +209,10 @@ fn render_heading_element(el: &Element, config: &PrinterConfig, out: &mut String
         out.push(' ');
         out.push_str(&render_value(&v));
     }
+    if el.id.is_some() {
+        out.push(' ');
+    }
+    out.push_str(&render_id(el.id.as_ref()));
     out.push_str(&render_connects(&el.connects, config));
     out.push('\n');
 }
@@ -296,6 +304,10 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
                 out.push(' ');
                 out.push_str(&render_value(&attrs));
             }
+            if item.id.is_some() {
+                out.push(' ');
+            }
+            out.push_str(&render_id(item.id.as_ref()));
             out.push_str(&render_connects(&item.connects, config));
             out.push('\n');
         } else {
@@ -305,6 +317,10 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
                 out.push(' ');
                 out.push_str(&render_value(&attrs));
             }
+            if item.id.is_some() {
+                out.push(' ');
+            }
+            out.push_str(&render_id(item.id.as_ref()));
             out.push_str(&render_connects(&item.connects, config));
             out.push('\n');
         }
@@ -320,13 +336,25 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
     }
 }
 
+/// Prints `#(foobar)` if `id` is `Some`, else nothing. Shared by every
+/// construct that carries an id (elements, sections, list items,
+/// connects) -- always printed right after the construct's own
+/// `(args)[content]{value}` and before any connect, matching where the
+/// parser reads it.
+fn render_id(id: Option<&Id>) -> String {
+    match id {
+        Some(id) => format!("#({})", quote_scalar_string(&id.0)),
+        None => String::new(),
+    }
+}
+
 /// Prints each of `connects` as `:name(...)`/`:name[...]`/`:name{...}`,
 /// stacked in source order right after whatever comes before it -- a
 /// connect is structurally an ordinary `Element` (its own `args`/
-/// `content`/`value`), just introduced by `:` instead of `@`, so this
-/// reuses the same group renderers [`render_element`]'s own generic tail
-/// does. No connect nests further connects (the parser never lets one),
-/// so this does not recurse into `connect.connects`.
+/// `content`/`value`/`id`), just introduced by `:` instead of `@`, so
+/// this reuses the same group renderers [`render_element`]'s own
+/// generic tail does. No connect nests further connects (the parser
+/// never lets one), so this does not recurse into `connect.connects`.
 ///
 /// No leading space or newline: a connect attaches directly to what
 /// precedes it, the same tight style `(args)[content]{value}` already
@@ -355,6 +383,7 @@ fn render_connects(connects: &[Element], config: &PrinterConfig) -> String {
                 config,
             ));
         }
+        out.push_str(&render_id(connect.id.as_ref()));
     }
     out
 }
@@ -423,18 +452,24 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         if el.sigil.is_bare_named("hr") && el.args.is_none() && el.value.is_none() {
             if let Some(content) = &el.content {
                 return format!(
-                    "---[{}]---{}",
+                    "---[{}]---{}{}",
                     render_inlines(content, config),
+                    render_id(el.id.as_ref()),
                     render_connects(&el.connects, config)
                 );
             } else {
-                return format!("---{}", render_connects(&el.connects, config));
+                return format!(
+                    "---{}{}",
+                    render_id(el.id.as_ref()),
+                    render_connects(&el.connects, config)
+                );
             }
         }
     }
 
     if el.sigil.is_bare_named("meta") {
         let mut out = tomet_style::render_meta_element(el, config);
+        out.push_str(&render_id(el.id.as_ref()));
         out.push_str(&render_connects(&el.connects, config));
         return out;
     }
@@ -507,6 +542,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 out.push('\n');
             }
             out.push_str(&fence);
+            out.push_str(&render_id(el.id.as_ref()));
             out.push_str(&render_connects(&el.connects, config));
             return out;
         }
@@ -535,6 +571,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             if let Some(value) = &el.value {
                 out.push_str(&render_element_value(value, config));
             }
+            out.push_str(&render_id(el.id.as_ref()));
             out.push_str(&render_connects(&el.connects, config));
             return out;
         } else if style == "block" {
@@ -572,6 +609,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             if let Some(value) = &el.value {
                 out.push_str(&render_element_value(value, config));
             }
+            out.push_str(&render_id(el.id.as_ref()));
             out.push_str(&render_connects(&el.connects, config));
             return out;
         } else if style == "box" {
@@ -612,6 +650,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             if let Some(value) = &el.value {
                 out.push_str(&render_element_value(value, config));
             }
+            out.push_str(&render_id(el.id.as_ref()));
             out.push_str(&render_connects(&el.connects, config));
             return out;
         }
@@ -678,6 +717,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         ));
     }
 
+    out.push_str(&render_id(el.id.as_ref()));
     out.push_str(&render_connects(&el.connects, config));
 
     out
@@ -1408,6 +1448,20 @@ mod tests {
     }
 
     #[test]
+    fn test_id_printing_is_tight_on_a_plain_element_but_spaced_on_a_section() {
+        // A plain element's own groups all attach tight to each other
+        // (no spaces between `(args)[content]{value}`), and `#(id)`
+        // matches that -- but a section already puts a space before its
+        // own trailing `{value}` for readability, and `#(id)` matches
+        // *that* convention there instead, for the same reason.
+        let doc = tomet_parser::parse_document("@memo(a: 1)#(myid)\n").expect("valid doc");
+        assert_eq!(document_to_tm(&doc).trim(), "@memo(a: 1)#(myid)");
+
+        let doc = tomet_parser::parse_document("=[ Title ]#(intro)\n").expect("valid doc");
+        assert_eq!(document_to_tm(&doc).trim(), "=[Title] #(intro)");
+    }
+
+    #[test]
     fn test_old_hash_tag_sugar_prints_as_plain_text() {
         let doc = tomet_parser::parse_document("#(rust, tomet)\n").expect("valid doc");
         let printed = document_to_tm(&doc);
@@ -1421,6 +1475,7 @@ mod tests {
             title: vec![Inline::Text("Title".into())],
             args: None,
             value: None,
+            id: None,
             connects: Vec::new(),
             blocks: vec![
                 Block::Paragraph(tomet_ast::Paragraph::new(
@@ -1446,6 +1501,7 @@ mod tests {
             title: Vec::new(),
             args: None,
             value: None,
+            id: None,
             connects: Vec::new(),
             blocks: vec![Block::Paragraph(tomet_ast::Paragraph::new(
                 vec![Inline::Text("Content".into())],

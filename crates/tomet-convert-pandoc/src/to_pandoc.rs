@@ -1,7 +1,8 @@
 //! `tomet_ast::Document` -> Pandoc's AST.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, ElementValue, Inline as TmInline, Placement, Sigil, Value,
+    Block as TmBlock, Document, Element, ElementValue, Id, Inline as TmInline, Placement, Sigil,
+    Value,
 };
 use tomet_semantics::{
     ElementKind, TableRow, classify_std_lenient, document_meta, flatten_data, flatten_element_data,
@@ -562,19 +563,26 @@ fn generic_attr(el: &Element, kind: &ElementKind) -> Attr {
 
 /// Builds a Pandoc `Attr` from an element's data.
 ///
-/// `id` is lifted out of the flattened pairs into the identifier slot,
-/// which is where Pandoc's writers look for an anchor. Everything else
-/// follows the shared flattening rule: readable pairs, plus the exact
-/// JSON copy under `EXACT_DATA_KEY` when the projection would lose
-/// something.
+/// The element's own `#(id)` becomes the identifier slot, which is where
+/// Pandoc's writers look for an anchor. Everything else follows the
+/// shared flattening rule: readable pairs, plus the exact JSON copy
+/// under `EXACT_DATA_KEY` when the projection would lose something.
 fn attr_of(el: &Element, classes: &[&str]) -> Attr {
-    attr_from(flatten_element_data(el).into_pairs(), classes)
+    attr_from(
+        el.id.as_ref(),
+        flatten_element_data(el).into_pairs(),
+        classes,
+    )
 }
 
 fn section_attr(sec: &tomet_ast::Section) -> Attr {
     let args = sec.args.as_ref();
     let value = sec.value.as_ref().and_then(|v| v.as_data());
-    attr_from(flatten_data(args, value.as_ref()).into_pairs(), &[])
+    attr_from(
+        sec.id.as_ref(),
+        flatten_data(args, value.as_ref()).into_pairs(),
+        &[],
+    )
 }
 
 /// Like [`attr_of`], but ignoring `(args)`.
@@ -583,14 +591,15 @@ fn section_attr(sec: &tomet_ast::Section) -> Attr {
 /// dedicated field: a heading's level, a link's or image's target.
 fn attr_from_value(el: &Element, classes: &[&str]) -> Attr {
     let value = el.value.as_ref().and_then(|v| v.as_data());
-    attr_from(flatten_data(None, value.as_ref()).into_pairs(), classes)
+    attr_from(
+        el.id.as_ref(),
+        flatten_data(None, value.as_ref()).into_pairs(),
+        classes,
+    )
 }
 
-fn attr_from(mut pairs: Vec<(String, String)>, classes: &[&str]) -> Attr {
-    let mut id = String::new();
-    if let Some(pos) = pairs.iter().position(|(k, _)| k == "id") {
-        id = pairs.remove(pos).1;
-    }
+fn attr_from(id: Option<&Id>, pairs: Vec<(String, String)>, classes: &[&str]) -> Attr {
+    let id = id.map(|id| id.0.clone()).unwrap_or_default();
     Attr(id, classes.iter().map(|c| c.to_string()).collect(), pairs)
 }
 
@@ -810,7 +819,7 @@ mod tests {
 
     #[test]
     fn an_id_goes_in_the_identifier_slot_not_the_pairs() {
-        let blocks = convert("@deck.card{ id: c1, tags: list(a, b) }\n");
+        let blocks = convert("@deck.card#(c1){ tags: list(a, b) }\n");
         let Block::Div(attr, _) = &blocks[0] else {
             panic!("expected a Div, got {:?}", blocks[0]);
         };

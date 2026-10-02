@@ -342,6 +342,37 @@ const CASES: &[Case] = &[
          コネクトの名前と同じく、パーサは呼び出し名を判断しない",
         "@x(a: list(card, ns.mycard))\n",
     ),
+    // ---- id `#(...)` --------------------------------------------------
+    case(
+        Some("id `#(...)`"),
+        "要素自身のid。`(args)[content]{value}`の後、コネクトの前に読まれる",
+        "@task(a: 1)[ text ]#(myid)\n",
+    ),
+    case(
+        None,
+        "groupsより前に書いても同じ。idと他のgroupsに順序はない",
+        "@task#(myid)(a: 1)[ text ]\n",
+    ),
+    case(None, "クォートすればスペースも入る", "@task#(\"has spaces\")\n"),
+    case(None, "セクションにも付く", "=[ Intro ]#(intro)\n"),
+    case(
+        None,
+        "リスト項目の完全形にも付く",
+        "- (x)[ y ]#(item1)\n",
+    ),
+    case(
+        None,
+        "糖衣形は末尾の`#(id)`と`{attrs}`を両方読む",
+        "- plain text #(item1){ tag: x }\n",
+    ),
+    case(
+        None,
+        "コネクトの直後に書くと、外側の要素ではなくそのコネクト自身のidになる。\
+         コネクトの再帰呼び出しが隣接する`#(...)`を先に奪うため、外側のidを\
+         付けたいなら必ずコネクトより前に書くことになる",
+        "@task(a: 1):rule(allow: list(card))#(myid)\n",
+    ),
+    case(None, "idを2つ書くとエラー", "@task#(a)#(b)\n"),
     // ---- comments ---------------------------------------------------
     case(Some("コメント"), "行コメント", "// 消える\n本文\n"),
     case(None, "ブロックコメント", "本文 /* 消える */ の続き\n"),
@@ -552,6 +583,10 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
             for inline in &sec.title {
                 dump_inline(out, inline, depth + 2);
             }
+            if let Some(id) = &sec.id {
+                indent(out, depth + 1);
+                let _ = writeln!(out, "id      {:?}", id.0);
+            }
             if !sec.blocks.is_empty() {
                 indent(out, depth + 1);
                 out.push_str("Blocks:\n");
@@ -627,6 +662,10 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
             }
         }
         None => {}
+    }
+    if let Some(id) = &el.id {
+        indent(out, depth + 1);
+        let _ = writeln!(out, "id      {:?}", id.0);
     }
     if let Some(children) = &el.children {
         indent(out, depth + 1);

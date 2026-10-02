@@ -5,10 +5,11 @@ use crate::fence::{is_fence_start, parse_fence};
 use crate::inline::{Stop, at_line_start, parse_inline_seq};
 use crate::section::{merge_values, parse_braced_value};
 use crate::value::{
-    POSITIONAL_ENTRY_KEY, eat_name, err, is_name_start_at, parse_one_entry, parse_value_at,
-    skip_block_comment, skip_inline_ws, skip_line_comment, skip_ws_newlines_and_comments,
+    POSITIONAL_ENTRY_KEY, eat_name, eat_scalar_raw, err, is_name_start_at, parse_one_entry,
+    parse_quoted, parse_value_at, skip_block_comment, skip_inline_ws, skip_line_comment,
+    skip_ws_newlines_and_comments,
 };
-use tomet_ast::{Element, ElementValue, Entry, Inline, Placement, Sigil, Value};
+use tomet_ast::{Element, ElementValue, Entry, Id, Inline, Placement, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -43,7 +44,7 @@ pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
         return false;
     }
     skip_lookahead_gap(&mut look);
-    if opens_group(look.peek()) || is_fence_start(&look) {
+    if opens_group(&look) || is_fence_start(&look) {
         return true;
     }
     // A `:` right after the name only starts an element when a `:name`
@@ -244,6 +245,14 @@ pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Resu
 /// `:` is deliberately not here. It opens nothing; it says where the group
 /// that follows belongs. See [`is_element_start`].
 ///
+/// `#` is here for a narrower reason than the rest: it does not open an
+/// `(args)`/`[content]`/`{value}` group at all, it opens the one `#(id)`
+/// slot (see [`parse_hash_id`]) -- and only when a `(` actually follows
+/// it, which is why this takes a `Cursor` rather than one already-peeked
+/// `char` the way it used to: `#` alone (not followed by `(`) answers
+/// "no", the same as any other character with no meaning here, since a
+/// bare `#` is otherwise completely free text.
+///
 /// The alternative was to delete the recognizers instead: decide by
 /// parsing speculatively on a copy of the cursor, the way
 /// [`element_ends_line`] already does, which leaves one definition per
@@ -254,8 +263,12 @@ pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Resu
 /// crate's writ asks for the same tree from the same input *in
 /// predictable time*. Reconsider it if the lookahead ever stops being
 /// per-line; a shared set plus a guard buys the same safety until then.
-pub(crate) fn opens_group(c: Option<char>) -> bool {
-    matches!(c, Some('(') | Some('[') | Some('{') | Some('|'))
+pub(crate) fn opens_group(cur: &Cursor) -> bool {
+    match cur.peek() {
+        Some('(') | Some('[') | Some('{') | Some('|') => true,
+        Some('#') => cur.peek_at(1) == Some('('),
+        _ => false,
+    }
 }
 
 /// Reads an element's `(args)`, `[content]` and `{value}` groups -- in any
@@ -349,6 +362,18 @@ pub(crate) fn parse_groups(
                     el.value = Some(parse_value_group(cur)?);
                     continue;
                 }
+                // `#(id)` -- a single slot, read after the three groups
+                // above. "Before any `:name(...)` connect" needs no
+                // explicit check here: a connect's own `#` arm (this
+                // same one, reached through its own recursive
+                // `parse_groups` call) always claims an adjacent `#(...)`
+                // for *itself* first, so writing an id after a connect
+                // names the connect's id, not this element's -- there is
+                // no ambiguous case left to reject.
+                Some('#') if el.id.is_none() && cur.peek_at(1) == Some('(') => {
+                    el.id = Some(parse_hash_id(cur)?);
+                    continue;
+                }
                 // A `+++` fence is exclusive with `[content]` and
                 // `{value}`: it *is* the body, captured verbatim.
                 _ if el.value.is_none() && el.content.is_none() && is_fence_start(cur) => {
@@ -381,7 +406,14 @@ pub(crate) fn parse_groups(
                 // else -- a list item's own `{attrs}`, an entry inside a
                 // `{...}` group -- where this fall-through is what hands
                 // it over.
-                _ if allow_colon_connect && cur.pos() == checkpoint && opens_group(cur.peek()) => {
+                _ if allow_colon_connect && cur.pos() == checkpoint && opens_group(cur) => {
+                    if cur.peek() == Some('#') {
+                        return Err(err(
+                            cur,
+                            cur.pos(),
+                            "a second `#(...)`: an element takes at most one id",
+                        ));
+                    }
                     let group = match cur.peek() {
                         Some('(') => "(args)",
                         Some('[') | Some('|') => "[content]",
@@ -426,79 +458,175 @@ pub(crate) fn connect_colon_pos(src: &str, brace_pos: usize) -> Option<usize> {
     }
 }
 
-/// Finds this line's own trailing `{attrs}`, if the rest of the line
-/// has one. Returns `(content_stop, brace_pos)`: `content_stop` is
-/// where the line's own inline *content* parsing must stop -- normally
-/// the same as `brace_pos` (a bare, colon-less `{}` is always claimed
-/// by an element instead, so content parsing runs right up to it
-/// regardless of whether it turns out to belong to the item or not),
-/// but the position of a preceding colon-connect marker instead when
-/// there is one, so that marker isn't left dangling as ordinary
-/// trailing text once `allow_colon_connect: false` stops an inner
-/// element from consuming it itself.
-pub(crate) fn peek_trailing_attrs(cur: &Cursor) -> Option<(usize, usize)> {
+/// What [`peek_trailing_attrs`] found at the end of a bracket-less
+/// sugar line. `content_stop` is where the line's own inline *content*
+/// parsing must stop; `id_pos`/`brace_pos` are where the real parse
+/// (`parse_sugar_body`) jumps to read each piece it found, in that
+/// order -- `#(id)`, if present, always comes before `{attrs}`, the
+/// same relative order [`parse_groups`] enforces for every other
+/// spelling.
+pub(crate) struct TrailingGroups {
+    content_stop: usize,
+    id_pos: Option<usize>,
+    brace_pos: Option<usize>,
+}
+
+/// Forward scan for the last `#(` starting before `before` (the whole
+/// line, if `None`) -- a cheap candidate, confirmed or rejected by
+/// actually parsing it. Mirrors the brace search just below it.
+fn last_hash_paren_pos(cur: &Cursor, before: Option<usize>) -> Option<usize> {
+    let mut look = *cur;
+    let mut last = None;
+    while !look.is_eof() && !matches!(look.peek(), Some('\n') | Some('\r')) {
+        if before.is_some_and(|limit| look.pos() >= limit) {
+            break;
+        }
+        if look.peek() == Some('#') {
+            let mut ahead = look;
+            ahead.bump();
+            if ahead.peek() == Some('(') {
+                last = Some(look.pos());
+            }
+        }
+        look.bump();
+    }
+    last
+}
+
+/// Confirms inline content parsing, stopped at `stop`, actually lands
+/// exactly there rather than overshooting it -- see
+/// [`peek_trailing_attrs`]'s doc comment for why this can't just be
+/// trusted.
+fn content_lands_at(cur: &Cursor, stop: usize) -> bool {
+    let mut probe = *cur;
+    parse_inline_seq(&mut probe, Stop::Offset(stop), false).is_ok() && probe.pos() == stop
+}
+
+fn id_probe_lands_at(cur: &Cursor, id_pos: usize, expect: Option<usize>) -> bool {
+    let mut probe = *cur;
+    probe.set_pos(id_pos);
+    if parse_hash_id(&mut probe).is_err() {
+        return false;
+    }
+    skip_inline_ws(&mut probe);
+    match expect {
+        Some(pos) => probe.pos() == pos,
+        None => matches!(probe.peek(), None | Some('\n') | Some('\r')),
+    }
+}
+
+fn braces_confirm(cur: &Cursor, brace_pos: usize) -> bool {
+    let mut test_cur = *cur;
+    test_cur.set_pos(brace_pos);
+    if parse_braced_value(&mut test_cur).is_err() {
+        return false;
+    }
+    skip_inline_ws(&mut test_cur);
+    matches!(test_cur.peek(), None | Some('\n') | Some('\r'))
+}
+
+/// Finds this line's own trailing `#(id)` and/or `{attrs}`, if the rest
+/// of the line has either.
+///
+/// A bare, colon-less trailing `{}` is always claimed by an element
+/// instead of this sugar, regardless of `allow_colon_connect`
+/// (`@meta(format:yaml) {...}` is real, existing usage that must keep
+/// working) -- so this line's one `{` can still belong to an inner
+/// element instead of the item, and `Stop::Offset` alone can't be
+/// trusted to have actually stopped parsing there: `parse_inline_seq`
+/// only checks its target *between* separate line items, not while a
+/// single element is mid-way through claiming one more trailing group
+/// -- so it can walk straight past the stop point without ever
+/// noticing. Speculatively parsing here (the result is discarded either
+/// way -- the real caller reparses once this confirms the guess) is the
+/// only way to know without duplicating `parse_element`'s own claiming
+/// logic. The `#(id)` search follows the exact same shape: a cheap
+/// forward scan for a candidate position, confirmed only by actually
+/// parsing it.
+pub(crate) fn peek_trailing_attrs(cur: &Cursor) -> Option<TrailingGroups> {
     let mut look = *cur;
     let mut last_brace_pos = None;
-    while !look.is_eof() && look.peek() != Some('\n') && look.peek() != Some('\r') {
+    while !look.is_eof() && !matches!(look.peek(), Some('\n') | Some('\r')) {
         if look.peek() == Some('{') {
             last_brace_pos = Some(look.pos());
         }
         look.bump();
     }
-    let brace_pos = last_brace_pos?;
-    let content_stop = connect_colon_pos(cur.src(), brace_pos).unwrap_or(brace_pos);
 
-    // Confirm inline content parsing, stopped at `content_stop`,
-    // actually lands exactly there rather than overshooting it. A bare,
-    // colon-less trailing group is still always claimed by an element
-    // regardless of `allow_colon_connect` (`@meta(format:yaml) {...}`
-    // is real, existing usage that must keep working) -- so this line's
-    // one `{` can still belong to an inner element instead of the item,
-    // and `Stop::Offset` alone can't be trusted to have actually
-    // stopped parsing there: `parse_inline_seq` only checks its target
-    // *between* separate line items, not while a single element is
-    // mid-way through claiming one more trailing group -- so it can
-    // walk straight past `content_stop` without ever noticing.
-    // Speculatively parsing here (the result is discarded either way --
-    // `parse_list_internal` reparses for real once this confirms the
-    // guess) is the only way to know without duplicating
-    // `parse_element`'s own claiming logic.
-    let mut probe = *cur;
-    let landed_at_pos = parse_inline_seq(&mut probe, Stop::Offset(content_stop), false).is_ok()
-        && (probe.pos() == content_stop);
-    if !landed_at_pos {
-        return None;
-    }
+    if let Some(brace_pos) = last_brace_pos {
+        // `attrs_start` is the colon-connect marker's position when
+        // there is one, short of `brace_pos` -- content parsing (and,
+        // if present, the id search) stop there instead, so that marker
+        // isn't left dangling as ordinary trailing text once
+        // `allow_colon_connect: false` stops an inner element from
+        // consuming it itself.
+        let attrs_start = connect_colon_pos(cur.src(), brace_pos).unwrap_or(brace_pos);
 
-    let mut test_cur = *cur;
-    test_cur.set_pos(brace_pos);
-    if parse_braced_value(&mut test_cur).is_ok() {
-        skip_inline_ws(&mut test_cur);
-        if matches!(test_cur.peek(), None | Some('\n') | Some('\r')) {
-            return Some((content_stop, brace_pos));
+        if let Some(id_pos) = last_hash_paren_pos(cur, Some(attrs_start))
+            && id_probe_lands_at(cur, id_pos, Some(attrs_start))
+            && content_lands_at(cur, id_pos)
+            && braces_confirm(cur, brace_pos)
+        {
+            return Some(TrailingGroups {
+                content_stop: id_pos,
+                id_pos: Some(id_pos),
+                brace_pos: Some(brace_pos),
+            });
+        }
+        if content_lands_at(cur, attrs_start) && braces_confirm(cur, brace_pos) {
+            return Some(TrailingGroups {
+                content_stop: attrs_start,
+                id_pos: None,
+                brace_pos: Some(brace_pos),
+            });
         }
     }
+
+    // No (confirmed) braces -- a trailing `#(id)` alone, with nothing
+    // but the end of the line after it.
+    if let Some(id_pos) = last_hash_paren_pos(cur, None)
+        && id_probe_lands_at(cur, id_pos, None)
+        && content_lands_at(cur, id_pos)
+    {
+        return Some(TrailingGroups {
+            content_stop: id_pos,
+            id_pos: Some(id_pos),
+            brace_pos: None,
+        });
+    }
+
     None
 }
 
-/// Reads a bracket-less body: inline content to the end of the line, plus
-/// the line's own trailing `{attrs}` if it has one.
+/// Reads a bracket-less body: inline content to the end of the line,
+/// plus the line's own trailing `#(id)` and/or `{attrs}` if it has
+/// either.
 ///
-/// This is the sugar shared by `-` and `#`. It is single-line on purpose:
+/// This is the sugar shared by `-` and `=`. It is single-line on purpose:
 /// content that spans lines has to say so with an explicit `[ ... ]`
 /// group, which is what [`parse_groups`] reads.
-pub(crate) fn parse_sugar_body(cur: &mut Cursor) -> Result<(Vec<Inline>, Option<Value>)> {
-    if let Some((content_stop, brace_pos)) = peek_trailing_attrs(cur) {
-        let content = parse_inline_seq(cur, Stop::Offset(content_stop), false)?;
-        // `content_stop` is the colon-connect marker's position when there
-        // is one, short of `brace_pos` -- jump the rest of the way past it
-        // and its surrounding whitespace, neither of which needs to
-        // survive as an AST node.
-        cur.set_pos(brace_pos);
-        let attrs = parse_braced_value(cur)?;
-        Ok((content, Some(attrs)))
+pub(crate) fn parse_sugar_body(
+    cur: &mut Cursor,
+) -> Result<(Vec<Inline>, Option<Value>, Option<Id>)> {
+    if let Some(trailing) = peek_trailing_attrs(cur) {
+        let content = parse_inline_seq(cur, Stop::Offset(trailing.content_stop), false)?;
+        let id = match trailing.id_pos {
+            Some(id_pos) => {
+                cur.set_pos(id_pos);
+                Some(parse_hash_id(cur)?)
+            }
+            None => None,
+        };
+        let attrs = match trailing.brace_pos {
+            Some(brace_pos) => {
+                cur.set_pos(brace_pos);
+                Some(parse_braced_value(cur)?)
+            }
+            None => None,
+        };
+        Ok((content, attrs, id))
     } else {
-        Ok((parse_inline_seq(cur, Stop::Line, false)?, None))
+        Ok((parse_inline_seq(cur, Stop::Line, false)?, None, None))
     }
 }
 
@@ -517,6 +645,42 @@ pub(crate) fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
         return Err(err(cur, cur.pos(), "expected ')'"));
     }
     Ok(v)
+}
+
+/// `#(foobar)` -- an element's own id. Eats the `#`, then delegates to
+/// [`parse_id_scalar`] for the parenthesized content.
+///
+/// Deliberately narrower than [`parse_paren_value`]: an id is a single
+/// scalar, not the general value grammar, so `#(key: value)` and
+/// `#(list(1, 2))` are parse errors here rather than silently admitting
+/// a map/seq/call that could never mean anything as an id.
+pub(crate) fn parse_hash_id(cur: &mut Cursor) -> Result<Id> {
+    cur.bump(); // eat '#'
+    if !cur.eat_str("(") {
+        return Err(err(cur, cur.pos(), "expected '(' after '#'"));
+    }
+    skip_ws_newlines_and_comments(cur);
+    let s = parse_id_scalar(cur)?;
+    skip_ws_newlines_and_comments(cur);
+    if !cur.eat_str(")") {
+        return Err(err(cur, cur.pos(), "expected ')'"));
+    }
+    Ok(Id(s))
+}
+
+/// A single scalar: a quoted string, or a bare run of text (same raw
+/// reader every other bare scalar value uses). Unlike [`parse_value_at`],
+/// never infers a non-string type -- `#(123)` is the id `"123"`, not an
+/// integer, since [`Id`] is always a plain string.
+fn parse_id_scalar(cur: &mut Cursor) -> Result<String> {
+    if cur.peek() == Some('"') {
+        return parse_quoted(cur);
+    }
+    let raw = eat_scalar_raw(cur).trim_end();
+    if raw.is_empty() {
+        return Err(err(cur, cur.pos(), "expected an id"));
+    }
+    Ok(raw.to_string())
 }
 
 /// Parses a `|`-prefixed content run: `[content]` spelled without brackets.

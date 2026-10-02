@@ -4,8 +4,8 @@
 use crate::RenderCtx;
 use crate::block::render_inlines;
 use crate::util::{
-    as_map, escape_attr, escape_html, inlines_to_plain, map_get, push_named_attrs, split_attrs,
-    value_to_plain,
+    as_map, escape_attr, escape_html, id_attr, inlines_to_plain, map_get, push_named_attrs,
+    split_attrs, value_to_plain,
 };
 use tomet_ast::{Element, Value};
 use tomet_semantics::normalized_element_args;
@@ -80,7 +80,8 @@ pub(crate) fn render_raw_element(el: &Element, out: &mut String, inline: bool) {
         Some(v) => v.as_data(),
         _ => None,
     };
-    let (id, class, data) = split_attrs(attrs.as_ref());
+    let (class, data) = split_attrs(attrs.as_ref());
+    let id = id_attr(el.id.as_ref());
 
     if inline {
         out.push_str("<code");

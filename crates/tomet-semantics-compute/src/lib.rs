@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn evaluates_identifier_via_resolve() {
-        let doc = parse("@x(id:a, n:5)\n");
+        let doc = parse("@x#(a)(n:5)\n");
         assert_eq!(evaluate(&doc, &interp("${a.n}")).unwrap(), Value::Int(5));
     }
 

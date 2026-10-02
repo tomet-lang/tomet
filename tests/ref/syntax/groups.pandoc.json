@@ -382,9 +382,13 @@
       "c": [
         1,
         [
-          "sec-heading",
+          "",
           [],
           [
+            [
+              "id",
+              "sec-heading"
+            ],
             [
               "tag",
               "groups"

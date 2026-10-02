@@ -17,7 +17,7 @@ fn renders_ordered_list_as_ol() {
 #[test]
 fn renders_list_with_value_markers_and_attrs() {
     let doc =
-        parse_document("- (T) in-progress {tag: dev}\n- (\"?\") question {id: task1}\n").unwrap();
+        parse_document("- (T) in-progress {tag: dev}\n- (\"?\") question #(task1)\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,

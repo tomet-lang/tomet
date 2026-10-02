@@ -65,6 +65,7 @@ mod tests {
             vec![],
             Some(Value::String("marker".into())),
             None,
+            None,
             Vec::new(),
             tomet_ast::Span::dummy(),
         );

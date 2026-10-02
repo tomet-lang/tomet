@@ -2,7 +2,7 @@
 
 use crate::RenderCtx;
 use crate::block::render_inlines;
-use crate::util::{as_map, map_get, push_named_attrs, split_attrs};
+use crate::util::{as_map, id_attr, map_get, push_named_attrs, split_attrs};
 use tomet_ast::{Element, Value};
 use tomet_semantics::normalized_element_args;
 
@@ -35,7 +35,8 @@ pub(crate) fn render_table_element(cx: &RenderCtx, el: &Element, out: &mut Strin
         Some(v) => v.as_data(),
         _ => None,
     };
-    let (id, class, data) = split_attrs(attrs.as_ref());
+    let (class, data) = split_attrs(attrs.as_ref());
+    let id = id_attr(el.id.as_ref());
     let class = class.or_else(|| Some("tm-element tm-table".to_string()));
 
     out.push_str("<table");

@@ -152,12 +152,14 @@ impl<'a> CstParser<'a> {
         None
     }
 
-    /// After an element's name (index `i`): does a group, a `:` connect or a
-    /// `+++` fence follow, so that it is an element and not plain text?
+    /// After an element's name (index `i`): does a group, a `:` connect, a
+    /// `#(id)` or a `+++` fence follow, so that it is an element and not
+    /// plain text?
     fn groups_follow(&self, i: usize) -> bool {
         let i = self.skip_ws_from(i);
         match self.kind_at(i) {
             Some(K::L_PAREN | K::L_BRACKET | K::L_BRACE) => true,
+            Some(K::HASH) => self.id_follows(i),
             Some(K::COLON) => {
                 Self::is_opener(self.kind_at(i + 1)) || self.kind_at(i + 1) == Some(K::IDENT)
             }
@@ -171,6 +173,7 @@ impl<'a> CstParser<'a> {
     fn element_end(&self, mut i: usize) -> usize {
         i += 2; // `@` and the name
         let mut seen = [false; 3]; // args, content, value: each at most once
+        let mut seen_id = false;
         loop {
             let j = self.skip_ws_from(i);
             match self.kind_at(j) {
@@ -181,6 +184,15 @@ impl<'a> CstParser<'a> {
                         return i;
                     }
                     match self.group_end(j) {
+                        Some(e) => i = e,
+                        None => return self.tokens.len(),
+                    }
+                }
+                Some(K::HASH) if !seen_id && self.id_follows(j) => {
+                    seen_id = true;
+                    // `#` `(` ... `)`: skip past the id the same way a
+                    // bracketed group is skipped, by matching the paren.
+                    match self.group_end(j + 1) {
                         Some(e) => i = e,
                         None => return self.tokens.len(),
                     }
@@ -540,9 +552,17 @@ impl<'a> CstParser<'a> {
     }
 
     /// An element's `(args)`, `{value}` and `[content]` (at most one of each,
-    /// in any order), then its `:name(...)` connects and `+++` fence.
+    /// in any order), then its `#(id)` slot, then its `:name(...)` connects
+    /// and `+++` fence.
+    ///
+    /// No ordering is enforced between `#(id)` and the other three groups,
+    /// mirroring the AST-path parser's `parse_groups` -- only "before any
+    /// connect" matters, and that needs no explicit check here either: a
+    /// connect's own id check (in [`parse_connect`]) claims an adjacent
+    /// `#(...)` for itself first, so a `#(id)` written after a connect
+    /// never reaches this loop's own `id` slot at all.
     fn parse_groups(&mut self) {
-        let (mut args, mut value, mut content) = (false, false, false);
+        let (mut args, mut value, mut content, mut id) = (false, false, false, false);
         loop {
             let j = self.skip_ws_from(self.pos);
             match self.kind_at(j) {
@@ -561,6 +581,11 @@ impl<'a> CstParser<'a> {
                     self.bump_while(K::WHITESPACE);
                     self.parse_content_group();
                 }
+                Some(K::HASH) if !id && self.id_follows(j) => {
+                    id = true;
+                    self.bump_while(K::WHITESPACE);
+                    self.parse_id_group();
+                }
                 Some(K::COLON) if self.allow_connect && self.connect_follows(j) => {
                     self.bump_while(K::WHITESPACE);
                     self.parse_connect();
@@ -573,6 +598,23 @@ impl<'a> CstParser<'a> {
                 _ => break,
             }
         }
+    }
+
+    /// Is `i` a `#` immediately followed by `(`, so that it opens the one
+    /// `#(id)` slot rather than being free text?
+    fn id_follows(&self, i: usize) -> bool {
+        self.kind_at(i + 1) == Some(K::L_PAREN)
+    }
+
+    fn parse_id_group(&mut self) {
+        self.builder.start_node(K::ID_GROUP.into());
+        self.bump(); // '#'
+        self.bump(); // '('
+        self.parse_value(K::R_PAREN);
+        if self.current_kind() == Some(K::R_PAREN) {
+            self.bump();
+        }
+        self.builder.finish_node();
     }
 
     fn connect_follows(&self, colon: usize) -> bool {
@@ -594,6 +636,14 @@ impl<'a> CstParser<'a> {
             Some(K::L_BRACE) => self.parse_value_group(),
             Some(K::L_BRACKET) => self.parse_content_group(),
             _ => {}
+        }
+        // A connect's own id, if immediately adjacent -- claimed here,
+        // before control returns to the outer `parse_groups` loop, the
+        // same way `parse_groups` itself claims one for its own element.
+        let j = self.skip_ws_from(self.pos);
+        if self.kind_at(j) == Some(K::HASH) && self.id_follows(j) {
+            self.bump_while(K::WHITESPACE);
+            self.parse_id_group();
         }
         self.builder.finish_node();
     }
@@ -1032,5 +1082,45 @@ mod tests {
             .map(|e| e.value_text())
             .collect();
         assert_eq!(entries, ["v", "2"]);
+    }
+
+    #[test]
+    fn id_group_is_structured_and_roundtrips() {
+        let src = "@memo(a: 1)[ x ]#(myid)\n";
+        let root = parse_cst(src);
+        assert_eq!(root.text().to_string(), src);
+        let el = find(&root, K::BLOCK_ELEMENT).unwrap();
+        assert_eq!(
+            child_kinds(&el),
+            [K::SIGIL, K::ARGS, K::CONTENT, K::ID_GROUP]
+        );
+        let id_group = find(&el, K::ID_GROUP).unwrap();
+        assert_eq!(id_group.text().to_string(), "#(myid)");
+    }
+
+    #[test]
+    fn id_group_can_come_before_its_groups() {
+        let el = find(&parse_cst("@memo#(myid)(a: 1)\n"), K::BLOCK_ELEMENT).unwrap();
+        assert_eq!(child_kinds(&el), [K::SIGIL, K::ID_GROUP, K::ARGS]);
+    }
+
+    #[test]
+    fn a_connect_can_carry_its_own_id_group() {
+        let el = find(
+            &parse_cst("@memo:rule(allow: list(card))#(myid)\n"),
+            K::CONNECT,
+        )
+        .unwrap();
+        assert_eq!(child_kinds(&el), [K::ARGS, K::ID_GROUP]);
+    }
+
+    #[test]
+    fn bare_hash_not_followed_by_paren_is_not_an_id_group() {
+        // Same regression this session's AST-path fix covers: `#` must be
+        // immediately followed by `(` to be the id slot, elsewhere it's
+        // free text -- confirmed here for the lossless tree too.
+        let root = parse_cst("@meta{a: 1}\n#[ Title ]\n");
+        assert_eq!(count(&root, K::ID_GROUP), 0);
+        assert_eq!(child_kinds(&root), [K::BLOCK_ELEMENT, K::PARAGRAPH]);
     }
 }

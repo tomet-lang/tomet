@@ -22,7 +22,7 @@ fn invalid_document_reports_one_diagnostic() {
 
 #[test]
 fn duplicate_id_document_reports_validator_diagnostic() {
-    let diags = diagnostics_for("=[ One ]{id: a}\n=[ Two ]{id: a}\n");
+    let diags = diagnostics_for("=[ One ]#(a)\n=[ Two ]#(a)\n");
     assert_eq!(diags.len(), 1);
     assert_eq!(diags[0].severity, Some(DiagnosticSeverity::ERROR));
     assert_eq!(diags[0].source.as_deref(), Some("tomet"));
@@ -51,7 +51,7 @@ fn document_symbols_returns_headings_and_elements() {
 
 #[test]
 fn definition_finds_matching_id() {
-    let text = "=[ Target ]{id: target1}\n\n@deck.ref(id: target1)\n";
+    let text = "=[ Target ]#(target1)\n\n@deck.ref(id: target1)\n";
     let uri = Uri::from_str("file:///test.tmt").unwrap();
     let def = definition_for(text, Position::new(2, 4), &uri);
     assert!(def.is_some());
@@ -105,13 +105,13 @@ fn completions_trigger_prefix() {
 
 #[test]
 fn exact_cst_diagnostic_range_on_duplicate_id() {
-    let text = "=[ A ]{id: my_id}\n\n=[ B ]{id: my_id}\n";
+    let text = "=[ A ]#(my_id)\n\n=[ B ]#(my_id)\n";
     let diags = diagnostics_for(text);
     assert_eq!(diags.len(), 1);
     let diag = &diags[0];
     assert_eq!(diag.range.start.line, 2);
-    assert_eq!(diag.range.start.character, 11);
-    assert_eq!(diag.range.end.character, 16);
+    assert_eq!(diag.range.start.character, 8);
+    assert_eq!(diag.range.end.character, 13);
 }
 
 #[test]

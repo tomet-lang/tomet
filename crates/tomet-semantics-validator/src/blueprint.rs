@@ -66,23 +66,7 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
                 }
             }
         } else if kind == ElementKind::Heading {
-            let id = el
-                .args
-                .as_ref()
-                .and_then(|a| a.get("id"))
-                .and_then(|v| v.as_str())
-                .or_else(|| {
-                    if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>())
-                    {
-                        entries
-                            .iter()
-                            .find(|(k, _)| *k == "id")
-                            .and_then(|(_, v)| v.as_str())
-                    } else {
-                        None
-                    }
-                })
-                .map(String::from);
+            let id = el.id.as_ref().map(|id| id.0.clone());
 
             // If the heading has an explicit ID or is defined in blueprint, treat as structural section
             let title = extract_element_title(el);
@@ -155,23 +139,7 @@ pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<D
 
     for_each_top_level_element(doc, |el| {
         if classify_std_lenient(el) == ElementKind::Heading {
-            let id = el
-                .args
-                .as_ref()
-                .and_then(|a| a.get("id"))
-                .and_then(|v| v.as_str())
-                .or_else(|| {
-                    if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>())
-                    {
-                        entries
-                            .iter()
-                            .find(|(k, _)| *k == "id")
-                            .and_then(|(_, v)| v.as_str())
-                    } else {
-                        None
-                    }
-                })
-                .map(String::from);
+            let id = el.id.as_ref().map(|id| id.0.clone());
 
             let title = extract_element_title(el);
             doc_headings.push((title, id));
@@ -217,21 +185,7 @@ fn extract_element_title(el: &Element) -> String {
 }
 
 fn section_id(sec: &Section) -> Option<String> {
-    sec.args
-        .as_ref()
-        .and_then(|a| a.get("id"))
-        .and_then(|v| v.as_str())
-        .or_else(|| {
-            if let Some(entries) = sec.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
-                entries
-                    .iter()
-                    .find(|(k, _)| *k == "id")
-                    .and_then(|(_, v)| v.as_str())
-            } else {
-                None
-            }
-        })
-        .map(String::from)
+    sec.id.as_ref().map(|id| id.0.clone())
 }
 
 fn extract_section_title(title_inlines: &[Inline]) -> String {
@@ -326,11 +280,11 @@ mod tests {
     #[test]
     fn reports_missing_meta_key_and_missing_section() {
         let blueprint = parse(
-            "@blueprint(daily-note)\n@meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n=[ Plan ] {id: plan}\n\n=[ Review ] {id: review}\n",
+            "@blueprint(daily-note)\n@meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n=[ Plan ]#(plan)\n\n=[ Review ]#(review)\n",
         );
-        // doc is missing `@meta.date` and `=[ Review ] {id: review}`
+        // doc is missing `@meta.date` and `=[ Review ]#(review)`
         let doc = parse(
-            "@kind(daily-note)\n@meta{\n  id: doc-123\n}\n\n=[ Plan ] {id: plan}\n- ( ) My task\n",
+            "@kind(daily-note)\n@meta{\n  id: doc-123\n}\n\n=[ Plan ]#(plan)\n- ( ) My task\n",
         );
 
         let errors = validate_against_blueprint(&doc, &blueprint);

@@ -1,9 +1,9 @@
 @meta{uuid: ""}
 
-=[TODO] {id: todo}
+=[TODO] #(todo)
 
-=[Review] {id: review}
+=[Review] #(review)
 
-=[Feadback] {id: feadback}
+=[Feadback] #(feadback)
 
-=[Timeline] {id: timeline}
+=[Timeline] #(timeline)

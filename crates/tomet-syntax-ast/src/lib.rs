@@ -300,6 +300,7 @@ pub struct Section {
     pub title: Vec<Inline>,
     pub args: Option<Value>,
     pub value: Option<ElementValue>,
+    pub id: Option<Id>,
     pub connects: Vec<Element>,
     pub blocks: Vec<Block>,
     pub span: Span,
@@ -312,6 +313,7 @@ impl Section {
             title,
             args: None,
             value: None,
+            id: None,
             connects: Vec::new(),
             blocks: Vec::new(),
             span,
@@ -557,6 +559,20 @@ impl fmt::Display for Name {
     }
 }
 
+/// An element's own id, written `#(foobar)` right after its own
+/// `(args)[content]{value}` groups and before any `:name(...)` connect.
+///
+/// A plain `String`, not [`Value`]: `#(...)` is parsed with a narrower,
+/// scalar-only grammar (a bare identifier-like token or a quoted
+/// string) than the general value grammar `(args)`/`{value}` use, so a
+/// map/seq/call can never end up here -- unlike `Name`, there is no
+/// namespace concept for an id. No ASCII restriction, unlike [`Name`]:
+/// the content is a value, not a structural identifier, so it is as
+/// free as any other string value (e.g. `@line(天音かなた)` elsewhere in
+/// this codebase already allows non-ASCII value text).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Id(pub String);
+
 /// Which sigil introduced an element, and its name.
 ///
 /// There is one element sigil, `@`. It says "an element starts here" and
@@ -569,8 +585,9 @@ impl fmt::Display for Name {
 /// but both classified through the same arm. `#name` vs `@name` was meant
 /// to encode shape, but the parser never consulted it (position already
 /// decided placement) and `tomet-semantics`' `required_shape` already knew
-/// each builtin's shape, so the sigil only restated it. `#` carries no
-/// syntax at all now -- not even a heading marker -- and is free.
+/// each builtin's shape, so the sigil only restated it. `#` is not a
+/// second sigil today either: `#(id)` is [`Element::id`], a slot in the
+/// element's own groups, not a different way to introduce an element.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Sigil {
     /// `@name` -- an element. The name is mandatory.
@@ -673,6 +690,9 @@ pub enum Placement {
 /// `(args)` / `[content]` / `{value}`, each optional and at most one of each,
 /// in any order in the source.
 ///
+/// `id` is a single slot, written `#(foobar)`, read after those three
+/// groups but strictly before any connect -- see [`Id`].
+///
 /// `connects` is unrelated to those three: it is the `:name(...)` family
 /// stacked after them (`@x(...):as(y):rule(...)`), zero or more, each its
 /// own full `Element` (with its own `args`/`content`/`value`, but never
@@ -686,6 +706,7 @@ pub struct Element {
     pub content: Option<Vec<Inline>>,
     pub children: Option<Vec<Block>>,
     pub value: Option<ElementValue>,
+    pub id: Option<Id>,
     pub connects: Vec<Element>,
     pub span: Span,
 }

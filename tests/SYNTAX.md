@@ -40,6 +40,7 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [補間 `${...}`](#補間-)
 - [コネクト `:`](#コネクト-)
 - [名前付きコネクト `:name(...)`](#名前付きコネクト-name)
+- [id `#(...)`](#id-)
 - [コメント](#コメント)
 - [撤去された構文](#撤去された構文)
 - [綴りを失ったまま、代わりが未決のもの](#綴りを失ったまま、代わりが未決のもの)
@@ -1265,6 +1266,142 @@ Block  @x
 
 ```
 unknown element `x`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `@use`
+```
+
+## id `#(...)`
+
+### 要素自身のid。`(args)[content]{value}`の後、コネクトの前に読まれる
+
+```tmt
+@task(a: 1)[ text ]#(myid)
+```
+
+```
+Block  @task
+  args    {a: 1}
+  content
+    Text "text"
+  id      "myid"
+```
+
+検証:
+
+```
+unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
+```
+
+### groupsより前に書いても同じ。idと他のgroupsに順序はない
+
+```tmt
+@task#(myid)(a: 1)[ text ]
+```
+
+```
+Block  @task
+  args    {a: 1}
+  content
+    Text "text"
+  id      "myid"
+```
+
+検証:
+
+```
+unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
+```
+
+### クォートすればスペースも入る
+
+```tmt
+@task#("has spaces")
+```
+
+```
+Block  @task
+  id      "has spaces"
+```
+
+検証:
+
+```
+unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
+```
+
+### セクションにも付く
+
+```tmt
+=[ Intro ]#(intro)
+```
+
+```
+Section level=1
+  Title:
+    Text "Intro"
+  id      "intro"
+```
+
+### リスト項目の完全形にも付く
+
+```tmt
+- (x)[ y ]#(item1)
+```
+
+```
+Block  @ul
+  group
+    Bare
+      args    "x"
+      content
+        Text "y"
+      id      "item1"
+```
+
+### 糖衣形は末尾の`#(id)`と`{attrs}`を両方読む
+
+```tmt
+- plain text #(item1){ tag: x }
+```
+
+```
+Block  @ul
+  group
+    Bare
+      content
+        Text "plain text"
+      group
+        tag: "x"
+      id      "item1"
+```
+
+### コネクトの直後に書くと、外側の要素ではなくそのコネクト自身のidになる。コネクトの再帰呼び出しが隣接する`#(...)`を先に奪うため、外側のidを付けたいなら必ずコネクトより前に書くことになる
+
+```tmt
+@task(a: 1):rule(allow: list(card))#(myid)
+```
+
+```
+Block  @task
+  args    {a: 1}
+  connect
+    Inline @rule
+      args    {allow: list("card")}
+      id      "myid"
+```
+
+検証:
+
+```
+unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
+```
+
+### idを2つ書くとエラー
+
+```tmt
+@task#(a)#(b)
+```
+
+```
+parse error: 1:10: a second `#(...)`: an element takes at most one id
 ```
 
 ## コメント

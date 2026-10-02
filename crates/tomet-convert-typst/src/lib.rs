@@ -547,7 +547,6 @@ fn render_embed(el: &Element) -> String {
     }
 }
 
-
 /// Re-renders an `InterpExpr` back to `${...}`-shaped source text, wrapped
 /// in a raw span (`` `${...}` ``) so Typst's own `$`-prefixed math mode
 /// never tries to parse it -- see the module doc's note on why `${...}`

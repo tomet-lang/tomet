@@ -372,6 +372,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     content: Some(content),
                     children: None,
                     value: None,
+                    id: None,
                     connects: Vec::new(),
                     span: Span::dummy(),
                 };
@@ -384,6 +385,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     content: Some(content),
                     children: None,
                     value: None,
+                    id: None,
                     connects: Vec::new(),
                     span: Span::dummy(),
                 };
@@ -406,6 +408,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 content: Some(vec![Inline::Raw(RawText::new(text, Span::dummy()))]),
                 children: None,
                 value: None,
+                id: None,
                 connects: Vec::new(),
                 span: Span::dummy(),
             };
@@ -483,6 +486,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     content,
                     marker,
                     None,
+                    None,
                     children,
                     Span::dummy(),
                 ));
@@ -513,6 +517,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 content: Some(inlines),
                 children: None,
                 value: None,
+                id: None,
                 connects: Vec::new(),
                 span: Span::dummy(),
             };
@@ -530,6 +535,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 content,
                 children: None,
                 value: None,
+                id: None,
                 connects: Vec::new(),
                 span: Span::dummy(),
             };
@@ -741,6 +747,7 @@ fn wrap_inline(tag: &str, content: Vec<Inline>) -> Inline {
         content: Some(content),
         children: None,
         value: None,
+        id: None,
         connects: Vec::new(),
         span: Span::dummy(),
     })

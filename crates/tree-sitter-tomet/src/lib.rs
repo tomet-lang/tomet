@@ -409,6 +409,41 @@ mod tests {
         }
     }
 
+    #[test]
+    fn parses_id_group_on_elements_sections_and_connects() {
+        for src in [
+            "@memo(a: 1)[ x ]#(myid)\n",
+            "@memo#(myid)(a: 1)\n",
+            "=[ Title ]#(intro)\n",
+            "@task(a: 1):rule(allow: list(card))#(myid)\n",
+        ] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn id_group_is_a_real_node_not_fallen_through_text() {
+        // Same `has_error()`-is-weak reasoning as the connect test right
+        // below: confirm an `id_group` node genuinely exists, not just
+        // that the line parsed without error.
+        let tree = parse("@memo(a: 1)#(myid)\n");
+        let element = tree
+            .root_node()
+            .named_child(0)
+            .unwrap()
+            .named_child(0)
+            .unwrap()
+            .named_child(0)
+            .unwrap();
+        let has_id_group = (0..element.named_child_count() as u32)
+            .any(|i| element.named_child(i).unwrap().kind() == "id_group");
+        assert!(has_id_group, "expected an id_group child");
+    }
+
     /// `has_error()` alone is a weak check here (arbitrary prose parses
     /// error-free too -- a `:name(...)` that fell through to plain text
     /// would still pass it), so this also confirms a `connect` node

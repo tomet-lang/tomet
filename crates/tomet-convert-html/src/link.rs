@@ -130,4 +130,3 @@ pub(crate) fn render_link_element(cx: &RenderCtx, el: &Element, out: &mut String
         out.push('\n');
     }
 }
-

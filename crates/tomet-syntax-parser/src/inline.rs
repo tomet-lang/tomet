@@ -789,6 +789,7 @@ fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
         content: None,
         children: None,
         value: None,
+        id: None,
         connects: Vec::new(),
         span,
     };

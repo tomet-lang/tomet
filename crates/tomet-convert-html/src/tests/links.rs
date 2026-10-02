@@ -39,10 +39,7 @@ fn renders_link_from_bare_absolute_path_positional_target() {
 fn renders_id_link_as_a_same_document_anchor() {
     let doc = parse_document("@link(target:id:greeting)[Hello]\n").unwrap();
     let body = render_body(&doc);
-    assert_eq!(
-        body,
-        "<a class=\"tm-id\" href=\"#greeting\">Hello</a>\n"
-    );
+    assert_eq!(body, "<a class=\"tm-id\" href=\"#greeting\">Hello</a>\n");
 }
 
 #[test]

@@ -14,6 +14,6 @@
 =[構造の要求]
 @memo[見出しの id が雛形の要求になる]
 
-=[Plan] {id: plan}
+=[Plan] #(plan)
 
-=[Review] {id: review}
+=[Review] #(review)

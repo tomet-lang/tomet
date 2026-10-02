@@ -4,7 +4,8 @@
 use crate::element::render_element;
 use crate::headings::HeadingState;
 use crate::util::{
-    escape_attr, escape_html, inlines_to_plain, push_named_attrs, split_attrs, value_to_plain,
+    escape_attr, escape_html, id_attr, inlines_to_plain, push_named_attrs, split_attrs,
+    value_to_plain,
 };
 use crate::{HeadingInfo, RenderCtx};
 use tomet_ast::{Block, Element, Inline, Section, Span, Value};
@@ -76,7 +77,8 @@ fn render_section(cx: &RenderCtx, sec: &Section, out: &mut String, state: &mut H
         Some(v) => v.as_data(),
         _ => None,
     };
-    let (mut id, class, data) = split_attrs(value_data.as_ref());
+    let (class, data) = split_attrs(value_data.as_ref());
+    let mut id = id_attr(sec.id.as_ref());
     let text = inlines_to_plain(&sec.title);
     if id.is_none() && cx.options.auto_slug_headings {
         let slug = state.slugs.slug_for(&text);
@@ -166,7 +168,8 @@ fn render_heading_element(
         Some(v) => v.as_data(),
         _ => None,
     };
-    let (mut id, class, data) = split_attrs(value_data.as_ref());
+    let (class, data) = split_attrs(value_data.as_ref());
+    let mut id = id_attr(el.id.as_ref());
     let text = inlines_to_plain(content);
     if id.is_none() && cx.options.auto_slug_headings {
         let slug = state.slugs.slug_for(&text);
@@ -210,7 +213,8 @@ fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
             Some(v) => v.as_data(),
             _ => None,
         };
-        let (id, class, data) = split_attrs(attrs.as_ref());
+        let (class, data) = split_attrs(attrs.as_ref());
+        let id = id_attr(item.id.as_ref());
         out.push_str("<li");
         push_named_attrs(out, &id, &class, &data);
         push_span_attrs(cx, out, item.span);

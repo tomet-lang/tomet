@@ -34,7 +34,7 @@
 //!   `Attr` is where data goes. Only the elements move.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, ElementValue, Inline as TmInline, LineBreak, Name,
+    Block as TmBlock, Document, Element, ElementValue, Id, Inline as TmInline, LineBreak, Name,
     Paragraph, Placement, RawText, Section, Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::EXACT_DATA_KEY;
@@ -153,6 +153,7 @@ fn block_from_pandoc(block: &Block) -> Option<TmBlock> {
             let (args, value) = extract_data_from_attr(attr);
             sec.args = args;
             sec.value = value;
+            sec.id = id_from_attr(attr);
             Some(TmBlock::Section(sec))
         }
         Block::Para(inlines) | Block::Plain(inlines) => Some(TmBlock::Paragraph(Paragraph::new(
@@ -258,6 +259,7 @@ fn list_element(items: &[Vec<Block>], ordered: bool) -> Element {
         .map(|blocks| {
             element_list_item(
                 blocks_to_content(blocks),
+                None,
                 None,
                 None,
                 Vec::new(),
@@ -518,9 +520,6 @@ fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<ElementValue>) 
     }
 
     let mut entries: Vec<(String, Value)> = Vec::new();
-    if !attr.0.is_empty() {
-        entries.push(("id".to_string(), Value::String(attr.0.clone())));
-    }
     for (k, v) in &attr.2 {
         if k == EXACT_DATA_KEY || k == SIGIL_KEY {
             continue;
@@ -543,7 +542,18 @@ fn named_element(name: &str, attr: &Attr) -> Element {
     let (args, value) = extract_data_from_attr(attr);
     el.args = args;
     el.value = value;
+    el.id = id_from_attr(attr);
     el
+}
+
+/// Pandoc's `Attr.0` identifier slot, round-tripped as the element/
+/// section's own `#(id)` rather than as an `id:` data key.
+fn id_from_attr(attr: &Attr) -> Option<Id> {
+    if attr.0.is_empty() {
+        None
+    } else {
+        Some(Id(attr.0.clone()))
+    }
 }
 
 /// Adds a key to an element's `(args)`, keeping whatever is already there.

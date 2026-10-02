@@ -72,6 +72,7 @@ define_ast_node!(CstSectionHeading, SECTION_HEADING);
 define_ast_node!(CstThematicBreak, THEMATIC_BREAK);
 define_ast_node!(CstInlineElement, INLINE_ELEMENT);
 define_ast_node!(CstConnect, CONNECT);
+define_ast_node!(CstIdGroup, ID_GROUP);
 define_ast_node!(CstFence, FENCE);
 define_ast_node!(CstInterpExpr, INTERP_EXPR);
 define_ast_node!(CstMapEntry, MAP_ENTRY);
@@ -116,6 +117,10 @@ impl CstBlockElement {
     pub fn value_data(&self) -> Option<CstValueData> {
         self.syntax().children().find_map(CstValueData::cast)
     }
+
+    pub fn id(&self) -> Option<CstIdGroup> {
+        self.syntax().children().find_map(CstIdGroup::cast)
+    }
 }
 
 impl CstSection {
@@ -154,6 +159,10 @@ impl CstSectionHeading {
     pub fn value_data(&self) -> Option<CstValueData> {
         self.syntax().children().find_map(CstValueData::cast)
     }
+
+    pub fn id(&self) -> Option<CstIdGroup> {
+        self.syntax().children().find_map(CstIdGroup::cast)
+    }
 }
 
 impl CstInlineElement {
@@ -176,6 +185,10 @@ impl CstInlineElement {
     pub fn connects(&self) -> impl Iterator<Item = CstConnect> {
         self.syntax().children().filter_map(CstConnect::cast)
     }
+
+    pub fn id(&self) -> Option<CstIdGroup> {
+        self.syntax().children().find_map(CstIdGroup::cast)
+    }
 }
 
 impl CstBlockElement {
@@ -185,6 +198,42 @@ impl CstBlockElement {
 
     pub fn fence(&self) -> Option<CstFence> {
         self.syntax().children().find_map(CstFence::cast)
+    }
+}
+
+impl CstConnect {
+    pub fn args(&self) -> Option<CstArgs> {
+        self.syntax().children().find_map(CstArgs::cast)
+    }
+
+    pub fn content(&self) -> Option<CstContent> {
+        self.syntax().children().find_map(CstContent::cast)
+    }
+
+    pub fn value_data(&self) -> Option<CstValueData> {
+        self.syntax().children().find_map(CstValueData::cast)
+    }
+
+    pub fn id(&self) -> Option<CstIdGroup> {
+        self.syntax().children().find_map(CstIdGroup::cast)
+    }
+}
+
+impl CstListItem {
+    pub fn args(&self) -> Option<CstArgs> {
+        self.syntax().children().find_map(CstArgs::cast)
+    }
+
+    pub fn content(&self) -> Option<CstContent> {
+        self.syntax().children().find_map(CstContent::cast)
+    }
+
+    pub fn value_data(&self) -> Option<CstValueData> {
+        self.syntax().children().find_map(CstValueData::cast)
+    }
+
+    pub fn id(&self) -> Option<CstIdGroup> {
+        self.syntax().children().find_map(CstIdGroup::cast)
     }
 }
 

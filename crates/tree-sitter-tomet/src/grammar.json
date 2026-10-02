@@ -203,6 +203,22 @@
           "type": "CHOICE",
           "members": [
             {
+              "type": "FIELD",
+              "name": "id",
+              "content": {
+                "type": "SYMBOL",
+                "name": "id_group"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
               "type": "PREC",
               "value": 1,
               "content": {
@@ -812,7 +828,7 @@
     },
     "text": {
       "type": "PATTERN",
-      "value": "[^\\n`*_=~@$:()\\[{\\]/|-]+"
+      "value": "[^\\n`*_=~@$#:()\\[{\\]/|-]+"
     },
     "punctuation": {
       "type": "CHOICE",
@@ -828,6 +844,10 @@
         {
           "type": "STRING",
           "value": "$"
+        },
+        {
+          "type": "STRING",
+          "value": "#"
         },
         {
           "type": "STRING",
@@ -1279,6 +1299,10 @@
                 {
                   "type": "SYMBOL",
                   "name": "connect"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "id_group"
                 }
               ]
             }
@@ -1646,12 +1670,49 @@
           {
             "type": "REPEAT",
             "content": {
-              "type": "SYMBOL",
-              "name": "_plain_group"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_plain_group"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "id_group"
+                }
+              ]
             }
           }
         ]
       }
+    },
+    "id_group": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "TOKEN",
+          "content": {
+            "type": "PREC",
+            "value": 1,
+            "content": {
+              "type": "STRING",
+              "value": "#"
+            }
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "SYMBOL",
+          "name": "value"
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        }
+      ]
     },
     "raw_fence": {
       "type": "SYMBOL",

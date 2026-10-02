@@ -36,9 +36,9 @@ type = "location"
 @[](file:/readme.md)
 @[](ref:2)
 
-=[heading] {id: "1"}
-==[heading] {id: "2"}
-===[heading] {id: "3"}
+=[heading] #("1")
+==[heading] #("2")
+===[heading] #("3")
 @embed(target: "url:https://")[alt]
 @embed(target: "file:/readme.md")[alt]
 @embed(target: "ref:3")[alt]

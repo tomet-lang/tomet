@@ -1,6 +1,6 @@
 //! Resolves a `${...}` interpolation's `Identifier`/`Member` chain
 //! (`tomet-parser`'s `InterpExpr`) against a `Document`'s own
-//! `{id:...}`/`(id:...)`-tagged nodes. Same-document only for v1 -- no
+//! `#(id)`-tagged nodes. Same-document only for v1 -- no
 //! `@settings(file:...)`-style cross-file lookup yet.
 //!
 //! `InterpExprKind::Literal`/`Call` aren't references at all, so
@@ -11,7 +11,7 @@
 
 use std::ops::ControlFlow;
 use tomet_ast::{Document, Element, InterpExpr, InterpExprKind, Value};
-use tomet_tree::{ElementExt, ValueExt, walk_document};
+use tomet_tree::{ValueExt, walk_document};
 
 use crate::ResolveError;
 
@@ -37,8 +37,8 @@ pub fn resolve_reference(doc: &Document, expr: &InterpExpr) -> Result<Value, Res
 }
 
 /// Depth-first search (via `tomet-tree`) for the first node anywhere
-/// in `doc` with a matching `{id: ...}` or `(id: ...)` attribute.
-/// Returns a deep copy of that node's value payload --
+/// in `doc` with a matching `#(id)`. Returns a deep copy of that
+/// node's value payload --
 /// `ElementValue::from_map(v)` -> `v`, `ElementValue::from_children(c)` ->
 /// `Value::Seq(...)` (wrapped as a synthetic list of the children's
 /// values).
@@ -49,7 +49,7 @@ pub fn resolve_reference(doc: &Document, expr: &InterpExpr) -> Result<Value, Res
 /// (`tomet_tree::walk_document`), not this search's own logic.
 fn find_by_id(doc: &Document, id: &str) -> Option<Value> {
     let mut visitor = |el: &Element| {
-        if id_matches(el.attrs_view(), id) {
+        if id_matches(el, id) {
             ControlFlow::Break(node_value(el))
         } else {
             ControlFlow::Continue(())
@@ -61,16 +61,8 @@ fn find_by_id(doc: &Document, id: &str) -> Option<Value> {
     }
 }
 
-fn id_matches(value: Option<Value>, target: &str) -> bool {
-    let id_val = match value.as_ref().and_then(|v| v.get("id")) {
-        Some(v) => v,
-        None => return false,
-    };
-    match id_val {
-        Value::String(s) => s == target,
-        Value::Int(i) => i.to_string() == target,
-        _ => false,
-    }
+fn id_matches(el: &Element, target: &str) -> bool {
+    el.id.as_ref().is_some_and(|id| id.0 == target)
 }
 
 /// An `Element`'s "value view" for `${id}`/`${id.member}` purposes:
@@ -137,59 +129,52 @@ mod tests {
 
     #[test]
     fn resolves_bare_id_from_args() {
-        let doc = parse("@x(id:greeting, text:hi)\n");
+        let doc = parse("@x#(greeting)(text:hi)\n");
         let value = resolve_reference(&doc, &interp("${greeting}")).unwrap();
         assert_eq!(
             value,
-            Value::Map(vec![
-                ("id".into(), Value::String("greeting".into())),
-                ("text".into(), Value::String("hi".into())),
-            ])
+            Value::Map(vec![("text".into(), Value::String("hi".into())),])
         );
     }
 
     #[test]
     fn resolves_bare_id_from_value() {
-        // `(id:greeting)` means `args` is never truly absent here -- it's
-        // always at least `{id: greeting}`, since that's where the
-        // matched id itself lives. The merge is unfiltered (no special
-        // "drop the id key" rule), so it shows up in the result
-        // alongside `{value}`'s `text` key.
-        let doc = parse("@meta(id:greeting){text: hi}\n");
+        // The id lives in its own `#(...)` slot now, not in `args` or
+        // `{value}`, so a node with no `(args)` at all but a `{value}`
+        // resolves to just that value -- no "id" key shows up alongside
+        // it the way it used to when `id` was merely an attribute key.
+        let doc = parse("@meta#(greeting){text: hi}\n");
         let value = resolve_reference(&doc, &interp("${greeting}")).unwrap();
         assert_eq!(
             value,
-            Value::Map(vec![
-                ("id".into(), Value::String("greeting".into())),
-                ("text".into(), Value::String("hi".into())),
-            ])
+            Value::Map(vec![("text".into(), Value::String("hi".into())),])
         );
     }
 
     #[test]
     fn member_prefers_value_over_args_on_conflict() {
-        let doc = parse("@x(id:greeting, text:from_args){text: from_value}\n");
+        let doc = parse("@x#(greeting)(text:from_args){text: from_value}\n");
         let value = resolve_reference(&doc, &interp("${greeting.text}")).unwrap();
         assert_eq!(value, Value::String("from_value".into()));
     }
 
     #[test]
     fn member_falls_back_to_args_when_absent_from_value() {
-        let doc = parse("@x(id:greeting, text:from_args){other: from_value}\n");
+        let doc = parse("@x#(greeting)(text:from_args){other: from_value}\n");
         let value = resolve_reference(&doc, &interp("${greeting.text}")).unwrap();
         assert_eq!(value, Value::String("from_args".into()));
     }
 
     #[test]
     fn nested_member_chain_resolves() {
-        let doc = parse("@x(id:a){b: {c: deep}}\n");
+        let doc = parse("@x#(a){b: {c: deep}}\n");
         let value = resolve_reference(&doc, &interp("${a.b.c}")).unwrap();
         assert_eq!(value, Value::String("deep".into()));
     }
 
     #[test]
     fn unknown_id_is_an_error() {
-        let doc = parse("@x(id:known)\n");
+        let doc = parse("@x#(known)\n");
         let err = resolve_reference(&doc, &interp("${missing}")).unwrap_err();
         assert!(matches!(err, ResolveError::UnknownId { id } if id == "missing"));
     }
@@ -197,19 +182,18 @@ mod tests {
     #[test]
     fn member_on_non_map_is_an_error() {
         // `${a.text}` resolves to the scalar `Value::String("hi")` --
-        // a bare id's own base is always at least `Value::Map` (its
-        // `(args)` must be a map to hold the matched `id:` key at all),
-        // so a truly non-map base only shows up one level deeper, here
-        // via `.text` landing on a plain string before `.sub` tries to
-        // go further.
-        let doc = parse("@x(id:a, text:hi)\n");
+        // `a`'s own base is `Value::Map` here only because its `(args)`
+        // happens to be one, so a truly non-map base only shows up one
+        // level deeper, here via `.text` landing on a plain string
+        // before `.sub` tries to go further.
+        let doc = parse("@x#(a)(text:hi)\n");
         let err = resolve_reference(&doc, &interp("${a.text.sub}")).unwrap_err();
         assert!(matches!(err, ResolveError::NoSuchMember { member } if member == "sub"));
     }
 
     #[test]
     fn missing_member_key_is_an_error() {
-        let doc = parse("@x(id:a){present: yes}\n");
+        let doc = parse("@x#(a){present: yes}\n");
         let err = resolve_reference(&doc, &interp("${a.absent}")).unwrap_err();
         assert!(matches!(err, ResolveError::NoSuchMember { member } if member == "absent"));
     }

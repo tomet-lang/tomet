@@ -6,6 +6,7 @@ mod connects;
 mod elements;
 mod fences;
 mod groups;
+mod id;
 mod inline;
 mod interpolation;
 mod lists;

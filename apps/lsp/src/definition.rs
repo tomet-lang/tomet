@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 
 use lsp_types::{GotoDefinitionResponse, Location, Position, Uri};
 use tomet_ast::{Element, ElementValue, InterpExprKind, Span, Value};
-use tomet_tree::{ElementExt, Visitor, walk_document};
+use tomet_tree::{Visitor, walk_document};
 
 use crate::position::{span_contains, span_to_range};
 
@@ -67,15 +67,8 @@ fn find_def_in_blocks(blocks: &[tomet_ast::Block], target_id: &str) -> Option<Sp
     for block in blocks {
         match block {
             tomet_ast::Block::Section(sec) => {
-                if let Some(Value::Map(entries)) = section_attrs(sec) {
-                    for (k, v) in entries {
-                        if k == "id"
-                            && let Value::String(s) = v
-                            && s == target_id
-                        {
-                            return Some(sec.span);
-                        }
-                    }
+                if sec.id.as_ref().is_some_and(|id| id.0 == target_id) {
+                    return Some(sec.span);
                 }
                 for conn in &sec.connects {
                     if let Some(span) = find_def_in_element(conn, target_id) {
@@ -106,15 +99,8 @@ fn find_def_in_blocks(blocks: &[tomet_ast::Block], target_id: &str) -> Option<Sp
 }
 
 fn find_def_in_element(el: &Element, target_id: &str) -> Option<Span> {
-    if let Some(Value::Map(entries)) = el.attrs_view() {
-        for (k, v) in entries {
-            if k == "id"
-                && let Value::String(s) = v
-                && s == target_id
-            {
-                return Some(el.span);
-            }
-        }
+    if el.id.as_ref().is_some_and(|id| id.0 == target_id) {
+        return Some(el.span);
     }
     if let Some(content) = &el.content {
         for inline in content {
@@ -136,21 +122,4 @@ fn find_def_in_element(el: &Element, target_id: &str) -> Option<Span> {
         }
     }
     None
-}
-
-fn section_attrs(sec: &tomet_ast::Section) -> Option<Value> {
-    match (&sec.args, &sec.value) {
-        (Some(args), Some(val)) => match (args, val.as_data()) {
-            (Value::Map(m1), Some(Value::Map(m2))) => {
-                let mut merged = m1.clone();
-                merged.extend(m2);
-                Some(Value::Map(merged))
-            }
-            (_, Some(val)) => Some(val),
-            (args, None) => Some(args.clone()),
-        },
-        (Some(args), None) => Some(args.clone()),
-        (None, Some(val)) => val.as_data(),
-        (None, None) => None,
-    }
 }

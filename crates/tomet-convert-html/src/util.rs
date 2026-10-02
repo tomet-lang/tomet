@@ -1,6 +1,6 @@
 //! Attribute, value and escaping helpers shared by the renderers.
 
-use tomet_ast::{Element, Inline, Value};
+use tomet_ast::{Element, Id, Inline, Value};
 use tomet_semantics::{EXACT_DATA_KEY, flatten_data};
 
 /// Flattens inline content to plain text -- used for the `alt` attribute,
@@ -27,22 +27,25 @@ pub(crate) fn inlines_to_plain(inlines: &[Inline]) -> String {
     s
 }
 
-pub(crate) fn split_attrs(
-    attrs: Option<&Value>,
-) -> (Option<String>, Option<String>, Vec<(String, String)>) {
-    let mut id = None;
+pub(crate) fn split_attrs(attrs: Option<&Value>) -> (Option<String>, Vec<(String, String)>) {
     let mut class = None;
     let mut data = Vec::new();
     if let Some(map) = attrs.and_then(as_map) {
         for (k, v) in map {
             match k.as_str() {
-                "id" => id = Some(value_to_plain(v)),
                 "cssclass" => class = Some(value_to_plain(v)),
                 _ => data.push((k.clone(), value_to_plain(v))),
             }
         }
     }
-    (id, class, data)
+    (class, data)
+}
+
+/// The HTML `id` attribute sourced from an element/section/list-item's
+/// own `#(id)`, not from any attribute key -- a literal `id:` key in
+/// `(args)`/`{value}` is ordinary data now, not this.
+pub(crate) fn id_attr(id: Option<&Id>) -> Option<String> {
+    id.map(|id| id.0.clone())
 }
 
 pub(crate) fn push_named_attrs(

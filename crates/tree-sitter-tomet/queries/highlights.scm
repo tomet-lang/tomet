@@ -111,6 +111,13 @@
 (connect (value_group "{" @punctuation.special))
 (connect (value_group "}" @punctuation.special))
 
+; Id framing: #(foobar) on an element or a connect -- same subdued
+; punctuation color as a connect, not @tag, since it's a slot, not a
+; second sigil.
+(id_group "#" @punctuation.special)
+(id_group "(" @punctuation.special)
+(id_group ")" @punctuation.special)
+
 ; Bare colons on inline elements and sections (:(), :{}) use distinct keyword color
 (inline_element ":" @keyword.control)
 (section ":" @keyword.control)

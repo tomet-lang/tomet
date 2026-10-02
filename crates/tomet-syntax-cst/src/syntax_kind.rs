@@ -76,6 +76,9 @@ pub enum SyntaxKind {
     SIGIL,
     ARGS,
     CONTENT,
+    /// `#(foobar)` -- a single id slot, read after `ARGS`/`CONTENT`/
+    /// `VALUE_DATA` but before any `CONNECT`.
+    ID_GROUP,
     /// `:name(...)`, `:(...)`, `:{...}` -- a group joined to the preceding element.
     CONNECT,
     /// A `+++ ... +++` fenced body of an element.

@@ -20,8 +20,8 @@ use tomet_tree::{element_list, element_list_item, element_new};
 /// refuses, so the two places that ask after the marker ask for this
 /// rather than for [`opens_group`]. Derived from it, so a fifth opener
 /// reaches both without being spelled again.
-fn opens_group_after_args(c: Option<char>) -> bool {
-    crate::element::opens_group(c) && c != Some('(')
+fn opens_group_after_args(cur: &Cursor) -> bool {
+    crate::element::opens_group(cur) && cur.peek() != Some('(')
 }
 
 /// What reading a list marker found.
@@ -77,7 +77,7 @@ pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
         // the same args; only the sugar needs a space to separate the
         // marker from the text that follows it. `|` joins the group
         // openers because it is one -- `[content]` without the brackets.
-        if matches!(probe.peek(), Some(' ') | Some('\t')) || opens_group_after_args(probe.peek()) {
+        if matches!(probe.peek(), Some(' ') | Some('\t')) || opens_group_after_args(&probe) {
             marker = Some(value);
             found_group = true;
             look = probe;
@@ -98,7 +98,7 @@ pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
     // declined it *as a marker*; that says nothing about whether it opens
     // this item's `args`, which is what `^(id: a)` and `@memo(x: 1)` do
     // with the same characters.
-    if !found_group && crate::element::opens_group(look.peek()) {
+    if !found_group && crate::element::opens_group(&look) {
         found_group = true;
     }
 
@@ -111,9 +111,9 @@ pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
     // Once the probe has taken a `(marker)`, a second `(` would be a
     // duplicate `args` group; until then it opens the first one.
     let full_form = if marker.is_some() {
-        opens_group_after_args(look.peek())
+        opens_group_after_args(&look)
     } else {
-        crate::element::opens_group(look.peek())
+        crate::element::opens_group(&look)
     };
     Ok(Some(ListMarker {
         indent,
@@ -142,7 +142,7 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
         let item_start = cur.pos();
         eat_list_marker(cur)?;
 
-        let (content, attrs) = if head.full_form {
+        let (content, attrs, id) = if head.full_form {
             // The full form: `- ()[ content ]{value}`. Groups are read by
             // the same code that reads `@name`'s, so `[content]` stops at
             // its closing bracket and `|content` at the end of its marked
@@ -159,6 +159,7 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
             if item.args.is_some() {
                 marker = merge_values(marker.as_ref(), item.args.as_ref());
             }
+            let id = item.id;
             let attrs = item.value.and_then(|v| v.as_data());
             let mut content = item.content.unwrap_or_default();
             // Text after the groups belongs to the item, the way
@@ -184,11 +185,12 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
                 }
                 extend_merging(&mut content, parse_inline_seq(cur, Stop::Line, false)?);
             }
-            (content, attrs)
+            (content, attrs, id)
         } else {
-            // The bracket-less sugar, shared with `#`: one line, plus this
-            // line's own trailing `{attrs}`. Spreading out means opening a
-            // group -- `[ ]` or `|` -- exactly as it does for `@name`.
+            // The bracket-less sugar, shared with `=`: one line, plus this
+            // line's own trailing `#(id)`/`{attrs}`. Spreading out means
+            // opening a group -- `[ ]` or `|` -- exactly as it does for
+            // `@name`.
             parse_sugar_body(cur)?
         };
 
@@ -218,7 +220,7 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
         }
 
         let span = cur.span_from(item_start);
-        items.push(element_list_item(content, marker, attrs, children, span));
+        items.push(element_list_item(content, marker, attrs, id, children, span));
     }
     Ok(items)
 }

@@ -1,6 +1,6 @@
 //! Extension trait, attribute helpers, and constructors for [`tomet_ast::Element`].
 
-use tomet_ast::{Block, Element, ElementValue, Inline, Name, Placement, Sigil, Span, Value};
+use tomet_ast::{Block, Element, ElementValue, Id, Inline, Name, Placement, Sigil, Span, Value};
 
 /// Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
 pub trait ElementExt {
@@ -21,6 +21,9 @@ pub trait ElementExt {
 
     /// Consumes `self` and sets its `value`.
     fn with_value(self, value: ElementValue) -> Self;
+
+    /// Consumes `self` and sets its `id`.
+    fn with_id(self, id: Id) -> Self;
 
     /// Returns the element's name, namespace included, if it has one.
     fn name(&self) -> Option<&Name>;
@@ -103,6 +106,11 @@ impl ElementExt for Element {
 
     fn with_value(mut self, value: ElementValue) -> Self {
         self.value = Some(value);
+        self
+    }
+
+    fn with_id(mut self, id: Id) -> Self {
+        self.id = Some(id);
         self
     }
 
@@ -290,6 +298,7 @@ pub fn element_new(sigil: Sigil) -> Element {
         content: None,
         children: None,
         value: None,
+        id: None,
         connects: Vec::new(),
         span: Span::default(),
     }
@@ -308,16 +317,24 @@ pub fn element_list(ordered: bool, items: Vec<Element>, span: Span) -> Element {
         content: None,
         children: None,
         value: Some(ElementValue::from_children(items)),
+        id: None,
         connects: Vec::new(),
         span,
     }
 }
 
 /// A list item element constructor (`Sigil::Bare`).
+///
+/// `id` is a real parameter, not hardcoded to `None` -- list items are a
+/// first-class consumer of `#(id)` like everything else `parse_groups`
+/// reads for, and silently dropping it here would repeat the exact bug
+/// `connects` used to have (a full-form list item's parsed connects were
+/// read and then thrown away at this exact spot).
 pub fn element_list_item(
     content: Vec<Inline>,
     marker: Option<Value>,
     attrs: Option<Value>,
+    id: Option<Id>,
     children: Vec<Block>,
     span: Span,
 ) -> Element {
@@ -332,6 +349,7 @@ pub fn element_list_item(
             Some(children)
         },
         value: attrs.map(ElementValue::from_map),
+        id,
         connects: Vec::new(),
         span,
     }

@@ -8,7 +8,7 @@ use crate::text::{
     render_hr_element, render_quote_element, render_raw_element, render_ruby_element,
     render_wrapped_inline,
 };
-use crate::util::{escape_html, push_data_attrs, push_value_data_attrs};
+use crate::util::{escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs};
 use crate::{CustomElementCtx, RenderCtx};
 use tomet_ast::{Element, ElementValue};
 use tomet_semantics::{
@@ -136,6 +136,9 @@ fn render_generic_element(
 ) {
     let tag = if inline { "span" } else { "div" };
     out.push_str(&format!("<{tag} class=\"tm-element tm-{kind}\""));
+    if let Some(id) = id_attr(el.id.as_ref()) {
+        out.push_str(&format!(" id=\"{}\"", escape_attr(&id)));
+    }
     push_data_attrs(out, el.args.as_ref(), &[]);
     push_value_data_attrs(out, el);
     out.push('>');

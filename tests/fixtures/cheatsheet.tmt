@@ -40,15 +40,10 @@ type = "location"
 ///   doesn't look like a working example. ]
 // #import(file:/settings.tmt)
 
-// #links{}: real, implemented (`tomet-renderer`'s `render_links_container`
-// / `tomet-markdown`'s `render_links_container`). Bare `(id)[content]`
-// children only -- no type name needed, the container already supplies it.
-// Renders as a `@dl` definition list, each id becoming an `#link-#id`
-// anchor target other elements can `@(ref:#id)` to.
-// #links {
-//  (1)[ 注釈その1 ]
-//  (anotation2)[ 注釈その2 ]
-// }
+// [ REMOVED ]
+// `@links{}` -- a reference-link definitions container -- was removed:
+// provisional code that didn't fit tomet's direction, superseded by the
+// real element-id design (`#(id)`, see `Element::id`).
 
 // [ NOT implemented ]
 // @foot()[
@@ -83,9 +78,9 @@ ${sum(a, b)}
 @[](file:/readme.md)
 @[](ref:2)
 
-=[ heading ]{ id:1 }
-==[ heading ]{ id:2 }
-===[ heading ]{ id:3 }
+=[ heading ]#(1)
+==[ heading ]#(2)
+===[ heading ]#(3)
 
 // @index(){}
 // @icon()
@@ -121,7 +116,7 @@ ls --help
 - outline/list
 -. number1
 -. number2
-- (x) check          {id:aaaaaa}
+- (x) check          #(aaaaaa)
 - ( ) none
 - ( ) custom?
 - (TODO) custom
