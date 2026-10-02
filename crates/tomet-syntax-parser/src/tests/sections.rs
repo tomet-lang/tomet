@@ -140,27 +140,17 @@ fn parses_section_with_decorative_trailing_equals() {
 }
 
 #[test]
-fn parses_tag_sugar_syntax() {
+fn old_hash_tag_sugar_is_plain_text() {
     let doc = parse_document("Prose with #(rust, parser, tomet) tags.\n").unwrap();
     let Block::Paragraph(p) = &doc.blocks[0] else {
         panic!()
     };
-    assert_eq!(p.content.len(), 3);
-    assert_eq!(p.content[0], Inline::Text("Prose with ".into()));
-
-    let Inline::Element(tag_el) = &p.content[1] else {
-        panic!("expected tag element, got {:?}", p.content[1]);
-    };
-    assert_eq!(tag_el.sigil, Sigil::named("tag"));
     assert_eq!(
-        tag_el.args,
-        Some(Value::Map(vec![
-            ("".into(), Value::String("rust".into())),
-            ("".into(), Value::String("parser".into())),
-            ("".into(), Value::String("tomet".into())),
-        ]))
+        p.content,
+        vec![Inline::Text(
+            "Prose with #(rust, parser, tomet) tags.".into()
+        )]
     );
-    assert_eq!(p.content[2], Inline::Text(" tags.".into()));
 }
 
 #[test]

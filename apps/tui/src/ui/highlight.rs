@@ -156,16 +156,6 @@ fn fallback_tomet_highlight(src: &str) -> Vec<Line<'static>> {
             continue;
         }
 
-        if trimmed.starts_with('#') {
-            lines.push(Line::from(Span::styled(
-                line_str.to_string(),
-                Style::default()
-                    .fg(Color::Magenta)
-                    .add_modifier(Modifier::BOLD),
-            )));
-            continue;
-        }
-
         if trimmed.starts_with('@') || trimmed.starts_with('<') {
             lines.push(highlight_tomet_line(line_str));
             continue;

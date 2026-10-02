@@ -174,7 +174,7 @@ pub enum ElementKind {
     Footnote,
     /// `Sigil::Caret` -- `^(id)` or `^name(id)` reference pin.
     Caret,
-    /// `@tag` or `#(tag)` -- topic/category tag.
+    /// `@tag` -- topic/category tag.
     Tag,
 }
 

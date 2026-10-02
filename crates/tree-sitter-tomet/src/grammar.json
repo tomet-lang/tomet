@@ -785,10 +785,6 @@
         },
         {
           "type": "SYMBOL",
-          "name": "tag"
-        },
-        {
-          "type": "SYMBOL",
           "name": "element"
         },
         {
@@ -816,7 +812,7 @@
     },
     "text": {
       "type": "PATTERN",
-      "value": "[^\\n`*_=~@$#:()\\[{\\]/|-]+"
+      "value": "[^\\n`*_=~@$:()\\[{\\]/|-]+"
     },
     "punctuation": {
       "type": "CHOICE",
@@ -832,10 +828,6 @@
         {
           "type": "STRING",
           "value": "$"
-        },
-        {
-          "type": "STRING",
-          "value": "#"
         },
         {
           "type": "STRING",
@@ -941,36 +933,6 @@
         }
       ]
     },
-    "tag": {
-      "type": "PREC",
-      "value": 2,
-      "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "FIELD",
-            "name": "marker",
-            "content": {
-              "type": "ALIAS",
-              "content": {
-                "type": "STRING",
-                "value": "#"
-              },
-              "named": true,
-              "value": "tag_marker"
-            }
-          },
-          {
-            "type": "FIELD",
-            "name": "args",
-            "content": {
-              "type": "SYMBOL",
-              "name": "args_group"
-            }
-          }
-        ]
-      }
-    },
     "strikeout": {
       "type": "SEQ",
       "members": [
@@ -1005,10 +967,6 @@
         {
           "type": "SYMBOL",
           "name": "strikeout"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "tag"
         },
         {
           "type": "SYMBOL",
@@ -1051,10 +1009,6 @@
         {
           "type": "SYMBOL",
           "name": "strikeout"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "tag"
         },
         {
           "type": "SYMBOL",
@@ -1101,10 +1055,6 @@
         {
           "type": "SYMBOL",
           "name": "strong"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "tag"
         },
         {
           "type": "SYMBOL",

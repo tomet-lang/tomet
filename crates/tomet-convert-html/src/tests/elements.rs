@@ -148,7 +148,7 @@ fn test_renders_wrap_sections() {
 
 #[test]
 fn test_renders_tag_element() {
-    let src = "Prose with #(rust, tomet) tags.\n";
+    let src = "Prose with @tag(rust, tomet) tags.\n";
     let doc = parse_document(src).unwrap();
     let html = render_body(&doc);
 

@@ -85,7 +85,7 @@ pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
     }
 
     // A group opening directly on the marker is the full form, and needs
-    // no space in front of it -- `#[ x ]` and `@name[ x ]` read that way,
+    // no space in front of it -- `^[ x ]` and `@name[ x ]` read that way,
     // and a list item is the same element.
     //
     // Only `(` used to count, because the flag was set solely by the
@@ -96,7 +96,7 @@ pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
     //
     // `(` belongs here too. The probe above has already tried it and
     // declined it *as a marker*; that says nothing about whether it opens
-    // this item's `args`, which is what `#(id: a)` and `@memo(x: 1)` do
+    // this item's `args`, which is what `^(id: a)` and `@memo(x: 1)` do
     // with the same characters.
     if !found_group && crate::element::opens_group(look.peek()) {
         found_group = true;

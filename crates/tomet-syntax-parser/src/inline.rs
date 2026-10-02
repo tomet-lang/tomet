@@ -276,12 +276,6 @@ pub(crate) fn parse_inline_seq(
             text_start = cur.pos();
             continue;
         }
-        if cur.starts_with("#(") {
-            flush_text(&mut items, cur, &mut text_start, fold_pipes);
-            items.push(Inline::Element(parse_tag_sugar(cur)?));
-            text_start = cur.pos();
-            continue;
-        }
         if cur.peek() == Some('^') && is_caret_start(cur) {
             flush_text(&mut items, cur, &mut text_start, fold_pipes);
             items.push(Inline::Element(parse_caret_element(
@@ -386,18 +380,6 @@ fn trim_edges(mut items: Vec<Inline>) -> Vec<Inline> {
         }
     }
     items
-}
-
-fn parse_tag_sugar(cur: &mut Cursor) -> Result<Element> {
-    let start_pos = cur.pos();
-    cur.bump(); // eat '#'
-    let args = crate::element::parse_paren_value(cur)?;
-    let span = cur.span_from(start_pos);
-    let mut el = element_new(Sigil::named("tag"))
-        .with_placement(Placement::Inline)
-        .with_span(span);
-    el.args = Some(args);
-    Ok(el)
 }
 
 const DELIMITERS: [(&str, &str); 5] = [

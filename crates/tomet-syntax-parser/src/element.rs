@@ -248,9 +248,9 @@ pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Resu
 /// parsing speculatively on a copy of the cursor, the way
 /// [`element_ends_line`] already does, which leaves one definition per
 /// sigil and makes the disagreement structurally impossible. It was
-/// rejected on cost. `document::is_heading_start` is called from
-/// `Stop::Paragraph`'s per-line lookahead, so trying a full parse there
-/// approaches quadratic on some inputs, and `parser-purity` in this
+/// rejected on cost. `is_element_start` is called from `Stop::Paragraph`'s
+/// per-character scan, so trying a full parse there approaches quadratic
+/// on some inputs, and `parser-purity` in this
 /// crate's writ asks for the same tree from the same input *in
 /// predictable time*. Reconsider it if the lookahead ever stops being
 /// per-line; a shared set plus a guard buys the same safety until then.
@@ -262,13 +262,13 @@ pub(crate) fn opens_group(c: Option<char>) -> bool {
 /// order, each at most once -- plus the colon-connect form and the `+++`
 /// fence that stands in for a body.
 ///
-/// Split out of [`parse_element`] because a sigil is a sigil: `-` and `#`
+/// Split out of [`parse_element`] because a sigil is a sigil: `-` and `=`
 /// take the same groups as `@name` and must not grow a second, subtly
 /// different implementation of this. `[content]` stops at its closing
 /// bracket rather than at end of line, and `|content` -- the same group
 /// without the brackets -- stops at the end of its marked run, so either
 /// spelling may span lines. Only the bracket-less *sugar* body
-/// (`parse_sugar_body`, the `- x` and `# x` forms) is still one line.
+/// (`parse_sugar_body`, the `- x` and `= x` forms) is still one line.
 pub(crate) fn parse_groups(
     cur: &mut Cursor,
     el: &mut Element,

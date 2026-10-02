@@ -127,7 +127,7 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
     let first_char = s.chars().next();
     let starts_with_special = matches!(
         first_char,
-        Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '#' | '~')
+        Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '~')
     );
 
     let needs_quotes = s.is_empty()

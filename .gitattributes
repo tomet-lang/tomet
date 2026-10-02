@@ -3,6 +3,7 @@
 
 #= Linguist
 docs/ linguist-documentation=true
+tmtroot/ linguist-documentation=true
 *.md linguist-language=Markdown
 *.tmt linguist-language=Tomet
 

@@ -439,16 +439,6 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         return out;
     }
 
-    if el.sigil.is_bare_named("tag")
-        && el.content.is_none()
-        && el.value.is_none()
-        && let Some(args) = &el.args
-    {
-        let mut out = format!("#({})", render_args_with_config(args, config));
-        out.push_str(&render_connects(&el.connects, config));
-        return out;
-    }
-
     if el.sigil.is_bare_named("raw") {
         if el.placement == Placement::Inline
             && el.args.is_none()
@@ -1411,7 +1401,14 @@ mod tests {
     }
 
     #[test]
-    fn test_tag_sugar_printing() {
+    fn test_tag_printing() {
+        let doc = tomet_parser::parse_document("@tag(rust, tomet)\n").expect("valid doc");
+        let printed = document_to_tm(&doc);
+        assert_eq!(printed.trim(), "@tag(rust, tomet)");
+    }
+
+    #[test]
+    fn test_old_hash_tag_sugar_prints_as_plain_text() {
         let doc = tomet_parser::parse_document("#(rust, tomet)\n").expect("valid doc");
         let printed = document_to_tm(&doc);
         assert_eq!(printed.trim(), "#(rust, tomet)");

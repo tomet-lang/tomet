@@ -191,7 +191,6 @@
 				{ "include": "#autolink" },
 				{ "include": "#strong" },
 				{ "include": "#emphasis" },
-				{ "include": "#tag-sugar" },
 				{ "include": "#interpolation" },
 				{ "include": "#footnote-hook" },
 				{ "include": "#named-connect" },
@@ -208,7 +207,6 @@
 				{ "include": "#comments" },
 				{ "include": "#code-span" },
 				{ "include": "#autolink" },
-				{ "include": "#tag-sugar" },
 				{ "include": "#interpolation" },
 				{ "include": "#footnote-hook" },
 				{ "include": "#named-connect" },
@@ -257,21 +255,6 @@
 					"patterns": [{ "include": "#inline-basic" }]
 				}
 			]
-		},
-
-		"tag-sugar": {
-			"comment": "`#(tag1, tag2)` sugar for `@tag(tag1, tag2)`",
-			"begin": "(?<![A-Za-z0-9_])(#)(\\()",
-			"beginCaptures": {
-				"1": { "name": "entity.name.tag.sigil.tomet entity.name.tag.tomet" },
-				"2": { "name": "punctuation.definition.tag.bracket.round.begin.tomet punctuation.section.group.round.begin.tomet entity.name.tag.bracket.tomet entity.name.tag.tomet" }
-			},
-			"end": "\\)",
-			"endCaptures": {
-				"0": { "name": "punctuation.definition.tag.bracket.round.end.tomet punctuation.section.group.round.end.tomet entity.name.tag.bracket.tomet entity.name.tag.tomet" }
-			},
-			"name": "meta.tag.sugar.tomet",
-			"patterns": [{ "include": "#value" }]
 		},
 
 		"named-connect": {
@@ -475,7 +458,7 @@
 		},
 
 		"element": {
-			"comment": "`@name` is the only element sigil, whatever the element's placement: `#` is the heading marker and nothing else, and shape comes from position rather than spelling. The name is required -- a name-less `@(...)` stopped forming an element. Names are ASCII, `.`-separated for namespaces (`@deck.ref`). Both alternatives refuse a `@` preceded by a word character, which is the half that keeps an email address prose.",
+			"comment": "`@name` is the only element sigil; `#` carries no syntax at all and is free. Shape comes from position rather than spelling. The name is required -- a name-less `@(...)` stopped forming an element. Names are ASCII, `.`-separated for namespaces (`@deck.ref`). The alternative refuses a `@` preceded by a word character, which is the half that keeps an email address prose.",
 			"patterns": [
 				{
 					"comment": "Element with attached groups: @name(...) / @name[...] / @name{...}. Captures brackets with tag scope so the element shell is unified.",

@@ -1,4 +1,4 @@
-//! Extracts tags from an element (`@tag(...)`, `#(tag)`, `@tag[...]`).
+//! Extracts tags from an element (`@tag(...)`, `@tag[...]`).
 
 use tomet_ast::{Element, Inline, Value};
 

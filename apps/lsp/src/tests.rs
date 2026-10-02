@@ -9,7 +9,7 @@ use crate::{
 
 #[test]
 fn valid_document_has_no_diagnostics() {
-    assert_eq!(diagnostics_for("#[ Hello ]\n"), Vec::new());
+    assert_eq!(diagnostics_for("=[ Hello ]\n"), Vec::new());
 }
 
 #[test]
@@ -22,7 +22,7 @@ fn invalid_document_reports_one_diagnostic() {
 
 #[test]
 fn duplicate_id_document_reports_validator_diagnostic() {
-    let diags = diagnostics_for("#[ One ]{id: a}\n#[ Two ]{id: a}\n");
+    let diags = diagnostics_for("=[ One ]{id: a}\n=[ Two ]{id: a}\n");
     assert_eq!(diags.len(), 1);
     assert_eq!(diags[0].severity, Some(DiagnosticSeverity::ERROR));
     assert_eq!(diags[0].source.as_deref(), Some("tomet"));
@@ -92,7 +92,7 @@ fn completions_trigger_prefix() {
     let em = at_items.iter().find(|i| i.label == "em").unwrap();
     assert!(em.detail.as_deref().unwrap().ends_with("(inline)"));
 
-    // `#` is the heading marker and offers no elements.
+    // `#` triggers nothing -- only `@` does.
     assert!(
         completions_for("#", Position::new(0, 1))
             .iter()
@@ -105,7 +105,7 @@ fn completions_trigger_prefix() {
 
 #[test]
 fn exact_cst_diagnostic_range_on_duplicate_id() {
-    let text = "#[ A ]{id: my_id}\n\n#[ B ]{id: my_id}\n";
+    let text = "=[ A ]{id: my_id}\n\n=[ B ]{id: my_id}\n";
     let diags = diagnostics_for(text);
     assert_eq!(diags.len(), 1);
     let diag = &diags[0];

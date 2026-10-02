@@ -49,7 +49,7 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 
 ## 見出し
 
-### `#[ ... ]` は見出し専用のマーカー
+### 見出しは `=`/`==` が担う。`#` は見出しのマーカーではなく、どんな数重ねても、空白や括弧を続けても、ただの文字として地の文に落ちる
 
 ```tmt
 #[ タイトル ]
@@ -60,7 +60,7 @@ Paragraph
   Text "#[ タイトル ]"
 ```
 
-### `#` の数がレベル
+### 重ねても同じ
 
 ```tmt
 ##[ 節 ]
@@ -69,53 +69,6 @@ Paragraph
 ```
 Paragraph
   Text "##[ 節 ]"
-```
-
-### `#` に空白が続けば、括弧なしでも見出しになる（糖衣）
-
-```tmt
-# 見出しになる
-```
-
-```
-Paragraph
-  Text "# 見出しになる"
-```
-
-### `#` は `(args)` も `{value}` も取る。レベルは `#` の数
-
-```tmt
-##(id: sec)[ 見出し ]{ tag: syntax }
-```
-
-```
-Paragraph
-  Text "#"
-  Inline @tag
-    args    {id: "sec"}
-  Text "[ 見出し ]{ tag: syntax }"
-```
-
-### 末尾の `{...}` は属性
-
-```tmt
-#[ タイトル ]{ id: intro }
-```
-
-```
-Paragraph
-  Text "#[ タイトル ]{ id: intro }"
-```
-
-### `:` を挟んでも同じ
-
-```tmt
-#[ タイトル ]:{ id: intro }
-```
-
-```
-Paragraph
-  Text "#[ タイトル ]:{ id: intro }"
 ```
 
 ## ブロック配置の要素
@@ -287,7 +240,7 @@ Paragraph
 
 ## 文字列に落ちる場合
 
-### `#` の直後に空白もグループも無ければ地の文
+### `#` はどんな綴りでも地の文
 
 ```tmt
 #タグ ではない
@@ -972,7 +925,7 @@ Block  @ol
         Text "ふたつ"
 ```
 
-### グループが直接続けば空白は要らない。`#[ x ]` や `@name[ x ]` と同じ
+### グループが直接続けば空白は要らない。`@name[ x ]` と同じ
 
 ```tmt
 -[ 括弧 ]
@@ -995,7 +948,7 @@ Block  @ul
         Text "マーカー"
 ```
 
-### `(...)` だけの項目。本文が続かなくてもマーカーになる。`#(id: a)` が引数つきの見出しになるのと同じ
+### `(...)` だけの項目。本文が続かなくてもマーカーになる。`@name(id: a)` が引数つきの要素になるのと同じ
 
 ```tmt
 - ( )
@@ -1279,17 +1232,6 @@ unknown element `x`: only `std` and this document's own `@kind` may be written b
 unknown connect `:as`; only a closed set may follow `:` (currently: rule)
 ```
 
-### 見出しにも付けられる
-
-```tmt
-#[ h ]:rule(allow: list(card))
-```
-
-```
-Paragraph
-  Text "#[ h ]:rule(allow: list(card))"
-```
-
 ### `list(...)`/`enum(...)` は即座に確定するリテラル呼び出し。コネクトの名前と同じく、パーサは呼び出し名を判断しない
 
 ```tmt
@@ -1385,7 +1327,7 @@ Paragraph
 parse error: 1:11: '[...]' list literal was removed -- write 'list(...)' instead
 ```
 
-### `#name` のブロックシジルも撤去。形はシジルではなく位置が決めるので、`#` は見出し専用に戻った
+### `#name` のブロックシジルも撤去。形はシジルではなく位置が決める。`#` 自体も見出しの糖衣とタグの糖衣を失い、今は完全に自由な文字
 
 ```tmt
 #memo[ x ]

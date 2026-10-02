@@ -282,7 +282,7 @@ impl<'a> CstParser<'a> {
             Some(K::EQUAL) => self.section_level_at(i).is_some(),
             Some(K::MINUS) => self.is_thematic_break_at(i) || self.is_list_start_at(i),
             Some(K::BACKTICK) => self.is_code_block_start_at(i),
-            Some(K::HASH | K::LT) => true,
+            Some(K::LT) => true,
             Some(K::AT) => self.is_block_element_at(i),
             _ => false,
         }
@@ -337,7 +337,6 @@ impl<'a> CstParser<'a> {
                 self.parse_thematic_break()
             }
             K::MINUS if self.is_list_start_at(self.pos) => self.parse_list(),
-            K::HASH => self.parse_heading(),
             K::BACKTICK if self.is_code_block_start_at(self.pos) => self.parse_code_block(),
             K::AT if self.is_block_element_at(self.pos) => self.parse_block_element(),
             K::LT => self.parse_block_element(),
@@ -377,15 +376,6 @@ impl<'a> CstParser<'a> {
         if self.current_kind() == Some(K::L_BRACKET) {
             self.parse_content_group();
         }
-        self.parse_inline(InlineStop::Line);
-        self.builder.finish_node();
-    }
-
-    fn parse_heading(&mut self) {
-        self.builder.start_node(K::HEADING.into());
-        self.bump_while(K::HASH);
-        self.bump_while(K::WHITESPACE);
-        self.parse_groups();
         self.parse_inline(InlineStop::Line);
         self.builder.finish_node();
     }
@@ -791,13 +781,20 @@ mod tests {
 
     #[test]
     fn test_cst_node_hierarchy() {
-        let src = "#[ Title ]\n\nParagraph\n";
+        let src = "=[ Title ]\n\nParagraph\n";
         let root = parse_cst(src);
         assert_eq!(root.kind(), K::ROOT);
 
         let children: Vec<_> = root.children().map(|n| n.kind()).collect();
-        assert!(children.contains(&K::HEADING));
-        assert!(children.contains(&K::PARAGRAPH));
+        assert!(children.contains(&K::SECTION));
+    }
+
+    #[test]
+    fn old_hash_heading_is_plain_paragraph() {
+        // `#` is free: a legacy ATX-style heading marker in the old
+        // `document.rs` pipeline, now plain text here too.
+        let root = parse_cst("#[ Title ]\n\nParagraph\n");
+        assert_eq!(child_kinds(&root), [K::PARAGRAPH, K::PARAGRAPH]);
     }
 
     #[test]

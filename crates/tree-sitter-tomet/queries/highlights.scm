@@ -101,11 +101,6 @@
 (inline_element (value_group "{" @tag))
 (inline_element (value_group "}" @tag))
 
-; Tag sugar (#(tag1, tag2))
-(tag_marker) @tag
-(tag (args_group "(" @tag))
-(tag (args_group ")" @tag))
-
 ; Connect framing: named connects (:rule()) use subdued punctuation gray
 (connect ":" @punctuation.special)
 (connect name: (identifier) @punctuation.special)

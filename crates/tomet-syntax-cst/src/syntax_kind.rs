@@ -60,8 +60,6 @@ pub enum SyntaxKind {
     DOCUMENT,
     BLOCK_ELEMENT,
     INLINE_ELEMENT,
-    /// Legacy `#` heading. Current headings are [`SyntaxKind::SECTION`].
-    HEADING,
     /// `=`-run heading plus every block up to the next section of the same or
     /// a shallower level. Sections nest by level; the first child is the
     /// [`SyntaxKind::SECTION_HEADING`].

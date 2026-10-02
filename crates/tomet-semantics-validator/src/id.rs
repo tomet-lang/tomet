@@ -116,7 +116,6 @@ pub(crate) fn collect_ids_cst(root: &SyntaxNode) -> Vec<(String, TextRange)> {
                 K::BLOCK_ELEMENT
                     | K::INLINE_ELEMENT
                     | K::SECTION_HEADING
-                    | K::HEADING
                     | K::LIST_ITEM
                     | K::THEMATIC_BREAK
                     | K::CONNECT

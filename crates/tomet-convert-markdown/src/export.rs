@@ -1352,8 +1352,8 @@ Prose B ^(shared).
     }
 
     #[test]
-    fn tag_sugar_and_element_export_to_markdown() {
-        let src = "#(rust, tomet) and @tag(spec)\n";
+    fn tag_elements_export_to_markdown() {
+        let src = "@tag(rust, tomet) and @tag(spec)\n";
         let doc = tomet_parser::parse_document(src).unwrap();
         let md = to_markdown(&doc);
         assert_eq!(md.trim(), "#rust #tomet and #spec");

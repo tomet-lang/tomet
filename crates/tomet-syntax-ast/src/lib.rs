@@ -569,8 +569,8 @@ impl fmt::Display for Name {
 /// but both classified through the same arm. `#name` vs `@name` was meant
 /// to encode shape, but the parser never consulted it (position already
 /// decided placement) and `tomet-semantics`' `required_shape` already knew
-/// each builtin's shape, so the sigil only restated it. `#` is the heading
-/// marker now, and nothing else.
+/// each builtin's shape, so the sigil only restated it. `#` carries no
+/// syntax at all now -- not even a heading marker -- and is free.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Sigil {
     /// `@name` -- an element. The name is mandatory.

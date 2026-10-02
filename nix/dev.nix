@@ -45,6 +45,8 @@ mkShell rec {
     wasm-bindgen-cli
     binaryen # wasm-opt: the size a browser downloads is after this
     twiggy # which crates the wasm size is spent in
+    #== Tree-sitter @dir(crates/tree-sitter-tomet)
+    tree-sitter # regenerates parser.c/grammar.json/node-types.json from grammar.js
     #== Python
     python313
     #== Pandoc

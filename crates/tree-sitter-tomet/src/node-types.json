@@ -188,10 +188,6 @@
           "named": true
         },
         {
-          "type": "tag",
-          "named": true
-        },
-        {
           "type": "text",
           "named": true
         }
@@ -287,10 +283,6 @@
         },
         {
           "type": "strikeout",
-          "named": true
-        },
-        {
-          "type": "tag",
           "named": true
         },
         {
@@ -579,10 +571,6 @@
           "named": true
         },
         {
-          "type": "tag",
-          "named": true
-        },
-        {
           "type": "text",
           "named": true
         }
@@ -680,10 +668,6 @@
           "named": true
         },
         {
-          "type": "tag",
-          "named": true
-        },
-        {
           "type": "text",
           "named": true
         }
@@ -728,10 +712,6 @@
         },
         {
           "type": "strong",
-          "named": true
-        },
-        {
-          "type": "tag",
           "named": true
         },
         {
@@ -831,10 +811,6 @@
             "named": true
           },
           {
-            "type": "tag",
-            "named": true
-          },
-          {
             "type": "text",
             "named": true
           }
@@ -899,10 +875,6 @@
           "named": true
         },
         {
-          "type": "tag",
-          "named": true
-        },
-        {
           "type": "text",
           "named": true
         }
@@ -947,40 +919,10 @@
           "named": true
         },
         {
-          "type": "tag",
-          "named": true
-        },
-        {
           "type": "text",
           "named": true
         }
       ]
-    }
-  },
-  {
-    "type": "tag",
-    "named": true,
-    "fields": {
-      "args": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "args_group",
-            "named": true
-          }
-        ]
-      },
-      "marker": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "tag_marker",
-            "named": true
-          }
-        ]
-      }
     }
   },
   {
@@ -1036,10 +978,6 @@
           },
           {
             "type": "strong",
-            "named": true
-          },
-          {
-            "type": "tag",
             "named": true
           },
           {
@@ -1151,10 +1089,6 @@
           "named": true
         },
         {
-          "type": "tag",
-          "named": true
-        },
-        {
           "type": "text",
           "named": true
         }
@@ -1202,10 +1136,6 @@
         }
       ]
     }
-  },
-  {
-    "type": "#",
-    "named": false
   },
   {
     "type": "$",
@@ -1301,10 +1231,6 @@
   },
   {
     "type": "section_marker",
-    "named": true
-  },
-  {
-    "type": "tag_marker",
     "named": true
   },
   {

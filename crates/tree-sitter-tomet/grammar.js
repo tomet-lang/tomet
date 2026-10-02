@@ -289,7 +289,6 @@ module.exports = grammar({
 				$.emphasis,
 				$.strong,
 				$.strikeout,
-				$.tag,
 				$.element,
 				$.interpolation,
 				$.punctuation,
@@ -317,8 +316,9 @@ module.exports = grammar({
 		// `/* ... */` needs to win over a `text` run that would otherwise
 		// swallow it whole, so a bare `/` (not opening a comment) falls
 		// back to `punctuation` like the others.
-		// `#` is excluded so `tag`'s `#(tag)` can win; `=` is excluded
-		// so `section_marker` can win.
+		// `=` is excluded so `section_marker` can win. `#` carries no
+		// syntax at all now -- not even a heading marker -- so it needs no
+		// exclusion and falls straight into `text` like any other letter.
 		// `:` is excluded for the same longest-match reason as the rest of
 		// this list: `:name(...)` (`connect`) and the bare `:(`/`:{` merge
 		// both start with a single-character `":"` token, but right after
@@ -330,9 +330,9 @@ module.exports = grammar({
 		// a bare `:{`/`:(` right after certain groups) was ever reachable.
 		// A bare `:` with nothing to attach to falls back to `punctuation`,
 		// same as the other excluded characters.
-		text: (_$) => /[^\n`*_=~@$#:()\[{\]/|-]+/,
+		text: (_$) => /[^\n`*_=~@$:()\[{\]/|-]+/,
 
-		punctuation: (_$) => choice(/[()\[{/<>|~]/, "-", "$", "#", ":", "="),
+		punctuation: (_$) => choice(/[()\[{/<>|~]/, "-", "$", ":", "="),
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>
@@ -345,14 +345,6 @@ module.exports = grammar({
 				seq("**", repeat1($._bracket_item_no_star), "**"),
 				seq("__", repeat1($._bracket_item_no_underscore), "__"),
 			),
-		tag: ($) =>
-			prec(
-				2,
-				seq(
-					field("marker", alias("#", $.tag_marker)),
-					field("args", $.args_group),
-				),
-			),
 		// GFM's spelling, and Tomet's. Paired delimiter with excluded character inside.
 		strikeout: ($) => seq("~~", repeat1($._bracket_item_no_tilde), "~~"),
 
@@ -361,7 +353,6 @@ module.exports = grammar({
 				$.code_span,
 				$.block_comment,
 				$.strikeout,
-				$.tag,
 				$.element,
 				$.interpolation,
 				$._newline,
@@ -373,7 +364,6 @@ module.exports = grammar({
 				$.code_span,
 				$.block_comment,
 				$.strikeout,
-				$.tag,
 				$.element,
 				$.interpolation,
 				$._newline,
@@ -386,7 +376,6 @@ module.exports = grammar({
 				$.block_comment,
 				$.emphasis,
 				$.strong,
-				$.tag,
 				$.element,
 				$.interpolation,
 				$._newline,
@@ -426,8 +415,8 @@ module.exports = grammar({
 		// ---- `@name` elements ---------------------------------------------
 		//
 		// One sigil, whatever the element's placement. `#` and `<T>` were
-		// both tried here and both carried no information; `#` is the
-		// heading marker and nothing else now. Whether an element stands
+		// both tried here and both carried no information; `#` carries no
+		// syntax at all now and is free. Whether an element stands
 		// as a block or belongs to running text is decided by position
 		// (does it occupy its own line), which is a question for
 		// `tomet-parser`, not for syntax highlighting -- so this grammar

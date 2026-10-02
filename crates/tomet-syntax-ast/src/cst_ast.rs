@@ -58,7 +58,6 @@ macro_rules! define_ast_node {
 }
 
 define_ast_node!(CstRoot, ROOT);
-define_ast_node!(CstHeading, HEADING);
 define_ast_node!(CstBlockElement, BLOCK_ELEMENT);
 define_ast_node!(CstParagraph, PARAGRAPH);
 define_ast_node!(CstList, LIST);
@@ -82,11 +81,6 @@ impl CstRoot {
     /// The top-level sections. Deeper ones are reached through [`CstSection::sections`].
     pub fn sections(&self) -> impl Iterator<Item = CstSection> {
         self.syntax().children().filter_map(CstSection::cast)
-    }
-
-    /// Legacy `#` headings.
-    pub fn headings(&self) -> impl Iterator<Item = CstHeading> {
-        self.syntax().children().filter_map(CstHeading::cast)
     }
 
     pub fn elements(&self) -> impl Iterator<Item = CstBlockElement> {

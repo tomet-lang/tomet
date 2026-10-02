@@ -898,8 +898,8 @@ Prose B ^(shared).
     }
 
     #[test]
-    fn renders_tag_sugar_and_element() {
-        let src = "#(rust, tomet) and @tag(spec)\n";
+    fn renders_tag_elements() {
+        let src = "@tag(rust, tomet) and @tag(spec)\n";
         assert_eq!(
             typst(src),
             "#box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#rust] #box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#tomet] and #box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#spec]\n\n"
