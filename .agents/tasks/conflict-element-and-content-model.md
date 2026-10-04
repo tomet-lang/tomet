@@ -285,6 +285,17 @@ enforcement):
   (brand new feature), so `content_allow` is `None` (no check) for every
   real custom element today.
 
+Step 5 done (printer round-trip stability): confirmed two ways beyond
+`cargo test --workspace` (which already runs `cst_is_lossless_across_
+the_corpus`/`formatting_does_not_change_the_parsed_document`/
+`printed_source_parses`/`formatting_is_idempotent_across_the_corpus`
+over the full corpus) -- `tomet format --check --force` run directly
+against `tests/fixtures/` via the real CLI (clean, exit 0, no fixture
+needs reformatting), and the new `syntax/block-value.tmt`/`syntax/
+conflict.tmt` fixtures specifically exercise genuine multi-paragraph
+block content in a value position end to end, which is what this step
+existed to de-risk.
+
 Blocker for step 6 cleared: `@conflict(a: [...], b: [...])` needed
 `key: [...]` to parse as real block content inside `(args)` at all, which
 nothing in the grammar supported (`[` in a value position was a hard
