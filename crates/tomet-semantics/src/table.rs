@@ -1,4 +1,4 @@
-use tomet_ast::{Inline, Text};
+use tomet_ast::{Block, Inline, Text};
 
 /// One cell in a `@table` row, holding trimmed inline nodes.
 #[derive(Debug, Clone, PartialEq)]
@@ -12,8 +12,25 @@ pub struct TableRow {
     pub cells: Vec<TableCell>,
 }
 
-/// Parses table rows and cells from an inline sequence (the `[content]` of a `@table` element).
-pub fn parse_table_rows(inlines: &[Inline]) -> Vec<TableRow> {
+/// Parses table rows and cells from `@table`'s `[content]` (`Vec<Block>`
+/// now). The row/cell syntax (`[cell][cell]`) is literal text scanned
+/// character-by-character below, not real nested elements, so this just
+/// flattens every `Paragraph`'s own inline content into one sequence first
+/// -- there is realistically only ever one (no blank line inside a
+/// table's rows), but this doesn't assume that.
+pub fn parse_table_rows(blocks: &[Block]) -> Vec<TableRow> {
+    let flattened: Vec<Inline> = blocks
+        .iter()
+        .filter_map(|b| match b {
+            Block::Paragraph(p) => Some(p.content.iter().cloned()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    parse_table_rows_inline(&flattened)
+}
+
+fn parse_table_rows_inline(inlines: &[Inline]) -> Vec<TableRow> {
     let mut rows: Vec<TableRow> = Vec::new();
     let mut current_row: Vec<TableCell> = Vec::new();
     let mut current_cell: Vec<Inline> = Vec::new();
@@ -164,7 +181,7 @@ mod tests {
         let inlines = vec![Inline::Text(Text::from(
             "\n[ title ][  sdfasdf   ]\n[ r2c1 ][ r2c2 ]\n",
         ))];
-        let rows = parse_table_rows(&inlines);
+        let rows = parse_table_rows_inline(&inlines);
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].cells.len(), 2);
         assert_eq!(
@@ -193,7 +210,7 @@ mod tests {
             Inline::Element(el.clone()),
             Inline::Text(Text::from(" ][ plain ]")),
         ];
-        let rows = parse_table_rows(&inlines);
+        let rows = parse_table_rows_inline(&inlines);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].cells.len(), 2);
         assert_eq!(rows[0].cells[0].content, vec![Inline::Element(el)]);

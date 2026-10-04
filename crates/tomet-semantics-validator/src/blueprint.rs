@@ -174,10 +174,14 @@ pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<D
 
 fn extract_element_title(el: &Element) -> String {
     let mut title = String::new();
-    if let Some(inlines) = &el.content {
-        for inline in inlines {
-            if let Inline::Text(t) = inline {
-                title.push_str(&t.value)
+    if let Some(blocks) = &el.content {
+        for block in blocks {
+            if let Block::Paragraph(p) = block {
+                for inline in &p.content {
+                    if let Inline::Text(t) = inline {
+                        title.push_str(&t.value)
+                    }
+                }
             }
         }
     }

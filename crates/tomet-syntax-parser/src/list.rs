@@ -10,7 +10,7 @@ use crate::error::Result;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_text};
 use crate::section::merge_values;
 use crate::value::skip_inline_ws;
-use tomet_ast::{Element, Sigil, Value};
+use tomet_ast::{Block, Element, Paragraph, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{element_list, element_list_item, element_new};
 
@@ -165,7 +165,9 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
             // Text after the groups belongs to the item, the way
             // `@x[T] content` keeps both halves in one paragraph. Letting
             // it fall out as a block of its own would silently move a
-            // sentence out of the list it was written in.
+            // sentence out of the list it was written in. `content` is a
+            // `Vec<Block>` now, so "the item's paragraph" is its last
+            // block if that's a `Paragraph`, not `content` itself.
             let after_groups = cur.pos();
             skip_inline_ws(cur);
             if !matches!(cur.peek(), None | Some('\n')) {
@@ -176,22 +178,46 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
                 // empty, though -- `- [ ] text` has nothing to separate
                 // the text from. `push_text`/`extend_merging` fold that
                 // space (and the parsed sequence's own leading `Text`, if
-                // it has one) into `content`'s last item rather than
-                // leaving separate nodes at the seam that mean nothing on
-                // their own -- same reasoning as `inline.rs`'s comment
-                // elision.
-                if cur.pos() != after_groups && !content.is_empty() {
-                    push_text(&mut content, " ".to_string(), cur.span_from(after_groups));
+                // it has one) into the last paragraph's content rather
+                // than leaving separate nodes at the seam that mean
+                // nothing on their own -- same reasoning as `inline.rs`'s
+                // comment elision.
+                if cur.pos() != after_groups
+                    && let Some(Block::Paragraph(p)) = content.last_mut()
+                {
+                    push_text(&mut p.content, " ".to_string(), cur.span_from(after_groups));
                 }
-                extend_merging(&mut content, parse_inline_seq(cur, Stop::Line, false)?);
+                let rest_start = cur.pos();
+                let rest = parse_inline_seq(cur, Stop::Line, false)?;
+                if !rest.is_empty() {
+                    match content.last_mut() {
+                        Some(Block::Paragraph(p)) => extend_merging(&mut p.content, rest),
+                        _ => content.push(Block::Paragraph(Paragraph::new(
+                            rest,
+                            cur.span_from(rest_start),
+                        ))),
+                    }
+                }
             }
             (content, attrs, id)
         } else {
             // The bracket-less sugar, shared with `=`: one line, plus this
             // line's own trailing `#(id)`/`{attrs}`. Spreading out means
             // opening a group -- `[ ]` or `|` -- exactly as it does for
-            // `@name`.
-            parse_sugar_body(cur)?
+            // `@name`. `parse_sugar_body` returns `Vec<Inline>` (`=`'s
+            // title stays that shape too); a list item's own `content` is
+            // `Vec<Block>` now, so wrap it in one `Paragraph`.
+            let item_start = cur.pos();
+            let (inline, attrs, id) = parse_sugar_body(cur)?;
+            let content = if inline.is_empty() {
+                Vec::new()
+            } else {
+                vec![Block::Paragraph(Paragraph::new(
+                    inline,
+                    cur.span_from(item_start),
+                ))]
+            };
+            (content, attrs, id)
         };
 
         if cur.peek() == Some('\n') {

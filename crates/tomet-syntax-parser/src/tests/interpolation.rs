@@ -218,7 +218,7 @@ fn interpolation_inside_element_content_and_section() {
     let doc = parse_document("@memo[ total: ${sum(a, b)} ]\n\n=[ ${x} ]\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            let content = el.content.as_ref().expect("content");
+            let content = first_para(el.content.as_ref().expect("content"));
             assert!(content.iter().any(|i| matches!(
                 i,
                 Inline::Element(e) if e.sigil == Sigil::Dollar

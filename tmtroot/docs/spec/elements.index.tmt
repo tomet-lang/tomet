@@ -72,6 +72,7 @@ Tometは構文を持つが、実際の振る舞いはアプリに任せる。
 @links
 @fixme
 @draft
+@conflict
 ```
 
 =[ Draft ]

@@ -100,7 +100,8 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 Block  @memo
   args    {a: 1}
   content
-    Text "本文"
+    Paragraph
+      Text "本文"
   group
     b: 2
 ```
@@ -121,7 +122,8 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 Block  @memo
   args    {a: 1}
   content
-    Text "本文"
+    Paragraph
+      Text "本文"
 ```
 
 検証:
@@ -140,7 +142,8 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 Block  @deck.bookmark
   args    {name: "foo"}
   content
-    Text "x"
+    Paragraph
+      Text "x"
 ```
 
 検証:
@@ -177,7 +180,8 @@ Paragraph
   Inline @link
     args    {target: "https://example.com"}
     content
-      Text "Tomet"
+      Paragraph
+        Text "Tomet"
   Text " は軽量マークアップ言語です。"
 ```
 
@@ -195,7 +199,8 @@ Paragraph
   Inline @link
     args    {target: "https://example.com"}
     content
-      Text "Tomet"
+      Paragraph
+        Text "Tomet"
   Text " といいます。"
 ```
 
@@ -213,7 +218,8 @@ Paragraph
   Inline @link
     args    {target: "https://example.com"}
     content
-      Text "リンク"
+      Paragraph
+        Text "リンク"
   Text " です。"
 ```
 
@@ -229,7 +235,8 @@ Paragraph
   Inline @deck.badge
     args    2
     content
-      Text "印"
+      Paragraph
+        Text "印"
   Text " です。"
 ```
 
@@ -440,11 +447,13 @@ Block  @memo
     Bare
       args    1
       content
-        Text "ひとつ"
+        Paragraph
+          Text "ひとつ"
     Bare
       args    2
       content
-        Text "ふたつ"
+        Paragraph
+          Text "ふたつ"
 ```
 
 検証:
@@ -466,7 +475,8 @@ Block  @deck.card
     Bare
       args    "a"
       content
-        Text "y"
+        Paragraph
+          Text "y"
     u: "z"
 ```
 
@@ -488,7 +498,8 @@ Block  @memo
     Bare
       args    1
       content
-        Text "ひとつ"
+        Paragraph
+          Text "ひとつ"
       group
         id: "a"
 ```
@@ -514,7 +525,8 @@ Block  @memo
     Bare
       args    1
       content
-        Text "ひとつ"
+        Paragraph
+          Text "ひとつ"
 ```
 
 検証:
@@ -681,9 +693,10 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 Block  @quote
   args    "A"
   content
-    Text "一行目"
-    SoftBreak
-    Text "二行目"
+    Paragraph
+      Text "一行目"
+      SoftBreak
+      Text "二行目"
 ```
 
 ### 同じものを括弧で書いた形。木は一致する
@@ -697,9 +710,10 @@ Block  @quote
 Block  @quote
   args    "A"
   content
-    Text "一行目"
-    SoftBreak
-    Text "二行目"
+    Paragraph
+      Text "一行目"
+      SoftBreak
+      Text "二行目"
 ```
 
 ### 要素の行で開いてもよい
@@ -711,7 +725,8 @@ Block  @quote
 ```
 Block  @quote
   content
-    Text "本文"
+    Paragraph
+      Text "本文"
 ```
 
 ### リスト項目も例外ではない。継続行は開いた `|` と同じ列に立つ
@@ -727,9 +742,10 @@ Block  @ul
     Bare
       args    "x"
       content
-        Text "一行目"
-        SoftBreak
-        Text "二行目"
+        Paragraph
+          Text "一行目"
+          SoftBreak
+          Text "二行目"
 ```
 
 ### 見出しも同じ
@@ -771,12 +787,14 @@ Paragraph
   Inline @link
     args    {target: "https://a.example"}
     content
-      Text "a"
+      Paragraph
+        Text "a"
   SoftBreak
   Inline @link
     args    {target: "https://b.example"}
     content
-      Text "b"
+      Paragraph
+        Text "b"
 ```
 
 ### 行末の `\` でも同じ木になる
@@ -791,12 +809,14 @@ Paragraph
   Inline @link
     args    {target: "https://a.example"}
     content
-      Text "a"
+      Paragraph
+        Text "a"
   SoftBreak
   Inline @link
     args    {target: "https://b.example"}
     content
-      Text "b"
+      Paragraph
+        Text "b"
 ```
 
 ### 継ぎ目を一度越えれば、以降は `\` なしで続く
@@ -812,17 +832,20 @@ Paragraph
   Inline @link
     args    {target: "https://a.example"}
     content
-      Text "a"
+      Paragraph
+        Text "a"
   SoftBreak
   Inline @link
     args    {target: "https://b.example"}
     content
-      Text "b"
+      Paragraph
+        Text "b"
   SoftBreak
   Inline @link
     args    {target: "https://c.example"}
     content
-      Text "c"
+      Paragraph
+        Text "c"
 ```
 
 ### 冗長な `\` は黙って許容される
@@ -838,17 +861,20 @@ Paragraph
   Inline @link
     args    {target: "https://a.example"}
     content
-      Text "a"
+      Paragraph
+        Text "a"
   SoftBreak
   Inline @link
     args    {target: "https://b.example"}
     content
-      Text "b"
+      Paragraph
+        Text "b"
   SoftBreak
   Inline @link
     args    {target: "https://c.example"}
     content
-      Text "c"
+      Paragraph
+        Text "c"
 ```
 
 ### `\` を書かなければ、今まで通り別々のブロックに割れる
@@ -862,11 +888,13 @@ Paragraph
 Block  @link
   args    {target: "https://a.example"}
   content
-    Text "a"
+    Paragraph
+      Text "a"
 Block  @link
   args    {target: "https://b.example"}
   content
-    Text "b"
+    Paragraph
+      Text "b"
 ```
 
 ### パーサーは種類を知らずに `\` を解釈するので、既に解析済みのどんな `Block::Element`（水平線など）も同じように畳み込める。ただし `hr` は `required_shape` が常に `Block` なので、`tomet check` の `shape_mismatch` に引っかかる -- 稀にしか起きない、明示的な誤用でしかない
@@ -903,7 +931,8 @@ Paragraph
 Block  @link
   args    {target: "https://a.example"}
   content
-    Text "dangling"
+    Paragraph
+      Text "dangling"
 ```
 
 ## リスト
@@ -920,10 +949,12 @@ Block  @ul
   group
     Bare
       content
-        Text "ひとつ"
+        Paragraph
+          Text "ひとつ"
     Bare
       content
-        Text "ふたつ"
+        Paragraph
+          Text "ふたつ"
 ```
 
 ### 順序つき
@@ -938,10 +969,12 @@ Block  @ol
   group
     Bare
       content
-        Text "ひとつ"
+        Paragraph
+          Text "ひとつ"
     Bare
       content
-        Text "ふたつ"
+        Paragraph
+          Text "ふたつ"
 ```
 
 ### グループが直接続けば空白は要らない。`@name[ x ]` と同じ
@@ -957,14 +990,16 @@ Block  @ul
   group
     Bare
       content
-        Text "括弧"
+        Paragraph
+          Text "括弧"
     Bare
       content
       group
         id: "x"
     Bare
       content
-        Text "マーカー"
+        Paragraph
+          Text "マーカー"
 ```
 
 ### `(...)` だけの項目。本文が続かなくてもマーカーになる。`@name(id: a)` が引数つきの要素になるのと同じ
@@ -1001,7 +1036,8 @@ Block  @ul
   group
     Bare
       content
-        Text "親"
+        Paragraph
+          Text "親"
 Paragraph
   Text "-- 子"
 ```
@@ -1018,7 +1054,8 @@ Block  @ul
     Bare
       args    {12: 1}
       content
-        Text "本文"
+        Paragraph
+          Text "本文"
       group
         id: "a"
 ```
@@ -1034,7 +1071,8 @@ Block  @ul
   group
     Bare
       content
-        Text "本文"
+        Paragraph
+          Text "本文"
       group
         id: "a"
 ```
@@ -1051,19 +1089,23 @@ Block  @ul
 Paragraph
   Inline @em
     content
-      Text "em"
+      Paragraph
+        Text "em"
   Text " と "
   Inline @strong
     content
-      Text "strong"
+      Paragraph
+        Text "strong"
   Text " と ==mark== と "
   Inline @strikeout
     content
-      Text "strikeout"
+      Paragraph
+        Text "strikeout"
   Text " と "
   Inline @raw
     content
-      Raw "code"
+      Paragraph
+        Raw "code"
 ```
 
 ### 自動リンク
@@ -1101,7 +1143,8 @@ Block  @hr
 ```
 Block  @hr
   content
-    Text "章題"
+    Paragraph
+      Text "章題"
 ```
 
 ### ``` フェンス。中身は逐語
@@ -1116,7 +1159,8 @@ let y = @T; *ptr
 Block  @raw
   args    {lang: "rust"}
   content
-    Raw "let y = @T; *ptr"
+    Paragraph
+      Raw "let y = @T; *ptr"
 ```
 
 ## 補間 `${...}`
@@ -1176,7 +1220,8 @@ Interp $
 ```
 Block  @task
   content
-    Text "A"
+    Paragraph
+      Text "A"
   group
     id: "t1"
 ```
@@ -1215,7 +1260,8 @@ unknown element `task`: only `std` and this document's own `@kind` may be writte
 ```
 Block  @section
   content
-    Text "x"
+    Paragraph
+      Text "x"
   connect
     Inline @rule
       args    {allow: list("card")}
@@ -1280,7 +1326,8 @@ unknown element `x`: only `std` and this document's own `@kind` may be written b
 Block  @task
   args    {a: 1}
   content
-    Text "text"
+    Paragraph
+      Text "text"
   id      "myid"
 ```
 
@@ -1300,7 +1347,8 @@ unknown element `task`: only `std` and this document's own `@kind` may be writte
 Block  @task
   args    {a: 1}
   content
-    Text "text"
+    Paragraph
+      Text "text"
   id      "myid"
 ```
 
@@ -1352,7 +1400,8 @@ Block  @ul
     Bare
       args    "x"
       content
-        Text "y"
+        Paragraph
+          Text "y"
       id      "item1"
 ```
 
@@ -1367,7 +1416,8 @@ Block  @ul
   group
     Bare
       content
-        Text "plain text"
+        Paragraph
+          Text "plain text"
       group
         tag: "x"
       id      "item1"
@@ -1533,9 +1583,10 @@ unknown element `id`: only `std` and this document's own `@kind` may be written 
 Block  @memo
   args    {content: "raw"}
   content
-    Text "1行目"
-    SoftBreak
-    Text "2行目"
+    Paragraph
+      Text "1行目"
+      SoftBreak
+      Text "2行目"
 ```
 
 検証:

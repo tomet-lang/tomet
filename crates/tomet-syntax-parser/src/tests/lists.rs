@@ -17,8 +17,8 @@ fn parses_list() {
             assert_eq!(list_ordered(list), Some(false));
             let items = list_items(list);
             assert_eq!(items.len(), 2);
-            assert_eq!(items[0].content, Some(vec![Inline::Text("one".into())]));
-            assert_eq!(items[1].content, Some(vec![Inline::Text("two".into())]));
+            assert_eq!(items[0].content, wrap(vec![Inline::Text("one".into())]));
+            assert_eq!(items[1].content, wrap(vec![Inline::Text("two".into())]));
         }
         other => panic!("expected list, got {other:?}"),
     }
@@ -33,7 +33,7 @@ fn parses_list_value_markers_and_trailing_attrs() {
             let items = list_items(list);
             assert_eq!(items.len(), 2);
 
-            assert_eq!(items[0].content, Some(vec![Inline::Text("todo".into())]));
+            assert_eq!(items[0].content, wrap(vec![Inline::Text("todo".into())]));
             assert_eq!(items[0].args, Some(Value::String("T".into())));
             assert_eq!(
                 item_attrs(items[0]),
@@ -45,7 +45,7 @@ fn parses_list_value_markers_and_trailing_attrs() {
 
             assert_eq!(
                 items[1].content,
-                Some(vec![Inline::Text("question".into())])
+                wrap(vec![Inline::Text("question".into())])
             );
             assert_eq!(items[1].args, Some(Value::String("?".into())));
             assert_eq!(
@@ -91,7 +91,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
             let items = list_items(list);
             assert_eq!(items.len(), 1, "{bare:?}");
             assert_eq!(item_attrs(items[0]), None, "{bare:?}");
-            match items[0].content.as_deref() {
+            match items[0].content.as_deref().map(first_para) {
                 Some([Inline::Element(link)]) => {
                     assert_eq!(link.sigil, Sigil::named("link"), "{bare:?}");
                     assert_eq!(
@@ -129,7 +129,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
                 // The connector (` :`) left no trace in the item's
                 // own content -- just the `@link` element, nothing
                 // else.
-                match items[0].content.as_deref() {
+                match items[0].content.as_deref().map(first_para) {
                     Some([Inline::Element(link)]) => {
                         assert_eq!(link.sigil, Sigil::named("link"), "{src:?}");
                         assert_eq!(link.value, None, "{src:?}");
@@ -158,7 +158,7 @@ fn list_item_colon_connect_supports_an_empty_braced_value() {
         Block::Element(list) => {
             let items = list_items(list);
             assert_eq!(items.len(), 1);
-            assert_eq!(items[0].content, Some(vec![Inline::Text("xxxxxx".into())]));
+            assert_eq!(items[0].content, wrap(vec![Inline::Text("xxxxxx".into())]));
             assert_eq!(item_attrs(items[0]), Some(Value::Map(vec![])));
         }
         other => panic!("expected list, got {other:?}"),
@@ -208,7 +208,7 @@ fn bracket_after_a_list_marker_is_the_content_group() {
         Block::Element(list) => {
             let items = list_items(list);
             assert_eq!(items[0].args, None);
-            let content = items[0].content.as_ref().expect("content");
+            let content = first_para(items[0].content.as_ref().expect("content"));
             let text: String = content
                 .iter()
                 .map(|inline| match inline {
@@ -245,8 +245,8 @@ fn parses_ordered_list() {
             assert_eq!(list_ordered(list), Some(true));
             let items = list_items(list);
             assert_eq!(items.len(), 2);
-            assert_eq!(items[0].content, Some(vec![Inline::Text("one".into())]));
-            assert_eq!(items[1].content, Some(vec![Inline::Text("two".into())]));
+            assert_eq!(items[0].content, wrap(vec![Inline::Text("one".into())]));
+            assert_eq!(items[1].content, wrap(vec![Inline::Text("two".into())]));
         }
         other => panic!("expected list, got {other:?}"),
     }

@@ -1,9 +1,9 @@
 //! Links, embeds and paths.
 
 use crate::RenderCtx;
-use crate::block::render_inlines;
+use crate::block::render_content_blocks;
 use crate::element::render_content_or_fallback;
-use crate::util::{escape_attr, escape_html, inlines_to_plain, push_data_attrs};
+use crate::util::{blocks_to_plain, escape_attr, escape_html, push_data_attrs};
 use tomet_ast::{Element, Value};
 use tomet_semantics::{
     TargetScheme, classify_std_lenient, link_target, normalized_element_args, path_target,
@@ -24,7 +24,7 @@ pub(crate) fn render_embed_element(el: &Element, out: &mut String) {
     let alt = el
         .content
         .as_ref()
-        .map(|a| inlines_to_plain(a))
+        .map(|a| blocks_to_plain(a))
         .unwrap_or_default();
     if scheme == TargetScheme::Unresolved {
         out.push_str(&format!(
@@ -55,7 +55,7 @@ pub(crate) fn render_path_element(cx: &RenderCtx, el: &Element, out: &mut String
     let class = format!("tm-{}", kind.as_str());
     let content = el.content.as_ref().filter(|c| !c.is_empty()).map(|c| {
         let mut s = String::new();
-        render_inlines(cx, c, &mut s);
+        render_content_blocks(cx, c, &mut s);
         s
     });
 

@@ -177,7 +177,7 @@ fn block_element(block: &Block) -> Element {
         Block::Header(level, attr, inlines) => {
             let mut el = named_element("heading", attr);
             el.args = Some(Value::Int(*level));
-            el.content = Some(inlines_from_pandoc(inlines));
+            el.content = Some(wrap_inline_content(inlines_from_pandoc(inlines)));
             el
         }
         Block::HorizontalRule => element_new(Sigil::named("hr")),
@@ -191,8 +191,8 @@ fn block_element(block: &Block) -> Element {
                     Value::String(lang.clone()),
                 )]));
             }
-            el.content = Some(vec![TmInline::Raw(RawText::new(
-                code.clone(),
+            el.content = Some(vec![TmBlock::Paragraph(Paragraph::new(
+                vec![TmInline::Raw(RawText::new(code.clone(), Span::dummy()))],
                 Span::dummy(),
             ))]);
             el
@@ -206,15 +206,15 @@ fn block_element(block: &Block) -> Element {
                 "lang".to_string(),
                 Value::String(format.clone()),
             )]));
-            el.content = Some(vec![TmInline::Raw(RawText::new(
-                text.clone(),
+            el.content = Some(vec![TmBlock::Paragraph(Paragraph::new(
+                vec![TmInline::Raw(RawText::new(text.clone(), Span::dummy()))],
                 Span::dummy(),
             ))]);
             el
         }
         Block::BlockQuote(blocks) => {
             let mut el = element_new(Sigil::named("quote"));
-            el.content = Some(blocks_to_content(blocks));
+            el.content = Some(pandoc_blocks_to_content(blocks));
             el
         }
         Block::BulletList(items) => return list_element(items, false),
@@ -222,12 +222,12 @@ fn block_element(block: &Block) -> Element {
         Block::Table(parts) => table_element(parts),
         Block::Div(attr, blocks) => {
             let mut el = element_from_attr(attr, || "div".to_string());
-            el.content = Some(blocks_to_content(blocks));
+            el.content = Some(pandoc_blocks_to_content(blocks));
             el
         }
         Block::Figure(attr, _, blocks) => {
             let mut el = named_element("figure", attr);
-            el.content = Some(blocks_to_content(blocks));
+            el.content = Some(pandoc_blocks_to_content(blocks));
             el
         }
         Block::LineBlock(lines) => {
@@ -236,14 +236,14 @@ fn block_element(block: &Block) -> Element {
             for line in lines {
                 content.extend(inlines_from_pandoc(line));
             }
-            el.content = Some(content);
+            el.content = Some(wrap_inline_content(content));
             el
         }
         // Handled by `block_from_pandoc`; reached only if this is called
         // directly with one.
         Block::Para(inlines) | Block::Plain(inlines) => {
             let mut el = element_new(Sigil::named("paragraph"));
-            el.content = Some(inlines_from_pandoc(inlines));
+            el.content = Some(wrap_inline_content(inlines_from_pandoc(inlines)));
             el
         }
         // Dropped by both callers (`block_from_pandoc`, `blocks_to_content`)
@@ -258,7 +258,7 @@ fn list_element(items: &[Vec<Block>], ordered: bool) -> Element {
         .iter()
         .map(|blocks| {
             element_list_item(
-                blocks_to_content(blocks),
+                pandoc_blocks_to_content(blocks),
                 None,
                 None,
                 None,
@@ -297,7 +297,7 @@ fn table_element(parts: &TableParts) -> Element {
     }
 
     let mut el = named_element("table", attr);
-    el.content = Some(content);
+    el.content = Some(wrap_inline_content(content));
     // `header: false` only needs saying when there is no head row; the
     // reader's default is that row 0 is the header.
     let mut args: Vec<(String, Value)> = Vec::new();
@@ -320,6 +320,32 @@ fn alignment_name(align: &crate::ast::Alignment) -> Option<&'static str> {
         crate::ast::Alignment::AlignRight => Some("right"),
         crate::ast::Alignment::AlignDefault => None,
     }
+}
+
+/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>` now):
+/// one `Paragraph`, or nothing for an empty sequence. Every pandoc import
+/// path here builds `[content]` as plain inlines first (the loss notes at
+/// the top of this module are about that shape, pinned by
+/// `pandoc_round_trip_is_stable`), so this is the single place that
+/// adapts all of them to the new field type without changing what any of
+/// them actually produce.
+fn wrap_inline_content(inlines: Vec<TmInline>) -> Vec<TmBlock> {
+    if inlines.is_empty() {
+        Vec::new()
+    } else {
+        vec![TmBlock::Paragraph(Paragraph::new(inlines, Span::dummy()))]
+    }
+}
+
+/// Pandoc blocks as `Element.content` (`Vec<Block>` now): each one through
+/// [`block_from_pandoc`], same as the document's own top level, dropping
+/// anything that drops there too (a `DefinitionList`). This is what a
+/// `Div`/`BlockQuote`/`Figure`/list item/footnote's body should use now
+/// that content can hold real blocks -- [`blocks_to_content`] below is
+/// the older flatten-to-one-inline-run shape, kept for the few positions
+/// that are still genuinely inline (a table cell).
+fn pandoc_blocks_to_content(blocks: &[Block]) -> Vec<TmBlock> {
+    blocks.iter().filter_map(block_from_pandoc).collect()
 }
 
 /// Pandoc blocks as a Tomet `[content]` group.
@@ -378,8 +404,8 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
         Inline::Code(attr, code) => {
             let mut el = named_element("raw", attr);
             el.placement = Placement::Inline;
-            el.content = Some(vec![TmInline::Raw(RawText::new(
-                code.clone(),
+            el.content = Some(vec![TmBlock::Paragraph(Paragraph::new(
+                vec![TmInline::Raw(RawText::new(code.clone(), Span::dummy()))],
                 Span::dummy(),
             ))]);
             TmInline::Element(el)
@@ -412,18 +438,18 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
         Inline::Link(attr, text, target) => {
             let mut el = named_element("link", attr);
             merge_arg(&mut el, "target", Value::String(target.0.clone()));
-            el.content = Some(inlines_from_pandoc(text));
+            el.content = Some(wrap_inline_content(inlines_from_pandoc(text)));
             TmInline::Element(el)
         }
         Inline::Image(attr, alt, target) => {
             let mut el = named_element("embed", attr);
             merge_arg(&mut el, "target", Value::String(target.0.clone()));
-            el.content = Some(inlines_from_pandoc(alt));
+            el.content = Some(wrap_inline_content(inlines_from_pandoc(alt)));
             TmInline::Element(el)
         }
         Inline::Note(blocks) => {
             let mut el = element_new(Sigil::named("quote"));
-            el.content = Some(blocks_to_content(blocks));
+            el.content = Some(pandoc_blocks_to_content(blocks));
             TmInline::Element(el)
         }
         Inline::Span(attr, inner) => {
@@ -435,7 +461,7 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
                     "span".to_string()
                 }
             });
-            el.content = Some(inlines_from_pandoc(inner));
+            el.content = Some(wrap_inline_content(inlines_from_pandoc(inner)));
             TmInline::Element(el)
         }
     }
@@ -443,7 +469,7 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
 
 fn inline_element(name: &str, attr: &Attr, inner: &[Inline]) -> TmInline {
     let mut el = named_element(name, attr);
-    el.content = Some(inlines_from_pandoc(inner));
+    el.content = Some(wrap_inline_content(inlines_from_pandoc(inner)));
     TmInline::Element(el)
 }
 
@@ -465,9 +491,26 @@ fn inlines_to_text_tm(inlines: &[TmInline]) -> String {
             TmInline::LineBreak(_) => out.push(' '),
             TmInline::Element(el) => {
                 if let Some(content) = &el.content {
-                    out.push_str(&inlines_to_text_tm(content));
+                    out.push_str(&blocks_to_text_tm(content));
                 }
             }
+        }
+    }
+    out
+}
+
+/// [`inlines_to_text_tm`] over `Element.content`'s `Vec<Block>` shape.
+fn blocks_to_text_tm(blocks: &[TmBlock]) -> String {
+    let mut out = String::new();
+    for block in blocks {
+        match block {
+            TmBlock::Paragraph(p) => out.push_str(&inlines_to_text_tm(&p.content)),
+            TmBlock::Element(el) => {
+                if let Some(content) = &el.content {
+                    out.push_str(&blocks_to_text_tm(content));
+                }
+            }
+            TmBlock::Section(sec) => out.push_str(&inlines_to_text_tm(&sec.title)),
         }
     }
     out
@@ -763,8 +806,8 @@ mod tests {
             .content
             .as_ref()
             .and_then(|c| {
-                c.iter().find_map(|i| match i {
-                    TmInline::Element(el) => Some(el),
+                c.iter().find_map(|b| match b {
+                    TmBlock::Element(el) => Some(el),
                     _ => None,
                 })
             })

@@ -224,7 +224,7 @@ fn item(cmd: &Command, arg: &Arg) -> Element {
     }
 
     let mut el = element_new(Sigil::Bare).with_placement(Placement::Block);
-    el.content = Some(content);
+    el.content = Some(vec![paragraph(content)]);
     el
 }
 
@@ -278,7 +278,10 @@ fn text(s: &str) -> Inline {
 
 fn code(s: &str) -> Inline {
     let mut el = element_new(Sigil::named("raw")).with_placement(Placement::Inline);
-    el.content = Some(vec![Inline::Raw(RawText::new(s, dummy()))]);
+    el.content = Some(vec![paragraph(vec![Inline::Raw(RawText::new(
+        s,
+        dummy(),
+    ))])]);
     Inline::Element(el)
 }
 
@@ -292,7 +295,10 @@ fn code_block(body: &str) -> Element {
         "lang".to_string(),
         Value::String("text".to_string()),
     )]));
-    el.content = Some(vec![Inline::Raw(RawText::new(body, dummy()))]);
+    el.content = Some(vec![paragraph(vec![Inline::Raw(RawText::new(
+        body,
+        dummy(),
+    ))])]);
     el
 }
 
@@ -473,11 +479,11 @@ mod tests {
                     Block::Paragraph(p) => stray(&p.content, found),
                     Block::Section(s) => walk(&s.blocks, found),
                     Block::Element(el) => {
-                        stray(el.content.as_deref().unwrap_or(&[]), found);
+                        walk(el.content.as_deref().unwrap_or(&[]), found);
                         if let Some(ElementValue::Group(entries)) = &el.value {
                             for entry in entries {
                                 if let Entry::Element(item) = entry {
-                                    stray(item.content.as_deref().unwrap_or(&[]), found);
+                                    walk(item.content.as_deref().unwrap_or(&[]), found);
                                 }
                             }
                         }

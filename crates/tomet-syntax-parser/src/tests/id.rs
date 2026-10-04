@@ -131,7 +131,7 @@ fn list_item_sugar_reads_a_trailing_id() {
     assert_eq!(items[0].id, Some(Id("item1".into())));
     assert_eq!(
         items[0].content,
-        Some(vec![Inline::Text("plain text".into())])
+        wrap(vec![Inline::Text("plain text".into())])
     );
 }
 
@@ -164,7 +164,7 @@ fn list_item_sugar_with_no_trailing_group_has_no_id() {
     assert_eq!(items[0].id, None);
     assert_eq!(
         items[0].content,
-        Some(vec![Inline::Text("plain text".into())])
+        wrap(vec![Inline::Text("plain text".into())])
     );
 }
 
@@ -194,6 +194,6 @@ fn bare_hash_paren_inside_sugar_text_is_still_plain_text_when_unconfirmed() {
     assert_eq!(items[0].id, None);
     assert_eq!(
         items[0].content,
-        Some(vec![Inline::Text("text #(unterminated".into())])
+        wrap(vec![Inline::Text("text #(unterminated".into())])
     );
 }

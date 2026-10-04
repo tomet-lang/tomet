@@ -27,7 +27,7 @@ fn parses_titled_thematic_break() {
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("hr"));
-            assert_eq!(el.content, Some(vec![Inline::Text("Title".into())]));
+            assert_eq!(el.content, wrap(vec![Inline::Text("Title".into())]));
         }
         other => panic!("expected hr element, got {other:?}"),
     }
@@ -38,7 +38,7 @@ fn titled_thematic_break_dash_runs_need_not_match_in_length() {
     let doc = parse_document("-----[ Title ]---\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.content, Some(vec![Inline::Text("Title".into())]));
+            assert_eq!(el.content, wrap(vec![Inline::Text("Title".into())]));
         }
         other => panic!("expected hr element, got {other:?}"),
     }

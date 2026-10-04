@@ -18,8 +18,8 @@ mod values;
 
 use super::*;
 use tomet_ast::{
-    Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Sigil, SoftBreak,
-    Span, Value,
+    Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Paragraph, Sigil,
+    SoftBreak, Span, Value,
 };
 use tomet_semantics::{list_items, list_ordered};
 
@@ -29,4 +29,25 @@ fn sb() -> Inline {
     Inline::SoftBreak(SoftBreak {
         span: Span::dummy(),
     })
+}
+
+/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>` now,
+/// see `tmtroot/docs/spec/feature/content-shape.tmt`) -- every fixture
+/// across these tests is still just one paragraph's worth. Replaces the
+/// old `Some(vec![Inline::...])` shape as `wrap(vec![Inline::...])`.
+fn wrap(inlines: Vec<Inline>) -> Option<Vec<Block>> {
+    Some(vec![Block::Paragraph(tomet_ast::Paragraph::new(
+        inlines,
+        Span::dummy(),
+    ))])
+}
+
+/// The single paragraph's own `Vec<Inline>` inside `Element.content`
+/// (`Vec<Block>` now) -- for fixtures that still want to assert on a flat
+/// inline run.
+fn first_para(blocks: &[Block]) -> &[Inline] {
+    match blocks {
+        [Block::Paragraph(p)] => &p.content,
+        _ => panic!("expected a single paragraph, got {blocks:?}"),
+    }
 }

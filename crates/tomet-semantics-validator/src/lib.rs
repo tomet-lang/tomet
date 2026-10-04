@@ -287,13 +287,18 @@ fn check_unfinished(doc: &Document, errors: &mut Vec<Diagnostic>) {
 /// prose, and anything richer belongs in the document rather than in the
 /// marker.
 fn note_text(el: &tomet_ast::Element) -> String {
-    let Some(inlines) = el.content.as_ref() else {
+    let Some(blocks) = el.content.as_ref() else {
         return String::new();
     };
     let mut out = String::new();
-    for inline in inlines {
-        if let tomet_ast::Inline::Text(t) = inline {
-            out.push_str(&t.value);
+    for block in blocks {
+        let tomet_ast::Block::Paragraph(p) = block else {
+            continue;
+        };
+        for inline in &p.content {
+            if let tomet_ast::Inline::Text(t) = inline {
+                out.push_str(&t.value);
+            }
         }
     }
     out.trim().to_string()

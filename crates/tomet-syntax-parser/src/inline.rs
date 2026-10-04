@@ -15,7 +15,18 @@ use tomet_tree::{ElementExt, element_new};
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Stop {
     Bracket(char),
-    Paragraph,
+    /// A paragraph: ends at a blank line, a heading, a list marker, etc.
+    /// (see [`paragraph_breaks_here`]). `boundary`, when set, is the
+    /// closing character of the `[content]`/`{value}` group this paragraph
+    /// is nested inside (currently always `']'`) -- tracked with the same
+    /// depth-counting [`Stop::Bracket`] uses, so a literal `[`/`]` typed as
+    /// plain prose (`array[0]`) doesn't end the paragraph early, but the
+    /// group's own closing bracket does, even mid-line with no blank line
+    /// in front of it (`@card[ Hello world ]`). `None` at the top level,
+    /// where there is no enclosing group to stop short for.
+    Paragraph {
+        boundary: Option<char>,
+    },
     Line,
     Offset(usize),
     Delim(&'static str),
@@ -71,9 +82,22 @@ pub(crate) fn parse_inline_seq(
                     break;
                 }
             }
-            Stop::Paragraph => {
+            Stop::Paragraph { boundary } => {
                 if cur.is_eof() {
+                    if let Some(c) = boundary {
+                        return Err(err(cur, cur.pos(), format!("unterminated, expected '{c}'")));
+                    }
                     break;
+                }
+                if let Some(c) = boundary {
+                    if cur.peek() == Some(c) {
+                        if bracket_depth == 0 {
+                            break;
+                        }
+                        bracket_depth -= 1;
+                    } else if cur.peek() == Some('[') {
+                        bracket_depth += 1;
+                    }
                 }
                 if cur.peek() == Some('\n') {
                     // A trailing `\` right before this newline is a
@@ -146,7 +170,16 @@ pub(crate) fn parse_inline_seq(
                 if cur.is_eof() {
                     break;
                 }
-                if cur.peek() == Some('\n') && !pipe_run_continues(cur, col)? {
+                // `Empty` ends this *paragraph* (the block-sequence loop in
+                // `element::parse_pipe_content` starts a new one), same as
+                // `End` ends the whole run -- this call only ever builds
+                // one paragraph's content, so both stop it the same way.
+                if cur.peek() == Some('\n')
+                    && matches!(
+                        pipe_run_state(cur, col)?,
+                        PipeContinuation::Empty | PipeContinuation::End
+                    )
+                {
                     break;
                 }
             }
@@ -183,7 +216,10 @@ pub(crate) fn parse_inline_seq(
                 let el = element_new(Sigil::named("raw"))
                     .with_placement(Placement::Inline)
                     .with_span(span)
-                    .with_content(vec![Inline::Raw(RawText::new(inner_text, content_span))]);
+                    .with_content(vec![tomet_ast::Block::Paragraph(tomet_ast::Paragraph::new(
+                        vec![Inline::Raw(RawText::new(inner_text, content_span))],
+                        content_span,
+                    ))]);
                 items.push(Inline::Element(el));
                 cur.set_pos(probe.pos());
                 text_start = cur.pos();
@@ -451,7 +487,12 @@ fn try_one_delimited(
     }
     let span = cur.span_from(start_pos);
     let mut el = element_new(Sigil::named(kind)).with_span(span);
-    el.content = Some(inner);
+    // `em`/`strong`/`mark`/`strikeout` are inline-only content (see
+    // `tmtroot/docs/spec/feature/content-shape.tmt`): always exactly one
+    // `Paragraph` wrapping the inline run, never multiple blocks.
+    el.content = Some(vec![tomet_ast::Block::Paragraph(tomet_ast::Paragraph::new(
+        inner, span,
+    ))]);
     Ok(Some(el))
 }
 
@@ -465,8 +506,27 @@ pub(crate) fn at_line_start(cur: &Cursor) -> bool {
     }
 }
 
-/// Whether the line after the newline at `cur` continues a `|` run opened in
+/// What the line after the newline at `cur` does to a `|` run opened in
 /// column `col`.
+pub(crate) enum PipeContinuation {
+    /// The next line carries the marker and real content after it: the run
+    /// continues, folded into the same paragraph as a `SoftBreak` (today's
+    /// behaviour, unchanged).
+    Content,
+    /// The next line is the marker alone, nothing after it before its own
+    /// end: the run continues, but this ends the *paragraph* -- the
+    /// block-sequence parser (`element::parse_pipe_content`) starts a new
+    /// one. This is `|content`'s only way to express more than one
+    /// paragraph, since an actually blank line (no marker at all) always
+    /// ends the whole run -- see `End` below.
+    Empty,
+    /// No `|` at all on the next line (or it's blank, or EOF): the run is
+    /// over.
+    End,
+}
+
+/// Whether the line after the newline at `cur` continues a `|` run opened in
+/// column `col`, and whether that line carries any content of its own.
 ///
 /// The marker is left where it is rather than consumed: `normalize_text`
 /// folds it away with the newline, which is what keeps the run's text one
@@ -476,16 +536,16 @@ pub(crate) fn at_line_start(cur: &Cursor) -> bool {
 /// quietly would drop the line into prose -- the failure that made a wrapped
 /// list item break every export -- and once lists nest, the column is the
 /// only thing that says which content a marker belongs to.
-fn pipe_run_continues(cur: &Cursor, col: usize) -> Result<bool> {
+pub(crate) fn pipe_run_state(cur: &Cursor, col: usize) -> Result<PipeContinuation> {
     let mut look = *cur;
     look.bump();
     skip_inline_ws(&mut look);
     // A blank line closes every block, this one included.
     if matches!(look.peek(), None | Some('\n') | Some('\r')) {
-        return Ok(false);
+        return Ok(PipeContinuation::End);
     }
     if look.peek() != Some('|') {
-        return Ok(false);
+        return Ok(PipeContinuation::End);
     }
     let (_, marker_col) = look.line_col(look.pos());
     if marker_col != col {
@@ -498,7 +558,12 @@ fn pipe_run_continues(cur: &Cursor, col: usize) -> Result<bool> {
             ),
         ));
     }
-    Ok(true)
+    look.bump(); // the marker itself
+    skip_inline_ws(&mut look);
+    if matches!(look.peek(), None | Some('\n') | Some('\r')) {
+        return Ok(PipeContinuation::Empty);
+    }
+    Ok(PipeContinuation::Content)
 }
 
 /// [`at_line_start`] for a `|` run: the marker is the line's left edge, not
@@ -509,7 +574,7 @@ fn pipe_run_continues(cur: &Cursor, col: usize) -> Result<bool> {
 /// its own line becomes a block inside `[ ]` and stayed inline inside a run
 /// -- which is the sort of quiet divergence `tests/src/pipe.rs` exists to
 /// refuse.
-fn at_marked_line_start(cur: &Cursor) -> bool {
+pub(crate) fn at_marked_line_start(cur: &Cursor) -> bool {
     let before = &cur.src()[..cur.pos()];
     let line = match before.rfind(['\n', '\r']) {
         Some(nl) => &before[nl + 1..],
@@ -699,7 +764,7 @@ fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
             // A `|` run joins with the same line ending as any other
             // fold, and a URL never survives one, so the run's marker is
             // simply out of reach here.
-            Stop::Line | Stop::Paragraph | Stop::PipeRun { .. } => {
+            Stop::Line | Stop::Paragraph { .. } | Stop::PipeRun { .. } => {
                 if probe.peek() == Some('\n') || probe.peek() == Some('\r') {
                     break;
                 }

@@ -1,0 +1,43 @@
+`[content]`/`|content`は、`Vec<Inline>`固定ではなく`Vec<Block>`になる。
+地の文（`Document.blocks`/`Section.blocks`）と同じ再帰文法でパースされる
+——`[content]`の中に空行で区切った複数段落や、`=[ 見出し ]`のような
+ブロックをそのまま書ける。
+
+```tm
+@card[
+  一段落目。
+
+  =[ 見出し ]
+
+  二段落目。
+]
+```
+
+何も区切りを書かなければ、1つの`Paragraph`だけを持つ`Vec<Block>`になる。
+`@em[text]`のような普段の使い方は見た目も挙動も変わらない。
+
+パーサは要素の種類を見て分岐しない。どの要素でも同じ文法で`Vec<Block>`を
+作るだけで、「この要素にそれを許すか」は一切パーサの仕事ではない。
+
+許すかどうかは`tomet-semantics`の仕事。`@element`は`@content{allow:}`で
+宣言する：
+
+```tm
+@content{ allow: list(link, em, strong, mark) }  // この名前だけ許す
+@content{ allow: inline }                        // display: inline のもの全部
+@content{ allow: any }
+```
+
+`allow:`の値は`list(...)`——`:rule(allow:list(...))`が既に使っている
+`Value::Call`そのもので、新しい値構文は要らない。
+
+組み込み36(+1)要素については、vocabulary宣言が無いので、`required_shape`/
+`builtin_region`/`builtin_singleton`と並ぶ新しい表を`tomet-semantics`に
+持つ。`em`/`strong`/`mark`/`strikeout`/`ruby`/`link`/`embed`/`file`/`dir`/
+`draft`/`fixme`/`heading`/`quote`は、たとえ`display: block`でも
+contentはinline限定（短い単一ラベル止まり）。`callout`/`card`/`table`/
+`conflict`はブロックを許す。
+
+`Element.children`（リスト項目のサブリスト専用）とは別物のまま——型が同じ
+`Vec<Block>`になっても、フィールドとしては統合しない。リストの子は
+「ネストしたリスト」という別の関係で、要素自身のcontentとは意味が違う。

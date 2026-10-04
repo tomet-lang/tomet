@@ -16,15 +16,15 @@ fn parses_emphasis_and_strong() {
             assert_eq!(
                 kinds,
                 vec![
-                    (Sigil::named("em"), Some(vec![Inline::Text("em".into())])),
+                    (Sigil::named("em"), wrap(vec![Inline::Text("em".into())])),
                     (
                         Sigil::named("strong"),
-                        Some(vec![Inline::Text("strong".into())])
+                        wrap(vec![Inline::Text("strong".into())])
                     ),
-                    (Sigil::named("em"), Some(vec![Inline::Text("em2".into())])),
+                    (Sigil::named("em"), wrap(vec![Inline::Text("em2".into())])),
                     (
                         Sigil::named("strong"),
-                        Some(vec![Inline::Text("strong2".into())])
+                        wrap(vec![Inline::Text("strong2".into())])
                     ),
                 ]
             );

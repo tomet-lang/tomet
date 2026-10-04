@@ -43,8 +43,8 @@ pub use tomet_search::filter::{
 };
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, InterpExprKind, Placement,
-    Sigil, Span, Value,
+    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, InterpExprKind, Paragraph,
+    Placement, Sigil, Span, Value,
 };
 use tomet_tree::{element_list_item, element_new};
 
@@ -204,13 +204,17 @@ fn filter_args_of_element(el: &Element) -> Option<&[InterpExpr]> {
     }
 }
 
-/// The argument list of a `${filter(...)}`, if a list item's whole inline
-/// content is exactly that and nothing else -- `- ${filter(...)}}`, not
-/// `- some text ${filter(...)}}` (which has no sensible expansion: it
-/// would have to splice several list items into the middle of one, so it
-/// is left as source, same as an inline query is at the top level).
-fn filter_args_of_content(content: &[Inline]) -> Option<&[InterpExpr]> {
-    let [Inline::Element(el)] = content else {
+/// The argument list of a `${filter(...)}`, if a list item's whole
+/// content (`Vec<Block>` now) is exactly that and nothing else --
+/// `- ${filter(...)}}`, not `- some text ${filter(...)}}` (which has no
+/// sensible expansion: it would have to splice several list items into
+/// the middle of one, so it is left as source, same as an inline query is
+/// at the top level).
+fn filter_args_of_content(content: &[Block]) -> Option<&[InterpExpr]> {
+    let [Block::Paragraph(p)] = content else {
+        return None;
+    };
+    let [Inline::Element(el)] = p.content.as_slice() else {
         return None;
     };
     filter_args_of_element(el)
@@ -242,7 +246,10 @@ fn link_block_element(path: &str) -> Element {
 /// span, reused since a generated item has no source position of its own.
 fn link_list_item(path: &str, span: Span) -> Element {
     element_list_item(
-        vec![Inline::Element(link_element(path))],
+        vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Element(link_element(path))],
+            span,
+        ))],
         None,
         None,
         None,
@@ -336,18 +343,26 @@ mod tests {
         (scheme == tomet_semantics::TargetScheme::Ref).then(|| rest.to_string())
     }
 
+    /// The single element a list item's whole content (`Vec<Block>` now)
+    /// amounts to, if it's exactly one plain paragraph holding exactly one
+    /// inline element -- `None` for anything richer.
+    fn single_content_element(content: Option<&[Block]>) -> Option<&Element> {
+        let [Block::Paragraph(p)] = content? else {
+            return None;
+        };
+        let [Inline::Element(el)] = p.content.as_slice() else {
+            return None;
+        };
+        Some(el)
+    }
+
     /// The `ref:` path of every list item directly under `list_el`, in
     /// source order -- `None` where an item isn't a lone `@link`, so a
     /// caller can tell a query-generated item from a hand-written label.
     fn item_refs(list_el: &Element) -> Vec<Option<String>> {
         tomet_semantics::list_items(list_el)
             .into_iter()
-            .map(|item| {
-                let [Inline::Element(el)] = item.content.as_deref()? else {
-                    return None;
-                };
-                link_ref(el)
-            })
+            .map(|item| link_ref(single_content_element(item.content.as_deref())?))
             .collect()
     }
 
@@ -490,10 +505,7 @@ mod tests {
         let top = tomet_semantics::list_items(list);
         assert_eq!(top.len(), 1);
         assert_eq!(
-            top[0].content.as_deref().and_then(|c| match c {
-                [Inline::Element(el)] => link_ref(el),
-                _ => None,
-            }),
+            single_content_element(top[0].content.as_deref()).and_then(link_ref),
             Some("docs/a.tmt".to_string())
         );
 

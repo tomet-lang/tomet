@@ -170,7 +170,7 @@ fn render_heading_element(
     };
     let (class, data) = split_attrs(value_data.as_ref());
     let mut id = id_attr(el.id.as_ref());
-    let text = inlines_to_plain(content);
+    let text = crate::util::blocks_to_plain(content);
     if id.is_none() && cx.options.auto_slug_headings {
         let slug = state.slugs.slug_for(&text);
         if !slug.is_empty() {
@@ -190,7 +190,7 @@ fn render_heading_element(
         out.push_str(&format!("<span class=\"tm-heading-number\">{label}</span>"));
         number = Some(label);
     }
-    render_inlines(cx, content, out);
+    render_content_blocks(cx, content, out);
     out.push_str(&format!("</h{level}>\n"));
 
     state.outline.push(HeadingInfo {
@@ -251,7 +251,7 @@ fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
             }
             out.push_str("</span> ");
         }
-        render_inlines(cx, item.content.as_deref().unwrap_or(&[]), out);
+        render_content_blocks(cx, item.content.as_deref().unwrap_or(&[]), out);
         if let Some(children) = &item.children {
             for child in children {
                 if let Block::Element(sub) = child
@@ -264,6 +264,25 @@ fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
         out.push_str("</li>\n");
     }
     out.push_str(&format!("</{tag}>\n"));
+}
+
+/// `Element.content` (`Vec<Block>`) to HTML. The common case -- exactly
+/// one plain paragraph, what ordinary inline usage always parses to --
+/// delegates straight to `render_inlines` on that paragraph's own content
+/// (no wrapping `<p>`, matching what this always produced for `content`
+/// before it became `Vec<Block>`); anything else falls back to
+/// `render_block` per block, with a fresh `HeadingState` -- nested headings
+/// inside a block-permitting element's content don't continue the
+/// document's own heading numbering.
+pub(crate) fn render_content_blocks(cx: &RenderCtx, blocks: &[Block], out: &mut String) {
+    if let [Block::Paragraph(p)] = blocks {
+        render_inlines(cx, &p.content, out);
+        return;
+    }
+    let mut state = HeadingState::default();
+    for block in blocks {
+        render_block(cx, block, out, &mut state);
+    }
 }
 
 pub(crate) fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut String) {

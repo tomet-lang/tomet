@@ -198,11 +198,11 @@ fn render_heading_element(el: &Element, config: &PrinterConfig, out: &mut String
     out.push_str(&"#".repeat(level));
     if config.heading_space_inside_brackets {
         out.push_str("[ ");
-        out.push_str(&render_inlines(content, config));
+        out.push_str(&render_content_blocks(content, config));
         out.push_str(" ]");
     } else {
         out.push('[');
-        out.push_str(&render_inlines(content, config));
+        out.push_str(&render_content_blocks(content, config));
         out.push(']');
     }
     if let Some(v) = el.value.as_ref().and_then(|v| v.as_data()) {
@@ -239,7 +239,7 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
             head_prefix.push_str(") ");
         }
 
-        let content_str = render_inlines(item.content.as_deref().unwrap_or(&[]), config);
+        let content_str = render_content_blocks(item.content.as_deref().unwrap_or(&[]), config);
         let lines: Vec<&str> = content_str.lines().collect();
         let item_attrs = match &item.value {
             Some(v) => v.as_data(),
@@ -373,7 +373,7 @@ fn render_connects(connects: &[Element], config: &PrinterConfig) -> String {
         }
         if let Some(content) = &connect.content {
             out.push('[');
-            out.push_str(&render_inlines(content, config));
+            out.push_str(&render_content_blocks(content, config));
             out.push(']');
         }
         if let Some(value) = &connect.value {
@@ -390,6 +390,30 @@ fn render_connects(connects: &[Element], config: &PrinterConfig) -> String {
 
 /// Renders a run of inlines.
 ///
+/// Renders an `Element.content` (`Vec<Block>`, see `tmtroot/docs/spec/
+/// feature/content-shape.tmt`) back to source text.
+///
+/// The common case -- exactly one plain paragraph, which is what ordinary
+/// inline usage (`@link(...)[Tomet]`, `@em[text]`, ...) always parses to --
+/// prints byte-for-byte what `render_inlines` on that paragraph's own
+/// content always has, so this is not a behaviour change for anything that
+/// doesn't actually use the new block-permitting content. Multiple blocks,
+/// or a block that isn't a paragraph, fall back to `render_block` per
+/// block, the same joining `render_section` already uses for its own
+/// `blocks` (no blank line between them -- see `.agents/tasks/
+/// man-import-and-printer-gaps.md`'s note on that, which this doesn't
+/// change).
+fn render_content_blocks(blocks: &[Block], config: &PrinterConfig) -> String {
+    if let [Block::Paragraph(p)] = blocks {
+        return render_inlines(&p.content, config);
+    }
+    let mut out = String::new();
+    for block in blocks {
+        render_block(block, config, &mut out);
+    }
+    out
+}
+
 /// A `[content]` group holds `Inline`s, but one of them may be
 /// block-placed -- an element written at a line start inside the group,
 /// the way `@references[` holds its entries. Placement is spelled with
@@ -453,7 +477,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             if let Some(content) = &el.content {
                 return format!(
                     "---[{}]---{}{}",
-                    render_inlines(content, config),
+                    render_content_blocks(content, config),
                     render_id(el.id.as_ref()),
                     render_connects(&el.connects, config)
                 );
@@ -483,7 +507,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             let from_content = el
                 .content
                 .as_ref()
-                .map(|content| render_inlines(content, config));
+                .map(|content| render_content_blocks(content, config));
             let body = from_content.unwrap_or_default();
             let longest = body
                 .split(|c| c != '`')
@@ -520,7 +544,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             let from_content = el
                 .content
                 .as_ref()
-                .map(|content| render_inlines(content, config))
+                .map(|content| render_content_blocks(content, config))
                 .filter(|body| !body.is_empty());
             let body = from_content
                 .or_else(|| match el.value.as_ref() {
@@ -559,7 +583,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 out.push(')');
             }
             if let Some(content) = &el.content {
-                let inlines_text = render_inlines(content, config);
+                let inlines_text = render_content_blocks(content, config);
                 out.push_str("[\n");
                 for line in inlines_text.lines() {
                     out.push_str("  ");
@@ -582,7 +606,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 out.push(')');
             }
             if let Some(content) = &el.content {
-                let inlines_text = render_inlines(content, config);
+                let inlines_text = render_content_blocks(content, config);
                 let lines: Vec<&str> = inlines_text.lines().collect();
                 out.push('\n');
                 if lines.is_empty() {
@@ -620,7 +644,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 out.push(')');
             }
             if let Some(content) = &el.content {
-                let inlines_text = render_inlines(content, config);
+                let inlines_text = render_content_blocks(content, config);
                 let lines: Vec<&str> = inlines_text.lines().collect();
                 out.push('\n');
                 if lines.is_empty() {
@@ -689,7 +713,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     let render_content = |out: &mut String| {
         if let Some(content) = &el.content {
             out.push('[');
-            out.push_str(&render_inlines(content, config));
+            out.push_str(&render_content_blocks(content, config));
             out.push(']');
         }
     };
@@ -893,11 +917,15 @@ fn value_to_json(val: &Value) -> serde_json::Value {
             if let Some(content) = &el.content {
                 let text: String = content
                     .iter()
-                    .filter_map(|i| match i {
-                        Inline::Text(t) => Some(t.value.as_str()),
-                        Inline::Raw(r) => Some(r.value.as_str()),
+                    .filter_map(|block| match block {
+                        Block::Paragraph(p) => Some(p.content.iter().filter_map(|i| match i {
+                            Inline::Text(t) => Some(t.value.as_str()),
+                            Inline::Raw(r) => Some(r.value.as_str()),
+                            _ => None,
+                        })),
                         _ => None,
                     })
+                    .flatten()
                     .collect();
                 map.insert("content".to_string(), serde_json::Value::String(text));
             }
@@ -909,6 +937,7 @@ fn value_to_json(val: &Value) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_ast::Paragraph;
     use tomet_config::{FieldConfig, load_config_from_str};
     use tomet_style::render_value_inner;
 
@@ -1389,11 +1418,11 @@ mod tests {
     fn test_container_children_indentation() {
         let mut child1 = element_new(Sigil::Bare);
         child1.args = Some(Value::Int(1));
-        child1.content = Some(vec![Inline::Text("note 1".into())]);
+        child1.content = Some(vec![Block::Paragraph(Paragraph::new(vec![Inline::Text("note 1".into())], tomet_ast::Span::dummy()))]);
 
         let mut child2 = element_new(Sigil::Bare);
         child2.args = Some(Value::Int(2));
-        child2.content = Some(vec![Inline::Text("note 2".into())]);
+        child2.content = Some(vec![Block::Paragraph(Paragraph::new(vec![Inline::Text("note 2".into())], tomet_ast::Span::dummy()))]);
 
         let mut links = element_new(Sigil::named("links"));
         links.value = Some(ElementValue::from_children(vec![child1, child2]));
@@ -1411,7 +1440,7 @@ mod tests {
     fn test_group_order_content_first() {
         let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::String("https://example.com".to_string()));
-        el.content = Some(vec![Inline::Text("Example".into())]);
+        el.content = Some(vec![Block::Paragraph(Paragraph::new(vec![Inline::Text("Example".into())], tomet_ast::Span::dummy()))]);
 
         let doc = Document::new(vec![Block::Element(el)], tomet_ast::Span::dummy());
 

@@ -73,7 +73,7 @@ fn content_raw_is_now_just_an_ordinary_argument() {
         Block::Element(el) => {
             assert_eq!(
                 el.content,
-                Some(vec![
+                wrap(vec![
                     Inline::Text("line one".into()),
                     sb(),
                     Inline::Text("line two".into()),
@@ -97,7 +97,7 @@ fn parses_a_fenced_code_block_with_lang() {
                     Value::String("rust".to_string())
                 )]))
             );
-            assert_eq!(el.content, Some(vec![Inline::Raw("fn main() {}".into())]));
+            assert_eq!(el.content, wrap(vec![Inline::Raw("fn main() {}".into())]));
         }
         other => panic!("expected a raw element, got {other:?}"),
     }
@@ -110,7 +110,7 @@ fn parses_a_fenced_code_block_without_lang() {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("raw"));
             assert_eq!(el.args, None);
-            assert_eq!(el.content, Some(vec![Inline::Raw("plain".into())]));
+            assert_eq!(el.content, wrap(vec![Inline::Raw("plain".into())]));
         }
         other => panic!("expected a raw element, got {other:?}"),
     }
@@ -137,8 +137,8 @@ fn fenced_code_block_and_bracket_codeblock_produce_the_same_ast() {
             assert_eq!(a.sigil, b.sigil);
             assert_eq!(a.args, b.args);
             assert_eq!(a.value, b.value);
-            assert_eq!(a.content, Some(vec![Inline::Raw("fn main() {}".into())]));
-            assert_eq!(b.content, Some(vec![Inline::Text("fn main() {}".into())]));
+            assert_eq!(a.content, wrap(vec![Inline::Raw("fn main() {}".into())]));
+            assert_eq!(b.content, wrap(vec![Inline::Text("fn main() {}".into())]));
         }
         other => panic!("expected two raw elements, got {other:?}"),
     }
@@ -154,7 +154,7 @@ fn fenced_code_block_closing_fence_needs_at_least_the_opening_backtick_count() {
         Block::Element(el) => {
             assert_eq!(
                 el.content,
-                Some(vec![Inline::Raw("code\n```\nmore code".into())])
+                wrap(vec![Inline::Raw("code\n```\nmore code".into())])
             );
         }
         other => panic!("expected a raw element, got {other:?}"),
@@ -166,7 +166,7 @@ fn fenced_code_block_closing_fence_can_have_more_backticks_than_opening() {
     let doc = parse_document("```\ncode\n`````\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.content, Some(vec![Inline::Raw("code".into())]));
+            assert_eq!(el.content, wrap(vec![Inline::Raw("code".into())]));
         }
         other => panic!("expected a raw element, got {other:?}"),
     }
@@ -179,7 +179,7 @@ fn fenced_code_block_body_can_contain_short_backtick_runs() {
         Block::Element(el) => {
             assert_eq!(
                 el.content,
-                Some(vec![Inline::Raw("see `foo` and ``bar``".into())])
+                wrap(vec![Inline::Raw("see `foo` and ``bar``".into())])
             );
         }
         other => panic!("expected a raw element, got {other:?}"),
@@ -196,7 +196,7 @@ fn unterminated_fenced_code_block_runs_to_eof_without_error() {
         Block::Element(el) => {
             assert_eq!(
                 el.content,
-                Some(vec![Inline::Raw("line one\nline two".into())])
+                wrap(vec![Inline::Raw("line one\nline two".into())])
             );
         }
         other => panic!("expected a raw element, got {other:?}"),
@@ -232,7 +232,7 @@ fn backtick_span_still_closes_normally_on_the_same_line() {
                 Inline::Element(el) => {
                     assert_eq!(el.sigil, Sigil::named("raw"));
                     assert_eq!(el.placement, tomet_ast::Placement::Inline);
-                    assert_eq!(el.content, Some(vec![Inline::Raw("foo()".into())]));
+                    assert_eq!(el.content, wrap(vec![Inline::Raw("foo()".into())]));
                 }
                 other => panic!("expected inline @raw element, got {other:?}"),
             }

@@ -121,7 +121,12 @@ fn resolve_element(
     unresolved: &mut Vec<Unresolved>,
 ) -> Element {
     if let Some(content) = el.content.take() {
-        el.content = Some(resolve_inlines(content, source, config, ctx, unresolved));
+        el.content = Some(
+            content
+                .into_iter()
+                .map(|block| resolve_block(block, source, config, ctx, unresolved))
+                .collect(),
+        );
     }
     if let Some(children) = el.children.take() {
         el.children = Some(
@@ -258,7 +263,9 @@ mod tests {
                     Inline::SoftBreak(_) | Inline::LineBreak(_) => {}
                     Inline::Element(el) => {
                         if let Some(content) = &el.content {
-                            walk(out, content);
+                            for block in content {
+                                walk_block(out, block);
+                            }
                         }
                     }
                 }
@@ -269,7 +276,9 @@ mod tests {
                 Block::Paragraph(p) => walk(out, &p.content),
                 Block::Element(el) => {
                     if let Some(content) = &el.content {
-                        walk(out, content);
+                        for block in content {
+                            walk_block(out, block);
+                        }
                     }
                 }
                 Block::Section(sec) => {

@@ -69,7 +69,9 @@ fn inlines_in_element(element: &Element, f: &mut dyn FnMut(&Inline)) {
         inlines_in_value(args, f);
     }
     if let Some(content) = &element.content {
-        inlines_in(content, f);
+        for block in content {
+            inlines_in_block(block, f);
+        }
     }
     if let Some(children) = &element.children {
         for child in children {
@@ -253,7 +255,9 @@ fn walk_element<B>(element: &Element, visitor: &mut impl Visitor<B>) -> ControlF
         propagate!(walk_value(args, visitor));
     }
     if let Some(content) = &element.content {
-        propagate!(walk_inlines(content, visitor));
+        for block in content {
+            propagate!(walk_block(block, visitor));
+        }
     }
     if let Some(children) = &element.children {
         for child in children {
@@ -372,7 +376,9 @@ fn walk_element_mut<B>(element: &mut Element, visitor: &mut impl VisitorMut<B>) 
         propagate!(walk_value_mut(args, visitor));
     }
     if let Some(content) = &mut element.content {
-        propagate!(walk_inlines_mut(content, visitor));
+        for block in content {
+            propagate!(walk_block_mut(block, visitor));
+        }
     }
     if let Some(children) = &mut element.children {
         for child in children {
@@ -446,9 +452,26 @@ fn walk_value_mut<B>(value: &mut Value, visitor: &mut impl VisitorMut<B>) -> Con
 pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&Element)) {
     if direct_only {
         if let Some(content) = &el.content {
-            for inline in content {
-                if let Inline::Element(child) = inline {
-                    f(child);
+            for block in content {
+                match block {
+                    Block::Element(child) => f(child),
+                    // A `Paragraph` isn't an element -- it's where an
+                    // inline-placed child landed (`@mid` written mid-line,
+                    // e.g. `@outer[ @mid[...] ]`, rather than at its own
+                    // line start). Its own inline items are still direct
+                    // children of `el` for this purpose, same as a
+                    // `Block::Element` sitting in `content` directly --
+                    // `content` becoming `Vec<Block>` must not make this
+                    // depend on whether the child happened to stand alone
+                    // on its line.
+                    Block::Paragraph(p) => {
+                        for inline in &p.content {
+                            if let Inline::Element(child) = inline {
+                                f(child);
+                            }
+                        }
+                    }
+                    Block::Section(_) => {}
                 }
             }
         }
@@ -473,7 +496,9 @@ pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&E
         ControlFlow::Continue(())
     };
     if let Some(content) = &el.content {
-        let _ = walk_inlines(content, &mut visitor);
+        for block in content {
+            let _ = walk_block(block, &mut visitor);
+        }
     }
     if let Some(children) = &el.children {
         for block in children {

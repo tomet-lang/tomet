@@ -68,7 +68,7 @@ fn render_leftover_footnotes(cx: &TypstCtx, out: &mut String) {
             if let Some(def_el) = &item.definition
                 && let Some(content) = &def_el.content
             {
-                def_text.push_str(&inline_to_typst(cx, content));
+                def_text.push_str(&blocks_to_typst(cx, content));
             }
             if !def_text.is_empty() {
                 out.push_str(&format!("#footnote[{def_text}]\n\n"));
@@ -135,7 +135,7 @@ fn render_list_with_indent(cx: &TypstCtx, el: &Element, indent: usize, out: &mut
         // `args` (the `(...)` marker `Value`) has no Typst markup
         // equivalent -- dropped on export, same as this crate's other
         // documented lossy cases (see the module doc).
-        out.push_str(&inline_to_typst(cx, item.content.as_deref().unwrap_or(&[])));
+        out.push_str(&blocks_to_typst(cx, item.content.as_deref().unwrap_or(&[])));
         out.push('\n');
         if let Some(children) = &item.children {
             for child in children {
@@ -147,6 +147,21 @@ fn render_list_with_indent(cx: &TypstCtx, el: &Element, indent: usize, out: &mut
             }
         }
     }
+}
+
+/// `Element.content` (`Vec<Block>`) to Typst. The common case -- exactly
+/// one plain paragraph, what ordinary inline usage always parses to --
+/// delegates straight to `inline_to_typst` on that paragraph's own
+/// content; anything else falls back to `render_block` per block.
+fn blocks_to_typst(cx: &TypstCtx, blocks: &[Block]) -> String {
+    if let [Block::Paragraph(p)] = blocks {
+        return inline_to_typst(cx, &p.content);
+    }
+    let mut out = String::new();
+    for block in blocks {
+        render_block(cx, block, &mut out);
+    }
+    out
 }
 
 fn inline_to_typst(cx: &TypstCtx, inlines: &[Inline]) -> String {
@@ -196,7 +211,7 @@ fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
                 if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
                     render_footnote_ref_or_def(cx, idx, el.content.as_deref())
                 } else if let Some(content) = &el.content {
-                    let text = inline_to_typst(cx, content);
+                    let text = blocks_to_typst(cx, content);
                     format!("#footnote[{text}]")
                 } else {
                     String::new()
@@ -222,7 +237,7 @@ fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
 fn render_footnote_ref_or_def(
     cx: &TypstCtx,
     idx: usize,
-    inline_content: Option<&[Inline]>,
+    inline_content: Option<&[Block]>,
 ) -> String {
     let item = cx.footnotes.items.iter().find(|it| it.index == idx);
     let Some(item) = item else {
@@ -233,10 +248,10 @@ fn render_footnote_ref_or_def(
     if is_first {
         let mut def_text = String::new();
         if let Some(content) = inline_content {
-            def_text = inline_to_typst(cx, content);
+            def_text = blocks_to_typst(cx, content);
         } else if let Some(def_el) = &item.definition {
             if let Some(content) = &def_el.content {
-                def_text = inline_to_typst(cx, content);
+                def_text = blocks_to_typst(cx, content);
             }
             if let Some(children) = &def_el.children {
                 for child in children {
@@ -290,7 +305,7 @@ fn render_tag(el: &Element) -> String {
 fn render_heading(cx: &TypstCtx, el: &Element) -> String {
     let level = heading_level(el).unwrap_or(1) as usize;
     let content = el.content.as_deref().unwrap_or(&[]);
-    format!("{} {}", "=".repeat(level), inline_to_typst(cx, content))
+    format!("{} {}", "=".repeat(level), blocks_to_typst(cx, content))
 }
 
 /// A bare `---` break renders as a full-width rule; a titled one
@@ -299,7 +314,7 @@ fn render_heading(cx: &TypstCtx, el: &Element) -> String {
 fn render_hr(cx: &TypstCtx, el: &Element) -> String {
     match &el.content {
         Some(title) if !title.is_empty() => {
-            format!("{}\n#line(length: 100%)", inline_to_typst(cx, title))
+            format!("{}\n#line(length: 100%)", blocks_to_typst(cx, title))
         }
         _ => "#line(length: 100%)".to_string(),
     }
@@ -385,7 +400,7 @@ fn render_raw(el: &Element, inline: bool) -> String {
     let code = el
         .content
         .as_ref()
-        .map(|a| inlines_to_plain(a))
+        .map(|a| blocks_to_plain(a))
         .unwrap_or_default();
     if inline {
         if lang.is_empty() && !code.contains('`') {
@@ -479,7 +494,7 @@ fn render_table(cx: &TypstCtx, el: &Element) -> String {
 fn render_path(cx: &TypstCtx, el: &Element, inline: bool) -> String {
     let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let content = match &el.content {
-        Some(content) if !content.is_empty() => Some(inline_to_typst(cx, content)),
+        Some(content) if !content.is_empty() => Some(blocks_to_typst(cx, content)),
         _ => None,
     };
     if inline {
@@ -495,7 +510,7 @@ fn render_link(cx: &TypstCtx, el: &Element) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let text = match &el.content {
-        Some(content) if !content.is_empty() => inline_to_typst(cx, content),
+        Some(content) if !content.is_empty() => blocks_to_typst(cx, content),
         _ => String::new(),
     };
     match scheme {
@@ -534,7 +549,7 @@ fn render_embed(el: &Element) -> String {
     let alt = el
         .content
         .as_ref()
-        .map(|a| inlines_to_plain(a))
+        .map(|a| blocks_to_plain(a))
         .unwrap_or_default();
     if alt.is_empty() {
         format!("#image(\"{}\")", escape_typst_string(src))
@@ -600,7 +615,7 @@ fn render_ruby(cx: &TypstCtx, el: &Element) -> String {
 fn content_to_typst(cx: &TypstCtx, el: &Element) -> String {
     el.content
         .as_ref()
-        .map(|a| inline_to_typst(cx, a))
+        .map(|a| blocks_to_typst(cx, a))
         .unwrap_or_default()
 }
 
@@ -620,9 +635,26 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
             Inline::LineBreak(_) => s.push(' '),
             Inline::Element(el) => {
                 if let Some(content) = &el.content {
-                    s.push_str(&inlines_to_plain(content));
+                    s.push_str(&blocks_to_plain(content));
                 }
             }
+        }
+    }
+    s
+}
+
+/// [`inlines_to_plain`] over `Element.content`'s `Vec<Block>` shape.
+fn blocks_to_plain(blocks: &[Block]) -> String {
+    let mut s = String::new();
+    for block in blocks {
+        match block {
+            Block::Paragraph(p) => s.push_str(&inlines_to_plain(&p.content)),
+            Block::Element(el) => {
+                if let Some(content) = &el.content {
+                    s.push_str(&blocks_to_plain(content));
+                }
+            }
+            Block::Section(sec) => s.push_str(&inlines_to_plain(&sec.title)),
         }
     }
     s

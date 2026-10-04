@@ -58,13 +58,28 @@ fn is_references_element(el: &Element) -> bool {
 fn extract_connections_from_references(el: &Element) -> Vec<RemoteConnection> {
     let mut connections = Vec::new();
 
-    // Check `el.content` (e.g. `@references[ <id:taskA>:{...} ]`)
+    // Check `el.content` (e.g. `@references[ <id:taskA>:{...} ]`) -- each
+    // entry is its own line, so it's a `Block::Element` directly now that
+    // `content` is `Vec<Block>`; still checked inside a `Paragraph` too, in
+    // case one ends up written inline.
     if let Some(content) = &el.content {
-        for inline in content {
-            if let Inline::Element(child_el) = inline
-                && let Some(conn) = parse_remote_connection_element(child_el)
-            {
-                connections.push(conn);
+        for block in content {
+            match block {
+                Block::Element(child_el) => {
+                    if let Some(conn) = parse_remote_connection_element(child_el) {
+                        connections.push(conn);
+                    }
+                }
+                Block::Paragraph(p) => {
+                    for inline in &p.content {
+                        if let Inline::Element(child_el) = inline
+                            && let Some(conn) = parse_remote_connection_element(child_el)
+                        {
+                            connections.push(conn);
+                        }
+                    }
+                }
+                Block::Section(_) => {}
             }
         }
     }

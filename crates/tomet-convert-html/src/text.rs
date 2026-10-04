@@ -2,9 +2,9 @@
 //! raw text and quotes.
 
 use crate::RenderCtx;
-use crate::block::render_inlines;
+use crate::block::render_content_blocks;
 use crate::util::{
-    as_map, escape_attr, escape_html, id_attr, inlines_to_plain, map_get, push_named_attrs,
+    as_map, blocks_to_plain, escape_attr, escape_html, id_attr, map_get, push_named_attrs,
     split_attrs, value_to_plain,
 };
 use tomet_ast::{Element, Value};
@@ -18,7 +18,7 @@ pub(crate) fn render_hr_element(cx: &RenderCtx, el: &Element, out: &mut String) 
     match &el.content {
         Some(title) if !title.is_empty() => {
             out.push_str("<div class=\"tm-hr-titled\"><hr><span>");
-            render_inlines(cx, title, out);
+            render_content_blocks(cx, title, out);
             out.push_str("</span><hr></div>\n");
         }
         _ => out.push_str("<hr>\n"),
@@ -30,7 +30,7 @@ pub(crate) fn render_hr_element(cx: &RenderCtx, el: &Element, out: &mut String) 
 pub(crate) fn render_wrapped_inline(cx: &RenderCtx, el: &Element, tag: &str, out: &mut String) {
     out.push_str(&format!("<{tag}>"));
     if let Some(content) = &el.content {
-        render_inlines(cx, content, out);
+        render_content_blocks(cx, content, out);
     }
     out.push_str(&format!("</{tag}>"));
 }
@@ -53,7 +53,7 @@ pub(crate) fn render_ruby_element(cx: &RenderCtx, el: &Element, out: &mut String
 
     out.push_str("<ruby>");
     if let Some(content) = &el.content {
-        render_inlines(cx, content, out);
+        render_content_blocks(cx, content, out);
     }
     out.push_str("<rt>");
     out.push_str(&escape_html(rt));
@@ -74,7 +74,7 @@ pub(crate) fn render_raw_element(el: &Element, out: &mut String, inline: bool) {
     let code = el
         .content
         .as_ref()
-        .map(|a| inlines_to_plain(a))
+        .map(|a| blocks_to_plain(a))
         .unwrap_or_default();
     let attrs = match &el.value {
         Some(v) => v.as_data(),
@@ -117,7 +117,7 @@ pub(crate) fn render_quote_element(cx: &RenderCtx, el: &Element, out: &mut Strin
     let tag = if inline { "q" } else { "blockquote" };
     out.push_str(&format!("<{tag}>"));
     if let Some(content) = &el.content {
-        render_inlines(cx, content, out);
+        render_content_blocks(cx, content, out);
     }
     out.push_str(&format!("</{tag}>"));
     if !inline {

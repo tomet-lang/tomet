@@ -1,6 +1,6 @@
 //! Extracts tags from an element (`@tag(...)`, `@tag[...]`).
 
-use tomet_ast::{Element, Inline, Value};
+use tomet_ast::{Block, Element, Inline, Value};
 
 /// Extracts a list of tag names from a tag element.
 /// Inspects `args` (as string, seq, or map) and `content` (as plain text).
@@ -12,7 +12,7 @@ pub fn extract_tags(el: &Element) -> Vec<String> {
     if tags.is_empty()
         && let Some(content) = &el.content
     {
-        let s = inlines_to_plain(content);
+        let s = blocks_to_plain(content);
         if !s.trim().is_empty() {
             tags.push(s.trim().to_string());
         }
@@ -51,8 +51,30 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
             Inline::LineBreak(_) => s.push(' '),
             Inline::Element(el) => {
                 if let Some(content) = &el.content {
-                    s.push_str(&inlines_to_plain(content));
+                    s.push_str(&blocks_to_plain(content));
                 }
+            }
+        }
+    }
+    s
+}
+
+/// [`inlines_to_plain`] over `Element.content`'s `Vec<Block>` shape --
+/// `@tag[...]`'s content is inline-only in practice (a single `Paragraph`),
+/// but this walks whatever shape actually parsed rather than assuming it.
+fn blocks_to_plain(blocks: &[Block]) -> String {
+    let mut s = String::new();
+    for block in blocks {
+        match block {
+            Block::Paragraph(p) => s.push_str(&inlines_to_plain(&p.content)),
+            Block::Element(el) => {
+                if let Some(content) = &el.content {
+                    s.push_str(&blocks_to_plain(content));
+                }
+            }
+            Block::Section(sec) => {
+                s.push_str(&inlines_to_plain(&sec.title));
+                s.push_str(&blocks_to_plain(&sec.blocks));
             }
         }
     }
@@ -62,7 +84,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Sigil, Span, Text};
+    use tomet_ast::{Paragraph, Sigil, Span, Text};
     use tomet_tree::element_new;
 
     #[test]
@@ -85,7 +107,10 @@ mod tests {
     #[test]
     fn extracts_tags_from_content() {
         let mut el = element_new(Sigil::named("tag"));
-        el.content = Some(vec![Inline::Text(Text::new("docs", Span::dummy()))]);
+        el.content = Some(vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Text(Text::new("docs", Span::dummy()))],
+            Span::dummy(),
+        ))]);
         assert_eq!(extract_tags(&el), vec!["docs"]);
     }
 }

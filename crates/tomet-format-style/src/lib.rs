@@ -15,7 +15,29 @@
 //! `tomet-printer` since it recurses into inline/child content and
 //! is genuinely part of rebuilding a whole document from its AST.
 
-use tomet_ast::{Element, ElementValue, Entry, Inline, Sigil, Value};
+use tomet_ast::{Block, Element, ElementValue, Entry, Inline, Sigil, Value};
+
+/// Renders one `Block` of a value-embedded element's `[content]` (now
+/// `Vec<Block>`) the way the old inline-only loop rendered an `Inline` --
+/// a value-embedded element's content is inline in practice, so this only
+/// descends into a `Paragraph`'s own inlines, not into nested structure.
+fn render_nested_block(block: &Block, config: &PrinterConfig, out: &mut String) {
+    let Block::Paragraph(p) = block else {
+        return;
+    };
+    for inline in &p.content {
+        match inline {
+            Inline::Text(t) => out.push_str(&t.value),
+            Inline::Raw(r) => out.push_str(&r.value),
+            Inline::LineBreak(_) => out.push('\n'),
+            Inline::SoftBreak(_) => out.push(' '),
+            Inline::Element(child_el) => {
+                let child_val = Value::Element(Box::new(child_el.clone()));
+                out.push_str(&render_nested(&child_val, config));
+            }
+        }
+    }
+}
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_field_utils::is_iso8601;
 
@@ -212,17 +234,8 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
             };
             if let Some(content) = &el.content {
                 s.push('[');
-                for inline in content {
-                    match inline {
-                        Inline::Text(t) => s.push_str(&t.value),
-                        Inline::Raw(r) => s.push_str(&r.value),
-                        Inline::LineBreak(_) => s.push('\n'),
-                        Inline::SoftBreak(_) => s.push(' '),
-                        Inline::Element(child_el) => {
-                            let child_val = Value::Element(Box::new(child_el.clone()));
-                            s.push_str(&render_nested(&child_val, config));
-                        }
-                    }
+                for block in content {
+                    render_nested_block(block, config, &mut s);
                 }
                 s.push(']');
             }

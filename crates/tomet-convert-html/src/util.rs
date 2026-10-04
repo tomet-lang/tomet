@@ -1,6 +1,6 @@
 //! Attribute, value and escaping helpers shared by the renderers.
 
-use tomet_ast::{Element, Id, Inline, Value};
+use tomet_ast::{Block, Element, Id, Inline, Value};
 use tomet_semantics::{EXACT_DATA_KEY, flatten_data};
 
 /// Flattens inline content to plain text -- used for the `alt` attribute,
@@ -19,8 +19,28 @@ pub(crate) fn inlines_to_plain(inlines: &[Inline]) -> String {
             Inline::LineBreak(_) => s.push(' '),
             Inline::Element(el) => {
                 if let Some(content) = &el.content {
-                    s.push_str(&inlines_to_plain(content));
+                    s.push_str(&blocks_to_plain(content));
                 }
+            }
+        }
+    }
+    s
+}
+
+/// [`inlines_to_plain`] over `Element.content`'s `Vec<Block>` shape.
+pub(crate) fn blocks_to_plain(blocks: &[Block]) -> String {
+    let mut s = String::new();
+    for block in blocks {
+        match block {
+            Block::Paragraph(p) => s.push_str(&inlines_to_plain(&p.content)),
+            Block::Element(el) => {
+                if let Some(content) = &el.content {
+                    s.push_str(&blocks_to_plain(content));
+                }
+            }
+            Block::Section(sec) => {
+                s.push_str(&inlines_to_plain(&sec.title));
+                s.push_str(&blocks_to_plain(&sec.blocks));
             }
         }
     }

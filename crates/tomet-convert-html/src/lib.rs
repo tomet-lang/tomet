@@ -26,7 +26,7 @@ use crate::block::render_block;
 use crate::footnotes::render_footnotes;
 use crate::headings::HeadingState;
 use crate::util::{escape_attr, escape_html};
-use tomet_ast::{Document, Inline, Value};
+use tomet_ast::{Block, Document, Value};
 use tomet_semantics::{Bindings, FootnoteRegistry, builtin_doc_vocabularies};
 
 const DEFAULT_STYLE: &str = "\
@@ -106,8 +106,13 @@ pub struct CustomElementCtx<'a> {
     /// The dotted or bare name [`classify_std_lenient`] fell back to
     /// (`"doc.icon"`, `"my-widget"`, ...).
     pub kind: &'a str,
-    /// The element's bracketed `[content]`, already parsed as inline nodes.
-    pub content: Option<&'a [Inline]>,
+    /// The element's bracketed `[content]`, as parsed blocks (`Vec<Block>`
+    /// now -- see `tmtroot/docs/spec/feature/content-shape.tmt`). Ordinary
+    /// inline usage is still exactly one `Block::Paragraph`; a hook that
+    /// only ever handled plain inline content can match that one case and
+    /// read `Block::Paragraph(p) => &p.content` for the same `&[Inline]`
+    /// it used to get directly.
+    pub content: Option<&'a [Block]>,
     /// Whether this element sits inline in running text (`span`) or as a
     /// block (`div`) -- the same distinction `render_generic_element` uses.
     pub inline: bool,
@@ -117,7 +122,7 @@ pub struct CustomElementCtx<'a> {
 impl<'a> CustomElementCtx<'a> {
     pub fn new(
         kind: &'a str,
-        content: Option<&'a [Inline]>,
+        content: Option<&'a [Block]>,
         inline: bool,
         normalize_args: impl Fn() -> Option<Value> + 'a,
     ) -> Self {

@@ -631,8 +631,8 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
     if let Some(content) = &el.content {
         indent(out, depth + 1);
         out.push_str("content\n");
-        for inline in content {
-            dump_inline(out, inline, depth + 2);
+        for block in content {
+            dump_block(out, block, depth + 2);
         }
     }
     match &el.value {

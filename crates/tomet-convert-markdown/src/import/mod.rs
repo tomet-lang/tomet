@@ -106,6 +106,20 @@ pub struct ImportOptions {
     pub table_align: Option<String>,
 }
 
+/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>` now):
+/// one `Paragraph`, or nothing for an empty sequence. Every `Frame`
+/// accumulates `Vec<Inline>` internally (unchanged -- see the module doc's
+/// note on block quotes/list items flattening to one inline run on
+/// import), so this is the single place that adapts all of them to the
+/// new field type without changing what any of them actually produce.
+fn wrap_inline_content(inlines: Vec<Inline>) -> Vec<Block> {
+    if inlines.is_empty() {
+        Vec::new()
+    } else {
+        vec![Block::Paragraph(Paragraph::new(inlines, Span::dummy()))]
+    }
+}
+
 pub fn from_markdown(src: &str) -> Document {
     from_markdown_with_options(src, &ImportOptions::default())
 }
@@ -369,7 +383,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     sigil: Sigil::named("callout"),
                     placement: Placement::Block,
                     args: Some(args),
-                    content: Some(content),
+                    content: Some(wrap_inline_content(content)),
                     children: None,
                     value: None,
                     id: None,
@@ -382,7 +396,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     sigil: Sigil::named("quote"),
                     placement: Placement::Block,
                     args: None,
-                    content: Some(content),
+                    content: Some(wrap_inline_content(content)),
                     children: None,
                     value: None,
                     id: None,
@@ -405,7 +419,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 sigil: Sigil::named("raw"),
                 placement: Placement::Block,
                 args,
-                content: Some(vec![Inline::Raw(RawText::new(text, Span::dummy()))]),
+                content: Some(vec![Block::Paragraph(Paragraph::new(vec![Inline::Raw(RawText::new(text, Span::dummy()))], Span::dummy()))]),
                 children: None,
                 value: None,
                 id: None,
@@ -483,7 +497,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     content.remove(0);
                 }
                 items.push(element_list_item(
-                    content,
+                    wrap_inline_content(content),
                     marker,
                     None,
                     None,
@@ -514,7 +528,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     "target".to_string(),
                     Value::String(dest),
                 )])),
-                content: Some(inlines),
+                content: Some(wrap_inline_content(inlines)),
                 children: None,
                 value: None,
                 id: None,
@@ -524,7 +538,11 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             push_inline(stack, Inline::Element(el));
         }
         (Frame::Image { dest, alt }, TagEnd::Image) => {
-            let content = if alt.is_empty() { None } else { Some(alt) };
+            let content = if alt.is_empty() {
+                None
+            } else {
+                Some(wrap_inline_content(alt))
+            };
             let el = Element {
                 sigil: Sigil::named("embed"),
                 placement: Placement::Inline,
@@ -603,12 +621,28 @@ fn inlines_display_width(inlines: &[Inline]) -> usize {
             Inline::LineBreak(_) => {}
             Inline::Element(el) => {
                 if let Some(content) = &el.content {
-                    len += inlines_display_width(content);
+                    len += blocks_display_width(content);
                 }
             }
         }
     }
     len
+}
+
+/// [`inlines_display_width`] over `Element.content`'s `Vec<Block>` shape.
+fn blocks_display_width(blocks: &[Block]) -> usize {
+    blocks
+        .iter()
+        .map(|block| match block {
+            Block::Paragraph(p) => inlines_display_width(&p.content),
+            Block::Element(el) => el
+                .content
+                .as_deref()
+                .map(blocks_display_width)
+                .unwrap_or(0),
+            Block::Section(sec) => inlines_display_width(&sec.title),
+        })
+        .sum()
 }
 
 fn build_table_element(
@@ -619,7 +653,7 @@ fn build_table_element(
     let mut content_inlines = Vec::new();
     if rows.is_empty() {
         let mut el = element_new(Sigil::named("table")).with_placement(Placement::Block);
-        el.content = Some(content_inlines);
+        el.content = Some(wrap_inline_content(content_inlines));
         return el;
     }
 
@@ -735,7 +769,7 @@ fn build_table_element(
     }
 
     let mut el = element_new(Sigil::named("table")).with_placement(Placement::Block);
-    el.content = Some(content_inlines);
+    el.content = Some(wrap_inline_content(content_inlines));
     el
 }
 
@@ -744,7 +778,7 @@ fn wrap_inline(tag: &str, content: Vec<Inline>) -> Inline {
         sigil: Sigil::named(tag),
         placement: Placement::Inline,
         args: None,
-        content: Some(content),
+        content: Some(wrap_inline_content(content)),
         children: None,
         value: None,
         id: None,
@@ -845,6 +879,20 @@ fn push_block(stack: &mut [Frame], block: Block) {
     }
 }
 
+/// Flattens an `Element.content` (`Vec<Block>` now) down to one inline
+/// run, by folding each block in with [`merge_block_into`] -- used where
+/// this importer already flattens surrounding structure to a single
+/// inline run (blockquotes, a heading/list merged into one) and now needs
+/// to do the same to a nested element's own content, which is no longer
+/// `Vec<Inline>` by construction.
+fn blocks_to_flat_inlines(blocks: Vec<Block>) -> Vec<Inline> {
+    let mut out = Vec::new();
+    for block in blocks {
+        merge_block_into(&mut out, block);
+    }
+    out
+}
+
 fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
     match block {
         Block::Paragraph(p) => extend_spaced(content, p.content),
@@ -853,7 +901,7 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
         // as a nested `Inline::Element`, which is what the generic
         // `Block::Element` arm below would do.
         Block::Element(el) if classify_std_lenient(&el) == ElementKind::Heading => {
-            extend_spaced(content, el.content.unwrap_or_default())
+            extend_spaced(content, blocks_to_flat_inlines(el.content.unwrap_or_default()))
         }
         // A list merged into flattened blockquote content (blockquotes
         // have no sibling-`children` concept, unlike `Item`) has each of
@@ -864,7 +912,10 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
                     tomet_ast::Entry::Element(el) => Some(el),
                     tomet_ast::Entry::Pair(..) => None,
                 }) {
-                    extend_spaced(content, item.content.unwrap_or_default());
+                    extend_spaced(
+                        content,
+                        blocks_to_flat_inlines(item.content.unwrap_or_default()),
+                    );
                 }
             }
         }
@@ -894,6 +945,25 @@ fn extend_spaced(content: &mut Vec<Inline>, more: Vec<Inline>) {
 mod tests {
     use super::*;
     use tomet_semantics::list_items;
+
+    /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`
+    /// now) -- every fixture below is still just one paragraph's worth.
+    fn wrap(inlines: Vec<Inline>) -> Option<Vec<Block>> {
+        Some(vec![Block::Paragraph(Paragraph::new(
+            inlines,
+            Span::dummy(),
+        ))])
+    }
+
+    /// The single paragraph's own `Vec<Inline>` inside `Element.content`
+    /// (`Vec<Block>` now) -- several fixtures below build up content as a
+    /// flat inline run (table cells) and still index into it that way.
+    fn para_inlines(blocks: &[Block]) -> &[Inline] {
+        match blocks {
+            [Block::Paragraph(p)] => &p.content,
+            _ => panic!("expected a single paragraph, got {blocks:?}"),
+        }
+    }
 
     #[test]
     fn heading_and_paragraph() {
@@ -947,11 +1017,11 @@ mod tests {
                 let items = list_items(list);
                 assert_eq!(
                     items[0].content,
-                    Some(vec![Inline::Text(Text::new("one", Span::dummy()))])
+                    wrap(vec![Inline::Text(Text::new("one", Span::dummy()))])
                 );
                 assert_eq!(
                     items[1].content,
-                    Some(vec![Inline::Text(Text::new("two", Span::dummy()))])
+                    wrap(vec![Inline::Text(Text::new("two", Span::dummy()))])
                 );
             }
             other => panic!("expected list, got {other:?}"),
@@ -976,7 +1046,7 @@ mod tests {
                 assert_eq!(items.len(), 2);
                 assert_eq!(
                     items[0].content,
-                    Some(vec![Inline::Text(Text::new("a", Span::dummy()))])
+                    wrap(vec![Inline::Text(Text::new("a", Span::dummy()))])
                 );
                 let children = items[0].children.as_ref().expect("nested sub-list");
                 assert_eq!(children.len(), 1);
@@ -987,11 +1057,11 @@ mod tests {
                 assert_eq!(sub_items.len(), 1);
                 assert_eq!(
                     sub_items[0].content,
-                    Some(vec![Inline::Text(Text::new("b", Span::dummy()))])
+                    wrap(vec![Inline::Text(Text::new("b", Span::dummy()))])
                 );
                 assert_eq!(
                     items[1].content,
-                    Some(vec![Inline::Text(Text::new("c", Span::dummy()))])
+                    wrap(vec![Inline::Text(Text::new("c", Span::dummy()))])
                 );
             }
             other => panic!("expected list, got {other:?}"),
@@ -1014,7 +1084,7 @@ mod tests {
                     );
                     assert_eq!(
                         el.content,
-                        Some(vec![Inline::Text(Text::new("Wiki", Span::dummy()))])
+                        wrap(vec![Inline::Text(Text::new("Wiki", Span::dummy()))])
                     );
                 }
                 other => panic!("expected element, got {other:?}"),
@@ -1051,7 +1121,7 @@ mod tests {
                     );
                     assert_eq!(
                         el.content,
-                        Some(vec![Inline::Text(Text::new("a cat", Span::dummy()))])
+                        wrap(vec![Inline::Text(Text::new("a cat", Span::dummy()))])
                     );
                 }
                 other => panic!("expected element, got {other:?}"),
@@ -1084,7 +1154,7 @@ mod tests {
                 );
                 assert_eq!(
                     el.content,
-                    Some(vec![Inline::Raw(RawText::new(
+                    wrap(vec![Inline::Raw(RawText::new(
                         "fn main() {}",
                         Span::dummy()
                     ))])
@@ -1103,7 +1173,7 @@ mod tests {
                 assert_eq!(el.args, None);
                 assert_eq!(
                     el.content,
-                    Some(vec![Inline::Text(Text::new("quoted text", Span::dummy()))])
+                    wrap(vec![Inline::Text(Text::new("quoted text", Span::dummy()))])
                 );
             }
             other => panic!("expected blockquote element, got {other:?}"),
@@ -1122,7 +1192,7 @@ mod tests {
         match &doc.blocks[0] {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::named("quote"));
-                let content = el.content.as_ref().expect("content");
+                let content = para_inlines(el.content.as_ref().expect("content"));
                 assert!(
                     !content
                         .iter()
@@ -1175,9 +1245,11 @@ mod tests {
             };
             let has_raw = p.content.iter().any(|inl| match inl {
                 Inline::Element(el) if el.sigil.is_bare_named("raw") => {
-                    el.content.as_ref().is_some_and(|c| match &c[0] {
-                        Inline::Raw(r) => r.value == expected_code,
-                        _ => false,
+                    el.content.as_ref().is_some_and(|c| {
+                        match para_inlines(c).first() {
+                            Some(Inline::Raw(r)) => r.value == expected_code,
+                            _ => false,
+                        }
                     })
                 }
                 _ => false,
@@ -1275,7 +1347,7 @@ mod tests {
         );
         assert_eq!(
             el2.content,
-            Some(vec![Inline::Text(Text::new("display", Span::dummy()))])
+            wrap(vec![Inline::Text(Text::new("display", Span::dummy()))])
         );
 
         assert_eq!(
@@ -1310,7 +1382,7 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(
             items[0].content,
-            Some(vec![Inline::Text(Text::new("a", Span::dummy()))])
+            wrap(vec![Inline::Text(Text::new("a", Span::dummy()))])
         );
         let children = items[0].children.as_ref().expect("nested sub-list");
         assert_eq!(children.len(), 1);
@@ -1321,7 +1393,7 @@ mod tests {
         assert_eq!(sub_items.len(), 1);
         assert_eq!(
             sub_items[0].content,
-            Some(vec![Inline::Text(Text::new("b", Span::dummy()))])
+            wrap(vec![Inline::Text(Text::new("b", Span::dummy()))])
         );
     }
 
@@ -1332,7 +1404,7 @@ mod tests {
         let Block::Element(el) = &doc.blocks[0] else {
             panic!("expected element");
         };
-        let content = el.content.as_ref().unwrap();
+        let content = para_inlines(el.content.as_ref().unwrap());
         let cell1_prefix = match &content[1] {
             Inline::Text(t) => &t.value,
             _ => "",
@@ -1353,7 +1425,7 @@ mod tests {
         let Block::Element(el) = &doc.blocks[0] else {
             panic!("expected element");
         };
-        let content = el.content.as_ref().unwrap();
+        let content = para_inlines(el.content.as_ref().unwrap());
         // Row 0 cell 1 ("sdfasdf" len 7 vs max len 10 "sdfddfasdf"): target_width 12, extra 5 -> left 2, right 3
         let row0_cell1_suffix = match &content[6] {
             Inline::Text(t) => &t.value,
@@ -1375,7 +1447,7 @@ mod tests {
         let Block::Element(el) = &doc.blocks[0] else {
             panic!("expected element");
         };
-        let content = el.content.as_ref().unwrap();
+        let content = para_inlines(el.content.as_ref().unwrap());
         // Col 0 (殻): display width 2 vs K殻 width 3 (<= 5) -> padded!
         // Col 1 (n): len 1 (<= 5) -> padded!
         // Col 2 (suborbitals): len > 5 -> NOT padded (stays "[ " and " ]")
@@ -1399,7 +1471,7 @@ mod tests {
         let Block::Element(el) = &doc.blocks[0] else {
             panic!("expected element");
         };
-        let content = el.content.as_ref().unwrap();
+        let content = para_inlines(el.content.as_ref().unwrap());
         let rendered: String = content
             .iter()
             .map(|inl| match inl {
@@ -1442,27 +1514,27 @@ mod tests {
         assert_eq!(items[0].args, Some(Value::String("x".to_string())));
         assert_eq!(
             items[0].content,
-            Some(vec![Inline::Text(Text::new("task1", Span::dummy()))])
+            wrap(vec![Inline::Text(Text::new("task1", Span::dummy()))])
         );
         assert_eq!(items[1].args, Some(Value::String(" ".to_string())));
         assert_eq!(
             items[1].content,
-            Some(vec![Inline::Text(Text::new("task2", Span::dummy()))])
+            wrap(vec![Inline::Text(Text::new("task2", Span::dummy()))])
         );
         assert_eq!(items[2].args, Some(Value::String("c".to_string())));
         assert_eq!(
             items[2].content,
-            Some(vec![Inline::Text(Text::new("con item", Span::dummy()))])
+            wrap(vec![Inline::Text(Text::new("con item", Span::dummy()))])
         );
         assert_eq!(items[3].args, Some(Value::String("p".to_string())));
         assert_eq!(
             items[3].content,
-            Some(vec![Inline::Text(Text::new("pro item", Span::dummy()))])
+            wrap(vec![Inline::Text(Text::new("pro item", Span::dummy()))])
         );
         assert_eq!(items[4].args, Some(Value::String("x".to_string())));
         assert_eq!(
             items[4].content,
-            Some(vec![Inline::Text(Text::new("task3", Span::dummy()))])
+            wrap(vec![Inline::Text(Text::new("task3", Span::dummy()))])
         );
     }
 
@@ -1487,7 +1559,7 @@ mod tests {
         );
         assert_eq!(
             embed1.content,
-            Some(vec![Inline::Text(Text::new("display", Span::dummy()))])
+            wrap(vec![Inline::Text(Text::new("display", Span::dummy()))])
         );
 
         let Inline::Element(embed2) = &p.content[2] else {
@@ -1503,7 +1575,7 @@ mod tests {
         );
         assert_eq!(
             embed2.content,
-            Some(vec![Inline::Text(Text::new("display", Span::dummy()))])
+            wrap(vec![Inline::Text(Text::new("display", Span::dummy()))])
         );
     }
 
@@ -1624,7 +1696,7 @@ mod tests {
         let Block::Element(el) = &doc.blocks[0] else {
             panic!("expected element");
         };
-        let content = el.content.as_ref().unwrap();
+        let content = para_inlines(el.content.as_ref().unwrap());
         let Inline::Text(t) = &content[0] else {
             panic!("expected text");
         };

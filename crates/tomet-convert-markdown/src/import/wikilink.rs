@@ -26,8 +26,10 @@ fn post_process_block_wikilinks(block: &mut Block) {
                     tomet_ast::Entry::Element(el) => Some(el),
                     tomet_ast::Entry::Pair(..) => None,
                 }) {
-                    if let Some(content) = item.content.take() {
-                        item.content = Some(post_process_inlines_wikilinks(content));
+                    if let Some(content) = &mut item.content {
+                        for block in content.iter_mut() {
+                            post_process_block_wikilinks(block);
+                        }
                     }
                     if let Some(children) = &mut item.children {
                         for child in children {
@@ -53,8 +55,10 @@ fn post_process_element_wikilinks(el: &mut Element) {
     if el.sigil.is_bare_named("raw") {
         return;
     }
-    if let Some(content) = el.content.take() {
-        el.content = Some(post_process_inlines_wikilinks(content));
+    if let Some(content) = &mut el.content {
+        for block in content.iter_mut() {
+            post_process_block_wikilinks(block);
+        }
     }
 }
 
@@ -220,8 +224,11 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
                 "target".to_string(),
                 Value::String(target_key_value(target)),
             )]));
-            el.content = Some(vec![Inline::Text(Text::new(
-                enclose_sigils_in_backticks(display),
+            el.content = Some(vec![Block::Paragraph(tomet_ast::Paragraph::new(
+                vec![Inline::Text(Text::new(
+                    enclose_sigils_in_backticks(display),
+                    Span::dummy(),
+                ))],
                 Span::dummy(),
             ))]);
             el

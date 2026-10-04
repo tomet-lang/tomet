@@ -34,7 +34,7 @@ fn parses_link_with_order_free_groups() {
                     Value::String("https://example.com".into())
                 )]))
             );
-            assert_eq!(el.content, Some(vec![Inline::Text("Wiki".into())]));
+            assert_eq!(el.content, wrap(vec![Inline::Text("Wiki".into())]));
         }
         other => panic!("expected element, got {other:?}"),
     }
@@ -52,7 +52,7 @@ fn parses_links_container_with_bare_children() {
                     assert_eq!(children.len(), 2);
                     assert_eq!(children[0].sigil, Sigil::Bare);
                     assert_eq!(children[0].args, Some(Value::Int(1)));
-                    assert_eq!(children[0].content, Some(vec![Inline::Text("note".into())]));
+                    assert_eq!(children[0].content, wrap(vec![Inline::Text("note".into())]));
                     assert_eq!(children[1].args, Some(Value::String("anotation1".into())));
                 }
                 other => panic!("expected children, got {other:?}"),
@@ -68,7 +68,7 @@ fn parses_caution_as_typed_element_not_bare_bracket() {
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("caution"));
-            assert_eq!(el.content, Some(vec![Inline::Text("be careful".into())]));
+            assert_eq!(el.content, wrap(vec![Inline::Text("be careful".into())]));
         }
         other => panic!("expected element, got {other:?}"),
     }

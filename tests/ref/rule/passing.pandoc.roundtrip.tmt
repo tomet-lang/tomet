@@ -1,4 +1,3 @@
 @section[@card[First entry.]{ title: Alpha }
-
 @card[Second entry.]{ title: Beta }
 ]{ id: entries }

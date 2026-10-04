@@ -86,7 +86,7 @@ fn a_bare_bracket_pair_inside_a_content_no_longer_truncates_it() {
         Block::Element(el) => {
             assert_eq!(
                 el.content,
-                Some(vec![
+                wrap(vec![
                     Inline::Text("line one".into()),
                     sb(),
                     Inline::Text("line two with * and [brackets] inside".into()),
@@ -171,7 +171,7 @@ fn a_comment_between_groups_does_not_detach_the_next_group() {
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(el.args, Some(Value::Map(vec![("a".into(), Value::Int(1))])));
-            assert_eq!(el.content, Some(vec![Inline::Text("content".into())]));
+            assert_eq!(el.content, wrap(vec![Inline::Text("content".into())]));
         }
         other => panic!("expected an element with both groups, got {other:?}"),
     }

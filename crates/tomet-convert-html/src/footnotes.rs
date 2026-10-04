@@ -1,7 +1,7 @@
 //! The footnotes section written after the body.
 
 use crate::RenderCtx;
-use crate::block::{render_block, render_inlines};
+use crate::block::{render_block, render_content_blocks};
 use crate::headings::HeadingState;
 
 pub(crate) fn render_footnotes(cx: &RenderCtx, out: &mut String) {
@@ -14,7 +14,7 @@ pub(crate) fn render_footnotes(cx: &RenderCtx, out: &mut String) {
         let mut content_html = String::new();
         if let Some(def_el) = &item.definition {
             if let Some(content) = &def_el.content {
-                render_inlines(cx, content, &mut content_html);
+                render_content_blocks(cx, content, &mut content_html);
             }
             if let Some(children) = &def_el.children {
                 for child in children {

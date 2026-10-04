@@ -9,7 +9,7 @@ use crate::value::{
     parse_quoted, parse_value_at, skip_block_comment, skip_inline_ws, skip_line_comment,
     skip_ws_newlines_and_comments,
 };
-use tomet_ast::{Element, ElementValue, Entry, Id, Inline, Placement, Sigil, Value};
+use tomet_ast::{Block, Element, ElementValue, Entry, Id, Inline, Paragraph, Placement, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -683,28 +683,76 @@ fn parse_id_scalar(cur: &mut Cursor) -> Result<String> {
     Ok(raw.to_string())
 }
 
-/// Parses a `|`-prefixed content run: `[content]` spelled without brackets.
+/// Parses a `|`-prefixed content run: `[content]` spelled without brackets,
+/// as a block sequence.
 ///
-/// Nothing about the content is decided here. The run's text is the same
-/// contiguous slice of source it would be between brackets, and
-/// `normalize_text` folds each marker away with the newline it follows, so
-/// line joining, whitespace, and every element's own reading of its content
-/// are inherited rather than restated. A `|` run and the bracketed form of
-/// the same content parse to the same tree, and `tests/src/pipe.rs` pins
-/// that.
-fn parse_pipe_content(cur: &mut Cursor) -> Result<Vec<Inline>> {
+/// A marked line that bare-opens a block element (`@name...` ending its
+/// own line, same test `document.rs`'s own top-level loop uses) becomes its
+/// own `Block::Element`, exactly as it would inside `[...]` -- this is what
+/// keeps `tests/src/pipe.rs`'s parity check passing for something like
+/// `@references` holding several `@link`s in a row, each its own block
+/// rather than all three merged into one `Paragraph` by `SoftBreak`s. A
+/// line that is the marker alone, nothing after it, ends the current
+/// paragraph without ending the run -- the only way `|content` expresses
+/// more than one paragraph, since a line with no marker at all always ends
+/// the whole run (`crate::inline::PipeContinuation`).
+///
+/// Multi-level nesting (an element's own `|content` living inside another
+/// element's `|content`, each level adding its own marker column) is not
+/// handled here -- see `.agents/tasks/nested-pipe-markers.md`.
+fn parse_pipe_content(cur: &mut Cursor) -> Result<Vec<Block>> {
     let (_, col) = cur.line_col(cur.pos());
     if !cur.eat_str("|") {
         return Err(err(cur, cur.pos(), "expected '|'"));
     }
-    parse_inline_seq(cur, Stop::PipeRun { col }, true)
+    let mut blocks = Vec::new();
+    loop {
+        skip_inline_ws(cur);
+        if cur.peek() == Some('@')
+            && is_element_start(cur, true)
+            && element_ends_line(cur) == LineEnd::Bare
+        {
+            let el = parse_element(cur, true)?.with_placement(Placement::Block);
+            blocks.push(Block::Element(el));
+        } else {
+            let para_start = cur.pos();
+            let content = parse_inline_seq(cur, Stop::PipeRun { col }, true)?;
+            if !content.is_empty() {
+                let span = cur.span_from(para_start);
+                blocks.push(Block::Paragraph(Paragraph::new(content, span)));
+            }
+        }
+        if cur.is_eof() {
+            break;
+        }
+        // After either branch, `cur` sits at the `\n` that ends the line
+        // just consumed (a bare element's own line has nothing else on
+        // it; `Stop::PipeRun` only ever stops at `\n` or EOF, handled
+        // above) -- the next thing to check either way.
+        match crate::inline::pipe_run_state(cur, col)? {
+            crate::inline::PipeContinuation::End => break,
+            crate::inline::PipeContinuation::Empty | crate::inline::PipeContinuation::Content => {
+                cur.bump(); // the newline
+                skip_inline_ws(cur);
+                cur.bump(); // the marker itself
+                skip_inline_ws(cur);
+            }
+        }
+    }
+    Ok(blocks)
 }
 
-fn parse_content(cur: &mut Cursor) -> Result<Vec<Inline>> {
+/// Parses a `[content]` group as a block sequence -- the same recursive
+/// grammar `Document.blocks`/`Section.blocks` use (sections, lists,
+/// elements, paragraphs), bounded by the closing `]` instead of EOF. A bare
+/// run with no block markers inside comes out as a single `Paragraph`, so
+/// ordinary inline usage (`@link(...)[Tomet]`) is unaffected; see
+/// `tmtroot/docs/spec/feature/content-shape.tmt`.
+fn parse_content(cur: &mut Cursor) -> Result<Vec<Block>> {
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '['"));
     }
-    let content = parse_inline_seq(cur, Stop::Bracket(']'), true)?;
+    let content = crate::document::parse_block_seq(cur, crate::document::BlockStop::Bracket(']'))?;
     if !cur.eat_str("]") {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }

@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use tomet_ast::{Document, Element, Inline, Text, Value};
+use tomet_ast::{Block, Document, Element, Inline, Paragraph, Span, Text, Value};
 use tomet_semantics::{
     ElementKind, TargetScheme, classify_std_lenient, link_target, target_scheme,
 };
@@ -187,13 +187,19 @@ pub fn resolve_document_links<F>(
         if kind == ElementKind::Link {
             let has_content = el.content.as_ref().is_some_and(|c| {
                 !c.is_empty()
-                    && c.iter().any(|inline| match inline {
-                        Inline::Text(t) => !t.value.trim().is_empty(),
+                    && c.iter().any(|block| match block {
+                        Block::Paragraph(p) => p.content.iter().any(|inline| match inline {
+                            Inline::Text(t) => !t.value.trim().is_empty(),
+                            _ => true,
+                        }),
                         _ => true,
                     })
             });
             if !has_content {
-                el.content = Some(vec![Inline::Text(Text::from(fallback_label))]);
+                el.content = Some(vec![Block::Paragraph(Paragraph::new(
+                    vec![Inline::Text(Text::from(fallback_label))],
+                    Span::dummy(),
+                ))]);
             }
         }
     });
@@ -360,10 +366,16 @@ mod tests {
             if el.sigil.is_bare_named("link") {
                 let content_str = el.content.as_ref().map(|c| {
                     c.iter()
-                        .map(|inline| match inline {
-                            Inline::Text(t) => t.value.as_str(),
-                            _ => "",
+                        .filter_map(|block| match block {
+                            Block::Paragraph(p) => Some(p.content.iter().map(|inline| {
+                                match inline {
+                                    Inline::Text(t) => t.value.as_str(),
+                                    _ => "",
+                                }
+                            })),
+                            _ => None,
                         })
+                        .flatten()
                         .collect::<String>()
                 });
                 labels.push(content_str);

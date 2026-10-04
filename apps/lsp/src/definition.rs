@@ -102,14 +102,10 @@ fn find_def_in_element(el: &Element, target_id: &str) -> Option<Span> {
     if el.id.as_ref().is_some_and(|id| id.0 == target_id) {
         return Some(el.span);
     }
-    if let Some(content) = &el.content {
-        for inline in content {
-            if let tomet_ast::Inline::Element(child_el) = inline
-                && let Some(span) = find_def_in_element(child_el, target_id)
-            {
-                return Some(span);
-            }
-        }
+    if let Some(content) = &el.content
+        && let Some(span) = find_def_in_blocks(content, target_id)
+    {
+        return Some(span);
     }
     if let Some(children) = &el.children
         && let Some(span) = find_def_in_blocks(children, target_id)

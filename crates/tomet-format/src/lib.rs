@@ -699,9 +699,9 @@ fn check_and_swap_element(el: &Element, src: &str, config: &PrinterConfig) -> Op
     }
 
     // 2. Otherwise recursively check children
-    if let Some(inlines) = &el.content {
-        for inline in inlines {
-            if let Some(swapped) = find_swap_in_inline(inline, src, config) {
+    if let Some(blocks) = &el.content {
+        for block in blocks {
+            if let Some(swapped) = find_swap_in_block(block, src, config) {
                 return Some(swapped);
             }
         }
@@ -872,20 +872,21 @@ fn collect_fence_spans(src: &str, out: &mut Vec<(usize, usize)>) {
 fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
     fn walk_element(el: &Element, out: &mut Vec<(usize, usize)>) {
         if is_raw_element(el)
-            && let Some(inlines) = &el.content
+            && let Some(blocks) = &el.content
         {
-            for inline in inlines {
-                let span = inline.span();
-                if span.start.offset < span.end.offset {
-                    out.push((span.start.offset, span.end.offset));
+            for block in blocks {
+                let Block::Paragraph(p) = block else { continue };
+                for inline in &p.content {
+                    let span = inline.span();
+                    if span.start.offset < span.end.offset {
+                        out.push((span.start.offset, span.end.offset));
+                    }
                 }
             }
         }
-        if let Some(inlines) = &el.content {
-            for inline in inlines {
-                if let Inline::Element(child_el) = inline {
-                    walk_element(child_el, out);
-                }
+        if let Some(blocks) = &el.content {
+            for block in blocks {
+                walk_block(block, out);
             }
         }
         if let Some(children) = &el.children {

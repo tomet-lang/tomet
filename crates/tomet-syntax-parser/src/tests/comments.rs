@@ -119,7 +119,7 @@ fn inline_block_comment_works_inside_content() {
     let doc = parse_document("@caution[ keep /* drop */ this ]\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.content, Some(vec![Inline::Text("keep  this".into())]));
+            assert_eq!(el.content, wrap(vec![Inline::Text("keep  this".into())]));
         }
         other => panic!("expected element, got {other:?}"),
     }
@@ -180,7 +180,7 @@ fn inline_double_slash_comment_works_inside_content() {
             // existed: back then that lone newline folded straight
             // into a literal `" "` `Text`, and `trim_edges` only ever
             // trimmed `Text`, so it stopped one node short.
-            assert_eq!(el.content, Some(vec![Inline::Text("keep".into())]));
+            assert_eq!(el.content, wrap(vec![Inline::Text("keep".into())]));
         }
         other => panic!("expected element, got {other:?}"),
     }
@@ -188,23 +188,28 @@ fn inline_double_slash_comment_works_inside_content() {
 
 #[test]
 fn a_double_slash_line_inside_a_multiline_content_is_a_comment() {
-    // Unlike a top-level paragraph, `[content]` content has no block-level
-    // dispatch of its own -- a `//` starting a line inside it is only
-    // recognized because the preceding newline counts as a boundary,
-    // same rule as a same-line trailing comment.
+    // `[content]` is parsed as a real block sequence now (the same
+    // grammar `Document.blocks`/`Section.blocks` use), so a `//` line
+    // inside it ends the current paragraph exactly the way it does at
+    // the top level (`paragraph_breaks_here`) -- a comment is no longer
+    // specially transparent glue inside content the way it was when
+    // content had no block-level dispatch of its own. "keep"/"keep2"
+    // land in two separate `Paragraph`s, not one inline run joined by a
+    // `SoftBreak`.
     let doc = parse_document("@caution[\n  keep\n  // drop this line\n  keep2\n]\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            // Two flushes (before/after the elided comment line) each
-            // end/start with a break; `push_soft_break` merges them
-            // into the one `SoftBreak` a reader actually sees between
-            // `keep` and `keep2`, rather than leaving two adjacent ones.
             assert_eq!(
                 el.content,
                 Some(vec![
-                    Inline::Text("keep".into()),
-                    sb(),
-                    Inline::Text("keep2".into())
+                    Block::Paragraph(Paragraph::new(
+                        vec![Inline::Text("keep".into())],
+                        Span::dummy()
+                    )),
+                    Block::Paragraph(Paragraph::new(
+                        vec![Inline::Text("keep2".into())],
+                        Span::dummy()
+                    )),
                 ])
             );
         }

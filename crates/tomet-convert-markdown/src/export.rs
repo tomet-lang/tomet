@@ -101,7 +101,7 @@ fn render_list_with_indent(cx: &MarkdownCtx, el: &Element, indent: usize, out: &
         // `args` (the `(...)` marker `Value`) has no CommonMark equivalent
         // -- dropped on export, same as this crate's other documented
         // lossy cases (see the module doc).
-        out.push_str(&inline_to_md(cx, item.content.as_deref().unwrap_or(&[])));
+        out.push_str(&blocks_to_md(cx, item.content.as_deref().unwrap_or(&[])));
         out.push('\n');
         if let Some(children) = &item.children {
             for child in children {
@@ -113,6 +113,21 @@ fn render_list_with_indent(cx: &MarkdownCtx, el: &Element, indent: usize, out: &
             }
         }
     }
+}
+
+/// `Element.content` (`Vec<Block>`) to CommonMark. The common case --
+/// exactly one plain paragraph, what ordinary inline usage always parses
+/// to -- delegates straight to `inline_to_md` on that paragraph's own
+/// content; anything else falls back to `render_block` per block.
+fn blocks_to_md(cx: &MarkdownCtx, blocks: &[Block]) -> String {
+    if let [Block::Paragraph(p)] = blocks {
+        return inline_to_md(cx, &p.content);
+    }
+    let mut out = String::new();
+    for block in blocks {
+        render_block(cx, block, &mut out);
+    }
+    out
 }
 
 fn inline_to_md(cx: &MarkdownCtx, inlines: &[Inline]) -> String {
@@ -285,7 +300,7 @@ fn render_ruby(cx: &MarkdownCtx, el: &Element) -> String {
 fn content_to_md(cx: &MarkdownCtx, el: &Element) -> String {
     el.content
         .as_ref()
-        .map(|a| inline_to_md(cx, a))
+        .map(|a| blocks_to_md(cx, a))
         .unwrap_or_default()
 }
 
@@ -298,7 +313,7 @@ fn content_to_md(cx: &MarkdownCtx, el: &Element) -> String {
 fn render_heading(cx: &MarkdownCtx, el: &Element) -> String {
     let level = heading_level(el).unwrap_or(1) as usize;
     let content = el.content.as_deref().unwrap_or(&[]);
-    format!("{} {}", "#".repeat(level), inline_to_md(cx, content))
+    format!("{} {}", "#".repeat(level), blocks_to_md(cx, content))
 }
 
 fn render_hr(cx: &MarkdownCtx, el: &Element) -> String {
@@ -308,7 +323,7 @@ fn render_hr(cx: &MarkdownCtx, el: &Element) -> String {
         // divider silently exports as an `<h2>` -- the one shape this is
         // trying not to be.
         Some(title) if !title.is_empty() => {
-            format!("**{}**\n\n---", inline_to_md(cx, title))
+            format!("**{}**\n\n---", blocks_to_md(cx, title))
         }
         _ => "---".to_string(),
     }
@@ -321,7 +336,7 @@ fn render_raw(el: &Element, inline: bool) -> String {
     let code = el
         .content
         .as_ref()
-        .map(|a| inlines_to_plain(a))
+        .map(|a| blocks_to_plain(a))
         .unwrap_or_default();
     if inline {
         render_inline_raw(&code)
@@ -455,7 +470,7 @@ fn render_callout(cx: &MarkdownCtx, el: &Element) -> String {
 fn render_path(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
     let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let content = match &el.content {
-        Some(content) if !content.is_empty() => Some(inline_to_md(cx, content)),
+        Some(content) if !content.is_empty() => Some(blocks_to_md(cx, content)),
         _ => None,
     };
     if inline {
@@ -474,7 +489,7 @@ fn render_link(cx: &MarkdownCtx, el: &Element) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let text = match &el.content {
-        Some(content) if !content.is_empty() => inline_to_md(cx, content),
+        Some(content) if !content.is_empty() => blocks_to_md(cx, content),
         _ => String::new(),
     };
     match scheme {
@@ -512,9 +527,29 @@ fn render_embed(el: &Element) -> String {
     let alt = el
         .content
         .as_ref()
-        .map(|a| inlines_to_plain(a))
+        .map(|a| blocks_to_plain(a))
         .unwrap_or_default();
     format!("![{alt}]({src})")
+}
+
+/// [`inlines_to_plain`] over `Element.content`'s `Vec<Block>` shape.
+fn blocks_to_plain(blocks: &[Block]) -> String {
+    let mut s = String::new();
+    for block in blocks {
+        match block {
+            Block::Paragraph(p) => s.push_str(&inlines_to_plain(&p.content)),
+            Block::Element(el) => {
+                if let Some(content) = &el.content {
+                    s.push_str(&blocks_to_plain(content));
+                }
+            }
+            Block::Section(sec) => {
+                s.push_str(&inlines_to_plain(&sec.title));
+                s.push_str(&blocks_to_plain(&sec.blocks));
+            }
+        }
+    }
+    s
 }
 
 fn inlines_to_plain(inlines: &[Inline]) -> String {
@@ -531,7 +566,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
             Inline::LineBreak(_) => s.push(' '),
             Inline::Element(el) => {
                 if let Some(content) = &el.content {
-                    s.push_str(&inlines_to_plain(content));
+                    s.push_str(&blocks_to_plain(content));
                 }
             }
         }
@@ -566,7 +601,7 @@ fn render_footnotes(cx: &MarkdownCtx, out: &mut String) {
         let mut def_text = String::new();
         if let Some(def_el) = &item.definition {
             if let Some(content) = &def_el.content {
-                def_text.push_str(&inline_to_md(cx, content));
+                def_text.push_str(&blocks_to_md(cx, content));
             }
             if let Some(children) = &def_el.children {
                 for child in children {
@@ -610,7 +645,7 @@ fn render_generic(cx: &MarkdownCtx, el: &Element, kind: &str, inline: bool) -> S
     }
     out.push('>');
     if let Some(content) = &el.content {
-        out.push_str(&inline_to_md(cx, content));
+        out.push_str(&blocks_to_md(cx, content));
     }
     out.push_str(&format!("</{tag}>"));
     out
@@ -854,6 +889,12 @@ mod tests {
     use super::*;
     use tomet_ast::{Paragraph, Placement, RawText, Sigil, Span, Text};
 
+    /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`
+    /// now) -- every fixture below is still just one paragraph's worth.
+    fn wrap_content(inlines: Vec<Inline>) -> Vec<Block> {
+        vec![Block::Paragraph(Paragraph::new(inlines, Span::dummy()))]
+    }
+
     #[test]
     fn a_backtick_span_survives_export_unescaped() {
         // Tomet keeps `` `x` `` as literal text (the parser only shields
@@ -975,7 +1016,7 @@ mod tests {
             sigil: Sigil::named("heading"),
             placement: Placement::Block,
             args: Some(Value::Int(level)),
-            content: Some(content),
+            content: Some(wrap_content(content)),
             children: None,
             value: None,
             id: None,
@@ -1035,7 +1076,7 @@ mod tests {
                 true,
                 vec![
                     tomet_tree::element_list_item(
-                        vec![Inline::Text(Text::new("one", Span::dummy()))],
+                        wrap_content(vec![Inline::Text(Text::new("one", Span::dummy()))]),
                         None,
                         None,
                         None,
@@ -1043,7 +1084,7 @@ mod tests {
                         Span::dummy(),
                     ),
                     tomet_tree::element_list_item(
-                        vec![Inline::Text(Text::new("two", Span::dummy()))],
+                        wrap_content(vec![Inline::Text(Text::new("two", Span::dummy()))]),
                         None,
                         None,
                         None,
@@ -1067,7 +1108,7 @@ mod tests {
                         sigil: Sigil::named("em"),
                         placement: Placement::Inline,
                         args: None,
-                        content: Some(vec![Inline::Text(Text::new("a", Span::dummy()))]),
+                        content: Some(wrap_content(vec![Inline::Text(Text::new("a", Span::dummy()))])),
                         children: None,
                         value: None,
                         id: None,
@@ -1079,7 +1120,7 @@ mod tests {
                         sigil: Sigil::named("strong"),
                         placement: Placement::Inline,
                         args: None,
-                        content: Some(vec![Inline::Text(Text::new("b", Span::dummy()))]),
+                        content: Some(wrap_content(vec![Inline::Text(Text::new("b", Span::dummy()))])),
                         children: None,
                         value: None,
                         id: None,
@@ -1103,7 +1144,7 @@ mod tests {
                 "target".to_string(),
                 Value::String("https://example.com".to_string()),
             )])),
-            content: Some(vec![Inline::Text(Text::new("Wiki", Span::dummy()))]),
+            content: Some(wrap_content(vec![Inline::Text(Text::new("Wiki", Span::dummy()))])),
             children: None,
             value: None,
             id: None,
@@ -1129,7 +1170,7 @@ mod tests {
                 "target".to_string(),
                 Value::String("pic.png".to_string()),
             )])),
-            content: Some(vec![Inline::Text(Text::new("a cat", Span::dummy()))]),
+            content: Some(wrap_content(vec![Inline::Text(Text::new("a cat", Span::dummy()))])),
             children: None,
             value: None,
             id: None,
@@ -1155,7 +1196,7 @@ mod tests {
                 "lang".to_string(),
                 Value::String("rust".to_string()),
             )])),
-            content: Some(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))]),
+            content: Some(wrap_content(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))])),
             children: None,
             value: None,
             id: None,
@@ -1175,7 +1216,7 @@ mod tests {
             sigil: Sigil::named("raw"),
             placement: Placement::Inline,
             args: None,
-            content: Some(vec![Inline::Raw(RawText::new("foo()", Span::dummy()))]),
+            content: Some(wrap_content(vec![Inline::Raw(RawText::new("foo()", Span::dummy()))])),
             children: None,
             value: None,
             id: None,
@@ -1226,7 +1267,7 @@ mod tests {
     #[test]
     fn titled_thematic_break_is_not_a_setext_heading() {
         let mut el = tomet_tree::element_new(Sigil::named("hr"));
-        el.content = Some(vec![Inline::Text(Text::new("Title", Span::dummy()))]);
+        el.content = Some(wrap_content(vec![Inline::Text(Text::new("Title", Span::dummy()))]));
         let doc = Document {
             blocks: vec![Block::Element(el)],
             span: Span::dummy(),
@@ -1247,7 +1288,7 @@ mod tests {
             "target".to_string(),
             Value::String("ref:name".to_string()),
         )]));
-        el2.content = Some(vec![Inline::Text(Text::new("display", Span::dummy()))]);
+        el2.content = Some(wrap_content(vec![Inline::Text(Text::new("display", Span::dummy()))]));
 
         let doc = Document {
             blocks: vec![Block::Paragraph(Paragraph::new(
@@ -1266,10 +1307,10 @@ mod tests {
     #[test]
     fn table_exports_to_markdown() {
         let mut el = tomet_tree::element_new(Sigil::named("table"));
-        el.content = Some(vec![Inline::Text(Text::new(
+        el.content = Some(wrap_content(vec![Inline::Text(Text::new(
             "[ col1 ][ col2 ]\n[ val1 ][ val2 ]",
             Span::dummy(),
-        ))]);
+        ))]));
         let doc = Document {
             blocks: vec![Block::Element(el)],
             span: Span::dummy(),

@@ -188,8 +188,8 @@ fn evaluate_blocks(
                 }
             }
             Block::Element(el) => {
-                if let Some(inlines) = &mut el.content
-                    && evaluate_inlines(inlines, doc, config, ctx)
+                if let Some(content) = &mut el.content
+                    && evaluate_blocks(content, doc, config, ctx)
                 {
                     changed = true;
                 }

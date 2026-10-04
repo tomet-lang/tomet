@@ -62,7 +62,7 @@ fn collect_element_symbol(el: &Element, symbols: &mut Vec<DocumentSymbol>) {
     let kind = classify_std_lenient(el);
     let symbol = if kind == ElementKind::Heading {
         let level = heading_level(el).unwrap_or(1);
-        let title = extract_inlines_text(el.content.as_deref().unwrap_or(&[]));
+        let title = extract_blocks_text(el.content.as_deref().unwrap_or(&[]));
         let name = format!("{} {}", "=".repeat(level as usize), title);
         #[allow(deprecated)]
         DocumentSymbol {
@@ -76,7 +76,7 @@ fn collect_element_symbol(el: &Element, symbols: &mut Vec<DocumentSymbol>) {
             children: None,
         }
     } else if kind == ElementKind::Bare {
-        let text = extract_inlines_text(el.content.as_deref().unwrap_or(&[]));
+        let text = extract_blocks_text(el.content.as_deref().unwrap_or(&[]));
         let marker = list_item_marker_text(el);
         #[allow(deprecated)]
         DocumentSymbol {
@@ -106,8 +106,8 @@ fn collect_element_symbol(el: &Element, symbols: &mut Vec<DocumentSymbol>) {
     symbols.push(symbol);
 
     if let Some(content) = &el.content {
-        for inline in content {
-            collect_inline_symbols(inline, symbols);
+        for block in content {
+            collect_block_symbols(block, symbols);
         }
     }
     if let Some(children) = &el.children {
@@ -131,6 +131,23 @@ pub(crate) fn list_item_marker_text(item: &Element) -> String {
         return format!("({marker:?})");
     }
     "-".to_string()
+}
+
+/// [`extract_inlines_text`] over `Element.content`'s `Vec<Block>` shape.
+pub(crate) fn extract_blocks_text(blocks: &[Block]) -> String {
+    let mut out = String::new();
+    for block in blocks {
+        match block {
+            Block::Paragraph(p) => out.push_str(&extract_inlines_text(&p.content)),
+            Block::Element(el) => {
+                if let Some(content) = &el.content {
+                    out.push_str(&extract_blocks_text(content));
+                }
+            }
+            Block::Section(sec) => out.push_str(&extract_inlines_text(&sec.title)),
+        }
+    }
+    out
 }
 
 pub(crate) fn extract_inlines_text(inlines: &[Inline]) -> String {

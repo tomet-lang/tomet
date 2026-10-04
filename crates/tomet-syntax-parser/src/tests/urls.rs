@@ -124,7 +124,7 @@ fn code_span_does_not_autolink_bare_url() {
                     assert_eq!(el.placement, tomet_ast::Placement::Inline);
                     assert_eq!(
                         el.content,
-                        Some(vec![Inline::Raw("https://example.com".into())])
+                        wrap(vec![Inline::Raw("https://example.com".into())])
                     );
                 }
                 other => panic!("expected inline @raw element, got {other:?}"),

@@ -703,7 +703,23 @@ pub struct Element {
     pub sigil: Sigil,
     pub placement: Placement,
     pub args: Option<Value>,
-    pub content: Option<Vec<Inline>>,
+    /// `[content]` / `|content`, parsed with the exact same recursive block
+    /// grammar as `Document.blocks`/`Section.blocks`: a bare run with no
+    /// block markers becomes `[Paragraph(...)]`, and blank lines, `=[...]`
+    /// headings, lists etc. inside the brackets/pipe-run nest as their own
+    /// `Block`s, same as at the top level. Whether a *given* element's
+    /// vocabulary actually permits more than one block (or anything beyond
+    /// inline-shaped content) here is not this field's concern -- the
+    /// parser builds this uniformly, with no branch on the element's name,
+    /// and `tomet-semantics` enforces legality downstream (builtin
+    /// content-shape table for `BUILTIN_KINDS`, `@content{allow:}` for a
+    /// vocabulary's own elements). See `tmtroot/docs/spec/feature/
+    /// content-shape.tmt`.
+    pub content: Option<Vec<Block>>,
+    /// List items' nested sub-lists only (`crate::list`) -- a different
+    /// relationship from `content` even though both are `Vec<Block>`: this
+    /// is "what hangs below this item," not "this item's own body." Kept
+    /// as a separate field on purpose; do not fold it into `content`.
     pub children: Option<Vec<Block>>,
     pub value: Option<ElementValue>,
     pub id: Option<Id>,

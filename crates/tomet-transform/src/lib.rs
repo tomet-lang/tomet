@@ -102,7 +102,10 @@ mod tests {
         let items = ul_el.value.as_ref().unwrap().as_children();
         let item_el = items[0];
         let content = item_el.content.as_ref().unwrap();
-        let tomet_ast::Inline::Element(link_el) = &content[0] else {
+        let [Block::Paragraph(p)] = content.as_slice() else {
+            panic!()
+        };
+        let tomet_ast::Inline::Element(link_el) = &p.content[0] else {
             panic!()
         };
         assert_eq!(

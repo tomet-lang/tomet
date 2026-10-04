@@ -1,7 +1,7 @@
 //! Element dispatch: which renderer an element gets, and the generic
 //! `<div>`/`<span>` rendering of the ones with no fixed meaning.
 
-use crate::block::{push_span_attrs, render_inlines};
+use crate::block::push_span_attrs;
 use crate::link::{render_embed_element, render_link_element, render_path_element};
 use crate::table::render_table_element;
 use crate::text::{
@@ -122,7 +122,9 @@ pub(crate) fn render_content_or_fallback(
     out: &mut String,
 ) {
     match &el.content {
-        Some(content) if !content.is_empty() => render_inlines(cx, content, out),
+        Some(content) if !content.is_empty() => {
+            crate::block::render_content_blocks(cx, content, out)
+        }
         _ => out.push_str(&escape_html(fallback)),
     }
 }
@@ -143,7 +145,7 @@ fn render_generic_element(
     push_value_data_attrs(out, el);
     out.push('>');
     if let Some(content) = &el.content {
-        render_inlines(cx, content, out);
+        crate::block::render_content_blocks(cx, content, out);
     }
     if let Some(value) = &el.value {
         render_element_value(cx, value, out);

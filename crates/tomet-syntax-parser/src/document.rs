@@ -25,8 +25,47 @@ use tomet_tree::{ElementExt, element_list, element_new};
 pub fn parse_document(src: &str) -> Result<Document> {
     let mut cur = Cursor::new(src);
     let start_pos = cur.pos();
+    let blocks = parse_block_seq(&mut cur, BlockStop::Eof)?;
+    let span = cur.span_from(start_pos);
+    Ok(Document::new(blocks, span))
+}
+
+/// What ends a [`parse_block_seq`] run.
+///
+/// `Eof` is the top level (a whole document): nothing closes it but running
+/// out of source. `Bracket` is `[content]`'s own closing character (always
+/// `']'` today): the block sequence stops right before it, unconsumed, for
+/// the caller (`element::parse_content`) to eat, and running out of source
+/// first is an error, not a silent stop -- same asymmetry [`Stop::Bracket`]
+/// already has at the inline level.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum BlockStop {
+    Eof,
+    Bracket(char),
+}
+
+/// The block-sequence grammar shared by a whole document and by
+/// `[content]`: sections, lists, elements, fenced code, thematic breaks and
+/// paragraphs, orchestrated exactly the same way regardless of what bounds
+/// the sequence. A bounded call (`BlockStop::Bracket`) gets its own local
+/// `stack` -- a section opened inside `[content]` is fully closed by the
+/// time this returns, independent of whatever section the *enclosing*
+/// document is in the middle of.
+pub(crate) fn parse_block_seq(cur_ref: &mut Cursor, stop: BlockStop) -> Result<Vec<Block>> {
+    // The loop body below predates this function's extraction from
+    // `parse_document` and still borrows `cur` by value (`&cur`/`&mut cur`
+    // throughout) the way it did when `cur` was `parse_document`'s own
+    // local, owned `Cursor`. Shadowing with an owned copy here (`Cursor` is
+    // `Copy`) keeps that body byte-for-byte, rather than rewriting every
+    // borrow site -- `*cur_ref = cur` at the end writes the final position
+    // back for the caller.
+    let mut cur = *cur_ref;
     let mut doc_blocks: Vec<Block> = Vec::new();
     let mut stack: Vec<Section> = Vec::new();
+    let boundary = match stop {
+        BlockStop::Eof => None,
+        BlockStop::Bracket(c) => Some(c),
+    };
 
     loop {
         skip_ws_and_newlines(&mut cur);
@@ -38,8 +77,25 @@ pub fn parse_document(src: &str) -> Result<Document> {
             crate::value::skip_block_comment(&mut cur)?;
             continue;
         }
-        if cur.is_eof() {
-            break;
+        match stop {
+            BlockStop::Eof => {
+                if cur.is_eof() {
+                    break;
+                }
+            }
+            BlockStop::Bracket(c) => {
+                if cur.is_eof() {
+                    *cur_ref = cur;
+                    return Err(crate::value::err(
+                        &cur,
+                        cur.pos(),
+                        format!("unterminated, expected '{c}'"),
+                    ));
+                }
+                if cur.peek() == Some(c) {
+                    break;
+                }
+            }
         }
 
         // A leading `\` continuation trigger (`docs/spec/syntax.tmt`'s
@@ -68,7 +124,7 @@ pub fn parse_document(src: &str) -> Result<Document> {
                     };
                     el
                 };
-                let cont = continue_into_paragraph(&mut cur, prev)?;
+                let cont = continue_into_paragraph(&mut cur, prev, boundary)?;
                 if let Some(top) = stack.last_mut() {
                     top.blocks.push(cont);
                 } else {
@@ -132,7 +188,7 @@ pub fn parse_document(src: &str) -> Result<Document> {
                     let el = parse_element(&mut cur, true)?;
                     consume_trailing_continuation(&mut cur);
                     consume_bare_line_end(&mut cur);
-                    let cont = continue_into_paragraph(&mut cur, el)?;
+                    let cont = continue_into_paragraph(&mut cur, el, boundary)?;
                     push_block(&mut doc_blocks, &mut stack, cont);
                     continue;
                 }
@@ -145,7 +201,7 @@ pub fn parse_document(src: &str) -> Result<Document> {
             continue;
         }
 
-        let p = parse_paragraph(&mut cur)?;
+        let p = parse_paragraph(&mut cur, boundary)?;
         push_block(&mut doc_blocks, &mut stack, p);
     }
 
@@ -158,8 +214,8 @@ pub fn parse_document(src: &str) -> Result<Document> {
         }
     }
 
-    let span = cur.span_from(start_pos);
-    Ok(Document::new(doc_blocks, span))
+    *cur_ref = cur;
+    Ok(doc_blocks)
 }
 
 fn push_block(doc_blocks: &mut Vec<Block>, stack: &mut [Section], block: Block) {
@@ -219,7 +275,11 @@ fn consume_bare_line_end(cur: &mut Cursor) {
 /// source, joined to whatever follows by one `SoftBreak` spanning
 /// `first`'s own end to wherever the rest resumes. `cur` must already sit
 /// at the start of that following content.
-fn continue_into_paragraph(cur: &mut Cursor, first: Element) -> Result<Block> {
+fn continue_into_paragraph(
+    cur: &mut Cursor,
+    first: Element,
+    boundary: Option<char>,
+) -> Result<Block> {
     let para_start = first.span.start.offset;
     let break_start = first.span.end.offset;
     if let Some(after) = leading_continuation(cur) {
@@ -228,7 +288,7 @@ fn continue_into_paragraph(cur: &mut Cursor, first: Element) -> Result<Block> {
     let join_span = cur.span_from(break_start);
     let mut content = vec![Inline::Element(first.with_placement(Placement::Inline))];
     push_soft_break(&mut content, join_span);
-    let rest = parse_inline_seq(cur, Stop::Paragraph, true)?;
+    let rest = parse_inline_seq(cur, Stop::Paragraph { boundary }, true)?;
     extend_merging(&mut content, rest);
     if matches!(content.last(), Some(Inline::SoftBreak(_))) {
         content.pop();
@@ -249,16 +309,16 @@ fn is_block_comment_start(cur: &Cursor) -> bool {
     look.starts_with("/*")
 }
 
-fn skip_line_comment(cur: &mut Cursor) {
+pub(crate) fn skip_line_comment(cur: &mut Cursor) {
     skip_inline_ws(cur);
     cur.eat_str("//");
     cur.eat_while(|c| c != '\n' && c != '\r');
 }
 
 /// Parses a paragraph.
-fn parse_paragraph(cur: &mut Cursor) -> Result<Block> {
+fn parse_paragraph(cur: &mut Cursor, boundary: Option<char>) -> Result<Block> {
     let start_pos = cur.pos();
-    let content = parse_inline_seq(cur, Stop::Paragraph, true)?;
+    let content = parse_inline_seq(cur, Stop::Paragraph { boundary }, true)?;
     let span = cur.span_from(start_pos);
     Ok(Block::Paragraph(Paragraph::new(content, span)))
 }

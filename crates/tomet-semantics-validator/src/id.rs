@@ -40,8 +40,8 @@ fn collect_element_ids(el: &Element, ids: &mut Vec<(String, Span)>) {
         ids.push((id.0.clone(), el.span));
     }
     if let Some(content) = &el.content {
-        for inline in content {
-            collect_inline_ids(inline, ids);
+        for block in content {
+            collect_block_ids(block, ids);
         }
     }
     if let Some(children) = &el.children {

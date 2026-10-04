@@ -1,6 +1,6 @@
 //! Extension trait, attribute helpers, and constructors for [`tomet_ast::Element`].
 
-use tomet_ast::{Block, Element, ElementValue, Id, Inline, Name, Placement, Sigil, Span, Value};
+use tomet_ast::{Block, Element, ElementValue, Id, Name, Placement, Sigil, Span, Value};
 
 /// Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
 pub trait ElementExt {
@@ -14,7 +14,7 @@ pub trait ElementExt {
     fn with_args(self, args: Value) -> Self;
 
     /// Consumes `self` and sets its `content`.
-    fn with_content(self, content: Vec<Inline>) -> Self;
+    fn with_content(self, content: Vec<Block>) -> Self;
 
     /// Consumes `self` and sets its `children`.
     fn with_children(self, children: Vec<Block>) -> Self;
@@ -94,7 +94,7 @@ impl ElementExt for Element {
         self
     }
 
-    fn with_content(mut self, content: Vec<Inline>) -> Self {
+    fn with_content(mut self, content: Vec<Block>) -> Self {
         self.content = Some(content);
         self
     }
@@ -331,7 +331,7 @@ pub fn element_list(ordered: bool, items: Vec<Element>, span: Span) -> Element {
 /// `connects` used to have (a full-form list item's parsed connects were
 /// read and then thrown away at this exact spot).
 pub fn element_list_item(
-    content: Vec<Inline>,
+    content: Vec<Block>,
     marker: Option<Value>,
     attrs: Option<Value>,
     id: Option<Id>,

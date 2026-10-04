@@ -116,7 +116,7 @@ fn element_to_blocks(el: &Element) -> Vec<Block> {
         )],
         "hr" => vec![Block::HorizontalRule],
         "raw" => vec![Block::CodeBlock(code_attr(el), content_to_plain_text(el))],
-        "quote" => vec![Block::BlockQuote(content_to_blocks(content_of(el)))],
+        "quote" => vec![Block::BlockQuote(element_content_to_blocks(content_of(el)))],
         "ol" | "ul" => vec![list_to_pandoc(el)],
         "table" => table_to_pandoc(el),
         // A path standing as a block is a listing row, so the
@@ -206,18 +206,17 @@ fn element_to_inlines(el: &Element) -> Vec<Inline> {
 
 // ---- content -------------------------------------------------------
 
-fn content_of(el: &Element) -> &[TmInline] {
+fn content_of(el: &Element) -> &[TmBlock] {
     el.content.as_deref().unwrap_or(&[])
 }
 
-/// A `[content]` group as Pandoc blocks.
-///
-/// `content` is a `Vec<Inline>` whatever it holds, so an element written
-/// at a line start inside it -- `@references[` holding its entries -- is
-/// an `Inline::Element` carrying `Placement::Block`. That is precisely
-/// what placement exists to record, and this is where it is read: a
-/// block-placed element becomes its own Pandoc block, and the true
-/// inlines around it are gathered into `Plain`.
+/// A flat inline run (`Paragraph.content`, still `Vec<Inline>`) as Pandoc
+/// blocks: an element written at a line start inside it -- the join/isolate
+/// rule the parser applies when an `@`-element is glued into a paragraph
+/// (`document.rs`'s `continue_into_paragraph`) -- is an `Inline::Element`
+/// carrying `Placement::Block`, which is read here: a block-placed element
+/// becomes its own Pandoc block, and the true inlines around it are
+/// gathered into `Para`.
 fn content_to_blocks(inlines: &[TmInline]) -> Vec<Block> {
     let mut blocks = Vec::new();
     let mut run: Vec<Inline> = Vec::new();
@@ -250,14 +249,62 @@ fn flush_run(run: &mut Vec<Inline>, blocks: &mut Vec<Block>) {
     }
 }
 
+/// An `Element.content` group (`Vec<Block>` now) as Pandoc blocks: a
+/// direct, mostly 1:1 mapping, now that a block-placed element is a real
+/// `TmBlock::Element` rather than an `Inline::Element` carrying
+/// `Placement::Block` within a flat inline run (the trick
+/// [`content_to_blocks`] below still is, for `Paragraph.content`, which
+/// stayed `Vec<Inline>` -- see `tmtroot/docs/spec/feature/
+/// content-shape.tmt`).
+fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
+    let mut out = Vec::new();
+    for block in blocks {
+        match block {
+            TmBlock::Paragraph(p) => {
+                let inlines = inlines_to_pandoc(&p.content);
+                if inlines.iter().any(|i| !matches!(i, Inline::Space | Inline::SoftBreak)) {
+                    out.push(Block::Para(inlines));
+                }
+            }
+            TmBlock::Element(el) => out.extend(element_to_blocks(el)),
+            // No direct Pandoc equivalent for a nested section; a header
+            // plus its own blocks is the closest shape.
+            TmBlock::Section(sec) => {
+                out.push(Block::Header(
+                    sec.level.max(1) as i64,
+                    Attr::empty(),
+                    inlines_to_pandoc(&sec.title),
+                ));
+                out.extend(element_content_to_blocks(&sec.blocks));
+            }
+        }
+    }
+    out
+}
+
 /// A `[content]` group where Pandoc demands inlines -- a heading's text, a
-/// link's label, an emphasis span.
-///
-/// A block-placed element cannot be a `Div` here, so it degrades to a
-/// `Span`. That only happens in documents that put a block inside a
-/// heading, which the validator already reports as a shape mismatch.
+/// link's label, an emphasis span. Ordinary inline usage is still exactly
+/// one `Paragraph`, which this reads directly; anything else (multiple
+/// blocks, or a block-placed element put where a heading/link expects
+/// plain text -- which the validator already reports as a shape mismatch)
+/// flattens every paragraph's inlines together rather than losing it.
 fn content_to_inlines(el: &Element) -> Vec<Inline> {
-    inlines_to_pandoc(content_of(el))
+    blocks_to_pandoc_inlines(content_of(el))
+}
+
+fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
+    if let [TmBlock::Paragraph(p)] = blocks {
+        return inlines_to_pandoc(&p.content);
+    }
+    let mut out = Vec::new();
+    for block in blocks {
+        match block {
+            TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
+            TmBlock::Element(el) => out.extend(element_to_inlines(el)),
+            TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
+        }
+    }
+    out
 }
 
 fn inlines_to_pandoc(inlines: &[TmInline]) -> Vec<Inline> {
@@ -356,7 +403,7 @@ fn push_word(word: &mut String, out: &mut Vec<Inline>) {
 /// An element's own body as blocks: its `[content]`, then any elements
 /// its `{...}` group holds as children.
 fn element_body_blocks(el: &Element) -> Vec<Block> {
-    let mut blocks = content_to_blocks(content_of(el));
+    let mut blocks = element_content_to_blocks(content_of(el));
     if let Some(value) = el.value.as_ref() {
         for child in value.as_children() {
             blocks.extend(element_to_blocks(child));
@@ -371,8 +418,21 @@ fn content_to_plain_text(el: &Element) -> String {
     match el.value.as_ref() {
         // A `+++` fence body is already verbatim text.
         Some(ElementValue::Raw(raw)) => raw.clone(),
-        _ => plain_text(content_of(el)),
+        _ => blocks_plain_text(content_of(el)),
     }
+}
+
+/// [`plain_text`] over `Element.content`'s `Vec<Block>` shape.
+fn blocks_plain_text(blocks: &[TmBlock]) -> String {
+    let mut out = String::new();
+    for block in blocks {
+        match block {
+            TmBlock::Paragraph(p) => out.push_str(&plain_text(&p.content)),
+            TmBlock::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
+            TmBlock::Section(sec) => out.push_str(&plain_text(&sec.title)),
+        }
+    }
+    out
 }
 
 fn plain_text(inlines: &[TmInline]) -> String {
@@ -387,7 +447,7 @@ fn plain_text(inlines: &[TmInline]) -> String {
                 out.push_str(tomet_ast::softbreak_join(before, after));
             }
             TmInline::LineBreak(_) => out.push('\n'),
-            TmInline::Element(el) => out.push_str(&plain_text(content_of(el))),
+            TmInline::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
         }
     }
     out
@@ -406,7 +466,7 @@ fn list_to_pandoc(el: &Element) -> Block {
     let items: Vec<Vec<Block>> = list_items(el)
         .iter()
         .map(|item| {
-            let mut blocks = content_to_blocks(content_of(item));
+            let mut blocks = element_content_to_blocks(content_of(item));
             // A list item's own content is a single logical line, so
             // Pandoc's `Plain` is a better fit than `Para` -- it is what
             // keeps a tight list tight.
