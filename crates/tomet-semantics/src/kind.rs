@@ -71,6 +71,33 @@ pub enum ElementKind {
     /// `@fixme[ what is wrong ]` -- there is text here and it needs
     /// revisiting. See [`Draft`](ElementKind::Draft) for the difference.
     Fixme,
+    /// `@conflict(a: ..., b: ...)` -- two divergent candidates, from a
+    /// 3-way merge that touched the same spot from both sides and gave up
+    /// reconciling it automatically. `a`/`b` name structural slots, not
+    /// perspective: unlike a VCS's transient `ours`/`theirs` (local to one
+    /// working tree, gone the moment the conflict resolves), this marker
+    /// is written into a document other people may read before it is
+    /// resolved, and "mine" said by the writer reads as "theirs" to
+    /// everyone else. No timestamp either -- that is what `git log`
+    /// already answers, and letting assignment order double as a
+    /// recency signal is exactly the perspective leak the names already
+    /// avoid.
+    ///
+    /// `a: [...]`/`b: [...]` hold block content (see
+    /// `tmtroot/docs/spec/feature/content-shape.tmt`'s `Value::Blocks`)
+    /// when `@conflict` stands in the document body, or a scalar when
+    /// it sits in a `{data}`/`(args)` value position -- same element,
+    /// same `(args)` shape either way, so [`builtin_content_shape`]
+    /// returns `None` for it like every other kind whose payload is
+    /// `(args)` rather than `[content]` (`@conflict` never uses
+    /// `[content]`/`|content` at all).
+    ///
+    /// In `std`, bare, for the same reason as [`Draft`](ElementKind::Draft)/
+    /// [`Fixme`](ElementKind::Fixme): a conflict can happen while editing
+    /// any kind of document, so no single kind's vocabulary can own it,
+    /// and a shared vocabulary would need `@use` everywhere a merge might
+    /// ever collide.
+    Conflict,
     /// The one officially-supported link element, `@link(target:...)`
     /// (or the positional `@link(...)` shorthand -- see
     /// `crate::positional::builtin_positional_arg_key`). What kind of
@@ -201,6 +228,7 @@ impl ElementKind {
             ElementKind::Content => "content",
             ElementKind::Draft => "draft",
             ElementKind::Fixme => "fixme",
+            ElementKind::Conflict => "conflict",
             ElementKind::File => "file",
             ElementKind::Dir => "dir",
             ElementKind::Link => "link",
@@ -258,7 +286,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 37] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 38] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -286,6 +314,7 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 37] = [
     // anything that re-prints from the tree.
     ("draft", ElementKind::Draft),
     ("fixme", ElementKind::Fixme),
+    ("conflict", ElementKind::Conflict),
     ("file", ElementKind::File),
     ("dir", ElementKind::Dir),
     ("link", ElementKind::Link),
@@ -487,6 +516,9 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         // Either shape, for the same reason: a gap is sometimes a phrase
         // inside a sentence and sometimes a whole missing section.
         Draft | Fixme => return None,
+        // Either shape too: a conflicting edit can land mid-sentence (one
+        // word disputed) or span a whole section, same as a gap can.
+        Conflict => return None,
         Footnote => return None,
         Tag => return None,
         Custom(_) | Bare | Interp => return None,
@@ -546,6 +578,12 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         // fence, exclusive with `[content]`; no observed `@tag[...]`
         // usage to classify yet; `references` per the note above.
         Hr | OrderedList | UnorderedList | Raw | Tag | References => None,
+        // `@conflict`'s payload (`a`/`b`) lives in `(args)`, via
+        // `Value::Blocks` -- it never uses `[content]`/`|content` at all,
+        // same bucket as the directives above for that reason (not
+        // because it can't hold blocks: `a`/`b` each can, just not
+        // through this slot).
+        Conflict => None,
         // Short single-run labels: a vocabulary-doc prose description, a
         // one-line note, a display label, character-level running text,
         // a heading's title.
@@ -706,6 +744,16 @@ mod tests {
             Value::String("https://example.com".to_string()),
         )]));
         assert_eq!(classify_std_lenient(&el), ElementKind::Link);
+    }
+
+    #[test]
+    fn named_at_sigil_with_conflict_name_is_recognized() {
+        let el = element_new(Sigil::named("conflict"));
+        assert_eq!(classify_std_lenient(&el), ElementKind::Conflict);
+        // Either shape, and no `[content]`/`|content` concept of its own
+        // -- `a`/`b` live in `(args)` instead.
+        assert_eq!(required_shape(&ElementKind::Conflict), None);
+        assert_eq!(builtin_content_shape(&ElementKind::Conflict), None);
     }
 
     #[test]

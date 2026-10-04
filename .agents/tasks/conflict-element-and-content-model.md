@@ -299,7 +299,55 @@ with).
 Not yet started: step 5 (printer round-trip stability double-check --
 largely already covered by `render_content_blocks`'s design in the prior
 commit, but not separately re-verified against the full corpus beyond
-what `cargo test` already does) onward. Step 6 (add `@conflict` itself to
-`BUILTIN_KINDS`) needs `builtin_content_shape`/`required_shape`/etc. each
-to grow a `Conflict` arm once it exists, and can now actually use
-`a: [...]`/`b: [...]` syntax per the spec doc, since the above is done.
+what `cargo test` already does).
+
+Step 6 done -- `@conflict` added to `BUILTIN_KINDS`, bare, `std`
+(`crates/tomet-semantics/src/kind.rs`):
+
+- New `ElementKind::Conflict`, `("conflict", ElementKind::Conflict)` in
+  `BUILTIN_KINDS` (37 -> 38), `as_str()` arm.
+- `required_shape(Conflict) = None` (either shape -- a conflicting edit
+  can land mid-sentence or span a whole section, same reasoning as
+  `Draft`/`Fixme`, kept as its own match arm rather than folded into
+  theirs since the comment reasoning differs).
+- `builtin_content_shape(Conflict) = None` -- **not** because it can't
+  hold multiple blocks, but because it never uses `[content]`/`|content`
+  at all: `a`/`b` are `(args)` keys (`Value::Blocks`, from the
+  prerequisite task above), joining the directives/self-closing bucket
+  for that structural reason. This corrects step 1's classification
+  above, which had listed `conflict` under "block-permitting" from when
+  the design still assumed `a`/`b` would live in the element's own
+  content slot -- the "Decisions made" section settled on `(args)`
+  instead, which step 1 predates.
+- Positional args: `builtin_positional_arg_keys("conflict") = &["a",
+  "b"]` (`crates/tomet-semantics/src/positional.rs`) -- `@conflict(x,
+  y)` assigns by written position, `fill_positional_slots` already
+  generalizes to multiple positional keys in order (confirmed by a new
+  test, nothing needed changing there). This is message 2's decision
+  from the very start of this whole task ("enable positional args, but
+  the assignment order itself must never carry a mine/theirs meaning")
+  -- somehow never written down here until now; recorded on
+  `ElementKind::Conflict`'s own doc comment too.
+- New tests: `kind::tests::named_at_sigil_with_conflict_name_is_recognized`,
+  `positional::tests::normalizes_conflict_positional_args_by_written_order`.
+- No dedicated `tests/fixtures/` entry -- no existing builtin kind
+  (`draft`/`fixme`/`callout`/...) has one either; classification is
+  unit-tested in `tomet-semantics` instead, consistent with that.
+- Verified by hand with the real CLI (`tomet check`/`tomet format`) on
+  all three forms the spec describes: block `a`/`b` content standing in
+  the document body (multi-paragraph), the `@conflict(x, y)` positional
+  shorthand, and `@conflict(a: 2, b: 3)` embedded as a scalar inside
+  `@meta{...}` -- `check` passes clean, `format` round-trips byte-
+  identical.
+- Explicitly NOT done here, out of scope per step 9: no `tomet check`
+  diagnostic flagging an unresolved `@conflict`'s presence the way
+  `Diagnostic::Draft`/`Diagnostic::Fixme` do for those. Worth asking the
+  user about as a natural follow-up, but step 6 as scoped
+  ("Add `@conflict` to `BUILTIN_KINDS`, `std`, bare. Shape/content-shape
+  per step 1") was classification only, and a new diagnostic needs its
+  own severity/scope decision (likely `Error`, not `Warning` --
+  unresolved is a different kind of problem than unfinished -- but that
+  is a decision for the user, not mine to make silently).
+
+`cargo build`/`cargo test --workspace` (minus `tomet-python`) fully
+green throughout.

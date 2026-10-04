@@ -42,6 +42,11 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         "callout" => &["variant"],
         "meta" | "config" => &["format"],
         "heading" => &["level"],
+        // `@conflict(x, y)` assigns by written position -- `a` first,
+        // `b` second. Deliberately just an order, not a "mine/theirs"
+        // signal: see `ElementKind::Conflict`'s own doc comment for why
+        // that distinction matters here specifically.
+        "conflict" => &["a", "b"],
         _ => &[],
     }
 }
@@ -283,6 +288,29 @@ mod tests {
                 "lang".to_string(),
                 Value::String("rust".to_string())
             )]))
+        );
+    }
+
+    #[test]
+    fn normalizes_conflict_positional_args_by_written_order() {
+        // `@conflict(1, 2)` -- two bare entries, no keys -- parses as a
+        // `Value::Map` with two `POSITIONAL_ENTRY_KEY`-tagged entries
+        // (the single-entry collapse in `parse_map_body_or_scalar` only
+        // applies when there is exactly one). `fill_positional_slots`
+        // assigns them to `a`/`b` in the order they were written, not by
+        // any other ordering -- see `ElementKind::Conflict`'s own doc
+        // comment for why that distinction is deliberate here.
+        let mut el = element_new(Sigil::named("conflict"));
+        el.args = Some(Value::Map(vec![
+            (String::new(), Value::Int(1)),
+            (String::new(), Value::Int(2)),
+        ]));
+        assert_eq!(
+            normalized_element_args(&el),
+            Some(Value::Map(vec![
+                ("a".to_string(), Value::Int(1)),
+                ("b".to_string(), Value::Int(2)),
+            ]))
         );
     }
 
