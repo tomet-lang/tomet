@@ -254,11 +254,13 @@ fn validate_section_block(block: &Block, visit: &mut impl FnMut(&Element, bool))
     }
 }
 
-/// Surfaces `@draft` and `@fixme` -- the document's own statement that it
-/// is unfinished somewhere.
+/// Surfaces `@draft`, `@fixme`, and `@conflict` -- the document's own
+/// statement that something here still needs attention, whether that is
+/// missing/wrong prose or an unresolved merge conflict.
 ///
 /// Warnings, so `tomet check` reports them and still passes: marking a
-/// gap has to be cheaper than leaving it unmarked, or nobody marks it.
+/// gap (or leaving a conflict for someone else to resolve) has to be
+/// cheaper than hiding it, or nobody marks it.
 ///
 /// `classify_std` rather than a name comparison, so a `@ns.draft` from some
 /// vocabulary is not mistaken for `std`'s.
@@ -278,6 +280,9 @@ fn check_unfinished(doc: &Document, errors: &mut Vec<Diagnostic>) {
                 note,
                 span: el.span,
             }),
+            tomet_semantics::ElementKind::Conflict => {
+                errors.push(Diagnostic::Conflict { span: el.span })
+            }
             _ => {}
         }
     });
@@ -1006,6 +1011,22 @@ mod tests {
             .find(|d| matches!(d, Diagnostic::Fixme { .. }))
             .unwrap_or_else(|| panic!("{diagnostics:?}"));
         assert_eq!(fixme.severity(), Severity::Warning);
+    }
+
+    /// `@conflict` is also a warning -- same reasoning as `@draft`/
+    /// `@fixme`: an unresolved conflict is a normal thing to commit and
+    /// share so someone else can resolve it, not a reason to fail the
+    /// run.
+    #[test]
+    fn conflict_is_a_warning() {
+        let doc = parse("@kind(note)\n\n@conflict(a: [ ローカル ], b: [ リモート ])\n");
+        let diagnostics = validate_document(&doc);
+
+        let conflict = diagnostics
+            .iter()
+            .find(|d| matches!(d, Diagnostic::Conflict { .. }))
+            .unwrap_or_else(|| panic!("{diagnostics:?}"));
+        assert_eq!(conflict.severity(), Severity::Warning);
     }
 
     /// Both take either shape: a gap is sometimes a whole missing section

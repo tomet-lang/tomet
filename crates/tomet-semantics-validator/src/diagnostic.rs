@@ -116,6 +116,16 @@ pub enum Diagnostic {
     Draft { note: String, span: Span },
     /// `@fixme[ ... ]` -- there is text here and it needs revisiting.
     Fixme { note: String, span: Span },
+    /// `@conflict(a: ..., b: ...)` -- an unresolved merge conflict is
+    /// still in the document.
+    ///
+    /// A warning, same reasoning as `Draft`/`Fixme`: a document can be
+    /// committed and shared with an unresolved conflict still in it (a
+    /// reviewer may need to see both candidates to resolve it), so
+    /// failing the run outright would punish leaving the marker for
+    /// someone else to find rather than resolving it under pressure
+    /// just to make `tomet check` pass.
+    Conflict { span: Span },
     /// A `:name(...)` connect whose name is not in the closed set
     /// `tomet_semantics::CONNECT_MEMBERS` declares (`rule` is the only
     /// member so far). Distinct from [`Diagnostic::UnknownElement`]: a
@@ -186,6 +196,7 @@ impl Diagnostic {
             Diagnostic::MissingRequiredArgument { span, .. } => *span,
             Diagnostic::Draft { span, .. } => *span,
             Diagnostic::Fixme { span, .. } => *span,
+            Diagnostic::Conflict { span, .. } => *span,
             Diagnostic::ContentNotInline { span, .. } => *span,
             Diagnostic::DisallowedInContent { span, .. } => *span,
         }
@@ -194,7 +205,9 @@ impl Diagnostic {
     /// How much this matters. See [`Severity`].
     pub fn severity(&self) -> Severity {
         match self {
-            Diagnostic::Draft { .. } | Diagnostic::Fixme { .. } => Severity::Warning,
+            Diagnostic::Draft { .. } | Diagnostic::Fixme { .. } | Diagnostic::Conflict { .. } => {
+                Severity::Warning
+            }
             _ => Severity::Error,
         }
     }
@@ -336,6 +349,9 @@ impl fmt::Display for Diagnostic {
                 } else {
                     write!(f, "marked to fix: {note}")
                 }
+            }
+            Diagnostic::Conflict { .. } => {
+                write!(f, "unresolved conflict -- pick `a` or `b` and remove the marker")
             }
             Diagnostic::ContentNotInline { name, .. } => {
                 write!(

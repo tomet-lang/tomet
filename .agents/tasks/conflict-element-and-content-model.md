@@ -339,15 +339,23 @@ Step 6 done -- `@conflict` added to `BUILTIN_KINDS`, bare, `std`
   shorthand, and `@conflict(a: 2, b: 3)` embedded as a scalar inside
   `@meta{...}` -- `check` passes clean, `format` round-trips byte-
   identical.
-- Explicitly NOT done here, out of scope per step 9: no `tomet check`
-  diagnostic flagging an unresolved `@conflict`'s presence the way
-  `Diagnostic::Draft`/`Diagnostic::Fixme` do for those. Worth asking the
-  user about as a natural follow-up, but step 6 as scoped
-  ("Add `@conflict` to `BUILTIN_KINDS`, `std`, bare. Shape/content-shape
-  per step 1") was classification only, and a new diagnostic needs its
-  own severity/scope decision (likely `Error`, not `Warning` --
-  unresolved is a different kind of problem than unfinished -- but that
-  is a decision for the user, not mine to make silently).
-
 `cargo build`/`cargo test --workspace` (minus `tomet-python`) fully
 green throughout.
+
+Follow-up done, same session, user asked for it explicitly after
+reviewing step 6 ("tomet checkで警告診断を追加したい" -- severity settled
+as `Warning` by the user's own wording, matching the guess step 6 above
+had declined to make unilaterally): new `Diagnostic::Conflict { span }`
+in `tomet-semantics-validator` (`Severity::Warning`, same bucket as
+`Draft`/`Fixme` and the same reasoning -- an unresolved conflict is a
+normal thing to commit and share for someone else to resolve, not a
+reason to fail the run). Wired into the existing `check_unfinished`
+(renamed in spirit, not in name, via its doc comment) rather than a new
+function, since the mechanism -- "find this kind anywhere, push one
+diagnostic per occurrence" -- is identical to `Draft`/`Fixme`'s own.
+`@conflict` has no `note_text` equivalent (its payload is `a`/`b` in
+`(args)`, not `[content]`), so the diagnostic carries just a span, no
+note. Verified with the real CLI: `tomet check` on a document with an
+unresolved `@conflict` reports the warning and still exits 0 ("OK (1
+warning(s))"). New test
+`tests::conflict_is_a_warning` in `tomet-semantics-validator`.
