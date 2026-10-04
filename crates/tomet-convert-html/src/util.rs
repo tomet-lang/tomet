@@ -181,6 +181,8 @@ pub(crate) fn value_to_plain(v: &Value) -> String {
         Value::Call(..) => String::new(),
         // An embedded element has no scalar form either -- same as `Map`.
         Value::Element(_) => String::new(),
+        // Block content has no scalar form either -- same as `Map`.
+        Value::Blocks(_) => String::new(),
     }
 }
 

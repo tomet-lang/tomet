@@ -131,6 +131,15 @@ pub enum Value {
     /// and a connect changes what the *enclosing* element means, which
     /// has no sense for an element that is itself sitting inside a value.
     Element(Box<Element>),
+    /// `key: [ ... ]` -- block content (the same `Vec<Block>` grammar as
+    /// an element's own `[content]`/`|content` slot, see
+    /// `tmtroot/docs/spec/feature/content-shape.tmt`) sitting as a named
+    /// value inside `(args)`/`{data}`, e.g. `@conflict(a: [ ... ], b: [
+    /// ... ])`. `[a, b]` array literals were retired in favor of
+    /// `list(...)` specifically to free `[...]` for this -- it already
+    /// meant "block content" at the element level, and now means it
+    /// uniformly at any value position.
+    Blocks(Vec<Block>),
 }
 
 impl Serialize for Value {
@@ -168,15 +177,24 @@ impl Serialize for Value {
                 m.end()
             }
             Value::Element(el) => el.serialize(serializer),
+            Value::Blocks(blocks) => {
+                use serde::ser::SerializeSeq;
+                let mut s = serializer.serialize_seq(Some(blocks.len()))?;
+                for block in blocks {
+                    s.serialize_element(block)?;
+                }
+                s.end()
+            }
         }
     }
 }
 
-// Deliberately no `Value::Call` or `Value::Element` arm below: both are only
-// ever produced by `tomet-syntax-parser` reading source text (`name(...)` /
-// `@name(...)`), never by deserializing inbound data -- there is no
-// `visit_call` and nothing in serde's data model looks like an `Element`
-// either. This is not an oversight.
+// Deliberately no `Value::Call`, `Value::Element`, or `Value::Blocks` arm
+// below: all three are only ever produced by `tomet-syntax-parser` reading
+// source text (`name(...)` / `@name(...)` / `key: [...]`), never by
+// deserializing inbound data -- there is no `visit_call` and nothing in
+// serde's data model looks like an `Element` or a `Vec<Block>` either. This
+// is not an oversight.
 impl<'de> Deserialize<'de> for Value {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

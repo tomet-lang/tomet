@@ -17,7 +17,7 @@ use tomet_ast::{
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
-use tomet_style::{quote_scalar_string, render_args_with_config, render_nested, render_value};
+use tomet_style::{quote_scalar_string, render_nested, render_value};
 use tomet_tree::element_new;
 
 pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig) {
@@ -164,7 +164,7 @@ fn render_section(sec: &Section, config: &PrinterConfig, out: &mut String) {
     }
     if let Some(args) = &sec.args {
         out.push('(');
-        out.push_str(&render_args_with_config(args, config));
+        out.push_str(&render_args(args, config));
         out.push(')');
     }
     if let Some(v) = sec.value.as_ref().and_then(|v| v.as_data()) {
@@ -235,7 +235,7 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
         head_prefix.push_str(&prefix);
         if let Some(marker) = &item.args {
             head_prefix.push('(');
-            head_prefix.push_str(&render_args_with_config(marker, config));
+            head_prefix.push_str(&render_args(marker, config));
             head_prefix.push_str(") ");
         }
 
@@ -368,7 +368,7 @@ fn render_connects(connects: &[Element], config: &PrinterConfig) -> String {
         }
         if let Some(args) = &connect.args {
             out.push('(');
-            out.push_str(&render_args_with_config(args, config));
+            out.push_str(&render_args(args, config));
             out.push(')');
         }
         if let Some(content) = &connect.content {
@@ -403,6 +403,20 @@ fn render_connects(connects: &[Element], config: &PrinterConfig) -> String {
 /// `blocks` (no blank line between them -- see `.agents/tasks/
 /// man-import-and-printer-gaps.md`'s note on that, which this doesn't
 /// change).
+/// Renders `(args)` with full block-content fidelity: any `key: [...]`
+/// value (`Value::Blocks`, see `tomet-syntax-ast`) is rendered through
+/// this crate's own `render_content_blocks` -- the real recursive block
+/// renderer, which `tomet-format-style` (a lower layer) cannot call
+/// itself -- rather than the restricted, paragraph-inlines-only fallback
+/// `tomet_style::render_args_with_config` would otherwise use. Needed so
+/// e.g. `@conflict(a: [multi-paragraph content], ...)` round-trips
+/// without losing anything beyond the first paragraph.
+fn render_args(args: &Value, config: &PrinterConfig) -> String {
+    tomet_style::render_args_with_blocks(args, config, &mut |blocks, cfg| {
+        render_content_blocks(blocks, cfg)
+    })
+}
+
 fn render_content_blocks(blocks: &[Block], config: &PrinterConfig) -> String {
     if let [Block::Paragraph(p)] = blocks {
         return render_inlines(&p.content, config);
@@ -579,7 +593,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             let mut out = String::from("@callout");
             if let Some(args) = &el.args {
                 out.push('(');
-                out.push_str(&render_args_with_config(args, config));
+                out.push_str(&render_args(args, config));
                 out.push(')');
             }
             if let Some(content) = &el.content {
@@ -602,7 +616,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             let mut out = String::from("@callout");
             if let Some(args) = &el.args {
                 out.push('(');
-                out.push_str(&render_args_with_config(args, config));
+                out.push_str(&render_args(args, config));
                 out.push(')');
             }
             if let Some(content) = &el.content {
@@ -640,7 +654,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             let mut out = String::from("@callout");
             if let Some(args) = &el.args {
                 out.push('(');
-                out.push_str(&render_args_with_config(args, config));
+                out.push_str(&render_args(args, config));
                 out.push(')');
             }
             if let Some(content) = &el.content {
@@ -705,7 +719,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     let render_args = |out: &mut String| {
         if let Some(args) = &el.args {
             out.push('(');
-            out.push_str(&render_args_with_config(args, config));
+            out.push_str(&render_args(args, config));
             out.push(')');
         }
     };
@@ -930,6 +944,25 @@ fn value_to_json(val: &Value) -> serde_json::Value {
                 map.insert("content".to_string(), serde_json::Value::String(text));
             }
             serde_json::Value::Object(map)
+        }
+        // Same plain-text flattening as `Element`'s own `content` just
+        // above -- this path is `+++`-fenced `format:json` export, not
+        // the real `.tmt` printer, which uses `render_content_blocks`
+        // directly instead of going through `Value` at all.
+        Value::Blocks(blocks) => {
+            let text: String = blocks
+                .iter()
+                .filter_map(|block| match block {
+                    Block::Paragraph(p) => Some(p.content.iter().filter_map(|i| match i {
+                        Inline::Text(t) => Some(t.value.as_str()),
+                        Inline::Raw(r) => Some(r.value.as_str()),
+                        _ => None,
+                    })),
+                    _ => None,
+                })
+                .flatten()
+                .collect();
+            serde_json::Value::String(text)
         }
     }
 }

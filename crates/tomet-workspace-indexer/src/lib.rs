@@ -376,6 +376,7 @@ fn value_to_string(v: &Value) -> String {
                 None => format!("@{name}"),
             }
         }
+        Value::Blocks(blocks) => format!("<{} block(s)>", blocks.len()),
     }
 }
 

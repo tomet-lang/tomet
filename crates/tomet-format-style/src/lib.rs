@@ -105,6 +105,31 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
     }
 }
 
+/// Renders a `Vec<Block>` slot (an element's `[content]`, or a `key:
+/// [...]` value) back into `.tmt` source text.
+///
+/// This crate deliberately stays scoped to single nodes (see the module
+/// doc) and has no real block renderer of its own -- recursing through
+/// sections/lists/nested elements is `tomet-printer`'s
+/// `render_content_blocks`, one layer up, which this crate cannot depend
+/// on without an upward (and circular) dependency. Threading the renderer
+/// in as a callback instead lets `tomet-printer` plug its real one in
+/// (full fidelity, needed for e.g. `@conflict(a: [multi-paragraph content],
+/// ...)`), while every other caller (`tomet-formatter`, which patches
+/// spans incrementally and has no block renderer either) keeps the
+/// restricted default (`default_block_renderer`: paragraph-inlines only,
+/// same limit `Value::Element`'s own `content` already lived with before
+/// this existed).
+pub type BlockRenderer<'a> = dyn FnMut(&[Block], &PrinterConfig) -> String + 'a;
+
+fn default_block_renderer(blocks: &[Block], config: &PrinterConfig) -> String {
+    let mut out = String::new();
+    for block in blocks {
+        render_nested_block(block, config, &mut out);
+    }
+    out
+}
+
 /// Renders a value that sits *inside* another one.
 ///
 /// A map needs its own braces there. `render_value_inner_with_config`
@@ -116,13 +141,28 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
 /// Public because the printer renders a value group's pairs itself and
 /// needs the same rule.
 pub fn render_nested(v: &Value, config: &PrinterConfig) -> String {
+    render_nested_with_blocks(v, config, &mut default_block_renderer)
+}
+
+fn render_nested_with_blocks(v: &Value, config: &PrinterConfig, render_blocks: &mut BlockRenderer) -> String {
     match v {
-        Value::Map(_) => format!("{{{}}}", render_value_inner_with_config(v, config)),
-        _ => render_value_inner_with_config(v, config),
+        Value::Map(_) => format!("{{{}}}", render_value_inner_with_blocks(v, config, render_blocks)),
+        _ => render_value_inner_with_blocks(v, config, render_blocks),
     }
 }
 
 pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> String {
+    render_value_inner_with_blocks(v, config, &mut default_block_renderer)
+}
+
+/// Same as [`render_value_inner_with_config`], but with the block
+/// renderer supplied explicitly instead of defaulting to the restricted
+/// one. See [`BlockRenderer`].
+pub fn render_value_inner_with_blocks(
+    v: &Value,
+    config: &PrinterConfig,
+    render_blocks: &mut BlockRenderer,
+) -> String {
     match v {
         Value::Null => String::new(),
         Value::Bool(b) => b.to_string(),
@@ -135,7 +175,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
         Value::Seq(items) => {
             let rendered: Vec<_> = items
                 .iter()
-                .map(|item| render_nested(item, config))
+                .map(|item| render_nested_with_blocks(item, config, render_blocks))
                 .collect();
             format!("list({})", rendered.join(", "))
         }
@@ -144,11 +184,14 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                 let key = &entries[0].0;
                 if key == "target" {
                     let space = if config.link_no_space { "" } else { " " };
-                    format!("@({key}:{space}{})", render_nested(&entries[0].1, config))
+                    format!(
+                        "@({key}:{space}{})",
+                        render_nested_with_blocks(&entries[0].1, config, render_blocks)
+                    )
                 } else {
                     let mut parts = Vec::new();
                     for (idx, (k, val)) in entries.iter().enumerate() {
-                        let val_str = render_nested(val, config);
+                        let val_str = render_nested_with_blocks(val, config, render_blocks);
                         // An empty key is the parser's positional-entry
                         // sentinel (`k.is_empty()`, since a real map key
                         // can never be empty -- `eat_ident` never matches
@@ -168,7 +211,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
             } else {
                 let mut parts = Vec::new();
                 for (idx, (k, val)) in entries.iter().enumerate() {
-                    let val_str = render_nested(val, config);
+                    let val_str = render_nested_with_blocks(val, config, render_blocks);
                     // See the matching comment in the single-entry branch
                     // above -- an empty key is a positional entry, printed
                     // bare rather than as `: value`.
@@ -184,7 +227,10 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
             }
         }
         Value::Call(name, args) => {
-            let rendered: Vec<_> = args.iter().map(|a| render_nested(a, config)).collect();
+            let rendered: Vec<_> = args
+                .iter()
+                .map(|a| render_nested_with_blocks(a, config, render_blocks))
+                .collect();
             format!("{name}({})", rendered.join(", "))
         }
         // `parse_entry_value` only ever produces one of these with `args`
@@ -204,7 +250,9 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
         Value::Element(el) if el.sigil == Sigil::Dollar => match &el.value {
             Some(ElementValue::Interp(expr)) => format!("${{{expr}}}"),
             Some(ElementValue::Group(entries)) => match entries.as_slice() {
-                [Entry::Pair(k, v)] if k.is_empty() => render_nested(v, config),
+                [Entry::Pair(k, v)] if k.is_empty() => {
+                    render_nested_with_blocks(v, config, render_blocks)
+                }
                 _ => {
                     let map = Value::Map(
                         entries
@@ -215,7 +263,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                             })
                             .collect(),
                     );
-                    render_nested(&map, config)
+                    render_nested_with_blocks(&map, config, render_blocks)
                 }
             },
             Some(ElementValue::Raw(_)) | None => String::new(),
@@ -225,7 +273,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                 Some(args) => format!(
                     "@{}({})",
                     el.sigil.name().map(ToString::to_string).unwrap_or_default(),
-                    render_args_with_config(args, config)
+                    render_args_with_blocks(args, config, render_blocks)
                 ),
                 None => format!(
                     "@{}",
@@ -234,9 +282,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
             };
             if let Some(content) = &el.content {
                 s.push('[');
-                for block in content {
-                    render_nested_block(block, config, &mut s);
-                }
+                s.push_str(&render_blocks(content, config));
                 s.push(']');
             }
             if let Some(val) = &el.value {
@@ -249,11 +295,18 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
                             }
                             match entry {
                                 Entry::Pair(k, v) => {
-                                    s.push_str(&format!("{k}: {}", render_nested(v, config)));
+                                    s.push_str(&format!(
+                                        "{k}: {}",
+                                        render_nested_with_blocks(v, config, render_blocks)
+                                    ));
                                 }
                                 Entry::Element(nested_el) => {
                                     let nested_val = Value::Element(Box::new(nested_el.clone()));
-                                    s.push_str(&render_nested(&nested_val, config));
+                                    s.push_str(&render_nested_with_blocks(
+                                        &nested_val,
+                                        config,
+                                        render_blocks,
+                                    ));
                                 }
                             }
                         }
@@ -269,10 +322,21 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
             }
             s
         }
+        Value::Blocks(blocks) => format!("[{}]", render_blocks(blocks, config)),
     }
 }
 
 pub fn render_args_with_config(v: &Value, config: &PrinterConfig) -> String {
+    render_args_with_blocks(v, config, &mut default_block_renderer)
+}
+
+/// Same as [`render_args_with_config`], but with the block renderer
+/// supplied explicitly. See [`BlockRenderer`].
+pub fn render_args_with_blocks(
+    v: &Value,
+    config: &PrinterConfig,
+    render_blocks: &mut BlockRenderer,
+) -> String {
     if let Value::Map(entries) = v
         && entries.len() == 1
     {
@@ -281,11 +345,11 @@ pub fn render_args_with_config(v: &Value, config: &PrinterConfig) -> String {
             let space = if config.link_no_space { "" } else { " " };
             return format!(
                 "{key}:{space}{}",
-                render_value_inner_with_config(&entries[0].1, config)
+                render_value_inner_with_blocks(&entries[0].1, config, render_blocks)
             );
         }
     }
-    render_value_inner_with_config(v, config)
+    render_value_inner_with_blocks(v, config, render_blocks)
 }
 
 fn render_meta_field_value(

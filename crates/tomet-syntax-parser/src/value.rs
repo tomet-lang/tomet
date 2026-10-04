@@ -70,6 +70,27 @@ impl tove::ValueHook for TometValueHook {
             return Some(Ok(Value::Element(Box::new(el))));
         }
 
+        // `key: [ ... ]` -- block content as a value (`Value::Blocks`),
+        // the same recursive grammar `[content]` uses, bounded by `]`
+        // instead of consuming an enclosing element's own closer. Without
+        // this hook, `tove`'s own value grammar rejects `[` outright
+        // ("'[...]' list literal was removed").
+        if cur.peek() == Some('[') {
+            cur.bump();
+            let blocks = match crate::document::parse_block_seq(
+                cur,
+                crate::document::BlockStop::Bracket(']'),
+            ) {
+                Ok(blocks) => blocks,
+                Err(e) => return Some(Err(tove::Error::at(e.message, e.line, e.column, e.offset))),
+            };
+            if !cur.eat_str("]") {
+                let (line, column) = cur.line_col(cur.pos());
+                return Some(Err(tove::Error::at("expected ']'", line, column, cur.pos())));
+            }
+            return Some(Ok(Value::Blocks(blocks)));
+        }
+
         None
     }
 }

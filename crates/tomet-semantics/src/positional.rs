@@ -187,7 +187,9 @@ fn scalar_to_plain(v: &Value) -> String {
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
         Value::String(s) => s.clone(),
-        Value::Seq(_) | Value::Map(_) | Value::Call(..) | Value::Element(_) => String::new(),
+        Value::Seq(_) | Value::Map(_) | Value::Call(..) | Value::Element(_) | Value::Blocks(_) => {
+            String::new()
+        }
     }
 }
 

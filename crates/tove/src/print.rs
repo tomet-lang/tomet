@@ -48,6 +48,38 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
                 out.push(')');
             }
         }
+        // Best-effort only: `print_value` has no document-level block
+        // renderer to call (it's a generic TOVE-data printer, used by
+        // `tove`'s own tests/convenience function, not by
+        // `tomet-format-printer`, which has its own real block renderer
+        // and never calls through here). Plain text keeps this
+        // exhaustive without pretending to round-trip nested structure.
+        Value::Blocks(blocks) => {
+            out.push('[');
+            for (i, block) in blocks.iter().enumerate() {
+                if i > 0 {
+                    out.push(' ');
+                }
+                write_block_plain_text(block, out);
+            }
+            out.push(']');
+        }
+    }
+}
+
+fn write_block_plain_text(block: &tomet_ast::Block, out: &mut String) {
+    use tomet_ast::{Block, Inline};
+    let Block::Paragraph(p) = block else {
+        return;
+    };
+    for inline in &p.content {
+        match inline {
+            Inline::Text(t) => out.push_str(&t.value),
+            Inline::Raw(r) => out.push_str(&r.value),
+            Inline::SoftBreak(_) => out.push(' '),
+            Inline::LineBreak(_) => out.push('\n'),
+            Inline::Element(_) => {}
+        }
     }
 }
 

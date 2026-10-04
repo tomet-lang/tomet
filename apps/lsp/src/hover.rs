@@ -427,6 +427,7 @@ fn macro_hover(
                     el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
                     el.args
                 ),
+                Value::Blocks(blocks) => format!("{blocks:?}"),
             };
             let trimmed = rendered.trim();
             if is_web_url(trimmed) {

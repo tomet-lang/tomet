@@ -714,6 +714,8 @@ fn value_to_plain(v: &Value) -> String {
         // whole nested element), so this stays unrendered rather than
         // half-rendering it out of context.
         Value::Element(_) => String::new(),
+        // Block content has no scalar form either -- same as `Map`.
+        Value::Blocks(_) => String::new(),
     }
 }
 

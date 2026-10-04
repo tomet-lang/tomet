@@ -746,6 +746,13 @@ fn value_str(v: &Value) -> String {
                 None => format!("@{name}"),
             }
         }
+        Value::Blocks(blocks) => {
+            let mut inner = String::new();
+            for block in blocks {
+                dump_block(&mut inner, block, 0);
+            }
+            format!("[{}]", inner.trim())
+        }
     }
 }
 

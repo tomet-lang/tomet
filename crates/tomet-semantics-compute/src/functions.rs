@@ -444,6 +444,9 @@ fn truthy(value: &Value) -> bool {
         // Same reasoning as `Call`: an embedded element is a literal, not
         // an emptiable container.
         Value::Element(_) => true,
+        // Block content: truthy whenever there's at least one block,
+        // mirroring `Seq`/`Map`'s own-emptiness rule.
+        Value::Blocks(blocks) => !blocks.is_empty(),
     }
 }
 

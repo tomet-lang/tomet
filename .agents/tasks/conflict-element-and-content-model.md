@@ -285,9 +285,21 @@ enforcement):
   (brand new feature), so `content_allow` is `None` (no check) for every
   real custom element today.
 
+Blocker for step 6 cleared: `@conflict(a: [...], b: [...])` needed
+`key: [...]` to parse as real block content inside `(args)` at all, which
+nothing in the grammar supported (`[` in a value position was a hard
+parse error -- "list literal was removed"). That work was substantial
+enough to be its own task, done in full: see
+`.agents/tasks/block-content-value.md` (`Value::Blocks(Vec<Block>)`, the
+`TometValueHook` interception, and -- the real work -- making the
+printer render it with full block fidelity rather than the
+paragraph-only fallback `Value::Element`'s own `content` had been living
+with).
+
 Not yet started: step 5 (printer round-trip stability double-check --
 largely already covered by `render_content_blocks`'s design in the prior
 commit, but not separately re-verified against the full corpus beyond
 what `cargo test` already does) onward. Step 6 (add `@conflict` itself to
 `BUILTIN_KINDS`) needs `builtin_content_shape`/`required_shape`/etc. each
-to grow a `Conflict` arm once it exists.
+to grow a `Conflict` arm once it exists, and can now actually use
+`a: [...]`/`b: [...]` syntax per the spec doc, since the above is done.

@@ -10,17 +10,8 @@
       "c": ""
     },
     "icons": {
-      "t": "MetaList",
-      "c": [
-        {
-          "t": "MetaString",
-          "c": ""
-        },
-        {
-          "t": "MetaString",
-          "c": ""
-        }
-      ]
+      "t": "MetaString",
+      "c": ""
     },
     "mixed": {
       "t": "MetaString",

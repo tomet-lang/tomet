@@ -1529,8 +1529,18 @@ Paragraph
 ```
 
 ```
-parse error: 1:11: '[...]' list literal was removed -- write 'list(...)' instead
+Block  @memo
+  args    {xs: [Paragraph
+  Text "1, 2, 3"]}
 ```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
+```
+
+> **パースは通る。** 上が実際の結果。
 
 ### `#name` のブロックシジルも撤去。形はシジルではなく位置が決める。`#` 自体も見出しの糖衣とタグの糖衣を失い、今は完全に自由な文字
 

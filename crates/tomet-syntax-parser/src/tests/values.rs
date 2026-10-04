@@ -19,16 +19,23 @@ fn parses_flat_map() {
 }
 
 /// The `[a, b]` list literal was retired -- `list(...)` is the sole
-/// spelling now, since `[`/`]` already mean `[content]` at the
-/// element level.
+/// spelling for a list. `[`/`]` in a value position isn't a parse error
+/// either, though: it means block content (`Value::Blocks`, the same
+/// grammar as an element's own `[content]`), so `[a, b]` parses, but as
+/// one paragraph of plain text `"a, b"`, not a two-item list.
 #[test]
-fn a_bracket_list_literal_in_a_value_position_is_a_parse_error() {
-    let err = parse_value("tags: [a, b]").unwrap_err();
-    assert!(
-        err.message.contains("list(...)"),
-        "expected the error to point at 'list(...)', got: {}",
-        err.message
-    );
+fn a_bracket_value_parses_as_block_content_not_a_list() {
+    let v = parse_value("tags: [a, b]").unwrap();
+    let Value::Map(entries) = v else {
+        panic!("expected a map, got {v:?}");
+    };
+    let Value::Blocks(blocks) = &entries[0].1 else {
+        panic!("expected block content, got {:?}", entries[0].1);
+    };
+    match first_para(blocks) {
+        [Inline::Text(t)] => assert_eq!(t.value, "a, b"),
+        other => panic!("expected a single text run, got {other:?}"),
+    }
 }
 
 /// `@name(...)` in a value position parses to `Value::Element`, not

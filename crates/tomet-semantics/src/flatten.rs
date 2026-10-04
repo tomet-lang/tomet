@@ -141,6 +141,9 @@ pub fn scalar_string(v: &Value) -> Option<String> {
         // An embedded element is a whole element, not a scalar -- same
         // bucket as `Map`/`Call`.
         Value::Element(_) => None,
+        // Block content (`key: [...]`) is a tree, not a scalar -- same
+        // bucket.
+        Value::Blocks(_) => None,
     }
 }
 
@@ -193,6 +196,13 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
             }
             serde_json::Value::Object(obj)
         }
+        // Same reasoning as `Element` above: block content has no stable
+        // JSON shape anywhere else in the codebase, and an element like
+        // `@conflict` that carries it is never flattened through this
+        // generic path in practice -- a caller that knows about it reads
+        // `a`/`b` directly. A lossy placeholder keeps this exhaustive
+        // without inventing a new serialization nothing else uses.
+        Value::Blocks(blocks) => serde_json::Value::String(format!("<{} block(s)>", blocks.len())),
     }
 }
 

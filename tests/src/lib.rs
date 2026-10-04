@@ -84,14 +84,21 @@ pub fn read_fixture(rel: &Path) -> String {
 /// `docs/guide/cheatsheet.tmt` and exercised constructs the parser did not
 /// accept. The sigil rework fixed the last of them -- the `(format:...)`
 /// brace scanner that ended a body early at an unquoted `}` -- so it now
-/// parses, and the entry was gone until the two below.
+/// parses, and the entry was gone for a while.
 ///
-/// Both use the retired `[a, b]` list literal (`list(...)` is the sole
-/// surviving spelling); per this crate's own README, a fixture exercising
-/// retired syntax is regression coverage, not a bug, so it stays rather
-/// than being edited to the new spelling. `tests/fixtures/syntax/list-call.tmt`
-/// covers the replacement.
-pub const KNOWN_UNPARSEABLE: &[&str] = &["examples/bookmark.tmt", "syntax/value-element.tmt"];
+/// `examples/bookmark.tmt` and `syntax/value-element.tmt` then used the
+/// retired `[a, b]` list literal (`list(...)` is the sole surviving
+/// spelling for a *list*) and landed here, rejected outright. `key:
+/// [...]` stopped being a hard rejection once it gained its own meaning
+/// -- block content (`Value::Blocks`), the same grammar as an element's
+/// own `[content]` -- so both fixtures parse again, but to a different
+/// AST than the `[a, b]`-as-list spelling would have produced (one
+/// paragraph, not a sequence). `examples/bookmark.tmt`'s `tags:` was
+/// edited to `list(a, a)` to keep meaning what it always meant (a list
+/// of tags); `syntax/value-element.tmt`'s `icons: [...]` was left as-is,
+/// since embedding `@`-elements in a `[...]` value position is exactly
+/// what that fixture exists to demonstrate.
+pub const KNOWN_UNPARSEABLE: &[&str] = &[];
 
 /// Fixtures the tree-sitter grammar is known to mis-parse, and the text
 /// of the error nodes it produces for each.
@@ -196,10 +203,12 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // is its `list(...)`-based replacement, so it inherits the same
     // drift rather than a new one.
     ("syntax/list-call.tmt", &[ANY_ERROR]),
-    // The retired `[a, b]` list literal -- `tags:[ a, a ]` -- is now a
-    // missing-token error in both grammars alike (`tomet-parser` rejects
-    // it outright; see `KNOWN_UNPARSEABLE` above for this same fixture).
-    ("examples/bookmark.tmt", &[MISSING_NODE]),
+    // `key: [...]` (`Value::Blocks`, block content as a value -- see
+    // `tomet-syntax-ast`) has no `grammar.js` counterpart either, the
+    // same kind of gap as `Value::Element` above: `_entry_value` offers
+    // no "block content" alternative, so even one bracket pair at a
+    // value position errors. Same fix path as `syntax/value-element.tmt`.
+    ("syntax/block-value.tmt", &[MISSING_NODE, "]"]),
 ];
 
 /// Records a fixture as drifting wholesale, without pinning the text of

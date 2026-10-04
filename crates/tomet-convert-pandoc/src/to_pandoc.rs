@@ -70,6 +70,9 @@ fn meta_value(v: &Value) -> MetaValue {
         // concept, and `@meta(icon: @doc.icon("x"))`'s whole point is that
         // nothing resolves or renders the embedded element anyway.
         Value::Element(_) => MetaValue::MetaString(String::new()),
+        // Same treatment as `Element`/`Call`: no metadata concept for
+        // block content either.
+        Value::Blocks(_) => MetaValue::MetaString(String::new()),
     }
 }
 
