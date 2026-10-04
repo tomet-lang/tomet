@@ -509,6 +509,57 @@ impl From<Placement> for Shape {
     }
 }
 
+/// What a built-in kind's `[content]`/`|content` (`Vec<Block>`, see
+/// `tmtroot/docs/spec/feature/content-shape.tmt`) may hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentShape {
+    /// At most one plain paragraph -- no nested blocks, no multiple
+    /// paragraphs. What every inline-only built-in (`em`, `link`, a
+    /// heading's title, ...) has always meant by "content", now that the
+    /// parser itself no longer enforces it by construction.
+    Inline,
+    /// Any blocks -- multiple paragraphs, headings, lists, nested
+    /// elements.
+    Block,
+}
+
+/// Whether `kind`'s `[content]`/`|content` may hold more than one plain
+/// paragraph.
+///
+/// `None` means `kind` doesn't use `[content]` at all (its own slots are
+/// `{data}`/`(args)`, or it has no content concept, or -- for `Custom`,
+/// `Bare`, `Interp` -- it isn't a built-in kind in the first place, and a
+/// vocabulary's own `@content{allow:}` governs it instead). This table is
+/// the classification agreed in `.agents/tasks/
+/// conflict-element-and-content-model.md`'s "Step 1"; `references` is
+/// deliberately left unclassified there (a draft/placeholder element, not
+/// worth curating) and returns `None` here too.
+pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
+    use ElementKind::*;
+    match kind {
+        // Directives and vocabulary-document bookkeeping: `{data}`/
+        // `(args)` only, no `[content]`.
+        Kind | Version | Meta | Config | Settings | Use | Include | Blueprint | Vocabulary
+        | Content | Args | Data => None,
+        // Self-closing; list items' own body is `value: Children`, not
+        // `content`; a fenced/inline code body is the `+++...+++` raw
+        // fence, exclusive with `[content]`; no observed `@tag[...]`
+        // usage to classify yet; `references` per the note above.
+        Hr | OrderedList | UnorderedList | Raw | Tag | References => None,
+        // Short single-run labels: a vocabulary-doc prose description, a
+        // one-line note, a display label, character-level running text,
+        // a heading's title.
+        Element | Param | Draft | Fixme | File | Dir | Link | Embed | Em | Strong | Mark
+        | Strikeout | Ruby | Heading => Some(ContentShape::Inline),
+        // May hold multiple paragraphs, headings, lists: a blockquote
+        // commonly spans several paragraphs; an admonition/card/footnote
+        // can too; a table's rows/cells.
+        Quote | Callout | Card | Table | Footnote => Some(ContentShape::Block),
+        // Not a built-in bare name at all.
+        Custom(_) | Bare | Interp | Caret => None,
+    }
+}
+
 /// Whether at most one of `kind` may appear in a document.
 ///
 /// The six the spec has always declared, and nothing else.

@@ -81,6 +81,7 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Diagno
     check_arguments(doc, bindings, &mut errors);
     check_unfinished(doc, &mut errors);
     check_rule_connects(doc, bindings, &mut errors);
+    check_content_shape(doc, bindings, &mut errors);
 
     for (id, span) in collect_ids(doc) {
         if let Some((_, first)) = seen.iter().find(|(seen_id, _)| *seen_id == id) {
@@ -452,6 +453,95 @@ fn check_one_rule(
     });
 }
 
+/// Checks every element's `[content]`/`|content` against its
+/// content-shape rule: `tomet_semantics::builtin_content_shape` for a
+/// built-in kind, or a vocabulary's own `@content{allow:}`
+/// (`ElementDecl::content_allow`) for a custom one. No rule (`None`
+/// either way) means no check, same "absent says nothing" reasoning
+/// `@data`'s `open:` already has.
+fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+    tomet_tree::for_each_element(doc, |el| {
+        let Some(content) = &el.content else { return };
+        let Ok(kind) = classify_in(el, bindings) else {
+            // Unknown name is the top-level loop's diagnostic, not this
+            // one's.
+            return;
+        };
+        let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
+
+        let allow = match &kind {
+            tomet_semantics::ElementKind::Custom(_) => {
+                el.sigil.name().and_then(|n| bindings.declaration(n)).and_then(|decl| decl.content_allow.clone())
+            }
+            _ => match tomet_semantics::builtin_content_shape(&kind) {
+                Some(tomet_semantics::ContentShape::Inline) => {
+                    Some(tomet_semantics::ContentAllow::Inline)
+                }
+                Some(tomet_semantics::ContentShape::Block) | None => None,
+            },
+        };
+
+        match allow {
+            None | Some(tomet_semantics::ContentAllow::Any) => {}
+            Some(tomet_semantics::ContentAllow::Inline) => {
+                if !matches!(content.as_slice(), [] | [Block::Paragraph(_)]) {
+                    errors.push(Diagnostic::ContentNotInline {
+                        name,
+                        span: el.span,
+                    });
+                }
+            }
+            Some(tomet_semantics::ContentAllow::Names(names)) => {
+                let allowed_display: Vec<String> = names.iter().map(|n| n.to_string()).collect();
+                for_each_direct_content_element(content, |descendant| {
+                    let Ok(desc_kind) = classify_in(descendant, bindings) else {
+                        return;
+                    };
+                    let desc_name = desc_kind.as_str().to_string();
+                    if !names.iter().any(|n| n.to_string() == desc_name) {
+                        errors.push(Diagnostic::DisallowedInContent {
+                            name: desc_name,
+                            element: name.clone(),
+                            allowed: allowed_display.clone(),
+                            element_span: el.span,
+                            span: descendant.span,
+                        });
+                    }
+                });
+            }
+        }
+    });
+}
+
+/// Visits the immediate items of `content` that are elements -- a
+/// `Block::Element` directly, or an `Inline::Element` sitting inside a
+/// `Block::Paragraph` (an element placed *inline* rather than at its own
+/// line start, e.g. `@outer[ @mid[...] ]` all on one line). Deliberately
+/// one level only, unlike `:rule`'s own default: a nested element found
+/// here has its *own* `@content{allow:}` (if any) checked independently,
+/// the next time [`check_content_shape`]'s own `for_each_element` reaches
+/// it -- recursing into it here too would make an outer `allow:` list
+/// double as a rule for content several elements removed from it, which
+/// nothing asked for.
+fn for_each_direct_content_element<'a>(
+    content: &'a [Block],
+    mut f: impl FnMut(&'a tomet_ast::Element),
+) {
+    for block in content {
+        match block {
+            Block::Element(el) => f(el),
+            Block::Paragraph(p) => {
+                for inline in &p.content {
+                    if let Inline::Element(el) = inline {
+                        f(el);
+                    }
+                }
+            }
+            Block::Section(_) => {}
+        }
+    }
+}
+
 /// Reports `@settings`/`@config` keys that have been retired.
 ///
 /// One key so far, `elements:`, plus the `types:` map that sat beside it.
@@ -734,6 +824,97 @@ mod tests {
                 e,
                 Diagnostic::UnknownArgument { argument, .. } if argument == "colour"
             )),
+            "{errors:?}"
+        );
+    }
+
+    /// A vocabulary with `@content{allow:}` declared, for
+    /// `check_content_shape`'s own tests.
+    fn deck_with_content_allow() -> Bindings {
+        let vocab = tomet_semantics::Vocabulary::from_document(&parse(
+            r#"@kind(vocabulary)
+@vocabulary(deck){}
+
+@element(list){
+  display: block
+  // `item` resolves bare here (the document's own `@kind(deck)`), which
+  // `Bindings::classify` normalizes to `deck.item` even though it's
+  // written bare -- same pre-existing quirk `check_one_rule`'s own doc
+  // comment notes for `:rule(allow:...)`, so the allow-list has to name
+  // it the same way.
+  @content{ allow: list(deck.item) }
+}[ カードの一覧。 ]
+
+@element(item){
+  display: block
+  @content{ allow: inline }
+}[ 一覧の一項目。 ]
+"#,
+        ))
+        .expect("a vocabulary");
+        Bindings::for_document(&parse("@kind(deck)\n"), [vocab])
+    }
+
+    #[test]
+    fn content_allowed_by_name_is_clean() {
+        let doc = parse("@kind(deck)\n\n@list[\n  @item[ one ]\n  @item[ two ]\n]\n");
+        let errors = validate_document_with(&doc, &deck_with_content_allow());
+        assert!(
+            !errors
+                .iter()
+                .any(|e| matches!(e, Diagnostic::DisallowedInContent { .. })),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn content_not_in_the_allow_list_is_reported() {
+        let doc = parse("@kind(deck)\n\n@list[\n  @em[ not an item ]\n]\n");
+        let errors = validate_document_with(&doc, &deck_with_content_allow());
+        assert!(
+            errors.iter().any(|e| matches!(
+                e,
+                Diagnostic::DisallowedInContent { name, element, .. }
+                    if name == "em" && element == "list"
+            )),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn content_declared_inline_only_rejects_multiple_blocks() {
+        let doc = parse("@kind(deck)\n\n@item[\n  one\n\n  two\n]\n");
+        let errors = validate_document_with(&doc, &deck_with_content_allow());
+        assert!(
+            errors.iter().any(|e| matches!(
+                e,
+                Diagnostic::ContentNotInline { name, .. } if name == "item"
+            )),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn a_builtin_inline_only_kind_rejects_multiple_blocks() {
+        let doc = parse("@em[\n  one\n\n  two\n]\n");
+        let errors = validate_document_with(&doc, &Bindings::default());
+        assert!(
+            errors.iter().any(|e| matches!(
+                e,
+                Diagnostic::ContentNotInline { name, .. } if name == "em"
+            )),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn a_builtin_block_permitting_kind_allows_multiple_paragraphs() {
+        let doc = parse("@quote[\n  one\n\n  two\n]\n");
+        let errors = validate_document_with(&doc, &Bindings::default());
+        assert!(
+            !errors
+                .iter()
+                .any(|e| matches!(e, Diagnostic::ContentNotInline { .. })),
             "{errors:?}"
         );
     }

@@ -35,8 +35,9 @@ pub use flatten::{
 pub use footnote::{FootnoteItem, FootnoteRegistry};
 pub use heading::heading_level;
 pub use kind::{
-    BUILTIN_KINDS, ElementKind, Shape, UnknownName, builtin_region, builtin_singleton,
-    classify_std, classify_std_lenient, classify_std_name, is_directive, required_shape,
+    BUILTIN_KINDS, ContentShape, ElementKind, Shape, UnknownName, builtin_content_shape,
+    builtin_region, builtin_singleton, classify_std, classify_std_lenient, classify_std_name,
+    is_directive, required_shape,
     shape_mismatch,
 };
 pub use list::{list_items, list_ordered};
@@ -54,6 +55,6 @@ pub use target::{
 };
 pub use tomet_tree::{ElementExt, ValueExt};
 pub use vocabulary::{
-    Bindings, ElementDecl, LoadedVocabularies, ParamDecl, RESERVED_NAMESPACES, Region, Vocabulary,
-    builtin_doc_vocabularies,
+    Bindings, ContentAllow, ElementDecl, LoadedVocabularies, ParamDecl, RESERVED_NAMESPACES,
+    Region, Vocabulary, builtin_doc_vocabularies,
 };

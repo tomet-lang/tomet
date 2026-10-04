@@ -245,7 +245,49 @@ whoever picks this up next:
   of being squashed into `<span>`s on one line, the intended effect of
   this whole change, not a regression).
 
-Not yet started: step 4 (builtin content-shape table in
-`tomet-semantics`, `@content{allow:}` reading + enforcement) onward. Step
-1's classification above is the input step 4 needs to turn into an actual
-table.
+Step 4 done (builtin content-shape table + `@content{allow:}` reading and
+enforcement):
+
+- `tomet-semantics/src/kind.rs`: new `ContentShape` enum (`Inline`/
+  `Block`) and `builtin_content_shape(kind) -> Option<ContentShape>`,
+  exhaustively matching every `ElementKind` variant (compiler-checked, so
+  a future new kind can't silently go unclassified) -- the Step 1 table
+  above turned into code. `references` stays unclassified (`None`), same
+  reasoning as Step 1.
+- `tomet-semantics/src/vocabulary.rs`: `ElementDecl` gained
+  `content_allow: Option<ContentAllow>`, read from an `@element`'s own
+  `@content{allow:}` child the same way `params_from_element` finds
+  `@args` (search `{...}`'s children by classified kind). `ContentAllow`
+  has `Names(Vec<Name>)` / `Inline` / `Any`. Correction to the old "can't
+  be read even in principle" comment that used to sit on `ElementDecl`:
+  `list(...)` already parses fine (`Value::Call`); `element_data`'s own
+  `normalize_data_value` turns it into `Value::Seq` before this ever sees
+  it, so the decoder matches `Value::Seq`, not `Value::Call`.
+- `tomet-semantics-validator`: new `Diagnostic::ContentNotInline` (a kind
+  whose content-shape is `Inline`/`ContentAllow::Inline` holds more than
+  one plain paragraph) and `Diagnostic::DisallowedInContent` (a name not
+  in an `@content{allow:list(...)}`), both default `Severity::Error` via
+  the existing wildcard. New `check_content_shape`, wired into
+  `validate_document_with` alongside the other checks. `@content{allow:}`
+  enforcement is deliberately **one level only** (direct content items,
+  not recursed into found elements' own content) -- unlike `:rule`'s
+  default -- so an outer `allow:` list doesn't double as a rule for a
+  found element's *own* nested content, which gets checked independently
+  when `for_each_element` reaches that element itself. New
+  `for_each_direct_content_element` helper does this one-level walk
+  (`Block::Element` directly, or `Inline::Element` inside a
+  `Block::Paragraph` -- an element placed inline rather than at its own
+  line start).
+- Full `cargo test --workspace` (minus `tomet-python`) stays green with
+  the new check wired in live -- no existing fixture anywhere in the repo
+  trips `ContentNotInline`/`DisallowedInContent`, and no vault's existing
+  `.tomet/vocabularies/*.vocabulary.tmt` declares `@content{allow:}` yet
+  (brand new feature), so `content_allow` is `None` (no check) for every
+  real custom element today.
+
+Not yet started: step 5 (printer round-trip stability double-check --
+largely already covered by `render_content_blocks`'s design in the prior
+commit, but not separately re-verified against the full corpus beyond
+what `cargo test` already does) onward. Step 6 (add `@conflict` itself to
+`BUILTIN_KINDS`) needs `builtin_content_shape`/`required_shape`/etc. each
+to grow a `Conflict` arm once it exists.

@@ -134,6 +134,25 @@ pub enum Diagnostic {
         rule_span: Span,
         span: Span,
     },
+    /// `[content]`/`|content` holds more than a single plain paragraph
+    /// (multiple paragraphs, a nested heading/list/element, ...) where
+    /// `name`'s content-shape -- built in (`tomet_semantics::
+    /// builtin_content_shape`), or a vocabulary's own `@content{allow:
+    /// inline}` -- only permits one.
+    ContentNotInline { name: String, span: Span },
+    /// A descendant found inside `[content]`/`|content` whose classified
+    /// name is not in the `@content{allow:list(...)}` that `element`'s
+    /// vocabulary declares. `span` is the offending descendant's own
+    /// span; `element_span` is the enclosing element's, so a reader can
+    /// see both "found here" and "restricted here" -- same split
+    /// [`Diagnostic::DisallowedByRule`] makes for `:rule(...)`.
+    DisallowedInContent {
+        name: String,
+        element: String,
+        allowed: Vec<String>,
+        element_span: Span,
+        span: Span,
+    },
     /// A top-level `@settings`/`@config` key that has been retired.
     ///
     /// `elements:` described what a custom element takes -- its `args`,
@@ -167,6 +186,8 @@ impl Diagnostic {
             Diagnostic::MissingRequiredArgument { span, .. } => *span,
             Diagnostic::Draft { span, .. } => *span,
             Diagnostic::Fixme { span, .. } => *span,
+            Diagnostic::ContentNotInline { span, .. } => *span,
+            Diagnostic::DisallowedInContent { span, .. } => *span,
         }
     }
 
@@ -315,6 +336,26 @@ impl fmt::Display for Diagnostic {
                 } else {
                     write!(f, "marked to fix: {note}")
                 }
+            }
+            Diagnostic::ContentNotInline { name, .. } => {
+                write!(
+                    f,
+                    "`{name}`'s content can only be a single paragraph of plain text, \
+                     not multiple blocks"
+                )
+            }
+            Diagnostic::DisallowedInContent {
+                name,
+                element,
+                allowed,
+                ..
+            } => {
+                write!(
+                    f,
+                    "`{name}` is not allowed in `{element}`'s content; its vocabulary's \
+                     `@content{{allow:...}}` permits only {}",
+                    allowed.join(", ")
+                )
             }
             Diagnostic::RetiredSettingsKey { key, .. } => {
                 // Named per key rather than one generic sentence: `elements`

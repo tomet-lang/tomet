@@ -75,10 +75,7 @@ pub struct ParamDecl {
 
 /// One element, as a vocabulary declares it.
 ///
-/// `@args` is read; `@data` and `@content` are not yet. `@content`'s
-/// `allow: (link, em)` cannot be read even in principle today -- a
-/// parenthesised value has no form in `_entry_value`, so it arrives as
-/// the string `"(link, em)"`.
+/// `@args` and `@content` are read; `@data` is not yet.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ElementDecl {
     /// The shape this element may take, or `None` for either.
@@ -87,6 +84,24 @@ pub struct ElementDecl {
     pub singleton: bool,
     /// `(args)`, in declaration order.
     pub params: Vec<ParamDecl>,
+    /// `@content{allow:}`, or `None` when the element declared no
+    /// `@content` at all -- distinct from `Some(ContentAllow::Any)`
+    /// (`@content{allow: any}`, written out), the same "absent says
+    /// nothing, not none" reasoning `@data`'s `open:` already has.
+    pub content_allow: Option<ContentAllow>,
+}
+
+/// `@content{allow:}`'s value -- what a vocabulary's own element may hold
+/// in `[content]`/`|content` (`Vec<Block>`, see `tmtroot/docs/spec/
+/// feature/content-shape.tmt`).
+#[derive(Debug, Clone, PartialEq)]
+pub enum ContentAllow {
+    /// `allow: list(a, b)` -- only these names, at any depth.
+    Names(Vec<Name>),
+    /// `allow: inline` -- at most one plain paragraph, no nested blocks.
+    Inline,
+    /// `allow: any` -- any blocks, any names.
+    Any,
 }
 
 impl ElementDecl {
@@ -176,6 +191,7 @@ pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
                     display: Some(Shape::Inline),
                     region: Region::Body,
                     singleton: false,
+                    content_allow: None,
                     params: vec![
                         ParamDecl {
                             name: "name".to_string(),
@@ -570,6 +586,50 @@ fn decl_from_element(el: &tomet_ast::Element) -> ElementDecl {
             .and_then(|v| v.as_bool())
             .unwrap_or(false),
         params: params_from_element(el),
+        content_allow: content_allow_from_element(el),
+    }
+}
+
+/// The `@content{allow:}` declared inside an `@element`, if any.
+///
+/// Same shape as [`params_from_element`]'s search for `@args`: `@content`
+/// is one of `@element`'s own `{...}` children, found by classified kind
+/// rather than by position.
+fn content_allow_from_element(el: &Element) -> Option<ContentAllow> {
+    let value = el.value.as_ref()?;
+    let content_el = value
+        .as_children()
+        .into_iter()
+        .find(|child| classify_std_lenient(child) == ElementKind::Content)?;
+    let data = crate::embedded::element_data(content_el)?;
+    match data.get("allow")? {
+        Value::String(s) if s == "inline" => Some(ContentAllow::Inline),
+        Value::String(s) if s == "any" => Some(ContentAllow::Any),
+        // `list(...)` -- `element_data` already ran this through
+        // `normalize_data_value`, which turns `Value::Call("list", args)`
+        // into `Value::Seq(args)` before this ever sees it (unlike
+        // `:rule(allow:list(...))`'s own reader, `tomet-semantics-
+        // validator::rule::decode_rule_args`, which reads straight off
+        // `(args)` with no normalization pass in between).
+        Value::Seq(items) => {
+            let mut names = Vec::with_capacity(items.len());
+            for item in items {
+                names.push(name_from_dotted(item.as_str()?));
+            }
+            Some(ContentAllow::Names(names))
+        }
+        _ => None,
+    }
+}
+
+/// `"ns.mycard"` -> a namespaced [`Name`]; `"card"` -> a bare one. Same
+/// split `tomet-semantics-validator::rule`'s own copy uses for
+/// `:rule(allow:list(...))` -- duplicated rather than shared, since that
+/// crate depends on this one, not the other way around.
+fn name_from_dotted(s: &str) -> Name {
+    match s.split_once('.') {
+        Some((namespace, name)) => Name::namespaced(namespace, name),
+        None => Name::bare(s),
     }
 }
 
@@ -698,6 +758,67 @@ mod tests {
             tags.ty,
             Some(Value::Seq(vec![Value::String("string".to_string())]))
         );
+    }
+
+    #[test]
+    fn reads_content_allow_as_a_name_list() {
+        let v = vocab(
+            r#"@kind(vocabulary)
+@vocabulary(deck){ version: "1.0.0" }
+
+@element(card){
+  display: block
+  @content{ allow: list(link, em, ns.widget) }
+}[
+  カード一枚。
+]
+"#,
+        );
+        let card = &v.elements["card"];
+        assert_eq!(
+            card.content_allow,
+            Some(ContentAllow::Names(vec![
+                name("link"),
+                name("em"),
+                name("ns.widget"),
+            ]))
+        );
+    }
+
+    #[test]
+    fn reads_content_allow_inline_and_any() {
+        let v = vocab(
+            r#"@kind(vocabulary)
+@vocabulary(deck){ version: "1.0.0" }
+
+@element(label){
+  @content{ allow: inline }
+}[ 短い説明。 ]
+
+@element(box){
+  @content{ allow: any }
+}[ 何でも。 ]
+"#,
+        );
+        assert_eq!(
+            v.elements["label"].content_allow,
+            Some(ContentAllow::Inline)
+        );
+        assert_eq!(v.elements["box"].content_allow, Some(ContentAllow::Any));
+    }
+
+    #[test]
+    fn no_content_declaration_is_none() {
+        let v = vocab(
+            r#"@kind(vocabulary)
+@vocabulary(deck){ version: "1.0.0" }
+
+@element(plain){
+  display: block
+}[ 何も宣言しない。 ]
+"#,
+        );
+        assert_eq!(v.elements["plain"].content_allow, None);
     }
 
     /// An element with no `@args` declares no parameters. That is not the
