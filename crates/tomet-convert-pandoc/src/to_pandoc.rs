@@ -139,6 +139,23 @@ fn element_to_blocks(el: &Element) -> Vec<Block> {
             }
             vec![Block::Para(inlines)]
         }
+        // Both sides, each a real nested `Div`, rather than the generic
+        // `Div`/`flatten_element_data` fallback below -- `a`/`b` are
+        // block content (`Value::Blocks`), which that fallback flattens
+        // into a lossy attribute string. Showing both, marked, rather
+        // than silently picking one: discarding a side here would make
+        // `tomet check`'s own `Diagnostic::Conflict` warning pointless
+        // the moment someone exports.
+        "conflict" => {
+            let (a, b) = conflict_sides(el);
+            vec![Block::Div(
+                Attr::with_class("tm-conflict"),
+                vec![
+                    Block::Div(Attr::with_class("tm-conflict-a"), element_content_to_blocks(&a)),
+                    Block::Div(Attr::with_class("tm-conflict-b"), element_content_to_blocks(&b)),
+                ],
+            )]
+        }
         // An inline-only kind can still stand alone on its line -- the
         // placement rule makes `@link(...)[x]` on its own line a block.
         // It keeps its own mapping and gets wrapped, rather than falling
@@ -200,11 +217,68 @@ fn element_to_inlines(el: &Element) -> Vec<Inline> {
         // the Typst writer already sets this precedent.
         "interp" => vec![Inline::Code(Attr::empty(), interp_source(el))],
         "raw" => vec![Inline::Code(code_attr(el), content_to_plain_text(el))],
+        // Same reasoning as the block-position arm above -- both sides
+        // shown, not one silently dropped. Pandoc's `Inline` has no
+        // block-content carrier, so each side's blocks are flattened to
+        // a single run (fine for the common inline case, a short phrase
+        // each; a multi-paragraph side forced into running text loses
+        // its paragraph breaks here, same loss any inline flattening
+        // takes).
+        "conflict" => {
+            let (a, b) = conflict_sides(el);
+            vec![Inline::Span(
+                Attr::with_class("tm-conflict"),
+                vec![
+                    Inline::Span(Attr::with_class("tm-conflict-a"), blocks_to_inlines_lossy(&a)),
+                    Inline::Span(Attr::with_class("tm-conflict-b"), blocks_to_inlines_lossy(&b)),
+                ],
+            )]
+        }
         _ => vec![Inline::Span(
             generic_attr(el, &kind),
             content_to_inlines(el),
         )],
     }
+}
+
+/// `a`/`b` out of `@conflict`'s `(args)` -- block content
+/// (`Value::Blocks`), not a scalar, so it cannot go through
+/// `flatten_element_data`/`generic_attr` at all.
+fn conflict_sides(el: &Element) -> (Vec<TmBlock>, Vec<TmBlock>) {
+    let Some(Value::Map(entries)) = normalized_element_args(el) else {
+        return (Vec::new(), Vec::new());
+    };
+    let side = |key: &str| -> Vec<TmBlock> {
+        entries
+            .iter()
+            .find(|(k, _)| k == key)
+            .and_then(|(_, v)| match v {
+                Value::Blocks(blocks) => Some(blocks.clone()),
+                _ => None,
+            })
+            .unwrap_or_default()
+    };
+    (side("a"), side("b"))
+}
+
+/// Flattens block content to one `Inline` run -- for `@conflict` forced
+/// into inline position (legal: it takes either shape), where Pandoc's
+/// `Inline` has nothing that can carry real blocks. A paragraph's own
+/// inlines join directly; anything else (a nested element, a section
+/// title) contributes what its own inline form would.
+fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
+    let mut out = Vec::new();
+    for (i, block) in blocks.iter().enumerate() {
+        if i > 0 {
+            out.push(Inline::LineBreak);
+        }
+        match block {
+            TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
+            TmBlock::Element(el) => out.extend(element_to_inlines(el)),
+            TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
+        }
+    }
+    out
 }
 
 // ---- content -------------------------------------------------------

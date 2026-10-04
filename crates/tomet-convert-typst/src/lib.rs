@@ -202,6 +202,7 @@ fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
         "raw" => render_raw(el, inline),
         "quote" => render_quote(cx, el, inline),
         "callout" => render_callout(cx, el),
+        "conflict" => render_conflict(cx, el),
         "table" => render_table(cx, el),
         "link" => render_link(cx, el),
         "file" | "dir" => render_path(cx, el, inline),
@@ -344,6 +345,37 @@ fn render_callout(cx: &TypstCtx, el: &Element) -> String {
         None => format!("*[{variant}]*"),
     };
     format!("#block(inset: 8pt, stroke: (left: 2pt))[{header}\n\n{body}]")
+}
+
+/// `@conflict(a: ..., b: ...)` -- both sides rendered, clearly marked as
+/// unresolved, rather than the generic fallback's dropped-args behavior
+/// (`a`/`b` are block content, which the generic path can't carry at
+/// all -- `render_generic` only ever reads `el.content`, and `@conflict`
+/// has none). Showing both: picking one side here would make `tomet
+/// check`'s own `Diagnostic::Conflict` warning pointless the moment
+/// someone exports.
+fn render_conflict(cx: &TypstCtx, el: &Element) -> String {
+    let (a, b) = conflict_sides(el);
+    let a_body = blocks_to_typst(cx, &a);
+    let b_body = blocks_to_typst(cx, &b);
+    format!(
+        "#block(inset: 8pt, stroke: (left: 2pt, paint: red))[*unresolved conflict*\n\n\
+         *a:*\n{a_body}\n\n*b:*\n{b_body}]"
+    )
+}
+
+/// Reads `a`/`b` out of `el`'s `(args)` -- block content
+/// (`Value::Blocks`), not a scalar.
+fn conflict_sides(el: &Element) -> (Vec<Block>, Vec<Block>) {
+    let args = normalized_element_args(el);
+    let map = args.as_ref().and_then(as_map);
+    let side = |key: &str| -> Vec<Block> {
+        match map.and_then(|m| map_get(m, key)) {
+            Some(Value::Blocks(blocks)) => blocks.clone(),
+            _ => Vec::new(),
+        }
+    };
+    (side("a"), side("b"))
 }
 
 fn callout_variant_and_title(el: &Element) -> (String, Option<String>) {

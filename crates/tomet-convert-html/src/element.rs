@@ -57,8 +57,50 @@ pub(crate) fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inl
         "quote" => render_quote_element(cx, el, out, inline),
         "table" => render_table_element(cx, el, out),
         "tag" => render_tag_element(cx, el, out, inline),
+        "conflict" => render_conflict_element(cx, el, out, inline),
         _ => render_custom_or_generic_element(cx, el, kind.as_str(), out, inline),
     }
+}
+
+/// `@conflict(a: ..., b: ...)` -- unlike the generic fallback's
+/// `data-*` attributes (lossy for block content, which is exactly what
+/// `a`/`b` hold), both sides are rendered as real nested content so
+/// nothing is silently dropped. Marked, not resolved: picking one side
+/// and discarding the other here would make `tomet check`'s own
+/// `Diagnostic::Conflict` warning pointless the moment someone exports.
+fn render_conflict_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
+    let (a, b) = conflict_sides(cx, el);
+    let tag = if inline { "span" } else { "div" };
+    out.push_str(&format!("<{tag} class=\"tm-element tm-conflict\""));
+    if let Some(id) = id_attr(el.id.as_ref()) {
+        out.push_str(&format!(" id=\"{}\"", escape_attr(&id)));
+    }
+    out.push('>');
+    out.push_str("<div class=\"tm-conflict-a\">");
+    crate::block::render_content_blocks(cx, &a, out);
+    out.push_str("</div>");
+    out.push_str("<div class=\"tm-conflict-b\">");
+    crate::block::render_content_blocks(cx, &b, out);
+    out.push_str("</div>");
+    out.push_str(&format!("</{tag}>"));
+    if !inline {
+        out.push('\n');
+    }
+}
+
+/// Reads `a`/`b` out of `el`'s `(args)` -- block content
+/// (`tomet_ast::Value::Blocks`), not a scalar, so it cannot go through
+/// `push_data_attrs`/the generic flatten path at all.
+fn conflict_sides(cx: &RenderCtx, el: &Element) -> (Vec<tomet_ast::Block>, Vec<tomet_ast::Block>) {
+    let args = normalized_element_args_in(el, cx.bindings);
+    let map = args.as_ref().and_then(crate::util::as_map);
+    let side = |key: &str| -> Vec<tomet_ast::Block> {
+        match map.and_then(|m| crate::util::map_get(m, key)) {
+            Some(tomet_ast::Value::Blocks(blocks)) => blocks.clone(),
+            _ => Vec::new(),
+        }
+    };
+    (side("a"), side("b"))
 }
 
 fn render_tag_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {

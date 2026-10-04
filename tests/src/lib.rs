@@ -209,6 +209,9 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // no "block content" alternative, so even one bracket pair at a
     // value position errors. Same fix path as `syntax/value-element.tmt`.
     ("syntax/block-value.tmt", &[MISSING_NODE, "]"]),
+    // Same gap as `syntax/block-value.tmt` just above, hit again by
+    // `@conflict`'s own positional shorthand (`@conflict([...], [...])`).
+    ("syntax/conflict.tmt", &[ANY_ERROR]),
 ];
 
 /// Records a fixture as drifting wholesale, without pinning the text of

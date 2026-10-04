@@ -181,6 +181,7 @@ fn element_to_md(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
         "raw" => render_raw(el, inline),
         "quote" => render_quote(cx, el, inline),
         "callout" => render_callout(cx, el),
+        "conflict" => render_conflict(cx, el, inline),
         "table" => render_table(cx, el),
         "link" => render_link(cx, el),
         "file" | "dir" => render_path(cx, el, inline),
@@ -649,6 +650,39 @@ fn render_generic(cx: &MarkdownCtx, el: &Element, kind: &str, inline: bool) -> S
     }
     out.push_str(&format!("</{tag}>"));
     out
+}
+
+/// `@conflict(a: ..., b: ...)` -- raw HTML passthrough, same spirit as
+/// `render_generic`, but unlike that fallback both sides are rendered as
+/// real nested content rather than flattened into a lossy `data-*`
+/// attribute (which is what `a`/`b`'s block content would otherwise
+/// collapse to). Showing both, marked, rather than silently picking one:
+/// discarding a side here would make `tomet check`'s own
+/// `Diagnostic::Conflict` warning pointless the moment someone exports.
+fn render_conflict(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
+    let (a, b) = conflict_sides(el);
+    let tag = if inline { "span" } else { "div" };
+    format!(
+        "<{tag} class=\"tm-element tm-conflict\"><div class=\"tm-conflict-a\">{}</div>\
+         <div class=\"tm-conflict-b\">{}</div></{tag}>",
+        blocks_to_md(cx, &a),
+        blocks_to_md(cx, &b),
+    )
+}
+
+/// Reads `a`/`b` out of `el`'s `(args)` -- block content (`Value::Blocks`),
+/// not a scalar, so it cannot go through `push_data_attrs`/the generic
+/// flatten path at all.
+fn conflict_sides(el: &Element) -> (Vec<Block>, Vec<Block>) {
+    let args = normalized_element_args(el);
+    let map = args.as_ref().and_then(as_map);
+    let side = |key: &str| -> Vec<Block> {
+        match map.and_then(|m| map_get(m, key)) {
+            Some(Value::Blocks(blocks)) => blocks.clone(),
+            _ => Vec::new(),
+        }
+    };
+    (side("a"), side("b"))
 }
 
 fn push_data_attrs(out: &mut String, args: &Value) {

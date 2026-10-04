@@ -359,3 +359,67 @@ note. Verified with the real CLI: `tomet check` on a document with an
 unresolved `@conflict` reports the warning and still exits 0 ("OK (1
 warning(s))"). New test
 `tests::conflict_is_a_warning` in `tomet-semantics-validator`.
+
+New fixture `tests/fixtures/syntax/conflict.tmt` added (step 7's own
+wording explicitly asked for this one, unlike generic builtins): covers
+`@meta{x: @conflict(a: 2, b: 3)}` (scalar, embedded), block `a`/`b`
+content standing in the document body (multi-paragraph), and the
+`@conflict([...], [...])` positional shorthand. Recorded in
+`KNOWN_TS_ERRORS` (same `grammar.js` gap as `syntax/block-value.tmt`).
+
+**Second bug found this session, more serious than the printer one**:
+manually converting a document with `@conflict` to HTML/Pandoc revealed
+that every non-`.tmt` export (html/markdown/pandoc/typst) silently
+destroyed `a`/`b`'s content entirely -- the generic "unknown element"
+fallback in each converter flattens `(args)` into scalar attributes via
+`flatten_element_data`/`value_to_json`, and `Value::Blocks` has no
+scalar projection (by design, from the prerequisite task), so it
+collapsed to a lossy placeholder string (`"<N block(s)>"`) with the real
+content gone. Reported to the user with the actual broken HTML output as
+evidence; user agreed the fix should render **both sides, visibly,
+marked as unresolved** rather than silently picking one (silently
+picking `a` would make `tomet check`'s own new warning pointless -- a
+reader could ignore the warning, export, and get a document that looks
+fully resolved).
+
+Fixed with a dedicated renderer per converter (the same pattern
+`callout`/`ruby`/`quote` already use when the generic fallback's
+"args are flat scalar metadata, content is the real body" shape doesn't
+fit a kind) -- `@conflict`'s `a`/`b` live in args as `Value::Blocks`, so
+none of the four generic fallbacks ever look at them as real content:
+
+- `tomet-convert-html` (`element.rs`): `render_conflict_element`, two
+  nested `<div class="tm-conflict-a/b">` inside `<div class="tm-conflict">`,
+  rendered via `render_content_blocks` (real fidelity, not flattening).
+- `tomet-convert-markdown` (`export.rs`): `render_conflict`, same
+  structure as raw HTML passthrough (this converter's existing fallback
+  for anything with no CommonMark mapping).
+- `tomet-convert-typst` (`lib.rs`): `render_conflict`, an
+  `#block(inset:..., stroke:...)` box (same visual idiom as
+  `render_callout`) with both sides labelled `*a:*`/`*b:*`.
+- `tomet-convert-pandoc` (`to_pandoc.rs`): both block position
+  (`element_to_blocks`: nested `Div`s, real `element_content_to_blocks`
+  fidelity) and inline position (`element_to_inlines`: nested `Span`s,
+  via a new `blocks_to_inlines_lossy` -- `@conflict` takes either shape,
+  and Pandoc's `Inline` has no block-content carrier at all, so a side
+  forced into running text loses its paragraph breaks, same loss any
+  inline flattening takes; the block-position case, the normal one, has
+  full fidelity).
+
+Verified by hand with the real CLI across all four formats: both sides'
+full text (including a two-paragraph side) come through intact and
+visibly marked in every output. Pandoc's own round-trip
+(`.tmt -> pandoc -> .tmt`) was checked too: `@conflict` comes back as
+generic `@div[@div[...] @div[...]]`, losing the "this was a conflict"
+tag and the a/b labels specifically, but -- the actual regression this
+was about -- losing none of the *content*. Left as-is: `pandoc_round_
+trip_is_stable`'s own doc comment already states this bridge is lossy by
+design ("this does not assert a round trip -- it pins where the losses
+land"), and recovering the kind/label through Pandoc's JSON on top of
+that is a separate, smaller nice-to-have, not the regression that was
+reported.
+
+All of `cargo build`/`cargo test --workspace` (minus `tomet-python`) and
+`cargo test -p tomet-tests -p tree-sitter-tomet` green throughout,
+snapshot refs regenerated (`TOMET_UPDATE_REF=1`) and hand-checked before
+accepting.
