@@ -1,6 +1,7 @@
 @kind(todo)
 
 - `tellme`, `show`
+- `;`、schema
 - address絶対性
 - `directive`は本当に`@`なのか。
 - tove内の`@`は何を意味するのか？
