@@ -47,6 +47,10 @@ path = "src/syntax_report.rs"
 name = "rule"
 path = "src/rule.rs"
 
+[[test]]
+name = "block_value_loss"
+path = "src/block_value_loss.rs"
+
 [dependencies]
 tomet-ast = { workspace = true }
 tomet-compute = { workspace = true }
