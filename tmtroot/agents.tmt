@@ -95,19 +95,28 @@ This is a parser/CLI/LSP/editor-extensions project with no standalone GUI app. V
 -| For editor extensions (@dir(editors/vscode), @dir(editors/zed), @dir(editors/helix)), verify
  | via reading code and running their own tests.
 
-==[ Task tracking ]
+==[ Task tracking & Workspaces ]
 
 Before starting implementation on any non-trivial task, create a new file under @dir(.agents/tasks/) (one file per task, e.g. `.agents/tasks/<short-task-slug>.md`) that breaks the work into discrete steps. Update that file immediately after completing each step, marking it done. Keep it accurate and current so that if work is interrupted partway through, it can always be resumed from that file alone, without needing prior conversation context. Multiple task files may coexist under @dir(.agents/tasks/) when several non-trivial tasks are in flight; do not let one task's file block or get overwritten by another's.
+
+For non-trivial tasks, isolate work in a dedicated Jujutsu workspace under @dir(.agents/workspaces/):
+- Create the workspace before starting edits: `mkdir -p .agents/workspaces && jj workspace add .agents/workspaces/<short-task-slug>`
+- Perform edits, builds, and verification within that workspace directory.
+- Minor tasks (such as one-off typos or trivial single-file tweaks) may be performed directly in the default workspace.
+- When the task is completed and verified, clean up the workspace: `jj workspace forget <short-task-slug>` and remove the directory `rm -rf .agents/workspaces/<short-task-slug>`.
 
 If a session has to end early — for any reason, including a warning that a usage limit is close — stop at the next safe checkpoint. Finish the current atomic step rather than starting a new one, and write the state and the next steps into the task file before ending. Create the file at that point if the task never got one.
 
 When the task is done, fold anything worth keeping into where it belongs — a doc comment, a writ entry, a commit message — and then delete the task file. Deleting without folding is how the only copy of a decision gets lost; decide the destination when the task is created, not when it is deleted.
 
-==[ Commits ]
+==[ Commits & Version Control (jj) ]
 
+The repository uses Jujutsu (`jj`) in colocated mode with Git.
+-| Favor a branchless workflow. Do not create named Git branches for regular agent tasks.
 -| All commit messages must follow the convention in @file(CONTRIBUTING.md):
  | `type(scope): description` (e.g. `feat(cli): add export check`, `fix(parser): handle pipe`).
--| Never commit automatically or on your own initiative. Always ask and get explicit confirmation from the user before committing.
+-| Use `jj describe -m "..."` to set commit messages, and `jj new` to advance to subsequent revisions.
+-| Never commit automatically or on your own initiative. Always ask and get explicit confirmation from the user before finalizing commits or descriptions.
 -| Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit
  | messages. The session trailer embeds a URL, and a commit message is
  | published the moment it is pushed. This overrides the harness default that
