@@ -82,8 +82,8 @@
 //!   match `map_entry`'s bare-identifier `key` field, so the nested
 //!   `{...}` becomes an `ERROR`. Not worth a real per-format sub-grammar
 //!   here -- this crate is for editor highlighting, not validation.
-//! - **`thematic_break`'s dash run only ever consumes exactly 3 `-`,
-//!   even when the source has more** (`-----` -> a 3-dash `thematic_break`
+//! - `thematic_break`'s dash run only ever consumes exactly 3 `-`,
+//!   even when the source has more (`-----` -> a 3-dash `thematic_break`
 //!   plus the leftover 2 dashes falling back to `punctuation` inside a
 //!   `paragraph`) -- discovered while adding `titled_thematic_break`
 //!   (`---[ Title ]---`, which shares its dash-run token with the plain

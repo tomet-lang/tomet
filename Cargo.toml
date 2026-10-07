@@ -66,6 +66,7 @@ members = [
 
   #= Extract -- extraction of tomet from external source files / comments
   "crates/tomet-extract",
+  "crates/tomet-extract-rust",
 
   #= Format -- .tmt source text production & formatting
   "crates/tomet-format",
@@ -120,6 +121,7 @@ tomet-pandoc = { path = "crates/tomet-convert-pandoc" }
 tomet-typst = { path = "crates/tomet-convert-typst" }
 #= Extract
 tomet-extract = { path = "crates/tomet-extract" }
+tomet-extract-rust = { path = "crates/tomet-extract-rust" }
 #= Format
 tomet-field-utils = { path = "crates/tomet-format-field-utils" }
 tomet-formatter = { path = "crates/tomet-format" }
@@ -167,6 +169,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde-wasm-bindgen = "0.6"
 serde_yaml = "0.9"
+syn = { version = "2.0", features = ["full", "visit"] }
 time = "0.3"
 tokio = "1"
 toml = { version = "0.9", features = ["preserve_order"] }

@@ -1990,6 +1990,7 @@ dependencies = [
  "tomet-ast",
  "tomet-compute",
  "tomet-config",
+ "tomet-extract-rust",
  "tomet-formatter",
  "tomet-html",
  "tomet-indexer",
@@ -2007,6 +2008,7 @@ dependencies = [
  "tomet-typst",
  "tomet-validator",
  "tomet-workspace",
+ "toml",
  "tove",
  "uuid",
  "walkdir",
@@ -2058,6 +2060,18 @@ dependencies = [
  "tomet-ast",
  "tomet-cst",
  "tomet-parser",
+ "tomet-tree",
+]
+
+[[package]]
+name = "tomet-extract-rust"
+version = "0.1.0"
+dependencies = [
+ "syn 2.0.119",
+ "tomet-ast",
+ "tomet-extract",
+ "tomet-parser",
+ "tomet-printer",
  "tomet-tree",
 ]
 

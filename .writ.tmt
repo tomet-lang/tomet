@@ -25,7 +25,7 @@ does not relax the rule to fit the change it wanted to make.
         "crates/tomet-format*",
         "crates/tomet-convert-*",
         "crates/tomet-transform",
-        "crates/tomet-extract",
+        "crates/tomet-extract*",
         "crates/tomet-search",
         "crates/tomet-edit",
         "crates/tomet-stats",

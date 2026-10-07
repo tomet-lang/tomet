@@ -62,6 +62,9 @@
     ignore: list( "00-09 System/01 Apps/obsidian" )
     unswept: list( "tests/fixtures", "tests/ref", "tests/store" )
   }
+  api: {
+    rust: { out: "tmtroot/generated/crates" }
+  }
   migration: {
     meta: {
       created: { type: datetime, format: iso8601 }

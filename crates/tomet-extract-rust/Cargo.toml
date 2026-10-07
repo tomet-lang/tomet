@@ -1,0 +1,17 @@
+[package]
+name = "tomet-extract-rust"
+version.workspace = true
+edition.workspace = true
+description = "Extract Tomet API documentation from Rust crates using syn"
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-extract = { workspace = true }
+tomet-parser = { workspace = true }
+tomet-tree = { workspace = true }
+
+#= Crates.io
+syn = { workspace = true }
+
+[dev-dependencies]
+tomet-printer = { workspace = true }

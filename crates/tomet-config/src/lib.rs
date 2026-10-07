@@ -67,6 +67,8 @@ pub struct PrinterConfig {
     /// Vocabulary files this vault declares, by the same rule -- each one
     /// names itself with `@vocabulary(ns)`.
     pub vocabularies: Vec<String>,
+    /// `api.rust.out` -- destination directory for extracted Rust API .tmt documents.
+    pub api_rust_out: Option<String>,
 }
 
 /// Reads a declared list of paths. A single string is accepted as a
@@ -328,6 +330,27 @@ impl PrinterConfig {
             }
             "vocabularies" => {
                 collect_paths(value, &mut cfg.vocabularies);
+            }
+            "api" => {
+                if let Value::Map(entries) = value {
+                    for (lang, lang_val) in entries {
+                        if lang == "rust" {
+                            if let Some(out_val) = lang_val.get("out").and_then(|v| v.as_str()) {
+                                cfg.api_rust_out = Some(out_val.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+            "api.rust" => {
+                if let Some(out_val) = value.get("out").and_then(|v| v.as_str()) {
+                    cfg.api_rust_out = Some(out_val.to_string());
+                }
+            }
+            "api.rust.out" => {
+                if let Some(out_val) = value.as_str() {
+                    cfg.api_rust_out = Some(out_val.to_string());
+                }
             }
             // No `elements` arm. It used to reach `callout`, `list` and
             // `table` here and read their style out -- a fifth spelling of
@@ -679,8 +702,7 @@ mod tests {
 
     // Loading the shared `test.config.tmt`/`default.config.tmt` fixtures
     // lives in the `tomet-tests` package now. It used to walk up parent
-    // directories to find the repo root, which `crates/README.dirs.tmt`
-    // flags as sensitive to how deep this crate is nested.
+    // directories to find the repo root, which is sensitive to how deep this crate is nested.
 
     #[test]
     fn test_ignore_files_config_parsing() {
@@ -780,5 +802,28 @@ mod tests {
             cfg5.element_group_order("image"),
             Some(GroupOrder::ArgsFirst)
         );
+    }
+
+    #[test]
+    fn test_api_rust_out_config() {
+        let src1 = r#"@config{
+  api: {
+    rust: {
+      out: "docs/api"
+    }
+  }
+}
+"#;
+        let cfg1 = load_config_from_str(src1).expect("failed to parse config");
+        assert_eq!(cfg1.api_rust_out, Some("docs/api".to_string()));
+
+        let src2 = r#"@config{
+  api.rust: {
+    out: "target/api"
+  }
+}
+"#;
+        let cfg2 = load_config_from_str(src2).expect("failed to parse config");
+        assert_eq!(cfg2.api_rust_out, Some("target/api".to_string()));
     }
 }
