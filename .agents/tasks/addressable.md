@@ -40,9 +40,7 @@ Existing conventions to stay consistent with:
 Spec (`tmtroot/docs/spec/syntax/addressable.tmt`) now holds: address shape, steps,
 unique property + scope, templates, reference stability. Steps 1-4 of the original
 plan are DONE and live in the spec (that file is the source of truth, not this one).
-**The spec file itself still says `_id`/`#id(x)` and needs updating to match the
-2026-10-02 supersession above -- not done this session (docs were explicitly
-off-limits for this session's agent), left for the author or a future session.**
+**The spec file itself was updated to match the 2026-10-02 supersession (`#(x)`).**
 
 Implementation (the last "Open" item below) landed 2026-10-02: `Element.id`/
 `Section.id: Option<Id>` in both parser pipelines, the validator, printer, every
