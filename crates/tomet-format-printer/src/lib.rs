@@ -1451,11 +1451,17 @@ mod tests {
     fn test_container_children_indentation() {
         let mut child1 = element_new(Sigil::Bare);
         child1.args = Some(Value::Int(1));
-        child1.content = Some(vec![Block::Paragraph(Paragraph::new(vec![Inline::Text("note 1".into())], tomet_ast::Span::dummy()))]);
+        child1.content = Some(vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Text("note 1".into())],
+            tomet_ast::Span::dummy(),
+        ))]);
 
         let mut child2 = element_new(Sigil::Bare);
         child2.args = Some(Value::Int(2));
-        child2.content = Some(vec![Block::Paragraph(Paragraph::new(vec![Inline::Text("note 2".into())], tomet_ast::Span::dummy()))]);
+        child2.content = Some(vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Text("note 2".into())],
+            tomet_ast::Span::dummy(),
+        ))]);
 
         let mut links = element_new(Sigil::named("links"));
         links.value = Some(ElementValue::from_children(vec![child1, child2]));
@@ -1473,7 +1479,10 @@ mod tests {
     fn test_group_order_content_first() {
         let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::String("https://example.com".to_string()));
-        el.content = Some(vec![Block::Paragraph(Paragraph::new(vec![Inline::Text("Example".into())], tomet_ast::Span::dummy()))]);
+        el.content = Some(vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Text("Example".into())],
+            tomet_ast::Span::dummy(),
+        ))]);
 
         let doc = Document::new(vec![Block::Element(el)], tomet_ast::Span::dummy());
 

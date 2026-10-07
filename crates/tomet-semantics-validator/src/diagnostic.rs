@@ -351,7 +351,10 @@ impl fmt::Display for Diagnostic {
                 }
             }
             Diagnostic::Conflict { .. } => {
-                write!(f, "unresolved conflict -- pick `a` or `b` and remove the marker")
+                write!(
+                    f,
+                    "unresolved conflict -- pick `a` or `b` and remove the marker"
+                )
             }
             Diagnostic::ContentNotInline { name, .. } => {
                 write!(

@@ -9,7 +9,9 @@ use crate::value::{
     parse_quoted, parse_value_at, skip_block_comment, skip_inline_ws, skip_line_comment,
     skip_ws_newlines_and_comments,
 };
-use tomet_ast::{Block, Element, ElementValue, Entry, Id, Inline, Paragraph, Placement, Sigil, Value};
+use tomet_ast::{
+    Block, Element, ElementValue, Entry, Id, Inline, Paragraph, Placement, Sigil, Value,
+};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 

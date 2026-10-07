@@ -216,10 +216,12 @@ pub(crate) fn parse_inline_seq(
                 let el = element_new(Sigil::named("raw"))
                     .with_placement(Placement::Inline)
                     .with_span(span)
-                    .with_content(vec![tomet_ast::Block::Paragraph(tomet_ast::Paragraph::new(
-                        vec![Inline::Raw(RawText::new(inner_text, content_span))],
-                        content_span,
-                    ))]);
+                    .with_content(vec![tomet_ast::Block::Paragraph(
+                        tomet_ast::Paragraph::new(
+                            vec![Inline::Raw(RawText::new(inner_text, content_span))],
+                            content_span,
+                        ),
+                    )]);
                 items.push(Inline::Element(el));
                 cur.set_pos(probe.pos());
                 text_start = cur.pos();
@@ -490,9 +492,9 @@ fn try_one_delimited(
     // `em`/`strong`/`mark`/`strikeout` are inline-only content (see
     // `tmtroot/docs/spec/feature/content-shape.tmt`): always exactly one
     // `Paragraph` wrapping the inline run, never multiple blocks.
-    el.content = Some(vec![tomet_ast::Block::Paragraph(tomet_ast::Paragraph::new(
-        inner, span,
-    ))]);
+    el.content = Some(vec![tomet_ast::Block::Paragraph(
+        tomet_ast::Paragraph::new(inner, span),
+    )]);
     Ok(Some(el))
 }
 

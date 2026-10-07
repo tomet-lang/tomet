@@ -145,7 +145,7 @@ one branch at a time, and nothing pointed at the accumulation.
 
 ---[ Guard ]---
 
-@link(file:../../tests/src/vocabulary.rs)[`tests/src/vocabulary.rs`]
+@link[`tests/src/vocabulary.rs`](file:../../tests/src/vocabulary.rs)
 
 Each case is a pair of sources differing in exactly one identifier the
 parser is not allowed to recognize. Both are parsed, the identifier is

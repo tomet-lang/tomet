@@ -86,7 +86,12 @@ impl tove::ValueHook for TometValueHook {
             };
             if !cur.eat_str("]") {
                 let (line, column) = cur.line_col(cur.pos());
-                return Some(Err(tove::Error::at("expected ']'", line, column, cur.pos())));
+                return Some(Err(tove::Error::at(
+                    "expected ']'",
+                    line,
+                    column,
+                    cur.pos(),
+                )));
             }
             return Some(Ok(Value::Blocks(blocks)));
         }

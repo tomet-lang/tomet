@@ -1144,7 +1144,10 @@ mod tests {
                         sigil: Sigil::named("em"),
                         placement: Placement::Inline,
                         args: None,
-                        content: Some(wrap_content(vec![Inline::Text(Text::new("a", Span::dummy()))])),
+                        content: Some(wrap_content(vec![Inline::Text(Text::new(
+                            "a",
+                            Span::dummy(),
+                        ))])),
                         children: None,
                         value: None,
                         id: None,
@@ -1156,7 +1159,10 @@ mod tests {
                         sigil: Sigil::named("strong"),
                         placement: Placement::Inline,
                         args: None,
-                        content: Some(wrap_content(vec![Inline::Text(Text::new("b", Span::dummy()))])),
+                        content: Some(wrap_content(vec![Inline::Text(Text::new(
+                            "b",
+                            Span::dummy(),
+                        ))])),
                         children: None,
                         value: None,
                         id: None,
@@ -1180,7 +1186,10 @@ mod tests {
                 "target".to_string(),
                 Value::String("https://example.com".to_string()),
             )])),
-            content: Some(wrap_content(vec![Inline::Text(Text::new("Wiki", Span::dummy()))])),
+            content: Some(wrap_content(vec![Inline::Text(Text::new(
+                "Wiki",
+                Span::dummy(),
+            ))])),
             children: None,
             value: None,
             id: None,
@@ -1206,7 +1215,10 @@ mod tests {
                 "target".to_string(),
                 Value::String("pic.png".to_string()),
             )])),
-            content: Some(wrap_content(vec![Inline::Text(Text::new("a cat", Span::dummy()))])),
+            content: Some(wrap_content(vec![Inline::Text(Text::new(
+                "a cat",
+                Span::dummy(),
+            ))])),
             children: None,
             value: None,
             id: None,
@@ -1232,7 +1244,10 @@ mod tests {
                 "lang".to_string(),
                 Value::String("rust".to_string()),
             )])),
-            content: Some(wrap_content(vec![Inline::Text(Text::new("fn main() {}", Span::dummy()))])),
+            content: Some(wrap_content(vec![Inline::Text(Text::new(
+                "fn main() {}",
+                Span::dummy(),
+            ))])),
             children: None,
             value: None,
             id: None,
@@ -1252,7 +1267,10 @@ mod tests {
             sigil: Sigil::named("raw"),
             placement: Placement::Inline,
             args: None,
-            content: Some(wrap_content(vec![Inline::Raw(RawText::new("foo()", Span::dummy()))])),
+            content: Some(wrap_content(vec![Inline::Raw(RawText::new(
+                "foo()",
+                Span::dummy(),
+            ))])),
             children: None,
             value: None,
             id: None,
@@ -1303,7 +1321,10 @@ mod tests {
     #[test]
     fn titled_thematic_break_is_not_a_setext_heading() {
         let mut el = tomet_tree::element_new(Sigil::named("hr"));
-        el.content = Some(wrap_content(vec![Inline::Text(Text::new("Title", Span::dummy()))]));
+        el.content = Some(wrap_content(vec![Inline::Text(Text::new(
+            "Title",
+            Span::dummy(),
+        ))]));
         let doc = Document {
             blocks: vec![Block::Element(el)],
             span: Span::dummy(),
@@ -1324,7 +1345,10 @@ mod tests {
             "target".to_string(),
             Value::String("ref:name".to_string()),
         )]));
-        el2.content = Some(wrap_content(vec![Inline::Text(Text::new("display", Span::dummy()))]));
+        el2.content = Some(wrap_content(vec![Inline::Text(Text::new(
+            "display",
+            Span::dummy(),
+        ))]));
 
         let doc = Document {
             blocks: vec![Block::Paragraph(Paragraph::new(

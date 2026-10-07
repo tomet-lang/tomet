@@ -353,13 +353,13 @@ const CASES: &[Case] = &[
         "groupsより前に書いても同じ。idと他のgroupsに順序はない",
         "@task#(myid)(a: 1)[ text ]\n",
     ),
-    case(None, "クォートすればスペースも入る", "@task#(\"has spaces\")\n"),
-    case(None, "セクションにも付く", "=[ Intro ]#(intro)\n"),
     case(
         None,
-        "リスト項目の完全形にも付く",
-        "- (x)[ y ]#(item1)\n",
+        "クォートすればスペースも入る",
+        "@task#(\"has spaces\")\n",
     ),
+    case(None, "セクションにも付く", "=[ Intro ]#(intro)\n"),
+    case(None, "リスト項目の完全形にも付く", "- (x)[ y ]#(item1)\n"),
     case(
         None,
         "糖衣形は末尾の`#(id)`と`{attrs}`を両方読む",

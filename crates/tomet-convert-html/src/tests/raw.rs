@@ -62,8 +62,7 @@ fn renders_explicit_inline_raw() {
 
 #[test]
 fn raw_value_group_is_id_cssclass_metadata_not_code() {
-    let doc =
-        parse_document("@raw(lang:rust)#(snippet1){cssclass:card}[fn main() {}]\n").unwrap();
+    let doc = parse_document("@raw(lang:rust)#(snippet1){cssclass:card}[fn main() {}]\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,

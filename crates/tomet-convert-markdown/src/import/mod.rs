@@ -419,7 +419,10 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 sigil: Sigil::named("raw"),
                 placement: Placement::Block,
                 args,
-                content: Some(vec![Block::Paragraph(Paragraph::new(vec![Inline::Raw(RawText::new(text, Span::dummy()))], Span::dummy()))]),
+                content: Some(vec![Block::Paragraph(Paragraph::new(
+                    vec![Inline::Raw(RawText::new(text, Span::dummy()))],
+                    Span::dummy(),
+                ))]),
                 children: None,
                 value: None,
                 id: None,
@@ -635,11 +638,7 @@ fn blocks_display_width(blocks: &[Block]) -> usize {
         .iter()
         .map(|block| match block {
             Block::Paragraph(p) => inlines_display_width(&p.content),
-            Block::Element(el) => el
-                .content
-                .as_deref()
-                .map(blocks_display_width)
-                .unwrap_or(0),
+            Block::Element(el) => el.content.as_deref().map(blocks_display_width).unwrap_or(0),
             Block::Section(sec) => inlines_display_width(&sec.title),
         })
         .sum()
@@ -900,9 +899,10 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
         // its title text directly in, same as a paragraph -- not wrapped
         // as a nested `Inline::Element`, which is what the generic
         // `Block::Element` arm below would do.
-        Block::Element(el) if classify_std_lenient(&el) == ElementKind::Heading => {
-            extend_spaced(content, blocks_to_flat_inlines(el.content.unwrap_or_default()))
-        }
+        Block::Element(el) if classify_std_lenient(&el) == ElementKind::Heading => extend_spaced(
+            content,
+            blocks_to_flat_inlines(el.content.unwrap_or_default()),
+        ),
         // A list merged into flattened blockquote content (blockquotes
         // have no sibling-`children` concept, unlike `Item`) has each of
         // its items' content joined in the same way -- see the module doc.
@@ -1244,14 +1244,13 @@ mod tests {
                 panic!("expected a paragraph for {src:?}")
             };
             let has_raw = p.content.iter().any(|inl| match inl {
-                Inline::Element(el) if el.sigil.is_bare_named("raw") => {
-                    el.content.as_ref().is_some_and(|c| {
-                        match para_inlines(c).first() {
-                            Some(Inline::Raw(r)) => r.value == expected_code,
-                            _ => false,
-                        }
-                    })
-                }
+                Inline::Element(el) if el.sigil.is_bare_named("raw") => el
+                    .content
+                    .as_ref()
+                    .is_some_and(|c| match para_inlines(c).first() {
+                        Some(Inline::Raw(r)) => r.value == expected_code,
+                        _ => false,
+                    }),
                 _ => false,
             });
             assert!(

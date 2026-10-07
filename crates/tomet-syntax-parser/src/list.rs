@@ -246,7 +246,9 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
         }
 
         let span = cur.span_from(item_start);
-        items.push(element_list_item(content, marker, attrs, id, children, span));
+        items.push(element_list_item(
+            content, marker, attrs, id, children, span,
+        ));
     }
     Ok(items)
 }

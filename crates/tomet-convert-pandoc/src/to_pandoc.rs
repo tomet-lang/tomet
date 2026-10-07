@@ -151,8 +151,14 @@ fn element_to_blocks(el: &Element) -> Vec<Block> {
             vec![Block::Div(
                 Attr::with_class("tm-conflict"),
                 vec![
-                    Block::Div(Attr::with_class("tm-conflict-a"), element_content_to_blocks(&a)),
-                    Block::Div(Attr::with_class("tm-conflict-b"), element_content_to_blocks(&b)),
+                    Block::Div(
+                        Attr::with_class("tm-conflict-a"),
+                        element_content_to_blocks(&a),
+                    ),
+                    Block::Div(
+                        Attr::with_class("tm-conflict-b"),
+                        element_content_to_blocks(&b),
+                    ),
                 ],
             )]
         }
@@ -229,8 +235,14 @@ fn element_to_inlines(el: &Element) -> Vec<Inline> {
             vec![Inline::Span(
                 Attr::with_class("tm-conflict"),
                 vec![
-                    Inline::Span(Attr::with_class("tm-conflict-a"), blocks_to_inlines_lossy(&a)),
-                    Inline::Span(Attr::with_class("tm-conflict-b"), blocks_to_inlines_lossy(&b)),
+                    Inline::Span(
+                        Attr::with_class("tm-conflict-a"),
+                        blocks_to_inlines_lossy(&a),
+                    ),
+                    Inline::Span(
+                        Attr::with_class("tm-conflict-b"),
+                        blocks_to_inlines_lossy(&b),
+                    ),
                 ],
             )]
         }
@@ -339,7 +351,10 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
         match block {
             TmBlock::Paragraph(p) => {
                 let inlines = inlines_to_pandoc(&p.content);
-                if inlines.iter().any(|i| !matches!(i, Inline::Space | Inline::SoftBreak)) {
+                if inlines
+                    .iter()
+                    .any(|i| !matches!(i, Inline::Space | Inline::SoftBreak))
+                {
                     out.push(Block::Para(inlines));
                 }
             }

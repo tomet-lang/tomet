@@ -144,9 +144,16 @@ pub fn render_nested(v: &Value, config: &PrinterConfig) -> String {
     render_nested_with_blocks(v, config, &mut default_block_renderer)
 }
 
-fn render_nested_with_blocks(v: &Value, config: &PrinterConfig, render_blocks: &mut BlockRenderer) -> String {
+fn render_nested_with_blocks(
+    v: &Value,
+    config: &PrinterConfig,
+    render_blocks: &mut BlockRenderer,
+) -> String {
     match v {
-        Value::Map(_) => format!("{{{}}}", render_value_inner_with_blocks(v, config, render_blocks)),
+        Value::Map(_) => format!(
+            "{{{}}}",
+            render_value_inner_with_blocks(v, config, render_blocks)
+        ),
         _ => render_value_inner_with_blocks(v, config, render_blocks),
     }
 }

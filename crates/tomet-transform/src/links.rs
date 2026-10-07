@@ -367,12 +367,12 @@ mod tests {
                 let content_str = el.content.as_ref().map(|c| {
                     c.iter()
                         .filter_map(|block| match block {
-                            Block::Paragraph(p) => Some(p.content.iter().map(|inline| {
-                                match inline {
+                            Block::Paragraph(p) => {
+                                Some(p.content.iter().map(|inline| match inline {
                                     Inline::Text(t) => t.value.as_str(),
                                     _ => "",
-                                }
-                            })),
+                                }))
+                            }
                             _ => None,
                         })
                         .flatten()

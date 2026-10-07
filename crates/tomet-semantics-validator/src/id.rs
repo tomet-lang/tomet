@@ -77,9 +77,12 @@ pub(crate) fn collect_ids_cst(root: &SyntaxNode) -> Vec<(String, TextRange)> {
     root.descendants()
         .filter(|node| node.kind() == K::ID_GROUP)
         .filter_map(|group| {
-            let value = group.children_with_tokens().filter_map(|e| e.into_token()).find(
-                |t| !t.kind().is_trivia() && !matches!(t.kind(), K::HASH | K::L_PAREN | K::R_PAREN),
-            )?;
+            let value = group
+                .children_with_tokens()
+                .filter_map(|e| e.into_token())
+                .find(|t| {
+                    !t.kind().is_trivia() && !matches!(t.kind(), K::HASH | K::L_PAREN | K::R_PAREN)
+                })?;
             let text = value.text().trim_matches('"').to_string();
             Some((text, value.text_range()))
         })

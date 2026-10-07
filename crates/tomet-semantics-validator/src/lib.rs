@@ -475,9 +475,11 @@ fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec<Dia
         let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
 
         let allow = match &kind {
-            tomet_semantics::ElementKind::Custom(_) => {
-                el.sigil.name().and_then(|n| bindings.declaration(n)).and_then(|decl| decl.content_allow.clone())
-            }
+            tomet_semantics::ElementKind::Custom(_) => el
+                .sigil
+                .name()
+                .and_then(|n| bindings.declaration(n))
+                .and_then(|decl| decl.content_allow.clone()),
             _ => match tomet_semantics::builtin_content_shape(&kind) {
                 Some(tomet_semantics::ContentShape::Inline) => {
                     Some(tomet_semantics::ContentAllow::Inline)
