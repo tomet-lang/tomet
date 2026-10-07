@@ -1,12 +1,22 @@
+//! =[ tomet-cst ]
+//!
 //! Concrete Syntax Tree (CST) foundation for Tomet, powered by `rowan`.
 //!
-//! Provides a lossless, resilient, green/red syntax tree representation where
-//! 100% of characters (including whitespace, newlines, and comments) are preserved.
+//! =[ Architecture & Responsibilities ]
+//!
+//! - Lossless Green/Red Tree Foundation:
+//!   `tomet-cst` provides a Rowan-based syntax tree architecture preserving 100% of
+//!   source characters, whitespace, newlines, and comments.
+//!   Guaranteed Invariant: `syntax_node.text().to_string() == original_source`.
+//!
+//! - Core Types & Handles:
+//!   [`SyntaxNode`], [`SyntaxToken`], [`SyntaxElement`] provide offset navigation.
+//!   [`TextRange`], [`TextSize`] provide byte-offset spans for LSP diagnostics and refactorings.
 //!
 //! This crate defines only the vocabulary ([`SyntaxKind`]) and the rowan glue;
 //! `tomet-parser::parse_cst` builds the tree and documents its shape. The tree
 //! is structured down to sections (nested by level), elements and their groups,
-//! and `key: value` entries -- but not emphasis or `|` content runs.
+//! and `key: value` entries.
 
 pub mod syntax_kind;
 

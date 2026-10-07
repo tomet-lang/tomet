@@ -1,3 +1,35 @@
+//! =[ tomet-parser ]
+//!
+//! The recursive-descent parser (`&str -> Document / Value`) and authoritative
+//! source of truth for the Tomet grammar.
+//!
+//! =[ Architecture & Responsibilities ]
+//!
+//! - Deterministic Static Parser Boundary:
+//!   `tomet-parser` is strictly a pure, side-effect-free, deterministic static parser.
+//!   It performs zero I/O, external file resolution, or dynamic code execution.
+//!   Given identical input text, it produces identical AST output with guaranteed
+//!   linear/predictable time complexity.
+//!
+//! - Tree-sitter Synchronization:
+//!   `tomet-parser` is the single source of truth for grammar definitions.
+//!   `tree-sitter-tomet` is a separate hand-maintained grammar approximation used for
+//!   editor syntax highlighting.
+//!
+//! =[ Module Layout ]
+//!
+//! - `document`: Block-level dispatch loop, paragraphs, and document-level parsing.
+//! - `element`: Typed elements (`<T>`, `@name`, bare `@`), group ordering, and connect syntax.
+//! - `section`: Headings (`=[...]`) and thematic breaks (`---`, `---[ title ]---`).
+//! - `list`: Ordered and unordered lists (`-`, `-.`), markers, and item attributes.
+//! - `codeblock` / `fence`: Fenced code blocks and raw verbatim fence spans (`+++`).
+//! - `inline`: Inline scanning, formatting delimiters (`*em*`, `**strong**`, `==mark==`), autolinks.
+//! - `interp`: `${...}` interpolation expressions (identifiers, member chains, calls, literals).
+//! - `caret`: `^(id)` or `^name(id)` caret reference element parsing.
+//! - `value`: Lightweight Tomet data grammar (maps, sequences, scalars, comments).
+//! - `cst`: Lossless Concrete Syntax Tree parsing powered by `tomet-cst`.
+//! - `error`: Source location (`Position`/`Span`) aware error diagnostics.
+
 mod caret;
 mod codeblock;
 pub mod cst;

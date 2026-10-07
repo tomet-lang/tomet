@@ -1,8 +1,23 @@
 //! Bidirectional conversion between CommonMark and `tomet_ast`.
 //!
-//! The mapping and its known-lossy cases are documented where they are
-//! implemented: `import`'s module doc for Markdown -> Tomet, `export`'s
-//! for the other direction.
+//! =[ Overview ]
+//!
+//! Handles conversion between CommonMark Markdown and the Tomet Abstract Syntax Tree
+//! ([`tomet_ast::Document`]), supporting frontmatter, wikilinks, tables, callouts,
+//! and standard markup.
+//!
+//! =[ Key Functions ]
+//!
+//! - [`from_markdown`]: Parses CommonMark text into a Tomet [`tomet_ast::Document`].
+//! - [`from_markdown_with_options`]: Parses CommonMark text using custom [`ImportOptions`].
+//! - [`to_markdown`]: Converts a Tomet [`tomet_ast::Document`] into clean CommonMark text.
+//!
+//! =[ Key Types ]
+//!
+//! - [`ImportOptions`]: Options controlling frontmatter and extension parsing.
+//!
+//! Known-lossy cases are documented where they are implemented: `import`'s module
+//! doc for Markdown -> Tomet, `export`'s for the other direction.
 
 mod export;
 mod import;

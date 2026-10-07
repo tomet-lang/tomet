@@ -1,14 +1,21 @@
-//! Renders a parsed Tomet [`Document`] to HTML.
+//! =[ tomet-html ]
 //!
-//! This is a generic, data-driven mapping (not a full semantic engine):
-//! most `<T>`/`@name` elements become a `<div>`/`<span>` carrying their
-//! `args` map as `data-*` attributes, with `content` as inner content. A
-//! handful of element kinds get special handling because the spec gives
-//! them fixed meaning: `@link(target:..)` becomes a link -- an `<a href>`
-//! for most target schemes, or a same-document anchor reference (`<a
-//! href="#link-...">`) when the target's scheme is `id:` -- `@meta`
-//! carries no visible content, and `@links{}` containers render their bare
-//! children as a definition list of anchors.
+//! HTML renderer for Tomet AST documents.
+//!
+//! =[ Responsibilities ]
+//!
+//! - **Full Page & Fragment Rendering**:
+//!   -| [`render_page`] / [`render_page_with`]: Renders a complete standalone HTML document
+//!    | with DOCTYPE, CSS styling, and head metadata.
+//!    | [`render_body`] / [`render_body_with`]: Renders the HTML fragment representing the body content.
+//!
+//! - **Advanced Rendering Options**:
+//!   Heading numbering (`number_headings: true`), automatic slug anchors (`auto_slug_headings: true`),
+//!   document language setting, and semantic CSS classes for callouts and custom elements.
+//!
+//! This is a generic, data-driven mapping: most `<T>`/`@name` elements become `<div>`/`<span>`
+//! tags carrying `args` as `data-*` attributes. Built-in elements like `@link`, `@meta`, and
+//! `@links{}` containers receive dedicated HTML representations.
 
 mod block;
 mod element;

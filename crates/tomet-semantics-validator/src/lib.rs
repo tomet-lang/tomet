@@ -1,3 +1,21 @@
+//! =[ tomet-validator ]
+//!
+//! Read-only `.tmt` document schema, blueprint, and lint validation.
+//!
+//! =[ Architecture & Responsibilities ]
+//!
+//! - Read-Only In-Memory Validation:
+//!   `tomet-validator` performs pure, read-only semantic and schema validation across
+//!   an in-memory [`Document`]. It performs zero I/O, no reference resolution (handled
+//!   by `tomet-resolver` and `tomet-links`), and no AST mutations.
+//!
+//! - Validation Rules:
+//!   -| Duplicate ID Detection: Walks all element nodes and detects duplicate `id` attributes.
+//!    | Unknown & Mismatched Directives: Checks element sigils against standard vocabularies and bindings.
+//!    | Blueprint Conformance: Validates document structures against defined `@kind` blueprints.
+//!    | Diagnostic Error Mapping: Emits structured [`Diagnostic`] items carrying exact [`TextRange`]
+//!      spans, powering CLI warnings and LSP diagnostics in `apps/lsp`.
+
 pub mod blueprint;
 mod diagnostic;
 mod id;

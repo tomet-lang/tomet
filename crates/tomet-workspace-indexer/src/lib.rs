@@ -1,7 +1,25 @@
-//! Directory scanning and read-only metadata cataloging for `.tmt`/`.tmt`
-//! files. Split out of `tomet-tui`'s `engine::batch_meta` module so
-//! it's reusable outside the TUI (a future search/browse feature, e.g.)
-//! without pulling in ratatui/crossterm.
+//! =[ tomet-indexer ]
+//!
+//! Directory scanning, file classification, ignore filtering, and metadata cataloging
+//! for Tomet workspaces.
+//!
+//! =[ Architecture & Responsibilities ]
+//!
+//! - Workspace Scanning & Classification Domain:
+//!   `tomet-indexer` discovers `.tmt` and `.md` files across a workspace directory tree.
+//!   It respects `.gitignore`, hidden files, and `ignore_files` rules configured in
+//!   `default.config.tmt` / `tomet.config.tmt`.
+//!   Used by CLI commands (`check`, `export`, `format`, `lint`) and TUI components
+//!   (Explorer, BatchMeta, Migration view).
+//!
+//! - Core Capabilities:
+//!   -| Path Filtering & Discovery: Fast directory walks using `ignore::WalkBuilder`.
+//!    | Metadata Extraction: Extracts `@meta` and `@config` key-value pairs without full AST retention.
+//!    | Stateful Workspace Index ([`workspace_scan::WorkspaceIndex`]): Flat in-memory catalog
+//!      with zero-I/O derived views, compaction of single-child directory chains, and incremental updates.
+//!
+//! Split out of `tomet-tui`'s `engine::batch_meta` module so it is reusable outside
+//! the TUI without pulling in ratatui/crossterm dependencies.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

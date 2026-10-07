@@ -1,12 +1,25 @@
-//! `PrinterConfig` (loaded from a `default.config.tmt`/
-//! `tomet.config.tmt`, or an `@settings`/`@config` element in a
-//! document) and the config-driven formatting choices it controls: meta
-//! format (yaml/json/toml), link-key spacing, callout/list style,
-//! and per-field `@meta` rules. Split out of `tomet-printer` because
-//! finding/loading this config is a concern shared by every consumer
-//! that needs it (`tomet-tui`, `tomet-workspace`, `tomet-indexer`),
-//! not something specific to serializing a `Document` back to `.tmt`
-//! text.
+//! =[ tomet-config ]
+//!
+//! Configuration discovery, loading, and styling rule definitions ([`PrinterConfig`], [`FieldConfig`]).
+//!
+//! =[ Architecture & Responsibilities ]
+//!
+//! - Centralized Configuration Domain:
+//!   `tomet-config` owns configuration data structures and discovery/loading functions
+//!   ([`find_config_file`], [`load_config_from_file`], [`load_config_from_str`]).
+//!   Split out of `tomet-printer` because discovering and loading project configuration
+//!   is a shared concern across the workspace (`tomet-style`, `tomet-field-utils`,
+//!   `tomet-formatter`, `tomet-indexer`, `tomet-tui`, and `apps/cli`) without
+//!   requiring document serialization dependencies.
+//!
+//! =[ Core Capabilities ]
+//!
+//! - **Configuration Loading & Discovery**: Searches parent directories for `default.config.tmt`
+//!   or `tomet.config.tmt`.
+//! - **Printer Configuration ([`PrinterConfig`])**: Serialization formats (`yaml`, `json`, `toml`),
+//!   heading bracket spacing, link spacing, callout/list styling, and `ignore_files` patterns.
+//! - **Per-Field Metadata Rules ([`FieldConfig`])**: Rules mapping metadata keys to type,
+//!   formatting, offset, prefix, and overwrite constraints.
 
 use tomet_ast::{Document, Value};
 use tomet_tree::ValueExt;

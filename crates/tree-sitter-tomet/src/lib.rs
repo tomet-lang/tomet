@@ -1,3 +1,5 @@
+//! =[ tree-sitter-tomet ]
+//!
 //! Rust binding for the Tomet tree-sitter grammar (`grammar.js` at
 //! the crate root; `src/parser.c` etc. are generated from it via
 //! `npx tree-sitter-cli@0.26.12 generate`, then compiled by `build.rs`).

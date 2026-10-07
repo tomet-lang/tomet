@@ -1,10 +1,29 @@
-//! I/O-free classification of what a parsed `Element` officially means --
-//! recognizing Tomet's own built-in vocabulary (`@meta`, `@config`,
-//! `@links`, `@link`, ...) by name only (no inference from `args`) -- plus
-//! small `Document`-level lookups (`document_meta`) built directly on top
-//! of that classification. Depends only on `tomet-ast`; consumers
-//! (`tomet-html`, `tomet-markdown`, the CLI/TUI) use this instead
-//! of each carrying their own copy of this logic.
+//! =[ tomet-semantics ]
+//!
+//! I/O-free semantic classification and normalization layer for Tomet AST elements.
+//!
+//! =[ Architecture & Responsibilities ]
+//!
+//! - Pure I/O-Free Semantic Layer:
+//!   `tomet-semantics` is strictly a pure classification and semantic extraction layer.
+//!   It performs zero I/O and depends exclusively on `tomet-ast` (not `tomet-parser`),
+//!   allowing downstream consumers (`tomet-html`, `tomet-markdown`, `tomet-links`,
+//!   `tomet-tui`, `tomet-lsp`) to classify elements without pulling in the parser.
+//!
+//! =[ Core Capabilities ]
+//!
+//! - **Element Classification (`kind`)**: Canonical recognition of Tomet's built-in vocabulary
+//!   (`@meta`, `@config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`,
+//!   `codeblock`, `quote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`) via [`ElementKind`].
+//! - **Link Target Extraction (`target`)**: Canonical extraction of link targets and scheme
+//!   prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
+//! - **Positional Argument Normalization (`positional`)**: Unifies positional argument mapping
+//!   (e.g. `<codeblock>(rust)` -> `{lang: "rust"}`) for built-in and `@settings` custom schemas.
+//! - **Document Configuration (`config`)**: Merges `@config` and `@settings` blocks across
+//!   a document into a structured [`DocumentConfig`].
+//! - **Metadata Extraction (`meta`)**: Extracts top-level `@meta` values via [`document_meta`].
+//! - **Structural Helpers**: Heading level clamping (`heading`), list inspection (`list`),
+//!   table parsing (`table`), and connected value merging (`connect`).
 
 mod config;
 mod connect;
