@@ -1,60 +1,78 @@
-${macro.generated\_by(self.path)}
+<!-- Generated from tmtroot/agents.tmt. Edit that, then `tomet export .`. -->
 
 # Tomet
 
+## Single Source of Truth & Documentation
+
+### Never edit `.md` directly
+
+All Markdown files (`README.md`, `AGENTS.md`, `CLAUDE.md`, and crate `README.md` files) are generated build artifacts, not source files.
+
+- Never edit a `.md` file directly.
+- Always edit the corresponding `.tmt` file under `tmtroot/` (or the crate's own `.tmt`).
+- Run `tomet export` to regenerate the Markdown artifacts, and verify with `tomet export --check`.
+- Direct edits to generated `.md` files will be overwritten and will fail CI / lint checks.
+
+### Source of Truth Hierarchy (Preventing Drift)
+
+To prevent drift between documentation and implementation:
+
+1. **Behavior & API Truth**: The Rust source code and its inner doc-comments (`//!`, `///`) are the
+authoritative source of truth. If prose documentation contradicts the source code, the code
+reflects reality. Never hallucinate or enforce outdated behavior described in prose; always
+verify against the actual implementation.
+2. **Architecture & Invariant Truth**: Governed by `.writ.tmt` files. These define crate layering,
+dependencies, and placement rules, enforced automatically by `twrit`.
+3. **Narrative & Overview Truth**: Lives in `tmtroot/`.
+
+### Reference over Restatement
+
+Do not duplicate code signatures, struct layouts, or implementation prose into documentation files. Duplicate prose inevitably drifts.
+
+- Use pointers and links (`...`, `...`, or symbol references) instead of
+copy-pasting code definitions.
+- Keep prose documentation concise and high-level, pointing directly to the code where
+the truth lives.
+
+## Code Comments & Tomet
+
+- Doc-comments (`//!`, `///`) follow clean Tomet-compatible markup conventions.
+- When modifying function signatures, behavior, or crate responsibilities, update the
+corresponding doc-comments in the very same commit.
+- Never leave orphaned doc-comments that describe prior, deleted behaviors.
+
 ## Project overview
 
-Read the root `README.md` first (what the project is, directory layout,
-build/run commands) -- it's currently sparse, fill it in as you learn
-things worth putting there. Before a non-trivial change, read the `//!`
-module doc of every crate you are touching, and the `crate-layering` entry
-in the root `.writ.tmt` for how the layers depend on each other. There is
-no prose overview standing between you and those -- there was, and it
-drifted. For where a
-document belongs and what language it's written in, `docs/README.tmt` is
-the map and `docs/.writ.tmt` is the rulebook. Do not restate those files'
-content here — extend them instead, and keep this pointer short.
+Read the root `README.md` first (what the project is, directory layout, build/run commands)
+and `CONTRIBUTING.md` for contribution workflow, commit conventions, and verification steps.
+Before a non-trivial change:
 
-Rules this repository must obey live in `.writ.tmt` files, one per
-directory, scoped to that directory and inherited downward the way
-`.gitignore` is. Read every `.writ.tmt` from the file you are changing up
-to the workspace root. They are the author's; propose an edit and stop
-rather than working around a rule or relaxing it.
+- Read the `//!` module doc of every crate you are touching.
+- Read the `crate-layering` entry in the root `.writ.tmt` for how the layers depend
+on each other. There is no prose overview standing between you and those -- there was,
+and it drifted.
 
-## Language
-
-<mark>Write all code comments in English. Do not use Japanese in code.</mark>
-
-For documentation the rule is scoped by what the document sits next to,
-per `docs/.writ.tmt`'s `docs-language`: every `.writ.tmt` is English (they
-cross-link with the English doc comments); `docs/spec/`, `docs/guide/`,
-`docs/examples/` and `docs/why/` are user-facing and written in Japanese.
-`docs/design/ideas/` is whichever language the thinking happened in.
+Rules this repository must obey live in `.writ.tmt` files (at the workspace root and crate level). Read the governing `.writ.tmt` for the area you are changing. They are the author's; propose an edit and stop rather than working around a rule or relaxing it.
 
 ## Verifying changes
 
-There's no standalone GUI app here to screenshot or click through — this
-is a parser/CLI/LSP/editor-extensions project. Verify with `cargo build`/
-`cargo test`/`cargo check` and by reading the code. For the editor
-extensions (`editors/vscode`, `editors/zed`), this
-environment can't reliably launch a real VS Code/Zed window either, so
-verify those the same way: reading the code and their own tests, not by
-launching the actual editor to click around.
+This is a parser/CLI/LSP/editor-extensions project with no standalone GUI app. Verify with automated checks and code reading:
 
-For grammar changes specifically, also run
-`cargo test -p tomet-tests -p tree-sitter-tomet`. `tomet-parser` is the
-source of truth for the grammar; `tree-sitter-tomet`'s `grammar.js` is a
-separate, hand-maintained approximation used only for editor syntax
-highlighting, and it does not update itself when `tomet-parser` changes.
-Drift between the two is caught by `tomet-tests`'s `corpus` target, which
-runs the shared `.tmt` corpus through both implementations; the grammar's
-own structural tests stay in `tree-sitter-tomet`. Cover the new construct
-by adding a fixture under `tests/fixtures/` — that corpus is frozen and
-does not pick up changes to `docs/` on its own.
-
-Cross-crate tests live in the `tests/` package (`tomet-tests`), not in the
-individual crates; see `tests/README.md` for what belongs there and how
-the snapshot references work.
+- `cargo check` / `cargo build` / `cargo test`
+- `twrit check`: Verifies architectural layers and file placement rules in `.writ.tmt`.
+- `tomet export --check`: Verifies that all exported `.md` documents match their source `.tmt` files.
+- `tomet api --check`: Verifies that extracted Rust API documentation matches source code doc-comments.
+- For grammar changes specifically, also run `cargo test -p tomet-tests -p tree-sitter-tomet`.
+`tomet-parser` is the source of truth for the grammar; `tree-sitter-tomet`'s `grammar.js` is a
+separate, hand-maintained approximation used only for editor syntax highlighting, and it does
+not update itself when `tomet-parser` changes. Drift between the two is caught by `tomet-tests`'s
+`corpus` target, which runs the shared `.tmt` corpus through both implementations; the grammar's
+own structural tests stay in `tree-sitter-tomet`. Cover the new construct by adding a fixture
+under `tests/fixtures/` — that corpus is frozen.
+- Cross-crate tests live in the `tests/` package (`tomet-tests`), not in the individual crates;
+see `tests/README.md` for what belongs there and how the snapshot references work.
+- For editor extensions (`editors/vscode`, `editors/zed`, `editors/helix`), verify
+via reading code and running their own tests.
 
 ## Task tracking
 
@@ -66,10 +84,11 @@ When the task is done, fold anything worth keeping into where it belongs — a d
 
 ## Commits
 
-Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit
+- All commit messages must follow the convention in `CONTRIBUTING.md`:
+`type(scope): description` (e.g. `feat(cli): add export check`, `fix(parser): handle pipe`).
+- Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit
 messages. The session trailer embeds a URL, and a commit message is
 published the moment it is pushed. This overrides the harness default that
 asks for them.
-
-Never push to a remote without being asked.
+- Never push to a remote without being asked.
 
