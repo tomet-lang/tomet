@@ -64,6 +64,41 @@ const SAME: &[(&str, &str, &str)] = &[
         "@references\n| @link(target:\"a\")[x]\n| @link(target:\"b\")[y]\n",
         "@references[\n@link(target:\"a\")[x]\n@link(target:\"b\")[y]\n]\n",
     ),
+    (
+        "a list inside the body",
+        "@container\n| - alpha\n| - beta\n",
+        "@container[\n- alpha\n- beta\n]\n",
+    ),
+    (
+        "nested pipe markers with child element and list",
+        "@tree\n| @tree\n| | @tree\n| | | - outline\n| | | - outline\n| | @tree\n| | | - outline\n| | | - outline\n",
+        "@tree[\n@tree[\n@tree[\n- outline\n- outline\n]\n@tree[\n- outline\n- outline\n]\n]\n]\n",
+    ),
+    (
+        "nested pipe markers with paragraphs",
+        "@parent\n| @child\n| | inner\n| outer\n",
+        "@parent[\n@child[\ninner\n]\nouter\n]\n",
+    ),
+    (
+        "empty pipe line separates paragraphs",
+        "@quote\n| alpha\n|\n| beta\n",
+        "@quote[\nalpha\n\nbeta\n]\n",
+    ),
+    (
+        "nested empty pipe line separates paragraphs",
+        "@tree\n| @tree\n| | alpha\n| |\n| | beta\n",
+        "@tree[\n@tree[\nalpha\n\nbeta\n]\n]\n",
+    ),
+    (
+        "an ordered list inside the body",
+        "@container\n| 1. first\n| 2. second\n",
+        "@container[\n1. first\n2. second\n]\n",
+    ),
+    (
+        "list and paragraph inside the body",
+        "@container\n| - alpha\n| - beta\n| trailing text\n",
+        "@container[\n- alpha\n- beta\ntrailing text\n]\n",
+    ),
 ];
 
 #[test]

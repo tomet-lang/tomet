@@ -13,7 +13,7 @@ use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum Stop {
+pub(crate) enum Stop<'a> {
     Bracket(char),
     /// A paragraph: ends at a blank line, a heading, a list marker, etc.
     /// (see [`paragraph_breaks_here`]). `boundary`, when set, is the
@@ -30,11 +30,10 @@ pub(crate) enum Stop {
     Line,
     Offset(usize),
     Delim(&'static str),
-    /// A `|`-prefixed run: `[content]` spelled without brackets. `col` is
-    /// the 1-based column of the opening `|`, and a following line stays in
-    /// the run only when its own `|` stands in that same column.
+    /// A `|`-prefixed run: `[content]` spelled without brackets. `cols` is
+    /// the stack of 1-based columns of active ancestor and current `|` markers.
     PipeRun {
-        col: usize,
+        cols: &'a [usize],
     },
 }
 
@@ -45,9 +44,9 @@ pub(crate) enum Stop {
 /// top-level calls (a list item's own inline content) pass `false`;
 /// every other caller passes `true`, unchanged from before this
 /// parameter existed.
-pub(crate) fn parse_inline_seq(
+pub(crate) fn parse_inline_seq<'a>(
     cur: &mut Cursor,
-    stop: Stop,
+    stop: Stop<'a>,
     allow_colon_connect: bool,
 ) -> Result<Vec<Inline>> {
     let mut items = Vec::new();
@@ -56,7 +55,10 @@ pub(crate) fn parse_inline_seq(
     // A `|` run's markers are folded away with the newline they follow, so
     // the run's text stays one contiguous slice of the source and comes out
     // identical to the same content written between brackets.
-    let fold_pipes = matches!(stop, Stop::PipeRun { .. });
+    let pipe_cols = match &stop {
+        Stop::PipeRun { cols } => *cols,
+        _ => &[],
+    };
     loop {
         match stop {
             Stop::Bracket(c) => {
@@ -115,7 +117,7 @@ pub(crate) fn parse_inline_seq(
                     let trimmed = pending.trim_end_matches([' ', '\t']);
                     if let Some(content) = trimmed.strip_suffix('\\') {
                         let content_end = text_start + content.trim_end_matches([' ', '\t']).len();
-                        flush_text_upto(&mut items, cur, &mut text_start, content_end, fold_pipes);
+                        flush_text_upto(&mut items, cur, &mut text_start, content_end, pipe_cols);
                         text_start = cur.pos();
                     }
 
@@ -139,7 +141,7 @@ pub(crate) fn parse_inline_seq(
                         // the newline, then silently skip the marker so
                         // it never shows up as literal text either.
                         let break_start = cur.pos();
-                        flush_text(&mut items, cur, &mut text_start, fold_pipes);
+                        flush_text(&mut items, cur, &mut text_start, pipe_cols);
                         cur.bump();
                         skip_inline_ws(cur);
                         cur.bump();
@@ -166,7 +168,7 @@ pub(crate) fn parse_inline_seq(
                     }
                 }
             }
-            Stop::PipeRun { col } => {
+            Stop::PipeRun { cols } => {
                 if cur.is_eof() {
                     break;
                 }
@@ -174,13 +176,29 @@ pub(crate) fn parse_inline_seq(
                 // `element::parse_pipe_content` starts a new one), same as
                 // `End` ends the whole run -- this call only ever builds
                 // one paragraph's content, so both stop it the same way.
-                if cur.peek() == Some('\n')
-                    && matches!(
-                        pipe_run_state(cur, col)?,
-                        PipeContinuation::Empty | PipeContinuation::End
-                    )
-                {
-                    break;
+                // In addition, if the next line starts a block element or
+                // a list item under the same pipe run, this paragraph ends here
+                // so the outer block parser can dispatch it.
+                if cur.peek() == Some('\n') {
+                    match pipe_run_state(cur, cols)? {
+                        PipeContinuation::Empty | PipeContinuation::End => break,
+                        PipeContinuation::Content => {
+                            let mut look = *cur;
+                            look.bump();
+                            for _ in 0..cols.len() {
+                                skip_inline_ws(&mut look);
+                                look.bump();
+                            }
+                            skip_inline_ws(&mut look);
+                            if matches!(peek_list_marker(&look), Ok(Some(_)))
+                                || (look.peek() == Some('@')
+                                    && is_element_start(&look, true)
+                                    && element_ends_line(&look) == LineEnd::Bare)
+                            {
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -208,7 +226,7 @@ pub(crate) fn parse_inline_seq(
                 }
             }
             if closed {
-                flush_text_upto(&mut items, cur, &mut text_start, before, fold_pipes);
+                flush_text_upto(&mut items, cur, &mut text_start, before, pipe_cols);
                 let inner_text = cur.src()[inner_start..inner_end].to_string();
                 let span = cur.span_from(before);
                 let content_span =
@@ -231,20 +249,20 @@ pub(crate) fn parse_inline_seq(
         if is_autolink_start(cur) {
             let before = cur.pos();
             if let Some(el) = try_autolink(cur, stop)? {
-                flush_text_upto(&mut items, cur, &mut text_start, before, fold_pipes);
+                flush_text_upto(&mut items, cur, &mut text_start, before, pipe_cols);
                 items.push(Inline::Element(el));
                 text_start = cur.pos();
                 continue;
             }
         }
         if cur.starts_with("/*") {
-            flush_text(&mut items, cur, &mut text_start, fold_pipes);
+            flush_text(&mut items, cur, &mut text_start, pipe_cols);
             skip_block_comment(cur)?;
             text_start = cur.pos();
             continue;
         }
         if cur.starts_with("//") && is_boundary(char_before(cur)) {
-            flush_text(&mut items, cur, &mut text_start, fold_pipes);
+            flush_text(&mut items, cur, &mut text_start, pipe_cols);
             skip_line_comment(cur);
             text_start = cur.pos();
             continue;
@@ -293,7 +311,7 @@ pub(crate) fn parse_inline_seq(
                 // isolates by default (`Placement::Block`) the same way
                 // it does at the top level; only an explicit trailing
                 // `\` joins it to what follows.
-                flush_text(&mut items, cur, &mut text_start, fold_pipes);
+                flush_text(&mut items, cur, &mut text_start, pipe_cols);
                 let el = parse_element(cur, allow_colon_connect)?;
                 if line_end == LineEnd::Continuation {
                     crate::element::consume_trailing_continuation(cur);
@@ -309,13 +327,13 @@ pub(crate) fn parse_inline_seq(
             }
         }
         if cur.peek() == Some('$') && is_interp_start(cur) {
-            flush_text(&mut items, cur, &mut text_start, fold_pipes);
+            flush_text(&mut items, cur, &mut text_start, pipe_cols);
             items.push(Inline::Element(parse_dollar_element(cur)?));
             text_start = cur.pos();
             continue;
         }
         if cur.peek() == Some('^') && is_caret_start(cur) {
-            flush_text(&mut items, cur, &mut text_start, fold_pipes);
+            flush_text(&mut items, cur, &mut text_start, pipe_cols);
             items.push(Inline::Element(parse_caret_element(
                 cur,
                 allow_colon_connect,
@@ -326,7 +344,7 @@ pub(crate) fn parse_inline_seq(
         if matches!(cur.peek(), Some('*') | Some('_') | Some('~')) {
             let before = cur.pos();
             if let Some(el) = try_delimited(cur, allow_colon_connect)? {
-                flush_text_upto(&mut items, cur, &mut text_start, before, fold_pipes);
+                flush_text_upto(&mut items, cur, &mut text_start, before, pipe_cols);
                 items.push(Inline::Element(el));
                 text_start = cur.pos();
                 continue;
@@ -336,7 +354,7 @@ pub(crate) fn parse_inline_seq(
             break;
         }
     }
-    flush_text(&mut items, cur, &mut text_start, fold_pipes);
+    flush_text(&mut items, cur, &mut text_start, pipe_cols);
     Ok(trim_edges(items))
 }
 
@@ -527,18 +545,21 @@ pub(crate) enum PipeContinuation {
     End,
 }
 
-/// Whether the line after the newline at `cur` continues a `|` run opened in
-/// column `col`, and whether that line carries any content of its own.
+/// Whether the line after the newline at `cur` continues a `|` run with active
+/// columns `cols`, and whether that line carries any content of its own.
 ///
-/// The marker is left where it is rather than consumed: `normalize_text`
-/// folds it away with the newline, which is what keeps the run's text one
+/// The markers are left where they are rather than consumed: `normalize_text`
+/// folds them away with the newline, which is what keeps the run's text one
 /// contiguous slice of the source.
 ///
 /// A `|` in the wrong column is an error, not the end of the run. Ending
 /// quietly would drop the line into prose -- the failure that made a wrapped
 /// list item break every export -- and once lists nest, the column is the
 /// only thing that says which content a marker belongs to.
-pub(crate) fn pipe_run_state(cur: &Cursor, col: usize) -> Result<PipeContinuation> {
+pub(crate) fn pipe_run_state(cur: &Cursor, cols: &[usize]) -> Result<PipeContinuation> {
+    if cols.is_empty() {
+        return Ok(PipeContinuation::End);
+    }
     let mut look = *cur;
     look.bump();
     skip_inline_ws(&mut look);
@@ -546,30 +567,32 @@ pub(crate) fn pipe_run_state(cur: &Cursor, col: usize) -> Result<PipeContinuatio
     if matches!(look.peek(), None | Some('\n') | Some('\r')) {
         return Ok(PipeContinuation::End);
     }
-    if look.peek() != Some('|') {
-        return Ok(PipeContinuation::End);
+    for &expected_col in cols {
+        if look.peek() != Some('|') {
+            return Ok(PipeContinuation::End);
+        }
+        let (_, marker_col) = look.line_col(look.pos());
+        if marker_col != expected_col {
+            return Err(err(
+                &look,
+                look.pos(),
+                format!(
+                    "this `|` stands in column {marker_col}, and the content it would \
+                     continue opens in column {expected_col}: it lines up with no content"
+                ),
+            ));
+        }
+        look.bump(); // the marker itself
+        skip_inline_ws(&mut look);
     }
-    let (_, marker_col) = look.line_col(look.pos());
-    if marker_col != col {
-        return Err(err(
-            &look,
-            look.pos(),
-            format!(
-                "this `|` stands in column {marker_col}, and the content it would \
-                 continue opens in column {col}: it lines up with no content"
-            ),
-        ));
-    }
-    look.bump(); // the marker itself
-    skip_inline_ws(&mut look);
     if matches!(look.peek(), None | Some('\n') | Some('\r')) {
         return Ok(PipeContinuation::Empty);
     }
     Ok(PipeContinuation::Content)
 }
 
-/// [`at_line_start`] for a `|` run: the marker is the line's left edge, not
-/// content, so an element standing after one is at a line start exactly as
+/// [`at_line_start`] for a `|` run: the markers are the line's left edge, not
+/// content, so an element standing after them is at a line start exactly as
 /// it would be inside brackets.
 ///
 /// Without this the two spellings disagree about placement -- an element on
@@ -582,14 +605,19 @@ pub(crate) fn at_marked_line_start(cur: &Cursor) -> bool {
         Some(nl) => &before[nl + 1..],
         None => before,
     };
-    match line.split_once('|') {
-        Some((head, tail)) => head.trim().is_empty() && tail.trim().is_empty(),
-        None => false,
+    let mut has_pipe = false;
+    for c in line.chars() {
+        if c == '|' {
+            has_pipe = true;
+        } else if !c.is_whitespace() {
+            return false;
+        }
     }
+    has_pipe
 }
 
-fn flush_text(items: &mut Vec<Inline>, cur: &Cursor, text_start: &mut usize, fold_pipes: bool) {
-    flush_text_upto(items, cur, text_start, cur.pos(), fold_pipes);
+fn flush_text(items: &mut Vec<Inline>, cur: &Cursor, text_start: &mut usize, pipe_cols: &[usize]) {
+    flush_text_upto(items, cur, text_start, cur.pos(), pipe_cols);
 }
 
 fn flush_text_upto(
@@ -597,12 +625,12 @@ fn flush_text_upto(
     cur: &Cursor,
     text_start: &mut usize,
     end: usize,
-    fold_pipes: bool,
+    pipe_cols: &[usize],
 ) {
     let base = *text_start;
     let raw = &cur.src()[base..end];
     *text_start = end;
-    split_softbreaks(items, cur, raw, base, fold_pipes);
+    split_softbreaks(items, cur, raw, base, pipe_cols);
 }
 
 /// Pushes a `Text`, merging into the previous item if it is also a `Text`.
@@ -679,7 +707,7 @@ fn split_softbreaks(
     cur: &Cursor,
     raw: &str,
     base: usize,
-    fold_pipes: bool,
+    pipe_cols: &[usize],
 ) {
     let mut text_start = 0usize;
     let mut chars = raw.char_indices().peekable();
@@ -703,13 +731,19 @@ fn split_softbreaks(
                 break;
             }
         }
-        if fold_pipes && let Some(&(j, '|')) = chars.peek() {
-            gap_end = j + '|'.len_utf8();
-            chars.next();
-            while let Some(&(k, wc)) = chars.peek() {
-                if matches!(wc, ' ' | '\t') {
-                    gap_end = k + wc.len_utf8();
+        if !pipe_cols.is_empty() {
+            for _ in pipe_cols {
+                if let Some(&(j, '|')) = chars.peek() {
+                    gap_end = j + '|'.len_utf8();
                     chars.next();
+                    while let Some(&(k, wc)) = chars.peek() {
+                        if matches!(wc, ' ' | '\t') {
+                            gap_end = k + wc.len_utf8();
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    }
                 } else {
                     break;
                 }

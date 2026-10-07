@@ -5,7 +5,7 @@
 //! `crate::element::parse_paren_value`), normalized against the builtin
 //! `"marker"` positional key by `tomet-semantics::positional`.
 
-use crate::element::{parse_groups, parse_paren_value, parse_sugar_body};
+use crate::element::{parse_paren_value, parse_sugar_body};
 use crate::error::Result;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_text};
 use crate::section::merge_values;
@@ -138,117 +138,144 @@ fn parse_list_internal(cur: &mut Cursor, ordered: bool, min_indent: usize) -> Re
         if head.indent < min_indent || head.ordered != ordered {
             break;
         }
-        let mut marker = head.marker;
-        let item_start = cur.pos();
-        eat_list_marker(cur)?;
-
-        let (content, attrs, id) = if head.full_form {
-            // The full form: `- ()[ content ]{value}`. Groups are read by
-            // the same code that reads `@name`'s, so `[content]` stops at
-            // its closing bracket and `|content` at the end of its marked
-            // run -- either may span lines. Only the bracket-less sugar
-            // below is one line, and it is one line because it has no
-            // group to close rather than because spreading out is barred.
-            let mut item = element_new(Sigil::Bare);
-            parse_groups(cur, &mut item, false)?;
-            // An `(args)` group read here is the item's own -- the same
-            // slot the probe's `(marker)` fills, reached from the other
-            // side. `- (x)[ y ]` takes that path and `-(x)` this one, and
-            // dropping it here is what made `-(x)` an empty item once `(`
-            // could reach this branch at all.
-            if item.args.is_some() {
-                marker = merge_values(marker.as_ref(), item.args.as_ref());
-            }
-            let id = item.id;
-            let attrs = item.value.and_then(|v| v.as_data());
-            let mut content = item.content.unwrap_or_default();
-            // Text after the groups belongs to the item, the way
-            // `@x[T] content` keeps both halves in one paragraph. Letting
-            // it fall out as a block of its own would silently move a
-            // sentence out of the list it was written in. `content` is a
-            // `Vec<Block>` now, so "the item's paragraph" is its last
-            // block if that's a `Paragraph`, not `content` itself.
-            let after_groups = cur.pos();
-            skip_inline_ws(cur);
-            if !matches!(cur.peek(), None | Some('\n')) {
-                // `parse_inline_seq` trims its own edges, which is right
-                // for a standalone sequence and wrong when appending to
-                // one: the space that separated the group from the text
-                // has to be put back by hand. Not when the group was
-                // empty, though -- `- [ ] text` has nothing to separate
-                // the text from. `push_text`/`extend_merging` fold that
-                // space (and the parsed sequence's own leading `Text`, if
-                // it has one) into the last paragraph's content rather
-                // than leaving separate nodes at the seam that mean
-                // nothing on their own -- same reasoning as `inline.rs`'s
-                // comment elision.
-                if cur.pos() != after_groups
-                    && let Some(Block::Paragraph(p)) = content.last_mut()
-                {
-                    push_text(&mut p.content, " ".to_string(), cur.span_from(after_groups));
-                }
-                let rest_start = cur.pos();
-                let rest = parse_inline_seq(cur, Stop::Line, false)?;
-                if !rest.is_empty() {
-                    match content.last_mut() {
-                        Some(Block::Paragraph(p)) => extend_merging(&mut p.content, rest),
-                        _ => content.push(Block::Paragraph(Paragraph::new(
-                            rest,
-                            cur.span_from(rest_start),
-                        ))),
-                    }
-                }
-            }
-            (content, attrs, id)
-        } else {
-            // The bracket-less sugar, shared with `=`: one line, plus this
-            // line's own trailing `#(id)`/`{attrs}`. Spreading out means
-            // opening a group -- `[ ]` or `|` -- exactly as it does for
-            // `@name`. `parse_sugar_body` returns `Vec<Inline>` (`=`'s
-            // title stays that shape too); a list item's own `content` is
-            // `Vec<Block>` now, so wrap it in one `Paragraph`.
-            let item_start = cur.pos();
-            let (inline, attrs, id) = parse_sugar_body(cur)?;
-            let content = if inline.is_empty() {
-                Vec::new()
-            } else {
-                vec![Block::Paragraph(Paragraph::new(
-                    inline,
-                    cur.span_from(item_start),
-                ))]
-            };
-            (content, attrs, id)
-        };
-
-        if cur.peek() == Some('\n') {
-            cur.bump();
-        }
-
-        let mut children = Vec::new();
-        while let Some(next) = peek_list_marker(cur)? {
-            if next.indent > head.indent {
-                let sub_items = parse_list_internal(cur, next.ordered, next.indent)?;
-                if !sub_items.is_empty() {
-                    let list_span = sub_items
-                        .first()
-                        .unwrap()
-                        .span
-                        .union(&sub_items.last().unwrap().span);
-                    children.push(tomet_ast::Block::Element(element_list(
-                        next.ordered,
-                        sub_items,
-                        list_span,
-                    )));
-                }
-            } else {
-                break;
-            }
-        }
-
-        let span = cur.span_from(item_start);
-        items.push(element_list_item(
-            content, marker, attrs, id, children, span,
-        ));
+        let item = parse_single_list_item(cur, head)?;
+        items.push(item);
     }
     Ok(items)
+}
+
+pub(crate) fn parse_list_item_body(
+    cur: &mut Cursor,
+    head: &ListMarker,
+    pipe_stack: &[usize],
+) -> Result<Element> {
+    let mut marker = head.marker.clone();
+    let item_start = cur.pos();
+    eat_list_marker(cur)?;
+
+    let (content, attrs, id) = if head.full_form {
+        // The full form: `- ()[ content ]{value}`. Groups are read by
+        // the same code that reads `@name`'s, so `[content]` stops at
+        // its closing bracket and `|content` at the end of its marked
+        // run -- either may span lines. Only the bracket-less sugar
+        // below is one line, and it is one line because it has no
+        // group to close rather than because spreading out is barred.
+        let mut item = element_new(Sigil::Bare);
+        crate::element::parse_groups_with_pipe_stack(cur, &mut item, false, pipe_stack)?;
+        // An `(args)` group read here is the item's own -- the same
+        // slot the probe's `(marker)` fills, reached from the other
+        // side. `- (x)[ y ]` takes that path and `-(x)` this one, and
+        // dropping it here is what made `-(x)` an empty item once `(`
+        // could reach this branch at all.
+        if item.args.is_some() {
+            marker = merge_values(marker.as_ref(), item.args.as_ref());
+        }
+        let id = item.id;
+        let attrs = item.value.and_then(|v| v.as_data());
+        let mut content = item.content.unwrap_or_default();
+        // Text after the groups belongs to the item, the way
+        // `@x[T] content` keeps both halves in one paragraph. Letting
+        // it fall out as a block of its own would silently move a
+        // sentence out of the list it was written in. `content` is a
+        // `Vec<Block>` now, so "the item's paragraph" is its last
+        // block if that's a `Paragraph`, not `content` itself.
+        let after_groups = cur.pos();
+        skip_inline_ws(cur);
+        if !matches!(cur.peek(), None | Some('\n')) {
+            // `parse_inline_seq` trims its own edges, which is right
+            // for a standalone sequence and wrong when appending to
+            // one: the space that separated the group from the text
+            // has to be put back by hand. Not when the group was
+            // empty, though -- `- [ ] text` has nothing to separate
+            // the text from. `push_text`/`extend_merging` fold that
+            // space (and the parsed sequence's own leading `Text`, if
+            // it has one) into the last paragraph's content rather
+            // than leaving separate nodes at the seam that mean
+            // nothing on their own -- same reasoning as `inline.rs`'s
+            // comment elision.
+            if cur.pos() != after_groups
+                && let Some(Block::Paragraph(p)) = content.last_mut()
+            {
+                push_text(&mut p.content, " ".to_string(), cur.span_from(after_groups));
+            }
+            let rest_start = cur.pos();
+            let rest = parse_inline_seq(cur, Stop::Line, false)?;
+            if !rest.is_empty() {
+                match content.last_mut() {
+                    Some(Block::Paragraph(p)) => extend_merging(&mut p.content, rest),
+                    _ => content.push(Block::Paragraph(Paragraph::new(
+                        rest,
+                        cur.span_from(rest_start),
+                    ))),
+                }
+            }
+        }
+        (content, attrs, id)
+    } else {
+        // The bracket-less sugar, shared with `=`: one line, plus this
+        // line's own trailing `#(id)`/`{attrs}`. Spreading out means
+        // opening a group -- `[ ]` or `|` -- exactly as it does for
+        // `@name`. `parse_sugar_body` returns `Vec<Inline>` (`=`'s
+        // title stays that shape too); a list item's own `content` is
+        // `Vec<Block>` now, so wrap it in one `Paragraph`.
+        let item_start = cur.pos();
+        let (inline, attrs, id) = parse_sugar_body(cur)?;
+        let content = if inline.is_empty() {
+            Vec::new()
+        } else {
+            vec![Block::Paragraph(Paragraph::new(
+                inline,
+                cur.span_from(item_start),
+            ))]
+        };
+        (content, attrs, id)
+    };
+
+    let span = cur.span_from(item_start);
+    Ok(element_list_item(
+        content,
+        marker,
+        attrs,
+        id,
+        Vec::new(),
+        span,
+    ))
+}
+
+pub(crate) fn parse_single_list_item(cur: &mut Cursor, head: ListMarker) -> Result<Element> {
+    let item_start = cur.pos();
+    let mut item = parse_list_item_body(cur, &head, &[])?;
+
+    if cur.peek() == Some('\n') {
+        cur.bump();
+    }
+
+    let mut children = Vec::new();
+    while let Some(next) = peek_list_marker(cur)? {
+        if next.indent > head.indent {
+            let sub_items = parse_list_internal(cur, next.ordered, next.indent)?;
+            if !sub_items.is_empty() {
+                let list_span = sub_items
+                    .first()
+                    .unwrap()
+                    .span
+                    .union(&sub_items.last().unwrap().span);
+                children.push(tomet_ast::Block::Element(element_list(
+                    next.ordered,
+                    sub_items,
+                    list_span,
+                )));
+            }
+        } else {
+            break;
+        }
+    }
+
+    item.children = if children.is_empty() {
+        None
+    } else {
+        Some(children)
+    };
+    item.span = cur.span_from(item_start);
+    Ok(item)
 }

@@ -34,9 +34,7 @@ pub enum EditOp {
         node: Node,
     },
     /// Deletes a node by ID from its parent or root.
-    Delete {
-        id: NodeId,
-    },
+    Delete { id: NodeId },
     /// First-class move of an existing node to a new parent or new position.
     Move {
         id: NodeId,
@@ -44,10 +42,7 @@ pub enum EditOp {
         new_index: usize,
     },
     /// Replaces the entire text of a paragraph or code block.
-    EditText {
-        id: NodeId,
-        new_text: String,
-    },
+    EditText { id: NodeId, new_text: String },
     /// Sets, updates, or deletes an attribute/key in an element's data, args, or id slot.
     /// If `value` is `None`, the attribute or key is removed.
     SetAttribute {
@@ -177,7 +172,9 @@ impl EditDoc {
                 Ok(())
             }
             Some(parent_id) => {
-                let parent = self.get_mut(parent_id).ok_or(EditError::NodeNotFound(parent_id))?;
+                let parent = self
+                    .get_mut(parent_id)
+                    .ok_or(EditError::NodeNotFound(parent_id))?;
                 parent.mark_edited();
                 match &mut parent.kind {
                     NodeKind::Section { children, .. }
@@ -212,7 +209,10 @@ impl EditDoc {
                 NodeKind::Section { children, .. }
                 | NodeKind::List { children }
                 | NodeKind::ListItem { children, .. } => {
-                    if let Some(pos) = children.iter().position(|item| item.as_node_id() == Some(id)) {
+                    if let Some(pos) = children
+                        .iter()
+                        .position(|item| item.as_node_id() == Some(id))
+                    {
                         children.remove(pos);
                         true
                     } else {

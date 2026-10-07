@@ -161,7 +161,9 @@ mod tests {
         .unwrap();
 
         let exported = export_doc(&doc);
-        assert!(exported.contains("=[ Sec B ]\nItem 1.\n\nItem 2.\n") || exported.contains("Item 1."));
+        assert!(
+            exported.contains("=[ Sec B ]\nItem 1.\n\nItem 2.\n") || exported.contains("Item 1.")
+        );
     }
 
     #[test]
@@ -173,7 +175,10 @@ mod tests {
         match diagnose_doc(&doc) {
             PostEditReport::Validation(diags) => {
                 // Std elements only, no unknown elements
-                assert!(diags.is_empty(), "clean doc should have no diagnostics: {diags:?}");
+                assert!(
+                    diags.is_empty(),
+                    "clean doc should have no diagnostics: {diags:?}"
+                );
             }
             PostEditReport::ParseFailure(err) => {
                 panic!("clean document failed to parse: {err}");
@@ -220,13 +225,8 @@ mod tests {
             .next()
             .unwrap();
 
-        doc.set_attribute(
-            meta_id,
-            AttrGroup::Data,
-            "icon",
-            Some("@doc.icon(new)"),
-        )
-        .unwrap();
+        doc.set_attribute(meta_id, AttrGroup::Data, "icon", Some("@doc.icon(new)"))
+            .unwrap();
 
         let exported = export_doc(&doc);
         assert_eq!(exported, "@meta{icon: @doc.icon(new)}\n\nBody.\n");
@@ -263,13 +263,8 @@ mod tests {
             .next()
             .unwrap();
 
-        doc.set_attribute(
-            el_id,
-            AttrGroup::Args,
-            "type",
-            Some("\"warning\""),
-        )
-        .unwrap();
+        doc.set_attribute(el_id, AttrGroup::Args, "type", Some("\"warning\""))
+            .unwrap();
         doc.set_attribute(el_id, AttrGroup::Id, "", Some("callout-1"))
             .unwrap();
 

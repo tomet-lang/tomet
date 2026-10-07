@@ -77,9 +77,7 @@ pub enum NodeKind {
         children: Vec<ChildItem>,
     },
     /// A paragraph whose content is maintained as raw text.
-    Paragraph {
-        text: String,
-    },
+    Paragraph { text: String },
     /// A block element (e.g. `@callout`, `@note`, `@table`, `@meta`).
     BlockElement {
         name: String,
@@ -89,9 +87,7 @@ pub enum NodeKind {
         content: Option<String>,
     },
     /// A list grouping list items and trivia.
-    List {
-        children: Vec<ChildItem>,
-    },
+    List { children: Vec<ChildItem> },
     /// A single item within a list.
     ListItem {
         marker: String,
@@ -99,16 +95,9 @@ pub enum NodeKind {
         children: Vec<ChildItem>,
     },
     /// A fenced code block (` ```lang ... ``` `).
-    CodeBlock {
-        lang: Option<String>,
-        code: String,
-    },
+    CodeBlock { lang: Option<String>, code: String },
     /// A thematic break / horizontal rule (`---`).
-    ThematicBreak {
-        raw: String,
-    },
+    ThematicBreak { raw: String },
     /// Other block kinds preserved as raw text.
-    Other {
-        kind_name: String,
-    },
+    Other { kind_name: String },
 }

@@ -53,8 +53,13 @@ task) is enough for every element discussed so far.
 
 ## Status
 
-Not started. No design decisions made yet beyond "this is a real, separate
-gap." Whoever picks this up should re-read `tomet-syntax-parser/src/
-inline.rs`'s `Stop::PipeRun`/`pipe_run_continues`/`at_marked_line_start`
-(and whatever replaces them once the sibling task's block-content rewrite
-lands) before designing the stacked-column mechanism.
+Completed (2026-10-08).
+- Multi-level stacked column tracking implemented in `crates/tomet-syntax-parser/src/inline.rs` and `element.rs`.
+  - `Stop::PipeRun` tracks `cols: &[usize]`.
+  - `pipe_run_state` validates all ancestor and current columns, returns `End` on outer exits, and produces clear `"lines up with no content"` error on mismatch.
+  - `split_softbreaks` folds all ancestor/current markers into `SoftBreak` span.
+  - `parse_element_with_pipe_stack` and `parse_groups_with_pipe_stack` propagate active parent stacks to children.
+- Block dispatch inside pipe content:
+  - Lists (`-` and `1.`) are collected across lines with matching stack into `Block::Element(ul/ol)`.
+  - Empty pipe lines correctly separate paragraphs at any depth.
+  - Test parity verified against `[content]` in `tests/src/pipe.rs` with AST equality and printer expansion/round-trip.

@@ -220,6 +220,14 @@ fn skip_lookahead_gap(cur: &mut Cursor) {
 /// `remote_id_target_element_supports_colon_connection`) keeps working
 /// exactly as before there.
 pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Result<Element> {
+    parse_element_with_pipe_stack(cur, allow_colon_connect, &[])
+}
+
+pub(crate) fn parse_element_with_pipe_stack(
+    cur: &mut Cursor,
+    allow_colon_connect: bool,
+    parent_pipe_stack: &[usize],
+) -> Result<Element> {
     let start_pos = cur.pos();
     if !cur.eat_str("@") {
         return Err(err(cur, cur.pos(), "expected '@'"));
@@ -230,7 +238,7 @@ pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Resu
     };
 
     let mut el = element_new(sigil);
-    parse_groups(cur, &mut el, allow_colon_connect)?;
+    parse_groups_with_pipe_stack(cur, &mut el, allow_colon_connect, parent_pipe_stack)?;
     el.span = cur.span_from(start_pos);
     Ok(el)
 }
@@ -289,6 +297,15 @@ pub(crate) fn parse_groups(
     el: &mut Element,
     allow_colon_connect: bool,
 ) -> Result<()> {
+    parse_groups_with_pipe_stack(cur, el, allow_colon_connect, &[])
+}
+
+pub(crate) fn parse_groups_with_pipe_stack(
+    cur: &mut Cursor,
+    el: &mut Element,
+    allow_colon_connect: bool,
+    parent_pipe_stack: &[usize],
+) -> Result<()> {
     loop {
         let checkpoint = cur.pos();
         let newlines = skip_element_gap(cur);
@@ -311,7 +328,7 @@ pub(crate) fn parse_groups(
                 if is_name_start_at(cur) {
                     let name = eat_name(cur).expect("is_name_start_at just confirmed a name");
                     let mut connect_el = element_new(Sigil::Named(name));
-                    parse_groups(cur, &mut connect_el, false)?;
+                    parse_groups_with_pipe_stack(cur, &mut connect_el, false, parent_pipe_stack)?;
                     connect_el.span = cur.span_from(colon_pos);
                     el.connects.push(connect_el);
                     continue;
@@ -357,8 +374,32 @@ pub(crate) fn parse_groups(
                 // `|` is `[` without the brackets -- same slot, closed by
                 // the end of the marked run instead of by `]`.
                 Some('|') if el.content.is_none() => {
-                    el.content = Some(parse_pipe_content(cur)?);
-                    continue;
+                    let mut probe = *cur;
+                    let mut parent_ok = true;
+                    if newlines > 0 && !parent_pipe_stack.is_empty() {
+                        for &expected_col in parent_pipe_stack {
+                            skip_inline_ws(&mut probe);
+                            if probe.peek() != Some('|') {
+                                parent_ok = false;
+                                break;
+                            }
+                            let (_, col) = probe.line_col(probe.pos());
+                            if col != expected_col {
+                                parent_ok = false;
+                                break;
+                            }
+                            probe.bump();
+                        }
+                        skip_inline_ws(&mut probe);
+                    }
+                    if parent_ok && probe.peek() == Some('|') {
+                        *cur = probe;
+                        el.content = Some(parse_pipe_content(cur, parent_pipe_stack)?);
+                        continue;
+                    } else {
+                        cur.set_pos(checkpoint);
+                        break;
+                    }
                 }
                 Some('{') if el.value.is_none() => {
                     el.value = Some(parse_value_group(cur)?);
@@ -700,25 +741,76 @@ fn parse_id_scalar(cur: &mut Cursor) -> Result<String> {
 /// the whole run (`crate::inline::PipeContinuation`).
 ///
 /// Multi-level nesting (an element's own `|content` living inside another
-/// element's `|content`, each level adding its own marker column) is not
-/// handled here -- see `.agents/tasks/nested-pipe-markers.md`.
-fn parse_pipe_content(cur: &mut Cursor) -> Result<Vec<Block>> {
+/// element's `|content`, each level adding its own marker column) is
+/// handled by tracking `parent_stack` and pushing each active marker's column.
+fn parse_pipe_content(cur: &mut Cursor, parent_stack: &[usize]) -> Result<Vec<Block>> {
     let (_, col) = cur.line_col(cur.pos());
     if !cur.eat_str("|") {
         return Err(err(cur, cur.pos(), "expected '|'"));
     }
+    let mut current_stack = parent_stack.to_vec();
+    current_stack.push(col);
     let mut blocks = Vec::new();
     loop {
         skip_inline_ws(cur);
+        if cur.is_eof() {
+            break;
+        }
         if cur.peek() == Some('@')
             && is_element_start(cur, true)
             && element_ends_line(cur) == LineEnd::Bare
         {
-            let el = parse_element(cur, true)?.with_placement(Placement::Block);
+            let el = parse_element_with_pipe_stack(cur, true, &current_stack)?
+                .with_placement(Placement::Block);
+            blocks.push(Block::Element(el));
+        } else if let Some(head) = crate::list::peek_list_marker(cur)? {
+            let ordered = head.ordered;
+            let mut items = Vec::new();
+            let mut next_head = head;
+            loop {
+                let item = crate::list::parse_list_item_body(cur, &next_head, &current_stack)?;
+                items.push(item);
+                skip_inline_ws(cur);
+                if cur.is_eof() {
+                    break;
+                }
+                match crate::inline::pipe_run_state(cur, &current_stack)? {
+                    crate::inline::PipeContinuation::Content => {
+                        let mut probe = *cur;
+                        probe.bump();
+                        for _ in 0..current_stack.len() {
+                            skip_inline_ws(&mut probe);
+                            probe.bump();
+                        }
+                        skip_inline_ws(&mut probe);
+                        if let Ok(Some(h)) = crate::list::peek_list_marker(&probe) {
+                            if h.ordered == ordered {
+                                *cur = probe;
+                                next_head = h;
+                                continue;
+                            }
+                        }
+                        break;
+                    }
+                    _ => break,
+                }
+            }
+            let list_span = items
+                .first()
+                .unwrap()
+                .span
+                .union(&items.last().unwrap().span);
+            let el = tomet_tree::element_list(ordered, items, list_span);
             blocks.push(Block::Element(el));
         } else {
             let para_start = cur.pos();
-            let content = parse_inline_seq(cur, Stop::PipeRun { col }, true)?;
+            let content = parse_inline_seq(
+                cur,
+                Stop::PipeRun {
+                    cols: &current_stack,
+                },
+                true,
+            )?;
             if !content.is_empty() {
                 let span = cur.span_from(para_start);
                 blocks.push(Block::Paragraph(Paragraph::new(content, span)));
@@ -728,15 +820,16 @@ fn parse_pipe_content(cur: &mut Cursor) -> Result<Vec<Block>> {
             break;
         }
         // After either branch, `cur` sits at the `\n` that ends the line
-        // just consumed (a bare element's own line has nothing else on
-        // it; `Stop::PipeRun` only ever stops at `\n` or EOF, handled
-        // above) -- the next thing to check either way.
-        match crate::inline::pipe_run_state(cur, col)? {
+        // just consumed -- the next thing to check either way.
+        skip_inline_ws(cur);
+        match crate::inline::pipe_run_state(cur, &current_stack)? {
             crate::inline::PipeContinuation::End => break,
             crate::inline::PipeContinuation::Empty | crate::inline::PipeContinuation::Content => {
                 cur.bump(); // the newline
-                skip_inline_ws(cur);
-                cur.bump(); // the marker itself
+                for _ in 0..current_stack.len() {
+                    skip_inline_ws(cur);
+                    cur.bump(); // the marker itself
+                }
                 skip_inline_ws(cur);
             }
         }

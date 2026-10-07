@@ -34,9 +34,7 @@ fn import_block_node(doc: &mut EditDoc, node: &SyntaxNode) -> NodeId {
 
     let kind = match node.kind() {
         K::SECTION => import_section(doc, node),
-        K::PARAGRAPH => NodeKind::Paragraph {
-            text: raw.clone(),
-        },
+        K::PARAGRAPH => NodeKind::Paragraph { text: raw.clone() },
         K::BLOCK_ELEMENT => import_block_element(node),
         K::LIST => import_list(doc, node),
         K::LIST_ITEM => import_list_item(doc, node),
@@ -93,13 +91,13 @@ fn import_block_element(node: &SyntaxNode) -> NodeKind {
         .map(|sigil| sigil.text().to_string().trim_start_matches('@').to_string())
         .unwrap_or_default();
 
-    let id_attr = node
-        .children()
-        .find(|c| c.kind() == K::ID_GROUP)
-        .map(|id| {
-            let t = id.text().to_string();
-            t.trim_start_matches("#(").trim_end_matches(')').trim().to_string()
-        });
+    let id_attr = node.children().find(|c| c.kind() == K::ID_GROUP).map(|id| {
+        let t = id.text().to_string();
+        t.trim_start_matches("#(")
+            .trim_end_matches(')')
+            .trim()
+            .to_string()
+    });
 
     let args = node
         .children()
@@ -113,15 +111,12 @@ fn import_block_element(node: &SyntaxNode) -> NodeKind {
         .map(|val_node| extract_entries(&val_node))
         .unwrap_or_default();
 
-    let content = node
-        .children()
-        .find(|c| c.kind() == K::CONTENT)
-        .map(|c| {
-            let t = c.text().to_string();
-            let inner = t.strip_prefix('[').unwrap_or(&t);
-            let inner = inner.strip_suffix(']').unwrap_or(inner);
-            inner.to_string()
-        });
+    let content = node.children().find(|c| c.kind() == K::CONTENT).map(|c| {
+        let t = c.text().to_string();
+        let inner = t.strip_prefix('[').unwrap_or(&t);
+        let inner = inner.strip_suffix(']').unwrap_or(inner);
+        inner.to_string()
+    });
 
     NodeKind::BlockElement {
         name,
@@ -177,7 +172,11 @@ fn import_list_item(doc: &mut EditDoc, node: &SyntaxNode) -> NodeKind {
     for element in node.children_with_tokens() {
         match element {
             NodeOrToken::Token(token) => {
-                if marker.is_empty() && (token.kind() == K::MINUS || token.kind() == K::PLUS || token.kind() == K::STAR) {
+                if marker.is_empty()
+                    && (token.kind() == K::MINUS
+                        || token.kind() == K::PLUS
+                        || token.kind() == K::STAR)
+                {
                     marker = token.text().to_string();
                 }
                 children.push(ChildItem::Trivia(token.text().to_string()));
@@ -198,8 +197,5 @@ fn import_list_item(doc: &mut EditDoc, node: &SyntaxNode) -> NodeKind {
 
 fn import_code_block(node: &SyntaxNode) -> NodeKind {
     let code = node.text().to_string();
-    NodeKind::CodeBlock {
-        lang: None,
-        code,
-    }
+    NodeKind::CodeBlock { lang: None, code }
 }
