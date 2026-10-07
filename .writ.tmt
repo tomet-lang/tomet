@@ -21,16 +21,16 @@ does not relax the rule to fit the change it wanted to make.
     6: list( "apps/*", "bindings/*", "editors/*", "tests", "crates/tomet" )
     5: list( "crates/tomet-workspace*", "crates/tomet-load" )
     4: list(
-        "crates/serde_tomet",
-        "crates/tomet-format*",
-        "crates/tomet-convert-*",
-        "crates/tomet-transform",
-        "crates/tomet-extract*",
-        "crates/tomet-search",
-        "crates/tomet-edit",
-        "crates/tomet-stats",
-        "crates/tomet-vault"
-       )
+      "crates/serde_tomet",
+      "crates/tomet-format*",
+      "crates/tomet-convert-*",
+      "crates/tomet-transform",
+      "crates/tomet-extract*",
+      "crates/tomet-search",
+      "crates/tomet-edit",
+      "crates/tomet-stats",
+      "crates/tomet-vault"
+      )
     3: list( "crates/tomet-config" )
     2: list( "crates/tomet-semantics*" )
     1: list( "crates/tomet-syntax-*" )

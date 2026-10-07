@@ -6,24 +6,133 @@
 
 =[ tomet-edit ]
 
-Backend-neutral editable model of a Tomet document.
+==[ tomet-edit ]
 
-A tree of nodes that carry opaque ids, attribute maps, marked text and the
-layout trivia (whitespace, comments) of the source they came from, plus a
-small closed set of edit operations applied one at a time. Its purpose is
-to let an application bridge one document to an external editing runtime
--- typically a CRDT -- without this workspace depending on any of them.
+Backend-neutral editable tree model of a Tomet document for collaborative editing.
 
-Planned surface (nothing here yet):
+==[ Architecture & Core Principles ]
 
-- the model types;
-- `source -> model` and `model -> source`, where an import followed by an
+- CRDT-Agnostic Model:
 
-export with no edits is byte-identical;
+This crate provides an in-memory, tree-structured document model with opaque [`NodeId`]s,
+designed to bridge to external collaborative runtimes (such as Loro, Yjs, or Automerge).
+It depends on zero CRDT libraries, networking, or session transport code.
 
-- edit operations: insert, delete, move, set attribute, edit text;
-- validator diagnostics over an edited model, which only report, because
+- CST Foundation & Guaranteed Invariant:
 
-a runtime that merges concurrent edits cannot reject them.
+The model is derived from the Concrete Syntax Tree (`tomet-cst`). Trivia (whitespace,
+newlines, comments) is preserved alongside nodes.
+Guaranteed Invariant: Importing and immediately exporting without edits is 100% byte-identical
+to the original input source across the entire corpus (`export_doc(&import_source(src)) == src`).
 
-Not here: any CRDT library, and any sync, session or transport code.
+- Text as Raw String (Paragraphs & Headings):
+
+Prose within paragraphs, headings, and element content is held as raw text rather than
+inline marks. Structure in the model is retained where identity, moving, and keys matter
+(sections, blocks, attributes), allowing CRDTs to merge text via character-level sequences
+without fragile structured-mark nesting.
+
+- First-Class Move & Closed Edit Operations:
+
+[`EditOp`] provides a minimal, closed set of operations (`Insert`, `Delete`, `Move`, `EditText`).
+`Move` is a first-class operation, directly supported by tree-based CRDTs (e.g. Loro's MovableTree).
+
+- Post-Edit Diagnostics:
+
+Collaborative engines merge writes without rejecting them. [`diagnose_doc`] exports the edited
+document to source text and re-parses it with the full validator to report duplicate IDs,
+schema errors, or broken syntax after concurrent merges.
+
+==[ Module diagnostics ]
+
+Post-edit diagnostics over an [`EditDoc`].
+
+A collaborative editing runtime (e.g. CRDT) merges concurrent edits without
+rejecting writes. After applying edits, this module exports the document back
+to source text, parses it with the AST parser (`parse_document`), and runs
+`validate_document` to report duplicate IDs or validation warnings.
+
+===[ Enums ]
+
+====[ enum PostEditReport ]
+
+The diagnostic report of an edited document.
+
+===[ Functions ]
+
+====[ fn diagnose_doc ]
+
+Diagnoses an [`EditDoc`] by exporting to source, parsing with [`parse_document`],
+and running [`validate_document`].
+
+==[ Module doc ]
+
+The root `EditDoc` managing tree nodes and IDs.
+
+===[ Structs ]
+
+====[ struct EditDoc ]
+
+An editable tree model of a Tomet document.
+
+==[ Module export ]
+
+Serializes an [`EditDoc`] back into Tomet source text.
+
+===[ Functions ]
+
+====[ fn export_doc ]
+
+Exports an [`EditDoc`] back to a Tomet source string.
+
+Guaranteed Invariant: An import followed by export with no edits is byte-identical
+to the input source:
+`export(&import_source(src)) == src`
+
+==[ Module import ]
+
+Imports a concrete syntax tree (CST) into an [`EditDoc`].
+
+===[ Functions ]
+
+====[ fn import_source ]
+
+Parses `src` into a CST and imports it into an [`EditDoc`].
+
+====[ fn import_cst ]
+
+Imports an existing Rowan CST [`SyntaxNode`] into an [`EditDoc`].
+
+==[ Module node ]
+
+Node and child definitions for `tomet-edit`.
+
+===[ Structs ]
+
+====[ struct NodeId ]
+
+An opaque, unique identifier for a node in an [`EditDoc`].
+
+====[ struct Node ]
+
+An editable node in a Tomet document tree.
+
+===[ Enums ]
+
+====[ enum ChildItem ]
+
+An entry in a child list: either layout trivia (whitespace/comment) or a child node.
+
+====[ enum NodeKind ]
+
+Specific variant of an editable node.
+
+==[ Module op ]
+
+===[ Enums ]
+
+====[ enum EditError ]
+
+====[ enum EditOp ]
+
+A closed set of atomic edit operations on an [`EditDoc`].

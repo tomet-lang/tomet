@@ -166,6 +166,22 @@ fn cst_is_lossless_across_the_corpus() {
     }
 }
 
+#[test]
+fn tomet_edit_is_lossless_across_the_corpus() {
+    // Unedited import followed by export must be byte-identical across the corpus.
+    for rel in corpus() {
+        let src = read_fixture(&rel);
+        let doc = tomet_edit::import_source(&src);
+        let exported = tomet_edit::export_doc(&doc);
+        assert_eq!(
+            exported,
+            src,
+            "tomet-edit export lost bytes for {}",
+            rel.display()
+        );
+    }
+}
+
 /// Levels of every section in `blocks`, in document order.
 fn ast_section_levels(blocks: &[tomet_ast::Block], out: &mut Vec<usize>) {
     for block in blocks {
