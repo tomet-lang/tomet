@@ -1,0 +1,190 @@
+@kind(api)
+
+@meta{
+  crate: tove
+}
+
+=[ tove ]
+
+# TOVE (Tomet Object & Value Expression)
+
+A lightweight, expressive data language and parser crate for Tomet.
+
+TOVE provides:
+
+- Pure syntax parsing for values, maps, sequences (`list(...)`), and expressions into [`Value`].
+- Serde integration ([`from_str`], [`to_string`]) for serializing and deserializing Rust types.
+- AST and parser primitives shared with the document-level parser (`tomet-syntax-parser`).
+
+==[ Module de ]
+
+===[ Functions ]
+
+====[ fn from_value ]
+
+==[ Module error ]
+
+===[ Structs ]
+
+====[ struct Error ]
+
+===[ Type Aliases ]
+
+====[ type Result ]
+
+==[ Module parser ]
+
+Parsing for TOVE (Tomet Object & Value Expression):
+map bodies (`key: value`), `{ ... }` blocks, `"..."` strings,
+`call(...)` expressions, and bare scalars.
+
+A list value is spelled `list(...)` (a `Value::Call`,
+normalized to `Value::Seq` downstream).
+
+===[ Structs ]
+
+====[ struct NoHook ]
+
+The default no-op hook for pure TOVE documents.
+
+===[ Traits ]
+
+====[ trait ValueHook ]
+
+A hook allowing callers (such as `tomet-syntax-parser`) to parse custom
+embedded values (e.g. `@element` or `$interp`) at value positions.
+
+===[ Functions ]
+
+====[ fn parse_value ]
+
+Parse an entire source string as one `Value` using pure TOVE syntax.
+
+====[ fn parse_value_with ]
+
+Parse an entire source string as one `Value` with a custom [`ValueHook`].
+
+====[ fn err ]
+
+====[ fn is_ident_char ]
+
+Characters legal inside a @strong[map key].
+
+====[ fn is_name_start ]
+
+First character of one segment of an element/identifier name.
+
+====[ fn is_name_char ]
+
+Subsequent characters of one segment of an element/identifier name.
+
+====[ fn is_inline_ws ]
+
+====[ fn skip_inline_ws ]
+
+====[ fn skip_ws_and_newlines ]
+
+====[ fn skip_line_comment ]
+
+`// ...` to end of line/EOF.
+
+====[ fn skip_block_comment ]
+
+====[ fn skip_ws_newlines_and_comments ]
+
+Like `skip_ws_and_newlines`, but also consumes `//` line comments.
+
+====[ fn eat_ident ]
+
+====[ fn eat_name ]
+
+Reads one `.`-separated name, or `None` if `cur` is not at a name start.
+
+====[ fn eat_name_segment ]
+
+====[ fn is_name_start_at ]
+
+Whether `cur` is at the start of a name, without consuming it.
+
+====[ fn eat_scalar_raw ]
+
+Raw scalar text stops at any character that could plausibly end an
+entry/sequence item.
+
+====[ fn try_parse_call ]
+
+`name(arg, arg, ...)` -- an immediately-resolved literal such as
+`list(card, ns.mycard)`.
+
+====[ fn try_parse_call_with ]
+
+====[ fn scalar_from_text ]
+
+====[ fn parse_quoted ]
+
+====[ fn parse_one_entry ]
+
+====[ fn parse_one_entry_with ]
+
+====[ fn parse_map_body ]
+
+====[ fn parse_map_body_with ]
+
+====[ fn parse_entry_value ]
+
+====[ fn parse_entry_value_with ]
+
+====[ fn parse_value_at ]
+
+====[ fn parse_value_at_with ]
+
+====[ fn starts_absolute_path ]
+
+====[ fn is_scheme_uri_colon ]
+
+===[ Constants ]
+
+====[ const POSITIONAL_ENTRY_KEY ]
+
+Sentinel key for a positional (unkeyed) entry inside a map body.
+
+==[ Module print ]
+
+Renders a `Value` back into TOVE data text:
+a top-level map is written as bare `key: value` lines (no enclosing braces);
+nested maps use `{ ... }`, and a sequence prints as `list(...)`.
+
+===[ Functions ]
+
+====[ fn print_value ]
+
+====[ fn write_scalar_string ]
+
+==[ Module ser ]
+
+===[ Structs ]
+
+====[ struct ValueSerializer ]
+
+====[ struct SeqSerializer ]
+
+====[ struct MapSerializer ]
+
+===[ Functions ]
+
+====[ fn to_value ]
+
+==[ Functions ]
+
+===[ fn from_str ]
+
+Parse a TOVE data document into `T` via Serde.
+
+===[ fn to_string ]
+
+Render `T` into TOVE data text via Serde.
+
+===[ fn normalize_list_calls ]
+
+Normalizes `list(...)` calls into `Value::Seq` so Serde sequence deserialization
+works seamlessly.

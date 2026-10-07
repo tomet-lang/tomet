@@ -1,0 +1,56 @@
+@kind(api)
+
+@meta{
+  crate: tomet-config
+}
+
+=[ tomet-config ]
+
+`PrinterConfig` (loaded from a `default.config.tmt`/
+`tomet.config.tmt`, or an `@settings`/`@config` element in a
+document) and the config-driven formatting choices it controls: meta
+format (yaml/json/toml), link-key spacing, callout/list style,
+and per-field `@meta` rules. Split out of `tomet-printer` because
+finding/loading this config is a concern shared by every consumer
+that needs it (`tomet-tui`, `tomet-workspace`, `tomet-indexer`),
+not something specific to serializing a `Document` back to `.tmt`
+text.
+
+==[ Structs ]
+
+===[ struct FieldConfig ]
+
+===[ struct PrinterConfig ]
+
+==[ Enums ]
+
+===[ enum GroupOrder ]
+
+===[ enum ConfigError ]
+
+==[ Functions ]
+
+===[ fn load_config_from_file ]
+
+===[ fn load_config_from_str ]
+
+===[ fn config_for ]
+
+The config that governs `path`, for a tool about to act on `src`.
+
+The nearest `default.config.tmt`/`tomet.config.tmt` up the tree wins,
+because that file's position is what says where the vault begins.
+With no vault to find, the document's own `@config` is used, and
+failing that the defaults.
+
+This exists so there is one answer to the question. There were two:
+the LSP resolved a config before formatting and `tomet format` did
+not, so a file the editor wrote on save was a file `format --check`
+rejected -- with `table.adjust_width`, `max_col_width` and
+`always_newline` all live in this repository's own config, the two
+disagreed on real documents.
+
+===[ fn find_config_file ]
+
+Searches `start` and its parent directories for `default.config.tmt` or `tomet.config.tmt`.
+Returns `(PrinterConfig, config_file_path, config_directory_path)`.

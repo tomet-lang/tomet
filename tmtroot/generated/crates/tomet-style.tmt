@@ -1,0 +1,96 @@
+@kind(api)
+
+@meta{
+  crate: tomet-style
+}
+
+=[ tomet-style ]
+
+Applies `tomet_config::PrinterConfig`'s style rules (meta format,
+link-key spacing (`target`, `@link`/`<embed>`'s one shared key), per-field
+`@meta` formatting) to a single
+`tomet_ast::Value` or `Element`, returning `.tmt`-syntax text.
+Deliberately scoped to single nodes -- no `Document`, no tree
+position, no recursion into sibling/child elements of other kinds --
+so both `tomet-printer` (rebuilds a whole `Document`) and
+`tomet-formatter` (patches specific spans of existing `.tmt` text)
+can depend on this without a circular dependency (`tomet-printer`
+already depends on `tomet-formatter`). `render_meta_element`
+specifically covers only `@meta` elements' actual shape per the
+grammar (`args` an optional format map, `value` always
+`ElementValue::from_map(Value::Map(...))`) -- not the general
+element-rendering logic for every other sigil/kind, which stays in
+`tomet-printer` since it recurses into inline/child content and
+is genuinely part of rebuilding a whole document from its AST.
+
+==[ Functions ]
+
+===[ fn render_value ]
+
+===[ fn render_value_inner ]
+
+===[ fn quote_scalar_string ]
+
+Formats a string scalar for Tomet source text, wrapping in `"` and escaping
+inner quotes and special characters only when necessary.
+
+===[ fn write_scalar_string ]
+
+Appends a safely quoted/escaped string scalar to `out`.
+
+===[ fn render_nested ]
+
+Renders a value that sits @em[inside] another one.
+
+A map needs its own braces there. `render_value_inner_with_config`
+deliberately renders a map unwrapped, because at the top level the
+caller supplies the braces -- but recursing into it that way printed
+`m: { k: v }` as `m: k: v`, which reparses as the string `"k: v"`.
+Nesting was destroyed by any print-then-parse cycle.
+
+Public because the printer renders a value group's pairs itself and
+needs the same rule.
+
+===[ fn render_value_inner_with_config ]
+
+===[ fn render_value_inner_with_blocks ]
+
+Same as [`render_value_inner_with_config`], but with the block
+renderer supplied explicitly instead of defaulting to the restricted
+one. See [`BlockRenderer`].
+
+===[ fn render_args_with_config ]
+
+===[ fn render_args_with_blocks ]
+
+Same as [`render_args_with_config`], but with the block renderer
+supplied explicitly. See [`BlockRenderer`].
+
+===[ fn render_meta_element ]
+
+Renders an `@meta(...){...}` element per `config`'s meta format
+settings (element-local `format:` arg takes priority over
+`config.meta_format`; multi-line if `config.meta_always_newline` or a
+format is set, else a single `@meta{k: v, ...}` line). Scoped to
+`@meta`'s actual shape -- `value` must be `ElementValue::from_map(Value::Map(...))`,
+which is all the grammar ever produces for `@meta`; anything else
+renders as a bare `@meta` (with args, if any).
+
+==[ Type Aliases ]
+
+===[ type BlockRenderer ]
+
+Renders a `Vec<Block>` slot (an element's `[content]`, or a `key:
+[...]` value) back into `.tmt` source text.
+
+This crate deliberately stays scoped to single nodes (see the module
+doc) and has no real block renderer of its own -- recursing through
+sections/lists/nested elements is `tomet-printer`'s
+`render_content_blocks`, one layer up, which this crate cannot depend
+on without an upward (and circular) dependency. Threading the renderer
+in as a callback instead lets `tomet-printer` plug its real one in
+(full fidelity, needed for e.g. `@conflict(a: [multi-paragraph content], ...)`), while every other caller (`tomet-formatter`, which patches
+spans incrementally and has no block renderer either) keeps the
+restricted default (`default_block_renderer`: paragraph-inlines only,
+same limit `Value::Element`'s own `content` already lived with before
+this existed).

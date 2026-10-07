@@ -1,0 +1,13 @@
+@kind(api)
+
+@meta{
+  crate: tomet-markdown
+}
+
+=[ tomet-markdown ]
+
+Bidirectional conversion between CommonMark and `tomet_ast`.
+
+The mapping and its known-lossy cases are documented where they are
+implemented: `import`'s module doc for Markdown -> Tomet, `export`'s
+for the other direction.

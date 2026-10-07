@@ -1,0 +1,28 @@
+@kind(api)
+
+@meta{
+  crate: tomet-lexer
+}
+
+=[ tomet-lexer ]
+
+A minimal byte-position cursor over `&str` source text.
+
+Tomet's grammar is context-sensitive -- `<`, `@`, `(`, `[`, `{` are
+only structural right after specific lookaheads (an element trigger),
+and plain prose text otherwise. That's easier to scan directly with a
+cursor than to pre-tokenize into a context-free stream, so
+`tomet-parser` builds its recursive-descent parser straight on top
+of this rather than going through a separate token pass.
+
+==[ Structs ]
+
+===[ struct Cursor ]
+
+==[ Functions ]
+
+===[ fn tokenize ]
+
+Losslessly tokenizes `src` into a list of `(SyntaxKind, &str)` tokens.
+
+Guarantee: Concatenating all returned token slices produces the exact original source string.

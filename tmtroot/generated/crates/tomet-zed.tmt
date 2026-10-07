@@ -1,0 +1,7 @@
+@kind(api)
+
+@meta{
+  crate: tomet-zed
+}
+
+=[ tomet-zed ]

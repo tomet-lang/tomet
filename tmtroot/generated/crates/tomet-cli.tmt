@@ -1,0 +1,11 @@
+@kind(api)
+
+@meta{
+  crate: tomet-cli
+}
+
+=[ tomet-cli ]
+
+A small CLI for manually checking that `tomet-parser`/
+`tove` actually work against a real `.tmt` file, instead of
+only trusting `cargo test`'s unit tests.

@@ -1,0 +1,257 @@
+@kind(api)
+
+@meta{
+  crate: tomet-transform
+}
+
+=[ tomet-transform ]
+
+Pure in-memory AST refactoring and structural transformations for Tomet documents.
+
+Provides:
+
+- @strong[[`macro_rewrite`]]: Reverse URL-to-macro pattern matching and rewriting.
+- @strong[[`directive`]]: Directive promotion (`@meta.type` -> `@kind`) and Value DSL normalization.
+- @strong[[`structural`]]: Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
+- @strong[[`meta`]]: Batch `@meta` key/value updates.
+- @strong[[`index_query`]]: `${filter(...)}` in an `@kind(index)` document,
+
+expanded into the `@file` entries it selects.
+
+==[ Module blueprint ]
+
+Blueprint schema extraction, transformation, and instantiation.
+
+===[ Structs ]
+
+====[ struct BlueprintInfo ]
+
+Metadata and variable definitions extracted from a `@blueprint` directive.
+
+===[ Functions ]
+
+====[ fn extract_blueprint_info ]
+
+Extracts [`BlueprintInfo`] from `doc` if it declares a top-level `@blueprint` directive.
+
+====[ fn instantiate_blueprint ]
+
+Instantiates a blueprint `doc` in-place by:
+1. Promoting/converting `@blueprint(target)` to `@kind(target)` and stripping schema blocks.
+2. Evaluating all `${...}` interpolation expressions and placeholders using `ctx`.
+
+==[ Module directive ]
+
+Directive promotion and Value DSL normalization transformations.
+
+===[ Functions ]
+
+====[ fn promote_prop_to_directive ]
+
+Promotes a property `prop_key` from an element matching `source_filter` into a new top-level
+directive `@target_directive_name(val)` (or `@target_directive_name{...}`), inserting it at `target_index`
+(or automatically after any `@version` directive, or at position 0).
+
+If the property is absent, empty, or null, it is simply removed without creating a directive.
+Returns `true` if a directive was created and inserted.
+
+====[ fn normalize_embedded_to_value_dsl ]
+
+Normalizes elements in `doc` from `format:yaml` (or another embedded
+format) to the native Value DSL.
+
+Reads the body through `embedded::element_data` @em[before] stripping the
+`format` argument, and rewrites it as a native group -- otherwise the
+body stays an opaque `+++` fence with nothing left to say how to read
+it, and every later pass sees an element with no data.
+
+====[ fn promote_meta_type_to_kind ]
+
+Promotes `@meta`'s `type:` field to a top-level `@kind(...)` element.
+
+==[ Module index_query ]
+
+`${filter(...)}` -- the one query node an `@kind(doc.index)` document
+may write, and the pass that replaces it with the `@link(ref:...)`
+entries it selects, in place among whatever else the author wrote by
+hand.
+
+# Why this is not a builtin function
+
+Every other `${...}` evaluates to a single `Value` and renders as
+text. `filter` expands into @em[several] AST nodes, so it can never go
+through `tomet_compute::call`'s one-value path. This pass therefore
+pattern-matches `filter` as an @strong[unevaluated] `InterpExpr::Call` and
+reads its argument list as a small query language. Its arguments are
+ordinary expressions and are evaluated the ordinary way, once per
+candidate file.
+
+`by(...)` is read here for the same reason, and a smaller one: it
+names a @em[field] rather than a value, so evaluating it would resolve
+the very path the sort needs to keep.
+
+# Why the rows arrive as a parameter
+
+Building the table means reading every `.tmt` in the vault, and this
+crate sits below the one allowed to do that (`crate-layering` in the
+root `.writ.tmt`: `tomet-transform` is layer 4, `tomet-indexer` is
+layer 5). So the I/O happens there, the table arrives here as plain
+data, and this pass stays pure and testable without a directory.
+
+# Absent, versus nobody has it
+
+Every row's evaluation context is given @em[every] field path any row in
+the table has, with [`Value::Null`] for the ones this row lacks. That
+is what makes `exists(meta.draft)` answerable -- an unfilled context
+would fail to resolve the name instead of reporting it absent.
+
+A path no file in the vault has is deliberately left out, so it still
+fails to resolve. That is the typo case: `meta.tgs` should say so
+rather than quietly match nothing.
+
+===[ Functions ]
+
+====[ fn expand_index_queries ]
+
+Replaces every `${filter(...)}` in `doc` with the `@link(ref:...)`
+entries it selects, in the order `by(...)` asks for -- in place,
+whether the query sat at the top level or as a list item nested
+arbitrarily deep under hand-written entries (see [`rewrite_blocks`]/
+[`rewrite_list_value`]).
+
+Returns how many query nodes were expanded. This is a count for a
+caller that wants one (`Prepared::expanded_queries`); whether to run
+this pass at all is [`is_index_document`]'s question, not this
+function's -- it rewrites whatever queries it finds regardless of
+`@kind`.
+
+Only a query that is a whole block, or a whole list item, is expanded.
+One sitting inside running text (`索引は ${filter(...)} で書く`) is left
+exactly as it is: it would have to expand into several elements in the
+middle of a sentence, or several list items in the middle of one, and
+there is no sensible answer to what that means.
+
+==[ Module interp ]
+
+Resolving `${...}` before anything renders.
+
+# Why this is a pass and not a renderer's job
+
+It was a renderer's job, four times over, and the four disagreed:
+markdown evaluated with an [`EvaluationContext`], HTML evaluated
+without one (so `${self.path}` resolved in one and not the other, and
+the vault's macros expanded in neither), Typst and Pandoc did not
+evaluate at all. The same document produced three different answers
+depending on what it was being turned into.
+
+A `${...}` means one thing. Deciding what it means is the language's
+job, so it is settled here, once, before any converter sees the tree --
+and a converter that never meets an `InterpExpr` has nothing left to
+disagree about.
+
+# What a failure does
+
+Nothing is dropped and nothing is fatal. An expression that cannot be
+resolved is replaced by its own source spelling, so the output shows
+`${some_id}` exactly as written, and is reported in the returned
+[`Unresolved`] list so `tomet check` can warn about it. That keeps a
+document that shows `${...}` as an example working, while still giving
+a typo somewhere to surface.
+
+# `filter` is not ours
+
+`${filter(...)}` is an index query: it expands into several elements
+rather than into text, and [`crate::index_query`] owns it. It is
+skipped here rather than reported, because "unknown function `filter`"
+would be a lie.
+
+===[ Structs ]
+
+====[ struct Unresolved ]
+
+A `${...}` that could not be resolved, left in the output as written.
+
+===[ Functions ]
+
+====[ fn resolve_interpolations ]
+
+Replaces every `${...}` in `doc` with the text it stands for.
+
+`config` carries the macros in scope (the document's own and the
+vault's, already merged by the caller) and `ctx` the variables --
+`self.path` and the rest. Both are the caller's to supply because this
+crate cannot read a config file or know where a document sits.
+
+==[ Module links ]
+
+===[ Enums ]
+
+====[ enum TargetMode ]
+
+Destination target format when rewriting `ref:` links and `@embed` assets.
+
+===[ Functions ]
+
+====[ fn resolve_document_links ]
+
+Walks `doc` and resolves any `ref:` targets and local `@embed` targets using `resolver`.
+
+- Resolved links have their target rewritten according to `mode`.
+- Unresolved links are rewritten to the `unresolved:` scheme (e.g. `unresolved:Note Name`).
+
+==[ Module macro_expand ]
+
+Forward macro expansion and dollar expression evaluation.
+
+===[ Functions ]
+
+====[ fn expand_document_macros ]
+
+Expands `$macro(...)` or `${...}` expressions within element arguments (e.g. `@link($macro.https(...))`)
+using the provided [`DocumentConfig`].
+
+==[ Module macro_rewrite ]
+
+Reverse URL-to-macro pattern matching and rewriting.
+
+===[ Structs ]
+
+====[ struct MacroPattern ]
+
+A compiled macro matcher for reverse URL-to-macro rewriting.
+
+====[ struct MacroSet ]
+
+A collection of macro patterns sorted by specificity (longer constant prefix first).
+
+===[ Functions ]
+
+====[ fn transform_link_targets_with_macros ]
+
+Transforms link targets in `doc` matching any macro in `macro_set` into `$macro(...)` invocations.
+
+==[ Module meta ]
+
+Metadata element manipulation in documents.
+
+===[ Functions ]
+
+====[ fn set_meta_in_doc ]
+
+Updates or inserts a key-value pair in a target directive/metadata block (e.g. `@meta`).
+If the target block is not found, prepends a new directive block at position 0.
+
+==[ Module structural ]
+
+Structural in-place AST transformations.
+
+===[ Enums ]
+
+====[ enum StructuralAction ]
+
+===[ Functions ]
+
+====[ fn apply_structural_action ]
+
+Applies a structural refactoring action to all matching elements in `doc`.
+Returns the number of transformations applied.

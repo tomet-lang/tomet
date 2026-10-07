@@ -278,10 +278,7 @@ fn text(s: &str) -> Inline {
 
 fn code(s: &str) -> Inline {
     let mut el = element_new(Sigil::named("raw")).with_placement(Placement::Inline);
-    el.content = Some(vec![paragraph(vec![Inline::Raw(RawText::new(
-        s,
-        dummy(),
-    ))])]);
+    el.content = Some(vec![paragraph(vec![Inline::Raw(RawText::new(s, dummy()))])]);
     Inline::Element(el)
 }
 

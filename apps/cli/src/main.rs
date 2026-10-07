@@ -11,6 +11,7 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use cli::{Cli, Command};
+use commands::api::api_cmd;
 use commands::ast::ast;
 use commands::check::check;
 use commands::check_links::check_links_cmd;
@@ -115,6 +116,12 @@ fn main() -> ExitCode {
             vars,
         } => commands::new::new_cmd(path, blueprint.as_deref(), *list, *force, vars),
         Command::Stats { path, json } => stats_cmd(path, *json),
+        Command::Api {
+            path,
+            out,
+            private,
+            check,
+        } => api_cmd(path, out.as_deref(), *private, *check),
         Command::CheckLinks { .. } => unreachable!("handled above, before this match"),
     };
 

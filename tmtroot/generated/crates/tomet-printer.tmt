@@ -1,0 +1,35 @@
+@kind(api)
+
+@meta{
+  crate: tomet-printer
+}
+
+=[ tomet-printer ]
+
+Serializes a `tomet_ast::Document` back to `.tmt` source text
+(no span info required, unlike `tomet-formatter`, which
+re-formats existing `.tmt` text losslessly using spans -- this crate
+is for documents that never had `.tmt` source to begin with, e.g.
+ones built from Markdown or edited purely at the AST level). Uses
+`tomet_config::PrinterConfig` (see that crate for config
+loading/discovery) to drive formatting choices: meta format
+(yaml/json/toml), link-key spacing, callout/list style, via
+`tomet-style`'s single-node renderers. Also owns `@meta` id
+auto-generation (`ensure_document_id_with_config`, which mutates the
+AST directly), built on the pure generate/validate/convert helpers
+in `tomet-field-utils`.
+
+==[ Functions ]
+
+===[ fn ensure_document_id_with_config ]
+
+===[ fn document_to_tm ]
+
+Serialize a [`Document`] AST into Tomet (`.tmt`) source string using document-level config or defaults.
+
+===[ fn document_to_tm_with_config ]
+
+===[ fn render_element ]
+
+Render an [`Element`] AST node into Tomet syntax:
+`<sigil><name>(args)[content]{value}`, or `<sigil><name>+++body+++`.

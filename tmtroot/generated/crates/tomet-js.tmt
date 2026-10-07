@@ -1,0 +1,103 @@
+@kind(api)
+
+@meta{
+  crate: tomet-js
+}
+
+=[ tomet-js ]
+
+==[ Module highlight ]
+
+===[ Structs ]
+
+====[ struct HighlightSpan ]
+
+===[ Functions ]
+
+====[ fn compute_highlight_spans ]
+
+==[ Structs ]
+
+===[ struct ProcessOptions ]
+
+Options controlling HTML rendering and document processing.
+
+===[ struct TocItem ]
+
+An entry in the document's table of contents.
+
+===[ struct ProcessedDoc ]
+
+High-level output of processing a `.tmt` document.
+
+==[ Functions ]
+
+===[ fn parse_document ]
+
+Parse `.tmt` markup source text into a JavaScript `Document` AST object.
+
+===[ fn parse_value ]
+
+Parse a data-only `.tmt` document into a native JavaScript object/primitive.
+
+===[ fn set_vault_files ]
+
+Pre-builds and caches the link resolution index in Wasm memory once for the entire vault.
+
+===[ fn clear_vault_files ]
+
+Clears the cached link resolution index.
+
+===[ fn process_document_internal ]
+
+===[ fn to_html ]
+
+Convert `.tmt` source text or a `Document` AST object into an HTML body string.
+
+===[ fn process_document ]
+
+Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
+
+===[ fn to_markdown ]
+
+Convert `.tmt` source text or a `Document` AST object into a CommonMark Markdown string.
+
+===[ fn to_typst ]
+
+Convert `.tmt` source text or a `Document` AST object into a Typst markup string.
+
+===[ fn from_markdown ]
+
+Parse CommonMark Markdown text into a `Document` AST object.
+
+===[ fn print_document ]
+
+Serialize a `Document` AST object back into formatted `.tmt` source code.
+
+===[ fn format_source ]
+
+Format `.tmt` source text with lossless whitespace hygiene and span preservation.
+
+===[ fn validate ]
+
+Validate `.tmt` source text and return an array of validation diagnostics.
+
+===[ fn validate_with ]
+
+Validate `.tmt` source text against `std` plus the vocabularies given
+as source text.
+
+A host that has the vault's `@vocabulary(...)` files can pass their
+contents here. Without them, `validate` knows only `std`, so every
+element a vocabulary declares comes back as unknown -- correct, since
+nothing said it existed, but not useful in an editor that could have
+said so.
+
+A source that does not parse, carries no `@vocabulary(ns)` header, or
+claims a reserved or already-taken namespace is skipped: it declares no
+namespace, so there is nothing to bind. `doc.index` is always known, as
+it is to the CLI. Check vocabularies themselves with `tomet check`.
+
+===[ fn highlight_spans ]
+
+Compute syntax highlight token spans for CodeMirror and other editors.

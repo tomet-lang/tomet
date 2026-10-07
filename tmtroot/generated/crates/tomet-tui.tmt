@@ -1,0 +1,87 @@
+@kind(api)
+
+@meta{
+  crate: tomet-tui
+}
+
+=[ tomet-tui ]
+
+Tomet Workbench TUI.
+
+==[ Module app ]
+
+State management for the Tomet Workbench TUI.
+
+`App` aggregates state for all 4 tabs (Explorer/Migration/BatchMeta/
+StructuralGrep). Per-tab behavior lives in this module's submodules
+(`explorer`/`migration`/`batch_meta`/`structural`/`inline_editor`);
+this file keeps only the struct/enum definitions, construction, and
+thin cross-tab dispatchers (`move_up`/`toggle_select`/`execute_action`/
+etc.) that route to a `pub(super)` per-tab method based on
+`active_tab`.
+
+===[ Structs ]
+
+====[ struct PendingConfirm ]
+
+====[ struct App ]
+
+===[ Enums ]
+
+====[ enum ActiveTab ]
+
+====[ enum MetaEditTarget ]
+
+====[ enum StructuralInputTarget ]
+
+====[ enum FocusedPane ]
+
+==[ Module engine ]
+
+Core logic engine for Markdown migration. Batch metadata editing and
+structural refactoring live in `tomet-workspace` now.
+
+===[ Module migration ]
+
+Markdown -> Tomet conversion, plus the App-facing `MigrationItem`
+(a `tomet_indexer::workspace_scan::MigrationCandidate` decorated
+with lazily-loaded content and UI/session state: `selected`,
+`converted`). The index only ever knows about candidates (facts); this
+module owns the mutable, per-session view of them.
+
+====[ Structs ]
+
+=====[ struct MigrationItem ]
+
+=====[ struct MigrationEngine ]
+
+==[ Module ui ]
+
+Ratatui UI Layout and widget rendering for Tomet Workbench TUI.
+
+`draw` lays out the shared chrome (header/tabs, controls bar,
+footer, confirm modal -- this file) and delegates the main content
+area to a per-tab `render_*_view` function in this module's
+submodules (`explorer`/`migration`/`batch_meta`/`structural`).
+`render_controls` similarly delegates its per-tab hint text to each
+submodule's `*_controls_info`. `diff`/`highlight` hold
+tab-independent utilities (before/after diffing, `.tmt` syntax
+highlighting) shared across the tab-specific view functions.
+
+===[ Functions ]
+
+====[ fn draw ]
+
+====[ fn draw_loading ]
+
+Animated placeholder screen shown while the workspace scan (`App::new`)
+runs on a background thread. `tick` is a monotonically increasing frame
+counter driven by the caller's poll loop -- there's no real progress
+percentage to report (the scan doesn't know the file count up front),
+so this renders a spinner plus a sweeping indeterminate bar instead.
+
+==[ Functions ]
+
+===[ fn run_tui ]
+
+Launch the interactive TUI application.

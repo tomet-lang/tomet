@@ -11,6 +11,7 @@ path = "src/main.rs"
 tomet-ast = { workspace = true }
 tomet-compute = { workspace = true }
 tomet-config = { workspace = true }
+tomet-extract-rust = { workspace = true }
 tomet-formatter = { workspace = true }
 tomet-html = { workspace = true }
 tomet-indexer = { workspace = true }
@@ -38,5 +39,6 @@ nanoid = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net"] }
+toml = { workspace = true }
 uuid = { workspace = true }
 walkdir = { workspace = true }

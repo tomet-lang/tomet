@@ -1,0 +1,41 @@
+@kind(api)
+
+@meta{
+  crate: tomet-compute
+}
+
+=[ tomet-compute ]
+
+Evaluates a `${...}` interpolation's parsed `InterpExpr` --
+`tomet-parser`/`tomet-ast` own the grammar and syntax tree;
+this crate adds evaluation semantics on top. `Identifier`/`Member`
+sub-expressions resolve via `tomet-resolver` (this crate has no id
+lookup of its own); a `Call` dispatches to a builtin function
+(`functions.rs`) after recursively evaluating its args.
+
+==[ Structs ]
+
+===[ struct EvaluationContext ]
+
+An evaluation context carrying dynamic variables and parameters (e.g. for template instantiation).
+
+==[ Functions ]
+
+===[ fn evaluate ]
+
+Evaluates `expr` against `doc`. `Literal`s evaluate to themselves;
+`Identifier`/`Member` chains resolve via
+`tomet_resolver::resolve_reference` (falling back to `@config` macros for bare identifiers);
+a `Call` dispatches to builtins or `@config` user-defined macros after evaluating its args.
+
+===[ fn evaluate_with_config ]
+
+Evaluates `expr` against `doc` using an explicitly supplied [`tomet_semantics::DocumentConfig`].
+
+===[ fn evaluate_with_vars ]
+
+Evaluates `expr` against `doc` using an explicit variables map.
+
+===[ fn evaluate_with_context ]
+
+Evaluates `expr` against `doc` using a [`tomet_semantics::DocumentConfig`] and an [`EvaluationContext`].

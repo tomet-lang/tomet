@@ -1,0 +1,103 @@
+@kind(api)
+
+@meta{
+  crate: tomet-load
+}
+
+=[ tomet-load ]
+
+The one way to read a `.tmt` document correctly.
+
+Reading a document is four steps across three crates: find the config
+that governs it, load the vocabularies that config declares, parse the
+source, and bind the names. A caller that skips the middle two gets a
+`Document` whose element names resolve against `std` alone, which
+silently drops every user-vocabulary element. `twrit` shipped exactly
+that against this workspace's own writs: `@layers` was found and the
+equally legal `@writ.layers` was not, so the rule it was written to
+enforce stopped being enforced without anything reporting it.
+
+The pieces were public and correct before this crate existed; only the
+assembly was private, living inside `apps/cli`'s `check` command. That
+is why this is a crate rather than a function on `tomet-config`: the
+defect was that nobody could find the front door, and a door inside a
+crate named after one of its four steps is not findable. `tomet-config`
+already carried three of the four dependencies, so the cheaper change
+was available and was not taken for that reason.
+
+# Two levels, because vocabularies belong to a vault
+
+[`Vault::discover`] pays for config discovery and vocabulary loading
+once. [`Vault::document`] is per file. Collapsing the two into a single
+`load_document` and calling it in a loop would re-read and re-parse
+every declared vocabulary for every document -- seven vocabularies
+times eighty-five documents in this repository. [`load_document`] is
+for the case where there genuinely is one document.
+
+# A fifth step, for output
+
+The four steps above produce the document @em[as written]. Something that
+is about to render it needs one more: the AST rewrites that have to
+happen before any converter sees the tree. An index document's
+`${filter(...)}` is one -- it expands into several `@link(ref:...)`
+entries, so it cannot be a renderer's job the way `${gh(12)}` can.
+
+That step is [`Vault::prepare`], and it is deliberately @strong[not] part of
+[`Vault::document`]. It reads every `.tmt` in the vault, and a caller
+that wants one file read correctly must not pay for a directory walk --
+`bindings/js` parses a single string in a browser. So the two are
+separate doors: [`Vault::document`] to read, [`Vault::prepared_document`]
+to read and prepare.
+
+The pairing mirrors the one already here: [`Vault::parse`] is to
+[`Vault::document`] what [`Vault::prepare`] is to
+[`Vault::prepared_document`] -- the first of each takes what the caller
+already has in hand, the second goes to disk for it. A caller that
+formats its own parse errors (the CLI does) wants `parse` + `prepare`.
+
+## Who prepares, and who must not
+
+Anything producing output does: `export`, `html` (and so `serve`),
+`to-md`, `to-typst`, `to-pandoc`. They read through this crate for that
+reason -- before it, each parsed on its own and interpolation was
+decided four different ways, one per converter.
+
+The LSP must not, and is deliberately left out. An editor wants the
+document @em[as written]: rewriting the tree under the cursor would move
+every span the editor maps positions with. `tomet check` is the middle
+case -- it prepares a copy to report what could not be resolved, and
+validates the original.
+
+==[ Structs ]
+
+===[ struct Vault ]
+
+A vault found on disk: `tomet_vault::Vault` plus the parts that need
+a filesystem.
+
+Everything that is only computation -- [`parse`](tomet_vault::Vault::parse),
+[`bindings`](tomet_vault::Vault::bindings), the `config`/`root` fields --
+is the inner vault's, reached through `Deref`. What is added here is
+finding it ([`Vault::discover`]), reading a file in it
+([`Vault::document`]), and the vault-wide table an index query is
+answered from, which is a walk of the disk.
+
+"Vault" is the directory the config file sits in: `find_config_file`
+walks up until it finds one, and that file's position is what says
+where the vault begins.
+
+==[ Enums ]
+
+===[ enum LoadError ]
+
+Why a document could not be read.
+
+==[ Functions ]
+
+===[ fn load_document ]
+
+Reads one document correctly, discovering its vault first.
+
+For more than one document in the same vault, use [`Vault::discover`]
+once and [`Vault::document`] per file: this function reloads every
+declared vocabulary on each call.

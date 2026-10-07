@@ -1,0 +1,51 @@
+@kind(api)
+
+@meta{
+  crate: tomet-cst
+}
+
+=[ tomet-cst ]
+
+Concrete Syntax Tree (CST) foundation for Tomet, powered by `rowan`.
+
+Provides a lossless, resilient, green/red syntax tree representation where
+100% of characters (including whitespace, newlines, and comments) are preserved.
+
+This crate defines only the vocabulary ([`SyntaxKind`]) and the rowan glue;
+`tomet-parser::parse_cst` builds the tree and documents its shape. The tree
+is structured down to sections (nested by level), elements and their groups,
+and `key: value` entries -- but not emphasis or `|` content runs.
+
+==[ Module syntax_kind ]
+
+Defines the raw token and composite node kinds for Tomet's Concrete Syntax Tree (CST).
+
+===[ Enums ]
+
+====[ enum SyntaxKind ]
+
+==[ Enums ]
+
+===[ enum TometLanguage ]
+
+==[ Functions ]
+
+===[ fn replace_range ]
+
+Replaces the byte slice defined by `range` in `source` with `replacement`.
+
+===[ fn splice_node ]
+
+Replaces the exact source range occupied by `target` in `source` with `replacement`.
+
+==[ Type Aliases ]
+
+===[ type SyntaxNode ]
+
+===[ type SyntaxToken ]
+
+===[ type SyntaxElement ]
+
+===[ type SyntaxNodeChildren ]
+
+===[ type SyntaxElementChildren ]

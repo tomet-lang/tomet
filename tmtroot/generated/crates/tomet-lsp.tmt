@@ -1,0 +1,92 @@
+@kind(api)
+
+@meta{
+  crate: tomet-lsp
+}
+
+=[ tomet-lsp ]
+
+Language server library for Tomet (`tomet-lsp`).
+Provides diagnostics (parser & validator), document formatting,
+hover, document symbols, goto definition, and completions.
+
+==[ Module completion ]
+
+===[ Functions ]
+
+====[ fn completions_for ]
+
+Provides autocompletion items for elements, keywords, and builtin compute functions.
+
+====[ fn completions_for_with_uri ]
+
+Provides autocompletion items with document URI awareness for path completions.
+
+==[ Module definition ]
+
+===[ Functions ]
+
+====[ fn definition_for ]
+
+Provides Goto Definition target for reference links or interpolation expressions.
+
+==[ Module diagnostic ]
+
+===[ Functions ]
+
+====[ fn diagnostics_for ]
+
+Parses `text` and produces diagnostics (both parse errors and CST validation rules).
+
+==[ Module folding ]
+
+Provides folding ranges for sections, blocks, and comments in the editor.
+
+===[ Functions ]
+
+====[ fn folding_ranges_for ]
+
+Computes folding ranges for the given document text.
+
+==[ Module format ]
+
+===[ Functions ]
+
+====[ fn format_edits ]
+
+Formats the document using `tomet-formatter` with loaded or inferred configuration.
+
+====[ fn resolve_effective_config ]
+
+Resolves the merged configuration for a document by combining:
+1. Workspace config discovered from ancestor directories (`default.config.tmt` / `tomet.config.tmt`)
+2. Explicit `@config(import: ...)` / `@config(file: ...)` imported configs
+3. Document's local `@config` definitions (highest precedence)
+
+==[ Module hover ]
+
+===[ Functions ]
+
+====[ fn hover_for ]
+
+Provides hover information for the symbol under the cursor.
+
+==[ Module position ]
+
+===[ Functions ]
+
+====[ fn span_to_range ]
+
+Converts an AST [`Span`] to an LSP [`Range`].
+
+====[ fn text_range_to_lsp_range ]
+
+Converts a CST [`tomet_cst::TextRange`] to an LSP [`Range`].
+
+==[ Module symbol ]
+
+===[ Functions ]
+
+====[ fn document_symbols_for ]
+
+Provides document symbols for outline navigation in the editor.

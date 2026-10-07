@@ -1,0 +1,57 @@
+@kind(api)
+
+@meta{
+  crate: tomet-java
+}
+
+=[ tomet-java ]
+
+==[ Functions ]
+
+===[ fn Java_org_tomet_tomet_Tomet_parseDocumentJson ]
+
+Parse full `.tmt` markup source text into a JSON string representing the Document AST.
+
+===[ fn Java_org_tomet_tomet_Tomet_parseValueJson ]
+
+Parse a data-only `.tmt` document into a JSON string.
+
+===[ fn Java_org_tomet_tomet_Tomet_toHtml ]
+
+Convert `.tmt` source text into an HTML body string.
+
+===[ fn Java_org_tomet_tomet_Tomet_toMarkdown ]
+
+Convert `.tmt` source text into a CommonMark Markdown string.
+
+===[ fn Java_org_tomet_tomet_Tomet_toTypst ]
+
+Convert `.tmt` source text into a Typst markup string.
+
+===[ fn Java_org_tomet_tomet_Tomet_fromMarkdownJson ]
+
+Parse CommonMark Markdown text into a `Document` AST JSON string.
+
+===[ fn Java_org_tomet_tomet_Tomet_printDocumentJson ]
+
+Serialize a `Document` AST JSON string back into formatted `.tmt` source code.
+
+===[ fn Java_org_tomet_tomet_Tomet_format ]
+
+Format `.tmt` source text with lossless whitespace hygiene and span preservation.
+
+===[ fn Java_org_tomet_tomet_Tomet_validateJson ]
+
+Validate `.tmt` source text and return a JSON list of validation errors.
+
+===[ fn Java_org_tomet_tomet_Tomet_validateJsonWith ]
+
+Validate `.tmt` source text against `std` plus vocabularies passed as
+a JSON array of source strings.
+
+Without them, `validateJson` knows only `std`, so every element a
+vocabulary declares comes back as unknown. A source that does not
+parse, has no `@vocabulary(ns)` header, or claims a reserved or
+already-taken namespace is skipped -- it binds no namespace. `doc.index`
+is always known, as it is to the CLI. Check vocabularies themselves with
+`tomet check`.

@@ -1,0 +1,54 @@
+@kind(api)
+
+@meta{
+  crate: tomet-validator
+}
+
+=[ tomet-validator ]
+
+==[ Module blueprint ]
+
+Blueprint structural validation against a target document.
+
+===[ Structs ]
+
+====[ struct BlueprintSchema ]
+
+Structural requirement extracted from a blueprint.
+
+====[ struct RequiredSection ]
+
+===[ Functions ]
+
+====[ fn extract_blueprint_schema ]
+
+Extracts the [`BlueprintSchema`] requirements from a blueprint document.
+
+====[ fn validate_against_blueprint ]
+
+Validates `doc` against `blueprint` and returns any missing structural elements or fields.
+
+==[ Functions ]
+
+===[ fn validate_document ]
+
+Runs all validation rules against a parsed `Document` and returns every
+violation found. Read-only: never mutates `doc`, never does I/O.
+
+Knows only `std`, so every element from a vocabulary is reported as
+unknown. Callers that can read the vault's vocabularies -- which means
+callers that may do I/O -- should use [`validate_document_with`] and
+pass what is in scope.
+
+===[ fn validate_document_with ]
+
+[`validate_document`], with the namespaces the document has in scope.
+
+Still does no I/O: `bindings` arrives already loaded, by whoever was
+allowed to read the files. That split is why this can consult a
+vocabulary without the layer below it gaining the ability to open one.
+
+===[ fn validate_cst ]
+
+Runs all validation rules directly against a Concrete Syntax Tree ([`SyntaxNode`])
+and returns violations with exact byte [`TextRange`]s.

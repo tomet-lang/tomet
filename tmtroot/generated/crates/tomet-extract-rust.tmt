@@ -1,0 +1,39 @@
+@kind(api)
+
+@meta{
+  crate: tomet-extract-rust
+}
+
+=[ tomet-extract-rust ]
+
+Extraction of Tomet API documentation from Rust crates using `syn`.
+
+This crate parses Rust source files with `syn`, traverses crate and module
+hierarchies, inspects item visibilities (`pub`), and extracts documentation
+comments (`//!` and `///`).
+
+Because doc comments are assumed to be written in Tomet markup syntax,
+extracted comments are parsed into Tomet AST [`tomet_ast::Document`] blocks,
+creating a unified `.tmt` document for each Rust crate.
+
+==[ Module extract ]
+
+===[ Structs ]
+
+====[ struct RustExtractOptions ]
+
+Options controlling extraction of Rust code documentation.
+
+====[ struct RustCrateSource ]
+
+In-memory representation of a Rust crate source code.
+
+===[ Functions ]
+
+====[ fn extract_file_doc ]
+
+Extracts documentation for a single Rust source code string into a Tomet [`Document`].
+
+====[ fn extract_crate_doc ]
+
+Extracts documentation from an entire Rust crate into a single unified Tomet [`Document`].

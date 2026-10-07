@@ -1,0 +1,57 @@
+@kind(api)
+
+@meta{
+  crate: tomet-typst
+}
+
+=[ tomet-typst ]
+
+`tomet_ast::Document` -> Typst markup source, hand-written (same
+reasoning as `tomet-convert-markdown`: the output space is much
+smaller than the input space, so no need for a crate here).
+
+One-directional (`Document -> Typst` only, no importer) and lossy for
+constructs with no clean Typst equivalent:
+
+- Heading `id`/`cssclass` attrs have no Typst markup form and are
+
+dropped, same as `tomet-convert-markdown`'s heading handling.
+
+- `mark` renders as `#highlight[...]`, a Typst builtin only available
+
+since Typst 0.13 -- older Typst versions will fail to compile it.
+
+- `${...}` interpolation round-trips as inert raw text (`` `${...}` ``)
+
+rather than being evaluated: Typst has its own `#`/`{}` expression
+syntax with unrelated semantics, so naively emitting `${...}`
+unescaped would risk Typst trying (and failing) to parse it as its
+own code.
+
+- Any `<T>`/`@name` element with no dedicated mapping below (including
+
+`icon`, `bare`, and anything a hand-authored `.tmt` file might use
+that the mapping doesn't special-case) falls back to rendering just
+its inner content, annotated with a leading `// tomet:{kind}` line
+comment in block position. Unlike CommonMark, Typst's normal (non-
+HTML-export) compile mode has no raw-passthrough escape hatch, so
+this fallback is lossier than `tomet-convert-markdown`'s by
+necessity -- there is nowhere to put the dropped `args`/`kind`
+metadata except that comment.
+
+- `escape_text` only escapes markup-sensitive characters that Typst
+
+recognizes anywhere in a line (```*_`` ```#$<>@[]~\`); it does not guard
+against `=`/`-`/`+`/`/` at the very start of a line being
+misinterpreted as heading/list/term-list syntax -- a known gap, not
+yet hit by any of this crate's own tests.
+
+- Same-document `id:` links emit a bare `<{id}>` Typst label
+
+reference, but nothing on the producing side emits a matching
+label yet -- no element carries its own id as Typst label output.
+A known gap, pending the real element-id design.
+
+==[ Functions ]
+
+===[ fn to_typst ]

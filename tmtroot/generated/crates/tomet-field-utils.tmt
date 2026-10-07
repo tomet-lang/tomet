@@ -1,0 +1,30 @@
+@kind(api)
+
+@meta{
+  crate: tomet-field-utils
+}
+
+=[ tomet-field-utils ]
+
+Small pure helpers for `@meta` field values, driven by
+`tomet_config::FieldConfig`: id generation/validation
+(`generate_id_for_field`/`is_valid_id_format`) and ISO8601/RFC3339
+timestamp conversion (`is_iso8601`/`format_rfc3339`). None of these
+touch `tomet_ast::Document` -- they're a grab bag of
+generate/convert helpers, not a rules engine, so kept as plain
+utility functions rather than an invented abstraction. Split out of
+`tomet-printer` (which still owns the `Document`-mutating
+`ensure_document_id_with_config` and the `.tmt`-syntax rendering that
+call these) so `tomet-formatter` can reuse the same
+generate/validate/convert logic later without depending on printer's
+whole-document-rebuild model.
+
+==[ Functions ]
+
+===[ fn generate_id_for_field ]
+
+===[ fn is_valid_id_format ]
+
+===[ fn is_iso8601 ]
+
+===[ fn format_rfc3339 ]

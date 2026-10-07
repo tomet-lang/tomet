@@ -288,6 +288,27 @@ pub enum Command {
         #[arg(long = "var", value_parser = parse_key_val)]
         vars: Vec<(String, String)>,
     },
+    /// Extract API documentation from Rust crate(s) into Tomet (.tmt) documents.
+    ///
+    /// Reads doc comments (`//!` and `///`) from Rust source code and builds
+    /// a `.tmt` document for each crate. Output destination is configured via
+    /// `@config{ api: { rust: { out: "..." } } }` or overridden with `--out`.
+    #[command(alias = "doc")]
+    Api {
+        /// Target crate directory or workspace root (defaults to current directory ".").
+        #[arg(default_value = ".")]
+        path: PathBuf,
+        /// Output destination directory for generated .tmt files. Overrides @config.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+        /// Include private items as well as public (`pub`) items.
+        #[arg(long)]
+        private: bool,
+        /// Compare each generated .tmt file against disk without writing.
+        /// Exits non-zero if any differ or are missing.
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 fn parse_key_val(s: &str) -> Result<(String, String), String> {

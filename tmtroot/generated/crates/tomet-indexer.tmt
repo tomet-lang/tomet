@@ -1,0 +1,172 @@
+@kind(api)
+
+@meta{
+  crate: tomet-indexer
+}
+
+=[ tomet-indexer ]
+
+Directory scanning and read-only metadata cataloging for `.tmt`/`.tmt`
+files. Split out of `tomet-tui`'s `engine::batch_meta` module so
+it's reusable outside the TUI (a future search/browse feature, e.g.)
+without pulling in ratatui/crossterm.
+
+==[ Module workspace_scan ]
+
+Stateful, incrementally-updatable workspace index: walks a directory
+once and keeps a flat, path-keyed catalog of it in memory, from which
+`tomet-tui`'s Explorer tree, Migration candidate list, and BatchMeta
+path list are all cheaply derived (no I/O) on demand. `refresh_path`/
+`remove_path` let a caller that just wrote/deleted one specific file
+update the catalog without re-walking the whole tree.
+
+The catalog is deliberately kept @em[flat] (`BTreeMap<PathBuf, EntryKind>`)
+rather than as a nested tree: the nested/compacted tree shape (single-
+child-directory-chain folding, `has_md_children` bubbling) is pure
+in-memory computation with no I/O, so it's cheap to rebuild from the
+flat catalog on every `tree_nodes()` call. That sidesteps having to
+incrementally patch folded directory chains (e.g. un-collapsing `a/b/c`
+back into three nodes when a new sibling file appears under `b`), which
+would be much harder to get right.
+
+`MigrationCandidate`/`FileTreeNode` carry only filesystem-derived facts
+(which paths exist, what kind they are) -- no selected/converted/
+expanded/loaded-content fields. That UI/session state belongs to
+`tomet-tui`, keyed by path, reconciled against this index's current
+path set rather than replaced wholesale on every reindex.
+
+===[ Structs ]
+
+====[ struct MigrationCandidate ]
+
+====[ struct FileTreeNode ]
+
+====[ struct WorkspaceIndex ]
+
+==[ Structs ]
+
+===[ struct FileMetadata ]
+
+One file's queryable facts, keyed by the dotted paths a
+`${filter(...)}` predicate writes: `path`, `filename`, `kind`, `meta`
+and everything under it.
+
+The distinction from [`extract_metadata`] is the value type.
+`extract_metadata` collapses to `String` because its consumer is the
+TUI's batch metadata editor, where every field is about to be shown
+and typed into a text box. A predicate needs the value itself: a list
+of tags has to stay a list for `contains` to look inside it, and a
+number has to stay a number for `gt` to order it.
+
+`@config` is deliberately absent. It configures export and printing,
+not what the document @em[is], so filtering an index on it would be
+filtering on machinery.
+
+==[ Functions ]
+
+===[ fn resolve_document_relative ]
+
+What a relative path written @em[inside] a document means, resolved
+against the document and the project it belongs to.
+
+Three cases, decided by this project's author for links and applied
+wherever a document names a path:
+
+- absolute -- an OS-absolute path, taken as given;
+- starting with `./` or `../` -- relative to the referencing file's
+
+own directory;
+
+- anything else -- relative to the @em[project root], not to the
+
+process's working directory.
+
+The last is the one that is easy to get wrong by doing nothing.
+`@config(export: path)` did exactly that: it handed the string
+straight to `fs::write`, so `tmtroot/readme.tmt` declaring
+`README.ja.md` wrote to the repository root or to `docs/` depending
+on where you happened to be standing. Running the export from the
+right directory made it look correct.
+
+===[ fn normalize_join ]
+
+`base.join(target)` with `.` dropped and `..` popped, so the result
+has no traversal components left in it.
+
+===[ fn is_path_ignored ]
+
+Whether `path` matches one of `ignore_patterns` (each pattern
+matched against the path both as given and relative to `root`, with
+a directory-prefix or exact-segment match).
+
+===[ fn is_path_unswept ]
+
+Whether the sweep skips `p`: not part of the vault, or in it and
+left alone.
+
+The two lists answer different questions and only this one takes
+both. `ignore` says a path is not the vault's; `unswept` says it is,
+and is not processed -- the frozen corpus is skipped because a stale
+export there is the coverage, not because the repository lacks it.
+Reference resolution asks only the first, which is why a document can
+name `tests/fixtures` and cannot name a path outside the vault.
+
+===[ fn is_excluded_by_config ]
+
+Whether the sweep would leave `path` alone under `config`, judged the
+same way whether the path came from a walk or from the command line.
+
+Both sides are made absolute first, so a relative argument and a
+relative `config_root` cannot disagree about where the file is. A
+caller that writes to files it was handed by name (`format -i`,
+`refactor -i`) asks this before touching one: the sweep's exclusions
+only protect what the sweep finds.
+
+===[ fn collect_tm_files ]
+
+Collects every `.tmt`/`.tmt` file under `path` (or just `path` itself
+if it's a single file), auto-discovering the nearest
+`default.config.tmt`/`tomet.config.tmt` for `ignore_files` rules.
+
+===[ fn collect_tm_files_with_config ]
+
+Same as [`collect_tm_files`] but with an explicit `config`/
+`config_root` instead of auto-discovering one.
+
+===[ fn collect_all_paths_with_config ]
+
+Every non-ignored path under `path` (or just `path` itself if it's a
+single file) -- no extension filtering at all, unlike
+`collect_tm_files`/`WorkspaceIndex`. The shared, lowest-level walk
+primitive other extension-filtered scans (this crate's own
+`collect_tm_files_with_config`, `workspace_scan`'s `WorkspaceIndex`,
+and `tomet-links`'s existence checks) can build on, so
+`.hidden(false)`/`.git_ignore(true)`/`is_path_ignored` semantics can't
+drift between independently-configured `WalkBuilder`s.
+
+===[ fn collect_metadata_table ]
+
+Reads every `.tmt` under `path` and returns what each one can be
+queried on.
+
+The walk is [`collect_tm_files_with_config`]'s, so `ignore`/`unswept`
+mean here exactly what they mean everywhere else. A file that does not
+parse contributes no row: `tomet check` is where a parse error is
+reported, and failing the whole index for one bad file elsewhere in
+the vault would be the wrong trade.
+
+This is the only part of `${filter(...)}` that touches the disk. The
+pass that consumes the table is pure and lives a layer below, in
+`tomet-transform`.
+
+===[ fn document_fields ]
+
+The queryable facts of one already-parsed document. Pure -- split out
+from [`collect_metadata_table`] so the shape of a row can be tested
+without a directory on disk.
+
+`path` is measured from the project root and written with forward
+slashes, which is the spelling [`resolve_document_relative`] reads back
+and the spelling a generated `@file(...)` has to carry.
+
+===[ fn extract_metadata ]

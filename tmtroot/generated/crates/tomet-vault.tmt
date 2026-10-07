@@ -1,0 +1,62 @@
+@kind(api)
+
+@meta{
+  crate: tomet-vault
+}
+
+=[ tomet-vault ]
+
+A vault's config and vocabularies, and what can be done with them
+without touching the disk.
+
+A [`Vault`] is the state a document is read against: the config that
+governs it and the vocabularies that config declares. Given that state,
+parsing a source and binding its names ([`Vault::parse`],
+[`Vault::bindings`]) and rewriting a document into the shape a converter
+should see ([`Vault::prepare`]) are plain computation.
+
+What this crate does not do is find that state. Where the config sits
+and which files hold the vocabularies is a question about a filesystem,
+and `tomet-load` answers it and then builds a `Vault` from the result.
+A caller that already has the pieces in memory -- a wasm host, or a
+binding handed vocabulary text -- builds one directly with
+[`Vault::from_sources`] and gets the same verdicts, because both go
+through the same rules (`LoadedVocabularies::add` in `tomet-semantics`).
+
+# wasm
+
+This crate, and `tomet` and `tomet-load` above it, compile for
+`wasm32-unknown-unknown` (the host supplies `getrandom`'s `js` feature,
+as `bindings/js` does). Compiling is not running: on that target
+`std::fs` returns errors, so `Vault::discover` is for hosts that have a
+disk. Measured on `bindings/js` (release, `wasm-opt -Oz`), routing a
+parse through `from_sources` added about 1% to the module and reaching
+`tomet-load` as well added about 0.3% more.
+
+# Preparing
+
+`${filter(...)}` in an `@kind(doc.index)` document is answered from a
+table of every document in the vault. Building that table is a walk of
+the disk, so [`Vault::prepare`] takes it as a closure that is only
+called when a document actually asks: a document with no query pays
+nothing, and a caller with no table passes an empty one and gets the
+query left unexpanded.
+
+==[ Structs ]
+
+===[ struct Prepared ]
+
+What [`Vault::prepare`] did, and what it could not do.
+
+`unresolved` is not an error: an expression with no value is left in
+the output as written, so a document showing `${...}` as an example
+still renders. `tomet check` reports the list as warnings, which is
+what tells a typo apart from an example.
+
+===[ struct Vault ]
+
+A vault's config and the vocabularies it declares, resolved once.
+
+"Vault" is the directory the config file sits in. Whether `root` names
+a directory that exists is not this type's concern; it only decides
+what `${self.path}` is measured from.

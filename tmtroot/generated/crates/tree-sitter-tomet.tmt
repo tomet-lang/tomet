@@ -1,0 +1,197 @@
+@kind(api)
+
+@meta{
+  crate: tree-sitter-tomet
+}
+
+=[ tree-sitter-tomet ]
+
+Rust binding for the Tomet tree-sitter grammar (`grammar.js` at
+the crate root; `src/parser.c` etc. are generated from it via
+`npx tree-sitter-cli@0.26.12 generate`, then compiled by `build.rs`).
+
+This grammar exists for editor syntax highlighting (Zed and other
+tree-sitter-based editors), not as a source of truth -- that's
+`tomet-parser`'s job. It's a @strong[reasonable approximation of the
+real grammar, not a byte-for-byte match]; several things a
+context-free grammar can't cheaply express are simplified away or
+left as known-narrow parse-error cases:
+
+- @strong[No flanking-delimiter whitespace rules.] `*em*`/`**strong**`/
+
+`==mark==` don't reject e.g. `* not em *` the way the real parser
+does; `_`/`__` also skip the "must follow a non-alphanumeric
+character" check.
+
+- @strong[No lazy paragraph continuation.] A paragraph ends at a blank
+
+line or EOF only, not at the next line merely @em[looking] like a new
+block. `tomet-parser`'s own lazy-continuation check also ends a
+paragraph early when the next line is an element trigger (`<T>`/
+`@name`, see `document.rs`'s `Stop::Paragraph`) -- e.g. `@meta{...}`
+immediately followed by `@settings{...}` with no blank line between
+them becomes two separate top-level elements in the real parser.
+This grammar doesn't simulate that either, so it still merges such
+adjacent elements into one `paragraph` node.
+
+- [ @strong[Fenced code blocks only recognize exactly 3 backticks, not 3-or-
+    more with the closer tracking the opener's length.] Same ]
+
+"known-narrow" simplification as `thematic_break`'s fixed dash-run
+handling. The real parser
+(`document.rs::parse_fenced_code_block`) accepts any run of 3+ and
+requires the closer to have at least as many backticks as the
+opener; matching that here would need a stateful external scanner
+to remember the opening run's length across the body, which this
+grammar doesn't have (see `fenced_code_block`'s own comment in
+`grammar.js`).
+
+- [ @strong[`(args)`/`[content]`/`{value}` aren't capped at one each, in any
+    order.] The real grammar allows each group at most once, in any ]
+
+order; here they're just `repeat(choice(...))`, so e.g. two
+`(args)` groups back to back would (harmlessly) both parse.
+
+- @strong[`em`/`strong` don't nest in each other.] `*`/`**`/`_`/`__` all
+
+share a delimiter character, and letting them nest is the classic
+Markdown emphasis/strong ambiguity that needs real flanking-rule
+lookahead (or an external scanner) to resolve properly.
+
+- [ @strong[`//`/`/* */` comments aren't understood inside a `(...)`/`{...}`
+    group's value content at all.] `tomet-parser` does support ]
+
+them there (`value.rs::skip_line_comment`, used from
+`parse_map`/`parse_flat_map`), e.g. `@config(...)`'s several-line
+body in `tests/fixtures/cheatsheet.tmt` uses `///`/`//`-prefixed lines as a
+doc-comment convention -- but `map`/`children`/`_entry_sep` have no
+rule admitting a bare comment line at all, so a comment anywhere in
+a group's body derails the rest of that group into an `ERROR`. Not
+investigated further here -- a real fix means teaching `map`'s
+entry-separator logic about comments specifically, not just the
+`map`/`children` vs. their own trailing gap ambiguity below.
+
+- @strong[Stray/unmatched `]`] (e.g. literal `[content]` written as prose,
+
+not as a real `content_group`) has no fallback token and produces a
+small `ERROR` -- unlike `(`/`[`/`{`/`-`, which all fall back to a
+`punctuation` node when nothing opens with them.
+
+- @strong[`<T>`/`@name` written with no group at all] (e.g. `<T>` used as
+
+a literal placeholder in prose, as `tests/fixtures/readme.tmt` itself
+does when explaining the grammar) still parses as an `element`
+here, where the real parser requires an immediately-following
+group to even recognize it as one (see
+`document.rs::is_type_element_start`/`is_at_element_start`) and
+otherwise treats it as plain text. Considered an acceptable v1
+trade-off: it doesn't error, and highlighting `<T>`-shaped text as
+an element is a reasonable default regardless.
+
+- @strong[Unterminated `/* ... */` doesn't produce an `ERROR`.] The real
+
+parser (`document.rs::skip_block_comment`) hard-errors on a missing
+`*/` -- silently swallowing the rest of the document is a much
+worse failure mode for a comment than for e.g. a code span. Here an
+unmatched `/*` just fails to lex as `block_comment` and falls back
+to ordinary `text`/`punctuation` tokens instead.
+
+- [ @strong[A real embedded JSON/YAML/TOML body inside an element's `{...}`
+    (any element whose `(args)` has a `format:json|yaml|toml` key, not
+    just `@meta`) isn't understood as such.] `tomet-parser` hands ]
+
+that body as-is to `serde_json`/`serde_yaml`/`toml` (see
+`tomet-parser::embedded_format`), but this grammar has no idea a
+`{value}` group's content might be a different language -- it still
+tries its own `map`/`scalar` rules. A quoted JSON key
+(`{ "key": "value" }`, needed since JSON has no bare-identifier keys
+-- see `tests/fixtures/readme.tmt`'s `@meta(format:json)` block) doesn't
+match `map_entry`'s bare-identifier `key` field, so the nested
+`{...}` becomes an `ERROR`. Not worth a real per-format sub-grammar
+here -- this crate is for editor highlighting, not validation.
+
+- `thematic_break`'s dash run only ever consumes exactly 3 `-`,
+
+even when the source has more (`-----` -> a 3-dash `thematic_break`
+plus the leftover 2 dashes falling back to `punctuation` inside a
+`paragraph`) -- discovered while adding `titled_thematic_break`
+(`---[ Title ]---`, which shares its dash-run token with the plain
+break), but present before that addition too. Not an `ERROR`, just a
+shape mismatch: the real parser (`document.rs::is_thematic_break`)
+correctly accepts any run of 3+. See
+`more_than_three_dashes_are_only_partially_consumed_by_thematic_break`
+below for the pinned exact shape.
+
+- [ @strong[A bare `list(...)` occupying the @em[whole] `(args)`/`{value}`
+    doesn't parse as `call`, unlike the same call under a named key
+    (`a: list(...)`, which works fine).] `@id(list(a, b))` and ]
+
+`@meta{list(a, b)}` both land in an `ERROR` even with `$.call`
+added as an alternative to `args_group`/`value_group`'s shared
+`value` rule -- tried and reverted, since it changed nothing:
+whatever conflicts an identifier-then-`(` at that exact position
+with, it isn't decided by `value`'s own alternatives. Not
+root-caused. `tomet-parser` accepts it (`value.rs::try_parse_call`
+runs before `parse_value_at`'s map/scalar fallback); the DSL/list
+retirement (`[a, b]` -> `list(...)`) is what exposed this, since
+`[a, b]` in that same bare position used to reach the now-removed
+`$.seq` alternative just fine.
+
+`scanner.c` (see its own module doc) resolves what used to be listed
+here as a known limitation: a bare, colon-less, identifier-shaped
+scalar directly inside `(...)`/`{...}` (e.g. a bare tag like `@foo(yaml)`,
+or `{required}`) now parses as a clean `scalar` instead of an `ERROR`.
+
+`_value_scalar`'s regex (see its own comment in `grammar.js`) resolves
+another former limitation: a `key: [seq]` map entry (e.g.
+`tags: [a, b]`, as in `tests/fixtures/examples/image.meta.tmt`'s
+`@meta(format:yaml){...}`) used to get GLR-merged with a second,
+spurious top-level `seq` reading of the same `[...]` text, wrapping
+the whole map in an `ERROR` -- not just when that entry was last in
+the map with no trailing comma (the case originally found), but for
+an earlier, non-last `key: [seq]` entry too. Root cause: the regex
+never excluded space/tab from its character class, so it could match
+a lone leading space (between `:` and `[`) as a complete one-character
+token in its own right, and tree-sitter's lexer took that real, if
+useless, token match over skipping the space as `extras` first --
+same class of bug `SCALAR`/`LIST_MARKER_GAP` already existed to route
+around, just never applied to this token too.
+
+`conflicts: [$.map, $.children]` (both declared with no `prec.right`
+of their own, unlike an earlier revision) resolves another former
+limitation: a bare newline right before a `map`/`children`-holding
+group's `}`/`)`, with nothing else after it, used to be genuinely
+ambiguous with only one token of lookahead ("is this newline the
+start of another entry, or the group's own trailing gap?") and always
+guessed "another entry" -- a dead end whenever nothing valid actually
+followed. GLR now tries both and keeps whichever one doesn't dead-end.
+Also fixed `-`-vs-`punctuation` the same class of way: `punctuation`'s
+`-` (see its own comment in `grammar.js`) is now the exact same shared
+token as the list markers', rather than a second, competing
+definition that always won tree-sitter's lexer-level tie regardless
+of what (if anything) validly followed.
+
+Verified against real content: `cargo test` in this crate parses
+`tests/fixtures/readme.tmt` and `tests/fixtures/examples/image.meta.tmt` and checks that
+the only `ERROR`/`MISSING` nodes are the known, narrow cases above --
+not that there are none. `tests/fixtures/readme.tmt` also has one
+pre-existing case (`###[ [] のルール ]`, a `[]` immediately inside a
+`[...]` content-span) that the @em[real] hand-written parser mishandles
+too (confirmed separately against `tomet-parser`), so this
+grammar erroring on it as well isn't a regression.
+
+==[ Constants ]
+
+===[ const LANGUAGE ]
+
+The tree-sitter language function for Tomet. Convert to a
+`tree_sitter::Language` via `.into()` to build a `tree_sitter::Parser`.
+
+===[ const NODE_TYPES ]
+
+The grammar's `node-types.json`, e.g. for tooling that wants to
+inspect the node type set without parsing anything.
+
+===[ const HIGHLIGHTS_QUERY ]
+
+The grammar's `highlights.scm` query string for syntax highlighting.

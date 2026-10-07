@@ -1,0 +1,145 @@
+@kind(api)
+
+@meta{
+  crate: tomet-tests
+}
+
+=[ tomet-tests ]
+
+Shared harness for the workspace's cross-crate tests.
+
+This crate exists because the tests it hosts span more than one layer
+of the pipeline and therefore belong to none of the individual crates.
+Before it existed, four crates reached outside their own directory for
+the shared corpus -- three via `include_str!("../../../fixtures/...")`
+and one via a `.parent().unwrap()` walk up to the repo root, both
+flagged as a fragility in the root `.writ.tmt`.
+
+Layer-local tests stay in their own crate. Only tests that need the
+shared corpus, or that cross a crate boundary, live here.
+
+Three test targets sit on top of this module:
+
+- `corpus` -- every fixture parses (or is a known exception), and the
+
+tree-sitter grammar produces only its documented error cases.
+
+- `roundtrip` -- invariants that span parser + printer + formatter.
+- `snapshot` -- `.tmt` converted to each output format, compared
+
+against committed reference files.
+
+==[ Functions ]
+
+===[ fn package_dir ]
+
+Root of this package (`<repo>/tests`).
+
+===[ fn fixtures_dir ]
+
+===[ fn ref_dir ]
+
+===[ fn store_dir ]
+
+Where actual output is written when it does not match the reference,
+so the two can be diffed by hand. Gitignored.
+
+===[ fn corpus ]
+
+Every `.tmt` file in the corpus, sorted, as paths relative to
+`fixtures/` (e.g. `examples/image.meta.tmt`).
+
+===[ fn read_fixture ]
+
+===[ fn known_ts_errors ]
+
+The markers recorded for `rel`, or `None` when the grammar is expected
+to parse it without any error node.
+
+===[ fn is_known_unparseable ]
+
+===[ fn parseable_corpus ]
+
+Corpus entries that parse, as `(relative path, source)` pairs.
+
+===[ fn assert_snapshot ]
+
+Compares `actual` against the committed reference at `ref/<name>`.
+
+With `TOMET_UPDATE_REF=1` the reference is rewritten instead of
+compared. On mismatch the actual output is written to `store/<name>`
+so the two files can be diffed directly.
+
+===[ fn snapshot_name ]
+
+Turns `examples/image.meta.tmt` into `examples/image.meta.<ext>` for
+naming the reference file of a converted fixture.
+
+===[ fn ts_parse ]
+
+Parses with the tree-sitter grammar -- the second, hand-maintained
+approximation of the language, kept in sync with `tomet-parser` by the
+`corpus` target's drift tests.
+
+===[ fn ts_error_texts ]
+
+Collects the source text of every `ERROR`/`MISSING` node, so a
+fixture-level assertion can compare against exactly the known,
+documented cases rather than just counting them.
+
+==[ Constants ]
+
+===[ const KNOWN_UNPARSEABLE ]
+
+Corpus entries that `tomet-parser` is currently expected to reject.
+
+This is an allow-list, not a skip-list: `corpus.rs` asserts it matches
+reality exactly, so a fixture that starts or stops parsing shows up as
+a failure rather than silently changing which files get covered.
+
+`cheatsheet.tmt` used to be the sole entry: it is a frozen copy of
+`docs/guide/cheatsheet.tmt` and exercised constructs the parser did not
+accept. The sigil rework fixed the last of them -- the `(format:...)`
+brace scanner that ended a body early at an unquoted `}` -- so it now
+parses, and the entry was gone for a while.
+
+`examples/bookmark.tmt` and `syntax/value-element.tmt` then used the
+retired `[a, b]` list literal (`list(...)` is the sole surviving
+spelling for a @em[list]) and landed here, rejected outright. `key:
+[...]` stopped being a hard rejection once it gained its own meaning
+-- block content (`Value::Blocks`), the same grammar as an element's
+own `[content]` -- so both fixtures parse again, but to a different
+AST than the `[a, b]`-as-list spelling would have produced (one
+paragraph, not a sequence). `examples/bookmark.tmt`'s `tags:` was
+edited to `list(a, a)` to keep meaning what it always meant (a list
+of tags); `syntax/value-element.tmt`'s `icons: [...]` was left as-is,
+since embedding `@`-elements in a `[...]` value position is exactly
+what that fixture exists to demonstrate.
+
+===[ const KNOWN_TS_ERRORS ]
+
+Fixtures the tree-sitter grammar is known to mis-parse, and the text
+of the error nodes it produces for each.
+
+The default for every other fixture is @strong[no error nodes at all].
+`grammar.js` is a hand-maintained approximation of `tomet-parser` and
+does not follow it on its own, so a fixture covering new syntax lands
+here as a failure until the grammar catches up -- which is the whole
+point of keeping the two side by side.
+
+A marker matches by substring. An empty marker would match anything
+and make the check vacuous, so the sweep rejects one outright rather
+than trusting nobody adds it back.
+
+===[ const ANY_ERROR ]
+
+Records a fixture as drifting wholesale, without pinning the text of
+each error node. Deliberately coarse: use it when the grammar fails
+once per line and the texts share nothing, not to wave away a case
+worth naming.
+
+===[ const MISSING_NODE ]
+
+Stands in for an error node with no text -- a @em[missing] token rather
+than an unexpected one. Spelled out so it can be recorded without an
+empty marker, which would match everything.

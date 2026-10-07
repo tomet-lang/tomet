@@ -52,6 +52,14 @@ format-check:
 # triggered manually (or from CI) rather than failing unrelated code
 # changes.
 #
+# Generate and update all derived documentation across the workspace.
+docs:
+    cargo build -p tomet-cli
+    ./target/debug/tomet cli-docs --out tmtroot/generated/cli.tmt
+    ./target/debug/tomet api .
+    ./target/debug/tomet export .
+    ./target/debug/tomet format .
+
 # The placement check stays here because it is this repository's docs
 # layout, not a rule of the language. It is `twrit`'s job when `twrit`
 # reads `.writ.tmt` itself.
@@ -61,6 +69,7 @@ docs-check:
     ./target/debug/tomet format --check .
     ./target/debug/tomet export --check .
     ./target/debug/tomet cli-docs --check --out tmtroot/generated/cli.tmt
+    ./target/debug/tomet api --check .
     @stray=$(find tmtroot -name '*.tmt' -exec grep -L 'export:' {} +); \
     if [ -n "$stray" ]; then \
         echo "$stray" | while IFS= read -r f; do \

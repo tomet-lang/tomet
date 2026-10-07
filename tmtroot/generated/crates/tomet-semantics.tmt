@@ -1,0 +1,312 @@
+@kind(api)
+
+@meta{
+  crate: tomet-semantics
+}
+
+=[ tomet-semantics ]
+
+I/O-free classification of what a parsed `Element` officially means --
+recognizing Tomet's own built-in vocabulary (`@meta`, `@config`,
+`@links`, `@link`, ...) by name only (no inference from `args`) -- plus
+small `Document`-level lookups (`document_meta`) built directly on top
+of that classification. Depends only on `tomet-ast`; consumers
+(`tomet-html`, `tomet-markdown`, the CLI/TUI) use this instead
+of each carrying their own copy of this logic.
+
+==[ Module embedded ]
+
+Reading a `+++` fence body as JSON/YAML/TOML.
+
+This lives in `tomet-semantics`, not in the parser. Before the fence,
+`format:` steered the lexer, so the reader had to sit inside
+`tomet-parser` and run mid-parse. A fence body is opaque text, so
+deciding what that text @em[means] is exactly the kind of interpretation
+this crate exists for -- and the parser now has no dependency on
+serde_json/serde_yaml/toml at all.
+
+This runs @strong[after] parsing, not during it. The fence captures its body
+verbatim as `ElementValue::Raw`; whether that opaque string is later
+read as JSON, YAML or TOML is decided here, from the element's
+`format:` argument.
+
+That ordering is the point. `format:` used to steer the lexer: a
+`{...}` body was scanned with brace-depth tracking and handed to
+another parser mid-parse, which meant the element's own arguments could
+change the shape of the tree -- and it terminated `@meta(format:yaml)`
+early at the first unquoted `}` inside otherwise legal YAML. A fence
+has no such failure mode, and `format:` is now pure interpretation.
+
+===[ Structs ]
+
+====[ struct EmbeddedError ]
+
+A `+++` fence body that its declared format could not read.
+
+===[ Enums ]
+
+====[ enum EmbeddedFormat ]
+
+===[ Functions ]
+
+====[ fn parse_raw_body ]
+
+Reads a `+++` fence body as `format`.
+
+Error positions are relative to `raw` itself (line 1 is the fence
+body's first line); a caller that knows where the fence sits in the
+document can offset them.
+
+====[ fn element_format ]
+
+The format an element's `+++` fence body should be read as, from its
+`format:` argument.
+
+`format:` is now pure interpretation: it says which parser receives the
+opaque string, and has no effect on how that string was lexed. A
+missing or unrecognized tag means "read it with Tomet's own value
+grammar", which the caller does -- this crate deliberately does not
+depend on `tomet-parser`.
+
+====[ fn element_data ]
+
+An element's value as data, whichever way it was written.
+
+A `{...}` group contributes its `key: value` pairs; a `+++` fence body
+is read with the element's declared `format:`. Returns `None` when the
+element has no value, or when a fence body has no recognized format
+(the body is opaque text and only its author knows what it means) or
+fails to parse as the format it declares.
+
+This is the "data-vs-children becomes a view" half of the design: no
+consumer has to know whether the author wrote `{a: 1}` or
+`(format:yaml)+++a: 1+++`.
+
+==[ Module flatten ]
+
+Projecting an element's data onto a flat, string-valued attribute map.
+
+Every output format Tomet writes into carries element data as string
+pairs and nothing more -- HTML's `data-*`, Pandoc's `Attr`. A Tomet
+value is a tree, so something has to give.
+
+The rule is @strong[a readable projection plus an exact copy]: scalars and
+sequences of scalars keep their own flat entry, and whenever that
+projection would lose something -- a map anywhere, or a sequence
+holding one -- the whole group is additionally serialized as JSON
+under [`EXACT_DATA_KEY`]. A reader that finds that key should prefer
+it and ignore the projection.
+
+Dotted keys (`m.k` for a nested `k` inside `m`) were considered and
+rejected: a Tomet map key may itself contain `.` (the repository's own
+`default.config.tmt` has `"url.wiki"`), so `m.k` would be ambiguous
+between a nested lookup and a flat key of that name. Element @em[names]
+use `.` as a namespace separator, but map keys deliberately do not.
+
+===[ Structs ]
+
+====[ struct FlatData ]
+
+An element's data, ready for a string-valued attribute map.
+
+===[ Functions ]
+
+====[ fn flatten_element_data ]
+
+Flattens `el`'s `(args)` and `{value}` for an attribute map.
+
+A `+++` raw body and a `${...}` interpolation are not data and are
+skipped; so are the element children a `{...}` group may hold, which
+belong in the output's body rather than its attributes.
+
+====[ fn flatten_data ]
+
+Flattens the two groups directly.
+
+Callers pass `None` for a group the surrounding mapping has already
+consumed -- a heading's level, a link's target -- so it is not emitted
+a second time as an attribute.
+
+====[ fn scalar_string ]
+
+The string a value projects to, or `None` when it cannot project.
+
+A sequence joins with `", "`, which is what the HTML writer has always
+done. That is not reversible -- `[p, q]` and the literal `"p, q"`
+project identically -- but it stays readable, and the exact copy is
+what a reader uses when it needs the difference.
+
+====[ fn value_to_json ]
+
+Converts a Tomet value to JSON, preserving structure exactly.
+
+The inverse of `embedded::json_to_value`, which reads a `+++` fence
+body declared `format: json` back into a [`Value`].
+
+===[ Constants ]
+
+====[ const EXACT_DATA_KEY ]
+
+The attribute a consumer should read instead of the flat projection
+when it is present.
+
+====[ const POSITIONAL_KEY ]
+
+The key [`FlatData::into_pairs`] gives a positional group's value.
+
+==[ Module footnote ]
+
+Footnote collection, sequential numbering, and cross-reference resolution.
+
+===[ Structs ]
+
+====[ struct FootnoteItem ]
+
+An individual footnote entry resolved within a document.
+
+====[ struct FootnoteRegistry ]
+
+Registry storing all resolved footnotes and element back-references for a document.
+
+==[ Module tag ]
+
+Extracts tags from an element (`@tag(...)`, `@tag[...]`).
+
+===[ Functions ]
+
+====[ fn extract_tags ]
+
+Extracts a list of tag names from a tag element.
+Inspects `args` (as string, seq, or map) and `content` (as plain text).
+
+==[ Module vocabulary ]
+
+What a `@vocabulary(ns)` document declares, and how a name resolves
+against the namespaces a document has in scope.
+
+Extraction is pure: it takes a parsed [`Document`] and reads it. The
+file that document came from is somebody else's problem --
+`tomet-semantics-resolver` finds `.tomet/vocabularies/<ns>.vocabulary.tmt`
+and reads it, because this layer may not do I/O.
+
+See `docs/spec/vocabulary.tmt` for the normative description. Three
+rules from it are enforced here:
+
+- Exactly two namespaces may be written bare -- `std`, because the
+
+language carries it, and the document's own `@kind`, because it is
+declared on the first line. Anything brought in with `@use` is
+always written out.
+
+- `std` wins every collision, and cannot be shadowed: a vocabulary
+
+that declares a name already in [`BUILTIN_KINDS`] is rejected at the
+declaration rather than at each use site, which is one error instead
+of many.
+
+- `doc` (`RESERVED_NAMESPACES`) is a second namespace tomet carries
+
+itself, resolved the same unconditional way `std` is in
+[`Bindings::classify`]/[`Bindings::declaration`] -- but, unlike
+`std`, never written bare: `@doc.icon(...)` needs its full name, just
+never an `@use(doc)` in front of it.
+
+===[ Structs ]
+
+====[ struct ParamDecl ]
+
+One parameter, as `@param(name){ ... }` declares it.
+
+`param` and not `arg`: parameter is the declaration side, argument is
+the call side, so `(args)` needs no rename.
+
+@strong[`ty` is read but never checked.] It is kept as `element_data`
+produces it -- `uint` arrives as a string, `list(string)` as a
+sequence -- because
+checking a value against it needs a type language this project has not
+settled: `@param(name)`'s own type is an identifier rather than a
+string, `default:`'s type depends on `type:`, and `type:`'s type is a
+type. Interpreting it here would mean deciding all three by accident.
+
+====[ struct ElementDecl ]
+
+One element, as a vocabulary declares it.
+
+`@args` and `@content` are read; `@data` is not yet.
+
+====[ struct Vocabulary ]
+
+The elements one namespace declares.
+
+====[ struct LoadedVocabularies ]
+
+Every vocabulary a vault declares, with whatever went wrong.
+
+The rules for accepting one live in [`LoadedVocabularies::add`], and
+they are pure: a caller hands over a parsed document and the label it
+wants errors reported under. Where the document came from -- a file
+`tomet-resolver` read, or source text a wasm host was given -- is not
+this type's business, so both get the same verdicts.
+
+====[ struct Bindings ]
+
+The namespaces in scope for one document.
+
+===[ Enums ]
+
+====[ enum Region ]
+
+Where an element is allowed to sit in a document.
+
+Distinct from an element's @em[shape], which is whether it stands as a
+block or belongs to running text. `@use` has `Region::Preamble` and is
+not a singleton -- you bring in several vocabularies -- which is the
+proof the two axes are independent.
+
+====[ enum ContentAllow ]
+
+`@content{allow:}`'s value -- what a vocabulary's own element may hold
+in `[content]`/`|content` (`Vec<Block>`, see `tmtroot/docs/spec/
+feature/content-shape.tmt`).
+
+===[ Functions ]
+
+====[ fn builtin_doc_vocabularies ]
+
+The vocabularies tomet ships hardcoded in Rust rather than as a vault's
+`@vocabulary(ns)` document -- the same reason `std`'s elements are a
+Rust table (`BUILTIN_KINDS`) rather than a `@vocabulary(std)` document:
+see `kind.rs`'s doc comment on why that is a limit of the vocabulary
+format, not a permanent design.
+
+`doc.index` declares no elements: an index document's body is `std`
+(`ul`/`ol`/`@link`) plus `${filter(...)}`/`${by(...)}`, which are neither
+elements nor registered functions -- `tomet-transform::index_query`
+pattern-matches them directly, with no dependency on `Bindings` at all.
+This vocabulary exists purely so `@kind(doc.index)` resolves instead of
+being rejected as unknown.
+
+`doc` (bare namespace, not `doc.index`) is the opposite case: it
+declares exactly one element, `icon`, and exists so `@doc.icon(...)`
+resolves as running text. `std` used to have its own `icon`, recognized
+but never drawing anything (`docs/spec/builtin-elements.tmt`'s old
+"recognized, does nothing" table) -- worse than not having it, the same
+way `@config(style:)` is worse than unimplemented, because a bare
+`@icon` looked like the real spelling while doing nothing. `doc.icon`
+replaces it under a namespace that says the opposite by construction:
+Tomet resolves and draws nothing here, on purpose, forever -- an
+external renderer implements this notation to make it into a picture.
+`params` exists so `check_arguments` still catches a typo'd key; it is
+not a step toward Tomet ever reading `name`/`pkg` itself.
+
+===[ Constants ]
+
+====[ const RESERVED_NAMESPACES ]
+
+Namespaces no vault vocabulary may claim, because tomet already gives
+them a hardcoded meaning -- `std` conceptually, and now `doc`.
+
+`std` is not actually checked here today (nothing ever compared a
+vocabulary's own namespace string against `"std"`; only individual
+element names were checked, via `shadowed_builtins`). `doc` is the first
+namespace this list actually enforces.

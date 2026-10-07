@@ -1,0 +1,236 @@
+@kind(api)
+
+@meta{
+  crate: tomet-tree
+}
+
+=[ tomet-tree ]
+
+AST node accessors, extension traits, builders, and recursive tree traversal for Tomet.
+
+Provides:
+
+- @strong[[`ValueExt`]]: Inspection and accessor methods on [`tomet_ast::Value`].
+- @strong[[`ElementExt`]]: Attribute manipulation and helpers on [`tomet_ast::Element`].
+- @strong[[`DocumentExt`]]: Block-level manipulation helpers on [`tomet_ast::Document`].
+- @strong[[`walk`]]: Generic recursive tree visitors ([`walk_document`], [`walk_document_mut`]).
+
+==[ Module document ]
+
+Extension trait and block manipulation helpers for [`tomet_ast::Document`].
+
+===[ Traits ]
+
+====[ trait DocumentExt ]
+
+Extension trait providing block-level operations on [`Document`].
+
+==[ Module element ]
+
+Extension trait, attribute helpers, and constructors for [`tomet_ast::Element`].
+
+===[ Traits ]
+
+====[ trait ElementExt ]
+
+Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
+
+===[ Functions ]
+
+====[ fn element_new ]
+
+Creates a new [`Element`] with given `sigil` and default empty fields.
+
+The placement is [`Placement::Inline`]; a caller building a block uses
+[`ElementExt::with_placement`], and the parser sets it from position.
+
+====[ fn element_list ]
+
+A list element constructor (`ol` if `ordered`, else `ul`).
+
+A list has no sigil in the source -- the marker (`-` / `-.`) is its
+surface form -- but it always stands as a block, so it is constructed
+with [`Placement::Block`] directly.
+
+====[ fn element_list_item ]
+
+A list item element constructor (`Sigil::Bare`).
+
+`id` is a real parameter, not hardcoded to `None` -- list items are a
+first-class consumer of `#(id)` like everything else `parse_groups`
+reads for, and silently dropping it here would repeat the exact bug
+`connects` used to have (a full-form list item's parsed connects were
+read and then thrown away at this exact spot).
+
+==[ Module value ]
+
+Extension trait and helpers for [`tomet_ast::Value`].
+
+===[ Traits ]
+
+====[ trait ValueExt ]
+
+Extension trait providing accessors and inspections on [`Value`].
+
+==[ Module walk ]
+
+Generic recursive traversal of a [`tomet_ast::Document`]'s tree.
+
+===[ Traits ]
+
+====[ trait Visitor ]
+
+Called at every [`Element`] `walk_document` visits, in document order.
+
+====[ trait VisitorMut ]
+
+Mutable counterpart of [`Visitor`] -- called at every `&mut Element`
+in document order.
+
+===[ Functions ]
+
+====[ fn for_each_element ]
+
+Traverses all elements in `doc` in document order and executes `f` for each.
+
+====[ fn for_each_inline ]
+
+Traverses every [`Inline`] in `doc` in document order: paragraph
+content, section titles, and every element's `[content]`.
+
+It covers exactly the positions [`walk_document`] covers -- an element
+reached there has its inlines reached here -- so a count taken over
+elements and a count taken over text describe the same part of the tree.
+An `Inline::Element` is itself passed to `f`, and then descended into.
+
+====[ fn for_each_element_in_block ]
+
+[`for_each_element`] over one [`Block`], for callers that walk the
+document's own top level themselves and need the elements below it.
+
+====[ fn for_each_top_level_element ]
+
+Visits every element a reader would find by scanning only the top of
+the document, in document order.
+
+Before `docs/spec/syntax.tmt`'s `##[ 区切り ]`, that was simply every
+`Block::Element` in `doc.blocks` -- a bare element with nothing
+adjacent to join always stood alone, so `@kind`/`@blueprint`/`@meta`/
+`@vocabulary`/... were always found this way, and more than one
+caller across the workspace grew its own copy of that same loop. Now
+one can join an adjacent paragraph instead (no blank line, no `;`
+separator) and come back as an `Inline::Element` inside a
+`Block::Paragraph`, a tree-shape choice that says nothing about
+whether it still opened its own line -- so this visits both: every
+`Block::Element`, and every `Inline::Element` sitting directly in a
+`Block::Paragraph`'s own content (not recursed into that element's
+\@em[own] content/children -- something nested three levels deep inside
+unrelated prose was never a document-level declaration and still
+is not).
+
+This is the one place that decision lives. A caller that wants "the
+declarations at the top of this document" should call this instead of
+walking `doc.blocks` by hand -- that hand-rolled loop is exactly what
+stopped finding a joined `@blueprint`/`@vocabulary`/`@meta` the moment
+this rule shipped, in more than one crate at once.
+
+====[ fn for_each_top_level_element_mut ]
+
+[`for_each_top_level_element`], mutably -- for a caller that rewrites a
+top-level declaration in place (`@blueprint(x)` becoming `@kind(x)`,
+say) without changing how many elements are there.
+
+====[ fn retain_top_level_elements ]
+
+[`for_each_top_level_element`], removing every one `keep` rejects --
+from `doc.blocks` directly for a `Block::Element`, or from a
+`Block::Paragraph`'s own content for an `Inline::Element` found there.
+A removal from inside a paragraph closes the gap it leaves the same
+way the normal parse path already would: the `SoftBreak` immediately
+before the removed item goes with it (so two joined items never end up
+separated by two adjacent `SoftBreak`s), and a `SoftBreak` left
+leading the paragraph (the removed item was first) is dropped too, the
+same trim [`parse_inline_seq`] already applies to a freshly parsed
+paragraph's edges.
+
+The paragraph itself is never dropped, even if this empties it --
+nothing downstream needs that (`render_block` already treats an
+all-whitespace paragraph as producing nothing), and deciding that here
+would be a second place holding a rule a printer already holds.
+
+====[ fn walk_document ]
+
+Depth-first, document-order walk of every `Element` in `doc`.
+
+====[ fn for_each_element_mut ]
+
+Traverses all elements in `doc` mutably in document order and executes `f` for each in place.
+
+====[ fn walk_document_mut ]
+
+Mutable counterpart of [`walk_document`].
+
+====[ fn for_each_descendant ]
+
+Every descendant of `el` (not `el` itself), in document order --
+`content`, `children`, and `ElementValue::Group` entries. `:rule`'s own
+use is the only caller, so "descendant" means what `:rule(allow:...)`
+means by it: content and children the reader encounters @em[underneath]
+`el`, not configuration carried @em[on] `el`.
+
+That is also why this deliberately never looks at `el.args`, even
+though [`walk_element`] does (`args` can hold a [`Value::Element`]
+since elements were allowed to sit in value position): an element
+embedded in `el`'s own `(args)` -- `@thing(icon: @doc.icon("x"))` --
+describes `thing`, the same way `el.connects` does, so it is exempt
+for the same reason. `el.connects` itself is skipped for a related but
+distinct reason: a connect (`Sigil::Named` carrying `:name(...)`'s own
+args/content/value, e.g. `:rule(...)`) is not a descendant of the
+document `el` sits in at all -- it is metadata about `el` itself,
+consumed only by the dedicated check that understands the closed set
+of connect names. Feeding either through here would let it reach the
+same classification a real document element gets, which is exactly the
+confusion a `:rule(...)` element (or an `@doc.icon` describing `thing`)
+being reported as a disallowed @em[descendant] would be.
+
+`direct_only` restricts to immediate children only -- one level of
+`content`/`children`/`ElementValue::Group`, not recursed further --
+for `:rule(direct:true)`; `false` walks every descendant at any
+depth, same as [`walk_element`].
+
+====[ fn transform_elements ]
+
+Mutates all elements in `doc` matching `filter` by applying `transform`.
+Returns the number of elements transformed.
+
+==[ Functions ]
+
+===[ fn element_get_attr ]
+
+===[ fn element_get_attr_mut ]
+
+===[ fn element_has_prop_key ]
+
+===[ fn element_set_prop ]
+
+===[ fn element_rename_prop_key ]
+
+===[ fn element_replace_prop_value ]
+
+===[ fn element_remove_prop ]
+
+===[ fn element_transform_prop ]
+
+===[ fn element_attrs_view ]
+
+===[ fn element_attrs_mut ]
+
+===[ fn insert_block_at ]
+
+===[ fn remove_block_at ]
+
+===[ fn replace_block_at ]
+
+===[ fn find_block_index ]
+
+===[ fn find_element_block_index ]

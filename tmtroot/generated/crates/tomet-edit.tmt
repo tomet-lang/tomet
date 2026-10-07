@@ -1,0 +1,29 @@
+@kind(api)
+
+@meta{
+  crate: tomet-edit
+}
+
+=[ tomet-edit ]
+
+Backend-neutral editable model of a Tomet document.
+
+A tree of nodes that carry opaque ids, attribute maps, marked text and the
+layout trivia (whitespace, comments) of the source they came from, plus a
+small closed set of edit operations applied one at a time. Its purpose is
+to let an application bridge one document to an external editing runtime
+-- typically a CRDT -- without this workspace depending on any of them.
+
+Planned surface (nothing here yet):
+
+- the model types;
+- `source -> model` and `model -> source`, where an import followed by an
+
+export with no edits is byte-identical;
+
+- edit operations: insert, delete, move, set attribute, edit text;
+- validator diagnostics over an edited model, which only report, because
+
+a runtime that merges concurrent edits cannot reject them.
+
+Not here: any CRDT library, and any sync, session or transport code.

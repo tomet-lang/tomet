@@ -1,0 +1,53 @@
+@kind(api)
+
+@meta{
+  crate: tomet-parser
+}
+
+=[ tomet-parser ]
+
+==[ Module cst ]
+
+Resilient, lossless Concrete Syntax Tree (CST) parser for Tomet.
+
+Preserves 100% of source characters including trivia (whitespace, newlines, comments).
+
+The tree follows the current surface syntax, not the AST parser's exact
+decisions: it never fails, and where the two could disagree it prefers
+the reading that keeps more structure.
+
+```text
+ROOT
+  SECTION                    `=[ T ]` and everything up to the next section
+    SECTION_HEADING          of the same or a shallower level (they nest)
+    PARAGRAPH | LIST | BLOCK_ELEMENT | CODE_BLOCK | THEMATIC_BREAK | SECTION ...
+```
+
+An element (`BLOCK_ELEMENT`, `INLINE_ELEMENT`) is a `SIGIL` followed by
+its groups -- `ARGS` `( )`, `VALUE_DATA` `{ }`, `CONTENT` `[ ]`, at most
+one of each -- then any `CONNECT` (`:name(...)`) and `FENCE` (`+++`).
+`${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
+`MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
+`MAP_LITERAL`, `SEQ_LITERAL` or (a call such as `list(...)`) `ARGS`.
+`CONTENT` holds inline text, which may itself contain elements.
+
+Emphasis (`*em*`) and `|`-marked content runs are not modelled: they stay
+flat tokens in their paragraph.
+
+===[ Functions ]
+
+====[ fn parse_cst ]
+
+Parse `src` into a lossless, resilient [`SyntaxNode`].
+
+Guaranteed Invariant: `parse_cst(src).text().to_string() == src`.
+
+==[ Functions ]
+
+===[ fn parse_dollar_element_str ]
+
+Parse a `$func(args)` or `${expr}` dollar element directly from a string slice.
+
+===[ fn parse_caret_element_str ]
+
+Parse a `^(id)` or `^name(id)` caret reference element directly from a string slice.
