@@ -48,6 +48,8 @@
 //!
 //! @table
 //! |[ feature ][ module ][ from ]
+//! |[ `edit` ][ [`edit`] ][ `tomet-edit` ]
+//! |[ `parser` ][ [`parser`] ][ `tomet-parser` ]
 //! |[ `html` ][ [`html`] ][ `tomet-html` ]
 //! |[ `markdown` ][ [`markdown`] ][ `tomet-markdown` ]
 //! |[ `typst` ][ [`typst`] ][ `tomet-typst` ]
@@ -77,6 +79,16 @@ pub use tomet_load::{
 /// document; use [`Vault`] for that.
 pub use tomet_parser::parse_value;
 
+/// Bare document parser (opt-in feature `parser`).
+#[cfg(feature = "parser")]
+pub use tomet_parser as parser;
+#[cfg(feature = "parser")]
+pub use tomet_parser::parse_document;
+
+/// Lossless editable document tree model (opt-in feature `edit`).
+#[cfg(feature = "edit")]
+pub use tomet_edit as edit;
+
 /// The disk-free `Vault`: build one from text with `from_sources`. The
 /// top-level [`Vault`] is this plus finding and reading files.
 pub use tomet_vault as vault;
@@ -101,4 +113,24 @@ pub use tomet_typst as typst;
 pub fn measure_document(path: &std::path::Path) -> Result<tomet_stats::Stats, LoadError> {
     let (doc, _) = load_document(path)?;
     Ok(tomet_stats::measure(&doc))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_and_edit_features() {
+        #[cfg(feature = "parser")]
+        {
+            let doc = parse_document("Hello world.\n").unwrap();
+            assert_eq!(doc.blocks.len(), 1);
+        }
+
+        #[cfg(feature = "edit")]
+        {
+            let doc = edit::import_source("Hello world.\n");
+            assert_eq!(edit::export_doc(&doc), "Hello world.\n");
+        }
+    }
 }

@@ -4,10 +4,12 @@ version.workspace = true
 edition.workspace = true
 
 [features]
+edit = ["dep:tomet-edit"]
 format = ["dep:tomet-formatter"]
 html = ["dep:tomet-html"]
 markdown = ["dep:tomet-markdown"]
 pandoc = ["dep:tomet-pandoc"]
+parser = []
 printer = ["dep:tomet-printer"]
 stats = ["dep:tomet-stats"]
 typst = ["dep:tomet-typst"]
@@ -22,6 +24,7 @@ tomet-validator = { workspace = true }
 tomet-vault = { workspace = true }
 
 #= Optional
+tomet-edit = { workspace = true, optional = true }
 tomet-formatter = { workspace = true, optional = true }
 tomet-html = { workspace = true, optional = true }
 tomet-markdown = { workspace = true, optional = true }

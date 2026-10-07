@@ -1953,6 +1953,7 @@ version = "0.1.0"
 dependencies = [
  "tomet-ast",
  "tomet-config",
+ "tomet-edit",
  "tomet-formatter",
  "tomet-html",
  "tomet-load",
