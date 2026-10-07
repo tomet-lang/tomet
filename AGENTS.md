@@ -85,6 +85,16 @@ All commands, builds, and tests must run within the Nix development environment 
 
 This is a parser/CLI/LSP/editor-extensions project with no standalone GUI app. Verify with automated checks and code reading:
 
+Useful recipes defined in `justfile`:
+
+- `just test`: Runs all workspace tests (`cargo test --workspace`).
+- `just test-suite`: Runs the cross-crate corpus and snapshot test suite (`cargo test -p tomet-tests`).
+- `just docs-check`: Runs a comprehensive check on all documents (`tomet check`, `format --check`, `export --check`, `api --check`, and `twrit check`).
+- `just docs`: Updates, regenerates, and formats all derived documentation.
+- `just writ-check`: Verifies `.writ.tmt` guard rules and language conventions.
+
+Direct checks (if running individually):
+
 - `cargo check` / `cargo build` / `cargo test`
 - `twrit check`: Verifies architectural layers and file placement rules in `.writ.tmt`.
 - `tomet export --check`: Verifies that all exported `.md` documents match their source `.tmt` files.
