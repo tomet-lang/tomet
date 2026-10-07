@@ -5,7 +5,7 @@
 //! Before it existed, four crates reached outside their own directory for
 //! the shared corpus -- three via `include_str!("../../../fixtures/...")`
 //! and one via a `.parent().unwrap()` walk up to the repo root, both
-//! flagged as a fragility in `crates/README.dirs.tmt`.
+//! flagged as a fragility in the root `.writ.tmt`.
 //!
 //! Layer-local tests stay in their own crate. Only tests that need the
 //! shared corpus, or that cross a crate boundary, live here.
