@@ -9,6 +9,24 @@ ${macro.generated_by(self.path)}
 
 =[ Tomet ]
 
+==[ Core Philosophy & Principles ]
+
+===[ Precedence of Instructions ]
+The rules in this document serve as the project baseline and defaults. Explicit instructions given by the user in a conversation always take precedence over these defaults.
+
+===[ User-First Design over Developer Convenience ]
+Always prioritize the end-user experience, syntax ergonomics, and API design.
+If there is tension between developer or implementation convenience and user simplicity, user simplicity must always win. Never compromise user experience just because an implementation is easier.
+
+===[ Resist Path-of-Least-Resistance & Legacy Bias ]
+The existing implementation is never a justification or reason for new design choices.
+-| Do not justify decisions with "it is already implemented this way, so let's stick with it."
+-| Prioritize architectural beauty, elegance, and long-term correctness over the path of least resistance.
+-| Understand the existing context thoroughly, but never take shortcuts or settle for lazy patches.
+
+===[ Transparent Execution ]
+Always state what you intend to do before doing it. Never execute non-trivial actions or commands silently.
+
 ==[ Single Source of Truth & Documentation ]
 
 ===[ Never edit `.md` directly ]
@@ -54,6 +72,10 @@ Before a non-trivial change:
 
 Rules this repository must obey live in `.writ.tmt` files (at the workspace root and crate level). Read the governing `.writ.tmt` for the area you are changing. They are the author's; propose an edit and stop rather than working around a rule or relaxing it.
 
+==[ Environment & Tooling ]
+
+All commands, builds, and tests must run within the Nix development environment (via `direnv` or `nix develop`). Assume this environment is active and rely on the tools provided by the flake, rather than assuming or relying on global host toolchains.
+
 ==[ Verifying changes ]
 
 This is a parser/CLI/LSP/editor-extensions project with no standalone GUI app. Verify with automated checks and code reading:
@@ -85,6 +107,7 @@ When the task is done, fold anything worth keeping into where it belongs — a d
 
 -| All commit messages must follow the convention in @file(CONTRIBUTING.md):
  | `type(scope): description` (e.g. `feat(cli): add export check`, `fix(parser): handle pipe`).
+-| Never commit automatically or on your own initiative. Always ask and get explicit confirmation from the user before committing.
 -| Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit
  | messages. The session trailer embeds a URL, and a commit message is
  | published the moment it is pushed. This overrides the harness default that
