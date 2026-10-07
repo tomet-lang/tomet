@@ -85,7 +85,7 @@ pub fn extract_crate_doc(
     // 3. Root inner doc comments (//! ...)
     let root_docs = extract_docs(&file_ast.attrs, true);
     if !root_docs.is_empty() {
-        blocks.extend(parse_doc_to_blocks(&root_docs));
+        blocks.extend(parse_doc_to_blocks(&root_docs, 1));
     }
 
     // 4. Collect and process items in the root module & submodules
@@ -177,13 +177,13 @@ impl<'a> CrateItemCollector<'a> {
 
             let mod_docs = extract_docs(&m.attrs, false);
             if !mod_docs.is_empty() {
-                out.extend(parse_doc_to_blocks(&mod_docs));
+                out.extend(parse_doc_to_blocks(&mod_docs, section_level));
             }
 
             if let Some((_, inline_items)) = &m.content {
                 let inner_docs = extract_docs(&m.attrs, true);
                 if !inner_docs.is_empty() {
-                    out.extend(parse_doc_to_blocks(&inner_docs));
+                    out.extend(parse_doc_to_blocks(&inner_docs, section_level));
                 }
                 self.process_items(inline_items, current_file, section_level + 1, out)?;
             } else {
@@ -201,7 +201,7 @@ impl<'a> CrateItemCollector<'a> {
 
                     let inner_docs = extract_docs(&sub_ast.attrs, true);
                     if !inner_docs.is_empty() {
-                        out.extend(parse_doc_to_blocks(&inner_docs));
+                        out.extend(parse_doc_to_blocks(&inner_docs, section_level));
                     }
 
                     self.process_items(&sub_ast.items, target_file, section_level + 1, out)?;
@@ -225,7 +225,7 @@ impl<'a> CrateItemCollector<'a> {
                 )));
                 let docs = extract_docs(&s.attrs, false);
                 if !docs.is_empty() {
-                    out.extend(parse_doc_to_blocks(&docs));
+                    out.extend(parse_doc_to_blocks(&docs, section_level + 1));
                 }
             }
         }
@@ -246,7 +246,7 @@ impl<'a> CrateItemCollector<'a> {
                 )));
                 let docs = extract_docs(&e.attrs, false);
                 if !docs.is_empty() {
-                    out.extend(parse_doc_to_blocks(&docs));
+                    out.extend(parse_doc_to_blocks(&docs, section_level + 1));
                 }
             }
         }
@@ -267,7 +267,7 @@ impl<'a> CrateItemCollector<'a> {
                 )));
                 let docs = extract_docs(&t.attrs, false);
                 if !docs.is_empty() {
-                    out.extend(parse_doc_to_blocks(&docs));
+                    out.extend(parse_doc_to_blocks(&docs, section_level + 1));
                 }
             }
         }
@@ -288,7 +288,7 @@ impl<'a> CrateItemCollector<'a> {
                 )));
                 let docs = extract_docs(&f.attrs, false);
                 if !docs.is_empty() {
-                    out.extend(parse_doc_to_blocks(&docs));
+                    out.extend(parse_doc_to_blocks(&docs, section_level + 1));
                 }
             }
         }
@@ -309,7 +309,7 @@ impl<'a> CrateItemCollector<'a> {
                 )));
                 let docs = extract_docs(&t.attrs, false);
                 if !docs.is_empty() {
-                    out.extend(parse_doc_to_blocks(&docs));
+                    out.extend(parse_doc_to_blocks(&docs, section_level + 1));
                 }
             }
         }
@@ -329,7 +329,7 @@ impl<'a> CrateItemCollector<'a> {
                 )));
                 let docs = extract_docs(attrs, false);
                 if !docs.is_empty() {
-                    out.extend(parse_doc_to_blocks(&docs));
+                    out.extend(parse_doc_to_blocks(&docs, section_level + 1));
                 }
             }
         }
@@ -418,17 +418,51 @@ fn is_doc_hidden(attrs: &[syn::Attribute]) -> bool {
 }
 
 /// Parses extracted doc comment text into Tomet AST blocks.
-fn parse_doc_to_blocks(doc_text: &str) -> Vec<Block> {
+///
+/// Section headings inside the doc comment are shifted so that the shallowest
+/// heading becomes a direct child of the enclosing section (`parent_level + 1`),
+/// maintaining relative differences between sub-headings without breaking the outline.
+fn parse_doc_to_blocks(doc_text: &str, parent_level: usize) -> Vec<Block> {
     let trimmed = doc_text.trim();
     if trimmed.is_empty() {
         return Vec::new();
     }
-    match tomet_parser::parse_document(trimmed) {
+    let mut blocks = match tomet_parser::parse_document(trimmed) {
         Ok(doc) => doc.blocks,
         Err(_) => vec![Block::Paragraph(Paragraph::new(
             vec![Inline::Text(Text::new(trimmed, dummy()))],
             dummy(),
         ))],
+    };
+
+    if let Some(min_level) = find_min_section_level(&blocks) {
+        let target_start = parent_level + 1;
+        let offset = target_start as isize - min_level as isize;
+        shift_section_levels(&mut blocks, offset);
+    }
+
+    blocks
+}
+
+fn find_min_section_level(blocks: &[Block]) -> Option<usize> {
+    let mut min = None;
+    for b in blocks {
+        if let Block::Section(s) = b {
+            min = Some(min.map_or(s.level, |m: usize| m.min(s.level)));
+            if let Some(sub_min) = find_min_section_level(&s.blocks) {
+                min = Some(min.map_or(sub_min, |m: usize| m.min(sub_min)));
+            }
+        }
+    }
+    min
+}
+
+fn shift_section_levels(blocks: &mut [Block], offset: isize) {
+    for b in blocks {
+        if let Block::Section(s) = b {
+            s.level = (s.level as isize + offset).max(1) as usize;
+            shift_section_levels(&mut s.blocks, offset);
+        }
     }
 }
 
@@ -551,5 +585,63 @@ pub fn run() {}
         assert!(printed.contains("Important invariant."));
         assert!(printed.contains("- First item"));
         assert!(printed.contains("@file(docs/spec.tmt)"));
+    }
+
+    #[test]
+    fn test_doc_comment_heading_level_offset() {
+        let src = r#"//! Crate overview.
+//!
+//! =[ Architecture ]
+//! Root doc section should become level 2.
+
+/// Function documentation.
+///
+/// =[ Examples ]
+/// Example text.
+///
+/// ==[ Edge Cases ]
+/// Sub-case text.
+pub fn calculate() {}
+"#;
+        let doc = extract_file_doc("test-offset", src, &RustExtractOptions::default()).unwrap();
+        let printed = tomet_printer::document_to_tm(&doc);
+
+        // Crate root is level 1: =[test-offset]
+        assert!(printed.contains("=[test-offset]"));
+        // Architecture in root doc becomes level 2: ==[Architecture]
+        assert!(printed.contains("==[Architecture]"));
+
+        // Functions category is level 2: ==[Functions]
+        assert!(printed.contains("==[Functions]"));
+        // calculate function is level 3: ===[fn calculate]
+        assert!(printed.contains("===[fn calculate]"));
+
+        // Examples inside calculate should shift to level 4: ====[Examples]
+        assert!(printed.contains("====[Examples]"));
+        // Edge Cases sub-section should shift to level 5: =====[Edge Cases]
+        assert!(printed.contains("=====[Edge Cases]"));
+    }
+
+    #[test]
+    fn test_doc_comment_heading_offset_preserves_relative_distance() {
+        let src = r#"
+/// Struct with initially deep headings.
+///
+/// ===[ Overview ]
+/// Overview text.
+///
+/// =====[ Deep Detail ]
+/// Detail text.
+pub struct MyStruct;
+"#;
+        let doc = extract_file_doc("test-deep", src, &RustExtractOptions::default()).unwrap();
+        let printed = tomet_printer::document_to_tm(&doc);
+
+        // Struct is level 3: ===[struct MyStruct]
+        assert!(printed.contains("===[struct MyStruct]"));
+        // The shallowest heading (Overview, was level 3) becomes level 4 (parent + 1)
+        assert!(printed.contains("====[Overview]"));
+        // Deep Detail was +2 deeper (level 5), so it becomes level 6 (4 + 2)
+        assert!(printed.contains("======[Deep Detail]"));
     }
 }
