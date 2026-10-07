@@ -1,4 +1,4 @@
-<!-- Generated from tmtroot/readme.tmt. Edit that, then `tomet export .`. -->
+<!-- Generated from tmtroot/locales/ja/readme.tmt. Edit that, then `tomet export .`. -->
 
 > [!warning]
 > Tometは現在開発中であり、日々構文や仕様が大きく変わっています。
@@ -6,19 +6,12 @@
 
 # Tomet
 
-[license](https://github.com/tomet-lang/tomet)
+![license](https://img.shields.io/github/license/tomet-lang/tomet?style=flat-square&color=brightgreen)
+![downloads](https://img.shields.io/github/downloads/tomet-lang/tomet/total?style=flat-square&color=orange)
+![npm](https://img.shields.io/npm/v/@tomet/wasm?style=flat-square&color=blue)
 
-| ![license](https://img.shields.io/github/license/tomet-lang/tomet?style=flat-square&color=brightgreen)
-[release](https://github.com/tomet-lang/tomet/releases)
-| ![downloads](https://img.shields.io/github/downloads/tomet-lang/tomet/total?style=flat-square&color=orange)
-[npm](https://www.npmjs.com/package/@tomet/wasm)
-| ![npm](https://img.shields.io/npm/v/@tomet/wasm?style=flat-square&color=blue)
-
-[VS Code Marketplace](https://vsmarketplacebadges.dev/version/tomet-lang.tomet.svg)
-
-| ![](https://marketplace.visualstudio.com/items?itemName=tomet-lang.tomet)
-[Installs](https://vsmarketplacebadges.dev/installs-short/tomet-lang.tomet.svg)
-| ![](https://marketplace.visualstudio.com/items?itemName=tomet-lang.tomet)
+![VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=tomet-lang.tomet)
+![Installs](https://marketplace.visualstudio.com/items?itemName=tomet-lang.tomet)
 
 Tome to me!!
 

@@ -1,94 +1,89 @@
 @config(
   export: {
     type: commonmark,
-    path: "README.ja.md"
+    path: "README.md"
   }
 )
-@meta{ id: doc-gCzNE6yl }
+@meta{
+  id: doc-readme,
+  lang: en
+}
 
-$macro.generated_by(self.path)
-
-@callout(warning)
-| Tometは現在開発中であり、日々構文や仕様が大きく変わっています。
-| 試す際には、バックアップを取り実運用をしないでください。
+${macro.generated_by(self.path)}
 
 =[ Tomet ]
 
-@link[license]("https://github.com/tomet-lang/tomet")
-| @embed(url:"https://img.shields.io/github/license/tomet-lang/tomet?style=flat-square&color=brightgreen")[license]
-\@link[release]("https://github.com/tomet-lang/tomet/releases")
-| @embed(url:"https://img.shields.io/github/downloads/tomet-lang/tomet/total?style=flat-square&color=orange")[downloads]
-\@link[npm]("https://www.npmjs.com/package/@tomet/wasm")
-| @embed(url:"https://img.shields.io/npm/v/@tomet/wasm?style=flat-square&color=blue")[npm]
-
-@link[VS Code Marketplace](https://vsmarketplacebadges.dev/version/tomet-lang.tomet.svg)
-| @embed(url:"https://marketplace.visualstudio.com/items?itemName=tomet-lang.tomet")
-\@link[Installs](https://vsmarketplacebadges.dev/installs-short/tomet-lang.tomet.svg)
-| @embed(url:"https://marketplace.visualstudio.com/items?itemName=tomet-lang.tomet")
-
 Tome to me!!
 
-==[ What is tomet? ]
+Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and Rust toolchain designed as a modern alternative.
 
--. 人間工学的見やすさ。
--. パーサーにも優しい。
--. 拡張性を担保
--. key:valueを重視
--. 私は、研究目的。
+==[ Example ]
 
-==[ なぜtometを使用するのか？ ]
+```tm
+@meta{id: doc-asdfadsf}
 
--. 非曖昧な構文
--. リンクと変数に特化。
--. 統一された記法
--. ふりがなが簡単
--. リテラルを保持
+=[ heading ]
 
-@callout(note)
-| MDXやAstroコンポーネントのように、文書の中に型付きデータやコンポーネントを埋め込みたいエンジニア向け
-| ObsidianのDataviewやBasesのように、メタデータとノートを高度に連携させたいKB作成向け
+- list #(tag, tag2, tag3, tag4)
+  -. orderd
 
----[ vs json ]---
+@table
+|[ col1 ][ col2 ][ col3 ]
 
-- key:value構造で張り合える。
-- tmtは、人間ファーストであり、改行ありの長文を挿入するのに長けている。
-- 深いネストには弱い。タイムライン形式は得意なんじゃないかと考える。
+@callout(info)
+| content
+```
 
----[ vs markdown ]---
+==[ Repository Layout ]
 
-- key:valueをブロックに作成可能
-- テンプレート機能
-- 厳密
-- Markdownのように簡潔にかけない。記号が多い
+```
+tomet/
+├── apps/
+│   ├── cli/              # Main CLI binary (`tomet`)
+│   ├── lsp/              # Language Server Protocol implementation (`tomet-lsp`)
+│   └── tui/              # Interactive TUI workbench (`tomet-tui`)
+├── bindings/             # Language bindings (Java, JS, Python)
+├── editors/              # Editor extensions (VS Code, Zed, Helix, Neovim)
+├── crates/
+│   ├── tomet-syntax-*    # Syntax layer: cst, lexer, parser, ast, tree
+│   ├── tomet-semantics*  # Semantics layer: semantics, validator, compute, resolver
+│   ├── tomet-transform/  # In-memory AST refactoring & macro rewrite engine
+│   ├── tomet-convert-*   # Document format converters: html, markdown, typst, pandoc
+│   ├── tomet-format-*    # Source output: formatter, printer, style, field-utils
+│   ├── tomet-workspace*  # Multi-file I/O: workspace, indexer, links, config
+│   ├── tove/             # TOVE data language parser and Serde adapter
+│   └── tree-sitter-tomet/# Tree-sitter grammar for editor syntax highlighting
+└── tmtroot/              # Canonical source documents and generated API docs
+    ├── generated/crates/ # Generated API docs for workspace crates
+    ├── docs/             # Specs, design notes, and guides
+    └── locales/          # Multilingual localized documentation (e.g. ja/)
+```
 
----[ vs xml/html ]---
+==[ Building and Testing ]
 
-- 文字が少ない
-- 深いネストを作成しない
+===[ Build workspace ]
+```bash
+cargo build
+```
 
----[ vs typst ]---
+===[ Run tests ]
+```bash
+cargo test --workspace
+```
 
-- テキストファースト
-- PDF無理
-- HTML/Markdown、他の記法を組み込める。
-- @mark[文書を美しく組版するための言語]
-- 意味を持った構造を記述し、それを様々な方法で消費できる言語
-- データとしての読み書き可能。
+===[ Run tree-sitter tests ]
+```bash
+cargo test -p tree-sitter-tomet
+```
 
----[ vs mdx ]---
+==[ Packaging ]
 
-- Javascript非依存
+Nix is the packaging story. `nix/pkgs/tomet.nix` and `nix/pkgs/vscode-extension.nix` build the CLI and the VS Code extension; `nix/dev.nix` is the dev shell.
 
-==[ 構造上の弱点 ]
+==[ Finding your way around ]
 
--. 視覚的ノイズとタイピング摩擦。記号の渋滞 (LSP機能を大切に)
--. Markdown非完全互換
-
-=[ Supported Editors ]
-
-- Helix
-- Neovim
-- VSCode
-- Zed
-
----[ Community Support ]---
+- Crate layers and the dependency direction between them: the `crate-layering` entry in @file(.writ.tmt).
+- What a crate is and why it exists: that crate's `//!` module doc and @dir(tmtroot/generated/crates/).
+- What a crate depends on: its @file(Cargo.toml).
+- What the CLI does: `tomet --help`.
+- Multilingual docs: Japanese documentation lives under @dir(tmtroot/locales/ja/) (exported to @file(README.ja.md)).

@@ -1,3 +1,5 @@
+<!-- Generated from tmtroot/readme.tmt. Edit that, then `tomet export .`. -->
+
 # Tomet
 
 Tome to me!!
@@ -15,12 +17,10 @@ Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and 
   -. orderd
 
 @table
-|[][][]
+|[ col1 ][ col2 ][ col3 ]
 
 @callout(info)
 | content
-
-=
 ```
 
 ## Repository Layout
@@ -35,44 +35,48 @@ tomet/
 ├── editors/              # Editor extensions (VS Code, Zed, Helix, Neovim)
 ├── crates/
 │   ├── tomet-syntax-*    # Syntax layer: cst, lexer, parser, ast, tree
-│   ├── tomet-semantics*  # Semantics layer: semantics, validator, compute (eval), resolver (linker)
+│   ├── tomet-semantics*  # Semantics layer: semantics, validator, compute, resolver
 │   ├── tomet-transform/  # In-memory AST refactoring & macro rewrite engine
-│   ├── tomet-convert-*   # Document format converters: html, markdown, typst
+│   ├── tomet-convert-*   # Document format converters: html, markdown, typst, pandoc
 │   ├── tomet-format-*    # Source output: formatter, printer, style, field-utils
 │   ├── tomet-workspace*  # Multi-file I/O: workspace, indexer, links, config
 │   ├── tove/             # TOVE data language parser and Serde adapter
 │   └── tree-sitter-tomet/# Tree-sitter grammar for editor syntax highlighting
-└── docs/                 # Architecture notes, spec, and documentation
+└── tmtroot/              # Canonical source documents and generated API docs
+    ├── generated/crates/ # Generated API docs for workspace crates
+    ├── docs/             # Specs, design notes, and guides
+    └── locales/          # Multilingual localized documentation (e.g. ja/)
 ```
 
 ## Building and Testing
 
 ### Build workspace
+
 ```bash
 cargo build
 ```
 
 ### Run tests
+
 ```bash
 cargo test --workspace
 ```
 
 ### Run tree-sitter tests
+
 ```bash
 cargo test -p tree-sitter-tomet
 ```
 
 ## Packaging
 
-Nix is the packaging story. `nix/pkgs/tomet.nix` and
-`nix/pkgs/vscode-extension.nix` build the CLI and the VS Code extension;
-`nix/dev.nix` is the dev shell.
+Nix is the packaging story. `nix/pkgs/tomet.nix` and `nix/pkgs/vscode-extension.nix` build the CLI and the VS Code extension; `nix/dev.nix` is the dev shell.
 
 ## Finding your way around
 
-- Crate layers and the dependency direction between them: the
-  `crate-layering` entry in `.writ.tmt`.
-- What a crate is and why it exists: that crate's `//!` module doc.
+- Crate layers and the dependency direction between them: the `crate-layering` entry in `.writ.tmt`.
+- What a crate is and why it exists: that crate's `//!` module doc and `tmtroot/generated/crates/`.
 - What a crate depends on: its `Cargo.toml`.
 - What the CLI does: `tomet --help`.
-- The language itself: `docs/README.tmt` is the map.
+- Multilingual docs: Japanese documentation lives under `tmtroot/locales/ja/` (exported to `README.ja.md`).
+
