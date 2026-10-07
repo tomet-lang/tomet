@@ -6,6 +6,31 @@
 
 =[ tomet-ast ]
 
+==[ tomet-ast ]
+
+Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
+`Inline`, `Element`, `Value`, `Position`, `Span`).
+
+==[ Design Policy ]
+
+- Pure Data Models & Structural Accessors Only:
+
+`tomet-ast` is the foundational dependency-free crate referenced across the workspace.
+It contains only struct/enum definitions and pure inherent methods for construction
+(`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`, `Span::union()`).
+
+- Clear Crate Boundaries:
+  - [ Semantics: Classification of element meanings (links, `@meta`, `@config`) lives in `tomet-semantics`.
+      Traversal & Manipulation: Generic tree traversal algorithms live in `tomet-tree`.
+      Formatting & Printing: Serialization to `.tmt` text lives in `tomet-style` and `tomet-printer`.
+      Validation: Field formatting and lint validation live in `tomet-validator`. ]
+
+- Span Equality Contract:
+
+`Span` implements a custom `PartialEq` that always returns `true` so that structural
+equality comparisons (`assert_eq!(doc1, doc2)`) ignore source positions. Use
+[`Span::exact_eq()`] when exact source position comparisons are required.
+
 ==[ Module cst_ast ]
 
 Typed AST wrappers over Rowan's [`SyntaxNode`].

@@ -5,3 +5,23 @@
 }
 
 =[ tomet-python ]
+
+Python bindings for the Tomet document engine using PyO3.
+
+==[ Overview ]
+
+Provides native Python interoperability for parsing Tomet documents, loading
+TOVE data into Python dictionaries, and converting documents into HTML,
+Markdown, Typst, and Pandoc formats. It also exposes document formatting,
+printing, and validation.
+
+==[ Key Functions ]
+
+- `loads`: Parse a data-only `.tmt` document into native Python objects.
+- `parse_document`: Parse full `.tmt` markup text into a Python AST dictionary.
+- `to_html`: Convert `.tmt` source or AST dictionary into an HTML body string.
+- `to_markdown`: Convert `.tmt` source or AST dictionary into CommonMark.
+- `to_typst`: Convert `.tmt` source or AST dictionary into Typst.
+- `to_pandoc`: Convert `.tmt` source or AST dictionary into Pandoc JSON.
+- `format`: Format `.tmt` source text with the canonical formatter.
+- `validate`: Validate `.tmt` source against semantic constraints.

@@ -9,8 +9,10 @@
 - @link(ref:"readme")
 - @link(ref:"contributing")
 - @link(ref:"agents")
-- ${filter(contains(path, "docs/"), by(path))}
-- ${filter(contains(path, "generated/"), by(path))}
+- ドキュメント
+  - ${filter(contains(path, "docs/"), by(path))}
+- クレート
+  - ${filter(contains(path, "generated/"), by(path))}
 
 - 何がどこにあるか
   - ${filter(contains(path, "tmtroot/docs/moc/"), by(path))}

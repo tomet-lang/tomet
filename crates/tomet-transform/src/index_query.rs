@@ -3,21 +3,21 @@
 //! entries it selects, in place among whatever else the author wrote by
 //! hand.
 //!
-//! # Why this is not a builtin function
+//! =[ Why this is not a builtin function ]
 //!
 //! Every other `${...}` evaluates to a single `Value` and renders as
-//! text. `filter` expands into *several* AST nodes, so it can never go
+//! text. `filter` expands into @em[several] AST nodes, so it can never go
 //! through `tomet_compute::call`'s one-value path. This pass therefore
-//! pattern-matches `filter` as an **unevaluated** `InterpExpr::Call` and
+//! pattern-matches `filter` as an @strong[unevaluated] `InterpExpr::Call` and
 //! reads its argument list as a small query language. Its arguments are
 //! ordinary expressions and are evaluated the ordinary way, once per
 //! candidate file.
 //!
 //! `by(...)` is read here for the same reason, and a smaller one: it
-//! names a *field* rather than a value, so evaluating it would resolve
+//! names a @em[field] rather than a value, so evaluating it would resolve
 //! the very path the sort needs to keep.
 //!
-//! # Why the rows arrive as a parameter
+//! =[ Why the rows arrive as a parameter ]
 //!
 //! Building the table means reading every `.tmt` in the vault, and this
 //! crate sits below the one allowed to do that (`crate-layering` in the
@@ -25,9 +25,9 @@
 //! layer 5). So the I/O happens there, the table arrives here as plain
 //! data, and this pass stays pure and testable without a directory.
 //!
-//! # Absent, versus nobody has it
+//! =[ Absent, versus nobody has it ]
 //!
-//! Every row's evaluation context is given *every* field path any row in
+//! Every row's evaluation context is given @em[every] field path any row in
 //! the table has, with [`Value::Null`] for the ones this row lacks. That
 //! is what makes `exists(meta.draft)` answerable -- an unfilled context
 //! would fail to resolve the name instead of reporting it absent.

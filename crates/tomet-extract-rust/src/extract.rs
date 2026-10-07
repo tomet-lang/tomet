@@ -441,7 +441,26 @@ fn parse_doc_to_blocks(doc_text: &str, parent_level: usize) -> Vec<Block> {
         shift_section_levels(&mut blocks, offset);
     }
 
-    blocks
+    flatten_sections(blocks)
+}
+
+/// Lays sections and their child blocks out as flat siblings so that
+/// `tomet-printer` emits blank lines between blocks, preserving block-level
+/// context (e.g. preventing block elements like `@table` from collapsing into
+/// adjacent paragraphs as inline elements). The parser re-nests sections upon reading.
+fn flatten_sections(blocks: Vec<Block>) -> Vec<Block> {
+    let mut flat = Vec::new();
+    for b in blocks {
+        match b {
+            Block::Section(mut sec) => {
+                let inner = std::mem::take(&mut sec.blocks);
+                flat.push(Block::Section(sec));
+                flat.extend(flatten_sections(inner));
+            }
+            other => flat.push(other),
+        }
+    }
+    flat
 }
 
 fn find_min_section_level(blocks: &[Block]) -> Option<usize> {
@@ -643,5 +662,23 @@ pub struct MyStruct;
         assert!(printed.contains("====[Overview]"));
         // Deep Detail was +2 deeper (level 5), so it becomes level 6 (4 + 2)
         assert!(printed.contains("======[Deep Detail]"));
+    }
+
+    #[test]
+    fn test_extract_doc_comment_table_has_blank_lines() {
+        let src = r#"//! =[ Features ]
+//!
+//! Description text:
+//!
+//! @table
+//! |[ a ][ b ]
+//! |[ 1 ][ 2 ]
+//!
+//! Footer text.
+"#;
+        let doc = extract_file_doc("test-table", src, &RustExtractOptions::default()).unwrap();
+        let printed = tomet_printer::document_to_tm(&doc);
+        assert!(printed.contains("==[Features]\n\nDescription text:\n\n@table"));
+        assert!(printed.contains("[ 1 ][ 2 ]]\n\nFooter text."));
     }
 }

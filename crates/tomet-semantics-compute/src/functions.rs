@@ -6,7 +6,7 @@
 //! document-display context than silent truncation); `mod` keeps integer
 //! remainder for two `Int`s, otherwise floating-point remainder.
 //!
-//! # Predicates
+//! =[ Predicates ]
 //!
 //! `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`contains`/`exists`/`and`/`or`/`not`
 //! answer yes-or-no questions about a value. They exist for `${filter(...)}`
@@ -19,18 +19,18 @@
 //!
 //! Three decisions a caller can see:
 //!
-//! - **Ordering accepts two numbers or two strings, nothing else.** Two
+//! - @strong[Ordering accepts two numbers or two strings, nothing else.] Two
 //!   strings compare bytewise, which is the whole reason strings are
 //!   allowed: an ISO-8601 date sorts correctly as text, so
 //!   `gte(meta.created, "2026-01-01")` works without a date type. A
 //!   mixed pair is [`ComputeError::NotComparable`] rather than a silent
 //!   `false`, because a predicate that quietly matches nothing is
 //!   indistinguishable from one that legitimately found nothing.
-//! - **`Int` and `Float` compare as numbers throughout**, so `eq(1, 1.0)`
+//! - @strong[`Int` and `Float` compare as numbers throughout], so `eq(1, 1.0)`
 //!   is true and agrees with `gte(1, 1.0)`. Falling back to `Value`'s
 //!   derived `PartialEq` for equality alone would let `eq` and `gte`
 //!   disagree about the same pair, which an author has no way to see.
-//! - **`and`/`or` do not short-circuit.** Arguments are evaluated by the
+//! - @strong[`and`/`or` do not short-circuit.] Arguments are evaluated by the
 //!   caller before dispatch reaches here, so `or(exists(a), div(1, 0))`
 //!   still fails on the division. Making it otherwise means `and`/`or`
 //!   taking unevaluated expression trees, which is the shape `filter`

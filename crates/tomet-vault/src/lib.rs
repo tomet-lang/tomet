@@ -15,7 +15,7 @@
 //! [`Vault::from_sources`] and gets the same verdicts, because both go
 //! through the same rules (`LoadedVocabularies::add` in `tomet-semantics`).
 //!
-//! # wasm
+//! =[ wasm ]
 //!
 //! This crate, and `tomet` and `tomet-load` above it, compile for
 //! `wasm32-unknown-unknown` (the host supplies `getrandom`'s `js` feature,
@@ -25,7 +25,7 @@
 //! parse through `from_sources` added about 1% to the module and reaching
 //! `tomet-load` as well added about 0.3% more.
 //!
-//! # Preparing
+//! =[ Preparing ]
 //!
 //! `${filter(...)}` in an `@kind(doc.index)` document is answered from a
 //! table of every document in the vault. Building that table is a walk of

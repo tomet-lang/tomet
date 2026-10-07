@@ -6,19 +6,26 @@
 
 =[ tomet-links ]
 
-Broken-link checking for a vault of `.tmt`/`.tmt` files: extracts every
-`File`/`Embed`/`Tm`/`Ref` link (`Url`/`Id` are out of scope -- external
-URLs need network requests, not a parsing/caching problem; `id:`
-is a same-document id lookup with no cross-file aspect, better suited
-to `tomet-validator` as a separate lint), caches the extraction
-per source file keyed by mtime (so re-checking a large vault doesn't
-re-parse every unchanged file), and resolves every target against
-what actually exists on disk -- `File`/`Embed`/`Tm` by path (see
-`check`'s module doc for the exact resolution rules), and `Ref` by a
-project-wide filename/stem search (`ref` values are names, not
-paths).
+==[ tomet-links ]
 
-This crate is the "I/O and file resolution are allowed here" layer
-for link-checking, analogous to `tomet-resolver`'s role for
-`@settings(file:...)`/`${...}` resolution -- kept separate from that
-crate since resolver's own scope is narrower and unrelated.
+Vault-wide broken-link detection, target resolution, and SQLite-backed mtime caching.
+
+==[ Architecture & Responsibilities ]
+
+- Vault-Wide Link Integrity & Resolution Layer:
+
+`tomet-links` scans workspaces and checks `File`, `Embed`, `Tm`, and `Ref` links
+for validity against real files on disk. External URLs (`Url`) and intra-document
+identifiers (`Id`) are deliberately excluded (network checkers or `tomet-validator`).
+
+- Link Target Resolution Rules:
+  - [ `./` or `../`: Relative to referencing file's directory.
+      `/`: OS-absolute path.
+      Bare string: Relative to project root.
+      `Ref`: Case/extension-insensitive matching against file names and stems (wikilink convention).
+      `Tm`: Project-root-relative path with `#fragment` stripped. ]
+
+- SQLite Incremental Cache ([`LinkCache`]):
+
+A cache database in `~/.cache/tomet/links.sqlite3` avoids re-parsing unchanged
+files across runs based on filesystem modification timestamps (`mtime`).

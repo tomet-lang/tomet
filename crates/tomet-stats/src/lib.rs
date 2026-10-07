@@ -6,20 +6,20 @@
 //! queries, making it suitable for WebAssembly, mobile apps, and parallel
 //! processing pipelines.
 //!
-//! # Counting rules
+//! =[ Counting rules ]
 //!
-//! - **Characters**: Reader-visible prose text inside `[...]` and section
+//! - @strong[Characters] : Reader-visible prose text inside `[...]` and section
 //!   headings, with whitespace omitted. `(args)`, `{value}`, and code block
 //!   bodies (`Inline::Raw`) are data, not prose, and are not counted.
-//! - **Characters with whitespace**: Same reader-visible prose text, including
+//! - @strong[Characters with whitespace] : Same reader-visible prose text, including
 //!   whitespace characters.
-//! - **Words**: Reader-visible prose text split by Unicode whitespace.
-//! - **Elements**: Counts by sigil (`@name`, `${...}`, `^...`, `- ...`) and by
+//! - @strong[Words] : Reader-visible prose text split by Unicode whitespace.
+//! - @strong[Elements] : Counts by sigil (`@name`, `${...}`, `^...`, `- ...`) and by
 //!   element name.
-//! - **Links**: Structural internal document links (`file`, `dir`, `embed`,
+//! - @strong[Links] : Structural internal document links (`file`, `dir`, `embed`,
 //!   `tm`, `ref`). External web URLs and same-document `#id` links are not
 //!   counted as workspace document links.
-//! - **Headings**: Count of section headings and maximum heading depth.
+//! - @strong[Headings] : Count of section headings and maximum heading depth.
 
 use std::collections::BTreeMap;
 

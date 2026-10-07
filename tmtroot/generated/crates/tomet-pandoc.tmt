@@ -24,7 +24,7 @@ handled by `tomet_semantics::flatten`, whose rule the HTML writer
 shares -- a readable projection plus an exact JSON copy whenever the
 projection would lose something.
 
-# Why a JSON bridge
+==[ Why a JSON bridge ]
 
 Two alternatives were considered and rejected.
 

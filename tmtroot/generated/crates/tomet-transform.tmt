@@ -76,7 +76,7 @@ may write, and the pass that replaces it with the `@link(ref:...)`
 entries it selects, in place among whatever else the author wrote by
 hand.
 
-# Why this is not a builtin function
+===[ Why this is not a builtin function ]
 
 Every other `${...}` evaluates to a single `Value` and renders as
 text. `filter` expands into @em[several] AST nodes, so it can never go
@@ -90,7 +90,7 @@ candidate file.
 names a @em[field] rather than a value, so evaluating it would resolve
 the very path the sort needs to keep.
 
-# Why the rows arrive as a parameter
+===[ Why the rows arrive as a parameter ]
 
 Building the table means reading every `.tmt` in the vault, and this
 crate sits below the one allowed to do that (`crate-layering` in the
@@ -98,7 +98,7 @@ root `.writ.tmt`: `tomet-transform` is layer 4, `tomet-indexer` is
 layer 5). So the I/O happens there, the table arrives here as plain
 data, and this pass stays pure and testable without a directory.
 
-# Absent, versus nobody has it
+===[ Absent, versus nobody has it ]
 
 Every row's evaluation context is given @em[every] field path any row in
 the table has, with [`Value::Null`] for the ones this row lacks. That
@@ -135,7 +135,7 @@ there is no sensible answer to what that means.
 
 Resolving `${...}` before anything renders.
 
-# Why this is a pass and not a renderer's job
+===[ Why this is a pass and not a renderer's job ]
 
 It was a renderer's job, four times over, and the four disagreed:
 markdown evaluated with an [`EvaluationContext`], HTML evaluated
@@ -149,7 +149,7 @@ job, so it is settled here, once, before any converter sees the tree --
 and a converter that never meets an `InterpExpr` has nothing left to
 disagree about.
 
-# What a failure does
+===[ What a failure does ]
 
 Nothing is dropped and nothing is fatal. An expression that cannot be
 resolved is replaced by its own source spelling, so the output shows
@@ -158,7 +158,7 @@ resolved is replaced by its own source spelling, so the output shows
 document that shows `${...}` as an example working, while still giving
 a typo somewhere to surface.
 
-# `filter` is not ours
+===[ `filter` is not ours ]
 
 `${filter(...)}` is an index query: it expands into several elements
 rather than into text, and [`crate::index_query`] owns it. It is

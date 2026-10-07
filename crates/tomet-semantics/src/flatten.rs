@@ -4,7 +4,7 @@
 //! pairs and nothing more -- HTML's `data-*`, Pandoc's `Attr`. A Tomet
 //! value is a tree, so something has to give.
 //!
-//! The rule is **a readable projection plus an exact copy**: scalars and
+//! The rule is @strong[a readable projection plus an exact copy] -- scalars and
 //! sequences of scalars keep their own flat entry, and whenever that
 //! projection would lose something -- a map anywhere, or a sequence
 //! holding one -- the whole group is additionally serialized as JSON
@@ -14,7 +14,7 @@
 //! Dotted keys (`m.k` for a nested `k` inside `m`) were considered and
 //! rejected: a Tomet map key may itself contain `.` (the repository's own
 //! `default.config.tmt` has `"url.wiki"`), so `m.k` would be ambiguous
-//! between a nested lookup and a flat key of that name. Element *names*
+//! between a nested lookup and a flat key of that name. Element @em[names]
 //! use `.` as a namespace separator, but map keys deliberately do not.
 
 use tomet_ast::{Element, Value};

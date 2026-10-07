@@ -17,7 +17,7 @@
 //! already carried three of the four dependencies, so the cheaper change
 //! was available and was not taken for that reason.
 //!
-//! # Two levels, because vocabularies belong to a vault
+//! =[ Two levels, because vocabularies belong to a vault ]
 //!
 //! [`Vault::discover`] pays for config discovery and vocabulary loading
 //! once. [`Vault::document`] is per file. Collapsing the two into a single
@@ -26,15 +26,15 @@
 //! times eighty-five documents in this repository. [`load_document`] is
 //! for the case where there genuinely is one document.
 //!
-//! # A fifth step, for output
+//! =[ A fifth step, for output ]
 //!
-//! The four steps above produce the document *as written*. Something that
+//! The four steps above produce the document @em[as written]. Something that
 //! is about to render it needs one more: the AST rewrites that have to
 //! happen before any converter sees the tree. An index document's
 //! `${filter(...)}` is one -- it expands into several `@link(ref:...)`
 //! entries, so it cannot be a renderer's job the way `${gh(12)}` can.
 //!
-//! That step is [`Vault::prepare`], and it is deliberately **not** part of
+//! That step is [`Vault::prepare`], and it is deliberately @strong[not] part of
 //! [`Vault::document`]. It reads every `.tmt` in the vault, and a caller
 //! that wants one file read correctly must not pay for a directory walk --
 //! `bindings/js` parses a single string in a browser. So the two are
@@ -47,7 +47,7 @@
 //! already has in hand, the second goes to disk for it. A caller that
 //! formats its own parse errors (the CLI does) wants `parse` + `prepare`.
 //!
-//! ## Who prepares, and who must not
+//! ==[ Who prepares, and who must not ]
 //!
 //! Anything producing output does: `export`, `html` (and so `serve`),
 //! `to-md`, `to-typst`, `to-pandoc`. They read through this crate for that
@@ -55,7 +55,7 @@
 //! decided four different ways, one per converter.
 //!
 //! The LSP must not, and is deliberately left out. An editor wants the
-//! document *as written*: rewriting the tree under the cursor would move
+//! document @em[as written] -- rewriting the tree under the cursor would move
 //! every span the editor maps positions with. `tomet check` is the middle
 //! case -- it prepares a copy to report what could not be resolved, and
 //! validates the original.

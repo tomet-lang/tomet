@@ -14,7 +14,7 @@
 //! (`js`: `tomet-links`, `tomet-transform`, `tomet-lexer`) is what is
 //! missing here.
 //!
-//! # Reading a document
+//! =[ Reading a document ]
 //!
 //! Go through [`Vault`]. It finds the config that governs the file, loads
 //! the vocabularies that config declares, parses, and binds names -- the
@@ -39,22 +39,22 @@
 //! data-only document -- `key: value` entries, no headings, prose or
 //! top-level elements -- so there is no vocabulary for it to skip.
 //!
-//! # Features
+//! =[ Features ]
 //!
 //! [`semantics`] and [`validator`] are always present: they are pure, and
 //! reading a document already depends on the first. Everything that leaves
 //! the AST is opt-in, so a reader-only consumer
 //! compiles nothing it does not use. Each feature adds one module:
 //!
-//! | feature    | module            | from                 |
-//! |------------|-------------------|----------------------|
-//! | `html`     | [`html`]          | `tomet-html`         |
-//! | `markdown` | [`markdown`]      | `tomet-markdown`     |
-//! | `typst`    | [`typst`]         | `tomet-typst`        |
-//! | `pandoc`   | [`pandoc`]        | `tomet-pandoc`       |
-//! | `format`   | [`mod@format`]    | `tomet-formatter`    |
-//! | `printer`  | [`printer`]       | `tomet-printer`      |
-//! | `stats`    | [`stats`]         | `tomet-stats`        |
+//! @table
+//! |[ feature ][ module ][ from ]
+//! |[ `html` ][ [`html`] ][ `tomet-html` ]
+//! |[ `markdown` ][ [`markdown`] ][ `tomet-markdown` ]
+//! |[ `typst` ][ [`typst`] ][ `tomet-typst` ]
+//! |[ `pandoc` ][ [`pandoc`] ][ `tomet-pandoc` ]
+//! |[ `format` ][ [`mod@format`] ][ `tomet-formatter` ]
+//! |[ `printer` ][ [`printer`] ][ `tomet-printer` ]
+//! |[ `stats` ][ [`stats`] ][ `tomet-stats` ]
 //!
 //! Output-producing conversions want a document that has been through
 //! [`Vault::prepare`] first; see `tomet-load` for why that is a separate

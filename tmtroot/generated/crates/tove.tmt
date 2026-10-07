@@ -6,15 +6,24 @@
 
 =[ tove ]
 
-# TOVE (Tomet Object & Value Expression)
+==[ tove ]
 
 A lightweight, expressive data language and parser crate for Tomet.
+
+==[ Overview ]
 
 TOVE provides:
 
 - Pure syntax parsing for values, maps, sequences (`list(...)`), and expressions into [`Value`].
 - Serde integration ([`from_str`], [`to_string`]) for serializing and deserializing Rust types.
 - AST and parser primitives shared with the document-level parser (`tomet-syntax-parser`).
+
+==[ Key Functions ]
+
+- `from_str`: Parse a TOVE data document into a Rust type via Serde.
+- `to_string`: Render a Rust type into TOVE data text via Serde.
+- `from_value`: Convert a [`Value`] into a Rust type via Serde deserializer.
+- `to_value`: Convert a Rust type into a [`Value`] via Serde serializer.
 
 ==[ Module de ]
 

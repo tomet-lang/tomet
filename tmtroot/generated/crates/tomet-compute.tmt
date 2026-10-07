@@ -6,12 +6,29 @@
 
 =[ tomet-compute ]
 
-Evaluates a `${...}` interpolation's parsed `InterpExpr` --
-`tomet-parser`/`tomet-ast` own the grammar and syntax tree;
-this crate adds evaluation semantics on top. `Identifier`/`Member`
-sub-expressions resolve via `tomet-resolver` (this crate has no id
-lookup of its own); a `Call` dispatches to a builtin function
-(`functions.rs`) after recursively evaluating its args.
+==[ tomet-compute ]
+
+Expression evaluation for `${...}` interpolation expressions ([`InterpExpr`])
+and built-in math functions.
+
+==[ Architecture & Responsibilities ]
+
+- Pure Compute Boundary (Zero I/O):
+
+`tomet-compute` performs dynamic expression evaluation for Tomet interpolation
+expressions (`${...}`). It performs zero I/O: identifier and member lookups
+(`${node.member}`) are delegated to `tomet-resolver::resolve_reference`.
+
+- Expression Evaluation:
+  - [ `Literal`: Evaluates directly to [`Value::Int`], [`Value::Float`], or [`Value::String`].
+      `Identifier` / `Member`: Resolves against [`Document`] through `tomet_resolver`.
+      `Call`: Recursively evaluates argument expressions, then dispatches to builtin functions. ]
+
+- Builtin Numeric Functions:
+
+`add`, `sub`, `mul`, `div`, `mod`. Type promotion produces integers when both arguments
+are integers, or floats when mixing. Integer overflow automatically promotes to `f64`
+rather than panicking. `div` provides true division (e.g. `div(7, 2)` produces `3.5`).
 
 ==[ Structs ]
 

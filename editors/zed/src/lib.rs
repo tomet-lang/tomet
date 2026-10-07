@@ -1,3 +1,15 @@
+//! Zed editor extension for the Tomet document language.
+//!
+//! =[ Overview ]
+//!
+//! Provides Zed editor support for Tomet files (`.tmt`), integrating syntax
+//! highlighting and launching the language server (`tomet-lsp`).
+//!
+//! =[ Language Server ]
+//!
+//! The extension locates `tomet-lsp` on `$PATH` within the worktree environment
+//! and connects it to Zed's language server protocol client.
+
 use zed_extension_api::{self as zed, LanguageServerId, Result};
 
 struct TometExtension;

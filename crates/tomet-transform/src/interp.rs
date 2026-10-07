@@ -1,6 +1,6 @@
 //! Resolving `${...}` before anything renders.
 //!
-//! # Why this is a pass and not a renderer's job
+//! =[ Why this is a pass and not a renderer's job ]
 //!
 //! It was a renderer's job, four times over, and the four disagreed:
 //! markdown evaluated with an [`EvaluationContext`], HTML evaluated
@@ -14,7 +14,7 @@
 //! and a converter that never meets an `InterpExpr` has nothing left to
 //! disagree about.
 //!
-//! # What a failure does
+//! =[ What a failure does ]
 //!
 //! Nothing is dropped and nothing is fatal. An expression that cannot be
 //! resolved is replaced by its own source spelling, so the output shows
@@ -23,7 +23,7 @@
 //! document that shows `${...}` as an example working, while still giving
 //! a typo somewhere to surface.
 //!
-//! # `filter` is not ours
+//! =[ `filter` is not ours ]
 //!
 //! `${filter(...)}` is an index query: it expands into several elements
 //! rather than into text, and [`crate::index_query`] owns it. It is

@@ -6,6 +6,16 @@
 
 =[ tomet-cli ]
 
-A small CLI for manually checking that `tomet-parser`/
-`tove` actually work against a real `.tmt` file, instead of
-only trusting `cargo test`'s unit tests.
+Command-line interface and developer tools for the Tomet toolchain.
+
+==[ Overview ]
+
+Provides the `tomet` command-line executable, orchestrating parser, resolver,
+validator, formatter, and converter components for `.tmt` document processing.
+
+==[ Subcommands ]
+
+- @strong[Inspection & Validation] : `check`, `check-links`, `ast`, `roundtrip`, and `stats`.
+- @strong[Transformation & Formatting] : `format` and `refactor`.
+- @strong[Converters] : `html`, `to-md`, `from-md`, `to-typst`, `to-pandoc`, `from-pandoc`, and `export`.
+- @strong[Documentation & Ecosystem] : `api`, `cli-docs`, `tui`, and `serve`.

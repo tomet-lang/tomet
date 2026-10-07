@@ -6,13 +6,42 @@
 
 =[ tomet-semantics ]
 
-I/O-free classification of what a parsed `Element` officially means --
-recognizing Tomet's own built-in vocabulary (`@meta`, `@config`,
-`@links`, `@link`, ...) by name only (no inference from `args`) -- plus
-small `Document`-level lookups (`document_meta`) built directly on top
-of that classification. Depends only on `tomet-ast`; consumers
-(`tomet-html`, `tomet-markdown`, the CLI/TUI) use this instead
-of each carrying their own copy of this logic.
+==[ tomet-semantics ]
+
+I/O-free semantic classification and normalization layer for Tomet AST elements.
+
+==[ Architecture & Responsibilities ]
+
+- Pure I/O-Free Semantic Layer:
+
+`tomet-semantics` is strictly a pure classification and semantic extraction layer.
+It performs zero I/O and depends exclusively on `tomet-ast` (not `tomet-parser`),
+allowing downstream consumers (`tomet-html`, `tomet-markdown`, `tomet-links`,
+`tomet-tui`, `tomet-lsp`) to classify elements without pulling in the parser.
+
+==[ Core Capabilities ]
+
+- @strong[Element Classification (`kind`)]: Canonical recognition of Tomet's built-in vocabulary
+
+(`@meta`, `@config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`,
+`codeblock`, `quote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`) via [`ElementKind`].
+
+- @strong[Link Target Extraction (`target`)]: Canonical extraction of link targets and scheme
+
+prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
+
+- @strong[Positional Argument Normalization (`positional`)]: Unifies positional argument mapping
+
+(e.g. `<codeblock>(rust)` -> `{lang: "rust"}`) for built-in and `@settings` custom schemas.
+
+- @strong[Document Configuration (`config`)]: Merges `@config` and `@settings` blocks across
+
+a document into a structured [`DocumentConfig`].
+
+- @strong[Metadata Extraction (`meta`)]: Extracts top-level `@meta` values via [`document_meta`].
+- @strong[Structural Helpers]: Heading level clamping (`heading`), list inspection (`list`),
+
+table parsing (`table`), and connected value merging (`connect`).
 
 ==[ Module embedded ]
 
@@ -90,7 +119,7 @@ Every output format Tomet writes into carries element data as string
 pairs and nothing more -- HTML's `data-*`, Pandoc's `Attr`. A Tomet
 value is a tree, so something has to give.
 
-The rule is @strong[a readable projection plus an exact copy]: scalars and
+The rule is @strong[a readable projection plus an exact copy] -- scalars and
 sequences of scalars keep their own flat entry, and whenever that
 projection would lose something -- a map anywhere, or a sequence
 holding one -- the whole group is additionally serialized as JSON
