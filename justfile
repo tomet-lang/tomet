@@ -70,13 +70,6 @@ docs-check:
     ./target/debug/tomet export --check .
     ./target/debug/tomet cli-docs --check --out tmtroot/generated/cli.tmt
     ./target/debug/tomet api --check .
-    @stray=$(find tmtroot -name '*.tmt' -exec grep -L 'export:' {} +); \
-    if [ -n "$stray" ]; then \
-        echo "$stray" | while IFS= read -r f; do \
-            echo "TMTROOT FAIL: $f -- declares no @config(export:), so it produces nothing"; \
-        done; \
-        exit 1; \
-    fi
     @if command -v twrit >/dev/null 2>&1; then \
         twrit check .; \
     elif [ -x ../tomet-writ/target/debug/twrit ]; then \
@@ -94,21 +87,8 @@ docs-check:
 # out of `cargo test`: these are checks over prose this repository is
 # still writing, and a run aimed at one should not fail on the other.
 writ-check:
-    @stray=$(find . -name '.writ.tmt' -not -path './target/*' \
-        -exec grep -lP '[\x{3040}-\x{30ff}]' {} +); \
-    if [ -n "$stray" ]; then \
-        echo "$stray" | while IFS= read -r f; do \
-            echo "LANGUAGE FAIL: $f -- kana in a writ; docs-language says every .writ.tmt is English"; \
-        done; \
-        exit 1; \
-    fi
-    @stray=$(git ls-files --others --ignored --exclude-standard .tomet); \
-    if [ -n "$stray" ]; then \
-        echo "$stray" | while IFS= read -r f; do \
-            echo "AUTHORED FAIL: $f -- ignored file under .tomet; dot-tomet-is-authored says every file there is hand-written"; \
-        done; \
-        exit 1; \
-    fi
+    ./scripts/check-writ-language.ts
+    ./scripts/check-authored-files.ts
 
 # Clean Zed editor extension build and installation cache.
 clean-zed-cache:

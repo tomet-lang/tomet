@@ -51,6 +51,8 @@ mkShell rec {
     python313
     #== Pandoc
     haskellPackages.pandoc-cli
+    #== Scripts & Tooling
+    deno
     #== VS Code extension @dir(apps/vscode-extension)
     nodejs
     pnpm
