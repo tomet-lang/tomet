@@ -3,9 +3,7 @@
 
   nixConfig = {
     extra-substituters = [ "https://tomet.cachix.org" ];
-    extra-trusted-public-keys = [
-      "tomet.cachix.org-1:9c/iO8Tb6YOM+3r55t12W3fOJK+66itPEaIe8Rs9MDw="
-    ];
+    extra-trusted-public-keys = [ "tomet.cachix.org-1:9c/iO8Tb6YOM+3r55t12W3fOJK+66itPEaIe8Rs9MDw=" ];
   };
 
   inputs = {
@@ -26,16 +24,8 @@
     };
 
     #= Tool
-    twrit = {
-      url = "github:tomet-lang/tomet-writ";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.tomet.follows = "";
-    };
-    tomet-book = {
-      url = "github:tomet-lang/tomet-book";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.tomet.follows = "";
-    };
+    twrit.url = "github:tomet-lang/tomet-writ";
+    tomet-book.url = "github:tomet-lang/tomet-book";
   };
 
   outputs = inputs: import ./nix inputs;
