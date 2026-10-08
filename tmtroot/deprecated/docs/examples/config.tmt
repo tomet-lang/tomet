@@ -27,7 +27,7 @@
     url.main: { type: list, always_newline: true }
   }
   workspace: {
-    ignore: [ "00-09 System/01 Apps/obsidian" ]
+    ignore: list("00-09 System/01 Apps/obsidian")
   }
   migration: {
     meta: {

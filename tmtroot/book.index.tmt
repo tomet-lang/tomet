@@ -13,7 +13,6 @@
   - ${filter(contains(path, "docs/"), by(path))}
 - クレート
   - ${filter(contains(path, "generated/"), by(path))}
-
 - 何がどこにあるか
   - ${filter(contains(path, "tmtroot/docs/moc/"), by(path))}
 - なぜあるのか

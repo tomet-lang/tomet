@@ -1,6 +1,6 @@
 @kind(image)
 @meta{
-  tags: [ a, b ]
+  tags: list(a, b)
 }
 
 =[ 既存のconfig formatの代替 ]

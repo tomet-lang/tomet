@@ -25,13 +25,14 @@ let
 in
 mkShell rec {
   buildInputs = with pkgs; [
+    #= Develop
     tomet
     tomet-lsp
     twrit
     tmtbook
     pagefind
-
-    #= Develop
+    just
+    deno
     #== Build
     pkg-config
     #== CMake
@@ -51,8 +52,6 @@ mkShell rec {
     python313
     #== Pandoc
     haskellPackages.pandoc-cli
-    #== Scripts & Tooling
-    deno
     #== VS Code extension @dir(apps/vscode-extension)
     nodejs
     pnpm
