@@ -2,6 +2,9 @@
 name = "tomet-pandoc"
 version.workspace = true
 edition.workspace = true
+description = "Converts between a Tomet AST document and Pandoc's AST, over Pandoc's JSON encoding."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

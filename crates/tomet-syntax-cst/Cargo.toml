@@ -2,6 +2,9 @@
 name = "tomet-cst"
 version.workspace = true
 edition.workspace = true
+description = "Concrete Syntax Tree (CST) foundation for Tomet, powered by rowan."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 rowan = { workspace = true }

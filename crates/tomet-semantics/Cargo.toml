@@ -2,6 +2,9 @@
 name = "tomet-semantics"
 version.workspace = true
 edition.workspace = true
+description = "I/O-free semantic classification and normalization layer for Tomet AST elements."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

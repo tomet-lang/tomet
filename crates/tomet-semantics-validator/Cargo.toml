@@ -2,6 +2,9 @@
 name = "tomet-validator"
 version.workspace = true
 edition.workspace = true
+description = "Read-only .tmt document schema, blueprint, and lint validation."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

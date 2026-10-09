@@ -2,6 +2,9 @@
 name = "tomet-formatter"
 version.workspace = true
 edition.workspace = true
+description = "Whitespace-hygiene and layout formatter for .tmt source text."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

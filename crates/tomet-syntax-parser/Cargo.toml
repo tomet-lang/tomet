@@ -2,6 +2,9 @@
 name = "tomet-parser"
 version.workspace = true
 edition.workspace = true
+description = "The recursive-descent parser (&str -> Document/Value) and authoritative grammar for Tomet."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

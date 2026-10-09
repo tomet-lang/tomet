@@ -2,6 +2,8 @@
 name = "tomet-extract-rust"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Extract Tomet API documentation from Rust crates using syn"
 
 [dependencies]

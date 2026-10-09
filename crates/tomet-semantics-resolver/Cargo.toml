@@ -2,6 +2,9 @@
 name = "tomet-resolver"
 version.workspace = true
 edition.workspace = true
+description = "Resolves constructs that name another file, such as @config(import:...), in Tomet documents."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

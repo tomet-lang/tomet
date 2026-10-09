@@ -2,6 +2,9 @@
 name = "tomet-ast"
 version.workspace = true
 edition.workspace = true
+description = "Shared AST and Value data models for the Tomet toolchain."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-cst = { workspace = true }

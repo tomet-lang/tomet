@@ -2,6 +2,9 @@
 name = "tomet-config"
 version.workspace = true
 edition.workspace = true
+description = "Configuration discovery, loading, and styling rule definitions for Tomet."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

@@ -2,6 +2,9 @@
 name = "tomet-workspace"
 version.workspace = true
 edition.workspace = true
+description = "Workspace-level batch refactoring, structural search, metadata editing, and I/O execution for Tomet."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

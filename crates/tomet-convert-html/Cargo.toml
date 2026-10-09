@@ -2,6 +2,9 @@
 name = "tomet-html"
 version.workspace = true
 edition.workspace = true
+description = "HTML renderer for Tomet AST documents."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

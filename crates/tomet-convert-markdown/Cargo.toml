@@ -2,6 +2,9 @@
 name = "tomet-markdown"
 version.workspace = true
 edition.workspace = true
+description = "Bidirectional conversion between CommonMark and Tomet AST."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

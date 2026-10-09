@@ -2,6 +2,9 @@
 name = "tomet-extract"
 version.workspace = true
 edition.workspace = true
+description = "Extraction and mapping of Tomet markup embedded inside source code comments."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

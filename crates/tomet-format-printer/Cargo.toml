@@ -2,6 +2,9 @@
 name = "tomet-printer"
 version.workspace = true
 edition.workspace = true
+description = "Serializes a Tomet AST document back to .tmt source text."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

@@ -2,6 +2,9 @@
 name = "tomet-style"
 version.workspace = true
 edition.workspace = true
+description = "Applies Tomet's PrinterConfig style rules to a single document."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

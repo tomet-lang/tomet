@@ -2,6 +2,9 @@
 name = "tree-sitter-tomet"
 version.workspace = true
 edition.workspace = true
+description = "Rust binding for the Tomet tree-sitter grammar."
+license.workspace = true
+repository.workspace = true
 build = "build.rs"
 
 [dependencies]

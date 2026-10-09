@@ -91,53 +91,55 @@ default-members = ["apps/cli"]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tomet-lang/tomet"
 
 [workspace.dependencies]
 #= Syntax
-tomet-ast = { path = "crates/tomet-syntax-ast" }
-tomet-cst = { path = "crates/tomet-syntax-cst" }
-tomet-lexer = { path = "crates/tomet-syntax-lexer" }
-tomet-parser = { path = "crates/tomet-syntax-parser" }
-tomet-tree = { path = "crates/tomet-syntax-tree" }
+tomet-ast = { path = "crates/tomet-syntax-ast", version = "0.1.0" }
+tomet-cst = { path = "crates/tomet-syntax-cst", version = "0.1.0" }
+tomet-lexer = { path = "crates/tomet-syntax-lexer", version = "0.1.0" }
+tomet-parser = { path = "crates/tomet-syntax-parser", version = "0.1.0" }
+tomet-tree = { path = "crates/tomet-syntax-tree", version = "0.1.0" }
 #= Semantics
-tomet-compute = { path = "crates/tomet-semantics-compute" }
-tomet-resolver = { path = "crates/tomet-semantics-resolver" }
-tomet-semantics = { path = "crates/tomet-semantics" }
-tomet-validator = { path = "crates/tomet-semantics-validator" }
+tomet-compute = { path = "crates/tomet-semantics-compute", version = "0.1.0" }
+tomet-resolver = { path = "crates/tomet-semantics-resolver", version = "0.1.0" }
+tomet-semantics = { path = "crates/tomet-semantics", version = "0.1.0" }
+tomet-validator = { path = "crates/tomet-semantics-validator", version = "0.1.0" }
 #= Transform
-tomet-transform = { path = "crates/tomet-transform" }
+tomet-transform = { path = "crates/tomet-transform", version = "0.1.0" }
 #= Search
-tomet-search = { path = "crates/tomet-search" }
+tomet-search = { path = "crates/tomet-search", version = "0.1.0" }
 #= Edit
-tomet-edit = { path = "crates/tomet-edit" }
+tomet-edit = { path = "crates/tomet-edit", version = "0.1.0" }
 #= Stats
-tomet-stats = { path = "crates/tomet-stats" }
+tomet-stats = { path = "crates/tomet-stats", version = "0.1.0" }
 #= Vault
-tomet-vault = { path = "crates/tomet-vault" }
+tomet-vault = { path = "crates/tomet-vault", version = "0.1.0" }
 #= Convert
-tomet-html = { path = "crates/tomet-convert-html" }
-tomet-markdown = { path = "crates/tomet-convert-markdown" }
-tomet-pandoc = { path = "crates/tomet-convert-pandoc" }
-tomet-typst = { path = "crates/tomet-convert-typst" }
+tomet-html = { path = "crates/tomet-convert-html", version = "0.1.0" }
+tomet-markdown = { path = "crates/tomet-convert-markdown", version = "0.1.0" }
+tomet-pandoc = { path = "crates/tomet-convert-pandoc", version = "0.1.0" }
+tomet-typst = { path = "crates/tomet-convert-typst", version = "0.1.0" }
 #= Extract
-tomet-extract = { path = "crates/tomet-extract" }
-tomet-extract-rust = { path = "crates/tomet-extract-rust" }
+tomet-extract = { path = "crates/tomet-extract", version = "0.1.0" }
+tomet-extract-rust = { path = "crates/tomet-extract-rust", version = "0.1.0" }
 #= Format
-tomet-field-utils = { path = "crates/tomet-format-field-utils" }
-tomet-formatter = { path = "crates/tomet-format" }
-tomet-printer = { path = "crates/tomet-format-printer" }
-tomet-style = { path = "crates/tomet-format-style" }
+tomet-field-utils = { path = "crates/tomet-format-field-utils", version = "0.1.0" }
+tomet-formatter = { path = "crates/tomet-format", version = "0.1.0" }
+tomet-printer = { path = "crates/tomet-format-printer", version = "0.1.0" }
+tomet-style = { path = "crates/tomet-format-style", version = "0.1.0" }
 #= Workspace
-tomet-config = { path = "crates/tomet-config" }
-tomet-indexer = { path = "crates/tomet-workspace-indexer" }
-tomet-links = { path = "crates/tomet-workspace-links" }
-tomet-load = { path = "crates/tomet-load" }
-tomet-workspace = { path = "crates/tomet-workspace" }
+tomet-config = { path = "crates/tomet-config", version = "0.1.0" }
+tomet-indexer = { path = "crates/tomet-workspace-indexer", version = "0.1.0" }
+tomet-links = { path = "crates/tomet-workspace-links", version = "0.1.0" }
+tomet-load = { path = "crates/tomet-load", version = "0.1.0" }
+tomet-workspace = { path = "crates/tomet-workspace", version = "0.1.0" }
 #= Public
-tove = { path = "crates/tove" }
-tree-sitter-tomet = { path = "crates/tree-sitter-tomet" }
+tove = { path = "crates/tove", version = "0.1.0" }
+tree-sitter-tomet = { path = "crates/tree-sitter-tomet", version = "0.1.0" }
 #= Facade
-tomet = { path = "crates/tomet" }
+tomet = { path = "crates/tomet", version = "0.1.0" }
 #= Apps
 tomet-tui = { path = "apps/tui" }
 

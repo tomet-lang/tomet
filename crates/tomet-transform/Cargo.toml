@@ -2,6 +2,9 @@
 name = "tomet-transform"
 version.workspace = true
 edition.workspace = true
+description = "Pure in-memory AST refactoring and structural transformations for Tomet documents."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

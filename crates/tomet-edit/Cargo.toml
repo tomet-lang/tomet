@@ -2,6 +2,9 @@
 name = "tomet-edit"
 version.workspace = true
 edition.workspace = true
+description = "Backend-neutral editable tree model of a Tomet document for collaborative editing."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

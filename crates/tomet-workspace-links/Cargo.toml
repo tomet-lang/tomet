@@ -2,6 +2,9 @@
 name = "tomet-links"
 version.workspace = true
 edition.workspace = true
+description = "Vault-wide broken-link detection, target resolution, and SQLite-backed mtime caching for Tomet."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

@@ -2,6 +2,9 @@
 name = "tomet-indexer"
 version.workspace = true
 edition.workspace = true
+description = "Directory scanning, file classification, ignore filtering, and metadata cataloging for Tomet vaults."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

@@ -2,6 +2,10 @@
 name = "tomet-lsp"
 version.workspace = true
 edition.workspace = true
+description = "Language server for Tomet: diagnostics, formatting, hover, symbols, goto-definition, and completions."
+license.workspace = true
+repository.workspace = true
+publish = false
 
 [[bin]]
 name = "tomet-lsp"

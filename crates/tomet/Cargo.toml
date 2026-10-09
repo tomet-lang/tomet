@@ -2,6 +2,9 @@
 name = "tomet"
 version.workspace = true
 edition.workspace = true
+description = "The crate to depend on when using Tomet from Rust."
+license.workspace = true
+repository.workspace = true
 
 [features]
 edit = ["dep:tomet-edit"]

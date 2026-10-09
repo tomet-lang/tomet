@@ -2,6 +2,9 @@
 name = "tomet-typst"
 version.workspace = true
 edition.workspace = true
+description = "Converts a Tomet AST document to Typst markup source."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

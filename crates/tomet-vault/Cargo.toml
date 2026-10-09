@@ -2,6 +2,9 @@
 name = "tomet-vault"
 version.workspace = true
 edition.workspace = true
+description = "A vault's config and vocabularies, and what can be done with them without touching disk."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

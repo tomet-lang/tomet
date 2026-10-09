@@ -2,6 +2,9 @@
 name = "tomet-load"
 version.workspace = true
 edition.workspace = true
+description = "The one way to read a .tmt document correctly."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }

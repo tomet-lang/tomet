@@ -2,6 +2,10 @@
 name = "tomet-cli"
 version.workspace = true
 edition.workspace = true
+description = "Command-line interface and developer tools for the Tomet toolchain."
+license.workspace = true
+repository.workspace = true
+publish = false
 
 [[bin]]
 name = "tomet"

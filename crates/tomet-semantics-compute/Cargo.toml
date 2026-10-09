@@ -2,6 +2,9 @@
 name = "tomet-compute"
 version.workspace = true
 edition.workspace = true
+description = "Expression evaluation for ${...} interpolation expressions in Tomet documents."
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }
