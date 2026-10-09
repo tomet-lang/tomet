@@ -81,10 +81,10 @@ pub fn normalized_list_marker(marker: &Value) -> Value {
 /// only sees a value position, not an element name). This list exists
 /// solely to recover that split back into one `target` string, in
 /// [`recover_target_scheme_entry`] -- reusing `target_scheme`'s own
-/// recognized explicit prefixes (see `crate::target`) rather than a
+/// recognized explicit prefixes (see `crate::elements::target`) rather than a
 /// separately invented vocabulary.
 fn is_recoverable_target_scheme(key: &str) -> bool {
-    crate::target::EXPLICIT_SCHEMES
+    crate::elements::target::EXPLICIT_SCHEMES
         .iter()
         .any(|(name, _)| *name == key)
 }

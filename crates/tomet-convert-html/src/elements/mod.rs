@@ -1,13 +1,23 @@
-//! Element dispatch: which renderer an element gets, and the generic
-//! `<div>`/`<span>` rendering of the ones with no fixed meaning.
+//! =[ elements ]
+//!
+//! Element dispatch and specialized HTML renderers for concrete built-in elements.
 
-use crate::block::push_span_attrs;
-use crate::link::{render_embed_element, render_link_element, render_path_element};
-use crate::table::render_table_element;
-use crate::text::{
+pub(crate) mod footnote;
+pub(crate) mod heading;
+pub(crate) mod link;
+pub(crate) mod table;
+pub(crate) mod text;
+
+pub(crate) use footnote::render_footnotes;
+pub(crate) use heading::HeadingState;
+pub(crate) use link::{render_embed_element, render_link_element, render_path_element};
+pub(crate) use table::render_table_element;
+pub(crate) use text::{
     render_hr_element, render_quote_element, render_raw_element, render_ruby_element,
     render_wrapped_inline,
 };
+
+use crate::block::push_span_attrs;
 use crate::util::{escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs};
 use crate::{CustomElementCtx, RenderCtx};
 use tomet_ast::{Element, ElementValue};

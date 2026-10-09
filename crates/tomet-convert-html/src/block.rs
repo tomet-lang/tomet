@@ -1,8 +1,7 @@
 //! Block-level rendering -- sections, headings, lists and inline runs. This is
 //! the recursive core; the other renderers are called from it and call back in.
 
-use crate::element::render_element;
-use crate::headings::HeadingState;
+use crate::elements::{HeadingState, render_element};
 use crate::util::{
     escape_attr, escape_html, id_attr, inlines_to_plain, push_named_attrs, split_attrs,
     value_to_plain,

@@ -404,7 +404,7 @@ impl Bindings {
             .map(|v| (v.namespace.clone(), v))
             .collect();
 
-        let kind = crate::meta::document_kind(doc)
+        let kind = crate::elements::meta::document_kind(doc)
             .and_then(|kind| by_namespace.get(&kind))
             .cloned();
 

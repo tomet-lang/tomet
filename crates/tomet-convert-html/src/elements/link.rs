@@ -2,7 +2,7 @@
 
 use crate::RenderCtx;
 use crate::block::render_content_blocks;
-use crate::element::render_content_or_fallback;
+use super::render_content_or_fallback;
 use crate::util::{blocks_to_plain, escape_attr, escape_html, push_data_attrs};
 use tomet_ast::{Element, Value};
 use tomet_semantics::{

@@ -38,11 +38,61 @@ for built-in and `@settings` custom schemas.
 a document into a structured [`DocumentConfig`].
 
 - @strong[Metadata Extraction (`meta`)]: Extracts top-level `@meta` values via [`document_meta`].
-- @strong[Structural Helpers]: Heading level clamping (`heading`), list inspection (`list`),
+- @strong[Structural Helpers]: Heading level clamping (`heading`),
 
 table parsing (`table`), and connected value merging (`connect`).
 
-==[ Module embedded ]
+- @strong[Element-Specific Semantics ([`elements`])]: Dedicated normalization and extraction
+
+logic for concrete built-in element families (`config`, `embedded`, `footnote`,
+`heading`, `meta`, `table`, `tag`, `target`).
+
+==[ Module elements ]
+
+===[ elements ]
+
+Semantic interpretations and normalization helpers for concrete built-in elements.
+
+While the root of `tomet-semantics` provides the general semantic framework
+(element classification, vocabulary schemas, positional argument normalization,
+and connect evaluation), this module houses the logic specific to individual
+built-in element families:
+
+- (config) Document configuration (`@config`, `@settings`).
+- (embedded) Raw body parsing for `<embed>` and `+++` fenced data blocks (JSON/YAML/TOML).
+- (footnote) Footnote collection and indexing (`<footnote>`, `^id`).
+- (heading) Heading level calculation and bounds clamping (`heading`).
+- (meta) Document metadata and frontmatter extraction (`@meta`, `@kind`, `@version`).
+- (table) Table rows and cell structures (`@table`).
+- (tag) Tag collection (`#tag`).
+- (target) Target URI and scheme resolution (`@link`, `@embed`, `@file`, `@dir`).
+
+===[ Module config ]
+
+====[ Structs ]
+
+=====[ struct DocumentConfig ]
+
+Extracted document configuration settings from top-level `@config` elements.
+
+====[ Enums ]
+
+=====[ enum ExportType ]
+
+Supported target format for document exports.
+
+====[ Functions ]
+
+=====[ fn document_config ]
+
+Returns this document's `@config` and `@settings` settings merged from
+all configuration elements in the document -- top-level per
+[`tomet_tree::for_each_top_level_element`], which still counts a
+`@config`/`@settings` that joined an adjacent paragraph
+(`docs/spec/syntax.tmt`'s `##[ 区切り ]`), not just a raw `doc.blocks`
+walk.
+
+===[ Module embedded ]
 
 Reading a `+++` fence body as JSON/YAML/TOML.
 
@@ -65,19 +115,19 @@ change the shape of the tree -- and it terminated `@meta(format:yaml)`
 early at the first unquoted `}` inside otherwise legal YAML. A fence
 has no such failure mode, and `format:` is now pure interpretation.
 
-===[ Structs ]
+====[ Structs ]
 
-====[ struct EmbeddedError ]
+=====[ struct EmbeddedError ]
 
 A `+++` fence body that its declared format could not read.
 
-===[ Enums ]
+====[ Enums ]
 
-====[ enum EmbeddedFormat ]
+=====[ enum EmbeddedFormat ]
 
-===[ Functions ]
+====[ Functions ]
 
-====[ fn parse_raw_body ]
+=====[ fn parse_raw_body ]
 
 Reads a `+++` fence body as `format`.
 
@@ -85,7 +135,7 @@ Error positions are relative to `raw` itself (line 1 is the fence
 body's first line); a caller that knows where the fence sits in the
 document can offset them.
 
-====[ fn element_format ]
+=====[ fn element_format ]
 
 The format an element's `+++` fence body should be read as, from its
 `format:` argument.
@@ -96,7 +146,7 @@ missing or unrecognized tag means "read it with Tomet's own value
 grammar", which the caller does -- this crate deliberately does not
 depend on `tomet-parser`.
 
-====[ fn element_data ]
+=====[ fn element_data ]
 
 An element's value as data, whichever way it was written.
 
@@ -109,6 +159,176 @@ fails to parse as the format it declares.
 This is the "data-vs-children becomes a view" half of the design: no
 consumer has to know whether the author wrote `{a: 1}` or
 `(format:yaml)+++a: 1+++`.
+
+===[ Module footnote ]
+
+Footnote collection, sequential numbering, and cross-reference resolution.
+
+====[ Structs ]
+
+=====[ struct FootnoteItem ]
+
+An individual footnote entry resolved within a document.
+
+=====[ struct FootnoteRegistry ]
+
+Registry storing all resolved footnotes and element back-references for a document.
+
+===[ Module heading ]
+
+Extracts the `level` of a heading-shaped element (`Heading`, per
+[`crate::classify_std`]) from its `args`, centralizing the `1..=6` clamp
+that `tomet-html`/`tomet-markdown`/`tomet-printer` each used to apply separately.
+
+====[ Functions ]
+
+=====[ fn heading_level ]
+
+The clamped `1..=6` heading level of a heading-shaped element, if it
+has one. `None` for any non-heading element, or for a heading whose
+`level` argument is missing or not an integer (e.g. hand-authored
+`@heading(level: "two")`) -- callers fall back to a default level
+themselves, this function never guesses one.
+
+===[ Module meta ]
+
+====[ Functions ]
+
+=====[ fn document_meta ]
+
+Returns this document's `@meta` element's parsed data, if it has one --
+the `{...}` group from `@meta(format:...){...}`, already normalized to
+a `Value` regardless of which embedded format (JSON/YAML/TOML/the
+default DSL) it was written in. Callers pull whatever key they care
+about (`title`, `date`, `tags`, ...) out of the returned map themselves.
+
+`None` if the document has no `@meta` element, or that element has no
+`{value}` group at all. Only the first top-level `@meta` is considered
+-- `@meta` is documented as `singleton: true` (see
+`docs/spec/builtin-settings.tmt`), so a well-formed document
+never has more than one anyway.
+
+"Top-level" is [`tomet_tree::for_each_top_level_element`], not a raw
+`doc.blocks` walk: `@meta` still counts as top-level after joining an
+adjacent paragraph (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), a
+tree-shape choice unrelated to whether it opened its own line.
+
+=====[ fn document_kind ]
+
+Returns this document's declared kind string (e.g. `"j.daily"`, `"config"`, `"image_note"`),
+resolved strictly from top-level `@kind(...)` / `<kind>(...)` elements.
+
+=====[ fn document_version ]
+
+Returns this document's declared language/syntax version (e.g. `"1.0"`),
+resolved strictly from top-level `@version(...)` / `<version>(...)` elements.
+
+===[ Module table ]
+
+====[ Structs ]
+
+=====[ struct TableCell ]
+
+One cell in a `@table` row, holding trimmed inline nodes.
+
+=====[ struct TableRow ]
+
+One row in a `@table`, holding cells.
+
+====[ Functions ]
+
+=====[ fn parse_table_rows ]
+
+Parses table rows and cells from `@table`'s `[content]` (`Vec<Block>`
+now). The row/cell syntax (`[cell][cell]`) is literal text scanned
+character-by-character below, not real nested elements, so this just
+flattens every `Paragraph`'s own inline content into one sequence first
+-- there is realistically only ever one (no blank line inside a
+table's rows), but this doesn't assume that.
+
+===[ Module tag ]
+
+Extracts tags from an element (`@tag(...)`, `@tag[...]`).
+
+====[ Functions ]
+
+=====[ fn extract_tags ]
+
+Extracts a list of tag names from a tag element.
+Inspects `args` (as string, seq, or map) and `content` (as plain text).
+
+===[ Module target ]
+
+Extracts the raw target string of a link-shaped element (`Link`/`Embed`,
+per [`crate::classify_std`]) under their one canonical `target` key, and
+classifies @em[what kind] of target that string is (`TargetScheme`) by its
+own scheme prefix -- `url`/`file`/`tm`/`id`/`ref` are no longer carried
+by which argument key was used (there's only ever `target:` now); they
+live entirely in the target string itself. This is the canonical
+extraction, adopted by `tomet-html`/`tomet-markdown`/`tomet-links`
+instead of each reading `el.args` raw.
+
+====[ Enums ]
+
+=====[ enum TargetScheme ]
+
+What kind of thing a `target` string points at, derived purely from the
+string's own scheme prefix (never from which key/element name carried
+it -- there's only ever one key, `target`, for both `@link` and
+`@embed`).
+
+====[ Functions ]
+
+=====[ fn link_target ]
+
+The raw target string of a link-shaped element, if it has one. `kind`
+should be `classify_std_lenient(el)`'s result -- only `Link`/`Embed` ever return
+`Some`, everything else returns `None`.
+
+`tm:path/to/doc#some-id`'s `#fragment` is returned verbatim, still
+attached -- splitting it off is a caller concern, not done here.
+
+Deliberately stricter than the existing renderers: a non-string value
+under `target` (e.g. `target: 42`) returns `None` rather than a
+stringified `"42"`, which would be a wrong filesystem-lookup target
+even though it's harmless for display purposes.
+
+=====[ fn path_target ]
+
+The path a `@file`/`@dir` names, or `None` for anything else.
+
+No scheme prefix to strip: the element name already said which of the
+two this is, so a `file:`/`dir:` inside the value would be saying it
+twice. That is the difference from [`link_target`], where one element
+serves every scheme and the string has to carry which.
+
+=====[ fn link_target_of ]
+
+Classifies `el` and extracts its link target in one step, for callers
+that don't already have `classify_std_lenient(el)`'s result on hand.
+
+=====[ fn path_target_of ]
+
+[`path_target`] with the kind it classified to, for a caller sweeping
+a document without one in hand.
+
+=====[ fn target_scheme ]
+
+====[ Constants ]
+
+=====[ const EXPLICIT_SCHEMES ]
+
+Classifies a `target` string's scheme and strips a recognized explicit
+prefix (`tm:`/`id:`/`ref:`/`file:`/`dir:`) off of it, if any -- an implicit
+shape (`scheme://...`, a leading `/`, `./`, `../`, or no recognizable
+prefix at all) is returned unchanged since there's nothing to strip.
+The explicit scheme prefixes, without their `:`.
+
+One list. This crate's own `positional` module has to know the
+same set -- the parser splits a bare `tm:foo` into a map entry keyed
+`tm`, and recovering that means knowing which keys are schemes -- and
+it used to carry a hand-copied second copy that nothing held to this
+one.
 
 ==[ Module flatten ]
 
@@ -181,31 +401,6 @@ when it is present.
 ====[ const POSITIONAL_KEY ]
 
 The key [`FlatData::into_pairs`] gives a positional group's value.
-
-==[ Module footnote ]
-
-Footnote collection, sequential numbering, and cross-reference resolution.
-
-===[ Structs ]
-
-====[ struct FootnoteItem ]
-
-An individual footnote entry resolved within a document.
-
-====[ struct FootnoteRegistry ]
-
-Registry storing all resolved footnotes and element back-references for a document.
-
-==[ Module tag ]
-
-Extracts tags from an element (`@tag(...)`, `@tag[...]`).
-
-===[ Functions ]
-
-====[ fn extract_tags ]
-
-Extracts a list of tag names from a tag element.
-Inspects `args` (as string, seq, or map) and `content` (as plain text).
 
 ==[ Module vocabulary ]
 
