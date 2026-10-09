@@ -1,0 +1,4 @@
+=[ Notes ]:rule(allow:list(card))
+
+@card(title:"Alpha")[ First entry. ]
+@heading[ This is disallowed. ]

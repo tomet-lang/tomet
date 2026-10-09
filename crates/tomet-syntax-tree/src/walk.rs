@@ -45,9 +45,11 @@ fn inlines_in_block(block: &Block, f: &mut dyn FnMut(&Inline)) {
         Block::Element(element) => inlines_in_element(element, f),
         Block::Section(section) => {
             inlines_in(&section.title, f);
-            for conn in &section.connects {
-                inlines_in_element(conn, f);
-            }
+            // `section.connects` is deliberately not walked here -- same
+            // reason `inlines_in_element` never looks at an ordinary
+            // element's own `.connects`: a connect is metadata about its
+            // owner, not reachable content (see `for_each_descendant`'s
+            // doc comment in this file).
             for child in &section.blocks {
                 inlines_in_block(child, f);
             }
@@ -230,9 +232,13 @@ fn walk_block<B>(block: &Block, visitor: &mut impl Visitor<B>) -> ControlFlow<B>
         Block::Element(element) => walk_element(element, visitor),
         Block::Section(section) => {
             propagate!(walk_inlines(&section.title, visitor));
-            for conn in &section.connects {
-                propagate!(walk_element(conn, visitor));
-            }
+            // `section.connects` is deliberately not walked here -- same
+            // reason `walk_element` never descends into an ordinary
+            // element's own `.connects` (see `for_each_descendant`'s doc
+            // comment): a connect is metadata about its owner, not a
+            // document element in its own right, and feeding it through
+            // here is what let `rule` in `=[ h ]:rule(...)` reach the same
+            // "is this name bound" classification a real element gets.
             for child in &section.blocks {
                 propagate!(walk_block(child, visitor));
             }
@@ -357,9 +363,8 @@ fn walk_block_mut<B>(block: &mut Block, visitor: &mut impl VisitorMut<B>) -> Con
         Block::Element(element) => walk_element_mut(element, visitor),
         Block::Section(section) => {
             propagate!(walk_inlines_mut(&mut section.title, visitor));
-            for conn in &mut section.connects {
-                propagate!(walk_element_mut(conn, visitor));
-            }
+            // See the immutable `walk_block`'s matching comment:
+            // `section.connects` stays unvisited by the generic walker.
             for child in &mut section.blocks {
                 propagate!(walk_block_mut(child, visitor));
             }
@@ -463,31 +468,10 @@ fn walk_value_mut<B>(value: &mut Value, visitor: &mut impl VisitorMut<B>) -> Con
 /// for `:rule(direct:true)`; `false` walks every descendant at any
 /// depth, same as [`walk_element`].
 pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&Element)) {
+    if let Some(content) = &el.content {
+        for_each_descendant_in_blocks(content, direct_only, &mut f);
+    }
     if direct_only {
-        if let Some(content) = &el.content {
-            for block in content {
-                match block {
-                    Block::Element(child) => f(child),
-                    // A `Paragraph` isn't an element -- it's where an
-                    // inline-placed child landed (`@mid` written mid-line,
-                    // e.g. `@outer[ @mid[...] ]`, rather than at its own
-                    // line start). Its own inline items are still direct
-                    // children of `el` for this purpose, same as a
-                    // `Block::Element` sitting in `content` directly --
-                    // `content` becoming `Vec<Block>` must not make this
-                    // depend on whether the child happened to stand alone
-                    // on its line.
-                    Block::Paragraph(p) => {
-                        for inline in &p.content {
-                            if let Inline::Element(child) = inline {
-                                f(child);
-                            }
-                        }
-                    }
-                    Block::Section(_) => {}
-                }
-            }
-        }
         if let Some(children) = &el.children {
             for block in children {
                 if let Block::Element(child) = block {
@@ -508,11 +492,6 @@ pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&E
         f(child);
         ControlFlow::Continue(())
     };
-    if let Some(content) = &el.content {
-        for block in content {
-            let _ = walk_block(block, &mut visitor);
-        }
-    }
     if let Some(children) = &el.children {
         for block in children {
             let _ = walk_block(block, &mut visitor);
@@ -525,6 +504,64 @@ pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&E
             }
         }
     }
+}
+
+/// Every descendant element reachable from `blocks`, in document order --
+/// [`for_each_descendant`]'s own `content` handling factored out, since a
+/// [`tomet_ast::Section`]'s `blocks` is exactly the same shape (a general
+/// block sequence that may hold a `Paragraph`, an `Element`, or a nested
+/// `Section`) and needs the identical walk: a heading's own `:rule(...)`
+/// has to check what sits *under* the heading, which is this.
+pub fn for_each_descendant_in_blocks(
+    blocks: &[Block],
+    direct_only: bool,
+    mut f: impl FnMut(&Element),
+) {
+    if direct_only {
+        for block in blocks {
+            match block {
+                Block::Element(child) => f(child),
+                // See `for_each_descendant`'s own doc comment: a
+                // `Paragraph`'s inline items are still direct children
+                // for this purpose.
+                Block::Paragraph(p) => {
+                    for inline in &p.content {
+                        if let Inline::Element(child) = inline {
+                            f(child);
+                        }
+                    }
+                }
+                Block::Section(_) => {}
+            }
+        }
+        return;
+    }
+    let mut visitor = |child: &Element| -> ControlFlow<()> {
+        f(child);
+        ControlFlow::Continue(())
+    };
+    for block in blocks {
+        let _ = walk_block(block, &mut visitor);
+    }
+}
+
+/// Visits every [`tomet_ast::Section`] in `doc`, in document order,
+/// including ones nested under another section's own `blocks` -- the
+/// counterpart to [`for_each_element`] for the one `Block` variant that
+/// is not an [`Element`], needed so a heading's own `:name(...)` connect
+/// can be checked against `section.blocks`
+/// ([`for_each_descendant_in_blocks`]) the same way an element's connect
+/// is checked against its own content.
+pub fn for_each_section(doc: &Document, mut f: impl FnMut(&tomet_ast::Section)) {
+    fn walk(blocks: &[Block], f: &mut dyn FnMut(&tomet_ast::Section)) {
+        for block in blocks {
+            if let Block::Section(sec) = block {
+                f(sec);
+                walk(&sec.blocks, f);
+            }
+        }
+    }
+    walk(&doc.blocks, &mut f);
 }
 
 /// Mutates all elements in `doc` matching `filter` by applying `transform`.

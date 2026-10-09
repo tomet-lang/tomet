@@ -1398,12 +1398,6 @@ Section level=1
       args    {allow: list("card")}
 ```
 
-検証:
-
-```
-unknown element `rule`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.rule`), or declare the vocabulary that has it and bind it with `@use`
-```
-
 ## id `#(...)`
 
 ### 要素自身のid。`(args)[content]{value}`の後、コネクトの前に読まれる

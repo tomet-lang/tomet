@@ -198,6 +198,25 @@ being reported as a disallowed @em[descendant] would be.
 for `:rule(direct:true)`; `false` walks every descendant at any
 depth, same as [`walk_element`].
 
+====[ fn for_each_descendant_in_blocks ]
+
+Every descendant element reachable from `blocks`, in document order --
+[`for_each_descendant`]'s own `content` handling factored out, since a
+[`tomet_ast::Section`]'s `blocks` is exactly the same shape (a general
+block sequence that may hold a `Paragraph`, an `Element`, or a nested
+`Section`) and needs the identical walk: a heading's own `:rule(...)`
+has to check what sits @em[under] the heading, which is this.
+
+====[ fn for_each_section ]
+
+Visits every [`tomet_ast::Section`] in `doc`, in document order,
+including ones nested under another section's own `blocks` -- the
+counterpart to [`for_each_element`] for the one `Block` variant that
+is not an [`Element`], needed so a heading's own `:name(...)` connect
+can be checked against `section.blocks`
+([`for_each_descendant_in_blocks`]) the same way an element's connect
+is checked against its own content.
+
 ====[ fn transform_elements ]
 
 Mutates all elements in `doc` matching `filter` by applying `transform`.

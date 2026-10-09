@@ -222,10 +222,9 @@ fn check_singletons_and_regions(doc: &Document, bindings: &Bindings, errors: &mu
             }
             Block::Section(s) => {
                 in_preamble = false;
-                for conn in &s.connects {
-                    visit(conn, false);
-                    tomet_tree::for_each_descendant(conn, false, |el| visit(el, false));
-                }
+                // `s.connects` is deliberately not visited here -- a
+                // connect is metadata about the section, not a document
+                // element of its own (see `walk.rs`'s `walk_block`).
                 for inline in &s.title {
                     if let Inline::Element(el) = inline {
                         visit(el, false);
@@ -255,10 +254,9 @@ fn validate_section_block(block: &Block, visit: &mut impl FnMut(&Element, bool))
             }
         }
         Block::Section(s) => {
-            for conn in &s.connects {
-                visit(conn, false);
-                tomet_tree::for_each_descendant(conn, false, |desc| visit(desc, false));
-            }
+            // Same exclusion as the Section arm above: `s.connects` is
+            // metadata about the section, not a visitable document
+            // element.
             for inline in &s.title {
                 if let Inline::Element(el) = inline {
                     visit(el, false);
@@ -385,8 +383,11 @@ fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnos
 }
 
 /// Enforces every `:rule(allow:list(...))` connect found anywhere in the
-/// document, and reports an unrecognized connect name (`:xxx(...)` where
-/// `xxx` is not in `tomet_semantics::CONNECT_MEMBERS`).
+/// document -- on an ordinary element's own `connects` *and* on a
+/// heading's (`Section.connects`, since a `Section` is not an `Element`
+/// and so is never reached by the `el` loop below) -- and reports an
+/// unrecognized connect name (`:xxx(...)` where `xxx` is not in
+/// `tomet_semantics::CONNECT_MEMBERS`).
 ///
 /// Needs `bindings`, unlike the parser or `tomet-semantics-resolver`:
 /// `allow:list(ns.mycard)` can name a namespaced identifier, and deciding
@@ -394,40 +395,65 @@ fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnos
 /// resolved vocabulary. This is why the check lives here rather than
 /// earlier in the pipeline.
 ///
-/// Only iterates each visited element's own `connects` -- never recurses
-/// into a connect's internals beyond that, and `tomet_tree::for_each_element`
-/// itself never descends into `connects` either (see its sibling
-/// `for_each_descendant`'s doc comment), so a connect element is never
-/// misclassified as an ordinary document element.
+/// Only iterates each visited element's/section's own `connects` -- never
+/// recurses into a connect's internals beyond that, and
+/// `tomet_tree::for_each_element`/`for_each_section` themselves never
+/// descend into `connects` either (see `for_each_descendant`'s doc
+/// comment), so a connect element is never misclassified as an ordinary
+/// document element.
 fn check_rule_connects(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     tomet_tree::for_each_element(doc, |el| {
         for connect in &el.connects {
-            let Some(connect_name) = connect.sigil.name() else {
-                continue;
-            };
-            let member = match tomet_semantics::classify_connect_member(connect_name) {
-                Ok(member) => member,
-                Err(unknown) => {
-                    errors.push(Diagnostic::UnknownConnect {
-                        name: unknown.name,
-                        span: connect.span,
-                    });
-                    continue;
-                }
-            };
-            match member {
-                tomet_semantics::ConnectMember::Rule => {
-                    check_one_rule(el, connect, bindings, errors);
-                }
-            }
+            check_one_connect(connect, bindings, errors, |direct, f| {
+                tomet_tree::for_each_descendant(el, direct, f);
+            });
+        }
+    });
+    tomet_tree::for_each_section(doc, |sec| {
+        for connect in &sec.connects {
+            check_one_connect(connect, bindings, errors, |direct, f| {
+                tomet_tree::for_each_descendant_in_blocks(&sec.blocks, direct, f);
+            });
         }
     });
 }
 
-/// One `:rule(...)` connect's contribution to [`check_rule_connects`]:
-/// decode its args, then walk `el`'s descendants (or just its immediate
-/// children, if `direct:true`) checking each one's classified name
-/// against the rule's `allow` list.
+/// One connect's contribution to [`check_rule_connects`], independent of
+/// whether its owner is an `Element` or a `Section`: classify its name,
+/// then dispatch to the one implemented member (`rule`). `walk_descendants`
+/// is how the caller's owner-specific descendants get reached once
+/// `check_one_rule` has decided (from `connect`'s own `direct:` arg)
+/// whether that means immediate children only or every depth.
+fn check_one_connect(
+    connect: &tomet_ast::Element,
+    bindings: &Bindings,
+    errors: &mut Vec<Diagnostic>,
+    walk_descendants: impl FnOnce(bool, &mut dyn FnMut(&tomet_ast::Element)),
+) {
+    let Some(connect_name) = connect.sigil.name() else {
+        return;
+    };
+    let member = match tomet_semantics::classify_connect_member(connect_name) {
+        Ok(member) => member,
+        Err(unknown) => {
+            errors.push(Diagnostic::UnknownConnect {
+                name: unknown.name,
+                span: connect.span,
+            });
+            return;
+        }
+    };
+    match member {
+        tomet_semantics::ConnectMember::Rule => {
+            check_one_rule(connect, bindings, errors, walk_descendants);
+        }
+    }
+}
+
+/// `:rule(...)`'s own semantics: decode its args, then walk its owner's
+/// descendants (or just its immediate children, if `direct:true`) via
+/// `walk_descendants`, checking each one's classified name against the
+/// rule's `allow` list.
 ///
 /// Compares against the *classified* name (`ElementKind::as_str()`), not
 /// the name as literally written -- these agree for `std` names and for
@@ -439,10 +465,10 @@ fn check_rule_connects(doc: &Document, bindings: &Bindings, errors: &mut Vec<Dia
 /// introduced here), not yet worth a special case until real usage shows
 /// it matters.
 fn check_one_rule(
-    el: &tomet_ast::Element,
     connect: &tomet_ast::Element,
     bindings: &Bindings,
     errors: &mut Vec<Diagnostic>,
+    walk_descendants: impl FnOnce(bool, &mut dyn FnMut(&tomet_ast::Element)),
 ) {
     let Some(rule_args) = decode_rule_args(connect) else {
         // Malformed `:rule(...)` args -- an MVP-scoped, author-confirmed
@@ -452,7 +478,7 @@ fn check_one_rule(
 
     let allowed_display: Vec<String> = rule_args.allow.iter().map(|n| n.to_string()).collect();
 
-    tomet_tree::for_each_descendant(el, rule_args.direct, |descendant| {
+    walk_descendants(rule_args.direct, &mut |descendant| {
         let kind_name = match classify_in(descendant, bindings) {
             Ok(kind) => kind.as_str().to_string(),
             // An unknown descendant is `check_arguments`'/the top-level
@@ -779,6 +805,59 @@ mod tests {
 
         let doc = parse("@section[ @ns.mycard{} @card[a] ]:rule(allow:list(card, ns.mycard))\n");
         assert_eq!(rule_errors(&doc, &bindings), vec![]);
+    }
+
+    /// A heading's own `:rule(...)` (`Section.connects`, not an
+    /// `Element`'s) used to do nothing at all: `check_rule_connects` only
+    /// ever looked at `el.connects` via `for_each_element`, and a
+    /// `Section` is not an `Element`, so its connect was never checked
+    /// against anything underneath the heading.
+    #[test]
+    fn a_heading_rule_with_only_allowed_descendants_is_clean() {
+        let doc = parse("=[ Notes ]:rule(allow:list(card))\n@card(title:\"a\")[ x ]\n");
+        assert_eq!(rule_errors(&doc, &Bindings::default()), vec![]);
+    }
+
+    #[test]
+    fn a_disallowed_descendant_under_a_heading_rule_is_reported() {
+        let doc = parse("=[ Notes ]:rule(allow:list(card))\n@heading[ not allowed ]\n");
+        let errors = rule_errors(&doc, &Bindings::default());
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(matches!(
+            &errors[0],
+            Diagnostic::DisallowedByRule { name, .. } if name == "heading"
+        ));
+    }
+
+    #[test]
+    fn a_typoed_connect_name_on_a_heading_is_reported() {
+        let doc = parse("=[ Notes ]:rulle(allow:list(card))\n");
+        let errors = rule_errors(&doc, &Bindings::default());
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(matches!(
+            &errors[0],
+            Diagnostic::UnknownConnect { name, .. } if name == "rulle"
+        ));
+    }
+
+    /// The regression this whole group guards against: `rule` itself
+    /// must never be classified as if it were an ordinary document
+    /// element (`walk.rs`'s `walk_block` used to feed `Section.connects`
+    /// through the generic element walker, which is what let `classify_in`
+    /// -- a completely different check -- see `rule` and report it as an
+    /// unbound name). Goes through `validate_document`, not
+    /// `check_rule_connects` directly: that is the check this regresses,
+    /// and the one `check_rule_connects`'s own tests cannot see.
+    #[test]
+    fn a_heading_rule_connect_is_not_misclassified_as_an_unknown_element() {
+        let doc = parse("=[ Notes ]:rule(allow:list(card))\n@card(title:\"a\")[ x ]\n");
+        let errors = validate_document(&doc);
+        assert!(
+            !errors
+                .iter()
+                .any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "rule")),
+            "{errors:?}"
+        );
     }
 
     /// The preamble is the run of preamble-region elements at the top.

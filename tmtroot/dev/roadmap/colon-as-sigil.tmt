@@ -24,15 +24,3 @@
 - ( ) blueprint のテンプレート本体の `:rule`   // 実体化後の文書でも生き残って効き続けるのか。
                                       // `tomet new` の実体化パスと `:rule` の相互作用は
                                       // 一度も試していない
-- ( ) 見出しの named connect が偽の "unknown element" を出す // `=[ h ]:rule(allow:list(card))`
-                                      // は既に（この項目を見つけたタスク以前から）
-                                      // `unknown element \`rule\`` を誤って報告する。
-                                      // `tomet-syntax-tree::walk.rs`の`walk_block`が
-                                      // `Section.connects`を`walk_element`で素通りさせて
-                                      // いるため、`validate_document_with`の一般的な
-                                      // 「名前は束縛済みか」チェック（`classify_in`）が
-                                      // connect自身の名前（rule）まで要素名として見てしまう。
-                                      // 同じ`walk_element`は`@name`要素やlist itemの
-                                      // `connects`には立ち寄らないので、そちら側では
-                                      // 起きない（非対称）。`check_rule_connects`自体は
-                                      // 正しく動く — 二重に、別のチェックが誤爆している
