@@ -1,14 +1,5 @@
 use super::*;
 
-/// A list item's trailing `{value}` attrs, if any -- mirrors how
-/// `Element::list_item` stores them under `value` as `ElementValue::Data`.
-fn item_attrs(item: &Element) -> Option<Value> {
-    match &item.value {
-        Some(v) => v.as_data(),
-        _ => None,
-    }
-}
-
 #[test]
 fn parses_list() {
     let doc = parse_document("- one\n- two\n").unwrap();
@@ -144,15 +135,12 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
 
 #[test]
 fn list_item_colon_connect_supports_an_empty_braced_value() {
-    // The `docs/spec/syntax.tmt` `##[ コネクト ]` example
-    // this feature implements (`- () xxxxxx :{}`) uses an *empty*
-    // `{}` for its item-level attrs -- `heading::parse_braced_value`
-    // (shared by heading and list-item attrs) used to have no
-    // special case for that, unlike `parse_paren_value`/
-    // `element.rs::parse_value_group` right next to it, and errored
-    // ("expected a value") instead of producing an empty map,
-    // silently falling through to treating the whole line as
-    // ordinary text with no attrs at all.
+    // The `docs/spec/syntax.tmt` `##[ コネクト ]` example this
+    // feature implements (`- () xxxxxx :{}`) uses an *empty* `{}` for
+    // its item-level attrs -- `element.rs::parse_value_group` (the same
+    // reader a trailing sugar connect's `{value}` now goes through)
+    // already special-cases an empty body into an empty map rather than
+    // erroring, so this just confirms the sugar path inherits that.
     let doc = parse_document("- () xxxxxx :{}\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(list) => {
@@ -247,6 +235,83 @@ fn parses_ordered_list() {
             assert_eq!(items.len(), 2);
             assert_eq!(items[0].content, wrap(vec![Inline::Text("one".into())]));
             assert_eq!(items[1].content, wrap(vec![Inline::Text("two".into())]));
+        }
+        other => panic!("expected list, got {other:?}"),
+    }
+}
+
+#[test]
+fn full_form_list_item_supports_a_bare_trailing_connect() {
+    // `ConnectMode::Bare`: a full-form item's own `:(...)`/`:{...}` now
+    // merges into its own `args`/`value`, the same arms `@name` already
+    // uses for this -- previously `allow_colon_connect` was hardcoded
+    // `false` for the item's own groups, so none of these forms attached
+    // anywhere; the trailing `:...` became literal text instead.
+    let doc = parse_document("- [ content ]:(x: 1)\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Element(list) => {
+            let items = list_items(list);
+            assert_eq!(
+                items[0].args,
+                Some(Value::Map(vec![("x".into(), Value::Int(1))]))
+            );
+        }
+        other => panic!("expected list, got {other:?}"),
+    }
+
+    let doc = parse_document("- [ content ]:{y: 2}\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Element(list) => {
+            let items = list_items(list);
+            assert_eq!(
+                item_attrs(items[0]),
+                Some(Value::Map(vec![("y".into(), Value::Int(2))]))
+            );
+        }
+        other => panic!("expected list, got {other:?}"),
+    }
+
+    // Combined `:(){}`: the colon only has to precede the first group --
+    // the second is claimed by the item's own, still-empty slot the same
+    // way it would be with no colon at all (see `parse_groups_with_pipe_stack`'s
+    // colon branch).
+    let doc = parse_document("- [ content ]:(x: 1){y: 2}\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Element(list) => {
+            let items = list_items(list);
+            assert_eq!(
+                items[0].args,
+                Some(Value::Map(vec![("x".into(), Value::Int(1))]))
+            );
+            assert_eq!(
+                item_attrs(items[0]),
+                Some(Value::Map(vec![("y".into(), Value::Int(2))]))
+            );
+        }
+        other => panic!("expected list, got {other:?}"),
+    }
+}
+
+#[test]
+fn full_form_list_item_supports_a_named_connect() {
+    // A list item's own groups now take the full connect branch, same as
+    // `@name`'s or a heading's -- `element_list_item` carries `connects`
+    // too, so `:rule(...)` attaches to the item instead of becoming
+    // literal trailing text.
+    let doc = parse_document("- [ content ]:rule(allow: list(card))\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Element(list) => {
+            let items = list_items(list);
+            assert_eq!(items[0].connects.len(), 1);
+            assert_eq!(items[0].connects[0].sigil, Sigil::named("rule"));
+            let text: String = first_para(items[0].content.as_ref().expect("content"))
+                .iter()
+                .map(|inline| match inline {
+                    Inline::Text(t) => t.value.as_str(),
+                    other => panic!("expected text, got {other:?}"),
+                })
+                .collect();
+            assert_eq!(text, "content");
         }
         other => panic!("expected list, got {other:?}"),
     }

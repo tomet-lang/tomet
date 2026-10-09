@@ -263,6 +263,7 @@ fn list_element(items: &[Vec<Block>], ordered: bool) -> Element {
                 None,
                 None,
                 Vec::new(),
+                Vec::new(),
                 Span::dummy(),
             )
         })

@@ -51,3 +51,12 @@ fn first_para(blocks: &[Block]) -> &[Inline] {
         _ => panic!("expected a single paragraph, got {blocks:?}"),
     }
 }
+
+/// A list item's trailing `{value}` attrs, if any -- mirrors how
+/// `Element::list_item` stores them under `value` as `ElementValue::Data`.
+fn item_attrs(item: &Element) -> Option<Value> {
+    match &item.value {
+        Some(v) => v.as_data(),
+        _ => None,
+    }
+}

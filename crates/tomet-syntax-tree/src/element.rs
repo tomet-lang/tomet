@@ -335,6 +335,7 @@ pub fn element_list_item(
     marker: Option<Value>,
     attrs: Option<Value>,
     id: Option<Id>,
+    connects: Vec<Element>,
     children: Vec<Block>,
     span: Span,
 ) -> Element {
@@ -350,7 +351,7 @@ pub fn element_list_item(
         },
         value: attrs.map(ElementValue::from_map),
         id,
-        connects: Vec::new(),
+        connects,
         span,
     }
 }

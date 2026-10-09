@@ -342,6 +342,30 @@ const CASES: &[Case] = &[
          コネクトの名前と同じく、パーサは呼び出し名を判断しない",
         "@x(a: list(card, ns.mycard))\n",
     ),
+    case(
+        None,
+        "リスト項目・見出しの糖衣形でも bare connect が使える。`:()`/`:{}`は\
+         どちらが先でもよく、両方書いても一つの `:` で足りる",
+        "- content :(x: 1){y: 2}\n",
+    ),
+    case(None, "見出しの糖衣形も同様", "= title :(x: 1){y: 2}\n"),
+    case(
+        None,
+        "改行1つまでなら次の行に置いてもよい(他のsigilの groups と同じ gap)。\
+         空行を挟む(改行2つ)とつながらない -- REJECTEDの同じ例を参照",
+        "- content\n:{y: 2}\n",
+    ),
+    case(
+        None,
+        "リスト項目は named connect も直接持てる。完全形・糖衣形のどちらでも、\
+         要素自身ではなく項目自身の `connects` に積まれる",
+        "- [ x ]:rule(allow: list(card))\n",
+    ),
+    case(
+        None,
+        "見出しの糖衣形の named connect も、完全形(`=[ h ]:rule(...)`)と同じ扱い",
+        "= h :rule(allow: list(card))\n",
+    ),
     // ---- id `#(...)` --------------------------------------------------
     case(
         Some("id `#(...)`"),
@@ -421,6 +445,12 @@ const REJECTED: &[Case] = &[
         Some("紛らわしいが、これが正しい"),
         "`(content:raw)` は普通の引数。`[...]` の解釈を変えない",
         "@memo(content:raw)[\n1行目\n2行目\n]\n",
+    ),
+    case(
+        None,
+        "sugar bodyのtrailing connectは改行1つまで。空行(改行2つ)を挟むと\
+         要素につながらず、`:{...}`はただの地の文になる",
+        "- content\n\n:{ y: 2 }\n",
     ),
     case(
         Some("受け付けない書き方"),
@@ -583,9 +613,46 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
             for inline in &sec.title {
                 dump_inline(out, inline, depth + 2);
             }
+            if let Some(args) = &sec.args {
+                indent(out, depth + 1);
+                let _ = writeln!(out, "args    {}", value_str(args));
+            }
+            match &sec.value {
+                Some(ElementValue::Group(entries)) => {
+                    indent(out, depth + 1);
+                    if entries.is_empty() {
+                        out.push_str("group   (空)\n");
+                    } else {
+                        out.push_str("group\n");
+                    }
+                    for entry in entries {
+                        match entry {
+                            Entry::Pair(k, v) => {
+                                indent(out, depth + 2);
+                                let _ = writeln!(out, "{k}: {}", value_str(v));
+                            }
+                            Entry::Element(child) => dump_element(out, child, depth + 2),
+                        }
+                    }
+                }
+                Some(ElementValue::Raw(body)) => {
+                    indent(out, depth + 1);
+                    let _ = writeln!(out, "raw     {body:?}");
+                }
+                Some(ElementValue::Interp(expr)) => {
+                    indent(out, depth + 1);
+                    let _ = writeln!(out, "interp  {}", interp_str(expr));
+                }
+                None => {}
+            }
             if let Some(id) = &sec.id {
                 indent(out, depth + 1);
                 let _ = writeln!(out, "id      {:?}", id.0);
+            }
+            for connect in &sec.connects {
+                indent(out, depth + 1);
+                out.push_str("connect\n");
+                dump_element(out, connect, depth + 2);
             }
             if !sec.blocks.is_empty() {
                 indent(out, depth + 1);

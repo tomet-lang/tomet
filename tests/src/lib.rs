@@ -212,6 +212,21 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // Same gap as `syntax/block-value.tmt` just above, hit again by
     // `@conflict`'s own positional shorthand (`@conflict([...], [...])`).
     ("syntax/conflict.tmt", &[ANY_ERROR]),
+    // All new to `tomet-parser`, none ported to `grammar.js`: a
+    // bracket-less sugar body's own bare `:(...)`/`:{...}` connect (the
+    // grammar never read past the sugar text at all before), the same
+    // connect appearing after the single-blank-line gap `skip_element_gap`
+    // grants every sigil's own groups (the exact wall
+    // `examples/dirs.tmt`'s entry above already names -- tree-sitter's
+    // internal lexer cannot look past a newline for an opener without an
+    // external scanner token), and a list item's own `:name(...)` (no
+    // grammar.js rule ever routed a connect to the item rather than to
+    // whatever element sits inside it). The full-form (bracketed) cases
+    // in this fixture may well already parse cleanly; recorded coarsely
+    // because the point of this fixture is the sugar/gap/list-item
+    // cases, and splitting the file to isolate exactly which lines
+    // already pass is not worth it for a fixture this size.
+    ("syntax/connect.tmt", &[ANY_ERROR]),
 ];
 
 /// Records a fixture as drifting wholesale, without pinning the text of

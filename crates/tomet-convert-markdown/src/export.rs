@@ -1117,6 +1117,7 @@ mod tests {
                         None,
                         None,
                         Vec::new(),
+                        Vec::new(),
                         Span::dummy(),
                     ),
                     tomet_tree::element_list_item(
@@ -1124,6 +1125,7 @@ mod tests {
                         None,
                         None,
                         None,
+                        Vec::new(),
                         Vec::new(),
                         Span::dummy(),
                     ),

@@ -504,6 +504,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     marker,
                     None,
                     None,
+                    Vec::new(),
                     children,
                     Span::dummy(),
                 ));

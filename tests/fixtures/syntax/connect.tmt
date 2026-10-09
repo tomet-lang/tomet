@@ -1,0 +1,38 @@
+// Unified trailing connect for list items and headings, in both their
+// sugar (bracket-less) and full (bracketed) form: bare `:(args)`/
+// `:{value}`/`:(){}` merges into the owner's own slots, and `:name(...)`
+// attaches to the owner's own `connects` -- the same grammar a plain
+// `@name` element's own groups already use.
+
+// Sugar body: bare connect, both orders, combined in one `:`.
+- content :(x: 1)
+- content :{y: 2}
+- content :(x: 1){y: 2}
+- content :{y: 2}(x: 1)
+
+// Sugar body: a trailing connect may start on the very next line, the
+// same single-blank-line gap `skip_element_gap` grants every sigil's
+// own groups. Two blank lines is too far; that shape is covered by
+// `KNOWN_UNPARSEABLE`-exempt behavior elsewhere, not here, since it does
+// not fail to parse -- it just stops being a connect.
+- content
+  :(x: 1){y: 2}
+
+// Full-form (bracketed) list item: same bare connect support, now that
+// `allow_colon_connect` is no longer disabled for the item's own groups.
+- [ content ]:(x: 1)
+- [ content ]:{y: 2}
+- [ content ]:(x: 1){y: 2}
+
+// Named connect on a list item, sugar and full form -- `element_list_item`
+// carries `connects` now, matching a heading's own long-standing support.
+- content :rule(allow:list(card))
+- [ content ]:rule(allow:list(card))
+
+// Heading sugar form gains the same named-connect support its bracketed
+// form already had.
+= title :rule(allow:list(card))
+
+// Heading sugar form: bare connect, combined, matching the list-item
+// sugar body above (shared implementation, `parse_sugar_body`).
+= title :(x: 1){y: 2}

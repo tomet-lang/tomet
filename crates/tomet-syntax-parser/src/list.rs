@@ -153,15 +153,21 @@ pub(crate) fn parse_list_item_body(
     let item_start = cur.pos();
     eat_list_marker(cur)?;
 
-    let (content, attrs, id) = if head.full_form {
+    let (content, attrs, id, connects) = if head.full_form {
         // The full form: `- ()[ content ]{value}`. Groups are read by
         // the same code that reads `@name`'s, so `[content]` stops at
         // its closing bracket and `|content` at the end of its marked
         // run -- either may span lines. Only the bracket-less sugar
         // below is one line, and it is one line because it has no
         // group to close rather than because spreading out is barred.
+        //
+        // `allow_colon_connect: true`: both a bare `:(args)`/`:{value}`/
+        // `:(){}` merge and a named `:rule(...)` connect now attach to
+        // the item's own slots, the same arms/branch `@name`'s groups
+        // already use -- `element_list_item` now takes `connects` too,
+        // matching a heading's own full support for both forms.
         let mut item = element_new(Sigil::Bare);
-        crate::element::parse_groups_with_pipe_stack(cur, &mut item, false, pipe_stack)?;
+        crate::element::parse_groups_with_pipe_stack(cur, &mut item, true, pipe_stack)?;
         // An `(args)` group read here is the item's own -- the same
         // slot the probe's `(marker)` fills, reached from the other
         // side. `- (x)[ y ]` takes that path and `-(x)` this one, and
@@ -171,6 +177,7 @@ pub(crate) fn parse_list_item_body(
             marker = merge_values(marker.as_ref(), item.args.as_ref());
         }
         let id = item.id;
+        let connects = item.connects;
         let attrs = item.value.and_then(|v| v.as_data());
         let mut content = item.content.unwrap_or_default();
         // Text after the groups belongs to the item, the way
@@ -210,25 +217,31 @@ pub(crate) fn parse_list_item_body(
                 }
             }
         }
-        (content, attrs, id)
+        (content, attrs, id, connects)
     } else {
         // The bracket-less sugar, shared with `=`: one line, plus this
-        // line's own trailing `#(id)`/`{attrs}`. Spreading out means
-        // opening a group -- `[ ]` or `|` -- exactly as it does for
-        // `@name`. `parse_sugar_body` returns `Vec<Inline>` (`=`'s
-        // title stays that shape too); a list item's own `content` is
-        // `Vec<Block>` now, so wrap it in one `Paragraph`.
+        // line's own trailing `#(id)`/`{attrs}`/`:name(...)`. Spreading
+        // out means opening a group -- `[ ]` or `|` -- exactly as it
+        // does for `@name`. `parse_sugar_body` returns `Vec<Inline>`
+        // (`=`'s title stays that shape too); a list item's own
+        // `content` is `Vec<Block>` now, so wrap it in one `Paragraph`.
         let item_start = cur.pos();
-        let (inline, attrs, id) = parse_sugar_body(cur)?;
-        let content = if inline.is_empty() {
+        let body = parse_sugar_body(cur)?;
+        let content = if body.content.is_empty() {
             Vec::new()
         } else {
             vec![Block::Paragraph(Paragraph::new(
-                inline,
+                body.content,
                 cur.span_from(item_start),
             ))]
         };
-        (content, attrs, id)
+        // A trailing `:(...)` is the item's own `args` -- same slot the
+        // `(marker)` probe fills, reached from the other side.
+        if body.args.is_some() {
+            marker = merge_values(marker.as_ref(), body.args.as_ref());
+        }
+        let attrs = body.value.and_then(|v| v.as_data());
+        (content, attrs, body.id, body.connects)
     };
 
     let span = cur.span_from(item_start);
@@ -237,6 +250,7 @@ pub(crate) fn parse_list_item_body(
         marker,
         attrs,
         id,
+        connects,
         Vec::new(),
         span,
     ))

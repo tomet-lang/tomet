@@ -55,6 +55,8 @@ the AST is opt-in, so a reader-only consumer
 compiles nothing it does not use. Each feature adds one module:
 
 @table[[ feature ][ module ][ from ]
+[ `edit`     ][ [`edit`]       ][ `tomet-edit`      ]
+[ `parser`   ][ [`parser`]     ][ `tomet-parser`    ]
 [ `html`     ][ [`html`]       ][ `tomet-html`      ]
 [ `markdown` ][ [`markdown`]   ][ `tomet-markdown`  ]
 [ `typst`    ][ [`typst`]      ][ `tomet-typst`     ]

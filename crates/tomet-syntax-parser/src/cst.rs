@@ -417,10 +417,20 @@ impl<'a> CstParser<'a> {
             self.bump();
         }
         self.bump_while(K::WHITESPACE);
-        let outer = std::mem::replace(&mut self.allow_connect, false);
         // The item's own groups. Reading them here keeps a bracketed item,
-        // which may span lines, inside one node.
+        // which may span lines, inside one node. `allow_connect` is left
+        // as whatever the caller already had (true unless we are nested
+        // inside something that disabled it), so a full-form item's own
+        // trailing `:name(...)`/`:(...)`/`:{...}` -- immediately after
+        // its closing bracket, nothing else there to claim it -- attaches
+        // to the item itself, the same as any other sigil's groups do.
         self.parse_groups();
+        // The rest of the line -- plain trailing text for a full-form
+        // item, or the whole bracket-less sugar body -- must not let an
+        // inner element (`@link` in `- @link(ref:x) :{ id: b }`) steal a
+        // colon connect meant for the item: `connect_joins_the_element`
+        // depends on this staying `false` here.
+        let outer = std::mem::replace(&mut self.allow_connect, false);
         self.parse_inline(InlineStop::Line);
         self.allow_connect = outer;
         self.builder.finish_node();
@@ -996,6 +1006,23 @@ mod tests {
         let root = parse_cst("- @link(ref:x) :{ id: b }\n");
         let el = find(&root, K::INLINE_ELEMENT).unwrap();
         assert_eq!(count(&el, K::CONNECT), 0);
+    }
+
+    #[test]
+    fn full_form_list_item_claims_its_own_trailing_connect() {
+        // A full-form item's own groups reach `parse_groups`'s `COLON`
+        // arm directly (nothing else sits between the closing `]` and
+        // the `:`), so this now mirrors a plain element's own connect --
+        // `parse_list_item` only disables `allow_connect` for the rest
+        // of the line (the sugar/trailing-text scan), not for the item's
+        // own groups.
+        let root = parse_cst("- [ x ]:rule(allow: list(a))\n");
+        let item = find(&root, K::LIST_ITEM).unwrap();
+        assert_eq!(count(&item, K::CONNECT), 1);
+        assert_eq!(
+            find(&item, K::CONNECT).unwrap().text().to_string(),
+            ":rule(allow: list(a))"
+        );
     }
 
     #[test]

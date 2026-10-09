@@ -1314,6 +1314,96 @@ Block  @x
 unknown element `x`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
+### リスト項目・見出しの糖衣形でも bare connect が使える。`:()`/`:{}`はどちらが先でもよく、両方書いても一つの `:` で足りる
+
+```tmt
+- content :(x: 1){y: 2}
+```
+
+```
+Block  @ul
+  group
+    Bare
+      args    {x: 1}
+      content
+        Paragraph
+          Text "content"
+      group
+        y: 2
+```
+
+### 見出しの糖衣形も同様
+
+```tmt
+= title :(x: 1){y: 2}
+```
+
+```
+Section level=1
+  Title:
+    Text "title"
+  args    {x: 1}
+  group
+    y: 2
+```
+
+### 改行1つまでなら次の行に置いてもよい(他のsigilの groups と同じ gap)。空行を挟む(改行2つ)とつながらない -- REJECTEDの同じ例を参照
+
+```tmt
+- content
+:{y: 2}
+```
+
+```
+Block  @ul
+  group
+    Bare
+      content
+        Paragraph
+          Text "content"
+      group
+        y: 2
+```
+
+### リスト項目は named connect も直接持てる。完全形・糖衣形のどちらでも、要素自身ではなく項目自身の `connects` に積まれる
+
+```tmt
+- [ x ]:rule(allow: list(card))
+```
+
+```
+Block  @ul
+  group
+    Bare
+      content
+        Paragraph
+          Text "x"
+      connect
+        Inline @rule
+          args    {allow: list("card")}
+```
+
+### 見出しの糖衣形の named connect も、完全形(`=[ h ]:rule(...)`)と同じ扱い
+
+```tmt
+= h :rule(allow: list(card))
+```
+
+```
+Section level=1
+  Title:
+    Text "h"
+  connect
+    Inline @rule
+      args    {allow: list("card")}
+```
+
+検証:
+
+```
+unknown element `rule`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.rule`), or declare the vocabulary that has it and bind it with `@use`
+```
+
 ## id `#(...)`
 
 ### 要素自身のid。`(args)[content]{value}`の後、コネクトの前に読まれる
@@ -1603,6 +1693,27 @@ Block  @memo
 
 ```
 unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
+```
+
+> **パースは通る。** 上が実際の結果。
+
+### sugar bodyのtrailing connectは改行1つまで。空行(改行2つ)を挟むと要素につながらず、`:{...}`はただの地の文になる
+
+```tmt
+- content
+
+:{ y: 2 }
+```
+
+```
+Block  @ul
+  group
+    Bare
+      content
+        Paragraph
+          Text "content"
+Paragraph
+  Text ":{ y: 2 }"
 ```
 
 > **パースは通る。** 上が実際の結果。

@@ -1,0 +1,17 @@
+- (x: 1) content
+- content {y: 2}
+- (x: 1) content {y: 2}
+- (x: 1) content {y: 2}
+
+- (x: 1) content {y: 2}
+
+- (x: 1) content
+- content {y: 2}
+- (x: 1) content {y: 2}
+
+- content:rule(allow: list(card))
+- content:rule(allow: list(card))
+
+=[title]:rule(allow: list(card))
+
+=[title](x: 1) {y: 2}

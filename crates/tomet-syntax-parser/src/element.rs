@@ -3,7 +3,7 @@
 use crate::error::Result;
 use crate::fence::{is_fence_start, parse_fence};
 use crate::inline::{Stop, at_line_start, parse_inline_seq};
-use crate::section::{merge_values, parse_braced_value};
+use crate::section::merge_values;
 use crate::value::{
     POSITIONAL_ENTRY_KEY, eat_name, eat_scalar_raw, err, is_name_start_at, parse_one_entry,
     parse_quoted, parse_value_at, skip_block_comment, skip_inline_ws, skip_line_comment,
@@ -195,30 +195,15 @@ fn skip_lookahead_gap(cur: &mut Cursor) {
     skip_element_gap(cur);
 }
 
-/// `allow_colon_connect` gates the `:(...)`/`:{...}` "connect" branch
-/// below (a bare, colon-less trailing group is *always* claimed
-/// regardless -- see `docs/spec/syntax.tmt`'s
-/// `@meta(format:yaml) {...}` example, real usage this must keep
-/// working). List items pass `false` for the single top-level element
-/// they parse as their own content (`list.rs::parse_list_internal`):
-/// a list item has its own optional trailing `{attrs}`, and without
-/// this, a colon-prefixed group meant for the *item* (`- @link(ref:x)
-/// :{id:breakfast}`) always got silently claimed by `@link` instead --
-/// by the time `list.rs` got a turn, the group was already gone, with
-/// nothing left at the position it expected to still find one at (see
-/// `list_item_ending_in_an_element_does_not_error_on_a_trailing_brace`'s
-/// history for the crash this used to cause before the item-attrs guess
-/// was made speculative). `docs/spec/syntax.tmt`'s
-/// `##[ コネクト ]` section had flagged exactly this shape (`- ()
-/// xxxxxx :{}`) as an unimplemented idea for attaching a group to the
-/// *enclosing* construct rather than the nearest element -- this is
-/// that, scoped narrowly to where the ambiguity actually is. Every
-/// other caller (top-level block elements, content nested inside an
-/// already-bracketed group, paragraph prose) passes `true`, unchanged:
-/// none of those have a competing attrs slot of their own to lose the
-/// group to, so `<id:taskA>:{...}`-style remote connect (see
-/// `remote_id_target_element_supports_colon_connection`) keeps working
-/// exactly as before there.
+/// `allow_colon_connect` gates the `:(...)`/`:{...}`/`:name(...)` connect
+/// branch in [`parse_groups_with_pipe_stack`] (a bare, colon-less
+/// trailing group is *always* claimed regardless -- see
+/// `docs/spec/syntax.tmt`'s `@meta(format:yaml) {...}` example, real
+/// usage that must keep working). Every context that reaches a sigil's
+/// own top-level groups passes `true`: a list item's own groups used to
+/// pass `false` (no `connects` field to put a named one in), but
+/// `element_list_item` now takes `connects` too, so there is no longer a
+/// context that needs the connect branch half-enabled.
 pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Result<Element> {
     parse_element_with_pipe_stack(cur, allow_colon_connect, &[])
 }
@@ -446,9 +431,8 @@ pub(crate) fn parse_groups_with_pipe_stack(
                 //
                 // And `allow_colon_connect` is false in exactly the
                 // contexts where a trailing group may belong to something
-                // else -- a list item's own `{attrs}`, an entry inside a
-                // `{...}` group -- where this fall-through is what hands
-                // it over.
+                // else -- an entry inside a `{...}` group -- where this
+                // fall-through is what hands it over.
                 _ if allow_colon_connect && cur.pos() == checkpoint && opens_group(cur) => {
                     if cur.peek() == Some('#') {
                         return Err(err(
@@ -480,197 +464,241 @@ pub(crate) fn parse_groups_with_pipe_stack(
     Ok(())
 }
 
-/// Byte offset of a `:` immediately (only inline whitespace between)
-/// preceding `brace_pos`, if there is one -- the colon-connect marker
-/// that dedicates this line's trailing `{...}` to the sigil itself
-/// rather than to whatever element precedes it (see
-/// `element::parse_element`'s `allow_colon_connect` doc comment).
-/// Byte-indexed but UTF-8 safe: only ever steps back over bytes it has
-/// just confirmed are the ASCII space/tab/colon it's looking for, so it
-/// never lands on, or reads across, a multi-byte character's interior.
-pub(crate) fn connect_colon_pos(src: &str, brace_pos: usize) -> Option<usize> {
-    let bytes = src.as_bytes();
-    let mut i = brace_pos;
-    while i > 0 && matches!(bytes[i - 1], b' ' | b'\t') {
-        i -= 1;
-    }
-    if i > 0 && bytes[i - 1] == b':' {
-        Some(i - 1)
-    } else {
-        None
-    }
-}
-
-/// What [`peek_trailing_attrs`] found at the end of a bracket-less
-/// sugar line. `content_stop` is where the line's own inline *content*
-/// parsing must stop; `id_pos`/`brace_pos` are where the real parse
-/// (`parse_sugar_body`) jumps to read each piece it found, in that
-/// order -- `#(id)`, if present, always comes before `{attrs}`, the
-/// same relative order [`parse_groups`] enforces for every other
-/// spelling.
-pub(crate) struct TrailingGroups {
-    content_stop: usize,
-    id_pos: Option<usize>,
-    brace_pos: Option<usize>,
-}
-
-/// Forward scan for the last `#(` starting before `before` (the whole
-/// line, if `None`) -- a cheap candidate, confirmed or rejected by
-/// actually parsing it. Mirrors the brace search just below it.
-fn last_hash_paren_pos(cur: &Cursor, before: Option<usize>) -> Option<usize> {
-    let mut look = *cur;
-    let mut last = None;
-    while !look.is_eof() && !matches!(look.peek(), Some('\n') | Some('\r')) {
-        if before.is_some_and(|limit| look.pos() >= limit) {
-            break;
-        }
-        if look.peek() == Some('#') {
-            let mut ahead = look;
-            ahead.bump();
-            if ahead.peek() == Some('(') {
-                last = Some(look.pos());
-            }
-        }
-        look.bump();
-    }
-    last
-}
-
 /// Confirms inline content parsing, stopped at `stop`, actually lands
 /// exactly there rather than overshooting it -- see
-/// [`peek_trailing_attrs`]'s doc comment for why this can't just be
+/// [`find_trailing_connect`]'s doc comment for why this can't just be
 /// trusted.
 fn content_lands_at(cur: &Cursor, stop: usize) -> bool {
     let mut probe = *cur;
     parse_inline_seq(&mut probe, Stop::Offset(stop), false).is_ok() && probe.pos() == stop
 }
 
-fn id_probe_lands_at(cur: &Cursor, id_pos: usize, expect: Option<usize>) -> bool {
-    let mut probe = *cur;
-    probe.set_pos(id_pos);
-    if parse_hash_id(&mut probe).is_err() {
-        return false;
-    }
-    skip_inline_ws(&mut probe);
-    match expect {
-        Some(pos) => probe.pos() == pos,
-        None => matches!(probe.peek(), None | Some('\n') | Some('\r')),
-    }
+/// Whether `el`'s own groups-read actually claimed anything -- used to
+/// tell a genuine connect apart from a trial parse that advanced the
+/// cursor (eating a `:` and a name) without ever finding a group to
+/// read. A named connect with nothing of its own still counts as
+/// "nothing", even though [`parse_groups_with_pipe_stack`] pushes it to
+/// `connects` unconditionally: otherwise ordinary prose ending in
+/// `word:word` (`...see note:more`) would read as a zero-argument
+/// `:more` connect merely because there happened to be nothing left
+/// after it to disagree.
+fn claimed_something(el: &Element) -> bool {
+    el.args.is_some()
+        || el.content.is_some()
+        || el.value.is_some()
+        || el.id.is_some()
+        || el
+            .connects
+            .iter()
+            .any(|c| c.args.is_some() || c.content.is_some() || c.value.is_some() || c.id.is_some())
 }
 
-fn braces_confirm(cur: &Cursor, brace_pos: usize) -> bool {
-    let mut test_cur = *cur;
-    test_cur.set_pos(brace_pos);
-    if parse_braced_value(&mut test_cur).is_err() {
-        return false;
-    }
-    skip_inline_ws(&mut test_cur);
-    matches!(test_cur.peek(), None | Some('\n') | Some('\r'))
-}
-
-/// Finds this line's own trailing `#(id)` and/or `{attrs}`, if the rest
-/// of the line has either.
+/// Leftmost position on the current line where the rest of the line,
+/// read the same way [`parse_groups_with_pipe_stack`] reads any sigil's
+/// own groups, both claims something and lands exactly at the end of the
+/// line -- the trailing `#(id)`/`(args)`/`{value}`/`:name(...)` a
+/// bracket-less sugar body hands over to its owner (a list item or
+/// heading). Leftmost, not rightmost: a valid starting point reads every
+/// contiguous group from there to the end of the line in one pass, so
+/// the leftmost one that validates is always the full run (`#(id){value}`,
+/// not just whichever piece happens to follow a later candidate).
 ///
-/// A bare, colon-less trailing `{}` is always claimed by an element
-/// instead of this sugar, regardless of `allow_colon_connect`
-/// (`@meta(format:yaml) {...}` is real, existing usage that must keep
-/// working) -- so this line's one `{` can still belong to an inner
-/// element instead of the item, and `Stop::Offset` alone can't be
-/// trusted to have actually stopped parsing there: `parse_inline_seq`
-/// only checks its target *between* separate line items, not while a
-/// single element is mid-way through claiming one more trailing group
-/// -- so it can walk straight past the stop point without ever
-/// noticing. Speculatively parsing here (the result is discarded either
-/// way -- the real caller reparses once this confirms the guess) is the
-/// only way to know without duplicating `parse_element`'s own claiming
-/// logic. The `#(id)` search follows the exact same shape: a cheap
-/// forward scan for a candidate position, confirmed only by actually
-/// parsing it.
-pub(crate) fn peek_trailing_attrs(cur: &Cursor) -> Option<TrailingGroups> {
+/// Candidates are every `(`, `{`, `#(` and `:` on the line -- a cheap
+/// forward scan -- each confirmed or rejected by actually parsing from
+/// there, the only way to know without duplicating
+/// `parse_groups_with_pipe_stack`'s own claiming logic. Three things
+/// narrow this to exactly the shapes that belong to the owner rather
+/// than to something else in the content:
+///
+/// - "Lands exactly at the end of the line" rejects a colon that's just
+///   part of ordinary prose (`see note: more text`): something would
+///   still be unconsumed after it.
+/// - [`claimed_something`] further rejects a colon at the very end of a
+///   line with nothing structured after it (`...note:more`) -- otherwise
+///   indistinguishable from plain text that happens to end in a word
+///   with a colon in front of it.
+/// - [`content_lands_at`] rejects a *colon-less* candidate that an inner
+///   element occupying the end of the content would itself reach past --
+///   `@meta(format:yaml) {...}` must still belong to `@meta`, not to
+///   this sugar body, the same real, existing usage a bare trailing
+///   group has always been claimed by first (`parse_groups_with_pipe_stack`'s
+///   colon branch doc comment). A colon-prefixed candidate can't suffer
+///   this: nothing within the content is ever parsed with a mode that
+///   lets it claim a colon connect for itself (`parse_sugar_body` always
+///   parses its own content with `allow_colon_connect: false`), so this
+///   check is cheap insurance there rather than load-bearing.
+fn find_trailing_connect(cur: &Cursor) -> Option<usize> {
+    let src = cur.src();
+    let preceded_by_colon = |pos: usize| {
+        let bytes = src.as_bytes();
+        let mut i = pos;
+        while i > 0 && matches!(bytes[i - 1], b' ' | b'\t') {
+            i -= 1;
+        }
+        i > 0 && bytes[i - 1] == b':'
+    };
+    // Names are ASCII-only (`is_name_char`), so a raw byte compare is
+    // UTF-8-safe here: no continuation byte of a multi-byte character
+    // ever equals one of these.
+    let preceded_by_name_char = |pos: usize| {
+        pos > 0
+            && matches!(src.as_bytes()[pos - 1], b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-')
+    };
     let mut look = *cur;
-    let mut last_brace_pos = None;
+    let mut candidates = Vec::new();
     while !look.is_eof() && !matches!(look.peek(), Some('\n') | Some('\r')) {
-        if look.peek() == Some('{') {
-            last_brace_pos = Some(look.pos());
+        if look.peek() == Some(':') {
+            // Always a candidate -- and, unlike an opener, never itself
+            // excluded for being colon-preceded (`::` doesn't happen in
+            // practice, but there's no reason to special-case it away).
+            candidates.push(look.pos());
+            look.bump();
+            continue;
+        }
+        let is_hash_paren = look.peek() == Some('#') && look.peek_at(1) == Some('(');
+        // A *colonless* `(` is deliberately not a candidate opener here,
+        // unlike `{` -- parenthetical remarks are common, ordinary prose
+        // (`tmtroot/locales/ja/readme.tmt`'s own
+        // `...記号の渋滞 (LSP機能を大切に)` is exactly this), so treating
+        // every sentence that happens to end in `(...)` as the owner's
+        // own `args` would be far too eager. `(` only ever participates
+        // here through a `:` candidate, matching what the user actually
+        // writes (`:(...)`), never bare.
+        let is_opener = is_hash_paren || look.peek() == Some('{');
+        // A colon-preceded opener is already reachable by starting the
+        // trial right at that colon (which will itself eat the opener
+        // as part of the same read) -- adding the opener too would let
+        // a trial starting there "succeed" while leaving the colon
+        // itself dangling as unconsumed content text. A name-preceded
+        // one (the `(` of `rule(...)` in `:rule(allow:list)`) is the
+        // same problem one level removed: starting right at it reads a
+        // plain `(args)` group that happens to look valid on its own,
+        // leaving the name *and* its colon as unconsumed text instead
+        // of being read together as one `:name(...)` connect.
+        if is_opener && !preceded_by_colon(look.pos()) && !preceded_by_name_char(look.pos()) {
+            candidates.push(look.pos());
         }
         look.bump();
+        // `#(` is one unit: stepping past both here keeps the `(` from
+        // also being added as its own, separate (and wrong -- it would
+        // read as a plain `(args)` group instead of the id it's part
+        // of) candidate one character later.
+        if is_hash_paren {
+            look.bump();
+        }
     }
-
-    if let Some(brace_pos) = last_brace_pos {
-        // `attrs_start` is the colon-connect marker's position when
-        // there is one, short of `brace_pos` -- content parsing (and,
-        // if present, the id search) stop there instead, so that marker
-        // isn't left dangling as ordinary trailing text once
-        // `allow_colon_connect: false` stops an inner element from
-        // consuming it itself.
-        let attrs_start = connect_colon_pos(cur.src(), brace_pos).unwrap_or(brace_pos);
-
-        if let Some(id_pos) = last_hash_paren_pos(cur, Some(attrs_start))
-            && id_probe_lands_at(cur, id_pos, Some(attrs_start))
-            && content_lands_at(cur, id_pos)
-            && braces_confirm(cur, brace_pos)
+    // Leftmost first, not rightmost: a valid starting point reads every
+    // contiguous group from there to the end of the line in one go (the
+    // same loop any sigil's own groups use), so the leftmost one that
+    // validates always captures the full run (`#(id){value}`, not just
+    // whichever piece happens to follow a later candidate) --
+    // `list_item_sugar_reads_a_trailing_id_and_attrs_together` is
+    // exactly this: starting at the `{` alone would "succeed" too, but
+    // only by skipping straight past the `#(id)` in front of it.
+    candidates.into_iter().find(|&pos| {
+        let mut probe = *cur;
+        probe.set_pos(pos);
+        let mut scratch = element_new(Sigil::Bare);
+        if parse_groups_with_pipe_stack(&mut probe, &mut scratch, true, &[]).is_err()
+            || !claimed_something(&scratch)
         {
-            return Some(TrailingGroups {
-                content_stop: id_pos,
-                id_pos: Some(id_pos),
-                brace_pos: Some(brace_pos),
-            });
+            return false;
         }
-        if content_lands_at(cur, attrs_start) && braces_confirm(cur, brace_pos) {
-            return Some(TrailingGroups {
-                content_stop: attrs_start,
-                id_pos: None,
-                brace_pos: Some(brace_pos),
-            });
+        skip_inline_ws(&mut probe);
+        matches!(probe.peek(), None | Some('\n') | Some('\r')) && content_lands_at(cur, pos)
+    })
+}
+
+/// What a bracket-less sugar body (`- x`, `= x`) found for its own
+/// `args`/`value`/`id`/`connects`, alongside its `content` -- merged
+/// into the caller's constructed item/heading exactly the way any other
+/// element's own slots are.
+pub(crate) struct SugarBody {
+    pub content: Vec<Inline>,
+    pub args: Option<Value>,
+    pub value: Option<ElementValue>,
+    pub id: Option<Id>,
+    pub connects: Vec<Element>,
+}
+
+impl SugarBody {
+    fn from_scratch(content: Vec<Inline>, scratch: Element) -> Self {
+        SugarBody {
+            content,
+            args: scratch.args,
+            value: scratch.value,
+            id: scratch.id,
+            connects: scratch.connects,
         }
     }
-
-    // No (confirmed) braces -- a trailing `#(id)` alone, with nothing
-    // but the end of the line after it.
-    if let Some(id_pos) = last_hash_paren_pos(cur, None)
-        && id_probe_lands_at(cur, id_pos, None)
-        && content_lands_at(cur, id_pos)
-    {
-        return Some(TrailingGroups {
-            content_stop: id_pos,
-            id_pos: Some(id_pos),
-            brace_pos: None,
-        });
-    }
-
-    None
 }
 
 /// Reads a bracket-less body: inline content to the end of the line,
-/// plus the line's own trailing `#(id)` and/or `{attrs}` if it has
-/// either.
+/// plus whatever trailing connect that line (or, failing that, the next
+/// one) hands over to its owner.
 ///
-/// This is the sugar shared by `-` and `=`. It is single-line on purpose:
-/// content that spans lines has to say so with an explicit `[ ... ]`
-/// group, which is what [`parse_groups`] reads.
-pub(crate) fn parse_sugar_body(
-    cur: &mut Cursor,
-) -> Result<(Vec<Inline>, Option<Value>, Option<Id>)> {
-    if let Some(trailing) = peek_trailing_attrs(cur) {
-        let content = parse_inline_seq(cur, Stop::Offset(trailing.content_stop), false)?;
-        let id = match trailing.id_pos {
-            Some(id_pos) => {
-                cur.set_pos(id_pos);
-                Some(parse_hash_id(cur)?)
-            }
-            None => None,
-        };
-        let attrs = match trailing.brace_pos {
-            Some(brace_pos) => {
-                cur.set_pos(brace_pos);
-                Some(parse_braced_value(cur)?)
-            }
-            None => None,
-        };
-        Ok((content, attrs, id))
-    } else {
-        Ok((parse_inline_seq(cur, Stop::Line, false)?, None, None))
+/// This is the sugar shared by `-` and `=`. The content itself is
+/// single-line on purpose: content that spans lines has to say so with
+/// an explicit `[ ... ]` group, which is what [`parse_groups`] reads.
+/// The trailing connect is not bound by that: once a line's content ends
+/// with nothing of the owner's own found on it,
+/// [`parse_groups_with_pipe_stack`] is tried again right there, which is
+/// what lets it tolerate the same single-blank-line gap every other
+/// sigil's groups do -- `- content` followed by `  :{}` on the next line
+/// connects exactly as `- content :{}` does on one.
+pub(crate) fn parse_sugar_body(cur: &mut Cursor) -> Result<SugarBody> {
+    if let Some(connect_pos) = find_trailing_connect(cur) {
+        let content = parse_inline_seq(cur, Stop::Offset(connect_pos), false)?;
+        cur.set_pos(connect_pos);
+        let mut scratch = element_new(Sigil::Bare);
+        parse_groups_with_pipe_stack(cur, &mut scratch, true, &[])?;
+        // `find_trailing_connect` only ever starts a candidate at `:`,
+        // `(`, `{` or `#(`, never at `[`/`|` -- but a *second*, colon-less
+        // group read further along the same candidate's run still could
+        // be (`:(x:1)[y]`, say). A bracket-less sugar body has nowhere
+        // of its own to put that `[...]`/`|...`, so treat it the same as
+        // not finding a connect at all rather than silently losing it.
+        if scratch.content.is_some() {
+            cur.set_pos(connect_pos);
+            let content = parse_inline_seq(cur, Stop::Line, false)?;
+            return Ok(SugarBody::from_scratch(content, element_new(Sigil::Bare)));
+        }
+        return Ok(SugarBody::from_scratch(content, scratch));
     }
+
+    // Plain content, nothing of the owner's own on this line -- try a
+    // trailing connect after a gap (the same single-blank-line tolerance
+    // `parse_groups` grants every other sigil) -- `- content` followed
+    // by `  :{}` on the next line connects exactly as `- content :{}`
+    // does on one.
+    let content = parse_inline_seq(cur, Stop::Line, false)?;
+    let after_content = cur.pos();
+    let mut scratch = element_new(Sigil::Bare);
+    // Confirm what follows the gap is actually a connect opener before
+    // calling into the real reader: a bracket-less sugar body has no
+    // `content`/`children` field of its own to hold a `[...]`/`|...`
+    // group, but `parse_groups_with_pipe_stack`'s ordinary `[`/`|` arms
+    // fire unconditionally whenever a fresh scratch element's `content`
+    // slot is empty (which it always is here) -- so without this guard,
+    // a *following* pipe-marked list continuation (`current_stack`'s own
+    // next `|`, not this scratch's) would get silently read and
+    // discarded as if it belonged to this line instead. Only `:`,
+    // `(`, `{` and `#(` are the connect family; `[`/`|` are never routed
+    // here at all.
+    let mut probe = *cur;
+    let is_connect_opener = skip_element_gap(&mut probe) <= 1
+        && (matches!(probe.peek(), Some('(') | Some('{') | Some(':'))
+            || (probe.peek() == Some('#') && probe.peek_at(1) == Some('(')));
+    if is_connect_opener {
+        parse_groups_with_pipe_stack(cur, &mut scratch, true, &[])?;
+        // Same guard as above, for the same reason: a second, colon-less
+        // group within this gap-tolerant read could still reach `[`/`|`.
+        if scratch.content.is_some() {
+            cur.set_pos(after_content);
+            return Ok(SugarBody::from_scratch(content, element_new(Sigil::Bare)));
+        }
+    }
+    Ok(SugarBody::from_scratch(content, scratch))
 }
 
 pub(crate) fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {

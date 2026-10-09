@@ -254,6 +254,7 @@ fn link_list_item(path: &str, span: Span) -> Element {
         None,
         None,
         Vec::new(),
+        Vec::new(),
         span,
     )
 }

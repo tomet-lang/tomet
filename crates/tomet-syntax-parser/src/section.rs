@@ -3,10 +3,8 @@
 use crate::element::{parse_groups, parse_sugar_body};
 use crate::error::Result;
 use crate::inline::{Stop, parse_inline_seq};
-use crate::value::{err, parse_value_at, skip_inline_ws, skip_ws_newlines_and_comments};
-use tomet_ast::{
-    Block, Element, ElementValue, Inline, Paragraph, Placement, Section, Sigil, Value,
-};
+use crate::value::{err, skip_inline_ws};
+use tomet_ast::{Block, Element, Inline, Paragraph, Placement, Section, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -113,11 +111,16 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
             // A heading-less section with a trailing comment.
         }
         _ if had_ws && !matches!(cur.peek(), None | Some('\n') | Some('\r')) => {
-            let (mut content, attrs, id) = parse_sugar_body(cur)?;
+            // A sugar heading supports a named connect too, matching its
+            // full, bracketed form just above.
+            let body = parse_sugar_body(cur)?;
+            let mut content = body.content;
             trim_trailing_equals(&mut content);
             title = content;
-            el.value = attrs.map(ElementValue::from_map);
-            el.id = id;
+            el.args = body.args;
+            el.value = body.value;
+            el.id = body.id;
+            el.connects = body.connects;
         }
         None | Some('\n') | Some('\r') => {
             // A heading-less section (`=` or `==` alone on its line).
@@ -146,33 +149,6 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
         blocks: Vec::new(),
         span,
     })
-}
-
-pub(crate) fn parse_braced_value(cur: &mut Cursor) -> Result<Value> {
-    if !cur.eat_str("{") {
-        return Err(err(cur, cur.pos(), "expected '{'"));
-    }
-    skip_ws_newlines_and_comments(cur);
-    // `parse_value_at`'s own fallback (`parse_map_body_or_scalar`)
-    // deliberately errors ("expected a value") on an immediately-
-    // closing bracket, since *that* function is also used for sequence
-    // items and single-value positions where an empty body is never
-    // valid. A whole `{}`/`()` *group*, though, is: `element.rs`'s
-    // `parse_value_group` and `parse_paren_value` both special-case it
-    // into an empty `Value::Map` before ever calling
-    // `parse_value_at` -- this mirrors that (this function's callers,
-    // heading/list-item attrs, are exactly that same "whole group"
-    // position, not a sequence item).
-    let v = if cur.peek() == Some('}') {
-        Value::Map(Vec::new())
-    } else {
-        parse_value_at(cur)?
-    };
-    skip_ws_newlines_and_comments(cur);
-    if !cur.eat_str("}") {
-        return Err(err(cur, cur.pos(), "expected '}'"));
-    }
-    Ok(v)
 }
 
 pub(crate) fn is_thematic_break(cur: &Cursor) -> bool {

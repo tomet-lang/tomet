@@ -34,8 +34,9 @@ without fragile structured-mark nesting.
 
 - First-Class Move & Closed Edit Operations:
 
-[`EditOp`] provides a minimal, closed set of operations (`Insert`, `Delete`, `Move`, `EditText`).
+[`EditOp`] provides a minimal, closed set of operations (`Insert`, `Delete`, `Move`, `EditText`, `SetAttribute`).
 `Move` is a first-class operation, directly supported by tree-based CRDTs (e.g. Loro's MovableTree).
+[`EditOp::SetAttribute`] allows key-level manipulation of an element's `{}` data, `()` args, and `#()` id slot.
 
 - Post-Edit Diagnostics:
 
@@ -122,6 +123,10 @@ An editable node in a Tomet document tree.
 ====[ enum ChildItem ]
 
 An entry in a child list: either layout trivia (whitespace/comment) or a child node.
+
+====[ enum AttrGroup ]
+
+Target attribute slot or group on an element.
 
 ====[ enum NodeKind ]
 

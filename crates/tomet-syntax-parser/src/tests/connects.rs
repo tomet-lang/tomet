@@ -121,3 +121,142 @@ fn section_supports_named_connect() {
         other => panic!("expected section, got {other:?}"),
     }
 }
+
+#[test]
+fn sugar_list_item_and_heading_support_a_bare_connect() {
+    // `:()`, `:{}` and the combined `:(){}` now attach to a bracket-less
+    // sugar body's own owner the same way they already did for a
+    // bracketed one -- see `ConnectMode::Bare`/`find_trailing_connect`.
+    for (src, expect_args, expect_value) in [
+        ("- content :(x: 1)\n", Some(Value::Int(1)), None),
+        ("- content :{y: 2}\n", None, Some(Value::Int(2))),
+        (
+            "- content :(x: 1){y: 2}\n",
+            Some(Value::Int(1)),
+            Some(Value::Int(2)),
+        ),
+    ] {
+        let doc = parse_document(src).unwrap_or_else(|e| panic!("{src:?} failed: {e}"));
+        match &doc.blocks[0] {
+            Block::Element(list) => {
+                let items = list_items(list);
+                assert_eq!(
+                    items[0].args,
+                    expect_args.map(|v| Value::Map(vec![("x".into(), v)])),
+                    "{src:?}"
+                );
+                assert_eq!(
+                    item_attrs(items[0]),
+                    expect_value.map(|v| Value::Map(vec![("y".into(), v)])),
+                    "{src:?}"
+                );
+                let text: String = first_para(items[0].content.as_ref().expect("content"))
+                    .iter()
+                    .map(|inline| match inline {
+                        Inline::Text(t) => t.value.as_str(),
+                        other => panic!("{src:?}: expected text, got {other:?}"),
+                    })
+                    .collect();
+                assert_eq!(text, "content", "{src:?}");
+            }
+            other => panic!("{src:?}: expected list, got {other:?}"),
+        }
+    }
+
+    let doc = parse_document("= title :(x: 1){y: 2}\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Section(s) => {
+            assert_eq!(s.args, Some(Value::Map(vec![("x".into(), Value::Int(1))])));
+            assert_eq!(
+                s.value,
+                Some(ElementValue::from_map(Value::Map(vec![(
+                    "y".into(),
+                    Value::Int(2)
+                )])))
+            );
+            assert_eq!(s.title, vec![Inline::Text("title".into())]);
+        }
+        other => panic!("expected section, got {other:?}"),
+    }
+}
+
+#[test]
+fn sugar_heading_supports_a_named_connect_matching_its_bracketed_form() {
+    // A bracketed heading (`section_supports_named_connect`, just above)
+    // has always supported `:name(...)`; the sugar form didn't, purely
+    // because `parse_sugar_body` had no colon handling of any kind
+    // before -- `ConnectMode::Full` closes that gap rather than leaving
+    // the sugar form one step behind the bracketed one.
+    let doc = parse_document("= h :rule(allow: list(card))\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Section(s) => {
+            assert_eq!(s.connects.len(), 1);
+            assert_eq!(s.connects[0].sigil, Sigil::named("rule"));
+        }
+        other => panic!("expected section, got {other:?}"),
+    }
+}
+
+#[test]
+fn sugar_list_item_supports_a_named_connect_matching_its_bracketed_form() {
+    // A list item's sugar body now supports `:name(...)` too -- matching
+    // both its own full-bracketed form (just above) and a heading's sugar
+    // form, now that `element_list_item` carries `connects`.
+    let doc = parse_document("- content :rule(allow: list(card))\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Element(list) => {
+            let items = list_items(list);
+            assert_eq!(items[0].connects.len(), 1);
+            assert_eq!(items[0].connects[0].sigil, Sigil::named("rule"));
+        }
+        other => panic!("expected list, got {other:?}"),
+    }
+}
+
+#[test]
+fn sugar_connect_tolerates_one_blank_line_but_not_two() {
+    // The same gap `skip_element_gap` already grants a bracketed
+    // element's own groups: a trailing connect may start on the very
+    // next line, or after exactly one blank line, but a second blank
+    // line ends the block before the connect is ever reached.
+    let doc = parse_document("- content\n:{y: 2}\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Element(list) => {
+            let items = list_items(list);
+            assert_eq!(
+                item_attrs(items[0]),
+                Some(Value::Map(vec![("y".into(), Value::Int(2))]))
+            );
+        }
+        other => panic!("expected list, got {other:?}"),
+    }
+    assert_eq!(doc.blocks.len(), 1, "no stray paragraph split off");
+
+    let doc = parse_document("- content\n\n:{y: 2}\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Element(list) => {
+            let items = list_items(list);
+            assert_eq!(item_attrs(items[0]), None);
+        }
+        other => panic!("expected list, got {other:?}"),
+    }
+    assert_eq!(
+        doc.blocks.len(),
+        2,
+        "two blank lines end the item before the connect"
+    );
+
+    let doc = parse_document("= title\n:{y: 2}\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Section(s) => {
+            assert_eq!(
+                s.value,
+                Some(ElementValue::from_map(Value::Map(vec![(
+                    "y".into(),
+                    Value::Int(2)
+                )])))
+            );
+        }
+        other => panic!("expected section, got {other:?}"),
+    }
+}
