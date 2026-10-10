@@ -389,9 +389,11 @@ impl Bindings {
     /// What `doc` has in scope, given every vocabulary available.
     ///
     /// Pure: the vocabularies arrive already parsed, so this is the half
-    /// a caller that cannot open a file can still run.
-    /// `tomet-resolver::bindings_for` is this plus reading them off disk,
-    /// and a wasm host that has the sources can pass them straight in.
+    /// a caller that cannot open a file can still run. A caller that can
+    /// gets them via `tomet-resolver::load_vocabularies` and calls
+    /// [`LoadedVocabularies::bindings_for`] directly, which is this plus
+    /// reading them off disk; a wasm host that has the sources instead
+    /// can pass them straight in.
     ///
     /// A document's `@kind(X)` binds the vocabulary calling itself `X`.
     /// Everything else has to be asked for with `@use`.

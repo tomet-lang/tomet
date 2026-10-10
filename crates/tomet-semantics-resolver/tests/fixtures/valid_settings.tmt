@@ -1,9 +1,0 @@
-@kind(settings)
-@settings{
-  format: {
-    callout: { style: { content: block } }
-  }
-  macros: {
-    gh: "https://github.com/tomet/tomet/issues/${1}"
-  }
-}

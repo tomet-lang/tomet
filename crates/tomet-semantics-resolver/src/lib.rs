@@ -1,19 +1,25 @@
 //! =[ tomet-resolver ]
 //!
-//! Resolves the constructs that name another file: `@config(import:...)`
-//! / `@settings(file:...)`, and the vocabularies a document brings into
-//! scope. This is Tomet's "preprocessor/linker" layer: the only place I/O
-//! and file resolution are allowed, precisely because `tomet-parser`
-//! itself must have none (see `crates/tomet-syntax-parser/.writ.tmt`'s
-//! `parser-purity`).
+//! Reads the vocabularies a document brings into scope, and recognizes
+//! -- without reading -- the constructs that name another file:
+//! `@config(import:...)` / `@settings(file:...)`. This is Tomet's
+//! "preprocessor/linker" layer: the only place I/O and file resolution
+//! are allowed, precisely because `tomet-parser` itself must have none
+//! (see `crates/tomet-syntax-parser/.writ.tmt`'s `parser-purity`).
+//!
+//! Recognizing a `@config(import:...)`/`@settings(file:...)` reference
+//! ([`config_import_ref`]/[`settings_file_ref`]) is as far as this crate
+//! takes it -- actually resolving one lives in `apps/lsp`, which reads
+//! and merges the target itself rather than calling back in here.
 //!
 //! =[ Reading is here; deciding is not ]
 //! Every rule lives one layer down, in `tomet-semantics`, and this crate
 //! only adds "read it off disk". `Vocabulary::from_document` and
-//! `Bindings::for_document` are pure there; `load_vocabularies` and
-//! `bindings_for` are those two plus a `fs::read_to_string`. That split
-//! is what lets the js/java/python bindings hand vocabularies in as
-//! source text from a target that cannot open a file.
+//! `Bindings::for_document` are pure there; [`load_vocabularies`] is that
+//! plus a `fs::read_to_string` per declared vocabulary. That split is
+//! what lets the js/java/python bindings hand vocabularies in as source
+//! text, via [`load_vocabulary_sources`], from a target that cannot open
+//! a file.
 //!
 //! =[ `@include` is recognized and expands nothing ]
 //! `@import` split into `@use` (bind a namespace, handled here) and
@@ -28,9 +34,5 @@ mod vocabulary;
 
 pub use error::ResolveError;
 pub use interp::resolve_reference;
-pub use settings::{
-    config_import_ref, resolve_settings_file, resolve_settings_ref, settings_file_ref,
-};
-pub use vocabulary::{
-    LoadedVocabularies, bindings_for, load_vocabularies, load_vocabulary_sources,
-};
+pub use settings::{config_import_ref, settings_file_ref};
+pub use vocabulary::{LoadedVocabularies, load_vocabularies, load_vocabulary_sources};

@@ -13,9 +13,6 @@
 
 use std::path::Path;
 
-use tomet_ast::Document;
-use tomet_semantics::Bindings;
-
 pub use tomet_semantics::LoadedVocabularies;
 
 /// Reads every vocabulary in `declared`, as paths relative to `root`.
@@ -61,16 +58,6 @@ fn add_source(loaded: &mut LoadedVocabularies, label: &str, src: &str) {
     }
 }
 
-/// The namespaces `doc` has in scope, from what was loaded off disk.
-///
-/// The decision itself is `Bindings::for_document`, which is pure. This
-/// only supplies what reading the filesystem found, so a caller that
-/// cannot read one -- a wasm host, say -- can call that directly with
-/// vocabularies it obtained some other way.
-pub fn bindings_for(doc: &Document, loaded: &LoadedVocabularies) -> Bindings {
-    loaded.bindings_for(doc)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,7 +79,7 @@ mod tests {
 
         let doc = tomet_parser::parse_document("@kind(doc.index)\n\n#[ An index ]\n")
             .expect("document parses");
-        let bindings = bindings_for(&doc, &loaded);
+        let bindings = loaded.bindings_for(&doc);
         assert!(bindings.kind.is_some());
 
         let _ = fs::remove_dir_all(&root);
@@ -107,7 +94,7 @@ mod tests {
 
         let doc = tomet_parser::parse_document("a @doc.icon(\"star\", pkg:\"lucide\") b\n")
             .expect("document parses");
-        let bindings = bindings_for(&doc, &loaded);
+        let bindings = loaded.bindings_for(&doc);
         assert_eq!(
             bindings.classify(&tomet_ast::Name::namespaced("doc", "icon")),
             Ok(tomet_semantics::ElementKind::Custom("doc.icon".to_string()))
