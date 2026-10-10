@@ -44,7 +44,7 @@ pub(crate) fn render_embed_element(el: &Element, out: &mut String) {
 /// `@file(x)`/`@dir(x)` -- a path named, not navigated to.
 ///
 /// A `<code>`, not an `<a>`, and that is the whole difference from
-/// `render_link_element`. Prose saying "read `codeblock.rs`" is not
+/// `render_link_element`. Prose saying "read `raw.rs`" is not
 /// offering to take the reader there, and before these elements existed
 /// it was written in backticks -- which is exactly what this renders back
 /// to, so moving a mention onto `@file` changes what a checker can see

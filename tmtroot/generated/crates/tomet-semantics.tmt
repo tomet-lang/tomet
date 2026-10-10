@@ -21,7 +21,7 @@ allowing downstream consumers (`tomet-html`, `tomet-markdown`, `tomet-links`,
 
 ==[ Core Capabilities ]
 
-- ("`@meta`", "`@config`", "`@links`", "`@link`", "`<embed>`", "`hr`", "`em`", "`strong`", "`mark`", "`codeblock`", "`quote`", "`table`", "`heading`", "`ol`", "`ul`", "`bare`", "`interp`") @strong[Element Classification (`kind`)]: Canonical recognition of Tomet's built-in vocabulary
+- ("`@meta`", "`@config`", "`@links`", "`@link`", "`<embed>`", "`hr`", "`em`", "`strong`", "`mark`", "`raw`", "`quote`", "`table`", "`heading`", "`ol`", "`ul`", "`bare`", "`interp`") @strong[Element Classification (`kind`)]: Canonical recognition of Tomet's built-in vocabulary
 
 via [`ElementKind`].
 
@@ -29,7 +29,7 @@ via [`ElementKind`].
 
 prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
 
-- ("e.g. `<codeblock>(rust)` -> `{lang: \"rust\"}`") @strong[Positional Argument Normalization (`positional`)]: Unifies positional argument mapping
+- ("e.g. `@raw(rust)` -> `{lang: \"rust\"}`") @strong[Positional Argument Normalization (`positional`)]: Unifies positional argument mapping
 
 for built-in and `@settings` custom schemas.
 

@@ -22,7 +22,7 @@
 //! - `element`: Typed elements (`<T>`, `@name`, bare `@`), group ordering, and connect syntax.
 //! - `section`: Headings (`=[...]`) and thematic breaks (`---`, `---[ title ]---`).
 //! - `list`: Ordered and unordered lists (`-`, `-.`), markers, and item attributes.
-//! - `codeblock` / `fence`: Fenced code blocks (``` ``` ```) and the
+//! - `raw` / `fence`: Fenced code blocks (``` ``` ```) and the
 //!   line-oriented fence scan they share.
 //! - `inline`: Inline scanning, formatting delimiters (`*em*`, `**strong**`, `==mark==`), autolinks.
 //! - `interp`: `${...}` interpolation expressions (identifiers, member chains, calls, literals).
@@ -32,7 +32,6 @@
 //! - `error`: Source location (`Position`/`Span`) aware error diagnostics.
 
 mod caret;
-mod codeblock;
 pub mod cst;
 mod document;
 mod element;
@@ -41,6 +40,7 @@ mod fence;
 mod inline;
 mod interp;
 mod list;
+mod raw;
 mod section;
 mod value;
 

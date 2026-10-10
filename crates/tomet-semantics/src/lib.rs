@@ -14,11 +14,11 @@
 //!
 //! - **Element Classification (`kind`)**: Canonical recognition of Tomet's built-in vocabulary
 //!   (`@meta`, `@config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`,
-//!   `codeblock`, `quote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`) via [`ElementKind`].
+//!   `raw`, `quote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`) via [`ElementKind`].
 //! - **Link Target Extraction (`target`)**: Canonical extraction of link targets and scheme
 //!   prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
 //! - **Positional Argument Normalization (`positional`)**: Unifies positional argument mapping
-//!   (e.g. `<codeblock>(rust)` -> `{lang: "rust"}`) for built-in and `@settings` custom schemas.
+//!   (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and `@settings` custom schemas.
 //! - **Document Configuration (`config`)**: Merges `@config` and `@settings` blocks across
 //!   a document into a structured [`DocumentConfig`].
 //! - **Metadata Extraction (`meta`)**: Extracts top-level `@meta` values via [`document_meta`].

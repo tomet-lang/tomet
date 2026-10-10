@@ -32,7 +32,7 @@ editor syntax highlighting.
 - `element`: Typed elements (`<T>`, `@name`, bare `@`), group ordering, and connect syntax.
 - `section`: Headings (`=[...]`) and thematic breaks (`---`, `---[ title ]---`).
 - `list`: Ordered and unordered lists (`-`, `-.`), markers, and item attributes.
-- `codeblock` / `fence`: Fenced code blocks (` ` ```) and the
+- `raw` / `fence`: Fenced code blocks (` ` ```) and the
 
 line-oriented fence scan they share.
 

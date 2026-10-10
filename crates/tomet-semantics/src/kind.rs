@@ -108,7 +108,7 @@ pub enum ElementKind {
     ///
     /// Separate from [`Link`](ElementKind::Link) because the two differ
     /// in what they produce: `@link` is an `<a>`, and this is a mention.
-    /// Prose that says "read `codeblock.rs`" is not offering to take the
+    /// Prose that says "read `raw.rs`" is not offering to take the
     /// reader there. Before this, such a mention was written in
     /// backticks, which no checker can tell from a sentence that happens
     /// to look like a path -- 453 of them here, and of the 164 distinct
@@ -151,7 +151,7 @@ pub enum ElementKind {
     /// The reader is what settles it: a Markdown round-trip produced an
     /// element that validation then rejected as unknown. The three
     /// writers already match `callout` in the same arm list as `heading`,
-    /// `codeblock` and `link`, on `kind.as_str()`, so joining the list
+    /// `raw` and `link`, on `kind.as_str()`, so joining the list
     /// changes nothing for them.
     ///
     /// This records that the name exists and stands as a block. What its
@@ -264,7 +264,7 @@ impl ElementKind {
 /// and what has to change.** These entries carry behavior, not just shape:
 /// `@link`'s target kind is derived from the target string's own scheme
 /// prefix (`crate::target::target_scheme`), `@meta` selects an embedded
-/// format, `@codeblock` takes a raw body. A vocabulary document declares
+/// format, `@raw` takes a raw body. A vocabulary document declares
 /// names, arguments and constraints; it cannot yet declare any of that, so
 /// moving `std` into one would either lose the behavior or smuggle it in
 /// under a key that means "call into the binary".
@@ -558,7 +558,7 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         Kind | Version | Meta | Config | Settings | Use | Include | Blueprint | Vocabulary
         | Content | Args | Data => None,
         // Self-closing; a fenced/backtick code body's `[content]` is
-        // synthesized by the parser itself (`codeblock.rs`), not shaped
+        // synthesized by the parser itself (`raw.rs`), not shaped
         // by an author, so there is nothing here for a shape check to
         // classify. No observed `@tag[...]` usage to classify yet.
         // Lists are no longer `Element`s at all (see `tomet_ast::List`),

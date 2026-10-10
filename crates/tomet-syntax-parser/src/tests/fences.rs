@@ -3,7 +3,7 @@ use super::*;
 /// The `Inline::Raw` text of `doc`'s first block, which must be a `@name`
 /// element whose `[content]` is a single nested backtick-fenced `@raw`
 /// element -- the replacement for the old `+++` raw-body fence (see
-/// `codeblock.rs`): `[...]` shares `document.rs::parse_block_seq` with the
+/// `raw.rs`): `[...]` shares `document.rs::parse_block_seq` with the
 /// document root, so a fenced code block nests inside it exactly as it
 /// would at the top level.
 fn nested_raw_body(doc: &tomet_ast::Document) -> &str {
@@ -112,7 +112,7 @@ fn parses_a_fenced_code_block_without_lang() {
 }
 
 #[test]
-fn fenced_code_block_and_bracket_codeblock_produce_the_same_ast() {
+fn fenced_code_block_and_bracket_raw_produce_the_same_ast() {
     // No longer *identical* content: the fenced spelling is always
     // captured verbatim (`Inline::Raw`, can hold real newlines), while
     // `@raw(...)[...]` is ordinary `[content]` -- the parser

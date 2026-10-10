@@ -83,7 +83,7 @@ mod tests {
 
     #[test]
     fn non_heading_element_is_always_none() {
-        let mut el = element_new(Sigil::named("codeblock"));
+        let mut el = element_new(Sigil::named("raw"));
         el.args = Some(Value::Int(2));
         assert_eq!(heading_level(&el), None);
     }

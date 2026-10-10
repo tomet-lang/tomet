@@ -62,6 +62,8 @@ define_ast_node!(CstBlockElement, BLOCK_ELEMENT);
 define_ast_node!(CstParagraph, PARAGRAPH);
 define_ast_node!(CstList, LIST);
 define_ast_node!(CstListItem, LIST_ITEM);
+// Note: `CstCodeBlock` / `CODE_BLOCK` refers to the concrete syntax construct
+// (backtick fences), whereas the semantic element sigil is `@raw`.
 define_ast_node!(CstCodeBlock, CODE_BLOCK);
 define_ast_node!(CstSigil, SIGIL);
 define_ast_node!(CstArgs, ARGS);

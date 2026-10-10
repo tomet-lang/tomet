@@ -69,7 +69,7 @@ fn post_process_inlines_wikilinks(inlines: Vec<Inline>) -> Vec<Inline> {
             }
             // Not text to scan for URLs/wikilinks: a break carries no
             // characters, and raw content (code block bodies -- already
-            // skipped a level up by the `codeblock` check above) must stay
+            // skipped a level up by the `raw` check above) must stay
             // verbatim.
             other @ (Inline::SoftBreak(_) | Inline::LineBreak(_) | Inline::Raw(_)) => {
                 new_inlines.push(other);

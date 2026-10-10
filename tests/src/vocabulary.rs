@@ -30,7 +30,7 @@ use tomet_tree::for_each_element_mut;
 /// Which kind of identifier a case renames.
 #[derive(Clone, Copy)]
 enum Ident {
-    /// An element name: `codeblock` in `#codeblock`, `meta` in `#meta`.
+    /// An element name: `raw` in `#raw`, `meta` in `#meta`.
     ElementName,
     /// A key inside `(args)`: `content:`, `format:`, ...
     ArgKey,
@@ -63,7 +63,7 @@ struct Case {
 const CASES: &[Case] = &[
     Case {
         label: "`#raw`'s content is not parsed differently from any \
-                other element's (was codeblock.rs `is_codeblock`)",
+                other element's (was raw.rs `is_codeblock`)",
         known: "@raw[ *a* ]",
         unknown: "@zzz[ *a* ]",
         known_ident: "raw",
@@ -72,7 +72,7 @@ const CASES: &[Case] = &[
     },
     Case {
         label: "`(content:raw)` is an ordinary argument and does not switch \
-                `[...]` to verbatim (was codeblock.rs `is_verbatim_content`)",
+                `[...]` to verbatim (was raw.rs `is_verbatim_content`)",
         known: "@memo(content:raw)[ *a* ]",
         unknown: "@memo(zcontent:raw)[ *a* ]",
         known_ident: "content",

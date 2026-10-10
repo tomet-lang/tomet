@@ -3,7 +3,7 @@
 //! Orchestrates block-level constructs (sections, paragraphs, lists,
 //! elements, thematic breaks) into a [`Document`].
 
-use crate::codeblock::{is_fenced_code_block_start, parse_fenced_code_block};
+use crate::raw::{is_fenced_code_block_start, parse_fenced_code_block};
 use crate::element::{
     LineEnd, consume_trailing_continuation, element_ends_line, is_element_start,
     leading_continuation, parse_element,

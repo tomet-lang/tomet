@@ -4,7 +4,7 @@
 //! character is at least as long as the opening run -- a longer opening
 //! run (` ```` `) escapes a body that itself contains a closing-looking
 //! line. This is the one piece of that machinery still needed:
-//! `codeblock.rs`'s fenced code block is the only fence left in the
+//! `raw.rs`'s fenced code block is the only fence left in the
 //! grammar.
 
 use crate::value::skip_inline_ws;

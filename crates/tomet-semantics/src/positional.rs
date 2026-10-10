@@ -5,7 +5,7 @@ use crate::vocabulary::{Bindings, ElementDecl};
 /// One table, keyed on the bare name alone.
 ///
 /// This used to be two parallel tables, one per sigil, and they had
-/// silently drifted: `codeblock`, `embed` and `callout` had entries only
+/// silently drifted: `raw`, `embed` and `callout` had entries only
 /// under `<T>`, so `@embed(x)` and `<embed>(x)` disagreed about whether
 /// `x` meant `target`. Both of those sigils are gone -- `@name` is the
 /// only one, and shape comes from position -- so keying on anything but

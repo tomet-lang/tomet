@@ -1,7 +1,7 @@
 //! Parsing for inline sequences, text normalization, and inline delimiters (`*em*`, `**strong**`, `==mark==`).
 
 use crate::caret::{is_caret_start, parse_caret_element};
-use crate::codeblock::is_fenced_code_block_start;
+use crate::raw::is_fenced_code_block_start;
 use crate::element::{LineEnd, element_ends_line, is_element_start, parse_element};
 use crate::error::Result;
 use crate::interp::{is_interp_start, parse_dollar_element};

@@ -130,7 +130,7 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // it; `grammar.js` has not been taught the combine form yet.
     ("syntax/combine.tmt", &[ANY_ERROR]),
     // A fenced code block nested inside `[content]` -- the replacement
-    // for the retired `+++` raw-body fence (see `codeblock.rs` and
+    // for the retired `+++` raw-body fence (see `raw.rs` and
     // `document.rs::parse_block_seq`, which `[content]` shares with the
     // document root in the real parser). `grammar.js`'s own content rule,
     // `_bracket_item: choice($._line_item, $._newline)`, is inline-only
