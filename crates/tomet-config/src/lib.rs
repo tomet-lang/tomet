@@ -9,33 +9,21 @@
 //!   ([`find_config_file`], [`load_config_from_file`], [`load_config_from_str`]).
 //!
 //! - Root Group Modules:
-//!   - [`format`]: Heading, link, element, callout, list, and table formatting rules ([`FormatConfig`], [`GroupOrder`]).
-//!   - [`meta`]: Document metadata formatting and schema rules ([`MetaConfig`], [`FieldConfig`]).
-//!   - [`workspace`]: Vault file indexing exclusions and unswept rules ([`WorkspaceConfig`]).
-//!   - [`macros`]: Macro template expansions ([`MacrosConfig`]).
-//!   - [`registry`]: Blueprints and vocabularies declarations ([`RegistryConfig`]).
-//!   - [`api`]: API extraction settings ([`ApiConfig`]).
+//!   - [`groups`]: Root configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`MacrosConfig`], [`RegistryConfig`], [`ApiConfig`]).
 //!   - [`discovery`]: Configuration file discovery, loading, and error handling.
 //!   - [`tree`]: AST tree normalization and path lookup utilities.
 
-pub mod api;
 pub mod discovery;
-pub mod format;
-pub mod macros;
-pub mod meta;
-pub mod registry;
+pub mod groups;
 pub mod tree;
-pub mod workspace;
 
-pub use api::ApiConfig;
 pub use discovery::{
     ConfigError, config_for, find_config_file, load_config_from_file, load_config_from_str,
 };
-pub use format::{FormatConfig, GroupOrder};
-pub use macros::MacrosConfig;
-pub use meta::{FieldConfig, MetaConfig};
-pub use registry::RegistryConfig;
-pub use workspace::WorkspaceConfig;
+pub use groups::{
+    ApiConfig, FieldConfig, FormatConfig, GroupOrder, MacrosConfig, MetaConfig, RegistryConfig,
+    WorkspaceConfig, api, format, macros, meta, registry, workspace,
+};
 
 use tomet_ast::{Document, Value};
 use tree::merge_entry;

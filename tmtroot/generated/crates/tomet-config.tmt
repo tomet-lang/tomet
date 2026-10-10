@@ -18,22 +18,9 @@ Configuration discovery, loading, and styling rule definitions ([`Config`], [`Fo
 ([`find_config_file`], [`load_config_from_file`], [`load_config_from_str`]).
 
 - Root Group Modules:
-  - `format`, link, element, callout, list, and table formatting rules ([`FormatConfig`], [`GroupOrder`]).:Heading
-  - `meta` metadata formatting and schema rules ([`MetaConfig`], [`FieldConfig`]).:Document
-  - `workspace` file indexing exclusions and unswept rules ([`WorkspaceConfig`]).:Vault
-  - `macros` template expansions ([`MacrosConfig`]).:Macro
-  - `registry` and vocabularies declarations ([`RegistryConfig`]).:Blueprints
-  - `api` extraction settings ([`ApiConfig`]).:API
+  - `groups` configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`MacrosConfig`], [`RegistryConfig`], [`ApiConfig`]).:Root
   - `discovery` file discovery, loading, and error handling.:Configuration
   - `tree` tree normalization and path lookup utilities.:AST
-
-==[ Module api ]
-
-API extraction configuration ([`ApiConfig`]).
-
-===[ Structs ]
-
-====[ struct ApiConfig ]
 
 ==[ Module discovery ]
 
@@ -63,43 +50,72 @@ failing that the defaults.
 Searches `start` and its parent directories for `default.config.tmt` or `tomet.config.tmt`.
 Returns `(Config, config_file_path, config_directory_path)`.
 
-==[ Module format ]
+==[ Module groups ]
+
+Root configuration groups corresponding to `@settings{ ... }` / `@config{ ... }` sections.
+
+Each submodule defines a dedicated strongly-typed configuration struct for a specific domain:
+
+- `format`, link, element, callout, list, and table formatting rules ([`FormatConfig`], [`GroupOrder`]).:Heading
+- `meta` metadata formatting and schema rules ([`MetaConfig`], [`FieldConfig`]).:Document
+- `workspace` file indexing exclusions and unswept rules ([`WorkspaceConfig`]).:Vault
+- `macros` template expansions ([`MacrosConfig`]).:Macro
+- `registry` and vocabularies declarations ([`RegistryConfig`]).:Blueprints
+- `api` extraction settings ([`ApiConfig`]).:API
+
+===[ Module api ]
+
+API extraction configuration ([`ApiConfig`]).
+
+====[ Structs ]
+
+=====[ struct ApiConfig ]
+
+===[ Module format ]
 
 Formatting and printer rule configuration ([`FormatConfig`], [`GroupOrder`]).
 
-===[ Structs ]
+====[ Structs ]
 
-====[ struct FormatConfig ]
+=====[ struct FormatConfig ]
 
-===[ Enums ]
+====[ Enums ]
 
-====[ enum GroupOrder ]
+=====[ enum GroupOrder ]
 
-==[ Module macros ]
+===[ Module macros ]
 
 Macro template definitions ([`MacrosConfig`]).
 
-===[ Structs ]
+====[ Structs ]
 
-====[ struct MacrosConfig ]
+=====[ struct MacrosConfig ]
 
-==[ Module meta ]
+===[ Module meta ]
 
 Metadata styling rules and per-field constraints ([`MetaConfig`], [`FieldConfig`]).
 
-===[ Structs ]
+====[ Structs ]
 
-====[ struct FieldConfig ]
+=====[ struct FieldConfig ]
 
-====[ struct MetaConfig ]
+=====[ struct MetaConfig ]
 
-==[ Module registry ]
+===[ Module registry ]
 
 Blueprint and vocabulary file registry declarations ([`RegistryConfig`]).
 
-===[ Structs ]
+====[ Structs ]
 
-====[ struct RegistryConfig ]
+=====[ struct RegistryConfig ]
+
+===[ Module workspace ]
+
+Workspace-level configuration ([`WorkspaceConfig`]).
+
+====[ Structs ]
+
+=====[ struct WorkspaceConfig ]
 
 ==[ Module tree ]
 
@@ -120,14 +136,6 @@ one-element list shorthand.
 
 Recursively merges `key` and `value` into `target`, normalizing dotted keys
 into hierarchical `Value::Map` entries while preserving flat keys for `meta` and `macros`.
-
-==[ Module workspace ]
-
-Workspace-level configuration ([`WorkspaceConfig`]).
-
-===[ Structs ]
-
-====[ struct WorkspaceConfig ]
 
 ==[ Structs ]
 
