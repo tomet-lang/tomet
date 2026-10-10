@@ -4,17 +4,16 @@
 //!
 //! =[ Architecture & Responsibilities ]
 //!
-//! - Read-Only In-Memory Validation:
-//!   `tomet-validator` performs pure, read-only semantic and schema validation across
-//!   an in-memory [`Document`]. It performs zero I/O, no reference resolution (handled
-//!   by `tomet-address` and `tomet-links`), and no AST mutations.
-//!
-//! - Validation Rules:
-//!   -| Duplicate ID Detection: Walks all element nodes and detects duplicate `id` attributes.
-//!    | Unknown & Mismatched Directives: Checks element sigils against standard vocabularies and bindings.
-//!    | Blueprint Conformance: Validates document structures against defined `@kind` blueprints.
-//!    | Diagnostic Error Mapping: Emits structured [`Diagnostic`] items carrying exact [`TextRange`]
-//!      spans, powering CLI warnings and LSP diagnostics in `apps/lsp`.
+//! - (Read-Only In-Memory Validation)
+//!   | `tomet-validator` performs pure, read-only semantic and schema validation across
+//!   | an in-memory [`Document`]. It performs zero I/O, no reference resolution (handled
+//!   | by `tomet-address` and `tomet-links`), and no AST mutations.
+//! - (Validation Rules)
+//!   | Duplicate ID Detection: Walks all element nodes and detects duplicate `id` attributes.
+//!   | Unknown & Mismatched Directives: Checks element sigils against standard vocabularies and bindings.
+//!   | Blueprint Conformance: Validates document structures against defined `@kind` blueprints.
+//!   | Diagnostic Error Mapping: Emits structured [`Diagnostic`] items carrying exact [`TextRange`]
+//!   | spans, powering CLI warnings and LSP diagnostics in `apps/lsp`.
 
 pub mod blueprint;
 mod diagnostic;
@@ -646,7 +645,7 @@ fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>) {
         if !el.sigil.is_bare_named("settings") && !el.sigil.is_bare_named("config") {
             return;
         }
-        let Some(Value::Map(entries)) = tomet_semantics::embedded::element_data(el) else {
+        let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el) else {
             return;
         };
         for key in RETIRED {

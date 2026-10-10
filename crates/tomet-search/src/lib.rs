@@ -10,9 +10,9 @@
 //!
 //! =[ Query Engines ]
 //!
-//! - **[`structural`]**: AST element query matching by tag, key, and value content.
-//! - **[`filter`]**: Document metadata query filtering (`contains`, `exists`, `eq`, `gt`)
-//!   and sorting (`by(field, "asc"|"desc")`) over in-memory rows (the engine behind `${filter(...)}`).
+//! - (`structural`) AST element query matching by tag, key, and value content.
+//! - (`filter`)| Document metadata query filtering (`contains`, `exists`, `eq`, `gt`)
+//!             | and sorting (`by(field, "asc"|"desc")`) over in-memory rows (the engine behind `${filter(...)}`).
 
 pub mod filter;
 pub mod structural;

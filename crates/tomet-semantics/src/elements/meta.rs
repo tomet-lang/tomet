@@ -30,7 +30,7 @@ pub fn document_meta(doc: &Document) -> Option<Value> {
 }
 
 fn meta_data(el: &Element) -> Option<Value> {
-    crate::embedded::element_data(el)
+    crate::data::element_data(el)
 }
 
 use crate::positional::normalized_element_args;
@@ -53,7 +53,7 @@ pub fn document_kind(doc: &Document) -> Option<String> {
                 return;
             }
         }
-        if let Some(val) = crate::embedded::element_data(el) {
+        if let Some(val) = crate::data::element_data(el) {
             if let Some(s) = val.get("kind").and_then(|v| v.as_str()) {
                 found = Some(s.to_string());
                 return;
@@ -81,7 +81,7 @@ pub fn document_version(doc: &Document) -> Option<String> {
             });
             return;
         }
-        if let Some(val) = crate::embedded::element_data(el) {
+        if let Some(val) = crate::data::element_data(el) {
             found = Some(match val.get("version") {
                 Some(v) => value_to_version_string(v),
                 None => value_to_version_string(&val),

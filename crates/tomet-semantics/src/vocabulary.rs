@@ -546,7 +546,7 @@ fn header(doc: &Document) -> Option<(String, bool)> {
         let Some(name) = positional_name(el) else {
             return;
         };
-        let open = crate::embedded::element_data(el)
+        let open = crate::data::element_data(el)
             .and_then(|data| data.get("open").and_then(|v| v.as_bool()))
             .unwrap_or(false);
         found = Some((name, open));
@@ -570,7 +570,7 @@ fn positional_name(el: &tomet_ast::Element) -> Option<String> {
 }
 
 fn decl_from_element(el: &tomet_ast::Element) -> ElementDecl {
-    let Some(data) = crate::embedded::element_data(el) else {
+    let Some(data) = crate::data::element_data(el) else {
         return ElementDecl::default();
     };
 
@@ -604,7 +604,7 @@ fn content_allow_from_element(el: &Element) -> Option<ContentAllow> {
         .as_children()
         .into_iter()
         .find(|child| classify_std_lenient(child) == ElementKind::Content)?;
-    let data = crate::embedded::element_data(content_el)?;
+    let data = crate::data::element_data(content_el)?;
     match data.get("allow")? {
         Value::String(s) if s == "inline" => Some(ContentAllow::Inline),
         Value::String(s) if s == "any" => Some(ContentAllow::Any),
@@ -671,7 +671,7 @@ fn params_from_element(el: &Element) -> Vec<ParamDecl> {
 
 fn param_from_element(el: &Element) -> Option<ParamDecl> {
     let name = positional_name(el)?;
-    let data = crate::embedded::element_data(el);
+    let data = crate::data::element_data(el);
     let get = |key: &str| data.as_ref().and_then(|d| d.get(key).cloned());
     Some(ParamDecl {
         name,

@@ -10,11 +10,11 @@ Workspace-level batch refactoring, structural search, metadata editing, and I/O 
 
 Provides:
 
-- @strong[[`diff`]]: [`FileDiff`] model and disk persistence.
-- @strong[[`refactor`]]: Refactoring pipeline across `.tmt` files.
-- @strong[[`structural`]]: Structural search & replace engine across a workspace.
-- @strong[[`batch_meta`]]: Batch metadata update engine.
-- @strong[[`blueprint`]]: Blueprint discovery and document instantiation.
+- (diff) `FileDiff` model and disk persistence.
+- (refactor) Refactoring pipeline across `.tmt` files.
+- (structural) Structural search & replace engine across a workspace.
+- (batch_meta) Batch metadata update engine.
+- (blueprint) Blueprint discovery and document instantiation.
 
 ==[ Module batch_meta ]
 

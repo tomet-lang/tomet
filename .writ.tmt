@@ -21,11 +21,11 @@ does not relax the rule to fit the change it wanted to make.
     6: list( "apps/*", "bindings/*", "editors/*", "tests", "crates/tomet" )
     5: list( "crates/tomet-workspace*", "crates/tomet-load*" )
     4: list(
-      "crates/serde_tomet",
       "crates/tomet-format*",
-      "crates/tomet-convert-*",
-      "crates/tomet-transform",
+      "crates/tomet-convert*",
       "crates/tomet-extract*",
+      "crates/serde_tomet",
+      "crates/tomet-transform",
       "crates/tomet-search",
       "crates/tomet-edit",
       "crates/tomet-stats",

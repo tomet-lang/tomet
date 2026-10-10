@@ -1,10 +1,10 @@
 //! AST node accessors, extension traits, builders, and recursive tree traversal for Tomet.
 //!
 //! Provides:
-//! - **[`ValueExt`]**: Inspection and accessor methods on [`tomet_ast::Value`].
-//! - **[`ElementExt`]**: Attribute manipulation and helpers on [`tomet_ast::Element`].
-//! - **[`DocumentExt`]**: Block-level manipulation helpers on [`tomet_ast::Document`].
-//! - **[`walk`]**: Generic recursive tree visitors ([`walk_document`], [`walk_document_mut`]).
+//! - (ValueExt) Inspection and accessor methods on [`tomet_ast::Value`].
+//! - (ElementExt) Attribute manipulation and helpers on [`tomet_ast::Element`].
+//! - (DocumentExt) Block-level manipulation helpers on [`tomet_ast::Document`].
+//! - (walk) Generic recursive tree visitors ([`walk_document`], [`walk_document_mut`]).
 
 pub mod document;
 pub mod element;

@@ -1,12 +1,12 @@
 //! Pure in-memory AST refactoring and structural transformations for Tomet documents.
 //!
 //! Provides:
-//! - **[`macro_rewrite`]**: Reverse URL-to-macro pattern matching and rewriting.
-//! - **[`directive`]**: Directive promotion (`@meta.type` -> `@kind`) and Value DSL normalization.
-//! - **[`structural`]**: Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
-//! - **[`meta`]**: Batch `@meta` key/value updates.
-//! - **[`index_query`]**: `${filter(...)}` in an `@kind(index)` document,
-//!   expanded into the `@file` entries it selects.
+//! - (macro_rewrite) Reverse URL-to-macro pattern matching and rewriting.
+//! - (directive) Directive promotion (`@meta.type` -> `@kind`) and Value DSL normalization.
+//! - (structural) Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
+//! - (meta) Batch `@meta` key/value updates.
+//! - (index_query)| `${filter(...)}` in an `@kind(index)` document,
+//!                | expanded into the `@file` entries it selects.
 
 pub mod blueprint;
 pub mod directive;

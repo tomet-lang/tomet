@@ -4,32 +4,28 @@
 //!
 //! =[ Architecture & Core Principles ]
 //!
-//! - CRDT-Agnostic Model:
-//!   This crate provides an in-memory, tree-structured document model with opaque [`NodeId`]s,
-//!   designed to bridge to external collaborative runtimes (such as Loro, Yjs, or Automerge).
-//!   It depends on zero CRDT libraries, networking, or session transport code.
-//!
-//! - CST Foundation & Guaranteed Invariant:
-//!   The model is derived from the Concrete Syntax Tree (`tomet-cst`). Trivia (whitespace,
-//!   newlines, comments) is preserved alongside nodes.
-//!   Guaranteed Invariant: Importing and immediately exporting without edits is 100% byte-identical
-//!   to the original input source across the entire corpus (`export_doc(&import_source(src)) == src`).
-//!
-//! - Text as Raw String (Paragraphs & Headings):
-//!   Prose within paragraphs, headings, and element content is held as raw text rather than
-//!   inline marks. Structure in the model is retained where identity, moving, and keys matter
-//!   (sections, blocks, attributes), allowing CRDTs to merge text via character-level sequences
-//!   without fragile structured-mark nesting.
-//!
-//! - First-Class Move & Closed Edit Operations:
-//!   [`EditOp`] provides a minimal, closed set of operations (`Insert`, `Delete`, `Move`, `EditText`, `SetAttribute`).
-//!   `Move` is a first-class operation, directly supported by tree-based CRDTs (e.g. Loro's MovableTree).
-//!   [`EditOp::SetAttribute`] allows key-level manipulation of an element's `{}` data, `()` args, and `#()` id slot.
-//!
-//! - Post-Edit Diagnostics:
-//!   Collaborative engines merge writes without rejecting them. [`diagnose_doc`] exports the edited
-//!   document to source text and re-parses it with the full validator to report duplicate IDs,
-//!   schema errors, or broken syntax after concurrent merges.
+//! - (CRDT-Agnostic Model)
+//!   | This crate provides an in-memory, tree-structured document model with opaque [`NodeId`]s,
+//!   | designed to bridge to external collaborative runtimes (such as Loro, Yjs, or Automerge).
+//!   | It depends on zero CRDT libraries, networking, or session transport code.
+//! - (CST Foundation & Guaranteed Invariant)
+//!   | The model is derived from the Concrete Syntax Tree (`tomet-cst`). Trivia (whitespace,
+//!   | newlines, comments) is preserved alongside nodes.
+//!   | Guaranteed Invariant: Importing and immediately exporting without edits is 100% byte-identical
+//!   | to the original input source across the entire corpus (`export_doc(&import_source(src)) == src`).
+//! - (Text as Raw String (Paragraphs & Headings))
+//!   | Prose within paragraphs, headings, and element content is held as raw text rather than
+//!   | inline marks. Structure in the model is retained where identity, moving, and keys matter
+//!   | (sections, blocks, attributes), allowing CRDTs to merge text via character-level sequences
+//!   | without fragile structured-mark nesting.
+//! - (First-Class Move & Closed Edit Operations)
+//!   | [`EditOp`] provides a minimal, closed set of operations (`Insert`, `Delete`, `Move`, `EditText`, `SetAttribute`).
+//!   | `Move` is a first-class operation, directly supported by tree-based CRDTs (e.g. Loro's MovableTree).
+//!   | [`EditOp::SetAttribute`] allows key-level manipulation of an element's `{}` data, `()` args, and `#()` id slot.
+//! - (Post-Edit Diagnostics)
+//!   | Collaborative engines merge writes without rejecting them. [`diagnose_doc`] exports the edited
+//!   | document to source text and re-parses it with the full validator to report duplicate IDs,
+//!   | schema errors, or broken syntax after concurrent merges.
 
 pub mod diagnostics;
 pub mod doc;

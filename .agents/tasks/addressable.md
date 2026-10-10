@@ -48,46 +48,27 @@ converter, and `tree-sitter-tomet`'s grammar; `tests/fixtures/syntax/id.tmt`-sty
 coverage lives in `crates/tomet-syntax-parser/src/tests/id.rs` and new
 `tests/src/syntax_report.rs` CASES instead of a dedicated fixture file. ~947
 workspace tests green. Still only covers the unique-property/addressability half
-of this file's original scope -- the reference-writing question and the
-dangling-reference/rename-update checker below are untouched.
+of this file's original scope -- the reference-writing syntax is decided in the spec
+(`@link(ref:)`/`${}`/`#(x)`), but the runtime path traversal (Step 5, targeted for `tomet-address`)
+and the dangling-reference/rename-update checker are untouched.
 
 ## Open
 
 (Template expansion with no `_id`: DECIDED - unreachable by unique address; only the user naming it makes it reachable. Range inside strings: dropped.)
 
 - [x] `.settings` spelling: `meta: { isbn: { type: string, unique: true } }` in `default.config.tmt` (DECIDED)
-- [ ] how references are *written* in text: `@link(ref:)` vs `^...` vs `[[ ]]`
+- [x] how references are *written* in text: `@link(ref:)` is the shorthand for `#(x)`, references in text use `@link` or `${...}`. `^` is dedicated to footnotes (`^footnote(1)`); `[[ ]]` was not adopted. (DECIDED, documented in `tmtroot/docs/spec/syntax/addressable.tmt`)
 - [ ] dangling-reference check in `tomet check`; renaming an `_id` with reference update
 - [ ] vault-wide `@meta` `_id`: duplicates across the vault, cross-vault refs
 - [ ] step 5: does the parser/AST carry parent+sibling info to compute addresses.
-      **2026-10-10 findings** (from a conversation that started as "should
-      there be a `tomet-address` crate"):
-      - Confirmed there is currently *zero* resolution path for the
-        `item(n)`/`prop(k)` step vocabulary this spec defines, anywhere in
-        the codebase. `tomet-semantics-resolver::interp::resolve_reference`
-        (the thing that resolves `${}` chains today) only handles
-        `InterpExprKind::Identifier`/`Member` (plain map-key lookup).
-        `crates/tomet-syntax-parser/src/interp.rs:146-156` parses any
-        `.name(args)` step — which is exactly the shape `item(2)`/
-        `prop(priority)` take — as `InterpExprKind::Call`, and
-        `resolve_reference`'s match arm rejects `Call` outright as
-        `ResolveError::NotAReference` (it's explicitly left for
-        `tomet-compute` to evaluate as a function call, not a path step).
-        So writing `#(intro).item(2)` today does not do what the spec
-        says; nothing walks it.
-      - Where this should land is now entangled with a separate, still-
-        open task: `.agents/tasks/layer-purity-io-split.md`. That task is
-        splitting `tomet-semantics-resolver`'s 2 fs-I/O functions out
-        (promoted to layer 5, keeping the `tomet-resolver` name) and
-        leaves behind a pure remainder at layer 2 that is *not yet one
-        coherent crate* — `resolve_reference` is one of ~4 distinct
-        things left in it, un-split. A candidate name for that pure
-        remainder (or at least the `resolve_reference`/address part of
-        it) discussed: `tomet-semantics-address`. **Not decided.** Step 5
-        (implementing real `item(n)`/`prop(k)` traversal) should probably
-        be built into wherever that remainder ends up living, once
-        `layer-purity-io-split.md` resolves its own open questions —
-        check that task's status before starting step 5.
+      **2026-10-10 findings & resolution**:
+      - `layer-purity-io-split` completed in commit `b4b987a`.
+      - `tomet-semantics-address` (crate name `tomet-address`) was created at Layer 2
+        as the pure in-memory home for reference and address resolution (`resolve_reference`,
+        `config_import_ref`, `settings_file_ref`). `tomet-semantics-resolver` was deleted.
+      - Therefore, the home for Step 5 (`item(n)`/`prop(k)` traversal and path step
+        resolution) is **DECIDED**: it lives in `tomet-address` (`crates/tomet-semantics-address`).
+      - Traversal implementation itself is still open (currently `${}` Call nodes are rejected by `resolve_reference` as `NotAReference`).
 - [x] implementation + fixtures (done 2026-10-02 as `id`/`#(x)`, not `_id`/`#id(x)` --
       see the supersession note above; `cargo test -p tomet-tests -p tree-sitter-tomet`
       passes)

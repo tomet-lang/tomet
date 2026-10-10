@@ -4,29 +4,36 @@
 //!
 //! =[ Architecture & Responsibilities ]
 //!
-//! - Pure I/O-Free Semantic Layer:
-//!   `tomet-semantics` is strictly a pure classification and semantic extraction layer.
-//!   It performs zero I/O and depends exclusively on `tomet-ast` (not `tomet-parser`),
-//!   allowing downstream consumers (`tomet-html`, `tomet-markdown`, `tomet-links`,
-//!   `tomet-tui`, `tomet-lsp`) to classify elements without pulling in the parser.
+//! - (Pure I/O-Free Semantic Layer)
+//!   | `tomet-semantics` is strictly a pure classification and semantic extraction layer.
+//!   | It performs zero I/O and depends exclusively on `tomet-ast` (not `tomet-parser`),
+//!   | allowing downstream consumers (`tomet-html`, `tomet-markdown`, `tomet-links`,
+//!   | `tomet-tui`, `tomet-lsp`) to classify elements without pulling in the parser.
 //!
 //! =[ Core Capabilities ]
 //!
-//! - **Element Classification (`kind`)**: Canonical recognition of Tomet's built-in vocabulary
-//!   (`@meta`, `@config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`,
-//!   `raw`, `quote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`) via [`ElementKind`].
-//! - **Link Target Extraction (`target`)**: Canonical extraction of link targets and scheme
-//!   prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
-//! - **Positional Argument Normalization (`positional`)**: Unifies positional argument mapping
-//!   (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and `@settings` custom schemas.
-//! - **Document Configuration (`config`)**: Merges `@config` and `@settings` blocks across
-//!   a document into a structured [`DocumentConfig`].
-//! - **Metadata Extraction (`meta`)**: Extracts top-level `@meta` values via [`document_meta`].
-//! - **Structural Helpers**: Heading level clamping (`heading`) and
-//!   table parsing (`table`).
-//! - **Element-Specific Semantics ([`elements`])**: Dedicated normalization and extraction
-//!   logic for concrete built-in element families (`config`, `embedded`, `footnote`,
-//!   `heading`, `meta`, `table`, `tag`, `target`).
+//! - (Element Classification (`kind`))
+//!   | Canonical recognition of Tomet's built-in vocabulary
+//!   | (`@meta`, `@config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`,
+//!   | `raw`, `quote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`) via [`ElementKind`].
+//! - (Link Target Extraction (`target`))
+//!   | Canonical extraction of link targets and scheme
+//!   | prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
+//! - **Positional Argument Normalization (`positional`))
+//!   | Unifies positional argument mapping
+//!   | (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and `@settings` custom schemas.
+//! - (Document Configuration (`config`))
+//!   | Merges `@config` and `@settings` blocks across
+//!   | a document into a structured [`DocumentConfig`].
+//! - (Metadata Extraction (`meta`))
+//!   | Extracts top-level `@meta` values via [`document_meta`].
+//! - (Structural Helpers)
+//!   | Heading level clamping (`heading`) and
+//!   | table parsing (`table`).
+//! - (Element-Specific Semantics (`elements`))
+//!   | Dedicated normalization and extraction
+//!   | logic for concrete built-in element families (`config`, `data`, `footnote`,
+//!   | `heading`, `meta`, `table`, `tag`, `target`).
 //!
 
 mod connect_member;
@@ -41,7 +48,7 @@ pub use connect_member::{
     CONNECT_MEMBERS, ConnectMember, UnknownConnectMember, classify_connect_member,
 };
 pub use elements::config::{DocumentConfig, ExportType, document_config};
-pub use elements::embedded;
+pub use elements::data;
 pub use elements::footnote::{self, FootnoteItem, FootnoteRegistry};
 pub use elements::heading::heading_level;
 pub use elements::meta::{document_kind, document_meta, document_version};

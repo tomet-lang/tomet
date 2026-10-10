@@ -47,16 +47,16 @@
 //! compiles nothing it does not use. Each feature adds one module:
 //!
 //! @table
-//! |[ feature ][ module ][ from ]
-//! |[ `edit` ][ [`edit`] ][ `tomet-edit` ]
-//! |[ `parser` ][ [`parser`] ][ `tomet-parser` ]
-//! |[ `html` ][ [`html`] ][ `tomet-html` ]
-//! |[ `markdown` ][ [`markdown`] ][ `tomet-markdown` ]
-//! |[ `typst` ][ [`typst`] ][ `tomet-typst` ]
-//! |[ `pandoc` ][ [`pandoc`] ][ `tomet-pandoc` ]
-//! |[ `format` ][ [`mod@format`] ][ `tomet-formatter` ]
-//! |[ `printer` ][ [`printer`] ][ `tomet-printer` ]
-//! |[ `stats` ][ [`stats`] ][ `tomet-stats` ]
+//! |[ feature    ][ module       ][ from              ]
+//! |[ `edit`     ][ `edit`       ][ `tomet-edit`      ]
+//! |[ `parser`   ][ `parser`     ][ `tomet-parser`    ]
+//! |[ `html`     ][ `html`       ][ `tomet-html`      ]
+//! |[ `markdown` ][ `markdown`   ][ `tomet-markdown`  ]
+//! |[ `typst`    ][ `typst`      ][ `tomet-typst`     ]
+//! |[ `pandoc`   ][ `pandoc`     ][ `tomet-pandoc`    ]
+//! |[ `format`   ][ `mod@format` ][ `tomet-formatter` ]
+//! |[ `printer`  ][ `printer`    ][ `tomet-printer`   ]
+//! |[ `stats`    ][ `stats`      ][ `tomet-stats`     ]
 //!
 //! Output-producing conversions want a document that has been through
 //! [`Vault::prepare`] first; see `tomet-load` for why that is a separate

@@ -7,10 +7,10 @@
 //!
 //! =[ Subcommands ]
 //!
-//! - @strong[Inspection & Validation] : `check`, `check-links`, `ast`, `roundtrip`, and `stats`.
-//! - @strong[Transformation & Formatting] : `format` and `refactor`.
-//! - @strong[Converters] : `html`, `to-md`, `from-md`, `to-typst`, `to-pandoc`, `from-pandoc`, and `export`.
-//! - @strong[Documentation & Ecosystem] : `api`, `cli-docs`, `tui`, and `serve`.
+//! - (Inspection & Validation) `check`, `check-links`, `ast`, `roundtrip`, and `stats`.
+//! - (Transformation & Formatting) `format` and `refactor`.
+//! - (Converters) `html`, `to-md`, `from-md`, `to-typst`, `to-pandoc`, `from-pandoc`, and `export`.
+//! - (Documentation & Ecosystem) `api`, `cli-docs`, `tui`, and `serve`.
 
 mod cli;
 mod commands;

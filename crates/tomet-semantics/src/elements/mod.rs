@@ -8,7 +8,7 @@
 //! built-in element families:
 //!
 //! - (config) Document configuration (`@config`, `@settings`).
-//! - (embedded) An element's `{...}` value read as data.
+//! - (data) An element's `{...}` value read as data.
 //! - (footnote) Footnote collection and indexing (`<footnote>`, `^id`).
 //! - (heading) Heading level calculation and bounds clamping (`heading`).
 //! - (meta) Document metadata and frontmatter extraction (`@meta`, `@kind`, `@version`).
@@ -17,7 +17,7 @@
 //! - (target) Target URI and scheme resolution (`@link`, `@embed`, `@file`, `@dir`).
 
 pub mod config;
-pub mod embedded;
+pub mod data;
 pub mod footnote;
 pub mod heading;
 pub mod meta;

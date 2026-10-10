@@ -11,10 +11,10 @@
 //!
 //! =[ Key Functions ]
 //!
-//! - [`from_str`]: Parse a TOVE data document into a Rust type via Serde.
-//! - [`to_string`]: Render a Rust type into TOVE data text via Serde.
-//! - [`from_value`]: Convert a [`Value`] into a Rust type via Serde deserializer.
-//! - [`to_value`]: Convert a Rust type into a [`Value`] via Serde serializer.
+//! - (from_str) Parse a TOVE data document into a Rust type via Serde.
+//! - (to_string) Render a Rust type into TOVE data text via Serde.
+//! - (from_value) Convert a [`Value`] into a Rust type via Serde deserializer.
+//! - (to_value) Convert a Rust type into a [`Value`] via Serde serializer.
 
 pub mod de;
 pub mod error;

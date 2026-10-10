@@ -4,14 +4,13 @@
 //!
 //! =[ Architecture & Responsibilities ]
 //!
-//! - Lossless Green/Red Tree Foundation:
-//!   `tomet-cst` provides a Rowan-based syntax tree architecture preserving 100% of
-//!   source characters, whitespace, newlines, and comments.
-//!   Guaranteed Invariant: `syntax_node.text().to_string() == original_source`.
-//!
-//! - Core Types & Handles:
-//!   [`SyntaxNode`], [`SyntaxToken`], [`SyntaxElement`] provide offset navigation.
-//!   [`TextRange`], [`TextSize`] provide byte-offset spans for LSP diagnostics and refactorings.
+//! - (Lossless Green/Red Tree Foundation)
+//!   | `tomet-cst` provides a Rowan-based syntax tree architecture preserving 100% of
+//!   | source characters, whitespace, newlines, and comments.
+//!   | Guaranteed Invariant: `syntax_node.text().to_string() == original_source`.
+//! - (Core Types & Handles)
+//!   | [`SyntaxNode`], [`SyntaxToken`], [`SyntaxElement`] provide offset navigation.
+//!   | [`TextRange`], [`TextSize`] provide byte-offset spans for LSP diagnostics and refactorings.
 //!
 //! This crate defines only the vocabulary ([`SyntaxKind`]) and the rowan glue;
 //! `tomet-parser::parse_cst` builds the tree and documents its shape. The tree

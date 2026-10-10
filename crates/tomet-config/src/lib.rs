@@ -4,15 +4,14 @@
 //!
 //! =[ Architecture & Responsibilities ]
 //!
-//! - Centralized Configuration Domain:
-//!   `tomet-config` owns configuration data structures and pure parsing
-//!   ([`load_config_from_str`]). Finding and reading a config file off
-//!   disk is `tomet-load-config`'s job, one layer up.
-//!
-//! - Root Group Modules:
-//!   - [`groups`]: Root configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`MacrosConfig`], [`RegistryConfig`], [`ApiConfig`]).
-//!   - [`discovery`]: Configuration parsing and error handling.
-//!   - [`tree`]: AST tree normalization and path lookup utilities.
+//! - (Centralized Configuration Domain)
+//!   | `tomet-config` owns configuration data structures and pure parsing
+//!   | ([`load_config_from_str`]). Finding and reading a config file off
+//!   | disk is `tomet-load-config`'s job, one layer up.
+//! - (Root Group Modules)
+//!   - (groups) Root configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`MacrosConfig`], [`RegistryConfig`], [`ApiConfig`]).
+//!   - (discovery) Configuration parsing and error handling.
+//!   - (tree) AST tree normalization and path lookup utilities.
 
 pub mod discovery;
 pub mod groups;

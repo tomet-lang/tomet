@@ -5,12 +5,12 @@
 //! =[ Responsibilities ]
 //!
 //! - (Full Page & Fragment Rendering)
-//!   -| [`render_page`] / [`render_page_with`]: Renders a complete standalone HTML document
-//!    | with DOCTYPE, CSS styling, and head metadata.
-//!    | [`render_body`] / [`render_body_with`]: Renders the HTML fragment representing the body content.
+//!   | [`render_page`] / [`render_page_with`]: Renders a complete standalone HTML document
+//!   | with DOCTYPE, CSS styling, and head metadata.
+//!   | [`render_body`] / [`render_body_with`]: Renders the HTML fragment representing the body content.
 //! - (Advanced Rendering Options)
-//!   -| Heading numbering (`number_headings: true`), automatic slug anchors (`auto_slug_headings: true`),
-//!    | document language setting, and semantic CSS classes for callouts and custom elements.
+//!   | Heading numbering (`number_headings: true`), automatic slug anchors (`auto_slug_headings: true`),
+//!   | document language setting, and semantic CSS classes for callouts and custom elements.
 //!
 //! This is a generic, data-driven mapping: most `<T>`/`@name` elements become `<div>`/`<span>`
 //! tags carrying `args` as `data-*` attributes. Built-in elements like `@link`, `@meta`, and

@@ -1,11 +1,11 @@
 //! Workspace-level batch refactoring, structural search, metadata editing, and I/O execution.
 //!
 //! Provides:
-//! - **[`diff`]**: [`FileDiff`] model and disk persistence.
-//! - **[`refactor`]**: Refactoring pipeline across `.tmt` files.
-//! - **[`structural`]**: Structural search & replace engine across a workspace.
-//! - **[`batch_meta`]**: Batch metadata update engine.
-//! - **[`blueprint`]**: Blueprint discovery and document instantiation.
+//! - (diff) [`FileDiff`] model and disk persistence.
+//! - (refactor) Refactoring pipeline across `.tmt` files.
+//! - (structural) Structural search & replace engine across a workspace.
+//! - (batch_meta) Batch metadata update engine.
+//! - (blueprint) Blueprint discovery and document instantiation.
 
 pub mod batch_meta;
 pub mod blueprint;

@@ -7,6 +7,9 @@
 | 複数行ルール
 ---
 - `;`、schema
+- rule補充
+- `fixme()`などを収集したい？
+- exportしたcratesのノートの規則性、blueprint使用。
 - 固有名詞なくす。たそ、00 Obsidianもあるみたい...
 - address絶対性
 - `directive`は本当に`@`なのか。
@@ -40,7 +43,6 @@
 - `\n`の統一は決着（`Inline::SoftBreak`/`LineBreak`/`Raw`、`tomet-syntax-ast`）。
   残るのはhardbreak（`LineBreak`）の記法だけ ── 今は誰も書けない
 - blueprint統合と#[ heading ]:rule
-- tmtroot vs tmtdocs
 - idの種類にsha1追加
 - `@element`ではなくて、`@define`のほうが適切か？
 - checkのエラー個数指定`@`
@@ -55,7 +57,7 @@
 - 読み込みロード画面
 - 構文変更によるbindigsの乖離
 ---[ 構文を決定する ]---
-- (x) リモート接続の綴り              // `<id:taskA>:{ priority: high }` は `<T>` の
+- ( ) リモート接続の綴り              // `<id:taskA>:{ priority: high }` は `<T>` の
                                       // 撤去で書けなくなり、作るものも呼ぶものも
                                       // 無いまま`@references`/`resolve_connect_targets`/
                                       // `RemoteConnection`だけが残っていたので、

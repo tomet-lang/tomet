@@ -4,20 +4,18 @@
 //!
 //! =[ Overview & Design ]
 //!
-//! - Context-Sensitive Scanning:
-//!   Tomet's grammar is context-sensitive -- `<`, `@`, `(`, `[`, `{` are only
-//!   structural right after specific triggers (an element sigil/name), and plain
-//!   prose text otherwise. Scanning directly with a lightweight cursor is more efficient
-//!   and flexible than pre-tokenizing into a context-free token stream.
-//!
-//! - Zero-Copy & Copyable:
-//!   [`Cursor`] holds only `&'a str` and byte offset `pos: usize`, making it `Copy`
-//!   and strictly zero-copy.
-//!
-//! - Core Capabilities:
-//!   -| Scanning & Consumption: `bump()`, `eat_char()`, `eat_str()`, `eat_while()`, `eat_whitespace()`.
-//!    | Lookahead & Peeking: `peek()`, `peek_at()`, `starts_with()`.
-//!    | Position & Span Mapping: `line_col()`, `position_at()`, `current_position()`, `span_from()`.
+//! - (Context-Sensitive Scanning)
+//!   | Tomet's grammar is context-sensitive -- `<`, `@`, `(`, `[`, `{` are only
+//!   | structural right after specific triggers (an element sigil/name), and plain
+//!   | prose text otherwise. Scanning directly with a lightweight cursor is more efficient
+//!   | and flexible than pre-tokenizing into a context-free token stream.
+//! - (Zero-Copy & Copyable)
+//!   | [`Cursor`] holds only `&'a str` and byte offset `pos: usize`, making it `Copy`
+//!   | and strictly zero-copy.
+//! - (Core Capabilities)
+//!   | Scanning & Consumption: `bump()`, `eat_char()`, `eat_str()`, `eat_while()`, `eat_whitespace()`.
+//!   | Lookahead & Peeking: `peek()`, `peek_at()`, `starts_with()`.
+//!   | Position & Span Mapping: `line_col()`, `position_at()`, `current_position()`, `span_from()`.
 
 use tomet_ast::{Position, Span};
 

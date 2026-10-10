@@ -18,10 +18,9 @@ to higher layers (`tomet-workspace-indexer` and `tomet-workspace` in Layer 5).
 
 ==[ Query Engines ]
 
-- @strong[[`structural`]]: AST element query matching by tag, key, and value content.
-- @strong[[`filter`]]: Document metadata query filtering (`contains`, `exists`, `eq`, `gt`)
-
-and sorting (`by(field, "asc"|"desc")`) over in-memory rows (the engine behind `${filter(...)}`).
+- ("`structural`") AST element query matching by tag, key, and value content.
+- ("`filter`") [ Document metadata query filtering (`contains`, `exists`, `eq`, `gt`)
+                 and sorting (`by(field, "asc"|"desc")`) over in-memory rows (the engine behind `${filter(...)}`). ]
 
 ==[ Module filter ]
 

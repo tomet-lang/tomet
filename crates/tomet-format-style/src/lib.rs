@@ -400,7 +400,7 @@ fn render_meta_field_value(
 /// args, if any).
 pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
     if config.meta.always_newline
-        && let Some(Value::Map(entries)) = tomet_semantics::embedded::element_data(el)
+        && let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el)
     {
         let mut out = String::from("@meta{\n");
         for (k, v) in &entries {
@@ -426,7 +426,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
         out.push_str(&render_args_with_config(args, config));
         out.push(')');
     }
-    if let Some(v) = tomet_semantics::embedded::element_data(el) {
+    if let Some(v) = tomet_semantics::data::element_data(el) {
         out.push('{');
         out.push_str(&render_value_inner_with_config(&v, config));
         out.push('}');

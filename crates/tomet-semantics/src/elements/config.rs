@@ -111,7 +111,7 @@ fn extract_config_from_element(el: &Element, config: &mut DocumentConfig) {
     }
 
     // 2. Process the element's value as data -- `{key: value}` pairs.
-    if let Some(Value::Map(entries)) = crate::embedded::element_data(el) {
+    if let Some(Value::Map(entries)) = crate::data::element_data(el) {
         for (k, v) in &entries {
             process_config_entry(k, v, config);
         }

@@ -1,5 +1,3 @@
-@config(export: {type: commonmark, path: docs/reference/cli.md})
-
 @meta{
   id: doc-cliDocRf
 }
