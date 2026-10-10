@@ -59,7 +59,35 @@ dangling-reference/rename-update checker below are untouched.
 - [ ] how references are *written* in text: `@link(ref:)` vs `^...` vs `[[ ]]`
 - [ ] dangling-reference check in `tomet check`; renaming an `_id` with reference update
 - [ ] vault-wide `@meta` `_id`: duplicates across the vault, cross-vault refs
-- [ ] step 5: does the parser/AST carry parent+sibling info to compute addresses
+- [ ] step 5: does the parser/AST carry parent+sibling info to compute addresses.
+      **2026-10-10 findings** (from a conversation that started as "should
+      there be a `tomet-address` crate"):
+      - Confirmed there is currently *zero* resolution path for the
+        `item(n)`/`prop(k)` step vocabulary this spec defines, anywhere in
+        the codebase. `tomet-semantics-resolver::interp::resolve_reference`
+        (the thing that resolves `${}` chains today) only handles
+        `InterpExprKind::Identifier`/`Member` (plain map-key lookup).
+        `crates/tomet-syntax-parser/src/interp.rs:146-156` parses any
+        `.name(args)` step — which is exactly the shape `item(2)`/
+        `prop(priority)` take — as `InterpExprKind::Call`, and
+        `resolve_reference`'s match arm rejects `Call` outright as
+        `ResolveError::NotAReference` (it's explicitly left for
+        `tomet-compute` to evaluate as a function call, not a path step).
+        So writing `#(intro).item(2)` today does not do what the spec
+        says; nothing walks it.
+      - Where this should land is now entangled with a separate, still-
+        open task: `.agents/tasks/layer-purity-io-split.md`. That task is
+        splitting `tomet-semantics-resolver`'s 2 fs-I/O functions out
+        (promoted to layer 5, keeping the `tomet-resolver` name) and
+        leaves behind a pure remainder at layer 2 that is *not yet one
+        coherent crate* — `resolve_reference` is one of ~4 distinct
+        things left in it, un-split. A candidate name for that pure
+        remainder (or at least the `resolve_reference`/address part of
+        it) discussed: `tomet-semantics-address`. **Not decided.** Step 5
+        (implementing real `item(n)`/`prop(k)` traversal) should probably
+        be built into wherever that remainder ends up living, once
+        `layer-purity-io-split.md` resolves its own open questions —
+        check that task's status before starting step 5.
 - [x] implementation + fixtures (done 2026-10-02 as `id`/`#(x)`, not `_id`/`#id(x)` --
       see the supersession note above; `cargo test -p tomet-tests -p tree-sitter-tomet`
       passes)

@@ -1,7 +1,13 @@
 @kind(todo)
 
 - `tellme`, `show`
+- rust用の追加要素
+- `:rule()`にnamespace
+---
+| 複数行ルール
+---
 - `;`、schema
+- 固有名詞なくす。たそ、00 Obsidianもあるみたい...
 - address絶対性
 - `directive`は本当に`@`なのか。
 - tove内の`@`は何を意味するのか？
@@ -9,6 +15,7 @@
 - `:ignore`, `:nocheck`
 - `$generate.uuid`
 - cliの色付け
+- `cmd`, `kbd`
 - githubのreadme
 - `[[  ]]`を`@link(ref:)`の糖衣構文(ただし、labelは設定不可能にする。)
 - `{{}}`を`${}`の糖衣構文。
