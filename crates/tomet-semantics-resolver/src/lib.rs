@@ -21,13 +21,11 @@
 //! is built. `@include` parses and classifies, and no expansion exists
 //! for it yet.
 
-mod connect;
 mod error;
 mod interp;
 mod settings;
 mod vocabulary;
 
-pub use connect::{RemoteConnection, resolve_connect_targets};
 pub use error::ResolveError;
 pub use interp::resolve_reference;
 pub use settings::{

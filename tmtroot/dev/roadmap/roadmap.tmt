@@ -49,11 +49,11 @@
 - 読み込みロード画面
 - 構文変更によるbindigsの乖離
 ---[ 構文を決定する ]---
-- ( ) リモート接続の綴り              // `<id:taskA>:{ priority: high }` は `<T>` の
-                                      // 撤去で書けなくなった。resolver 側
-                                      // (`resolve_connect_targets`) は残っているが
-                                      // `RemoteConnection` を作るものが無い。
-                                      // 綴りを決めるか、機能ごと消すか
+- (x) リモート接続の綴り              // `<id:taskA>:{ priority: high }` は `<T>` の
+                                      // 撤去で書けなくなり、作るものも呼ぶものも
+                                      // 無いまま`@references`/`resolve_connect_targets`/
+                                      // `RemoteConnection`だけが残っていたので、
+                                      // 機能ごと削除した
 - ( ) 属性と生の本文を同時に持つ要素   // `{value}` と `+++` は排他なので
                                       // `@bookmark(...){ id: ... }+++ ... +++` が
                                       // 書けない。`(args)` に寄せるか、生の本文に

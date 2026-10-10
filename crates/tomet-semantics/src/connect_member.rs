@@ -6,15 +6,15 @@ use tomet_ast::Name;
 /// connect name lives in its own namespace, not the element-name one, so
 /// `:rule` and a hypothetical `@rule` element do not collide.
 ///
-/// Not to be confused with two other, unrelated things this codebase
-/// already calls "connect":
-/// - [`crate::connect::merge_connected_values`] -- the bare
-///   `:(...)`/`:{...}` *value-merge* mechanism (`@memo(a:1):(b:2)`),
-///   which has nothing to do with names at all.
-/// - `tomet-semantics-resolver`'s `RemoteConnection` -- the `<id:...>`
-///   remote-reference mechanism.
+/// Not to be confused with one other, unrelated thing this codebase also
+/// calls "connect": the bare `:(...)`/`:{...}` *value-merge* mechanism
+/// (`@memo(a:1):(b:2)`), which has nothing to do with names at all. That
+/// one is parser-level, not semantic -- `tomet-syntax-parser/src/
+/// section.rs` folds it into the owning group's data as it parses,
+/// because this crate sits a layer above the parser and cannot be the
+/// one doing it.
 ///
-/// This module is the third, separate thing: which bare words are legal
+/// This module is the second, separate thing: which bare words are legal
 /// right after a `:`. The parser reads `:name(...)` uniformly, without
 /// judging the name (mirroring how it never judges an `@name`); this is
 /// where the judging happens, the same split `normalized_element_args`

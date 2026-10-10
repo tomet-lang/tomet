@@ -33,8 +33,6 @@ pub enum ElementKind {
     /// `@include(file)` -- splices another document in at this point.
     /// Recognized only; nothing expands it yet.
     Include,
-    /// `@references[...]` -- the container for remote connections.
-    References,
     Blueprint,
     /// `@vocabulary(ns){...}` -- the header of a vocabulary document,
     /// naming the namespace it declares. See `docs/spec/vocabulary.tmt`.
@@ -212,7 +210,6 @@ impl ElementKind {
             ElementKind::Settings => "settings",
             ElementKind::Use => "use",
             ElementKind::Include => "include",
-            ElementKind::References => "references",
             ElementKind::Blueprint => "blueprint",
             ElementKind::Vocabulary => "vocabulary",
             ElementKind::Element => "element",
@@ -278,7 +275,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -286,7 +283,6 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
     ("settings", ElementKind::Settings),
     ("use", ElementKind::Use),
     ("include", ElementKind::Include),
-    ("references", ElementKind::References),
     ("blueprint", ElementKind::Blueprint),
     // The vocabulary document's own six. They are here rather than in a
     // `@vocabulary(vocabulary)` document because reading that document
@@ -480,7 +476,7 @@ pub fn is_directive(kind: &ElementKind) -> bool {
 pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
-        Meta | Config | Settings | Use | Include | References | Blueprint | Hr | Callout | Card
+        Meta | Config | Settings | Use | Include | Blueprint | Hr | Callout | Card
         | Table | Heading | Kind | Version | Vocabulary | Element | Param | Args | Data
         | Content => Shape::Block,
         Em | Strong | Mark | Strikeout | Ruby | Caret => Shape::Inline,
@@ -553,9 +549,7 @@ pub enum ContentShape {
 /// `Bare`, `Interp` -- it isn't a built-in kind in the first place, and a
 /// vocabulary's own `@content{allow:}` governs it instead). This table is
 /// the classification agreed in `.agents/tasks/
-/// conflict-element-and-content-model.md`'s "Step 1"; `references` is
-/// deliberately left unclassified there (a draft/placeholder element, not
-/// worth curating) and returns `None` here too.
+/// conflict-element-and-content-model.md`'s "Step 1".
 pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
     use ElementKind::*;
     match kind {
@@ -565,10 +559,10 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         | Content | Args | Data => None,
         // Self-closing; a fenced/inline code body is the `+++...+++` raw
         // fence, exclusive with `[content]`; no observed `@tag[...]`
-        // usage to classify yet; `references` per the note above. Lists
-        // are no longer `Element`s at all (see `tomet_ast::List`), so
-        // there is nothing list-shaped left to classify here.
-        Hr | Raw | Tag | References => None,
+        // usage to classify yet. Lists are no longer `Element`s at all
+        // (see `tomet_ast::List`), so there is nothing list-shaped left
+        // to classify here.
+        Hr | Raw | Tag => None,
         // `@conflict`'s payload (`a`/`b`) lives in `(args)`, via
         // `Value::Blocks` -- it never uses `[content]`/`|content` at all,
         // same bucket as the directives above for that reason (not

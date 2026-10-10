@@ -67,7 +67,6 @@ Tometは構文を持つが、実際の振る舞いはアプリに任せる。
 
 ```tm
 @table
-@references
 @id
 @links
 @fixme

@@ -22,14 +22,13 @@
 //! - **Document Configuration (`config`)**: Merges `@config` and `@settings` blocks across
 //!   a document into a structured [`DocumentConfig`].
 //! - **Metadata Extraction (`meta`)**: Extracts top-level `@meta` values via [`document_meta`].
-//! - **Structural Helpers**: Heading level clamping (`heading`),
-//!   table parsing (`table`), and connected value merging (`connect`).
+//! - **Structural Helpers**: Heading level clamping (`heading`) and
+//!   table parsing (`table`).
 //! - **Element-Specific Semantics ([`elements`])**: Dedicated normalization and extraction
 //!   logic for concrete built-in element families (`config`, `embedded`, `footnote`,
 //!   `heading`, `meta`, `table`, `tag`, `target`).
 //!
 
-mod connect;
 mod connect_member;
 pub mod elements;
 pub mod flatten;
@@ -38,7 +37,6 @@ mod normalize;
 mod positional;
 pub mod vocabulary;
 
-pub use connect::merge_connected_values;
 pub use connect_member::{
     CONNECT_MEMBERS, ConnectMember, UnknownConnectMember, classify_connect_member,
 };

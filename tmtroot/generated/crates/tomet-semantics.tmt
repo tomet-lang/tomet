@@ -38,9 +38,9 @@ for built-in and `@settings` custom schemas.
 a document into a structured [`DocumentConfig`].
 
 - @strong[Metadata Extraction (`meta`)]: Extracts top-level `@meta` values via [`document_meta`].
-- @strong[Structural Helpers]: Heading level clamping (`heading`),
+- @strong[Structural Helpers]: Heading level clamping (`heading`) and
 
-table parsing (`table`), and connected value merging (`connect`).
+table parsing (`table`).
 
 - @strong[Element-Specific Semantics ([`elements`])]: Dedicated normalization and extraction
 
