@@ -38,6 +38,7 @@ fn every_sigil_takes_every_group_opener() {
             Block::Element(el) => el.sigil.name().map(|n| n.name.clone()),
             Block::Section(_) => Some("section".into()),
             Block::Paragraph(_) => None,
+            Block::List(list) => Some(if list.ordered { "ol" } else { "ul" }.into()),
         }
     }
 

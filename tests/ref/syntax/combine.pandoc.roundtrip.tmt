@@ -1,0 +1,10 @@
+- @task[]
+
+- @task[content]
+
+- @task[]{ x: "1", y: "2" }
+
+-. @task[]
+
+- @task[a]
+- b

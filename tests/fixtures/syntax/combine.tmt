@@ -1,0 +1,21 @@
+// The combine notation: `-@name(...)`, no space between the list marker
+// and `@`. Parses `@name(...)` through the exact same element-parsing
+// path a standalone, top-level `@name(...)` would -- same `Element`
+// shape, no naming constraint, no second grammar. Position (list item)
+// and naming (what kind of thing it is) are orthogonal.
+
+// Bare combine item, no groups at all.
+-@task()
+
+// `[content]`, a bare trailing connect, and a named connect, same as a
+// standalone element's own groups.
+-@task()[content]:rule(allow:list(card))
+-@task():(x: 1){y: 2}
+
+// Ordered list marker, same combine support.
+-.@task()
+
+// A nested list under a combine item is that item's own `sublist`,
+// same as a plain bare item's.
+-@task() a
+  - b

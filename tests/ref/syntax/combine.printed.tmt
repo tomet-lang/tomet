@@ -1,0 +1,9 @@
+-@task()[]
+
+-@task()[content]:rule(allow: list(card))
+-@task(x: 1)[]{ y: 2 }
+
+-.@task()[]
+
+-@task()[a]
+  - b

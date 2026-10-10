@@ -71,6 +71,7 @@ fn settings_block(doc: &Document) -> Option<Value> {
             _ => None,
         }),
         Block::Section(_) => None,
+        Block::List(_) => None,
     })
 }
 

@@ -172,12 +172,6 @@ pub enum ElementKind {
     Card,
     Table,
     Heading,
-    /// `Element { sigil: Named("ol"), .. }` -- a `-.` (auto-numbered) list.
-    /// See `crate::list`.
-    OrderedList,
-    /// `Element { sigil: Named("ul"), .. }` -- a plain `-` list.
-    /// See `crate::list`.
-    UnorderedList,
     /// A namespaced `@ns.name` that doesn't match any of the built-in
     /// kinds above -- consumers fall back to their own generic rendering,
     /// keyed on the name. A *bare* name that matches nothing is
@@ -245,8 +239,6 @@ impl ElementKind {
             ElementKind::Card => "card",
             ElementKind::Table => "table",
             ElementKind::Heading => "heading",
-            ElementKind::OrderedList => "ol",
-            ElementKind::UnorderedList => "ul",
             ElementKind::Custom(name) => name,
             ElementKind::Bare => "bare",
             ElementKind::Interp => "interp",
@@ -286,7 +278,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 38] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -331,8 +323,6 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 38] = [
     ("card", ElementKind::Card),
     ("table", ElementKind::Table),
     ("heading", ElementKind::Heading),
-    ("ol", ElementKind::OrderedList),
-    ("ul", ElementKind::UnorderedList),
     ("footnote", ElementKind::Footnote),
     ("tag", ElementKind::Tag),
 ];
@@ -491,8 +481,8 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
         Meta | Config | Settings | Use | Include | References | Blueprint | Hr | Callout | Card
-        | Table | Heading | OrderedList | UnorderedList | Kind | Version | Vocabulary | Element
-        | Param | Args | Data | Content => Shape::Block,
+        | Table | Heading | Kind | Version | Vocabulary | Element | Param | Args | Data
+        | Content => Shape::Block,
         Em | Strong | Mark | Strikeout | Ruby | Caret => Shape::Inline,
         // Either shape. A link or an embed alone on a line is not a
         // structural error -- it is how you show one file or one image.
@@ -573,11 +563,12 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         // `(args)` only, no `[content]`.
         Kind | Version | Meta | Config | Settings | Use | Include | Blueprint | Vocabulary
         | Content | Args | Data => None,
-        // Self-closing; list items' own body is `value: Children`, not
-        // `content`; a fenced/inline code body is the `+++...+++` raw
+        // Self-closing; a fenced/inline code body is the `+++...+++` raw
         // fence, exclusive with `[content]`; no observed `@tag[...]`
-        // usage to classify yet; `references` per the note above.
-        Hr | OrderedList | UnorderedList | Raw | Tag | References => None,
+        // usage to classify yet; `references` per the note above. Lists
+        // are no longer `Element`s at all (see `tomet_ast::List`), so
+        // there is nothing list-shaped left to classify here.
+        Hr | Raw | Tag | References => None,
         // `@conflict`'s payload (`a`/`b`) lives in `(args)`, via
         // `Value::Blocks` -- it never uses `[content]`/`|content` at all,
         // same bucket as the directives above for that reason (not

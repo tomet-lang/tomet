@@ -241,7 +241,9 @@ This is a paragraph with @link(readme.md)[custom text].
         assert_eq!(stats.headings, 2);
         assert_eq!(stats.max_heading_level, 2);
         assert_eq!(stats.bare, 2);
-        assert_eq!(stats.named, 3); // @link, @custom_tag, and @ul wrapper
+        // Just `@link` and `@custom_tag` -- the list itself is
+        // `Block::List` now, not a named `@ul` element.
+        assert_eq!(stats.named, 2);
         assert_eq!(stats.link_count(LinkKind::File), 1);
         assert_eq!(stats.total_links(), 1);
         assert!(stats.characters > 0);

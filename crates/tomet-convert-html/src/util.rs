@@ -42,6 +42,13 @@ pub(crate) fn blocks_to_plain(blocks: &[Block]) -> String {
                 s.push_str(&inlines_to_plain(&sec.title));
                 s.push_str(&blocks_to_plain(&sec.blocks));
             }
+            Block::List(list) => {
+                for item in &list.items {
+                    if let Some(content) = &item.element.content {
+                        s.push_str(&blocks_to_plain(content));
+                    }
+                }
+            }
         }
     }
     s

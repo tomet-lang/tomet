@@ -24,7 +24,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, Placement, Sigil, Value,
+    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, List, Placement, Sigil,
+    Value,
 };
 use tomet_parser::parse_document;
 
@@ -662,6 +663,31 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
                 }
             }
         }
+        Block::List(list) => dump_list(out, list, depth),
+    }
+}
+
+fn dump_list(out: &mut String, list: &List, depth: usize) {
+    indent(out, depth);
+    let _ = writeln!(out, "List ordered={}", list.ordered);
+    if let Some(id) = &list.id {
+        indent(out, depth + 1);
+        let _ = writeln!(out, "id      {:?}", id.0);
+    }
+    for connect in &list.connects {
+        indent(out, depth + 1);
+        out.push_str("connect\n");
+        dump_element(out, connect, depth + 2);
+    }
+    indent(out, depth + 1);
+    out.push_str("Items:\n");
+    for item in &list.items {
+        dump_element(out, &item.element, depth + 2);
+        if let Some(sub) = &item.sublist {
+            indent(out, depth + 2);
+            out.push_str("sublist\n");
+            dump_list(out, sub, depth + 3);
+        }
     }
 }
 
@@ -733,13 +759,6 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
     if let Some(id) = &el.id {
         indent(out, depth + 1);
         let _ = writeln!(out, "id      {:?}", id.0);
-    }
-    if let Some(children) = &el.children {
-        indent(out, depth + 1);
-        out.push_str("children\n");
-        for child in children {
-            dump_block(out, child, depth + 2);
-        }
     }
     for connect in &el.connects {
         indent(out, depth + 1);

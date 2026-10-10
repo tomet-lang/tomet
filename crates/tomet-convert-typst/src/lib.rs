@@ -35,11 +35,13 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Placement, Section, Value};
+use tomet_ast::{
+    Block, Document, Element, ElementValue, Inline, List, Placement, Section, Sigil, Value,
+};
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
-    is_directive, link_target, list_items, list_ordered, normalized_element_args, parse_table_rows,
-    path_target, target_scheme,
+    is_directive, link_target, normalized_element_args, parse_table_rows, path_target,
+    target_scheme,
 };
 
 struct TypstCtx<'a> {
@@ -90,7 +92,6 @@ fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
                 out.push_str("\n\n");
             }
         }
-        Block::Element(el) if list_ordered(el).is_some() => render_list(cx, el, out),
         Block::Element(el) => {
             let text = element_to_typst(cx, el, false);
             if !text.is_empty() {
@@ -99,6 +100,7 @@ fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
             }
         }
         Block::Section(sec) => render_section(cx, sec, out),
+        Block::List(list) => render_list(cx, list, out),
     }
 }
 
@@ -116,15 +118,16 @@ fn render_section(cx: &TypstCtx, sec: &Section, out: &mut String) {
     }
 }
 
-fn render_list(cx: &TypstCtx, el: &Element, out: &mut String) {
-    render_list_with_indent(cx, el, 0, out);
+fn render_list(cx: &TypstCtx, list: &List, out: &mut String) {
+    render_list_with_indent(cx, list, 0, out);
     out.push('\n');
 }
 
-fn render_list_with_indent(cx: &TypstCtx, el: &Element, indent: usize, out: &mut String) {
-    let ordered = list_ordered(el).unwrap_or(false);
+fn render_list_with_indent(cx: &TypstCtx, list: &List, indent: usize, out: &mut String) {
+    let ordered = list.ordered;
     let indent_str = "  ".repeat(indent);
-    for (i, item) in list_items(el).iter().enumerate() {
+    for (i, list_item) in list.items.iter().enumerate() {
+        let item = &list_item.element;
         out.push_str(&indent_str);
         let marker = if ordered {
             format!("{}. ", i + 1)
@@ -132,19 +135,20 @@ fn render_list_with_indent(cx: &TypstCtx, el: &Element, indent: usize, out: &mut
             "- ".to_string()
         };
         out.push_str(&marker);
-        // `args` (the `(...)` marker `Value`) has no Typst markup
-        // equivalent -- dropped on export, same as this crate's other
-        // documented lossy cases (see the module doc).
-        out.push_str(&blocks_to_typst(cx, item.content.as_deref().unwrap_or(&[])));
+        if matches!(item.sigil, Sigil::Named(_)) {
+            // The combine notation (`-@name(...)`): no Typst markup
+            // marker has an equivalent, so this falls back to the same
+            // generic element rendering a standalone one would use.
+            out.push_str(&element_to_typst(cx, item, true));
+        } else {
+            // `args` (the `(...)` marker `Value`) has no Typst markup
+            // equivalent -- dropped on export, same as this crate's
+            // other documented lossy cases (see the module doc).
+            out.push_str(&blocks_to_typst(cx, item.content.as_deref().unwrap_or(&[])));
+        }
         out.push('\n');
-        if let Some(children) = &item.children {
-            for child in children {
-                if let Block::Element(sub) = child
-                    && list_ordered(sub).is_some()
-                {
-                    render_list_with_indent(cx, sub, indent + 1, out);
-                }
-            }
+        if let Some(sub) = &list_item.sublist {
+            render_list_with_indent(cx, sub, indent + 1, out);
         }
     }
 }
@@ -250,22 +254,10 @@ fn render_footnote_ref_or_def(
         let mut def_text = String::new();
         if let Some(content) = inline_content {
             def_text = blocks_to_typst(cx, content);
-        } else if let Some(def_el) = &item.definition {
-            if let Some(content) = &def_el.content {
-                def_text = blocks_to_typst(cx, content);
-            }
-            if let Some(children) = &def_el.children {
-                for child in children {
-                    let mut child_text = String::new();
-                    render_block(cx, child, &mut child_text);
-                    if !child_text.trim().is_empty() {
-                        if !def_text.is_empty() {
-                            def_text.push(' ');
-                        }
-                        def_text.push_str(child_text.trim());
-                    }
-                }
-            }
+        } else if let Some(def_el) = &item.definition
+            && let Some(content) = &def_el.content
+        {
+            def_text = blocks_to_typst(cx, content);
         }
         let label = item
             .id
@@ -687,6 +679,13 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
                 }
             }
             Block::Section(sec) => s.push_str(&inlines_to_plain(&sec.title)),
+            Block::List(list) => {
+                for item in &list.items {
+                    if let Some(content) = &item.element.content {
+                        s.push_str(&blocks_to_plain(content));
+                    }
+                }
+            }
         }
     }
     s

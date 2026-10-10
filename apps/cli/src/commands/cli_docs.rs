@@ -18,8 +18,8 @@ use std::path::{Path, PathBuf};
 
 use clap::{Arg, Command, CommandFactory};
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, Paragraph, Placement, RawText, Section,
-    Sigil, Span, Text, Value,
+    Block, Document, Element, ElementValue, Inline, List, ListItem, Paragraph, Placement, RawText,
+    Section, Sigil, Span, Text, Value,
 };
 use tomet_config::PrinterConfig;
 use tomet_tree::{ElementExt, element_new};
@@ -145,13 +145,11 @@ fn push_command(cmd: &mut Command, level: usize, out: &mut Vec<Block>) {
         .collect();
     if !positional.is_empty() {
         out.push(paragraph(vec![text("Arguments:")]));
-        out.push(Block::Element(list(
-            positional.iter().map(|a| item(cmd, a)),
-        )));
+        out.push(Block::List(list(positional.iter().map(|a| item(cmd, a)))));
     }
     if !options.is_empty() {
         out.push(paragraph(vec![text("Options:")]));
-        out.push(Block::Element(list(options.iter().map(|a| item(cmd, a)))));
+        out.push(Block::List(list(options.iter().map(|a| item(cmd, a)))));
     }
 
     let subs: Vec<String> = cmd
@@ -299,10 +297,17 @@ fn code_block(body: &str) -> Element {
     el
 }
 
-fn list(items: impl Iterator<Item = Element>) -> Element {
-    let mut el = element_new(Sigil::named("ul")).with_placement(Placement::Block);
-    el.value = Some(ElementValue::Group(items.map(Entry::Element).collect()));
-    el
+fn list(items: impl Iterator<Item = Element>) -> List {
+    tomet_tree::list(
+        false,
+        items
+            .map(|element| ListItem {
+                element,
+                sublist: None,
+            })
+            .collect(),
+        dummy(),
+    )
 }
 
 /// Text with `` `code` `` spans turned into inline code. An unbalanced
@@ -377,6 +382,7 @@ fn paragraphs(s: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_ast::Entry;
 
     fn rendered() -> String {
         render(&PrinterConfig::default())
@@ -422,6 +428,7 @@ mod tests {
                     }
                     Block::Paragraph(_) => *paragraphs += 1,
                     Block::Element(_) => {}
+                    Block::List(_) => {}
                 }
             }
         }
@@ -485,6 +492,15 @@ mod tests {
                             }
                         }
                     }
+                    Block::List(list) => walk_list(list, found),
+                }
+            }
+        }
+        fn walk_list(list: &List, found: &mut Vec<String>) {
+            for item in &list.items {
+                walk(item.element.content.as_deref().unwrap_or(&[]), found);
+                if let Some(sub) = &item.sublist {
+                    walk_list(sub, found);
                 }
             }
         }

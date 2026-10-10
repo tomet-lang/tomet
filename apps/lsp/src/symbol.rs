@@ -1,5 +1,5 @@
 use lsp_types::{DocumentSymbol, SymbolKind};
-use tomet_ast::{Block, Element, Inline, Sigil};
+use tomet_ast::{Block, Element, Inline, List, Sigil};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 use crate::position::span_to_range;
@@ -53,6 +53,16 @@ fn collect_block_symbols(block: &Block, symbols: &mut Vec<DocumentSymbol>) {
             for inline in &p.content {
                 collect_inline_symbols(inline, symbols);
             }
+        }
+        Block::List(list) => collect_list_symbol(list, symbols),
+    }
+}
+
+fn collect_list_symbol(list: &List, symbols: &mut Vec<DocumentSymbol>) {
+    for item in &list.items {
+        collect_element_symbol(&item.element, symbols);
+        if let Some(sub) = &item.sublist {
+            collect_list_symbol(sub, symbols);
         }
     }
 }
@@ -110,11 +120,6 @@ fn collect_element_symbol(el: &Element, symbols: &mut Vec<DocumentSymbol>) {
             collect_block_symbols(block, symbols);
         }
     }
-    if let Some(children) = &el.children {
-        for child in children {
-            collect_block_symbols(child, symbols);
-        }
-    }
     for conn in &el.connects {
         collect_element_symbol(conn, symbols);
     }
@@ -145,6 +150,13 @@ pub(crate) fn extract_blocks_text(blocks: &[Block]) -> String {
                 }
             }
             Block::Section(sec) => out.push_str(&extract_inlines_text(&sec.title)),
+            Block::List(list) => {
+                for item in &list.items {
+                    if let Some(content) = &item.element.content {
+                        out.push_str(&extract_blocks_text(content));
+                    }
+                }
+            }
         }
     }
     out

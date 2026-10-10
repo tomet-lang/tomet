@@ -147,10 +147,14 @@ mod tests {
         doc.insert_block(1, third);
         assert_eq!(doc.blocks.len(), 3);
 
+        // Just the bare list item (`- item`) -- the list itself is
+        // `Block::List` now, not an `Element`, so `for_each_element`
+        // (which only ever visits real `Element`s) no longer counts it
+        // the way it counted the old `Sigil::Named("ul")` wrapper.
         let mut count = 0;
         for_each_element(&doc, |_el| {
             count += 1;
         });
-        assert!(count >= 2);
+        assert!(count >= 1);
     }
 }

@@ -43,10 +43,10 @@ pub use tomet_search::filter::{
 };
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, InterpExprKind, Paragraph,
-    Placement, Sigil, Span, Value,
+    Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, List, ListItem,
+    Paragraph, Placement, Sigil, Span, Value,
 };
-use tomet_tree::{element_list_item, element_new};
+use tomet_tree::{element_new, list_item};
 
 /// Replaces every `${filter(...)}` in `doc` with the `@link(ref:...)`
 /// entries it selects, in the order `by(...)` asks for -- in place,
@@ -107,58 +107,59 @@ fn rewrite_blocks(
                 sec.blocks = rewrite_blocks(sec.blocks, source, config, rows, known, expanded)?;
                 rewritten.push(Block::Section(sec));
             }
-            Block::Element(mut el) => {
-                if tomet_semantics::list_ordered(&el).is_some() {
-                    let value = el.value.take().unwrap_or_else(ElementValue::empty_group);
-                    el.value = Some(rewrite_list_value(
-                        value, source, config, rows, known, expanded,
-                    )?);
-                    rewritten.push(Block::Element(el));
-                    continue;
-                }
-
-                match filter_args_of_element(&el) {
-                    Some(args) => {
-                        let query = Query::parse(args)?;
-                        for path in query.run(source, config, rows, known)? {
-                            rewritten.push(Block::Element(link_block_element(&path)));
-                        }
-                        *expanded += 1;
-                    }
-                    None => rewritten.push(Block::Element(el)),
-                }
+            Block::List(list) => {
+                rewritten.push(Block::List(rewrite_list(
+                    list, source, config, rows, known, expanded,
+                )?));
             }
+            Block::Element(el) => match filter_args_of_element(&el) {
+                Some(args) => {
+                    let query = Query::parse(args)?;
+                    for path in query.run(source, config, rows, known)? {
+                        rewritten.push(Block::Element(link_block_element(&path)));
+                    }
+                    *expanded += 1;
+                }
+                None => rewritten.push(Block::Element(el)),
+            },
             other => rewritten.push(other),
         }
     }
     Ok(rewritten)
 }
 
-/// Rewrites one list's items in place: an item whose entire content is
-/// `${filter(...)}` is replaced by the sibling list items it selects
-/// (zero or more, at that same position); every surviving item's own
-/// nested children are walked by [`rewrite_blocks`] the same way, so a
-/// query nested arbitrarily deep under hand-written entries still expands.
-fn rewrite_list_value(
-    value: ElementValue,
+/// [`rewrite_list_items`], wrapped around a whole [`List`] -- the
+/// counterpart [`rewrite_blocks`] delegates to for its own `Block::List`
+/// arm, and what a nested `sublist` recurses through below.
+fn rewrite_list(
+    mut list: List,
     source: &Document,
     config: &tomet_semantics::DocumentConfig,
     rows: &[IndexRow],
     known: &BTreeSet<String>,
     expanded: &mut usize,
-) -> Result<ElementValue, IndexQueryError> {
-    let ElementValue::Group(entries) = value else {
-        return Ok(value);
-    };
+) -> Result<List, IndexQueryError> {
+    list.items = rewrite_list_items(list.items, source, config, rows, known, expanded)?;
+    Ok(list)
+}
 
-    let mut rewritten = Vec::with_capacity(entries.len());
-    for entry in entries {
-        let Entry::Element(mut item) = entry else {
-            rewritten.push(entry);
-            continue;
-        };
-
+/// Rewrites one list's items in place: an item whose entire content is
+/// `${filter(...)}` is replaced by the sibling list items it selects
+/// (zero or more, at that same position); every surviving item's own
+/// nested `sublist` is walked by [`rewrite_list`] the same way, so a
+/// query nested arbitrarily deep under hand-written entries still expands.
+fn rewrite_list_items(
+    items: Vec<ListItem>,
+    source: &Document,
+    config: &tomet_semantics::DocumentConfig,
+    rows: &[IndexRow],
+    known: &BTreeSet<String>,
+    expanded: &mut usize,
+) -> Result<Vec<ListItem>, IndexQueryError> {
+    let mut rewritten = Vec::with_capacity(items.len());
+    for mut item in items {
         let query_args = item
+            .element
             .content
             .as_deref()
             .and_then(filter_args_of_content)
@@ -167,20 +168,18 @@ fn rewrite_list_value(
         if let Some(args) = query_args {
             let query = Query::parse(&args)?;
             for path in query.run(source, config, rows, known)? {
-                rewritten.push(Entry::Element(link_list_item(&path, item.span)));
+                rewritten.push(link_list_item(&path, item.element.span));
             }
             *expanded += 1;
             continue;
         }
 
-        if let Some(children) = item.children.take() {
-            item.children = Some(rewrite_blocks(
-                children, source, config, rows, known, expanded,
-            )?);
+        if let Some(sub) = item.sublist.take() {
+            item.sublist = Some(rewrite_list(sub, source, config, rows, known, expanded)?);
         }
-        rewritten.push(Entry::Element(item));
+        rewritten.push(item);
     }
-    Ok(ElementValue::Group(rewritten))
+    Ok(rewritten)
 }
 
 /// The argument list of a `${filter(...)}`, if `el` is exactly that --
@@ -244,8 +243,9 @@ fn link_block_element(path: &str) -> Element {
 /// One list item wrapping a single `@link(ref:path)` -- indistinguishable
 /// from `- @link(ref:"path")` typed by hand. `span` is the query's own
 /// span, reused since a generated item has no source position of its own.
-fn link_list_item(path: &str, span: Span) -> Element {
-    element_list_item(
+fn link_list_item(path: &str, span: Span) -> ListItem {
+    list_item(
+        Sigil::Bare,
         vec![Block::Paragraph(Paragraph::new(
             vec![Inline::Element(link_element(path))],
             span,
@@ -254,7 +254,7 @@ fn link_list_item(path: &str, span: Span) -> Element {
         None,
         None,
         Vec::new(),
-        Vec::new(),
+        None,
         span,
     )
 }
@@ -357,23 +357,23 @@ mod tests {
         Some(el)
     }
 
-    /// The `ref:` path of every list item directly under `list_el`, in
+    /// The `ref:` path of every list item directly under `list`, in
     /// source order -- `None` where an item isn't a lone `@link`, so a
     /// caller can tell a query-generated item from a hand-written label.
-    fn item_refs(list_el: &Element) -> Vec<Option<String>> {
-        tomet_semantics::list_items(list_el)
-            .into_iter()
-            .map(|item| link_ref(single_content_element(item.content.as_deref())?))
+    fn item_refs(list: &List) -> Vec<Option<String>> {
+        list.items
+            .iter()
+            .map(|item| link_ref(single_content_element(item.element.content.as_deref())?))
             .collect()
     }
 
     /// The first top-level list in `doc` -- the `@kind` header sits before
     /// it, so it is never simply `doc.blocks[0]`.
-    fn top_list(doc: &Document) -> &Element {
+    fn top_list(doc: &Document) -> &List {
         doc.blocks
             .iter()
             .find_map(|b| match b {
-                Block::Element(el) if tomet_semantics::list_ordered(el).is_some() => Some(el),
+                Block::List(list) => Some(list),
                 _ => None,
             })
             .expect("expected a top-level list")
@@ -503,15 +503,14 @@ mod tests {
         assert_eq!(expand_index_queries(&mut doc, &table()).unwrap(), 1);
 
         let list = top_list(&doc);
-        let top = tomet_semantics::list_items(list);
+        let top = &list.items;
         assert_eq!(top.len(), 1);
         assert_eq!(
-            single_content_element(top[0].content.as_deref()).and_then(link_ref),
+            single_content_element(top[0].element.content.as_deref()).and_then(link_ref),
             Some("docs/a.tmt".to_string())
         );
 
-        let Some(Block::Element(nested)) = top[0].children.as_deref().and_then(|c| c.first())
-        else {
+        let Some(nested) = &top[0].sublist else {
             panic!("expected the query to have expanded into a nested list");
         };
         assert_eq!(item_refs(nested), [Some("docs/b.tmt".to_string())]);

@@ -33,7 +33,6 @@ pub mod flatten;
 pub mod footnote;
 mod heading;
 mod kind;
-mod list;
 mod meta;
 mod normalize;
 mod positional;
@@ -58,7 +57,6 @@ pub use kind::{
     builtin_region, builtin_singleton, classify_std, classify_std_lenient, classify_std_name,
     is_directive, required_shape, shape_mismatch,
 };
-pub use list::{list_items, list_ordered};
 pub use meta::{document_kind, document_meta, document_version};
 pub use normalize::normalize_data_value;
 pub use positional::{

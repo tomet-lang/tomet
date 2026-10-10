@@ -138,19 +138,19 @@ fn sugar_list_item_and_heading_support_a_bare_connect() {
     ] {
         let doc = parse_document(src).unwrap_or_else(|e| panic!("{src:?} failed: {e}"));
         match &doc.blocks[0] {
-            Block::Element(list) => {
-                let items = list_items(list);
+            Block::List(list) => {
+                let items = &list.items;
                 assert_eq!(
-                    items[0].args,
+                    items[0].element.args,
                     expect_args.map(|v| Value::Map(vec![("x".into(), v)])),
                     "{src:?}"
                 );
                 assert_eq!(
-                    item_attrs(items[0]),
+                    item_attrs(&items[0].element),
                     expect_value.map(|v| Value::Map(vec![("y".into(), v)])),
                     "{src:?}"
                 );
-                let text: String = first_para(items[0].content.as_ref().expect("content"))
+                let text: String = first_para(items[0].element.content.as_ref().expect("content"))
                     .iter()
                     .map(|inline| match inline {
                         Inline::Text(t) => t.value.as_str(),
@@ -204,10 +204,10 @@ fn sugar_list_item_supports_a_named_connect_matching_its_bracketed_form() {
     // form, now that `element_list_item` carries `connects`.
     let doc = parse_document("- content :rule(allow: list(card))\n").unwrap();
     match &doc.blocks[0] {
-        Block::Element(list) => {
-            let items = list_items(list);
-            assert_eq!(items[0].connects.len(), 1);
-            assert_eq!(items[0].connects[0].sigil, Sigil::named("rule"));
+        Block::List(list) => {
+            let items = &list.items;
+            assert_eq!(items[0].element.connects.len(), 1);
+            assert_eq!(items[0].element.connects[0].sigil, Sigil::named("rule"));
         }
         other => panic!("expected list, got {other:?}"),
     }
@@ -221,10 +221,10 @@ fn sugar_connect_tolerates_one_blank_line_but_not_two() {
     // line ends the block before the connect is ever reached.
     let doc = parse_document("- content\n:{y: 2}\n").unwrap();
     match &doc.blocks[0] {
-        Block::Element(list) => {
-            let items = list_items(list);
+        Block::List(list) => {
+            let items = &list.items;
             assert_eq!(
-                item_attrs(items[0]),
+                item_attrs(&items[0].element),
                 Some(Value::Map(vec![("y".into(), Value::Int(2))]))
             );
         }
@@ -234,9 +234,9 @@ fn sugar_connect_tolerates_one_blank_line_but_not_two() {
 
     let doc = parse_document("- content\n\n:{y: 2}\n").unwrap();
     match &doc.blocks[0] {
-        Block::Element(list) => {
-            let items = list_items(list);
-            assert_eq!(item_attrs(items[0]), None);
+        Block::List(list) => {
+            let items = &list.items;
+            assert_eq!(item_attrs(&items[0].element), None);
         }
         other => panic!("expected list, got {other:?}"),
     }

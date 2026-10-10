@@ -43,21 +43,10 @@ impl tove::ValueHook for TometValueHook {
     fn try_parse_value(&mut self, cur: &mut Cursor) -> Option<tove::Result<Value>> {
         // A real, `@`-sigiled element sitting in a value slot
         if cur.peek() == Some('@') && crate::element::is_element_start(cur, false) {
-            let start = cur.pos();
             let el = match crate::element::parse_element(cur, false) {
                 Ok(el) => el,
                 Err(e) => return Some(Err(tove::Error::at(e.message, e.line, e.column, e.offset))),
             };
-            // An element embedded in a value position cannot carry block children.
-            if el.children.is_some() {
-                let (line, col) = cur.line_col(start);
-                return Some(Err(tove::Error::at(
-                    "an element embedded in a value may not take block children",
-                    line,
-                    col,
-                    start,
-                )));
-            }
             return Some(Ok(Value::Element(Box::new(el))));
         }
 

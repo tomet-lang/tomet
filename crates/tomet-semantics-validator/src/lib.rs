@@ -26,7 +26,7 @@ pub use diagnostic::{CstValidationError, Diagnostic, Severity};
 pub use rule::{RuleArgs, decode_rule_args};
 
 use id::{collect_ids, collect_ids_cst};
-use tomet_ast::{Block, Document, Element, Inline};
+use tomet_ast::{Block, Document, Element, Inline, List};
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::{Bindings, Shape};
 
@@ -235,6 +235,10 @@ fn check_singletons_and_regions(doc: &Document, bindings: &Bindings, errors: &mu
                     validate_section_block(child, &mut visit);
                 }
             }
+            Block::List(list) => {
+                in_preamble = false;
+                validate_list_items(list, &mut visit);
+            }
         }
     }
 }
@@ -266,6 +270,22 @@ fn validate_section_block(block: &Block, visit: &mut impl FnMut(&Element, bool))
             for child in &s.blocks {
                 validate_section_block(child, visit);
             }
+        }
+        Block::List(list) => validate_list_items(list, visit),
+    }
+}
+
+/// [`validate_section_block`]'s counterpart for a list's own items --
+/// each item's `element` (plus its descendants), recursing into a nested
+/// `sublist` the same way `validate_section_block` recurses into a nested
+/// `Section`. `list.connects` is deliberately not visited, the same
+/// exclusion `s.connects` gets above.
+fn validate_list_items(list: &List, visit: &mut impl FnMut(&Element, bool)) {
+    for item in &list.items {
+        visit(&item.element, false);
+        tomet_tree::for_each_descendant(&item.element, false, |desc| visit(desc, false));
+        if let Some(sub) = &item.sublist {
+            validate_list_items(sub, visit);
         }
     }
 }
@@ -383,11 +403,12 @@ fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnos
 }
 
 /// Enforces every `:rule(allow:list(...))` connect found anywhere in the
-/// document -- on an ordinary element's own `connects` *and* on a
-/// heading's (`Section.connects`, since a `Section` is not an `Element`
-/// and so is never reached by the `el` loop below) -- and reports an
-/// unrecognized connect name (`:xxx(...)` where `xxx` is not in
-/// `tomet_semantics::CONNECT_MEMBERS`).
+/// document -- on an ordinary element's own `connects`, on a heading's
+/// (`Section.connects`, since a `Section` is not an `Element` and so is
+/// never reached by the `el` loop below), and on a list's own
+/// (`List.connects`, likewise never reached by either of the other two
+/// loops) -- and reports an unrecognized connect name (`:xxx(...)` where
+/// `xxx` is not in `tomet_semantics::CONNECT_MEMBERS`).
 ///
 /// Needs `bindings`, unlike the parser or `tomet-semantics-resolver`:
 /// `allow:list(ns.mycard)` can name a namespaced identifier, and deciding
@@ -395,12 +416,12 @@ fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnos
 /// resolved vocabulary. This is why the check lives here rather than
 /// earlier in the pipeline.
 ///
-/// Only iterates each visited element's/section's own `connects` -- never
-/// recurses into a connect's internals beyond that, and
-/// `tomet_tree::for_each_element`/`for_each_section` themselves never
-/// descend into `connects` either (see `for_each_descendant`'s doc
-/// comment), so a connect element is never misclassified as an ordinary
-/// document element.
+/// Only iterates each visited element's/section's/list's own `connects`
+/// -- never recurses into a connect's internals beyond that, and
+/// `tomet_tree::for_each_element`/`for_each_section`/`for_each_list`
+/// themselves never descend into `connects` either (see
+/// `for_each_descendant`'s doc comment), so a connect element is never
+/// misclassified as an ordinary document element.
 fn check_rule_connects(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     tomet_tree::for_each_element(doc, |el| {
         for connect in &el.connects {
@@ -413,6 +434,13 @@ fn check_rule_connects(doc: &Document, bindings: &Bindings, errors: &mut Vec<Dia
         for connect in &sec.connects {
             check_one_connect(connect, bindings, errors, |direct, f| {
                 tomet_tree::for_each_descendant_in_blocks(&sec.blocks, direct, f);
+            });
+        }
+    });
+    tomet_tree::for_each_list(doc, |list| {
+        for connect in &list.connects {
+            check_one_connect(connect, bindings, errors, |direct, f| {
+                tomet_tree::for_each_item_descendant(&list.items, direct, f);
             });
         }
     });
@@ -589,6 +617,7 @@ fn for_each_direct_content_element<'a>(
                 }
             }
             Block::Section(_) => {}
+            Block::List(_) => {}
         }
     }
 }

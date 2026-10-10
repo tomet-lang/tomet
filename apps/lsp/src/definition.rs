@@ -1,7 +1,7 @@
 use std::ops::ControlFlow;
 
 use lsp_types::{GotoDefinitionResponse, Location, Position, Uri};
-use tomet_ast::{Element, ElementValue, InterpExprKind, Span, Value};
+use tomet_ast::{Block, Element, ElementValue, Inline, InterpExprKind, List, Span, Value};
 use tomet_tree::{Visitor, walk_document};
 
 use crate::position::{span_contains, span_to_range};
@@ -63,10 +63,10 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
     })
 }
 
-fn find_def_in_blocks(blocks: &[tomet_ast::Block], target_id: &str) -> Option<Span> {
+fn find_def_in_blocks(blocks: &[Block], target_id: &str) -> Option<Span> {
     for block in blocks {
         match block {
-            tomet_ast::Block::Section(sec) => {
+            Block::Section(sec) => {
                 if sec.id.as_ref().is_some_and(|id| id.0 == target_id) {
                     return Some(sec.span);
                 }
@@ -79,20 +79,47 @@ fn find_def_in_blocks(blocks: &[tomet_ast::Block], target_id: &str) -> Option<Sp
                     return Some(span);
                 }
             }
-            tomet_ast::Block::Element(el) => {
+            Block::Element(el) => {
                 if let Some(span) = find_def_in_element(el, target_id) {
                     return Some(span);
                 }
             }
-            tomet_ast::Block::Paragraph(p) => {
+            Block::Paragraph(p) => {
                 for inline in &p.content {
-                    if let tomet_ast::Inline::Element(el) = inline
+                    if let Inline::Element(el) = inline
                         && let Some(span) = find_def_in_element(el, target_id)
                     {
                         return Some(span);
                     }
                 }
             }
+            Block::List(list) => {
+                if let Some(span) = find_def_in_list(list, target_id) {
+                    return Some(span);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn find_def_in_list(list: &List, target_id: &str) -> Option<Span> {
+    if list.id.as_ref().is_some_and(|id| id.0 == target_id) {
+        return Some(list.span);
+    }
+    for conn in &list.connects {
+        if let Some(span) = find_def_in_element(conn, target_id) {
+            return Some(span);
+        }
+    }
+    for item in &list.items {
+        if let Some(span) = find_def_in_element(&item.element, target_id) {
+            return Some(span);
+        }
+        if let Some(sub) = &item.sublist
+            && let Some(span) = find_def_in_list(sub, target_id)
+        {
+            return Some(span);
         }
     }
     None
@@ -104,11 +131,6 @@ fn find_def_in_element(el: &Element, target_id: &str) -> Option<Span> {
     }
     if let Some(content) = &el.content
         && let Some(span) = find_def_in_blocks(content, target_id)
-    {
-        return Some(span);
-    }
-    if let Some(children) = &el.children
-        && let Some(span) = find_def_in_blocks(children, target_id)
     {
         return Some(span);
     }

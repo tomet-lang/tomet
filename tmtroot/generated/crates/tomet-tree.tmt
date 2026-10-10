@@ -44,17 +44,15 @@ Creates a new [`Element`] with given `sigil` and default empty fields.
 The placement is [`Placement::Inline`]; a caller building a block uses
 [`ElementExt::with_placement`], and the parser sets it from position.
 
-====[ fn element_list ]
+====[ fn list ]
 
-A list element constructor (`ol` if `ordered`, else `ul`).
+A list constructor (ordered if `ordered`, i.e. `-.`, else `-`).
 
-A list has no sigil in the source -- the marker (`-` / `-.`) is its
-surface form -- but it always stands as a block, so it is constructed
-with [`Placement::Block`] directly.
+====[ fn list_item ]
 
-====[ fn element_list_item ]
-
-A list item element constructor (`Sigil::Bare`).
+A list item constructor. `sigil` is `Sigil::Bare` for a plain `- content`
+item, or `Sigil::Named(name)` for the `-@name(...)` combine form -- the
+exact same `Element` shape a standalone `@name(...)` would produce.
 
 `id` is a real parameter, not hardcoded to `None` -- list items are a
 first-class consumer of `#(id)` like everything else `parse_groups`
@@ -206,6 +204,26 @@ Every descendant element reachable from `blocks`, in document order --
 block sequence that may hold a `Paragraph`, an `Element`, or a nested
 `Section`) and needs the identical walk: a heading's own `:rule(...)`
 has to check what sits @em[under] the heading, which is this.
+
+====[ fn for_each_item_descendant ]
+
+Walks `items` as descendants, mirroring [`for_each_descendant_in_blocks`]
+for a list's own items instead of a block sequence -- what a list's own
+`:rule(allow:...)` checks against. `direct_only` means "just the items
+themselves, not what's inside each one's own content" -- same meaning
+`for_each_descendant`'s `direct_only` already has.
+
+Deliberately never reads `list.connects` or any `ListItem`'s own
+`element.connects` -- see [`for_each_descendant`]'s doc comment for why
+that must stay true structurally, not just by convention.
+
+====[ fn for_each_list ]
+
+Visits every [`List`] in `doc`, in document order, including ones
+reachable through an element's own `content`/`value` entries, a
+section's `blocks`, and a list item's own `sublist` -- every place a
+`Block::List` or a `ListItem.sublist` can occur. The counterpart to
+[`for_each_section`] for the other non-`Element` `Block` variant.
 
 ====[ fn for_each_section ]
 

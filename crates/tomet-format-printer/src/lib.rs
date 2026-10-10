@@ -12,11 +12,12 @@
 //! in `tomet-field-utils`.
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Id, Inline, Placement, Section, Sigil, Value,
+    Block, Document, Element, ElementValue, Entry, Id, Inline, List, Placement, Section, Sigil,
+    Value,
 };
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
-use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
+use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 use tomet_style::{quote_scalar_string, render_nested, render_value};
 use tomet_tree::element_new;
 
@@ -97,7 +98,7 @@ pub fn document_to_tm_with_config(doc: &Document, config: &PrinterConfig) -> Str
 
 fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
     match block {
-        // A heading or list joined into a paragraph by an explicit `\`
+        // A heading joined into a paragraph by an explicit `\`
         // continuation trigger (`docs/spec/syntax.tmt`'s `##[ 継続 ]`) --
         // rare, and flagged by `tomet-semantics::shape_mismatch` as a
         // kind that cannot actually be inline, but still round-trips.
@@ -106,25 +107,28 @@ fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
         // way `nested_inline_heading_does_not_reserialize_as_hash_sugar`
         // guards against. So its sugar is still valid to print here: only
         // the placement, not the sugar, has changed. `render_inlines`
-        // (shared with truly-nested content) has no heading/list arm and
-        // would otherwise fall back to the full `@heading(...)`/
-        // `@list(...)` form for exactly this case.
+        // (shared with truly-nested content) has no heading arm and
+        // would otherwise fall back to the full `@heading(...)` form for
+        // exactly this case.
+        //
+        // A list cannot join a paragraph this way any more: `List` is a
+        // first-class `Block` variant now, with no `Inline` form at all
+        // (see `tomet_ast::List`'s own doc comment), so it can never sit
+        // as `p.content.first()` in the first place -- a list is always
+        // block-level, by construction, the same way a `Section` already
+        // was.
         Block::Paragraph(p)
             if matches!(
                 p.content.first(),
                 Some(Inline::Element(el)) if el.placement == Placement::Inline
-                    && (list_ordered(el).is_some() || classify_std_lenient(el) == ElementKind::Heading)
+                    && classify_std_lenient(el) == ElementKind::Heading
             ) =>
         {
             let Some(Inline::Element(first)) = p.content.first() else {
                 unreachable!()
             };
             let mut head = String::new();
-            if list_ordered(first).is_some() {
-                render_list(first, config, &mut head);
-            } else {
-                render_heading_element(first, config, &mut head);
-            }
+            render_heading_element(first, config, &mut head);
             out.push_str(head.trim_end_matches('\n'));
             out.push_str(&render_inlines(&p.content[1..], config));
             out.push('\n');
@@ -136,7 +140,6 @@ fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
                 out.push('\n');
             }
         }
-        Block::Element(el) if list_ordered(el).is_some() => render_list(el, config, out),
         Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading => {
             render_heading_element(el, config, out)
         }
@@ -145,6 +148,7 @@ fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
             out.push('\n');
         }
         Block::Section(sec) => render_section(sec, config, out),
+        Block::List(list) => render_list(list, config, out),
     }
 }
 
@@ -217,14 +221,33 @@ fn render_heading_element(el: &Element, config: &PrinterConfig, out: &mut String
     out.push('\n');
 }
 
-fn render_list(el: &Element, config: &PrinterConfig, out: &mut String) {
-    render_list_with_indent(el, 0, config, out);
+fn render_list(list: &List, config: &PrinterConfig, out: &mut String) {
+    render_list_with_indent(list, 0, config, out);
 }
 
-fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, out: &mut String) {
-    let ordered = list_ordered(el).unwrap_or(false);
+fn render_list_with_indent(list: &List, indent: usize, config: &PrinterConfig, out: &mut String) {
+    let ordered = list.ordered;
     let indent_str = "  ".repeat(indent);
-    for item in list_items(el) {
+    for list_item in &list.items {
+        let item = &list_item.element;
+
+        // The combine notation (`-@name(...)`): `item` is a real, named
+        // `Element` identical to what a standalone `@name(...)` would
+        // parse to, so it round-trips through the exact same
+        // `render_element` a standalone one would use -- no marker, no
+        // `( )`-wrapping, just the bare `-`/`-.` prefix directly against
+        // `@name`.
+        if matches!(item.sigil, Sigil::Named(_)) {
+            out.push_str(&indent_str);
+            out.push_str(if ordered { "-." } else { "-" });
+            out.push_str(&render_element(item, config));
+            out.push('\n');
+            if let Some(sub) = &list_item.sublist {
+                render_list_with_indent(sub, indent + 1, config, out);
+            }
+            continue;
+        }
+
         let prefix = if ordered {
             "-. ".to_string()
         } else {
@@ -324,14 +347,8 @@ fn render_list_with_indent(el: &Element, indent: usize, config: &PrinterConfig, 
             out.push_str(&render_connects(&item.connects, config));
             out.push('\n');
         }
-        if let Some(children) = &item.children {
-            for child in children {
-                if let Block::Element(sub) = child
-                    && list_ordered(sub).is_some()
-                {
-                    render_list_with_indent(sub, indent + 1, config, out);
-                }
-            }
+        if let Some(sub) = &list_item.sublist {
+            render_list_with_indent(sub, indent + 1, config, out);
         }
     }
 }

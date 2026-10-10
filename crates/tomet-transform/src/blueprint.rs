@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use tomet_ast::{Block, Document, ElementValue, Inline, Sigil, Span, Text, Value};
+use tomet_ast::{Block, Document, ElementValue, Inline, ListItem, Sigil, Span, Text, Value};
 use tomet_compute::EvaluationContext;
 use tomet_semantics::{ElementKind, classify_std_lenient, normalized_element_args};
 use tomet_tree::{
@@ -193,12 +193,34 @@ fn evaluate_blocks(
                 {
                     changed = true;
                 }
-                if let Some(children) = &mut el.children
-                    && evaluate_blocks(children, doc, config, ctx)
-                {
+            }
+            Block::List(list) => {
+                if evaluate_list_items(&mut list.items, doc, config, ctx) {
                     changed = true;
                 }
             }
+        }
+    }
+    changed
+}
+
+fn evaluate_list_items(
+    items: &mut [ListItem],
+    doc: &Document,
+    config: &tomet_semantics::DocumentConfig,
+    ctx: &EvaluationContext,
+) -> bool {
+    let mut changed = false;
+    for item in items {
+        if let Some(content) = &mut item.element.content
+            && evaluate_blocks(content, doc, config, ctx)
+        {
+            changed = true;
+        }
+        if let Some(sub) = &mut item.sublist
+            && evaluate_list_items(&mut sub.items, doc, config, ctx)
+        {
+            changed = true;
         }
     }
     changed

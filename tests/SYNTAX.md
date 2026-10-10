@@ -737,8 +737,8 @@ Block  @quote
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       args    "x"
       content
@@ -945,8 +945,8 @@ Block  @link
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       content
         Paragraph
@@ -965,8 +965,8 @@ Block  @ul
 ```
 
 ```
-Block  @ol
-  group
+List ordered=true
+  Items:
     Bare
       content
         Paragraph
@@ -986,8 +986,8 @@ Block  @ol
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       content
         Paragraph
@@ -1011,8 +1011,8 @@ Block  @ul
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       args    {}
       content
@@ -1032,8 +1032,8 @@ Block  @ul
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       content
         Paragraph
@@ -1049,8 +1049,8 @@ Paragraph
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       args    {12: 1}
       content
@@ -1067,8 +1067,8 @@ Block  @ul
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       content
         Paragraph
@@ -1321,8 +1321,8 @@ unknown element `x`: only `std` and this document's own `@kind` may be written b
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       args    {x: 1}
       content
@@ -1355,8 +1355,8 @@ Section level=1
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       content
         Paragraph
@@ -1372,8 +1372,8 @@ Block  @ul
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       content
         Paragraph
@@ -1479,8 +1479,8 @@ Section level=1
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       args    "x"
       content
@@ -1496,8 +1496,8 @@ Block  @ul
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       content
         Paragraph
@@ -1700,8 +1700,8 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 ```
 
 ```
-Block  @ul
-  group
+List ordered=false
+  Items:
     Bare
       content
         Paragraph

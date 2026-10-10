@@ -826,10 +826,11 @@ fn parse_pipe_content(cur: &mut Cursor, parent_stack: &[usize]) -> Result<Vec<Bl
             let list_span = items
                 .first()
                 .unwrap()
+                .element
                 .span
-                .union(&items.last().unwrap().span);
-            let el = tomet_tree::element_list(ordered, items, list_span);
-            blocks.push(Block::Element(el));
+                .union(&items.last().unwrap().element.span);
+            let l = tomet_tree::list(ordered, items, list_span);
+            blocks.push(Block::List(l));
         } else {
             let para_start = cur.pos();
             let content = parse_inline_seq(

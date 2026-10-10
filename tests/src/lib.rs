@@ -117,6 +117,13 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // does -- `heading`'s content-opening `[`, `area_group`'s, and
     // `punctuation`'s all coexist unshared.
     ("cheatsheet.tmt", &["@config(", "や", "]"]),
+    // The combine notation (`-@name(...)`): `grammar.js`'s
+    // `ordered_list_item`/`unordered_list_item` only ever produce a
+    // `list_marker`/`content_group`/`marked_content` shape, with no
+    // production for `@name`'s own groups following the marker
+    // directly. `tomet-parser`'s `list.rs::eat_list_marker` recognizes
+    // it; `grammar.js` has not been taught the combine form yet.
+    ("syntax/combine.tmt", &[ANY_ERROR]),
     // ---- drift the grammar has not caught up with -------------------
     //
     // Everything below was already drifting and nobody could see it: the

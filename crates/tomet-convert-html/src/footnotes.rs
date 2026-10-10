@@ -1,8 +1,7 @@
 //! The footnotes section written after the body.
 
 use crate::RenderCtx;
-use crate::block::{render_block, render_content_blocks};
-use crate::headings::HeadingState;
+use crate::block::render_content_blocks;
 
 pub(crate) fn render_footnotes(cx: &RenderCtx, out: &mut String) {
     if cx.footnotes.items.is_empty() {
@@ -12,16 +11,10 @@ pub(crate) fn render_footnotes(cx: &RenderCtx, out: &mut String) {
     for item in &cx.footnotes.items {
         out.push_str(&format!("<li id=\"fn-{}\">\n", item.index));
         let mut content_html = String::new();
-        if let Some(def_el) = &item.definition {
-            if let Some(content) = &def_el.content {
-                render_content_blocks(cx, content, &mut content_html);
-            }
-            if let Some(children) = &def_el.children {
-                for child in children {
-                    let mut dummy_state = HeadingState::default();
-                    render_block(cx, child, &mut content_html, &mut dummy_state);
-                }
-            }
+        if let Some(def_el) = &item.definition
+            && let Some(content) = &def_el.content
+        {
+            render_content_blocks(cx, content, &mut content_html);
         }
 
         let backlink_html = if item.backlinks.len() == 1 {

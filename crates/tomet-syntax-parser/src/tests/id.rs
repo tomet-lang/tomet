@@ -112,25 +112,25 @@ fn section_sugar_reads_a_trailing_id_and_attrs_together() {
 #[test]
 fn list_item_full_form_reads_an_id() {
     let doc = parse_document("- (x)[ y ]#(item1)\n").unwrap();
-    let el = match &doc.blocks[0] {
-        Block::Element(el) => el,
-        other => panic!("expected element, got {other:?}"),
+    let list = match &doc.blocks[0] {
+        Block::List(list) => list,
+        other => panic!("expected list, got {other:?}"),
     };
-    let items = list_items(el);
-    assert_eq!(items[0].id, Some(Id("item1".into())));
+    let items = &list.items;
+    assert_eq!(items[0].element.id, Some(Id("item1".into())));
 }
 
 #[test]
 fn list_item_sugar_reads_a_trailing_id() {
     let doc = parse_document("- plain text #(item1)\n").unwrap();
-    let el = match &doc.blocks[0] {
-        Block::Element(el) => el,
-        other => panic!("expected element, got {other:?}"),
+    let list = match &doc.blocks[0] {
+        Block::List(list) => list,
+        other => panic!("expected list, got {other:?}"),
     };
-    let items = list_items(el);
-    assert_eq!(items[0].id, Some(Id("item1".into())));
+    let items = &list.items;
+    assert_eq!(items[0].element.id, Some(Id("item1".into())));
     assert_eq!(
-        items[0].content,
+        items[0].element.content,
         wrap(vec![Inline::Text("plain text".into())])
     );
 }
@@ -138,14 +138,14 @@ fn list_item_sugar_reads_a_trailing_id() {
 #[test]
 fn list_item_sugar_reads_a_trailing_id_and_attrs_together() {
     let doc = parse_document("- plain text #(item1){ tag: x }\n").unwrap();
-    let el = match &doc.blocks[0] {
-        Block::Element(el) => el,
-        other => panic!("expected element, got {other:?}"),
+    let list = match &doc.blocks[0] {
+        Block::List(list) => list,
+        other => panic!("expected list, got {other:?}"),
     };
-    let items = list_items(el);
-    assert_eq!(items[0].id, Some(Id("item1".into())));
+    let items = &list.items;
+    assert_eq!(items[0].element.id, Some(Id("item1".into())));
     assert_eq!(
-        items[0].value,
+        items[0].element.value,
         Some(ElementValue::from_map(Value::Map(vec![(
             "tag".into(),
             Value::String("x".into())
@@ -156,14 +156,14 @@ fn list_item_sugar_reads_a_trailing_id_and_attrs_together() {
 #[test]
 fn list_item_sugar_with_no_trailing_group_has_no_id() {
     let doc = parse_document("- plain text\n").unwrap();
-    let el = match &doc.blocks[0] {
-        Block::Element(el) => el,
-        other => panic!("expected element, got {other:?}"),
+    let list = match &doc.blocks[0] {
+        Block::List(list) => list,
+        other => panic!("expected list, got {other:?}"),
     };
-    let items = list_items(el);
-    assert_eq!(items[0].id, None);
+    let items = &list.items;
+    assert_eq!(items[0].element.id, None);
     assert_eq!(
-        items[0].content,
+        items[0].element.content,
         wrap(vec![Inline::Text("plain text".into())])
     );
 }
@@ -186,14 +186,14 @@ fn bare_hash_paren_inside_sugar_text_is_still_plain_text_when_unconfirmed() {
     // Not followed by anything that parses as an id (unterminated), so
     // this must remain ordinary prose rather than erroring the whole line.
     let doc = parse_document("- text #(unterminated\n").unwrap();
-    let el = match &doc.blocks[0] {
-        Block::Element(el) => el,
-        other => panic!("expected element, got {other:?}"),
+    let list = match &doc.blocks[0] {
+        Block::List(list) => list,
+        other => panic!("expected list, got {other:?}"),
     };
-    let items = list_items(el);
-    assert_eq!(items[0].id, None);
+    let items = &list.items;
+    assert_eq!(items[0].element.id, None);
     assert_eq!(
-        items[0].content,
+        items[0].element.content,
         wrap(vec![Inline::Text("text #(unterminated".into())])
     );
 }

@@ -9,11 +9,12 @@
 //! valid CommonMark. Heading `id`/`cssclass` attrs have no CommonMark
 //! form and are dropped.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Placement, Section, Value};
+use tomet_ast::{
+    Block, Document, Element, ElementValue, Inline, List, Placement, Section, Sigil, Value,
+};
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
-    is_directive, link_target, list_items, list_ordered, normalized_element_args, path_target,
-    target_scheme,
+    is_directive, link_target, normalized_element_args, path_target, target_scheme,
 };
 
 struct MarkdownCtx<'a> {
@@ -56,7 +57,6 @@ fn render_block(cx: &MarkdownCtx, block: &Block, out: &mut String) {
                 out.push_str("\n\n");
             }
         }
-        Block::Element(el) if list_ordered(el).is_some() => render_list(cx, el, out),
         Block::Element(el) => {
             let text = element_to_md(cx, el, false);
             if !text.is_empty() {
@@ -65,6 +65,7 @@ fn render_block(cx: &MarkdownCtx, block: &Block, out: &mut String) {
             }
         }
         Block::Section(sec) => render_section(cx, sec, out),
+        Block::List(list) => render_list(cx, list, out),
     }
 }
 
@@ -82,15 +83,16 @@ fn render_section(cx: &MarkdownCtx, sec: &Section, out: &mut String) {
     }
 }
 
-fn render_list(cx: &MarkdownCtx, el: &Element, out: &mut String) {
-    render_list_with_indent(cx, el, 0, out);
+fn render_list(cx: &MarkdownCtx, list: &List, out: &mut String) {
+    render_list_with_indent(cx, list, 0, out);
     out.push('\n');
 }
 
-fn render_list_with_indent(cx: &MarkdownCtx, el: &Element, indent: usize, out: &mut String) {
-    let ordered = list_ordered(el).unwrap_or(false);
+fn render_list_with_indent(cx: &MarkdownCtx, list: &List, indent: usize, out: &mut String) {
+    let ordered = list.ordered;
     let indent_str = "  ".repeat(indent);
-    for (i, item) in list_items(el).iter().enumerate() {
+    for (i, list_item) in list.items.iter().enumerate() {
+        let item = &list_item.element;
         out.push_str(&indent_str);
         let marker = if ordered {
             format!("{}. ", i + 1)
@@ -98,19 +100,21 @@ fn render_list_with_indent(cx: &MarkdownCtx, el: &Element, indent: usize, out: &
             "- ".to_string()
         };
         out.push_str(&marker);
-        // `args` (the `(...)` marker `Value`) has no CommonMark equivalent
-        // -- dropped on export, same as this crate's other documented
-        // lossy cases (see the module doc).
-        out.push_str(&blocks_to_md(cx, item.content.as_deref().unwrap_or(&[])));
+        if matches!(item.sigil, Sigil::Named(_)) {
+            // The combine notation (`-@name(...)`): no CommonMark list
+            // item has an equivalent, so this falls back the same way
+            // `element_to_md` already does for any other construct with
+            // no CommonMark form (see the module doc).
+            out.push_str(&element_to_md(cx, item, false));
+        } else {
+            // `args` (the `(...)` marker `Value`) has no CommonMark
+            // equivalent -- dropped on export, same as this crate's
+            // other documented lossy cases (see the module doc).
+            out.push_str(&blocks_to_md(cx, item.content.as_deref().unwrap_or(&[])));
+        }
         out.push('\n');
-        if let Some(children) = &item.children {
-            for child in children {
-                if let Block::Element(sub) = child
-                    && list_ordered(sub).is_some()
-                {
-                    render_list_with_indent(cx, sub, indent + 1, out);
-                }
-            }
+        if let Some(sub) = &list_item.sublist {
+            render_list_with_indent(cx, sub, indent + 1, out);
         }
     }
 }
@@ -548,6 +552,13 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
                 s.push_str(&inlines_to_plain(&sec.title));
                 s.push_str(&blocks_to_plain(&sec.blocks));
             }
+            Block::List(list) => {
+                for item in &list.items {
+                    if let Some(content) = &item.element.content {
+                        s.push_str(&blocks_to_plain(content));
+                    }
+                }
+            }
         }
     }
     s
@@ -600,34 +611,10 @@ fn render_footnotes(cx: &MarkdownCtx, out: &mut String) {
     for item in &cx.footnotes.items {
         out.push_str(&format!("[^{}]: ", item.index));
         let mut def_text = String::new();
-        if let Some(def_el) = &item.definition {
-            if let Some(content) = &def_el.content {
-                def_text.push_str(&blocks_to_md(cx, content));
-            }
-            if let Some(children) = &def_el.children {
-                for child in children {
-                    let mut child_text = String::new();
-                    render_block(cx, child, &mut child_text);
-                    let trimmed = child_text.trim();
-                    if !trimmed.is_empty() {
-                        if !def_text.is_empty() {
-                            def_text.push_str("\n\n");
-                        }
-                        let indented = trimmed
-                            .lines()
-                            .map(|l| {
-                                if l.is_empty() {
-                                    String::new()
-                                } else {
-                                    format!("    {l}")
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n");
-                        def_text.push_str(&indented);
-                    }
-                }
-            }
+        if let Some(def_el) = &item.definition
+            && let Some(content) = &def_el.content
+        {
+            def_text.push_str(&blocks_to_md(cx, content));
         }
         out.push_str(&def_text);
         out.push_str("\n\n");
@@ -1015,7 +1002,6 @@ mod tests {
                 placement: Placement::Inline,
                 args: Some(Value::String(tag.to_string())),
                 content: None,
-                children: None,
                 value: Some(ElementValue::from_map(Value::Map(vec![(
                     "key".to_string(),
                     Value::String("value".to_string()),
@@ -1053,7 +1039,6 @@ mod tests {
             placement: Placement::Block,
             args: Some(Value::Int(level)),
             content: Some(wrap_content(content)),
-            children: None,
             value: None,
             id: None,
             connects: Vec::new(),
@@ -1108,25 +1093,27 @@ mod tests {
     #[test]
     fn bullet_and_ordered_list() {
         let doc = Document {
-            blocks: vec![Block::Element(tomet_tree::element_list(
+            blocks: vec![Block::List(tomet_tree::list(
                 true,
                 vec![
-                    tomet_tree::element_list_item(
+                    tomet_tree::list_item(
+                        Sigil::Bare,
                         wrap_content(vec![Inline::Text(Text::new("one", Span::dummy()))]),
                         None,
                         None,
                         None,
                         Vec::new(),
-                        Vec::new(),
+                        None,
                         Span::dummy(),
                     ),
-                    tomet_tree::element_list_item(
+                    tomet_tree::list_item(
+                        Sigil::Bare,
                         wrap_content(vec![Inline::Text(Text::new("two", Span::dummy()))]),
                         None,
                         None,
                         None,
                         Vec::new(),
-                        Vec::new(),
+                        None,
                         Span::dummy(),
                     ),
                 ],
@@ -1150,7 +1137,6 @@ mod tests {
                             "a",
                             Span::dummy(),
                         ))])),
-                        children: None,
                         value: None,
                         id: None,
                         connects: Vec::new(),
@@ -1165,7 +1151,6 @@ mod tests {
                             "b",
                             Span::dummy(),
                         ))])),
-                        children: None,
                         value: None,
                         id: None,
                         connects: Vec::new(),
@@ -1192,7 +1177,6 @@ mod tests {
                 "Wiki",
                 Span::dummy(),
             ))])),
-            children: None,
             value: None,
             id: None,
             connects: Vec::new(),
@@ -1221,7 +1205,6 @@ mod tests {
                 "a cat",
                 Span::dummy(),
             ))])),
-            children: None,
             value: None,
             id: None,
             connects: Vec::new(),
@@ -1250,7 +1233,6 @@ mod tests {
                 "fn main() {}",
                 Span::dummy(),
             ))])),
-            children: None,
             value: None,
             id: None,
             connects: Vec::new(),
@@ -1273,7 +1255,6 @@ mod tests {
                 "foo()",
                 Span::dummy(),
             ))])),
-            children: None,
             value: None,
             id: None,
             connects: Vec::new(),

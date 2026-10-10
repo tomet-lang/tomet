@@ -24,7 +24,6 @@ pub fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_
             placement: Placement::Block,
             args: None,
             content: None,
-            children: None,
             value: Some(ElementValue::from_map(Value::Map(vec![(
                 key.to_string(),
                 Value::String(new_val.to_string()),

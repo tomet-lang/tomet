@@ -80,6 +80,7 @@ fn extract_connections_from_references(el: &Element) -> Vec<RemoteConnection> {
                     }
                 }
                 Block::Section(_) => {}
+                Block::List(_) => {}
             }
         }
     }

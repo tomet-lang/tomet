@@ -19,7 +19,7 @@ use crate::section::{
 use crate::value::{skip_inline_ws, skip_ws_and_newlines};
 use tomet_ast::{Block, Document, Element, Inline, Paragraph, Placement, Section};
 use tomet_lexer::Cursor;
-use tomet_tree::{ElementExt, element_list, element_new};
+use tomet_tree::{ElementExt, element_new, list};
 
 /// Parse an entire source string as a markup [`Document`].
 pub fn parse_document(src: &str) -> Result<Document> {
@@ -164,10 +164,11 @@ pub(crate) fn parse_block_seq(cur_ref: &mut Cursor, stop: BlockStop) -> Result<V
                 let list_span = items
                     .first()
                     .unwrap()
+                    .element
                     .span
-                    .union(&items.last().unwrap().span);
-                let el = element_list(head.ordered, items, list_span);
-                push_block(&mut doc_blocks, &mut stack, Block::Element(el));
+                    .union(&items.last().unwrap().element.span);
+                let l = list(head.ordered, items, list_span);
+                push_block(&mut doc_blocks, &mut stack, Block::List(l));
             }
             continue;
         }

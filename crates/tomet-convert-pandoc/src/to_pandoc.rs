@@ -1,13 +1,13 @@
 //! `tomet_ast::Document` -> Pandoc's AST.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, ElementValue, Id, Inline as TmInline, Placement, Sigil,
-    Value,
+    Block as TmBlock, Document, Element, ElementValue, Id, Inline as TmInline, List, Placement,
+    Sigil, Value,
 };
 use tomet_semantics::{
     ElementKind, TableRow, classify_std_lenient, document_meta, flatten_data, flatten_element_data,
-    heading_level, is_directive, link_target, list_items, list_ordered, normalized_element_args,
-    parse_table_rows, path_target,
+    heading_level, is_directive, link_target, normalized_element_args, parse_table_rows,
+    path_target,
 };
 
 use crate::ast::{
@@ -99,6 +99,7 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
             }
             blocks
         }
+        TmBlock::List(list) => vec![list_to_pandoc(list)],
     }
 }
 
@@ -120,7 +121,6 @@ fn element_to_blocks(el: &Element) -> Vec<Block> {
         "hr" => vec![Block::HorizontalRule],
         "raw" => vec![Block::CodeBlock(code_attr(el), content_to_plain_text(el))],
         "quote" => vec![Block::BlockQuote(element_content_to_blocks(content_of(el)))],
-        "ol" | "ul" => vec![list_to_pandoc(el)],
         "table" => table_to_pandoc(el),
         // A path standing as a block is a listing row, so the
         // description goes beside the path rather than instead of it --
@@ -288,6 +288,11 @@ fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el)),
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
+            TmBlock::List(list) => {
+                for item in &list.items {
+                    out.extend(blocks_to_inlines_lossy(content_of(&item.element)));
+                }
+            }
         }
     }
     out
@@ -369,6 +374,7 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
                 ));
                 out.extend(element_content_to_blocks(&sec.blocks));
             }
+            TmBlock::List(list) => out.push(list_to_pandoc(list)),
         }
     }
     out
@@ -394,6 +400,11 @@ fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el)),
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
+            TmBlock::List(list) => {
+                for item in &list.items {
+                    out.extend(blocks_to_pandoc_inlines(content_of(&item.element)));
+                }
+            }
         }
     }
     out
@@ -522,6 +533,11 @@ fn blocks_plain_text(blocks: &[TmBlock]) -> String {
             TmBlock::Paragraph(p) => out.push_str(&plain_text(&p.content)),
             TmBlock::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
             TmBlock::Section(sec) => out.push_str(&plain_text(&sec.title)),
+            TmBlock::List(list) => {
+                for item in &list.items {
+                    out.push_str(&blocks_plain_text(content_of(&item.element)));
+                }
+            }
         }
     }
     out
@@ -554,11 +570,20 @@ fn interp_source(el: &Element) -> String {
 
 // ---- lists ---------------------------------------------------------
 
-fn list_to_pandoc(el: &Element) -> Block {
-    let items: Vec<Vec<Block>> = list_items(el)
+fn list_to_pandoc(list: &List) -> Block {
+    let items: Vec<Vec<Block>> = list
+        .items
         .iter()
-        .map(|item| {
-            let mut blocks = element_content_to_blocks(content_of(item));
+        .map(|list_item| {
+            let item = &list_item.element;
+            let mut blocks = if matches!(item.sigil, Sigil::Named(_)) {
+                // The combine notation (`-@name(...)`): rendered exactly
+                // like a standalone `@name(...)` would be, through the
+                // same generic element-to-blocks dispatch.
+                element_to_blocks(item)
+            } else {
+                element_content_to_blocks(content_of(item))
+            };
             // A list item's own content is a single logical line, so
             // Pandoc's `Plain` is a better fit than `Para` -- it is what
             // keeps a tight list tight.
@@ -567,16 +592,14 @@ fn list_to_pandoc(el: &Element) -> Block {
                     *block = Block::Plain(std::mem::take(inlines));
                 }
             }
-            if let Some(children) = &item.children {
-                for child in children {
-                    blocks.extend(block_to_pandoc(child));
-                }
+            if let Some(sub) = &list_item.sublist {
+                blocks.push(list_to_pandoc(sub));
             }
             blocks
         })
         .collect();
 
-    if list_ordered(el).unwrap_or(false) {
+    if list.ordered {
         Block::OrderedList(ListAttributes::default(), items)
     } else {
         Block::BulletList(items)

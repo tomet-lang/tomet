@@ -35,6 +35,11 @@ fn title_from_content_blocks(cur: &Cursor, content: Option<Vec<Block>>) -> Resul
                 cur.pos(),
                 "a heading's title can only hold plain text, not a nested section",
             )),
+            Some(Block::List(_)) => Err(err(
+                cur,
+                cur.pos(),
+                "a heading's title can only hold plain text, not a list",
+            )),
             None => unreachable!(),
         },
         Some(_) => Err(err(

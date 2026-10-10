@@ -96,11 +96,10 @@ mod tests {
 
         expand_document_macros(&mut doc, &config);
 
-        let Block::Element(ul_el) = &doc.blocks[0] else {
+        let Block::List(list) = &doc.blocks[0] else {
             panic!()
         };
-        let items = ul_el.value.as_ref().unwrap().as_children();
-        let item_el = items[0];
+        let item_el = &list.items[0].element;
         let content = item_el.content.as_ref().unwrap();
         let [Block::Paragraph(p)] = content.as_slice() else {
             panic!()

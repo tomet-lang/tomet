@@ -477,11 +477,12 @@ mod tests {
         assert_eq!(stats.dollar, 1);
         assert_eq!(stats.caret, 1);
         assert_eq!(stats.bare, 2);
-        // `@note` and the `@ul` the list is.
-        assert_eq!(stats.named, 2);
-        assert_eq!(stats.elements(), 6);
+        // Just `@note` -- the list itself is `Block::List` now, not a
+        // named `@ul` element, so it contributes nothing here.
+        assert_eq!(stats.named, 1);
+        assert_eq!(stats.elements(), 5);
         assert_eq!(stats.by_name.get("note"), Some(&1));
-        assert_eq!(stats.by_name.get("ul"), Some(&1));
+        assert_eq!(stats.by_name.get("ul"), None);
     }
 
     #[test]

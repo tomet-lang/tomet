@@ -31,8 +31,8 @@
 //! would be a lie.
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Paragraph, Sigil,
-    Span, Text, Value,
+    Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, List, Paragraph,
+    Sigil, Span, Text, Value,
 };
 use tomet_compute::EvaluationContext;
 use tomet_semantics::DocumentConfig;
@@ -110,7 +110,34 @@ fn resolve_block(
                 .collect();
             Block::Section(sec)
         }
+        Block::List(list) => Block::List(resolve_list(list, source, config, ctx, unresolved)),
     }
+}
+
+fn resolve_list(
+    mut list: List,
+    source: &Document,
+    config: &DocumentConfig,
+    ctx: &EvaluationContext,
+    unresolved: &mut Vec<Unresolved>,
+) -> List {
+    list.connects = list
+        .connects
+        .into_iter()
+        .map(|conn| resolve_element(conn, source, config, ctx, unresolved))
+        .collect();
+    list.items = list
+        .items
+        .into_iter()
+        .map(|mut item| {
+            item.element = resolve_element(item.element, source, config, ctx, unresolved);
+            item.sublist = item
+                .sublist
+                .map(|sub| resolve_list(sub, source, config, ctx, unresolved));
+            item
+        })
+        .collect();
+    list
 }
 
 fn resolve_element(
@@ -123,14 +150,6 @@ fn resolve_element(
     if let Some(content) = el.content.take() {
         el.content = Some(
             content
-                .into_iter()
-                .map(|block| resolve_block(block, source, config, ctx, unresolved))
-                .collect(),
-        );
-    }
-    if let Some(children) = el.children.take() {
-        el.children = Some(
-            children
                 .into_iter()
                 .map(|block| resolve_block(block, source, config, ctx, unresolved))
                 .collect(),
@@ -285,6 +304,15 @@ mod tests {
                     walk(out, &sec.title);
                     for child in &sec.blocks {
                         walk_block(out, child);
+                    }
+                }
+                Block::List(list) => {
+                    for item in &list.items {
+                        if let Some(content) = &item.element.content {
+                            for block in content {
+                                walk_block(out, block);
+                            }
+                        }
                     }
                 }
             }

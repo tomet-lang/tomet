@@ -37,7 +37,7 @@
 //! applies [`format_source`]. It never alters document metadata (`@meta`)
 //! or injects structural elements.
 
-use tomet_ast::{Block, Document, Element, Inline, Sigil, Value};
+use tomet_ast::{Block, Document, Element, Inline, List, ListItem, Sigil, Value};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_parser::parse_document;
 
@@ -668,6 +668,21 @@ fn find_swap_in_block(block: &Block, src: &str, config: &PrinterConfig) -> Optio
                 }
             }
         }
+        Block::List(list) => return find_swap_in_list(list, src, config),
+    }
+    None
+}
+
+fn find_swap_in_list(list: &List, src: &str, config: &PrinterConfig) -> Option<String> {
+    for item in &list.items {
+        if let Some(swapped) = check_and_swap_element(&item.element, src, config) {
+            return Some(swapped);
+        }
+        if let Some(sub) = &item.sublist
+            && let Some(swapped) = find_swap_in_list(sub, src, config)
+        {
+            return Some(swapped);
+        }
     }
     None
 }
@@ -702,13 +717,6 @@ fn check_and_swap_element(el: &Element, src: &str, config: &PrinterConfig) -> Op
     if let Some(blocks) = &el.content {
         for block in blocks {
             if let Some(swapped) = find_swap_in_block(block, src, config) {
-                return Some(swapped);
-            }
-        }
-    }
-    if let Some(children) = &el.children {
-        for child in children {
-            if let Some(swapped) = find_swap_in_block(child, src, config) {
                 return Some(swapped);
             }
         }
@@ -889,11 +897,6 @@ fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                 walk_block(block, out);
             }
         }
-        if let Some(children) = &el.children {
-            for child in children {
-                walk_block(child, out);
-            }
-        }
         if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
             for child in children {
                 walk_element(child, out);
@@ -923,6 +926,24 @@ fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                 for child in &sec.blocks {
                     walk_block(child, out);
                 }
+            }
+            Block::List(list) => {
+                for conn in &list.connects {
+                    walk_element(conn, out);
+                }
+                walk_list_items(&list.items, out);
+            }
+        }
+    }
+
+    fn walk_list_items(items: &[ListItem], out: &mut Vec<(usize, usize)>) {
+        for item in items {
+            walk_element(&item.element, out);
+            if let Some(sub) = &item.sublist {
+                for conn in &sub.connects {
+                    walk_element(conn, out);
+                }
+                walk_list_items(&sub.items, out);
             }
         }
     }

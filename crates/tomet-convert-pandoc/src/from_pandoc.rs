@@ -34,13 +34,13 @@
 //!   `Attr` is where data goes. Only the elements move.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, ElementValue, Id, Inline as TmInline, LineBreak, Name,
-    Paragraph, Placement, RawText, Section, Sigil, SoftBreak, Span, Text, Value,
+    Block as TmBlock, Document, Element, ElementValue, Id, Inline as TmInline, LineBreak, List,
+    Name, Paragraph, Placement, RawText, Section, Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::EXACT_DATA_KEY;
 
 use crate::to_pandoc::{BARE_SIGIL, SIGIL_KEY};
-use tomet_tree::{ElementExt, element_list, element_list_item, element_new};
+use tomet_tree::{ElementExt, element_new, list, list_item};
 
 use crate::ast::{Attr, Block, Inline, MetaValue, PandocDoc, Row, TableParts};
 
@@ -167,6 +167,8 @@ fn block_from_pandoc(block: &Block) -> Option<TmBlock> {
         // definitions) and is not a stand-in for a real definition list,
         // so this is dropped rather than forced into it.
         Block::DefinitionList(_) => None,
+        Block::BulletList(items) => Some(TmBlock::List(list_element(items, false))),
+        Block::OrderedList(_, items) => Some(TmBlock::List(list_element(items, true))),
         other => Some(TmBlock::Element(block_element(other))),
     }
 }
@@ -217,8 +219,15 @@ fn block_element(block: &Block) -> Element {
             el.content = Some(pandoc_blocks_to_content(blocks));
             el
         }
-        Block::BulletList(items) => return list_element(items, false),
-        Block::OrderedList(_, items) => return list_element(items, true),
+        // A `List` is not an `Element` at all any more (see
+        // `tomet_ast::List`), so it can't be produced here -- both
+        // callers (`block_from_pandoc`, `blocks_to_content`) handle
+        // `BulletList`/`OrderedList` themselves before ever reaching
+        // this function, the same way `DefinitionList` is handled
+        // before `block_element` below.
+        Block::BulletList(_) | Block::OrderedList(..) => {
+            unreachable!("BulletList/OrderedList is handled before block_element")
+        }
         Block::Table(parts) => table_element(parts),
         Block::Div(attr, blocks) => {
             let mut el = element_from_attr(attr, || "div".to_string());
@@ -253,22 +262,33 @@ fn block_element(block: &Block) -> Element {
     el.with_placement(Placement::Block)
 }
 
-fn list_element(items: &[Vec<Block>], ordered: bool) -> Element {
-    let elements: Vec<Element> = items
+/// `sublist` is always `None` here: a nested `BulletList`/`OrderedList`
+/// inside an item's own Pandoc blocks round-trips as a `Block::List`
+/// entry in that item's `content` instead (via `block_from_pandoc`'s own
+/// `BulletList`/`OrderedList` arm, reached through `pandoc_blocks_to_content`
+/// below), the same shape this crate's reconstruction has always produced
+/// (`tests/ref/roadmap.pandoc.roundtrip.tmt` pins the exact text this
+/// produces -- a nested list reached this way prints at the printer's
+/// top-level indent, not nested under the item, which is a pre-existing
+/// round-trip quirk, not something this task's `List`/`ListItem`
+/// promotion set out to fix).
+fn list_element(items: &[Vec<Block>], ordered: bool) -> List {
+    let elements = items
         .iter()
         .map(|blocks| {
-            element_list_item(
+            list_item(
+                Sigil::Bare,
                 pandoc_blocks_to_content(blocks),
                 None,
                 None,
                 None,
                 Vec::new(),
-                Vec::new(),
+                None,
                 Span::dummy(),
             )
         })
         .collect();
-    element_list(ordered, elements, Span::dummy())
+    list(ordered, elements, Span::dummy())
 }
 
 /// Rebuilds a `@table` from Pandoc's table.
@@ -368,6 +388,19 @@ fn blocks_to_content(blocks: &[Block]) -> Vec<TmInline> {
             // See `block_from_pandoc`'s own `DefinitionList` arm: dropped
             // here too, for the same reason.
             Block::DefinitionList(_) => {}
+            // No `TmInline` form for a `List` at all (see
+            // `tomet_ast::List`) -- flattens each item's own content into
+            // this same inline run instead, same lossy treatment
+            // `tomet-convert-markdown`'s importer gives a list inside a
+            // flattened blockquote.
+            Block::BulletList(items) | Block::OrderedList(_, items) => {
+                for (j, item_blocks) in items.iter().enumerate() {
+                    if j > 0 {
+                        out.push(TmInline::Text(Text::from(" ".to_string())));
+                    }
+                    out.extend(blocks_to_content(item_blocks));
+                }
+            }
             other => out.push(TmInline::Element(block_element(other))),
         }
     }
@@ -512,6 +545,13 @@ fn blocks_to_text_tm(blocks: &[TmBlock]) -> String {
                 }
             }
             TmBlock::Section(sec) => out.push_str(&inlines_to_text_tm(&sec.title)),
+            TmBlock::List(list) => {
+                for item in &list.items {
+                    if let Some(content) = &item.element.content {
+                        out.push_str(&blocks_to_text_tm(content));
+                    }
+                }
+            }
         }
     }
     out

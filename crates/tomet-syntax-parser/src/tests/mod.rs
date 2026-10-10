@@ -18,10 +18,9 @@ mod values;
 
 use super::*;
 use tomet_ast::{
-    Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Paragraph, Sigil,
-    SoftBreak, Span, Value,
+    Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Paragraph,
+    Placement, Sigil, SoftBreak, Span, Value,
 };
-use tomet_semantics::{list_items, list_ordered};
 
 /// A `SoftBreak` for test expectations -- span never matters, `Span`'s
 /// `PartialEq` always returns `true` (see its own doc comment).

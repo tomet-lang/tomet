@@ -1,7 +1,7 @@
 //! Generic recursive traversal of a [`tomet_ast::Document`]'s tree.
 
 use std::ops::ControlFlow;
-use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline, Value};
+use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline, List, ListItem, Value};
 
 /// Called at every [`Element`] `walk_document` visits, in document order.
 pub trait Visitor<B> {
@@ -54,6 +54,16 @@ fn inlines_in_block(block: &Block, f: &mut dyn FnMut(&Inline)) {
                 inlines_in_block(child, f);
             }
         }
+        Block::List(list) => inlines_in_list_items(&list.items, f),
+    }
+}
+
+fn inlines_in_list_items(items: &[ListItem], f: &mut dyn FnMut(&Inline)) {
+    for item in items {
+        inlines_in_element(&item.element, f);
+        if let Some(sub) = &item.sublist {
+            inlines_in_list_items(&sub.items, f);
+        }
     }
 }
 
@@ -73,11 +83,6 @@ fn inlines_in_element(element: &Element, f: &mut dyn FnMut(&Inline)) {
     if let Some(content) = &element.content {
         for block in content {
             inlines_in_block(block, f);
-        }
-    }
-    if let Some(children) = &element.children {
-        for child in children {
-            inlines_in_block(child, f);
         }
     }
     if let Some(ElementValue::Group(entries)) = &element.value {
@@ -146,6 +151,7 @@ pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
                 }
             }
             Block::Section(_) => {}
+            Block::List(_) => {}
         }
     }
 }
@@ -165,6 +171,7 @@ pub fn for_each_top_level_element_mut(doc: &mut Document, mut f: impl FnMut(&mut
                 }
             }
             Block::Section(_) => {}
+            Block::List(_) => {}
         }
     }
 }
@@ -206,6 +213,7 @@ pub fn retain_top_level_elements(doc: &mut Document, mut keep: impl FnMut(&Eleme
             true
         }
         Block::Section(_) => true,
+        Block::List(_) => true,
     });
 }
 
@@ -244,7 +252,20 @@ fn walk_block<B>(block: &Block, visitor: &mut impl Visitor<B>) -> ControlFlow<B>
             }
             ControlFlow::Continue(())
         }
+        // `list.connects` deliberately not walked here either -- same
+        // reason as `section.connects` above.
+        Block::List(list) => walk_list_items(list, visitor),
     }
+}
+
+fn walk_list_items<B>(list: &List, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
+    for item in &list.items {
+        propagate!(walk_element(&item.element, visitor));
+        if let Some(sub) = &item.sublist {
+            propagate!(walk_list_items(sub, visitor));
+        }
+    }
+    ControlFlow::Continue(())
 }
 
 fn walk_inlines<B>(inlines: &[Inline], visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
@@ -264,11 +285,6 @@ fn walk_element<B>(element: &Element, visitor: &mut impl Visitor<B>) -> ControlF
     if let Some(content) = &element.content {
         for block in content {
             propagate!(walk_block(block, visitor));
-        }
-    }
-    if let Some(children) = &element.children {
-        for child in children {
-            propagate!(walk_block(child, visitor));
         }
     }
     if let Some(ElementValue::Group(entries)) = &element.value {
@@ -370,7 +386,18 @@ fn walk_block_mut<B>(block: &mut Block, visitor: &mut impl VisitorMut<B>) -> Con
             }
             ControlFlow::Continue(())
         }
+        Block::List(list) => walk_list_items_mut(list, visitor),
     }
+}
+
+fn walk_list_items_mut<B>(list: &mut List, visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
+    for item in &mut list.items {
+        propagate!(walk_element_mut(&mut item.element, visitor));
+        if let Some(sub) = &mut item.sublist {
+            propagate!(walk_list_items_mut(sub, visitor));
+        }
+    }
+    ControlFlow::Continue(())
 }
 
 fn walk_inlines_mut<B>(inlines: &mut [Inline], visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
@@ -390,11 +417,6 @@ fn walk_element_mut<B>(element: &mut Element, visitor: &mut impl VisitorMut<B>) 
     if let Some(content) = &mut element.content {
         for block in content {
             propagate!(walk_block_mut(block, visitor));
-        }
-    }
-    if let Some(children) = &mut element.children {
-        for child in children {
-            propagate!(walk_block_mut(child, visitor));
         }
     }
     if let Some(ElementValue::Group(entries)) = &mut element.value {
@@ -472,13 +494,6 @@ pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&E
         for_each_descendant_in_blocks(content, direct_only, &mut f);
     }
     if direct_only {
-        if let Some(children) = &el.children {
-            for block in children {
-                if let Block::Element(child) = block {
-                    f(child);
-                }
-            }
-        }
         if let Some(ElementValue::Group(entries)) = &el.value {
             for entry in entries {
                 if let Entry::Element(child) = entry {
@@ -492,11 +507,6 @@ pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&E
         f(child);
         ControlFlow::Continue(())
     };
-    if let Some(children) = &el.children {
-        for block in children {
-            let _ = walk_block(block, &mut visitor);
-        }
-    }
     if let Some(ElementValue::Group(entries)) = &el.value {
         for entry in entries {
             if let Entry::Element(child) = entry {
@@ -532,6 +542,7 @@ pub fn for_each_descendant_in_blocks(
                     }
                 }
                 Block::Section(_) => {}
+                Block::List(_) => {}
             }
         }
         return;
@@ -543,6 +554,93 @@ pub fn for_each_descendant_in_blocks(
     for block in blocks {
         let _ = walk_block(block, &mut visitor);
     }
+}
+
+/// Walks `items` as descendants, mirroring [`for_each_descendant_in_blocks`]
+/// for a list's own items instead of a block sequence -- what a list's own
+/// `:rule(allow:...)` checks against. `direct_only` means "just the items
+/// themselves, not what's inside each one's own content" -- same meaning
+/// `for_each_descendant`'s `direct_only` already has.
+///
+/// Deliberately never reads `list.connects` or any `ListItem`'s own
+/// `element.connects` -- see [`for_each_descendant`]'s doc comment for why
+/// that must stay true structurally, not just by convention.
+pub fn for_each_item_descendant(
+    items: &[ListItem],
+    direct_only: bool,
+    mut f: impl FnMut(&Element),
+) {
+    if direct_only {
+        for item in items {
+            f(&item.element);
+        }
+        return;
+    }
+    item_descendants(items, &mut f);
+}
+
+fn item_descendants(items: &[ListItem], f: &mut dyn FnMut(&Element)) {
+    for item in items {
+        let mut visitor = |child: &Element| -> ControlFlow<()> {
+            f(child);
+            ControlFlow::Continue(())
+        };
+        let _ = walk_element(&item.element, &mut visitor);
+        if let Some(sub) = &item.sublist {
+            item_descendants(&sub.items, f);
+        }
+    }
+}
+
+/// Visits every [`List`] in `doc`, in document order, including ones
+/// reachable through an element's own `content`/`value` entries, a
+/// section's `blocks`, and a list item's own `sublist` -- every place a
+/// `Block::List` or a `ListItem.sublist` can occur. The counterpart to
+/// [`for_each_section`] for the other non-`Element` `Block` variant.
+pub fn for_each_list(doc: &Document, mut f: impl FnMut(&List)) {
+    for block in &doc.blocks {
+        lists_in_block(block, &mut f);
+    }
+}
+
+fn lists_in_block(block: &Block, f: &mut dyn FnMut(&List)) {
+    match block {
+        Block::Paragraph(_) => {}
+        Block::Element(el) => lists_in_element(el, f),
+        Block::Section(sec) => {
+            for b in &sec.blocks {
+                lists_in_block(b, f);
+            }
+            // sec.connects deliberately not visited, same invariant.
+        }
+        Block::List(list) => lists_in_list(list, f),
+    }
+}
+
+fn lists_in_list(list: &List, f: &mut dyn FnMut(&List)) {
+    f(list);
+    for item in &list.items {
+        lists_in_element(&item.element, f);
+        if let Some(sub) = &item.sublist {
+            lists_in_list(sub, f);
+        }
+    }
+}
+
+fn lists_in_element(el: &Element, f: &mut dyn FnMut(&List)) {
+    if let Some(content) = &el.content {
+        for b in content {
+            lists_in_block(b, f);
+        }
+    }
+    if let Some(ElementValue::Group(entries)) = &el.value {
+        for entry in entries {
+            if let Entry::Element(child) = entry {
+                lists_in_element(child, f);
+            }
+        }
+    }
+    // el.connects deliberately not visited, same invariant.
 }
 
 /// Visits every [`tomet_ast::Section`] in `doc`, in document order,

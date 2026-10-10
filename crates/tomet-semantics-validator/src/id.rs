@@ -1,4 +1,4 @@
-use tomet_ast::{Block, Document, Element, Inline, Span};
+use tomet_ast::{Block, Document, Element, Inline, List, Span};
 
 /// Walks every node in `doc` and returns `(id, span)` for each
 /// [`Element::id`]/[`Section::id`] found, in document order.
@@ -32,6 +32,22 @@ fn collect_block_ids(block: &Block, ids: &mut Vec<(String, Span)>) {
                 collect_inline_ids(inline, ids);
             }
         }
+        Block::List(list) => collect_list_ids(list, ids),
+    }
+}
+
+fn collect_list_ids(list: &List, ids: &mut Vec<(String, Span)>) {
+    if let Some(id) = &list.id {
+        ids.push((id.0.clone(), list.span));
+    }
+    for conn in &list.connects {
+        collect_element_ids(conn, ids);
+    }
+    for item in &list.items {
+        collect_element_ids(&item.element, ids);
+        if let Some(sub) = &item.sublist {
+            collect_list_ids(sub, ids);
+        }
     }
 }
 
@@ -42,11 +58,6 @@ fn collect_element_ids(el: &Element, ids: &mut Vec<(String, Span)>) {
     if let Some(content) = &el.content {
         for block in content {
             collect_block_ids(block, ids);
-        }
-    }
-    if let Some(children) = &el.children {
-        for child in children {
-            collect_block_ids(child, ids);
         }
     }
     for conn in &el.connects {

@@ -306,17 +306,11 @@ impl Document {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Block {
     Paragraph(Paragraph),
-    /// A list is `Element { sigil: Sigil::Named("ol"|"ul"), value:
-    /// Some(ElementValue::Children(items)), .. }`. `"ol"` vs `"ul"`
-    /// distinguishes `-.` (auto-numbered) from plain `-` lists; numbering
-    /// itself isn't stored, it's computed at render time. Each item is an
-    /// `Element { sigil: Sigil::Bare, .. }` (legal only here, as an entry
-    /// of `ElementValue::Children`); its `(...)` marker and trailing
-    /// `{value}` attrs both use the ordinary `Value` grammar and are
-    /// merged into that item `Element`'s `args`, and any nested sub-lists
-    /// or indented blocks live in that item `Element`'s `children`.
     Element(Element),
     Section(Section),
+    /// A `-`/`-.` list, first-class like [`Section`] rather than encoded as
+    /// a named [`Element`]. See [`List`].
+    List(List),
 }
 
 impl Block {
@@ -325,6 +319,7 @@ impl Block {
             Block::Paragraph(p) => p.span,
             Block::Element(e) => e.span,
             Block::Section(s) => s.span,
+            Block::List(l) => l.span,
         }
     }
 }
@@ -360,6 +355,60 @@ impl Section {
             span,
         }
     }
+}
+
+/// A `-` (unordered) or `-.` (ordered) list: first-class, like [`Section`],
+/// rather than a named [`Element`] holding bare sub-`Element`s.
+///
+/// No `args`/`content`/`value`, unlike `Section` -- none of the three had a
+/// concrete use case (a caption for the whole list, attrs on the list as a
+/// whole, an ordered list's starting number) when this type was designed;
+/// add one later if a real want surfaces, with the use case stated
+/// alongside the field. `id`/`connects` were kept: `id` mirrors `Section`'s
+/// own anchor-reference use (`#(id)` on the whole list), and `connects` is
+/// what a `:rule(allow:list(...))` attached to the list itself (restricting
+/// what its own items may be) needs to live on.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct List {
+    pub ordered: bool,
+    pub items: Vec<ListItem>,
+    pub id: Option<Id>,
+    pub connects: Vec<Element>,
+    pub span: Span,
+}
+
+impl List {
+    pub fn new(ordered: bool, items: Vec<ListItem>, span: Span) -> Self {
+        Self {
+            ordered,
+            items,
+            id: None,
+            connects: Vec::new(),
+            span,
+        }
+    }
+}
+
+/// One item of a [`List`].
+///
+/// Composes an ordinary [`Element`] rather than restating its fields: a
+/// list item written `- content` is `Element { sigil: Sigil::Bare, .. }`,
+/// and one written `-@name(...) content` (the combine notation) is
+/// `Element { sigil: Sigil::Named(name), .. }` -- the exact same `Element`
+/// a standalone `@name(...)` would parse to, with no naming constraint and
+/// no second grammar. Every existing consumer that already treats a list
+/// item as "just an `Element`" (the validator, the formatter, every
+/// converter) keeps working unchanged against `&item.element`.
+///
+/// `sublist` is the one genuinely new thing: an indented list directly
+/// below this item. Typed as `Option<List>`, not `Option<Vec<Block>>`,
+/// because the parser only ever produces one specific shape here (another
+/// list) -- giving it its own field makes that a compiler-checked fact
+/// instead of a convention.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ListItem {
+    pub element: Element,
+    pub sublist: Option<List>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -639,9 +688,11 @@ pub enum Sigil {
     /// still parsed and classified as the meaningless `Custom("at")`.
     /// It is gone: an element has a name.
     Named(Name),
-    /// No sigil at all. Only legal as an entry inside another element's
-    /// value group (e.g. the `(1)[...]` entries inside `@links{ ... }`),
-    /// where the container already supplies the type.
+    /// No sigil at all. Legal as an entry inside another element's value
+    /// group (e.g. the `(1)[...]` entries inside `@links{ ... }`), where
+    /// the container already supplies the type, and as a [`crate::ListItem`]
+    /// written without the combine notation (a plain `- content`), where
+    /// the list itself is the container.
     #[default]
     Bare,
     /// `${...}` interpolation -- structurally just a sigil with a
@@ -757,11 +808,6 @@ pub struct Element {
     /// vocabulary's own elements). See `tmtroot/docs/spec/feature/
     /// content-shape.tmt`.
     pub content: Option<Vec<Block>>,
-    /// List items' nested sub-lists only (`crate::list`) -- a different
-    /// relationship from `content` even though both are `Vec<Block>`: this
-    /// is "what hangs below this item," not "this item's own body." Kept
-    /// as a separate field on purpose; do not fold it into `content`.
-    pub children: Option<Vec<Block>>,
     pub value: Option<ElementValue>,
     pub id: Option<Id>,
     pub connects: Vec<Element>,

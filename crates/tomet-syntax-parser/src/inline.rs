@@ -888,7 +888,6 @@ fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
             Value::String(url_str),
         )])),
         content: None,
-        children: None,
         value: None,
         id: None,
         connects: Vec::new(),

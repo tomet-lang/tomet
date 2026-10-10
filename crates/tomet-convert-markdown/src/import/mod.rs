@@ -14,7 +14,8 @@
 //! single inline run (`Element::content` is `Vec<Inline>`, not
 //! `Vec<Block>`), so a list inside a quote has its items' content
 //! flattened into that run too. A nested list under a plain (non-quote)
-//! list item is not lossy -- it's kept as that item's own `children`. HTML
+//! list item is not lossy -- it's kept as that item's own
+//! `ListItem::sublist`. HTML
 //! blocks are dropped; inline HTML round-trips as literal text. Soft and
 //! hard breaks map to `Inline::SoftBreak`/`Inline::LineBreak` respectively,
 //! not collapsed into a space -- see those types' doc comments.
@@ -27,11 +28,11 @@
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, LineBreak, Paragraph, Placement, RawText,
+    Block, Document, Element, Inline, LineBreak, List, ListItem, Paragraph, Placement, RawText,
     Section, Sigil, SoftBreak, Span, Text, Value,
 };
-use tomet_semantics::{ElementKind, classify_std_lenient, list_ordered};
-use tomet_tree::{ElementExt, element_list, element_list_item, element_new};
+use tomet_semantics::{ElementKind, classify_std_lenient};
+use tomet_tree::{ElementExt, element_new, list, list_item};
 
 mod frontmatter;
 mod wikilink;
@@ -45,17 +46,17 @@ enum Frame {
     /// A block quote's content, already flattened to inlines as blocks
     /// close inside it (see `merge_block_into`).
     BlockQuote(Vec<Inline>),
-    /// A list item's content. `extra` collects items promoted out of a
-    /// nested list (flattening) so `List`'s End handler can splice them
-    /// in as siblings right after this item.
+    /// A list item's content. `sublist` is the one nested list directly
+    /// under this item, if any -- matches `ListItem.sublist`'s own
+    /// single slot (see `tomet_ast::ListItem`).
     Item {
         content: Vec<Inline>,
-        children: Vec<Block>,
+        sublist: Option<List>,
         marker: Option<Value>,
     },
     List {
         ordered: bool,
-        items: Vec<Element>,
+        items: Vec<ListItem>,
     },
     Emphasis(Vec<Inline>),
     /// GFM's `~~x~~`. Tomet spells it the same way, so the tildes used to
@@ -278,7 +279,7 @@ fn start_frame(tag: Tag) -> Frame {
         },
         Tag::Item => Frame::Item {
             content: Vec::new(),
-            children: Vec::new(),
+            sublist: None,
             marker: None,
         },
         Tag::Emphasis => Frame::Emphasis(Vec::new()),
@@ -384,7 +385,6 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     placement: Placement::Block,
                     args: Some(args),
                     content: Some(wrap_inline_content(content)),
-                    children: None,
                     value: None,
                     id: None,
                     connects: Vec::new(),
@@ -397,7 +397,6 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     placement: Placement::Block,
                     args: None,
                     content: Some(wrap_inline_content(content)),
-                    children: None,
                     value: None,
                     id: None,
                     connects: Vec::new(),
@@ -423,7 +422,6 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     vec![Inline::Raw(RawText::new(text, Span::dummy()))],
                     Span::dummy(),
                 ))]),
-                children: None,
                 value: None,
                 id: None,
                 connects: Vec::new(),
@@ -431,14 +429,13 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             };
             push_block(stack, Block::Element(el));
         }
-        (Frame::List { ordered, items }, TagEnd::List(_)) => push_block(
-            stack,
-            Block::Element(element_list(ordered, items, Span::dummy())),
-        ),
+        (Frame::List { ordered, items }, TagEnd::List(_)) => {
+            push_block(stack, Block::List(list(ordered, items, Span::dummy())))
+        }
         (
             Frame::Item {
                 mut content,
-                children,
+                sublist,
                 mut marker,
             },
             TagEnd::Item,
@@ -499,13 +496,14 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 {
                     content.remove(0);
                 }
-                items.push(element_list_item(
+                items.push(list_item(
+                    Sigil::Bare,
                     wrap_inline_content(content),
                     marker,
                     None,
                     None,
                     Vec::new(),
-                    children,
+                    sublist,
                     Span::dummy(),
                 ));
             }
@@ -533,7 +531,6 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     Value::String(dest),
                 )])),
                 content: Some(wrap_inline_content(inlines)),
-                children: None,
                 value: None,
                 id: None,
                 connects: Vec::new(),
@@ -555,7 +552,6 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     Value::String(dest),
                 )])),
                 content,
-                children: None,
                 value: None,
                 id: None,
                 connects: Vec::new(),
@@ -641,6 +637,17 @@ fn blocks_display_width(blocks: &[Block]) -> usize {
             Block::Paragraph(p) => inlines_display_width(&p.content),
             Block::Element(el) => el.content.as_deref().map(blocks_display_width).unwrap_or(0),
             Block::Section(sec) => inlines_display_width(&sec.title),
+            Block::List(list) => list
+                .items
+                .iter()
+                .map(|item| {
+                    item.element
+                        .content
+                        .as_deref()
+                        .map(blocks_display_width)
+                        .unwrap_or(0)
+                })
+                .sum(),
         })
         .sum()
 }
@@ -779,7 +786,6 @@ fn wrap_inline(tag: &str, content: Vec<Inline>) -> Inline {
         placement: Placement::Inline,
         args: None,
         content: Some(wrap_inline_content(content)),
-        children: None,
         value: None,
         id: None,
         connects: Vec::new(),
@@ -859,22 +865,28 @@ fn push_inline(stack: &mut [Frame], inline: Inline) {
 /// joined in (space-separated -- multi-paragraph quotes/items are a
 /// documented lossy case), plain elements (code blocks, nested quotes,
 /// `hr`, ...) come along as a single `Inline::Element`, and a nested
-/// list's items are either promoted as siblings (`Item`) or flattened
-/// into text (`BlockQuote`, which has no sibling-item concept).
+/// list becomes the item's own `sublist` (`BlockQuote`, which has no
+/// `sublist` concept, flattens it into text instead).
 fn push_block(stack: &mut [Frame], block: Block) {
     match stack.last_mut() {
         Some(Frame::Blocks(v)) => v.push(block),
         Some(Frame::BlockQuote(content)) => merge_block_into(content, block),
         Some(Frame::Item {
-            content, children, ..
-        }) => {
-            let is_list = matches!(&block, Block::Element(el) if list_ordered(el).is_some());
-            if is_list {
-                children.push(block);
-            } else {
-                merge_block_into(content, block);
+            content, sublist, ..
+        }) => match block {
+            Block::List(l) => {
+                // At most one nested list per item, matching
+                // `ListItem.sublist`'s single slot (see
+                // `tomet_ast::ListItem`) -- a second one directly under
+                // the same item (rare, and arguably not well-defined
+                // CommonMark) is dropped rather than silently
+                // overwriting the first.
+                if sublist.is_none() {
+                    *sublist = Some(l);
+                }
             }
-        }
+            other => merge_block_into(content, other),
+        },
         _ => {}
     }
 }
@@ -905,19 +917,14 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
             blocks_to_flat_inlines(el.content.unwrap_or_default()),
         ),
         // A list merged into flattened blockquote content (blockquotes
-        // have no sibling-`children` concept, unlike `Item`) has each of
-        // its items' content joined in the same way -- see the module doc.
-        Block::Element(mut el) if list_ordered(&el).is_some() => {
-            if let Some(ElementValue::Group(entries)) = el.value.take() {
-                for item in entries.into_iter().filter_map(|e| match e {
-                    tomet_ast::Entry::Element(el) => Some(el),
-                    tomet_ast::Entry::Pair(..) => None,
-                }) {
-                    extend_spaced(
-                        content,
-                        blocks_to_flat_inlines(item.content.unwrap_or_default()),
-                    );
-                }
+        // have no `sublist` concept, unlike `Item`) has each of its
+        // items' content joined in the same way -- see the module doc.
+        Block::List(list) => {
+            for item in list.items {
+                extend_spaced(
+                    content,
+                    blocks_to_flat_inlines(item.element.content.unwrap_or_default()),
+                );
             }
         }
         Block::Element(el) => {
@@ -945,7 +952,6 @@ fn extend_spaced(content: &mut Vec<Inline>, more: Vec<Inline>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_semantics::list_items;
 
     /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`
     /// now) -- every fixture below is still just one paragraph's worth.
@@ -1013,15 +1019,14 @@ mod tests {
     fn flat_bullet_list() {
         let doc = from_markdown("- one\n- two\n");
         match &doc.blocks[0] {
-            Block::Element(list) => {
-                assert_eq!(list_ordered(list), Some(false));
-                let items = list_items(list);
+            Block::List(list) => {
+                assert!(!list.ordered);
                 assert_eq!(
-                    items[0].content,
+                    list.items[0].element.content,
                     wrap(vec![Inline::Text(Text::new("one", Span::dummy()))])
                 );
                 assert_eq!(
-                    items[1].content,
+                    list.items[1].element.content,
                     wrap(vec![Inline::Text(Text::new("two", Span::dummy()))])
                 );
             }
@@ -1033,7 +1038,7 @@ mod tests {
     fn ordered_list() {
         let doc = from_markdown("1. one\n2. two\n");
         match &doc.blocks[0] {
-            Block::Element(list) => assert_eq!(list_ordered(list), Some(true)),
+            Block::List(list) => assert!(list.ordered),
             other => panic!("expected list, got {other:?}"),
         }
     }
@@ -1042,26 +1047,21 @@ mod tests {
     fn nested_list_preserves_children_hierarchy() {
         let doc = from_markdown("- a\n  - b\n- c\n");
         match &doc.blocks[0] {
-            Block::Element(list) => {
-                let items = list_items(list);
+            Block::List(list) => {
+                let items = &list.items;
                 assert_eq!(items.len(), 2);
                 assert_eq!(
-                    items[0].content,
+                    items[0].element.content,
                     wrap(vec![Inline::Text(Text::new("a", Span::dummy()))])
                 );
-                let children = items[0].children.as_ref().expect("nested sub-list");
-                assert_eq!(children.len(), 1);
-                let Block::Element(sub) = &children[0] else {
-                    panic!("expected sub-list");
-                };
-                let sub_items = list_items(sub);
-                assert_eq!(sub_items.len(), 1);
+                let sub = items[0].sublist.as_ref().expect("nested sub-list");
+                assert_eq!(sub.items.len(), 1);
                 assert_eq!(
-                    sub_items[0].content,
+                    sub.items[0].element.content,
                     wrap(vec![Inline::Text(Text::new("b", Span::dummy()))])
                 );
                 assert_eq!(
-                    items[1].content,
+                    items[1].element.content,
                     wrap(vec![Inline::Text(Text::new("c", Span::dummy()))])
                 );
             }
@@ -1375,24 +1375,20 @@ mod tests {
         let md = "- a\n  - b\n";
         let doc = from_markdown(md);
         assert_eq!(doc.blocks.len(), 1);
-        let Block::Element(list) = &doc.blocks[0] else {
+        let Block::List(list) = &doc.blocks[0] else {
             panic!("expected list");
         };
-        let items = list_items(list);
+        let items = &list.items;
         assert_eq!(items.len(), 1);
         assert_eq!(
-            items[0].content,
+            items[0].element.content,
             wrap(vec![Inline::Text(Text::new("a", Span::dummy()))])
         );
-        let children = items[0].children.as_ref().expect("nested sub-list");
-        assert_eq!(children.len(), 1);
-        let Block::Element(sub_list) = &children[0] else {
-            panic!("expected sub-list");
-        };
-        let sub_items = list_items(sub_list);
+        let sub_list = items[0].sublist.as_ref().expect("nested sub-list");
+        let sub_items = &sub_list.items;
         assert_eq!(sub_items.len(), 1);
         assert_eq!(
-            sub_items[0].content,
+            sub_items[0].element.content,
             wrap(vec![Inline::Text(Text::new("b", Span::dummy()))])
         );
     }
@@ -1506,34 +1502,34 @@ mod tests {
         let md = "- [x] task1\n- [ ] task2\n- [c] con item\n- [p] pro item\n- (x) task3\n";
         let doc = from_markdown(md);
         assert_eq!(doc.blocks.len(), 1);
-        let Block::Element(list) = &doc.blocks[0] else {
+        let Block::List(list) = &doc.blocks[0] else {
             panic!("expected list");
         };
-        let items = list_items(list);
+        let items = &list.items;
         assert_eq!(items.len(), 5);
-        assert_eq!(items[0].args, Some(Value::String("x".to_string())));
+        assert_eq!(items[0].element.args, Some(Value::String("x".to_string())));
         assert_eq!(
-            items[0].content,
+            items[0].element.content,
             wrap(vec![Inline::Text(Text::new("task1", Span::dummy()))])
         );
-        assert_eq!(items[1].args, Some(Value::String(" ".to_string())));
+        assert_eq!(items[1].element.args, Some(Value::String(" ".to_string())));
         assert_eq!(
-            items[1].content,
+            items[1].element.content,
             wrap(vec![Inline::Text(Text::new("task2", Span::dummy()))])
         );
-        assert_eq!(items[2].args, Some(Value::String("c".to_string())));
+        assert_eq!(items[2].element.args, Some(Value::String("c".to_string())));
         assert_eq!(
-            items[2].content,
+            items[2].element.content,
             wrap(vec![Inline::Text(Text::new("con item", Span::dummy()))])
         );
-        assert_eq!(items[3].args, Some(Value::String("p".to_string())));
+        assert_eq!(items[3].element.args, Some(Value::String("p".to_string())));
         assert_eq!(
-            items[3].content,
+            items[3].element.content,
             wrap(vec![Inline::Text(Text::new("pro item", Span::dummy()))])
         );
-        assert_eq!(items[4].args, Some(Value::String("x".to_string())));
+        assert_eq!(items[4].element.args, Some(Value::String("x".to_string())));
         assert_eq!(
-            items[4].content,
+            items[4].element.content,
             wrap(vec![Inline::Text(Text::new("task3", Span::dummy()))])
         );
     }

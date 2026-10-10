@@ -5,8 +5,7 @@
 //! round-trip as literal text rather than being misread as `.tmt`
 //! syntax on export.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Inline, Sigil, Span, Text, Value};
-use tomet_semantics::list_ordered;
+use tomet_ast::{Block, Document, Element, Inline, List, Sigil, Span, Text, Value};
 use tomet_tree::element_new;
 
 pub(super) fn post_process_document_wikilinks(doc: &mut Document) {
@@ -20,25 +19,6 @@ fn post_process_block_wikilinks(block: &mut Block) {
         Block::Paragraph(p) => {
             p.content = post_process_inlines_wikilinks(std::mem::take(&mut p.content));
         }
-        Block::Element(el) if list_ordered(el).is_some() => {
-            if let Some(ElementValue::Group(entries)) = &mut el.value {
-                for item in entries.iter_mut().filter_map(|e| match e {
-                    tomet_ast::Entry::Element(el) => Some(el),
-                    tomet_ast::Entry::Pair(..) => None,
-                }) {
-                    if let Some(content) = &mut item.content {
-                        for block in content.iter_mut() {
-                            post_process_block_wikilinks(block);
-                        }
-                    }
-                    if let Some(children) = &mut item.children {
-                        for child in children {
-                            post_process_block_wikilinks(child);
-                        }
-                    }
-                }
-            }
-        }
         Block::Element(el) => {
             post_process_element_wikilinks(el);
         }
@@ -47,6 +27,20 @@ fn post_process_block_wikilinks(block: &mut Block) {
             for child in &mut sec.blocks {
                 post_process_block_wikilinks(child);
             }
+        }
+        Block::List(list) => post_process_list_wikilinks(list),
+    }
+}
+
+fn post_process_list_wikilinks(list: &mut List) {
+    for item in &mut list.items {
+        if let Some(content) = &mut item.element.content {
+            for block in content.iter_mut() {
+                post_process_block_wikilinks(block);
+            }
+        }
+        if let Some(sub) = &mut item.sublist {
+            post_process_list_wikilinks(sub);
         }
     }
 }

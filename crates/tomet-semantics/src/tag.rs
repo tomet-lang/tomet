@@ -1,6 +1,6 @@
 //! Extracts tags from an element (`@tag(...)`, `@tag[...]`).
 
-use tomet_ast::{Block, Element, Inline, Value};
+use tomet_ast::{Block, Element, Inline, List, Value};
 
 /// Extracts a list of tag names from a tag element.
 /// Inspects `args` (as string, seq, or map) and `content` (as plain text).
@@ -76,6 +76,20 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
                 s.push_str(&inlines_to_plain(&sec.title));
                 s.push_str(&blocks_to_plain(&sec.blocks));
             }
+            Block::List(list) => s.push_str(&list_to_plain(list)),
+        }
+    }
+    s
+}
+
+fn list_to_plain(list: &List) -> String {
+    let mut s = String::new();
+    for item in &list.items {
+        if let Some(content) = &item.element.content {
+            s.push_str(&blocks_to_plain(content));
+        }
+        if let Some(sub) = &item.sublist {
+            s.push_str(&list_to_plain(sub));
         }
     }
     s

@@ -8,8 +8,8 @@ use crate::util::{
     value_to_plain,
 };
 use crate::{HeadingInfo, RenderCtx};
-use tomet_ast::{Block, Element, Inline, Section, Span, Value};
-use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, list_items, list_ordered};
+use tomet_ast::{Block, Element, Inline, List, Section, Sigil, Span, Value};
+use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 /// Dispatches one top-level document block, and -- when
 /// `RenderOptions::emit_source_spans` is set -- tags whatever it emits as
@@ -48,7 +48,6 @@ pub(crate) fn render_block(
                 out.push_str("</p>\n");
             }
         }
-        Block::Element(el) if list_ordered(el).is_some() => render_list(cx, el, out),
         Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading => {
             render_heading_element(cx, el, out, state)
         }
@@ -68,6 +67,7 @@ pub(crate) fn render_block(
             }
         }
         Block::Section(sec) => render_section(cx, sec, out, state),
+        Block::List(list) => render_list(cx, list, out),
     }
 }
 
@@ -201,14 +201,30 @@ fn render_heading_element(
     });
 }
 
-fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
-    let tag = if list_ordered(el) == Some(true) {
-        "ol"
-    } else {
-        "ul"
-    };
+fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
+    let tag = if list.ordered { "ol" } else { "ul" };
     out.push_str(&format!("<{tag}>\n"));
-    for item in list_items(el) {
+    for list_item in &list.items {
+        let item = &list_item.element;
+
+        // The combine notation (`-@name(...)`): `item` is a real, named
+        // `Element` identical to a standalone `@name(...)`, so its `<li>`
+        // just wraps whatever `render_element` already produces for one
+        // -- no list-marker span, since there is no marker, and `item`'s
+        // own `{value}`/`id` belong to the element, not to a synthetic
+        // `<li class=.. data-..>` the way a bare item's do below.
+        if matches!(item.sigil, Sigil::Named(_)) {
+            out.push_str("<li");
+            push_span_attrs(cx, out, item.span);
+            out.push('>');
+            render_element(cx, item, out, false);
+            if let Some(sub) = &list_item.sublist {
+                render_list(cx, sub, out);
+            }
+            out.push_str("</li>\n");
+            continue;
+        }
+
         let attrs = match &item.value {
             Some(v) => v.as_data(),
             _ => None,
@@ -252,14 +268,8 @@ fn render_list(cx: &RenderCtx, el: &Element, out: &mut String) {
             out.push_str("</span> ");
         }
         render_content_blocks(cx, item.content.as_deref().unwrap_or(&[]), out);
-        if let Some(children) = &item.children {
-            for child in children {
-                if let Block::Element(sub) = child
-                    && list_ordered(sub).is_some()
-                {
-                    render_list(cx, sub, out);
-                }
-            }
+        if let Some(sub) = &list_item.sublist {
+            render_list(cx, sub, out);
         }
         out.push_str("</li>\n");
     }

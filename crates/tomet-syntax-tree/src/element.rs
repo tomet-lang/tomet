@@ -1,6 +1,8 @@
 //! Extension trait, attribute helpers, and constructors for [`tomet_ast::Element`].
 
-use tomet_ast::{Block, Element, ElementValue, Id, Name, Placement, Sigil, Span, Value};
+use tomet_ast::{
+    Block, Element, ElementValue, Id, List, ListItem, Name, Placement, Sigil, Span, Value,
+};
 
 /// Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
 pub trait ElementExt {
@@ -15,9 +17,6 @@ pub trait ElementExt {
 
     /// Consumes `self` and sets its `content`.
     fn with_content(self, content: Vec<Block>) -> Self;
-
-    /// Consumes `self` and sets its `children`.
-    fn with_children(self, children: Vec<Block>) -> Self;
 
     /// Consumes `self` and sets its `value`.
     fn with_value(self, value: ElementValue) -> Self;
@@ -96,11 +95,6 @@ impl ElementExt for Element {
 
     fn with_content(mut self, content: Vec<Block>) -> Self {
         self.content = Some(content);
-        self
-    }
-
-    fn with_children(mut self, children: Vec<Block>) -> Self {
-        self.children = Some(children);
         self
     }
 
@@ -296,7 +290,6 @@ pub fn element_new(sigil: Sigil) -> Element {
         placement: Placement::Inline,
         args: None,
         content: None,
-        children: None,
         value: None,
         id: None,
         connects: Vec::new(),
@@ -304,54 +297,47 @@ pub fn element_new(sigil: Sigil) -> Element {
     }
 }
 
-/// A list element constructor (`ol` if `ordered`, else `ul`).
-///
-/// A list has no sigil in the source -- the marker (`-` / `-.`) is its
-/// surface form -- but it always stands as a block, so it is constructed
-/// with [`Placement::Block`] directly.
-pub fn element_list(ordered: bool, items: Vec<Element>, span: Span) -> Element {
-    Element {
-        sigil: Sigil::named(if ordered { "ol" } else { "ul" }),
-        placement: Placement::Block,
-        args: None,
-        content: None,
-        children: None,
-        value: Some(ElementValue::from_children(items)),
+/// A list constructor (ordered if `ordered`, i.e. `-.`, else `-`).
+pub fn list(ordered: bool, items: Vec<ListItem>, span: Span) -> List {
+    List {
+        ordered,
+        items,
         id: None,
         connects: Vec::new(),
         span,
     }
 }
 
-/// A list item element constructor (`Sigil::Bare`).
+/// A list item constructor. `sigil` is `Sigil::Bare` for a plain `- content`
+/// item, or `Sigil::Named(name)` for the `-@name(...)` combine form -- the
+/// exact same `Element` shape a standalone `@name(...)` would produce.
 ///
 /// `id` is a real parameter, not hardcoded to `None` -- list items are a
 /// first-class consumer of `#(id)` like everything else `parse_groups`
 /// reads for, and silently dropping it here would repeat the exact bug
 /// `connects` used to have (a full-form list item's parsed connects were
 /// read and then thrown away at this exact spot).
-pub fn element_list_item(
+pub fn list_item(
+    sigil: Sigil,
     content: Vec<Block>,
-    marker: Option<Value>,
+    args: Option<Value>,
     attrs: Option<Value>,
     id: Option<Id>,
     connects: Vec<Element>,
-    children: Vec<Block>,
+    sublist: Option<List>,
     span: Span,
-) -> Element {
-    Element {
-        sigil: Sigil::Bare,
-        placement: Placement::Block,
-        args: marker,
-        content: Some(content),
-        children: if children.is_empty() {
-            None
-        } else {
-            Some(children)
+) -> ListItem {
+    ListItem {
+        element: Element {
+            sigil,
+            placement: Placement::Block,
+            args,
+            content: Some(content),
+            value: attrs.map(ElementValue::from_map),
+            id,
+            connects,
+            span,
         },
-        value: attrs.map(ElementValue::from_map),
-        id,
-        connects,
-        span,
+        sublist,
     }
 }

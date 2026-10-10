@@ -1,7 +1,7 @@
 //! Provides folding ranges for sections, blocks, and comments in the editor.
 
 use lsp_types::{FoldingRange, FoldingRangeKind};
-use tomet_ast::{Block, ElementValue};
+use tomet_ast::{Block, ElementValue, List};
 
 /// Computes folding ranges for the given document text.
 pub fn folding_ranges_for(text: &str) -> Vec<FoldingRange> {
@@ -65,6 +65,32 @@ fn collect_block_folding_ranges(block: &Block, ranges: &mut Vec<FoldingRange>) {
             }
         }
         Block::Paragraph(_) => {}
+        Block::List(list) => collect_list_folding_ranges(list, ranges),
+    }
+}
+
+fn collect_list_folding_ranges(list: &List, ranges: &mut Vec<FoldingRange>) {
+    let start_line = list.span.start.line.saturating_sub(1) as u32;
+    let end_line = span_end_line(&list.span);
+
+    if end_line > start_line {
+        ranges.push(FoldingRange {
+            start_line,
+            start_character: None,
+            end_line,
+            end_character: None,
+            kind: Some(FoldingRangeKind::Region),
+            collapsed_text: None,
+        });
+    }
+
+    for item in &list.items {
+        if let Some(val) = &item.element.value {
+            collect_element_value_folding_ranges(val, ranges);
+        }
+        if let Some(sub) = &item.sublist {
+            collect_list_folding_ranges(sub, ranges);
+        }
     }
 }
 
@@ -103,6 +129,7 @@ fn block_end_line(block: &Block) -> u32 {
         }
         Block::Element(el) => span_end_line(&el.span),
         Block::Paragraph(p) => span_end_line(&p.span),
+        Block::List(list) => span_end_line(&list.span),
     }
 }
 
