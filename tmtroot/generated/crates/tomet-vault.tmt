@@ -2,6 +2,8 @@
 
 @meta{
   crate: tomet-vault
+  dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-parser, tomet-search, tomet-semantics, tomet-transform)
+  dependents: list(tomet, tomet-load)
 }
 
 =[ tomet-vault ]

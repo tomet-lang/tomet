@@ -14,7 +14,7 @@ pub struct RustExtractOptions {
 }
 
 /// In-memory representation of a Rust crate source code.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RustCrateSource {
     /// The crate name (e.g. "tomet-parser").
     pub crate_name: String,
@@ -22,6 +22,10 @@ pub struct RustCrateSource {
     pub root_file: PathBuf,
     /// In-memory mapping of relative file paths to their source text contents.
     pub files: HashMap<PathBuf, String>,
+    /// Direct internal dependencies (workspace crates this crate depends on).
+    pub dependencies: Vec<String>,
+    /// Direct internal dependents (workspace crates depending on this crate).
+    pub dependents: Vec<String>,
 }
 
 /// Extracts documentation for a single Rust source code string into a Tomet [`Document`].
@@ -38,6 +42,8 @@ pub fn extract_file_doc(
         crate_name: crate_name.to_string(),
         root_file,
         files,
+        dependencies: Vec::new(),
+        dependents: Vec::new(),
     };
 
     extract_crate_doc(&crate_source, options)
@@ -63,16 +69,40 @@ pub fn extract_crate_doc(
 
     let mut blocks = Vec::new();
 
-    // 1. Header elements: @kind(api) and @meta{ crate: "..." }
+    // 1. Header elements: @kind(api) and @meta{ crate: "...", dependencies: list(...), dependents: list(...) }
     let mut kind_el = element_new(Sigil::named("kind")).with_placement(Placement::Block);
     kind_el.args = Some(Value::String("api".to_string()));
     blocks.push(Block::Element(kind_el));
 
-    let mut meta_el = element_new(Sigil::named("meta")).with_placement(Placement::Block);
-    meta_el.value = Some(ElementValue::from_map(Value::Map(vec![(
+    let mut meta_pairs = vec![(
         "crate".to_string(),
         Value::String(crate_source.crate_name.clone()),
-    )])));
+    )];
+    meta_pairs.push((
+        "dependencies".to_string(),
+        Value::Seq(
+            crate_source
+                .dependencies
+                .iter()
+                .cloned()
+                .map(Value::String)
+                .collect(),
+        ),
+    ));
+    meta_pairs.push((
+        "dependents".to_string(),
+        Value::Seq(
+            crate_source
+                .dependents
+                .iter()
+                .cloned()
+                .map(Value::String)
+                .collect(),
+        ),
+    ));
+
+    let mut meta_el = element_new(Sigil::named("meta")).with_placement(Placement::Block);
+    meta_el.value = Some(ElementValue::from_map(Value::Map(meta_pairs)));
     blocks.push(Block::Element(meta_el));
 
     // 2. Root crate section: =[ crate_name ]
@@ -575,6 +605,8 @@ pub fn sub_fn() {}
             crate_name: "test-crate".to_string(),
             root_file: PathBuf::from("src/lib.rs"),
             files,
+            dependencies: vec!["dep-a".to_string(), "dep-b".to_string()],
+            dependents: vec!["downstream-c".to_string()],
         };
 
         let doc = extract_crate_doc(&crate_source, &RustExtractOptions::default()).unwrap();
@@ -582,6 +614,8 @@ pub fn sub_fn() {}
         assert!(printed.contains("Module sub"));
         assert!(printed.contains("Submodule documentation."));
         assert!(printed.contains("fn sub_fn"));
+        assert!(printed.contains("dependencies: list(dep-a, dep-b)"));
+        assert!(printed.contains("dependents: list(downstream-c)"));
     }
 
     #[test]

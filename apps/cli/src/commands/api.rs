@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -58,14 +58,24 @@ pub(crate) fn api_cmd(
     let mut stale_files = Vec::new();
     let mut generated_count = 0;
 
+    let (dependencies_map, dependents_map) = build_crate_dependency_graph(&crates);
+
     for (crate_name, crate_dir) in &crates {
-        let crate_source = match load_crate_source(crate_name, crate_dir) {
+        let mut crate_source = match load_crate_source(crate_name, crate_dir) {
             Ok(src) => src,
             Err(e) => {
                 eprintln!("Warning: skipping crate '{}': {e}", crate_name);
                 continue;
             }
         };
+        crate_source.dependencies = dependencies_map
+            .get(crate_name)
+            .cloned()
+            .unwrap_or_default();
+        crate_source.dependents = dependents_map
+            .get(crate_name)
+            .cloned()
+            .unwrap_or_default();
 
         let doc = match extract_crate_doc(&crate_source, &options) {
             Ok(doc) => doc,
@@ -165,7 +175,9 @@ fn discover_crates(path: &Path) -> anyhow::Result<Vec<DiscoveredCrate>> {
                                     .and_then(|p| p.get("name"))
                                     .and_then(|n| n.as_str())
                                 {
-                                    crates.push((name.to_string(), member_dir));
+                                    if !crates.iter().any(|(n, _)| n == name) {
+                                        crates.push((name.to_string(), member_dir));
+                                    }
                                 }
                             }
                         }
@@ -185,6 +197,64 @@ fn discover_crates(path: &Path) -> anyhow::Result<Vec<DiscoveredCrate>> {
     }
 
     Ok(crates)
+}
+
+/// Builds bidirectional dependency graphs (internal dependencies and reverse dependents)
+/// across the discovered crates by parsing their `Cargo.toml` files.
+fn build_crate_dependency_graph(
+    crates: &[DiscoveredCrate],
+) -> (HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
+    let known_crates: HashSet<&str> = crates.iter().map(|(name, _)| name.as_str()).collect();
+    let mut dependencies_map: HashMap<String, Vec<String>> = HashMap::new();
+    let mut dependents_map: HashMap<String, Vec<String>> = HashMap::new();
+
+    for (name, _) in crates {
+        dependencies_map.insert(name.clone(), Vec::new());
+        dependents_map.insert(name.clone(), Vec::new());
+    }
+
+    for (crate_name, crate_dir) in crates {
+        let cargo_toml_path = crate_dir.join("Cargo.toml");
+        let Ok(content) = fs::read_to_string(&cargo_toml_path) else {
+            continue;
+        };
+        let Ok(parsed) = toml::from_str::<toml::Value>(&content) else {
+            continue;
+        };
+
+        let mut deps_set = HashSet::new();
+
+        if let Some(deps_table) = parsed.get("dependencies").and_then(|d| d.as_table()) {
+            for (key, val) in deps_table {
+                let actual_pkg_name = if let Some(pkg) = val.get("package").and_then(|p| p.as_str()) {
+                    pkg
+                } else {
+                    key.as_str()
+                };
+
+                if known_crates.contains(actual_pkg_name) && actual_pkg_name != crate_name.as_str() {
+                    deps_set.insert(actual_pkg_name.to_string());
+                }
+            }
+        }
+
+        let mut deps_list: Vec<String> = deps_set.into_iter().collect();
+        deps_list.sort();
+        for dep in &deps_list {
+            dependents_map
+                .entry(dep.clone())
+                .or_default()
+                .push(crate_name.clone());
+        }
+        dependencies_map.insert(crate_name.clone(), deps_list);
+    }
+
+    for dependents in dependents_map.values_mut() {
+        dependents.sort();
+        dependents.dedup();
+    }
+
+    (dependencies_map, dependents_map)
 }
 
 /// Loads all Rust source files for a crate into an in-memory `RustCrateSource`.
@@ -220,6 +290,8 @@ fn load_crate_source(crate_name: &str, crate_dir: &Path) -> anyhow::Result<RustC
         crate_name: crate_name.to_string(),
         root_file,
         files,
+        dependencies: Vec::new(),
+        dependents: Vec::new(),
     })
 }
 
@@ -268,6 +340,8 @@ pub fn hello() -> &'static str {
         assert!(content.contains("test-dummy"));
         assert!(content.contains("Test dummy crate documentation."));
         assert!(content.contains("fn hello"));
+        assert!(content.contains("dependencies: list()"));
+        assert!(content.contains("dependents: list()"));
 
         // 2. Check mode - should succeed when up to date
         let check_ok = api_cmd(&crate_dir, Some(&out_dir), false, true);
@@ -277,6 +351,64 @@ pub fn hello() -> &'static str {
         fs::write(&generated_file, "stale content").unwrap();
         let check_stale = api_cmd(&crate_dir, Some(&out_dir), false, true);
         assert!(check_stale.is_err());
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_build_crate_dependency_graph() {
+        let temp_dir = std::env::temp_dir().join(format!("tomet_test_dep_{}", nanoid::nanoid!()));
+        let crate_a_dir = temp_dir.join("crate_a");
+        let crate_b_dir = temp_dir.join("crate_b");
+        fs::create_dir_all(&crate_a_dir).unwrap();
+        fs::create_dir_all(&crate_b_dir).unwrap();
+
+        fs::write(
+            crate_a_dir.join("Cargo.toml"),
+            r#"[package]
+name = "crate-a"
+version = "0.1.0"
+"#,
+        )
+        .unwrap();
+
+        fs::write(
+            crate_b_dir.join("Cargo.toml"),
+            r#"[package]
+name = "crate-b"
+version = "0.1.0"
+
+[dependencies]
+crate-a = { path = "../crate_a" }
+external-pkg = "1.0"
+"#,
+        )
+        .unwrap();
+
+        let crates = vec![
+            ("crate-a".to_string(), crate_a_dir),
+            ("crate-b".to_string(), crate_b_dir),
+        ];
+
+        let (dependencies_map, dependents_map) = build_crate_dependency_graph(&crates);
+
+        assert_eq!(
+            dependencies_map.get("crate-a").unwrap(),
+            &Vec::<String>::new()
+        );
+        assert_eq!(
+            dependencies_map.get("crate-b").unwrap(),
+            &vec!["crate-a".to_string()]
+        );
+
+        assert_eq!(
+            dependents_map.get("crate-a").unwrap(),
+            &vec!["crate-b".to_string()]
+        );
+        assert_eq!(
+            dependents_map.get("crate-b").unwrap(),
+            &Vec::<String>::new()
+        );
 
         let _ = fs::remove_dir_all(&temp_dir);
     }

@@ -2,6 +2,8 @@
 
 @meta{
   crate: tomet-markdown
+  dependencies: list(tomet-ast, tomet-compute, tomet-semantics, tomet-tree)
+  dependents: list(tomet, tomet-cli, tomet-tests, tomet-tui)
 }
 
 =[ tomet-markdown ]

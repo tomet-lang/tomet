@@ -2,6 +2,8 @@
 
 @meta{
   crate: tomet-printer
+  dependencies: list(tomet-ast, tomet-config, tomet-field-utils, tomet-formatter, tomet-semantics, tomet-style, tomet-tree)
+  dependents: list(tomet, tomet-cli, tomet-tests, tomet-tui, tomet-workspace)
 }
 
 =[ tomet-printer ]

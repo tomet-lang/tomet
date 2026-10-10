@@ -2,6 +2,8 @@
 
 @meta{
   crate: tomet-edit
+  dependencies: list(tomet-ast, tomet-cst, tomet-parser, tomet-tree, tomet-validator)
+  dependents: list(tomet, tomet-tests)
 }
 
 =[ tomet-edit ]

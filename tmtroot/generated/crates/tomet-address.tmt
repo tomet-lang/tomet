@@ -2,6 +2,8 @@
 
 @meta{
   crate: tomet-address
+  dependencies: list(tomet-ast, tomet-tree)
+  dependents: list(tomet-compute, tomet-lsp)
 }
 
 =[ tomet-address ]

@@ -2,6 +2,8 @@
 
 @meta{
   crate: tomet
+  dependencies: list(tomet-ast, tomet-config, tomet-edit, tomet-formatter, tomet-html, tomet-load, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-typst, tomet-validator, tomet-vault)
+  dependents: list(tomet-java, tomet-js, tomet-python)
 }
 
 =[ tomet ]

@@ -2,6 +2,8 @@
 
 @meta{
   crate: tomet-java
+  dependencies: list(tomet)
+  dependents: list()
 }
 
 =[ tomet-java ]

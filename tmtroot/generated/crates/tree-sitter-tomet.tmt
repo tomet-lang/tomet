@@ -2,6 +2,8 @@
 
 @meta{
   crate: tree-sitter-tomet
+  dependencies: list()
+  dependents: list(tomet-tests, tomet-tui)
 }
 
 =[ tree-sitter-tomet ]

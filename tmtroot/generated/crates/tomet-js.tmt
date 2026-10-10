@@ -2,6 +2,8 @@
 
 @meta{
   crate: tomet-js
+  dependencies: list(tomet, tomet-cst, tomet-lexer, tomet-links, tomet-transform)
+  dependents: list()
 }
 
 =[ tomet-js ]

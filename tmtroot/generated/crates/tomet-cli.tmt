@@ -2,6 +2,8 @@
 
 @meta{
   crate: tomet-cli
+  dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-extract-rust, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-workspace, tove)
+  dependents: list()
 }
 
 =[ tomet-cli ]

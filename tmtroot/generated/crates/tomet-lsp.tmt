@@ -2,6 +2,8 @@
 
 @meta{
   crate: tomet-lsp
+  dependencies: list(tomet-address, tomet-ast, tomet-compute, tomet-cst, tomet-formatter, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator)
+  dependents: list()
 }
 
 =[ tomet-lsp ]
