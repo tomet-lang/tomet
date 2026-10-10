@@ -4,8 +4,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use tomet_ast::Document;
-use tomet_config::{PrinterConfig, find_config_file};
+use tomet_config::PrinterConfig;
 use tomet_formatter::format_source;
+use tomet_load_config::find_config_file;
 use tomet_indexer::{collect_tm_files_with_config, is_excluded_by_config};
 use tomet_parser::parse_document;
 use tomet_printer::document_to_tm_with_config;

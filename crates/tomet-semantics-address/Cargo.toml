@@ -1,0 +1,14 @@
+[package]
+name = "tomet-address"
+version.workspace = true
+edition.workspace = true
+description = "Resolves same-document ${...} references and recognizes (without reading) constructs that name another file."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-tree = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

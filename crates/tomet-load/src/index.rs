@@ -32,7 +32,7 @@ impl VaultIndex {
     /// The config found from `root` decides what is in the vault, so
     /// `ignore`/`unswept` mean here what they mean to every other sweep.
     pub fn build(root: &Path) -> Self {
-        let (config, config_root) = tomet_config::find_config_file(root)
+        let (config, config_root) = tomet_load_config::find_config_file(root)
             .map(|(config, _, config_root)| (config, config_root))
             .unwrap_or_else(|| (tomet_config::PrinterConfig::default(), root.to_path_buf()));
 

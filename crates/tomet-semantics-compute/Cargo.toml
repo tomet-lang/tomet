@@ -7,8 +7,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+tomet-address = { workspace = true }
 tomet-ast = { workspace = true }
-tomet-resolver = { workspace = true }
 tomet-semantics = { workspace = true }
 
 #= Crates.io

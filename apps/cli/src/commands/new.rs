@@ -3,7 +3,8 @@ use std::path::Path;
 
 use anyhow::Result;
 use tomet_ast::Value;
-use tomet_config::{PrinterConfig, find_config_file};
+use tomet_config::PrinterConfig;
+use tomet_load_config::find_config_file;
 use tomet_workspace::{create_file_from_blueprint, declaration_errors, list_blueprints};
 
 pub fn new_cmd(

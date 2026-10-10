@@ -7,7 +7,7 @@
 //! - Read-Only In-Memory Validation:
 //!   `tomet-validator` performs pure, read-only semantic and schema validation across
 //!   an in-memory [`Document`]. It performs zero I/O, no reference resolution (handled
-//!   by `tomet-resolver` and `tomet-links`), and no AST mutations.
+//!   by `tomet-address` and `tomet-links`), and no AST mutations.
 //!
 //! - Validation Rules:
 //!   -| Duplicate ID Detection: Walks all element nodes and detects duplicate `id` attributes.
@@ -410,7 +410,7 @@ fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnos
 /// loops) -- and reports an unrecognized connect name (`:xxx(...)` where
 /// `xxx` is not in `tomet_semantics::CONNECT_MEMBERS`).
 ///
-/// Needs `bindings`, unlike the parser or `tomet-semantics-resolver`:
+/// Needs `bindings`, unlike the parser or `tomet-address`:
 /// `allow:list(ns.mycard)` can name a namespaced identifier, and deciding
 /// whether a descendant actually *is* `ns.mycard` requires the document's
 /// resolved vocabulary. This is why the check lives here rather than

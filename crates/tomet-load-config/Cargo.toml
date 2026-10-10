@@ -1,0 +1,11 @@
+[package]
+name = "tomet-load-config"
+version.workspace = true
+edition.workspace = true
+description = "Finds and reads the config file governing a path -- the filesystem half of tomet-config."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tomet-config = { workspace = true }
+tomet-parser = { workspace = true }

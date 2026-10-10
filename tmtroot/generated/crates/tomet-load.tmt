@@ -8,9 +8,10 @@
 
 The one way to read a `.tmt` document correctly.
 
-Reading a document is four steps across three crates: find the config
-that governs it, load the vocabularies that config declares, parse the
-source, and bind the names. A caller that skips the middle two gets a
+Reading a document is four steps: find the config that governs it
+(`tomet-load-config`), load the vocabularies that config declares
+(this crate's own `vocabulary` module), parse the source, and bind
+the names. A caller that skips the middle two gets a
 `Document` whose element names resolve against `std` alone, which
 silently drops every user-vocabulary element. `twrit` shipped exactly
 that against this workspace's own writs: `@layers` was found and the

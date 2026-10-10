@@ -105,7 +105,7 @@ fn printed_source_parses() {
 fn config_fixtures_load() {
     // Was a `.parent().unwrap()` walk up to the repo root inside
     // `tomet-config`; the fixtures are local to this package now.
-    let cfg = tomet_config::load_config_from_file(&fixtures_dir().join("test.config.tmt"))
+    let cfg = tomet_load_config::load_config_from_file(&fixtures_dir().join("test.config.tmt"))
         .expect("failed to load test.config.tmt");
     assert_eq!(cfg.meta.format.as_deref(), Some("yaml"));
     assert!(cfg.meta.always_newline);
@@ -130,7 +130,7 @@ fn config_fixtures_load() {
     );
 
     let default_cfg =
-        tomet_config::load_config_from_file(&fixtures_dir().join("default.config.tmt"))
+        tomet_load_config::load_config_from_file(&fixtures_dir().join("default.config.tmt"))
             .expect("failed to load default.config.tmt");
     assert_eq!(
         default_cfg.format.callout_content_style.as_deref(),

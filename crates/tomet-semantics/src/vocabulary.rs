@@ -3,7 +3,7 @@
 //!
 //! Extraction is pure: it takes a parsed [`Document`] and reads it. The
 //! file that document came from is somebody else's problem --
-//! `tomet-semantics-resolver` finds `.tomet/vocabularies/<ns>.vocabulary.tmt`
+//! `tomet-load` finds `.tomet/vocabularies/<ns>.vocabulary.tmt`
 //! and reads it, because this layer may not do I/O.
 //!
 //! See `docs/spec/vocabulary.tmt` for the normative description. Three
@@ -285,7 +285,7 @@ impl Vocabulary {
 /// The rules for accepting one live in [`LoadedVocabularies::add`], and
 /// they are pure: a caller hands over a parsed document and the label it
 /// wants errors reported under. Where the document came from -- a file
-/// `tomet-resolver` read, or source text a wasm host was given -- is not
+/// `tomet-load` read, or source text a wasm host was given -- is not
 /// this type's business, so both get the same verdicts.
 #[derive(Debug)]
 pub struct LoadedVocabularies {
@@ -390,7 +390,8 @@ impl Bindings {
     ///
     /// Pure: the vocabularies arrive already parsed, so this is the half
     /// a caller that cannot open a file can still run. A caller that can
-    /// gets them via `tomet-resolver::load_vocabularies` and calls
+    /// reads them through `tomet-load`, which finds and parses each
+    /// declared vocabulary and then calls
     /// [`LoadedVocabularies::bindings_for`] directly, which is this plus
     /// reading them off disk; a wasm host that has the sources instead
     /// can pass them straight in.

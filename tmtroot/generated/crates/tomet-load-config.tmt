@@ -1,0 +1,37 @@
+@kind(api)
+
+@meta{
+  crate: tomet-load-config
+}
+
+=[ tomet-load-config ]
+
+==[ tomet-load-config ]
+
+Finds the config that governs a path, by walking up from it, and
+reads it. `tomet-config` owns the `Config` type and its pure parsing
+(`load_config_from_str`); this crate is the filesystem half, split
+out so `tomet-config` itself can stay layer 3 and disk-free.
+
+Shares the `tomet-load` name prefix deliberately: both crates are
+"read something correctly off disk," one a document, one a config.
+`tomet-load`'s own `Vault::discover` calls [`find_config_file`]
+directly rather than duplicating the walk.
+
+==[ Functions ]
+
+===[ fn find_config_file ]
+
+Searches `start` and its parent directories for `default.config.tmt` or `tomet.config.tmt`.
+Returns `(Config, config_file_path, config_directory_path)`.
+
+===[ fn load_config_from_file ]
+
+===[ fn config_for ]
+
+The config that governs `path`, for a tool about to act on `src`.
+
+The nearest `default.config.tmt`/`tomet.config.tmt` up the tree wins,
+because that file's position is what says where the vault begins.
+With no vault to find, the document's own `@config` is used, and
+failing that the defaults.

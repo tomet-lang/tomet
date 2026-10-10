@@ -1,4 +1,4 @@
-use tomet_ast::{Element, Value};
+use tomet_ast::Element;
 use tomet_tree::ValueExt;
 
 /// Extracts the import path string from a `@config(import:...)` / `@config(file:...)`
@@ -25,7 +25,7 @@ pub fn settings_file_ref(el: &Element) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::Sigil;
+    use tomet_ast::{Sigil, Value};
     use tomet_tree::element_new;
 
     #[test]

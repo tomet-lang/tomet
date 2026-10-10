@@ -16,7 +16,7 @@ Read-only `.tmt` document schema, blueprint, and lint validation.
 
 `tomet-validator` performs pure, read-only semantic and schema validation across
 an in-memory [`Document`]. It performs zero I/O, no reference resolution (handled
-by `tomet-resolver` and `tomet-links`), and no AST mutations.
+by `tomet-address` and `tomet-links`), and no AST mutations.
 
 - Validation Rules:
   - [ Duplicate ID Detection: Walks all element nodes and detects duplicate `id` attributes.

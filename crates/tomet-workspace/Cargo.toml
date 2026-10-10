@@ -12,6 +12,7 @@ tomet-compute = { workspace = true }
 tomet-config = { workspace = true }
 tomet-formatter = { workspace = true }
 tomet-indexer = { workspace = true }
+tomet-load-config = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-printer = { workspace = true }
 tomet-search = { workspace = true }

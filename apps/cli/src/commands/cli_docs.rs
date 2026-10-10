@@ -69,7 +69,7 @@ pub(crate) fn cli_docs_cmd(out: Option<&Path>, check: bool) -> anyhow::Result<()
 /// --check` accepts there.
 fn config_for_output(out: Option<&Path>) -> PrinterConfig {
     let probe: PathBuf = out.map_or_else(|| PathBuf::from("."), Path::to_path_buf);
-    tomet_config::find_config_file(&probe)
+    tomet_load_config::find_config_file(&probe)
         .map_or_else(PrinterConfig::default, |(config, _, _)| config)
 }
 

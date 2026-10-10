@@ -409,7 +409,7 @@ against the namespaces a document has in scope.
 
 Extraction is pure: it takes a parsed [`Document`] and reads it. The
 file that document came from is somebody else's problem --
-`tomet-semantics-resolver` finds `.tomet/vocabularies/<ns>.vocabulary.tmt`
+`tomet-load` finds `.tomet/vocabularies/<ns>.vocabulary.tmt`
 and reads it, because this layer may not do I/O.
 
 See `docs/spec/vocabulary.tmt` for the normative description. Three
@@ -468,7 +468,7 @@ Every vocabulary a vault declares, with whatever went wrong.
 The rules for accepting one live in [`LoadedVocabularies::add`], and
 they are pure: a caller hands over a parsed document and the label it
 wants errors reported under. Where the document came from -- a file
-`tomet-resolver` read, or source text a wasm host was given -- is not
+`tomet-load` read, or source text a wasm host was given -- is not
 this type's business, so both get the same verdicts.
 
 ====[ struct Bindings ]

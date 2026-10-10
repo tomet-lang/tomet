@@ -35,13 +35,14 @@ members = [
   "crates/tomet-semantics",
   "crates/tomet-semantics-validator",
   "crates/tomet-semantics-compute",
-  "crates/tomet-semantics-resolver",
+  "crates/tomet-semantics-address",
 
   #= Config -- PrinterConfig discovery & loading; the producers sit on this
   "crates/tomet-config",
 
   #= Load -- the front door: config + vocabularies + parse + bind
   "crates/tomet-load",
+  "crates/tomet-load-config",
 
   #= Transform -- in-memory AST transformations & macros
   "crates/tomet-transform",
@@ -102,8 +103,8 @@ tomet-lexer = { path = "crates/tomet-syntax-lexer", version = "0.1.0" }
 tomet-parser = { path = "crates/tomet-syntax-parser", version = "0.1.0" }
 tomet-tree = { path = "crates/tomet-syntax-tree", version = "0.1.0" }
 #= Semantics
+tomet-address = { path = "crates/tomet-semantics-address", version = "0.1.0" }
 tomet-compute = { path = "crates/tomet-semantics-compute", version = "0.1.0" }
-tomet-resolver = { path = "crates/tomet-semantics-resolver", version = "0.1.0" }
 tomet-semantics = { path = "crates/tomet-semantics", version = "0.1.0" }
 tomet-validator = { path = "crates/tomet-semantics-validator", version = "0.1.0" }
 #= Transform
@@ -134,6 +135,7 @@ tomet-config = { path = "crates/tomet-config", version = "0.1.0" }
 tomet-indexer = { path = "crates/tomet-workspace-indexer", version = "0.1.0" }
 tomet-links = { path = "crates/tomet-workspace-links", version = "0.1.0" }
 tomet-load = { path = "crates/tomet-load", version = "0.1.0" }
+tomet-load-config = { path = "crates/tomet-load-config", version = "0.1.0" }
 tomet-workspace = { path = "crates/tomet-workspace", version = "0.1.0" }
 #= Public
 tove = { path = "crates/tove", version = "0.1.0" }

@@ -1,10 +1,8 @@
-//! Loading the vocabularies a vault declares, and working out which ones
-//! a document has in scope.
+//! Reading the vocabularies a vault declares.
 //!
 //! This is the half of `tomet_semantics::vocabulary` that touches the
 //! filesystem. Extraction stays there, pure; finding and reading the
-//! files is here, because the semantics layer may not do I/O and
-//! `validate_document` promises it does none.
+//! files is here, because the semantics layer may not do I/O.
 //!
 //! Nothing is discovered. A vault lists its vocabularies by path and each
 //! file names itself with `@vocabulary(ns)`, the same shape blueprints
@@ -13,14 +11,13 @@
 
 use std::path::Path;
 
-pub use tomet_semantics::LoadedVocabularies;
+use tomet_semantics::LoadedVocabularies;
 
 /// Reads every vocabulary in `declared`, as paths relative to `root`.
 ///
-/// Takes the paths rather than a `PrinterConfig`, because a config lives
-/// a layer above this one -- and because this does not need to know what
-/// a config is, only where the files are. Reading and parsing are all it
-/// does; whether a vocabulary is acceptable is
+/// Takes the paths rather than a `PrinterConfig`, because this does not
+/// need to know what a config is, only where the files are. Reading and
+/// parsing are all it does; whether a vocabulary is acceptable is
 /// [`LoadedVocabularies::add`], in `tomet-semantics`.
 pub fn load_vocabularies(root: &Path, declared: &[String]) -> LoadedVocabularies {
     let mut loaded = LoadedVocabularies::default();
@@ -35,17 +32,6 @@ pub fn load_vocabularies(root: &Path, declared: &[String]) -> LoadedVocabularies
         }
     }
 
-    loaded
-}
-
-/// The same as [`load_vocabularies`] for sources the caller already holds,
-/// as `(label, source text)` pairs. Touches nothing outside memory, so a
-/// host with no filesystem gets the same verdicts as one with a vault.
-pub fn load_vocabulary_sources(sources: &[(&str, &str)]) -> LoadedVocabularies {
-    let mut loaded = LoadedVocabularies::default();
-    for (label, src) in sources {
-        add_source(&mut loaded, label, src);
-    }
     loaded
 }
 
@@ -72,7 +58,7 @@ mod tests {
 
     #[test]
     fn doc_index_resolves_with_no_declared_vocabularies_at_all() {
-        let root = scratch_dir("tomet_test_resolver_doc_index");
+        let root = scratch_dir("tomet_test_load_vocabulary_doc_index");
         let loaded = load_vocabularies(&root, &[]);
         assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
         assert!(loaded.by_namespace.contains_key("doc.index"));
@@ -87,7 +73,7 @@ mod tests {
 
     #[test]
     fn doc_icon_resolves_with_no_declared_vocabularies_at_all() {
-        let root = scratch_dir("tomet_test_resolver_doc_icon");
+        let root = scratch_dir("tomet_test_load_vocabulary_doc_icon");
         let loaded = load_vocabularies(&root, &[]);
         assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
         assert!(loaded.by_namespace.contains_key("doc"));
@@ -105,7 +91,7 @@ mod tests {
 
     #[test]
     fn a_vault_vocabulary_cannot_claim_the_reserved_doc_namespace() {
-        let root = scratch_dir("tomet_test_resolver_reserved_doc");
+        let root = scratch_dir("tomet_test_load_vocabulary_reserved_doc");
         fs::write(
             root.join("doc.vocabulary.tmt"),
             "@kind(vocabulary)\n@vocabulary(doc){ version: \"1.0.0\" }\n",
@@ -129,7 +115,7 @@ mod tests {
 
     #[test]
     fn a_vault_vocabulary_cannot_claim_doc_index_itself() {
-        let root = scratch_dir("tomet_test_resolver_reserved_doc_index");
+        let root = scratch_dir("tomet_test_load_vocabulary_reserved_doc_index");
         fs::write(
             root.join("index.vocabulary.tmt"),
             "@kind(vocabulary)\n@vocabulary(doc.index){ version: \"1.0.0\" }\n",

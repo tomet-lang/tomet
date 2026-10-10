@@ -38,8 +38,7 @@ use std::path::{Path, PathBuf};
 
 use tomet_ast::Document;
 use tomet_config::PrinterConfig;
-use tomet_resolver::{LoadedVocabularies, load_vocabulary_sources};
-use tomet_semantics::Bindings;
+use tomet_semantics::{Bindings, LoadedVocabularies};
 
 pub use tomet_search::{IndexQueryError, IndexRow, is_index_document};
 pub use tomet_transform::Unresolved;
@@ -92,7 +91,14 @@ impl Vault {
         root: impl Into<PathBuf>,
         vocabularies: &[(&str, &str)],
     ) -> Self {
-        Self::new(config, root.into(), load_vocabulary_sources(vocabularies))
+        let mut loaded = LoadedVocabularies::default();
+        for (label, src) in vocabularies {
+            match tomet_parser::parse_document(src) {
+                Ok(doc) => loaded.add(label, &doc),
+                Err(e) => loaded.errors.push(format!("declared vocabulary {label}: {e}")),
+            }
+        }
+        Self::new(config, root.into(), loaded)
     }
 
     /// The names in scope for `doc`: `std`, the document's own `@kind`,

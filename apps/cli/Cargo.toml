@@ -21,11 +21,11 @@ tomet-html = { workspace = true }
 tomet-indexer = { workspace = true }
 tomet-links = { workspace = true }
 tomet-load = { workspace = true }
+tomet-load-config = { workspace = true }
 tomet-markdown = { workspace = true }
 tomet-pandoc = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-printer = { workspace = true }
-tomet-resolver = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-stats = { workspace = true }
 tomet-tree = { workspace = true }

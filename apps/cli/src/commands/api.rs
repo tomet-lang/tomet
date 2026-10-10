@@ -20,7 +20,7 @@ pub(crate) fn api_cmd(
     }
 
     // 1. Locate config and resolve output directory
-    let (config, _, config_root) = tomet_config::find_config_file(target_path).unwrap_or((
+    let (config, _, config_root) = tomet_load_config::find_config_file(target_path).unwrap_or((
         PrinterConfig::default(),
         target_path.to_path_buf(),
         target_path.to_path_buf(),

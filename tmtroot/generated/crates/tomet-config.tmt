@@ -8,23 +8,28 @@
 
 ==[ tomet-config ]
 
-Configuration discovery, loading, and styling rule definitions ([`Config`], [`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`]).
+Configuration parsing and styling rule definitions ([`Config`], [`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`]).
 
 ==[ Architecture & Responsibilities ]
 
 - Centralized Configuration Domain:
 
-`tomet-config` owns configuration data structures and discovery/loading functions
-([`find_config_file`], [`load_config_from_file`], [`load_config_from_str`]).
+`tomet-config` owns configuration data structures and pure parsing
+([`load_config_from_str`]). Finding and reading a config file off
+disk is `tomet-load-config`'s job, one layer up.
 
 - Root Group Modules:
   - `groups` configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`MacrosConfig`], [`RegistryConfig`], [`ApiConfig`]).:Root
-  - `discovery` file discovery, loading, and error handling.:Configuration
+  - `discovery` parsing and error handling.:Configuration
   - `tree` tree normalization and path lookup utilities.:AST
 
 ==[ Module discovery ]
 
-Configuration discovery, file loading, and error reporting.
+Config parsing and error reporting. Finding and reading a config file
+off disk is `tomet-load-config`'s job, one layer up -- this stays
+pure so `tomet-config` itself can stay layer 3 and disk-free.
+[`ConfigError::Io`] exists for that crate's `load_config_from_file`
+to construct; nothing in this crate ever produces it.
 
 ===[ Enums ]
 
@@ -32,23 +37,7 @@ Configuration discovery, file loading, and error reporting.
 
 ===[ Functions ]
 
-====[ fn load_config_from_file ]
-
 ====[ fn load_config_from_str ]
-
-====[ fn config_for ]
-
-The config that governs `path`, for a tool about to act on `src`.
-
-The nearest `default.config.tmt`/`tomet.config.tmt` up the tree wins,
-because that file's position is what says where the vault begins.
-With no vault to find, the document's own `@config` is used, and
-failing that the defaults.
-
-====[ fn find_config_file ]
-
-Searches `start` and its parent directories for `default.config.tmt` or `tomet.config.tmt`.
-Returns `(Config, config_file_path, config_directory_path)`.
 
 ==[ Module groups ]
 

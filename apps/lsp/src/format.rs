@@ -6,7 +6,7 @@ use crate::position::{uri_to_file_path, whole_document_range};
 /// Formats the document using `tomet-formatter` with loaded or inferred configuration.
 pub fn format_edits(text: &str, uri: Option<&Uri>) -> Vec<TextEdit> {
     let path = uri.and_then(uri_to_file_path);
-    let config = tomet_config::config_for(path.as_deref(), text);
+    let config = tomet_load_config::config_for(path.as_deref(), text);
     let formatted = tomet_formatter::format_source_with_config(text, &config);
     if formatted == text {
         return Vec::new();
@@ -30,7 +30,7 @@ pub fn resolve_effective_config(
 
     // 1. Merge macros from workspace config file (e.g. default.config.tmt / tomet.config.tmt)
     if let Some(fp) = &file_path_opt
-        && let Some((_, cfg_path, _)) = tomet_config::find_config_file(fp)
+        && let Some((_, cfg_path, _)) = tomet_load_config::find_config_file(fp)
         && let Ok(src) = std::fs::read_to_string(&cfg_path)
         && let Ok(cfg_doc) = tomet_parser::parse_document(&src)
     {
@@ -44,7 +44,7 @@ pub fn resolve_effective_config(
     let mut import_targets = config.imports.clone();
     for block in &doc.blocks {
         if let tomet_ast::Block::Element(el) = block
-            && let Some(target) = tomet_resolver::config_import_ref(el)
+            && let Some(target) = tomet_address::config_import_ref(el)
             && !import_targets.iter().any(|t| t == target)
         {
             import_targets.push(target.to_string());

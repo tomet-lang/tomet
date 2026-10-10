@@ -1969,6 +1969,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomet-address"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-tree",
+]
+
+[[package]]
 name = "tomet-ast"
 version = "0.1.0"
 dependencies = [
@@ -1997,11 +2006,11 @@ dependencies = [
  "tomet-indexer",
  "tomet-links",
  "tomet-load",
+ "tomet-load-config",
  "tomet-markdown",
  "tomet-pandoc",
  "tomet-parser",
  "tomet-printer",
- "tomet-resolver",
  "tomet-semantics",
  "tomet-stats",
  "tomet-tree",
@@ -2020,9 +2029,9 @@ name = "tomet-compute"
 version = "0.1.0"
 dependencies = [
  "time",
+ "tomet-address",
  "tomet-ast",
  "tomet-parser",
- "tomet-resolver",
  "tomet-semantics",
  "uuid",
 ]
@@ -2114,6 +2123,7 @@ dependencies = [
  "ignore",
  "tomet-ast",
  "tomet-config",
+ "tomet-load-config",
  "tomet-parser",
  "tomet-semantics",
  "tomet-tree",
@@ -2176,12 +2186,20 @@ dependencies = [
  "tomet-ast",
  "tomet-config",
  "tomet-indexer",
+ "tomet-load-config",
  "tomet-parser",
- "tomet-resolver",
  "tomet-search",
  "tomet-semantics",
  "tomet-transform",
  "tomet-vault",
+]
+
+[[package]]
+name = "tomet-load-config"
+version = "0.1.0"
+dependencies = [
+ "tomet-config",
+ "tomet-parser",
 ]
 
 [[package]]
@@ -2192,13 +2210,13 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "serde_json",
+ "tomet-address",
  "tomet-ast",
  "tomet-compute",
- "tomet-config",
  "tomet-cst",
  "tomet-formatter",
+ "tomet-load-config",
  "tomet-parser",
- "tomet-resolver",
  "tomet-semantics",
  "tomet-tree",
  "tomet-validator",
@@ -2274,16 +2292,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tomet-resolver"
-version = "0.1.0"
-dependencies = [
- "tomet-ast",
- "tomet-parser",
- "tomet-semantics",
- "tomet-tree",
-]
-
-[[package]]
 name = "tomet-search"
 version = "0.1.0"
 dependencies = [
@@ -2341,6 +2349,7 @@ dependencies = [
  "tomet-edit",
  "tomet-formatter",
  "tomet-html",
+ "tomet-load-config",
  "tomet-markdown",
  "tomet-pandoc",
  "tomet-parser",
@@ -2386,6 +2395,7 @@ dependencies = [
  "tomet-ast",
  "tomet-config",
  "tomet-indexer",
+ "tomet-load-config",
  "tomet-markdown",
  "tomet-parser",
  "tomet-printer",
@@ -2428,7 +2438,6 @@ dependencies = [
  "tomet-compute",
  "tomet-config",
  "tomet-parser",
- "tomet-resolver",
  "tomet-search",
  "tomet-semantics",
  "tomet-transform",
@@ -2444,6 +2453,7 @@ dependencies = [
  "tomet-config",
  "tomet-formatter",
  "tomet-indexer",
+ "tomet-load-config",
  "tomet-parser",
  "tomet-printer",
  "tomet-search",

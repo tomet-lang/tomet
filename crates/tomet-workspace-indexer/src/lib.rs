@@ -150,7 +150,7 @@ pub fn is_excluded_by_config(path: &Path, config_root: &Path, config: &PrinterCo
 /// if it's a single file), auto-discovering the nearest
 /// `default.config.tmt`/`tomet.config.tmt` for `ignore_files` rules.
 pub fn collect_tm_files(path: &Path) -> Vec<PathBuf> {
-    let (config, _, config_root) = tomet_config::find_config_file(path).unwrap_or_else(|| {
+    let (config, _, config_root) = tomet_load_config::find_config_file(path).unwrap_or_else(|| {
         (
             PrinterConfig::default(),
             path.to_path_buf(),

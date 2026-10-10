@@ -1,8 +1,9 @@
 //! The one way to read a `.tmt` document correctly.
 //!
-//! Reading a document is four steps across three crates: find the config
-//! that governs it, load the vocabularies that config declares, parse the
-//! source, and bind the names. A caller that skips the middle two gets a
+//! Reading a document is four steps: find the config that governs it
+//! (`tomet-load-config`), load the vocabularies that config declares
+//! (this crate's own `vocabulary` module), parse the source, and bind
+//! the names. A caller that skips the middle two gets a
 //! `Document` whose element names resolve against `std` alone, which
 //! silently drops every user-vocabulary element. `twrit` shipped exactly
 //! that against this workspace's own writs: `@layers` was found and the
@@ -66,10 +67,11 @@ use std::sync::OnceLock;
 
 use tomet_ast::Document;
 use tomet_config::PrinterConfig;
-use tomet_resolver::load_vocabularies;
 use tomet_semantics::Bindings;
+use vocabulary::load_vocabularies;
 
 mod index;
+mod vocabulary;
 
 pub use index::{IndexQueryError, VaultIndex, is_index_document};
 pub use tomet_vault::{Prepared, Unresolved};
@@ -115,7 +117,7 @@ impl Vault {
     /// `root` is `path`'s directory -- a lone `.tmt` outside any vault is
     /// still readable, it just brings no vocabulary of its own.
     pub fn discover(path: &Path) -> Self {
-        let (config, root) = tomet_config::find_config_file(path)
+        let (config, root) = tomet_load_config::find_config_file(path)
             .map(|(config, _, root)| (config, root))
             .unwrap_or_else(|| {
                 let root = if path.is_dir() {

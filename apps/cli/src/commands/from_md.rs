@@ -20,7 +20,7 @@ pub(crate) fn from_md_cmd(
 }
 
 fn convert_md_source(path: &Path, src: &str) -> anyhow::Result<String> {
-    let (config, _, _) = tomet_config::find_config_file(path).unwrap_or((
+    let (config, _, _) = tomet_load_config::find_config_file(path).unwrap_or((
         tomet_config::PrinterConfig::default(),
         path.to_path_buf(),
         path.to_path_buf(),
@@ -97,7 +97,7 @@ fn from_md_directory(
     remove_original: bool,
     dry_run: bool,
 ) -> anyhow::Result<()> {
-    let (config, _, config_root) = tomet_config::find_config_file(dir_path).unwrap_or((
+    let (config, _, config_root) = tomet_load_config::find_config_file(dir_path).unwrap_or((
         tomet_config::PrinterConfig::default(),
         dir_path.to_path_buf(),
         dir_path.to_path_buf(),

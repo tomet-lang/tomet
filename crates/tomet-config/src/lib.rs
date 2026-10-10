@@ -1,25 +1,24 @@
 //! =[ tomet-config ]
 //!
-//! Configuration discovery, loading, and styling rule definitions ([`Config`], [`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`]).
+//! Configuration parsing and styling rule definitions ([`Config`], [`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`]).
 //!
 //! =[ Architecture & Responsibilities ]
 //!
 //! - Centralized Configuration Domain:
-//!   `tomet-config` owns configuration data structures and discovery/loading functions
-//!   ([`find_config_file`], [`load_config_from_file`], [`load_config_from_str`]).
+//!   `tomet-config` owns configuration data structures and pure parsing
+//!   ([`load_config_from_str`]). Finding and reading a config file off
+//!   disk is `tomet-load-config`'s job, one layer up.
 //!
 //! - Root Group Modules:
 //!   - [`groups`]: Root configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`MacrosConfig`], [`RegistryConfig`], [`ApiConfig`]).
-//!   - [`discovery`]: Configuration file discovery, loading, and error handling.
+//!   - [`discovery`]: Configuration parsing and error handling.
 //!   - [`tree`]: AST tree normalization and path lookup utilities.
 
 pub mod discovery;
 pub mod groups;
 pub mod tree;
 
-pub use discovery::{
-    ConfigError, config_for, find_config_file, load_config_from_file, load_config_from_str,
-};
+pub use discovery::{ConfigError, load_config_from_str};
 pub use groups::{
     ApiConfig, FieldConfig, FormatConfig, GroupOrder, MacrosConfig, MetaConfig, RegistryConfig,
     WorkspaceConfig, api, format, macros, meta, registry, workspace,

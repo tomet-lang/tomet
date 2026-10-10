@@ -60,7 +60,7 @@ fn export_single_file(
 /// find, which keeps a loose file exporting beside itself rather than
 /// into whatever directory the shell happened to be in.
 fn project_root_for(target: &Path) -> PathBuf {
-    if let Some((_, _, root)) = tomet_config::find_config_file(target) {
+    if let Some((_, _, root)) = tomet_load_config::find_config_file(target) {
         return root;
     }
     if target.is_dir() {

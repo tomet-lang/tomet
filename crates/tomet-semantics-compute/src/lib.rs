@@ -8,11 +8,11 @@
 //! - Pure Compute Boundary (Zero I/O):
 //!   `tomet-compute` performs dynamic expression evaluation for Tomet interpolation
 //!   expressions (`${...}`). It performs zero I/O: identifier and member lookups
-//!   (`${node.member}`) are delegated to `tomet-resolver::resolve_reference`.
+//!   (`${node.member}`) are delegated to `tomet-address::resolve_reference`.
 //!
 //! - Expression Evaluation:
 //!   -| `Literal`: Evaluates directly to [`Value::Int`], [`Value::Float`], or [`Value::String`].
-//!    | `Identifier` / `Member`: Resolves against [`Document`] through `tomet_resolver`.
+//!    | `Identifier` / `Member`: Resolves against [`Document`] through `tomet_address`.
 //!    | `Call`: Recursively evaluates argument expressions, then dispatches to builtin functions.
 //!
 //! - Builtin Numeric Functions:
@@ -68,7 +68,7 @@ impl EvaluationContext {
 
 /// Evaluates `expr` against `doc`. `Literal`s evaluate to themselves;
 /// `Identifier`/`Member` chains resolve via
-/// `tomet_resolver::resolve_reference` (falling back to `@config` macros for bare identifiers);
+/// `tomet_address::resolve_reference` (falling back to `@config` macros for bare identifiers);
 /// a `Call` dispatches to builtins or `@config` user-defined macros after evaluating its args.
 pub fn evaluate(doc: &Document, expr: &InterpExpr) -> Result<Value, ComputeError> {
     let config = tomet_semantics::document_config(doc);
@@ -111,7 +111,7 @@ pub fn evaluate_with_context(
             if let Some(val) = ctx.get_var(id) {
                 return Ok(val.clone());
             }
-            match tomet_resolver::resolve_reference(doc, expr) {
+            match tomet_address::resolve_reference(doc, expr) {
                 Ok(val) => Ok(val),
                 Err(err) => {
                     if let Some(template) = config.macros.get(id) {
@@ -128,7 +128,7 @@ pub fn evaluate_with_context(
             {
                 return Ok(val.clone());
             }
-            Ok(tomet_resolver::resolve_reference(doc, expr)?)
+            Ok(tomet_address::resolve_reference(doc, expr)?)
         }
         InterpExprKind::NamedArg { name, value } => {
             let val = evaluate_with_context(doc, value, config, ctx)?;

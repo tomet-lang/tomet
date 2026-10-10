@@ -19,7 +19,7 @@ does not relax the rule to fit the change it wanted to make.
 
   layers: {
     6: list( "apps/*", "bindings/*", "editors/*", "tests", "crates/tomet" )
-    5: list( "crates/tomet-workspace*", "crates/tomet-load" )
+    5: list( "crates/tomet-workspace*", "crates/tomet-load*" )
     4: list(
       "crates/serde_tomet",
       "crates/tomet-format*",
@@ -392,9 +392,8 @@ failing the run, so a broken file is also an unguarded one.
     names: list( "std::fs" )
     within: list( "crates/*" )
     allowed: list(
-      "crates/tomet-semantics-resolver",
-      "crates/tomet-config",
       "crates/tomet-load",
+      "crates/tomet-load-config",
       "crates/tomet-workspace",
       "crates/tomet-workspace-indexer",
       "crates/tomet-workspace-links"

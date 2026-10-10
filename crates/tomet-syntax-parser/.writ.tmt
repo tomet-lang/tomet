@@ -33,10 +33,12 @@ The parser is pure, deterministic and side-effect-free. It performs no
 I/O, resolves no external file, and executes nothing. The same input text
 produces the same tree, in predictable time.
 
-File resolution is `tomet-semantics-resolver`'s job -- Tomet's
-preprocessor/linker layer, and the only place reading a referenced file is
-allowed. `@config(import:)` and `@settings(file:)` are resolved there,
-after parsing.
+File resolution is split, now: `tomet-address` recognizes a
+`@config(import:)`/`@settings(file:)` reference without reading it, and
+actually reading a file is layer 5's job -- `tomet-load`/`tomet-load-config`
+for vocabularies and workspace config, or (for `@config(import:)`
+specifically) `apps/lsp`'s own merge. Either way, it happens after
+parsing, never during it.
 
 ---[ Why ]---
 

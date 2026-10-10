@@ -7,9 +7,9 @@ use std::path::{Path, PathBuf};
 /// all, while the LSP formatted with the vault's. So a document the
 /// editor wrote on save was a document `format --check` called
 /// unformatted -- a guard rejecting what the tool everyone uses
-/// produces. Both go through `tomet_config::config_for` now.
+/// produces. Both go through `tomet_load_config::config_for` now.
 fn format_file(path: &Path, src: &str) -> String {
-    let config = tomet_config::config_for(Some(path), src);
+    let config = tomet_load_config::config_for(Some(path), src);
     tomet_formatter::format_source_with_config(src, &config)
 }
 
@@ -21,7 +21,7 @@ fn format_file(path: &Path, src: &str) -> String {
 /// explicit file list -- `git ls-files`, a shell glob -- rewrite the frozen
 /// corpus and its references, which exist to be left exactly as they are.
 fn is_excluded_by_config(path: &Path) -> bool {
-    tomet_config::find_config_file(path)
+    tomet_load_config::find_config_file(path)
         .is_some_and(|(config, _, root)| tomet_indexer::is_excluded_by_config(path, &root, &config))
 }
 
@@ -31,7 +31,7 @@ fn collect_dir(dir: &Path, force: bool) -> Vec<PathBuf> {
     if !force {
         return tomet_indexer::collect_tm_files(dir);
     }
-    let (mut config, _, root) = tomet_config::find_config_file(dir).unwrap_or_else(|| {
+    let (mut config, _, root) = tomet_load_config::find_config_file(dir).unwrap_or_else(|| {
         (
             tomet_config::PrinterConfig::default(),
             dir.to_path_buf(),
