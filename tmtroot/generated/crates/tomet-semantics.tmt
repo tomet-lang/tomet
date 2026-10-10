@@ -34,9 +34,26 @@ I/O-free semantic classification and normalization layer for Tomet AST elements.
 - ("Metadata Extraction (`meta`)") Extracts top-level `@meta` values via [`document_meta`].
 - ("Structural Helpers") [ Heading level clamping (`heading`) and
                            table parsing (`table`). ]
+- ("Element Data Extraction (`data`)") Extracts and normalizes an element's `{...}` data group via [`data::element_data`].
 - ("Element-Specific Semantics (`elements`)") [ Dedicated normalization and extraction
-                                                logic for concrete built-in element families (`config`, `data`, `footnote`,
+                                                logic for concrete built-in element families (`config`, `footnote`,
                                                 `heading`, `meta`, `table`, `tag`, `target`). ]
+
+==[ Module data ]
+
+An element's value as data.
+
+`{...}` is the only data syntax tove has; `element_data` is the single
+place every caller reads an element's `{...}` group through, so none of
+them need to know `ElementValue::Group`'s shape themselves.
+
+===[ Functions ]
+
+====[ fn element_data ]
+
+An element's value as data: a `{...}` group's `key: value` pairs, or
+`None` if the element has no value group at all (or an interpolated
+one, `${...}`, which is not data).
 
 ==[ Module elements ]
 
@@ -50,7 +67,6 @@ and connect evaluation), this module houses the logic specific to individual
 built-in element families:
 
 - (config) Document configuration (`@config`, `@settings`).
-- (data) An element's `{...}` value read as data.
 - (footnote) Footnote collection and indexing (`<footnote>`, `^id`).
 - (heading) Heading level calculation and bounds clamping (`heading`).
 - (meta) Document metadata and frontmatter extraction (`@meta`, `@kind`, `@version`).
@@ -82,22 +98,6 @@ all configuration elements in the document -- top-level per
 `@config`/`@settings` that joined an adjacent paragraph
 (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), not just a raw `doc.blocks`
 walk.
-
-===[ Module data ]
-
-An element's value as data.
-
-`{...}` is the only data syntax tove has; `element_data` is the single
-place every caller reads an element's `{...}` group through, so none of
-them need to know `ElementValue::Group`'s shape themselves.
-
-====[ Functions ]
-
-=====[ fn element_data ]
-
-An element's value as data: a `{...}` group's `key: value` pairs, or
-`None` if the element has no value group at all (or an interpolated
-one, `${...}`, which is not data).
 
 ===[ Module footnote ]
 

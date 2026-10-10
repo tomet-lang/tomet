@@ -30,13 +30,16 @@
 //! - (Structural Helpers)
 //!   | Heading level clamping (`heading`) and
 //!   | table parsing (`table`).
+//! - (Element Data Extraction (`data`))
+//!   | Extracts and normalizes an element's `{...}` data group via [`data::element_data`].
 //! - (Element-Specific Semantics (`elements`))
 //!   | Dedicated normalization and extraction
-//!   | logic for concrete built-in element families (`config`, `data`, `footnote`,
+//!   | logic for concrete built-in element families (`config`, `footnote`,
 //!   | `heading`, `meta`, `table`, `tag`, `target`).
 //!
 
 mod connect_member;
+pub mod data;
 pub mod elements;
 pub mod flatten;
 mod kind;
@@ -47,8 +50,8 @@ pub mod vocabulary;
 pub use connect_member::{
     CONNECT_MEMBERS, ConnectMember, UnknownConnectMember, classify_connect_member,
 };
+pub use data::element_data;
 pub use elements::config::{DocumentConfig, ExportType, document_config};
-pub use elements::data;
 pub use elements::footnote::{self, FootnoteItem, FootnoteRegistry};
 pub use elements::heading::heading_level;
 pub use elements::meta::{document_kind, document_meta, document_version};
