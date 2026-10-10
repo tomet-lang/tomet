@@ -640,3 +640,23 @@ fn validate_cst_counts_only_the_id_group_not_any_attribute_named_id() {
     let cst = tomet_parser::parse_cst(src);
     assert_eq!(validate_cst(&cst).len(), 1);
 }
+
+#[test]
+fn validate_cst_catches_a_duplicate_id_nested_inside_content() {
+    // `cst.rs::parse_content_group` used to parse `[content]` as flat
+    // inline text only (`try_parse_inline_element`'s `@`/`^`/`$` sigils
+    // only), never dispatching to block constructs like a section --
+    // so a nested section heading's own `#(id)` was never wrapped in an
+    // `ID_GROUP` at all; `=` isn't a sigil `try_parse_inline_element`
+    // recognizes, so it stayed raw text. A plain `@`-element's own
+    // `#(id)` nested the same way was already caught even before this
+    // fix -- `try_parse_inline_element` reaches the same shared
+    // `parse_groups`/`parse_id_group` regardless of bare-line status --
+    // so that shape doesn't distinguish old from new behavior; a nested
+    // section's heading-level `#(id)` does. This is the LSP's only
+    // duplicate-id diagnostic (`apps/lsp` never calls the AST-based
+    // `validate_document`).
+    let src = "@a#(x)\n@outer[\n=[ Heading ]#(x)\n]\n";
+    let cst = tomet_parser::parse_cst(src);
+    assert_eq!(validate_cst(&cst).len(), 1);
+}

@@ -66,7 +66,11 @@ one of each -- then any `CONNECT` (`:name(...)`).
 `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
 `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
 `MAP_LITERAL`, `SEQ_LITERAL` or (a call such as `list(...)`) `ARGS`.
-`CONTENT` holds inline text, which may itself contain elements.
+`CONTENT` recurses into the same block grammar `ROOT`/`SECTION` use
+(`SECTION`, `LIST`, `BLOCK_ELEMENT`, `CODE_BLOCK`, `THEMATIC_BREAK`,
+`PARAGRAPH`), bounded by the group's own closing `]` instead of EOF or
+a shallower section -- a block nested inside `[content]` (and its own
+`#(id)`) is represented, not flattened into inline text.
 
 Emphasis (`*em*`) and `|`-marked content runs are not modelled: they stay
 flat tokens in their paragraph.

@@ -19,7 +19,11 @@
 //! `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
 //! `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
 //! `MAP_LITERAL`, `SEQ_LITERAL` or (a call such as `list(...)`) `ARGS`.
-//! `CONTENT` holds inline text, which may itself contain elements.
+//! `CONTENT` recurses into the same block grammar `ROOT`/`SECTION` use
+//! (`SECTION`, `LIST`, `BLOCK_ELEMENT`, `CODE_BLOCK`, `THEMATIC_BREAK`,
+//! `PARAGRAPH`), bounded by the group's own closing `]` instead of EOF or
+//! a shallower section -- a block nested inside `[content]` (and its own
+//! `#(id)`) is represented, not flattened into inline text.
 //!
 //! Emphasis (`*em*`) and `|`-marked content runs are not modelled: they stay
 //! flat tokens in their paragraph.
@@ -43,9 +47,10 @@ pub fn parse_cst(src: &str) -> SyntaxNode {
 enum InlineStop {
     /// Up to and including the newline.
     Line,
-    /// Up to (not including) the `]` that closes the enclosing `[`.
-    Bracket,
-    /// Up to and including the newline that ends the paragraph.
+    /// Up to and including the newline that ends the paragraph -- or,
+    /// when [`CstParser::in_bracket`], the enclosing group's own closing
+    /// `]`, depth-counted so a literal `[`/`]` typed as plain prose
+    /// (`array[0]`) doesn't end it early.
     Paragraph,
 }
 
@@ -56,6 +61,14 @@ struct CstParser<'a> {
     /// Whether an element may claim a `:name(...)` group that follows it.
     /// A list item's own top-level element may not: the group is the item's.
     allow_connect: bool,
+    /// Whether the block grammar currently being parsed (via
+    /// [`CstParser::parse_body`]/[`CstParser::parse_inline`]) is bounded
+    /// by a `[content]` group's closing `]` rather than EOF/a section.
+    /// Toggled around [`CstParser::parse_content_group`]'s own call,
+    /// the same way `allow_connect` is -- a nested `[...]` sets and
+    /// restores it around its own body, so nesting depth is tracked by
+    /// the call stack, not a counter here.
+    in_bracket: bool,
 }
 
 impl<'a> CstParser<'a> {
@@ -65,6 +78,7 @@ impl<'a> CstParser<'a> {
             pos: 0,
             builder: GreenNodeBuilder::new(),
             allow_connect: true,
+            in_bracket: false,
         }
     }
 
@@ -317,12 +331,17 @@ impl<'a> CstParser<'a> {
         self.builder.finish_node();
     }
 
-    /// Blocks until EOF, or until a section of level `<= section_level` starts.
+    /// Blocks until EOF, until a section of level `<= section_level`
+    /// starts, or -- when [`CstParser::in_bracket`] -- until the
+    /// enclosing `[content]` group's own closing `]`.
     fn parse_body(&mut self, section_level: usize) {
         while !self.is_eof() {
             if self.current_kind().is_some_and(|k| k.is_trivia()) {
                 self.bump();
                 continue;
+            }
+            if self.in_bracket && self.current_kind() == Some(K::R_BRACKET) {
+                break;
             }
             if self
                 .section_level_here()
@@ -474,16 +493,20 @@ impl<'a> CstParser<'a> {
                     self.bump();
                     break;
                 }
-                InlineStop::Paragraph if k == K::NEWLINE && self.paragraph_ends_after_newline() => {
-                    self.bump();
-                    break;
+                InlineStop::Paragraph => {
+                    if self.in_bracket {
+                        match k {
+                            K::R_BRACKET if depth == 0 => break,
+                            K::R_BRACKET => depth -= 1,
+                            K::L_BRACKET => depth += 1,
+                            _ => {}
+                        }
+                    }
+                    if k == K::NEWLINE && self.paragraph_ends_after_newline() {
+                        self.bump();
+                        break;
+                    }
                 }
-                InlineStop::Bracket => match k {
-                    K::R_BRACKET if depth == 0 => break,
-                    K::R_BRACKET => depth -= 1,
-                    K::L_BRACKET => depth += 1,
-                    _ => {}
-                },
                 _ => {}
             }
             if !self.try_parse_inline_element() {
@@ -687,9 +710,11 @@ impl<'a> CstParser<'a> {
     fn parse_content_group(&mut self) {
         self.builder.start_node(K::CONTENT.into());
         self.bump(); // '['
-        let outer = std::mem::replace(&mut self.allow_connect, true);
-        self.parse_inline(InlineStop::Bracket);
-        self.allow_connect = outer;
+        let outer_connect = std::mem::replace(&mut self.allow_connect, true);
+        let outer_bracket = std::mem::replace(&mut self.in_bracket, true);
+        self.parse_body(0);
+        self.in_bracket = outer_bracket;
+        self.allow_connect = outer_connect;
         if self.current_kind() == Some(K::R_BRACKET) {
             self.bump();
         }
@@ -832,7 +857,11 @@ mod tests {
         );
         let a1 = a.children().nth(2).unwrap();
         assert_eq!(child_kinds(&a1), [K::SECTION_HEADING, K::PARAGRAPH]);
-        assert_eq!(count(&root, K::PARAGRAPH), 3);
+        // 3 real bodies ("text"/"inner"/"last") + 4 section titles ("A"/
+        // "A1"/"A2"/"B"), each title's own `[...]` now wrapping its bare
+        // inline content in a `PARAGRAPH` the same way any other content
+        // group does -- see `parse_content_group`'s doc comment.
+        assert_eq!(count(&root, K::PARAGRAPH), 7);
     }
 
     #[test]
@@ -912,6 +941,51 @@ mod tests {
         assert_eq!(child_kinds(&el), [K::SIGIL, K::CONTENT, K::VALUE_DATA]);
         let content = find(&el, K::CONTENT).unwrap();
         assert_eq!(count(&content, K::INLINE_ELEMENT), 1);
+    }
+
+    #[test]
+    fn block_level_constructs_nest_in_content_with_their_own_id() {
+        // `[content]` recurses into the same block grammar ROOT/SECTION
+        // use, not just inline text -- a section (or list, code block)
+        // nested inside it is a real `SECTION`/`ID_GROUP`, not flattened
+        // into `CONTENT`'s plain text. This is what lets
+        // `tomet-semantics-validator::collect_ids_cst` (the LSP's only
+        // duplicate-id check) see a duplicate id nested this way.
+        let root = parse_cst("@outer[\n=[ Heading ]#(x)\n\nbody\n]\n");
+        let el = find(&root, K::BLOCK_ELEMENT).unwrap();
+        let content = find(&el, K::CONTENT).unwrap();
+        let section = find(&content, K::SECTION).unwrap();
+        assert_eq!(child_kinds(&section), [K::SECTION_HEADING, K::PARAGRAPH]);
+        let heading = find(&section, K::SECTION_HEADING).unwrap();
+        let id_group = find(&heading, K::ID_GROUP).unwrap();
+        assert_eq!(id_group.text().to_string(), "#(x)");
+    }
+
+    #[test]
+    fn a_literal_bracket_in_content_prose_does_not_end_it_early() {
+        // `array[0]` inside `[content]`: the inner `[`/`]` are plain
+        // text, not recognized as a nested group (nothing precedes `[`
+        // that would make it one), so the outer group's own `]` -- the
+        // *third* one here -- is the one that actually closes it.
+        // Depth-counted the same way the AST parser's `Stop::Paragraph`
+        // boundary tracking is.
+        let root = parse_cst("@a[ array[0] is nice ]\n");
+        let content = find(&root, K::CONTENT).unwrap();
+        assert_eq!(content.text().to_string(), "[ array[0] is nice ]");
+    }
+
+    #[test]
+    fn bare_paragraph_content_spanning_lines_does_not_swallow_the_close() {
+        // No blank line, no new block starting the second line -- under
+        // the old inline-only `parse_content_group`, nothing stopped a
+        // paragraph at `]` at all; under the block grammar, the
+        // paragraph's own bracket-depth tracking has to catch it even
+        // after crossing a newline.
+        let root = parse_cst("@card[ hello\nworld ]\nafter\n");
+        let content = find(&root, K::CONTENT).unwrap();
+        assert_eq!(content.text().to_string(), "[ hello\nworld ]");
+        // One paragraph inside the content group, one for "after".
+        assert_eq!(count(&root, K::PARAGRAPH), 2);
     }
 
     #[test]
