@@ -190,7 +190,7 @@ pub fn render_value_inner_with_blocks(
             if entries.len() == 1 {
                 let key = &entries[0].0;
                 if key == "target" {
-                    let space = if config.link_no_space { "" } else { " " };
+                    let space = if config.format.link_no_space { "" } else { " " };
                     format!(
                         "@({key}:{space}{})",
                         render_nested_with_blocks(&entries[0].1, config, render_blocks)
@@ -349,7 +349,7 @@ pub fn render_args_with_blocks(
     {
         let key = &entries[0].0;
         if key == "target" {
-            let space = if config.link_no_space { "" } else { " " };
+            let space = if config.format.link_no_space { "" } else { " " };
             return format!(
                 "{key}:{space}{}",
                 render_value_inner_with_blocks(&entries[0].1, config, render_blocks)
@@ -436,9 +436,9 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
                 None
             }
         })
-        .or_else(|| config.meta_format.clone());
+        .or_else(|| config.meta.format.clone());
 
-    if config.meta_always_newline || effective_format.is_some() {
+    if config.meta.always_newline || effective_format.is_some() {
         // Read through `element_data` rather than `pairs()`: the body may
         // already be a `+++` fence, which has no pairs of its own and
         // would otherwise be rendered back out empty.
@@ -453,7 +453,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
             let is_foreign_format = effective_format.is_some();
             let mut out = open;
             for (k, v) in &entries {
-                let field_cfg = config.meta_fields.get(k);
+                let field_cfg = config.meta.fields.get(k);
                 let val_str = render_meta_field_value(v, field_cfg, config, is_foreign_format);
                 out.push_str(indent);
                 out.push_str(k);
@@ -565,7 +565,10 @@ mod tests {
         );
 
         let cfg_no_space = PrinterConfig {
-            link_no_space: true,
+            format: tomet_config::FormatConfig {
+                link_no_space: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
         assert_eq!(
@@ -593,7 +596,10 @@ mod tests {
             Value::String("doc-12345678".to_string()),
         )])));
         let cfg = PrinterConfig {
-            meta_format: Some("yaml".to_string()),
+            meta: tomet_config::MetaConfig {
+                format: Some("yaml".to_string()),
+                ..Default::default()
+            },
             ..Default::default()
         };
         assert_eq!(

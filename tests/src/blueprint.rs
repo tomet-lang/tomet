@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 
 use tomet_ast::Value;
-use tomet_config::PrinterConfig;
+use tomet_config::{PrinterConfig, RegistryConfig};
 use tomet_validator::validate_against_blueprint;
 use tomet_workspace::{create_file_from_blueprint, find_blueprint, list_blueprints};
 
@@ -44,7 +44,10 @@ fn test_blueprint_end_to_end_lifecycle() {
 
     // 2. Discover it through the declaration, by the name it gives itself
     let config = PrinterConfig {
-        blueprints: vec![".tomet/blueprints/daily-note.blueprint.tmt".to_string()],
+        registry: RegistryConfig {
+            blueprints: vec![".tomet/blueprints/daily-note.blueprint.tmt".to_string()],
+            ..Default::default()
+        },
         ..PrinterConfig::default()
     };
     let found = find_blueprint(&temp_dir, "daily-note", &config);

@@ -26,11 +26,11 @@ fn convert_md_source(path: &Path, src: &str) -> anyhow::Result<String> {
         path.to_path_buf(),
     ));
     let import_opts = tomet_markdown::ImportOptions {
-        adjust_table_width: config.table_adjust_width.as_deref() == Some("true")
-            || config.table_adjust_width.as_deref() == Some("auto"),
-        table_adjust_width_mode: config.table_adjust_width.clone(),
-        table_max_col_width: config.table_max_col_width,
-        table_align: config.table_align.clone(),
+        adjust_table_width: config.format.table_adjust_width.as_deref() == Some("true")
+            || config.format.table_adjust_width.as_deref() == Some("auto"),
+        table_adjust_width_mode: config.format.table_adjust_width.clone(),
+        table_max_col_width: config.format.table_max_col_width,
+        table_align: config.format.table_align.clone(),
     };
     let mut doc = tomet_markdown::from_markdown_with_options(src, &import_opts);
     tomet_printer::ensure_document_id_with_config(&mut doc, &config);

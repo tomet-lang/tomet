@@ -35,7 +35,7 @@ use tomet_transform::instantiate_blueprint;
 /// should not fail wholesale because one entry rotted.
 pub fn list_blueprints(root: &Path, config: &PrinterConfig) -> Vec<(String, PathBuf)> {
     let mut found: Vec<(String, PathBuf)> = Vec::new();
-    for declared in &config.blueprints {
+    for declared in &config.registry.blueprints {
         let path = root.join(declared);
         let Some(name) = blueprint_name(&path) else {
             continue;
@@ -56,7 +56,7 @@ pub fn declaration_errors(root: &Path, config: &PrinterConfig) -> Vec<String> {
     let mut errors = Vec::new();
     let mut seen: HashMap<String, String> = HashMap::new();
 
-    for declared in &config.blueprints {
+    for declared in &config.registry.blueprints {
         let path = root.join(declared);
         if !path.is_file() {
             errors.push(format!("declared blueprint does not exist: {declared}"));
@@ -216,7 +216,10 @@ mod tests {
 
     fn declaring(paths: &[&str]) -> PrinterConfig {
         PrinterConfig {
-            blueprints: paths.iter().map(|p| p.to_string()).collect(),
+            registry: tomet_config::RegistryConfig {
+                blueprints: paths.iter().map(|p| p.to_string()).collect(),
+                ..Default::default()
+            },
             ..PrinterConfig::default()
         }
     }

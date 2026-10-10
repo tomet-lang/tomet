@@ -35,7 +35,7 @@ pub(crate) fn api_cmd(
             }
         }
         None => {
-            if let Some(cfg_out) = &config.api_rust_out {
+            if let Some(cfg_out) = &config.api.rust_out {
                 config_root.join(cfg_out)
             } else {
                 return Err(anyhow::anyhow!(

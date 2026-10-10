@@ -8,7 +8,7 @@
 
 ==[ tomet-config ]
 
-Configuration discovery, loading, and styling rule definitions ([`PrinterConfig`], [`FieldConfig`]).
+Configuration discovery, loading, and styling rule definitions ([`Config`], [`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`]).
 
 ==[ Architecture & Responsibilities ]
 
@@ -16,44 +16,40 @@ Configuration discovery, loading, and styling rule definitions ([`PrinterConfig`
 
 `tomet-config` owns configuration data structures and discovery/loading functions
 ([`find_config_file`], [`load_config_from_file`], [`load_config_from_str`]).
-Split out of `tomet-printer` because discovering and loading project configuration
-is a shared concern across the workspace (`tomet-style`, `tomet-field-utils`,
-`tomet-formatter`, `tomet-indexer`, `tomet-tui`, and `apps/cli`) without
-requiring document serialization dependencies.
 
-==[ Core Capabilities ]
+- Root Group Modules:
+  - `format`, link, element, callout, list, and table formatting rules ([`FormatConfig`], [`GroupOrder`]).:Heading
+  - `meta` metadata formatting and schema rules ([`MetaConfig`], [`FieldConfig`]).:Document
+  - `workspace` file indexing exclusions and unswept rules ([`WorkspaceConfig`]).:Vault
+  - `macros` template expansions ([`MacrosConfig`]).:Macro
+  - `registry` and vocabularies declarations ([`RegistryConfig`]).:Blueprints
+  - `api` extraction settings ([`ApiConfig`]).:API
+  - `discovery` file discovery, loading, and error handling.:Configuration
+  - `tree` tree normalization and path lookup utilities.:AST
 
-- @strong[Configuration Loading & Discovery]: Searches parent directories for `default.config.tmt`
+==[ Module api ]
 
-or `tomet.config.tmt`.
+API extraction configuration ([`ApiConfig`]).
 
-- @strong[Printer Configuration ([`PrinterConfig`])]: Serialization formats (`yaml`, `json`, `toml`),
+===[ Structs ]
 
-heading bracket spacing, link spacing, callout/list styling, and `ignore_files` patterns.
+====[ struct ApiConfig ]
 
-- @strong[Per-Field Metadata Rules ([`FieldConfig`])]: Rules mapping metadata keys to type,
+==[ Module discovery ]
 
-formatting, offset, prefix, and overwrite constraints.
+Configuration discovery, file loading, and error reporting.
 
-==[ Structs ]
+===[ Enums ]
 
-===[ struct FieldConfig ]
+====[ enum ConfigError ]
 
-===[ struct PrinterConfig ]
+===[ Functions ]
 
-==[ Enums ]
+====[ fn load_config_from_file ]
 
-===[ enum GroupOrder ]
+====[ fn load_config_from_str ]
 
-===[ enum ConfigError ]
-
-==[ Functions ]
-
-===[ fn load_config_from_file ]
-
-===[ fn load_config_from_str ]
-
-===[ fn config_for ]
+====[ fn config_for ]
 
 The config that governs `path`, for a tool about to act on `src`.
 
@@ -62,14 +58,85 @@ because that file's position is what says where the vault begins.
 With no vault to find, the document's own `@config` is used, and
 failing that the defaults.
 
-This exists so there is one answer to the question. There were two:
-the LSP resolved a config before formatting and `tomet format` did
-not, so a file the editor wrote on save was a file `format --check`
-rejected -- with `table.adjust_width`, `max_col_width` and
-`always_newline` all live in this repository's own config, the two
-disagreed on real documents.
-
-===[ fn find_config_file ]
+====[ fn find_config_file ]
 
 Searches `start` and its parent directories for `default.config.tmt` or `tomet.config.tmt`.
-Returns `(PrinterConfig, config_file_path, config_directory_path)`.
+Returns `(Config, config_file_path, config_directory_path)`.
+
+==[ Module format ]
+
+Formatting and printer rule configuration ([`FormatConfig`], [`GroupOrder`]).
+
+===[ Structs ]
+
+====[ struct FormatConfig ]
+
+===[ Enums ]
+
+====[ enum GroupOrder ]
+
+==[ Module macros ]
+
+Macro template definitions ([`MacrosConfig`]).
+
+===[ Structs ]
+
+====[ struct MacrosConfig ]
+
+==[ Module meta ]
+
+Metadata styling rules and per-field constraints ([`MetaConfig`], [`FieldConfig`]).
+
+===[ Structs ]
+
+====[ struct FieldConfig ]
+
+====[ struct MetaConfig ]
+
+==[ Module registry ]
+
+Blueprint and vocabulary file registry declarations ([`RegistryConfig`]).
+
+===[ Structs ]
+
+====[ struct RegistryConfig ]
+
+==[ Module tree ]
+
+AST tree normalization and path-based lookup utilities for configuration.
+
+===[ Functions ]
+
+====[ fn get_path ]
+
+Traverses nested `Value::Map` nodes along `path`, returning the referenced value if found.
+
+====[ fn collect_paths ]
+
+Reads a declared list of paths. A single string is accepted as a
+one-element list shorthand.
+
+====[ fn merge_entry ]
+
+Recursively merges `key` and `value` into `target`, normalizing dotted keys
+into hierarchical `Value::Map` entries while preserving flat keys for `meta` and `macros`.
+
+==[ Module workspace ]
+
+Workspace-level configuration ([`WorkspaceConfig`]).
+
+===[ Structs ]
+
+====[ struct WorkspaceConfig ]
+
+==[ Structs ]
+
+===[ struct Config ]
+
+Full Tomet document / vault configuration.
+
+==[ Type Aliases ]
+
+===[ type PrinterConfig ]
+
+Type alias for backward compatibility with earlier code referencing `PrinterConfig`.

@@ -22,7 +22,7 @@ use tomet_style::{quote_scalar_string, render_nested, render_value};
 use tomet_tree::element_new;
 
 pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig) {
-    let Some(id_cfg) = config.meta_fields.get("id") else {
+    let Some(id_cfg) = config.meta.fields.get("id") else {
         return;
     };
     if id_cfg.field_type.is_none() {
@@ -156,7 +156,7 @@ fn render_section(sec: &Section, config: &PrinterConfig, out: &mut String) {
     let level = sec.level.max(1);
     out.push_str(&"=".repeat(level));
     if !sec.title.is_empty() {
-        if config.heading_space_inside_brackets {
+        if config.format.heading_space_inside_brackets {
             out.push_str("[ ");
             out.push_str(&render_inlines(&sec.title, config));
             out.push_str(" ]");
@@ -200,7 +200,7 @@ fn render_heading_element(el: &Element, config: &PrinterConfig, out: &mut String
     let level = heading_level(el).unwrap_or(1) as usize;
     let content = el.content.as_deref().unwrap_or(&[]);
     out.push_str(&"#".repeat(level));
-    if config.heading_space_inside_brackets {
+    if config.format.heading_space_inside_brackets {
         out.push_str("[ ");
         out.push_str(&render_content_blocks(content, config));
         out.push_str(" ]");
@@ -269,8 +269,12 @@ fn render_list_with_indent(list: &List, indent: usize, config: &PrinterConfig, o
             _ => None,
         };
 
-        if lines.len() > 1 && config.list_multiline_style_content.is_some() {
-            let style = config.list_multiline_style_content.as_deref().unwrap();
+        if lines.len() > 1 && config.format.list_multiline_style_content.is_some() {
+            let style = config
+                .format
+                .list_multiline_style_content
+                .as_deref()
+                .unwrap();
             let prefix_width = head_prefix.chars().count();
             let pad = " ".repeat(prefix_width + 2);
 
@@ -604,7 +608,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     }
 
     if el.sigil.is_bare_named("callout")
-        && let Some(style) = config.callout_content_style.as_deref()
+        && let Some(style) = config.format.callout_content_style.as_deref()
     {
         if style == "expanded" {
             let mut out = String::from("@callout");
@@ -988,14 +992,17 @@ fn value_to_json(val: &Value) -> serde_json::Value {
 mod tests {
     use super::*;
     use tomet_ast::Paragraph;
-    use tomet_config::{FieldConfig, load_config_from_str};
+    use tomet_config::{FieldConfig, FormatConfig, MetaConfig, load_config_from_str};
     use tomet_style::render_value_inner;
 
     #[test]
     fn test_printer_config_space_inside_brackets() {
         let doc = tomet_parser::parse_document("=[Title]\n").unwrap();
         let cfg = PrinterConfig {
-            heading_space_inside_brackets: true,
+            format: FormatConfig {
+                heading_space_inside_brackets: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc, &cfg);
@@ -1077,7 +1084,10 @@ mod tests {
         let doc =
             tomet_parser::parse_document("@callout(info)[x]:rule(allow: list(card))\n").unwrap();
         let cfg = PrinterConfig {
-            callout_content_style: Some("block".to_string()),
+            format: FormatConfig {
+                callout_content_style: Some("block".to_string()),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc, &cfg);
@@ -1092,7 +1102,10 @@ mod tests {
         let md = "---\ntitle: Hello\n---\n\n# World\n";
         let doc = tomet_markdown::from_markdown(md);
         let cfg = PrinterConfig {
-            meta_format: Some("yaml".to_string()),
+            meta: MetaConfig {
+                format: Some("yaml".to_string()),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc, &cfg);
@@ -1104,7 +1117,10 @@ mod tests {
         let md = "---\nmodified: 2026-06-17T05:52:44\n---\n\n# Document\n";
         let doc = tomet_markdown::from_markdown(md);
         let cfg = PrinterConfig {
-            meta_format: Some("yaml".to_string()),
+            meta: MetaConfig {
+                format: Some("yaml".to_string()),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc, &cfg);
@@ -1153,8 +1169,11 @@ mod tests {
         );
 
         let cfg = PrinterConfig {
-            meta_format: Some("yaml".to_string()),
-            meta_fields,
+            meta: MetaConfig {
+                format: Some("yaml".to_string()),
+                fields: meta_fields,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -1187,8 +1206,11 @@ mod tests {
         );
 
         let cfg = PrinterConfig {
-            meta_format: Some("yaml".to_string()),
-            meta_fields,
+            meta: MetaConfig {
+                format: Some("yaml".to_string()),
+                fields: meta_fields,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -1203,7 +1225,10 @@ mod tests {
         let md = "---\ntitle:\n---\n\n# Document\n";
         let doc = tomet_markdown::from_markdown(md);
         let cfg = PrinterConfig {
-            meta_format: Some("yaml".to_string()),
+            meta: MetaConfig {
+                format: Some("yaml".to_string()),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc, &cfg);
@@ -1223,7 +1248,10 @@ mod tests {
         assert!(printed_default.contains("@link(target: \"ref:target\")[display]"));
 
         let cfg_no_space = PrinterConfig {
-            link_no_space: true,
+            format: FormatConfig {
+                link_no_space: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed_no_space = document_to_tm_with_config(&doc, &cfg_no_space);
@@ -1246,7 +1274,7 @@ mod tests {
 +++
 "#;
         let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
-        let id_cfg = cfg.meta_fields.get("id").expect("id config present");
+        let id_cfg = cfg.meta.fields.get("id").expect("id config present");
         assert_eq!(id_cfg.field_type.as_deref(), Some("nanoid"));
         assert_eq!(id_cfg.length, Some(8));
         assert_eq!(id_cfg.prefix.as_deref(), Some("doc-"));
@@ -1279,7 +1307,7 @@ mod tests {
 +++
 "#;
         let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
-        let id_cfg = cfg.meta_fields.get("id").unwrap();
+        let id_cfg = cfg.meta.fields.get("id").unwrap();
         assert_eq!(id_cfg.force, Some(true));
         assert_eq!(id_cfg.overwrite, Some(true));
 
@@ -1300,17 +1328,20 @@ mod tests {
 
         // Case 3: When force: true and overwrite: false, invalid existing ID is preserved
         let cfg_no_overwrite = PrinterConfig {
-            meta_fields: std::collections::BTreeMap::from([(
-                "id".to_string(),
-                FieldConfig {
-                    field_type: Some("nanoid".to_string()),
-                    length: Some(8),
-                    prefix: Some("doc-".to_string()),
-                    force: Some(true),
-                    overwrite: Some(false),
-                    ..Default::default()
-                },
-            )]),
+            meta: MetaConfig {
+                fields: std::collections::BTreeMap::from([(
+                    "id".to_string(),
+                    FieldConfig {
+                        field_type: Some("nanoid".to_string()),
+                        length: Some(8),
+                        prefix: Some("doc-".to_string()),
+                        force: Some(true),
+                        overwrite: Some(false),
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let mut doc3 = tomet_markdown::from_markdown(md2);
@@ -1342,7 +1373,10 @@ mod tests {
 
         // Test "block" style
         let cfg_block = PrinterConfig {
-            callout_content_style: Some("block".to_string()),
+            format: FormatConfig {
+                callout_content_style: Some("block".to_string()),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed_block = document_to_tm_with_config(&doc, &cfg_block);
@@ -1350,7 +1384,10 @@ mod tests {
 
         // Test "box" style
         let cfg_box = PrinterConfig {
-            callout_content_style: Some("box".to_string()),
+            format: FormatConfig {
+                callout_content_style: Some("box".to_string()),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed_box = document_to_tm_with_config(&doc, &cfg_box);
@@ -1358,7 +1395,10 @@ mod tests {
 
         // Test "expanded" style
         let cfg_expanded = PrinterConfig {
-            callout_content_style: Some("expanded".to_string()),
+            format: FormatConfig {
+                callout_content_style: Some("expanded".to_string()),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed_expanded = document_to_tm_with_config(&doc, &cfg_expanded);
@@ -1371,14 +1411,20 @@ mod tests {
         let doc = tomet_markdown::from_markdown(md);
 
         let cfg_box = PrinterConfig {
-            list_multiline_style_content: Some("box".to_string()),
+            format: FormatConfig {
+                list_multiline_style_content: Some("box".to_string()),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed_box = document_to_tm_with_config(&doc, &cfg_box);
         assert!(printed_box.contains("-. [ いや、まずこういう話をするときの前提として、\n     Vtuberでくくってるやつがまず、ゴミだ。\n     確実に脳が言っている割合が高い。イメージだけで物事を語る。それってあなたの間奏ですよね。 ]"));
 
         let cfg_block = PrinterConfig {
-            list_multiline_style_content: Some("block".to_string()),
+            format: FormatConfig {
+                list_multiline_style_content: Some("block".to_string()),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed_block = document_to_tm_with_config(&doc, &cfg_block);
@@ -1390,7 +1436,10 @@ mod tests {
         let md_callout = "> [!info] Single Line\n> 一行テキスト\n";
         let doc_callout = tomet_markdown::from_markdown(md_callout);
         let cfg = PrinterConfig {
-            callout_content_style: Some("block".to_string()),
+            format: FormatConfig {
+                callout_content_style: Some("block".to_string()),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc_callout, &cfg);
@@ -1407,7 +1456,10 @@ mod tests {
         assert!(printed_default.contains("@link(target: \"https://google.com\")[Google]"));
 
         let cfg_nospace = PrinterConfig {
-            link_no_space: true,
+            format: FormatConfig {
+                link_no_space: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed_nospace = document_to_tm_with_config(&doc, &cfg_nospace);
@@ -1504,13 +1556,16 @@ mod tests {
         let doc = Document::new(vec![Block::Element(el)], tomet_ast::Span::dummy());
 
         let mut config = PrinterConfig {
-            group_order: Some(GroupOrder::ContentFirst),
+            format: tomet_config::FormatConfig {
+                group_order: Some(GroupOrder::ContentFirst),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed = document_to_tm_with_config(&doc, &config);
         assert_eq!(printed.trim(), "@link[Example](\"https://example.com\")");
 
-        config.group_order = Some(GroupOrder::ArgsFirst);
+        config.format.group_order = Some(GroupOrder::ArgsFirst);
         let printed_args_first = document_to_tm_with_config(&doc, &config);
         assert_eq!(
             printed_args_first.trim(),
@@ -1518,7 +1573,10 @@ mod tests {
         );
 
         let config_link_only = PrinterConfig {
-            link_group_order: Some(GroupOrder::ContentFirst),
+            format: tomet_config::FormatConfig {
+                link_group_order: Some(GroupOrder::ContentFirst),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let printed_link_only = document_to_tm_with_config(&doc, &config_link_only);

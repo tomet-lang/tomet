@@ -107,31 +107,37 @@ fn config_fixtures_load() {
     // `tomet-config`; the fixtures are local to this package now.
     let cfg = tomet_config::load_config_from_file(&fixtures_dir().join("test.config.tmt"))
         .expect("failed to load test.config.tmt");
-    assert_eq!(cfg.meta_format.as_deref(), Some("yaml"));
-    assert!(cfg.meta_always_newline);
-    assert!(cfg.meta_fields.get("aliases").unwrap().always_newline);
+    assert_eq!(cfg.meta.format.as_deref(), Some("yaml"));
+    assert!(cfg.meta.always_newline);
+    assert!(cfg.meta.fields.get("aliases").unwrap().always_newline);
     assert_eq!(
-        cfg.meta_fields.get("created").unwrap().format.as_deref(),
+        cfg.meta.fields.get("created").unwrap().format.as_deref(),
         Some("rfc3339")
     );
     assert_eq!(
-        cfg.meta_fields.get("created").unwrap().offset.as_deref(),
+        cfg.meta.fields.get("created").unwrap().offset.as_deref(),
         Some("+09:00")
     );
-    assert!(cfg.link_no_space);
-    assert_eq!(cfg.callout_content_style.as_deref(), Some("block"));
-    assert_eq!(cfg.list_multiline_style_content.as_deref(), Some("box"));
+    assert!(cfg.format.link_no_space);
+    assert_eq!(cfg.format.callout_content_style.as_deref(), Some("block"));
     assert_eq!(
-        cfg.ignore_files,
+        cfg.format.list_multiline_style_content.as_deref(),
+        Some("box")
+    );
+    assert_eq!(
+        cfg.workspace.ignore,
         vec!["00-09 System/01 Apps/obsidian".to_string()]
     );
 
     let default_cfg =
         tomet_config::load_config_from_file(&fixtures_dir().join("default.config.tmt"))
             .expect("failed to load default.config.tmt");
-    assert_eq!(default_cfg.callout_content_style.as_deref(), Some("block"));
     assert_eq!(
-        default_cfg.list_multiline_style_content.as_deref(),
+        default_cfg.format.callout_content_style.as_deref(),
+        Some("block")
+    );
+    assert_eq!(
+        default_cfg.format.list_multiline_style_content.as_deref(),
         Some("box")
     );
 }

@@ -126,7 +126,7 @@ impl Vault {
                 (PrinterConfig::default(), root)
             });
 
-        let loaded = load_vocabularies(&root, &config.vocabularies);
+        let loaded = load_vocabularies(&root, &config.registry.vocabularies);
         Self {
             core: tomet_vault::Vault::new(config, root, loaded),
             index: OnceLock::new(),

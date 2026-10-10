@@ -98,7 +98,7 @@ pub fn refactor_source(
 
     let mut effective_config = config.clone();
     if options.meta_to_value_dsl {
-        effective_config.meta_format = None;
+        effective_config.meta.format = None;
     }
 
     let rendered = document_to_tm_with_config(&doc, &effective_config);
@@ -143,8 +143,8 @@ pub fn refactor_workspace(
     let mut report = RefactorReport::default();
 
     if options.force {
-        config.ignore_files.clear();
-        config.unswept_files.clear();
+        config.workspace.ignore.clear();
+        config.workspace.unswept.clear();
     }
 
     let files = if target_path.is_file() {

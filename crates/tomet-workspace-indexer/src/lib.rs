@@ -128,8 +128,8 @@ pub fn is_path_ignored(path: &Path, root: Option<&Path>, ignore_patterns: &[Stri
 /// Reference resolution asks only the first, which is why a document can
 /// name `tests/fixtures` and cannot name a path outside the vault.
 pub fn is_path_unswept(p: &Path, config_root: Option<&Path>, config: &PrinterConfig) -> bool {
-    is_path_ignored(p, config_root, &config.ignore_files)
-        || is_path_ignored(p, config_root, &config.unswept_files)
+    is_path_ignored(p, config_root, &config.workspace.ignore)
+        || is_path_ignored(p, config_root, &config.workspace.unswept)
 }
 
 /// Whether the sweep would leave `path` alone under `config`, judged the
@@ -227,7 +227,7 @@ pub fn collect_all_paths_with_config(
             // therefore fine. Asking both here is what made
             // `@dir(tests/fixtures)` report broken while the directory
             // sat committed in the repository.
-            if is_path_ignored(p, Some(config_root), &config.ignore_files) {
+            if is_path_ignored(p, Some(config_root), &config.workspace.ignore) {
                 continue;
             }
             paths.insert(p.to_path_buf());
@@ -432,7 +432,7 @@ mod tests {
         assert!(is_path_ignored(
             &ignored_file,
             Some(root),
-            &cfg.ignore_files
+            &cfg.workspace.ignore
         ));
     }
 
@@ -470,8 +470,10 @@ mod unswept_tests {
 
     fn config(ignore: &[&str], unswept: &[&str]) -> PrinterConfig {
         PrinterConfig {
-            ignore_files: ignore.iter().map(|s| s.to_string()).collect(),
-            unswept_files: unswept.iter().map(|s| s.to_string()).collect(),
+            workspace: tomet_config::WorkspaceConfig {
+                ignore: ignore.iter().map(|s| s.to_string()).collect(),
+                unswept: unswept.iter().map(|s| s.to_string()).collect(),
+            },
             ..PrinterConfig::default()
         }
     }
@@ -500,11 +502,11 @@ mod unswept_tests {
         );
 
         assert!(
-            !is_path_ignored(frozen, Some(root), &cfg.ignore_files),
+            !is_path_ignored(frozen, Some(root), &cfg.workspace.ignore),
             "frozen is still referable"
         );
         assert!(
-            is_path_ignored(foreign, Some(root), &cfg.ignore_files),
+            is_path_ignored(foreign, Some(root), &cfg.workspace.ignore),
             "foreign is not referable"
         );
     }

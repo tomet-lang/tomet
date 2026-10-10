@@ -73,6 +73,7 @@ pub fn new_cmd(
 mod tests {
     use super::*;
     use std::fs;
+    use tomet_config::RegistryConfig;
 
     #[test]
     fn test_new_cmd_execution() {
@@ -90,7 +91,10 @@ mod tests {
         .unwrap();
 
         let cfg = PrinterConfig {
-            blueprints: vec![".tomet/blueprints/rfc.blueprint.tmt".to_string()],
+            registry: RegistryConfig {
+                blueprints: vec![".tomet/blueprints/rfc.blueprint.tmt".to_string()],
+                ..Default::default()
+            },
             ..PrinterConfig::default()
         };
 

@@ -38,8 +38,8 @@ fn collect_dir(dir: &Path, force: bool) -> Vec<PathBuf> {
             dir.to_path_buf(),
         )
     });
-    config.ignore_files.clear();
-    config.unswept_files.clear();
+    config.workspace.ignore.clear();
+    config.workspace.unswept.clear();
     tomet_indexer::collect_tm_files_with_config(dir, &config, &root)
 }
 
