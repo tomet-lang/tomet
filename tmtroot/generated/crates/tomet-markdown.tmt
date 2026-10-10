@@ -16,13 +16,13 @@ and standard markup.
 
 ==[ Key Functions ]
 
-- `from_markdown` CommonMark text into a Tomet [`tomet_ast::Document`].:Parses
-- `from_markdown_with_options` CommonMark text using custom [`ImportOptions`].:Parses
-- `to_markdown` a Tomet [`tomet_ast::Document`] into clean CommonMark text.:Converts
+- (from_markdown) Parses CommonMark text into a Tomet [`tomet_ast::Document`].
+- (from_markdown_with_options) Parses CommonMark text using custom [`ImportOptions`].
+- (to_markdown) Converts a Tomet [`tomet_ast::Document`] into clean CommonMark text.
 
 ==[ Key Types ]
 
-- `ImportOptions` controlling frontmatter and extension parsing.:Options
+- (ImportOptions) Options controlling frontmatter and extension parsing.
 
 Known-lossy cases are documented where they are implemented: `import`'s module
 doc for Markdown -> Tomet, `export`'s for the other direction.

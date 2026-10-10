@@ -51,7 +51,3 @@ yet hit by any of this crate's own tests.
 reference, but nothing on the producing side emits a matching
 label yet -- no element carries its own id as Typst label output.
 A known gap, pending the real element-id design.
-
-==[ Functions ]
-
-===[ fn to_typst ]

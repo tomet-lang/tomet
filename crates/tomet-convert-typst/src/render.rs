@@ -1,0 +1,730 @@
+//! Typst document rendering logic.
+
+use std::cell::RefCell;
+use std::collections::HashSet;
+
+use tomet_ast::{
+    Block, Document, Element, ElementValue, Inline, List, Placement, Section, Sigil, Value,
+};
+use tomet_semantics::{
+    FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
+    is_directive, link_target, normalized_element_args, parse_table_rows, path_target,
+    target_scheme,
+};
+
+pub(crate) struct TypstCtx<'a> {
+    pub(crate) footnotes: &'a FootnoteRegistry,
+    pub(crate) rendered_footnotes: RefCell<HashSet<usize>>,
+}
+
+pub fn to_typst(doc: &Document) -> String {
+    let footnotes = FootnoteRegistry::from_document(doc);
+    let cx = TypstCtx {
+        footnotes: &footnotes,
+        rendered_footnotes: RefCell::new(HashSet::new()),
+    };
+    let mut out = String::new();
+    for block in &doc.blocks {
+        render_block(&cx, block, &mut out);
+    }
+    render_leftover_footnotes(&cx, &mut out);
+    out
+}
+
+fn render_leftover_footnotes(cx: &TypstCtx, out: &mut String) {
+    for item in &cx.footnotes.items {
+        if cx.rendered_footnotes.borrow_mut().insert(item.index) {
+            let mut def_text = String::new();
+            if let Some(def_el) = &item.definition
+                && let Some(content) = &def_el.content
+            {
+                def_text.push_str(&blocks_to_typst(cx, content));
+            }
+            if !def_text.is_empty() {
+                out.push_str(&format!("#footnote[{def_text}]\n\n"));
+            }
+        }
+    }
+}
+
+fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
+    match block {
+        Block::Paragraph(p) => {
+            // Same reasoning as `tomet-convert-markdown`'s `render_block`:
+            // an all-invisible-element paragraph (e.g. adjacent
+            // `@meta(...)` lines with no blank line between them) must
+            // not leave a stray blank paragraph behind.
+            let text = inline_to_typst(cx, &p.content);
+            if !text.trim().is_empty() {
+                out.push_str(&text);
+                out.push_str("\n\n");
+            }
+        }
+        Block::Element(el) => {
+            let text = element_to_typst(cx, el, false);
+            if !text.is_empty() {
+                out.push_str(&text);
+                out.push_str("\n\n");
+            }
+        }
+        Block::Section(sec) => render_section(cx, sec, out),
+        Block::List(list) => render_list(cx, list, out),
+    }
+}
+
+fn render_section(cx: &TypstCtx, sec: &Section, out: &mut String) {
+    if !sec.title.is_empty() {
+        let marker = "=".repeat(sec.level.max(1));
+        let title = inline_to_typst(cx, &sec.title);
+        out.push_str(&marker);
+        out.push(' ');
+        out.push_str(&title);
+        out.push_str("\n\n");
+    }
+    for child in &sec.blocks {
+        render_block(cx, child, out);
+    }
+}
+
+fn render_list(cx: &TypstCtx, list: &List, out: &mut String) {
+    render_list_with_indent(cx, list, 0, out);
+    out.push('\n');
+}
+
+fn render_list_with_indent(cx: &TypstCtx, list: &List, indent: usize, out: &mut String) {
+    let ordered = list.ordered;
+    let indent_str = "  ".repeat(indent);
+    for (i, list_item) in list.items.iter().enumerate() {
+        let item = &list_item.element;
+        out.push_str(&indent_str);
+        let marker = if ordered {
+            format!("{}. ", i + 1)
+        } else {
+            "- ".to_string()
+        };
+        out.push_str(&marker);
+        if matches!(item.sigil, Sigil::Named(_)) {
+            // The combine notation (`-@name(...)`): no Typst markup
+            // marker has an equivalent, so this falls back to the same
+            // generic element rendering a standalone one would use.
+            out.push_str(&element_to_typst(cx, item, true));
+        } else {
+            // `args` (the `(...)` marker `Value`) has no Typst markup
+            // equivalent -- dropped on export, same as this crate's
+            // other documented lossy cases (see the module doc).
+            out.push_str(&blocks_to_typst(cx, item.content.as_deref().unwrap_or(&[])));
+        }
+        out.push('\n');
+        if let Some(sub) = &list_item.sublist {
+            render_list_with_indent(cx, sub, indent + 1, out);
+        }
+    }
+}
+
+/// `Element.content` (`Vec<Block>`) to Typst. The common case -- exactly
+/// one plain paragraph, what ordinary inline usage always parses to --
+/// delegates straight to `inline_to_typst` on that paragraph's own
+/// content; anything else falls back to `render_block` per block.
+fn blocks_to_typst(cx: &TypstCtx, blocks: &[Block]) -> String {
+    if let [Block::Paragraph(p)] = blocks {
+        return inline_to_typst(cx, &p.content);
+    }
+    let mut out = String::new();
+    for block in blocks {
+        render_block(cx, block, &mut out);
+    }
+    out
+}
+
+fn inline_to_typst(cx: &TypstCtx, inlines: &[Inline]) -> String {
+    let mut out = String::new();
+    for (idx, inline) in inlines.iter().enumerate() {
+        match inline {
+            Inline::Text(t) => out.push_str(&escape_text(&t.value)),
+            Inline::Raw(t) => out.push_str(&escape_text(&t.value)),
+            Inline::SoftBreak(_) => {
+                let before = out.chars().last();
+                let after = inlines.get(idx + 1).and_then(Inline::first_char);
+                out.push_str(tomet_ast::softbreak_join(before, after));
+            }
+            Inline::LineBreak(_) => out.push_str("\\\n"),
+            Inline::Element(el) => out.push_str(&element_to_typst(cx, el, true)),
+        }
+    }
+    out
+}
+
+fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
+    let kind = classify_std_lenient(el);
+    match kind.as_str() {
+        // Directives -- see `tomet_semantics::is_directive`.
+        _ if is_directive(&kind) => String::new(),
+        // Block-position only, mirroring `tomet-convert-markdown`'s
+        // heading handling -- a nested/inline `@heading(...)`
+        // (`inline == true`) falls through to the generic fallback
+        // instead of emitting a bare `= text` mid-paragraph (which
+        // wouldn't parse back as a heading anyway).
+        "heading" if !inline => render_heading(cx, el),
+        "hr" => render_hr(cx, el),
+        "em" => format!("_{}_", content_to_typst(cx, el)),
+        "strong" => format!("*{}*", content_to_typst(cx, el)),
+        "mark" => format!("#highlight[{}]", content_to_typst(cx, el)),
+        "strikeout" => format!("#strike[{}]", content_to_typst(cx, el)),
+        "ruby" => render_ruby(cx, el),
+        "raw" => render_raw(el, inline),
+        "quote" => render_quote(cx, el, inline),
+        "callout" => render_callout(cx, el),
+        "conflict" => render_conflict(cx, el),
+        "table" => render_table(cx, el),
+        "link" => render_link(cx, el),
+        "file" | "dir" => render_path(cx, el, inline),
+        "embed" => render_embed(el),
+        "footnote" => {
+            if inline || el.placement == Placement::Inline {
+                if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
+                    render_footnote_ref_or_def(cx, idx, el.content.as_deref())
+                } else if let Some(content) = &el.content {
+                    let text = blocks_to_typst(cx, content);
+                    format!("#footnote[{text}]")
+                } else {
+                    String::new()
+                }
+            } else {
+                // Block footnote definition: will be rendered at caret pin location or leftover
+                String::new()
+            }
+        }
+        "caret" => {
+            if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
+                render_footnote_ref_or_def(cx, idx, None)
+            } else {
+                String::new()
+            }
+        }
+        "tag" => render_tag(el),
+        "interp" => render_interp(el),
+        _ => render_generic(cx, el, kind.as_str(), inline),
+    }
+}
+
+fn render_footnote_ref_or_def(
+    cx: &TypstCtx,
+    idx: usize,
+    inline_content: Option<&[Block]>,
+) -> String {
+    let item = cx.footnotes.items.iter().find(|it| it.index == idx);
+    let Some(item) = item else {
+        return String::new();
+    };
+
+    let is_first = cx.rendered_footnotes.borrow_mut().insert(idx);
+    if is_first {
+        let mut def_text = String::new();
+        if let Some(content) = inline_content {
+            def_text = blocks_to_typst(cx, content);
+        } else if let Some(def_el) = &item.definition
+            && let Some(content) = &def_el.content
+        {
+            def_text = blocks_to_typst(cx, content);
+        }
+        let label = item
+            .id
+            .as_deref()
+            .map(|id| format!("fn-{id}"))
+            .unwrap_or_else(|| format!("fn-{}", item.index));
+        if item.backlinks.len() > 1 {
+            format!("#footnote[{def_text}] <{label}>")
+        } else {
+            format!("#footnote[{def_text}]")
+        }
+    } else {
+        let label = item
+            .id
+            .as_deref()
+            .map(|id| format!("fn-{id}"))
+            .unwrap_or_else(|| format!("fn-{}", item.index));
+        format!("#footnote(<{label}>)")
+    }
+}
+
+fn render_tag(el: &Element) -> String {
+    let tags = extract_tags(el);
+    if tags.is_empty() {
+        return String::new();
+    }
+    let boxes: Vec<String> = tags
+        .into_iter()
+        .map(|t| {
+            let label = t.strip_prefix('#').unwrap_or(&t);
+            let escaped = escape_text(label);
+            format!("#box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#{escaped}]")
+        })
+        .collect();
+    boxes.join(" ")
+}
+
+fn render_heading(cx: &TypstCtx, el: &Element) -> String {
+    let level = heading_level(el).unwrap_or(1) as usize;
+    let content = el.content.as_deref().unwrap_or(&[]);
+    format!("{} {}", "=".repeat(level), blocks_to_typst(cx, content))
+}
+
+/// A bare `---` break renders as a full-width rule; a titled one
+/// (`---[ Title ]---`) has no single-construct Typst equivalent, so it's
+/// lossy: the title text on its own line followed by the rule.
+fn render_hr(cx: &TypstCtx, el: &Element) -> String {
+    match &el.content {
+        Some(title) if !title.is_empty() => {
+            format!("{}\n#line(length: 100%)", blocks_to_typst(cx, title))
+        }
+        _ => "#line(length: 100%)".to_string(),
+    }
+}
+
+/// Typst has no bare `>` markup shorthand; `#quote` is the built-in
+/// function, and its own `block:` parameter is exactly the distinction
+/// Tomet draws by position.
+fn render_quote(cx: &TypstCtx, el: &Element, inline: bool) -> String {
+    if inline {
+        return format!("#quote[{}]", content_to_typst(cx, el));
+    }
+    format!("#quote(block: true)[{}]", content_to_typst(cx, el))
+}
+
+/// No dedicated `callout` `ElementKind` exists (it classifies as
+/// `Custom("callout")`, same as `tomet-convert-markdown`'s `render_callout`
+/// -- see that crate's `element_to_md` for the precedent this mirrors).
+/// Typst has no built-in admonition/callout construct, so this renders a
+/// plain bordered block with a bold `[variant] title` header line -- a
+/// first-pass approximation, not a byte-for-byte callout package match.
+fn render_callout(cx: &TypstCtx, el: &Element) -> String {
+    let (variant, title) = callout_variant_and_title(el);
+    let body = content_to_typst(cx, el);
+    let header = match title {
+        Some(t) => format!("*[{variant}] {t}*"),
+        None => format!("*[{variant}]*"),
+    };
+    format!("#block(inset: 8pt, stroke: (left: 2pt))[{header}\n\n{body}]")
+}
+
+/// `@conflict(a: ..., b: ...)` -- both sides rendered, clearly marked as
+/// unresolved, rather than the generic fallback's dropped-args behavior
+/// (`a`/`b` are block content, which the generic path can't carry at
+/// all -- `render_generic` only ever reads `el.content`, and `@conflict`
+/// has none). Showing both: picking one side here would make `tomet
+/// check`'s own `Diagnostic::Conflict` warning pointless the moment
+/// someone exports.
+fn render_conflict(cx: &TypstCtx, el: &Element) -> String {
+    let (a, b) = conflict_sides(el);
+    let a_body = blocks_to_typst(cx, &a);
+    let b_body = blocks_to_typst(cx, &b);
+    format!(
+        "#block(inset: 8pt, stroke: (left: 2pt, paint: red))[*unresolved conflict*\n\n\
+         *a:*\n{a_body}\n\n*b:*\n{b_body}]"
+    )
+}
+
+/// Reads `a`/`b` out of `el`'s `(args)` -- block content
+/// (`Value::Blocks`), not a scalar.
+fn conflict_sides(el: &Element) -> (Vec<Block>, Vec<Block>) {
+    let args = normalized_element_args(el);
+    let map = args.as_ref().and_then(as_map);
+    let side = |key: &str| -> Vec<Block> {
+        match map.and_then(|m| map_get(m, key)) {
+            Some(Value::Blocks(blocks)) => blocks.clone(),
+            _ => Vec::new(),
+        }
+    };
+    (side("a"), side("b"))
+}
+
+fn callout_variant_and_title(el: &Element) -> (String, Option<String>) {
+    let mut variant = None;
+    let mut title = None;
+
+    if let Some(args) = &el.args {
+        match args {
+            Value::String(s) => variant = Some(s.clone()),
+            Value::Map(entries) => {
+                for (k, v) in entries {
+                    if k == "variant" {
+                        if let Value::String(s) = v {
+                            variant = Some(s.clone());
+                        }
+                    } else if k == "title"
+                        && let Value::String(s) = v
+                    {
+                        title = Some(s.clone());
+                    }
+                }
+                if variant.is_none()
+                    && !entries.is_empty()
+                    && let Value::String(s) = &entries[0].1
+                {
+                    variant = Some(s.clone());
+                }
+            }
+            Value::Seq(items) => {
+                if let Some(Value::String(s)) = items.first() {
+                    variant = Some(s.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    (variant.unwrap_or_else(|| "note".to_string()), title)
+}
+
+/// `<raw>(lang:xxx)[code]` -- Typst uses the same triple-backtick
+/// raw-block fence syntax as CommonMark for blocks, and single backticks
+/// or `#raw(...)` for inlines. Reads `lang` via `normalized_element_args`
+/// (not raw `el.args`) so a positional lang arg (`<raw>("rust")[...]`)
+/// resolves the same as a named `lang:rust` one.
+fn render_raw(el: &Element, inline: bool) -> String {
+    let args = normalized_element_args(el);
+    let lang = args
+        .as_ref()
+        .and_then(as_map)
+        .and_then(|m| map_get(m, "lang"))
+        .map(value_to_plain)
+        .unwrap_or_default();
+    let code = el
+        .content
+        .as_ref()
+        .map(|a| blocks_to_plain(a))
+        .unwrap_or_default();
+    if inline {
+        if lang.is_empty() && !code.contains('`') {
+            format!("`{code}`")
+        } else if lang.is_empty() {
+            format!("#raw({code:?})")
+        } else {
+            format!("#raw({code:?}, lang: {lang:?})")
+        }
+    } else {
+        let fence = fence_for(&code);
+        format!("{fence}{lang}\n{code}\n{fence}")
+    }
+}
+
+fn fence_for(code: &str) -> String {
+    let longest_run = code
+        .split(|c: char| c != '`')
+        .map(|run| run.len())
+        .max()
+        .unwrap_or(0);
+    "`".repeat((longest_run + 1).max(3))
+}
+
+/// `@table()[...]` -> Typst's `#table(...)` function call. Row 0 is
+/// treated as a header (its cells bolded) unless `header:false` is set,
+/// same default/opt-out convention `tomet-convert-html`'s
+/// `render_table_element` uses for its `<thead>` split.
+fn render_table(cx: &TypstCtx, el: &Element) -> String {
+    let inlines = match &el.content {
+        Some(content) => content,
+        None => return String::new(),
+    };
+    let rows = parse_table_rows(inlines);
+    if rows.is_empty() {
+        return String::new();
+    }
+
+    let mut col_count = 0;
+    for row in &rows {
+        col_count = col_count.max(row.cells.len());
+    }
+    if col_count == 0 {
+        return String::new();
+    }
+
+    let args = normalized_element_args(el);
+    let has_header = args
+        .as_ref()
+        .and_then(as_map)
+        .and_then(|m| map_get(m, "header"))
+        .map(|v| match v {
+            Value::Bool(b) => *b,
+            _ => true,
+        })
+        .unwrap_or(true);
+
+    let mut lines = Vec::new();
+    for (ri, row) in rows.iter().enumerate() {
+        let mut cells = Vec::new();
+        for ci in 0..col_count {
+            let text = if ci < row.cells.len() {
+                inline_to_typst(cx, &row.cells[ci].content)
+            } else {
+                String::new()
+            };
+            let text = if ri == 0 && has_header {
+                format!("*{text}*")
+            } else {
+                text
+            };
+            cells.push(format!("[{text}]"));
+        }
+        lines.push(format!("  {},", cells.join(", ")));
+    }
+
+    format!("#table(\n  columns: {col_count},\n{}\n)", lines.join("\n"))
+}
+
+/// `@link(target:..)` -- the target string's own scheme prefix (see
+/// `tomet_semantics::target_scheme`) decides which shape it exports as:
+/// a same-document label reference (`id:`, emitted as a bare `<id>`
+/// Typst label -- see this module's doc comment for the matching-label
+/// gap) or a plain `#link("target")[text]` for everything else (Typst
+/// has no separate wikilink-style shorthand for `ref:` targets, so
+/// those fall into the same general case). The scheme prefix itself is
+/// stripped before rendering -- it's addressing metadata, not part of
+/// the visible target.
+/// `@file(x)`/`@dir(x)` -> Typst raw text, the same shape CommonMark
+/// gets. A path is named, not navigated to, so there is no `#link` here.
+fn render_path(cx: &TypstCtx, el: &Element, inline: bool) -> String {
+    let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
+    let content = match &el.content {
+        Some(content) if !content.is_empty() => Some(blocks_to_typst(cx, content)),
+        _ => None,
+    };
+    if inline {
+        return format!("`{}`", content.unwrap_or(path));
+    }
+    match content {
+        Some(content) => format!("`{path}` {content}"),
+        None => format!("`{path}`"),
+    }
+}
+
+fn render_link(cx: &TypstCtx, el: &Element) -> String {
+    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
+    let (scheme, target) = target_scheme(&raw_target);
+    let text = match &el.content {
+        Some(content) if !content.is_empty() => blocks_to_typst(cx, content),
+        _ => String::new(),
+    };
+    match scheme {
+        TargetScheme::Id => {
+            let text = if text.is_empty() {
+                target.to_string()
+            } else {
+                text
+            };
+            format!("#link(<{target}>)[{text}]")
+        }
+        TargetScheme::Unresolved => {
+            if text.is_empty() {
+                target.to_string()
+            } else {
+                text
+            }
+        }
+        _ => {
+            let text = if text.is_empty() {
+                target.to_string()
+            } else {
+                text
+            };
+            format!("#link(\"{}\")[{text}]", escape_typst_string(target))
+        }
+    }
+}
+
+/// Strips `target`'s scheme prefix the same way `render_link` does -- see
+/// `tomet-convert-html`'s `render_embed_element` for why `<embed>` needs
+/// this too, not just a raw passthrough.
+fn render_embed(el: &Element) -> String {
+    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
+    let (_, src) = target_scheme(&raw_target);
+    let alt = el
+        .content
+        .as_ref()
+        .map(|a| blocks_to_plain(a))
+        .unwrap_or_default();
+    if alt.is_empty() {
+        format!("#image(\"{}\")", escape_typst_string(src))
+    } else {
+        format!(
+            "#image(\"{}\", alt: \"{}\")",
+            escape_typst_string(src),
+            escape_typst_string(&alt)
+        )
+    }
+}
+
+/// Re-renders an `InterpExpr` back to `${...}`-shaped source text, wrapped
+/// in a raw span (`` `${...}` ``) so Typst's own `$`-prefixed math mode
+/// never tries to parse it -- see the module doc's note on why `${...}`
+/// is kept inert here rather than evaluated.
+fn render_interp(el: &Element) -> String {
+    match &el.value {
+        Some(ElementValue::Interp(expr)) => format!("`${{{expr}}}`"),
+        _ => String::new(),
+    }
+}
+
+/// Anything with no dedicated Typst mapping (a hand-authored `<T>`/`@name`
+/// element the mapping above doesn't special-case) renders just its inner
+/// content -- Typst's normal compile mode has no raw-passthrough escape
+/// hatch, so unlike `tomet-convert-markdown`'s equivalent fallback,
+/// `args`/`kind` metadata can't be preserved in the output itself. In
+/// block position only (never inline, to avoid corrupting running text) a
+/// leading `// tomet:{kind}` line comment records what was dropped.
+fn render_generic(cx: &TypstCtx, el: &Element, kind: &str, inline: bool) -> String {
+    let content = content_to_typst(cx, el);
+    if content.is_empty() {
+        return String::new();
+    }
+    if inline {
+        content
+    } else {
+        format!("// tomet:{kind}\n{content}")
+    }
+}
+
+/// `@ruby[漢字](rt:"かんじ")` -- Typst has no built-in ruby annotation, and
+/// unlike [`render_generic`]'s inline fallback, `rt` can't just be dropped:
+/// it's the reading, meaningful content rather than decoration. Renders as
+/// `base(reading)`, the least-lossy plain-text approximation.
+fn render_ruby(cx: &TypstCtx, el: &Element) -> String {
+    let args = normalized_element_args(el);
+    let rt = args
+        .as_ref()
+        .and_then(as_map)
+        .and_then(|m| map_get(m, "rt"))
+        .map(value_to_plain)
+        .unwrap_or_default();
+    let content = content_to_typst(cx, el);
+    if rt.is_empty() {
+        content
+    } else {
+        format!("{content}({rt})")
+    }
+}
+
+fn content_to_typst(cx: &TypstCtx, el: &Element) -> String {
+    el.content
+        .as_ref()
+        .map(|a| blocks_to_typst(cx, a))
+        .unwrap_or_default()
+}
+
+/// Flattens inline content to plain text -- used where Typst syntax can't
+/// itself carry markup (a raw code block's contents, an image's `alt`).
+fn inlines_to_plain(inlines: &[Inline]) -> String {
+    let mut s = String::new();
+    for (idx, inline) in inlines.iter().enumerate() {
+        match inline {
+            Inline::Text(t) => s.push_str(&t.value),
+            Inline::Raw(t) => s.push_str(&t.value),
+            Inline::SoftBreak(_) => {
+                let before = s.chars().last();
+                let after = inlines.get(idx + 1).and_then(Inline::first_char);
+                s.push_str(tomet_ast::softbreak_join(before, after));
+            }
+            Inline::LineBreak(_) => s.push(' '),
+            Inline::Element(el) => {
+                if let Some(content) = &el.content {
+                    s.push_str(&blocks_to_plain(content));
+                }
+            }
+        }
+    }
+    s
+}
+
+/// [`inlines_to_plain`] over `Element.content`'s `Vec<Block>` shape.
+fn blocks_to_plain(blocks: &[Block]) -> String {
+    let mut s = String::new();
+    for block in blocks {
+        match block {
+            Block::Paragraph(p) => s.push_str(&inlines_to_plain(&p.content)),
+            Block::Element(el) => {
+                if let Some(content) = &el.content {
+                    s.push_str(&blocks_to_plain(content));
+                }
+            }
+            Block::Section(sec) => s.push_str(&inlines_to_plain(&sec.title)),
+            Block::List(list) => {
+                for item in &list.items {
+                    if let Some(content) = &item.element.content {
+                        s.push_str(&blocks_to_plain(content));
+                    }
+                }
+            }
+        }
+    }
+    s
+}
+
+/// Escapes markup-sensitive characters for plain running text. Does not
+/// handle line-start-only markers (`=`/`-`/`+`/`/`) -- see the module doc.
+fn escape_text(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if matches!(
+            c,
+            '\\' | '*' | '_' | '`' | '#' | '$' | '<' | '>' | '@' | '[' | ']' | '~'
+        ) {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// Escapes a value going inside a Typst `"..."` string literal (function
+/// arguments like `#link("...")`/`#image("...")`), distinct from
+/// `escape_text`'s markup escaping.
+fn escape_typst_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if matches!(c, '\\' | '"') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
+fn value_to_plain(v: &Value) -> String {
+    match v {
+        Value::Null => String::new(),
+        Value::Bool(b) => b.to_string(),
+        Value::Int(i) => i.to_string(),
+        Value::Float(f) => f.to_string(),
+        Value::String(s) => s.clone(),
+        Value::Seq(items) => items
+            .iter()
+            .map(value_to_plain)
+            .collect::<Vec<_>>()
+            .join(", "),
+        // A map has no single scalar representation; callers that need
+        // per-key access use `as_map`/`map_get` instead.
+        Value::Map(_) => String::new(),
+        // A call is validation-only (e.g. `:rule`'s `allow:list(...)`)
+        // and has no rendered form.
+        Value::Call(..) => String::new(),
+        // An embedded element has no scalar form either -- same as `Map`.
+        // Typst has no path from here into `element_to_typst` (this
+        // function only ever reads a plain arg like `lang`/`pkg`, never a
+        // whole nested element), so this stays unrendered rather than
+        // half-rendering it out of context.
+        Value::Element(_) => String::new(),
+        // Block content has no scalar form either -- same as `Map`.
+        Value::Blocks(_) => String::new(),
+    }
+}
+
+fn as_map(v: &Value) -> Option<&Vec<(String, Value)>> {
+    match v {
+        Value::Map(m) => Some(m),
+        _ => None,
+    }
+}
+
+fn map_get<'a>(map: &'a [(String, Value)], key: &str) -> Option<&'a Value> {
+    map.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+}
