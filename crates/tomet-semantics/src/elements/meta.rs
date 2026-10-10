@@ -4,10 +4,9 @@ use tomet_tree::ValueExt;
 use crate::{ElementKind, classify_std_lenient};
 
 /// Returns this document's `@meta` element's parsed data, if it has one --
-/// the `{...}` group from `@meta(format:...){...}`, already normalized to
-/// a `Value` regardless of which embedded format (JSON/YAML/TOML/the
-/// default DSL) it was written in. Callers pull whatever key they care
-/// about (`title`, `date`, `tags`, ...) out of the returned map themselves.
+/// the `{...}` value group read via [`crate::data::element_data`].
+/// Callers pull whatever key they care about (`title`, `date`, `tags`, ...) out
+/// of the returned map themselves.
 ///
 /// `None` if the document has no `@meta` element, or that element has no
 /// `{value}` group at all. Only the first top-level `@meta` is considered

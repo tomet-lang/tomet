@@ -206,7 +206,7 @@ pub fn render_value_inner_with_blocks(
                         // value with named ones, and the bare one prints
                         // bare too, not as `: a`.
                         if k.is_empty()
-                            || (idx == 0 && (k == "variant" || k == "lang" || k == "format"))
+                            || (idx == 0 && (k == "variant" || k == "lang"))
                         {
                             parts.push(val_str);
                         } else {
@@ -223,7 +223,7 @@ pub fn render_value_inner_with_blocks(
                     // above -- an empty key is a positional entry, printed
                     // bare rather than as `: value`.
                     if k.is_empty()
-                        || (idx == 0 && (k == "variant" || k == "lang" || k == "format"))
+                        || (idx == 0 && (k == "variant" || k == "lang"))
                     {
                         parts.push(val_str);
                     } else {

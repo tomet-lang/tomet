@@ -90,7 +90,6 @@ pub fn completions_for_with_uri(
         ),
         ("ref", "Search project by filename/title"),
         ("tag", "Tag classification"),
-        ("format", "Embedded format (json, yaml, toml)"),
     ];
 
     for (key, detail) in inferred_keys {

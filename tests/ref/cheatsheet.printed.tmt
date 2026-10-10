@@ -1,6 +1,6 @@
 @settings(file: docs/docs.settings.tmt)
 
-@config(json)
+@config(style: structural)
 
 @meta{key: value, type: person}
 

@@ -40,7 +40,6 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         // mean the output's kind while `@kind` means this file's.
         "blueprint" => &["target"],
         "callout" => &["variant"],
-        "meta" | "config" => &["format"],
         "heading" => &["level"],
         // `@conflict(x, y)` assigns by written position -- `a` first,
         // `b` second. Deliberately just an order, not a "mine/theirs"
@@ -479,18 +478,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn normalizes_meta_positional_arg() {
-        let mut el = element_new(Sigil::named("meta"));
-        el.args = Some(Value::String("json".to_string()));
-        assert_eq!(
-            normalized_element_args(&el),
-            Some(Value::Map(vec![(
-                "format".to_string(),
-                Value::String("json".to_string())
-            )]))
-        );
-    }
 
     #[test]
     fn leaves_map_args_unchanged() {

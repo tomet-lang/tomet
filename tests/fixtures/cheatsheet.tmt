@@ -1,6 +1,6 @@
 @settings(file:docs/docs.settings.tmt)
 @config(
-  format:json
+  style: structural
   /// [ (意図)[formatterが見る。視覚に長けたフォーマットであるために、
   ///   @[一行ずつ](file:tmt/examples/bookmark.tmt)]や、@[エリアだけ改行](file:tmt/examples/scenario.tmt)などをフォーマッタや出力が合わせるために記入したい。
   ///   だが、確かに、毎ファイル書くのはどうかとも思う。其の場合は、type(あるいは拡張子)で、別ファイルに宣言された設定を自動的に読み込むようにしたいかもしれない。 ]

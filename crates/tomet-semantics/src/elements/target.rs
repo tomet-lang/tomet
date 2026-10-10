@@ -335,7 +335,7 @@ mod tests {
 
     #[test]
     fn non_link_kind_has_no_target() {
-        let el = map_el(Sigil::named("meta"), vec![("format", s("json"))]);
+        let el = map_el(Sigil::named("meta"), vec![("key", s("val"))]);
         assert_eq!(crate::classify_std_lenient(&el), ElementKind::Meta);
         assert_eq!(link_target_of(&el), None);
     }
