@@ -99,6 +99,41 @@ const SAME: &[(&str, &str, &str)] = &[
         "@container\n| - alpha\n| - beta\n| trailing text\n",
         "@container[\n- alpha\n- beta\ntrailing text\n]\n",
     ),
+    (
+        "a fenced code block inside the body",
+        "@quote\n| ```rust\n| fn foo() {}\n| ```\n",
+        "@quote[\n```rust\nfn foo() {}\n```\n]\n",
+    ),
+    (
+        "a fenced code block with indentation inside the body",
+        "@quote\n| ```rust\n| fn foo() {\n|     bar();\n| }\n| ```\n",
+        "@quote[\n```rust\nfn foo() {\n    bar();\n}\n```\n]\n",
+    ),
+    (
+        "a section heading inside the body",
+        "@container\n| = Title\n| body text\n",
+        "@container[\n= Title\nbody text\n]\n",
+    ),
+    (
+        "a thematic break inside the body",
+        "@card\n| above\n| ---\n| below\n",
+        "@card[\nabove\n---\nbelow\n]\n",
+    ),
+    (
+        "section and fenced code block inside the body",
+        "@parent\n| = Section\n| ```\n| hello\n| ```\n",
+        "@parent[\n= Section\n```\nhello\n```\n]\n",
+    ),
+    (
+        "a fenced code block followed by paragraph text inside the body",
+        "@parent\n| ```\n| hello\n| ```\n| after text\n",
+        "@parent[\n```\nhello\n```\nafter text\n]\n",
+    ),
+    (
+        "a section followed by a fenced code block and thematic break inside the body",
+        "@parent\n| = Section\n| ```\n| hello\n| ```\n| ---\n| footer\n",
+        "@parent[\n= Section\n```\nhello\n```\n---\nfooter\n]\n",
+    ),
 ];
 
 #[test]

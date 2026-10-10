@@ -190,10 +190,11 @@ pub(crate) fn parse_inline_seq<'a>(
                                 look.bump();
                             }
                             skip_inline_ws(&mut look);
-                            if matches!(peek_list_marker(&look), Ok(Some(_)))
+                            if paragraph_breaks_here(&look)
                                 || (look.peek() == Some('@')
                                     && is_element_start(&look, true)
                                     && element_ends_line(&look) == LineEnd::Bare)
+                                || (look.peek() == Some('$') && is_interp_start(&look))
                             {
                                 break;
                             }

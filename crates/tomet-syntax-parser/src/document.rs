@@ -1,20 +1,20 @@
-//! Document-level parsing for `.tmt` / `.tmt` files.
+//! Document-level parsing for `.tmt` files.
 //!
 //! Orchestrates block-level constructs (sections, paragraphs, lists,
 //! elements, thematic breaks) into a [`Document`].
 
-use crate::raw::{is_fenced_code_block_start, parse_fenced_code_block};
 use crate::element::{
     LineEnd, consume_trailing_continuation, element_ends_line, is_element_start,
-    leading_continuation, parse_element,
+    leading_continuation, parse_element_with_pipe_stack,
 };
 use crate::error::Result;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_soft_break};
 use crate::interp::{is_interp_start, parse_dollar_element};
 use crate::list::{parse_list, peek_list_marker};
+use crate::raw::{is_fenced_code_block_start, parse_fenced_code_block};
 use crate::section::{
-    consume_thematic_break, is_section_start, is_thematic_break, is_titled_thematic_break_start,
-    parse_section, parse_titled_thematic_break,
+    consume_thematic_break, is_section_start, is_thematic_break,
+    is_titled_thematic_break_start, parse_section, parse_titled_thematic_break,
 };
 use crate::value::{skip_inline_ws, skip_ws_and_newlines};
 use tomet_ast::{Block, Document, Element, Inline, Paragraph, Placement, Section};
@@ -25,7 +25,7 @@ use tomet_tree::{ElementExt, element_new, list};
 pub fn parse_document(src: &str) -> Result<Document> {
     let mut cur = Cursor::new(src);
     let start_pos = cur.pos();
-    let blocks = parse_block_seq(&mut cur, BlockStop::Eof)?;
+    let blocks = parse_block_seq(&mut cur, BlockStop::Eof, &[])?;
     let span = cur.span_from(start_pos);
     Ok(Document::new(blocks, span))
 }
@@ -44,21 +44,18 @@ pub(crate) enum BlockStop {
     Bracket(char),
 }
 
-/// The block-sequence grammar shared by a whole document and by
-/// `[content]`: sections, lists, elements, fenced code, thematic breaks and
+/// The block-sequence grammar shared by a whole document, `[content]`, and
+/// `|content`: sections, lists, elements, fenced code, thematic breaks and
 /// paragraphs, orchestrated exactly the same way regardless of what bounds
-/// the sequence. A bounded call (`BlockStop::Bracket`) gets its own local
-/// `stack` -- a section opened inside `[content]` is fully closed by the
-/// time this returns, independent of whatever section the *enclosing*
-/// document is in the middle of.
-pub(crate) fn parse_block_seq(cur_ref: &mut Cursor, stop: BlockStop) -> Result<Vec<Block>> {
-    // The loop body below predates this function's extraction from
-    // `parse_document` and still borrows `cur` by value (`&cur`/`&mut cur`
-    // throughout) the way it did when `cur` was `parse_document`'s own
-    // local, owned `Cursor`. Shadowing with an owned copy here (`Cursor` is
-    // `Copy`) keeps that body byte-for-byte, rather than rewriting every
-    // borrow site -- `*cur_ref = cur` at the end writes the final position
-    // back for the caller.
+/// the sequence. A bounded call (`BlockStop::Bracket` or active `pipe_stack`)
+/// gets its own local `stack` -- a section opened inside `[content]` or
+/// `|content` is fully closed by the time this returns, independent of
+/// whatever section the *enclosing* document is in the middle of.
+pub(crate) fn parse_block_seq(
+    cur_ref: &mut Cursor,
+    stop: BlockStop,
+    pipe_stack: &[usize],
+) -> Result<Vec<Block>> {
     let mut cur = *cur_ref;
     let mut doc_blocks: Vec<Block> = Vec::new();
     let mut stack: Vec<Section> = Vec::new();
@@ -68,7 +65,41 @@ pub(crate) fn parse_block_seq(cur_ref: &mut Cursor, stop: BlockStop) -> Result<V
     };
 
     loop {
-        skip_ws_and_newlines(&mut cur);
+        if pipe_stack.is_empty() {
+            skip_ws_and_newlines(&mut cur);
+        } else {
+            skip_inline_ws(&mut cur);
+            let mut ended = false;
+            while matches!(cur.peek(), Some('\n') | Some('\r')) {
+                match crate::inline::pipe_run_state(&cur, pipe_stack)? {
+                    crate::inline::PipeContinuation::End => {
+                        ended = true;
+                        break;
+                    }
+                    crate::inline::PipeContinuation::Empty => {
+                        cur.bump();
+                        for _ in 0..pipe_stack.len() {
+                            skip_inline_ws(&mut cur);
+                            cur.bump();
+                        }
+                        skip_inline_ws(&mut cur);
+                    }
+                    crate::inline::PipeContinuation::Content => {
+                        cur.bump();
+                        for _ in 0..pipe_stack.len() {
+                            skip_inline_ws(&mut cur);
+                            cur.bump();
+                        }
+                        skip_inline_ws(&mut cur);
+                        break;
+                    }
+                }
+            }
+            if ended {
+                break;
+            }
+        }
+
         if is_line_comment_start(&cur) {
             skip_line_comment(&mut cur);
             continue;
@@ -154,12 +185,12 @@ pub(crate) fn parse_block_seq(cur_ref: &mut Cursor, stop: BlockStop) -> Result<V
             continue;
         }
         if is_fenced_code_block_start(&cur) {
-            let el = parse_fenced_code_block(&mut cur)?;
+            let el = parse_fenced_code_block(&mut cur, pipe_stack)?;
             push_block(&mut doc_blocks, &mut stack, Block::Element(el));
             continue;
         }
         if let Some(head) = peek_list_marker(&cur)? {
-            let items = parse_list(&mut cur, head.ordered)?;
+            let items = parse_list(&mut cur, head.ordered, pipe_stack)?;
             if !items.is_empty() {
                 let list_span = items
                     .first()
@@ -180,15 +211,19 @@ pub(crate) fn parse_block_seq(cur_ref: &mut Cursor, stop: BlockStop) -> Result<V
         if cur.peek() == Some('@') && is_element_start(&cur, true) {
             match element_ends_line(&cur) {
                 LineEnd::Bare => {
-                    let el = parse_element(&mut cur, true)?.with_placement(Placement::Block);
+                    let el = parse_element_with_pipe_stack(&mut cur, true, pipe_stack)?
+                        .with_placement(Placement::Block);
                     consume_bare_line_end(&mut cur);
                     push_block(&mut doc_blocks, &mut stack, Block::Element(el));
                     continue;
                 }
                 LineEnd::Continuation => {
-                    let el = parse_element(&mut cur, true)?;
+                    let el = parse_element_with_pipe_stack(&mut cur, true, pipe_stack)?;
                     consume_trailing_continuation(&mut cur);
                     consume_bare_line_end(&mut cur);
+                    if matches!(cur.peek(), Some('\n') | Some('\r')) {
+                        cur.bump();
+                    }
                     let cont = continue_into_paragraph(&mut cur, el, boundary)?;
                     push_block(&mut doc_blocks, &mut stack, cont);
                     continue;
@@ -202,8 +237,9 @@ pub(crate) fn parse_block_seq(cur_ref: &mut Cursor, stop: BlockStop) -> Result<V
             continue;
         }
 
-        let p = parse_paragraph(&mut cur, boundary)?;
-        push_block(&mut doc_blocks, &mut stack, p);
+        if let Some(p) = parse_paragraph(&mut cur, boundary, pipe_stack)? {
+            push_block(&mut doc_blocks, &mut stack, p);
+        }
     }
 
     // Flush all remaining open sections from innermost to outermost
@@ -218,6 +254,7 @@ pub(crate) fn parse_block_seq(cur_ref: &mut Cursor, stop: BlockStop) -> Result<V
     *cur_ref = cur;
     Ok(doc_blocks)
 }
+
 
 fn push_block(doc_blocks: &mut Vec<Block>, stack: &mut [Section], block: Block) {
     if let Some(top) = stack.last_mut() {
@@ -243,12 +280,6 @@ fn push_section(doc_blocks: &mut Vec<Block>, stack: &mut Vec<Section>, sec: Sect
     stack.push(sec);
 }
 
-/// Consumes the inline whitespace/comments and the line's own trailing
-/// newline after a bare element already confirmed [`LineEnd::Bare`] or
-/// [`LineEnd::Continuation`] (and, for the latter, after the trigger
-/// itself has already been consumed) -- the same gap `element_ends_line`'s
-/// probe already walked through without consuming. Leaves `cur` at the
-/// start of the next line.
 fn consume_bare_line_end(cur: &mut Cursor) {
     if cur.pos() == 0 || cur.src()[..cur.pos()].ends_with(['\n', '\r']) {
         return;
@@ -266,16 +297,8 @@ fn consume_bare_line_end(cur: &mut Cursor) {
         }
         skip_inline_ws(cur);
     }
-    if matches!(cur.peek(), Some('\n') | Some('\r')) {
-        cur.bump();
-    }
 }
 
-/// Builds a paragraph that starts from an already-parsed `first` element
-/// (demoted to `Placement::Inline`, whatever it was) instead of from raw
-/// source, joined to whatever follows by one `SoftBreak` spanning
-/// `first`'s own end to wherever the rest resumes. `cur` must already sit
-/// at the start of that following content.
 fn continue_into_paragraph(
     cur: &mut Cursor,
     first: Element,
@@ -316,10 +339,20 @@ pub(crate) fn skip_line_comment(cur: &mut Cursor) {
     cur.eat_while(|c| c != '\n' && c != '\r');
 }
 
-/// Parses a paragraph.
-fn parse_paragraph(cur: &mut Cursor, boundary: Option<char>) -> Result<Block> {
+fn parse_paragraph(
+    cur: &mut Cursor,
+    boundary: Option<char>,
+    pipe_stack: &[usize],
+) -> Result<Option<Block>> {
     let start_pos = cur.pos();
-    let content = parse_inline_seq(cur, Stop::Paragraph { boundary }, true)?;
+    let content = if pipe_stack.is_empty() {
+        parse_inline_seq(cur, Stop::Paragraph { boundary }, true)?
+    } else {
+        parse_inline_seq(cur, Stop::PipeRun { cols: pipe_stack }, true)?
+    };
+    if content.is_empty() {
+        return Ok(None);
+    }
     let span = cur.span_from(start_pos);
-    Ok(Block::Paragraph(Paragraph::new(content, span)))
+    Ok(Some(Block::Paragraph(Paragraph::new(content, span))))
 }

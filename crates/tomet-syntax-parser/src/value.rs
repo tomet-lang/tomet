@@ -69,6 +69,7 @@ impl tove::ValueHook for TometValueHook {
             let blocks = match crate::document::parse_block_seq(
                 cur,
                 crate::document::BlockStop::Bracket(']'),
+                &[],
             ) {
                 Ok(blocks) => blocks,
                 Err(e) => return Some(Err(tove::Error::at(e.message, e.line, e.column, e.offset))),

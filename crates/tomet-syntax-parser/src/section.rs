@@ -4,7 +4,7 @@ use crate::element::{parse_groups, parse_sugar_body};
 use crate::error::Result;
 use crate::inline::{Stop, parse_inline_seq};
 use crate::value::{err, skip_inline_ws};
-use tomet_ast::{Block, Element, Inline, Paragraph, Placement, Section, Sigil, Value};
+use tomet_ast::{Block, Element, Inline, Paragraph, Placement, Section, Sigil, Span, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -138,11 +138,19 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
     if cur.starts_with("//") {
         crate::value::skip_line_comment(cur);
     }
-    if matches!(cur.peek(), Some('\n') | Some('\r')) {
-        cur.bump();
-    }
-
-    let span = cur.span_from(start_pos);
+    let end_pos = if matches!(cur.peek(), Some('\n') | Some('\r')) {
+        let mut look = *cur;
+        if look.peek() == Some('\r') {
+            look.bump();
+        }
+        if look.peek() == Some('\n') {
+            look.bump();
+        }
+        look.pos()
+    } else {
+        cur.pos()
+    };
+    let span = Span::new(cur.position_at(start_pos), cur.position_at(end_pos));
 
     Ok(Section {
         level,
@@ -167,9 +175,6 @@ pub(crate) fn is_thematic_break(cur: &Cursor) -> bool {
 
 pub(crate) fn consume_thematic_break(cur: &mut Cursor) {
     cur.eat_while(|c| c == '-' || c == ' ' || c == '\t');
-    if matches!(cur.peek(), Some('\n') | Some('\r')) {
-        cur.bump();
-    }
 }
 
 pub(crate) fn is_titled_thematic_break_start(cur: &Cursor) -> bool {
@@ -208,10 +213,19 @@ pub(crate) fn parse_titled_thematic_break(cur: &mut Cursor) -> Result<Element> {
             "unexpected trailing content after titled thematic break",
         ));
     }
-    if matches!(cur.peek(), Some('\n') | Some('\r')) {
-        cur.bump();
-    }
-    let title_span = cur.span_from(start_pos);
+    let end_pos = if matches!(cur.peek(), Some('\n') | Some('\r')) {
+        let mut look = *cur;
+        if look.peek() == Some('\r') {
+            look.bump();
+        }
+        if look.peek() == Some('\n') {
+            look.bump();
+        }
+        look.pos()
+    } else {
+        cur.pos()
+    };
+    let title_span = Span::new(cur.position_at(start_pos), cur.position_at(end_pos));
     let mut el = element_new(Sigil::named("hr"))
         .with_placement(Placement::Block)
         .with_span(title_span);

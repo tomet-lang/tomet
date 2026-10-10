@@ -157,21 +157,58 @@ pub(crate) fn peek_list_marker(cur: &Cursor) -> Result<Option<ListMarker>> {
     eat_list_marker(&mut look)
 }
 
-pub(crate) fn parse_list(cur: &mut Cursor, ordered: bool) -> Result<Vec<ListItem>> {
-    parse_list_internal(cur, ordered, 0)
+pub(crate) fn parse_list(
+    cur: &mut Cursor,
+    ordered: bool,
+    pipe_stack: &[usize],
+) -> Result<Vec<ListItem>> {
+    parse_list_internal(cur, ordered, 0, pipe_stack)
 }
 
 fn parse_list_internal(
     cur: &mut Cursor,
     ordered: bool,
     min_indent: usize,
+    pipe_stack: &[usize],
 ) -> Result<Vec<ListItem>> {
     let mut items = Vec::new();
-    while let Some(head) = peek_list_marker(cur)? {
-        if head.indent < min_indent || head.ordered != ordered {
-            break;
-        }
-        let item = parse_single_list_item(cur, head)?;
+    loop {
+        let head = if pipe_stack.is_empty() {
+            match peek_list_marker(cur)? {
+                Some(head) if head.indent >= min_indent && head.ordered == ordered => head,
+                _ => break,
+            }
+        } else {
+            if items.is_empty() {
+                match peek_list_marker(cur)? {
+                    Some(head) if head.indent >= min_indent && head.ordered == ordered => head,
+                    _ => break,
+                }
+            } else {
+                skip_inline_ws(cur);
+                match crate::inline::pipe_run_state(cur, pipe_stack)? {
+                    crate::inline::PipeContinuation::Content => {
+                        let mut probe = *cur;
+                        probe.bump();
+                        for _ in 0..pipe_stack.len() {
+                            skip_inline_ws(&mut probe);
+                            probe.bump();
+                        }
+                        skip_inline_ws(&mut probe);
+                        match peek_list_marker(&probe)? {
+                            Some(head) if head.indent >= min_indent && head.ordered == ordered => {
+                                *cur = probe;
+                                head
+                            }
+                            _ => break,
+                        }
+                    }
+                    _ => break,
+                }
+            }
+        };
+
+        let item = parse_single_list_item(cur, head, pipe_stack)?;
         items.push(item);
     }
     Ok(items)
@@ -306,37 +343,68 @@ pub(crate) fn parse_list_item_body(
     ))
 }
 
-pub(crate) fn parse_single_list_item(cur: &mut Cursor, head: ListMarker) -> Result<ListItem> {
+pub(crate) fn parse_single_list_item(
+    cur: &mut Cursor,
+    head: ListMarker,
+    pipe_stack: &[usize],
+) -> Result<ListItem> {
     let item_start = cur.pos();
-    let mut item = parse_list_item_body(cur, &head, &[])?;
+    let mut item = parse_list_item_body(cur, &head, pipe_stack)?;
 
-    if cur.peek() == Some('\n') {
-        cur.bump();
-    }
-
-    // At most one nested list per item -- matches `sublist: Option<List>`.
-    // A contiguous run of deeper-indented items (all the same `ordered`)
-    // becomes that one sublist; anything beyond it (e.g. a second run with
-    // the opposite ordering directly under the same item) is not captured
-    // as a further sublist, the same single-slot limit `Option<List>`
-    // states structurally.
-    let mut sublist = None;
-    if let Some(next) = peek_list_marker(cur)?
-        && next.indent > head.indent
-    {
-        let sub_items = parse_list_internal(cur, next.ordered, next.indent)?;
-        if !sub_items.is_empty() {
-            let list_span = sub_items
-                .first()
-                .unwrap()
-                .element
-                .span
-                .union(&sub_items.last().unwrap().element.span);
-            sublist = Some(list(next.ordered, sub_items, list_span));
+    if pipe_stack.is_empty() {
+        if cur.peek() == Some('\n') {
+            cur.bump();
         }
+
+        let mut sublist = None;
+        if let Some(next) = peek_list_marker(cur)?
+            && next.indent > head.indent
+        {
+            let sub_items = parse_list_internal(cur, next.ordered, next.indent, pipe_stack)?;
+            if !sub_items.is_empty() {
+                let list_span = sub_items
+                    .first()
+                    .unwrap()
+                    .element
+                    .span
+                    .union(&sub_items.last().unwrap().element.span);
+                sublist = Some(list(next.ordered, sub_items, list_span));
+            }
+        }
+        item.sublist = sublist;
+    } else {
+        skip_inline_ws(cur);
+        let mut sublist = None;
+        if matches!(cur.peek(), Some('\n') | Some('\r'))
+            && let Ok(crate::inline::PipeContinuation::Content) =
+                crate::inline::pipe_run_state(cur, pipe_stack)
+        {
+            let mut probe = *cur;
+            probe.bump();
+            for _ in 0..pipe_stack.len() {
+                skip_inline_ws(&mut probe);
+                probe.bump();
+            }
+            skip_inline_ws(&mut probe);
+            if let Ok(Some(next)) = peek_list_marker(&probe)
+                && next.indent > head.indent
+            {
+                *cur = probe;
+                let sub_items = parse_list_internal(cur, next.ordered, next.indent, pipe_stack)?;
+                if !sub_items.is_empty() {
+                    let list_span = sub_items
+                        .first()
+                        .unwrap()
+                        .element
+                        .span
+                        .union(&sub_items.last().unwrap().element.span);
+                    sublist = Some(list(next.ordered, sub_items, list_span));
+                }
+            }
+        }
+        item.sublist = sublist;
     }
 
-    item.sublist = sublist;
     item.element.span = cur.span_from(item_start);
     Ok(item)
 }

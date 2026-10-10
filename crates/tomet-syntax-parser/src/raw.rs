@@ -11,7 +11,10 @@ pub(crate) fn is_fenced_code_block_start(cur: &Cursor) -> bool {
     look.eat_while(|c| c == '`').len() >= 3
 }
 
-pub(crate) fn parse_fenced_code_block(cur: &mut Cursor) -> Result<Element> {
+pub(crate) fn parse_fenced_code_block(
+    cur: &mut Cursor,
+    pipe_stack: &[usize],
+) -> Result<Element> {
     let start_pos = cur.pos();
     let fence_len = cur.eat_while(|c| c == '`').len();
 
@@ -28,12 +31,8 @@ pub(crate) fn parse_fenced_code_block(cur: &mut Cursor) -> Result<Element> {
         cur.bump();
     }
 
-    let (body_start, body_end) = crate::fence::scan_fenced_body(cur, '`', fence_len);
-
-    let mut code = cur.src()[body_start..body_end].to_string();
-    if code.ends_with('\n') {
-        code.pop();
-    }
+    let (code, body_start, body_end) =
+        crate::fence::scan_fenced_body(cur, '`', fence_len, pipe_stack)?;
 
     let args = if lang.is_empty() {
         None

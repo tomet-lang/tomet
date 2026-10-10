@@ -9,7 +9,7 @@ use crate::value::{
     skip_ws_newlines_and_comments,
 };
 use tomet_ast::{
-    Block, Element, ElementValue, Entry, Id, Inline, Paragraph, Placement, Sigil, Value,
+    Block, Element, ElementValue, Entry, Id, Inline, Placement, Sigil, Value,
 };
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
@@ -741,23 +741,8 @@ fn parse_id_scalar(cur: &mut Cursor) -> Result<String> {
     Ok(raw.to_string())
 }
 
-/// Parses a `|`-prefixed content run: `[content]` spelled without brackets,
-/// as a block sequence.
-///
-/// A marked line that bare-opens a block element (`@name...` ending its
-/// own line, same test `document.rs`'s own top-level loop uses) becomes its
-/// own `Block::Element`, exactly as it would inside `[...]` -- this is what
-/// keeps `tests/src/pipe.rs`'s parity check passing for something like
-/// `@references` holding several `@link`s in a row, each its own block
-/// rather than all three merged into one `Paragraph` by `SoftBreak`s. A
-/// line that is the marker alone, nothing after it, ends the current
-/// paragraph without ending the run -- the only way `|content` expresses
-/// more than one paragraph, since a line with no marker at all always ends
-/// the whole run (`crate::inline::PipeContinuation`).
-///
-/// Multi-level nesting (an element's own `|content` living inside another
-/// element's `|content`, each level adding its own marker column) is
-/// handled by tracking `parent_stack` and pushing each active marker's column.
+/// Parses a `|content` run as a block sequence -- identical to `[content]`,
+/// bounded by the end of the marked run instead of `]`.
 fn parse_pipe_content(cur: &mut Cursor, parent_stack: &[usize]) -> Result<Vec<Block>> {
     let (_, col) = cur.line_col(cur.pos());
     if !cur.eat_str("|") {
@@ -765,92 +750,8 @@ fn parse_pipe_content(cur: &mut Cursor, parent_stack: &[usize]) -> Result<Vec<Bl
     }
     let mut current_stack = parent_stack.to_vec();
     current_stack.push(col);
-    let mut blocks = Vec::new();
-    loop {
-        skip_inline_ws(cur);
-        if cur.is_eof() {
-            break;
-        }
-        if cur.peek() == Some('@')
-            && is_element_start(cur, true)
-            && element_ends_line(cur) == LineEnd::Bare
-        {
-            let el = parse_element_with_pipe_stack(cur, true, &current_stack)?
-                .with_placement(Placement::Block);
-            blocks.push(Block::Element(el));
-        } else if let Some(head) = crate::list::peek_list_marker(cur)? {
-            let ordered = head.ordered;
-            let mut items = Vec::new();
-            let mut next_head = head;
-            loop {
-                let item = crate::list::parse_list_item_body(cur, &next_head, &current_stack)?;
-                items.push(item);
-                skip_inline_ws(cur);
-                if cur.is_eof() {
-                    break;
-                }
-                match crate::inline::pipe_run_state(cur, &current_stack)? {
-                    crate::inline::PipeContinuation::Content => {
-                        let mut probe = *cur;
-                        probe.bump();
-                        for _ in 0..current_stack.len() {
-                            skip_inline_ws(&mut probe);
-                            probe.bump();
-                        }
-                        skip_inline_ws(&mut probe);
-                        if let Ok(Some(h)) = crate::list::peek_list_marker(&probe) {
-                            if h.ordered == ordered {
-                                *cur = probe;
-                                next_head = h;
-                                continue;
-                            }
-                        }
-                        break;
-                    }
-                    _ => break,
-                }
-            }
-            let list_span = items
-                .first()
-                .unwrap()
-                .element
-                .span
-                .union(&items.last().unwrap().element.span);
-            let l = tomet_tree::list(ordered, items, list_span);
-            blocks.push(Block::List(l));
-        } else {
-            let para_start = cur.pos();
-            let content = parse_inline_seq(
-                cur,
-                Stop::PipeRun {
-                    cols: &current_stack,
-                },
-                true,
-            )?;
-            if !content.is_empty() {
-                let span = cur.span_from(para_start);
-                blocks.push(Block::Paragraph(Paragraph::new(content, span)));
-            }
-        }
-        if cur.is_eof() {
-            break;
-        }
-        // After either branch, `cur` sits at the `\n` that ends the line
-        // just consumed -- the next thing to check either way.
-        skip_inline_ws(cur);
-        match crate::inline::pipe_run_state(cur, &current_stack)? {
-            crate::inline::PipeContinuation::End => break,
-            crate::inline::PipeContinuation::Empty | crate::inline::PipeContinuation::Content => {
-                cur.bump(); // the newline
-                for _ in 0..current_stack.len() {
-                    skip_inline_ws(cur);
-                    cur.bump(); // the marker itself
-                }
-                skip_inline_ws(cur);
-            }
-        }
-    }
-    Ok(blocks)
+    skip_inline_ws(cur);
+    crate::document::parse_block_seq(cur, crate::document::BlockStop::Eof, &current_stack)
 }
 
 /// Parses a `[content]` group as a block sequence -- the same recursive
@@ -863,7 +764,8 @@ fn parse_content(cur: &mut Cursor) -> Result<Vec<Block>> {
     if !cur.eat_str("[") {
         return Err(err(cur, cur.pos(), "expected '['"));
     }
-    let content = crate::document::parse_block_seq(cur, crate::document::BlockStop::Bracket(']'))?;
+    let content =
+        crate::document::parse_block_seq(cur, crate::document::BlockStop::Bracket(']'), &[])?;
     if !cur.eat_str("]") {
         return Err(err(cur, cur.pos(), "expected ']'"));
     }
