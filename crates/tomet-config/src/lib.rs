@@ -126,295 +126,144 @@ impl PrinterConfig {
     }
 
     pub fn from_document_config(config: &tomet_semantics::DocumentConfig) -> Self {
-        let mut cfg = PrinterConfig::default();
+        let mut normalized_entries = Vec::new();
         for (k, v) in &config.entries {
-            Self::apply_entry(&mut cfg, k, v);
+            if k == "format" {
+                if let Value::Map(map) = v {
+                    for (sub_k, sub_v) in map {
+                        merge_entry(&mut normalized_entries, sub_k, sub_v);
+                    }
+                }
+            } else if let Some(sub_k) = k.strip_prefix("format.") {
+                merge_entry(&mut normalized_entries, sub_k, v);
+            } else {
+                merge_entry(&mut normalized_entries, k, v);
+            }
         }
+
+        let root = Value::Map(normalized_entries);
+        let mut cfg = PrinterConfig::default();
+
+        // 1. Meta settings
+        if let Some(b) = get_path(&root, &["meta", "always_newline"]).and_then(|v| v.as_bool()) {
+            cfg.meta_always_newline = b;
+        }
+        if let Some(s) = get_path(&root, &["meta", "format"]).and_then(|v| v.as_str()) {
+            cfg.meta_format = Some(s.to_string());
+        }
+        if let Some(Value::Map(map)) = get_path(&root, &["meta"]) {
+            for (k, v) in map {
+                if k != "always_newline" && k != "format" && matches!(v, Value::Map(_)) {
+                    Self::parse_meta_field_props(k, v, &mut cfg);
+                }
+            }
+        }
+
+        // 2. Heading
+        if let Some(space) =
+            get_path(&root, &["heading", "space_inside_brackets"]).and_then(|v| v.as_bool())
+        {
+            cfg.heading_space_inside_brackets = space;
+        }
+
+        // 3. Link and wikilink
+        let parse_bool_or_str = |v: &Value| {
+            if let Some(b) = v.as_bool() {
+                Some(b)
+            } else if let Some(s) = v.as_str() {
+                Some(s == "true" || s == "1")
+            } else {
+                None
+            }
+        };
+        if let Some(b) = get_path(&root, &["link", "no_space"])
+            .or_else(|| get_path(&root, &["wikilink", "no_space"]))
+            .and_then(parse_bool_or_str)
+        {
+            cfg.link_no_space = b;
+        }
+        if let Some(order) = get_path(&root, &["link", "group_order"])
+            .or_else(|| get_path(&root, &["link", "order"]))
+            .or_else(|| get_path(&root, &["wikilink", "group_order"]))
+            .or_else(|| get_path(&root, &["wikilink", "order"]))
+            .and_then(parse_group_order)
+        {
+            cfg.link_group_order = Some(order);
+        }
+
+        // 4. Element group order
+        if let Some(order) = get_path(&root, &["element", "group_order"])
+            .or_else(|| get_path(&root, &["element", "order"]))
+            .or_else(|| get_path(&root, &["group_order"]))
+            .and_then(parse_group_order)
+        {
+            cfg.group_order = Some(order);
+        }
+
+        // 5. Callout
+        if let Some(s) = get_path(&root, &["callout", "style", "content"]).and_then(|v| v.as_str())
+        {
+            cfg.callout_content_style = Some(s.to_string());
+        }
+
+        // 6. List
+        if let Some(s) =
+            get_path(&root, &["list", "multiline", "style", "content"]).and_then(|v| v.as_str())
+        {
+            cfg.list_multiline_style_content = Some(s.to_string());
+        }
+
+        // 7. Table
+        if let Some(v) = get_path(&root, &["table", "adjust_width"]) {
+            if let Some(b) = v.as_bool() {
+                cfg.table_adjust_width = Some(b.to_string());
+            } else if let Some(s) = v.as_str() {
+                cfg.table_adjust_width = Some(s.to_string());
+            }
+        }
+        if let Some(n) = get_path(&root, &["table", "max_col_width"]).and_then(|v| v.as_i64()) {
+            cfg.table_max_col_width = Some(n as usize);
+        }
+        if let Some(s) = get_path(&root, &["table", "align"]).and_then(|v| v.as_str()) {
+            cfg.table_align = Some(s.to_string());
+        }
+
+        // 8. Macros
+        for macro_path in [&["macros"][..], &["macro"][..]] {
+            if let Some(Value::Map(entries)) = get_path(&root, macro_path) {
+                for (mk, mv) in entries {
+                    if let Some(template) = mv.as_str() {
+                        cfg.macros.insert(mk.clone(), template.to_string());
+                    }
+                }
+            }
+        }
+
+        // 9. Blueprints & Vocabularies
+        if let Some(bp) = get_path(&root, &["blueprints"]) {
+            collect_paths(bp, &mut cfg.blueprints);
+        }
+        if let Some(voc) = get_path(&root, &["vocabularies"]) {
+            collect_paths(voc, &mut cfg.vocabularies);
+        }
+
+        // 10. API
+        if let Some(s) = get_path(&root, &["api", "rust", "out"]).and_then(|v| v.as_str()) {
+            cfg.api_rust_out = Some(s.to_string());
+        }
+
+        // 11. Workspace ignore & unswept
+        if let Some(v) = get_path(&root, &["workspace", "ignore"]) {
+            collect_paths(v, &mut cfg.ignore_files);
+        }
+        if let Some(v) = get_path(&root, &["ignore", "files"]) {
+            collect_paths(v, &mut cfg.ignore_files);
+        }
+        if let Some(v) = get_path(&root, &["workspace", "unswept"]) {
+            collect_paths(v, &mut cfg.unswept_files);
+        }
+
         cfg
-    }
-
-    fn apply_entry(cfg: &mut Self, key: &str, value: &Value) {
-        if key == "format" {
-            if let Value::Map(map) = value {
-                for (k, v) in map {
-                    Self::apply_entry(cfg, k, v);
-                }
-            }
-            return;
-        }
-        if let Some(sub_k) = key.strip_prefix("format.") {
-            Self::apply_entry(cfg, sub_k, value);
-            return;
-        }
-
-        match key {
-            "meta" => {
-                if let Value::Map(map) = value {
-                    for (k, v) in map {
-                        if k == "always_newline" {
-                            if let Some(b) = v.as_bool() {
-                                cfg.meta_always_newline = b;
-                            }
-                        } else if k == "format" {
-                            if let Some(s) = v.as_str() {
-                                cfg.meta_format = Some(s.to_string());
-                            }
-                        } else if let Value::Map(_) = v {
-                            Self::parse_meta_field_props(k, v, cfg);
-                        }
-                    }
-                }
-            }
-            "meta.always_newline" => {
-                if let Some(b) = value.as_bool() {
-                    cfg.meta_always_newline = b;
-                }
-            }
-            "meta.format" => {
-                if let Some(s) = value.as_str() {
-                    cfg.meta_format = Some(s.to_string());
-                }
-            }
-            "heading" => {
-                if let Some(space) = value.get("space_inside_brackets").and_then(|v| v.as_bool()) {
-                    cfg.heading_space_inside_brackets = space;
-                }
-            }
-            "heading.space_inside_brackets" => {
-                if let Some(b) = value.as_bool() {
-                    cfg.heading_space_inside_brackets = b;
-                }
-            }
-            "link" | "wikilink" => {
-                if let Value::Map(map) = value {
-                    for (k, v) in map {
-                        if k == "no_space" {
-                            if let Some(b) = v.as_bool() {
-                                cfg.link_no_space = b;
-                            } else if let Some(s) = v.as_str() {
-                                cfg.link_no_space = s == "true" || s == "1";
-                            }
-                        } else if (k == "group_order" || k == "order")
-                            && let Some(s) = v.as_str()
-                        {
-                            cfg.link_group_order = match s {
-                                "content_first" | "content_args" | "[]()" | "content" => {
-                                    Some(GroupOrder::ContentFirst)
-                                }
-                                "args_first" | "args_content" | "()[]" | "args" => {
-                                    Some(GroupOrder::ArgsFirst)
-                                }
-                                _ => None,
-                            };
-                        }
-                    }
-                } else if let Some(no_space) = value.get("no_space") {
-                    if let Some(b) = no_space.as_bool() {
-                        cfg.link_no_space = b;
-                    } else if let Some(s) = no_space.as_str() {
-                        cfg.link_no_space = s == "true" || s == "1";
-                    }
-                }
-            }
-            "link.group_order" | "link.order" | "wikilink.group_order" | "wikilink.order" => {
-                if let Some(s) = value.as_str() {
-                    cfg.link_group_order = match s {
-                        "content_first" | "content_args" | "[]()" | "content" => {
-                            Some(GroupOrder::ContentFirst)
-                        }
-                        "args_first" | "args_content" | "()[]" | "args" => {
-                            Some(GroupOrder::ArgsFirst)
-                        }
-                        _ => None,
-                    };
-                }
-            }
-            "link.no_space" | "wikilink.no_space" => {
-                if let Some(b) = value.as_bool() {
-                    cfg.link_no_space = b;
-                } else if let Some(s) = value.as_str() {
-                    cfg.link_no_space = s == "true" || s == "1";
-                }
-            }
-            "element" => {
-                if let Value::Map(map) = value {
-                    for (k, v) in map {
-                        if (k == "group_order" || k == "order")
-                            && let Some(s) = v.as_str()
-                        {
-                            cfg.group_order = match s {
-                                "content_first" | "content_args" | "[]()" | "content" => {
-                                    Some(GroupOrder::ContentFirst)
-                                }
-                                "args_first" | "args_content" | "()[]" | "args" => {
-                                    Some(GroupOrder::ArgsFirst)
-                                }
-                                _ => None,
-                            };
-                        }
-                    }
-                }
-            }
-            "element.group_order" | "element.order" | "group_order" => {
-                if let Some(s) = value.as_str() {
-                    cfg.group_order = match s {
-                        "content_first" | "content_args" | "[]()" | "content" => {
-                            Some(GroupOrder::ContentFirst)
-                        }
-                        "args_first" | "args_content" | "()[]" | "args" => {
-                            Some(GroupOrder::ArgsFirst)
-                        }
-                        _ => None,
-                    };
-                }
-            }
-            "callout" => {
-                if let Value::Map(map) = value {
-                    Self::parse_callout_props(map, cfg);
-                }
-            }
-            "callout.style.content" => {
-                if let Some(s) = value.as_str() {
-                    cfg.callout_content_style = Some(s.to_string());
-                }
-            }
-            "callout.style" => {
-                if let Some(s) = value.get("content").and_then(|c| c.as_str()) {
-                    cfg.callout_content_style = Some(s.to_string());
-                }
-            }
-            "list" => {
-                if let Value::Map(map) = value {
-                    Self::parse_list_props(map, cfg);
-                }
-            }
-            "list.multiline.style.content" => {
-                if let Some(s) = value.as_str() {
-                    cfg.list_multiline_style_content = Some(s.to_string());
-                }
-            }
-            "list.multiline.style" => {
-                if let Some(s) = value.get("content").and_then(|c| c.as_str()) {
-                    cfg.list_multiline_style_content = Some(s.to_string());
-                }
-            }
-            "list.multiline" => {
-                if let Some(s) = value
-                    .get("style")
-                    .and_then(|st| st.get("content"))
-                    .and_then(|c| c.as_str())
-                {
-                    cfg.list_multiline_style_content = Some(s.to_string());
-                }
-            }
-            "table" => {
-                if let Value::Map(map) = value {
-                    Self::parse_table_props(map, cfg);
-                }
-            }
-            "table.adjust_width" => {
-                if let Some(b) = value.as_bool() {
-                    cfg.table_adjust_width = Some(b.to_string());
-                } else if let Some(s) = value.as_str() {
-                    cfg.table_adjust_width = Some(s.to_string());
-                }
-            }
-            "table.max_col_width" => {
-                if let Some(n) = value.as_i64() {
-                    cfg.table_max_col_width = Some(n as usize);
-                }
-            }
-            "table.align" => {
-                if let Some(s) = value.as_str() {
-                    cfg.table_align = Some(s.to_string());
-                }
-            }
-            "macros" | "macro" => {
-                if let Value::Map(entries) = value {
-                    for (mk, mv) in entries {
-                        if let Some(template) = mv.as_str() {
-                            cfg.macros.insert(mk.clone(), template.to_string());
-                        }
-                    }
-                }
-            }
-            "blueprints" => {
-                collect_paths(value, &mut cfg.blueprints);
-            }
-            "vocabularies" => {
-                collect_paths(value, &mut cfg.vocabularies);
-            }
-            "api" => {
-                if let Value::Map(entries) = value {
-                    for (lang, lang_val) in entries {
-                        if lang == "rust" {
-                            if let Some(out_val) = lang_val.get("out").and_then(|v| v.as_str()) {
-                                cfg.api_rust_out = Some(out_val.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-            "api.rust" => {
-                if let Some(out_val) = value.get("out").and_then(|v| v.as_str()) {
-                    cfg.api_rust_out = Some(out_val.to_string());
-                }
-            }
-            "api.rust.out" => {
-                if let Some(out_val) = value.as_str() {
-                    cfg.api_rust_out = Some(out_val.to_string());
-                }
-            }
-            // No `elements` arm. It used to reach `callout`, `list` and
-            // `table` here and read their style out -- a fifth spelling of
-            // `format.callout.style`, used by no config in this repository.
-            // `elements:` now means nothing at all in `@settings`, which is
-            // what lets `tomet_validator` reject the whole key instead of
-            // half of it.
-            "workspace" => {
-                if let Some(items) = value.get("ignore").and_then(|f| f.as_seq()) {
-                    for item in items {
-                        if let Some(s) = item.as_str()
-                            && !cfg.ignore_files.contains(&s.to_string())
-                        {
-                            cfg.ignore_files.push(s.to_string());
-                        }
-                    }
-                }
-                if let Some(items) = value.get("unswept").and_then(|f| f.as_seq()) {
-                    for item in items {
-                        if let Some(s) = item.as_str()
-                            && !cfg.unswept_files.contains(&s.to_string())
-                        {
-                            cfg.unswept_files.push(s.to_string());
-                        }
-                    }
-                }
-            }
-            "ignore" => {
-                if let Some(items) = value.get("files").and_then(|f| f.as_seq()) {
-                    for item in items {
-                        if let Some(s) = item.as_str()
-                            && !cfg.ignore_files.contains(&s.to_string())
-                        {
-                            cfg.ignore_files.push(s.to_string());
-                        }
-                    }
-                }
-            }
-            "ignore.files" => {
-                if let Some(items) = value.as_seq() {
-                    for item in items {
-                        if let Some(s) = item.as_str()
-                            && !cfg.ignore_files.contains(&s.to_string())
-                        {
-                            cfg.ignore_files.push(s.to_string());
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
     }
 
     fn parse_meta_field_props(field_name: &str, field_val: &Value, cfg: &mut Self) {
@@ -460,49 +309,90 @@ impl PrinterConfig {
             cfg.meta_fields.insert(field_name.to_string(), field_cfg);
         }
     }
+}
 
-    fn parse_callout_props(props: &[(String, Value)], cfg: &mut Self) {
-        let map = Value::Map(props.to_vec());
-        if let Some(s) = map
-            .get("style")
-            .and_then(|st| st.get("content"))
-            .and_then(|c| c.as_str())
-        {
-            cfg.callout_content_style = Some(s.to_string());
-        }
+fn get_path<'a>(mut current: &'a Value, path: &[&str]) -> Option<&'a Value> {
+    for &segment in path {
+        current = current.get(segment)?;
     }
+    Some(current)
+}
 
-    fn parse_list_props(props: &[(String, Value)], cfg: &mut Self) {
-        let map = Value::Map(props.to_vec());
-        if let Some(s) = map
-            .get("multiline")
-            .and_then(|m| m.get("style"))
-            .and_then(|st| st.get("content"))
-            .and_then(|c| c.as_str())
-        {
-            cfg.list_multiline_style_content = Some(s.to_string());
-        }
+fn parse_group_order(value: &Value) -> Option<GroupOrder> {
+    match value.as_str()? {
+        "content_first" | "content_args" | "[]()" | "content" => Some(GroupOrder::ContentFirst),
+        "args_first" | "args_content" | "()[]" | "args" => Some(GroupOrder::ArgsFirst),
+        _ => None,
     }
+}
 
-    fn parse_table_props(props: &[(String, Value)], cfg: &mut Self) {
-        let map = Value::Map(props.to_vec());
-        if let Some(adjust_width) = map.get("adjust_width") {
-            if let Some(b) = adjust_width.as_bool() {
-                cfg.table_adjust_width = Some(b.to_string());
-            } else if let Some(s) = adjust_width.as_str() {
-                cfg.table_adjust_width = Some(s.to_string());
+fn get_or_insert_map<'a>(
+    target: &'a mut Vec<(String, Value)>,
+    key: &str,
+) -> &'a mut Vec<(String, Value)> {
+    if let Some(pos) = target.iter().position(|(k, _)| k == key) {
+        if !matches!(target[pos].1, Value::Map(_)) {
+            target[pos].1 = Value::Map(Vec::new());
+        }
+    } else {
+        target.push((key.to_string(), Value::Map(Vec::new())));
+    }
+    let pos = target.iter().position(|(k, _)| k == key).unwrap();
+    match &mut target[pos].1 {
+        Value::Map(m) => m,
+        _ => unreachable!(),
+    }
+}
+
+fn insert_or_merge_prop(map: &mut Vec<(String, Value)>, key: &str, value: &Value) {
+    if let Some((_, existing)) = map.iter_mut().find(|(k, _)| k == key) {
+        match (existing, value) {
+            (Value::Map(ex_props), Value::Map(new_props)) => {
+                for (pk, pv) in new_props {
+                    if let Some((_, p)) = ex_props.iter_mut().find(|(k, _)| k == pk) {
+                        *p = pv.clone();
+                    } else {
+                        ex_props.push((pk.clone(), pv.clone()));
+                    }
+                }
+            }
+            (ex, val) => {
+                *ex = val.clone();
             }
         }
-        if let Some(max_col_width) = map.get("max_col_width")
-            && let Some(n) = max_col_width.as_i64()
-        {
-            cfg.table_max_col_width = Some(n as usize);
+    } else {
+        map.push((key.to_string(), value.clone()));
+    }
+}
+
+fn merge_entry(target: &mut Vec<(String, Value)>, key: &str, value: &Value) {
+    if let Some((head, tail)) = key.split_once('.') {
+        if head == "meta" || head == "macros" || head == "macro" {
+            // For meta and macros, `tail` is a flat key (e.g. field name or macro name)
+            // that should not be split further.
+            let sub_map = get_or_insert_map(target, head);
+            insert_or_merge_prop(sub_map, tail, value);
+            return;
         }
-        if let Some(align) = map.get("align")
-            && let Some(s) = align.as_str()
-        {
-            cfg.table_align = Some(s.to_string());
+
+        // General dotted key: descend or create sub-map at `head`.
+        let sub_map = get_or_insert_map(target, head);
+        merge_entry(sub_map, tail, value);
+    } else if let Value::Map(incoming_map) = value {
+        let existing_map = get_or_insert_map(target, key);
+        if key == "meta" || key == "macros" || key == "macro" {
+            for (sub_k, sub_v) in incoming_map {
+                insert_or_merge_prop(existing_map, sub_k, sub_v);
+            }
+        } else {
+            for (sub_k, sub_v) in incoming_map {
+                merge_entry(existing_map, sub_k, sub_v);
+            }
         }
+    } else if let Some((_, existing)) = target.iter_mut().find(|(k, _)| k == key) {
+        *existing = value.clone();
+    } else {
+        target.push((key.to_string(), value.clone()));
     }
 }
 
@@ -838,5 +728,76 @@ mod tests {
 "#;
         let cfg2 = load_config_from_str(src2).expect("failed to parse config");
         assert_eq!(cfg2.api_rust_out, Some("target/api".to_string()));
+    }
+
+    #[test]
+    fn test_dot_notation_variants() {
+        // Deep dotted: callout.style.content and list.multiline.style.content
+        let src_deep_dot = r#"@config{
+  callout.style.content: "quote"
+  list.multiline.style.content: "box"
+  table.adjust_width: true
+  table.max_col_width: 80
+  table.align: "center"
+  api.rust.out: "target/api"
+}
+"#;
+        let cfg = load_config_from_str(src_deep_dot).expect("failed to parse deep dot config");
+        assert_eq!(cfg.callout_content_style.as_deref(), Some("quote"));
+        assert_eq!(cfg.list_multiline_style_content.as_deref(), Some("box"));
+        assert_eq!(cfg.table_adjust_width.as_deref(), Some("true"));
+        assert_eq!(cfg.table_max_col_width, Some(80));
+        assert_eq!(cfg.table_align.as_deref(), Some("center"));
+        assert_eq!(cfg.api_rust_out.as_deref(), Some("target/api"));
+
+        // Mixed nesting: e.g. callout: { style.content: "quote" }
+        let src_mixed = r#"@config{
+  callout: {
+    style.content: "custom"
+  }
+  list.multiline: {
+    style.content: "bullet"
+  }
+}
+"#;
+        let cfg_mixed = load_config_from_str(src_mixed).expect("failed to parse mixed config");
+        assert_eq!(cfg_mixed.callout_content_style.as_deref(), Some("custom"));
+        assert_eq!(
+            cfg_mixed.list_multiline_style_content.as_deref(),
+            Some("bullet")
+        );
+
+        // Format wrapper with dotted entries
+        let src_format = r#"@config{
+  format.callout.style.content: "formatted"
+  format.table.max_col_width: 100
+}
+"#;
+        let cfg_fmt = load_config_from_str(src_format).expect("failed to parse format config");
+        assert_eq!(cfg_fmt.callout_content_style.as_deref(), Some("formatted"));
+        assert_eq!(cfg_fmt.table_max_col_width, Some(100));
+    }
+
+    #[test]
+    fn test_dot_notation_meta_and_merge() {
+        let src = r#"@config{
+  meta.always_newline: true
+  meta.format: "yaml"
+  meta: {
+    url.wiki: { type: list, always_newline: true }
+    title: { length: 70 }
+  }
+  workspace.ignore: list("target", "build")
+  workspace.unswept: list("tests/fixtures")
+}
+"#;
+        let cfg = load_config_from_str(src).expect("failed to parse meta and workspace config");
+        assert!(cfg.meta_always_newline);
+        assert_eq!(cfg.meta_format.as_deref(), Some("yaml"));
+        assert!(cfg.meta_fields.contains_key("url.wiki"));
+        assert!(cfg.meta_fields.get("url.wiki").unwrap().always_newline);
+        assert_eq!(cfg.meta_fields.get("title").unwrap().length, Some(70));
+        assert_eq!(cfg.ignore_files, vec!["target", "build"]);
+        assert_eq!(cfg.unswept_files, vec!["tests/fixtures"]);
     }
 }
