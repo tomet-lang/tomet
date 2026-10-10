@@ -1,8 +1,6 @@
 @kind(doc.index)
 
-@meta(format:yaml)+++
-id: doc-index-query
-+++
+@meta{id: doc-index-query}
 
 =[索引の問い合わせ]
 `${filter(...)}` は本文に直接置く。包む要素はない -- `${some_id}` が

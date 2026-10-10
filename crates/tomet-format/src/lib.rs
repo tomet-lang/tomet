@@ -4,33 +4,21 @@
 //! metadata. Normalizes whitespace policy (LF line endings, no trailing
 //! whitespace, collapsed excess blank lines, exactly one final newline)
 //! while losslessly preserving literal whitespace and blank lines inside
-//! raw/verbatim content (a ``` fenced code block, and any element body
-//! carried by a `+++` fence). It never changes the parsed `Document` --
-//! the `does_not_change_the_parsed_document` test in the `tomet-tests`
-//! package asserts this across the whole shared corpus, and its
-//! `KNOWN_FORMAT_CHANGES_DOCUMENT` exception list is empty.
+//! raw/verbatim content (a ``` fenced code block, nested in `[content]`
+//! or at the document's own top level). It never changes the parsed
+//! `Document` -- the `does_not_change_the_parsed_document` test in the
+//! `tomet-tests` package asserts this across the whole shared corpus, and
+//! its `KNOWN_FORMAT_CHANGES_DOCUMENT` exception list is empty.
 //!
-//! The list held one entry until the `+++` fence replaced
-//! `(content:raw)[...]`. A raw body used to be delimited by matched
-//! brackets, so a source that wrote full-width `｛｝` where the grammar
-//! wants ASCII `{}` did not opt into raw at all, left no raw span to
-//! protect, and had the trailing-whitespace rule run over content meant
-//! to be verbatim. A fence is delimited by a *line*, so no character
-//! inside the body can end it early or make the formatter disagree with
-//! the parser about where verbatim content begins. The bug class is gone
-//! by construction rather than by exception.
-//!
-//! There is one deliberate exception left:
-//! [`quote_bare_at_yaml_values`], run first, wraps a bare `@...`-led
-//! value inside any `(format:yaml)+++ ... +++` body in `""`.
-//! Unquoted, `@` is a reserved YAML indicator that can't start a plain
-//! scalar (`embedded_format.rs` hands the body straight to `serde_yaml`,
-//! which rejects it outright), so that shape doesn't have a successfully-
-//! parsed `Document` to preserve in the first place -- this pass turns
-//! an unparseable file into a parseable one with the obvious intended
-//! reading, it doesn't change what an already-valid file means. Raw-text
-//! based rather than AST-based for exactly that reason: there's nothing
-//! to walk yet for the file this exists to fix.
+//! The list held one entry until `(content:raw)[...]` was retired. A raw
+//! body used to be delimited by matched brackets, so a source that wrote
+//! full-width `｛｝` where the grammar wants ASCII `{}` did not opt into
+//! raw at all, left no raw span to protect, and had the trailing-
+//! whitespace rule run over content meant to be verbatim. A backtick
+//! fence is delimited by a *line*, so no character inside the body can
+//! end it early or make the formatter disagree with the parser about
+//! where verbatim content begins. The bug class is gone by construction
+//! rather than by exception.
 //!
 //! [`format_source_with_config`] formats tables according to `PrinterConfig`
 //! (e.g. `table.adjust_width`, `table.max_col_width`, `table.align`) and
@@ -40,7 +28,6 @@
 pub mod clean;
 pub mod reorder;
 pub mod table;
-pub mod yaml;
 
 #[cfg(test)]
 mod tests;
@@ -48,7 +35,6 @@ mod tests;
 pub use clean::clean_whitespace;
 pub use reorder::format_element_group_order;
 pub use table::format_tables_with_config;
-pub use yaml::quote_bare_at_yaml_values;
 
 use tomet_config::PrinterConfig;
 
@@ -56,7 +42,6 @@ use tomet_config::PrinterConfig;
 /// `format_source(&format_source(src)) == format_source(src)`.
 pub fn format_source(src: &str) -> String {
     let normalized = src.replace("\r\n", "\n").replace('\r', "\n");
-    let normalized = yaml::quote_bare_at_yaml_values(&normalized);
     clean::clean_whitespace(&normalized)
 }
 

@@ -78,7 +78,7 @@ fn already_formatted_input_is_unchanged() {
 
 #[test]
 fn raw_content_is_preserved_losslessly() {
-    let src = "@memo+++\nline one  \n\nline two\n+++\n";
+    let src = "@memo[\n```\nline one  \n\nline two\n```\n]\n";
     assert_eq!(format_source(src), src);
 }
 
@@ -92,41 +92,6 @@ fn raw_content_in_brackets_is_preserved_losslessly() {
 fn fenced_code_block_content_is_preserved_losslessly() {
     let src = "```rust\nfn foo() {\n    let a = 1;  \n\n    let b = 2;\n}\n```\n";
     assert_eq!(format_source(src), src);
-}
-
-#[test]
-fn quotes_bare_at_led_yaml_values_so_the_document_parses() {
-    let src = "@meta(format:yaml)+++\nprevious: @link(ref:x)\nnext: @link(ref:y)\nparent: [@link(ref:z), @link(ref:w)]\n+++\n";
-    let expected = "@meta(format:yaml)+++\nprevious: \"@link(ref:x)\"\nnext: \"@link(ref:y)\"\nparent: [\"@link(ref:z)\", \"@link(ref:w)\"]\n+++\n";
-    let out = format_source(src);
-    assert_eq!(out, expected);
-    tomet_parser::parse_document(&out)
-        .unwrap_or_else(|e| panic!("formatted output should now parse: {e}"));
-}
-
-#[test]
-fn quote_bare_at_yaml_values_handles_block_list_items() {
-    let src = "@meta(format:yaml)+++\nrefs:\n  - @link(ref:x)\n  - already \"@link(ref:y)\"\n+++\n";
-    let out = format_source(src);
-    assert!(out.contains("- \"@link(ref:x)\""));
-    assert!(
-        out.contains("- already \"@link(ref:y)\""),
-        "existing quote untouched: {out:?}"
-    );
-}
-
-#[test]
-fn quote_bare_at_yaml_values_leaves_already_quoted_and_unrelated_content_alone() {
-    let src = "@meta(format:yaml)+++\nprevious: \"@link(ref:x)\"\n+++\n\n@link(ref:x)[some text]\n";
-    assert_eq!(format_source(src), src);
-}
-
-#[test]
-fn quote_bare_at_yaml_values_is_idempotent() {
-    let src = "@meta(format:yaml)+++\nprevious: @link(ref:x)\n+++\n";
-    let once = format_source(src);
-    let twice = format_source(&once);
-    assert_eq!(once, twice);
 }
 
 #[test]

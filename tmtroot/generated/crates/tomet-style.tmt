@@ -69,12 +69,12 @@ supplied explicitly. See [`BlockRenderer`].
 ===[ fn render_meta_element ]
 
 Renders an `@meta(...){...}` element per `config`'s meta format
-settings (element-local `format:` arg takes priority over
-`config.meta_format`; multi-line if `config.meta_always_newline` or a
-format is set, else a single `@meta{k: v, ...}` line). Scoped to
-`@meta`'s actual shape -- `value` must be `ElementValue::from_map(Value::Map(...))`,
-which is all the grammar ever produces for `@meta`; anything else
-renders as a bare `@meta` (with args, if any).
+settings (multi-line, one field per line with per-field formatting
+rules, if `config.meta.always_newline`; else a single `@meta{k: v, ...}`
+line). Scoped to `@meta`'s actual shape -- `value` must be
+`ElementValue::from_map(Value::Map(...))`, which is all the grammar ever
+produces for `@meta`; anything else renders as a bare `@meta` (with
+args, if any).
 
 ==[ Type Aliases ]
 

@@ -1,8 +1,6 @@
 @kind(fixture)
 
-@meta(format:yaml)+++
-id: doc-groups
-+++
+@meta{id: doc-groups}
 
 =[シジルは同じグループを取る]
 `@name` も `-` も `=` も、`(args)` `[content]` `{value}` を取る。

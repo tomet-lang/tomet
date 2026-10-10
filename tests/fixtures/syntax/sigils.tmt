@@ -1,7 +1,5 @@
 @kind(fixture)
-@meta(format:yaml)+++
-id: doc-sigils
-+++
+@meta{ id: doc-sigils }
 
 =[ シジルは形を表す ]
 

@@ -21,7 +21,6 @@ pub struct FieldConfig {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct MetaConfig {
     pub always_newline: bool,
-    pub format: Option<String>,
     pub fields: BTreeMap<String, FieldConfig>,
 }
 
@@ -33,12 +32,9 @@ impl MetaConfig {
         if let Some(b) = get_path(root, &["meta", "always_newline"]).and_then(|v| v.as_bool()) {
             cfg.always_newline = b;
         }
-        if let Some(s) = get_path(root, &["meta", "format"]).and_then(|v| v.as_str()) {
-            cfg.format = Some(s.to_string());
-        }
         if let Some(Value::Map(map)) = get_path(root, &["meta"]) {
             for (k, v) in map {
-                if k != "always_newline" && k != "format" && matches!(v, Value::Map(_)) {
+                if k != "always_newline" && matches!(v, Value::Map(_)) {
                     parse_meta_field_props(k, v, &mut cfg.fields);
                 }
             }

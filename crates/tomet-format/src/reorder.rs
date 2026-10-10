@@ -4,7 +4,43 @@ use tomet_ast::{Block, Element, Inline, List, Sigil};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_parser::parse_document;
 
-use crate::yaml::find_matching;
+/// Byte offset of the `close` matching the `open` at `open_pos` in
+/// `src` (which must be `open`), tracking nested `open`/`close` depth
+/// and skipping over `"..."`/`'...'` quoted runs.
+fn find_matching(src: &str, open_pos: usize, open: char, close: char) -> Option<usize> {
+    let bytes = src.as_bytes();
+    let mut i = open_pos + open.len_utf8();
+    let mut depth: u32 = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if c == b'"' || c == b'\'' {
+            i += 1;
+            while i < bytes.len() {
+                if bytes[i] == b'\\' && c == b'"' && i + 1 < bytes.len() {
+                    i += 2;
+                    continue;
+                }
+                let closed = bytes[i] == c;
+                i += 1;
+                if closed {
+                    break;
+                }
+            }
+        } else if c == open as u8 {
+            depth += 1;
+            i += 1;
+        } else if c == close as u8 {
+            if depth == 0 {
+                return Some(i);
+            }
+            depth -= 1;
+            i += 1;
+        } else {
+            i += 1;
+        }
+    }
+    None
+}
 
 /// Formats element group order according to `config` (`PrinterConfig::group_order` / `PrinterConfig::link_group_order`).
 ///

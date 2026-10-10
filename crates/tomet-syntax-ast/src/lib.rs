@@ -833,15 +833,9 @@ pub enum Entry {
 /// list of children?" is no longer a parse-time branch -- it is a view
 /// computed downstream in `tomet-semantics`, which is what lets the parser
 /// build the tree without consulting any element vocabulary.
-///
-/// `Raw` is a `+++` fence body, captured verbatim. Whether it is later
-/// read as JSON/YAML/TOML is decided after parsing, from the element's
-/// `format:` arg -- the fence itself is opaque, so `format:` has no effect
-/// on lexing.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ElementValue {
     Group(Vec<Entry>),
-    Raw(String),
     Interp(InterpExpr),
 }
 

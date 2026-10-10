@@ -72,18 +72,6 @@
 //!   worse failure mode for a comment than for e.g. a code span. Here an
 //!   unmatched `/*` just fails to lex as `block_comment` and falls back
 //!   to ordinary `text`/`punctuation` tokens instead.
-//! - **A real embedded JSON/YAML/TOML body inside an element's `{...}`
-//!   (any element whose `(args)` has a `format:json|yaml|toml` key, not
-//!   just `@meta`) isn't understood as such.** `tomet-parser` hands
-//!   that body as-is to `serde_json`/`serde_yaml`/`toml` (see
-//!   `tomet-parser::embedded_format`), but this grammar has no idea a
-//!   `{value}` group's content might be a different language -- it still
-//!   tries its own `map`/`scalar` rules. A quoted JSON key
-//!   (`{ "key": "value" }`, needed since JSON has no bare-identifier keys
-//!   -- see `tests/fixtures/readme.tmt`'s `@meta(format:json)` block) doesn't
-//!   match `map_entry`'s bare-identifier `key` field, so the nested
-//!   `{...}` becomes an `ERROR`. Not worth a real per-format sub-grammar
-//!   here -- this crate is for editor highlighting, not validation.
 //! - `thematic_break`'s dash run only ever consumes exactly 3 `-`,
 //!   even when the source has more (`-----` -> a 3-dash `thematic_break`
 //!   plus the leftover 2 dashes falling back to `punctuation` inside a
@@ -114,15 +102,14 @@
 //! or `{required}`) now parses as a clean `scalar` instead of an `ERROR`.
 //!
 //! `_value_scalar`'s regex (see its own comment in `grammar.js`) resolves
-//! another former limitation: a `key: [seq]` map entry (e.g.
-//! `tags: [a, b]`, as in `tests/fixtures/examples/image.meta.tmt`'s
-//! `@meta(format:yaml){...}`) used to get GLR-merged with a second,
-//! spurious top-level `seq` reading of the same `[...]` text, wrapping
-//! the whole map in an `ERROR` -- not just when that entry was last in
-//! the map with no trailing comma (the case originally found), but for
-//! an earlier, non-last `key: [seq]` entry too. Root cause: the regex
-//! never excluded space/tab from its character class, so it could match
-//! a lone leading space (between `:` and `[`) as a complete one-character
+//! another former limitation: a `key: list(...)` map entry (e.g.
+//! `tags: list(a, b)`) used to get GLR-merged with a second, spurious
+//! top-level reading of the same text, wrapping the whole map in an
+//! `ERROR` -- not just when that entry was last in the map with no
+//! trailing comma (the case originally found), but for an earlier,
+//! non-last `key: list(...)` entry too. Root cause: the regex never
+//! excluded space/tab from its character class, so it could match a lone
+//! leading space (between `:` and the value) as a complete one-character
 //! token in its own right, and tree-sitter's lexer took that real, if
 //! useless, token match over skipping the space as `extras` first --
 //! same class of bug `SCALAR`/`LIST_MARKER_GAP` already existed to route
@@ -632,14 +619,13 @@ mod tests {
     #[test]
     fn map_entry_key_still_wins_when_a_colon_follows() {
         // The other half of the same regression guard: an identifier-
-        // shaped bare word immediately followed by `:` must still become a
-        // `map_entry` key, not the new bare-scalar token. All on one line,
-        // on purpose -- a newline directly before the closing `}` hits a
-        // different, pre-existing limitation unrelated to this one (see
-        // this module's doc comment), confirmed to already reproduce with
-        // this exact source on the grammar from before `scanner.c` existed.
-        let tree = parse("@meta(format:json)+++\nkey:value\n+++\n");
+        // shaped bare word immediately followed by `:` must still become
+        // a `map_entry` key, not the new bare-scalar token.
+        let src = "@meta(format:json)\n";
+        let tree = parse(src);
         assert!(!tree.root_node().has_error());
+        let entry = find_kind(tree.root_node(), "map_entry").expect("expected a map_entry node");
+        assert_eq!(entry.utf8_text(src.as_bytes()).unwrap(), "format:json");
     }
 
     #[test]
@@ -855,34 +841,31 @@ mod tests {
     }
 
     #[test]
-    fn map_entry_value_is_optional_for_embedded_yaml_null_shorthand() {
-        // `key:` with nothing after it is YAML's null shorthand -- routine
-        // in a real `@meta(format:yaml){...}` body (see
-        // `embedded_format.rs`, which hands this text to `serde_yaml`
-        // as-is). Before `_entry_value` became `optional`, a *mandatory*
+    fn map_entry_value_is_optional_for_null_shorthand() {
+        // `key:` with nothing after it is a legal map entry with no
+        // value. Before `_entry_value` became `optional`, a *mandatory*
         // value meant this shape didn't just mismatch locally like the
         // grammar's other known-narrow cases -- it derailed the entire
         // enclosing block into an `ERROR` that swallowed everything after
         // it too.
-        let src =
-            "@meta(format:yaml)+++\nid: doc-1\nflags:\nrating:\nreviewed:\ntype: j.daily\n+++\n";
+        let src = "@meta{\nid: doc-1\nflags:\nrating:\nreviewed:\ntype: j.daily\n}\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
     }
 
     #[test]
-    fn map_entry_seq_value_parses_cleanly_last_or_not() {
+    fn map_entry_call_value_parses_cleanly_last_or_not() {
         // `_value_scalar`'s regex used to be able to match a lone leading
         // space as a bogus one-character `scalar`, which won out over
         // skipping that space as `extras` first -- see that rule's own
         // comment in `grammar.js`. Covers both the originally-found shape
-        // (a `[seq]`-valued entry last in the map, no trailing comma) and
-        // the broader one found while fixing it (an earlier, non-last
-        // `[seq]`-valued entry, still followed by more entries).
+        // (a `list(...)`-valued entry last in the map, no trailing comma)
+        // and the broader one found while fixing it (an earlier, non-last
+        // `list(...)`-valued entry, still followed by more entries).
         for src in [
-            "@meta(format:yaml)+++\naliases: []\n+++\n",
-            "@meta(format:yaml)+++\naliases: []\nflags: x\n+++\n",
-            "@meta(format:yaml)+++\naliases: [a, b]\nflags: x\n+++\n",
+            "@meta{\naliases: list()\n}\n",
+            "@meta{\naliases: list()\nflags: x\n}\n",
+            "@meta{\naliases: list(a, b)\nflags: x\n}\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -898,9 +881,19 @@ mod tests {
         // leading space/tab from `_value_scalar` must not exclude *all*
         // whitespace, or multi-word bare values would break, and the tail
         // must still allow colons (URLs, timestamps).
-        let src =
-            "@meta(format:yaml)+++\na: hello world\nb: 12:34\nc: https://example.com/x\n+++\n";
+        let src = "@meta{\na: hello world\nb: 12:34\nc: https://example.com/x\n}\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
+    }
+
+    #[test]
+    fn probe2() {
+        let src = "@ns.thing(\n  a: [\n    para1.\n\n    para2.\n  ]\n  b: [ one para. ]\n)\n";
+        let tree = parse(src);
+        eprintln!(
+            "error={} sexp={}",
+            tree.root_node().has_error(),
+            tree.root_node().to_sexp()
+        );
     }
 }

@@ -1,6 +1,6 @@
 //! Rendering elements, values, args, and connects.
 
-use tomet_ast::{Block, Element, ElementValue, Entry, Inline, Placement, Sigil, Value};
+use tomet_ast::{Element, ElementValue, Entry, Placement, Sigil, Value};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_style::render_nested;
 
@@ -8,7 +8,7 @@ use crate::id::render_id;
 use crate::inline::render_content_blocks;
 
 /// Render an [`Element`] AST node into Tomet syntax:
-/// `<sigil><name>(args)[content]{value}`, or `<sigil><name>+++body+++`.
+/// `<sigil><name>(args)[content]{value}`.
 pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     {
         if el.sigil.is_bare_named("hr") && el.args.is_none() && el.value.is_none() {
@@ -79,16 +79,10 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                     _ => None,
                 })
                 .unwrap_or_default();
-            let from_content = el
+            let body = el
                 .content
                 .as_ref()
                 .map(|content| render_content_blocks(content, config))
-                .filter(|body| !body.is_empty());
-            let body = from_content
-                .or_else(|| match el.value.as_ref() {
-                    Some(ElementValue::Raw(raw)) => Some(raw.clone()),
-                    _ => None,
-                })
                 .unwrap_or_default();
             let longest = body
                 .lines()
@@ -272,11 +266,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     }
 
     if let Some(value) = &el.value {
-        out.push_str(&render_element_value_with_format(
-            value,
-            get_format_from_args(el.args.as_ref()),
-            config,
-        ));
+        out.push_str(&render_element_value(value, config));
     }
 
     out.push_str(&render_id(el.id.as_ref()));
@@ -285,63 +275,9 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     out
 }
 
-/// Renders an element's value: a `{...}` group, or a `+++` fence for a
-/// raw body.
+/// Renders an element's value: a `{...}` group.
 pub(crate) fn render_element_value(value: &ElementValue, config: &PrinterConfig) -> String {
-    render_element_value_with_format(value, None, config)
-}
-
-/// Renders an element's value, honouring a declared `format:`.
-///
-/// When an element says `(format:json)` and holds data, that data is
-/// written back as JSON inside a `+++` fence -- the fence being the only
-/// place another language's source can live now. Reading it back is
-/// `tomet-semantics`' `embedded::element_data`, so the round trip is
-/// data-in, data-out regardless of which side wrote it.
-///
-/// This is rendering, not parsing: the printer is free to consult an
-/// element's arguments. The invariant the rework protects is that the
-/// *parser* does not.
-pub(crate) fn render_element_value_with_format(
-    value: &ElementValue,
-    format: Option<&str>,
-    config: &PrinterConfig,
-) -> String {
-    if let (ElementValue::Group(_), Some(fmt)) = (value, format)
-        && let Some(data) = value.as_data()
-    {
-        let json = value_to_json(&data);
-        let serialized = match fmt {
-            "json" => serde_json::to_string_pretty(&json).ok(),
-            "yaml" => serde_yaml::to_string(&json).ok(),
-            "toml" => toml::to_string_pretty(&json).ok(),
-            _ => None,
-        };
-        if let Some(body) = serialized {
-            let body = body.trim_end();
-            return format!(
-                "{}\n{body}\n{}",
-                "+".repeat(fence_len_for(body)),
-                "+".repeat(fence_len_for(body))
-            );
-        }
-    }
     match value {
-        // A raw body is written back as the fence it came from. The run is
-        // grown past any `+++` line inside the body, matching the rule the
-        // parser reads it with.
-        ElementValue::Raw(body) => {
-            let fence = "+".repeat(fence_len_for(body));
-            let mut out = String::new();
-            out.push_str(&fence);
-            out.push('\n');
-            out.push_str(body);
-            if !body.is_empty() && !body.ends_with('\n') {
-                out.push('\n');
-            }
-            out.push_str(&fence);
-            out
-        }
         ElementValue::Interp(expr) => format!("{{{expr}}}"),
         ElementValue::Group(entries) => {
             format!("{{{}}}", render_group_entries(entries, config))
@@ -417,11 +353,7 @@ pub(crate) fn render_connects(connects: &[Element], config: &PrinterConfig) -> S
             out.push(']');
         }
         if let Some(value) = &connect.value {
-            out.push_str(&render_element_value_with_format(
-                value,
-                get_format_from_args(connect.args.as_ref()),
-                config,
-            ));
+            out.push_str(&render_element_value(value, config));
         }
         out.push_str(&render_id(connect.id.as_ref()));
     }
@@ -440,107 +372,4 @@ pub(crate) fn render_args(args: &Value, config: &PrinterConfig) -> String {
     tomet_style::render_args_with_blocks(args, config, &mut |blocks, cfg| {
         render_content_blocks(blocks, cfg)
     })
-}
-
-/// The `+` run length needed to fence `body`: three, unless the body
-/// itself contains a line that would close the fence early.
-fn fence_len_for(body: &str) -> usize {
-    let longest = body
-        .lines()
-        .map(|l| l.trim_end())
-        .filter(|l| !l.is_empty() && l.chars().all(|c| c == '+'))
-        .map(|l| l.len())
-        .max()
-        .unwrap_or(0);
-    longest.max(2) + 1
-}
-
-fn get_format_from_args(args: Option<&Value>) -> Option<&str> {
-    if let Some(Value::Map(entries)) = args {
-        for (k, v) in entries {
-            if k == "format"
-                && let Value::String(fmt) = v
-            {
-                return Some(fmt.as_str());
-            }
-        }
-    }
-    None
-}
-
-fn value_to_json(val: &Value) -> serde_json::Value {
-    match val {
-        Value::Null => serde_json::Value::Null,
-        Value::Bool(b) => serde_json::Value::Bool(*b),
-        Value::Int(i) => serde_json::Value::Number((*i).into()),
-        Value::Float(f) => serde_json::Number::from_f64(*f)
-            .map(serde_json::Value::Number)
-            .unwrap_or(serde_json::Value::Null),
-        Value::String(s) => serde_json::Value::String(s.clone()),
-        Value::Seq(items) => serde_json::Value::Array(items.iter().map(value_to_json).collect()),
-        Value::Map(entries) => {
-            let mut map = serde_json::Map::new();
-            for (k, v) in entries {
-                map.insert(k.clone(), value_to_json(v));
-            }
-            serde_json::Value::Object(map)
-        }
-        Value::Call(name, args) => {
-            let mut map = serde_json::Map::new();
-            map.insert("call".to_string(), serde_json::Value::String(name.clone()));
-            map.insert(
-                "args".to_string(),
-                serde_json::Value::Array(args.iter().map(value_to_json).collect()),
-            );
-            serde_json::Value::Object(map)
-        }
-        // Same tagged-object shape as `Call` above -- JSON has no element
-        // concept, and this is only reached via `+++`-fenced `format:json`
-        // export, not the normal `.tmt` printer path (see
-        // `tomet_style::render_value_inner_with_config`'s `Value::Element`
-        // arm for that one).
-        Value::Element(el) => {
-            let mut map = serde_json::Map::new();
-            let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
-            map.insert("element".to_string(), serde_json::Value::String(name));
-            if let Some(args) = &el.args {
-                map.insert("args".to_string(), value_to_json(args));
-            }
-            if let Some(content) = &el.content {
-                let text: String = content
-                    .iter()
-                    .filter_map(|block| match block {
-                        Block::Paragraph(p) => Some(p.content.iter().filter_map(|i| match i {
-                            Inline::Text(t) => Some(t.value.as_str()),
-                            Inline::Raw(r) => Some(r.value.as_str()),
-                            _ => None,
-                        })),
-                        _ => None,
-                    })
-                    .flatten()
-                    .collect();
-                map.insert("content".to_string(), serde_json::Value::String(text));
-            }
-            serde_json::Value::Object(map)
-        }
-        // Same plain-text flattening as `Element`'s own `content` just
-        // above -- this path is `+++`-fenced `format:json` export, not
-        // the real `.tmt` printer, which uses `render_content_blocks`
-        // directly instead of going through `Value` at all.
-        Value::Blocks(blocks) => {
-            let text: String = blocks
-                .iter()
-                .filter_map(|block| match block {
-                    Block::Paragraph(p) => Some(p.content.iter().filter_map(|i| match i {
-                        Inline::Text(t) => Some(t.value.as_str()),
-                        Inline::Raw(r) => Some(r.value.as_str()),
-                        _ => None,
-                    })),
-                    _ => None,
-                })
-                .flatten()
-                .collect();
-            serde_json::Value::String(text)
-        }
-    }
 }

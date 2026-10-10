@@ -10,29 +10,10 @@
   // export_path:/readme.md
 )
 
-```
-@meta(format:json)+++
-{
-  "key": "value",
-  "type": "person"
+@meta{
+  key: value
+  type: person
 }
-+++
-@meta(format:yaml)+++
-key: value
-date: time
-type: character
-+++
-@meta(format:toml)+++
-key = "value"
-type = "location"
-+++
-// #meta(format:ini){
-//   key = "value"
-// }
-// #meta(format:kdl){
-//   key = "value"
-// }
-```
 
 /// [ special-casing exists for "import" anywhere. Renders as a generic
 ///   element (`<div class="tm-element tm-import" data-file="...">`), same as
@@ -95,12 +76,14 @@ sudo whoami
 ls --help
 ]
 
-// content:raw: opts any element's [content] into raw/verbatim text, same
-// treatment as raw -- byte-safe against an embedded "]" and
-// newline-preserving (no inline markup, no lazy-continuation folding).
-@memo+++
-  don't forget: check [this] and [that]
-+++
+// A backtick fence nested in [content] carries its body verbatim --
+// byte-safe against an embedded "]" and newline-preserving (no inline
+// markup, no lazy-continuation folding).
+@memo[
+```
+don't forget: check [this] and [that]
+```
+]
 
 @quote[ 引用文 ]
 

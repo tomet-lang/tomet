@@ -6,24 +6,22 @@
 ```tm
 @config(import:@target)
 
-@settings(format:json)+++
-{
-  "format": {
-    "meta": { "format": "yaml", "always_newline": true },
-    "heading": { "space_inside_brackets": true },
-    "table": { "adjust_width": "auto", "max_col_width": 50 }
-  },
-  "meta": {
-    "created": { "type": "datetime", "format": "rfc3339", "offset": "+09:00" }
-  },
-  "macros": {
-    "gh": "https://github.com/tomet/tomet/issues/${1}"
-  },
-  "blueprints": [ ".tomet/blueprints/daily-note.blueprint.tmt" ],
-  "vocabularies": [ ".tomet/vocabularies/deck.vocabulary.tmt" ],
-  "workspace": { "ignore": [ "tests/fixtures" ] }
+@settings{
+  format: {
+    meta: { always_newline: true }
+    heading: { space_inside_brackets: true }
+    table: { adjust_width: auto, max_col_width: 50 }
+  }
+  meta: {
+    created: { type: datetime, format: rfc3339, offset: "+09:00" }
+  }
+  macros: {
+    gh: "https://github.com/tomet/tomet/issues/${1}"
+  }
+  blueprints: list(".tomet/blueprints/daily-note.blueprint.tmt")
+  vocabularies: list(".tomet/vocabularies/deck.vocabulary.tmt")
+  workspace: { ignore: list("tests/fixtures") }
 }
-+++
 ```
 
 キーの一覧は @link[`spec/builtin-settings.tmt`](file:docs/spec/builtin-settings.tmt)

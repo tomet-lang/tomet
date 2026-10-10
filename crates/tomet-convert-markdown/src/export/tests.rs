@@ -13,8 +13,7 @@ fn a_backtick_span_survives_export_unescaped() {
     // the run from further markup), so it reaches the writer looking
     // like prose. Escaping it turned every `` `spec/` `` in the docs
     // into a literal ``\`spec/\``.
-    let doc =
-        tomet_parser::parse_document("地の文に `code` と `spec/` があります。\n").unwrap();
+    let doc = tomet_parser::parse_document("地の文に `code` と `spec/` があります。\n").unwrap();
     assert_eq!(
         to_markdown(&doc).trim(),
         "地の文に `code` と `spec/` があります。"
@@ -40,10 +39,9 @@ fn an_unpaired_backtick_is_still_escaped() {
 
 #[test]
 fn a_backtick_span_is_not_escaped_inside_a_table_cell() {
-    let doc = tomet_parser::parse_document(
-        "@table()[\n[ Dir ][ Lang ]\n[ `spec/` ][ 日本語 ]\n]{}\n",
-    )
-    .unwrap();
+    let doc =
+        tomet_parser::parse_document("@table()[\n[ Dir ][ Lang ]\n[ `spec/` ][ 日本語 ]\n]{}\n")
+            .unwrap();
     assert!(
         to_markdown(&doc).contains("| `spec/` |"),
         "got: {}",
@@ -471,10 +469,9 @@ fn an_unprepared_interpolation_renders_as_its_own_source() {
     // into one long line, which is what happened while `tomet-parser`
     // still folded a wrapped line into a space before this crate ever
     // saw it.
-    let doc = tomet_parser::parse_document(
-        "Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n",
-    )
-    .unwrap();
+    let doc =
+        tomet_parser::parse_document("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n")
+            .unwrap();
     assert_eq!(
         to_markdown(&doc),
         "Issue: ${gh(42)}\nFooter: ${copyright}\nMath: ${add(10, 5)}\n\n"

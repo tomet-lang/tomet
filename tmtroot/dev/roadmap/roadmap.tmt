@@ -9,7 +9,6 @@
 - `:ignore`, `:nocheck`
 - `$generate.uuid`
 - cliの色付け
-- `+++`の削除
 - githubのreadme
 - `[[  ]]`を`@link(ref:)`の糖衣構文(ただし、labelは設定不可能にする。)
 - `{{}}`を`${}`の糖衣構文。
@@ -54,10 +53,6 @@
                                       // 無いまま`@references`/`resolve_connect_targets`/
                                       // `RemoteConnection`だけが残っていたので、
                                       // 機能ごと削除した
-- ( ) 属性と生の本文を同時に持つ要素   // `{value}` と `+++` は排他なので
-                                      // `@bookmark(...){ id: ... }+++ ... +++` が
-                                      // 書けない。`(args)` に寄せるか、生の本文に
-                                      // 専用スロットを与えるか (tests/README.md)
 - ( ) `ref`構文                      // `@self`
 - ( ) `${}` の `std.` と、裸マクロの拒否   // `macro.` と `self.` は入った。
                                       // `${gh(12)}` はまだ通る（移行が要る）

@@ -518,11 +518,7 @@ fn element_body_blocks(el: &Element) -> Vec<Block> {
 /// Content flattened to plain text, for slots that cannot hold markup --
 /// a code block's body.
 fn content_to_plain_text(el: &Element) -> String {
-    match el.value.as_ref() {
-        // A `+++` fence body is already verbatim text.
-        Some(ElementValue::Raw(raw)) => raw.clone(),
-        _ => blocks_plain_text(content_of(el)),
-    }
+    blocks_plain_text(content_of(el))
 }
 
 /// [`plain_text`] over `Element.content`'s `Vec<Block>` shape.

@@ -1,21 +1,38 @@
-<span data-tm-kind="bookmark"></span>+++
+<div data-tm-kind="bookmark">```
 ブックマークの
 メモ
 改行を保持できる
-+++
-<span data-tm-kind="bookmark"></span>+++
+```
+
+</div>
+
+<div data-tm-kind="bookmark">```
 メモ
-+++
-<span data-tm-kind="bookmark"></span>+++
+```
+
+</div>
+
+<div data-tm-kind="bookmark">```
 メモ
-+++
-<span data-tm-kind="bookmark"></span>+++
+```
+
+</div>
+
+<div data-tm-kind="bookmark">```
 メモ
-+++
-<span data-tm-kind="bookmark"></span>+++
+```
+
+</div>
+
+<div data-tm-kind="bookmark">```
 メモ
-+++
-<span data-tm-kind="bookmark"></span>+++
+```
+
+</div>
+
+<div data-tm-kind="bookmark">```
 メモ
-+++
+```
+
+</div>
 

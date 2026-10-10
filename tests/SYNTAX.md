@@ -29,7 +29,7 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [ブロック配置の要素](#ブロック配置の要素)
 - [インライン配置の要素](#インライン配置の要素)
 - [文字列に落ちる場合](#文字列に落ちる場合)
-- [`+++` フェンス](#-フェンス)
+- [`[content]` に入れ子になった backtick フェンス](#content-に入れ子になった-backtick-フェンス)
 - [`{...}` グループ](#-グループ)
 - [`(args)` と値の文法](#args-と値の文法)
 - [`|` で開く内容](#-で開く内容)
@@ -303,19 +303,25 @@ Paragraph
   Text "型は Vec<T> と書く"
 ```
 
-## `+++` フェンス
+## `[content]` に入れ子になった backtick フェンス
 
-### 閉じる `+++` だけの行まで逐語。括弧も引用符もそのまま
+### `[content]` は要素本体と同じ再帰文法を共有するので、backtickフェンスも入れ子にできる。閉じる backtick の行まで逐語、括弧も引用符もそのまま
 
 ```tmt
-@memo+++
+@memo[
+```
 don't forget [this]
-+++
+```
+]
 ```
 
 ```
 Block  @memo
-  raw     "don't forget [this]"
+  content
+    Block  @raw
+      content
+        Paragraph
+          Raw "don't forget [this]"
 ```
 
 検証:
@@ -324,36 +330,24 @@ Block  @memo
 unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
-### 本文に `+++` があるときは長い走りで囲む
+### 本文に backtick の行があるときは長い走りで囲む
 
 ```tmt
-@memo++++
-+++
+@memo[
+````
+```
 まだ本文
-++++
+````
+]
 ```
 
 ```
 Block  @memo
-  raw     "+++\nまだ本文"
-```
-
-検証:
-
-```
-unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
-```
-
-### 閉じないまま EOF に達したらそこで終わる
-
-```tmt
-@memo+++
-閉じない
-```
-
-```
-Block  @memo
-  raw     "閉じない"
+  content
+    Block  @raw
+      content
+        Paragraph
+          Raw "```\nまだ本文"
 ```
 
 検証:
@@ -365,50 +359,20 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 ### `${...}` は展開されず逐語で残る
 
 ```tmt
-@config(format:json)+++
+@config[
+```
 {"gh": "x/${1}"}
-+++
+```
+]
 ```
 
 ```
 Block  @config
-  args    {format: "json"}
-  raw     "{\"gh\": \"x/${1}\"}"
-```
-
-### 引用符の中の `}` で本文が途切れない
-
-```tmt
-@meta(format:yaml)+++
-a: "}"
-b: 1
-+++
-```
-
-```
-Block  @meta
-  args    {format: "yaml"}
-  raw     "a: \"}\"\nb: 1"
-```
-
-### `format:` は解釈だけを決め、字句解析には影響しない
-
-```tmt
-@zzz(format:yaml)+++
-a: 1
-+++
-```
-
-```
-Block  @zzz
-  args    {format: "yaml"}
-  raw     "a: 1"
-```
-
-検証:
-
-```
-unknown element `zzz`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.zzz`), or declare the vocabulary that has it and bind it with `@use`
+  content
+    Block  @raw
+      content
+        Paragraph
+          Raw "{\"gh\": \"x/${1}\"}"
 ```
 
 ## `{...}` グループ
@@ -1721,7 +1685,7 @@ Paragraph
 ```
 
 ```
-parse error: 1:7: a '{...}' group holds 'key: value' entries or elements; write a bare value in '(args)', or use a '+++' fence
+parse error: 1:7: a '{...}' group holds 'key: value' entries or elements; write a bare value in '(args)' instead
 ```
 
 ### 閉じない `[`

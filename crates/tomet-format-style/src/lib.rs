@@ -273,7 +273,7 @@ pub fn render_value_inner_with_blocks(
                     render_nested_with_blocks(&map, config, render_blocks)
                 }
             },
-            Some(ElementValue::Raw(_)) | None => String::new(),
+            None => String::new(),
         },
         Value::Element(el) => {
             let mut s = match &el.args {
@@ -319,9 +319,6 @@ pub fn render_value_inner_with_blocks(
                         }
                         s.push('}');
                     }
-                    ElementValue::Raw(raw) => {
-                        s.push_str(&format!("+++{raw}+++"));
-                    }
                     ElementValue::Interp(expr) => {
                         s.push_str(&format!("${{{expr}}}"));
                     }
@@ -363,7 +360,6 @@ fn render_meta_field_value(
     v: &Value,
     field_cfg: Option<&FieldConfig>,
     config: &PrinterConfig,
-    foreign_format: bool,
 ) -> String {
     if let Value::Null = v {
         return String::new();
@@ -384,90 +380,44 @@ fn render_meta_field_value(
             let mut s = String::new();
             for item in items {
                 s.push_str("\n    - ");
-                s.push_str(&render_meta_value(item, config, foreign_format));
+                s.push_str(&render_value_inner_with_config(item, config));
             }
             return s;
         }
     }
     match v {
         Value::String(s) if is_iso8601(s) => s.clone(),
-        _ => render_meta_value(v, config, foreign_format),
+        _ => render_value_inner_with_config(v, config),
     }
-}
-
-/// A meta field's value: `.tmt` syntax (`list(...)`, same as
-/// `render_value_inner_with_config`) for the native `@meta{...}` group,
-/// or foreign-format syntax for a `format:`-fenced body, where the
-/// target language (YAML/JSON/TOML) spells a sequence `[...]`, not
-/// `list(...)` -- that spelling is `tomet_parser`'s, not theirs.
-fn render_meta_value(v: &Value, config: &PrinterConfig, foreign_format: bool) -> String {
-    if foreign_format && let Value::Seq(items) = v {
-        let rendered: Vec<_> = items
-            .iter()
-            .map(|item| render_meta_value(item, config, true))
-            .collect();
-        return format!("[{}]", rendered.join(", "));
-    }
-    render_value_inner_with_config(v, config)
 }
 
 /// Renders an `@meta(...){...}` element per `config`'s meta format
-/// settings (element-local `format:` arg takes priority over
-/// `config.meta_format`; multi-line if `config.meta_always_newline` or a
-/// format is set, else a single `@meta{k: v, ...}` line). Scoped to
-/// `@meta`'s actual shape -- `value` must be `ElementValue::from_map(Value::Map(...))`,
-/// which is all the grammar ever produces for `@meta`; anything else
-/// renders as a bare `@meta` (with args, if any).
+/// settings (multi-line, one field per line with per-field formatting
+/// rules, if `config.meta.always_newline`; else a single `@meta{k: v, ...}`
+/// line). Scoped to `@meta`'s actual shape -- `value` must be
+/// `ElementValue::from_map(Value::Map(...))`, which is all the grammar ever
+/// produces for `@meta`; anything else renders as a bare `@meta` (with
+/// args, if any).
 pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
-    let effective_format = el
-        .args
-        .as_ref()
-        .and_then(|args| {
-            if let Value::Map(entries) = args {
-                entries.iter().find_map(|(k, v)| {
-                    if k == "format"
-                        && let Value::String(fmt) = v
-                    {
-                        return Some(fmt.clone());
-                    }
-                    None
-                })
+    if config.meta.always_newline
+        && let Some(Value::Map(entries)) = tomet_semantics::embedded::element_data(el)
+    {
+        let mut out = String::from("@meta{\n");
+        for (k, v) in &entries {
+            let field_cfg = config.meta.fields.get(k);
+            let val_str = render_meta_field_value(v, field_cfg, config);
+            out.push_str("  ");
+            out.push_str(k);
+            if val_str.starts_with('\n') || val_str.is_empty() {
+                out.push(':');
             } else {
-                None
+                out.push_str(": ");
             }
-        })
-        .or_else(|| config.meta.format.clone());
-
-    if config.meta.always_newline || effective_format.is_some() {
-        // Read through `element_data` rather than `pairs()`: the body may
-        // already be a `+++` fence, which has no pairs of its own and
-        // would otherwise be rendered back out empty.
-        if let Some(Value::Map(entries)) = tomet_semantics::embedded::element_data(el) {
-            // A declared `format:` means the body is written as a `+++`
-            // fence, not a `{...}` group: the fence is what carries a
-            // body in another language now.
-            let (open, close, indent) = match effective_format {
-                Some(ref fmt) => (format!("@meta(format:{fmt})+++\n"), "+++", ""),
-                None => (String::from("@meta{\n"), "}", "  "),
-            };
-            let is_foreign_format = effective_format.is_some();
-            let mut out = open;
-            for (k, v) in &entries {
-                let field_cfg = config.meta.fields.get(k);
-                let val_str = render_meta_field_value(v, field_cfg, config, is_foreign_format);
-                out.push_str(indent);
-                out.push_str(k);
-                if val_str.starts_with('\n') || val_str.is_empty() {
-                    out.push(':');
-                } else {
-                    out.push_str(": ");
-                }
-                out.push_str(&val_str);
-                out.push('\n');
-            }
-            out.push_str(close);
-            return out;
+            out.push_str(&val_str);
+            out.push('\n');
         }
+        out.push('}');
+        return out;
     }
 
     let mut out = String::from("@meta");
@@ -589,7 +539,7 @@ mod tests {
     }
 
     #[test]
-    fn render_meta_element_multiline_when_format_configured() {
+    fn render_meta_element_multiline_when_always_newline_configured() {
         let mut el = tomet_tree::element_new(Sigil::named("meta"));
         el.value = Some(ElementValue::from_map(Value::Map(vec![(
             "id".to_string(),
@@ -597,14 +547,14 @@ mod tests {
         )])));
         let cfg = PrinterConfig {
             meta: tomet_config::MetaConfig {
-                format: Some("yaml".to_string()),
+                always_newline: true,
                 ..Default::default()
             },
             ..Default::default()
         };
         assert_eq!(
             render_meta_element(&el, &cfg),
-            "@meta(format:yaml)+++\nid: doc-12345678\n+++"
+            "@meta{\n  id: doc-12345678\n}"
         );
     }
 

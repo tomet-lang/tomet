@@ -1,7 +1,5 @@
 @kind(fixture)
-@meta(format:yaml)+++
-id: doc-groups
-+++
+@meta{ id: doc-groups }
 
 =[ シジルは同じグループを取る ]
 

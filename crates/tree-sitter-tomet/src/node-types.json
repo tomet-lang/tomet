@@ -141,10 +141,6 @@
           "named": true
         },
         {
-          "type": "raw_fence",
-          "named": true
-        },
-        {
           "type": "value_group",
           "named": true
         }
@@ -384,10 +380,6 @@
         },
         {
           "type": "marked_content",
-          "named": true
-        },
-        {
-          "type": "raw_fence",
           "named": true
         },
         {
@@ -746,11 +738,6 @@
   },
   {
     "type": "punctuation",
-    "named": true,
-    "fields": {}
-  },
-  {
-    "type": "raw_fence",
     "named": true,
     "fields": {}
   },

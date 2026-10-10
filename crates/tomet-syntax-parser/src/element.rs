@@ -1,7 +1,6 @@
 //! Parsing for elements (`@name`, bare elements, colon connect syntax).
 
 use crate::error::Result;
-use crate::fence::{is_fence_start, parse_fence};
 use crate::inline::{Stop, at_line_start, parse_inline_seq};
 use crate::section::merge_values;
 use crate::value::{
@@ -22,9 +21,9 @@ use tomet_tree::{ElementExt, element_new};
 /// `[content]`. It only widens what may follow the name, never the sigil
 /// or the name itself:
 ///
-/// - anywhere: a group (see [`opens_group`]), a `:` that a `:name` family
-///   member follows, or a `+++` fence must follow. This is what keeps
-///   `me@example.com` and a lone `@foo` in running prose as plain text.
+/// - anywhere: a group (see [`opens_group`]), or a `:` that a `:name`
+///   family member follows. This is what keeps `me@example.com` and a
+///   lone `@foo` in running prose as plain text.
 /// - in block context only: end-of-line also counts, so `@memo` alone on
 ///   its line is an element. It then fails later, in `tomet-semantics`,
 ///   as an unknown bare name -- the intended report, and the reason no
@@ -46,7 +45,7 @@ pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
         return false;
     }
     skip_lookahead_gap(&mut look);
-    if opens_group(&look) || is_fence_start(&look) {
+    if opens_group(&look) {
         return true;
     }
     // A `:` right after the name only starts an element when a `:name`
@@ -107,12 +106,7 @@ pub(crate) fn element_ends_line(cur: &Cursor) -> LineEnd {
         probe.bump();
         skip_inline_ws(&mut probe);
     }
-    // A `+++` fence swallows its own closing line, newline included, so
-    // the probe can already sit at the start of the *next* line. That
-    // still means the element ended its line.
-    if matches!(probe.peek(), None | Some('\n') | Some('\r'))
-        || probe.src()[..probe.pos()].ends_with(['\n', '\r'])
-    {
+    if matches!(probe.peek(), None | Some('\n') | Some('\r')) {
         if continues {
             LineEnd::Continuation
         } else {
@@ -267,8 +261,7 @@ pub(crate) fn opens_group(cur: &Cursor) -> bool {
 }
 
 /// Reads an element's `(args)`, `[content]` and `{value}` groups -- in any
-/// order, each at most once -- plus the colon-connect form and the `+++`
-/// fence that stands in for a body.
+/// order, each at most once -- plus the colon-connect form.
 ///
 /// Split out of [`parse_element`] because a sigil is a sigil: `-` and `=`
 /// take the same groups as `@name` and must not grow a second, subtly
@@ -400,12 +393,6 @@ pub(crate) fn parse_groups_with_pipe_stack(
                 // no ambiguous case left to reject.
                 Some('#') if el.id.is_none() && cur.peek_at(1) == Some('(') => {
                     el.id = Some(parse_hash_id(cur)?);
-                    continue;
-                }
-                // A `+++` fence is exclusive with `[content]` and
-                // `{value}`: it *is* the body, captured verbatim.
-                _ if el.value.is_none() && el.content.is_none() && is_fence_start(cur) => {
-                    el.value = Some(ElementValue::Raw(parse_fence(cur)?));
                     continue;
                 }
                 // A group whose slot is already filled. Every arm above
@@ -898,9 +885,12 @@ fn parse_content(cur: &mut Cursor) -> Result<Vec<Block>> {
 /// `@element(c){ @args{ @param(id){...} } }` -- the shape
 /// `docs/spec/vocabulary.tmt` is written in -- could not be parsed at all.
 ///
-/// A non-map body (`{[1,2,3]}`, `{"str"}`, `{bare}`) is rejected. Those had
-/// no uniform-entry spelling, and the `+++` fence now covers the case they
-/// served -- `@meta(format:json)+++ [1,2,3] +++`.
+/// A non-map body (`{[1,2,3]}`, `{"str"}`, `{bare}`) is rejected: `{...}`
+/// is always a uniform-entry data group, never a bare scalar/array
+/// literal. A bare sequence of values belongs in `(args)`'s own positional
+/// slot instead (`@tags(1, 2, 3)`, already a `Seq` there) -- there is no
+/// live spelling anywhere in the corpus that needs `{...}` itself to hold
+/// one.
 pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
     let group_start = cur.pos();
     if !cur.eat_str("{") {
@@ -920,7 +910,7 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
             // arm only turns errors into parses.
             //
             // `block_context: false`: a group entry still has to carry a
-            // group, a `:` or a fence after the name, so a bare `@foo`
+            // group or a `:` after the name, so a bare `@foo`
             // inside `{...}` stays the error it already was.
             // The placement rule reaches inside a group too, the same way
             // it reaches inside `[content]` (see `inline.rs`): a line start
@@ -953,7 +943,7 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
                         cur,
                         entry_start,
                         "a '{...}' group holds 'key: value' entries or elements; \
-                         write a bare value in '(args)', or use a '+++' fence",
+                         write a bare value in '(args)' instead",
                     ));
                 }
                 entries.push(Entry::Pair(key, value));

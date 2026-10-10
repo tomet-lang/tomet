@@ -45,8 +45,6 @@ impl ExportType {
 /// Extracted document configuration settings from top-level `@config` elements.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DocumentConfig {
-    /// Default format for embedded `{value}` blocks (`json`, `yaml`, `toml`, etc.).
-    pub format: Option<String>,
     /// Target export types specified by `export.type` (or `export_type`).
     pub export_type: Vec<ExportType>,
     /// Default output path specified by `export.path` (or `export_path`) scalar string.
@@ -112,8 +110,7 @@ fn extract_config_from_element(el: &Element, config: &mut DocumentConfig) {
         }
     }
 
-    // 2. Process the element's value as data -- `{key: value}` pairs, or
-    // a `+++` fence body read with its declared `format:`.
+    // 2. Process the element's value as data -- `{key: value}` pairs.
     if let Some(Value::Map(entries)) = crate::embedded::element_data(el) {
         for (k, v) in &entries {
             process_config_entry(k, v, config);
@@ -138,9 +135,7 @@ fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
 
     match k {
         "format" => {
-            if let Some(s) = v.as_str() {
-                config.format = Some(s.to_string());
-            } else if let Some(table) = v.get("table") {
+            if let Some(table) = v.get("table") {
                 if let Some(adjust_width) = table.get("adjust_width") {
                     config.table_adjust_width = is_truthy(adjust_width);
                     if let Some(s) = adjust_width.as_str() {
@@ -299,12 +294,11 @@ mod tests {
     #[test]
     fn parses_grouped_export_config_args() {
         let doc = parse_document(
-            "@config(\n  format: json\n  export: {\n    type: commonmark\n    path: \"README.md\"\n  }\n)\n",
+            "@config(\n  export: {\n    type: commonmark\n    path: \"README.md\"\n  }\n)\n",
         )
         .unwrap();
 
         let config = document_config(&doc);
-        assert_eq!(config.format.as_deref(), Some("json"));
         assert_eq!(config.export_type, vec![ExportType::CommonMark]);
         assert_eq!(config.export_path.as_deref(), Some("README.md"));
         assert_eq!(
@@ -344,7 +338,8 @@ mod tests {
 
     #[test]
     fn parses_table_adjust_width_config() {
-        let doc = parse_document("@settings(format:json)+++\n{\n  \"table\": {\n    \"adjust_width\": \"true\"\n  }\n}\n+++\n").unwrap();
+        let doc =
+            parse_document("@settings{\n  table: {\n    adjust_width: true\n  }\n}\n").unwrap();
         let config = document_config(&doc);
         assert!(config.table_adjust_width);
     }

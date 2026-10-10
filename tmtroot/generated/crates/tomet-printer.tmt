@@ -32,7 +32,7 @@ Rendering elements, values, args, and connects.
 ====[ fn render_element ]
 
 Render an [`Element`] AST node into Tomet syntax:
-`<sigil><name>(args)[content]{value}`, or `<sigil><name>+++body+++`.
+`<sigil><name>(args)[content]{value}`.
 
 ==[ Module id ]
 

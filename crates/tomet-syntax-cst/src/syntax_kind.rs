@@ -81,8 +81,6 @@ pub enum SyntaxKind {
     ID_GROUP,
     /// `:name(...)`, `:(...)`, `:{...}` -- a group joined to the preceding element.
     CONNECT,
-    /// A `+++ ... +++` fenced body of an element.
-    FENCE,
     VALUE_DATA,
     VALUE_CHILDREN,
     MAP_ENTRY,

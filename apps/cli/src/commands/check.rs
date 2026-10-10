@@ -254,7 +254,7 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/vocabularies")).unwrap();
         fs::write(
             dir.join("default.config.tmt"),
-            "@kind(config)\n@config(format:json)+++\n{ \"vocabularies\": [\".tomet/vocabularies/deck.vocabulary.tmt\"] }\n+++\n",
+            "@kind(config)\n@config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
         )
         .unwrap();
         fs::write(

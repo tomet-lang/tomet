@@ -241,7 +241,7 @@ pub enum Command {
         json: bool,
     },
 
-    /// Refactor .tmt file(s) across a workspace (URL macros, @meta.type -> @kind, Value DSL normalization).
+    /// Refactor .tmt file(s) across a workspace (URL macros, @meta.type -> @kind).
     Refactor {
         /// Target file or directory path (defaults to current directory ".").
         #[arg(default_value = ".")]
@@ -255,9 +255,6 @@ pub enum Command {
         /// Only promote @meta.type to @kind.
         #[arg(long)]
         meta_kind: bool,
-        /// Only normalize @meta(format:yaml) to Value DSL.
-        #[arg(long)]
-        value_dsl: bool,
         /// Check/dry-run mode without modifying files (exits non-zero if changes are needed).
         #[arg(long, conflicts_with = "in_place")]
         check: bool,

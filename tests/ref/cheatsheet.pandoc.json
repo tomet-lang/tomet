@@ -4,19 +4,27 @@
     23,
     1
   ],
-  "meta": {},
-  "blocks": [
-    {
-      "t": "CodeBlock",
+  "meta": {
+    "key": {
+      "t": "MetaInlines",
       "c": [
-        [
-          "",
-          [],
-          []
-        ],
-        "@meta(format:json)+++\n{\n  \"key\": \"value\",\n  \"type\": \"person\"\n}\n+++\n@meta(format:yaml)+++\nkey: value\ndate: time\ntype: character\n+++\n@meta(format:toml)+++\nkey = \"value\"\ntype = \"location\"\n+++\n// #meta(format:ini){\n//   key = \"value\"\n// }\n// #meta(format:kdl){\n//   key = \"value\"\n// }"
+        {
+          "t": "Str",
+          "c": "value"
+        }
       ]
     },
+    "type": {
+      "t": "MetaInlines",
+      "c": [
+        {
+          "t": "Str",
+          "c": "person"
+        }
+      ]
+    }
+  },
+  "blocks": [
     {
       "t": "Para",
       "c": [
@@ -281,7 +289,19 @@
           ],
           []
         ],
-        []
+        [
+          {
+            "t": "CodeBlock",
+            "c": [
+              [
+                "",
+                [],
+                []
+              ],
+              "don't forget: check [this] and [that]"
+            ]
+          }
+        ]
       ]
     },
     {

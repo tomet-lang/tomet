@@ -313,7 +313,7 @@ fn list(items: impl Iterator<Item = Element>) -> List {
 /// Text with `` `code` `` spans turned into inline code. An unbalanced
 /// backtick means it was not meant as one, so the text is kept as written.
 ///
-/// Whatever could start an element -- `@config`, `@meta(format:yaml)`,
+/// Whatever could start an element -- `@config`, `@meta(id:x)`,
 /// `${x}`, `^n(1)` -- is made code too. Inline text has no escape for those
 /// and the printer writes a `Text` verbatim, so left as text they would come
 /// back as elements when the file is read.

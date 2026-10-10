@@ -107,36 +107,23 @@ const CASES: &[Case] = &[
     ),
     case(None, "行中の `#` は普通の文字", "C# と F# の話\n"),
     case(None, "`<` はもうシジルではない", "型は Vec<T> と書く\n"),
-    // ---- the +++ fence ----------------------------------------------
+    // ---- fenced raw body nested in [content] -------------------------
     case(
-        Some("`+++` フェンス"),
-        "閉じる `+++` だけの行まで逐語。括弧も引用符もそのまま",
-        "@memo+++\ndon't forget [this]\n+++\n",
+        Some("`[content]` に入れ子になった backtick フェンス"),
+        "`[content]` は要素本体と同じ再帰文法を共有するので、backtick\
+         フェンスも入れ子にできる。閉じる backtick の行まで逐語、\
+         括弧も引用符もそのまま",
+        "@memo[\n```\ndon't forget [this]\n```\n]\n",
     ),
     case(
         None,
-        "本文に `+++` があるときは長い走りで囲む",
-        "@memo++++\n+++\nまだ本文\n++++\n",
-    ),
-    case(
-        None,
-        "閉じないまま EOF に達したらそこで終わる",
-        "@memo+++\n閉じない\n",
+        "本文に backtick の行があるときは長い走りで囲む",
+        "@memo[\n````\n```\nまだ本文\n````\n]\n",
     ),
     case(
         None,
         "`${...}` は展開されず逐語で残る",
-        "@config(format:json)+++\n{\"gh\": \"x/${1}\"}\n+++\n",
-    ),
-    case(
-        None,
-        "引用符の中の `}` で本文が途切れない",
-        "@meta(format:yaml)+++\na: \"}\"\nb: 1\n+++\n",
-    ),
-    case(
-        None,
-        "`format:` は解釈だけを決め、字句解析には影響しない",
-        "@zzz(format:yaml)+++\na: 1\n+++\n",
+        "@config[\n```\n{\"gh\": \"x/${1}\"}\n```\n]\n",
     ),
     // ---- value groups -----------------------------------------------
     case(
@@ -636,10 +623,6 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
                         }
                     }
                 }
-                Some(ElementValue::Raw(body)) => {
-                    indent(out, depth + 1);
-                    let _ = writeln!(out, "raw     {body:?}");
-                }
                 Some(ElementValue::Interp(expr)) => {
                     indent(out, depth + 1);
                     let _ = writeln!(out, "interp  {}", interp_str(expr));
@@ -729,10 +712,6 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
         }
     }
     match &el.value {
-        Some(ElementValue::Raw(body)) => {
-            indent(out, depth + 1);
-            let _ = writeln!(out, "raw     {body:?}");
-        }
         Some(ElementValue::Interp(expr)) => {
             indent(out, depth + 1);
             let _ = writeln!(out, "interp  {}", interp_str(expr));

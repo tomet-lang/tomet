@@ -2,7 +2,6 @@
 
 [
   (fenced_code_block)
-  (raw_fence)
   (block_comment)
   (value_group)
   (content_group)

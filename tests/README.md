@@ -66,22 +66,16 @@ Some references are legitimately empty: a config-only document such as
 `test.config.tmt` renders to nothing in HTML/Typst, because `@meta` and
 `@config` are invisible in output formats.
 
-One set is known to be wrong rather than merely unverified. Every
-`ref/examples/bookmark.*` records the document parsed as a single
-paragraph. `fixtures/examples/bookmark.tmt` writes
-`@bookmark(...){ id: ..., tags: [...] }+++ ... +++`, and `{value}` and a
-`+++` fence are exclusive (`element.rs`, and `docs/spec/types.tmt` says
-so): taking the `{...}` group fills the element's value, so the `+++` is
-never read as a fence, the element does not end its line, and the rest of
-the file flows into the paragraph.
-
-The real gap is in the language, not the fixture: there is no spelling
-for *an element with attributes and a verbatim body*, which is exactly
-what a bookmark wants. Deferred deliberately -- it is one example
-document. If it is picked up, the two options are moving the attributes
-into `(args)`, which works today, or giving the raw body its own slot
-instead of sharing `Element::value`. Either way, regenerate these
-references rather than diffing against them.
+`fixtures/examples/bookmark.tmt` used to be a known-wrong reference: it
+wrote `@bookmark(...){ id: ..., tags: [...] }+++ ... +++`, and `{value}`
+and a `+++` fence were exclusive, so taking the `{...}` group filled the
+element's value, the `+++` was never read as a fence, the element never
+ended its line, and the rest of the file flowed into one paragraph. The
+`+++` fence has since been retired entirely; *an element with attributes
+and a verbatim body* now just means putting the raw body in `[content]`
+as a nested backtick fence, a slot `{value}` never competed with --
+`@bookmark(...){ id: ..., tags: [...] }[` followed by a fenced code block
+and `]`. The fixture and its references were updated accordingly.
 
 ## `fixtures/` is deliberately not synced with `docs/`
 

@@ -1586,10 +1586,6 @@
         {
           "type": "SYMBOL",
           "name": "value_group"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "raw_fence"
         }
       ]
     },
@@ -1633,10 +1629,6 @@
             {
               "type": "SYMBOL",
               "name": "value_group"
-            },
-            {
-              "type": "SYMBOL",
-              "name": "raw_fence"
             }
           ]
         }
@@ -1713,10 +1705,6 @@
           "value": ")"
         }
       ]
-    },
-    "raw_fence": {
-      "type": "SYMBOL",
-      "name": "_raw_fence_token"
     },
     "identifier": {
       "type": "PATTERN",
@@ -2080,10 +2068,6 @@
     {
       "type": "SYMBOL",
       "name": "_list_marker_gap"
-    },
-    {
-      "type": "SYMBOL",
-      "name": "_raw_fence_token"
     }
   ],
   "inline": [],

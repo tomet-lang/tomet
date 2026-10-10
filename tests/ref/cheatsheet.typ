@@ -1,27 +1,3 @@
-```
-@meta(format:json)+++
-{
-  "key": "value",
-  "type": "person"
-}
-+++
-@meta(format:yaml)+++
-key: value
-date: time
-type: character
-+++
-@meta(format:toml)+++
-key = "value"
-type = "location"
-+++
-// #meta(format:ini){
-//   key = "value"
-// }
-// #meta(format:kdl){
-//   key = "value"
-// }
-```
-
 `${some_id}`
 
 `${sum(a, b)}`
@@ -49,6 +25,13 @@ type = "location"
 ```sh
 sudo whoami ls --help
 ```
+
+// tomet:memo
+```
+don't forget: check [this] and [that]
+```
+
+
 
 #quote(block: true)[引用文]
 

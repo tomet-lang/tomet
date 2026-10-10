@@ -6,7 +6,6 @@
 	"patterns": [
 		{ "include": "#comments" },
 		{ "include": "#fenced-code-block" },
-		{ "include": "#raw-fence" },
 		{ "include": "#section" },
 		{ "include": "#thematic-break" },
 		{ "include": "#list-marker" },
@@ -475,8 +474,8 @@
 					]
 				},
 				{
-					"comment": "Mid-line: an element needs one of `( [ { :` or a `+++` fence after the name. Without one it is text -- `連絡は me@example.com まで` is a paragraph. The whitespace in the lookahead is what spec/syntax.tmt's `@name () [] {}` spelling needs; the group does not have to be flush against the name.",
-					"match": "(?<![A-Za-z0-9_])(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*(?:[(\\[{:|]|\\+{3,}))",
+					"comment": "Mid-line: an element needs one of `( [ { :` after the name. Without one it is text -- `連絡は me@example.com まで` is a paragraph. The whitespace in the lookahead is what spec/syntax.tmt's `@name () [] {}` spelling needs; the group does not have to be flush against the name.",
+					"match": "(?<![A-Za-z0-9_])(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*[(\\[{:|])",
 					"captures": {
 						"1": { "name": "entity.name.tag.sigil.tomet entity.name.tag.tomet" },
 						"2": { "name": "entity.name.tag.tomet" }
@@ -530,19 +529,6 @@
 			},
 			"name": "meta.group.curly.tomet",
 			"patterns": [{ "include": "#value" }, { "include": "#element" }]
-		},
-
-		"raw-fence": {
-			"comment": "A `+++` fence carries a raw or embedded body: `@memo+++`, `@meta(format:yaml)+++`. It opens at the end of an element head and closes on a line holding only the run. A longer run escapes a body containing `+++`, matching the backtick fence's rule. The lookbehind is what keeps this from firing on the closing line: an opener always follows a name or a group's closing bracket.",
-			"begin": "(?<=[)\\]}A-Za-z0-9_-])(\\+{3,})[ \\t]*$",
-			"beginCaptures": {
-				"1": { "name": "punctuation.definition.raw.begin.tomet keyword.control.raw.tomet" }
-			},
-			"end": "^[ \\t]*(\\+{3,})[ \\t]*$",
-			"endCaptures": {
-				"1": { "name": "punctuation.definition.raw.end.tomet keyword.control.raw.tomet" }
-			},
-			"name": "markup.raw.block.fence.tomet"
 		},
 
 		"groups": {

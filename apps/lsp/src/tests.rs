@@ -261,7 +261,7 @@ fn hover_on_macro_defined_in_settings_file_ref() {
     let config_path = dir.join("default.config.tmt");
     std::fs::write(
         &config_path,
-        "@config(format:json)+++\n{\n  \"macros\": {\n    \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n+++\n",
+        "@config{\n  macros: {\n    youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n",
     )
     .unwrap();
 
@@ -315,7 +315,7 @@ fn hover_on_macro_auto_discovered_from_workspace_config() {
     let config_path = dir.join("default.config.tmt");
     std::fs::write(
         &config_path,
-        "@config(format:json)+++\n{\n  \"macros\": {\n    \"youtube_video\": \"https://www.youtube.com/watch?v=${1}\",\n    \"twitter_post\": \"https://x.com/${1}/status/${2}\"\n  }\n}\n+++\n",
+        "@config{\n  macros: {\n    youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n    twitter_post: \"https://x.com/${1}/status/${2}\"\n  }\n}\n",
     )
     .unwrap();
 

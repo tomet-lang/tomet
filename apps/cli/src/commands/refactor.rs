@@ -5,17 +5,15 @@ pub(crate) fn refactor_cmd(
     in_place: bool,
     url_macros: bool,
     meta_kind: bool,
-    value_dsl: bool,
     check: bool,
     force: bool,
 ) -> anyhow::Result<()> {
-    let options = if !url_macros && !meta_kind && !value_dsl {
+    let options = if !url_macros && !meta_kind {
         tomet_workspace::RefactorOptions::default()
     } else {
         tomet_workspace::RefactorOptions {
             url_to_macros: url_macros,
             meta_type_to_kind: meta_kind,
-            meta_to_value_dsl: value_dsl,
             ..tomet_workspace::RefactorOptions::default()
         }
     };
@@ -119,7 +117,7 @@ mod tests {
         fs::write(temp_dir.join("fine.tmt"), "@kind(note)\n\n=[ Title ]\n").unwrap();
         fs::write(temp_dir.join("broken.tmt"), "=[ unterminated\n").unwrap();
 
-        let res = refactor_cmd(&temp_dir, false, false, false, false, true, false);
+        let res = refactor_cmd(&temp_dir, false, false, false, true, false);
         assert!(
             res.is_err(),
             "--check must not pass while a file could not be parsed"
@@ -135,10 +133,10 @@ mod tests {
         let src_file = temp_dir.join("doc.tmt");
 
         let src_content = r#"@version(1.0)
-@meta(format:yaml)+++
-type: note
-title: My Title
-+++
+@meta{
+  type: note
+  title: "My Title"
+}
 @config{
   macros: {
     gh: "https://github.com/${1}"
@@ -149,13 +147,12 @@ title: My Title
 "#;
         fs::write(&src_file, src_content).unwrap();
 
-        let res = refactor_cmd(&src_file, true, false, false, false, false, false);
+        let res = refactor_cmd(&src_file, true, false, false, false, false);
         assert!(res.is_ok());
 
         let refactored = fs::read_to_string(&src_file).unwrap();
         assert!(refactored.contains("@kind(note)"));
         assert!(refactored.contains("$gh(\"tomet/tomet\")"));
-        assert!(!refactored.contains("format:yaml"));
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
@@ -170,17 +167,17 @@ title: My Title
         let _ = fs::create_dir_all(&frozen_dir);
         fs::write(
             vault.join("default.config.tmt"),
-            "@kind(config)\n@config(format:json)+++\n{ \"workspace\": { \"unswept\": [\"tests/fixtures\"] } }\n+++\n",
+            "@kind(config)\n@config{ workspace: { unswept: list(\"tests/fixtures\") } }\n",
         )
         .unwrap();
         let frozen = frozen_dir.join("f.tmt");
-        let old = "@meta(format:yaml)+++\ntype: note\n+++\n";
+        let old = "@meta{\n  type: note\n}\n";
         fs::write(&frozen, old).unwrap();
 
-        refactor_cmd(&frozen, true, false, false, false, false, false).unwrap();
+        refactor_cmd(&frozen, true, false, false, false, false).unwrap();
         assert_eq!(fs::read_to_string(&frozen).unwrap(), old, "left alone");
 
-        refactor_cmd(&frozen, true, false, false, false, false, true).unwrap();
+        refactor_cmd(&frozen, true, false, false, false, true).unwrap();
         assert_ne!(
             fs::read_to_string(&frozen).unwrap(),
             old,

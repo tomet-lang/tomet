@@ -10,10 +10,7 @@ use tomet_load_config::find_config_file;
 use tomet_indexer::{collect_tm_files_with_config, is_excluded_by_config};
 use tomet_parser::parse_document;
 use tomet_printer::document_to_tm_with_config;
-use tomet_transform::{
-    MacroSet, normalize_embedded_to_value_dsl, promote_meta_type_to_kind,
-    transform_link_targets_with_macros,
-};
+use tomet_transform::{MacroSet, promote_meta_type_to_kind, transform_link_targets_with_macros};
 
 use crate::diff::FileDiff;
 
@@ -24,8 +21,6 @@ pub struct RefactorOptions {
     pub url_to_macros: bool,
     /// Promote `@meta` `type:` field to top-level `@kind(...)` element.
     pub meta_type_to_kind: bool,
-    /// Normalize `@meta(format:yaml)` to native Value DSL `@meta`.
-    pub meta_to_value_dsl: bool,
     /// Also refactor files and directories the project config excludes
     /// (`workspace.ignore`, `workspace.unswept`). Off by default: a file
     /// named explicitly is held to the same exclusions as one a sweep finds.
@@ -37,7 +32,6 @@ impl Default for RefactorOptions {
         Self {
             url_to_macros: true,
             meta_type_to_kind: true,
-            meta_to_value_dsl: true,
             force: false,
         }
     }
@@ -65,10 +59,6 @@ pub fn refactor_document(
         total_changes += 1;
     }
 
-    if options.meta_to_value_dsl && normalize_embedded_to_value_dsl(doc) {
-        total_changes += 1;
-    }
-
     total_changes
 }
 
@@ -86,9 +76,6 @@ pub fn refactor_document(
 /// `FileDiff::is_changed` is `changes_count > 0` precisely so a file no
 /// rule touched is never rewritten. It is `-i` on a file a rule *does*
 /// touch that costs you the comments.
-///
-/// The `+++` fence used to be collapsed onto one line here too. That half
-/// is fixed: a fence is delimited by lines, so the printer reproduces it.
 pub fn refactor_source(
     src: &str,
     config: &PrinterConfig,
@@ -97,12 +84,7 @@ pub fn refactor_source(
     let mut doc = parse_document(src).map_err(|e| anyhow::anyhow!("parse error: {e}"))?;
     let changes = refactor_document(&mut doc, config, options);
 
-    let mut effective_config = config.clone();
-    if options.meta_to_value_dsl {
-        effective_config.meta.format = None;
-    }
-
-    let rendered = document_to_tm_with_config(&doc, &effective_config);
+    let rendered = document_to_tm_with_config(&doc, config);
     let formatted = format_source(&rendered);
 
     Ok((formatted, changes))

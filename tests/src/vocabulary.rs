@@ -80,10 +80,10 @@ const CASES: &[Case] = &[
         kind: Ident::ArgKey,
     },
     Case {
-        label: "`(format:json)` does not change how a `+++` fence is lexed \
+        label: "`(format:json)` does not change how `{...}` is lexed \
                 (was element.rs `local_format_key`)",
-        known: "@x(format:json)+++\n{\"a\": 1}\n+++\n",
-        unknown: "@x(zformat:json)+++\n{\"a\": 1}\n+++\n",
+        known: "@x(format:json){ a: 1 }\n",
+        unknown: "@x(zformat:json){ a: 1 }\n",
         known_ident: "format",
         unknown_ident: "zformat",
         kind: Ident::ArgKey,
@@ -103,8 +103,8 @@ const CASES: &[Case] = &[
     Case {
         label: "`#config` sets no document-wide lexing mode \
                 (was element.rs `is_config`, threaded as `running_format`)",
-        known: "@config(format:json)+++\n{\"a\": 1}\n+++\n\n@x{ b: 2 }\n",
-        unknown: "@zzz(format:json)+++\n{\"a\": 1}\n+++\n\n@x{ b: 2 }\n",
+        known: "@config(format:json){ a: 1 }\n\n@x{ b: 2 }\n",
+        unknown: "@zzz(format:json){ a: 1 }\n\n@x{ b: 2 }\n",
         known_ident: "config",
         unknown_ident: "zzz",
         kind: Ident::ElementName,

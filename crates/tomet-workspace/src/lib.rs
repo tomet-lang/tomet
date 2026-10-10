@@ -26,11 +26,11 @@ mod tests {
     #[test]
     fn test_refactor_source_end_to_end() {
         let src = r#"@version(1.0)
-@meta(format:yaml)+++
-id: doc-test1234
-type: task
-created: 2026-04-12T18:00:00+09:00
-+++
+@meta{
+  id: doc-test1234
+  type: task
+  created: 2026-04-12T18:00:00+09:00
+}
 @config{
   macros: {
     youtube_ch: "https://www.youtube.com/${1}"
@@ -44,11 +44,10 @@ created: 2026-04-12T18:00:00+09:00
         let opts = RefactorOptions::default();
 
         let (result, count) = refactor_source(src, &cfg, &opts).unwrap();
-        assert!(count >= 2);
+        assert!(count >= 1);
 
         assert!(result.contains("@kind(task)"));
         assert!(result.contains("@meta"));
-        assert!(!result.contains("format:yaml"));
         assert!(!result.contains("type: task"));
         assert!(result.contains("$youtube_ch(\"@realakibaboyz\")"));
     }

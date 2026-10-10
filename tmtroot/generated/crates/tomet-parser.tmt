@@ -32,7 +32,10 @@ editor syntax highlighting.
 - `element`: Typed elements (`<T>`, `@name`, bare `@`), group ordering, and connect syntax.
 - `section`: Headings (`=[...]`) and thematic breaks (`---`, `---[ title ]---`).
 - `list`: Ordered and unordered lists (`-`, `-.`), markers, and item attributes.
-- `codeblock` / `fence`: Fenced code blocks and raw verbatim fence spans (`+++`).
+- `codeblock` / `fence`: Fenced code blocks (` ` ```) and the
+
+line-oriented fence scan they share.
+
 - `inline`: Inline scanning, formatting delimiters (`*em*`, `**strong**`, `==mark==`), autolinks.
 - `interp`: `${...}` interpolation expressions (identifiers, member chains, calls, literals).
 - `caret`: `^(id)` or `^name(id)` caret reference element parsing.
@@ -59,7 +62,7 @@ ROOT
 
 An element (`BLOCK_ELEMENT`, `INLINE_ELEMENT`) is a `SIGIL` followed by
 its groups -- `ARGS` `( )`, `VALUE_DATA` `{ }`, `CONTENT` `[ ]`, at most
-one of each -- then any `CONNECT` (`:name(...)`) and `FENCE` (`+++`).
+one of each -- then any `CONNECT` (`:name(...)`).
 `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
 `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
 `MAP_LITERAL`, `SEQ_LITERAL` or (a call such as `list(...)`) `ARGS`.

@@ -1,7 +1,5 @@
 @kind(fixture)
-@meta(format:yaml)+++
-id: doc-interpolation
-+++
+@meta{ id: doc-interpolation }
 
 =[ 補間の識別子は要素の識別子と同じ形 ]
 

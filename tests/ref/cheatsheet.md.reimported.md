@@ -1,27 +1,3 @@
-```
-@meta(format:json)+++
-{
-  "key": "value",
-  "type": "person"
-}
-+++
-@meta(format:yaml)+++
-key: value
-date: time
-type: character
-+++
-@meta(format:toml)+++
-key = "value"
-type = "location"
-+++
-// #meta(format:ini){
-//   key = "value"
-// }
-// #meta(format:kdl){
-//   key = "value"
-// }
-```
-
 `$`{some\_id}
 
 `$`{sum(a, b)}

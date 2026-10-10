@@ -98,20 +98,6 @@ worse failure mode for a comment than for e.g. a code span. Here an
 unmatched `/*` just fails to lex as `block_comment` and falls back
 to ordinary `text`/`punctuation` tokens instead.
 
-- [ @strong[A real embedded JSON/YAML/TOML body inside an element's `{...}`
-    (any element whose `(args)` has a `format:json|yaml|toml` key, not
-    just `@meta`) isn't understood as such.] `tomet-parser` hands ]
-
-that body as-is to `serde_json`/`serde_yaml`/`toml` (see
-`tomet-parser::embedded_format`), but this grammar has no idea a
-`{value}` group's content might be a different language -- it still
-tries its own `map`/`scalar` rules. A quoted JSON key
-(`{ "key": "value" }`, needed since JSON has no bare-identifier keys
--- see `tests/fixtures/readme.tmt`'s `@meta(format:json)` block) doesn't
-match `map_entry`'s bare-identifier `key` field, so the nested
-`{...}` becomes an `ERROR`. Not worth a real per-format sub-grammar
-here -- this crate is for editor highlighting, not validation.
-
 - `thematic_break`'s dash run only ever consumes exactly 3 `-`,
 
 even when the source has more (`-----` -> a 3-dash `thematic_break`
@@ -145,15 +131,14 @@ scalar directly inside `(...)`/`{...}` (e.g. a bare tag like `@foo(yaml)`,
 or `{required}`) now parses as a clean `scalar` instead of an `ERROR`.
 
 `_value_scalar`'s regex (see its own comment in `grammar.js`) resolves
-another former limitation: a `key: [seq]` map entry (e.g.
-`tags: [a, b]`, as in `tests/fixtures/examples/image.meta.tmt`'s
-`@meta(format:yaml){...}`) used to get GLR-merged with a second,
-spurious top-level `seq` reading of the same `[...]` text, wrapping
-the whole map in an `ERROR` -- not just when that entry was last in
-the map with no trailing comma (the case originally found), but for
-an earlier, non-last `key: [seq]` entry too. Root cause: the regex
-never excluded space/tab from its character class, so it could match
-a lone leading space (between `:` and `[`) as a complete one-character
+another former limitation: a `key: list(...)` map entry (e.g.
+`tags: list(a, b)`) used to get GLR-merged with a second, spurious
+top-level reading of the same text, wrapping the whole map in an
+`ERROR` -- not just when that entry was last in the map with no
+trailing comma (the case originally found), but for an earlier,
+non-last `key: list(...)` entry too. Root cause: the regex never
+excluded space/tab from its character class, so it could match a lone
+leading space (between `:` and the value) as a complete one-character
 token in its own right, and tree-sitter's lexer took that real, if
 useless, token match over skipping the space as `extras` first --
 same class of bug `SCALAR`/`LIST_MARKER_GAP` already existed to route

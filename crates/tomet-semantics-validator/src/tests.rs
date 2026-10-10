@@ -86,8 +86,7 @@ fn a_rule_with_only_allowed_descendants_is_clean() {
 
 #[test]
 fn a_disallowed_descendant_is_reported() {
-    let doc =
-        parse("@section[ @card(title:\"a\")[ x ] @heading[ y ] ]:rule(allow:list(card))\n");
+    let doc = parse("@section[ @card(title:\"a\")[ x ] @heading[ y ] ]:rule(allow:list(card))\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -135,10 +134,9 @@ fn a_typoed_connect_name_is_reported() {
 /// requires this check to live in the validator rather than earlier.
 #[test]
 fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
-    let vocab = tomet_parser::parse_document(
-        "@kind(vocabulary)\n@vocabulary(ns)\n\n@element(mycard){}\n",
-    )
-    .expect("vocabulary parses");
+    let vocab =
+        tomet_parser::parse_document("@kind(vocabulary)\n@vocabulary(ns)\n\n@element(mycard){}\n")
+            .expect("vocabulary parses");
     let bindings = Bindings {
         used: std::collections::BTreeMap::from([(
             "ns".to_string(),
@@ -411,9 +409,9 @@ fn an_unregistered_name_under_doc_is_still_unknown_when_embedded() {
     let doc = parse("@meta(icon: @doc.glyph(\"triangle\"))\n");
     let errors = validate_document(&doc);
     assert!(
-        errors.iter().any(
-            |e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "doc.glyph")
-        ),
+        errors
+            .iter()
+            .any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "doc.glyph")),
         "{errors:?}"
     );
 }
@@ -477,8 +475,7 @@ fn conflict_is_a_warning() {
 /// a `ShapeMismatch`.
 #[test]
 fn an_unfinished_marker_is_not_a_shape_error_in_either_position() {
-    let doc =
-        parse("@kind(note)\n\n@draft[ 節まるごと ]\n\n文の途中の @draft[ 一語 ] も可。\n");
+    let doc = parse("@kind(note)\n\n@draft[ 節まるごと ]\n\n文の途中の @draft[ 一語 ] も可。\n");
     assert!(
         !validate_document(&doc)
             .iter()
@@ -504,14 +501,14 @@ fn an_unknown_element_is_still_an_error() {
 #[test]
 fn a_retired_settings_key_is_reported() {
     let doc = parse(
-        "@kind(settings)\n@settings(format:json)+++\n\
-         { \"elements\": { \"bookmark\": { \"singleton\": false } } }\n+++\n",
+        "@kind(settings)\n@settings{\n\
+         elements: { bookmark: { singleton: false } }\n}\n",
     );
     let errors = validate_document(&doc);
     assert!(
-        errors.iter().any(
-            |e| matches!(e, Diagnostic::RetiredSettingsKey { key, .. } if key == "elements")
-        ),
+        errors
+            .iter()
+            .any(|e| matches!(e, Diagnostic::RetiredSettingsKey { key, .. } if key == "elements")),
         "{errors:?}"
     );
 }
@@ -521,8 +518,8 @@ fn a_retired_settings_key_is_reported() {
 #[test]
 fn the_types_map_is_retired_too_and_says_it_has_no_replacement() {
     let doc = parse(
-        "@kind(settings)\n@settings(format:json)+++\n\
-         { \"types\": { \"bookmark\": { \"style\": \"one_line\" } } }\n+++\n",
+        "@kind(settings)\n@settings{\n\
+         types: { bookmark: { style: one_line } }\n}\n",
     );
     let errors = validate_document(&doc);
     let reported = errors
@@ -540,9 +537,9 @@ fn the_types_map_is_retired_too_and_says_it_has_no_replacement() {
 #[test]
 fn a_settings_document_using_only_live_keys_is_clean() {
     let doc = parse(
-        "@kind(config)\n@config(format:json)+++\n\
-         { \"format\": { \"callout\": { \"style\": { \"content\": \"block\" } } },\n\
-         \"macros\": { \"gh\": \"https://example.com/${1}\" } }\n+++\n",
+        "@kind(config)\n@config{\n\
+         format: { callout: { style: { content: block } } }\n\
+         macros: { gh: \"https://example.com/${1}\" }\n}\n",
     );
     let errors = validate_document(&doc);
     assert!(

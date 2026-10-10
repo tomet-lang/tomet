@@ -15,11 +15,6 @@ tomet-semantics = { workspace = true }
 tomet-style = { workspace = true }
 tomet-tree = { workspace = true }
 
-#= Crates.io
-serde_json = { workspace = true }
-serde_yaml = { workspace = true }
-toml = { workspace = true }
-
 [dev-dependencies]
 tomet-markdown = { workspace = true }
 tomet-parser = { workspace = true }

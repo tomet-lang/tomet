@@ -26,12 +26,7 @@ module.exports = grammar({
 	// unbounded lookahead past that whitespace, which a `token()` regex
 	// can't backtrack out of once `extras`/precedence has already
 	// committed to one interpretation.
-	externals: ($) => [
-		$._scalar_token,
-		$._list_marker_token,
-		$._list_marker_gap,
-		$._raw_fence_token,
-	],
+	externals: ($) => [$._scalar_token, $._list_marker_token, $._list_marker_gap],
 
 	// `heading`'s optional `{attrs}` can follow `]` either on the same
 	// line or after exactly one newline (see the real fixture examples in
@@ -544,13 +539,7 @@ module.exports = grammar({
 		// bare merge included, not just the named-connect check inside
 		// it).
 		_plain_group: ($) =>
-			choice(
-				$.args_group,
-				$.content_group,
-				$.marked_content,
-				$.value_group,
-				$.raw_fence,
-			),
+			choice($.args_group, $.content_group, $.marked_content, $.value_group),
 		// The original, unchanged bare-merge/plain-group form -- kept
 		// exactly as it was (a flat `seq`, not nested inside a further
 		// `choice`) because `inline_element`'s own `prec.right(3, ...)`
@@ -571,13 +560,7 @@ module.exports = grammar({
 		_element_group: ($) =>
 			seq(
 				optional(token(prec(1, ":"))),
-				choice(
-					$.args_group,
-					$.content_group,
-					$.marked_content,
-					$.value_group,
-					$.raw_fence,
-				),
+				choice($.args_group, $.content_group, $.marked_content, $.value_group),
 			),
 		// `:name(...)` -- one member of a closed family attached after an
 		// element (`@x(...):as(y):rule(...)`), e.g. `:rule(allow:list(card))`.
@@ -629,11 +612,6 @@ module.exports = grammar({
 		// bare `#` (the fallback for one with nothing to open), an
 		// equal-length tie this token must win.
 		id_group: ($) => seq(token(prec(1, "#")), "(", $.value, ")"),
-		// The whole fence -- opener, body and closer -- is one token from
-		// the external scanner. See `src/scanner.c` for why it is taken
-		// whole rather than split into three.
-		raw_fence: ($) => $._raw_fence_token,
-
 		identifier: (_$) => /[A-Za-z_][A-Za-z0-9_.-]*/,
 		// `inline_element`'s name field specifically: needs
 		// higher lexical precedence than `text` (both can match e.g. "meta"

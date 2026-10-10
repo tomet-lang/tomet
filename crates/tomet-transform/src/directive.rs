@@ -1,10 +1,8 @@
 //! Directive promotion and Value DSL normalization transformations.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Sigil, Value};
-use tomet_semantics::{ElementKind, classify_std_lenient, embedded::element_format};
-use tomet_tree::{
-    DocumentExt, ElementExt, element_new, for_each_element_mut, for_each_top_level_element_mut,
-};
+use tomet_ast::{Block, Document, Element, Sigil, Value};
+use tomet_semantics::{ElementKind, classify_std_lenient};
+use tomet_tree::{DocumentExt, ElementExt, element_new, for_each_top_level_element_mut};
 
 /// Promotes a property `prop_key` from an element matching `source_filter` into a new top-level
 /// directive `@target_directive_name(val)` (or `@target_directive_name{...}`), inserting it at `target_index`
@@ -33,13 +31,6 @@ where
         if extracted_val.is_some() || !source_filter(el) {
             return;
         }
-        // A `+++` fence body is opaque text, so there is no key to
-        // remove from it. Read it through its declared `format:`
-        // and rewrite it as a native group first -- otherwise this
-        // silently finds nothing whenever the source element was
-        // written as a fence, and depends on the value-DSL
-        // normalization happening to have run first.
-        materialize_raw_body(el);
         extracted_val = el.remove_prop(prop_key);
     });
 
@@ -75,101 +66,6 @@ where
 
     doc.insert_block(insert_pos, Block::Element(new_directive));
     true
-}
-
-/// Rewrites an element's `+++` fence body as a native value group, when
-/// its declared `format:` says how to read it. A no-op otherwise.
-fn materialize_raw_body(el: &mut Element) {
-    if !matches!(el.value, Some(ElementValue::Raw(_))) {
-        return;
-    }
-    if let Some(data) = tomet_semantics::embedded::element_data(el) {
-        el.value = Some(ElementValue::from_map(data));
-    }
-}
-
-/// Whether an element's `+++` body is data that could have been written
-/// as a value group instead.
-///
-/// Everything but a raw block. `@raw(yaml)+++a: 1+++` declares a
-/// format for syntax highlighting and serde_json / serde_yaml
-/// will happily read it -- but that body is a *sample* of YAML, and
-/// rewriting it as a group deletes the thing its author was showing.
-///
-/// A blacklist rather than a list of kinds to include, so an element a
-/// vocabulary declares -- `@deck.note(format:yaml)+++...+++` -- is
-/// covered without being named here. Naming them was the old shape: this
-/// pass only saw `@meta`, so `@config`, `@settings` and every custom
-/// element had to be converted by hand.
-fn body_is_data(el: &Element) -> bool {
-    classify_std_lenient(el) != ElementKind::Raw
-}
-
-/// Normalizes elements in `doc` from `format:yaml` (or another embedded
-/// format) to the native Value DSL.
-///
-/// Reads the body through `embedded::element_data` *before* stripping the
-/// `format` argument, and rewrites it as a native group -- otherwise the
-/// body stays an opaque `+++` fence with nothing left to say how to read
-/// it, and every later pass sees an element with no data.
-pub fn normalize_embedded_to_value_dsl(doc: &mut Document) -> bool {
-    let mut changed = false;
-    for_each_element_mut(doc, |el| {
-        if !body_is_data(el) {
-            return;
-        }
-        // An element with no value declares a format for nothing, and
-        // this pass cannot tell what the author meant by it. Leave it:
-        // `@config(format: json)` is written that way in
-        // `docs/guide/cheatsheet.tmt`, and `format` is a real setting --
-        // `docs/spec/builtin-settings.tmt` makes it the nested container
-        // the formatter reads. An earlier attempt at this deleted it.
-        if el.value.is_none() {
-            return;
-        }
-        if matches!(el.value, Some(ElementValue::Raw(_))) {
-            materialize_raw_body(el);
-            // Still `Raw` means no declared format, or one whose body did
-            // not parse. Either way there is nothing to convert.
-            if matches!(el.value, Some(ElementValue::Raw(_))) {
-                return;
-            }
-            changed = true;
-        }
-        // The value is data now -- either this pass made it so, or an
-        // earlier one did. `promote_meta_type_to_kind` runs first and
-        // materializes the body itself, so requiring `Raw` here would skip
-        // every element it had already touched.
-        //
-        // A scalar `format:` beside a data group describes nothing, so it
-        // goes. A `format:` holding a map is the setting container and is
-        // left alone; `element_format` only reads the scalar spelling.
-        if element_format(el).is_none() {
-            return;
-        }
-        changed = true;
-        match &mut el.args {
-            Some(Value::Map(entries)) => {
-                if let Some(pos) = entries.iter().position(|(k, _)| k == "format") {
-                    entries.remove(pos);
-                    // Only when `format` is what emptied it. An empty `()`
-                    // written on purpose stays: `docs/spec/syntax.tmt`
-                    // makes `@xxx()[]{}` every group explicitly empty,
-                    // distinct from leaving them off, and a todo marker is
-                    // `- ( )`.
-                    if entries.is_empty() {
-                        el.args = None;
-                    }
-                }
-            }
-            // The positional spelling, `@meta(yaml)`.
-            Some(Value::String(fmt)) if fmt == "yaml" || fmt == "json" || fmt == "toml" => {
-                el.args = None;
-            }
-            _ => {}
-        }
-    });
-    changed
 }
 
 /// Promotes `@meta`'s `type:` field to a top-level `@kind(...)` element.

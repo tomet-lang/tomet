@@ -1,4 +1,5 @@
-//! Whitespace-hygiene formatting preserving verbatim raw spans and fence blocks.
+//! Whitespace-hygiene formatting preserving verbatim raw spans (fenced code
+//! blocks, and any `(content:raw)` element).
 
 use tomet_ast::{Block, Document, Element, Inline, ListItem, Value};
 use tomet_parser::parse_document;
@@ -15,7 +16,6 @@ pub fn clean_whitespace(normalized: &str) -> String {
     if let Ok(doc) = parse_document(normalized) {
         collect_raw_spans(&doc, &mut raw_spans);
     }
-    collect_fence_spans(normalized, &mut raw_spans);
 
     let is_offset_raw = |offset: usize| -> bool {
         raw_spans
@@ -78,43 +78,6 @@ pub(crate) fn is_raw_element(el: &Element) -> bool {
         return true;
     }
     false
-}
-
-/// Byte ranges covered by `+++` fence bodies.
-///
-/// Found by scanning lines rather than through the AST: a fence is
-/// line-oriented, so the text alone says exactly where each body starts
-/// and ends, and `ElementValue::Raw` carries no span of its own. Anything
-/// inside is verbatim -- trailing whitespace included, which is the whole
-/// point of writing it in a fence.
-pub(crate) fn collect_fence_spans(src: &str, out: &mut Vec<(usize, usize)>) {
-    let mut offset = 0usize;
-    let mut fence: Option<(usize, usize)> = None; // (run length, body start)
-    for line in src.split_inclusive('\n') {
-        let trimmed = line.trim_end_matches(['\n', '\r']).trim_end();
-        // A closing line is all `+`; an opening run sits at the *end* of
-        // the element head, so the two are counted from opposite sides.
-        let leading = trimmed.len() - trimmed.trim_start_matches('+').len();
-        let trailing = trimmed.len() - trimmed.trim_end_matches('+').len();
-        match fence {
-            Some((open_run, body_start)) => {
-                if leading >= open_run && leading == trimmed.len() && !trimmed.is_empty() {
-                    out.push((body_start, offset));
-                    fence = None;
-                }
-            }
-            None => {
-                if trailing >= 3 {
-                    fence = Some((trailing, offset + line.len()));
-                }
-            }
-        }
-        offset += line.len();
-    }
-    // An unterminated fence runs to EOF, matching the parser.
-    if let Some((_, body_start)) = fence {
-        out.push((body_start, src.len()));
-    }
 }
 
 pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {

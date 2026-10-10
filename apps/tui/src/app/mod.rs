@@ -399,15 +399,11 @@ mod tests {
         let config_file = config_dir.join("default.config.tmt");
         std::fs::write(
             &config_file,
-            r#"@settings(format:json)+++
-{
-  "ignore": {
-    "files": [
-      "00-09 System/01 Apps/obsidian"
-    ]
+            r#"@settings{
+  ignore: {
+    files: list("00-09 System/01 Apps/obsidian")
   }
 }
-+++
 "#,
         )
         .unwrap();

@@ -1,26 +1,4 @@
-```
-@meta(format:json)+++
-{
-  "key": "value",
-  "type": "person"
-}
-+++
-@meta(format:yaml)+++
-key: value
-date: time
-type: character
-+++
-@meta(format:toml)+++
-key = "value"
-type = "location"
-+++
-// #meta(format:ini){
-//   key = "value"
-// }
-// #meta(format:kdl){
-//   key = "value"
-// }
-```
+@meta{key: value, type: person}
 
 `${some_id}`
 
@@ -45,7 +23,10 @@ type = "location"
 ```sh
 sudo whoami ls --help
 ```
-@memo[]
+@memo[```
+don't forget: check [this] and [that]
+```
+]
 @quote[引用文]
 @card[分類を持たない、題名+本文の区画]{ title: 題名 }
 - outline/list

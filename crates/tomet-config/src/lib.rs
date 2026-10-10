@@ -87,42 +87,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_printer_config_meta_format() {
-        let config_src = r#"@config(format:json)+++
-{
-  "format": {
-    "meta": {
-      "format": "yaml"
-    }
-  }
-}
-
-+++"#;
-        let cfg = load_config_from_str(config_src).unwrap();
-        assert_eq!(cfg.meta.format.as_deref(), Some("yaml"));
-    }
-
-    #[test]
     fn test_settings_field_config_parsing() {
-        let settings_src = r#"@settings(format:json)+++
-{
-  "meta": {
-    "aliases": {
-      "type": "list",
-      "always_newline": true
-    },
-    "created": {
-      "type": "datetime",
-      "format": "rfc3339"
-    },
-    "modified": {
-      "type": "datetime",
-      "format": "rfc3339"
+        let settings_src = r#"@settings{
+  meta: {
+    aliases: {
+      type: list
+      always_newline: true
+    }
+    created: {
+      type: datetime
+      format: rfc3339
+    }
+    modified: {
+      type: datetime
+      format: rfc3339
     }
   }
 }
-
-+++"#;
+"#;
         let cfg = load_config_from_str(settings_src).unwrap();
         assert!(cfg.meta.fields.get("aliases").unwrap().always_newline);
         assert_eq!(
@@ -137,9 +119,8 @@ mod tests {
 
     #[test]
     fn callout_style_is_read_from_format_and_no_longer_from_elements() {
-        let live = r#"@config(format:json)+++
-{ "format": { "callout": { "style": { "content": "block" } } } }
-+++"#;
+        let live = r#"@config{ format: { callout: { style: { content: block } } } }
+"#;
         assert_eq!(
             load_config_from_str(live)
                 .unwrap()
@@ -148,9 +129,8 @@ mod tests {
             Some("block".to_string())
         );
 
-        let retired = r#"@config(format:json)+++
-{ "elements": { "callout": { "style": { "content": "block" } } } }
-+++"#;
+        let retired = r#"@config{ elements: { callout: { style: { content: block } } } }
+"#;
         assert_eq!(
             load_config_from_str(retired)
                 .unwrap()
@@ -162,15 +142,11 @@ mod tests {
 
     #[test]
     fn test_ignore_files_config_parsing() {
-        let settings_src = r#"@settings(format:json)+++
-{
-  "ignore": {
-    "files": [
-      "00-09 System/01 Apps/obsidian"
-    ]
+        let settings_src = r#"@settings{
+  ignore: {
+    files: list("00-09 System/01 Apps/obsidian")
   }
 }
-+++
 "#;
         let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
         assert_eq!(
@@ -338,7 +314,6 @@ mod tests {
     fn test_dot_notation_meta_and_merge() {
         let src = r#"@config{
   meta.always_newline: true
-  meta.format: "yaml"
   meta: {
     url.wiki: { type: list, always_newline: true }
     title: { length: 70 }
@@ -349,7 +324,6 @@ mod tests {
 "#;
         let cfg = load_config_from_str(src).expect("failed to parse meta and workspace config");
         assert!(cfg.meta.always_newline);
-        assert_eq!(cfg.meta.format.as_deref(), Some("yaml"));
         assert!(cfg.meta.fields.contains_key("url.wiki"));
         assert!(cfg.meta.fields.get("url.wiki").unwrap().always_newline);
         assert_eq!(cfg.meta.fields.get("title").unwrap().length, Some(70));

@@ -222,12 +222,6 @@ fn render_element_value(cx: &RenderCtx, value: &ElementValue, out: &mut String) 
                 out.push_str("</div>\n");
             }
         }
-        // A `+++` fence body is opaque text.
-        ElementValue::Raw(body) => {
-            out.push_str("<pre class=\"tm-raw\">");
-            out.push_str(&escape_html(body));
-            out.push_str("</pre>");
-        }
         // A `${...}` that reached here unresolved, written back as it was.
         //
         // Reaching here at all means the document was not prepared -- a

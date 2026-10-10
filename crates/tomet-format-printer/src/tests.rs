@@ -91,8 +91,7 @@ fn connects_survive_the_four_specially_printed_kinds() {
 
 #[test]
 fn connects_survive_a_specially_styled_callout() {
-    let doc =
-        tomet_parser::parse_document("@callout(info)[x]:rule(allow: list(card))\n").unwrap();
+    let doc = tomet_parser::parse_document("@callout(info)[x]:rule(allow: list(card))\n").unwrap();
     let cfg = PrinterConfig {
         format: FormatConfig {
             callout_content_style: Some("block".to_string()),
@@ -108,27 +107,12 @@ fn connects_survive_a_specially_styled_callout() {
 }
 
 #[test]
-fn test_markdown_meta_export_with_meta_format() {
-    let md = "---\ntitle: Hello\n---\n\n# World\n";
-    let doc = tomet_markdown::from_markdown(md);
-    let cfg = PrinterConfig {
-        meta: MetaConfig {
-            format: Some("yaml".to_string()),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    let printed = document_to_tm_with_config(&doc, &cfg);
-    assert!(printed.contains("@meta(format:yaml)+++"));
-}
-
-#[test]
 fn test_iso8601_timestamp_rendering_in_meta() {
     let md = "---\nmodified: 2026-06-17T05:52:44\n---\n\n# Document\n";
     let doc = tomet_markdown::from_markdown(md);
     let cfg = PrinterConfig {
         meta: MetaConfig {
-            format: Some("yaml".to_string()),
+            always_newline: true,
             ..Default::default()
         },
         ..Default::default()
@@ -180,7 +164,7 @@ fn test_rfc3339_and_aliases_always_newline_meta_field_formatting() {
 
     let cfg = PrinterConfig {
         meta: MetaConfig {
-            format: Some("yaml".to_string()),
+            always_newline: true,
             fields: meta_fields,
             ..Default::default()
         },
@@ -195,8 +179,11 @@ fn test_rfc3339_and_aliases_always_newline_meta_field_formatting() {
     let md_empty = "---\naliases: []\nflags: []\n---\n\n# Document\n";
     let doc_empty = tomet_markdown::from_markdown(md_empty);
     let printed_empty = document_to_tm_with_config(&doc_empty, &cfg);
+    // "aliases" has its own `always_newline` field config, which
+    // special-cases an empty list to `[]`. "flags" has no field config, so
+    // it falls through to the native `list(...)` seq spelling.
     assert!(printed_empty.contains("aliases: []"));
-    assert!(printed_empty.contains("flags: []"));
+    assert!(printed_empty.contains("flags: list()"));
 }
 
 #[test]
@@ -217,7 +204,7 @@ fn test_rfc3339_with_offset_formatting() {
 
     let cfg = PrinterConfig {
         meta: MetaConfig {
-            format: Some("yaml".to_string()),
+            always_newline: true,
             fields: meta_fields,
             ..Default::default()
         },
@@ -236,7 +223,7 @@ fn test_null_value_rendering() {
     let doc = tomet_markdown::from_markdown(md);
     let cfg = PrinterConfig {
         meta: MetaConfig {
-            format: Some("yaml".to_string()),
+            always_newline: true,
             ..Default::default()
         },
         ..Default::default()
@@ -271,17 +258,15 @@ fn test_wikilink_no_space_setting() {
 
 #[test]
 fn test_nanoid_generation_and_ensure_document_id() {
-    let settings_src = r#"@settings(format:json)+++
-{
-  "meta": {
-    "id": {
-      "type": "nanoid",
-      "length": 8,
-      "prefix": "doc-"
+    let settings_src = r#"@settings{
+  meta: {
+    id: {
+      type: nanoid
+      length: 8
+      prefix: "doc-"
     }
   }
 }
-+++
 "#;
     let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
     let id_cfg = cfg.meta.fields.get("id").expect("id config present");
@@ -302,19 +287,17 @@ fn test_nanoid_generation_and_ensure_document_id() {
 
 #[test]
 fn test_nanoid_force_and_overwrite_behavior() {
-    let settings_src = r#"@settings(format:json)+++
-{
-  "meta": {
-    "id": {
-      "type": "nanoid",
-      "length": 8,
-      "prefix": "doc-",
-      "force": true,
-      "overwrite": true
+    let settings_src = r#"@settings{
+  meta: {
+    id: {
+      type: nanoid
+      length: 8
+      prefix: "doc-"
+      force: true
+      overwrite: true
     }
   }
 }
-+++
 "#;
     let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
     let id_cfg = cfg.meta.fields.get("id").unwrap();
@@ -476,18 +459,6 @@ fn test_link_no_space_setting() {
     assert!(printed_nospace.contains("@link(target:\"https://google.com\")[Google]"));
 }
 
-/// A raw block's body reaches the printer in either slot, and both
-/// have to come back out.
-///
-/// ``` parses into `[content]`; `@raw(yaml)+++...+++` parses
-/// into a `Raw` value.
-#[test]
-fn a_fenced_raw_body_survives_printing() {
-    let doc = tomet_parser::parse_document("@raw(yaml)+++\na: 1\n+++\n").unwrap();
-    let printed = document_to_tm(&doc);
-    assert!(printed.contains("a: 1"), "the body was dropped:\n{printed}");
-}
-
 #[test]
 fn inline_raw_prints_as_backticks() {
     let doc = tomet_parser::parse_document("call `foo()` now\n").unwrap();
@@ -504,26 +475,6 @@ fn test_codeblock_formatting() {
         printed.trim(),
         "```shell\nirm \"https://christitus.com/win\" | iex\n```"
     );
-}
-
-#[test]
-fn test_embedded_format_serialization_and_reparse() {
-    let mut el = element_new(Sigil::named("config"));
-    el.args = Some(Value::Map(vec![(
-        "format".to_string(),
-        Value::String("json".to_string()),
-    )]));
-    el.value = Some(ElementValue::from_map(Value::Map(vec![(
-        "meta".to_string(),
-        Value::String("yaml".to_string()),
-    )])));
-    let doc = Document::new(vec![Block::Element(el)], tomet_ast::Span::dummy());
-    let printed = document_to_tm(&doc);
-    assert!(printed.contains("\"meta\": \"yaml\""));
-
-    // Verify re-parsing
-    let re_parsed = tomet_parser::parse_document(&printed).expect("valid doc");
-    assert_eq!(re_parsed.blocks.len(), 1);
 }
 
 #[test]

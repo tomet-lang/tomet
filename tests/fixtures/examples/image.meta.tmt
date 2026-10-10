@@ -1,7 +1,5 @@
 @kind(image)
-@meta(format:yaml) +++
-tags: [a, b]
-+++
+@meta{ tags: list(a, b) }
 
 =[ 既存のconfig formatの代替 ]
 

@@ -48,7 +48,7 @@ pub enum ElementKind {
     /// element's `(args)` slot.
     Args,
     /// `@data{...}` -- inside `@element`, the description of that
-    /// element's `{...}`/`+++...+++` slot.
+    /// element's `{...}` slot.
     Data,
     /// `@content{...}` -- inside `@element`, the description of that
     /// element's `[content]` slot.
@@ -557,11 +557,12 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         // `(args)` only, no `[content]`.
         Kind | Version | Meta | Config | Settings | Use | Include | Blueprint | Vocabulary
         | Content | Args | Data => None,
-        // Self-closing; a fenced/inline code body is the `+++...+++` raw
-        // fence, exclusive with `[content]`; no observed `@tag[...]`
-        // usage to classify yet. Lists are no longer `Element`s at all
-        // (see `tomet_ast::List`), so there is nothing list-shaped left
-        // to classify here.
+        // Self-closing; a fenced/backtick code body's `[content]` is
+        // synthesized by the parser itself (`codeblock.rs`), not shaped
+        // by an author, so there is nothing here for a shape check to
+        // classify. No observed `@tag[...]` usage to classify yet.
+        // Lists are no longer `Element`s at all (see `tomet_ast::List`),
+        // so there is nothing list-shaped left to classify here.
         Hr | Raw | Tag => None,
         // `@conflict`'s payload (`a`/`b`) lives in `(args)`, via
         // `Value::Blocks` -- it never uses `[content]`/`|content` at all,

@@ -50,7 +50,6 @@ pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
             ElementValue::Group(_) => v
                 .as_data()
                 .is_some_and(|data| value_contains_str(&data, sub)),
-            ElementValue::Raw(body) => body.contains(sub),
             ElementValue::Interp(_) => false,
         });
         if !in_args && !in_val {

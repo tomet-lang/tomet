@@ -59,7 +59,7 @@ and connect evaluation), this module houses the logic specific to individual
 built-in element families:
 
 - (config) Document configuration (`@config`, `@settings`).
-- (embedded) Raw body parsing for `<embed>` and `+++` fenced data blocks (JSON/YAML/TOML).
+- (embedded) An element's `{...}` value read as data.
 - (footnote) Footnote collection and indexing (`<footnote>`, `^id`).
 - (heading) Heading level calculation and bounds clamping (`heading`).
 - (meta) Document metadata and frontmatter extraction (`@meta`, `@kind`, `@version`).
@@ -94,71 +94,19 @@ walk.
 
 ===[ Module embedded ]
 
-Reading a `+++` fence body as JSON/YAML/TOML.
+An element's value as data.
 
-This lives in `tomet-semantics`, not in the parser. Before the fence,
-`format:` steered the lexer, so the reader had to sit inside
-`tomet-parser` and run mid-parse. A fence body is opaque text, so
-deciding what that text @em[means] is exactly the kind of interpretation
-this crate exists for -- and the parser now has no dependency on
-serde_json/serde_yaml/toml at all.
-
-This runs @strong[after] parsing, not during it. The fence captures its body
-verbatim as `ElementValue::Raw`; whether that opaque string is later
-read as JSON, YAML or TOML is decided here, from the element's
-`format:` argument.
-
-That ordering is the point. `format:` used to steer the lexer: a
-`{...}` body was scanned with brace-depth tracking and handed to
-another parser mid-parse, which meant the element's own arguments could
-change the shape of the tree -- and it terminated `@meta(format:yaml)`
-early at the first unquoted `}` inside otherwise legal YAML. A fence
-has no such failure mode, and `format:` is now pure interpretation.
-
-====[ Structs ]
-
-=====[ struct EmbeddedError ]
-
-A `+++` fence body that its declared format could not read.
-
-====[ Enums ]
-
-=====[ enum EmbeddedFormat ]
+`{...}` is the only data syntax tove has; `element_data` is the single
+place every caller reads an element's `{...}` group through, so none of
+them need to know `ElementValue::Group`'s shape themselves.
 
 ====[ Functions ]
 
-=====[ fn parse_raw_body ]
-
-Reads a `+++` fence body as `format`.
-
-Error positions are relative to `raw` itself (line 1 is the fence
-body's first line); a caller that knows where the fence sits in the
-document can offset them.
-
-=====[ fn element_format ]
-
-The format an element's `+++` fence body should be read as, from its
-`format:` argument.
-
-`format:` is now pure interpretation: it says which parser receives the
-opaque string, and has no effect on how that string was lexed. A
-missing or unrecognized tag means "read it with Tomet's own value
-grammar", which the caller does -- this crate deliberately does not
-depend on `tomet-parser`.
-
 =====[ fn element_data ]
 
-An element's value as data, whichever way it was written.
-
-A `{...}` group contributes its `key: value` pairs; a `+++` fence body
-is read with the element's declared `format:`. Returns `None` when the
-element has no value, or when a fence body has no recognized format
-(the body is opaque text and only its author knows what it means) or
-fails to parse as the format it declares.
-
-This is the "data-vs-children becomes a view" half of the design: no
-consumer has to know whether the author wrote `{a: 1}` or
-`(format:yaml)+++a: 1+++`.
+An element's value as data: a `{...}` group's `key: value` pairs, or
+`None` if the element has no value group at all (or an interpolated
+one, `${...}`, which is not data).
 
 ===[ Module footnote ]
 
@@ -363,9 +311,9 @@ An element's data, ready for a string-valued attribute map.
 
 Flattens `el`'s `(args)` and `{value}` for an attribute map.
 
-A `+++` raw body and a `${...}` interpolation are not data and are
-skipped; so are the element children a `{...}` group may hold, which
-belong in the output's body rather than its attributes.
+A `${...}` interpolation is not data and is skipped; so are the
+element children a `{...}` group may hold, which belong in the
+output's body rather than its attributes.
 
 ====[ fn flatten_data ]
 
@@ -388,8 +336,8 @@ what a reader uses when it needs the difference.
 
 Converts a Tomet value to JSON, preserving structure exactly.
 
-The inverse of `embedded::json_to_value`, which reads a `+++` fence
-body declared `format: json` back into a [`Value`].
+`tomet-convert-pandoc`'s own `json_to_value` is this function's
+inverse, checked against it in `assert_json_round_trip`.
 
 ===[ Constants ]
 

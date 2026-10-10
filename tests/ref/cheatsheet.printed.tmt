@@ -2,29 +2,7 @@
 
 @config(json)
 
-```
-@meta(format:json)+++
-{
-  "key": "value",
-  "type": "person"
-}
-+++
-@meta(format:yaml)+++
-key: value
-date: time
-type: character
-+++
-@meta(format:toml)+++
-key = "value"
-type = "location"
-+++
-// #meta(format:ini){
-//   key = "value"
-// }
-// #meta(format:kdl){
-//   key = "value"
-// }
-```
+@meta{key: value, type: person}
 
 ${some_id}
 
@@ -50,9 +28,10 @@ ${sum(a, b)}
 sudo whoami
 ls --help
 ```
-@memo+++
-  don't forget: check [this] and [that]
-+++
+@memo[```
+don't forget: check [this] and [that]
+```
+]
 @quote[引用文]
 @card(title: 題名)[分類を持たない、題名+本文の区画]
 - outline/list

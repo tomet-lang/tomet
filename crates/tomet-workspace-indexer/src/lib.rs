@@ -415,15 +415,11 @@ mod tests {
 
     #[test]
     fn test_is_path_ignored_with_config_from_settings() {
-        let settings_src = r#"@settings(format:json)+++
-{
-  "ignore": {
-    "files": [
-      "00-09 System/01 Apps/obsidian"
-    ]
+        let settings_src = r#"@settings{
+  ignore: {
+    files: list("00-09 System/01 Apps/obsidian")
   }
 }
-+++
 "#;
         let cfg =
             tomet_config::load_config_from_str(settings_src).expect("failed to parse settings");
@@ -560,22 +556,6 @@ mod metadata_table_tests {
                 Value::String("rust".to_string()),
                 Value::String("cli".to_string()),
             ]))
-        );
-    }
-
-    #[test]
-    fn a_yaml_fenced_meta_is_read() {
-        // The spelling this repository's own documents use. It is invisible
-        // to `extract_metadata`, which reads `{...}` pairs only and sees an
-        // opaque `Raw` body here.
-        let fields = fields_of("@meta(format:yaml)+++\ntitle: Cheatsheet\ntags:\n  - rust\n+++\n");
-        assert_eq!(
-            fields.get("meta.title"),
-            Some(&Value::String("Cheatsheet".to_string()))
-        );
-        assert_eq!(
-            fields.get("meta.tags"),
-            Some(&Value::Seq(vec![Value::String("rust".to_string())]))
         );
     }
 

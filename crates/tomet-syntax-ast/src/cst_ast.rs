@@ -73,7 +73,6 @@ define_ast_node!(CstThematicBreak, THEMATIC_BREAK);
 define_ast_node!(CstInlineElement, INLINE_ELEMENT);
 define_ast_node!(CstConnect, CONNECT);
 define_ast_node!(CstIdGroup, ID_GROUP);
-define_ast_node!(CstFence, FENCE);
 define_ast_node!(CstInterpExpr, INTERP_EXPR);
 define_ast_node!(CstMapEntry, MAP_ENTRY);
 define_ast_node!(CstSeqItem, SEQ_ITEM);
@@ -194,10 +193,6 @@ impl CstInlineElement {
 impl CstBlockElement {
     pub fn connects(&self) -> impl Iterator<Item = CstConnect> {
         self.syntax().children().filter_map(CstConnect::cast)
-    }
-
-    pub fn fence(&self) -> Option<CstFence> {
-        self.syntax().children().find_map(CstFence::cast)
     }
 }
 

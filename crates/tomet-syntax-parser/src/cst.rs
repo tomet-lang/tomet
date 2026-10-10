@@ -15,7 +15,7 @@
 //!
 //! An element (`BLOCK_ELEMENT`, `INLINE_ELEMENT`) is a `SIGIL` followed by
 //! its groups -- `ARGS` `( )`, `VALUE_DATA` `{ }`, `CONTENT` `[ ]`, at most
-//! one of each -- then any `CONNECT` (`:name(...)`) and `FENCE` (`+++`).
+//! one of each -- then any `CONNECT` (`:name(...)`).
 //! `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
 //! `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
 //! `MAP_LITERAL`, `SEQ_LITERAL` or (a call such as `list(...)`) `ARGS`.
@@ -152,9 +152,8 @@ impl<'a> CstParser<'a> {
         None
     }
 
-    /// After an element's name (index `i`): does a group, a `:` connect, a
-    /// `#(id)` or a `+++` fence follow, so that it is an element and not
-    /// plain text?
+    /// After an element's name (index `i`): does a group, a `:` connect, or
+    /// a `#(id)` follow, so that it is an element and not plain text?
     fn groups_follow(&self, i: usize) -> bool {
         let i = self.skip_ws_from(i);
         match self.kind_at(i) {
@@ -163,7 +162,6 @@ impl<'a> CstParser<'a> {
             Some(K::COLON) => {
                 Self::is_opener(self.kind_at(i + 1)) || self.kind_at(i + 1) == Some(K::IDENT)
             }
-            Some(K::PLUS) => self.run_len(i, K::PLUS) >= 3,
             _ => false,
         }
     }
@@ -210,9 +208,6 @@ impl<'a> CstParser<'a> {
                     } else {
                         return i;
                     }
-                }
-                Some(K::PLUS) if self.run_len(j, K::PLUS) >= 3 => {
-                    return j + self.run_len(j, K::PLUS);
                 }
                 _ => return i,
             }
@@ -562,8 +557,7 @@ impl<'a> CstParser<'a> {
     }
 
     /// An element's `(args)`, `{value}` and `[content]` (at most one of each,
-    /// in any order), then its `#(id)` slot, then its `:name(...)` connects
-    /// and `+++` fence.
+    /// in any order), then its `#(id)` slot, then its `:name(...)` connects.
     ///
     /// No ordering is enforced between `#(id)` and the other three groups,
     /// mirroring the AST-path parser's `parse_groups` -- only "before any
@@ -599,11 +593,6 @@ impl<'a> CstParser<'a> {
                 Some(K::COLON) if self.allow_connect && self.connect_follows(j) => {
                     self.bump_while(K::WHITESPACE);
                     self.parse_connect();
-                }
-                Some(K::PLUS) if self.run_len(j, K::PLUS) >= 3 => {
-                    self.bump_while(K::WHITESPACE);
-                    self.parse_fence();
-                    break;
                 }
                 _ => break,
             }
@@ -654,32 +643,6 @@ impl<'a> CstParser<'a> {
         if self.kind_at(j) == Some(K::HASH) && self.id_follows(j) {
             self.bump_while(K::WHITESPACE);
             self.parse_id_group();
-        }
-        self.builder.finish_node();
-    }
-
-    fn parse_fence(&mut self) {
-        self.builder.start_node(K::FENCE.into());
-        // The closing line must be a run at least as long as the opening one.
-        let open = self.run_len(self.pos, K::PLUS);
-        self.bump_while(K::PLUS);
-        loop {
-            // Rest of the line, then the newline.
-            while let Some(k) = self.current_kind() {
-                self.bump();
-                if k == K::NEWLINE {
-                    break;
-                }
-            }
-            if self.is_eof() {
-                break;
-            }
-            let j = self.skip_ws_from(self.pos);
-            if self.kind_at(j) == Some(K::PLUS) && self.run_len(j, K::PLUS) >= open {
-                self.bump_while(K::WHITESPACE);
-                self.bump_while(K::PLUS);
-                break;
-            }
         }
         self.builder.finish_node();
     }
@@ -822,7 +785,7 @@ mod tests {
     fn test_cst_lossless_roundtrip_all_syntaxes() {
         let cases = [
             "#[ Heading ]\n\nParagraph text with *em* and @tag[ content ].\n",
-            "@config(format:json)+++\n{\n  \"meta\": \"yaml\"\n}\n+++\n",
+            "@config{ format: json }\n",
             "- item 1\n- item 2\n-. ordered 1\n\n```rust\nfn main() {}\n```\n",
             "// Comment line\n@card(id: 123){ priority: high }[ Note ]\n",
             "=[ A ]=\n== B ==\n=\n---\n---[ x ]---\n\ntext ^n(1) ${a.b} $f(x) @l[t](ref:y):rule(a)\n",
@@ -1035,15 +998,6 @@ mod tests {
     }
 
     #[test]
-    fn fence_body() {
-        let src = "@config(format:json)+++\n{ \"a\": 1 }\n+++\nafter\n";
-        let root = parse_cst(src);
-        assert_eq!(child_kinds(&root), [K::BLOCK_ELEMENT, K::PARAGRAPH]);
-        let fence = find(&root, K::FENCE).unwrap();
-        assert!(fence.text().to_string().ends_with("+++"));
-    }
-
-    #[test]
     fn paragraph_continuation_and_breaks() {
         // A trailing `\` keeps the paragraph going across a block-looking line.
         let root = parse_cst("one \\\n= two\n");
@@ -1051,21 +1005,6 @@ mod tests {
         // A block start on the next line ends the paragraph without a blank.
         let root = parse_cst("text\n=[ S ]\n- a\n");
         assert_eq!(child_kinds(&root), [K::PARAGRAPH, K::SECTION]);
-    }
-
-    #[test]
-    fn fence_body_is_raw_lines() {
-        // A stray apostrophe and a shorter `+++` inside a longer fence.
-        let src = "@memo++++\ndon't\n+++\nstill body\n++++\n=[ S ]\n";
-        let root = parse_cst(src);
-        assert_eq!(child_kinds(&root), [K::BLOCK_ELEMENT, K::SECTION]);
-        assert!(
-            find(&root, K::FENCE)
-                .unwrap()
-                .text()
-                .to_string()
-                .contains("still body")
-        );
     }
 
     #[test]

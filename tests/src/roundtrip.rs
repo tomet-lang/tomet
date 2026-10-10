@@ -35,11 +35,13 @@ fn formatting_is_idempotent_across_the_corpus() {
 /// following `[ ` was not treated as verbatim content -- the
 /// whitespace-hygiene pass then stripped a space and changed the content.
 ///
-/// The `+++` fence removes that whole class of bug by construction. A
-/// fence is delimited by a line, not by matched brackets, so no character
-/// inside the body -- full-width brace, unquoted `}`, stray apostrophe --
-/// can end it early or make the formatter disagree with the parser about
-/// where verbatim content begins.
+/// A backtick fence (the current way to carry a verbatim raw body, nested
+/// in `[content]` or at the document's own top level) removes that whole
+/// class of bug by construction. It is delimited by a line, not by
+/// matched brackets, so no character inside the body -- full-width brace,
+/// unquoted `}`, stray apostrophe -- can end it early or make the
+/// formatter disagree with the parser about where verbatim content
+/// begins.
 const KNOWN_FORMAT_CHANGES_DOCUMENT: &[&str] = &[];
 
 #[test]
@@ -84,9 +86,9 @@ fn printed_source_parses() {
     // parse -> print -> parse. This asserts only that `tomet-printer`
     // emits syntax `tomet-parser` accepts, not that the round trip is an
     // identity: the printer is a *styling* serializer and applies
-    // `PrinterConfig` defaults, so e.g. a bare `@meta{...}` comes back
-    // as `@meta(format:yaml){...}` -- a different AST for the same
-    // meaning. What the printer actually emits is pinned by
+    // `PrinterConfig` defaults, so e.g. a bare `@meta{...}` may come back
+    // multi-line (`meta.always_newline`) -- a different AST shape for the
+    // same meaning. What the printer actually emits is pinned by
     // `snapshot.rs`'s `printed_source_matches_reference` instead.
     for (rel, src) in parseable_corpus() {
         let doc = tomet_parser::parse_document(&src)
@@ -107,7 +109,6 @@ fn config_fixtures_load() {
     // `tomet-config`; the fixtures are local to this package now.
     let cfg = tomet_load_config::load_config_from_file(&fixtures_dir().join("test.config.tmt"))
         .expect("failed to load test.config.tmt");
-    assert_eq!(cfg.meta.format.as_deref(), Some("yaml"));
     assert!(cfg.meta.always_newline);
     assert!(cfg.meta.fields.get("aliases").unwrap().always_newline);
     assert_eq!(

@@ -503,7 +503,8 @@ fn table_converts_with_auto_width_adjustment_stops_at_wide_column() {
 
 #[test]
 fn table_converts_with_markdown_alignments() {
-    let src = "| left | center | right |\n| :--- | :---: | ---: |\n| 1 | 2 | 3 |\n| 100 | 200 | 300 |\n";
+    let src =
+        "| left | center | right |\n| :--- | :---: | ---: |\n| 1 | 2 | 3 |\n| 100 | 200 | 300 |\n";
     let opts = ImportOptions {
         adjust_table_width: true,
         table_adjust_width_mode: Some("true".to_string()),

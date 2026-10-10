@@ -141,9 +141,6 @@ text diff -- `tomet refactor --check` is safe to run on anything, and
 rule touched is never rewritten. It is `-i` on a file a rule @em[does]
 touch that costs you the comments.
 
-The `+++` fence used to be collapsed onto one line here too. That half
-is fixed: a fence is delimited by lines, so the printer reproduces it.
-
 ====[ fn refactor_workspace ]
 
 ==[ Module structural ]

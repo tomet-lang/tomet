@@ -58,9 +58,9 @@ impl FlatData {
 
 /// Flattens `el`'s `(args)` and `{value}` for an attribute map.
 ///
-/// A `+++` raw body and a `${...}` interpolation are not data and are
-/// skipped; so are the element children a `{...}` group may hold, which
-/// belong in the output's body rather than its attributes.
+/// A `${...}` interpolation is not data and is skipped; so are the
+/// element children a `{...}` group may hold, which belong in the
+/// output's body rather than its attributes.
 pub fn flatten_element_data(el: &Element) -> FlatData {
     let value = el.value.as_ref().and_then(|v| v.as_data());
     flatten_data(el.args.as_ref(), value.as_ref())
@@ -149,8 +149,8 @@ pub fn scalar_string(v: &Value) -> Option<String> {
 
 /// Converts a Tomet value to JSON, preserving structure exactly.
 ///
-/// The inverse of `embedded::json_to_value`, which reads a `+++` fence
-/// body declared `format: json` back into a [`Value`].
+/// `tomet-convert-pandoc`'s own `json_to_value` is this function's
+/// inverse, checked against it in `assert_json_round_trip`.
 pub fn value_to_json(v: &Value) -> serde_json::Value {
     match v {
         Value::Null => serde_json::Value::Null,

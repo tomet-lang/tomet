@@ -22,7 +22,8 @@
 //! - `element`: Typed elements (`<T>`, `@name`, bare `@`), group ordering, and connect syntax.
 //! - `section`: Headings (`=[...]`) and thematic breaks (`---`, `---[ title ]---`).
 //! - `list`: Ordered and unordered lists (`-`, `-.`), markers, and item attributes.
-//! - `codeblock` / `fence`: Fenced code blocks and raw verbatim fence spans (`+++`).
+//! - `codeblock` / `fence`: Fenced code blocks (``` ``` ```) and the
+//!   line-oriented fence scan they share.
 //! - `inline`: Inline scanning, formatting delimiters (`*em*`, `**strong**`, `==mark==`), autolinks.
 //! - `interp`: `${...}` interpolation expressions (identifiers, member chains, calls, literals).
 //! - `caret`: `^(id)` or `^name(id)` caret reference element parsing.

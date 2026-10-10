@@ -1,66 +1,61 @@
 use super::*;
 
-/// The `Raw` body of `doc`'s first block, or a panic.
-fn raw_body(doc: &tomet_ast::Document) -> &str {
-    match &doc.blocks[0] {
-        Block::Element(el) => match &el.value {
-            Some(ElementValue::Raw(body)) => body,
-            other => panic!("expected a raw fence body, got {other:?}"),
+/// The `Inline::Raw` text of `doc`'s first block, which must be a `@name`
+/// element whose `[content]` is a single nested backtick-fenced `@raw`
+/// element -- the replacement for the old `+++` raw-body fence (see
+/// `codeblock.rs`): `[...]` shares `document.rs::parse_block_seq` with the
+/// document root, so a fenced code block nests inside it exactly as it
+/// would at the top level.
+fn nested_raw_body(doc: &tomet_ast::Document) -> &str {
+    let Block::Element(outer) = &doc.blocks[0] else {
+        panic!("expected an element, got {:?}", doc.blocks[0]);
+    };
+    let content = outer.content.as_deref().unwrap_or(&[]);
+    let Some(Block::Element(raw)) = content.first() else {
+        panic!("expected a nested raw element, got {content:?}");
+    };
+    match raw.content.as_deref() {
+        Some([Block::Paragraph(p)]) => match p.content.as_slice() {
+            [Inline::Raw(text)] => &text.value,
+            other => panic!("expected a single raw inline, got {other:?}"),
         },
-        other => panic!("expected an element, got {other:?}"),
+        other => panic!("expected a single paragraph, got {other:?}"),
     }
 }
 
 #[test]
-fn a_fence_preserves_brackets_and_newlines_losslessly() {
+fn a_fenced_raw_body_nested_in_content_preserves_brackets_and_newlines_losslessly() {
     let doc =
-        parse_document("@memo+++\nline one\nline two with * and [brackets] inside\n+++\n").unwrap();
+        parse_document("@memo[\n```\nline one\nline two with * and [brackets] inside\n```\n]\n")
+            .unwrap();
     assert_eq!(
-        raw_body(&doc),
+        nested_raw_body(&doc),
         "line one\nline two with * and [brackets] inside"
     );
 }
 
 #[test]
-fn a_fence_is_not_confused_by_an_apostrophe() {
-    // The old `(content:raw)[...]` matched brackets and had to stay
-    // quote-agnostic, because free-form prose gives no guarantee its
-    // `'`/`"` occurrences are balanced. A fence has no such problem:
-    // it ends at a line, so nothing inside it can be miscounted.
-    let doc = parse_document("@memo+++\ndon't forget [this]\n+++\n").unwrap();
-    assert_eq!(raw_body(&doc), "don't forget [this]");
+fn a_fenced_raw_body_in_content_is_not_confused_by_an_apostrophe() {
+    // Free-form prose gives no guarantee its `'`/`"` occurrences are
+    // balanced; a fence has no such problem -- it ends at a line, so
+    // nothing inside it can be miscounted.
+    let doc = parse_document("@memo[\n```\ndon't forget [this]\n```\n]\n").unwrap();
+    assert_eq!(nested_raw_body(&doc), "don't forget [this]");
 }
 
 #[test]
-fn a_fence_body_is_not_confused_by_an_unquoted_brace() {
-    // The bug the fence removes by construction: the old
-    // `(format:yaml){...}` scanner tracked brace depth, so a `}`
-    // inside otherwise legal YAML ended the body early.
-    let doc = parse_document("@meta(format:yaml)+++\na: \"}\"\nb: 1\n+++\n").unwrap();
-    assert_eq!(raw_body(&doc), "a: \"}\"\nb: 1");
+fn a_fenced_raw_body_in_content_is_not_confused_by_an_unquoted_brace() {
+    let doc = parse_document("@memo[\n```\na: \"}\"\nb: 1\n```\n]\n").unwrap();
+    assert_eq!(nested_raw_body(&doc), "a: \"}\"\nb: 1");
 }
 
 #[test]
-fn a_longer_fence_run_escapes_a_body_containing_a_fence() {
-    let doc = parse_document("@memo++++\n+++\nstill inside\n++++\n").unwrap();
-    assert_eq!(raw_body(&doc), "+++\nstill inside");
-}
-
-#[test]
-fn an_unterminated_fence_runs_to_eof() {
-    // Matching the backtick fence, and unlike `[...]`/`{...}` groups,
-    // which error when unclosed.
-    let doc = parse_document("@memo+++\nno closing line\n").unwrap();
-    assert_eq!(raw_body(&doc), "no closing line");
-}
-
-#[test]
-fn interpolation_does_not_expand_inside_a_fence() {
+fn interpolation_does_not_expand_inside_a_fenced_raw_body_in_content() {
     // `default.config.tmt` stores macro templates such as
     // `"https://github.com/.../${1}"` that must reach
     // `tomet-transform`'s `MacroPattern::from_template` verbatim.
-    let doc = parse_document("@config(format:json)+++\n{\"gh\": \"x/${1}\"}\n+++\n").unwrap();
-    assert_eq!(raw_body(&doc), "{\"gh\": \"x/${1}\"}");
+    let doc = parse_document("@config[\n```\n{\"gh\": \"x/${1}\"}\n```\n]\n").unwrap();
+    assert_eq!(nested_raw_body(&doc), "{\"gh\": \"x/${1}\"}");
 }
 
 #[test]

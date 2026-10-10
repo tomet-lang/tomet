@@ -63,9 +63,6 @@
 (inline_element "@" @tag)
 (inline_element name: (identifier) @tag)
 
-; A `+++` fence body is verbatim text, like a code block's.
-(raw_fence) @string.special
-
 ; `${...}` / `$call(...)` interpolation
 (interpolation "${" @punctuation.special)
 (interpolation "}" @punctuation.special)

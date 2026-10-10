@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn meta_element_has_no_visible_output() {
-    let doc = parse_document("@meta(format:yaml)+++\nkey: value\n+++\n").unwrap();
+    let doc = parse_document("@meta{ key: value }\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "");
 }
@@ -29,9 +29,9 @@ fn adjacent_meta_blocks_have_no_visible_output() {
     // than leaking a stray whitespace-only `<p>` -- garbage in,
     // harmless out.
     let doc = parse_document(
-            "@meta(format:json)+++\n{\"key\":\"value\"}\n+++\n@meta(format:yaml)+++\nkey:value\n+++\n@meta(format:toml)+++\nkey = \"value\"\n+++\n\n=[ next ]\n",
-        )
-        .unwrap();
+        "@meta{ key: value }\n@meta{ key: value }\n@meta{ key: value }\n\n=[ next ]\n",
+    )
+    .unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "<h1>next</h1>\n");
 }
@@ -99,14 +99,6 @@ fn custom_element_hook_falling_through_matches_generic_rendering() {
     };
     let with_declining_hook = render_body_with(&doc, &options);
     assert_eq!(with_declining_hook, without_hook);
-}
-
-#[test]
-fn meta_and_config_with_positional_format_arg_have_no_visible_output() {
-    let doc = parse_document("@meta(\"json\")+++\n{\"key\": \"value\"}\n+++\n@config(\"json\")\n")
-        .unwrap();
-    let body = render_body(&doc);
-    assert_eq!(body, "");
 }
 
 /// This crate does not evaluate `${...}` any more, and this test is

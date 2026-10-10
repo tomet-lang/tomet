@@ -55,16 +55,6 @@ directive `@target_directive_name(val)` (or `@target_directive_name{...}`), inse
 If the property is absent, empty, or null, it is simply removed without creating a directive.
 Returns `true` if a directive was created and inserted.
 
-====[ fn normalize_embedded_to_value_dsl ]
-
-Normalizes elements in `doc` from `format:yaml` (or another embedded
-format) to the native Value DSL.
-
-Reads the body through `embedded::element_data` @em[before] stripping the
-`format` argument, and rewrites it as a native group -- otherwise the
-body stays an opaque `+++` fence with nothing left to say how to read
-it, and every later pass sees an element with no data.
-
 ====[ fn promote_meta_type_to_kind ]
 
 Promotes `@meta`'s `type:` field to a top-level `@kind(...)` element.

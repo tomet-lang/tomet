@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn finds_meta_value_from_a_meta_element() {
-        let doc = parse_document("@meta(format:yaml)+++\ntitle: Hello\n+++\n").unwrap();
+        let doc = parse_document("@meta{ title: Hello }\n").unwrap();
         let value = document_meta(&doc).expect("expected #meta value");
         match value {
             Value::Map(map) => {
@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn meta_element_without_a_value_group_is_none() {
-        let doc = parse_document("@meta(format:yaml)\n").unwrap();
+        let doc = parse_document("@meta\n").unwrap();
         assert_eq!(document_meta(&doc), None);
     }
 

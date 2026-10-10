@@ -1,20 +1,23 @@
-# `+++` フェンス
+# 逐語本文
 
-<div data-tm-kind="memo"></div>
+`[content]` に入れ子になったbacktickフェンスは、本文をそのまま運ぶ。`]` や
+引用符があっても安全で、行は折り畳まれない。
 
-# 埋め込みフォーマット
+<div data-tm-kind="memo">```
+don't forget: check [this] and [that]
+括弧も引用符も、行の終わりまでそのまま。
+```
 
-`format:` は解釈だけを決める。字句解析には影響しない。
-
-`${1}` はそのまま残り、閉じない `}` があっても本文は途中で終わらない。
+</div>
 
 # 長いフェンス
 
-本文に `+++` の行が含まれるときは、より長い走りで囲む。
+本文に ``\` の行が含まれるときは、より長い走りで囲む。
 
-<div data-tm-kind="memo"></div>
+<div data-tm-kind="memo">````
+```
+これはまだ本文の中。
+````
 
-# YAML の本文
-
-<div data-tm-kind="deck.note" data-format="yaml"></div>
+</div>
 

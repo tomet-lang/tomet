@@ -1,22 +1,33 @@
 @kind(bookmark)
 
-@bookmark("https://example.com"){ id: uuid-asld-lask-sdff, tags: list(a, a) }+++
+@bookmark("https://example.com")[```
 ブックマークの
 メモ
 改行を保持できる
-+++
-\@bookmark("https://example.com"){ id: uuid-asld-lask-sdff, tags: list(a, a) }+++
+```
+]{ id: uuid-asld-lask-sdff, tags: list(a, a) }
+
+@bookmark("https://example.com")[```
 メモ
-+++
-\@bookmark("https://example.com"){ id: uuid-asld-lask-sdff, tags: list(a, a) }+++
+```
+]{ id: uuid-asld-lask-sdff, tags: list(a, a) }
+
+@bookmark("https://example.com")[```
 メモ
-+++
-\@bookmark("https://example.com"){ id: uuid-asld-lask-sdff, tags: list(a, a) }+++
+```
+]{ id: uuid-asld-lask-sdff, tags: list(a, a) }
+
+@bookmark("https://example.com")[```
 メモ
-+++
-\@bookmark("https://example.com"){ id: uuid-asld-lask-sdff, tags: list(a, a) }+++
+```
+]{ id: uuid-asld-lask-sdff, tags: list(a, a) }
+
+@bookmark("https://example.com")[```
 メモ
-+++
-\@bookmark("https://example.com"){ id: uuid-asld-lask-sdff, tags: list(a, a) }+++
+```
+]{ id: uuid-asld-lask-sdff, tags: list(a, a) }
+
+@bookmark("https://example.com")[```
 メモ
-+++
+```
+]{ id: uuid-asld-lask-sdff, tags: list(a, a) }

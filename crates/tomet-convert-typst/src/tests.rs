@@ -108,7 +108,7 @@ fn renders_embed_as_image_with_alt() {
 
 #[test]
 fn meta_and_config_have_no_visible_output() {
-    assert_eq!(typst("@meta(format:yaml)+++\nkey: value\n+++\n"), "");
+    assert_eq!(typst("@meta{ key: value }\n"), "");
     assert_eq!(typst("@config(format:json)\n"), "");
 }
 

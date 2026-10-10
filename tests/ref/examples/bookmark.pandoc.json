@@ -7,301 +7,231 @@
   "meta": {},
   "blocks": [
     {
-      "t": "Para",
+      "t": "Div",
       "c": [
-        {
-          "t": "Span",
-          "c": [
+        [
+          "",
+          [
+            "tomet-bookmark"
+          ],
+          [
             [
-              "",
-              [
-                "tomet-bookmark"
-              ],
-              [
-                [
-                  "id",
-                  "uuid-asld-lask-sdff"
-                ],
-                [
-                  "tags",
-                  "a, a"
-                ],
-                [
-                  "value",
-                  "https://example.com"
-                ]
-              ]
+              "id",
+              "uuid-asld-lask-sdff"
             ],
-            []
-          ]
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "ブックマークの"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "メモ"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "改行を保持できる"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Span",
-          "c": [
             [
-              "",
-              [
-                "tomet-bookmark"
-              ],
-              [
-                [
-                  "id",
-                  "uuid-asld-lask-sdff"
-                ],
-                [
-                  "tags",
-                  "a, a"
-                ],
-                [
-                  "value",
-                  "https://example.com"
-                ]
-              ]
+              "tags",
+              "a, a"
             ],
-            []
-          ]
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "メモ"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Span",
-          "c": [
             [
-              "",
-              [
-                "tomet-bookmark"
-              ],
-              [
-                [
-                  "id",
-                  "uuid-asld-lask-sdff"
-                ],
-                [
-                  "tags",
-                  "a, a"
-                ],
-                [
-                  "value",
-                  "https://example.com"
-                ]
-              ]
-            ],
-            []
+              "value",
+              "https://example.com"
+            ]
           ]
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "メモ"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Span",
-          "c": [
+        ],
+        [
+          {
+            "t": "CodeBlock",
+            "c": [
+              [
+                "",
+                [],
+                []
+              ],
+              "ブックマークの\nメモ\n改行を保持できる"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-bookmark"
+          ],
+          [
             [
-              "",
-              [
-                "tomet-bookmark"
-              ],
-              [
-                [
-                  "id",
-                  "uuid-asld-lask-sdff"
-                ],
-                [
-                  "tags",
-                  "a, a"
-                ],
-                [
-                  "value",
-                  "https://example.com"
-                ]
-              ]
+              "id",
+              "uuid-asld-lask-sdff"
             ],
-            []
-          ]
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "メモ"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Span",
-          "c": [
             [
-              "",
-              [
-                "tomet-bookmark"
-              ],
-              [
-                [
-                  "id",
-                  "uuid-asld-lask-sdff"
-                ],
-                [
-                  "tags",
-                  "a, a"
-                ],
-                [
-                  "value",
-                  "https://example.com"
-                ]
-              ]
+              "tags",
+              "a, a"
             ],
-            []
-          ]
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "メモ"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Span",
-          "c": [
             [
-              "",
-              [
-                "tomet-bookmark"
-              ],
-              [
-                [
-                  "id",
-                  "uuid-asld-lask-sdff"
-                ],
-                [
-                  "tags",
-                  "a, a"
-                ],
-                [
-                  "value",
-                  "https://example.com"
-                ]
-              ]
-            ],
-            []
+              "value",
+              "https://example.com"
+            ]
           ]
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "メモ"
-        },
-        {
-          "t": "SoftBreak"
-        },
-        {
-          "t": "Str",
-          "c": "+++"
-        }
+        ],
+        [
+          {
+            "t": "CodeBlock",
+            "c": [
+              [
+                "",
+                [],
+                []
+              ],
+              "メモ"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-bookmark"
+          ],
+          [
+            [
+              "id",
+              "uuid-asld-lask-sdff"
+            ],
+            [
+              "tags",
+              "a, a"
+            ],
+            [
+              "value",
+              "https://example.com"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "CodeBlock",
+            "c": [
+              [
+                "",
+                [],
+                []
+              ],
+              "メモ"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-bookmark"
+          ],
+          [
+            [
+              "id",
+              "uuid-asld-lask-sdff"
+            ],
+            [
+              "tags",
+              "a, a"
+            ],
+            [
+              "value",
+              "https://example.com"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "CodeBlock",
+            "c": [
+              [
+                "",
+                [],
+                []
+              ],
+              "メモ"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-bookmark"
+          ],
+          [
+            [
+              "id",
+              "uuid-asld-lask-sdff"
+            ],
+            [
+              "tags",
+              "a, a"
+            ],
+            [
+              "value",
+              "https://example.com"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "CodeBlock",
+            "c": [
+              [
+                "",
+                [],
+                []
+              ],
+              "メモ"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-bookmark"
+          ],
+          [
+            [
+              "id",
+              "uuid-asld-lask-sdff"
+            ],
+            [
+              "tags",
+              "a, a"
+            ],
+            [
+              "value",
+              "https://example.com"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "CodeBlock",
+            "c": [
+              [
+                "",
+                [],
+                []
+              ],
+              "メモ"
+            ]
+          }
+        ]
       ]
     }
   ]

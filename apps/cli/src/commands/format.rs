@@ -166,7 +166,7 @@ mod tests {
         let _ = fs::create_dir_all(&vault);
         fs::write(
             vault.join("default.config.tmt"),
-            "@kind(config)\n@config(format:json)+++\n{ \"format\": { \"table\": { \"adjust_width\": \"auto\" } } }\n+++\n",
+            "@kind(config)\n@config{ format: { table: { adjust_width: auto } } }\n",
         )
         .unwrap();
 
@@ -244,7 +244,7 @@ mod tests {
         let _ = fs::create_dir_all(&frozen_dir);
         fs::write(
             vault.join("default.config.tmt"),
-            "@kind(config)\n@config(format:json)+++\n{ \"workspace\": { \"unswept\": [\"tests/fixtures\"] } }\n+++\n",
+            "@kind(config)\n@config{ workspace: { unswept: list(\"tests/fixtures\") } }\n",
         )
         .unwrap();
         let frozen = frozen_dir.join("f.tmt");
