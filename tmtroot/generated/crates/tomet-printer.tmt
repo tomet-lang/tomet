@@ -19,17 +19,39 @@ auto-generation (`ensure_document_id_with_config`, which mutates the
 AST directly), built on the pure generate/validate/convert helpers
 in `tomet-field-utils`.
 
-==[ Functions ]
+==[ Module block ]
 
-===[ fn ensure_document_id_with_config ]
+Rendering blocks, sections, headings, and lists.
+
+==[ Module element ]
+
+Rendering elements, values, args, and connects.
+
+===[ Functions ]
+
+====[ fn render_element ]
+
+Render an [`Element`] AST node into Tomet syntax:
+`<sigil><name>(args)[content]{value}`, or `<sigil><name>+++body+++`.
+
+==[ Module id ]
+
+ID generation and rendering helpers.
+
+===[ Functions ]
+
+====[ fn ensure_document_id_with_config ]
+
+Ensures that a document has an `id` field in its `@meta` block if configured to do so.
+
+==[ Module inline ]
+
+Rendering inline content and block-permitted content runs.
+
+==[ Functions ]
 
 ===[ fn document_to_tm ]
 
 Serialize a [`Document`] AST into Tomet (`.tmt`) source string using document-level config or defaults.
 
 ===[ fn document_to_tm_with_config ]
-
-===[ fn render_element ]
-
-Render an [`Element`] AST node into Tomet syntax:
-`<sigil><name>(args)[content]{value}`, or `<sigil><name>+++body+++`.

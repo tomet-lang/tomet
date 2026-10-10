@@ -45,6 +45,54 @@ to walk yet for the file this exists to fix.
 applies [`format_source`]. It never alters document metadata (`@meta`)
 or injects structural elements.
 
+==[ Module clean ]
+
+Whitespace-hygiene formatting preserving verbatim raw spans and fence blocks.
+
+===[ Functions ]
+
+====[ fn clean_whitespace ]
+
+Normalizes whitespace (LF line endings, no trailing whitespace, collapsed excess
+blank lines, exactly one final newline) while losslessly preserving literal whitespace
+and blank lines inside raw/verbatim content.
+
+==[ Module reorder ]
+
+Element group order formatting according to `GroupOrder` settings.
+
+===[ Functions ]
+
+====[ fn format_element_group_order ]
+
+Formats element group order according to `config` (`PrinterConfig::group_order` / `PrinterConfig::link_group_order`).
+
+Swaps `()` and `[]` for elements carrying both args and content groups based on configured element rules.
+
+==[ Module table ]
+
+Table layout formatting according to `table.adjust_width`, `table.max_col_width`, and `table.align`.
+
+===[ Functions ]
+
+====[ fn format_tables_with_config ]
+
+Formats tables in `src` according to `table.adjust_width`, `table.max_col_width`, and `table.align`.
+
+==[ Module yaml ]
+
+YAML quote fixing for bare `@`-led values in `@meta(format:yaml)+++` blocks.
+
+===[ Functions ]
+
+====[ fn quote_bare_at_yaml_values ]
+
+Finds every `(...){...}` or `(...)+++` body whose args declare `format:yaml` and
+wraps any bare, unquoted `@...`-led value inside it in `"..."`.
+
+Raw-text scanning, not a real YAML parse: cheap, and this only ever needs to recognize
+three "a value starts here" shapes (`key:`, `- `, and `[`/`,` inside a flow sequence).
+
 ==[ Functions ]
 
 ===[ fn format_source ]
@@ -52,17 +100,7 @@ or injects structural elements.
 Format `src` in place (returns a new `String`). Idempotent:
 `format_source(&format_source(src)) == format_source(src)`.
 
-===[ fn format_tables_with_config ]
-
-Formats tables in `src` according to `table.adjust_width`, `table.max_col_width`, and `table.align`.
-
 ===[ fn format_source_with_config ]
 
 Formats `src` by applying configured table layout formatting, element group order, and whitespace hygiene.
 Never mutates metadata or inserts structural blocks.
-
-===[ fn format_element_group_order ]
-
-Formats element group order according to `config` (`PrinterConfig::group_order` / `PrinterConfig::link_group_order`).
-
-Swaps `()` and `[]` for elements carrying both args and content groups based on configured element rules.
