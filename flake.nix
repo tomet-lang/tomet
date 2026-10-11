@@ -24,7 +24,7 @@
     };
 
     #= Tool
-    twrit.url = "github:tomet-lang/tomet-writ";
+    twrit.url = "github:tomet-lang/twrit";
     tomet-book.url = "github:tomet-lang/tomet-book";
   };
 

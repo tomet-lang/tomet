@@ -1,12 +1,8 @@
 @kind(api)
 
-@meta{
-  crate: tomet-tests
-  dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-cst, tomet-edit, tomet-formatter, tomet-html, tomet-load-config, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-transform, tomet-tree, tomet-typst, tomet-validator, tomet-workspace, tree-sitter-tomet)
-  dependents: list()
-}
+@meta{crate: tomet-tests, dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-cst, tomet-edit, tomet-formatter, tomet-html, tomet-load-config, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-transform, tomet-tree, tomet-typst, tomet-validator, tomet-workspace, tree-sitter-tomet), dependents: list()}
 
-=[ tomet-tests ]
+=[tomet-tests]
 
 Shared harness for the workspace's cross-crate tests.
 
@@ -31,40 +27,40 @@ tree-sitter grammar produces only its documented error cases.
 
 against committed reference files.
 
-==[ Functions ]
+==[Functions]
 
-===[ fn package_dir ]
+===[fn package_dir]
 
 Root of this package (`<repo>/tests`).
 
-===[ fn fixtures_dir ]
+===[fn fixtures_dir]
 
-===[ fn ref_dir ]
+===[fn ref_dir]
 
-===[ fn store_dir ]
+===[fn store_dir]
 
 Where actual output is written when it does not match the reference,
 so the two can be diffed by hand. Gitignored.
 
-===[ fn corpus ]
+===[fn corpus]
 
 Every `.tmt` file in the corpus, sorted, as paths relative to
 `fixtures/` (e.g. `examples/image.meta.tmt`).
 
-===[ fn read_fixture ]
+===[fn read_fixture]
 
-===[ fn known_ts_errors ]
+===[fn known_ts_errors]
 
 The markers recorded for `rel`, or `None` when the grammar is expected
 to parse it without any error node.
 
-===[ fn is_known_unparseable ]
+===[fn is_known_unparseable]
 
-===[ fn parseable_corpus ]
+===[fn parseable_corpus]
 
 Corpus entries that parse, as `(relative path, source)` pairs.
 
-===[ fn assert_snapshot ]
+===[fn assert_snapshot]
 
 Compares `actual` against the committed reference at `ref/<name>`.
 
@@ -72,26 +68,26 @@ With `TOMET_UPDATE_REF=1` the reference is rewritten instead of
 compared. On mismatch the actual output is written to `store/<name>`
 so the two files can be diffed directly.
 
-===[ fn snapshot_name ]
+===[fn snapshot_name]
 
 Turns `examples/image.meta.tmt` into `examples/image.meta.<ext>` for
 naming the reference file of a converted fixture.
 
-===[ fn ts_parse ]
+===[fn ts_parse]
 
 Parses with the tree-sitter grammar -- the second, hand-maintained
 approximation of the language, kept in sync with `tomet-parser` by the
 `corpus` target's drift tests.
 
-===[ fn ts_error_texts ]
+===[fn ts_error_texts]
 
 Collects the source text of every `ERROR`/`MISSING` node, so a
 fixture-level assertion can compare against exactly the known,
 documented cases rather than just counting them.
 
-==[ Constants ]
+==[Constants]
 
-===[ const KNOWN_UNPARSEABLE ]
+===[const KNOWN_UNPARSEABLE]
 
 Corpus entries that `tomet-parser` is currently expected to reject.
 
@@ -118,7 +114,7 @@ of tags); `syntax/value-element.tmt`'s `icons: [...]` was left as-is,
 since embedding `@`-elements in a `[...]` value position is exactly
 what that fixture exists to demonstrate.
 
-===[ const KNOWN_TS_ERRORS ]
+===[const KNOWN_TS_ERRORS]
 
 Fixtures the tree-sitter grammar is known to mis-parse, and the text
 of the error nodes it produces for each.
@@ -133,14 +129,14 @@ A marker matches by substring. An empty marker would match anything
 and make the check vacuous, so the sweep rejects one outright rather
 than trusting nobody adds it back.
 
-===[ const ANY_ERROR ]
+===[const ANY_ERROR]
 
 Records a fixture as drifting wholesale, without pinning the text of
 each error node. Deliberately coarse: use it when the grammar fails
 once per line and the texts share nothing, not to wave away a case
 worth naming.
 
-===[ const MISSING_NODE ]
+===[const MISSING_NODE]
 
 Stands in for an error node with no text -- a @em[missing] token rather
 than an unexpected one. Spelled out so it can be recorded without an

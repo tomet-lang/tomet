@@ -403,3 +403,27 @@ failing the run, so a broken file is also an unguarded one.
 
 A library crate reads a file only if it is named above. Programs are out
 of scope: a CLI reads files because that is what a CLI is.
+
+==[ rust-api-docs ]
+
+@rule(rust-api-docs){
+  guard: { twrit: rust-api }
+
+  rust_api: {
+    out: "tmtroot/generated/crates"
+  }
+}
+
+API documentation for all workspace Rust crates must be kept up to date
+with the source code and inner doc-comments (`//!`, `///`).
+
+---[ Why ]---
+
+Source code and inner doc-comments are the authoritative source of truth
+for API behavior and module structures. Extracted `.tmt` documents in
+`tmtroot/generated/crates` must reflect the code without manual drift.
+
+---[ Guard ]---
+
+`twrit check .` validates that all extracted `.tmt` files match the source
+code. Run `twrit api .` or `twrit check --fix .` to regenerate.

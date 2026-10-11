@@ -1,21 +1,17 @@
 @kind(api)
 
-@meta{
-  crate: tomet-zed
-  dependencies: list()
-  dependents: list()
-}
+@meta{crate: tomet-zed, dependencies: list(), dependents: list()}
 
-=[ tomet-zed ]
+=[tomet-zed]
 
 Zed editor extension for the Tomet document language.
 
-==[ Overview ]
+==[Overview]
 
 Provides Zed editor support for Tomet files (`.tmt`), integrating syntax
 highlighting and launching the language server (`tomet-lsp`).
 
-==[ Language Server ]
+==[Language Server]
 
 The extension locates `tomet-lsp` on `$PATH` within the worktree environment
 and connects it to Zed's language server protocol client.

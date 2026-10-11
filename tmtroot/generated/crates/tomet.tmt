@@ -1,12 +1,8 @@
 @kind(api)
 
-@meta{
-  crate: tomet
-  dependencies: list(tomet-ast, tomet-config, tomet-edit, tomet-formatter, tomet-html, tomet-load, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-typst, tomet-validator, tomet-vault)
-  dependents: list(tomet-java, tomet-js, tomet-python)
-}
+@meta{crate: tomet, dependencies: list(tomet-ast, tomet-config, tomet-edit, tomet-formatter, tomet-html, tomet-load, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-typst, tomet-validator, tomet-vault), dependents: list(tomet-java, tomet-js, tomet-python)}
 
-=[ tomet ]
+=[tomet]
 
 The crate to depend on when using Tomet from Rust.
 
@@ -24,7 +20,7 @@ is what keeps this surface honest -- what a binding still takes directly
 (`js`: `tomet-links`, `tomet-transform`, `tomet-lexer`) is what is
 missing here.
 
-==[ Reading a document ]
+==[Reading a document]
 
 Go through [`Vault`]. It finds the config that governs the file, loads
 the vocabularies that config declares, parses, and binds names -- the
@@ -49,7 +45,7 @@ vocabulary may claim, so they give the same verdicts.
 data-only document -- `key: value` entries, no headings, prose or
 top-level elements -- so there is no vocabulary for it to skip.
 
-==[ Features ]
+==[Features]
 
 [`semantics`] and [`validator`] are always present: they are pure, and
 reading a document already depends on the first. Everything that leaves
@@ -71,8 +67,8 @@ Output-producing conversions want a document that has been through
 [`Vault::prepare`] first; see `tomet-load` for why that is a separate
 step from reading.
 
-==[ Functions ]
+==[Functions]
 
-===[ fn measure_document ]
+===[fn measure_document]
 
 Measures statistics for a single document on disk.

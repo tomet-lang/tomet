@@ -1,16 +1,12 @@
 @kind(api)
 
-@meta{
-  crate: tomet-tui
-  dependencies: list(tomet-ast, tomet-config, tomet-indexer, tomet-load-config, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-transform, tomet-tree, tomet-workspace, tree-sitter-tomet)
-  dependents: list(tomet-cli)
-}
+@meta{crate: tomet-tui, dependencies: list(tomet-ast, tomet-config, tomet-indexer, tomet-load-config, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-transform, tomet-tree, tomet-workspace, tree-sitter-tomet), dependents: list(tomet-cli)}
 
-=[ tomet-tui ]
+=[tomet-tui]
 
 Tomet Workbench TUI.
 
-==[ Module app ]
+==[Module app]
 
 State management for the Tomet Workbench TUI.
 
@@ -22,28 +18,28 @@ thin cross-tab dispatchers (`move_up`/`toggle_select`/`execute_action`/
 etc.) that route to a `pub(super)` per-tab method based on
 `active_tab`.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct PendingConfirm ]
+====[struct PendingConfirm]
 
-====[ struct App ]
+====[struct App]
 
-===[ Enums ]
+===[Enums]
 
-====[ enum ActiveTab ]
+====[enum ActiveTab]
 
-====[ enum MetaEditTarget ]
+====[enum MetaEditTarget]
 
-====[ enum StructuralInputTarget ]
+====[enum StructuralInputTarget]
 
-====[ enum FocusedPane ]
+====[enum FocusedPane]
 
-==[ Module engine ]
+==[Module engine]
 
 Core logic engine for Markdown migration. Batch metadata editing and
 structural refactoring live in `tomet-workspace` now.
 
-===[ Module migration ]
+===[Module migration]
 
 Markdown -> Tomet conversion, plus the App-facing `MigrationItem`
 (a `tomet_indexer::workspace_scan::MigrationCandidate` decorated
@@ -51,13 +47,13 @@ with lazily-loaded content and UI/session state: `selected`,
 `converted`). The index only ever knows about candidates (facts); this
 module owns the mutable, per-session view of them.
 
-====[ Structs ]
+====[Structs]
 
-=====[ struct MigrationItem ]
+=====[struct MigrationItem]
 
-=====[ struct MigrationEngine ]
+=====[struct MigrationEngine]
 
-==[ Module ui ]
+==[Module ui]
 
 Ratatui UI Layout and widget rendering for Tomet Workbench TUI.
 
@@ -70,11 +66,11 @@ submodule's `*_controls_info`. `diff`/`highlight` hold
 tab-independent utilities (before/after diffing, `.tmt` syntax
 highlighting) shared across the tab-specific view functions.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn draw ]
+====[fn draw]
 
-====[ fn draw_loading ]
+====[fn draw_loading]
 
 Animated placeholder screen shown while the workspace scan (`App::new`)
 runs on a background thread. `tick` is a monotonically increasing frame
@@ -82,8 +78,8 @@ counter driven by the caller's poll loop -- there's no real progress
 percentage to report (the scan doesn't know the file count up front),
 so this renders a spinner plus a sweeping indeterminate bar instead.
 
-==[ Functions ]
+==[Functions]
 
-===[ fn run_tui ]
+===[fn run_tui]
 
 Launch the interactive TUI application.

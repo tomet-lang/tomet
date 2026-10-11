@@ -9,7 +9,7 @@
 @card(title:"tomet-book (tmtbook)")
 | tometを使用した本の見た目を求めた静的サイトジェネレータ。
 | 軽量で比較的高速
-@card(title:"tomet-writ")
+@card(title:"twrit")
 | アプリ開発で、開発の規範、チェックを行える。
 @card(title:"oneline")
 | tometの一部の構文を活かし、"一行に意味をもたせる"をモットウにした、派生記法。

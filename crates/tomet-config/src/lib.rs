@@ -19,8 +19,8 @@ pub mod tree;
 
 pub use discovery::{ConfigError, load_config_from_str};
 pub use groups::{
-    ApiConfig, FieldConfig, FormatConfig, GroupOrder, MacrosConfig, MetaConfig, RegistryConfig,
-    WorkspaceConfig, api, format, macros, meta, registry, workspace,
+    FieldConfig, FormatConfig, GroupOrder, MacrosConfig, MetaConfig, RegistryConfig,
+    WorkspaceConfig, format, macros, meta, registry, workspace,
 };
 
 use tomet_ast::{Document, Value};
@@ -34,7 +34,6 @@ pub struct Config {
     pub workspace: WorkspaceConfig,
     pub macros: MacrosConfig,
     pub registry: RegistryConfig,
-    pub api: ApiConfig,
 }
 
 /// Type alias for backward compatibility with earlier code referencing `PrinterConfig`.
@@ -76,7 +75,6 @@ impl Config {
             workspace: WorkspaceConfig::from_root(&root),
             macros: MacrosConfig::from_root(&root),
             registry: RegistryConfig::from_root(&root),
-            api: ApiConfig::from_root(&root),
         }
     }
 }
@@ -233,29 +231,6 @@ mod tests {
     }
 
     #[test]
-    fn test_api_rust_out_config() {
-        let src1 = r#"@config{
-  api: {
-    rust: {
-      out: "docs/api"
-    }
-  }
-}
-"#;
-        let cfg1 = load_config_from_str(src1).expect("failed to parse config");
-        assert_eq!(cfg1.api.rust_out, Some("docs/api".to_string()));
-
-        let src2 = r#"@config{
-  api.rust: {
-    out: "target/api"
-  }
-}
-"#;
-        let cfg2 = load_config_from_str(src2).expect("failed to parse config");
-        assert_eq!(cfg2.api.rust_out, Some("target/api".to_string()));
-    }
-
-    #[test]
     fn test_dot_notation_variants() {
         let src_deep_dot = r#"@config{
   callout.style.content: "quote"
@@ -263,7 +238,6 @@ mod tests {
   table.adjust_width: true
   table.max_col_width: 80
   table.align: "center"
-  api.rust.out: "target/api"
 }
 "#;
         let cfg = load_config_from_str(src_deep_dot).expect("failed to parse deep dot config");
@@ -275,7 +249,6 @@ mod tests {
         assert_eq!(cfg.format.table_adjust_width.as_deref(), Some("true"));
         assert_eq!(cfg.format.table_max_col_width, Some(80));
         assert_eq!(cfg.format.table_align.as_deref(), Some("center"));
-        assert_eq!(cfg.api.rust_out.as_deref(), Some("target/api"));
 
         let src_mixed = r#"@config{
   callout: {

@@ -1,14 +1,10 @@
 @kind(api)
 
-@meta{
-  crate: tomet-address
-  dependencies: list(tomet-ast, tomet-tree)
-  dependents: list(tomet-compute, tomet-lsp)
-}
+@meta{crate: tomet-address, dependencies: list(tomet-ast, tomet-parser, tomet-tree), dependents: list(tomet-compute, tomet-lsp)}
 
-=[ tomet-address ]
+=[tomet-address]
 
-==[ tomet-address ]
+==[tomet-address]
 
 Resolves what an expression or element points at, without ever
 touching disk: a `${...}` interpolation's `Identifier`/`Member`

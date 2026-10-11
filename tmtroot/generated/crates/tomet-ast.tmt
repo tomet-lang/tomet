@@ -1,48 +1,44 @@
 @kind(api)
 
-@meta{
-  crate: tomet-ast
-  dependencies: list(tomet-cst)
-  dependents: list(tomet, tomet-address, tomet-cli, tomet-compute, tomet-config, tomet-edit, tomet-extract, tomet-extract-rust, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-vault, tomet-workspace, tove)
-}
+@meta{crate: tomet-ast, dependencies: list(tomet-cst), dependents: list(tomet, tomet-address, tomet-cli, tomet-compute, tomet-config, tomet-edit, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-vault, tomet-workspace, tove)}
 
-=[ tomet-ast ]
+=[tomet-ast]
 
-==[ tomet-ast ]
+==[tomet-ast]
 
 Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
 `Inline`, `Element`, `Value`, `Position`, `Span`).
 
-==[ Design Policy ]
+==[Design Policy]
 
-- ("Pure Data Models & Structural Accessors Only") [ `tomet-ast` is the foundational dependency-free crate referenced across the workspace.
-                                                     It contains only struct/enum definitions and pure inherent methods for construction
-                                                     (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`, `Span::union()`). ]
-- ("Clear Crate Boundaries") [ Semantics: Classification of element meanings (links, `@meta`, `@config`) lives in `tomet-semantics`.
-                               Traversal & Manipulation: Generic tree traversal algorithms live in `tomet-tree`.
-                               Formatting & Printing: Serialization to `.tmt` text lives in `tomet-style` and `tomet-printer`.
-                               Validation: Field formatting and lint validation live in `tomet-validator`. ]
-- ("Span Equality Contract") [ `Span` implements a custom `PartialEq` that always returns `true` so that structural
-                               equality comparisons (`assert_eq!(doc1, doc2)`) ignore source positions. Use
-                               [`Span::exact_eq()`] when exact source position comparisons are required. ]
+- ("Pure Data Models & Structural Accessors Only") `tomet-ast` is the foundational dependency-free crate referenced across the workspace.
+It contains only struct/enum definitions and pure inherent methods for construction
+(`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`, `Span::union()`).
+- ("Clear Crate Boundaries") Semantics: Classification of element meanings (links, `@meta`, `@config`) lives in `tomet-semantics`.
+Traversal & Manipulation: Generic tree traversal algorithms live in `tomet-tree`.
+Formatting & Printing: Serialization to `.tmt` text lives in `tomet-style` and `tomet-printer`.
+Validation: Field formatting and lint validation live in `tomet-validator`.
+- ("Span Equality Contract") `Span` implements a custom `PartialEq` that always returns `true` so that structural
+equality comparisons (`assert_eq!(doc1, doc2)`) ignore source positions. Use
+[`Span::exact_eq()`] when exact source position comparisons are required.
 
-==[ Module cst_ast ]
+==[Module cst_ast]
 
 Typed AST wrappers over Rowan's [`SyntaxNode`].
 
-===[ Traits ]
+===[Traits]
 
-====[ trait AstNode ]
+====[trait AstNode]
 
-====[ trait AstToken ]
+====[trait AstToken]
 
-==[ Structs ]
+==[Structs]
 
-===[ struct Position ]
+===[struct Position]
 
 A 0-indexed byte offset and 1-indexed line/column position in source text.
 
-===[ struct Span ]
+===[struct Span]
 
 A source span bounded by start and end [`Position`]s.
 
@@ -58,9 +54,9 @@ so two "equal" `Span`s could hash differently -- a Hash/Eq contract
 violation that breaks `HashMap`/`HashSet` lookups. Don't re-add it
 without also reconciling it with the custom equality above.
 
-===[ struct Document ]
+===[struct Document]
 
-===[ struct Section ]
+===[struct Section]
 
 A hierarchical section: introduced by `=`, `==`, etc.
 
@@ -69,7 +65,7 @@ optional arguments (`(id: intro)`), optional value group (`{attrs}`),
 connects (`:as(...)`), and child blocks (paragraphs, lists, sub-sections)
 scoped to this section.
 
-===[ struct List ]
+===[struct List]
 
 A `-` (unordered) or `-.` (ordered) list: first-class, like [`Section`],
 rather than a named [`Element`] holding bare sub-`Element`s.
@@ -83,7 +79,7 @@ own anchor-reference use (`#(id)` on the whole list), and `connects` is
 what a `:rule(allow:list(...))` attached to the list itself (restricting
 what its own items may be) needs to live on.
 
-===[ struct ListItem ]
+===[struct ListItem]
 
 One item of a [`List`].
 
@@ -102,18 +98,18 @@ because the parser only ever produces one specific shape here (another
 list) -- giving it its own field makes that a compiler-checked fact
 instead of a convention.
 
-===[ struct Paragraph ]
+===[struct Paragraph]
 
-===[ struct SoftBreak ]
+===[struct SoftBreak]
 
-===[ struct LineBreak ]
+===[struct LineBreak]
 
-===[ struct RawText ]
+===[struct RawText]
 
 Verbatim text, captured byte-for-byte from source. See
 [`Inline::Raw`] for why this is a separate type from [`Text`].
 
-===[ struct Text ]
+===[struct Text]
 
 A run of prose text, folded from source the way any wrapped inline
 content is. Invariant: `value` never contains `'\n'` or `'\r'` -- a source
@@ -121,7 +117,7 @@ line break becomes an [`Inline::SoftBreak`] or [`Inline::LineBreak`]
 instead of a character here. Verbatim text that may contain real newlines
 (code block bodies) is [`RawText`], not this.
 
-===[ struct Name ]
+===[struct Name]
 
 An element's name, split into its optional namespace and its own name.
 
@@ -139,7 +135,7 @@ Both halves are ASCII identifiers (`[A-Za-z_][A-Za-z0-9_-]*`). `.` is
 the separator, so it is deliberately @em[not] an identifier character
 here -- unlike in map keys, where `url.wiki` is one flat key.
 
-===[ struct Id ]
+===[struct Id]
 
 An element's own id, written `#(foobar)` right after its own
 `(args)[content]{value}` groups and before any `:name(...)` connect.
@@ -153,7 +149,7 @@ the content is a value, not a structural identifier, so it is as
 free as any other string value (e.g. `@line(天音かなた)` elsewhere in
 this codebase already allows non-ASCII value text).
 
-===[ struct Element ]
+===[struct Element]
 
 `(args)` / `[content]` / `{value}`, each optional and at most one of each,
 in any order in the source.
@@ -167,22 +163,22 @@ own full `Element` (with its own `args`/`content`/`value`, but never
 its own `connects` -- a connect does not itself take further connects
 in this parser). Order-preserving, empty when nothing follows.
 
-===[ struct InterpExpr ]
+===[struct InterpExpr]
 
 One node of a `${...}` interpolation's parsed expression tree.
 
-==[ Enums ]
+==[Enums]
 
-===[ enum Value ]
+===[enum Value]
 
 A pure data value: the subset of Tomet with a direct serde
 equivalent (no headings, prose, or links).
 
-===[ enum Block ]
+===[enum Block]
 
-===[ enum Inline ]
+===[enum Inline]
 
-===[ enum Sigil ]
+===[enum Sigil]
 
 Which sigil introduced an element, and its name.
 
@@ -200,7 +196,7 @@ each builtin's shape, so the sigil only restated it. `#` is not a
 second sigil today either: `#(id)` is [`Element::id`], a slot in the
 element's own groups, not a different way to introduce an element.
 
-===[ enum Placement ]
+===[enum Placement]
 
 Where an element sits: on its own as a block, or inside running text.
 
@@ -219,7 +215,7 @@ This is placement, not shape. Which shape an element is @em[allowed] to
 take is a vocabulary question, answered by `tomet-semantics`'
 `required_shape` and checked against this field by `shape_mismatch`.
 
-===[ enum Entry ]
+===[enum Entry]
 
 One entry inside an element's `{value}` group: either a `key: value`
 pair or a nested element.
@@ -228,7 +224,7 @@ pair or a nested element.
 lets the data view be rebuilt from a group without copying any other
 structure.
 
-===[ enum ElementValue ]
+===[enum ElementValue]
 
 The contents of an element's value group.
 
@@ -238,13 +234,13 @@ list of children?" is no longer a parse-time branch -- it is a view
 computed downstream in `tomet-semantics`, which is what lets the parser
 build the tree without consulting any element vocabulary.
 
-===[ enum InterpExprKind ]
+===[enum InterpExprKind]
 
-===[ enum Literal ]
+===[enum Literal]
 
-==[ Functions ]
+==[Functions]
 
-===[ fn softbreak_join ]
+===[fn softbreak_join]
 
 What a [`SoftBreak`] renders as when it is folded into plain running
 text, given the character immediately before and after it.

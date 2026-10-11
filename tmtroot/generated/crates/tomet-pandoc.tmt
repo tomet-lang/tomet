@@ -1,12 +1,8 @@
 @kind(api)
 
-@meta{
-  crate: tomet-pandoc
-  dependencies: list(tomet-ast, tomet-semantics, tomet-tree)
-  dependents: list(tomet, tomet-cli, tomet-tests)
-}
+@meta{crate: tomet-pandoc, dependencies: list(tomet-ast, tomet-parser, tomet-printer, tomet-semantics, tomet-tree), dependents: list(tomet, tomet-cli, tomet-tests)}
 
-=[ tomet-pandoc ]
+=[tomet-pandoc]
 
 `tomet_ast::Document` <-> Pandoc's AST, over Pandoc's own JSON
 encoding.
@@ -26,7 +22,7 @@ handled by `tomet_semantics::flatten`, whose rule the HTML writer
 shares -- a readable projection plus an exact JSON copy whenever the
 projection would lose something.
 
-==[ Why a JSON bridge ]
+==[Why a JSON bridge]
 
 Two alternatives were considered and rejected.
 
@@ -49,7 +45,7 @@ no code at all. What is gained here is fidelity -- element data
 reaching `Attr` instead of being dropped at the CommonMark boundary --
 and a better import.
 
-==[ Module ast ]
+==[Module ast]
 
 Pandoc's own AST, as serde types matching its JSON encoding.
 
@@ -67,16 +63,16 @@ payload omits `c` entirely (`{"t":"Space"}`);
 
 in declaration order, which is why the variants below hold tuples.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct PandocDoc ]
+====[struct PandocDoc]
 
 A whole document: the API version, the metadata map, and the body.
 
 `pandoc_api_version` must match the Pandoc binary reading it, or the
 input is rejected. See [`PANDOC_API_VERSION`].
 
-====[ struct Attr ]
+====[struct Attr]
 
 `(identifier, classes, key-value pairs)`.
 
@@ -84,72 +80,72 @@ Values are plain strings with no structure of their own, which is what
 forces the flattening in `tomet_semantics::flatten`: a nested Tomet
 `{value}` has no direct representation here.
 
-====[ struct Target ]
+====[struct Target]
 
 `(url, title)`. The title is usually empty.
 
-====[ struct ListAttributes ]
+====[struct ListAttributes]
 
 `(start number, style, delimiter)` on an ordered list.
 
-====[ struct TableParts ]
+====[struct TableParts]
 
 `Table`'s payload: `(attr, caption, column specs, head, bodies, foot)`.
 
-====[ struct Caption ]
+====[struct Caption]
 
 `(short caption, caption blocks)`.
 
-====[ struct ColSpec ]
+====[struct ColSpec]
 
 `(alignment, column width)`.
 
-====[ struct TableHead ]
+====[struct TableHead]
 
-====[ struct TableBody ]
+====[struct TableBody]
 
 `(attr, row head columns, header rows, body rows)`.
 
-====[ struct TableFoot ]
+====[struct TableFoot]
 
-====[ struct RowHeadColumns ]
+====[struct RowHeadColumns]
 
-====[ struct Row ]
+====[struct Row]
 
-====[ struct Cell ]
+====[struct Cell]
 
 `(attr, alignment, rowspan, colspan, contents)`.
 
-===[ Enums ]
+===[Enums]
 
-====[ enum MetaValue ]
+====[enum MetaValue]
 
-====[ enum ListNumberStyle ]
+====[enum ListNumberStyle]
 
-====[ enum ListNumberDelim ]
+====[enum ListNumberDelim]
 
-====[ enum Block ]
+====[enum Block]
 
-====[ enum Inline ]
+====[enum Inline]
 
-====[ enum QuoteType ]
+====[enum QuoteType]
 
-====[ enum MathType ]
+====[enum MathType]
 
-====[ enum Alignment ]
+====[enum Alignment]
 
-====[ enum ColWidth ]
+====[enum ColWidth]
 
-===[ Type Aliases ]
+===[Type Aliases]
 
-====[ type Meta ]
+====[type Meta]
 
 The document metadata map -- what becomes YAML frontmatter, `\title{}`,
 docx document properties, and so on, depending on the output format.
 
-===[ Constants ]
+===[Constants]
 
-====[ const PANDOC_API_VERSION ]
+====[const PANDOC_API_VERSION]
 
 The version this crate writes, and the only one it is known to be
 compatible with.

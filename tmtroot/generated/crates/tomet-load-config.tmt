@@ -1,14 +1,10 @@
 @kind(api)
 
-@meta{
-  crate: tomet-load-config
-  dependencies: list(tomet-config, tomet-parser)
-  dependents: list(tomet-cli, tomet-indexer, tomet-load, tomet-lsp, tomet-tests, tomet-tui, tomet-workspace)
-}
+@meta{crate: tomet-load-config, dependencies: list(tomet-config, tomet-parser), dependents: list(tomet-cli, tomet-indexer, tomet-load, tomet-lsp, tomet-tests, tomet-tui, tomet-workspace)}
 
-=[ tomet-load-config ]
+=[tomet-load-config]
 
-==[ tomet-load-config ]
+==[tomet-load-config]
 
 Finds the config that governs a path, by walking up from it, and
 reads it. `tomet-config` owns the `Config` type and its pure parsing
@@ -20,16 +16,16 @@ Shares the `tomet-load` name prefix deliberately: both crates are
 `tomet-load`'s own `Vault::discover` calls [`find_config_file`]
 directly rather than duplicating the walk.
 
-==[ Functions ]
+==[Functions]
 
-===[ fn find_config_file ]
+===[fn find_config_file]
 
 Searches `start` and its parent directories for `default.config.tmt` or `tomet.config.tmt`.
 Returns `(Config, config_file_path, config_directory_path)`.
 
-===[ fn load_config_from_file ]
+===[fn load_config_from_file]
 
-===[ fn config_for ]
+===[fn config_for]
 
 The config that governs `path`, for a tool about to act on `src`.
 

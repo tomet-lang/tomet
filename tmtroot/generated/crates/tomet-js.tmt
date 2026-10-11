@@ -1,90 +1,86 @@
 @kind(api)
 
-@meta{
-  crate: tomet-js
-  dependencies: list(tomet, tomet-cst, tomet-lexer, tomet-links, tomet-transform)
-  dependents: list()
-}
+@meta{crate: tomet-js, dependencies: list(tomet, tomet-cst, tomet-lexer, tomet-links, tomet-transform), dependents: list()}
 
-=[ tomet-js ]
+=[tomet-js]
 
-==[ Module highlight ]
+==[Module highlight]
 
-===[ Structs ]
+===[Structs]
 
-====[ struct HighlightSpan ]
+====[struct HighlightSpan]
 
-===[ Functions ]
+===[Functions]
 
-====[ fn compute_highlight_spans ]
+====[fn compute_highlight_spans]
 
-==[ Structs ]
+==[Structs]
 
-===[ struct ProcessOptions ]
+===[struct ProcessOptions]
 
 Options controlling HTML rendering and document processing.
 
-===[ struct TocItem ]
+===[struct TocItem]
 
 An entry in the document's table of contents.
 
-===[ struct ProcessedDoc ]
+===[struct ProcessedDoc]
 
 High-level output of processing a `.tmt` document.
 
-==[ Functions ]
+==[Functions]
 
-===[ fn parse_document ]
+===[fn parse_document]
 
 Parse `.tmt` markup source text into a JavaScript `Document` AST object.
 
-===[ fn parse_value ]
+===[fn parse_value]
 
 Parse a data-only `.tmt` document into a native JavaScript object/primitive.
 
-===[ fn set_vault_files ]
+===[fn set_vault_files]
 
 Pre-builds and caches the link resolution index in Wasm memory once for the entire vault.
 
-===[ fn clear_vault_files ]
+===[fn clear_vault_files]
 
 Clears the cached link resolution index.
 
-===[ fn process_document_internal ]
+===[fn process_document_internal]
 
-===[ fn to_html ]
+===[fn to_html]
 
 Convert `.tmt` source text or a `Document` AST object into an HTML body string.
 
-===[ fn process_document ]
+===[fn process_document]
 
 Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
 
-===[ fn to_markdown ]
+===[fn to_markdown]
 
 Convert `.tmt` source text or a `Document` AST object into a CommonMark Markdown string.
 
-===[ fn to_typst ]
+===[fn to_typst]
 
 Convert `.tmt` source text or a `Document` AST object into a Typst markup string.
 
-===[ fn from_markdown ]
+===[fn from_markdown]
 
 Parse CommonMark Markdown text into a `Document` AST object.
 
-===[ fn print_document ]
+===[fn print_document]
 
 Serialize a `Document` AST object back into formatted `.tmt` source code.
 
-===[ fn format_source ]
+===[fn format_source]
 
 Format `.tmt` source text with lossless whitespace hygiene and span preservation.
 
-===[ fn validate ]
+===[fn validate]
 
 Validate `.tmt` source text and return an array of validation diagnostics.
 
-===[ fn validate_with ]
+===[fn validate_with]
 
 Validate `.tmt` source text against `std` plus the vocabularies given
 as source text.
@@ -100,6 +96,6 @@ claims a reserved or already-taken namespace is skipped: it declares no
 namespace, so there is nothing to bind. `doc.index` is always known, as
 it is to the CLI. Check vocabularies themselves with `tomet check`.
 
-===[ fn highlight_spans ]
+===[fn highlight_spans]
 
 Compute syntax highlight token spans for CodeMirror and other editors.

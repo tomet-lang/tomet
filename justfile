@@ -56,7 +56,21 @@ format-check:
 docs:
     cargo build -p tomet-cli
     ./target/debug/tomet cli-docs --out tmtroot/generated/cli.tmt
-    ./target/debug/tomet api .
+    @twrit_bin=""; \
+    for cand in \
+        ../twrit/target/debug/twrit \
+        ../../../../twrit/target/debug/twrit; do \
+        if [ -x "$cand" ]; then \
+            twrit_bin="$cand"; \
+            break; \
+        fi; \
+    done; \
+    if [ -z "$twrit_bin" ] && command -v twrit >/dev/null 2>&1; then \
+        twrit_bin=twrit; \
+    fi; \
+    if [ -n "$twrit_bin" ]; then \
+        "$twrit_bin" api .; \
+    fi
     ./target/debug/tomet export .
     ./target/debug/tomet format .
 
@@ -69,11 +83,20 @@ docs-check:
     ./target/debug/tomet format --check .
     ./target/debug/tomet export --check .
     ./target/debug/tomet cli-docs --check --out tmtroot/generated/cli.tmt
-    ./target/debug/tomet api --check .
-    @if command -v twrit >/dev/null 2>&1; then \
-        twrit check .; \
-    elif [ -x ../tomet-writ/target/debug/twrit ]; then \
-        ../tomet-writ/target/debug/twrit check .; \
+    @twrit_bin=""; \
+    for cand in \
+        ../twrit/target/debug/twrit \
+        ../../../../twrit/target/debug/twrit; do \
+        if [ -x "$cand" ]; then \
+            twrit_bin="$cand"; \
+            break; \
+        fi; \
+    done; \
+    if [ -z "$twrit_bin" ] && command -v twrit >/dev/null 2>&1; then \
+        twrit_bin=twrit; \
+    fi; \
+    if [ -n "$twrit_bin" ]; then \
+        "$twrit_bin" check .; \
     fi
 
 # Run the two guards that `.writ.tmt` entries name but nothing executed.

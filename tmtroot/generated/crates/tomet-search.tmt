@@ -1,30 +1,26 @@
 @kind(api)
 
-@meta{
-  crate: tomet-search
-  dependencies: list(tomet-ast, tomet-compute, tomet-semantics, tomet-tree)
-  dependents: list(tomet-load, tomet-transform, tomet-vault, tomet-workspace)
-}
+@meta{crate: tomet-search, dependencies: list(tomet-ast, tomet-compute, tomet-parser, tomet-semantics, tomet-tree), dependents: list(tomet-load, tomet-transform, tomet-vault, tomet-workspace)}
 
-=[ tomet-search ]
+=[tomet-search]
 
-==[ tomet-search ]
+==[tomet-search]
 
 Pure, in-memory search and query engine for Tomet documents.
 
-==[ Scope & Layering ]
+==[Scope & Layering]
 
 Sits in Layer 4 of the Tomet crate hierarchy. Performs pure, in-memory querying
 and matching without filesystem I/O. Filesystem scanning and disk caching belong
 to higher layers (`tomet-workspace-indexer` and `tomet-workspace` in Layer 5).
 
-==[ Query Engines ]
+==[Query Engines]
 
 - ("`structural`") AST element query matching by tag, key, and value content.
-- ("`filter`") [ Document metadata query filtering (`contains`, `exists`, `eq`, `gt`)
-                 and sorting (`by(field, "asc"|"desc")`) over in-memory rows (the engine behind `${filter(...)}`). ]
+- ("`filter`") Document metadata query filtering (`contains`, `exists`, `eq`, `gt`)
+and sorting (`by(field, "asc"|"desc")`) over in-memory rows (the engine behind `${filter(...)}`).
 
-==[ Module filter ]
+==[Module filter]
 
 In-memory metadata query filtering and sorting engine.
 
@@ -34,29 +30,29 @@ and sort keys (e.g. `by(meta.date, "desc")`) across collections of metadata rows
 This engine performs no filesystem I/O: candidate rows are provided as in-memory
 [`IndexRow`] structures.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct IndexRow ]
+====[struct IndexRow]
 
 One candidate document's queryable facts.
 
-====[ struct IndexQueryError ]
+====[struct IndexQueryError]
 
 An error encountered when parsing or executing an index query.
 
-====[ struct SortKey ]
+====[struct SortKey]
 
 A sort key with its direction.
 
-====[ struct Query ]
+====[struct Query]
 
 Parsed filter query consisting of an optional combined predicate and sort keys.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn err ]
+====[fn err]
 
-====[ fn is_index_document ]
+====[fn is_index_document]
 
 Whether `doc` is an index document -- `@kind(doc.index)`, nothing else.
 
@@ -67,57 +63,57 @@ truth; the filename is not consulted here either (a caller that wants a
 cheap pre-parse filter, e.g. tomet-book's `.index.tmt` suffix, applies
 it before ever calling this).
 
-====[ fn known_paths ]
+====[fn known_paths]
 
 Collects every field path any row carries in `rows`.
 
-====[ fn sort_key ]
+====[fn sort_key]
 
 Reads one `by(field)` / `by(field, "asc"|"desc")` argument.
 
-====[ fn dotted_path ]
+====[fn dotted_path]
 
 Converts an AST identifier or member chain into a dotted string path.
 
-====[ fn unknown_fields ]
+====[fn unknown_fields]
 
 Finds field paths referenced in `predicate` that no row in `known` possesses.
 
-====[ fn context_for ]
+====[fn context_for]
 
 Builds an evaluation context with every known path bound, or `Null` if absent.
 
-====[ fn sort_value ]
+====[fn sort_value]
 
 Reads the value for a sort key, treating `Null` as absent.
 
-==[ Module structural ]
+==[Module structural]
 
 Structural AST query matching.
 
 Provides pure in-memory querying over Tomet AST elements by tag,
 attribute/property key, and value content.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct StructuralQuery ]
+====[struct StructuralQuery]
 
 Criteria for matching AST elements.
 
-====[ struct StructuralMatch ]
+====[struct StructuralMatch]
 
 A matched AST element occurrence with its span and tag name.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn matches_query ]
+====[fn matches_query]
 
 Checks if a single element matches `query`.
 
-====[ fn count_structural_matches ]
+====[fn count_structural_matches]
 
 Counts matching elements in `doc` for `query`.
 
-====[ fn find_structural_matches ]
+====[fn find_structural_matches]
 
 Finds all matching element occurrences in `doc` for `query`.

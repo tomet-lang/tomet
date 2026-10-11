@@ -10,7 +10,7 @@
 //! - (Inspection & Validation) `check`, `check-links`, `ast`, `roundtrip`, and `stats`.
 //! - (Transformation & Formatting) `format` and `refactor`.
 //! - (Converters) `html`, `to-md`, `from-md`, `to-typst`, `to-pandoc`, `from-pandoc`, and `export`.
-//! - (Documentation & Ecosystem) `api`, `cli-docs`, `tui`, and `serve`.
+//! - (Documentation & Ecosystem) `cli-docs`, `tui`, and `serve`.
 
 mod cli;
 mod commands;
@@ -21,7 +21,6 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use cli::{Cli, Command};
-use commands::api::api_cmd;
 use commands::ast::ast;
 use commands::check::check;
 use commands::check_links::check_links_cmd;
@@ -117,12 +116,6 @@ fn main() -> ExitCode {
             vars,
         } => commands::new::new_cmd(path, blueprint.as_deref(), *list, *force, vars),
         Command::Stats { path, json } => stats_cmd(path, *json),
-        Command::Api {
-            path,
-            out,
-            private,
-            check,
-        } => api_cmd(path, out.as_deref(), *private, *check),
         Command::CheckLinks { .. } => unreachable!("handled above, before this match"),
     };
 

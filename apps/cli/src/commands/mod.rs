@@ -1,4 +1,3 @@
-pub mod api;
 pub mod ast;
 pub mod check;
 pub mod check_links;

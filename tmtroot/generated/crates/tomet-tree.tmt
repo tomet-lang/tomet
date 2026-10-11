@@ -1,12 +1,8 @@
 @kind(api)
 
-@meta{
-  crate: tomet-tree
-  dependencies: list(tomet-ast)
-  dependents: list(tomet-address, tomet-cli, tomet-config, tomet-edit, tomet-extract, tomet-extract-rust, tomet-html, tomet-indexer, tomet-links, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tui, tomet-typst, tomet-validator, tomet-workspace)
-}
+@meta{crate: tomet-tree, dependencies: list(tomet-ast, tomet-parser), dependents: list(tomet-address, tomet-cli, tomet-config, tomet-edit, tomet-extract, tomet-html, tomet-indexer, tomet-links, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tui, tomet-typst, tomet-validator, tomet-workspace)}
 
-=[ tomet-tree ]
+=[tomet-tree]
 
 AST node accessors, extension traits, builders, and recursive tree traversal for Tomet.
 
@@ -17,40 +13,40 @@ Provides:
 - (DocumentExt) Block-level manipulation helpers on [`tomet_ast::Document`].
 - (walk) Generic recursive tree visitors ([`walk_document`], [`walk_document_mut`]).
 
-==[ Module document ]
+==[Module document]
 
 Extension trait and block manipulation helpers for [`tomet_ast::Document`].
 
-===[ Traits ]
+===[Traits]
 
-====[ trait DocumentExt ]
+====[trait DocumentExt]
 
 Extension trait providing block-level operations on [`Document`].
 
-==[ Module element ]
+==[Module element]
 
 Extension trait, attribute helpers, and constructors for [`tomet_ast::Element`].
 
-===[ Traits ]
+===[Traits]
 
-====[ trait ElementExt ]
+====[trait ElementExt]
 
 Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
 
-===[ Functions ]
+===[Functions]
 
-====[ fn element_new ]
+====[fn element_new]
 
 Creates a new [`Element`] with given `sigil` and default empty fields.
 
 The placement is [`Placement::Inline`]; a caller building a block uses
 [`ElementExt::with_placement`], and the parser sets it from position.
 
-====[ fn list ]
+====[fn list]
 
 A list constructor (ordered if `ordered`, i.e. `-.`, else `-`).
 
-====[ fn list_item ]
+====[fn list_item]
 
 A list item constructor. `sigil` is `Sigil::Bare` for a plain `- content`
 item, or `Sigil::Named(name)` for the `-@name(...)` combine form -- the
@@ -62,38 +58,38 @@ reads for, and silently dropping it here would repeat the exact bug
 `connects` used to have (a full-form list item's parsed connects were
 read and then thrown away at this exact spot).
 
-==[ Module value ]
+==[Module value]
 
 Extension trait and helpers for [`tomet_ast::Value`].
 
-===[ Traits ]
+===[Traits]
 
-====[ trait ValueExt ]
+====[trait ValueExt]
 
 Extension trait providing accessors and inspections on [`Value`].
 
-==[ Module walk ]
+==[Module walk]
 
 Generic recursive traversal of a [`tomet_ast::Document`]'s tree.
 
-===[ Traits ]
+===[Traits]
 
-====[ trait Visitor ]
+====[trait Visitor]
 
 Called at every [`Element`] `walk_document` visits, in document order.
 
-====[ trait VisitorMut ]
+====[trait VisitorMut]
 
 Mutable counterpart of [`Visitor`] -- called at every `&mut Element`
 in document order.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn for_each_element ]
+====[fn for_each_element]
 
 Traverses all elements in `doc` in document order and executes `f` for each.
 
-====[ fn for_each_inline ]
+====[fn for_each_inline]
 
 Traverses every [`Inline`] in `doc` in document order: paragraph
 content, section titles, and every element's `[content]`.
@@ -103,12 +99,12 @@ reached there has its inlines reached here -- so a count taken over
 elements and a count taken over text describe the same part of the tree.
 An `Inline::Element` is itself passed to `f`, and then descended into.
 
-====[ fn for_each_element_in_block ]
+====[fn for_each_element_in_block]
 
 [`for_each_element`] over one [`Block`], for callers that walk the
 document's own top level themselves and need the elements below it.
 
-====[ fn for_each_top_level_element ]
+====[fn for_each_top_level_element]
 
 Visits every element a reader would find by scanning only the top of
 the document, in document order.
@@ -134,13 +130,13 @@ walking `doc.blocks` by hand -- that hand-rolled loop is exactly what
 stopped finding a joined `@blueprint`/`@vocabulary`/`@meta` the moment
 this rule shipped, in more than one crate at once.
 
-====[ fn for_each_top_level_element_mut ]
+====[fn for_each_top_level_element_mut]
 
 [`for_each_top_level_element`], mutably -- for a caller that rewrites a
 top-level declaration in place (`@blueprint(x)` becoming `@kind(x)`,
 say) without changing how many elements are there.
 
-====[ fn retain_top_level_elements ]
+====[fn retain_top_level_elements]
 
 [`for_each_top_level_element`], removing every one `keep` rejects --
 from `doc.blocks` directly for a `Block::Element`, or from a
@@ -158,19 +154,19 @@ nothing downstream needs that (`render_block` already treats an
 all-whitespace paragraph as producing nothing), and deciding that here
 would be a second place holding a rule a printer already holds.
 
-====[ fn walk_document ]
+====[fn walk_document]
 
 Depth-first, document-order walk of every `Element` in `doc`.
 
-====[ fn for_each_element_mut ]
+====[fn for_each_element_mut]
 
 Traverses all elements in `doc` mutably in document order and executes `f` for each in place.
 
-====[ fn walk_document_mut ]
+====[fn walk_document_mut]
 
 Mutable counterpart of [`walk_document`].
 
-====[ fn for_each_descendant ]
+====[fn for_each_descendant]
 
 Every descendant of `el` (not `el` itself), in document order --
 `content`, `children`, and `ElementValue::Group` entries. `:rule`'s own
@@ -198,7 +194,7 @@ being reported as a disallowed @em[descendant] would be.
 for `:rule(direct:true)`; `false` walks every descendant at any
 depth, same as [`walk_element`].
 
-====[ fn for_each_descendant_in_blocks ]
+====[fn for_each_descendant_in_blocks]
 
 Every descendant element reachable from `blocks`, in document order --
 [`for_each_descendant`]'s own `content` handling factored out, since a
@@ -207,7 +203,7 @@ block sequence that may hold a `Paragraph`, an `Element`, or a nested
 `Section`) and needs the identical walk: a heading's own `:rule(...)`
 has to check what sits @em[under] the heading, which is this.
 
-====[ fn for_each_item_descendant ]
+====[fn for_each_item_descendant]
 
 Walks `items` as descendants, mirroring [`for_each_descendant_in_blocks`]
 for a list's own items instead of a block sequence -- what a list's own
@@ -219,7 +215,7 @@ Deliberately never reads `list.connects` or any `ListItem`'s own
 `element.connects` -- see [`for_each_descendant`]'s doc comment for why
 that must stay true structurally, not just by convention.
 
-====[ fn for_each_list ]
+====[fn for_each_list]
 
 Visits every [`List`] in `doc`, in document order, including ones
 reachable through an element's own `content`/`value` entries, a
@@ -227,7 +223,7 @@ section's `blocks`, and a list item's own `sublist` -- every place a
 `Block::List` or a `ListItem.sublist` can occur. The counterpart to
 [`for_each_section`] for the other non-`Element` `Block` variant.
 
-====[ fn for_each_section ]
+====[fn for_each_section]
 
 Visits every [`tomet_ast::Section`] in `doc`, in document order,
 including ones nested under another section's own `blocks` -- the
@@ -237,39 +233,39 @@ can be checked against `section.blocks`
 ([`for_each_descendant_in_blocks`]) the same way an element's connect
 is checked against its own content.
 
-====[ fn transform_elements ]
+====[fn transform_elements]
 
 Mutates all elements in `doc` matching `filter` by applying `transform`.
 Returns the number of elements transformed.
 
-==[ Functions ]
+==[Functions]
 
-===[ fn element_get_attr ]
+===[fn element_get_attr]
 
-===[ fn element_get_attr_mut ]
+===[fn element_get_attr_mut]
 
-===[ fn element_has_prop_key ]
+===[fn element_has_prop_key]
 
-===[ fn element_set_prop ]
+===[fn element_set_prop]
 
-===[ fn element_rename_prop_key ]
+===[fn element_rename_prop_key]
 
-===[ fn element_replace_prop_value ]
+===[fn element_replace_prop_value]
 
-===[ fn element_remove_prop ]
+===[fn element_remove_prop]
 
-===[ fn element_transform_prop ]
+===[fn element_transform_prop]
 
-===[ fn element_attrs_view ]
+===[fn element_attrs_view]
 
-===[ fn element_attrs_mut ]
+===[fn element_attrs_mut]
 
-===[ fn insert_block_at ]
+===[fn insert_block_at]
 
-===[ fn remove_block_at ]
+===[fn remove_block_at]
 
-===[ fn replace_block_at ]
+===[fn replace_block_at]
 
-===[ fn find_block_index ]
+===[fn find_block_index]
 
-===[ fn find_element_block_index ]
+===[fn find_element_block_index]

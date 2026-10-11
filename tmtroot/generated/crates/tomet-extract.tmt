@@ -1,12 +1,8 @@
 @kind(api)
 
-@meta{
-  crate: tomet-extract
-  dependencies: list(tomet-ast, tomet-cst, tomet-parser, tomet-tree)
-  dependents: list(tomet-extract-rust)
-}
+@meta{crate: tomet-extract, dependencies: list(tomet-ast, tomet-cst, tomet-parser, tomet-tree), dependents: list()}
 
-=[ tomet-extract ]
+=[tomet-extract]
 
 Extraction and mapping of Tomet markup embedded inside source code comments.
 
@@ -27,81 +23,81 @@ By preserving original source locations, links and rule references inside commen
 can be checked by tools like `tomet check-links` or `twrit` with exact line and
 column diagnostics pointing back to the original source file.
 
-==[ Module comment ]
+==[Module comment]
 
 Generic comment extraction engine supporting line and block comments across languages.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct ExtractOptions ]
+====[struct ExtractOptions]
 
 Options for comment extraction.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn extract_comments ]
+====[fn extract_comments]
 
 Extracts comments from source code based on language syntax.
 
-==[ Module lang ]
+==[Module lang]
 
 Supported programming languages and their comment syntax rules.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct CommentSyntax ]
+====[struct CommentSyntax]
 
 Comment syntax definitions for a language.
 
-===[ Enums ]
+===[Enums]
 
-====[ enum Language ]
+====[enum Language]
 
 Supported languages for comment extraction.
 
-==[ Structs ]
+==[Structs]
 
-===[ struct ExtractedCommentBlock ]
+===[struct ExtractedCommentBlock]
 
 A contiguous block of comment lines extracted from a source file.
 
-===[ struct CommentSourceMap ]
+===[struct CommentSourceMap]
 
 Records the source location of each line in an extracted comment block.
 
-===[ struct ParsedComment ]
+===[struct ParsedComment]
 
 A parsed Tomet comment document along with its source map.
 
-==[ Enums ]
+==[Enums]
 
-===[ enum CommentKind ]
+===[enum CommentKind]
 
 The kind of comment in source code.
 
-==[ Functions ]
+==[Functions]
 
-===[ fn extract_comments_from_file ]
+===[fn extract_comments_from_file]
 
 Extracts comments from a source file, automatically detecting the language
 from the file path extension.
 
-===[ fn extract_rust_comments ]
+===[fn extract_rust_comments]
 
 Extracts contiguous Rust doc comments (`///` and `//!`) from source text.
 
-===[ fn parse_comments ]
+===[fn parse_comments]
 
 Parses extracted comments from source into Tomet documents for a given language.
 
-===[ fn parse_rust_comments ]
+===[fn parse_rust_comments]
 
 Parses all extracted doc comments in a Rust source file into Tomet documents.
 
-===[ fn collect_comment_elements_for_lang ]
+===[fn collect_comment_elements_for_lang]
 
 Collects all Tomet elements found in comments for a specific language.
 
-===[ fn collect_comment_elements ]
+===[fn collect_comment_elements]
 
 Collects all Tomet elements found in comments, auto-detecting language from `file`.

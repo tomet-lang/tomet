@@ -1,60 +1,56 @@
 @kind(api)
 
-@meta{
-  crate: tomet-cst
-  dependencies: list()
-  dependents: list(tomet-ast, tomet-edit, tomet-extract, tomet-js, tomet-lexer, tomet-lsp, tomet-parser, tomet-tests, tomet-validator)
-}
+@meta{crate: tomet-cst, dependencies: list(), dependents: list(tomet-ast, tomet-edit, tomet-extract, tomet-js, tomet-lexer, tomet-lsp, tomet-parser, tomet-tests, tomet-validator)}
 
-=[ tomet-cst ]
+=[tomet-cst]
 
-==[ tomet-cst ]
+==[tomet-cst]
 
 Concrete Syntax Tree (CST) foundation for Tomet, powered by `rowan`.
 
-==[ Architecture & Responsibilities ]
+==[Architecture & Responsibilities]
 
-- ("Lossless Green/Red Tree Foundation") [ `tomet-cst` provides a Rowan-based syntax tree architecture preserving 100% of
-                                           source characters, whitespace, newlines, and comments.
-                                           Guaranteed Invariant: `syntax_node.text().to_string() == original_source`. ]
-- ("Core Types & Handles") [ [`SyntaxNode`], [`SyntaxToken`], [`SyntaxElement`] provide offset navigation.
-                             [`TextRange`], [`TextSize`] provide byte-offset spans for LSP diagnostics and refactorings. ]
+- ("Lossless Green/Red Tree Foundation") `tomet-cst` provides a Rowan-based syntax tree architecture preserving 100% of
+source characters, whitespace, newlines, and comments.
+Guaranteed Invariant: `syntax_node.text().to_string() == original_source`.
+- ("Core Types & Handles") [`SyntaxNode`], [`SyntaxToken`], [`SyntaxElement`] provide offset navigation.
+[`TextRange`], [`TextSize`] provide byte-offset spans for LSP diagnostics and refactorings.
 
 This crate defines only the vocabulary ([`SyntaxKind`]) and the rowan glue;
 `tomet-parser::parse_cst` builds the tree and documents its shape. The tree
 is structured down to sections (nested by level), elements and their groups,
 and `key: value` entries.
 
-==[ Module syntax_kind ]
+==[Module syntax_kind]
 
 Defines the raw token and composite node kinds for Tomet's Concrete Syntax Tree (CST).
 
-===[ Enums ]
+===[Enums]
 
-====[ enum SyntaxKind ]
+====[enum SyntaxKind]
 
-==[ Enums ]
+==[Enums]
 
-===[ enum TometLanguage ]
+===[enum TometLanguage]
 
-==[ Functions ]
+==[Functions]
 
-===[ fn replace_range ]
+===[fn replace_range]
 
 Replaces the byte slice defined by `range` in `source` with `replacement`.
 
-===[ fn splice_node ]
+===[fn splice_node]
 
 Replaces the exact source range occupied by `target` in `source` with `replacement`.
 
-==[ Type Aliases ]
+==[Type Aliases]
 
-===[ type SyntaxNode ]
+===[type SyntaxNode]
 
-===[ type SyntaxToken ]
+===[type SyntaxToken]
 
-===[ type SyntaxElement ]
+===[type SyntaxElement]
 
-===[ type SyntaxNodeChildren ]
+===[type SyntaxNodeChildren]
 
-===[ type SyntaxElementChildren ]
+===[type SyntaxElementChildren]

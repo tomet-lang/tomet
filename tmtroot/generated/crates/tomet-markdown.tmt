@@ -1,28 +1,24 @@
 @kind(api)
 
-@meta{
-  crate: tomet-markdown
-  dependencies: list(tomet-ast, tomet-compute, tomet-semantics, tomet-tree)
-  dependents: list(tomet, tomet-cli, tomet-tests, tomet-tui)
-}
+@meta{crate: tomet-markdown, dependencies: list(tomet-ast, tomet-compute, tomet-html, tomet-parser, tomet-semantics, tomet-tree), dependents: list(tomet, tomet-cli, tomet-printer, tomet-tests, tomet-tui)}
 
-=[ tomet-markdown ]
+=[tomet-markdown]
 
 Bidirectional conversion between CommonMark and `tomet_ast`.
 
-==[ Overview ]
+==[Overview]
 
 Handles conversion between CommonMark Markdown and the Tomet Abstract Syntax Tree
 ([`tomet_ast::Document`]), supporting frontmatter, wikilinks, tables, callouts,
 and standard markup.
 
-==[ Key Functions ]
+==[Key Functions]
 
 - (from_markdown) Parses CommonMark text into a Tomet [`tomet_ast::Document`].
 - (from_markdown_with_options) Parses CommonMark text using custom [`ImportOptions`].
 - (to_markdown) Converts a Tomet [`tomet_ast::Document`] into clean CommonMark text.
 
-==[ Key Types ]
+==[Key Types]
 
 - (ImportOptions) Options controlling frontmatter and extension parsing.
 

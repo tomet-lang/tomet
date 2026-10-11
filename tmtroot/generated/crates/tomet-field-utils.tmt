@@ -1,12 +1,8 @@
 @kind(api)
 
-@meta{
-  crate: tomet-field-utils
-  dependencies: list(tomet-config)
-  dependents: list(tomet-printer, tomet-style)
-}
+@meta{crate: tomet-field-utils, dependencies: list(tomet-config), dependents: list(tomet-printer, tomet-style)}
 
-=[ tomet-field-utils ]
+=[tomet-field-utils]
 
 Small pure helpers for `@meta` field values, driven by
 `tomet_config::FieldConfig`: id generation/validation
@@ -21,12 +17,12 @@ call these) so `tomet-formatter` can reuse the same
 generate/validate/convert logic later without depending on printer's
 whole-document-rebuild model.
 
-==[ Functions ]
+==[Functions]
 
-===[ fn generate_id_for_field ]
+===[fn generate_id_for_field]
 
-===[ fn is_valid_id_format ]
+===[fn is_valid_id_format]
 
-===[ fn is_iso8601 ]
+===[fn is_iso8601]
 
-===[ fn format_rfc3339 ]
+===[fn format_rfc3339]

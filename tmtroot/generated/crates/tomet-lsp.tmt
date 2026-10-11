@@ -1,94 +1,90 @@
 @kind(api)
 
-@meta{
-  crate: tomet-lsp
-  dependencies: list(tomet-address, tomet-ast, tomet-compute, tomet-cst, tomet-formatter, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator)
-  dependents: list()
-}
+@meta{crate: tomet-lsp, dependencies: list(tomet-address, tomet-ast, tomet-compute, tomet-cst, tomet-formatter, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator), dependents: list()}
 
-=[ tomet-lsp ]
+=[tomet-lsp]
 
 Language server library for Tomet (`tomet-lsp`).
 Provides diagnostics (parser & validator), document formatting,
 hover, document symbols, goto definition, and completions.
 
-==[ Module completion ]
+==[Module completion]
 
-===[ Functions ]
+===[Functions]
 
-====[ fn completions_for ]
+====[fn completions_for]
 
 Provides autocompletion items for elements, keywords, and builtin compute functions.
 
-====[ fn completions_for_with_uri ]
+====[fn completions_for_with_uri]
 
 Provides autocompletion items with document URI awareness for path completions.
 
-==[ Module definition ]
+==[Module definition]
 
-===[ Functions ]
+===[Functions]
 
-====[ fn definition_for ]
+====[fn definition_for]
 
 Provides Goto Definition target for reference links or interpolation expressions.
 
-==[ Module diagnostic ]
+==[Module diagnostic]
 
-===[ Functions ]
+===[Functions]
 
-====[ fn diagnostics_for ]
+====[fn diagnostics_for]
 
 Parses `text` and produces diagnostics (both parse errors and CST validation rules).
 
-==[ Module folding ]
+==[Module folding]
 
 Provides folding ranges for sections, blocks, and comments in the editor.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn folding_ranges_for ]
+====[fn folding_ranges_for]
 
 Computes folding ranges for the given document text.
 
-==[ Module format ]
+==[Module format]
 
-===[ Functions ]
+===[Functions]
 
-====[ fn format_edits ]
+====[fn format_edits]
 
 Formats the document using `tomet-formatter` with loaded or inferred configuration.
 
-====[ fn resolve_effective_config ]
+====[fn resolve_effective_config]
 
 Resolves the merged configuration for a document by combining:
 1. Workspace config discovered from ancestor directories (`default.config.tmt` / `tomet.config.tmt`)
 2. Explicit `@config(import: ...)` / `@config(file: ...)` imported configs
 3. Document's local `@config` definitions (highest precedence)
 
-==[ Module hover ]
+==[Module hover]
 
-===[ Functions ]
+===[Functions]
 
-====[ fn hover_for ]
+====[fn hover_for]
 
 Provides hover information for the symbol under the cursor.
 
-==[ Module position ]
+==[Module position]
 
-===[ Functions ]
+===[Functions]
 
-====[ fn span_to_range ]
+====[fn span_to_range]
 
 Converts an AST [`Span`] to an LSP [`Range`].
 
-====[ fn text_range_to_lsp_range ]
+====[fn text_range_to_lsp_range]
 
 Converts a CST [`tomet_cst::TextRange`] to an LSP [`Range`].
 
-==[ Module symbol ]
+==[Module symbol]
 
-===[ Functions ]
+===[Functions]
 
-====[ fn document_symbols_for ]
+====[fn document_symbols_for]
 
 Provides document symbols for outline navigation in the editor.

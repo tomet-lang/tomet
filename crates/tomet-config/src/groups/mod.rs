@@ -6,16 +6,13 @@
 //! - [`workspace`]: Vault file indexing exclusions and unswept rules ([`WorkspaceConfig`]).
 //! - [`macros`]: Macro template expansions ([`MacrosConfig`]).
 //! - [`registry`]: Blueprints and vocabularies declarations ([`RegistryConfig`]).
-//! - [`api`]: API extraction settings ([`ApiConfig`]).
 
-pub mod api;
 pub mod format;
 pub mod macros;
 pub mod meta;
 pub mod registry;
 pub mod workspace;
 
-pub use api::ApiConfig;
 pub use format::{FormatConfig, GroupOrder};
 pub use macros::MacrosConfig;
 pub use meta::{FieldConfig, MetaConfig};

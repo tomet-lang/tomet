@@ -1,12 +1,8 @@
 @kind(api)
 
-@meta{
-  crate: tomet-printer
-  dependencies: list(tomet-ast, tomet-config, tomet-field-utils, tomet-formatter, tomet-semantics, tomet-style, tomet-tree)
-  dependents: list(tomet, tomet-cli, tomet-tests, tomet-tui, tomet-workspace)
-}
+@meta{crate: tomet-printer, dependencies: list(tomet-ast, tomet-config, tomet-field-utils, tomet-formatter, tomet-markdown, tomet-parser, tomet-semantics, tomet-style, tomet-tree), dependents: list(tomet, tomet-cli, tomet-pandoc, tomet-tests, tomet-tui, tomet-workspace)}
 
-=[ tomet-printer ]
+=[tomet-printer]
 
 Serializes a `tomet_ast::Document` back to `.tmt` source text
 (no span info required, unlike `tomet-formatter`, which
@@ -21,39 +17,39 @@ auto-generation (`ensure_document_id_with_config`, which mutates the
 AST directly), built on the pure generate/validate/convert helpers
 in `tomet-field-utils`.
 
-==[ Module block ]
+==[Module block]
 
 Rendering blocks, sections, headings, and lists.
 
-==[ Module element ]
+==[Module element]
 
 Rendering elements, values, args, and connects.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn render_element ]
+====[fn render_element]
 
 Render an [`Element`] AST node into Tomet syntax:
 `<sigil><name>(args)[content]{value}`.
 
-==[ Module id ]
+==[Module id]
 
 ID generation and rendering helpers.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn ensure_document_id_with_config ]
+====[fn ensure_document_id_with_config]
 
 Ensures that a document has an `id` field in its `@meta` block if configured to do so.
 
-==[ Module inline ]
+==[Module inline]
 
 Rendering inline content and block-permitted content runs.
 
-==[ Functions ]
+==[Functions]
 
-===[ fn document_to_tm ]
+===[fn document_to_tm]
 
 Serialize a [`Document`] AST into Tomet (`.tmt`) source string using document-level config or defaults.
 
-===[ fn document_to_tm_with_config ]
+===[fn document_to_tm_with_config]

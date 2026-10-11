@@ -1,47 +1,43 @@
 @kind(api)
 
-@meta{
-  crate: tomet-semantics
-  dependencies: list(tomet-ast, tomet-tree)
-  dependents: list(tomet, tomet-cli, tomet-compute, tomet-config, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tui, tomet-typst, tomet-validator, tomet-vault, tomet-workspace)
-}
+@meta{crate: tomet-semantics, dependencies: list(tomet-ast, tomet-parser, tomet-tree), dependents: list(tomet, tomet-cli, tomet-compute, tomet-config, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tui, tomet-typst, tomet-validator, tomet-vault, tomet-workspace)}
 
-=[ tomet-semantics ]
+=[tomet-semantics]
 
-==[ tomet-semantics ]
+==[tomet-semantics]
 
 I/O-free semantic classification and normalization layer for Tomet AST elements.
 
-==[ Architecture & Responsibilities ]
+==[Architecture & Responsibilities]
 
-- ("Pure I/O-Free Semantic Layer") [ `tomet-semantics` is strictly a pure classification and semantic extraction layer.
-                                     It performs zero I/O and depends exclusively on `tomet-ast` (not `tomet-parser`),
-                                     allowing downstream consumers (`tomet-html`, `tomet-markdown`, `tomet-links`,
-                                     `tomet-tui`, `tomet-lsp`) to classify elements without pulling in the parser. ]
+- ("Pure I/O-Free Semantic Layer") `tomet-semantics` is strictly a pure classification and semantic extraction layer.
+It performs zero I/O and depends exclusively on `tomet-ast` (not `tomet-parser`),
+allowing downstream consumers (`tomet-html`, `tomet-markdown`, `tomet-links`,
+`tomet-tui`, `tomet-lsp`) to classify elements without pulling in the parser.
 
-==[ Core Capabilities ]
+==[Core Capabilities]
 
-- ("Element Classification (`kind`)") [ Canonical recognition of Tomet's built-in vocabulary
-                                        (`@meta`, `@config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`,
-                                        `raw`, `quote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`) via [`ElementKind`]. ]
-- ("Link Target Extraction (`target`)") [ Canonical extraction of link targets and scheme
-                                          prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`]. ]
+- ("Element Classification (`kind`)") Canonical recognition of Tomet's built-in vocabulary
+(`@meta`, `@config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`,
+`raw`, `quote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`) via [`ElementKind`].
+- ("Link Target Extraction (`target`)") Canonical extraction of link targets and scheme
+prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
 - @em[]Positional Argument Normalization (`positional`))
 
 | Unifies positional argument mapping
 | (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and `@settings` custom schemas.
 
-- ("Document Configuration (`config`)") [ Merges `@config` and `@settings` blocks across
-                                          a document into a structured [`DocumentConfig`]. ]
+- ("Document Configuration (`config`)") Merges `@config` and `@settings` blocks across
+a document into a structured [`DocumentConfig`].
 - ("Metadata Extraction (`meta`)") Extracts top-level `@meta` values via [`document_meta`].
-- ("Structural Helpers") [ Heading level clamping (`heading`) and
-                           table parsing (`table`). ]
+- ("Structural Helpers") Heading level clamping (`heading`) and
+table parsing (`table`).
 - ("Element Data Extraction (`data`)") Extracts and normalizes an element's `{...}` data group via [`data::element_data`].
-- ("Element-Specific Semantics (`elements`)") [ Dedicated normalization and extraction
-                                                logic for concrete built-in element families (`config`, `footnote`,
-                                                `heading`, `meta`, `table`, `tag`, `target`). ]
+- ("Element-Specific Semantics (`elements`)") Dedicated normalization and extraction
+logic for concrete built-in element families (`config`, `footnote`,
+`heading`, `meta`, `table`, `tag`, `target`).
 
-==[ Module data ]
+==[Module data]
 
 An element's value as data.
 
@@ -49,17 +45,17 @@ An element's value as data.
 place every caller reads an element's `{...}` group through, so none of
 them need to know `ElementValue::Group`'s shape themselves.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn element_data ]
+====[fn element_data]
 
 An element's value as data: a `{...}` group's `key: value` pairs, or
 `None` if the element has no value group at all (or an interpolated
 one, `${...}`, which is not data).
 
-==[ Module elements ]
+==[Module elements]
 
-===[ elements ]
+===[elements]
 
 Semantic interpretations and normalization helpers for concrete built-in elements.
 
@@ -76,23 +72,23 @@ built-in element families:
 - (tag) Tag collection (`#tag`).
 - (target) Target URI and scheme resolution (`@link`, `@embed`, `@file`, `@dir`).
 
-===[ Module config ]
+===[Module config]
 
-====[ Structs ]
+====[Structs]
 
-=====[ struct DocumentConfig ]
+=====[struct DocumentConfig]
 
 Extracted document configuration settings from top-level `@config` elements.
 
-====[ Enums ]
+====[Enums]
 
-=====[ enum ExportType ]
+=====[enum ExportType]
 
 Supported target format for document exports.
 
-====[ Functions ]
+====[Functions]
 
-=====[ fn document_config ]
+=====[fn document_config]
 
 Returns this document's `@config` and `@settings` settings merged from
 all configuration elements in the document -- top-level per
@@ -101,29 +97,29 @@ all configuration elements in the document -- top-level per
 (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), not just a raw `doc.blocks`
 walk.
 
-===[ Module footnote ]
+===[Module footnote]
 
 Footnote collection, sequential numbering, and cross-reference resolution.
 
-====[ Structs ]
+====[Structs]
 
-=====[ struct FootnoteItem ]
+=====[struct FootnoteItem]
 
 An individual footnote entry resolved within a document.
 
-=====[ struct FootnoteRegistry ]
+=====[struct FootnoteRegistry]
 
 Registry storing all resolved footnotes and element back-references for a document.
 
-===[ Module heading ]
+===[Module heading]
 
 Extracts the `level` of a heading-shaped element (`Heading`, per
 [`crate::classify_std`]) from its `args`, centralizing the `1..=6` clamp
 that `tomet-html`/`tomet-markdown`/`tomet-printer` each used to apply separately.
 
-====[ Functions ]
+====[Functions]
 
-=====[ fn heading_level ]
+=====[fn heading_level]
 
 The clamped `1..=6` heading level of a heading-shaped element, if it
 has one. `None` for any non-heading element, or for a heading whose
@@ -131,11 +127,11 @@ has one. `None` for any non-heading element, or for a heading whose
 `@heading(level: "two")`) -- callers fall back to a default level
 themselves, this function never guesses one.
 
-===[ Module meta ]
+===[Module meta]
 
-====[ Functions ]
+====[Functions]
 
-=====[ fn document_meta ]
+=====[fn document_meta]
 
 Returns this document's `@meta` element's parsed data, if it has one --
 the `{...}` value group read via [`crate::data::element_data`].
@@ -153,31 +149,31 @@ never has more than one anyway.
 adjacent paragraph (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), a
 tree-shape choice unrelated to whether it opened its own line.
 
-=====[ fn document_kind ]
+=====[fn document_kind]
 
 Returns this document's declared kind string (e.g. `"j.daily"`, `"config"`, `"image_note"`),
 resolved strictly from top-level `@kind(...)` / `<kind>(...)` elements.
 
-=====[ fn document_version ]
+=====[fn document_version]
 
 Returns this document's declared language/syntax version (e.g. `"1.0"`),
 resolved strictly from top-level `@version(...)` / `<version>(...)` elements.
 
-===[ Module table ]
+===[Module table]
 
-====[ Structs ]
+====[Structs]
 
-=====[ struct TableCell ]
+=====[struct TableCell]
 
 One cell in a `@table` row, holding trimmed inline nodes.
 
-=====[ struct TableRow ]
+=====[struct TableRow]
 
 One row in a `@table`, holding cells.
 
-====[ Functions ]
+====[Functions]
 
-=====[ fn parse_table_rows ]
+=====[fn parse_table_rows]
 
 Parses table rows and cells from `@table`'s `[content]` (`Vec<Block>`
 now). The row/cell syntax (`[cell][cell]`) is literal text scanned
@@ -186,18 +182,18 @@ flattens every `Paragraph`'s own inline content into one sequence first
 -- there is realistically only ever one (no blank line inside a
 table's rows), but this doesn't assume that.
 
-===[ Module tag ]
+===[Module tag]
 
 Extracts tags from an element (`@tag(...)`, `@tag[...]`).
 
-====[ Functions ]
+====[Functions]
 
-=====[ fn extract_tags ]
+=====[fn extract_tags]
 
 Extracts a list of tag names from a tag element.
 Inspects `args` (as string, seq, or map) and `content` (as plain text).
 
-===[ Module target ]
+===[Module target]
 
 Extracts the raw target string of a link-shaped element (`Link`/`Embed`,
 per [`crate::classify_std`]) under their one canonical `target` key, and
@@ -208,18 +204,18 @@ live entirely in the target string itself. This is the canonical
 extraction, adopted by `tomet-html`/`tomet-markdown`/`tomet-links`
 instead of each reading `el.args` raw.
 
-====[ Enums ]
+====[Enums]
 
-=====[ enum TargetScheme ]
+=====[enum TargetScheme]
 
 What kind of thing a `target` string points at, derived purely from the
 string's own scheme prefix (never from which key/element name carried
 it -- there's only ever one key, `target`, for both `@link` and
 `@embed`).
 
-====[ Functions ]
+====[Functions]
 
-=====[ fn link_target ]
+=====[fn link_target]
 
 The raw target string of a link-shaped element, if it has one. `kind`
 should be `classify_std_lenient(el)`'s result -- only `Link`/`Embed` ever return
@@ -233,7 +229,7 @@ under `target` (e.g. `target: 42`) returns `None` rather than a
 stringified `"42"`, which would be a wrong filesystem-lookup target
 even though it's harmless for display purposes.
 
-=====[ fn path_target ]
+=====[fn path_target]
 
 The path a `@file`/`@dir` names, or `None` for anything else.
 
@@ -242,21 +238,21 @@ two this is, so a `file:`/`dir:` inside the value would be saying it
 twice. That is the difference from [`link_target`], where one element
 serves every scheme and the string has to carry which.
 
-=====[ fn link_target_of ]
+=====[fn link_target_of]
 
 Classifies `el` and extracts its link target in one step, for callers
 that don't already have `classify_std_lenient(el)`'s result on hand.
 
-=====[ fn path_target_of ]
+=====[fn path_target_of]
 
 [`path_target`] with the kind it classified to, for a caller sweeping
 a document without one in hand.
 
-=====[ fn target_scheme ]
+=====[fn target_scheme]
 
-====[ Constants ]
+====[Constants]
 
-=====[ const EXPLICIT_SCHEMES ]
+=====[const EXPLICIT_SCHEMES]
 
 Classifies a `target` string's scheme and strips a recognized explicit
 prefix (`tm:`/`id:`/`ref:`/`file:`/`dir:`) off of it, if any -- an implicit
@@ -270,7 +266,7 @@ same set -- the parser splits a bare `tm:foo` into a map entry keyed
 it used to carry a hand-copied second copy that nothing held to this
 one.
 
-==[ Module flatten ]
+==[Module flatten]
 
 Projecting an element's data onto a flat, string-valued attribute map.
 
@@ -291,15 +287,15 @@ rejected: a Tomet map key may itself contain `.` (the repository's own
 between a nested lookup and a flat key of that name. Element @em[names]
 use `.` as a namespace separator, but map keys deliberately do not.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct FlatData ]
+====[struct FlatData]
 
 An element's data, ready for a string-valued attribute map.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn flatten_element_data ]
+====[fn flatten_element_data]
 
 Flattens `el`'s `(args)` and `{value}` for an attribute map.
 
@@ -307,7 +303,7 @@ A `${...}` interpolation is not data and is skipped; so are the
 element children a `{...}` group may hold, which belong in the
 output's body rather than its attributes.
 
-====[ fn flatten_data ]
+====[fn flatten_data]
 
 Flattens the two groups directly.
 
@@ -315,7 +311,7 @@ Callers pass `None` for a group the surrounding mapping has already
 consumed -- a heading's level, a link's target -- so it is not emitted
 a second time as an attribute.
 
-====[ fn scalar_string ]
+====[fn scalar_string]
 
 The string a value projects to, or `None` when it cannot project.
 
@@ -324,25 +320,25 @@ done. That is not reversible -- `[p, q]` and the literal `"p, q"`
 project identically -- but it stays readable, and the exact copy is
 what a reader uses when it needs the difference.
 
-====[ fn value_to_json ]
+====[fn value_to_json]
 
 Converts a Tomet value to JSON, preserving structure exactly.
 
 `tomet-convert-pandoc`'s own `json_to_value` is this function's
 inverse, checked against it in `assert_json_round_trip`.
 
-===[ Constants ]
+===[Constants]
 
-====[ const EXACT_DATA_KEY ]
+====[const EXACT_DATA_KEY]
 
 The attribute a consumer should read instead of the flat projection
 when it is present.
 
-====[ const POSITIONAL_KEY ]
+====[const POSITIONAL_KEY]
 
 The key [`FlatData::into_pairs`] gives a positional group's value.
 
-==[ Module vocabulary ]
+==[Module vocabulary]
 
 What a `@vocabulary(ns)` document declares, and how a name resolves
 against the namespaces a document has in scope.
@@ -374,9 +370,9 @@ itself, resolved the same unconditional way `std` is in
 `std`, never written bare: `@doc.icon(...)` needs its full name, just
 never an `@use(doc)` in front of it.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct ParamDecl ]
+====[struct ParamDecl]
 
 One parameter, as `@param(name){ ... }` declares it.
 
@@ -391,17 +387,17 @@ settled: `@param(name)`'s own type is an identifier rather than a
 string, `default:`'s type depends on `type:`, and `type:`'s type is a
 type. Interpreting it here would mean deciding all three by accident.
 
-====[ struct ElementDecl ]
+====[struct ElementDecl]
 
 One element, as a vocabulary declares it.
 
 `@args` and `@content` are read; `@data` is not yet.
 
-====[ struct Vocabulary ]
+====[struct Vocabulary]
 
 The elements one namespace declares.
 
-====[ struct LoadedVocabularies ]
+====[struct LoadedVocabularies]
 
 Every vocabulary a vault declares, with whatever went wrong.
 
@@ -411,13 +407,13 @@ wants errors reported under. Where the document came from -- a file
 `tomet-load` read, or source text a wasm host was given -- is not
 this type's business, so both get the same verdicts.
 
-====[ struct Bindings ]
+====[struct Bindings]
 
 The namespaces in scope for one document.
 
-===[ Enums ]
+===[Enums]
 
-====[ enum Region ]
+====[enum Region]
 
 Where an element is allowed to sit in a document.
 
@@ -426,15 +422,15 @@ block or belongs to running text. `@use` has `Region::Preamble` and is
 not a singleton -- you bring in several vocabularies -- which is the
 proof the two axes are independent.
 
-====[ enum ContentAllow ]
+====[enum ContentAllow]
 
 `@content{allow:}`'s value -- what a vocabulary's own element may hold
 in `[content]`/`|content` (`Vec<Block>`, see `tmtroot/docs/spec/
 feature/content-shape.tmt`).
 
-===[ Functions ]
+===[Functions]
 
-====[ fn builtin_doc_vocabularies ]
+====[fn builtin_doc_vocabularies]
 
 The vocabularies tomet ships hardcoded in Rust rather than as a vault's
 `@vocabulary(ns)` document -- the same reason `std`'s elements are a
@@ -462,9 +458,9 @@ external renderer implements this notation to make it into a picture.
 `params` exists so `check_arguments` still catches a typo'd key; it is
 not a step toward Tomet ever reading `name`/`pkg` itself.
 
-===[ Constants ]
+===[Constants]
 
-====[ const RESERVED_NAMESPACES ]
+====[const RESERVED_NAMESPACES]
 
 Namespaces no vault vocabulary may claim, because tomet already gives
 them a hardcoded meaning -- `std` conceptually, and now `doc`.

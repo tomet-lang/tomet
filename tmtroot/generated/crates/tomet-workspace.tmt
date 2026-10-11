@@ -1,12 +1,8 @@
 @kind(api)
 
-@meta{
-  crate: tomet-workspace
-  dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-formatter, tomet-indexer, tomet-load-config, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-transform, tomet-tree)
-  dependents: list(tomet-cli, tomet-tests, tomet-tui)
-}
+@meta{crate: tomet-workspace, dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-formatter, tomet-indexer, tomet-load-config, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-transform, tomet-tree), dependents: list(tomet-cli, tomet-tests, tomet-tui)}
 
-=[ tomet-workspace ]
+=[tomet-workspace]
 
 Workspace-level batch refactoring, structural search, metadata editing, and I/O execution.
 
@@ -18,19 +14,19 @@ Provides:
 - (batch_meta) Batch metadata update engine.
 - (blueprint) Blueprint discovery and document instantiation.
 
-==[ Module batch_meta ]
+==[Module batch_meta]
 
 Batch metadata editing across workspace files.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct MetaFile ]
+====[struct MetaFile]
 
 Represents a workspace file with its metadata.
 
-====[ struct BatchMetaEngine ]
+====[struct BatchMetaEngine]
 
-==[ Module blueprint ]
+==[Module blueprint]
 
 Blueprint discovery and file instantiation across a workspace.
 
@@ -51,9 +47,9 @@ where it is written, instead of at every document that wanted it.
 A name -> path map was rejected as a duplicate: the name would appear
 in the key, in the path, and again in the file's own `@blueprint(X)`.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn list_blueprints ]
+====[fn list_blueprints]
 
 Every blueprint `config` declares, as `(name, path)`, sorted by name.
 
@@ -61,52 +57,52 @@ A declared path that is missing or does not name itself is skipped
 here and reported by [`declaration_errors`]; listing and creating
 should not fail wholesale because one entry rotted.
 
-====[ fn declaration_errors ]
+====[fn declaration_errors]
 
 What is wrong with the declared list: paths that do not exist, do not
 parse, or do not name themselves, and names claimed twice.
 
 Reported at the declaration, which is the whole point of declaring.
 
-====[ fn find_blueprint ]
+====[fn find_blueprint]
 
 The blueprint named `name`, among the ones `config` declares.
 
-====[ fn instantiate_blueprint_file ]
+====[fn instantiate_blueprint_file]
 
 Instantiates a blueprint file into formatted Tomet source text for `output_path`.
 
-====[ fn create_file_from_blueprint ]
+====[fn create_file_from_blueprint]
 
 Creates a new document from a blueprint and writes it to disk.
 
-==[ Module diff ]
+==[Module diff]
 
 File difference model and safe disk saving operations.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct FileDiff ]
+====[struct FileDiff]
 
 Represents the modification state and diff of a file.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn save_file_diffs ]
+====[fn save_file_diffs]
 
 Saves all modified `FileDiff`s to disk, returning the count of saved files.
 
-==[ Module refactor ]
+==[Module refactor]
 
 Workspace and document refactoring pipeline.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct RefactorOptions ]
+====[struct RefactorOptions]
 
 Configuration options for workspace and document refactoring passes.
 
-====[ struct RefactorReport ]
+====[struct RefactorReport]
 
 Discovers and refactors all `.tmt` files in `dir_or_file`.
 What a sweep found: the per-file diffs, and the files it could not
@@ -120,13 +116,13 @@ skipped has its hole exactly where it matters most: a file broken
 enough not to parse is the likeliest one to still carry the spelling
 being migrated away from.
 
-===[ Functions ]
+===[Functions]
 
-====[ fn refactor_document ]
+====[fn refactor_document]
 
 Applies configured refactoring transformations to a parsed [`Document`].
 
-====[ fn refactor_source ]
+====[fn refactor_source]
 
 Refactors source text, returning the transformed and formatted text alongside the changes count.
 
@@ -143,12 +139,12 @@ text diff -- `tomet refactor --check` is safe to run on anything, and
 rule touched is never rewritten. It is `-i` on a file a rule @em[does]
 touch that costs you the comments.
 
-====[ fn refactor_workspace ]
+====[fn refactor_workspace]
 
-==[ Module structural ]
+==[Module structural]
 
 Structural search and replace engine across workspace files.
 
-===[ Structs ]
+===[Structs]
 
-====[ struct StructuralEngine ]
+====[struct StructuralEngine]

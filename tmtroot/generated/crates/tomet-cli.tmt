@@ -1,23 +1,19 @@
 @kind(api)
 
-@meta{
-  crate: tomet-cli
-  dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-extract-rust, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-workspace, tove)
-  dependents: list()
-}
+@meta{crate: tomet-cli, dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-workspace, tove), dependents: list()}
 
-=[ tomet-cli ]
+=[tomet-cli]
 
 Command-line interface and developer tools for the Tomet toolchain.
 
-==[ Overview ]
+==[Overview]
 
 Provides the `tomet` command-line executable, orchestrating parser, resolver,
 validator, formatter, and converter components for `.tmt` document processing.
 
-==[ Subcommands ]
+==[Subcommands]
 
 - ("Inspection & Validation") `check`, `check-links`, `ast`, `roundtrip`, and `stats`.
 - ("Transformation & Formatting") `format` and `refactor`.
 - (Converters) `html`, `to-md`, `from-md`, `to-typst`, `to-pandoc`, `from-pandoc`, and `export`.
-- ("Documentation & Ecosystem") `api`, `cli-docs`, `tui`, and `serve`.
+- ("Documentation & Ecosystem") `cli-docs`, `tui`, and `serve`.

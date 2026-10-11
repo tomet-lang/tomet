@@ -1,12 +1,8 @@
 @kind(api)
 
-@meta{
-  crate: tomet-vault
-  dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-parser, tomet-search, tomet-semantics, tomet-transform)
-  dependents: list(tomet, tomet-load)
-}
+@meta{crate: tomet-vault, dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-parser, tomet-search, tomet-semantics, tomet-transform), dependents: list(tomet, tomet-load)}
 
-=[ tomet-vault ]
+=[tomet-vault]
 
 A vault's config and vocabularies, and what can be done with them
 without touching the disk.
@@ -25,7 +21,7 @@ binding handed vocabulary text -- builds one directly with
 [`Vault::from_sources`] and gets the same verdicts, because both go
 through the same rules (`LoadedVocabularies::add` in `tomet-semantics`).
 
-==[ wasm ]
+==[wasm]
 
 This crate, and `tomet` and `tomet-load` above it, compile for
 `wasm32-unknown-unknown` (the host supplies `getrandom`'s `js` feature,
@@ -35,7 +31,7 @@ disk. Measured on `bindings/js` (release, `wasm-opt -Oz`), routing a
 parse through `from_sources` added about 1% to the module and reaching
 `tomet-load` as well added about 0.3% more.
 
-==[ Preparing ]
+==[Preparing]
 
 `${filter(...)}` in an `@kind(doc.index)` document is answered from a
 table of every document in the vault. Building that table is a walk of
@@ -44,9 +40,9 @@ called when a document actually asks: a document with no query pays
 nothing, and a caller with no table passes an empty one and gets the
 query left unexpanded.
 
-==[ Structs ]
+==[Structs]
 
-===[ struct Prepared ]
+===[struct Prepared]
 
 What [`Vault::prepare`] did, and what it could not do.
 
@@ -55,7 +51,7 @@ the output as written, so a document showing `${...}` as an example
 still renders. `tomet check` reports the list as warnings, which is
 what tells a typo apart from an example.
 
-===[ struct Vault ]
+===[struct Vault]
 
 A vault's config and the vocabularies it declares, resolved once.
 

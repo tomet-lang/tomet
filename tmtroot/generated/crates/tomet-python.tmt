@@ -1,23 +1,19 @@
 @kind(api)
 
-@meta{
-  crate: tomet-python
-  dependencies: list(tomet)
-  dependents: list()
-}
+@meta{crate: tomet-python, dependencies: list(tomet), dependents: list()}
 
-=[ tomet-python ]
+=[tomet-python]
 
 Python bindings for the Tomet document engine using PyO3.
 
-==[ Overview ]
+==[Overview]
 
 Provides native Python interoperability for parsing Tomet documents, loading
 TOVE data into Python dictionaries, and converting documents into HTML,
 Markdown, Typst, and Pandoc formats. It also exposes document formatting,
 printing, and validation.
 
-==[ Key Functions ]
+==[Key Functions]
 
 - `loads` a data-only `.tmt` document into native Python objects.:Parse
 - `parse_document` full `.tmt` markup text into a Python AST dictionary.:Parse
