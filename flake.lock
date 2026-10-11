@@ -5584,16 +5584,16 @@
         "treefmt-nix": "treefmt-nix_36"
       },
       "locked": {
-        "lastModified": 1791440732,
-        "narHash": "sha256-/+Pj1d+ugkpmJR2jQl2iOn8wKWlzclil19rk/c/gGKY=",
+        "lastModified": 1791739228,
+        "narHash": "sha256-LgcWp3EZ+ySWAjsPEVXNp5qf4tlEVQ6l+MnL05xofpU=",
         "owner": "tomet-lang",
-        "repo": "tomet-writ",
-        "rev": "2ad0e2dfac5270b77bfb113be46460ed9e2b2cae",
+        "repo": "twrit",
+        "rev": "0890e2cc5e97d0fd3820ff92ef54990692d50cfb",
         "type": "github"
       },
       "original": {
         "owner": "tomet-lang",
-        "repo": "tomet-writ",
+        "repo": "twrit",
         "type": "github"
       }
     },
