@@ -1190,12 +1190,6 @@ Block  @task
     id: "t1"
 ```
 
-検証:
-
-```
-unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
-```
-
 ### `:(...)` は args をマージ
 
 ```tmt
@@ -1205,12 +1199,6 @@ unknown element `task`: only `std` and this document's own `@kind` may be writte
 ```
 Block  @task
   args    {b: 2, a: 1}
-```
-
-検証:
-
-```
-unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ## 名前付きコネクト `:name(...)`
@@ -1379,12 +1367,6 @@ Block  @task
   id      "myid"
 ```
 
-検証:
-
-```
-unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
-```
-
 ### groupsより前に書いても同じ。idと他のgroupsに順序はない
 
 ```tmt
@@ -1400,12 +1382,6 @@ Block  @task
   id      "myid"
 ```
 
-検証:
-
-```
-unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
-```
-
 ### クォートすればスペースも入る
 
 ```tmt
@@ -1415,12 +1391,6 @@ unknown element `task`: only `std` and this document's own `@kind` may be writte
 ```
 Block  @task
   id      "has spaces"
-```
-
-検証:
-
-```
-unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### セクションにも付く
@@ -1484,12 +1454,6 @@ Block  @task
     Inline @rule
       args    {allow: list("card")}
       id      "myid"
-```
-
-検証:
-
-```
-unknown element `task`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.task`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
 ### idを2つ書くとエラー

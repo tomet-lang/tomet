@@ -126,7 +126,8 @@ impl App {
         {
             let cfg = tomet_load_config::load_config_from_file(path).unwrap_or_default();
             (Some(path.clone()), cfg, dir_path.clone())
-        } else if let Some((cfg, found_path, root)) = tomet_load_config::find_config_file(&dir_path) {
+        } else if let Some((cfg, found_path, root)) = tomet_load_config::find_config_file(&dir_path)
+        {
             (Some(found_path), cfg, root)
         } else {
             (

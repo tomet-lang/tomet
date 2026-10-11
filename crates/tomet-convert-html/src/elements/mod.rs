@@ -18,7 +18,9 @@ pub(crate) use text::{
 };
 
 use crate::block::push_span_attrs;
-use crate::util::{escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs};
+use crate::util::{
+    escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs, value_to_plain,
+};
 use crate::{CustomElementCtx, RenderCtx};
 use tomet_ast::{Element, ElementValue};
 use tomet_semantics::{
@@ -67,8 +69,40 @@ pub(crate) fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inl
         "quote" => render_quote_element(cx, el, out, inline),
         "table" => render_table_element(cx, el, out),
         "tag" => render_tag_element(cx, el, out, inline),
+        "task" => render_task_element(cx, el, out, inline),
         "conflict" => render_conflict_element(cx, el, out, inline),
         _ => render_custom_or_generic_element(cx, el, kind.as_str(), out, inline),
+    }
+}
+
+fn render_task_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
+    let status = normalized_element_args_in(el, cx.bindings)
+        .as_ref()
+        .and_then(crate::util::as_map)
+        .and_then(|m| crate::util::map_get(m, "status"))
+        .map(value_to_plain)
+        .unwrap_or_else(|| " ".to_string());
+    let checked = matches!(status.as_str(), "x" | "X" | "done");
+    let tag = if inline { "span" } else { "div" };
+    out.push_str(&format!(
+        "<{tag} class=\"tm-element tm-task\" data-status=\"{}\"",
+        escape_attr(&status)
+    ));
+    if let Some(id) = id_attr(el.id.as_ref()) {
+        out.push_str(&format!(" id=\"{}\"", escape_attr(&id)));
+    }
+    push_span_attrs(cx, out, el.span);
+    out.push('>');
+    let checked_attr = if checked { " checked" } else { "" };
+    out.push_str(&format!(
+        "<input type=\"checkbox\" class=\"tm-task-checkbox\" disabled{checked_attr}> "
+    ));
+    if let Some(content) = &el.content {
+        crate::block::render_content_blocks(cx, content, out);
+    }
+    out.push_str(&format!("</{tag}>"));
+    if !inline {
+        out.push('\n');
     }
 }
 

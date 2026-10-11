@@ -1,6 +1,6 @@
 use std::fmt;
-use tomet_ast::Value;
 use tomet_address::ResolveError;
+use tomet_ast::Value;
 
 #[derive(Debug)]
 pub enum ComputeError {

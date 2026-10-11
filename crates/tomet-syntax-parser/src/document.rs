@@ -13,8 +13,8 @@ use crate::interp::{is_interp_start, parse_dollar_element};
 use crate::list::{parse_list, peek_list_marker};
 use crate::raw::{is_fenced_code_block_start, parse_fenced_code_block};
 use crate::section::{
-    consume_thematic_break, is_section_start, is_thematic_break,
-    is_titled_thematic_break_start, parse_section, parse_titled_thematic_break,
+    consume_thematic_break, is_section_start, is_thematic_break, is_titled_thematic_break_start,
+    parse_section, parse_titled_thematic_break,
 };
 use crate::value::{skip_inline_ws, skip_ws_and_newlines};
 use tomet_ast::{Block, Document, Element, Inline, Paragraph, Placement, Section};
@@ -254,7 +254,6 @@ pub(crate) fn parse_block_seq(
     *cur_ref = cur;
     Ok(doc_blocks)
 }
-
 
 fn push_block(doc_blocks: &mut Vec<Block>, stack: &mut [Section], block: Block) {
     if let Some(top) = stack.last_mut() {

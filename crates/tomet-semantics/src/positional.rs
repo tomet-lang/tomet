@@ -41,6 +41,7 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         "blueprint" => &["target"],
         "callout" => &["variant"],
         "heading" => &["level"],
+        "task" => &["status"],
         // `@conflict(x, y)` assigns by written position -- `a` first,
         // `b` second. Deliberately just an order, not a "mine/theirs"
         // signal: see `ElementKind::Conflict`'s own doc comment for why
@@ -451,7 +452,7 @@ mod tests {
     /// written for `@param` and exercised with one slot today.
     #[test]
     fn a_custom_element_gets_no_positional_inference() {
-        let mut el = element_new(Sigil::named("task"));
+        let mut el = element_new(Sigil::Named(Name::namespaced("deck", "job")));
         el.args = Some(Value::Map(vec![
             (
                 POSITIONAL_ENTRY_KEY.to_string(),
@@ -477,7 +478,6 @@ mod tests {
             ]))
         );
     }
-
 
     #[test]
     fn leaves_map_args_unchanged() {
@@ -527,7 +527,7 @@ mod tests {
     /// [`a_custom_element_gets_no_positional_inference`].
     #[test]
     fn a_custom_elements_bracketed_positional_list_is_left_alone() {
-        let mut el = element_new(Sigil::named("task"));
+        let mut el = element_new(Sigil::Named(Name::namespaced("deck", "job")));
         el.args = Some(Value::Seq(vec![
             Value::String("Clean room".to_string()),
             Value::String("high".to_string()),
@@ -539,6 +539,19 @@ mod tests {
                 Value::String("Clean room".to_string()),
                 Value::String("high".to_string()),
             ]))
+        );
+    }
+
+    #[test]
+    fn normalizes_task_status_positional_arg() {
+        let mut el = element_new(Sigil::named("task"));
+        el.args = Some(Value::String("x".to_string()));
+        assert_eq!(
+            normalized_element_args(&el),
+            Some(Value::Map(vec![(
+                "status".to_string(),
+                Value::String("x".to_string()),
+            )]))
         );
     }
 }

@@ -146,3 +146,13 @@ fn test_renders_tag_element() {
 
     assert!(html.contains("<span class=\"tmt-tag-list\"><span class=\"tmt-tag\">#rust</span> <span class=\"tmt-tag\">#tomet</span></span>"), "got {html}");
 }
+
+#[test]
+fn test_renders_task_element() {
+    let src = "@task(done)[ Finished work ]\n\n@task(todo)[ Pending work ]\n";
+    let doc = parse_document(src).unwrap();
+    let html = render_body(&doc);
+
+    assert!(html.contains("<div class=\"tm-element tm-task\" data-status=\"done\"><input type=\"checkbox\" class=\"tm-task-checkbox\" disabled checked> Finished work</div>\n"), "got {html}");
+    assert!(html.contains("<div class=\"tm-element tm-task\" data-status=\"todo\"><input type=\"checkbox\" class=\"tm-task-checkbox\" disabled> Pending work</div>\n"), "got {html}");
+}

@@ -11,10 +11,7 @@ pub(crate) fn is_fenced_code_block_start(cur: &Cursor) -> bool {
     look.eat_while(|c| c == '`').len() >= 3
 }
 
-pub(crate) fn parse_fenced_code_block(
-    cur: &mut Cursor,
-    pipe_stack: &[usize],
-) -> Result<Element> {
+pub(crate) fn parse_fenced_code_block(cur: &mut Cursor, pipe_stack: &[usize]) -> Result<Element> {
     let start_pos = cur.pos();
     let fence_len = cur.eat_while(|c| c == '`').len();
 

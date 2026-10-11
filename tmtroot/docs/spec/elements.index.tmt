@@ -28,6 +28,7 @@ Tometの仕様、Markdownの基本的な記法
 @codeblock   | ```
 @callout
 @card
+@task
 ```
 
 ---[ Literal ]---

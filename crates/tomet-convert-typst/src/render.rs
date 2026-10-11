@@ -202,6 +202,7 @@ fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
             }
         }
         "tag" => render_tag(el),
+        "task" => render_task(cx, el, inline),
         "interp" => render_interp(el),
         _ => render_generic(cx, el, kind.as_str(), inline),
     }
@@ -261,6 +262,42 @@ fn render_tag(el: &Element) -> String {
         })
         .collect();
     boxes.join(" ")
+}
+
+fn render_task(cx: &TypstCtx, el: &Element, _inline: bool) -> String {
+    let status_str = task_status(el);
+    let marker = match status_str.as_deref() {
+        Some("x") | Some("X") | Some("done") => "[x]",
+        Some(other) if other.chars().count() == 1 && other != " " => {
+            return format!("[{other}] {}", content_to_typst(cx, el));
+        }
+        _ => "[ ]",
+    };
+    let content = content_to_typst(cx, el);
+    if content.is_empty() {
+        marker.to_string()
+    } else {
+        format!("{marker} {content}")
+    }
+}
+
+fn task_status(el: &Element) -> Option<String> {
+    let args = normalized_element_args(el)?;
+    match args {
+        Value::Map(entries) => {
+            entries
+                .into_iter()
+                .find(|(k, _)| k == "status")
+                .and_then(|(_, v)| match v {
+                    Value::String(s) => Some(s),
+                    Value::Bool(b) => Some(if b { "x".to_string() } else { " ".to_string() }),
+                    _ => None,
+                })
+        }
+        Value::String(s) => Some(s),
+        Value::Bool(b) => Some(if b { "x".to_string() } else { " ".to_string() }),
+        _ => None,
+    }
 }
 
 fn render_heading(cx: &TypstCtx, el: &Element) -> String {

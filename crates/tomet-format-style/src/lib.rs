@@ -205,9 +205,7 @@ pub fn render_value_inner_with_blocks(
                         // one): `(a, key:value)` mixes a bare positional
                         // value with named ones, and the bare one prints
                         // bare too, not as `: a`.
-                        if k.is_empty()
-                            || (idx == 0 && (k == "variant" || k == "lang"))
-                        {
+                        if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang")) {
                             parts.push(val_str);
                         } else {
                             parts.push(format!("{k}: {val_str}"));
@@ -222,9 +220,7 @@ pub fn render_value_inner_with_blocks(
                     // See the matching comment in the single-entry branch
                     // above -- an empty key is a positional entry, printed
                     // bare rather than as `: value`.
-                    if k.is_empty()
-                        || (idx == 0 && (k == "variant" || k == "lang"))
-                    {
+                    if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang")) {
                         parts.push(val_str);
                     } else {
                         parts.push(format!("{k}: {val_str}"));

@@ -15,13 +15,14 @@ pub struct StructuralEngine;
 impl StructuralEngine {
     /// Perform structural query search across `.tmt` files.
     pub fn search(dir: &Path, query: &StructuralQuery) -> Vec<FileDiff> {
-        let (config, _, config_root) = tomet_load_config::find_config_file(dir).unwrap_or_else(|| {
-            (
-                tomet_config::PrinterConfig::default(),
-                dir.to_path_buf(),
-                dir.to_path_buf(),
-            )
-        });
+        let (config, _, config_root) =
+            tomet_load_config::find_config_file(dir).unwrap_or_else(|| {
+                (
+                    tomet_config::PrinterConfig::default(),
+                    dir.to_path_buf(),
+                    dir.to_path_buf(),
+                )
+            });
         Self::search_with_config(dir, query, &config, &config_root)
     }
 

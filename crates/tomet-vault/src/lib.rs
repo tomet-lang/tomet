@@ -95,7 +95,9 @@ impl Vault {
         for (label, src) in vocabularies {
             match tomet_parser::parse_document(src) {
                 Ok(doc) => loaded.add(label, &doc),
-                Err(e) => loaded.errors.push(format!("declared vocabulary {label}: {e}")),
+                Err(e) => loaded
+                    .errors
+                    .push(format!("declared vocabulary {label}: {e}")),
             }
         }
         Self::new(config, root.into(), loaded)

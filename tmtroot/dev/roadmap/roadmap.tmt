@@ -1,6 +1,7 @@
 @kind(todo)
 
 - `tellme`, `show`
+- (x) `@task`の昇格
 - rust用の追加要素
 - `:rule()`にnamespace
 ---

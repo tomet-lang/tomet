@@ -518,3 +518,26 @@ fn tag_elements_export_to_markdown() {
     let md = to_markdown(&doc);
     assert_eq!(md.trim(), "#rust #tomet and #spec");
 }
+
+#[test]
+fn task_elements_export_to_markdown() {
+    let src = "\
+-@task(x)[ Done task ]
+-@task(todo)[ Todo task ]
+-@task(\" \")[ Unchecked task ]
+";
+    let doc = tomet_parser::parse_document(src).unwrap();
+    let md = to_markdown(&doc);
+    assert_eq!(
+        md.trim(),
+        "- [x] Done task\n- [ ] Todo task\n- [ ] Unchecked task"
+    );
+}
+
+#[test]
+fn standalone_task_element_exports_to_markdown() {
+    let src = "@task(done)[ Single task ]\n";
+    let doc = tomet_parser::parse_document(src).unwrap();
+    let md = to_markdown(&doc);
+    assert_eq!(md.trim(), "[x] Single task");
+}

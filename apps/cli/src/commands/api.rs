@@ -72,10 +72,7 @@ pub(crate) fn api_cmd(
             .get(crate_name)
             .cloned()
             .unwrap_or_default();
-        crate_source.dependents = dependents_map
-            .get(crate_name)
-            .cloned()
-            .unwrap_or_default();
+        crate_source.dependents = dependents_map.get(crate_name).cloned().unwrap_or_default();
 
         let doc = match extract_crate_doc(&crate_source, &options) {
             Ok(doc) => doc,
@@ -226,13 +223,15 @@ fn build_crate_dependency_graph(
 
         if let Some(deps_table) = parsed.get("dependencies").and_then(|d| d.as_table()) {
             for (key, val) in deps_table {
-                let actual_pkg_name = if let Some(pkg) = val.get("package").and_then(|p| p.as_str()) {
+                let actual_pkg_name = if let Some(pkg) = val.get("package").and_then(|p| p.as_str())
+                {
                     pkg
                 } else {
                     key.as_str()
                 };
 
-                if known_crates.contains(actual_pkg_name) && actual_pkg_name != crate_name.as_str() {
+                if known_crates.contains(actual_pkg_name) && actual_pkg_name != crate_name.as_str()
+                {
                     deps_set.insert(actual_pkg_name.to_string());
                 }
             }

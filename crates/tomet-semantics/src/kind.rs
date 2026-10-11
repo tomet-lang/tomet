@@ -194,6 +194,8 @@ pub enum ElementKind {
     Caret,
     /// `@tag` -- topic/category tag.
     Tag,
+    /// `@task(status)[ ... ]` -- an actionable task item.
+    Task,
 }
 
 impl ElementKind {
@@ -242,6 +244,7 @@ impl ElementKind {
             ElementKind::Footnote => "footnote",
             ElementKind::Caret => "caret",
             ElementKind::Tag => "tag",
+            ElementKind::Task => "task",
         }
     }
 }
@@ -275,7 +278,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -321,6 +324,7 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
     ("heading", ElementKind::Heading),
     ("footnote", ElementKind::Footnote),
     ("tag", ElementKind::Tag),
+    ("task", ElementKind::Task),
 ];
 
 fn builtin_kind(name: &str) -> Option<ElementKind> {
@@ -476,9 +480,10 @@ pub fn is_directive(kind: &ElementKind) -> bool {
 pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
-        Meta | Config | Settings | Use | Include | Blueprint | Hr | Callout | Card
-        | Table | Heading | Kind | Version | Vocabulary | Element | Param | Args | Data
-        | Content => Shape::Block,
+        Meta | Config | Settings | Use | Include | Blueprint | Hr | Callout | Card | Table
+        | Heading | Kind | Version | Vocabulary | Element | Param | Args | Data | Content => {
+            Shape::Block
+        }
         Em | Strong | Mark | Strikeout | Ruby | Caret => Shape::Inline,
         // Either shape. A link or an embed alone on a line is not a
         // structural error -- it is how you show one file or one image.
@@ -507,6 +512,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         Conflict => return None,
         Footnote => return None,
         Tag => return None,
+        Task => return None,
         Custom(_) | Bare | Interp => return None,
     })
 }
@@ -577,8 +583,8 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         | Strikeout | Ruby | Heading => Some(ContentShape::Inline),
         // May hold multiple paragraphs, headings, lists: a blockquote
         // commonly spans several paragraphs; an admonition/card/footnote
-        // can too; a table's rows/cells.
-        Quote | Callout | Card | Table | Footnote => Some(ContentShape::Block),
+        // can too; a table's rows/cells; a task's details.
+        Quote | Callout | Card | Table | Footnote | Task => Some(ContentShape::Block),
         // Not a built-in bare name at all.
         Custom(_) | Bare | Interp | Caret => None,
     }
@@ -740,6 +746,17 @@ mod tests {
         // -- `a`/`b` live in `(args)` instead.
         assert_eq!(required_shape(&ElementKind::Conflict), None);
         assert_eq!(builtin_content_shape(&ElementKind::Conflict), None);
+    }
+
+    #[test]
+    fn named_at_sigil_with_task_name_is_recognized() {
+        let el = element_new(Sigil::named("task"));
+        assert_eq!(classify_std_lenient(&el), ElementKind::Task);
+        assert_eq!(required_shape(&ElementKind::Task), None);
+        assert_eq!(
+            builtin_content_shape(&ElementKind::Task),
+            Some(ContentShape::Block)
+        );
     }
 
     #[test]
