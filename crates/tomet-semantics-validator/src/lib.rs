@@ -99,6 +99,7 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Diagno
     check_unfinished(doc, &mut errors);
     check_rule_connects(doc, bindings, &mut errors);
     check_content_shape(doc, bindings, &mut errors);
+    check_dangling_anchors(doc, &mut errors);
 
     for (id, span) in collect_ids(doc) {
         if let Some((_, first)) = seen.iter().find(|(seen_id, _)| *seen_id == id) {
@@ -655,6 +656,39 @@ fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>) {
                     span: el.span,
                 });
             }
+        }
+    });
+}
+
+/// Checks for intra-document anchor links (`#anchor` or `id:anchor`) that point
+/// to an anchor ID that does not exist anywhere in `doc`.
+fn check_dangling_anchors(doc: &Document, errors: &mut Vec<Diagnostic>) {
+    tomet_tree::for_each_element(doc, |el| {
+        let Some((_, raw_target)) = tomet_semantics::link_target_of(el) else {
+            return;
+        };
+        let (scheme, anchor) = tomet_semantics::target_scheme(&raw_target);
+        let anchor = if scheme == tomet_semantics::TargetScheme::Internal {
+            anchor
+        } else if scheme == tomet_semantics::TargetScheme::Document && anchor.starts_with('#') {
+            &anchor[1..]
+        } else {
+            return;
+        };
+        // Positional addresses like `item(0)` or `#item(0)` are valid snapshot references.
+        if anchor.starts_with("item(") {
+            return;
+        }
+        // Path traversal like `#intro.prop.tags` -> base ID is `intro`.
+        let base_id = anchor
+            .split_once('.')
+            .map(|(base, _)| base)
+            .unwrap_or(anchor);
+        if !tomet_address::has_anchor(doc, anchor) && !tomet_address::has_anchor(doc, base_id) {
+            errors.push(Diagnostic::DanglingAnchor {
+                anchor: anchor.to_string(),
+                span: el.span,
+            });
         }
     });
 }

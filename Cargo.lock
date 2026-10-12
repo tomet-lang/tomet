@@ -2419,6 +2419,7 @@ name = "tomet-validator"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "tomet-address",
  "tomet-ast",
  "tomet-cst",
  "tomet-parser",

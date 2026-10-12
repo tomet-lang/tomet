@@ -32,6 +32,8 @@ pub enum Diagnostic {
         first: Span,
         duplicate: Span,
     },
+    /// An intra-document anchor reference points to an anchor ID that does not exist in the document.
+    DanglingAnchor { anchor: String, span: Span },
     /// A required `@meta` field defined in the blueprint is missing from the document.
     MissingRequiredMetaKey {
         key: String,
@@ -183,6 +185,7 @@ impl Diagnostic {
     pub fn span(&self) -> Span {
         match self {
             Diagnostic::DuplicateId { duplicate, .. } => *duplicate,
+            Diagnostic::DanglingAnchor { span, .. } => *span,
             Diagnostic::MissingRequiredMetaKey { span, .. } => *span,
             Diagnostic::MissingRequiredSection { span, .. } => *span,
             Diagnostic::UnknownElement { span, .. } => *span,
@@ -222,6 +225,9 @@ impl fmt::Display for Diagnostic {
                     "duplicate id `{id}` (first defined at {}:{})",
                     first.start.line, first.start.column
                 )
+            }
+            Diagnostic::DanglingAnchor { anchor, .. } => {
+                write!(f, "dangling anchor `#{anchor}`")
             }
             Diagnostic::MissingRequiredMetaKey { key, kind, .. } => {
                 write!(

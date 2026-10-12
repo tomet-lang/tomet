@@ -310,4 +310,23 @@ mod tests {
         assert!(err.to_string().contains("--data takes one file"));
         let _ = fs::remove_dir_all(&root);
     }
+
+    /// Dangling intra-document anchor links are caught and fail the check.
+    #[test]
+    fn dangling_anchor_link_fails_check() {
+        let root = vault("dangling_link");
+        fs::write(root.join("bad.tmt"), "@link(#nonexistent)\n").unwrap();
+        fs::write(
+            root.join("good.tmt"),
+            "=[ Intro ]#(intro)\n\n@link(#intro)\n",
+        )
+        .unwrap();
+
+        let err = check(&root.join("bad.tmt"), false, true, false).expect_err("bad file fails");
+        assert!(err.to_string().contains("1 of 1 file(s) failed"));
+
+        check(&root.join("good.tmt"), false, true, false).expect("good file passes");
+
+        let _ = fs::remove_dir_all(&root);
+    }
 }

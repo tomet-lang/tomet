@@ -67,7 +67,14 @@ and the dangling-reference/rename-update checker are untouched.
 
 - [x] `.settings` spelling: `meta: { isbn: { type: string, unique: true } }` in `default.config.tmt` (DECIDED)
 - [x] how references are *written* in text: `@link(ref:)` is the shorthand for `#(x)`, references in text use `@link` or `${...}`. `^` is dedicated to footnotes (`^footnote(1)`); `[[ ]]` was not adopted. (DECIDED, documented in `tmtroot/docs/spec/syntax/addressable.tmt`)
-- [ ] dangling-reference check in `tomet check`; renaming an `_id` with reference update
+- [x] dangling-reference check in `tomet check`
+      **2026-10-12 resolution**:
+      - Added `Diagnostic::DanglingAnchor { anchor, span }` to Layer 3 `tomet-validator`.
+      - Validates intra-document `@link(#anchor)` / `@link(id:anchor)` and `@embed` targets against document anchors via `tomet_address::has_anchor`.
+      - Path traversal targets (e.g. `#intro.prop.tags`) verify base ID existence.
+      - Causes `tomet check` to report dangling anchors and fail cleanly.
+      - Also checked in Java, JS, and Python bindings through `validate_document`.
+- [ ] renaming an `id` with reference update
 - [ ] vault-wide `@meta` `_id`: duplicates across the vault, cross-vault refs
 - [x] step 5: does the parser/AST carry parent+sibling info to compute addresses.
       **2026-10-10 & 2026-10-12 resolution**:
