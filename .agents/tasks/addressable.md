@@ -69,15 +69,16 @@ and the dangling-reference/rename-update checker are untouched.
 - [x] how references are *written* in text: `@link(ref:)` is the shorthand for `#(x)`, references in text use `@link` or `${...}`. `^` is dedicated to footnotes (`^footnote(1)`); `[[ ]]` was not adopted. (DECIDED, documented in `tmtroot/docs/spec/syntax/addressable.tmt`)
 - [ ] dangling-reference check in `tomet check`; renaming an `_id` with reference update
 - [ ] vault-wide `@meta` `_id`: duplicates across the vault, cross-vault refs
-- [ ] step 5: does the parser/AST carry parent+sibling info to compute addresses.
-      **2026-10-10 findings & resolution**:
+- [x] step 5: does the parser/AST carry parent+sibling info to compute addresses.
+      **2026-10-10 & 2026-10-12 resolution**:
       - `layer-purity-io-split` completed in commit `b4b987a`.
       - `tomet-semantics-address` (crate name `tomet-address`) was created at Layer 2
         as the pure in-memory home for reference and address resolution (`resolve_reference`,
-        `config_import_ref`, `settings_file_ref`). `tomet-semantics-resolver` was deleted.
-      - Therefore, the home for Step 5 (`item(n)`/`prop(k)` traversal and path step
-        resolution) is **DECIDED**: it lives in `tomet-address` (`crates/tomet-semantics-address`).
-      - Traversal implementation itself is still open (currently `${}` Call nodes are rejected by `resolve_reference` as `NotAReference`).
+        `config_import_ref`, `settings_file_ref`).
+      - Step 5 landed 2026-10-12: `InterpExprKind::Id(String)` for `${#id...}` syntax,
+        pure downward in-memory path traversal in `tomet-semantics-address::reference`
+        with `.prop`, `.id`, `.sigil`, `.connects`, `.content`, `.item(n)`, and `.prop(k)`.
+        No parent or sibling AST pointers required. Evaluates cleanly in `tomet-compute`.
 - [x] implementation + fixtures (done 2026-10-02 as `id`/`#(x)`, not `_id`/`#id(x)` --
       see the supersession note above; `cargo test -p tomet-tests -p tree-sitter-tomet`
       passes)

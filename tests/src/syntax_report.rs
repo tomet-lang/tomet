@@ -825,6 +825,7 @@ fn interp_str(expr: &InterpExpr) -> String {
     use tomet_ast::{InterpExprKind as K, Literal};
     match &expr.kind {
         K::Identifier(name) => name.clone(),
+        K::Id(name) => format!("#{name}"),
         K::Literal(Literal::Int(i)) => i.to_string(),
         K::Literal(Literal::Float(f)) => f.to_string(),
         K::Literal(Literal::String(s)) => format!("{s:?}"),

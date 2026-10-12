@@ -30,6 +30,7 @@ fn interp_expr(block: &Block) -> &InterpExpr {
 fn describe(expr: &InterpExpr) -> String {
     match &expr.kind {
         InterpExprKind::Identifier(name) => format!("Identifier({name})"),
+        InterpExprKind::Id(name) => format!("Id({name})"),
         InterpExprKind::Literal(Literal::Int(i)) => format!("Int({i})"),
         InterpExprKind::Literal(Literal::Float(f)) => format!("Float({f})"),
         InterpExprKind::Literal(Literal::String(s)) => format!("String({s:?})"),
@@ -44,6 +45,27 @@ fn describe(expr: &InterpExpr) -> String {
             format!("NamedArg({name}, {})", describe(value))
         }
     }
+}
+
+#[test]
+fn parses_hash_id_interpolation() {
+    let doc1 = parse_document("${#intro}\n").unwrap();
+    assert_eq!(describe(interp_expr(&doc1.blocks[0])), "Id(intro)");
+
+    let doc2 = parse_document("${#(intro)}\n").unwrap();
+    assert_eq!(describe(interp_expr(&doc2.blocks[0])), "Id(intro)");
+
+    let doc3 = parse_document("${#intro.prop.tags}\n").unwrap();
+    assert_eq!(
+        describe(interp_expr(&doc3.blocks[0])),
+        "Member(Member(Id(intro), prop), tags)"
+    );
+
+    let doc4 = parse_document("${#intro.prop.tags.item(0)}\n").unwrap();
+    assert_eq!(
+        describe(interp_expr(&doc4.blocks[0])),
+        "Call(Member(Member(Member(Id(intro), prop), tags), item), [Int(0)])"
+    );
 }
 
 #[test]

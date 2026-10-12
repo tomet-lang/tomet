@@ -969,6 +969,7 @@ pub struct InterpExpr {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum InterpExprKind {
     Identifier(String),
+    Id(String),
     Literal(Literal),
     Call {
         callee: Box<InterpExpr>,
@@ -1002,6 +1003,7 @@ impl fmt::Display for InterpExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             InterpExprKind::Identifier(name) => f.write_str(name),
+            InterpExprKind::Id(name) => write!(f, "#{name}"),
             InterpExprKind::Literal(Literal::Int(i)) => write!(f, "{i}"),
             InterpExprKind::Literal(Literal::Float(x)) => write!(f, "{x}"),
             InterpExprKind::Literal(Literal::String(s)) => {

@@ -162,6 +162,27 @@ pub(crate) fn parse_interp_expr(cur: &mut Cursor) -> Result<InterpExpr> {
 
 fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr> {
     match cur.peek() {
+        Some('#') => {
+            cur.bump();
+            let has_paren = cur.peek() == Some('(');
+            if has_paren {
+                cur.bump();
+                skip_inline_ws(cur);
+            }
+            let name = eat_interp_ident(cur)?.to_string();
+            if has_paren {
+                skip_inline_ws(cur);
+                if cur.peek() == Some(')') {
+                    cur.bump();
+                } else {
+                    return Err(err(cur, cur.pos(), "expected closing ')' after '#('"));
+                }
+            }
+            Ok(InterpExpr {
+                kind: InterpExprKind::Id(name),
+                span: cur.span_from(start_pos),
+            })
+        }
         Some('"') => {
             let s = parse_quoted(cur)?;
             Ok(InterpExpr {

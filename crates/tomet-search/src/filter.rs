@@ -250,7 +250,7 @@ fn collect_field_paths(expr: &InterpExpr, out: &mut BTreeSet<String>) {
                 out.insert(path);
             }
         }
-        InterpExprKind::Literal(_) => {}
+        InterpExprKind::Literal(_) | InterpExprKind::Id(_) => {}
     }
 }
 

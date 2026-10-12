@@ -105,6 +105,7 @@ pub fn evaluate_with_context(
         InterpExprKind::Literal(Literal::Int(i)) => Ok(Value::Int(*i)),
         InterpExprKind::Literal(Literal::Float(f)) => Ok(Value::Float(*f)),
         InterpExprKind::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
+        InterpExprKind::Id(_) => Ok(tomet_address::resolve_reference(doc, expr)?),
         InterpExprKind::Identifier(id) => {
             if let Some(val) = ctx.get_var(id) {
                 return Ok(val.clone());
@@ -132,7 +133,9 @@ pub fn evaluate_with_context(
             let val = evaluate_with_context(doc, value, config, ctx)?;
             Ok(Value::Map(vec![(name.clone(), val)]))
         }
-        InterpExprKind::Call { callee, args } => evaluate_call(doc, callee, args, config, ctx),
+        InterpExprKind::Call { callee, args } => {
+            evaluate_call(doc, expr, callee, args, config, ctx)
+        }
     }
 }
 
@@ -149,17 +152,14 @@ fn expr_to_path(expr: &InterpExpr) -> Option<String> {
 
 fn evaluate_call(
     doc: &Document,
+    expr: &InterpExpr,
     callee: &InterpExpr,
     args: &[InterpExpr],
     config: &tomet_semantics::DocumentConfig,
     ctx: &EvaluationContext,
 ) -> Result<Value, ComputeError> {
     // `${macro.NAME(...)}` names the namespace, so it goes straight to the
-    // macros and never tries a builtin. That is the point of writing it:
-    // a bare `${gh(12)}` reaches the same template only *after*
-    // `functions::call` misses, so a macro named like a builtin loses
-    // silently -- the fallback `docs/spec/builtin-functions.tmt` rejects.
-    // Unknown under `macro.` is an error, not a fall-through.
+    // macros and never tries a builtin.
     if let InterpExprKind::Member { object, member } = &callee.kind
         && matches!(&object.kind, InterpExprKind::Identifier(ns) if ns == "macro")
     {
@@ -171,6 +171,20 @@ fn evaluate_call(
             .map(|arg| evaluate_with_context(doc, arg, config, ctx))
             .collect::<Result<Vec<_>, _>>()?;
         return Ok(Value::String(expand_macro_template(template, &values)));
+    }
+
+    // Address method steps: `.item(...)` or `.prop(...)`
+    if let InterpExprKind::Member { member, .. } = &callee.kind {
+        if member == "item" || member == "prop" {
+            return Ok(tomet_address::resolve_reference(doc, expr)?);
+        }
+    }
+
+    // Root-level address step: `item(...)`
+    if let InterpExprKind::Identifier(name) = &callee.kind {
+        if name == "item" {
+            return Ok(tomet_address::resolve_reference(doc, expr)?);
+        }
     }
 
     let InterpExprKind::Identifier(name) = &callee.kind else {
@@ -550,5 +564,38 @@ mod tests {
 
         let file_res = evaluate_with_context(&doc, &interp("${filename}"), &cfg, &ctx).unwrap();
         assert_eq!(file_res, Value::String("001-rfc.tmt".into()));
+    }
+
+    #[test]
+    fn evaluates_hash_id_and_path_traversal() {
+        let doc = parse("@card#(intro)(tags: list(rust, tomet), score: 10)\n");
+        assert_eq!(
+            evaluate(&doc, &interp("${#intro.id}")).unwrap(),
+            Value::String("intro".into())
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("${#intro.sigil}")).unwrap(),
+            Value::String("card".into())
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("${#intro.prop.score}")).unwrap(),
+            Value::Int(10)
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("${#intro.prop.tags.item(0)}")).unwrap(),
+            Value::String("rust".into())
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("${#intro.prop.tags.item(1)}")).unwrap(),
+            Value::String("tomet".into())
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("${#intro.prop(\"score\")}")).unwrap(),
+            Value::Int(10)
+        );
+        assert_eq!(
+            evaluate(&doc, &interp("${item(0).id}")).unwrap(),
+            Value::String("intro".into())
+        );
     }
 }

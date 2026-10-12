@@ -15,6 +15,10 @@ pub enum ResolveError {
     /// `Member` chains are resolved here (a `Call` is
     /// `tomet-compute`'s job).
     NotAReference,
+    /// An `item(n)` step index was out of bounds.
+    IndexOutOfBounds { index: i64 },
+    /// An invalid traversal step was encountered.
+    InvalidStep { message: String },
 }
 
 impl fmt::Display for ResolveError {
@@ -31,6 +35,12 @@ impl fmt::Display for ResolveError {
                     f,
                     "expression is not a reference (only identifiers and member access resolve here)"
                 )
+            }
+            ResolveError::IndexOutOfBounds { index } => {
+                write!(f, "index `{index}` out of bounds")
+            }
+            ResolveError::InvalidStep { message } => {
+                write!(f, "invalid step: {message}")
             }
         }
     }
