@@ -77,113 +77,13 @@ pub fn path_target_of(el: &Element) -> Option<(ElementKind, String)> {
     path_target(el, &kind).map(|target| (kind, target))
 }
 
-/// What kind of thing a `target` string points at, derived purely from the
-/// string's own scheme prefix (never from which key/element name carried
-/// it -- there's only ever one key, `target`, for both `@link` and
-/// `@embed`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TargetScheme {
-    /// `scheme://...` (`https://...`, ...), or an explicit `url:...`
-    /// prefix -- an external URL, opaque to this codebase.
-    Url,
-    /// An OS-absolute path (`/...`), a doc-relative path (`./...`/`../...`),
-    /// an explicit `file:...` (project-root-relative) prefix, or -- the
-    /// fallback for anything with no recognized prefix at all (a bare
-    /// relative word like `readme.md`) -- treated as a project/doc-relative
-    /// file path by default, since `target` no longer has a separate
-    /// explicit key to opt into that meaning.
-    File,
-    /// `dir:path/to/place` -- a directory, project-root-relative like
-    /// `File`.
-    ///
-    /// Separate from `File` because the two are checked differently and
-    /// only the writer knows which was meant. `file:` accepting a
-    /// directory made `check-links` prove `.exists()` and call it a
-    /// file, which is a weaker statement than the one the reader takes
-    /// from the spelling. RFC 8089 draws no such line, but it defines
-    /// syntax only -- what a path denotes is this layer's question.
-    ///
-    /// A trailing `/` is accepted and carries no meaning: the scheme has
-    /// already said "directory", so the slash would be saying it twice.
-    /// `tomet fmt` removes it.
-    Dir,
-    /// `tm:path/to/doc` -- another Tomet document, project-root-relative
-    /// like `File` but semantically a document, not an arbitrary
-    /// attachment. Composable with `#fragment` to target a specific id
-    /// inside that document.
-    Tm,
-    /// `id:...` -- id-based reference (same-document-only for now).
-    Id,
-    /// `ref:...` -- resolved by searching the project for a file whose
-    /// name/title matches the given string (the old "wikilink" resolution).
-    Ref,
-    /// `unresolved:...` -- link target could not be resolved (stub/uncreated note).
-    Unresolved,
-}
+pub use tomet_address::{
+    Address, AddressKind, AddressKind as TargetScheme, EXPLICIT_SCHEMES, is_explicit_scheme,
+};
 
-impl TargetScheme {
-    /// Mirrors the retired per-kind names (`"url"/"file"/"tm"/"id"/"ref"`)
-    /// so callers building CSS classes / `data-*` attributes keep the same
-    /// vocabulary as before this scheme moved from key to value.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            TargetScheme::Url => "url",
-            TargetScheme::File => "file",
-            TargetScheme::Dir => "dir",
-            TargetScheme::Tm => "tm",
-            TargetScheme::Id => "id",
-            TargetScheme::Ref => "ref",
-            TargetScheme::Unresolved => "unresolved",
-        }
-    }
-}
-
-/// Classifies a `target` string's scheme and strips a recognized explicit
-/// prefix (`tm:`/`id:`/`ref:`/`file:`/`dir:`) off of it, if any -- an implicit
-/// shape (`scheme://...`, a leading `/`, `./`, `../`, or no recognizable
-/// prefix at all) is returned unchanged since there's nothing to strip.
-/// The explicit scheme prefixes, without their `:`.
-///
-/// One list. This crate's own `positional` module has to know the
-/// same set -- the parser splits a bare `tm:foo` into a map entry keyed
-/// `tm`, and recovering that means knowing which keys are schemes -- and
-/// it used to carry a hand-copied second copy that nothing held to this
-/// one.
-pub const EXPLICIT_SCHEMES: [(&str, TargetScheme); 7] = [
-    ("tm", TargetScheme::Tm),
-    ("id", TargetScheme::Id),
-    ("ref", TargetScheme::Ref),
-    ("unresolved", TargetScheme::Unresolved),
-    ("file", TargetScheme::File),
-    ("dir", TargetScheme::Dir),
-    ("url", TargetScheme::Url),
-];
-
-pub fn target_scheme(target: &str) -> (TargetScheme, &str) {
-    for (name, scheme) in EXPLICIT_SCHEMES {
-        if let Some(rest) = target.strip_prefix(name).and_then(|r| r.strip_prefix(':')) {
-            return (scheme, rest);
-        }
-    }
-    if is_scheme_uri(target) {
-        return (TargetScheme::Url, target);
-    }
-    (TargetScheme::File, target)
-}
-
-/// Whether `s` looks like `scheme://...` per RFC 3986's scheme grammar (a
-/// leading letter, then letters/digits/`+`/`-`/`.`).
-fn is_scheme_uri(s: &str) -> bool {
-    let Some(colon) = s.find(':') else {
-        return false;
-    };
-    let (scheme, rest) = s.split_at(colon);
-    !scheme.is_empty()
-        && scheme.starts_with(|c: char| c.is_ascii_alphabetic())
-        && scheme
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
-        && rest.starts_with("://")
+/// Classifies a `target` string's scheme and strips a recognized explicit prefix.
+pub fn target_scheme(target: &str) -> (AddressKind, &str) {
+    Address::split_scheme(target)
 }
 
 #[cfg(test)]
@@ -267,36 +167,41 @@ mod tests {
 
     #[test]
     fn target_scheme_recognizes_explicit_prefixes() {
-        assert_eq!(target_scheme("tm:foo/bar"), (TargetScheme::Tm, "foo/bar"));
         assert_eq!(
-            target_scheme("tm:foo/bar#some-id"),
-            (TargetScheme::Tm, "foo/bar#some-id")
+            target_scheme("tmt:foo/bar"),
+            (AddressKind::Document, "foo/bar")
         );
-        assert_eq!(target_scheme("id:greeting"), (TargetScheme::Id, "greeting"));
+        assert_eq!(
+            target_scheme("tmt:foo/bar#some-id"),
+            (AddressKind::Document, "foo/bar#some-id")
+        );
+        assert_eq!(
+            target_scheme("id:greeting"),
+            (AddressKind::Internal, "greeting")
+        );
+        assert_eq!(
+            target_scheme("#greeting"),
+            (AddressKind::Internal, "greeting")
+        );
         assert_eq!(
             target_scheme("ref:Some Page"),
-            (TargetScheme::Ref, "Some Page")
+            (AddressKind::Ref, "Some Page")
         );
         assert_eq!(
             target_scheme("unresolved:Future Note"),
-            (TargetScheme::Unresolved, "Future Note")
+            (AddressKind::Unresolved, "Future Note")
         );
-        assert_eq!(target_scheme("file:x.md"), (TargetScheme::File, "x.md"));
-        assert_eq!(target_scheme("dir:spec"), (TargetScheme::Dir, "spec"));
-        // The trailing slash is accepted and carries nothing: the scheme
-        // has already said "directory", so the slash would say it twice.
-        assert_eq!(target_scheme("dir:spec/"), (TargetScheme::Dir, "spec/"));
+        assert_eq!(target_scheme("file:x.md"), (AddressKind::File, "x.md"));
+        assert_eq!(target_scheme("dir:spec"), (AddressKind::Dir, "spec"));
     }
 
     #[test]
     fn every_explicit_scheme_round_trips_through_its_own_name() {
-        // `EXPLICIT_SCHEMES` is the one list, and `as_str` is what a CSS
-        // class and a cache row are spelled from. If the two ever
-        // disagree, a scheme parses under one name and renders under
-        // another, and nothing else would say so.
-        for (name, scheme) in EXPLICIT_SCHEMES {
+        for name in EXPLICIT_SCHEMES {
+            let input = format!("{name}:x");
+            let (scheme, rest) = target_scheme(&input);
             assert_eq!(scheme.as_str(), name, "{name}: prefix and as_str disagree");
-            assert_eq!(target_scheme(&format!("{name}:x")), (scheme, "x"));
+            assert_eq!(rest, "x");
         }
     }
 

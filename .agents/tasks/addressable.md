@@ -5,11 +5,20 @@ Destination when done: fold the decisions into that spec file (Japanese,
 user-facing), delete this file.
 
 Existing conventions to stay consistent with:
-- `scheme:address` links: `file:`, `dir:`, `tm:path#section`, `ref:target`
+- `scheme:address` links: `file:`, `dir:`, `tmt:path#anchor`, `#anchor`, `ref:target`
   (`docs/spec/builtin-functions.tmt`, `docs/spec/builtin-elements.tmt`)
 - call-chain in `${}`: `ref(id(asdf).contents(default))` (parses today, no semantics)
 - `^` sigil is reserved for `^footnote(1)` in `tmtroot/docs/spec/sigils.tmt`
 - `:` is a sigil (`tmtroot/dev/roadmap/colon-as-sigil.tmt`), avoid new uses
+
+## Decisions added later (2026-10-12)
+
+- Link anchor syntax is `tmt:path#anchor` (or `#anchor` for intra-document), NOT function call `#(anchor)`.
+- Scheme name is standardized to `tmt:`; legacy `tm:` compatibility dropped.
+- Address definitions (`Address`, `AddressKind`, `LinkKind`) are unified into Layer 2 `crates/tomet-semantics-address` (`tomet-address`).
+- Anchor inspection across ASTs (`has_anchor`, `find_anchor`, `collect_anchors`) lives purely in Layer 2 `tomet-semantics-address::anchor` without filesystem I/O.
+- Removed duplicated `LinkKind` from `tomet-stats` and `tomet-workspace-links`.
+- Converters (`tomet-html`, `tomet-typst`, `tomet-markdown`, `tomet-transform`) updated to use `TargetScheme::Internal` (`#anchor`).
 
 ## Decisions added later (2026-09-25)
 

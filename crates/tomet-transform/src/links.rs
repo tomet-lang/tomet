@@ -126,7 +126,8 @@ pub fn resolve_document_links<F>(
         let (scheme, rest) = target_scheme(&raw_target);
 
         // Never rewrite external URLs, in-document IDs, or absolute web paths
-        if scheme == TargetScheme::Url || scheme == TargetScheme::Id || rest.starts_with('/') {
+        if scheme == TargetScheme::Url || scheme == TargetScheme::Internal || rest.starts_with('/')
+        {
             return;
         }
 

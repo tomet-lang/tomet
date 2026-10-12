@@ -498,7 +498,7 @@ mod tests {
             "@link(https://example.com)[ a ]\n\
              @link(target: id:n1)[ b ]\n\
              @link(target: readme.md)[ c ]\n\
-             @link(target: tm:foo/bar)[ d ]\n\
+             @link(target: tmt:foo/bar)[ d ]\n\
              @link(target: ref:x)[ e ]\n\
              @embed(target: pic.png)\n\
              @file(a.txt)\n\
@@ -512,7 +512,13 @@ mod tests {
             .collect();
         assert_eq!(
             by_kind,
-            [("file", 2), ("dir", 1), ("embed", 1), ("tm", 1), ("ref", 1)]
+            [
+                ("file", 2),
+                ("dir", 1),
+                ("embed", 1),
+                ("tmt", 1),
+                ("ref", 1)
+            ]
         );
         assert_eq!(stats.total_links(), 6);
     }
@@ -669,7 +675,7 @@ mod tests {
         let after_total = text.split("Total").nth(1).expect("has a total row");
         // A symbol for each kind of element: the sigil it is written with.
         assert!(after_total.contains("@ 2 / ${} 1 / ^ 1 / - 0"), "{text}");
-        assert!(after_total.contains("file 0 / dir 0 / embed 0 / tm 0 / ref 0"));
+        assert!(after_total.contains("file 0 / dir 0 / embed 0 / tmt 0 / ref 0"));
         assert!(after_total.contains("deepest level 0"));
         assert!(
             after_total.contains(&format!("{:<NOTE_LABEL$}failed 3 / warnings 12", "Check")),

@@ -104,7 +104,7 @@ pub(crate) fn call(name: &str, args: &[Value]) -> Result<Value, ComputeError> {
         "uuid" => call_uuid(args),
         "unicode" => call_unicode(args),
         "emoji" => call_emoji(args),
-        "tm" => call_tm(args),
+        "tmt" => call_tmt(args),
         "ref" => call_ref(args),
         _ => Err(ComputeError::UnknownFunction(name.to_string())),
     }
@@ -300,12 +300,12 @@ fn call_emoji(args: &[Value]) -> Result<Value, ComputeError> {
     Ok(Value::String(emoji.to_string()))
 }
 
-fn call_tm(args: &[Value]) -> Result<Value, ComputeError> {
+fn call_tmt(args: &[Value]) -> Result<Value, ComputeError> {
     match args {
-        [Value::String(path)] => Ok(Value::String(format!("tm:{path}"))),
-        [Value::String(path), Value::String(sec)] => Ok(Value::String(format!("tm:{path}#{sec}"))),
+        [Value::String(path)] => Ok(Value::String(format!("tmt:{path}"))),
+        [Value::String(path), Value::String(sec)] => Ok(Value::String(format!("tmt:{path}#{sec}"))),
         other => Err(ComputeError::WrongArgCount {
-            function: "tm".to_string(),
+            function: "tmt".to_string(),
             expected: 1,
             got: other.len(),
         }),

@@ -7,81 +7,29 @@ use tomet_ast::{Document, Span};
 use tomet_semantics::{ElementKind, TargetScheme, link_target_of, path_target_of, target_scheme};
 use tomet_tree::for_each_element;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LinkKind {
-    File,
-    Dir,
-    Embed,
-    Tm,
-    Ref,
-}
+pub use tomet_address::LinkKind;
 
-impl LinkKind {
-    /// Every kind, so the cache schema can spell its CHECK from this
-    /// rather than from a hand-copied list that nothing holds to it.
-    pub const ALL: [LinkKind; 5] = [
-        LinkKind::File,
-        LinkKind::Dir,
-        LinkKind::Embed,
-        LinkKind::Tm,
-        LinkKind::Ref,
-    ];
-
-    /// `Embed` (`<embed>`/`@embed`) is always a link regardless of what its
-    /// `target` string looks like -- it's "this is embedded media", not a
-    /// scheme distinction. `Link` (`@link`/`<link>`) has no fixed kind of
-    /// its own anymore; its `target` string's own scheme decides File/Tm/Ref
-    /// (or excludes it: `Url` needs network, `Id` is same-document-only --
-    /// see this module's doc comment). Returns the scheme-stripped
-    /// remainder of `target` alongside the resolved `LinkKind`, since the
-    /// scheme prefix (`tm:`/`ref:`/`file:`/`dir:`) is no longer part of the actual
-    /// target value once it's been recognized.
-    fn from_element_kind_and_target(kind: &ElementKind, target: &str) -> Option<(Self, String)> {
-        match kind {
-            ElementKind::Embed => Some((LinkKind::Embed, target.to_string())),
-            // `@file`/`@dir` carry no scheme prefix: the element name is
-            // the scheme. Checked exactly as `file:`/`dir:` are, because
-            // the question is the same one -- only the rendering differs.
-            ElementKind::File => Some((LinkKind::File, target.to_string())),
-            ElementKind::Dir => Some((LinkKind::Dir, target.to_string())),
-            ElementKind::Link => {
-                let (scheme, rest) = target_scheme(target);
-                let link_kind = match scheme {
-                    TargetScheme::File => LinkKind::File,
-                    TargetScheme::Dir => LinkKind::Dir,
-                    TargetScheme::Tm => LinkKind::Tm,
-                    TargetScheme::Ref => LinkKind::Ref,
-                    TargetScheme::Url | TargetScheme::Id | TargetScheme::Unresolved => return None,
-                };
-                Some((link_kind, rest.to_string()))
-            }
-            _ => None,
+/// Returns the scheme-stripped remainder of `target` alongside the resolved `LinkKind`.
+fn from_element_kind_and_target(kind: &ElementKind, target: &str) -> Option<(LinkKind, String)> {
+    match kind {
+        ElementKind::Embed => Some((LinkKind::Embed, target.to_string())),
+        // `@file`/`@dir` carry no scheme prefix: the element name is
+        // the scheme. Checked exactly as `file:`/`dir:` are, because
+        // the question is the same one -- only the rendering differs.
+        ElementKind::File => Some((LinkKind::File, target.to_string())),
+        ElementKind::Dir => Some((LinkKind::Dir, target.to_string())),
+        ElementKind::Link => {
+            let (scheme, rest) = target_scheme(target);
+            let link_kind = match scheme {
+                TargetScheme::File => LinkKind::File,
+                TargetScheme::Dir => LinkKind::Dir,
+                TargetScheme::Document => LinkKind::Tmt,
+                TargetScheme::Ref => LinkKind::Ref,
+                _ => return None,
+            };
+            Some((link_kind, rest.to_string()))
         }
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            LinkKind::File => "file",
-            LinkKind::Dir => "dir",
-            LinkKind::Embed => "embed",
-            LinkKind::Tm => "tm",
-            LinkKind::Ref => "ref",
-        }
-    }
-}
-
-impl std::str::FromStr for LinkKind {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "file" => Ok(LinkKind::File),
-            "dir" => Ok(LinkKind::Dir),
-            "embed" => Ok(LinkKind::Embed),
-            "tm" => Ok(LinkKind::Tm),
-            "ref" => Ok(LinkKind::Ref),
-            _ => Err(()),
-        }
+        _ => None,
     }
 }
 
@@ -96,7 +44,7 @@ pub fn collect_links(doc: &Document) -> Vec<DocumentLink> {
     let mut links = Vec::new();
     for_each_element(doc, |el| {
         if let Some((kind, target)) = link_target_of(el).or_else(|| path_target_of(el))
-            && let Some((kind, target)) = LinkKind::from_element_kind_and_target(&kind, &target)
+            && let Some((kind, target)) = from_element_kind_and_target(&kind, &target)
         {
             links.push(DocumentLink {
                 kind,
@@ -135,7 +83,7 @@ mod tests {
 
 @link(target:ref:Some Page)
 
-@link(target:tm:foo/bar#some-id)
+@link(target:tmt:foo/bar#some-id)
 "#;
         let doc = tomet_parser::parse_document(src).unwrap();
         let links = collect_links(&doc);
@@ -159,7 +107,7 @@ mod tests {
         assert!(
             links
                 .iter()
-                .any(|l| l.kind == LinkKind::Tm && l.target == "foo/bar#some-id")
+                .any(|l| l.kind == LinkKind::Tmt && l.target == "foo/bar#some-id")
         );
     }
 

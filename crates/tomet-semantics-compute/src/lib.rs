@@ -450,15 +450,15 @@ mod tests {
     }
 
     #[test]
-    fn evaluates_tm_and_ref_uris() {
+    fn evaluates_tmt_and_ref_uris() {
         let doc = parse("\n");
         assert_eq!(
-            evaluate(&doc, &interp("$tm(\"guide/intro\")")).unwrap(),
-            Value::String("tm:guide/intro".into())
+            evaluate(&doc, &interp("$tmt(\"guide/intro\")")).unwrap(),
+            Value::String("tmt:guide/intro".into())
         );
         assert_eq!(
-            evaluate(&doc, &interp("$tm(\"guide/intro\", \"installation\")")).unwrap(),
-            Value::String("tm:guide/intro#installation".into())
+            evaluate(&doc, &interp("$tmt(\"guide/intro\", \"installation\")")).unwrap(),
+            Value::String("tmt:guide/intro#installation".into())
         );
         assert_eq!(
             evaluate(&doc, &interp("$ref(\"アーキテクチャ\")")).unwrap(),

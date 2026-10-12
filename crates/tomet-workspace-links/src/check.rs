@@ -118,6 +118,17 @@ fn resolve_ref_target(target: &str, existing: &HashSet<PathBuf>) -> bool {
     })
 }
 
+/// Reads and parses the document at `path`, and verifies whether `anchor` exists.
+fn check_document_anchor(path: &Path, anchor: &str) -> bool {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    let Ok(doc) = tomet_parser::parse_document(&content) else {
+        return false;
+    };
+    tomet_address::has_anchor(&doc, anchor)
+}
+
 /// Enumerates `.tmt`/`.tmt` files under `root`, pulls each one's links
 /// through `cache` (re-parsing only what changed since the last run),
 /// and resolves every `File`/`Embed`/`Tm`/`Ref` target against every
@@ -166,9 +177,33 @@ pub fn check_vault(
                 LinkKind::Dir => {
                     exists_as(&link.target, file, project_root, &existing, Path::is_dir)
                 }
-                LinkKind::Tm => {
-                    let path_part = link.target.split('#').next().unwrap_or(&link.target);
-                    exists_as(path_part, file, project_root, &existing, Path::is_file)
+                LinkKind::Tmt => {
+                    let (path_part, anchor_part) =
+                        if let Some((path, anchor)) = link.target.split_once('#') {
+                            let trimmed_anchor = anchor.trim();
+                            (
+                                path.trim(),
+                                if trimmed_anchor.is_empty() {
+                                    None
+                                } else {
+                                    Some(trimmed_anchor)
+                                },
+                            )
+                        } else {
+                            (link.target.trim(), None)
+                        };
+
+                    let target_path = rebase_on_project_root(
+                        resolve_file_target(file, path_part, project_root),
+                        project_root,
+                    );
+                    if !existing.contains(&target_path) || !target_path.is_file() {
+                        false
+                    } else if let Some(anchor) = anchor_part {
+                        check_document_anchor(&target_path, anchor)
+                    } else {
+                        true
+                    }
                 }
             };
             if !resolved {

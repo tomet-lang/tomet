@@ -543,7 +543,7 @@ fn render_link(cx: &TypstCtx, el: &Element) -> String {
         _ => String::new(),
     };
     match scheme {
-        TargetScheme::Id => {
+        TargetScheme::Internal => {
             let text = if text.is_empty() {
                 target.to_string()
             } else {

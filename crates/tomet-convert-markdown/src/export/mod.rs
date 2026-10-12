@@ -493,7 +493,7 @@ fn render_link(cx: &MarkdownCtx, el: &Element) -> String {
         _ => String::new(),
     };
     match scheme {
-        TargetScheme::Id => {
+        TargetScheme::Internal => {
             let text = if text.is_empty() {
                 target.to_string()
             } else {

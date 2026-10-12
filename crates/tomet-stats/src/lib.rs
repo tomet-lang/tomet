@@ -26,56 +26,25 @@ use serde::{Deserialize, Serialize};
 use tomet_ast::{Block, Document, Inline, Sigil};
 use tomet_semantics::{ElementKind, TargetScheme, link_target_of, path_target_of, target_scheme};
 
-/// Internal workspace link kinds recognized by Tomet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum LinkKind {
-    File,
-    Dir,
-    Embed,
-    Tm,
-    Ref,
-}
+pub use tomet_address::LinkKind;
 
-impl LinkKind {
-    /// All recognized link kinds in fixed order.
-    pub const ALL: [LinkKind; 5] = [
-        LinkKind::File,
-        LinkKind::Dir,
-        LinkKind::Embed,
-        LinkKind::Tm,
-        LinkKind::Ref,
-    ];
-
-    /// Canonical string identifier for this link kind.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            LinkKind::File => "file",
-            LinkKind::Dir => "dir",
-            LinkKind::Embed => "embed",
-            LinkKind::Tm => "tm",
-            LinkKind::Ref => "ref",
-        }
-    }
-
-    /// Determines the link kind from a semantic element kind and its target.
-    fn from_semantic(kind: &ElementKind, target: &str) -> Option<Self> {
-        match kind {
-            ElementKind::Embed => Some(LinkKind::Embed),
-            ElementKind::File => Some(LinkKind::File),
-            ElementKind::Dir => Some(LinkKind::Dir),
-            ElementKind::Link => {
-                let (scheme, _) = target_scheme(target);
-                match scheme {
-                    TargetScheme::File => Some(LinkKind::File),
-                    TargetScheme::Dir => Some(LinkKind::Dir),
-                    TargetScheme::Tm => Some(LinkKind::Tm),
-                    TargetScheme::Ref => Some(LinkKind::Ref),
-                    TargetScheme::Url | TargetScheme::Id | TargetScheme::Unresolved => None,
-                }
+/// Determines the link kind from a semantic element kind and its target.
+fn link_kind_from_semantic(kind: &ElementKind, target: &str) -> Option<LinkKind> {
+    match kind {
+        ElementKind::Embed => Some(LinkKind::Embed),
+        ElementKind::File => Some(LinkKind::File),
+        ElementKind::Dir => Some(LinkKind::Dir),
+        ElementKind::Link => {
+            let (scheme, _) = target_scheme(target);
+            match scheme {
+                TargetScheme::File => Some(LinkKind::File),
+                TargetScheme::Dir => Some(LinkKind::Dir),
+                TargetScheme::Document => Some(LinkKind::Tmt),
+                TargetScheme::Ref => Some(LinkKind::Ref),
+                _ => None,
             }
-            _ => None,
         }
+        _ => None,
     }
 }
 
@@ -176,7 +145,7 @@ pub fn measure(doc: &Document) -> Stats {
         }
 
         if let Some((kind, target)) = link_target_of(el).or_else(|| path_target_of(el))
-            && let Some(link_kind) = LinkKind::from_semantic(&kind, &target)
+            && let Some(link_kind) = link_kind_from_semantic(&kind, &target)
             && let Some(i) = LinkKind::ALL.iter().position(|k| *k == link_kind)
         {
             stats.links[i] += 1;

@@ -1973,6 +1973,7 @@ dependencies = [
 name = "tomet-address"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "tomet-ast",
  "tomet-parser",
  "tomet-tree",
@@ -2158,6 +2159,7 @@ version = "0.1.0"
 dependencies = [
  "directories",
  "rusqlite",
+ "tomet-address",
  "tomet-ast",
  "tomet-config",
  "tomet-indexer",
@@ -2301,6 +2303,7 @@ name = "tomet-semantics"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+ "tomet-address",
  "tomet-ast",
  "tomet-parser",
  "tomet-tree",
@@ -2312,6 +2315,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "tomet-address",
  "tomet-ast",
  "tomet-parser",
  "tomet-semantics",

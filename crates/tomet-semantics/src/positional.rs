@@ -84,9 +84,7 @@ pub fn normalized_list_marker(marker: &Value) -> Value {
 /// recognized explicit prefixes (see `crate::elements::target`) rather than a
 /// separately invented vocabulary.
 fn is_recoverable_target_scheme(key: &str) -> bool {
-    crate::elements::target::EXPLICIT_SCHEMES
-        .iter()
-        .any(|(name, _)| *name == key)
+    tomet_address::is_explicit_scheme(key)
 }
 
 /// Sentinel key `tomet_parser` tags a bare, unkeyed positional entry
@@ -342,32 +340,32 @@ mod tests {
 
     #[test]
     fn recovers_bare_scheme_prefixed_link_target_from_parser_key_split() {
-        // `@link(tm:foo/bar)` parses as `Map([("tm", "foo/bar")])` (the
+        // `@link(tmt:foo/bar)` parses as `Map([("tmt", "foo/bar")])` (the
         // parser's `identifier:` rule has no notion of `target` being the
         // only real key `@link` has) -- this recovers it back into one
         // `target` string.
         let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::Map(vec![(
-            "tm".to_string(),
+            "tmt".to_string(),
             Value::String("foo/bar".to_string()),
         )]));
         assert_eq!(
             normalized_element_args(&el),
             Some(Value::Map(vec![(
                 "target".to_string(),
-                Value::String("tm:foo/bar".to_string())
+                Value::String("tmt:foo/bar".to_string())
             )]))
         );
     }
 
     #[test]
     fn recovers_scheme_prefixed_target_alongside_genuine_extra_keys() {
-        // `@link(tm:foo, predicate: depends_on)` -- only the `tm` entry is
+        // `@link(tmt:foo, predicate: depends_on)` -- only the `tmt` entry is
         // a parser-split scheme prefix; `predicate` is real extra data and
         // stays untouched.
         let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::Map(vec![
-            ("tm".to_string(), Value::String("foo".to_string())),
+            ("tmt".to_string(), Value::String("foo".to_string())),
             (
                 "predicate".to_string(),
                 Value::String("depends_on".to_string()),
@@ -376,7 +374,7 @@ mod tests {
         assert_eq!(
             normalized_element_args(&el),
             Some(Value::Map(vec![
-                ("target".to_string(), Value::String("tm:foo".to_string())),
+                ("target".to_string(), Value::String("tmt:foo".to_string())),
                 (
                     "predicate".to_string(),
                     Value::String("depends_on".to_string())
@@ -389,14 +387,14 @@ mod tests {
     fn does_not_recover_when_target_key_already_present() {
         let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::Map(vec![
-            ("target".to_string(), Value::String("tm:foo".to_string())),
-            ("tm".to_string(), Value::String("bar".to_string())),
+            ("target".to_string(), Value::String("tmt:foo".to_string())),
+            ("tmt".to_string(), Value::String("bar".to_string())),
         ]));
         assert_eq!(
             normalized_element_args(&el),
             Some(Value::Map(vec![
-                ("target".to_string(), Value::String("tm:foo".to_string())),
-                ("tm".to_string(), Value::String("bar".to_string())),
+                ("target".to_string(), Value::String("tmt:foo".to_string())),
+                ("tmt".to_string(), Value::String("bar".to_string())),
             ]))
         );
     }
@@ -405,13 +403,13 @@ mod tests {
     fn does_not_recover_when_multiple_scheme_candidates_are_ambiguous() {
         let mut el = element_new(Sigil::named("link"));
         el.args = Some(Value::Map(vec![
-            ("tm".to_string(), Value::String("foo".to_string())),
+            ("tmt".to_string(), Value::String("foo".to_string())),
             ("id".to_string(), Value::String("bar".to_string())),
         ]));
         assert_eq!(
             normalized_element_args(&el),
             Some(Value::Map(vec![
-                ("tm".to_string(), Value::String("foo".to_string())),
+                ("tmt".to_string(), Value::String("foo".to_string())),
                 ("id".to_string(), Value::String("bar".to_string())),
             ]))
         );
@@ -419,18 +417,18 @@ mod tests {
 
     #[test]
     fn does_not_recover_for_non_link_embed_elements() {
-        // An arbitrary custom element's own `tm`-named field is left
+        // An arbitrary custom element's own `tmt`-named field is left
         // alone -- recovery is scoped to elements whose positional key
         // is `target` (`@link`/`@embed`), not a general mechanism.
         let mut el = element_new(Sigil::named("caution"));
         el.args = Some(Value::Map(vec![(
-            "tm".to_string(),
+            "tmt".to_string(),
             Value::String("foo".to_string()),
         )]));
         assert_eq!(
             normalized_element_args(&el),
             Some(Value::Map(vec![(
-                "tm".to_string(),
+                "tmt".to_string(),
                 Value::String("foo".to_string())
             )]))
         );

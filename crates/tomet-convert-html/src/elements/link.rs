@@ -102,7 +102,7 @@ pub(crate) fn render_link_element(cx: &RenderCtx, el: &Element, out: &mut String
                 escape_attr(&target)
             ));
         }
-        TargetScheme::Id => {
+        TargetScheme::Internal => {
             let href = format!("#{}", escape_attr(&target));
             out.push_str(&format!("<a class=\"tm-id\" href=\"{href}\""));
         }

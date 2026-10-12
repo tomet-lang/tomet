@@ -12,8 +12,8 @@
 @link(target:ref:no-such-note)
 [ Ref target that doesn't match anything. ]
 
-@link(target:tm:good.tmt#anchor)
-[ Tm: project-root-relative like file:, fragment stripped before resolving. ]
+@link(target:tmt:good.tmt#anchor)
+[ Tmt: project-root-relative like file:, anchor resolved against target AST. ]
 
-@link(target:tm:missing.tmt#anchor)
-[ Tm target whose path portion doesn't exist. ]
+@link(target:tmt:missing.tmt#anchor)
+[ Tmt target whose path portion doesn't exist. ]

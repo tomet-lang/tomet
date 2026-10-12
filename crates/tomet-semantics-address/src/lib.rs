@@ -20,10 +20,14 @@
 //! merging the target -- lives in `apps/lsp`, which reads it itself
 //! rather than calling back in here.
 
+mod address;
+mod anchor;
 mod error;
 mod import_ref;
 mod reference;
 
+pub use address::{Address, AddressKind, EXPLICIT_SCHEMES, LinkKind, is_explicit_scheme};
+pub use anchor::{collect_anchors, find_anchor, has_anchor};
 pub use error::ResolveError;
 pub use import_ref::{config_import_ref, settings_file_ref};
 pub use reference::resolve_reference;
