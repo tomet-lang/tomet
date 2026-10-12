@@ -65,6 +65,16 @@ impl Node {
     pub fn mark_edited(&mut self) {
         self.edited = true;
     }
+
+    /// Returns the identity attribute `#(id)` attached to this node, if any.
+    pub fn id_attr(&self) -> Option<&str> {
+        match &self.kind {
+            NodeKind::BlockElement { id_attr, .. }
+            | NodeKind::Section { id_attr, .. }
+            | NodeKind::ListItem { id_attr, .. } => id_attr.as_deref(),
+            _ => None,
+        }
+    }
 }
 
 /// Specific variant of an editable node.
@@ -74,6 +84,7 @@ pub enum NodeKind {
     Section {
         level: usize,
         heading_raw: String,
+        id_attr: Option<String>,
         children: Vec<ChildItem>,
     },
     /// A paragraph whose content is maintained as raw text.
@@ -92,6 +103,7 @@ pub enum NodeKind {
     ListItem {
         marker: String,
         text: String,
+        id_attr: Option<String>,
         children: Vec<ChildItem>,
     },
     /// A fenced code block (` ```lang ... ``` `).

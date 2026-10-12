@@ -53,6 +53,7 @@ fn import_block_node(doc: &mut EditDoc, node: &SyntaxNode) -> NodeId {
 fn import_section(doc: &mut EditDoc, node: &SyntaxNode) -> NodeKind {
     let mut heading_raw = String::new();
     let mut level = 1;
+    let mut id_attr = None;
     let mut children = Vec::new();
 
     for element in node.children_with_tokens() {
@@ -64,6 +65,16 @@ fn import_section(doc: &mut EditDoc, node: &SyntaxNode) -> NodeKind {
                 if child_node.kind() == K::SECTION_HEADING {
                     heading_raw = child_node.text().to_string();
                     level = count_heading_level(&heading_raw);
+                    id_attr = child_node
+                        .children()
+                        .find(|c| c.kind() == K::ID_GROUP)
+                        .map(|id| {
+                            let t = id.text().to_string();
+                            t.trim_start_matches("#(")
+                                .trim_end_matches(')')
+                                .trim()
+                                .to_string()
+                        });
                 } else {
                     let child_id = import_block_node(doc, &child_node);
                     children.push(ChildItem::Node(child_id));
@@ -75,6 +86,7 @@ fn import_section(doc: &mut EditDoc, node: &SyntaxNode) -> NodeKind {
     NodeKind::Section {
         level,
         heading_raw,
+        id_attr,
         children,
     }
 }
@@ -169,6 +181,14 @@ fn import_list_item(doc: &mut EditDoc, node: &SyntaxNode) -> NodeKind {
     let mut marker = String::new();
     let mut children = Vec::new();
 
+    let id_attr = node.children().find(|c| c.kind() == K::ID_GROUP).map(|id| {
+        let t = id.text().to_string();
+        t.trim_start_matches("#(")
+            .trim_end_matches(')')
+            .trim()
+            .to_string()
+    });
+
     for element in node.children_with_tokens() {
         match element {
             NodeOrToken::Token(token) => {
@@ -191,6 +211,7 @@ fn import_list_item(doc: &mut EditDoc, node: &SyntaxNode) -> NodeKind {
     NodeKind::ListItem {
         marker,
         text: node.text().to_string(),
+        id_attr,
         children,
     }
 }

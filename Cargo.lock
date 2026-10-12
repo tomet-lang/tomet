@@ -2058,6 +2058,7 @@ dependencies = [
 name = "tomet-edit"
 version = "0.1.0"
 dependencies = [
+ "tomet-address",
  "tomet-ast",
  "tomet-cst",
  "tomet-parser",
