@@ -2,7 +2,7 @@ use tomet_ast::{Block, Document, Element, Inline, List, Span};
 
 /// Walks every node in `doc` and returns `(id, span)` for each
 /// [`Element::id`]/[`Section::id`] found, in document order.
-pub(crate) fn collect_ids(doc: &Document) -> Vec<(String, Span)> {
+pub fn collect_ids(doc: &Document) -> Vec<(String, Span)> {
     let mut ids = Vec::new();
     for block in &doc.blocks {
         collect_block_ids(block, &mut ids);
@@ -82,7 +82,7 @@ use tomet_cst::{SyntaxKind, SyntaxNode, TextRange};
 /// `parse_connect` put one, so there is nothing else it could be mistaken
 /// for, and no attribute-key collision with `@link`'s own `id` argument
 /// to guard against (that argument is not this slot).
-pub(crate) fn collect_ids_cst(root: &SyntaxNode) -> Vec<(String, TextRange)> {
+pub fn collect_ids_cst(root: &SyntaxNode) -> Vec<(String, TextRange)> {
     use SyntaxKind as K;
 
     root.descendants()

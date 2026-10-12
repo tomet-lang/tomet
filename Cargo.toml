@@ -31,11 +31,16 @@ members = [
   "crates/tomet-syntax-lexer",
   "crates/tomet-syntax-parser",
 
-  #= Semantics -- classification/validation/eval/resolve
+  #= Semantics -- classification/eval/resolve
   "crates/tomet-semantics",
-  "crates/tomet-semantics-validator",
   "crates/tomet-semantics-compute",
   "crates/tomet-semantics-address",
+
+  #= Validator -- core, rule, blueprint, facade
+  "crates/tomet-validator-core",
+  "crates/tomet-validator-rule",
+  "crates/tomet-validator-blueprint",
+  "crates/tomet-validator",
 
   #= Config -- PrinterConfig discovery & loading; the producers sit on this
   "crates/tomet-config",
@@ -108,7 +113,11 @@ tomet-tree = { path = "crates/tomet-syntax-tree", version = "0.1.0" }
 tomet-address = { path = "crates/tomet-semantics-address", version = "0.1.0" }
 tomet-compute = { path = "crates/tomet-semantics-compute", version = "0.1.0" }
 tomet-semantics = { path = "crates/tomet-semantics", version = "0.1.0" }
-tomet-validator = { path = "crates/tomet-semantics-validator", version = "0.1.0" }
+#= Validator
+tomet-validator = { path = "crates/tomet-validator", version = "0.1.0" }
+tomet-validator-blueprint = { path = "crates/tomet-validator-blueprint", version = "0.1.0" }
+tomet-validator-core = { path = "crates/tomet-validator-core", version = "0.1.0" }
+tomet-validator-rule = { path = "crates/tomet-validator-rule", version = "0.1.0" }
 #= Transform
 tomet-transform = { path = "crates/tomet-transform", version = "0.1.0" }
 #= Search

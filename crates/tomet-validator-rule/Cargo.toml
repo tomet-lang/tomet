@@ -1,20 +1,16 @@
 [package]
-name = "tomet-validator"
+name = "tomet-validator-rule"
 version.workspace = true
 edition.workspace = true
-description = "Read-only .tmt document schema, blueprint, and lint validation."
+description = "Node-level constraint and :rule connect validation engine for Tomet documents."
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
-tomet-address = { workspace = true }
 tomet-ast = { workspace = true }
-tomet-cst = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-tree = { workspace = true }
-
-#= Crates.io
-serde = { workspace = true }
+tomet-validator-core = { workspace = true }
 
 [dev-dependencies]
 tomet-parser = { workspace = true }

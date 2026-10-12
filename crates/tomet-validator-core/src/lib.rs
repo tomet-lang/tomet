@@ -1,0 +1,435 @@
+//! Core document structure and semantic validation.
+//!
+//! Validates standard and custom elements, duplicate IDs, singleton directives,
+//! regions (preamble vs body), argument declarations, and dangling intra-document anchors.
+
+pub mod diagnostic;
+pub mod id;
+
+pub use diagnostic::{CstValidationError, Diagnostic, Severity};
+pub use id::{collect_ids, collect_ids_cst};
+
+use tomet_ast::{Block, Document, Element, Inline, List};
+use tomet_cst::{SyntaxNode, TextRange};
+use tomet_semantics::{Bindings, Shape};
+
+/// Classifies `el` against `std` and the namespaces in scope.
+pub fn classify_in(
+    el: &tomet_ast::Element,
+    bindings: &Bindings,
+) -> Result<tomet_semantics::ElementKind, tomet_semantics::UnknownName> {
+    match &el.sigil {
+        tomet_ast::Sigil::Named(name) => bindings.classify(name),
+        _ => tomet_semantics::classify_std(el),
+    }
+}
+
+pub fn shape_str(shape: Shape) -> &'static str {
+    match shape {
+        Shape::Block => "a block element",
+        Shape::Inline => "an inline element",
+    }
+}
+
+/// Runs core element, ID, region, and argument validations on `doc`.
+pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+    let mut seen: Vec<(String, tomet_ast::Span)> = Vec::new();
+
+    tomet_tree::for_each_element(doc, |el| {
+        if let Err(unknown) = classify_in(el, bindings) {
+            errors.push(Diagnostic::UnknownElement {
+                name: unknown.name,
+                unbound_namespace: unknown.unbound_namespace,
+                span: el.span,
+            });
+            return;
+        }
+        if let Some((found, expected)) = tomet_semantics::shape_mismatch(el) {
+            errors.push(Diagnostic::ShapeMismatch {
+                name: el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
+                found: shape_str(found),
+                expected: shape_str(expected),
+                span: el.span,
+            });
+        }
+    });
+
+    check_singletons_and_regions(doc, bindings, errors);
+    check_retired_settings_keys(doc, errors);
+    check_arguments(doc, bindings, errors);
+    check_unfinished(doc, errors);
+    check_content_shape(doc, bindings, errors);
+    check_dangling_anchors(doc, errors);
+
+    for (id, span) in collect_ids(doc) {
+        if let Some((_, first)) = seen.iter().find(|(seen_id, _)| *seen_id == id) {
+            errors.push(Diagnostic::DuplicateId {
+                id,
+                first: *first,
+                duplicate: span,
+            });
+        } else {
+            seen.push((id, span));
+        }
+    }
+}
+
+/// Enforces the `singleton` and `region` axes.
+pub fn check_singletons_and_regions(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+    use tomet_ast::{Block, Inline};
+    use tomet_semantics::Region;
+
+    let constraints = |el: &tomet_ast::Element| -> Option<(String, bool, Region)> {
+        let name = el.sigil.name()?;
+        let kind = classify_in(el, bindings).ok()?;
+        let (singleton, region) = match bindings.declaration(name) {
+            Some(decl) => (decl.singleton, decl.region),
+            None => (
+                tomet_semantics::builtin_singleton(&kind),
+                tomet_semantics::builtin_region(&kind),
+            ),
+        };
+        Some((name.to_string(), singleton, region))
+    };
+
+    let mut in_preamble = true;
+    let mut seen: Vec<(String, tomet_ast::Span)> = Vec::new();
+
+    let mut visit = |el: &tomet_ast::Element, in_place: bool| {
+        let Some((name, singleton, region)) = constraints(el) else {
+            return;
+        };
+        if singleton {
+            if let Some((_, first)) = seen.iter().find(|(seen_name, _)| *seen_name == name) {
+                errors.push(Diagnostic::DuplicateSingleton {
+                    name: name.clone(),
+                    first: *first,
+                    duplicate: el.span,
+                });
+            } else {
+                seen.push((name.clone(), el.span));
+            }
+        }
+        if region == Region::Preamble && !in_place {
+            errors.push(Diagnostic::OutsidePreamble {
+                name,
+                span: el.span,
+            });
+        }
+    };
+
+    for block in &doc.blocks {
+        match block {
+            Block::Element(el) => {
+                let still_preamble = constraints(el)
+                    .map(|(_, _, region)| region == Region::Preamble)
+                    .unwrap_or(false);
+                visit(el, in_preamble);
+                if !still_preamble {
+                    in_preamble = false;
+                }
+            }
+            Block::Paragraph(p) => {
+                for inline in &p.content {
+                    match inline {
+                        Inline::Element(el) => {
+                            let still_preamble = constraints(el)
+                                .map(|(_, _, region)| region == Region::Preamble)
+                                .unwrap_or(false);
+                            visit(el, in_preamble);
+                            if !still_preamble {
+                                in_preamble = false;
+                            }
+                            tomet_tree::for_each_descendant(el, false, |el| visit(el, false));
+                        }
+                        Inline::Text(t) if !t.value.trim().is_empty() => {
+                            in_preamble = false;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Block::Section(s) => {
+                in_preamble = false;
+                for inline in &s.title {
+                    if let Inline::Element(el) = inline {
+                        visit(el, false);
+                        tomet_tree::for_each_descendant(el, false, |el| visit(el, false));
+                    }
+                }
+                for child in &s.blocks {
+                    validate_section_block(child, &mut visit);
+                }
+            }
+            Block::List(list) => {
+                in_preamble = false;
+                validate_list_items(list, &mut visit);
+            }
+        }
+    }
+}
+
+fn validate_section_block(block: &Block, visit: &mut impl FnMut(&Element, bool)) {
+    match block {
+        Block::Element(el) => {
+            visit(el, false);
+            tomet_tree::for_each_descendant(el, false, |desc| visit(desc, false));
+        }
+        Block::Paragraph(p) => {
+            for inline in &p.content {
+                if let Inline::Element(el) = inline {
+                    visit(el, false);
+                    tomet_tree::for_each_descendant(el, false, |desc| visit(desc, false));
+                }
+            }
+        }
+        Block::Section(s) => {
+            for inline in &s.title {
+                if let Inline::Element(el) = inline {
+                    visit(el, false);
+                    tomet_tree::for_each_descendant(el, false, |desc| visit(desc, false));
+                }
+            }
+            for child in &s.blocks {
+                validate_section_block(child, visit);
+            }
+        }
+        Block::List(list) => validate_list_items(list, visit),
+    }
+}
+
+fn validate_list_items(list: &List, visit: &mut impl FnMut(&Element, bool)) {
+    for item in &list.items {
+        visit(&item.element, false);
+        tomet_tree::for_each_descendant(&item.element, false, |desc| visit(desc, false));
+        if let Some(sub) = &item.sublist {
+            validate_list_items(sub, visit);
+        }
+    }
+}
+
+pub fn check_unfinished(doc: &Document, errors: &mut Vec<Diagnostic>) {
+    tomet_tree::for_each_element(doc, |el| {
+        let kind = match tomet_semantics::classify_std(el) {
+            Ok(kind) => kind,
+            Err(_) => return,
+        };
+        let note = note_text(el);
+        match kind {
+            tomet_semantics::ElementKind::Draft => errors.push(Diagnostic::Draft {
+                note,
+                span: el.span,
+            }),
+            tomet_semantics::ElementKind::Fixme => errors.push(Diagnostic::Fixme {
+                note,
+                span: el.span,
+            }),
+            tomet_semantics::ElementKind::Conflict => {
+                errors.push(Diagnostic::Conflict { span: el.span })
+            }
+            _ => {}
+        }
+    });
+}
+
+fn note_text(el: &tomet_ast::Element) -> String {
+    let Some(blocks) = el.content.as_ref() else {
+        return String::new();
+    };
+    let mut out = String::new();
+    for block in blocks {
+        let tomet_ast::Block::Paragraph(p) = block else {
+            continue;
+        };
+        for inline in &p.content {
+            if let tomet_ast::Inline::Text(t) = inline {
+                out.push_str(&t.value);
+            }
+        }
+    }
+    out.trim().to_string()
+}
+
+pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+    use tomet_ast::Value;
+
+    tomet_tree::for_each_element(doc, |el| {
+        let Some(name) = el.sigil.name() else { return };
+        let Some(decl) = bindings.declaration(name) else {
+            return;
+        };
+        if decl.params.is_empty() {
+            return;
+        }
+
+        let args = tomet_semantics::normalized_element_args_in(el, bindings);
+        let entries: &[(String, Value)] = match args.as_ref() {
+            Some(Value::Map(entries)) => entries,
+            _ => &[],
+        };
+
+        for (key, _) in entries {
+            if !key.is_empty() && decl.param(key).is_none() {
+                errors.push(Diagnostic::UnknownArgument {
+                    element: name.to_string(),
+                    argument: key.clone(),
+                    span: el.span,
+                });
+            }
+        }
+        for param in decl.params.iter().filter(|p| p.required) {
+            if !entries.iter().any(|(k, _)| *k == param.name) {
+                errors.push(Diagnostic::MissingRequiredArgument {
+                    element: name.to_string(),
+                    argument: param.name.clone(),
+                    span: el.span,
+                });
+            }
+        }
+    });
+}
+
+pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+    tomet_tree::for_each_element(doc, |el| {
+        let Some(content) = &el.content else { return };
+        let Ok(kind) = classify_in(el, bindings) else {
+            return;
+        };
+        let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
+
+        let allow = match &kind {
+            tomet_semantics::ElementKind::Custom(_) => el
+                .sigil
+                .name()
+                .and_then(|n| bindings.declaration(n))
+                .and_then(|decl| decl.content_allow.clone()),
+            _ => match tomet_semantics::builtin_content_shape(&kind) {
+                Some(tomet_semantics::ContentShape::Inline) => {
+                    Some(tomet_semantics::ContentAllow::Inline)
+                }
+                Some(tomet_semantics::ContentShape::Block) | None => None,
+            },
+        };
+
+        match allow {
+            None | Some(tomet_semantics::ContentAllow::Any) => {}
+            Some(tomet_semantics::ContentAllow::Inline) => {
+                if !matches!(content.as_slice(), [] | [Block::Paragraph(_)]) {
+                    errors.push(Diagnostic::ContentNotInline {
+                        name,
+                        span: el.span,
+                    });
+                }
+            }
+            Some(tomet_semantics::ContentAllow::Names(names)) => {
+                let allowed_display: Vec<String> = names.iter().map(|n| n.to_string()).collect();
+                for_each_direct_content_element(content, |descendant| {
+                    let Ok(desc_kind) = classify_in(descendant, bindings) else {
+                        return;
+                    };
+                    let desc_name = desc_kind.as_str().to_string();
+                    if !names.iter().any(|n| n.to_string() == desc_name) {
+                        errors.push(Diagnostic::DisallowedInContent {
+                            name: desc_name,
+                            element: name.clone(),
+                            allowed: allowed_display.clone(),
+                            element_span: el.span,
+                            span: descendant.span,
+                        });
+                    }
+                });
+            }
+        }
+    });
+}
+
+fn for_each_direct_content_element<'a>(
+    content: &'a [Block],
+    mut f: impl FnMut(&'a tomet_ast::Element),
+) {
+    for block in content {
+        match block {
+            Block::Element(el) => f(el),
+            Block::Paragraph(p) => {
+                for inline in &p.content {
+                    if let Inline::Element(el) = inline {
+                        f(el);
+                    }
+                }
+            }
+            Block::Section(_) => {}
+            Block::List(_) => {}
+        }
+    }
+}
+
+pub fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>) {
+    use tomet_ast::Value;
+
+    const RETIRED: [&str; 2] = ["elements", "types"];
+
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        if !el.sigil.is_bare_named("settings") && !el.sigil.is_bare_named("config") {
+            return;
+        }
+        let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el) else {
+            return;
+        };
+        for key in RETIRED {
+            if entries.iter().any(|(k, _)| k == key) {
+                errors.push(Diagnostic::RetiredSettingsKey {
+                    key: key.to_string(),
+                    span: el.span,
+                });
+            }
+        }
+    });
+}
+
+pub fn check_dangling_anchors(doc: &Document, errors: &mut Vec<Diagnostic>) {
+    tomet_tree::for_each_element(doc, |el| {
+        let Some((_, raw_target)) = tomet_semantics::link_target_of(el) else {
+            return;
+        };
+        let (scheme, anchor) = tomet_semantics::target_scheme(&raw_target);
+        let anchor = if scheme == tomet_semantics::TargetScheme::Internal {
+            anchor
+        } else if scheme == tomet_semantics::TargetScheme::Document && anchor.starts_with('#') {
+            &anchor[1..]
+        } else {
+            return;
+        };
+        if anchor.starts_with("item(") {
+            return;
+        }
+        let base_id = anchor
+            .split_once('.')
+            .map(|(base, _)| base)
+            .unwrap_or(anchor);
+        if !tomet_address::has_anchor(doc, anchor) && !tomet_address::has_anchor(doc, base_id) {
+            errors.push(Diagnostic::DanglingAnchor {
+                anchor: anchor.to_string(),
+                span: el.span,
+            });
+        }
+    });
+}
+
+pub fn validate_cst(root: &SyntaxNode) -> Vec<CstValidationError> {
+    let mut errors = Vec::new();
+    let mut seen: Vec<(String, TextRange)> = Vec::new();
+
+    for (id, range) in collect_ids_cst(root) {
+        if let Some((_, first_range)) = seen.iter().find(|(seen_id, _)| *seen_id == id) {
+            errors.push(CstValidationError::DuplicateId {
+                id,
+                first_range: *first_range,
+                duplicate_range: range,
+            });
+        } else {
+            seen.push((id, range));
+        }
+    }
+
+    errors
+}

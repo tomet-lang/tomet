@@ -1,0 +1,21 @@
+[package]
+name = "tomet-validator"
+version.workspace = true
+edition.workspace = true
+description = "Read-only .tmt document schema, blueprint, and lint validation facade."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-cst = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-validator-blueprint = { workspace = true }
+tomet-validator-core = { workspace = true }
+tomet-validator-rule = { workspace = true }
+
+#= Crates.io
+serde = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

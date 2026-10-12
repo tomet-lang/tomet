@@ -1,7 +1,5 @@
 //! Decodes a `:rule(allow:list(...), direct:@bool)` connect element's own
-//! `args` into a usable [`RuleArgs`]. The check itself (walking an
-//! element's descendants against it) lives in `lib.rs`, alongside the
-//! other `check_*` passes -- this module is just the args reader.
+//! `args` into a usable [`RuleArgs`].
 
 use tomet_ast::{Element, Name, Value};
 
@@ -9,8 +7,8 @@ use tomet_ast::{Element, Name, Value};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuleArgs {
     /// The names `allow:list(...)` named, in source order. Never checked
-    /// against declared vocabulary here (or anywhere, in this MVP) --
-    /// only compared against what a descendant actually classifies as.
+    /// against declared vocabulary here -- only compared against what a
+    /// descendant actually classifies as.
     pub allow: Vec<Name>,
     /// `direct:@bool` -- restrict the check to immediate children only.
     /// Defaults to `false` (every descendant, any depth).
@@ -19,14 +17,6 @@ pub struct RuleArgs {
 
 /// Reads `connect_el.args` for a `:rule(...)` connect, or `None` if the
 /// shape isn't recognized.
-///
-/// Permissive by design (an explicit MVP scope decision, not an
-/// oversight): a `:rule(...)` with no `allow:`, or one whose `allow:`
-/// isn't a `Value::Call` of strings, applies no rule at all -- no
-/// diagnostic. The call's own callee (`list`/`enum`/a typo) is never
-/// checked; only its arguments matter. Deciding whether malformed
-/// `:rule` args deserve their own diagnostic is future work, once real
-/// usage shows whether silent no-op is actually confusing in practice.
 pub fn decode_rule_args(connect_el: &Element) -> Option<RuleArgs> {
     let Some(Value::Map(entries)) = &connect_el.args else {
         return None;
@@ -53,9 +43,7 @@ pub fn decode_rule_args(connect_el: &Element) -> Option<RuleArgs> {
     Some(RuleArgs { allow, direct })
 }
 
-/// `"ns.mycard"` -> a namespaced [`Name`]; `"card"` -> a bare one. Split
-/// on the first `.`, matching how `tomet-syntax-ast::Name` itself joins a
-/// namespace and a name back together for `Display`.
+/// `"ns.mycard"` -> a namespaced [`Name`]; `"card"` -> a bare one.
 fn name_from_dotted(s: &str) -> Name {
     match s.split_once('.') {
         Some((namespace, name)) => Name::namespaced(namespace, name),

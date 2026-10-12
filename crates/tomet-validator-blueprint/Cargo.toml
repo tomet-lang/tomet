@@ -1,0 +1,17 @@
+[package]
+name = "tomet-validator-blueprint"
+version.workspace = true
+edition.workspace = true
+description = "Blueprint schema extraction and structural conformance validation for Tomet documents."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-tree = { workspace = true }
+tomet-validator-core = { workspace = true }
+tomet-validator-rule = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

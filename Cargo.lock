@@ -2420,12 +2420,48 @@ name = "tomet-validator"
 version = "0.1.0"
 dependencies = [
  "serde",
- "tomet-address",
  "tomet-ast",
  "tomet-cst",
  "tomet-parser",
  "tomet-semantics",
+ "tomet-validator-blueprint",
+ "tomet-validator-core",
+ "tomet-validator-rule",
+]
+
+[[package]]
+name = "tomet-validator-blueprint"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-semantics",
  "tomet-tree",
+ "tomet-validator-core",
+ "tomet-validator-rule",
+]
+
+[[package]]
+name = "tomet-validator-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tomet-address",
+ "tomet-ast",
+ "tomet-cst",
+ "tomet-semantics",
+ "tomet-tree",
+]
+
+[[package]]
+name = "tomet-validator-rule"
+version = "0.1.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-tree",
+ "tomet-validator-core",
 ]
 
 [[package]]

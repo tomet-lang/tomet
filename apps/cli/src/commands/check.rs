@@ -15,7 +15,21 @@ pub(crate) struct Findings {
 impl Findings {
     pub(crate) fn of(vault: &tomet_load::Vault, file: &Path, doc: &tomet_ast::Document) -> Self {
         let bindings = vault.bindings(doc);
-        let diagnostics = tomet_validator::validate_document_with(doc, &bindings);
+        let mut diagnostics = tomet_validator::validate_document_with(doc, &bindings);
+
+        if let Some(kind) = tomet_semantics::document_kind(doc)
+            && kind != "blueprint"
+            && let Some(blueprint_path) =
+                tomet_workspace::blueprint::find_blueprint(&vault.root, &kind, &vault.config)
+        {
+            if let Ok(src) = std::fs::read_to_string(&blueprint_path)
+                && let Ok(blueprint_doc) = tomet_parser::parse_document(&src)
+            {
+                let bp_diagnostics =
+                    tomet_validator::validate_against_blueprint_with(doc, &blueprint_doc, &bindings);
+                diagnostics.extend(bp_diagnostics);
+            }
+        }
 
         // A `${...}` with no value is not an error: a document showing one
         // as an example is a legitimate document, and `export` leaves it
@@ -319,6 +333,43 @@ mod tests {
         fs::write(
             root.join("good.tmt"),
             "=[ Intro ]#(intro)\n\n@link(#intro)\n",
+        )
+        .unwrap();
+
+        let err = check(&root.join("bad.tmt"), false, true, false).expect_err("bad file fails");
+        assert!(err.to_string().contains("1 of 1 file(s) failed"));
+
+        check(&root.join("good.tmt"), false, true, false).expect("good file passes");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Blueprint conformance (required meta and section :rule constraints) is checked automatically.
+    #[test]
+    fn blueprint_conformance_fails_check() {
+        let root = vault("blueprint_check");
+        fs::write(
+            root.join("default.config.tmt"),
+            "@kind(settings)\n@settings{\n  blueprints: list(\"bp.tmt\")\n}\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("bp.tmt"),
+            "@kind(blueprint)\n@blueprint(note)\n@meta{\n  date: \"2026\"\n}\n\n=[ Items ]#(items):rule(allow: list(task))\n",
+        )
+        .unwrap();
+
+        // bad.tmt has a disallowed heading inside the items section
+        fs::write(
+            root.join("bad.tmt"),
+            "@kind(note)\n@meta{\n  date: \"2026-10-13\"\n}\n\n=[ Items ]#(items)\n@heading[ Disallowed ]\n",
+        )
+        .unwrap();
+
+        // good.tmt adheres to the blueprint
+        fs::write(
+            root.join("good.tmt"),
+            "@kind(note)\n@meta{\n  date: \"2026-10-13\"\n}\n\n=[ Items ]#(items)\n@task[ Clean room ]\n",
         )
         .unwrap();
 
