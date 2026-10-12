@@ -11,6 +11,7 @@ edit = ["dep:tomet-edit"]
 format = ["dep:tomet-formatter"]
 html = ["dep:tomet-html"]
 markdown = ["dep:tomet-markdown"]
+merge = ["dep:tomet-merge"]
 pandoc = ["dep:tomet-pandoc"]
 parser = []
 printer = ["dep:tomet-printer"]
@@ -31,6 +32,7 @@ tomet-edit = { workspace = true, optional = true }
 tomet-formatter = { workspace = true, optional = true }
 tomet-html = { workspace = true, optional = true }
 tomet-markdown = { workspace = true, optional = true }
+tomet-merge = { workspace = true, optional = true }
 tomet-pandoc = { workspace = true, optional = true }
 tomet-printer = { workspace = true, optional = true }
 tomet-stats = { workspace = true, optional = true }

@@ -18,7 +18,7 @@ does not relax the rule to fit the change it wanted to make.
   guard: { twrit: layers }
 
   layers: {
-    6: list( "apps/*", "bindings/*", "editors/*", "tests", "crates/tomet" )
+    6: list( "crates/tomet", "apps/*", "bindings/*", "editors/*", "tests" )
     5: list( "crates/tomet-workspace*", "crates/tomet-load*" )
     4: list(
       "crates/tomet-format*",
@@ -28,6 +28,7 @@ does not relax the rule to fit the change it wanted to make.
       "crates/tomet-transform",
       "crates/tomet-search",
       "crates/tomet-edit",
+      "crates/tomet-merge",
       "crates/tomet-stats",
       "crates/tomet-vault"
       )
@@ -53,6 +54,8 @@ with the producer groups.
 
 @dir(crates/tomet-edit) is likewise listed by name: it is a backend-neutral in-memory editing model that apps bridge to external
 editing runtimes, and it shares no prefix with the producer groups.
+
+@dir(crates/tomet-merge) is likewise listed by name: it is pure in-memory three-way AST merge and conflict resolution over parsed documents, and it shares no prefix with the producer groups.
 
 @dir(crates/tomet-stats) is likewise listed by name: it is pure in-memory document statistics and metrics calculation over a parsed AST, and it shares no prefix with the producer groups.
 

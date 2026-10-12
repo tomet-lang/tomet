@@ -53,6 +53,9 @@ members = [
   #= Edit -- backend-neutral editable model for collaborative editing
   "crates/tomet-edit",
 
+  #= Merge -- pure in-memory 3-way AST merge & conflict resolution
+  "crates/tomet-merge",
+
   #= Stats -- pure in-memory document statistics & metrics
   "crates/tomet-stats",
 
@@ -112,6 +115,8 @@ tomet-transform = { path = "crates/tomet-transform", version = "0.1.0" }
 tomet-search = { path = "crates/tomet-search", version = "0.1.0" }
 #= Edit
 tomet-edit = { path = "crates/tomet-edit", version = "0.1.0" }
+#= Merge
+tomet-merge = { path = "crates/tomet-merge", version = "0.1.0" }
 #= Stats
 tomet-stats = { path = "crates/tomet-stats", version = "0.1.0" }
 #= Vault

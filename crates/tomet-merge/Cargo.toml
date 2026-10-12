@@ -1,0 +1,14 @@
+[package]
+name = "tomet-merge"
+version.workspace = true
+edition.workspace = true
+description = "Pure in-memory three-way AST merge and conflict resolution for Tomet."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-printer = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

@@ -49,6 +49,7 @@
 //! @table
 //! |[ feature    ][ module       ][ from              ]
 //! |[ `edit`     ][ `edit`       ][ `tomet-edit`      ]
+//! |[ `merge`    ][ `merge`      ][ `tomet-merge`     ]
 //! |[ `parser`   ][ `parser`     ][ `tomet-parser`    ]
 //! |[ `html`     ][ `html`       ][ `tomet-html`      ]
 //! |[ `markdown` ][ `markdown`   ][ `tomet-markdown`  ]
@@ -88,6 +89,10 @@ pub use tomet_parser::parse_document;
 /// Lossless editable document tree model (opt-in feature `edit`).
 #[cfg(feature = "edit")]
 pub use tomet_edit as edit;
+
+/// Three-way AST merge and conflict resolution (opt-in feature `merge`).
+#[cfg(feature = "merge")]
+pub use tomet_merge as merge;
 
 /// The disk-free `Vault`: build one from text with `from_sources`. The
 /// top-level [`Vault`] is this plus finding and reading files.
@@ -131,6 +136,15 @@ mod tests {
         {
             let doc = edit::import_source("Hello world.\n");
             assert_eq!(edit::export_doc(&doc), "Hello world.\n");
+        }
+
+        #[cfg(all(feature = "parser", feature = "merge"))]
+        {
+            let base = parse_document("Hello world.\n").unwrap();
+            let local = parse_document("Hello my world.\n").unwrap();
+            let remote = parse_document("Hello world!\n").unwrap();
+            let res = merge::merge(&base, &local, &remote);
+            assert!(res.clean);
         }
     }
 }
