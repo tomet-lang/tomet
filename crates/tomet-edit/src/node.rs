@@ -75,6 +75,184 @@ impl Node {
             _ => None,
         }
     }
+
+    /// Constructs a new [`NodeKind::Paragraph`] node.
+    pub fn paragraph(id: NodeId, text: impl Into<String>) -> Self {
+        let mut text_str = text.into();
+        if !text_str.ends_with('\n') {
+            text_str.push('\n');
+        }
+        Self {
+            id,
+            kind: NodeKind::Paragraph {
+                text: text_str.clone(),
+            },
+            raw: text_str,
+            edited: true,
+        }
+    }
+
+    /// Constructs a new [`NodeKind::CodeBlock`] node.
+    pub fn code_block(
+        id: NodeId,
+        lang: Option<impl Into<String>>,
+        code: impl Into<String>,
+    ) -> Self {
+        let lang_opt = lang.map(Into::into);
+        let code_str = code.into();
+        let formatted = if code_str.starts_with("```") {
+            code_str
+        } else {
+            let l = lang_opt.as_deref().unwrap_or("");
+            let trimmed = code_str.trim_end_matches(['\r', '\n']);
+            format!("```{l}\n{trimmed}\n```\n")
+        };
+        Self {
+            id,
+            kind: NodeKind::CodeBlock {
+                lang: lang_opt,
+                code: formatted.clone(),
+            },
+            raw: formatted,
+            edited: true,
+        }
+    }
+
+    /// Constructs a new [`NodeKind::Section`] node with a formatted heading.
+    pub fn section(
+        id: NodeId,
+        level: usize,
+        title: impl Into<String>,
+        id_attr: Option<impl Into<String>>,
+    ) -> Self {
+        let level = level.max(1);
+        let prefix = "=".repeat(level);
+        let title_str = title.into();
+        let id_opt = id_attr.map(Into::into);
+        let heading_raw = match &id_opt {
+            Some(id_str) => format!("{prefix}[ {title_str} ] #({id_str})\n"),
+            None => format!("{prefix}[ {title_str} ]\n"),
+        };
+        Self {
+            id,
+            kind: NodeKind::Section {
+                level,
+                heading_raw: heading_raw.clone(),
+                id_attr: id_opt,
+                children: Vec::new(),
+            },
+            raw: heading_raw,
+            edited: true,
+        }
+    }
+
+    /// Constructs a new [`NodeKind::ThematicBreak`] node.
+    pub fn thematic_break(id: NodeId) -> Self {
+        let raw = "---\n".to_string();
+        Self {
+            id,
+            kind: NodeKind::ThematicBreak { raw: raw.clone() },
+            raw,
+            edited: true,
+        }
+    }
+
+    /// Constructs a new [`NodeKind::List`] node grouping child list items.
+    pub fn list(id: NodeId, items: impl IntoIterator<Item = NodeId>) -> Self {
+        let children = items.into_iter().map(ChildItem::Node).collect();
+        Self {
+            id,
+            kind: NodeKind::List { children },
+            raw: String::new(),
+            edited: true,
+        }
+    }
+
+    /// Constructs a new [`NodeKind::ListItem`] node.
+    pub fn list_item(
+        id: NodeId,
+        marker: impl Into<String>,
+        text: impl Into<String>,
+        id_attr: Option<impl Into<String>>,
+    ) -> Self {
+        let marker = marker.into();
+        let mut text_str = text.into();
+        if !text_str.ends_with('\n') {
+            text_str.push('\n');
+        }
+        let id_opt = id_attr.map(Into::into);
+        let formatted = match &id_opt {
+            Some(id_str) => {
+                let trimmed = text_str.trim_end_matches(['\r', '\n']);
+                format!("{marker} {trimmed} #({id_str})\n")
+            }
+            None => format!("{marker} {text_str}"),
+        };
+        Self {
+            id,
+            kind: NodeKind::ListItem {
+                marker,
+                text: formatted.clone(),
+                id_attr: id_opt,
+                children: vec![ChildItem::Trivia(formatted.clone())],
+            },
+            raw: formatted,
+            edited: true,
+        }
+    }
+
+    /// Constructs a new task [`NodeKind::ListItem`] with a Tomet value marker (`- (x)` or `- ()`).
+    pub fn task_item(
+        id: NodeId,
+        marker: impl Into<String>,
+        checked: bool,
+        text: impl Into<String>,
+        id_attr: Option<impl Into<String>>,
+    ) -> Self {
+        let marker = marker.into();
+        let marker_val = if checked { "(x)" } else { "()" };
+        let text_str = text.into();
+        let trimmed = text_str.trim_end_matches(['\r', '\n']);
+        let id_opt = id_attr.map(Into::into);
+        let formatted = match &id_opt {
+            Some(id_str) => format!("{marker} {marker_val} {trimmed} #({id_str})\n"),
+            None => format!("{marker} {marker_val} {trimmed}\n"),
+        };
+        Self {
+            id,
+            kind: NodeKind::ListItem {
+                marker,
+                text: formatted.clone(),
+                id_attr: id_opt,
+                children: vec![ChildItem::Trivia(formatted.clone())],
+            },
+            raw: formatted,
+            edited: true,
+        }
+    }
+
+    /// Constructs a new [`NodeKind::BlockElement`] node.
+    pub fn block_element(
+        id: NodeId,
+        name: impl Into<String>,
+        id_attr: Option<impl Into<String>>,
+        args: Vec<(String, String)>,
+        data: Vec<(String, String)>,
+        content: Option<impl Into<String>>,
+    ) -> Self {
+        Self {
+            id,
+            kind: NodeKind::BlockElement {
+                name: name.into(),
+                id_attr: id_attr.map(Into::into),
+                args,
+                data,
+                content: content.map(Into::into),
+            },
+            raw: String::new(),
+            edited: true,
+        }
+    }
 }
 
 /// Specific variant of an editable node.

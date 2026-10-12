@@ -35,6 +35,8 @@ pub enum EditOp {
         index: usize,
         node: Node,
     },
+    /// Replaces an existing node by ID with a new node in-place.
+    Replace { id: NodeId, new_node: Node },
     /// Deletes a node by ID from its parent or root.
     Delete { id: NodeId },
     /// First-class move of an existing node to a new parent or new position.
@@ -67,6 +69,35 @@ impl EditDoc {
                 let id = node.id;
                 self.insert_node(node);
                 self.insert_child_ref(parent, index, ChildItem::Node(id))?;
+            }
+            EditOp::Replace { id, new_node } => {
+                let (parent, pos) = self
+                    .find_child_location(id)
+                    .ok_or(EditError::NodeNotFound(id))?;
+                let new_id = new_node.id;
+                self.insert_node(new_node);
+
+                match parent {
+                    None => {
+                        self.root_children_mut()[pos] = ChildItem::Node(new_id);
+                    }
+                    Some(parent_id) => {
+                        let parent = self
+                            .get_mut(parent_id)
+                            .ok_or(EditError::NodeNotFound(parent_id))?;
+                        parent.mark_edited();
+                        match &mut parent.kind {
+                            NodeKind::Section { children, .. }
+                            | NodeKind::List { children }
+                            | NodeKind::ListItem { children, .. } => {
+                                children[pos] = ChildItem::Node(new_id);
+                            }
+                            _ => return Err(EditError::NotAContainer(parent_id)),
+                        }
+                    }
+                }
+
+                self.remove_node_recursive(id);
             }
             EditOp::Delete { id } => {
                 self.remove_child_ref(id)?;
@@ -103,8 +134,13 @@ impl EditDoc {
                     NodeKind::Section { heading_raw, .. } => {
                         *heading_raw = new_text;
                     }
-                    NodeKind::ListItem { text, .. } => {
-                        *text = new_text;
+                    NodeKind::ListItem { text, children, .. } => {
+                        *text = new_text.clone();
+                        if children.iter().all(|c| matches!(c, ChildItem::Trivia(_))) {
+                            *children = vec![ChildItem::Trivia(new_text)];
+                        } else if let Some(ChildItem::Trivia(t)) = children.first_mut() {
+                            *t = new_text;
+                        }
                     }
                     _ => {
                         // For other nodes, update raw directly
@@ -226,6 +262,19 @@ impl EditDoc {
         })
     }
 
+    /// Replaces an existing node by ID with a new node in-place.
+    pub fn replace_node(&mut self, id: NodeId, new_node: Node) -> Result<(), EditError> {
+        self.apply_op(EditOp::Replace { id, new_node })
+    }
+
+    /// Applies a sequence of edit operations in order, stopping at the first error.
+    pub fn apply_ops(&mut self, ops: impl IntoIterator<Item = EditOp>) -> Result<(), EditError> {
+        for op in ops {
+            self.apply_op(op)?;
+        }
+        Ok(())
+    }
+
     fn contains_node(&self, id: NodeId) -> bool {
         self.get(id).is_some()
     }
@@ -266,41 +315,31 @@ impl EditDoc {
     }
 
     fn remove_child_ref(&mut self, id: NodeId) -> Result<(), EditError> {
-        // Try root first
-        if let Some(pos) = self
-            .root_children()
-            .iter()
-            .position(|item| item.as_node_id() == Some(id))
-        {
-            remove_child_at(self.root_children_mut(), pos);
-            return Ok(());
-        }
+        let (parent, pos) = self
+            .find_child_location(id)
+            .ok_or(EditError::NodeNotFound(id))?;
 
-        // Search through all container nodes
-        for node in self.iter_nodes_mut() {
-            let removed = match &mut node.kind {
-                NodeKind::Section { children, .. }
-                | NodeKind::List { children }
-                | NodeKind::ListItem { children, .. } => {
-                    if let Some(pos) = children
-                        .iter()
-                        .position(|item| item.as_node_id() == Some(id))
-                    {
+        match parent {
+            None => {
+                remove_child_at(self.root_children_mut(), pos);
+                Ok(())
+            }
+            Some(parent_id) => {
+                let parent = self
+                    .get_mut(parent_id)
+                    .ok_or(EditError::NodeNotFound(parent_id))?;
+                parent.mark_edited();
+                match &mut parent.kind {
+                    NodeKind::Section { children, .. }
+                    | NodeKind::List { children }
+                    | NodeKind::ListItem { children, .. } => {
                         remove_child_at(children, pos);
-                        true
-                    } else {
-                        false
+                        Ok(())
                     }
+                    _ => Err(EditError::NotAContainer(parent_id)),
                 }
-                _ => false,
-            };
-            if removed {
-                node.mark_edited();
-                return Ok(());
             }
         }
-
-        Err(EditError::NodeNotFound(id))
     }
 
     fn remove_node_recursive(&mut self, id: NodeId) {

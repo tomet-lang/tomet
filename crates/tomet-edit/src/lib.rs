@@ -550,4 +550,256 @@ mod tests {
         assert_eq!(doc_empty.ensure_meta_node(), empty_meta_id); // idempotent
         assert_eq!(export_doc(&doc_empty), "@meta\n");
     }
+
+    #[test]
+    fn tree_navigation_queries() {
+        let src = r#"=[ Section 1 ]#(sec1)
+First paragraph.
+
+==[ Subsection ]#(sec2)
+Second paragraph.
+
+- item 1
+- item 2
+"#;
+        let doc = import_source(src);
+
+        let sec1_id = doc.node_at("#sec1").unwrap();
+        let sec2_id = doc.node_at("#sec2").unwrap();
+        let p1_id = doc.child_node_at(sec1_id, 0).unwrap(); // First paragraph
+        let list_id = doc.child_node_at(sec2_id, 1).unwrap(); // List under Subsection
+        let item1_id = doc.child_node_at(list_id, 0).unwrap();
+        let item2_id = doc.child_node_at(list_id, 1).unwrap();
+
+        // 1. parent_of
+        assert_eq!(doc.parent_of(sec1_id), None);
+        assert_eq!(doc.parent_of(p1_id), Some(sec1_id));
+        assert_eq!(doc.parent_of(sec2_id), Some(sec1_id));
+        assert_eq!(doc.parent_of(list_id), Some(sec2_id));
+        assert_eq!(doc.parent_of(item1_id), Some(list_id));
+        assert_eq!(doc.parent_of(item2_id), Some(list_id));
+
+        // 2. ancestors
+        assert_eq!(doc.ancestors(sec1_id), vec![]);
+        assert_eq!(doc.ancestors(p1_id), vec![sec1_id]);
+        assert_eq!(doc.ancestors(item1_id), vec![list_id, sec2_id, sec1_id]);
+
+        // 3. index_in_parent (among sibling nodes)
+        assert_eq!(doc.index_in_parent(sec1_id), Some(0));
+        assert_eq!(doc.index_in_parent(p1_id), Some(0));
+        assert_eq!(doc.index_in_parent(sec2_id), Some(1));
+        assert_eq!(doc.index_in_parent(item1_id), Some(0));
+        assert_eq!(doc.index_in_parent(item2_id), Some(1));
+
+        // 4. raw_index_in_parent
+        assert!(doc.raw_index_in_parent(sec1_id).is_some());
+        assert!(doc.raw_index_in_parent(item2_id).is_some());
+
+        // 5. prev_sibling & next_sibling
+        assert_eq!(doc.prev_sibling(sec1_id), None);
+        assert_eq!(doc.next_sibling(sec1_id), None); // only 1 root node in this doc
+
+        assert_eq!(doc.prev_sibling(p1_id), None);
+        assert_eq!(doc.next_sibling(p1_id), Some(sec2_id));
+        assert_eq!(doc.prev_sibling(sec2_id), Some(p1_id));
+        assert_eq!(doc.next_sibling(sec2_id), None);
+
+        assert_eq!(doc.prev_sibling(item1_id), None);
+        assert_eq!(doc.next_sibling(item1_id), Some(item2_id));
+        assert_eq!(doc.prev_sibling(item2_id), Some(item1_id));
+        assert_eq!(doc.next_sibling(item2_id), None);
+
+        // 6. leaf_nodes
+        let leaves = doc.leaf_nodes();
+        // Leaves should be: First paragraph, Second paragraph, item 1, item 2
+        assert_eq!(leaves.len(), 4);
+        assert_eq!(leaves[0], p1_id);
+        assert_eq!(leaves[2], item1_id);
+        assert_eq!(leaves[3], item2_id);
+    }
+
+    #[test]
+    fn node_factories_and_fluent_insertion() {
+        let mut doc = EditDoc::new();
+
+        let sec_id = doc
+            .append_section(None, 1, "Introduction", Some("intro"))
+            .unwrap();
+        let p_id = doc
+            .append_paragraph(Some(sec_id), "This is an introductory paragraph.")
+            .unwrap();
+        let code_id = doc
+            .append_code_block(
+                Some(sec_id),
+                Some("rust"),
+                "fn main() {\n    println!(\"Hello\");\n}",
+            )
+            .unwrap();
+
+        assert_eq!(doc.parent_of(p_id), Some(sec_id));
+        assert_eq!(doc.parent_of(code_id), Some(sec_id));
+
+        let exported = export_doc(&doc);
+        assert!(exported.starts_with("=[ Introduction ] #(intro)\n"));
+        assert!(exported.contains("This is an introductory paragraph.\n"));
+        assert!(exported.contains("```rust\nfn main() {\n    println!(\"Hello\");\n}\n```\n"));
+
+        // insert_paragraph at position 0 inside section
+        let inserted_p = doc
+            .insert_paragraph(Some(sec_id), 0, "Top notice inside section.")
+            .unwrap();
+        assert_eq!(doc.index_in_parent(inserted_p), Some(0));
+        assert_eq!(doc.index_in_parent(p_id), Some(1));
+    }
+
+    #[test]
+    fn atomic_replace_node_and_apply_ops() {
+        let src = "=[ Title ]\n\nOld paragraph to replace.\n";
+        let mut doc = import_source(src);
+        let sec_id = doc.root_nodes().next().unwrap();
+        let old_p_id = doc.child_node_at(sec_id, 0).unwrap();
+
+        let new_id = doc.alloc_id();
+        let new_node = Node::code_block(new_id, Some("toml"), "key = \"value\"\n");
+
+        doc.replace_node(old_p_id, new_node).unwrap();
+
+        // Old node is removed
+        assert!(doc.get(old_p_id).is_none());
+        assert!(doc.get(new_id).is_some());
+        assert_eq!(doc.child_node_at(sec_id, 0), Some(new_id));
+
+        let exported = export_doc(&doc);
+        assert!(exported.contains("```toml\nkey = \"value\"\n```\n"));
+
+        // Batch apply_ops
+        let p2_id = doc.alloc_id();
+        let p2 = Node::paragraph(p2_id, "Batch paragraph.");
+        doc.apply_ops([
+            EditOp::Insert {
+                parent: Some(sec_id),
+                index: 1,
+                node: p2,
+            },
+            EditOp::EditText {
+                id: p2_id,
+                new_text: "Edited batch paragraph.\n".to_string(),
+            },
+        ])
+        .unwrap();
+
+        assert_eq!(
+            doc.text_at("#item(0).item(0)").as_deref(),
+            Some("Edited batch paragraph.\n")
+        );
+        assert_eq!(
+            doc.text_at("#item(0).item(1)").as_deref(),
+            Some("```toml\nkey = \"value\"\n```\n")
+        );
+    }
+
+    #[test]
+    fn task_item_detection_and_toggling() {
+        let src = r#"- () Task 1
+- (x) Task 2
+- Regular item
+- ( ) Task 3
+- (done) Task 4
+- (todo) Task 5
+"#;
+        let mut doc = import_source(src);
+        let list_id = doc.root_nodes().next().unwrap();
+        let items = doc.child_nodes(list_id);
+        assert_eq!(items.len(), 6);
+
+        // Detection & inspection
+        assert!(doc.is_task_item(items[0]));
+        assert_eq!(doc.task_state(items[0]), Some(false));
+
+        assert!(doc.is_task_item(items[1]));
+        assert_eq!(doc.task_state(items[1]), Some(true));
+
+        assert!(!doc.is_task_item(items[2]));
+        assert_eq!(doc.task_state(items[2]), None);
+
+        assert!(doc.is_task_item(items[3]));
+        assert_eq!(doc.task_state(items[3]), Some(false));
+
+        assert!(doc.is_task_item(items[4]));
+        assert_eq!(doc.task_state(items[4]), Some(true));
+
+        assert!(doc.is_task_item(items[5]));
+        assert_eq!(doc.task_state(items[5]), Some(false));
+
+        // Toggle Task 1: false -> true
+        doc.toggle_task(items[0]).unwrap();
+        assert_eq!(doc.task_state(items[0]), Some(true));
+        assert!(export_doc(&doc).contains("- (x) Task 1"));
+
+        // Toggle Task 1 back: true -> false
+        doc.toggle_task(items[0]).unwrap();
+        assert_eq!(doc.task_state(items[0]), Some(false));
+        assert!(export_doc(&doc).contains("- ( ) Task 1"));
+
+        // Toggle Task 5 ((todo) -> (done)): false -> true
+        doc.toggle_task(items[5]).unwrap();
+        assert_eq!(doc.task_state(items[5]), Some(true));
+        assert!(export_doc(&doc).contains("- (done) Task 5"));
+
+        // Toggle Task 5 back ((done) -> (todo)): true -> false
+        doc.toggle_task(items[5]).unwrap();
+        assert_eq!(doc.task_state(items[5]), Some(false));
+        assert!(export_doc(&doc).contains("- (todo) Task 5"));
+
+        // Standalone @task element
+        let task_elem_src = "@task(todo)[ Standalone task ]\n";
+        let mut doc_elem = import_source(task_elem_src);
+        let elem_id = doc_elem.root_nodes().next().unwrap();
+        assert!(doc_elem.is_task_item(elem_id));
+        assert_eq!(doc_elem.task_state(elem_id), Some(false));
+
+        doc_elem.toggle_task(elem_id).unwrap();
+        assert_eq!(doc_elem.task_state(elem_id), Some(true));
+        assert_eq!(export_doc(&doc_elem), "@task(done)[ Standalone task ]\n");
+
+        doc_elem.toggle_task(elem_id).unwrap();
+        assert_eq!(doc_elem.task_state(elem_id), Some(false));
+        assert_eq!(export_doc(&doc_elem), "@task(todo)[ Standalone task ]\n");
+
+        // Node::task_item factory
+        let item_id = doc.alloc_id();
+        let task_node = Node::task_item(item_id, "-", true, "New task", None::<String>);
+        assert_eq!(
+            match &task_node.kind {
+                NodeKind::ListItem { text, .. } => text.as_str(),
+                _ => "",
+            },
+            "- (x) New task\n"
+        );
+    }
+
+    #[test]
+    fn list_item_indent_and_outdent() {
+        let src = "- item 1\n- item 2\n";
+        let mut doc = import_source(src);
+        let list_id = doc.root_nodes().next().unwrap();
+        let item2_id = doc.child_nodes(list_id)[1];
+
+        // Indent item 2 by 2 spaces
+        doc.indent_list_item(item2_id).unwrap();
+        let exported_indented = export_doc(&doc);
+        assert_eq!(exported_indented, "- item 1\n  - item 2\n");
+
+        // Indent item 2 by 2 more spaces (total 4)
+        doc.indent_list_item(item2_id).unwrap();
+        assert_eq!(export_doc(&doc), "- item 1\n    - item 2\n");
+
+        // Outdent by 2 spaces
+        doc.outdent_list_item(item2_id).unwrap();
+        assert_eq!(export_doc(&doc), "- item 1\n  - item 2\n");
+
+        // Outdent back to 0 spaces
+        doc.outdent_list_item(item2_id).unwrap();
+        assert_eq!(export_doc(&doc), "- item 1\n- item 2\n");
+    }
 }

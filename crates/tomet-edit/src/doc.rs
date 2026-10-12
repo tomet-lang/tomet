@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crate::node::{AttrGroup, ChildItem, Node, NodeId, NodeKind};
-use crate::op::EditError;
+use crate::op::{EditError, EditOp};
 
 /// An editable tree model of a Tomet document.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -216,4 +216,515 @@ impl EditDoc {
         let meta_id = self.ensure_meta_node();
         self.set_attribute(meta_id, AttrGroup::Data, key_str, val_opt)
     }
+
+    /// Finds the parent and child-item index for a given node.
+    ///
+    /// Returns `Some((None, pos))` for top-level root items, or `Some((Some(parent_id), pos))`
+    /// for items located in a container's children list.
+    pub(crate) fn find_child_location(&self, id: NodeId) -> Option<(Option<NodeId>, usize)> {
+        if let Some(pos) = self
+            .root_children()
+            .iter()
+            .position(|item| item.as_node_id() == Some(id))
+        {
+            return Some((None, pos));
+        }
+
+        for node in self.iter_nodes() {
+            let children = match &node.kind {
+                NodeKind::Section { children, .. }
+                | NodeKind::List { children }
+                | NodeKind::ListItem { children, .. } => children,
+                _ => continue,
+            };
+            if let Some(pos) = children
+                .iter()
+                .position(|item| item.as_node_id() == Some(id))
+            {
+                return Some((Some(node.id), pos));
+            }
+        }
+
+        None
+    }
+
+    // --- Tree navigation & hierarchy ---
+
+    /// Returns the parent [`NodeId`] of a given node, or `None` if it is a root node
+    /// or not present in the document.
+    pub fn parent_of(&self, id: NodeId) -> Option<NodeId> {
+        self.find_child_location(id).and_then(|(p, _)| p)
+    }
+
+    /// Returns the sequence of ancestor [`NodeId`]s starting from direct parent up to root.
+    pub fn ancestors(&self, mut id: NodeId) -> Vec<NodeId> {
+        let mut res = Vec::new();
+        while let Some(parent) = self.parent_of(id) {
+            res.push(parent);
+            id = parent;
+        }
+        res
+    }
+
+    /// Returns the 0-based index of this node among its sibling nodes (excluding trivia).
+    pub fn index_in_parent(&self, id: NodeId) -> Option<usize> {
+        let siblings: Vec<NodeId> = match self.parent_of(id) {
+            Some(p) => self.child_nodes(p),
+            None => self.root_nodes().collect(),
+        };
+        siblings.iter().position(|&x| x == id)
+    }
+
+    /// Returns the raw 0-based index in the parent's `children` (or root children),
+    /// including layout trivia.
+    pub fn raw_index_in_parent(&self, id: NodeId) -> Option<usize> {
+        self.find_child_location(id).map(|(_, pos)| pos)
+    }
+
+    /// Returns the previous sibling [`NodeId`] (excluding trivia).
+    pub fn prev_sibling(&self, id: NodeId) -> Option<NodeId> {
+        let siblings: Vec<NodeId> = match self.parent_of(id) {
+            Some(p) => self.child_nodes(p),
+            None => self.root_nodes().collect(),
+        };
+        let pos = siblings.iter().position(|&x| x == id)?;
+        if pos > 0 {
+            Some(siblings[pos - 1])
+        } else {
+            None
+        }
+    }
+
+    /// Returns the next sibling [`NodeId`] (excluding trivia).
+    pub fn next_sibling(&self, id: NodeId) -> Option<NodeId> {
+        let siblings: Vec<NodeId> = match self.parent_of(id) {
+            Some(p) => self.child_nodes(p),
+            None => self.root_nodes().collect(),
+        };
+        let pos = siblings.iter().position(|&x| x == id)?;
+        if pos + 1 < siblings.len() {
+            Some(siblings[pos + 1])
+        } else {
+            None
+        }
+    }
+
+    /// Returns all leaf node IDs in document order (nodes that have no child nodes).
+    pub fn leaf_nodes(&self) -> Vec<NodeId> {
+        let mut leaves = Vec::new();
+        for root_id in self.root_nodes() {
+            self.collect_leaves(root_id, &mut leaves);
+        }
+        leaves
+    }
+
+    fn collect_leaves(&self, id: NodeId, leaves: &mut Vec<NodeId>) {
+        let children = self.child_nodes(id);
+        if children.is_empty() {
+            leaves.push(id);
+        } else {
+            for child in children {
+                self.collect_leaves(child, leaves);
+            }
+        }
+    }
+
+    // --- Fluent insertion & helpers ---
+
+    /// Appends a new child node to `parent` (or at the root if `None`).
+    pub fn append_child(
+        &mut self,
+        parent: Option<NodeId>,
+        node: Node,
+    ) -> Result<NodeId, EditError> {
+        let id = node.id;
+        let index = match parent {
+            None => self.root_children().len(),
+            Some(pid) => {
+                let p = self.get(pid).ok_or(EditError::NodeNotFound(pid))?;
+                match &p.kind {
+                    NodeKind::Section { children, .. }
+                    | NodeKind::List { children }
+                    | NodeKind::ListItem { children, .. } => children.len(),
+                    _ => return Err(EditError::NotAContainer(pid)),
+                }
+            }
+        };
+        self.apply_op(EditOp::Insert {
+            parent,
+            index,
+            node,
+        })?;
+        Ok(id)
+    }
+
+    /// Appends a paragraph to `parent` (or root if `None`).
+    pub fn append_paragraph(
+        &mut self,
+        parent: Option<NodeId>,
+        text: impl Into<String>,
+    ) -> Result<NodeId, EditError> {
+        let id = self.alloc_id();
+        let node = Node::paragraph(id, text);
+        self.append_child(parent, node)
+    }
+
+    /// Inserts a paragraph at `index` under `parent` (or root if `None`).
+    pub fn insert_paragraph(
+        &mut self,
+        parent: Option<NodeId>,
+        index: usize,
+        text: impl Into<String>,
+    ) -> Result<NodeId, EditError> {
+        let id = self.alloc_id();
+        let node = Node::paragraph(id, text);
+        self.apply_op(EditOp::Insert {
+            parent,
+            index,
+            node,
+        })?;
+        Ok(id)
+    }
+
+    /// Appends a fenced code block to `parent` (or root if `None`).
+    pub fn append_code_block(
+        &mut self,
+        parent: Option<NodeId>,
+        lang: Option<impl Into<String>>,
+        code: impl Into<String>,
+    ) -> Result<NodeId, EditError> {
+        let id = self.alloc_id();
+        let node = Node::code_block(id, lang, code);
+        self.append_child(parent, node)
+    }
+
+    /// Appends a section heading to `parent` (or root if `None`).
+    pub fn append_section(
+        &mut self,
+        parent: Option<NodeId>,
+        level: usize,
+        title: impl Into<String>,
+        id_attr: Option<impl Into<String>>,
+    ) -> Result<NodeId, EditError> {
+        let id = self.alloc_id();
+        let node = Node::section(id, level, title, id_attr);
+        self.append_child(parent, node)
+    }
+
+    // --- List & task item operations ---
+
+    /// Returns whether the node represents an actionable task item
+    /// (e.g. `- [ ]`, `- [x]`, `- ( )`, `- (x)`, or `@task(...)`).
+    pub fn is_task_item(&self, id: NodeId) -> bool {
+        self.task_state(id).is_some()
+    }
+
+    /// Returns the completion state of a task item:
+    /// - `Some(true)`: completed (`- [x]`, `- (x)`, `@task(done)`, etc.)
+    /// - `Some(false)`: pending / unchecked (`- [ ]`, `- ( )`, `@task(todo)`, etc.)
+    /// - `None`: not a task item
+    pub fn task_state(&self, id: NodeId) -> Option<bool> {
+        let node = self.get(id)?;
+        match &node.kind {
+            NodeKind::ListItem { text, children, .. } => {
+                if let Some(state) = inspect_task_text(text) {
+                    return Some(state);
+                }
+                for child in children {
+                    if let Some(cid) = child.as_node_id() {
+                        if let Some(state) = self.task_state(cid) {
+                            return Some(state);
+                        }
+                    }
+                }
+                None
+            }
+            NodeKind::BlockElement { name, args, .. } if name == "task" => inspect_task_args(args),
+            _ => None,
+        }
+    }
+
+    /// Sets the completion state of a task item.
+    ///
+    /// Modifies Markdown-style `- [ ]`/`- [x]`, Tomet value markers `- ( )`/`- (x)`,
+    /// combine `-@task(...)`, or standalone `@task(...)` elements.
+    pub fn set_task_state(&mut self, id: NodeId, checked: bool) -> Result<(), EditError> {
+        let node = self.get(id).ok_or(EditError::NodeNotFound(id))?;
+        match &node.kind {
+            NodeKind::ListItem { text, children, .. } => {
+                if let Some(new_text) = update_task_text(text, checked) {
+                    let text_updated = new_text.clone();
+                    let node_mut = self.get_mut(id).unwrap();
+                    if let NodeKind::ListItem { text, children, .. } = &mut node_mut.kind {
+                        *text = text_updated.clone();
+                        let mut trivia_updated = false;
+                        for item in children.iter_mut() {
+                            if let ChildItem::Trivia(t) = item {
+                                if let Some(upd) = update_task_text(t, checked) {
+                                    *t = upd;
+                                    trivia_updated = true;
+                                }
+                            }
+                        }
+                        if !trivia_updated
+                            && children.iter().all(|c| matches!(c, ChildItem::Trivia(_)))
+                        {
+                            *children = vec![ChildItem::Trivia(text_updated)];
+                        }
+                    }
+
+                    let child_ids: Vec<NodeId> = self
+                        .get(id)
+                        .map(|n| match &n.kind {
+                            NodeKind::ListItem { children, .. } => {
+                                children.iter().filter_map(|c| c.as_node_id()).collect()
+                            }
+                            _ => Vec::new(),
+                        })
+                        .unwrap_or_default();
+
+                    for cid in child_ids {
+                        if let Some(child_node) = self.get_mut(cid) {
+                            if let Some(upd) = update_task_text(&child_node.raw, checked) {
+                                child_node.raw = upd;
+                                child_node.mark_edited();
+                            }
+                        }
+                    }
+
+                    if let Some(node) = self.get_mut(id) {
+                        node.mark_edited();
+                    }
+                    return Ok(());
+                }
+
+                let child_ids: Vec<NodeId> =
+                    children.iter().filter_map(|c| c.as_node_id()).collect();
+                for cid in child_ids {
+                    if self.is_task_item(cid) {
+                        return self.set_task_state(cid, checked);
+                    }
+                }
+
+                Err(EditError::NotAnElement(id))
+            }
+            NodeKind::BlockElement { name, .. } if name == "task" => {
+                let mut updated = false;
+                let node_mut = self.get_mut(id).unwrap();
+                if let NodeKind::BlockElement { args, .. } = &mut node_mut.kind {
+                    for (k, v) in args.iter_mut() {
+                        if k.is_empty() || k == "status" {
+                            let old = v.trim().trim_matches('"');
+                            *v = if checked {
+                                if old == "todo" {
+                                    "done".to_string()
+                                } else {
+                                    "x".to_string()
+                                }
+                            } else if old == "done" {
+                                "todo".to_string()
+                            } else {
+                                "todo".to_string()
+                            };
+                            updated = true;
+                            break;
+                        }
+                    }
+                    if !updated {
+                        args.insert(
+                            0,
+                            (
+                                String::new(),
+                                if checked {
+                                    "x".to_string()
+                                } else {
+                                    "todo".to_string()
+                                },
+                            ),
+                        );
+                    }
+                }
+                if let Some(node) = self.get_mut(id) {
+                    node.mark_edited();
+                }
+                Ok(())
+            }
+            _ => Err(EditError::NotAnElement(id)),
+        }
+    }
+
+    /// Toggles the completion state of a task item.
+    pub fn toggle_task(&mut self, id: NodeId) -> Result<(), EditError> {
+        let current = self.task_state(id).ok_or(EditError::NotAnElement(id))?;
+        self.set_task_state(id, !current)
+    }
+
+    /// Indents a list item by adding 2 spaces of indentation.
+    pub fn indent_list_item(&mut self, id: NodeId) -> Result<(), EditError> {
+        let node = self.get_mut(id).ok_or(EditError::NodeNotFound(id))?;
+        match &mut node.kind {
+            NodeKind::ListItem { text, children, .. } => {
+                text.insert_str(0, "  ");
+                if let Some(ChildItem::Trivia(t)) = children.first_mut() {
+                    t.insert_str(0, "  ");
+                } else {
+                    children.insert(0, ChildItem::Trivia("  ".to_string()));
+                }
+                node.mark_edited();
+                Ok(())
+            }
+            _ => Err(EditError::NotAnElement(id)),
+        }
+    }
+
+    /// Outdents a list item by removing up to 2 spaces of indentation.
+    pub fn outdent_list_item(&mut self, id: NodeId) -> Result<(), EditError> {
+        let node = self.get_mut(id).ok_or(EditError::NodeNotFound(id))?;
+        match &mut node.kind {
+            NodeKind::ListItem { text, children, .. } => {
+                let spaces = if text.starts_with("  ") {
+                    2
+                } else if text.starts_with(' ') {
+                    1
+                } else {
+                    0
+                };
+                if spaces > 0 {
+                    *text = text[spaces..].to_string();
+                    if let Some(ChildItem::Trivia(t)) = children.first_mut() {
+                        if t.starts_with(&"  "[..spaces]) {
+                            *t = t[spaces..].to_string();
+                        }
+                    }
+                    node.mark_edited();
+                }
+                Ok(())
+            }
+            _ => Err(EditError::NotAnElement(id)),
+        }
+    }
+}
+
+fn inspect_task_text(text: &str) -> Option<bool> {
+    let trimmed = text.trim_start();
+    let after_marker = if let Some(rest) = trimmed
+        .strip_prefix('-')
+        .or_else(|| trimmed.strip_prefix('*'))
+        .or_else(|| trimmed.strip_prefix('+'))
+    {
+        rest.trim_start()
+    } else {
+        trimmed
+    };
+
+    if after_marker.starts_with("(x)")
+        || after_marker.starts_with("(X)")
+        || after_marker.starts_with("(done)")
+    {
+        Some(true)
+    } else if after_marker.starts_with("( )")
+        || after_marker.starts_with("()")
+        || after_marker.starts_with("(todo)")
+        || after_marker.starts_with("(\" \")")
+    {
+        Some(false)
+    } else if after_marker.starts_with("@task(x)") || after_marker.starts_with("@task(done)") {
+        Some(true)
+    } else if after_marker.starts_with("@task(todo)")
+        || after_marker.starts_with("@task(\" \")")
+        || after_marker.starts_with("@task( )")
+    {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+fn inspect_task_args(args: &[(String, String)]) -> Option<bool> {
+    for (k, v) in args {
+        if k.is_empty() || k == "status" {
+            let val = v.trim().trim_matches('"');
+            if val == "done" || val == "x" || val == "X" {
+                return Some(true);
+            } else if val == "todo" || val == " " || val.is_empty() {
+                return Some(false);
+            }
+        }
+    }
+    Some(false)
+}
+
+fn update_task_text(text: &str, checked: bool) -> Option<String> {
+    // Check (done) <-> (todo)
+    if let Some(pos) = text.find("(todo)") {
+        return if checked {
+            let mut s = text.to_string();
+            s.replace_range(pos..pos + 6, "(done)");
+            Some(s)
+        } else {
+            Some(text.to_string())
+        };
+    }
+    if let Some(pos) = text.find("(done)") {
+        return if !checked {
+            let mut s = text.to_string();
+            s.replace_range(pos..pos + 6, "(todo)");
+            Some(s)
+        } else {
+            Some(text.to_string())
+        };
+    }
+    // Check () <-> (x)
+    if let Some(pos) = text.find("()") {
+        return if checked {
+            let mut s = text.to_string();
+            s.replace_range(pos..pos + 2, "(x)");
+            Some(s)
+        } else {
+            Some(text.to_string())
+        };
+    }
+    // Check ( ) <-> (x)
+    if let Some(pos) = text.find("( )") {
+        return if checked {
+            let mut s = text.to_string();
+            s.replace_range(pos..pos + 3, "(x)");
+            Some(s)
+        } else {
+            Some(text.to_string())
+        };
+    }
+    // Check (" ") <-> (x)
+    if let Some(pos) = text.find("(\" \")") {
+        return if checked {
+            let mut s = text.to_string();
+            s.replace_range(pos..pos + 5, "(x)");
+            Some(s)
+        } else {
+            Some(text.to_string())
+        };
+    }
+    if let Some(pos) = text.find("(x)").or_else(|| text.find("(X)")) {
+        return if !checked {
+            let mut s = text.to_string();
+            s.replace_range(pos..pos + 3, "( )");
+            Some(s)
+        } else {
+            Some(text.to_string())
+        };
+    }
+    // Check @task(...)
+    if text.contains("@task(") {
+        let s = if checked {
+            text.replace("@task(todo)", "@task(done)")
+                .replace("@task(\" \")", "@task(x)")
+                .replace("@task( )", "@task(x)")
+        } else {
+            text.replace("@task(done)", "@task(todo)")
+                .replace("@task(x)", "@task(todo)")
+                .replace("@task(X)", "@task(todo)")
+        };
+        return Some(s);
+    }
+    None
 }
