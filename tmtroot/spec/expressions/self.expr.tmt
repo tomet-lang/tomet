@@ -1,0 +1,64 @@
+@kind(expr)
+@meta{
+  id: expr.self
+}
+
+文書の値と、ディレクトリの値。
+
+状態: 設計済み・未実装（2026-10-17）。現状の実装との差は末尾に記す。
+
+=[ 文書の値 ]
+
+文書の値は、ソース中の文書への参照。`self`、`tmt(...)`、`ref(...)`、`addr(...)`、ディレクトリの `.docs` が作る。
+
+@table
+|[ メンバー    ][ 指すもの ]
+|[ `.path`     ][ vault ルートからの相対パス（`/` 区切り） ]
+|[ `.filename` ][ パスの最後の部分 ]
+|[ `.meta`     ][ その文書の `@meta` をまとめたマップ ]
+|[ `.kind`     ][ その文書の `@kind` ]
+|[ `#id`       ][ id が付いた要素（@file(tmtroot/spec/expressions/address.expr.tmt)） ]
+|[ `.item(n)`  ][ ルートの n 番目のブロック ]
+|[ `.link()`   ][ その文書へのリンク（断片） ]
+
+`.path` と `.filename` は別のメンバーとして持つ。片方をもう片方の意味で呼ぶと、その名前が嘘をつき始めるため。
+
+`self` は、**式を書いたファイル**。`include` で別の文書に取り込まれた内容の中でも、`self` は元のファイルのまま（@file(tmtroot/spec/expressions/include.expr.tmt)）。作成時（`tomet new`）には、作成先の文書を指す。
+
+=[ `.meta` の読み方 ]
+
+`.meta` の中のキーの扱いは、設定で宣言されたフィールドを基準にする。
+
+@table
+|[ 参照するキー                     ][ 結果 ]
+|[ 宣言されていて、その文書にない   ][ Null（`list` 型のフィールドは空の Seq） ]
+|[ 宣言されていない                 ][ エラー（綴り間違いとして検出） ]
+|[ 宣言されていないが任意で読みたい ][ `.meta.get("draft", false)` のように、既定値を明示して読む ]
+
+宣言は設定の `meta` に書く（`created`、`modified` など）。どの文書が持っているかには依存しない。宣言された `type:` が値の型になる（@file(tmtroot/spec/expressions/types.expr.tmt)）。
+
+=[ ディレクトリの値 ]
+
+ディレクトリの値は、ディレクトリへの参照。`addr(dir:docs/notes)` が作る。`vault` は vault のルートのディレクトリ。
+
+@table
+|[ メンバー ][ 指すもの ]
+|[ `.docs`  ][ その下（サブディレクトリも含む）にあるすべての文書。文書の Seq ]
+
+```tm
+${vault.docs}
+${addr(dir:docs/notes).docs}
+```
+
+文書の集まりを絞り込み、並べ、リンクにする方法は @file(tmtroot/spec/expressions/filter.expr.tmt)。
+
+=[ 現状の実装との差 ]
+
+- `self` は `path` と `filename` だけを持つマップ。文書の値ではない。
+- `.meta`、`.kind`、`.link()` がない。
+- `vault` とディレクトリの値がない。
+- `filter` が使う索引は、`@kind(doc.index)` の文書でだけ作られる。
+
+=[ まだ決まっていないこと ]
+
+- `.docs` の絞り込みに使う、非再帰の指定。

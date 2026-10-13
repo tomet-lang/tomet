@@ -1,0 +1,73 @@
+@kind(expr)
+@meta{
+  id: expr.func
+}
+
+組み込み関数と、純粋性。
+
+状態: 設計済み・未実装（2026-10-17）。現状の実装との差は末尾に記す。
+
+関数の細かい引数の取り方は、実装の doc-comment（`tomet-semantics-compute`）を正とする。ここには分類と規則だけを書く。
+
+=[ 純粋な関数 ]
+
+同じ引数なら、いつ呼んでも同じ結果になる。どこでも使える。
+
+- 算術: `add`、`sub`、`mul`、`div`、`mod`
+- 述語: `exists`、`not`
+- 文字: `emoji`、`unicode`
+- アドレス: `tmt`、`ref`、`addr`（@file(tmtroot/spec/expressions/address.expr.tmt)）
+- 断片: `include`、`link`（@file(tmtroot/spec/expressions/include.expr.tmt)）
+
+受け手に対する操作（`contains`、日時の整形など）は関数ではなくメソッド（@file(tmtroot/spec/expressions/types.expr.tmt)）。関数は、二つの対等な値の関係と、受け手を持たない操作だけ。
+
+- 比較と論理積・論理和は演算子（@file(tmtroot/spec/expressions/operators.expr.tmt)）。`eq`、`ne`、`gt`、`gte`、`lt`、`lte`、`and`、`or` の関数はない。
+- `not(x)` は真偽値だけを受け取る。`Null`、`0`、空の文字列などを偽として扱うことはしない。`draft` が宣言されたフィールドなら、`not(d.meta.draft == true)` のように書く。
+- `exists(x)` は、`x` が Null でなければ真。`x != null` と同じ意味で、読みやすさのために残している。
+- `emoji` は名前から絵文字を返す。知らない名前はエラー。`unicode` はコードポイントから文字を返す。
+- 比較できるのは、数同士、文字列同士、日時同士。それ以外の組み合わせはエラー。
+
+=[ 作成時だけの関数 ]
+
+呼ぶたびに結果が変わる関数は、`generate` 名前空間に集める。作成時（`tomet new`）にだけ使える。
+
+@table
+|[ 関数              ][ 結果                 ]
+|[ `generate.now()`  ][ 今の日時（日時の値） ]
+|[ `generate.uuid()` ][ 新しい UUID v4       ]
+
+```tm
+@meta{
+  id: ${generate.uuid()}
+  created: ${generate.now()}
+  date: ${generate.now().format("YYYY-MM-DD")}
+  title: ${vars.title}
+}
+```
+
+- 出力時に `generate.` を使うと、「作成時専用」という専用のエラーになる。出力が再現でき、`tomet export --check` が壊れない。
+- `generate.now()` の時刻は、フィールドに設定されたオフセットに従う（`created` の `offset: "+09:00"` など）。
+- `vars` は、`tomet new --var key=value` で渡された変数のマップ。作成先のファイル名は `self.filename`。
+
+UUID の形式の検証は式ではなく、フィールドの型で行う。`type: uuid` と宣言したフィールドは、空なら生成され、`tomet check` が形式を検査する。
+
+=[ 知らない入力 ]
+
+受け取れない入力は、エラーにする。入力をそのまま返す、既定の値で動く、といった黙った動きはしない。
+
+=[ 現状の実装との差 ]
+
+- `date()`、`time()`、`uuid()` が出力時にも呼べ、`tomet export --check` が通らなくなる。
+- `date` と `time` が関数で、文字列を整形する。`date` は、引数に `YYYY` などが含まれるかで「今日を整形する」と「渡された日付を整形する」を切り替えている。
+- `and`、`or`、`not` が、`Null`、`0`、`""`、`[]`、`{}` を偽として扱う。`and` と `or` はすべての引数を評価し、短絡しない。
+- `contains` が関数で、受け取れない型にも偽を返す。
+- 時刻は UTC 固定。
+- `date("hello")`、`uuid("bogus")`、`emoji("nope")` は、エラーにならずに値を返す。
+- `uuid("nil")` と `uuid("simple")` の引数がある。テストでは `uuid("nil")` で決定的な出力を得ている。
+- フィールドの型 `uuid` は生成にだけ使われ、形式の検査がない。
+
+=[ まだ決まっていないこと ]
+
+- 実行側が時計と乱数を差し替える方法（テストで決定的な出力を得るため）。
+- `emoji` の名前表を、利用者が足せるか（拡張の議題）。
+- 関数・マクロを、言語としてどう足すか。

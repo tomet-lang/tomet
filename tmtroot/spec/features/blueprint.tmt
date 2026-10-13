@@ -15,9 +15,9 @@
 @kind(blueprint)
 @blueprint(daily-note)
 @meta{
-  id: ${uuid()}
-  date: ${date("YYYY-MM-DD")}
-  title: ${title}
+  id: ${generate.uuid()}
+  date: ${generate.now().format("YYYY-MM-DD")}
+  title: ${vars.title}
 }
 
 #[ TODO ] {id: todo}
@@ -52,14 +52,16 @@ tomet new --list
 
 =[ 3. 動的変数と組み込み関数 ]
 
-ブループリント内では `${...}` 式を使用して、生成時に動的な値を展開できます。
+ブループリント内では `${...}` 式を使用して、生成時に動的な値を展開できます。呼ぶたびに結果が変わる関数は `generate` 名前空間に集められ、作成時（`tomet new`）にだけ使えます。出力時に書くと「作成時専用」のエラーになります（@file(tmtroot/spec/expressions/func.expr.tmt)）。
 
-- `${uuid()}`: 新しいUUID v4文字列を生成。
-- `${date()}` / `${date("YYYY-MM-DD")}`: 現在の日付を展開。
-- `${time()}`: 現在の時刻を展開。
-- `${filename}`: 作成先ファイル名。
-- `${title}`: ファイル名や引数から推定されるタイトル。
-- `${vars.@name}`: CLIの `--var @name=@value` で渡されたカスタム変数。
+- `${generate.uuid()}`: 新しいUUID v4文字列を生成。
+- `${generate.now()}`: 今の日時（RFC 3339）を生成。
+- `${generate.now().format("YYYY-MM-DD")}`: 日時を整形する。`.format` は渡された日時を整形するだけの純粋なメソッド（書式の記号は @file(tmtroot/spec/expressions/types.expr.tmt)）。
+- `${self.filename}`: 作成先ファイル名。
+- `${vars.title}`: CLIの `--var title=...` で渡されたタイトル。省略時はファイル名から推定される。
+- `${vars.name}`: CLIの `--var name=value` で渡されたカスタム変数。
+
+UUID の形式の検査は式ではなく、フィールドの型（`type: uuid`）で行います。
 
 =[ 4. 構造検証（ブループリント検証） ]
 
