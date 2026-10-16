@@ -1,3 +1,5 @@
+#![cfg(feature = "cache")]
+
 use std::path::PathBuf;
 
 use tomet_config::PrinterConfig;

@@ -145,7 +145,7 @@ tomet-style = { path = "crates/tomet-format-style", version = "0.1.0" }
 #= Workspace
 tomet-config = { path = "crates/tomet-config", version = "0.1.0" }
 tomet-indexer = { path = "crates/tomet-workspace-indexer", version = "0.1.0" }
-tomet-links = { path = "crates/tomet-workspace-links", version = "0.1.0" }
+tomet-links = { path = "crates/tomet-workspace-links", version = "0.1.0", default-features = false }
 tomet-load = { path = "crates/tomet-load", version = "0.1.0" }
 tomet-load-config = { path = "crates/tomet-load-config", version = "0.1.0" }
 tomet-workspace = { path = "crates/tomet-workspace", version = "0.1.0" }

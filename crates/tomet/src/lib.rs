@@ -11,8 +11,7 @@
 //! them through here would turn this crate into a mirror of the workspace.
 //! The language bindings (`bindings/python`, `java`, `js`) do use it, which
 //! is what keeps this surface honest -- what a binding still takes directly
-//! (`js`: `tomet-links`, `tomet-transform`, `tomet-lexer`) is what is
-//! missing here.
+//! (`js`: `tomet-transform`, `tomet-lexer`) is what is missing here.
 //!
 //! =[ Reading a document ]
 //!
@@ -52,12 +51,19 @@
 //! |[ `merge`    ][ `merge`      ][ `tomet-merge`     ]
 //! |[ `parser`   ][ `parser`     ][ `tomet-parser`    ]
 //! |[ `html`     ][ `html`       ][ `tomet-html`      ]
+//! |[ `links`    ][ `links`      ][ `tomet-links`     ]
 //! |[ `markdown` ][ `markdown`   ][ `tomet-markdown`  ]
 //! |[ `typst`    ][ `typst`      ][ `tomet-typst`     ]
 //! |[ `pandoc`   ][ `pandoc`     ][ `tomet-pandoc`    ]
 //! |[ `format`   ][ `mod@format` ][ `tomet-formatter` ]
 //! |[ `printer`  ][ `printer`    ][ `tomet-printer`   ]
 //! |[ `stats`    ][ `stats`      ][ `tomet-stats`     ]
+//!
+//! `links` is link *resolution* only -- [`links::VaultLinkIndex`] and
+//! [`links::collect_links`]. The broken-link check and its SQLite cache are
+//! `tomet-links`'s own `cache` feature, which this facade leaves off: a
+//! consumer that links its own SQLite cannot also link this workspace's, and
+//! it is the cache that brings that in.
 //!
 //! Output-producing conversions want a document that has been through
 //! [`Vault::prepare`] first; see `tomet-load` for why that is a separate
@@ -102,6 +108,10 @@ pub use tomet_vault as vault;
 pub use tomet_formatter as format;
 #[cfg(feature = "html")]
 pub use tomet_html as html;
+/// Resolving a link target (`ref:name`, `./relative`, ...) to the file it
+/// names in a vault, without the SQLite link cache (opt-in feature `links`).
+#[cfg(feature = "links")]
+pub use tomet_links as links;
 #[cfg(feature = "markdown")]
 pub use tomet_markdown as markdown;
 #[cfg(feature = "pandoc")]
@@ -136,6 +146,19 @@ mod tests {
         {
             let doc = edit::import_source("Hello world.\n");
             assert_eq!(edit::export_doc(&doc), "Hello world.\n");
+        }
+
+        #[cfg(feature = "links")]
+        {
+            let index = links::VaultLinkIndex::from_paths([
+                "people/fauna/-/+a.png",
+                "people/mumei/-/+a.png",
+            ]);
+            let from = std::path::Path::new("people/mumei/note.tmt");
+            assert_eq!(
+                index.resolve_ref("+a.png", Some(from)),
+                Some(std::path::Path::new("people/mumei/-/+a.png"))
+            );
         }
 
         #[cfg(all(feature = "parser", feature = "merge"))]

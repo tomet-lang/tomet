@@ -1,12 +1,22 @@
 @kind(api)
 
-@meta{crate: tomet-links, dependencies: list(tomet-ast, tomet-config, tomet-indexer, tomet-parser, tomet-semantics, tomet-tree), dependents: list(tomet-cli, tomet-js)}
+@meta{crate: tomet-links, dependencies: list(tomet-address, tomet-ast, tomet-config, tomet-indexer, tomet-parser, tomet-semantics, tomet-tree), dependents: list(tomet, tomet-cli, tomet-js)}
 
 =[tomet-links]
 
 ==[tomet-links]
 
-Vault-wide broken-link detection, target resolution, and SQLite-backed mtime caching.
+Vault-wide link target resolution, and -- behind the `cache` feature --
+broken-link detection with a SQLite-backed mtime cache.
+
+==[Features]
+
+- ("`cache` (on by default)")
+  - The SQLite incremental cache ([`LinkCache`], [`default_cache_path`]) and the
+vault-wide check built on it ([`check_vault`]). Switch it off with
+`default-features = false` to use [`VaultLinkIndex`] and [`collect_links`] with
+no SQLite in the build -- a host that links its own `libsqlite3` cannot also
+link this crate's (Cargo allows one copy of a native library per build).
 
 ==[Architecture & Responsibilities]
 

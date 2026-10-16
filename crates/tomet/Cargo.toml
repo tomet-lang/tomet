@@ -10,6 +10,7 @@ repository.workspace = true
 edit = ["dep:tomet-edit"]
 format = ["dep:tomet-formatter"]
 html = ["dep:tomet-html"]
+links = ["dep:tomet-links"]
 markdown = ["dep:tomet-markdown"]
 merge = ["dep:tomet-merge"]
 pandoc = ["dep:tomet-pandoc"]
@@ -31,6 +32,7 @@ tomet-vault = { workspace = true }
 tomet-edit = { workspace = true, optional = true }
 tomet-formatter = { workspace = true, optional = true }
 tomet-html = { workspace = true, optional = true }
+tomet-links = { workspace = true, optional = true }
 tomet-markdown = { workspace = true, optional = true }
 tomet-merge = { workspace = true, optional = true }
 tomet-pandoc = { workspace = true, optional = true }

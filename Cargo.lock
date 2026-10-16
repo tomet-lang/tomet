@@ -1956,6 +1956,7 @@ dependencies = [
  "tomet-edit",
  "tomet-formatter",
  "tomet-html",
+ "tomet-links",
  "tomet-load",
  "tomet-markdown",
  "tomet-merge",

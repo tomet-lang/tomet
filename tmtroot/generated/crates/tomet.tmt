@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet, dependencies: list(tomet-ast, tomet-config, tomet-edit, tomet-formatter, tomet-html, tomet-load, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-typst, tomet-validator, tomet-vault), dependents: list(tomet-java, tomet-js, tomet-python)}
+@meta{crate: tomet, dependencies: list(tomet-ast, tomet-config, tomet-edit, tomet-formatter, tomet-html, tomet-links, tomet-load, tomet-markdown, tomet-merge, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-typst, tomet-validator, tomet-vault), dependents: list(tomet-java, tomet-js, tomet-python)}
 
 =[tomet]
 
@@ -17,8 +17,7 @@ not: the CST, the lexer, the resolver, the workspace and the TUI. Routing
 them through here would turn this crate into a mirror of the workspace.
 The language bindings (`bindings/python`, `java`, `js`) do use it, which
 is what keeps this surface honest -- what a binding still takes directly
-(`js`: `tomet-links`, `tomet-transform`, `tomet-lexer`) is what is
-missing here.
+(`js`: `tomet-transform`, `tomet-lexer`) is what is missing here.
 
 ==[Reading a document]
 
@@ -54,14 +53,22 @@ compiles nothing it does not use. Each feature adds one module:
 
 @table[[ feature    ][ module       ][ from              ]
 [ `edit`     ][ `edit`       ][ `tomet-edit`      ]
+[ `merge`    ][ `merge`      ][ `tomet-merge`     ]
 [ `parser`   ][ `parser`     ][ `tomet-parser`    ]
 [ `html`     ][ `html`       ][ `tomet-html`      ]
+[ `links`    ][ `links`      ][ `tomet-links`     ]
 [ `markdown` ][ `markdown`   ][ `tomet-markdown`  ]
 [ `typst`    ][ `typst`      ][ `tomet-typst`     ]
 [ `pandoc`   ][ `pandoc`     ][ `tomet-pandoc`    ]
 [ `format`   ][ `mod@format` ][ `tomet-formatter` ]
 [ `printer`  ][ `printer`    ][ `tomet-printer`   ]
 [ `stats`    ][ `stats`      ][ `tomet-stats`     ]]
+
+`links` is link @em[resolution] only -- [`links::VaultLinkIndex`] and
+[`links::collect_links`]. The broken-link check and its SQLite cache are
+`tomet-links`'s own `cache` feature, which this facade leaves off: a
+consumer that links its own SQLite cannot also link this workspace's, and
+it is the cache that brings that in.
 
 Output-producing conversions want a document that has been through
 [`Vault::prepare`] first; see `tomet-load` for why that is a separate
