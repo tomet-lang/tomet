@@ -1,0 +1,28 @@
+[package]
+name = "tomet-benches"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+# Bench targets are declared explicitly (criterion supplies its own `main`).
+autobenches = false
+autotests = false
+autobins = false
+autoexamples = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bench]]
+name = "parse"
+path = "benches/parse.rs"
+harness = false
+
+[dependencies]
+tomet-parser = { workspace = true }
+tomet-synth = { workspace = true }
+# The frozen `.tmt` corpus and its allow-list of known-unparseable files.
+tomet-tests = { path = "../tests" }
+
+#= Crates.io
+criterion = { workspace = true }

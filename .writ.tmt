@@ -18,7 +18,7 @@ does not relax the rule to fit the change it wanted to make.
   guard: { twrit: layers }
 
   layers: {
-    7: list( "crates/tomet", "apps/*", "bindings/*", "editors/*", "tests" )
+    7: list( "crates/tomet", "apps/*", "bindings/*", "editors/*", "tests", "benches" )
     6: list( "crates/tomet-workspace*", "crates/tomet-load*" )
     5: list(
       "crates/tomet-format*",
