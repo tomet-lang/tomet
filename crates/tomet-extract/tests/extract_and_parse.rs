@@ -1,5 +1,11 @@
 use std::path::Path;
 use tomet_extract::{CommentKind, collect_comment_elements, extract_rust_comments};
+use tomet_lexer::{LineCol, LineIndex};
+
+/// Where a byte offset of the original source is, as a line and column.
+fn line_col(src: &str, offset: usize) -> LineCol {
+    LineIndex::new(src).line_col(offset)
+}
 
 #[test]
 fn test_indented_and_multiline_elements() {
@@ -23,15 +29,15 @@ pub struct Service {
     assert_eq!(el0.sigil.name().map(|n| n.name.as_str()), Some("rule"));
     assert_eq!(kind0, &CommentKind::OuterDoc);
     // Line 5 is where `@rule` appears in source
-    assert_eq!(span0.start.line, 5);
+    assert_eq!(line_col(source, span0.start).line, 5);
     // Indentation: 4 spaces + '/// ' (4 chars) + 1 = col 9
-    assert_eq!(span0.start.column, 9);
+    assert_eq!(line_col(source, span0.start).column, 9);
 
     let (el1, span1, kind1) = &elements[1];
     assert_eq!(el1.sigil.name().map(|n| n.name.as_str()), Some("file"));
     assert_eq!(kind1, &CommentKind::OuterDoc);
     // Line 9 is where `@file` appears
-    assert_eq!(span1.start.line, 9);
+    assert_eq!(line_col(source, span1.start).line, 9);
 }
 
 #[test]
@@ -46,7 +52,8 @@ fn bar() {}
     let blocks = extract_rust_comments(source, Path::new("test.rs"));
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].source_map.lines.len(), 3);
-    assert_eq!(blocks[0].source_map.lines[0], (2, 5));
-    assert_eq!(blocks[0].source_map.lines[1], (3, 4)); // '///' with no space
-    assert_eq!(blocks[0].source_map.lines[2], (4, 5));
+    let origin = |i: usize| line_col(source, blocks[0].source_map.lines[i].source_start);
+    assert_eq!(origin(0), LineCol { line: 2, column: 5 });
+    assert_eq!(origin(1), LineCol { line: 3, column: 4 }); // '///' with no space
+    assert_eq!(origin(2), LineCol { line: 4, column: 5 });
 }

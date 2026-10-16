@@ -2149,6 +2149,7 @@ dependencies = [
  "tomet-formatter",
  "tomet-html",
  "tomet-indexer",
+ "tomet-lexer",
  "tomet-links",
  "tomet-load",
  "tomet-load-config",
@@ -2216,6 +2217,7 @@ version = "0.1.0"
 dependencies = [
  "tomet-ast",
  "tomet-cst",
+ "tomet-lexer",
  "tomet-parser",
  "tomet-tree",
 ]
@@ -2350,6 +2352,7 @@ dependencies = [
  "tomet-compute",
  "tomet-cst",
  "tomet-formatter",
+ "tomet-lexer",
  "tomet-load-config",
  "tomet-parser",
  "tomet-semantics",
@@ -2571,6 +2574,7 @@ dependencies = [
  "serde",
  "tomet-ast",
  "tomet-cst",
+ "tomet-lexer",
  "tomet-parser",
  "tomet-semantics",
  "tomet-validator-blueprint",
@@ -2598,6 +2602,7 @@ dependencies = [
  "tomet-address",
  "tomet-ast",
  "tomet-cst",
+ "tomet-lexer",
  "tomet-semantics",
  "tomet-tree",
 ]

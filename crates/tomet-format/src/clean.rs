@@ -89,8 +89,8 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                 let Block::Paragraph(p) = block else { continue };
                 for inline in &p.content {
                     let span = inline.span();
-                    if span.start.offset < span.end.offset {
-                        out.push((span.start.offset, span.end.offset));
+                    if span.start < span.end {
+                        out.push((span.start, span.end));
                     }
                 }
             }

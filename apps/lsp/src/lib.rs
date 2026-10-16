@@ -17,7 +17,7 @@ pub use diagnostic::diagnostics_for;
 pub use folding::folding_ranges_for;
 pub use format::{format_edits, resolve_effective_config};
 pub use hover::hover_for;
-pub use position::{span_to_range, text_range_to_lsp_range};
+pub use position::TextPositions;
 pub use symbol::document_symbols_for;
 
 #[cfg(test)]

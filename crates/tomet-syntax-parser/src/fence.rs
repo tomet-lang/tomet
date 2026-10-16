@@ -70,10 +70,9 @@ pub(crate) fn scan_fenced_body(
                 ok = false;
                 break;
             }
-            let (_, marker_col) = probe.line_col(probe.pos());
+            let marker_col = probe.column();
             if marker_col != expected_col {
                 return Err(crate::value::err(
-                    &probe,
                     probe.pos(),
                     format!(
                         "this `|` stands in column {marker_col}, and the content it would \

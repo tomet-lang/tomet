@@ -2,7 +2,7 @@ use lsp_types::{DocumentSymbol, SymbolKind};
 use tomet_ast::{Block, Element, Inline, List, Sigil};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
-use crate::position::span_to_range;
+use crate::position::TextPositions;
 
 /// Provides document symbols for outline navigation in the editor.
 pub fn document_symbols_for(text: &str) -> Vec<DocumentSymbol> {
@@ -11,16 +11,21 @@ pub fn document_symbols_for(text: &str) -> Vec<DocumentSymbol> {
     };
 
     let mut symbols = Vec::new();
+    let positions = TextPositions::new(text);
     for block in &doc.blocks {
-        collect_block_symbols(block, &mut symbols);
+        collect_block_symbols(&positions, block, &mut symbols);
     }
     symbols
 }
 
-fn collect_block_symbols(block: &Block, symbols: &mut Vec<DocumentSymbol>) {
+fn collect_block_symbols(
+    positions: &TextPositions<'_>,
+    block: &Block,
+    symbols: &mut Vec<DocumentSymbol>,
+) {
     match block {
         Block::Section(sec) => {
-            let range = span_to_range(&sec.span);
+            let range = positions.range(&sec.span);
             let title = extract_inlines_text(&sec.title);
             let name = if title.is_empty() {
                 "=".repeat(sec.level)
@@ -39,36 +44,44 @@ fn collect_block_symbols(block: &Block, symbols: &mut Vec<DocumentSymbol>) {
                 children: None,
             });
             for inline in &sec.title {
-                collect_inline_symbols(inline, symbols);
+                collect_inline_symbols(positions, inline, symbols);
             }
             for conn in &sec.connects {
-                collect_element_symbol(conn, symbols);
+                collect_element_symbol(positions, conn, symbols);
             }
             for child in &sec.blocks {
-                collect_block_symbols(child, symbols);
+                collect_block_symbols(positions, child, symbols);
             }
         }
-        Block::Element(el) => collect_element_symbol(el, symbols),
+        Block::Element(el) => collect_element_symbol(positions, el, symbols),
         Block::Paragraph(p) => {
             for inline in &p.content {
-                collect_inline_symbols(inline, symbols);
+                collect_inline_symbols(positions, inline, symbols);
             }
         }
-        Block::List(list) => collect_list_symbol(list, symbols),
+        Block::List(list) => collect_list_symbol(positions, list, symbols),
     }
 }
 
-fn collect_list_symbol(list: &List, symbols: &mut Vec<DocumentSymbol>) {
+fn collect_list_symbol(
+    positions: &TextPositions<'_>,
+    list: &List,
+    symbols: &mut Vec<DocumentSymbol>,
+) {
     for item in &list.items {
-        collect_element_symbol(&item.element, symbols);
+        collect_element_symbol(positions, &item.element, symbols);
         if let Some(sub) = &item.sublist {
-            collect_list_symbol(sub, symbols);
+            collect_list_symbol(positions, sub, symbols);
         }
     }
 }
 
-fn collect_element_symbol(el: &Element, symbols: &mut Vec<DocumentSymbol>) {
-    let range = span_to_range(&el.span);
+fn collect_element_symbol(
+    positions: &TextPositions<'_>,
+    el: &Element,
+    symbols: &mut Vec<DocumentSymbol>,
+) {
+    let range = positions.range(&el.span);
     let kind = classify_std_lenient(el);
     let symbol = if kind == ElementKind::Heading {
         let level = heading_level(el).unwrap_or(1);
@@ -117,17 +130,21 @@ fn collect_element_symbol(el: &Element, symbols: &mut Vec<DocumentSymbol>) {
 
     if let Some(content) = &el.content {
         for block in content {
-            collect_block_symbols(block, symbols);
+            collect_block_symbols(positions, block, symbols);
         }
     }
     for conn in &el.connects {
-        collect_element_symbol(conn, symbols);
+        collect_element_symbol(positions, conn, symbols);
     }
 }
 
-fn collect_inline_symbols(inline: &Inline, symbols: &mut Vec<DocumentSymbol>) {
+fn collect_inline_symbols(
+    positions: &TextPositions<'_>,
+    inline: &Inline,
+    symbols: &mut Vec<DocumentSymbol>,
+) {
     if let Inline::Element(el) = inline {
-        collect_element_symbol(el, symbols);
+        collect_element_symbol(positions, el, symbols);
     }
 }
 

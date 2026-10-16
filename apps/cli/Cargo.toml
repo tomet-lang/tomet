@@ -18,6 +18,7 @@ tomet-config = { workspace = true }
 tomet-formatter = { workspace = true }
 tomet-html = { workspace = true }
 tomet-indexer = { workspace = true }
+tomet-lexer = { workspace = true }
 tomet-links = { workspace = true, features = ["cache"] }
 tomet-load = { workspace = true }
 tomet-load-config = { workspace = true }

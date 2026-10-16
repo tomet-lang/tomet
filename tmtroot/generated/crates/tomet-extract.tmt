@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-extract, dependencies: list(tomet-ast, tomet-cst, tomet-parser, tomet-tree), dependents: list()}
+@meta{crate: tomet-extract, dependencies: list(tomet-ast, tomet-cst, tomet-lexer, tomet-parser, tomet-tree), dependents: list()}
 
 =[tomet-extract]
 
@@ -16,7 +16,7 @@ pub fn resolve(...) { ... }
 
 This crate extracts contiguous comment blocks from source code across multiple
 programming languages (Rust, Python, JavaScript/TypeScript, Java, C/C++, Go,
-Shell, etc.), strips comment prefixes while preserving line and column mapping,
+Shell, etc.), strips comment prefixes while mapping every byte offset back to the original file,
 and parses the extracted text into Tomet AST [`tomet_ast::Document`]s.
 
 By preserving original source locations, links and rule references inside comments
@@ -61,9 +61,18 @@ Supported languages for comment extraction.
 
 A contiguous block of comment lines extracted from a source file.
 
+===[struct LineOrigin]
+
+Where one line of an extracted comment block came from.
+
 ===[struct CommentSourceMap]
 
-Records the source location of each line in an extracted comment block.
+Records where each line of an extracted comment block sits in the source file.
+
+Everything is a byte offset: a [`Span`] from parsing `text` points into
+`text`, [`map_span`](Self::map_span) turns it into a span of the original
+file, and the caller resolves a line and column from the file with a
+`tomet_lexer::LineIndex` when it has to show one.
 
 ===[struct ParsedComment]
 

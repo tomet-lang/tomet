@@ -82,7 +82,7 @@ pub struct LinkCache {
 /// mismatch wipes rather than migrates: rebuilding costs one re-parse of
 /// the vault, and a migration path would be code with no way to be wrong
 /// loudly.
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 
 /// Bumped whenever *what counts as a link* changes -- a new extraction
 /// rule, a changed target string, a scheme that starts or stops being
@@ -128,10 +128,8 @@ fn schema() -> String {
             file_path  TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
             kind       TEXT NOT NULL CHECK (kind IN ({})),
             target     TEXT NOT NULL,
-            start_line INTEGER NOT NULL,
-            start_col  INTEGER NOT NULL,
-            end_line   INTEGER NOT NULL,
-            end_col    INTEGER NOT NULL
+            start_offset INTEGER NOT NULL,
+            end_offset   INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_links_file_path ON links(file_path);",
         kinds.join(", ")
@@ -235,16 +233,14 @@ impl LinkCache {
         tx.execute("DELETE FROM links WHERE file_path = ?1", params![path_str])?;
         for link in &links {
             tx.execute(
-                "INSERT INTO links (file_path, kind, target, start_line, start_col, end_line, end_col)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                "INSERT INTO links (file_path, kind, target, start_offset, end_offset)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![
                     path_str,
                     link.kind.as_str(),
                     link.target,
-                    link.span.start.line as i64,
-                    link.span.start.column as i64,
-                    link.span.end.line as i64,
-                    link.span.end.column as i64,
+                    link.span.start as i64,
+                    link.span.end as i64,
                 ],
             )?;
         }
@@ -276,30 +272,25 @@ impl LinkCache {
 
     fn read_links(&self, path_str: &str) -> rusqlite::Result<Vec<DocumentLink>> {
         let mut stmt = self.conn.prepare(
-            "SELECT kind, target, start_line, start_col, end_line, end_col
+            "SELECT kind, target, start_offset, end_offset
              FROM links WHERE file_path = ?1 ORDER BY id",
         )?;
         let rows = stmt.query_map(params![path_str], |row| {
             let kind: String = row.get(0)?;
             let target: String = row.get(1)?;
-            let start_line: i64 = row.get(2)?;
-            let start_col: i64 = row.get(3)?;
-            let end_line: i64 = row.get(4)?;
-            let end_col: i64 = row.get(5)?;
-            Ok((kind, target, start_line, start_col, end_line, end_col))
+            let start: i64 = row.get(2)?;
+            let end: i64 = row.get(3)?;
+            Ok((kind, target, start, end))
         })?;
 
         let mut links = Vec::new();
         for row in rows {
-            let (kind, target, start_line, start_col, end_line, end_col) = row?;
+            let (kind, target, start, end) = row?;
             let kind: LinkKind = kind.parse().unwrap_or(LinkKind::File);
             links.push(DocumentLink {
                 kind,
                 target,
-                span: tomet_ast::Span::new(
-                    tomet_ast::Position::new(start_line as usize, start_col as usize, 0),
-                    tomet_ast::Position::new(end_line as usize, end_col as usize, 0),
-                ),
+                span: tomet_ast::Span::new(start as usize, end as usize),
             });
         }
         Ok(links)

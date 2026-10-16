@@ -25,6 +25,12 @@ pub fn extract_comments(
 
     // We scan lines for line comments and block comment delimiters.
     let lines: Vec<&str> = source.lines().collect();
+    // Byte offset at which each source line starts; every position this
+    // function records is a byte offset into `source`.
+    let line_starts: Vec<usize> = std::iter::once(0)
+        .chain(source.match_indices('\n').map(|(i, _)| i + 1))
+        .collect();
+    let at = |line_num: usize, col: usize| line_starts[line_num - 1] + (col - 1);
     let mut line_idx = 0;
 
     while line_idx < lines.len() {
@@ -45,13 +51,13 @@ pub fn extract_comments(
                 let inner = &after_start[..end_offset];
                 let (content, col_offset) = strip_boundary_whitespace(inner, start_col);
 
+                let text = format!("{content}\n");
+                let source_map =
+                    CommentSourceMap::new(file, &text, &[at(line_num, col_offset + 1)]);
                 blocks.push(ExtractedCommentBlock {
-                    text: format!("{content}\n"),
+                    text,
                     kind,
-                    source_map: CommentSourceMap {
-                        file_path: file.to_path_buf(),
-                        lines: vec![(line_num, col_offset + 1)],
-                    },
+                    source_map,
                 });
 
                 line_idx += 1;
@@ -68,7 +74,7 @@ pub fn extract_comments(
             if !first_line_content.trim().is_empty() {
                 block_text.push_str(first_line_content);
                 block_text.push('\n');
-                source_lines.push((line_num, first_line_col + 1));
+                source_lines.push(at(line_num, first_line_col + 1));
             }
 
             line_idx += 1;
@@ -84,7 +90,7 @@ pub fn extract_comments(
                     if !content.trim().is_empty() {
                         block_text.push_str(&content);
                         block_text.push('\n');
-                        source_lines.push((cur_line_num, col + 1));
+                        source_lines.push(at(cur_line_num, col + 1));
                     }
                     found_end = true;
                     line_idx += 1;
@@ -93,19 +99,17 @@ pub fn extract_comments(
                     let (content, col) = clean_block_comment_line(cur_line, start_delim);
                     block_text.push_str(&content);
                     block_text.push('\n');
-                    source_lines.push((cur_line_num, col + 1));
+                    source_lines.push(at(cur_line_num, col + 1));
                     line_idx += 1;
                 }
             }
 
             if !block_text.is_empty() {
+                let source_map = CommentSourceMap::new(file, &block_text, &source_lines);
                 blocks.push(ExtractedCommentBlock {
                     text: block_text,
                     kind,
-                    source_map: CommentSourceMap {
-                        file_path: file.to_path_buf(),
-                        lines: source_lines,
-                    },
+                    source_map,
                 });
             }
 
@@ -140,7 +144,7 @@ pub fn extract_comments(
 
                     block_text.push_str(content);
                     block_text.push('\n');
-                    source_lines.push((line_idx + 1, col_offset + 1));
+                    source_lines.push(at(line_idx + 1, col_offset + 1));
                     line_idx += 1;
                 } else {
                     break;
@@ -148,13 +152,11 @@ pub fn extract_comments(
             }
 
             if !block_text.is_empty() {
+                let source_map = CommentSourceMap::new(file, &block_text, &source_lines);
                 blocks.push(ExtractedCommentBlock {
                     text: block_text,
                     kind,
-                    source_map: CommentSourceMap {
-                        file_path: file.to_path_buf(),
-                        lines: source_lines,
-                    },
+                    source_map,
                 });
             }
 

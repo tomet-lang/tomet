@@ -602,15 +602,19 @@ fn duplicate_id_nested_inline_is_reported() {
 
 #[test]
 fn duplicate_id_with_integer_values_is_reported() {
-    let doc = parse("=[ one ]#(42)\n=[ two ]#(42)\n");
+    let src = "=[ one ]#(42)\n=[ two ]#(42)\n";
+    let doc = parse(src);
     let errors = validate_document(&doc);
     assert_eq!(errors.len(), 1);
     assert!(matches!(
         &errors[0],
         Diagnostic::DuplicateId { id, .. } if id == "42"
     ));
+    // `Display` has no source text, so it leaves the related location out;
+    // a renderer that holds the source asks for it.
+    assert_eq!(errors[0].to_string(), "duplicate id `42`");
     assert_eq!(
-        errors[0].to_string(),
+        errors[0].message_in(&tomet_lexer::LineIndex::new(src)),
         "duplicate id `42` (first defined at 1:1)"
     );
 }

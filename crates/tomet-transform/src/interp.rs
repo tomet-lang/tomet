@@ -357,18 +357,17 @@ mod tests {
 
     #[test]
     fn an_unresolvable_expression_is_left_as_written_and_reported() {
-        let (doc, unresolved) = resolve(
-            "例: ${some_id}\n",
-            &DocumentConfig::default(),
-            &EvaluationContext::new(),
-        );
+        let src = "例: ${some_id}\n";
+        let (doc, unresolved) = resolve(src, &DocumentConfig::default(), &EvaluationContext::new());
         // Left in the output, so a document showing `${...}` as an example
         // still renders as one.
         assert_eq!(text_of(&doc), "例: ${some_id}");
         // ...and reported, so a typo has somewhere to surface.
         assert_eq!(unresolved.len(), 1);
         assert_eq!(unresolved[0].source, "some_id");
-        assert_eq!(unresolved[0].span.start.line, 1);
+        // The span points at the expression itself, in bytes of the source.
+        let span = unresolved[0].span;
+        assert_eq!(&src[span.start..span.end], "${some_id}");
     }
 
     #[test]

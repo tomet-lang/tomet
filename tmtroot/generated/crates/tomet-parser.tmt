@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-parser, dependencies: list(tomet-ast, tomet-cst, tomet-lexer, tomet-semantics, tomet-tree, tove), dependents: list(tomet, tomet-address, tomet-cli, tomet-compute, tomet-config, tomet-edit, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-tests, tomet-transform, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-vault, tomet-workspace)}
+@meta{crate: tomet-parser, dependencies: list(tomet-ast, tomet-cst, tomet-lexer, tomet-semantics, tomet-tree, tove), dependents: list(tomet, tomet-address, tomet-benches, tomet-cli, tomet-compute, tomet-config, tomet-edit, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-lsp, tomet-markdown, tomet-merge, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-tests, tomet-transform, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-parser]
 
@@ -34,7 +34,7 @@ line-oriented fence scan they share.
 - (caret) `^(id)` or `^name(id)` caret reference element parsing.
 - (value) Lightweight Tomet data grammar (maps, sequences, scalars, comments).
 - (cst) Lossless Concrete Syntax Tree parsing powered by `tomet-cst`.
-- (error) Source location (`Position`/`Span`) aware error diagnostics.
+- (error) Parse errors: a message plus a byte offset, with line and column resolved once at the entry points (`located_in`).
 
 ==[Module cst]
 

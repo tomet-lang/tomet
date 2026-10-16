@@ -17,12 +17,11 @@ pub fn parse_value(src: &str) -> Result<Value> {
     tove::parse_value_with(src, &mut TometValueHook).map_err(Into::into)
 }
 
-pub(crate) fn err(cur: &Cursor, pos: usize, message: impl Into<String>) -> Error {
-    let (line, column) = cur.line_col(pos);
+pub(crate) fn err(pos: usize, message: impl Into<String>) -> Error {
     Error {
         message: message.into(),
-        line,
-        column,
+        line: 0,
+        column: 0,
         offset: pos,
     }
 }
@@ -75,13 +74,7 @@ impl tove::ValueHook for TometValueHook {
                 Err(e) => return Some(Err(tove::Error::at(e.message, e.line, e.column, e.offset))),
             };
             if !cur.eat_str("]") {
-                let (line, column) = cur.line_col(cur.pos());
-                return Some(Err(tove::Error::at(
-                    "expected ']'",
-                    line,
-                    column,
-                    cur.pos(),
-                )));
+                return Some(Err(tove::Error::at_offset("expected ']'", cur.pos())));
             }
             return Some(Ok(Value::Blocks(blocks)));
         }

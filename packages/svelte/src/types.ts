@@ -1,13 +1,12 @@
 import type { Component, Snippet } from 'svelte';
 
 /**
- * Span information representing exact source location.
+ * A range of byte offsets into the source text a node was parsed from.
+ * Line and column are not part of a span: derive them from the source.
  */
 export interface Span {
   start: number;
   end: number;
-  line?: number;
-  column?: number;
 }
 
 /**

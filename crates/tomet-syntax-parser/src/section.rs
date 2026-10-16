@@ -31,19 +31,16 @@ fn title_from_content_blocks(cur: &Cursor, content: Option<Vec<Block>>) -> Resul
                 Ok(vec![Inline::Element(el)])
             }
             Some(Block::Section(_)) => Err(err(
-                cur,
                 cur.pos(),
                 "a heading's title can only hold plain text, not a nested section",
             )),
             Some(Block::List(_)) => Err(err(
-                cur,
                 cur.pos(),
                 "a heading's title can only hold plain text, not a list",
             )),
             None => unreachable!(),
         },
         Some(_) => Err(err(
-            cur,
             cur.pos(),
             "a heading's title can only hold one paragraph of plain text, \
              not multiple blocks",
@@ -131,7 +128,7 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
             // A heading-less section (`=` or `==` alone on its line).
             // `title` stays empty.
         }
-        _ => return Err(err(cur, cur.pos(), "expected '[' or a space after '='")),
+        _ => return Err(err(cur.pos(), "expected '[' or a space after '='")),
     }
 
     skip_inline_ws(cur);
@@ -150,7 +147,7 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
     } else {
         cur.pos()
     };
-    let span = Span::new(cur.position_at(start_pos), cur.position_at(end_pos));
+    let span = Span::new(start_pos, end_pos);
 
     Ok(Section {
         level,
@@ -191,16 +188,15 @@ pub(crate) fn parse_titled_thematic_break(cur: &mut Cursor) -> Result<Element> {
     cur.eat_while(|c| c == '-');
     skip_inline_ws(cur);
     if !cur.eat_str("[") {
-        return Err(err(cur, cur.pos(), "expected '['"));
+        return Err(err(cur.pos(), "expected '['"));
     }
     let title = parse_inline_seq(cur, Stop::Bracket(']'), true)?;
     if !cur.eat_str("]") {
-        return Err(err(cur, cur.pos(), "expected ']'"));
+        return Err(err(cur.pos(), "expected ']'"));
     }
     skip_inline_ws(cur);
     if cur.eat_while(|c| c == '-').len() < 3 {
         return Err(err(
-            cur,
             cur.pos(),
             "expected 3 or more '-' to close the titled thematic break",
         ));
@@ -208,7 +204,6 @@ pub(crate) fn parse_titled_thematic_break(cur: &mut Cursor) -> Result<Element> {
     skip_inline_ws(cur);
     if !matches!(cur.peek(), None | Some('\n') | Some('\r')) {
         return Err(err(
-            cur,
             cur.pos(),
             "unexpected trailing content after titled thematic break",
         ));
@@ -225,7 +220,7 @@ pub(crate) fn parse_titled_thematic_break(cur: &mut Cursor) -> Result<Element> {
     } else {
         cur.pos()
     };
-    let title_span = Span::new(cur.position_at(start_pos), cur.position_at(end_pos));
+    let title_span = Span::new(start_pos, end_pos);
     let mut el = element_new(Sigil::named("hr"))
         .with_placement(Placement::Block)
         .with_span(title_span);

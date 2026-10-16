@@ -127,7 +127,7 @@ pub(crate) fn push_span_attrs(cx: &RenderCtx, out: &mut String, span: Span) {
     if cx.options.emit_source_spans {
         out.push_str(&format!(
             " data-tmt-start=\"{}\" data-tmt-end=\"{}\"",
-            span.start.offset, span.end.offset
+            span.start, span.end
         ));
     }
 }
@@ -144,7 +144,7 @@ fn splice_span_attrs(out: &mut String, start: usize, span: Span) {
             gt,
             &format!(
                 " data-tmt-start=\"{}\" data-tmt-end=\"{}\"",
-                span.start.offset, span.end.offset
+                span.start, span.end
             ),
         );
     }

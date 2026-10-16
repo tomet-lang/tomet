@@ -63,7 +63,7 @@ pub(crate) fn parse_inline_seq<'a>(
         match stop {
             Stop::Bracket(c) => {
                 if cur.is_eof() {
-                    return Err(err(cur, cur.pos(), format!("unterminated, expected '{c}'")));
+                    return Err(err(cur.pos(), format!("unterminated, expected '{c}'")));
                 }
                 if cur.peek() == Some(c) {
                     if bracket_depth == 0 {
@@ -87,7 +87,7 @@ pub(crate) fn parse_inline_seq<'a>(
             Stop::Paragraph { boundary } => {
                 if cur.is_eof() {
                     if let Some(c) = boundary {
-                        return Err(err(cur, cur.pos(), format!("unterminated, expected '{c}'")));
+                        return Err(err(cur.pos(), format!("unterminated, expected '{c}'")));
                     }
                     break;
                 }
@@ -154,7 +154,7 @@ pub(crate) fn parse_inline_seq<'a>(
             }
             Stop::Delim(d) => {
                 if cur.is_eof() {
-                    return Err(err(cur, cur.pos(), format!("unterminated, expected '{d}'")));
+                    return Err(err(cur.pos(), format!("unterminated, expected '{d}'")));
                 }
                 if cur.starts_with(d) && !is_boundary(char_before(cur)) {
                     break;
@@ -164,7 +164,7 @@ pub(crate) fn parse_inline_seq<'a>(
                     look.bump();
                     skip_inline_ws(&mut look);
                     if look.is_eof() || look.peek() == Some('\n') {
-                        return Err(err(cur, cur.pos(), format!("unterminated, expected '{d}'")));
+                        return Err(err(cur.pos(), format!("unterminated, expected '{d}'")));
                     }
                 }
             }
@@ -230,8 +230,7 @@ pub(crate) fn parse_inline_seq<'a>(
                 flush_text_upto(&mut items, cur, &mut text_start, before, pipe_cols);
                 let inner_text = cur.src()[inner_start..inner_end].to_string();
                 let span = cur.span_from(before);
-                let content_span =
-                    Span::new(cur.position_at(inner_start), cur.position_at(inner_end));
+                let content_span = Span::new(inner_start, inner_end);
                 let el = element_new(Sigil::named("raw"))
                     .with_placement(Placement::Inline)
                     .with_span(span)
@@ -504,7 +503,7 @@ fn try_one_delimited(
     cur.set_pos(open.pos());
     let inner = parse_inline_seq(cur, Stop::Delim(delim), allow_colon_connect)?;
     if !cur.eat_str(delim) {
-        return Err(err(cur, cur.pos(), format!("expected '{delim}'")));
+        return Err(err(cur.pos(), format!("expected '{delim}'")));
     }
     let span = cur.span_from(start_pos);
     let mut el = element_new(Sigil::named(kind)).with_span(span);
@@ -572,10 +571,9 @@ pub(crate) fn pipe_run_state(cur: &Cursor, cols: &[usize]) -> Result<PipeContinu
         if look.peek() != Some('|') {
             return Ok(PipeContinuation::End);
         }
-        let (_, marker_col) = look.line_col(look.pos());
+        let marker_col = look.column();
         if marker_col != expected_col {
             return Err(err(
-                &look,
                 look.pos(),
                 format!(
                     "this `|` stands in column {marker_col}, and the content it would \
@@ -631,7 +629,7 @@ fn flush_text_upto(
     let base = *text_start;
     let raw = &cur.src()[base..end];
     *text_start = end;
-    split_softbreaks(items, cur, raw, base, pipe_cols);
+    split_softbreaks(items, raw, base, pipe_cols);
 }
 
 /// Pushes a `Text`, merging into the previous item if it is also a `Text`.
@@ -703,13 +701,7 @@ pub(crate) fn push_soft_break(items: &mut Vec<Inline>, span: Span) {
 /// output differs: the swallowed gap becomes a `SoftBreak` node spanning it,
 /// not a character. Deciding what that node renders as (a space, nothing,
 /// a real newline) is left to whoever consumes the tree.
-fn split_softbreaks(
-    items: &mut Vec<Inline>,
-    cur: &Cursor,
-    raw: &str,
-    base: usize,
-    pipe_cols: &[usize],
-) {
+fn split_softbreaks(items: &mut Vec<Inline>, raw: &str, base: usize, pipe_cols: &[usize]) {
     let mut text_start = 0usize;
     let mut chars = raw.char_indices().peekable();
     while let Some((i, c)) = chars.next() {
@@ -717,10 +709,7 @@ fn split_softbreaks(
             continue;
         }
         if i > text_start {
-            let span = Span::new(
-                cur.position_at(base + text_start),
-                cur.position_at(base + i),
-            );
+            let span = Span::new(base + text_start, base + i);
             push_text(items, raw[text_start..i].to_string(), span);
         }
         let mut gap_end = i + c.len_utf8();
@@ -750,15 +739,12 @@ fn split_softbreaks(
                 }
             }
         }
-        let span = Span::new(cur.position_at(base + i), cur.position_at(base + gap_end));
+        let span = Span::new(base + i, base + gap_end);
         push_soft_break(items, span);
         text_start = gap_end;
     }
     if text_start < raw.len() {
-        let span = Span::new(
-            cur.position_at(base + text_start),
-            cur.position_at(base + raw.len()),
-        );
+        let span = Span::new(base + text_start, base + raw.len());
         push_text(items, raw[text_start..].to_string(), span);
     }
 }

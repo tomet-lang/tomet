@@ -36,7 +36,7 @@ pub(crate) fn parse_fenced_code_block(cur: &mut Cursor, pipe_stack: &[usize]) ->
     } else {
         Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
     };
-    let content_span = Span::new(cur.position_at(body_start), cur.position_at(body_end));
+    let content_span = Span::new(body_start, body_end);
     // `raw`'s content is always exactly one `Inline::Raw`, wrapped in a
     // single `Paragraph` -- a fenced code block never holds more than one
     // verbatim blob, so this is not a case the new block-permitting

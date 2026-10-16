@@ -11,3 +11,6 @@ tomet-ast = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-tree = { workspace = true }
+
+[dev-dependencies]
+tomet-lexer = { workspace = true }

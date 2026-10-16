@@ -28,7 +28,7 @@
 //! - (caret) `^(id)` or `^name(id)` caret reference element parsing.
 //! - (value) Lightweight Tomet data grammar (maps, sequences, scalars, comments).
 //! - (cst) Lossless Concrete Syntax Tree parsing powered by `tomet-cst`.
-//! - (error) Source location (`Position`/`Span`) aware error diagnostics.
+//! - (error) Parse errors: a message plus a byte offset, with line and column resolved once at the entry points (`located_in`).
 
 mod caret;
 pub mod cst;
@@ -51,13 +51,13 @@ pub use value::parse_value;
 /// Parse a `$func(args)` or `${expr}` dollar element directly from a string slice.
 pub fn parse_dollar_element_str(source: &str) -> Result<tomet_ast::Element> {
     let mut cur = tomet_lexer::Cursor::new(source);
-    interp::parse_dollar_element(&mut cur)
+    interp::parse_dollar_element(&mut cur).map_err(|e| e.located_in(source))
 }
 
 /// Parse a `^(id)` or `^name(id)` caret reference element directly from a string slice.
 pub fn parse_caret_element_str(source: &str) -> Result<tomet_ast::Element> {
     let mut cur = tomet_lexer::Cursor::new(source);
-    caret::parse_caret_element(&mut cur, true)
+    caret::parse_caret_element(&mut cur, true).map_err(|e| e.located_in(source))
 }
 
 #[cfg(test)]

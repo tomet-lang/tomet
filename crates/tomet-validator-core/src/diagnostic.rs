@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use tomet_ast::Span;
 use tomet_cst::TextRange;
+use tomet_lexer::LineIndex;
 
 /// How much a [`Diagnostic`] matters.
 ///
@@ -216,15 +217,47 @@ impl Diagnostic {
     }
 }
 
+/// `Display` has no source text, so it cannot say where a *related* span (the first
+/// occurrence of a duplicate, the `:rule` that forbids something) is, and leaves
+/// that clause out. A renderer that holds the source asks for the full message
+/// with [`Diagnostic::message_in`].
 impl fmt::Display for Diagnostic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.write_message(f, None)
+    }
+}
+
+impl Diagnostic {
+    /// The message with related locations resolved against `index`, e.g.
+    /// ``duplicate id `x` (first defined at 3:1)``.
+    pub fn message_in(&self, index: &LineIndex<'_>) -> String {
+        struct Located<'a, 'b>(&'a Diagnostic, &'a LineIndex<'b>);
+        impl fmt::Display for Located<'_, '_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.0.write_message(f, Some(self.1))
+            }
+        }
+        Located(self, index).to_string()
+    }
+
+    fn write_message(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        index: Option<&LineIndex<'_>>,
+    ) -> fmt::Result {
+        let at = |span: &Span| {
+            index.map(|i| {
+                let p = i.line_col(span.start);
+                format!("{}:{}", p.line, p.column)
+            })
+        };
         match self {
             Diagnostic::DuplicateId { id, first, .. } => {
-                write!(
-                    f,
-                    "duplicate id `{id}` (first defined at {}:{})",
-                    first.start.line, first.start.column
-                )
+                write!(f, "duplicate id `{id}`")?;
+                match at(first) {
+                    Some(loc) => write!(f, " (first defined at {loc})"),
+                    None => Ok(()),
+                }
             }
             Diagnostic::DanglingAnchor { anchor, .. } => {
                 write!(f, "dangling anchor `#{anchor}`")
@@ -285,20 +318,18 @@ impl fmt::Display for Diagnostic {
                 rule_span,
                 ..
             } => {
-                write!(
-                    f,
-                    "`{name}` is not allowed here; the `:rule(allow:...)` at {}:{} permits only {}",
-                    rule_span.start.line,
-                    rule_span.start.column,
-                    allowed.join(", ")
-                )
+                write!(f, "`{name}` is not allowed here; the `:rule(allow:...)`")?;
+                if let Some(loc) = at(rule_span) {
+                    write!(f, " at {loc}")?;
+                }
+                write!(f, " permits only {}", allowed.join(", "))
             }
             Diagnostic::DuplicateSingleton { name, first, .. } => {
-                write!(
-                    f,
-                    "`{name}` may appear once in a document; the first is at {}:{}",
-                    first.start.line, first.start.column
-                )
+                write!(f, "`{name}` may appear once in a document")?;
+                match at(first) {
+                    Some(loc) => write!(f, "; the first is at {loc}"),
+                    None => Ok(()),
+                }
             }
             Diagnostic::OutsidePreamble { name, .. } => {
                 write!(

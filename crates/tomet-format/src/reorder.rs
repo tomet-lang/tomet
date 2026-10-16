@@ -137,8 +137,8 @@ fn check_and_swap_element(el: &Element, src: &str, config: &PrinterConfig) -> Op
         && el.content.is_some()
         && !el.span.is_dummy()
     {
-        let start = el.span.start.offset;
-        let end = el.span.end.offset;
+        let start = el.span.start;
+        let end = el.span.end;
         if start < end
             && end <= src.len()
             && let Some(swapped) = try_swap_element_groups(src, start, end, order)

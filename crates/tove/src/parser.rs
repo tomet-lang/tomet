@@ -41,17 +41,16 @@ pub fn parse_value(src: &str) -> Result<Value> {
 /// Parse an entire source string as one `Value` with a custom [`ValueHook`].
 pub fn parse_value_with<H: ValueHook>(src: &str, hook: &mut H) -> Result<Value> {
     let mut cur = Cursor::new(src);
-    let value = parse_value_at_with(&mut cur, hook)?;
+    let value = parse_value_at_with(&mut cur, hook).map_err(|e| e.located_in(src))?;
     skip_ws_newlines_and_comments(&mut cur);
     if !cur.is_eof() {
-        return Err(err(&cur, cur.pos(), "unexpected trailing content"));
+        return Err(err(cur.pos(), "unexpected trailing content").located_in(src));
     }
     Ok(value)
 }
 
-pub fn err(cur: &Cursor, pos: usize, message: impl Into<String>) -> Error {
-    let (line, column) = cur.line_col(pos);
-    Error::at(message, line, column, pos)
+pub fn err(pos: usize, message: impl Into<String>) -> Error {
+    Error::at_offset(message, pos)
 }
 
 /// Characters legal inside a **map key**.
@@ -93,7 +92,6 @@ pub fn skip_block_comment(cur: &mut Cursor) -> Result<()> {
     loop {
         if cur.is_eof() {
             return Err(err(
-                cur,
                 group_start,
                 "unterminated block comment '/*', expected '*/'",
             ));
@@ -267,16 +265,12 @@ pub fn try_parse_call_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Opti
             }
             Some(')') => break,
             _ => {
-                return Some(Err(err(
-                    cur,
-                    cur.pos(),
-                    "expected ',' or ')' in call arguments",
-                )));
+                return Some(Err(err(cur.pos(), "expected ',' or ')' in call arguments")));
             }
         }
     }
     if !cur.eat_str(")") {
-        return Some(Err(err(cur, cur.pos(), "expected ')'")));
+        return Some(Err(err(cur.pos(), "expected ')'")));
     }
     Some(Ok(Value::Call(name, args)))
 }
@@ -300,12 +294,12 @@ pub fn scalar_from_text(s: &str) -> Value {
 pub fn parse_quoted(cur: &mut Cursor) -> Result<String> {
     let start = cur.pos();
     if !cur.eat_str("\"") {
-        return Err(err(cur, start, "expected '\"'"));
+        return Err(err(start, "expected '\"'"));
     }
     let mut out = String::new();
     loop {
         match cur.bump() {
-            None => return Err(err(cur, cur.pos(), "unterminated string")),
+            None => return Err(err(cur.pos(), "unterminated string")),
             Some('"') => break,
             Some('\\') => match cur.bump() {
                 Some('"') => out.push('"'),
@@ -313,7 +307,7 @@ pub fn parse_quoted(cur: &mut Cursor) -> Result<String> {
                 Some('n') => out.push('\n'),
                 Some('t') => out.push('\t'),
                 Some(other) => out.push(other),
-                None => return Err(err(cur, cur.pos(), "unterminated string escape")),
+                None => return Err(err(cur.pos(), "unterminated string escape")),
             },
             Some(c) => out.push(c),
         }
@@ -374,11 +368,7 @@ pub fn parse_map_body_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Resu
             Some('\n') | Some('\r') => {}
             None | Some(')' | '}' | ']') => break,
             _ => {
-                return Err(err(
-                    cur,
-                    cur.pos(),
-                    "expected ',' or a newline between entries",
-                ));
+                return Err(err(cur.pos(), "expected ',' or a newline between entries"));
             }
         }
     }
@@ -399,7 +389,6 @@ pub fn parse_entry_value_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> R
     }
     match cur.peek() {
         Some('[') => Err(err(
-            cur,
             cur.pos(),
             "'[...]' list literal was removed -- write 'list(...)' instead",
         )),
@@ -409,14 +398,14 @@ pub fn parse_entry_value_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> R
             let v = parse_map_body_with(cur, hook)?;
             skip_ws_newlines_and_comments(cur);
             if !cur.eat_str("}") {
-                return Err(err(cur, cur.pos(), "expected '}'"));
+                return Err(err(cur.pos(), "expected '}'"));
             }
             Ok(v)
         }
         _ => {
             let raw = eat_scalar_raw(cur).trim();
             if raw.is_empty() {
-                return Err(err(cur, cur.pos(), "expected a value"));
+                return Err(err(cur.pos(), "expected a value"));
             }
             Ok(scalar_from_text(raw))
         }
@@ -448,7 +437,7 @@ fn parse_map_body_or_scalar<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Res
     let checkpoint = cur.pos();
     skip_ws_newlines_and_comments(cur);
     if matches!(cur.peek(), None | Some(')') | Some('}') | Some(']')) {
-        return Err(err(cur, checkpoint, "expected a value"));
+        return Err(err(checkpoint, "expected a value"));
     }
     cur.set_pos(checkpoint);
     let value = parse_map_body_with(cur, hook)?;

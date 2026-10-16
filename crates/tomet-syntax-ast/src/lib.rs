@@ -1,7 +1,7 @@
 //! =[ tomet-ast ]
 //!
 //! Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
-//! `Inline`, `Element`, `Value`, `Position`, `Span`).
+//! `Inline`, `Element`, `Value`, `Span`).
 //!
 //! =[ Design Policy ]
 //!
@@ -27,25 +27,12 @@ use std::fmt::{self, Write as _};
 pub mod cst_ast;
 pub use cst_ast::*;
 
-/// A 0-indexed byte offset and 1-indexed line/column position in source text.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
-pub struct Position {
-    pub line: usize,
-    pub column: usize,
-    pub offset: usize,
-}
-
-impl Position {
-    pub fn new(line: usize, column: usize, offset: usize) -> Self {
-        Self {
-            line,
-            column,
-            offset,
-        }
-    }
-}
-
-/// A source span bounded by start and end [`Position`]s.
+/// A source span: a range of byte offsets into the text it was parsed from.
+///
+/// A span deliberately holds no line or column. Those are a view of the source
+/// text, not a property of the node, and computing them while parsing made
+/// every node cost a rescan of everything before it. Resolve them on demand
+/// with `tomet_lexer::LineIndex`.
 ///
 /// Note: [`PartialEq`] is implemented to always return `true` so that AST
 /// structural equality checks (e.g. `assert_eq!(doc1, doc2)`) compare node
@@ -60,12 +47,14 @@ impl Position {
 /// without also reconciling it with the custom equality above.
 #[derive(Debug, Clone, Copy, Eq, Default, Serialize, Deserialize)]
 pub struct Span {
-    pub start: Position,
-    pub end: Position,
+    /// Byte offset of the first byte.
+    pub start: usize,
+    /// Byte offset one past the last byte.
+    pub end: usize,
 }
 
 impl Span {
-    pub fn new(start: Position, end: Position) -> Self {
+    pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
     }
 
@@ -73,9 +62,9 @@ impl Span {
         Self::default()
     }
 
-    /// Returns `true` if this span represents a default/dummy span with zero positions.
+    /// Returns `true` if this span represents a default/dummy span with zero offsets.
     pub fn is_dummy(&self) -> bool {
-        self.start == Position::default() && self.end == Position::default()
+        self.start == 0 && self.end == 0
     }
 
     pub fn exact_eq(&self, other: &Self) -> bool {
@@ -90,9 +79,9 @@ impl Span {
         }
     }
 
-    /// Returns `true` if the given byte offset falls within this span (`start.offset..=end.offset`).
+    /// Returns `true` if the given byte offset falls within this span (`start..=end`).
     pub fn contains_offset(&self, offset: usize) -> bool {
-        self.start.offset <= offset && offset <= self.end.offset
+        self.start <= offset && offset <= self.end
     }
 }
 
@@ -1047,10 +1036,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_position_and_span() {
-        let p1 = Position::new(1, 1, 0);
-        let p2 = Position::new(1, 10, 9);
-        let span = Span::new(p1, p2);
+    fn test_span() {
+        let span = Span::new(0, 9);
 
         assert!(!span.is_dummy());
         assert!(span.contains_offset(0));

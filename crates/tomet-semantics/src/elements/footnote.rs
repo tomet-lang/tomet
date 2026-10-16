@@ -21,7 +21,7 @@ pub struct FootnoteItem {
 
 /// Key derived from a Span's start and end byte offsets for HashMap lookups.
 fn span_key(span: &Span) -> (usize, usize) {
-    (span.start.offset, span.end.offset)
+    (span.start, span.end)
 }
 
 /// Registry storing all resolved footnotes and element back-references for a document.

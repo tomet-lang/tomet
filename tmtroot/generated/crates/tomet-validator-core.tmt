@@ -1,0 +1,84 @@
+@kind(api)
+
+@meta{crate: tomet-validator-core, dependencies: list(tomet-address, tomet-ast, tomet-cst, tomet-lexer, tomet-semantics, tomet-tree), dependents: list(tomet-validator, tomet-validator-blueprint, tomet-validator-rule)}
+
+=[tomet-validator-core]
+
+Core document structure and semantic validation.
+
+Validates standard and custom elements, duplicate IDs, singleton directives,
+regions (preamble vs body), argument declarations, and dangling intra-document anchors.
+
+==[Module diagnostic]
+
+===[Enums]
+
+====[enum Severity]
+
+How much a [`Diagnostic`] matters.
+
+Derived from the variant rather than stored: severity is a property of
+the rule, not of the occurrence, so keeping a field would be a second
+place the same fact lives.
+
+====[enum Diagnostic]
+
+Something `validate_document` found and a reader should know about.
+
+Named for what the callers already called it: `bindings/{js,java,
+python}` each bind the result to `diagnostics`. It was
+`ValidationError` while every variant really was an error; `Draft` and
+`Fixme` are not, so the name moved rather than the meaning stretching.
+
+====[enum CstValidationError]
+
+A validation error tied directly to precise byte ranges in the CST.
+
+==[Module id]
+
+===[Functions]
+
+====[fn collect_ids]
+
+Walks every node in `doc` and returns `(id, span)` for each
+[`Element::id`]/[`Section::id`] found, in document order.
+
+====[fn collect_ids_cst]
+
+Scans `root` for every `#(id)` slot and returns the exact [`TextRange`]
+of each id's value, in document order.
+
+Mirrors [`collect_ids`]. No owner-kind allowlist or `@link` exclusion
+is needed the way the old `MAP_ENTRY`-scanning version needed both:
+an `ID_GROUP` node can only ever appear where `parse_groups`/
+`parse_connect` put one, so there is nothing else it could be mistaken
+for, and no attribute-key collision with `@link`'s own `id` argument
+to guard against (that argument is not this slot).
+
+==[Functions]
+
+===[fn classify_in]
+
+Classifies `el` against `std` and the namespaces in scope.
+
+===[fn shape_str]
+
+===[fn validate_core]
+
+Runs core element, ID, region, and argument validations on `doc`.
+
+===[fn check_singletons_and_regions]
+
+Enforces the `singleton` and `region` axes.
+
+===[fn check_unfinished]
+
+===[fn check_arguments]
+
+===[fn check_content_shape]
+
+===[fn check_retired_settings_keys]
+
+===[fn check_dangling_anchors]
+
+===[fn validate_cst]

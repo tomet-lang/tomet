@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Runs the broken-link check and prints its report. Returns `Ok(true)`
@@ -38,12 +39,11 @@ pub(crate) fn check_links_cmd(target_path: &Path, json: bool) -> anyhow::Result<
             report.links_checked,
             report.broken.len(),
         );
-        for link in &report.broken {
+        for (link, at) in report.broken.iter().zip(locate(&report.broken)) {
+            let at = at.map_or("?:?".to_string(), |p| format!("{}:{}", p.line, p.column));
             println!(
-                "  {}:{}:{}: broken link -> {}",
+                "  {}:{at}: broken link -> {}",
                 link.source.display(),
-                link.span.start.line,
-                link.span.start.column,
                 link.target
             );
         }
@@ -55,16 +55,38 @@ pub(crate) fn check_links_cmd(target_path: &Path, json: bool) -> anyhow::Result<
     Ok(!report.broken.is_empty())
 }
 
+/// The line and column of each broken link. A link carries a byte span into its
+/// source file, so each file is read once and indexed once, however many of its
+/// links are broken. `None` when the file can no longer be read.
+fn locate(broken: &[tomet_links::BrokenLink]) -> Vec<Option<tomet_lexer::LineCol>> {
+    let mut located = vec![None; broken.len()];
+    let mut by_file: BTreeMap<&Path, Vec<usize>> = BTreeMap::new();
+    for (i, link) in broken.iter().enumerate() {
+        by_file.entry(link.source.as_path()).or_default().push(i);
+    }
+    for (path, links) in by_file {
+        let Ok(src) = std::fs::read_to_string(path) else {
+            continue;
+        };
+        let index = tomet_lexer::LineIndex::new(&src);
+        for i in links {
+            located[i] = Some(index.line_col(broken[i].span.start));
+        }
+    }
+    located
+}
+
 fn check_links_report_to_json(report: &tomet_links::CheckReport) -> String {
     let broken: Vec<serde_json::Value> = report
         .broken
         .iter()
-        .map(|l| {
+        .zip(locate(&report.broken))
+        .map(|(l, at)| {
             serde_json::json!({
                 "source": l.source.display().to_string(),
                 "target": l.target,
-                "line": l.span.start.line,
-                "column": l.span.start.column,
+                "line": at.map(|p| p.line),
+                "column": at.map(|p| p.column),
             })
         })
         .collect();

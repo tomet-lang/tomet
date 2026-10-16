@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-lexer, dependencies: list(tomet-ast, tomet-cst), dependents: list(tomet-js, tomet-parser, tove)}
+@meta{crate: tomet-lexer, dependencies: list(tomet-ast, tomet-cst), dependents: list(tomet-cli, tomet-extract, tomet-js, tomet-lsp, tomet-parser, tomet-validator, tomet-validator-core, tove)}
 
 =[tomet-lexer]
 
@@ -18,11 +18,26 @@ and flexible than pre-tokenizing into a context-free token stream.
 and strictly zero-copy.
 - ("Core Capabilities") Scanning & Consumption: `bump()`, `eat_char()`, `eat_str()`, `eat_while()`, `eat_whitespace()`.
 Lookahead & Peeking: `peek()`, `peek_at()`, `starts_with()`.
-Position & Span Mapping: `line_col()`, `position_at()`, `current_position()`, `span_from()`.
+Span Mapping: `span_from()`, `column()`. Spans are byte offsets; lines and columns are not
+computed while scanning -- [`LineIndex`] resolves them from offsets on demand.
 
 ==[Structs]
 
 ===[struct Cursor]
+
+===[struct LineCol]
+
+A 1-based line and a 1-based column, the column counted in `char`s.
+
+===[struct LineIndex]
+
+Resolves byte offsets of one source text to lines and columns, and back.
+
+Spans and errors carry byte offsets only; a line and column is a view of
+the text, built here when something has to show one (a diagnostic, an
+editor position). Building the index is one pass over the text, a lookup is
+a binary search plus a count of the characters in that one line, and
+nothing about it is paid while parsing.
 
 ==[Functions]
 

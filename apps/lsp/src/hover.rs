@@ -6,14 +6,14 @@ use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, normaliz
 use tomet_tree::{ValueExt, Visitor, walk_document};
 
 use crate::format::resolve_effective_config;
-use crate::position::{span_contains, span_to_range};
+use crate::position::{TextPositions, span_contains};
 use crate::symbol::{list_item_marker_text, sigil_display_name};
 
 /// Provides hover information for the symbol under the cursor.
 pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> {
     let doc = tomet_parser::parse_document(text).ok()?;
-    let target_line = pos.line as usize + 1;
-    let target_col = pos.character as usize + 1;
+    let positions = TextPositions::new(text);
+    let offset = positions.offset(pos);
 
     let config = resolve_effective_config(&doc, uri);
 
@@ -21,20 +21,20 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
         doc: &'a Document,
         config: &'a tomet_semantics::DocumentConfig,
         text: &'a str,
+        positions: &'a TextPositions<'a>,
         pos: Position,
-        line: usize,
-        col: usize,
+        offset: usize,
         best_match: Option<Hover>,
     }
 
     impl<'a> Visitor<()> for HoverFinder<'a> {
         fn visit(&mut self, el: &Element) -> ControlFlow<()> {
             let span = el.span;
-            if span_contains(&span, self.line, self.col) {
+            if span_contains(&span, self.offset) {
                 let kind = classify_std_lenient(el);
                 let hover = if kind == ElementKind::Table {
-                    table_hover(self.text, self.pos, el)
-                } else if let Some(h) = macro_hover(self.doc, self.config, el) {
+                    table_hover(self.positions, self.text, self.pos, el)
+                } else if let Some(h) = macro_hover(self.positions, self.doc, self.config, el) {
                     Some(h)
                 } else if kind == ElementKind::Bare {
                     Some(Hover {
@@ -45,7 +45,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                                 list_item_marker_text(el)
                             ),
                         }),
-                        range: Some(span_to_range(&span)),
+                        range: Some(self.positions.range(&span)),
                     })
                 } else if kind == ElementKind::Heading {
                     Some(Hover {
@@ -53,7 +53,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                             kind: MarkupKind::Markdown,
                             value: format!("**Heading Level {}**", heading_level(el).unwrap_or(1)),
                         }),
-                        range: Some(span_to_range(&span)),
+                        range: Some(self.positions.range(&span)),
                     })
                 } else if kind == ElementKind::Kind {
                     let declared_kind = normalized_element_args(el)
@@ -76,7 +76,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                             kind: MarkupKind::Markdown,
                             value: desc,
                         }),
-                        range: Some(span_to_range(&span)),
+                        range: Some(self.positions.range(&span)),
                     })
                 } else if kind == ElementKind::Blueprint {
                     let target_kind = normalized_element_args(el)
@@ -100,7 +100,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                             kind: MarkupKind::Markdown,
                             value: desc,
                         }),
-                        range: Some(span_to_range(&span)),
+                        range: Some(self.positions.range(&span)),
                     })
                 } else if kind == ElementKind::Version {
                     let declared_ver = normalized_element_args(el)
@@ -120,7 +120,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                             kind: MarkupKind::Markdown,
                             value: desc,
                         }),
-                        range: Some(span_to_range(&span)),
+                        range: Some(self.positions.range(&span)),
                     })
                 } else {
                     let mut desc = format!("**Element**: `{}`\n", sigil_display_name(&el.sigil));
@@ -133,7 +133,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                             kind: MarkupKind::Markdown,
                             value: desc,
                         }),
-                        range: Some(span_to_range(&span)),
+                        range: Some(self.positions.range(&span)),
                     })
                 };
                 if let Some(h) = hover {
@@ -148,9 +148,9 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
         doc: &doc,
         config: &config,
         text,
+        positions: &positions,
         pos,
-        line: target_line,
-        col: target_col,
+        offset,
         best_match: None,
     };
     let _ = walk_document(&doc, &mut finder);
@@ -234,15 +234,15 @@ fn extract_table_aligns_from_args(args: Option<&Value>) -> Vec<String> {
     Vec::new()
 }
 
-fn table_hover(text: &str, pos: Position, el: &Element) -> Option<Hover> {
+fn table_hover(
+    positions: &TextPositions<'_>,
+    text: &str,
+    pos: Position,
+    el: &Element,
+) -> Option<Hover> {
     let lines: Vec<&str> = text.lines().collect();
-    let start_line = el.span.start.line.saturating_sub(1);
-    let end_line = el
-        .span
-        .end
-        .line
-        .saturating_sub(1)
-        .min(lines.len().saturating_sub(1));
+    let start_line = positions.line(el.span.start) as usize;
+    let end_line = (positions.line(el.span.end) as usize).min(lines.len().saturating_sub(1));
 
     // `normalized_element_args`, not raw `el.args`: `align: list(...)` is
     // a `Value::Call` until normalized, and `extract_table_aligns_from_args`
@@ -349,7 +349,7 @@ fn table_hover(text: &str, pos: Position, el: &Element) -> Option<Hover> {
             kind: MarkupKind::Markdown,
             value: summary,
         }),
-        range: Some(span_to_range(&el.span)),
+        range: Some(positions.range(&el.span)),
     })
 }
 
@@ -399,6 +399,7 @@ fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
 }
 
 fn macro_hover(
+    positions: &TextPositions<'_>,
     doc: &Document,
     config: &tomet_semantics::DocumentConfig,
     el: &Element,
@@ -445,7 +446,7 @@ fn macro_hover(
             kind: MarkupKind::Markdown,
             value: md,
         }),
-        range: Some(span_to_range(&el.span)),
+        range: Some(positions.range(&el.span)),
     })
 }
 

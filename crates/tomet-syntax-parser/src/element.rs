@@ -207,11 +207,11 @@ pub(crate) fn parse_element_with_pipe_stack(
 ) -> Result<Element> {
     let start_pos = cur.pos();
     if !cur.eat_str("@") {
-        return Err(err(cur, cur.pos(), "expected '@'"));
+        return Err(err(cur.pos(), "expected '@'"));
     }
     let sigil = match eat_name(cur) {
         Some(name) => Sigil::Named(name),
-        None => return Err(err(cur, cur.pos(), "expected an element name after '@'")),
+        None => return Err(err(cur.pos(), "expected an element name after '@'")),
     };
 
     let mut el = element_new(sigil);
@@ -359,7 +359,7 @@ pub(crate) fn parse_groups_with_pipe_stack(
                                 parent_ok = false;
                                 break;
                             }
-                            let (_, col) = probe.line_col(probe.pos());
+                            let col = probe.column();
                             if col != expected_col {
                                 parent_ok = false;
                                 break;
@@ -421,7 +421,6 @@ pub(crate) fn parse_groups_with_pipe_stack(
                 _ if allow_colon_connect && cur.pos() == checkpoint && opens_group(cur) => {
                     if cur.peek() == Some('#') {
                         return Err(err(
-                            cur,
                             cur.pos(),
                             "a second `#(...)`: an element takes at most one id",
                         ));
@@ -432,7 +431,6 @@ pub(crate) fn parse_groups_with_pipe_stack(
                         _ => "{value}",
                     };
                     return Err(err(
-                        cur,
                         cur.pos(),
                         format!(
                             "a second `{group}` group: an element takes one of each. \
@@ -688,7 +686,7 @@ pub(crate) fn parse_sugar_body(cur: &mut Cursor) -> Result<SugarBody> {
 
 pub(crate) fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
     if !cur.eat_str("(") {
-        return Err(err(cur, cur.pos(), "expected '('"));
+        return Err(err(cur.pos(), "expected '('"));
     }
     skip_ws_newlines_and_comments(cur);
     let v = if cur.peek() == Some(')') {
@@ -698,7 +696,7 @@ pub(crate) fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
     };
     skip_ws_newlines_and_comments(cur);
     if !cur.eat_str(")") {
-        return Err(err(cur, cur.pos(), "expected ')'"));
+        return Err(err(cur.pos(), "expected ')'"));
     }
     Ok(v)
 }
@@ -713,13 +711,13 @@ pub(crate) fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
 pub(crate) fn parse_hash_id(cur: &mut Cursor) -> Result<Id> {
     cur.bump(); // eat '#'
     if !cur.eat_str("(") {
-        return Err(err(cur, cur.pos(), "expected '(' after '#'"));
+        return Err(err(cur.pos(), "expected '(' after '#'"));
     }
     skip_ws_newlines_and_comments(cur);
     let s = parse_id_scalar(cur)?;
     skip_ws_newlines_and_comments(cur);
     if !cur.eat_str(")") {
-        return Err(err(cur, cur.pos(), "expected ')'"));
+        return Err(err(cur.pos(), "expected ')'"));
     }
     Ok(Id(s))
 }
@@ -734,7 +732,7 @@ fn parse_id_scalar(cur: &mut Cursor) -> Result<String> {
     }
     let raw = eat_scalar_raw(cur).trim_end();
     if raw.is_empty() {
-        return Err(err(cur, cur.pos(), "expected an id"));
+        return Err(err(cur.pos(), "expected an id"));
     }
     Ok(raw.to_string())
 }
@@ -742,9 +740,9 @@ fn parse_id_scalar(cur: &mut Cursor) -> Result<String> {
 /// Parses a `|content` run as a block sequence -- identical to `[content]`,
 /// bounded by the end of the marked run instead of `]`.
 fn parse_pipe_content(cur: &mut Cursor, parent_stack: &[usize]) -> Result<Vec<Block>> {
-    let (_, col) = cur.line_col(cur.pos());
+    let col = cur.column();
     if !cur.eat_str("|") {
-        return Err(err(cur, cur.pos(), "expected '|'"));
+        return Err(err(cur.pos(), "expected '|'"));
     }
     let mut current_stack = parent_stack.to_vec();
     current_stack.push(col);
@@ -760,12 +758,12 @@ fn parse_pipe_content(cur: &mut Cursor, parent_stack: &[usize]) -> Result<Vec<Bl
 /// `tmtroot/docs/spec/feature/content-shape.tmt`.
 fn parse_content(cur: &mut Cursor) -> Result<Vec<Block>> {
     if !cur.eat_str("[") {
-        return Err(err(cur, cur.pos(), "expected '['"));
+        return Err(err(cur.pos(), "expected '['"));
     }
     let content =
         crate::document::parse_block_seq(cur, crate::document::BlockStop::Bracket(']'), &[])?;
     if !cur.eat_str("]") {
-        return Err(err(cur, cur.pos(), "expected ']'"));
+        return Err(err(cur.pos(), "expected ']'"));
     }
     Ok(content)
 }
@@ -794,13 +792,13 @@ fn parse_content(cur: &mut Cursor) -> Result<Vec<Block>> {
 pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
     let group_start = cur.pos();
     if !cur.eat_str("{") {
-        return Err(err(cur, cur.pos(), "expected '{'"));
+        return Err(err(cur.pos(), "expected '{'"));
     }
     let mut entries = Vec::new();
     loop {
         skip_ws_newlines_and_comments(cur);
         match cur.peek() {
-            None => return Err(err(cur, group_start, "unterminated '{', expected '}'")),
+            None => return Err(err(group_start, "unterminated '{', expected '}'")),
             Some('}') => break,
             Some('(') => entries.push(Entry::Element(parse_bare_element(cur)?)),
             // A named entry, `@args{ ... }`. Unambiguous: `is_ident_char`
@@ -840,7 +838,6 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
                 let (key, value) = parse_one_entry(cur)?;
                 if key == POSITIONAL_ENTRY_KEY {
                     return Err(err(
-                        cur,
                         entry_start,
                         "a '{...}' group holds 'key: value' entries or elements; \
                          write a bare value in '(args)' instead",
@@ -856,7 +853,7 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
         }
     }
     if !cur.eat_str("}") {
-        return Err(err(cur, cur.pos(), "expected '}'"));
+        return Err(err(cur.pos(), "expected '}'"));
     }
     Ok(ElementValue::Group(entries))
 }

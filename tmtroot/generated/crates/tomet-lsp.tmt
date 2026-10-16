@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-lsp, dependencies: list(tomet-address, tomet-ast, tomet-compute, tomet-cst, tomet-formatter, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator), dependents: list()}
+@meta{crate: tomet-lsp, dependencies: list(tomet-address, tomet-ast, tomet-compute, tomet-cst, tomet-formatter, tomet-lexer, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator), dependents: list()}
 
 =[tomet-lsp]
 
@@ -71,15 +71,16 @@ Provides hover information for the symbol under the cursor.
 
 ==[Module position]
 
-===[Functions]
+===[Structs]
 
-====[fn span_to_range]
+====[struct TextPositions]
 
-Converts an AST [`Span`] to an LSP [`Range`].
+Converts between byte offsets into one document's text and LSP positions
+(a 0-based line and a UTF-16 character offset within it).
 
-====[fn text_range_to_lsp_range]
-
-Converts a CST [`tomet_cst::TextRange`] to an LSP [`Range`].
+Spans and parse errors carry byte offsets only. Build one of these per
+request, from the text the request is about, and pass it down: building it
+is one pass over the text, and every conversion after that is cheap.
 
 ==[Module symbol]
 

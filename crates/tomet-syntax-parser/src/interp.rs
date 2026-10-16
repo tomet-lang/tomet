@@ -40,7 +40,6 @@ pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
         skip_inline_ws(cur);
         if cur.peek() == Some('}') {
             return Err(err(
-                cur,
                 cur.pos(),
                 "empty interpolation, expected an expression",
             ));
@@ -48,7 +47,7 @@ pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
         let expr = parse_interp_expr(cur)?;
         skip_inline_ws(cur);
         if !cur.eat_str("}") {
-            return Err(err(cur, cur.pos(), "unterminated '${', expected '}'"));
+            return Err(err(cur.pos(), "unterminated '${', expected '}'"));
         }
         let mut el = element_new(Sigil::Dollar);
         el.value = Some(tomet_ast::ElementValue::Interp(expr));
@@ -175,7 +174,7 @@ fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr
                 if cur.peek() == Some(')') {
                     cur.bump();
                 } else {
-                    return Err(err(cur, cur.pos(), "expected closing ')' after '#('"));
+                    return Err(err(cur.pos(), "expected closing ')' after '#('"));
                 }
             }
             Ok(InterpExpr {
@@ -202,7 +201,6 @@ fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr
             })
         }
         _ => Err(err(
-            cur,
             cur.pos(),
             "expected a value, identifier, or call in '${...}'",
         )),
@@ -223,12 +221,12 @@ fn parse_interp_call_args(cur: &mut Cursor) -> Result<Vec<InterpExpr>> {
                     skip_inline_ws(cur);
                 }
                 Some(')') => break,
-                _ => return Err(err(cur, cur.pos(), "expected ',' or ')' in call arguments")),
+                _ => return Err(err(cur.pos(), "expected ',' or ')' in call arguments")),
             }
         }
     }
     if !cur.eat_str(")") {
-        return Err(err(cur, cur.pos(), "expected ')'"));
+        return Err(err(cur.pos(), "expected ')'"));
     }
     Ok(args)
 }
@@ -239,7 +237,7 @@ fn parse_interp_number(cur: &mut Cursor, start: usize) -> Result<InterpExpr> {
     }
     let digits = cur.eat_while(|c| c.is_ascii_digit());
     if digits.is_empty() {
-        return Err(err(cur, cur.pos(), "expected digits"));
+        return Err(err(cur.pos(), "expected digits"));
     }
     let mut is_float = false;
     if cur.peek() == Some('.') && cur.peek_at(1).is_some_and(|c| c.is_ascii_digit()) {
@@ -251,11 +249,11 @@ fn parse_interp_number(cur: &mut Cursor, start: usize) -> Result<InterpExpr> {
     let literal = if is_float {
         text.parse::<f64>()
             .map(Literal::Float)
-            .map_err(|_| err(cur, start, "invalid float literal"))?
+            .map_err(|_| err(start, "invalid float literal"))?
     } else {
         text.parse::<i64>()
             .map(Literal::Int)
-            .map_err(|_| err(cur, start, "invalid integer literal"))?
+            .map_err(|_| err(start, "invalid integer literal"))?
     };
     Ok(InterpExpr {
         kind: InterpExprKind::Literal(literal),
@@ -282,7 +280,7 @@ fn is_interp_ident_char(c: char) -> bool {
 fn eat_interp_ident<'a>(cur: &mut Cursor<'a>) -> Result<&'a str> {
     let start = cur.pos();
     if !cur.peek().is_some_and(is_interp_ident_start) {
-        return Err(err(cur, start, "expected an identifier"));
+        return Err(err(start, "expected an identifier"));
     }
     Ok(cur.eat_while(is_interp_ident_char))
 }

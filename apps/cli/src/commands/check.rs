@@ -153,6 +153,9 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
         };
 
         let findings = Findings::of(&vault, file, &doc);
+        // One index per file: diagnostics carry byte spans, and this is where
+        // they become the line:column a reader sees.
+        let index = tomet_lexer::LineIndex::new(&src);
         checked += 1;
         warned += findings.warnings();
         let has_errors = findings.has_errors();
@@ -175,7 +178,7 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
                 eprintln!(
                     "{}:{}: warning: unresolved ${{{}}} -- {}",
                     file.display(),
-                    u.span.start.line,
+                    index.line_col(u.span.start).line,
                     u.source,
                     u.reason
                 );
@@ -196,7 +199,7 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
                 "errors": diagnostics
                     .iter()
                     .map(|d| serde_json::json!({
-                        "message": d.to_string(),
+                        "message": d.message_in(&index),
                         "severity": if is_error(d) { "error" } else { "warning" },
                     }))
                     .collect::<Vec<_>>(),
@@ -204,7 +207,7 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
         } else {
             for d in &diagnostics {
                 let label = if is_error(d) { "" } else { "warning: " };
-                eprintln!("{}: {label}{d}", file.display());
+                eprintln!("{}: {label}{}", file.display(), d.message_in(&index));
             }
         }
     }

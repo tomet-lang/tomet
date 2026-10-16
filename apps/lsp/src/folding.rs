@@ -2,6 +2,7 @@
 
 use lsp_types::{FoldingRange, FoldingRangeKind};
 use tomet_ast::{Block, ElementValue, List};
+use tomet_lexer::LineIndex;
 
 /// Computes folding ranges for the given document text.
 pub fn folding_ranges_for(text: &str) -> Vec<FoldingRange> {
@@ -10,8 +11,9 @@ pub fn folding_ranges_for(text: &str) -> Vec<FoldingRange> {
     };
 
     let mut ranges = Vec::new();
+    let index = &LineIndex::new(text);
     for block in &doc.blocks {
-        collect_block_folding_ranges(block, &mut ranges);
+        collect_block_folding_ranges(index, block, &mut ranges);
     }
 
     collect_comment_folding_ranges(text, &mut ranges);
@@ -20,14 +22,18 @@ pub fn folding_ranges_for(text: &str) -> Vec<FoldingRange> {
     ranges
 }
 
-fn collect_block_folding_ranges(block: &Block, ranges: &mut Vec<FoldingRange>) {
+fn collect_block_folding_ranges(
+    index: &LineIndex<'_>,
+    block: &Block,
+    ranges: &mut Vec<FoldingRange>,
+) {
     match block {
         Block::Section(sec) => {
-            let start_line = sec.span.start.line.saturating_sub(1) as u32;
+            let start_line = line0(index, sec.span.start);
             let end_line = if let Some(last) = sec.blocks.last() {
-                block_end_line(last)
+                block_end_line(index, last)
             } else {
-                sec.span.end.line.saturating_sub(1) as u32
+                line0(index, sec.span.end)
             };
 
             if end_line > start_line {
@@ -42,12 +48,12 @@ fn collect_block_folding_ranges(block: &Block, ranges: &mut Vec<FoldingRange>) {
             }
 
             for child in &sec.blocks {
-                collect_block_folding_ranges(child, ranges);
+                collect_block_folding_ranges(index, child, ranges);
             }
         }
         Block::Element(el) => {
-            let start_line = el.span.start.line.saturating_sub(1) as u32;
-            let end_line = span_end_line(&el.span);
+            let start_line = line0(index, el.span.start);
+            let end_line = span_end_line(index, &el.span);
 
             if end_line > start_line {
                 ranges.push(FoldingRange {
@@ -61,17 +67,17 @@ fn collect_block_folding_ranges(block: &Block, ranges: &mut Vec<FoldingRange>) {
             }
 
             if let Some(val) = &el.value {
-                collect_element_value_folding_ranges(val, ranges);
+                collect_element_value_folding_ranges(index, val, ranges);
             }
         }
         Block::Paragraph(_) => {}
-        Block::List(list) => collect_list_folding_ranges(list, ranges),
+        Block::List(list) => collect_list_folding_ranges(index, list, ranges),
     }
 }
 
-fn collect_list_folding_ranges(list: &List, ranges: &mut Vec<FoldingRange>) {
-    let start_line = list.span.start.line.saturating_sub(1) as u32;
-    let end_line = span_end_line(&list.span);
+fn collect_list_folding_ranges(index: &LineIndex<'_>, list: &List, ranges: &mut Vec<FoldingRange>) {
+    let start_line = line0(index, list.span.start);
+    let end_line = span_end_line(index, &list.span);
 
     if end_line > start_line {
         ranges.push(FoldingRange {
@@ -86,20 +92,24 @@ fn collect_list_folding_ranges(list: &List, ranges: &mut Vec<FoldingRange>) {
 
     for item in &list.items {
         if let Some(val) = &item.element.value {
-            collect_element_value_folding_ranges(val, ranges);
+            collect_element_value_folding_ranges(index, val, ranges);
         }
         if let Some(sub) = &item.sublist {
-            collect_list_folding_ranges(sub, ranges);
+            collect_list_folding_ranges(index, sub, ranges);
         }
     }
 }
 
-fn collect_element_value_folding_ranges(val: &ElementValue, ranges: &mut Vec<FoldingRange>) {
+fn collect_element_value_folding_ranges(
+    index: &LineIndex<'_>,
+    val: &ElementValue,
+    ranges: &mut Vec<FoldingRange>,
+) {
     if let ElementValue::Group(entries) = val {
         for entry in entries {
             if let tomet_ast::Entry::Element(child) = entry {
-                let start_line = child.span.start.line.saturating_sub(1) as u32;
-                let end_line = child.span.end.line.saturating_sub(1) as u32;
+                let start_line = line0(index, child.span.start);
+                let end_line = line0(index, child.span.end);
                 if end_line > start_line {
                     ranges.push(FoldingRange {
                         start_line,
@@ -111,35 +121,41 @@ fn collect_element_value_folding_ranges(val: &ElementValue, ranges: &mut Vec<Fol
                     });
                 }
                 if let Some(child_val) = &child.value {
-                    collect_element_value_folding_ranges(child_val, ranges);
+                    collect_element_value_folding_ranges(index, child_val, ranges);
                 }
             }
         }
     }
 }
 
-fn block_end_line(block: &Block) -> u32 {
+fn block_end_line(index: &LineIndex<'_>, block: &Block) -> u32 {
     match block {
         Block::Section(sec) => {
             if let Some(last) = sec.blocks.last() {
-                block_end_line(last)
+                block_end_line(index, last)
             } else {
-                span_end_line(&sec.span)
+                span_end_line(index, &sec.span)
             }
         }
-        Block::Element(el) => span_end_line(&el.span),
-        Block::Paragraph(p) => span_end_line(&p.span),
-        Block::List(list) => span_end_line(&list.span),
+        Block::Element(el) => span_end_line(index, &el.span),
+        Block::Paragraph(p) => span_end_line(index, &p.span),
+        Block::List(list) => span_end_line(index, &list.span),
     }
 }
 
-fn span_end_line(span: &tomet_ast::Span) -> u32 {
-    let raw_end = span.end.line.saturating_sub(1) as u32;
-    if span.end.column <= 1 && span.end.line > span.start.line {
+fn span_end_line(index: &LineIndex<'_>, span: &tomet_ast::Span) -> u32 {
+    let end = index.line_col(span.end);
+    let raw_end = end.line.saturating_sub(1) as u32;
+    if end.column <= 1 && end.line > index.line_col(span.start).line {
         raw_end.saturating_sub(1)
     } else {
         raw_end
     }
+}
+
+/// The 0-based line of byte `offset`, as LSP counts lines.
+fn line0(index: &LineIndex<'_>, offset: usize) -> u32 {
+    index.line_col(offset).line.saturating_sub(1) as u32
 }
 
 fn collect_comment_folding_ranges(text: &str, ranges: &mut Vec<FoldingRange>) {

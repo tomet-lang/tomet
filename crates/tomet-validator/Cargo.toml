@@ -18,4 +18,5 @@ tomet-validator-rule = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
+tomet-lexer = { workspace = true }
 tomet-parser = { workspace = true }

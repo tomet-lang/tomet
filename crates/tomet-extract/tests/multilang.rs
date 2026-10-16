@@ -1,5 +1,11 @@
 use std::path::Path;
 use tomet_extract::{CommentKind, collect_comment_elements};
+use tomet_lexer::{LineCol, LineIndex};
+
+/// Where a byte offset of the original source is, as a line and column.
+fn line_col(src: &str, offset: usize) -> LineCol {
+    LineIndex::new(src).line_col(offset)
+}
 
 #[test]
 fn test_python_hash_comments_and_docstrings() {
@@ -21,12 +27,12 @@ def run():
     let (el0, span0, kind0) = &elements[0];
     assert_eq!(el0.sigil.name().map(|n| n.name.as_str()), Some("file"));
     assert_eq!(kind0, &CommentKind::Line);
-    assert_eq!(span0.start.line, 3);
+    assert_eq!(line_col(py_src, span0.start).line, 3);
 
     let (el1, span1, kind1) = &elements[1];
     assert_eq!(el1.sigil.name().map(|n| n.name.as_str()), Some("rule"));
     assert_eq!(kind1, &CommentKind::OuterDoc);
-    assert_eq!(span1.start.line, 8);
+    assert_eq!(line_col(py_src, span1.start).line, 8);
 }
 
 #[test]
@@ -48,12 +54,12 @@ export function parseInput() {}
     let (el0, span0, kind0) = &elements[0];
     assert_eq!(el0.sigil.name().map(|n| n.name.as_str()), Some("link"));
     assert_eq!(kind0, &CommentKind::Line);
-    assert_eq!(span0.start.line, 3);
+    assert_eq!(line_col(ts_src, span0.start).line, 3);
 
     let (el1, span1, kind1) = &elements[1];
     assert_eq!(el1.sigil.name().map(|n| n.name.as_str()), Some("rule"));
     assert_eq!(kind1, &CommentKind::OuterDoc);
-    assert_eq!(span1.start.line, 7);
+    assert_eq!(line_col(ts_src, span1.start).line, 7);
 }
 
 #[test]
@@ -75,7 +81,7 @@ public class Controller {
     let (el0, span0, kind0) = &elements[0];
     assert_eq!(el0.sigil.name().map(|n| n.name.as_str()), Some("file"));
     assert_eq!(kind0, &CommentKind::OuterDoc);
-    assert_eq!(span0.start.line, 6);
+    assert_eq!(line_col(java_src, span0.start).line, 6);
 }
 
 #[test]
@@ -93,5 +99,5 @@ echo "starting"
     let (el0, span0, kind0) = &elements[0];
     assert_eq!(el0.sigil.name().map(|n| n.name.as_str()), Some("rule"));
     assert_eq!(kind0, &CommentKind::Line);
-    assert_eq!(span0.start.line, 4);
+    assert_eq!(line_col(sh_src, span0.start).line, 4);
 }

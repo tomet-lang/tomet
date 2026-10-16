@@ -34,16 +34,12 @@ pub(crate) fn parse_caret_element(cur: &mut Cursor, allow_colon_connect: bool) -
         match eat_name(cur) {
             Some(name) => Some(name),
             None => {
-                return Err(err(
-                    cur,
-                    cur.pos(),
-                    "expected element name or '(' after '^'",
-                ));
+                return Err(err(cur.pos(), "expected element name or '(' after '^'"));
             }
         }
     };
     if cur.peek() != Some('(') {
-        return Err(err(cur, cur.pos(), "expected '(' after '^' or '^name'"));
+        return Err(err(cur.pos(), "expected '(' after '^' or '^name'"));
     }
     let sigil = Sigil::Caret(target_kind);
     let mut el = element_new(sigil).with_placement(Placement::Inline);

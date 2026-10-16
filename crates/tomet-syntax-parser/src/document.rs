@@ -25,7 +25,7 @@ use tomet_tree::{ElementExt, element_new, list};
 pub fn parse_document(src: &str) -> Result<Document> {
     let mut cur = Cursor::new(src);
     let start_pos = cur.pos();
-    let blocks = parse_block_seq(&mut cur, BlockStop::Eof, &[])?;
+    let blocks = parse_block_seq(&mut cur, BlockStop::Eof, &[]).map_err(|e| e.located_in(src))?;
     let span = cur.span_from(start_pos);
     Ok(Document::new(blocks, span))
 }
@@ -118,7 +118,6 @@ pub(crate) fn parse_block_seq(
                 if cur.is_eof() {
                     *cur_ref = cur;
                     return Err(crate::value::err(
-                        &cur,
                         cur.pos(),
                         format!("unterminated, expected '{c}'"),
                     ));
@@ -303,8 +302,8 @@ fn continue_into_paragraph(
     first: Element,
     boundary: Option<char>,
 ) -> Result<Block> {
-    let para_start = first.span.start.offset;
-    let break_start = first.span.end.offset;
+    let para_start = first.span.start;
+    let break_start = first.span.end;
     if let Some(after) = leading_continuation(cur) {
         *cur = after;
     }

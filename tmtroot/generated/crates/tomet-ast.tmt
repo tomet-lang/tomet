@@ -1,13 +1,13 @@
 @kind(api)
 
-@meta{crate: tomet-ast, dependencies: list(tomet-cst), dependents: list(tomet, tomet-address, tomet-cli, tomet-compute, tomet-config, tomet-edit, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-vault, tomet-workspace, tove)}
+@meta{crate: tomet-ast, dependencies: list(tomet-cst), dependents: list(tomet, tomet-address, tomet-cli, tomet-compute, tomet-config, tomet-edit, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-merge, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule, tomet-vault, tomet-workspace, tove)}
 
 =[tomet-ast]
 
 ==[tomet-ast]
 
 Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
-`Inline`, `Element`, `Value`, `Position`, `Span`).
+`Inline`, `Element`, `Value`, `Span`).
 
 ==[Design Policy]
 
@@ -34,13 +34,14 @@ Typed AST wrappers over Rowan's [`SyntaxNode`].
 
 ==[Structs]
 
-===[struct Position]
-
-A 0-indexed byte offset and 1-indexed line/column position in source text.
-
 ===[struct Span]
 
-A source span bounded by start and end [`Position`]s.
+A source span: a range of byte offsets into the text it was parsed from.
+
+A span deliberately holds no line or column. Those are a view of the source
+text, not a property of the node, and computing them while parsing made
+every node cost a rescan of everything before it. Resolve them on demand
+with `tomet_lexer::LineIndex`.
 
 Note: [`PartialEq`] is implemented to always return `true` so that AST
 structural equality checks (e.g. `assert_eq!(doc1, doc2)`) compare node

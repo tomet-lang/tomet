@@ -1,9 +1,10 @@
-use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
+use lsp_types::{Diagnostic, DiagnosticSeverity, Range};
 
-use crate::position::text_range_to_lsp_range;
+use crate::position::TextPositions;
 
 /// Parses `text` and produces diagnostics (both parse errors and CST validation rules).
 pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
+    let positions = TextPositions::new(text);
     let mut diags = Vec::new();
     let cst = tomet_parser::parse_cst(text);
 
@@ -11,7 +12,7 @@ pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
     let cst_errors = tomet_validator::validate_cst(&cst);
     for err in cst_errors {
         diags.push(Diagnostic {
-            range: text_range_to_lsp_range(text, err.range()),
+            range: positions.text_range(err.range()),
             severity: Some(DiagnosticSeverity::ERROR),
             source: Some("tomet".to_string()),
             message: err.to_string(),
@@ -22,7 +23,7 @@ pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
     // 2. High-level parser errors if document structure is invalid
     if let Err(err) = tomet_parser::parse_document(text) {
         diags.push(Diagnostic {
-            range: error_range(&err, text),
+            range: error_range(&err, &positions),
             severity: Some(DiagnosticSeverity::ERROR),
             source: Some("tomet".to_string()),
             message: err.message.clone(),
@@ -33,15 +34,16 @@ pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
     diags
 }
 
-fn error_range(err: &tomet_parser::Error, text: &str) -> Range {
-    let line = (err.line.saturating_sub(1)) as u32;
-    let col = (err.column.saturating_sub(1)) as u32;
-    let start = Position::new(line, col);
-    let line_len = text
-        .lines()
-        .nth(line as usize)
-        .map(|l| l.chars().count() as u32)
-        .unwrap_or(col);
-    let end = Position::new(line, line_len.max(col));
-    Range::new(start, end)
+fn error_range(err: &tomet_parser::Error, positions: &TextPositions<'_>) -> Range {
+    // From where the error is to the end of that line.
+    let start = positions.position(err.offset);
+    let end = positions.line_end(start.line);
+    Range::new(
+        start,
+        if end.character >= start.character {
+            end
+        } else {
+            start
+        },
+    )
 }

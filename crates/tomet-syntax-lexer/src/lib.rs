@@ -15,9 +15,10 @@
 //! - (Core Capabilities)
 //!   | Scanning & Consumption: `bump()`, `eat_char()`, `eat_str()`, `eat_while()`, `eat_whitespace()`.
 //!   | Lookahead & Peeking: `peek()`, `peek_at()`, `starts_with()`.
-//!   | Position & Span Mapping: `line_col()`, `position_at()`, `current_position()`, `span_from()`.
+//!   | Span Mapping: `span_from()`, `column()`. Spans are byte offsets; lines and columns are not
+//!   | computed while scanning -- [`LineIndex`] resolves them from offsets on demand.
 
-use tomet_ast::{Position, Span};
+use tomet_ast::Span;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cursor<'a> {
@@ -128,35 +129,103 @@ impl<'a> Cursor<'a> {
         &self.src[start..self.pos]
     }
 
-    /// 1-based line/column of a byte position, for error reporting.
-    pub fn line_col(&self, pos: usize) -> (usize, usize) {
-        let mut line = 1;
-        let mut col = 1;
-        for c in self.src[..pos].chars() {
-            if c == '\n' {
-                line += 1;
-                col = 1;
-            } else {
-                col += 1;
-            }
-        }
-        (line, col)
-    }
-
-    /// Returns a [`Position`] for a given byte offset.
-    pub fn position_at(&self, pos: usize) -> Position {
-        let (line, column) = self.line_col(pos);
-        Position::new(line, column, pos)
-    }
-
-    /// Returns the current [`Position`] of the cursor.
-    pub fn current_position(&self) -> Position {
-        self.position_at(self.pos)
+    /// The 1-based column, in `char`s, of the cursor within its line. Counts back
+    /// to the previous line start, so it costs the length of the line and never
+    /// the length of the file.
+    pub fn column(&self) -> usize {
+        let line_start = self.src[..self.pos].rfind('\n').map_or(0, |i| i + 1);
+        self.src[line_start..self.pos].chars().count() + 1
     }
 
     /// Returns a [`Span`] from `start_pos` byte offset to the current cursor position.
     pub fn span_from(&self, start_pos: usize) -> Span {
-        Span::new(self.position_at(start_pos), self.current_position())
+        Span::new(start_pos, self.pos)
+    }
+}
+
+/// A 1-based line and a 1-based column, the column counted in `char`s.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+pub struct LineCol {
+    pub line: usize,
+    pub column: usize,
+}
+
+/// Resolves byte offsets of one source text to lines and columns, and back.
+///
+/// Spans and errors carry byte offsets only; a line and column is a view of
+/// the text, built here when something has to show one (a diagnostic, an
+/// editor position). Building the index is one pass over the text, a lookup is
+/// a binary search plus a count of the characters in that one line, and
+/// nothing about it is paid while parsing.
+#[derive(Debug, Clone)]
+pub struct LineIndex<'a> {
+    src: &'a str,
+    /// Byte offset at which each line starts; `starts[0]` is always `0`.
+    starts: Vec<usize>,
+}
+
+impl<'a> LineIndex<'a> {
+    pub fn new(src: &'a str) -> Self {
+        let mut starts = vec![0];
+        starts.extend(src.match_indices('\n').map(|(i, _)| i + 1));
+        LineIndex { src, starts }
+    }
+
+    pub fn src(&self) -> &'a str {
+        self.src
+    }
+
+    /// Number of lines. A text ending in `\n` has an empty last line.
+    pub fn line_count(&self) -> usize {
+        self.starts.len()
+    }
+
+    /// Byte offset at which the 1-based `line` starts, or `None` if there is no
+    /// such line.
+    pub fn line_start(&self, line: usize) -> Option<usize> {
+        self.starts.get(line.checked_sub(1)?).copied()
+    }
+
+    /// `offset` brought into the text: clamped to its length, and moved back to
+    /// the start of the character it falls inside.
+    pub fn clamp(&self, offset: usize) -> usize {
+        let mut offset = offset.min(self.src.len());
+        while !self.src.is_char_boundary(offset) {
+            offset -= 1;
+        }
+        offset
+    }
+
+    /// The line and column of byte `offset`. An offset past the end resolves
+    /// to the end; one inside a multi-byte character resolves to that
+    /// character's start.
+    pub fn line_col(&self, offset: usize) -> LineCol {
+        let offset = self.clamp(offset);
+        let line = self.starts.partition_point(|&start| start <= offset) - 1;
+        let column = self.src[self.starts[line]..offset].chars().count() + 1;
+        LineCol {
+            line: line + 1,
+            column,
+        }
+    }
+
+    /// The byte offset of a 1-based line and column, or `None` if the line
+    /// does not exist or the column is past the end of that line (the column
+    /// just after the last character is allowed). The inverse of
+    /// [`line_col`](Self::line_col).
+    pub fn offset(&self, position: LineCol) -> Option<usize> {
+        let line = position.line.checked_sub(1)?;
+        let column = position.column.checked_sub(1)?;
+        let start = *self.starts.get(line)?;
+        let end = self.starts.get(line + 1).copied().unwrap_or(self.src.len());
+        let text = &self.src[start..end];
+        let text = text.strip_suffix('\n').unwrap_or(text);
+        let mut chars = text.char_indices();
+        match chars.nth(column) {
+            Some((i, _)) => Some(start + i),
+            None if text.chars().count() == column => Some(start + text.len()),
+            None => None,
+        }
     }
 }
 
@@ -413,7 +482,10 @@ mod tests {
         assert!(cursor.eat_char('b'));
         assert_eq!(cursor.bump(), Some('c'));
         assert_eq!(cursor.bump(), Some('\n'));
-        assert_eq!(cursor.line_col(cursor.pos()), (2, 1));
+        assert_eq!(
+            LineIndex::new("abc\ndef").line_col(cursor.pos()),
+            LineCol { line: 2, column: 1 }
+        );
 
         assert_eq!(cursor.eat_while(|c| c.is_alphabetic()), "def");
         assert!(cursor.is_eof());
@@ -436,23 +508,59 @@ mod tests {
     }
 
     #[test]
-    fn test_cursor_positions_and_spans() {
-        let src = "line1\nline2";
-        let mut cursor = Cursor::new(src);
+    fn test_cursor_spans_are_byte_offsets() {
+        let mut cursor = Cursor::new("line1\nline2");
         let start = cursor.pos();
-        assert_eq!(cursor.line_col(0), (1, 1));
-
         cursor.eat_until_char('\n');
-        let line1_span = cursor.span_from(start);
-        assert_eq!(line1_span.start.line, 1);
-        assert_eq!(line1_span.start.column, 1);
-        assert_eq!(line1_span.end.line, 1);
-        assert_eq!(line1_span.end.column, 6);
+        assert_eq!(cursor.span_from(start), Span::new(0, 5));
+        assert!(cursor.span_from(start).exact_eq(&Span::new(0, 5)));
+        cursor.bump();
+        assert_eq!(cursor.pos(), 6);
+    }
 
-        cursor.bump(); // consume '\n'
-        let p2 = cursor.current_position();
-        assert_eq!(p2.line, 2);
-        assert_eq!(p2.column, 1);
+    fn lc(line: usize, column: usize) -> LineCol {
+        LineCol { line, column }
+    }
+
+    #[test]
+    fn test_line_index_resolves_lines_and_columns() {
+        let src = "line1\nline2";
+        let index = LineIndex::new(src);
+        assert_eq!(index.line_count(), 2);
+        assert_eq!(index.line_col(0), lc(1, 1));
+        assert_eq!(index.line_col(5), lc(1, 6));
+        assert_eq!(index.line_col(6), lc(2, 1));
+        assert_eq!(index.line_col(src.len()), lc(2, 6));
+        // Past the end clamps to the end.
+        assert_eq!(index.line_col(999), lc(2, 6));
+    }
+
+    #[test]
+    fn test_line_index_counts_chars_not_bytes() {
+        // Each of these is 3 bytes.
+        let src = "あいう\nえお";
+        let index = LineIndex::new(src);
+        assert_eq!(index.line_col(3), lc(1, 2));
+        assert_eq!(index.line_col(9), lc(1, 4));
+        assert_eq!(index.line_col(10), lc(2, 1));
+        // Inside a character: resolves to that character's start.
+        assert_eq!(index.line_col(4), lc(1, 2));
+    }
+
+    #[test]
+    fn test_line_index_offset_is_the_inverse() {
+        let src = "あいう\nabc\n\nz";
+        let index = LineIndex::new(src);
+        for offset in (0..=src.len()).filter(|&o| src.is_char_boundary(o)) {
+            assert_eq!(
+                index.offset(index.line_col(offset)),
+                Some(offset),
+                "offset {offset}"
+            );
+        }
+        assert_eq!(index.offset(lc(0, 1)), None);
+        assert_eq!(index.offset(lc(1, 5)), None);
+        assert_eq!(index.offset(lc(9, 1)), None);
     }
 
     #[test]

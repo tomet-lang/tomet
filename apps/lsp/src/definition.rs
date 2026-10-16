@@ -4,24 +4,23 @@ use lsp_types::{GotoDefinitionResponse, Location, Position, Uri};
 use tomet_ast::{Block, Element, ElementValue, Inline, InterpExprKind, List, Span, Value};
 use tomet_tree::{Visitor, walk_document};
 
-use crate::position::{span_contains, span_to_range};
+use crate::position::{TextPositions, span_contains};
 
 /// Provides Goto Definition target for reference links or interpolation expressions.
 pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefinitionResponse> {
     let doc = tomet_parser::parse_document(text).ok()?;
-    let target_line = pos.line as usize + 1;
-    let target_col = pos.character as usize + 1;
+    let positions = TextPositions::new(text);
+    let offset = positions.offset(pos);
 
     // Find the node under cursor to get the referenced ID
     struct TargetIdFinder {
-        line: usize,
-        col: usize,
+        offset: usize,
         ref_id: Option<String>,
     }
 
     impl Visitor<()> for TargetIdFinder {
         fn visit(&mut self, el: &Element) -> ControlFlow<()> {
-            if span_contains(&el.span, self.line, self.col) {
+            if span_contains(&el.span, self.offset) {
                 // Check whether it carries an `id` arg
                 if let Some(Value::Map(entries)) = &el.args {
                     for (k, v) in entries {
@@ -44,8 +43,7 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
     }
 
     let mut id_finder = TargetIdFinder {
-        line: target_line,
-        col: target_col,
+        offset,
         ref_id: None,
     };
     let _ = walk_document(&doc, &mut id_finder);
@@ -58,7 +56,7 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
     found_span.map(|span| {
         GotoDefinitionResponse::Scalar(Location {
             uri: uri.clone(),
-            range: span_to_range(&span),
+            range: positions.range(&span),
         })
     })
 }
