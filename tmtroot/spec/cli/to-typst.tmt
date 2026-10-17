@@ -1,0 +1,29 @@
+@meta{
+  id: cli.to-typst
+}
+
+`tomet to-typst <FILE>`: 文書を Typst の記法にする。
+
+状態: 実装済み。
+
+共通の決まりは @file(tmtroot/spec/cli/overview.tmt)。変換器の実装は @file(tmtroot/generated/crates/tomet-typst.tmt)。
+
+=[ 動き ]
+
++ `FILE` を読む。`-` なら標準入力。その vault で読み、`${...}` を評価した値に置き換える（@file(tmtroot/spec/cli/overview.tmt) の「式の評価」）。
++ Typst の記法にする。
++ 標準出力に出す。`--out` があれば、そのファイルに書く。
+
+`tomet export` が Typst に書き出すときと、同じ変換器を使う。
+
+Typst に対応する形がない構成要素は、損なわれる。一覧は変換器（`tomet-typst`）の説明にある。
+
+読めない文書は、位置と該当の行を添えたエラーを標準エラー出力に出して1で終わる。
+
+=[ 現状の実装との差 ]
+
+- 差はない。
+
+=[ まだ決まっていないこと ]
+
+- 損なわれるものを、実行のときに知らせるか。

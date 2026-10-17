@@ -1,0 +1,30 @@
+@meta{
+  id: cli.roundtrip
+}
+
+`tomet roundtrip <FILE>`: データファイルを読み、書き戻し、読み直して、元と同じになるか確かめる。データの保存と読み込み（`tove`）が、値を損なわないことを確かめるためのコマンド。
+
+状態: 実装済み。
+
+共通の決まりは @file(tmtroot/spec/cli/overview.tmt)。
+
+=[ 動き ]
+
+文書ではなく、データ（`key: value`、列、スカラー）を扱う。
+
++ `FILE` を読む。`-` なら標準入力。データの文法で、一般的な値として読む。
++ 読んだ値を JSON で、`parsed:` の下に出す。
++ 値を `tove` で書き出し、`rendered back:` の下に出す。
++ 書き出したものを読み直し、最初の値と比べる。
+
+等しければ `round-trip OK` を出して0。等しくなければ `round-trip MISMATCH` を出し、`re-parsing the rendered output produced a different value` で1。読めなければ、そのエラーで1。
+
+出力はすべて標準出力。
+
+=[ 現状の実装との差 ]
+
+- 差はない。
+
+=[ まだ決まっていないこと ]
+
+- なし。

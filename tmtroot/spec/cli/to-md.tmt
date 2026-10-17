@@ -1,0 +1,33 @@
+@meta{
+  id: cli.to-md
+}
+
+`tomet to-md <FILE>`: 文書を CommonMark にする。
+
+状態: 実装済み。
+
+共通の決まりは @file(tmtroot/spec/cli/overview.tmt)。変換器の実装は @file(tmtroot/generated/crates/tomet-markdown.tmt)。
+
+=[ 動き ]
+
++ `FILE` を読む。`-` なら標準入力。その vault で読み、`${...}` を評価した値に置き換える（@file(tmtroot/spec/cli/overview.tmt) の「式の評価」）。
++ CommonMark にする。
++ 標準出力に出す。`--out` があれば、そのファイルに書く。
+
+`tomet export` が CommonMark に書き出すときと、同じ変換器と同じ式の評価を使う。
+
+=[ 損なわれるもの ]
+
+CommonMark に対応する形がない構成要素は、損なわれる。Markdown の中に HTML としてそのまま書き残すものと、落とすものがある。一覧は変換器（`tomet-markdown`）のモジュールの説明にある。
+
+損なわれたものは、Markdown を `from-md` で読み戻しても戻らない（@file(tmtroot/spec/cli/from-md.tmt)）。
+
+読めない文書は、位置と該当の行を添えたエラーを標準エラー出力に出して1で終わる。
+
+=[ 現状の実装との差 ]
+
+- 差はない。
+
+=[ まだ決まっていないこと ]
+
+- 損なわれるものを、実行のときに知らせるか。今は黙って損なう。

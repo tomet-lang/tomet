@@ -1,0 +1,57 @@
+@meta{
+  id: lsp.overview
+}
+
+Tomet の言語サーバー `tomet-lsp`。エディタに、診断、整形、ホバー、補完、定義ジャンプ、アウトライン、折りたたみを与える。
+
+状態: 実装済み。ただし、各ページ末尾の「現状の実装との差」にある点を除く。
+
+=[ 構成 ]
+
+- 実行ファイルは `tomet-lsp`（`apps/lsp`）。標準入出力で LSP（JSON-RPC）を話す。
+- 各機能の中身は、ライブラリ `tomet_lsp` にある。文書の文字列（と、必要なら vault）から結果を作る関数で、プロトコルを知らない。
+- 診断の組み立ては `tomet-load` の `Vault::findings` にあり、`tomet check` と `tomet stats` と共有する。LSP が独自に判断するものはない。
+
+=[ 機能 ]
+
+@table
+|[ 機能         ][ LSP のメソッド ][ 書いてあるページ ]
+|[ 診断         ][ `textDocument/publishDiagnostics`（サーバーから） ][ @file(tmtroot/spec/lsp/diagnostics.tmt) ]
+|[ 整形         ][ `textDocument/formatting` ][ @file(tmtroot/spec/lsp/editing.tmt) ]
+|[ ホバー       ][ `textDocument/hover` ][ @file(tmtroot/spec/lsp/editing.tmt) ]
+|[ 補完         ][ `textDocument/completion`。トリガーは `<` `@` `$` `:` `/` `.` ][ @file(tmtroot/spec/lsp/editing.tmt) ]
+|[ 定義ジャンプ ][ `textDocument/definition` ][ @file(tmtroot/spec/lsp/editing.tmt) ]
+|[ アウトライン ][ `textDocument/documentSymbol` ][ @file(tmtroot/spec/lsp/editing.tmt) ]
+|[ 折りたたみ   ][ `textDocument/foldingRange` ][ @file(tmtroot/spec/lsp/editing.tmt) ]
+
+サーバーからクライアントへ送るものは、診断のほかに2つある。
+
+- `window/logMessage`: vault の設定の問題（@file(tmtroot/spec/lsp/diagnostics.tmt)）。
+- `client/registerCapability`: `.tmt` ファイルの変更の監視の登録。クライアントが動的な登録に対応しているときだけ送る。
+
+=[ 文書の同期 ]
+
+- 全文同期。開いた文書の全文を、変更のたびに受け取る。
+- 開く、閉じる、保存の通知を受ける。保存の通知に本文は付けない。
+- 文書は `file://` の URI で識別する。それ以外の URI の文書には vault がなく、文字列だけで答えられるものだけが働く。
+- 位置は LSP の規則（行は 0 始まり、桁は UTF-16 の単位）で数える。内部の位置（バイトオフセット）との変換は `TextPositions`。
+- 文書が構文として読めないとき、ホバー、定義ジャンプ、アウトライン、折りたたみは何も返さない。診断は、そのエラーを出す。
+
+=[ vault ]
+
+vault は、文書の設定（`default.config.tmt` か `tomet.config.tmt`）のあるディレクトリ。開いたファイルのパスから祖先を辿って見つける。CLI の `Vault::discover` と同じ規則で、設定が見つからなければ、そのファイルのあるディレクトリを vault として、既定の設定で働く。
+
+`initialize` が渡すワークスペースのルートは使わない。ルートが複数あっても、なくても、ファイルのパスだけで同じ規則で決まるため。
+
+vault ごとに1つ作って持つ。診断は、その vault で答える。変更の知らせを受けたときの作り直しは @file(tmtroot/spec/lsp/diagnostics.tmt)。
+
+整形とホバーは設定を自分で探し、補完はファイルシステムを見る。どれも vault は使わない（@file(tmtroot/spec/lsp/editing.tmt)）。
+
+=[ 現状の実装との差 ]
+
+- 差はない。機能ごとの差は、各ページにある。
+
+=[ まだ決まっていないこと ]
+
+- 診断以外の機能が vault を使うか。使うと、ホバーが別の文書を評価でき、補完が語彙の要素を出せる（@file(tmtroot/spec/lsp/editing.tmt)）。
+- 設定のないファイルの扱い。今は、ファイルのあるディレクトリを vault とするので、同じディレクトリの別の文書は、同じ vault になる。

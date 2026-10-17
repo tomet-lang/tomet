@@ -1,0 +1,88 @@
+@meta{
+  id: cli.overview
+}
+
+`tomet`: 文書を調べ、整え、変換し、作るコマンド。このページは、すべてのコマンドに共通する決まりと、コマンドの一覧。コマンドごとの振る舞いは、同じディレクトリのページに書く。
+
+状態: 実装済み。ただし、各ページ末尾の「現状の実装との差」にある点を除く。
+
+オプションの一覧は、`tomet cli-docs` が定義から生成する @file(tmtroot/generated/cli.tmt)。ここには、その一覧に載らない決まり（何を保証するか、どこへ出すか、いつ失敗するか）を書く。
+
+=[ コマンド ]
+
+@table
+|[ 分類               ][ コマンド      ][ していること ]
+|[ 調べる             ][ `check`       ][ 文書が正しいか調べる（@file(tmtroot/spec/cli/check.tmt)） ]
+|[                    ][ `check-links` ][ ローカルファイルへのリンクの切れを調べる（@file(tmtroot/spec/cli/check-links.tmt)） ]
+|[                    ][ `stats`       ][ 文字、要素、リンク、見出しを数える（@file(tmtroot/spec/cli/stats.tmt)） ]
+|[                    ][ `ast`         ][ 構文木を表示する（@file(tmtroot/spec/cli/ast.tmt)） ]
+|[                    ][ `roundtrip`   ][ データファイルの保存と読み込みが損なわれないか確かめる（@file(tmtroot/spec/cli/roundtrip.tmt)） ]
+|[ 整える・書き換える ][ `format`      ][ 書き方を整える（@file(tmtroot/spec/cli/format.tmt)） ]
+|[                    ][ `refactor`    ][ 古い書き方を新しい書き方に直す（@file(tmtroot/spec/cli/refactor.tmt)） ]
+|[ 作る               ][ `new`         ][ ブループリントから文書を作る（@file(tmtroot/spec/cli/new.tmt)） ]
+|[ 変換する           ][ `html`        ][ HTML にする（@file(tmtroot/spec/cli/html.tmt)） ]
+|[                    ][ `to-md`       ][ CommonMark にする（@file(tmtroot/spec/cli/to-md.tmt)） ]
+|[                    ][ `from-md`     ][ CommonMark から `.tmt` にする（@file(tmtroot/spec/cli/from-md.tmt)） ]
+|[                    ][ `to-typst`    ][ Typst にする（@file(tmtroot/spec/cli/to-typst.tmt)） ]
+|[                    ][ `to-pandoc`   ][ Pandoc の構文木（JSON）にする（@file(tmtroot/spec/cli/to-pandoc.tmt)） ]
+|[                    ][ `from-pandoc` ][ Pandoc の構文木（JSON）から `.tmt` にする（@file(tmtroot/spec/cli/from-pandoc.tmt)） ]
+|[                    ][ `export`      ][ 文書が宣言した設定に従って書き出す（@file(tmtroot/spec/cli/export.tmt)） ]
+|[ 見る・補助         ][ `tui`         ][ 端末の作業台（@file(tmtroot/spec/cli/tui.tmt)） ]
+|[                    ][ `serve`       ][ 文書を HTTP で見せる（@file(tmtroot/spec/cli/serve.tmt)） ]
+|[                    ][ `cli-docs`    ][ このコマンドの一覧を生成する（@file(tmtroot/spec/cli/cli-docs.tmt)） ]
+
+言語サーバー `tomet-lsp` は別の実行ファイル（@file(tmtroot/spec/lsp/overview.tmt)）。
+
+=[ vault ]
+
+文書を読むコマンドは、読む文書の**vault** を決めてから読む。vault は、`default.config.tmt` か `tomet.config.tmt` のあるディレクトリで、文書のパス（ディレクトリを渡されたら、そのパス）から祖先を辿って見つける。見つからなければ、文書のあるディレクトリを、既定の設定で使う。
+
+vault が決めるのは、設定、語彙、`workspace.ignore` などの除外、ブループリント、`ref("名前")` や `vault.docs` のような式が引く文書。
+
+標準入力（後述）を読むときは、文書のパスがないので、作業ディレクトリの vault を使う。
+
+=[ 出力先と終了コード ]
+
+- 結果（変換した文書、表、`OK`）は標準出力に出す。問題、警告、進み具合は標準エラー出力に出す。パイプにつないだとき、結果だけが流れるため。
+- 終了コードは、成功が0、失敗が1。コマンドが動かなかった（引数が違う、パスがない、読めない）ときも1。
+- 複数の文書を扱うコマンドは、1つの文書で失敗しても残りを続け、最後にまとめて失敗にする（`check`、`stats`、`refactor`、`from-md`）。例外は @file(tmtroot/spec/cli/export.tmt)。
+- `check-links` は、リンクの切れを見つけたとき1で終わる。調べること自体ができなかったときも1。
+
+=[ 共通の形 ]
+
+同じ意味のオプションは、コマンドが違っても同じ綴りにする。
+
+@table
+|[ 綴り               ][ 意味 ][ あるコマンド ]
+|[ `PATH`             ][ 対象のファイルかディレクトリ。省くと `.` ][ `check`、`stats`、`export`、`check-links`、`refactor`、`tui` ]
+|[ `--check`          ][ 書かずに、書く必要があるかを調べる。必要なら非ゼロで終わる ][ `format`、`export`、`refactor`、`cli-docs` ]
+|[ `--in-place`、`-i` ][ ファイルをその場で書き換える。なければ、結果を標準出力に出す ][ `format`、`refactor`、`from-md` ]
+|[ `--out`、`-o`      ][ 結果を標準出力ではなく、ここに書く ][ `html`、`to-md`、`to-typst`、`to-pandoc`、`from-pandoc`、`from-md`、`export`、`cli-docs` ]
+|[ `--json`           ][ 人が読む形ではなく、JSON で出す ][ `check`、`stats`、`check-links` ]
+|[ `--force`          ][ 設定の除外（`workspace.ignore`、`workspace.unswept`）を外す ][ `format`、`refactor` ]
+|[ `--quiet`、`-q`    ][ 成功の `OK` を出さない ][ `check` ]
+
+=[ 標準入力 ]
+
+ファイルの代わりに `-` を渡すと、標準入力から読む。パイプでつなぐためで、`ast`、`roundtrip`、`to-md`、`to-typst`、`to-pandoc`、`from-pandoc` で使える。
+
+`html` と `serve` は標準入力を読まない。
+
+=[ 式の評価 ]
+
+文書を別の形に書き出すコマンド（`html`、`to-md`、`to-typst`、`to-pandoc`、`export`、`serve`）は、書き出す前に、文書の `${...}` をすべて、その vault で評価した値に置き換える（@file(tmtroot/spec/expressions/overview.expr.tmt)）。評価できなかったものは、書かれたままの文字として出す。変換器は、式があることを知らない。
+
+`html`、`to-md`、`to-typst`、`to-pandoc` は、標準出力に出す結果の末尾に改行を1つ付ける。`--out` に書くときは付けない。
+
+=[ 設定のファイル名 ]
+
+設定は `default.config.tmt` か `tomet.config.tmt`。`--config` を受けるのは `tui` だけ。
+
+=[ 現状の実装との差 ]
+
+- `html`、`to-md`、`to-typst`、`to-pandoc` は、標準出力に書くとき、結果の末尾に改行を1つ足す（`--out` に書くときは足さない）。同じ文書でも、標準出力と `--out` で、1バイト違う。`from-pandoc`、`from-md`（ファイル1つ）、`export` は足さない。
+
+=[ まだ決まっていないこと ]
+
+- 標準出力に書くときの末尾の改行を、揃えるか。
+- `check`・`stats` 以外の、複数の文書を扱うコマンドの `--json`。

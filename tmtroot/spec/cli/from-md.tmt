@@ -1,0 +1,55 @@
+@meta{
+  id: cli.from-md
+}
+
+`tomet from-md <PATH>`: CommonMark の Markdown を、`.tmt` にする。
+
+状態: 実装済み。ただし、末尾の「現状の実装との差」にある点を除く。
+
+共通の決まりは @file(tmtroot/spec/cli/overview.tmt)。変換器の実装は @file(tmtroot/generated/crates/tomet-markdown.tmt)。
+
+TUI の Migration タブ（@file(tmtroot/spec/cli/tui.tmt)）も、Markdown を `.tmt` に変換する。
+
+=[ 変換 ]
+
+どの Markdown も、同じ設定で変換する。設定は `PATH` から祖先を辿って見つけ、なければ既定。
+
+- 表の幅の整え方は、設定（`format.table_adjust_width`、`format.table_max_col_width`、`format.table_align`）に従う。
+- 設定が文書に `id` を求めていれば、足す。
+- 出力は、設定に従って整えた `.tmt`。
+- 出力した `.tmt` を、もう一度読んでみて、読めなければ、その文書の変換は失敗にする（`generated .tmt has parse error: ...`）。書き込む前の検査なので、読めない `.tmt` はできない。
+
+=[ ファイル1つ ]
+
+@table
+|[ 指定                ][ していること ]
+|[ 指定なし            ][ `.tmt` を標準出力に出す。何も書かない。 ]
+|[ `--out <パス>`      ][ そのパスに書く。パスがディレクトリなら、その中に `<元の名前>.tmt` として。親のディレクトリがなければ作る。`Converted <元> -> <先>` と出す。 ]
+|[ `--in-place`        ][ 元の隣に、拡張子を `.tmt` にして書く。`Converted <元> -> <先>` と出す。 ]
+|[ `--dry-run`         ][ 変換して読めるかだけ確かめ、何も書かない。`OK (dry-run): <元>` と出す。 ]
+|[ `--remove-original` ][ 書き込みに成功したあと、元の Markdown を消す。`--out` か `--in-place` のときだけ。 ]
+
+=[ ディレクトリ ]
+
+ディレクトリは、その下の Markdown を、vault の索引（`workspace.ignore` が効く）から数える。Markdown がなければ、`No .md files found in <ディレクトリ>`。
+
+@table
+|[ 指定                   ][ していること                                    ]
+|[ `--out <ディレクトリ>` ][ ディレクトリの中の並びを保って、`.tmt` を書く。 ]
+|[ `--in-place`           ][ それぞれの元の隣に書く。                        ]
+|[ `--dry-run`            ][ 変換して読めるかだけ確かめ、何も書かない。      ]
+|[ `--remove-original`    ][ 書き込みに成功したものの元を消す。              ]
+
+終わりに、`Conversion finished: <n> total, <m> succeeded, <k> failed`（`--dry-run` なら `Dry-run finished: ...`）と出す。失敗した文書は、標準エラー出力に `Errors encountered (<k>):` として並べる。1つが失敗しても、残りを続ける。
+
+1つでも失敗すれば、`<k> file(s) failed conversion` で1。なければ0。
+
+=[ 現状の実装との差 ]
+
+- TUI の Migration は、表の整形の設定（`format.table_*`）を変換に渡さない。同じ Markdown でも、表の幅の整え方が、この CLI と違うことがある。
+- ディレクトリに `--out` も `--in-place` も `--dry-run` も付けないと、何も書かないのに、`Conversion finished: <n> total, <n> succeeded` と出す。書いたように見える。ファイル1つなら、標準出力に出す。
+- 書き込みに失敗したときの数え方。ディレクトリで書き込みに失敗したファイルは、`failed` にも数えず、`succeeded` に数えたまま、エラーを標準エラー出力に出すだけで、終了コードも0のまま。
+
+=[ まだ決まっていないこと ]
+
+- ディレクトリに出力の指定がないときの動き。標準出力にまとめて出すのか、エラーにするのか。

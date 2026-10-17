@@ -1,0 +1,33 @@
+@meta{
+  id: cli.to-pandoc
+}
+
+`tomet to-pandoc <FILE>`: 文書を、Pandoc の構文木（JSON）にする。Pandoc が書けるすべての形式（docx、LaTeX、EPUB、org、…）への橋になる。
+
+状態: 実装済み。
+
+共通の決まりは @file(tmtroot/spec/cli/overview.tmt)。変換器の実装は @file(tmtroot/generated/crates/tomet-pandoc.tmt)。
+
+=[ 動き ]
+
++ `FILE` を読む。`-` なら標準入力。その vault で読み、`${...}` を評価した値に置き換える（@file(tmtroot/spec/cli/overview.tmt) の「式の評価」）。
++ Pandoc の構文木にして、1行の JSON にする。
++ 標準出力に出す。`--out` があれば、そのファイルに書く。
+
+Pandoc は、標準入力から `-f json` でこの JSON を読む。
+
+```
+tomet to-pandoc doc.tmt | pandoc -f json -t docx -o doc.docx
+```
+
+逆向きは @file(tmtroot/spec/cli/from-pandoc.tmt)。
+
+読めない文書は、位置と該当の行を添えたエラーを標準エラー出力に出して1で終わる。Pandoc 自体は呼ばない。
+
+=[ 現状の実装との差 ]
+
+- 差はない。
+
+=[ まだ決まっていないこと ]
+
+- なし。
