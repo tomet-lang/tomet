@@ -46,17 +46,19 @@
     url.main: { type: list, always_newline: true }
   }
   blueprints: list(
-    ".tomet/blueprints/writ.blueprint.tmt",
+    "tmtroot/schema/blueprints/writ.blueprint.tmt",
+    "tmtroot/schema/blueprints/element.blueprint.tmt",
+    "tmtroot/schema/blueprints/crate.blueprint.tmt",
     "docs/examples/blueprints/daily-note.blueprint.tmt",
     "docs/examples/blueprints/rfc.blueprint.tmt",
   )
   vocabularies: list(
-    ".tomet/vocabularies/writ.vocabulary.tmt",
-    ".tomet/vocabularies/bookmark.vocabulary.tmt",
-    ".tomet/vocabularies/node-graph.vocabulary.tmt",
-    ".tomet/vocabularies/scenario.vocabulary.tmt",
-    ".tomet/vocabularies/video.vocabulary.tmt",
-    ".tomet/vocabularies/idea.vocabulary.tmt",
+    "tmtroot/schema/vocabularies/writ.vocabulary.tmt",
+    "tmtroot/schema/vocabularies/bookmark.vocabulary.tmt",
+    "tmtroot/schema/vocabularies/node-graph.vocabulary.tmt",
+    "tmtroot/schema/vocabularies/scenario.vocabulary.tmt",
+    "tmtroot/schema/vocabularies/video.vocabulary.tmt",
+    "tmtroot/schema/vocabularies/idea.vocabulary.tmt",
   )
   workspace: {
     ignore: list( "00-09 System/01 Apps/obsidian" )

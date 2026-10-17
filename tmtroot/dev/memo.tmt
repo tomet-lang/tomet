@@ -1,0 +1,8 @@
+今後の改善候補:
+  1. tomet-semantics の re-export: AddressKind が TargetScheme
+  という別名でのみ公開されているため、元の型名 AddressKind でも同時に re-export
+  されていると使いやすくなります。
+  2. 軽量な引数正規化関数: @link(url: "...") などの名前付き引数を、完全な
+  Vault（ディスク読み込み）を経由せずに ast::Element から canonical
+  なターゲット文字列として抽出できる小型のユーティリティが tomet
+  側にあると、軽量レンダラーからさらに便利に扱えるようになります。

@@ -1,0 +1,22 @@
+@kind(element)
+@meta{
+  id: std.config
+}
+
+=[ 全容 ]
+
+```tm
+@config{
+  format: {
+    table: { adjust_width: auto }
+  }
+  export: {
+    path: /path
+  }
+}
+
+```
+
+#[ 未実装 ]
+
+- `:` を省略したブロック記法 (`export { path: /path }`)。`export: {...}` と書く。

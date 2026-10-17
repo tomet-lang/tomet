@@ -1,0 +1,41 @@
+@kind(roots)
+
+@root(elements.index)
+| About Element
+
+=[ std ]
+
+---[ directive ]---
+
+-@root(std.meta)|
+-@root(std.kind)|
+-@root(std.related)|
+-@root(std.settings)|
+-@root(std.config)|
+-@root(std.version)|
+
+---[ structure ]---
+
+-@root(std.callout)|
+-@root(std.card)|
+-@root(std.list)|
+-@root(std.table)|
+
+---[ status ]---
+
+-@root(task)|
+-@root(draft)|
+-@root(fixme)|
+-@root(std.conflict)|
+
+---[ styling ]---
+
+-@root(std.em)|
+-@root(std.mark)|
+-@root(std.ruby)|
+-@root(std.strikeout)|
+
+=[ doc ]
+
+-@root(doc.icon)|
+-@root(doc.index)|

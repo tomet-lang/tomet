@@ -1,0 +1,9 @@
+@kind(element)
+@meta{
+  id: std.link
+}
+
+#[ 対応形式 ]
+
+- URL(Web)
+- ファイルパス

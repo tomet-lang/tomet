@@ -1,0 +1,33 @@
+@kind(element)
+@meta{
+  id: std.table
+}
+
+```tm
+| 糖衣         | 要素      |
+| -            | ul        |
+| -.           | ol        |
+| ---          | hr        |
+| *x*          | em        |
+| **x**        | strong    |
+| ==x==        | mark      |
+
+[ 糖衣         ][ 要素      ]
+[ -            ][ ul        ]
+[ -.           ][ ol        ]
+[ ---          ][ hr        ]
+[ *x*          ][ em        ]
+[ **x**        ][ strong    ]
+[ ==x==        ][ mark      ]
+```
+
+=[ Sample ]
+
+```tm
+@table()[
+  [   ][   ][   ][   ]
+]
+@table
+|[   ][   ][   ][   ]
+|[   ][   ][   ][   ]
+```

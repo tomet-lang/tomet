@@ -2,7 +2,7 @@
 
 # Tomet
 
-Tome to me!!
+Tome to me!
 
 Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and Rust toolchain designed as a modern alternative.
 
