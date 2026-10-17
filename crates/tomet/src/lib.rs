@@ -79,9 +79,7 @@ pub use tomet_semantics as semantics;
 /// Diagnostics for a parsed document.
 pub use tomet_validator as validator;
 
-pub use tomet_load::{
-    IndexQueryError, LoadError, Prepared, Unresolved, Vault, VaultIndex, load_document,
-};
+pub use tomet_load::{DiskResolver, LoadError, Prepared, Unresolved, Vault, load_document};
 /// Parses a data-only document into a [`ast::Value`]. Not a way to read a
 /// document; use [`Vault`] for that.
 pub use tomet_parser::parse_value;

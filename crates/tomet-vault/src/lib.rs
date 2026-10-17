@@ -27,23 +27,28 @@
 //!
 //! =[ Preparing ]
 //!
-//! `${filter(...)}` in an `@kind(doc.index)` document is answered from a
-//! table of every document in the vault. Building that table is a walk of
-//! the disk, so [`Vault::prepare`] takes it as a closure that is only
-//! called when a document actually asks: a document with no query pays
-//! nothing, and a caller with no table passes an empty one and gets the
-//! query left unexpanded.
+//! [`Vault::prepare`] resolves every `${...}` in a document, once, against a
+//! [`Resolver`] the caller supplies. What the vault adds is what only it
+//! knows: the macros in scope, the settings' `type:` declarations that make
+//! `.meta` typed, and the document being prepared standing for its own path
+//! as it was written. Where the other documents come from -- the disk, a
+//! host's memory -- is the caller's resolver; `tomet-load` supplies the disk.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use tomet_ast::Document;
+use tomet_compute::eval::{DocRef, EvalContext, EvalValue, Phase, SystemGenerate};
 use tomet_config::PrinterConfig;
 use tomet_semantics::{Bindings, LoadedVocabularies};
 
-pub use tomet_search::{IndexQueryError, IndexRow, is_index_document};
+mod resolve;
+
+pub use resolve::{Overlay, typed_meta};
+pub use tomet_compute::eval::{DirRef, MemoryResolver, NoResolver, Resolver};
 pub use tomet_transform::Unresolved;
 
-/// What [`Vault::prepare`] did, and what it could not do.
+/// What [`Vault::prepare`] could not do.
 ///
 /// `unresolved` is not an error: an expression with no value is left in
 /// the output as written, so a document showing `${...}` as an example
@@ -51,7 +56,6 @@ pub use tomet_transform::Unresolved;
 /// what tells a typo apart from an example.
 #[derive(Debug, Default)]
 pub struct Prepared {
-    pub expanded_queries: usize,
     pub unresolved: Vec<Unresolved>,
 }
 
@@ -120,44 +124,50 @@ impl Vault {
         Ok((doc, bindings))
     }
 
-    /// Rewrites `doc` into the shape a converter should see.
+    /// Resolves every `${...}` in `doc`, so it is the shape a converter
+    /// should see.
     ///
-    /// Two rewrites, in this order, because the first produces elements
-    /// and the second turns expressions into text:
+    /// `path` is where the document sits, which is what `self` is.
+    /// References -- `#id`, `self.meta` -- are answered from the document as
+    /// it was written, not as this call rewrites it; everything else is
+    /// asked of `resolver`.
     ///
-    /// 1. index queries -- `${filter(...)}` becomes the `@link(ref:...)`
-    ///    entries it selects, answered from `rows`. `rows` is called only
-    ///    for an `@kind(doc.index)` document.
-    /// 2. interpolation -- every remaining `${...}` becomes the text it
-    ///    stands for, against this vault's macros and this document's
-    ///    position.
-    ///
-    /// `path` is where the document sits, which is what `${self.path}`
-    /// and `${self.filename}` are about.
-    ///
-    /// Call this and not the underlying passes directly. A caller reaching
+    /// Call this and not the underlying pass directly. A caller reaching
     /// past it for one rewrite is how a rewrite ends up applied in three
     /// commands and missing from the fourth -- which is the state
     /// interpolation was in before this existed.
-    pub fn prepare<'r>(
-        &self,
-        doc: &mut Document,
-        path: &Path,
-        rows: impl FnOnce() -> &'r [IndexRow],
-    ) -> Result<Prepared, IndexQueryError> {
-        let mut expanded_queries = 0;
-        if is_index_document(doc) {
-            expanded_queries = tomet_transform::expand_index_queries(doc, rows())?;
+    pub fn prepare(&self, doc: &mut Document, path: &Path, resolver: &dyn Resolver) -> Prepared {
+        let self_doc = self.doc_ref(path);
+        let snapshot = Arc::new(doc.clone());
+        let overlay = Overlay {
+            meta: typed_meta(&self.config, &snapshot, &self_doc),
+            path: self_doc.clone(),
+            snapshot,
+            inner: resolver,
+        };
+        let macros = self.evaluation_config(doc).macros;
+        let cx = EvalContext {
+            phase: Phase::Output,
+            resolver: &overlay,
+            generate: &SystemGenerate,
+            self_doc,
+            macros: &macros,
+            vars: &EvalValue::Null,
+        };
+        Prepared {
+            unresolved: tomet_transform::resolve_expressions(doc, &cx),
         }
+    }
 
-        let config = self.evaluation_config(doc);
-        let vars = self.evaluation_vars(path);
-        let unresolved = tomet_transform::resolve_interpolations(doc, &config, &vars);
-
-        Ok(Prepared {
-            expanded_queries,
-            unresolved,
-        })
+    /// `path` as the vault names a document: measured from the root, with
+    /// `/` separators and no leading `./`.
+    pub fn doc_ref(&self, path: &Path) -> DocRef {
+        let rel = path
+            .strip_prefix(&self.root)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        DocRef(rel.strip_prefix("./").unwrap_or(&rel).to_string())
     }
 
     /// The macros in scope for `doc`: its own `@config`, then the vault's
@@ -175,32 +185,6 @@ impl Vault {
                 .or_insert_with(|| template.clone());
         }
         config
-    }
-
-    /// `${self.path}` and `${self.filename}`.
-    ///
-    /// `path` is measured from this vault's root, `filename` is the
-    /// basename. Two fields and not one: naming either for the other's
-    /// meaning is how a field starts lying.
-    fn evaluation_vars(&self, path: &Path) -> tomet_compute::EvaluationContext {
-        let rel = path
-            .strip_prefix(&self.root)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .replace('\\', "/");
-        let rel = rel.strip_prefix("./").unwrap_or(&rel).to_string();
-        let filename = path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-
-        tomet_compute::EvaluationContext::new().with_var(
-            "self",
-            tomet_ast::Value::Map(vec![
-                ("path".to_string(), tomet_ast::Value::String(rel)),
-                ("filename".to_string(), tomet_ast::Value::String(filename)),
-            ]),
-        )
     }
 }
 
@@ -247,25 +231,96 @@ mod tests {
         assert!(bindings.kind.is_none());
     }
 
-    #[test]
-    fn prepare_measures_self_path_from_the_root() {
-        let vault = Vault::from_sources(PrinterConfig::default(), "/v", &[]);
-        let (mut doc, _) = vault.parse("at ${self.path}\n").expect("parses");
-        let prepared = vault
-            .prepare(&mut doc, Path::new("/v/notes/a.tmt"), || &[])
-            .expect("prepares");
-        assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
-        assert!(format!("{doc:?}").contains("notes/a.tmt"));
+    fn prepared(vault: &Vault, path: &str, src: &str) -> (Document, Prepared) {
+        let (mut doc, _) = vault.parse(src).expect("parses");
+        let prepared = vault.prepare(&mut doc, Path::new(path), &NoResolver);
+        (doc, prepared)
+    }
+
+    /// The text of every paragraph, joined by a space. Two expressions on
+    /// one line are two blocks, so a document is read as a whole.
+    fn text_of(doc: &Document) -> String {
+        doc.blocks
+            .iter()
+            .filter_map(|block| match block {
+                tomet_ast::Block::Paragraph(p) => Some(
+                    p.content
+                        .iter()
+                        .filter_map(|i| match i {
+                            tomet_ast::Inline::Text(t) => Some(t.value.as_str()),
+                            _ => None,
+                        })
+                        .collect::<String>(),
+                ),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     #[test]
-    fn the_table_is_not_asked_for_by_a_document_with_no_query() {
+    fn prepare_measures_self_path_from_the_root() {
         let vault = Vault::from_sources(PrinterConfig::default(), "/v", &[]);
-        let (mut doc, _) = vault.parse("plain\n").expect("parses");
-        vault
-            .prepare(&mut doc, Path::new("/v/a.tmt"), || {
-                panic!("the table was built for a document that asked nothing")
-            })
-            .expect("prepares");
+        let (doc, prepared) = prepared(
+            &vault,
+            "/v/notes/a.tmt",
+            "at ${self.path} (${self.filename})\n",
+        );
+        assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
+        assert_eq!(text_of(&doc), "at notes/a.tmt (a.tmt)");
+    }
+
+    #[test]
+    fn a_vault_in_the_current_directory_names_a_document_without_a_leading_dot() {
+        let vault = Vault::from_sources(PrinterConfig::default(), ".", &[]);
+        assert_eq!(vault.doc_ref(Path::new("./a.tmt")), DocRef("a.tmt".into()));
+        assert_eq!(vault.doc_ref(Path::new("a.tmt")), DocRef("a.tmt".into()));
+    }
+
+    #[test]
+    fn a_document_reads_its_own_meta_typed_by_the_settings() {
+        let config =
+            tomet_config::load_config_from_str("@settings{ meta: { tags: { type: list } } }\n")
+                .unwrap();
+        let vault = Vault::from_sources(config, "/v", &[]);
+        // No `tags` written: still a list, so `.contains` answers instead of failing.
+        let (doc, prepared) = prepared(
+            &vault,
+            "/v/a.tmt",
+            "@meta{ title: A }\n\nrust? ${self.meta.tags.contains(\"rust\")}\n",
+        );
+        assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
+        assert_eq!(text_of(&doc), "rust? false");
+    }
+
+    #[test]
+    fn macros_from_the_vault_and_the_document_are_both_in_scope() {
+        let config = tomet_config::load_config_from_str(
+            "@settings{ macros: { gh: \"https://gh/${1}\", site: \"vault\" } }\n",
+        )
+        .unwrap();
+        let vault = Vault::from_sources(config, "/v", &[]);
+        let (doc, prepared) = prepared(
+            &vault,
+            "/v/a.tmt",
+            "@config{ macros: { site: \"doc\" } }\n\n${macro.gh(1)} ${macro.site()}\n",
+        );
+        assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
+        // The document wins a collision.
+        assert_eq!(text_of(&doc), "https://gh/1 doc");
+    }
+
+    #[test]
+    fn references_are_answered_from_the_document_as_written() {
+        let vault = Vault::from_sources(PrinterConfig::default(), "/v", &[]);
+        // `n` is itself an expression. The reference sees it unresolved, so it
+        // is not the number 3 -- evaluation order cannot change an answer.
+        let (doc, prepared) = prepared(
+            &vault,
+            "/v/a.tmt",
+            "@card(n: ${add(1, 2)})#(c1)\n\nn is ${#c1.prop.n}\n",
+        );
+        assert_eq!(prepared.unresolved.len(), 1, "{:?}", prepared.unresolved);
+        assert_eq!(text_of(&doc), "n is ${#c1.prop.n}");
     }
 }

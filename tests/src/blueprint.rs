@@ -27,13 +27,13 @@ fn test_blueprint_end_to_end_lifecycle() {
   }
 }
 @meta{
-  id: ${uuid()}
-  date: ${date("YYYY-MM-DD")}
+  id: ${generate.uuid()}
+  date: ${generate.now().format("YYYY-MM-DD")}
   author: ${vars.author}
-  title: ${title}
+  title: ${vars.title}
 }
 
-=[ Goals for ${date("YYYY-MM-DD")} ]#(goals)
+=[ Goals for ${generate.now().format("YYYY-MM-DD")} ]#(goals)
 - ( ) First goal
 
 =[ Review ]#(review)
@@ -59,10 +59,7 @@ fn test_blueprint_end_to_end_lifecycle() {
 
     // 3. Instantiate document via workspace
     let mut vars = HashMap::new();
-    vars.insert(
-        "vars".to_string(),
-        Value::Map(vec![("author".to_string(), Value::String("Alice".into()))]),
-    );
+    vars.insert("author".to_string(), Value::String("Alice".into()));
 
     let doc_rel_path = Path::new("journal/2026-09-01.tmt");
     let doc_abs_path =

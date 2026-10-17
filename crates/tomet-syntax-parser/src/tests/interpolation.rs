@@ -599,3 +599,40 @@ fn addr_prints_back_in_the_spelling_it_was_written() {
     );
     assert_eq!(printed("addr( tmt:docs/a.tmt )"), "addr(tmt:docs/a.tmt)");
 }
+
+#[test]
+fn an_expression_may_run_over_several_lines() {
+    let doc = parse_document("${xs\n    .filter(d => d.n > 1)\n    .map(d => d.n)}\n").unwrap();
+    assert_eq!(
+        describe(interp_expr(&doc.blocks[0])),
+        "Call(Member(Call(Member(Identifier(xs), filter), [Lambda([d], (Member(Identifier(d), n) > Int(1)))]), map), [Lambda([d], Member(Identifier(d), n))])"
+    );
+}
+
+#[test]
+fn a_call_may_put_its_arguments_on_separate_lines() {
+    let doc = parse_document("${f(\n  1,\n  2\n)}\n").unwrap();
+    assert_eq!(
+        describe(interp_expr(&doc.blocks[0])),
+        "Call(Identifier(f), [Int(1), Int(2)])"
+    );
+}
+
+#[test]
+fn a_multi_line_expression_in_a_list_item_is_still_one_item() {
+    let doc = parse_document("- ${xs\n    .len()}\n- next\n").unwrap();
+    let Block::List(list) = &doc.blocks[0] else {
+        panic!("a list, got {:?}", doc.blocks[0]);
+    };
+    assert_eq!(list.items.len(), 2);
+}
+
+#[test]
+fn an_unterminated_multi_line_expression_is_still_an_error() {
+    assert!(parse_document("${xs\n    .len()\n\nmore text\n").is_err());
+}
+
+#[test]
+fn a_raw_address_still_ends_at_the_line() {
+    assert!(parse_document("${addr(tmt:a\n.tmt)}\n").is_err());
+}

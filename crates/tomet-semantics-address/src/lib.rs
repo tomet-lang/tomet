@@ -1,20 +1,15 @@
 //! =[ tomet-address ]
 //!
-//! Resolves what an expression or element points at, without ever
-//! touching disk: a `${...}` interpolation's `Identifier`/`Member`
-//! chain against the same document's `#(id)`-tagged nodes
-//! ([`resolve_reference`]), and recognizing -- not reading -- a
-//! `@config(import:...)`/`@settings(file:...)` reference to another
-//! file ([`config_import_ref`]/[`settings_file_ref`]).
+//! What a link or an element points at, recognized without ever touching
+//! disk: the scheme of a link target ([`Address`], [`is_explicit_scheme`]),
+//! whether an anchor exists in a document ([`has_anchor`]), and a
+//! `@config(import:...)`/`@settings(file:...)` reference to another file
+//! ([`config_import_ref`]/[`settings_file_ref`]), which is recognized and not
+//! read.
 //!
-//! Split out of what used to be `tomet-resolver`'s pure half: that
-//! crate's whole remaining point was reading files off disk, so once
-//! its fs-touching functions moved to `tomet-load`/`tomet-load-config`
-//! and its other pure leftover (`load_vocabulary_sources`) turned out
-//! to need no separate home at all, nothing stayed behind that was
-//! actually about *resolving a reference* -- this crate is that,
-//! named for what it does rather than inheriting a name whose point
-//! (I/O) had moved elsewhere.
+//! An expression's `#id` and `doc#id` are not resolved here any more: that
+//! is the evaluator's job (`tomet-compute`), which answers it through a
+//! resolver so that it can reach other documents.
 //!
 //! Actually resolving a `@config(import:...)` reference -- reading and
 //! merging the target -- lives in `apps/lsp`, which reads it itself
@@ -22,12 +17,8 @@
 
 mod address;
 mod anchor;
-mod error;
 mod import_ref;
-mod reference;
 
 pub use address::{Address, AddressKind, EXPLICIT_SCHEMES, LinkKind, is_explicit_scheme};
 pub use anchor::{collect_anchors, find_anchor, has_anchor};
-pub use error::ResolveError;
 pub use import_ref::{config_import_ref, settings_file_ref};
-pub use reference::resolve_reference;

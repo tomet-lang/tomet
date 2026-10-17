@@ -1,29 +1,25 @@
 //! Pure in-memory AST refactoring and structural transformations for Tomet documents.
 //!
 //! Provides:
+//! - (expressions)| Every `${...}` in a document resolved once, in one pass, with the
+//!                | evaluator's typed values put back according to where each expression sits.
 //! - (macro_rewrite) Reverse URL-to-macro pattern matching and rewriting.
 //! - (directive) Directive promotion (`@meta.type` -> `@kind`) and Value DSL normalization.
 //! - (structural) Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
 //! - (meta) Batch `@meta` key/value updates.
-//! - (index_query)| `${filter(...)}` in an `@kind(index)` document,
-//!                | expanded into the `@file` entries it selects.
 
 pub mod blueprint;
 pub mod directive;
-pub mod index_query;
-pub mod interp;
+pub mod expressions;
 pub mod links;
-pub mod macro_expand;
 pub mod macro_rewrite;
 pub mod meta;
 pub mod structural;
 
 pub use blueprint::*;
 pub use directive::*;
-pub use index_query::*;
-pub use interp::*;
+pub use expressions::{Unresolved, resolve_expressions};
 pub use links::*;
-pub use macro_expand::*;
 pub use macro_rewrite::*;
 pub use meta::*;
 pub use structural::*;
@@ -32,7 +28,6 @@ pub use structural::*;
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use tomet_ast::{Block, Value};
 
     fn parse_doc(src: &str) -> tomet_ast::Document {
         tomet_parser::parse_document(src).expect("valid source")
@@ -50,11 +45,11 @@ mod tests {
         let set = MacroSet::from_map(&macros);
         assert_eq!(
             set.rewrite_url("https://github.com/tomet/tomet"),
-            Some("$gh(\"tomet/tomet\")".into())
+            Some("$macro.gh(\"tomet/tomet\")".into())
         );
         assert_eq!(
             set.rewrite_url("https://github.com/tomet/tomet/issues/42"),
-            Some("$gh_issue(\"tomet/tomet\", 42)".into())
+            Some("$macro.gh_issue(\"tomet/tomet\", 42)".into())
         );
     }
 
@@ -86,30 +81,5 @@ mod tests {
         };
         let count = apply_structural_action(&mut doc, &action);
         assert_eq!(count, 1);
-    }
-
-    #[test]
-    fn test_expand_document_macros() {
-        let mut doc = parse_doc("- @link($macro.https(\"www.kaggle.com\"))\n");
-        let mut config = tomet_semantics::DocumentConfig::default();
-        config.macros.insert("https".into(), "https://${1}".into());
-
-        expand_document_macros(&mut doc, &config);
-
-        let Block::List(list) = &doc.blocks[0] else {
-            panic!()
-        };
-        let item_el = &list.items[0].element;
-        let content = item_el.content.as_ref().unwrap();
-        let [Block::Paragraph(p)] = content.as_slice() else {
-            panic!()
-        };
-        let tomet_ast::Inline::Element(link_el) = &p.content[0] else {
-            panic!()
-        };
-        assert_eq!(
-            link_el.args,
-            Some(Value::String("https://www.kaggle.com".into()))
-        );
     }
 }

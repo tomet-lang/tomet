@@ -23,6 +23,12 @@ impl MemoryResolver {
         Self::default()
     }
 
+    /// Adds an already parsed document at `path`.
+    pub fn with_document(mut self, path: &str, doc: Arc<Document>) -> Self {
+        self.docs.insert(path.to_string(), doc);
+        self
+    }
+
     /// Adds the document read from `source` at `path`.
     pub fn with_source(mut self, path: &str, source: &str) -> Result<Self, tomet_parser::Error> {
         let doc = tomet_parser::parse_document(source)?;

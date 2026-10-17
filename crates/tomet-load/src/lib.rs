@@ -30,14 +30,14 @@
 //! =[ A fifth step, for output ]
 //!
 //! The four steps above produce the document @em[as written]. Something that
-//! is about to render it needs one more: the AST rewrites that have to
-//! happen before any converter sees the tree. An index document's
-//! `${filter(...)}` is one -- it expands into several `@link(ref:...)`
-//! entries, so it cannot be a renderer's job the way `${gh(12)}` can.
+//! is about to render it needs one more: every `${...}` in it put back as
+//! what it stands for -- text, a list of links, another file's content --
+//! before any converter sees the tree, so that a converter never has to
+//! decide what an expression means.
 //!
 //! That step is [`Vault::prepare`], and it is deliberately @strong[not] part of
-//! [`Vault::document`]. It reads every `.tmt` in the vault, and a caller
-//! that wants one file read correctly must not pay for a directory walk --
+//! [`Vault::document`]. A caller that wants one file read correctly must not
+//! pay for evaluating expressions that may reach other files --
 //! `bindings/js` parses a single string in a browser. So the two are
 //! separate doors: [`Vault::document`] to read, [`Vault::prepared_document`]
 //! to read and prepare.
@@ -47,6 +47,11 @@
 //! [`Vault::prepared_document`] -- the first of each takes what the caller
 //! already has in hand, the second goes to disk for it. A caller that
 //! formats its own parse errors (the CLI does) wants `parse` + `prepare`.
+//!
+//! Preparing asks the vault's files questions -- which documents are under a
+//! directory, what a note name stands for, what another document's `@meta`
+//! says -- through [`Vault::resolver`], and a document is read at most once
+//! however many expressions ask for it.
 //!
 //! ==[ Who prepares, and who must not ]
 //!
@@ -61,19 +66,20 @@
 //! case -- it prepares a copy to report what could not be resolved, and
 //! validates the original.
 
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use tomet_ast::Document;
 use tomet_config::PrinterConfig;
 use tomet_semantics::Bindings;
 use vocabulary::load_vocabularies;
 
-mod index;
+mod resolver;
 mod vocabulary;
 
-pub use index::{IndexQueryError, VaultIndex, is_index_document};
+pub use resolver::DiskResolver;
 pub use tomet_vault::{Prepared, Unresolved};
 
 /// A vault found on disk: `tomet_vault::Vault` plus the parts that need
@@ -91,15 +97,11 @@ pub use tomet_vault::{Prepared, Unresolved};
 /// where the vault begins.
 pub struct Vault {
     core: tomet_vault::Vault,
-    /// Filled by the first [`Vault::prepare`] that meets an
-    /// `@kind(doc.index)` document, and shared by every one after it. A
-    /// directory export would otherwise re-read the whole vault per file.
-    ///
-    /// `OnceLock` rather than `OnceCell` so a `Vault` stays `Sync` and can
-    /// be shared rather than rebuilt -- a server answering requests from
-    /// one vault is the obvious caller, and `serve` builds a fresh one per
-    /// request today only because nothing made it cheap to keep.
-    index: OnceLock<VaultIndex>,
+    /// Documents already read for the evaluator, by vault-relative path.
+    /// A `Mutex` so a `Vault` stays `Sync`.
+    docs: Mutex<HashMap<String, Arc<Document>>>,
+    /// The names of the vault's files, built on the first `ref("note")`.
+    links: OnceLock<tomet_links::VaultLinkIndex>,
 }
 
 impl Deref for Vault {
@@ -131,8 +133,42 @@ impl Vault {
         let loaded = load_vocabularies(&root, &config.registry.vocabularies);
         Self {
             core: tomet_vault::Vault::new(config, root, loaded),
-            index: OnceLock::new(),
+            docs: Mutex::new(HashMap::new()),
+            links: OnceLock::new(),
         }
+    }
+
+    /// The evaluator's view of this vault: what `vault.docs`, `ref("note")`
+    /// and `.meta` are answered from.
+    pub fn resolver(&self) -> DiskResolver<'_> {
+        DiskResolver::new(self)
+    }
+
+    pub(crate) fn cached_document(&self, path: &str) -> Option<Arc<Document>> {
+        self.docs
+            .lock()
+            .expect("the document cache is never held across a panic")
+            .get(path)
+            .cloned()
+    }
+
+    pub(crate) fn cache_document(&self, path: &str, doc: Document) -> Arc<Document> {
+        let doc = Arc::new(doc);
+        self.docs
+            .lock()
+            .expect("the document cache is never held across a panic")
+            .insert(path.to_string(), doc.clone());
+        doc
+    }
+
+    pub(crate) fn link_index(&self) -> &tomet_links::VaultLinkIndex {
+        self.links.get_or_init(|| {
+            tomet_links::VaultLinkIndex::from_vault(
+                &self.core.root,
+                &self.core.config,
+                &self.core.root,
+            )
+        })
     }
 
     /// Reads, parses, and binds one file in this vault.
@@ -147,38 +183,20 @@ impl Vault {
         })
     }
 
-    /// The fifth step: rewrites `doc` into the shape a converter should
-    /// see. What the rewrites are is `tomet_vault::Vault::prepare`'s doc;
-    /// this supplies the vault-wide table it needs, building it on the
-    /// first `@kind(doc.index)` document and reusing it for every one
-    /// after, so a document that isn't one costs a single `document_kind`
-    /// read and no I/O.
-    pub fn prepare(&self, doc: &mut Document, path: &Path) -> Result<Prepared, IndexQueryError> {
-        self.core.prepare(doc, path, || {
-            self.index
-                .get_or_init(|| VaultIndex::build(&self.core.root))
-                .rows()
-        })
+    /// The fifth step: resolves every `${...}` in `doc`, so it is the shape
+    /// a converter should see. What that means is
+    /// `tomet_vault::Vault::prepare`'s doc; this supplies the files the
+    /// expressions ask about.
+    pub fn prepare(&self, doc: &mut Document, path: &Path) -> Prepared {
+        self.core.prepare(doc, path, &self.resolver())
     }
 
     /// [`Vault::document`] followed by [`Vault::prepare`] -- what anything
     /// about to render a document wants.
     pub fn prepared_document(&self, path: &Path) -> Result<(Document, Bindings), LoadError> {
         let (mut doc, bindings) = self.document(path)?;
-        self.prepare(&mut doc, path)
-            .map_err(|source| LoadError::Prepare {
-                path: path.to_path_buf(),
-                source,
-            })?;
+        self.prepare(&mut doc, path);
         Ok((doc, bindings))
-    }
-
-    /// The vault's metadata table, if some document has already needed it.
-    ///
-    /// `None` means no query has been met yet, not that the vault is
-    /// empty -- the table is never built speculatively.
-    pub fn index(&self) -> Option<&VaultIndex> {
-        self.index.get()
     }
 }
 
@@ -202,12 +220,6 @@ pub enum LoadError {
         path: PathBuf,
         source: tomet_parser::Error,
     },
-    /// The document read, and then failed the fifth step -- a query it
-    /// carries could not be answered.
-    Prepare {
-        path: PathBuf,
-        source: IndexQueryError,
-    },
 }
 
 impl std::fmt::Display for LoadError {
@@ -218,9 +230,6 @@ impl std::fmt::Display for LoadError {
             // in both places prints it twice.
             LoadError::Io { path, .. } => write!(f, "failed to read {}", path.display()),
             LoadError::Parse { path, .. } => write!(f, "failed to parse {}", path.display()),
-            LoadError::Prepare { path, .. } => {
-                write!(f, "failed to prepare {}", path.display())
-            }
         }
     }
 }
@@ -230,7 +239,6 @@ impl std::error::Error for LoadError {
         match self {
             LoadError::Io { source, .. } => Some(source),
             LoadError::Parse { source, .. } => Some(source),
-            LoadError::Prepare { source, .. } => Some(source),
         }
     }
 }
@@ -239,32 +247,52 @@ impl std::error::Error for LoadError {
 mod tests {
     use super::*;
     use std::fs;
-    use tomet_ast::Block;
+    use tomet_ast::{Block, Inline};
 
-    /// The `ref:` path of every block-level `@link`, in order, with the
-    /// scheme prefix stripped.
-    fn file_paths(doc: &Document) -> Vec<String> {
-        doc.blocks
-            .iter()
-            .filter_map(|block| match block {
-                Block::Element(el) => {
-                    let (kind, target) = tomet_semantics::link_target_of(el)?;
-                    if kind != tomet_semantics::ElementKind::Link {
-                        return None;
+    /// The text of every paragraph and the target of every link, in order.
+    fn flat(doc: &Document) -> Vec<String> {
+        fn inlines(out: &mut Vec<String>, items: &[Inline]) {
+            for inline in items {
+                match inline {
+                    Inline::Text(t) => out.push(t.value.clone()),
+                    Inline::Element(el) => {
+                        if let Some((_, target)) = tomet_semantics::link_target_of(el) {
+                            out.push(format!("link:{target}"));
+                        }
                     }
-                    let (scheme, rest) = tomet_semantics::target_scheme(&target);
-                    (scheme == tomet_semantics::TargetScheme::Ref).then(|| rest.to_string())
+                    _ => {}
                 }
-                _ => None,
-            })
-            .collect()
+            }
+        }
+        fn blocks(out: &mut Vec<String>, items: &[Block]) {
+            for block in items {
+                match block {
+                    Block::Paragraph(p) => inlines(out, &p.content),
+                    Block::List(list) => {
+                        for item in &list.items {
+                            if let Some(content) = &item.element.content {
+                                blocks(out, content);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let mut out = Vec::new();
+        blocks(&mut out, &doc.blocks);
+        out
     }
 
     fn vault_fixture(name: &str) -> PathBuf {
         let root = std::env::temp_dir().join(name);
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("notes")).expect("temp dirs");
-        fs::write(root.join("default.config.tmt"), "@kind(config)\n").expect("config");
+        fs::write(
+            root.join("default.config.tmt"),
+            "@kind(config)\n@settings{ meta: { tags: { type: list }, created: { type: datetime } } }\n",
+        )
+        .expect("config");
         for (file, tags, created) in [
             ("rust.tmt", "list(rust)", "2026-01-01"),
             ("cli.tmt", "list(rust, cli)", "2026-05-01"),
@@ -272,99 +300,101 @@ mod tests {
         ] {
             fs::write(
                 root.join("notes").join(file),
-                format!("@meta{{ tags: {tags}, created: \"{created}\" }}\n\n#[ Note ]\n"),
+                format!("@meta{{ tags: {tags}, created: \"{created}\" }}\n\n=[ Note ]\n"),
             )
             .expect("note");
         }
         root
     }
 
+    const QUERY: &str = "- ${vault.docs\n    .filter(d => d.meta.tags.contains(\"rust\"))\n    .sort(d => d.meta.created, \"desc\")\n    .map(d => d.link())}\n";
+
     #[test]
     fn prepared_document_answers_a_query_from_the_vault() {
         let root = vault_fixture("tomet_test_load_prepared");
-        fs::write(
-            root.join("index.tmt"),
-            "@kind(doc.index)\n\n${filter(contains(meta.tags, \"rust\"), by(meta.created, \"desc\"))}\n",
-        )
-        .expect("index");
+        fs::write(root.join("index.tmt"), QUERY).expect("index");
 
         let vault = Vault::discover(&root);
         let (doc, _bindings) = vault
             .prepared_document(&root.join("index.tmt"))
             .expect("prepared");
-        assert_eq!(file_paths(&doc), ["notes/cli.tmt", "notes/rust.tmt"]);
+        assert_eq!(
+            flat(&doc),
+            ["link:tmt:notes/cli.tmt", "link:tmt:notes/rust.tmt"]
+        );
 
         let _ = fs::remove_dir_all(&root);
     }
 
     /// The reason `prepare` is a separate door from `document`: a caller
-    /// that only wants one file read must not pay for a walk of the vault.
+    /// that only wants one file read gets it as written, expressions and all.
     #[test]
-    fn a_document_with_no_query_never_builds_the_table() {
-        let root = vault_fixture("tomet_test_load_no_query");
-        fs::write(root.join("plain.tmt"), "@kind(writ)\n\n#[ Plain ]\n").expect("plain");
+    fn reading_a_document_does_not_evaluate_it() {
+        let root = vault_fixture("tomet_test_load_as_written");
+        fs::write(root.join("plain.tmt"), "sum ${add(1, 2)}\n").expect("plain");
 
         let vault = Vault::discover(&root);
-        assert!(vault.index().is_none());
-
-        let (mut doc, _) = vault.document(&root.join("plain.tmt")).expect("read");
-        assert_eq!(
-            vault
-                .prepare(&mut doc, &root.join("plain.tmt"))
-                .expect("prepare")
-                .expanded_queries,
-            0
-        );
+        let (doc, _) = vault.document(&root.join("plain.tmt")).expect("read");
         assert!(
-            vault.index().is_none(),
-            "the table was built for a document that asked nothing"
+            flat(&doc).iter().all(|t| !t.contains('3')),
+            "{:?}",
+            flat(&doc)
         );
+        let (prepared, _) = vault
+            .prepared_document(&root.join("plain.tmt"))
+            .expect("prepared");
+        assert_eq!(flat(&prepared), ["sum ", "3"]);
 
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// And it is built once, not once per document.
+    /// A document is read once, however many expressions and documents ask.
     #[test]
-    fn the_table_is_shared_across_documents_in_one_vault() {
-        let root = vault_fixture("tomet_test_load_shared_table");
+    fn a_document_is_read_once_across_documents_in_one_vault() {
+        let root = vault_fixture("tomet_test_load_shared_docs");
         for name in ["a.tmt", "b.tmt"] {
-            fs::write(
-                root.join(name),
-                "@kind(doc.index)\n\n${filter(contains(meta.tags, \"go\"))}\n",
-            )
-            .expect("index");
+            fs::write(root.join(name), QUERY).expect("index");
         }
 
         let vault = Vault::discover(&root);
-        let first = vault.prepared_document(&root.join("a.tmt")).expect("a");
-        let built = vault.index().expect("built by the first query") as *const VaultIndex;
-        let second = vault.prepared_document(&root.join("b.tmt")).expect("b");
-        let reused = vault.index().expect("still there") as *const VaultIndex;
+        let (first, _) = vault.prepared_document(&root.join("a.tmt")).expect("a");
+        let cached = vault
+            .cached_document("notes/go.tmt")
+            .expect("read by the first query");
+        let (second, _) = vault.prepared_document(&root.join("b.tmt")).expect("b");
 
-        assert_eq!(file_paths(&first.0), ["notes/go.tmt"]);
-        assert_eq!(file_paths(&second.0), ["notes/go.tmt"]);
-        assert_eq!(
-            built, reused,
-            "the table was rebuilt for the second document"
+        assert_eq!(flat(&first), flat(&second));
+        assert!(
+            Arc::ptr_eq(&cached, &vault.cached_document("notes/go.tmt").unwrap()),
+            "the document was read again for the second one"
         );
 
         let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
-    fn a_query_that_cannot_be_answered_is_a_load_error() {
-        let root = vault_fixture("tomet_test_load_bad_query");
+    fn an_expression_that_cannot_be_answered_stays_in_the_text_and_is_reported() {
+        let root = vault_fixture("tomet_test_load_bad_expression");
         fs::write(
             root.join("index.tmt"),
-            "@kind(doc.index)\n\n${filter(exists(meta.tgs))}\n",
+            "${vault.docs.filter(d => d.meta.tgs.contains(\"x\"))}\n",
         )
         .expect("index");
 
         let vault = Vault::discover(&root);
-        let err = vault
-            .prepared_document(&root.join("index.tmt"))
-            .expect_err("a misspelt field cannot be answered");
-        assert!(matches!(err, LoadError::Prepare { .. }), "{err:?}");
+        let (mut doc, _) = vault.document(&root.join("index.tmt")).expect("read");
+        let prepared = vault.prepare(&mut doc, &root.join("index.tmt"));
+        assert_eq!(prepared.unresolved.len(), 1);
+        assert!(
+            prepared.unresolved[0].reason.contains("tgs"),
+            "{}",
+            prepared.unresolved[0].reason
+        );
+        assert!(
+            flat(&doc)[0].starts_with("${vault.docs"),
+            "{:?}",
+            flat(&doc)
+        );
 
         let _ = fs::remove_dir_all(&root);
     }

@@ -109,7 +109,7 @@ fn custom_element_hook_falling_through_matches_generic_rendering() {
 /// decided differently -- this one evaluated without an
 /// `EvaluationContext` or the vault's config, so `${self.path}`
 /// resolved in CommonMark and not here. Evaluation moved to
-/// `tomet-transform`'s `resolve_interpolations`, which runs before any
+/// `tomet-transform`'s `resolve_expressions`, which runs before any
 /// converter sees the tree; the expansion those assertions were about
 /// is pinned there now.
 ///

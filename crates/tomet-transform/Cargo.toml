@@ -14,3 +14,6 @@ tomet-search = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-style = { workspace = true }
 tomet-tree = { workspace = true }
+
+[dev-dependencies]
+time = { workspace = true }

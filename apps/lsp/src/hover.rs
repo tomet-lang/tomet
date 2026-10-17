@@ -2,6 +2,9 @@ use std::ops::ControlFlow;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
 use tomet_ast::{Document, Element, ElementValue, Value};
+use tomet_compute::eval::{
+    DocRef, EvalContext, EvalValue, MemoryResolver, Phase, SystemGenerate, evaluate,
+};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, normalized_element_args};
 use tomet_tree::{ValueExt, Visitor, walk_document};
 
@@ -412,24 +415,9 @@ fn macro_hover(
         None
     }?;
 
-    let md = match tomet_compute::evaluate_with_config(doc, &expr, config) {
+    let md = match evaluate_for_hover(doc, &expr, config) {
         Ok(val) => {
-            let rendered = match val {
-                Value::String(s) => s,
-                Value::Int(i) => i.to_string(),
-                Value::Float(f) => f.to_string(),
-                Value::Bool(b) => b.to_string(),
-                Value::Seq(seq) => format!("{seq:?}"),
-                Value::Map(map) => format!("{map:?}"),
-                Value::Null => "null".to_string(),
-                Value::Call(name, args) => format!("{name:?}({args:?})"),
-                Value::Element(el) => format!(
-                    "@{}({:?})",
-                    el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
-                    el.args
-                ),
-                Value::Blocks(blocks) => format!("{blocks:?}"),
-            };
+            let rendered = render_value(&val);
             let trimmed = rendered.trim();
             if is_web_url(trimmed) {
                 format!("**Macro Result**\n\n[{trimmed}]({trimmed})")
@@ -455,4 +443,63 @@ fn is_web_url(s: &str) -> bool {
         && !s.contains('\n')
         && !s.contains('\r')
         && !s.contains(' ')
+}
+
+/// Evaluates `expr` the way rendering would, against this one document.
+///
+/// The editor has the document and its settings and nothing else, so what
+/// reaches for another file fails and says so; `generate.*` fails too,
+/// because rendering never runs it.
+fn evaluate_for_hover(
+    doc: &Document,
+    expr: &tomet_ast::InterpExpr,
+    config: &tomet_semantics::DocumentConfig,
+) -> Result<EvalValue, tomet_compute::eval::EvalError> {
+    let here = "document.tmt";
+    let resolver = MemoryResolver::new().with_document(here, std::sync::Arc::new(doc.clone()));
+    let vars = EvalValue::Null;
+    let cx = EvalContext {
+        phase: Phase::Output,
+        resolver: &resolver,
+        generate: &SystemGenerate,
+        self_doc: DocRef(here.to_string()),
+        macros: &config.macros,
+        vars: &vars,
+    };
+    evaluate(expr, &cx)
+}
+
+fn render_value(value: &EvalValue) -> String {
+    match value {
+        EvalValue::Null => "null".to_string(),
+        EvalValue::Bool(b) => b.to_string(),
+        EvalValue::Int(i) => i.to_string(),
+        EvalValue::Float(f) => f.to_string(),
+        EvalValue::String(s) => s.clone(),
+        EvalValue::Seq(items) => {
+            let items: Vec<String> = items.iter().map(render_value).collect();
+            format!("[{}]", items.join(", "))
+        }
+        EvalValue::Map(entries) => {
+            let entries: Vec<String> = entries
+                .iter()
+                .map(|(k, v)| format!("{k}: {}", render_value(v)))
+                .collect();
+            format!("{{{}}}", entries.join(", "))
+        }
+        EvalValue::DateTime(dt) => tomet_compute::eval::format_datetime(dt, "YYYY-MM-DD HH:mm:ss"),
+        EvalValue::Document(doc) => format!("document {}", doc.0),
+        EvalValue::Directory(dir) => format!("directory {}", dir.0),
+        EvalValue::Node { node, .. } => match node.id() {
+            Some(id) => format!("element #{id}"),
+            None => "element".to_string(),
+        },
+        EvalValue::Fragment(blocks) => format!("fragment of {} block(s)", blocks.len()),
+        EvalValue::Function(_) => "function".to_string(),
+        EvalValue::Namespace(_) => "namespace".to_string(),
+        EvalValue::Call(name, args) => {
+            let args: Vec<String> = args.iter().map(render_value).collect();
+            format!("{name}({})", args.join(", "))
+        }
+    }
 }

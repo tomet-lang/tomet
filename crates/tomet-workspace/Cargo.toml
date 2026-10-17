@@ -22,3 +22,6 @@ tomet-tree = { workspace = true }
 
 #= Crates.io
 anyhow = { workspace = true }
+
+[dev-dependencies]
+time = { workspace = true }

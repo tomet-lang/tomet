@@ -2,7 +2,7 @@
 @kind(blueprint)
 @blueprint(daily-note)
 @meta{
-  uuid: ${uuid}
+  uuid: ${generate.uuid()}
 }
 
 =[ TODO ]#(todo)

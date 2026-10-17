@@ -134,20 +134,40 @@ Files: `tomet-semantics-compute/src/{lib,functions,error}.rs`, `tomet-semantics-
 
 ## Step 3: context and the single evaluation path (L5)
 
-Files: `tomet-transform/src/{interp,macro_expand,blueprint,index_query}.rs`,
-`tomet-vault/src/lib.rs` (`prepare`, `evaluation_vars`), `bindings/js/src/lib.rs`.
+Done together with most of Step 5 (the old `filter` machinery could not outlive the old evaluator) and the
+mechanical part of Step 6.
 
-- [ ] Build `self` as a document value (`path filename meta kind`) in the vault; `.meta` typed from
-      the config `type:` (`list` absent -> empty Seq, `datetime` -> datetime, others Null;
-      undeclared key -> error; `.get(k, default)` for the rest).
-- [ ] `vault` and directory values; `.docs` (recursive) from the lazy `VaultIndex`, via the resolver.
-- [ ] One pass in `prepare` replacing `resolve_interpolations` + `expand_document_macros`
-      + the blueprint evaluator; applies the position table in `overview.expr.tmt`
-      (value / inline / block / list item) and the type-mismatch rule.
-- [ ] References resolve against the source copy taken before any rewrite (already the shape; make
-      it an explicit, tested invariant).
-- [ ] Failure keeps the source spelling and reports (`Unresolved`); add the new reasons.
-- [ ] JS binding follows the new entry point.
+- [x] 3a `tomet-vault`: `typed_meta` (the settings' `type:` applied to `@meta`: `list` absent -> empty list, a lone
+      value wrapped; `datetime` -> datetime, bad text stays text; other declared fields `Null`; undeclared and
+      unwritten keys absent) and `Overlay` (the document being prepared stands for its own path, as written).
+      `tomet-load`: `DiskResolver` (`Vault::resolver()`): documents read once and cached in the `Vault`
+      (`Mutex`, so it stays `Sync`), `ref("name")` through `tomet-links`' `VaultLinkIndex`, `dir_docs` through
+      `collect_tm_files_with_config` (so `ignore`/`unswept` apply), `meta` typed.
+- [x] 3b `tomet-transform::expressions::resolve_expressions`: the one pass, with the position table (data /
+      inline / own line / list item), `Unresolved` for what has no value or no place, and the hints
+      (`.join`, `include`/`.link()`, `.format`, `.docs`). 24 tests.
+- [x] 3c `Vault::prepare(doc, path, &dyn Resolver) -> Prepared` (infallible; `expanded_queries` and
+      `LoadError::Prepare` are gone). A reference is answered from the document as written (tested: a
+      reference to an argument that is itself an expression sees the expression, not its value).
+- [x] 3d Blueprint: `instantiate_blueprint(doc, &EvalContext) -> Instantiated`; `tomet new` builds a `Create`
+      context (`vars` = the `--var` values plus a default `title`, `self` = the new file, macros, and
+      `generate.now()` in the offset the settings give `created`/`modified`). `--var author=Bob` now reaches
+      `${vars.author}` (before, only a nested `vars` map did). LSP hover and the JS binding use the new
+      evaluator; LSP completion offers the new names.
+- [x] 3e Deleted: the old `evaluate*`/`EvaluationContext`/`ComputeError`/`functions.rs`, `interp.rs`,
+      `macro_expand.rs`, `index_query.rs`, `tomet-search`'s `filter`, `tomet-load`'s `VaultIndex`,
+      `IndexQueryError`, `is_index_document`, and `tomet-address`'s `resolve_reference`.
+- [x] Parser: line breaks are whitespace inside `${...}` and a call's arguments (a method chain reads best one
+      call to a line). A raw `addr(...)` still ends at the line.
+- [x] `tomet refactor` writes `$macro.name(...)`; LSP tests and the cross tests use the new forms.
+- [x] `tmtroot/.index.tmt` (the book's index) uses `vault.docs.filter(...)....map(d => d.link())`.
+- [ ] Not done: `tomet new` should report the expressions left unresolved (they are only left in the file);
+      `tomet api` (needs `twrit`, not available here) has to regenerate `tmtroot/generated/crates/*`;
+      `tmtroot/deprecated/**` still has old forms (left alone).
+- [ ] Observed, not changed: the Markdown exporter writes a `tmt:` link as the bare path (an HTML anchor is
+      fine); `#item(n)` counts every block, not only elements as `addressable.tmt` says; `find_node` looks at
+      elements and sections, not at a list's own `#(id)`; `.link()` produces `tmt:` links where the old
+      `filter` produced `ref:`.
 
 ## Step 4: include (L5/L6)
 
@@ -163,10 +183,11 @@ Files: `tomet-transform/src/{interp,macro_expand,blueprint,index_query}.rs`,
 
 ## Step 5: filter and the old forms
 
-- [ ] Delete `index_query` special pass, `Query`, `by(...)`, string-keyed context, `known_paths`.
-      `@kind(doc.index)` restriction removed; the vault index is built lazily on first `.docs`.
-- [ ] Migrate `doc.index` and fixtures that use `${filter(...)}` to `vault.docs.filter(...)...`.
-- [ ] `blueprint`: `generate.*`, `${self.filename}`, `${vars.title}`; `tomet new` passes `vars`.
+- [x] (done in Step 3) `index_query`, `Query`, `by(...)`, string-keyed context and `known_paths` are deleted; the
+      `@kind(doc.index)` restriction is gone; `.docs` reads files through the resolver, cached per vault.
+- [~] `tmtroot/.index.tmt` migrated. The parse-only fixtures (`tests/fixtures/syntax/index-query.tmt` and the like) are
+      frozen and still carry `${filter(...)}`; they exercise the parser and need no change.
+- [x] (done in Step 3) Blueprint: `generate.*`, `${self.filename}`, `${vars.title}`; `tomet new` passes `vars`.
 - [ ] `type: uuid` field validation in `tomet check` (generation already exists in
       `tomet-format-field-utils`).
 

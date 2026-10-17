@@ -1,7 +1,7 @@
 //! Datetimes: reading them from text and writing them with a format string.
 
 use time::format_description::well_known::Rfc3339;
-use time::{Date, Month, OffsetDateTime, PrimitiveDateTime, Time};
+use time::{Date, Month, OffsetDateTime, PrimitiveDateTime, Time, UtcOffset};
 
 /// Reads RFC 3339 (`2026-10-17T09:00:00+09:00`) or a bare date
 /// (`2026-10-17`, taken as midnight UTC). `None` for anything else.
@@ -24,6 +24,29 @@ pub fn parse_datetime(text: &str) -> Option<OffsetDateTime> {
     )
     .ok()?;
     Some(PrimitiveDateTime::new(date, Time::MIDNIGHT).assume_utc())
+}
+
+/// Reads a UTC offset written `+09:00`, `-05:30` or `Z`. `None` for anything else.
+pub fn parse_offset(text: &str) -> Option<UtcOffset> {
+    let text = text.trim();
+    if text == "Z" {
+        return Some(UtcOffset::UTC);
+    }
+    let (sign, rest) = match text.as_bytes().first()? {
+        b'+' => (1i8, &text[1..]),
+        b'-' => (-1i8, &text[1..]),
+        _ => return None,
+    };
+    let (hours, minutes) = rest.split_once(':')?;
+    if hours.len() != 2 || minutes.len() != 2 {
+        return None;
+    }
+    let (hours, minutes) = (hours.parse::<i8>().ok()?, minutes.parse::<i8>().ok()?);
+    // No offset in use is further than 18 hours from UTC.
+    if !(0..=18).contains(&hours) || !(0..60).contains(&minutes) {
+        return None;
+    }
+    UtcOffset::from_hms(sign * hours, sign * minutes, 0).ok()
 }
 
 /// Writes `value` with `format`. The symbols are `YYYY` `YY` `MM` (month)
@@ -72,6 +95,16 @@ mod tests {
         let dt = at("2026-10-17T09:05:07+09:00");
         assert_eq!(dt.offset().whole_hours(), 9);
         assert_eq!(format_datetime(&dt, "HH:mm:ss"), "09:05:07");
+    }
+
+    #[test]
+    fn an_offset_is_read_with_its_sign() {
+        assert_eq!(parse_offset("+09:00").unwrap().whole_hours(), 9);
+        assert_eq!(parse_offset("-05:30").unwrap().whole_minutes(), -330);
+        assert_eq!(parse_offset("Z"), Some(UtcOffset::UTC));
+        for bad in ["", "09:00", "+9:00", "+09", "+25:00", "x"] {
+            assert_eq!(parse_offset(bad), None, "{bad}");
+        }
     }
 
     #[test]

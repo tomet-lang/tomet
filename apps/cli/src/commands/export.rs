@@ -121,12 +121,9 @@ fn export_one(
         .parse(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file_path, &src, &e)))?;
 
-    // An index document's `${filter(...)}` is answered before anything
-    // renders, so every converter is handed the `@file` entries and none
-    // of them needs to know this feature exists.
-    vault
-        .prepare(&mut doc, file_path)
-        .map_err(|e| anyhow::anyhow!("{}: index query failed -- {e}", file_path.display()))?;
+    // Every `${...}` is resolved before anything renders, so every converter
+    // is handed its value and none of them needs to know expressions exist.
+    vault.prepare(&mut doc, file_path);
 
     let config = document_config(&doc);
 

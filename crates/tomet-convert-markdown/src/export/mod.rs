@@ -33,7 +33,7 @@ struct MarkdownCtx<'a> {
 /// carried a `DocumentConfig` and an `EvaluationContext` for one purpose,
 /// evaluating `${...}`, and no converter does that any more. What a
 /// `${...}` means is settled before any of them sees the tree, by
-/// `tomet-transform`'s `resolve_interpolations` (reached through
+/// `tomet-transform`'s `resolve_expressions` (reached through
 /// `tomet_load::Vault::prepare`), because four converters deciding it
 /// independently is how the same document came to produce three different
 /// answers.

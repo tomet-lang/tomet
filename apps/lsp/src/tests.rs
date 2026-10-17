@@ -101,6 +101,15 @@ fn completions_trigger_prefix() {
 
     let interp_items = completions_for("${", Position::new(0, 2));
     assert!(interp_items.iter().any(|i| i.label == "add(...)"));
+    // The reserved values start an expression too, and the functions that
+    // changed from call to call are no longer offered where rendering is.
+    assert!(interp_items.iter().any(|i| i.label == "self"));
+    assert!(interp_items.iter().any(|i| i.label == "macro"));
+    assert!(
+        !interp_items
+            .iter()
+            .any(|i| i.label == "uuid(...)" || i.label == "date(...)")
+    );
 }
 
 #[test]
@@ -191,9 +200,9 @@ fn completions_with_multibyte_characters() {
 
 #[test]
 fn hover_on_macro_evaluation() {
-    let text = "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n\n$gh(42)\n\n$greet(\"Alice\", \"Bob\")\n\n${copyright}\n\n$emoji(\"sparkles\")\n";
+    let text = "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n\n$macro.gh(42)\n\n$macro.greet(\"Alice\", \"Bob\")\n\n${macro.copyright()}\n\n$emoji(\"sparkles\")\n";
 
-    // Hover on $gh(42) (line 8, char 2)
+    // Hover on $macro.gh(42) (line 8, char 2)
     let hover = hover_for(text, Position::new(8, 2), None).expect("hover found for $gh");
     if let HoverContents::Markup(m) = hover.contents {
         assert!(m.value.contains("Macro Result"));
@@ -204,7 +213,7 @@ fn hover_on_macro_evaluation() {
         panic!("expected markup contents");
     }
 
-    // Hover on $greet("Alice", "Bob") (line 10, char 3)
+    // Hover on $macro.greet("Alice", "Bob") (line 10, char 3)
     let hover2 = hover_for(text, Position::new(10, 3), None).expect("hover found for $greet");
     if let HoverContents::Markup(m) = hover2.contents {
         assert!(m.value.contains("Macro Result"));
@@ -213,8 +222,9 @@ fn hover_on_macro_evaluation() {
         panic!("expected markup contents");
     }
 
-    // Hover on ${copyright} (line 12, char 3)
-    let hover3 = hover_for(text, Position::new(12, 3), None).expect("hover found for ${copyright}");
+    // Hover on ${macro.copyright()} (line 12, char 3)
+    let hover3 =
+        hover_for(text, Position::new(12, 3), None).expect("hover found for ${macro.copyright()}");
     if let HoverContents::Markup(m) = hover3.contents {
         assert!(m.value.contains("Macro Result"));
         assert!(m.value.contains("(C) 2026 Tomet Projects"));
@@ -234,7 +244,7 @@ fn hover_on_macro_evaluation() {
 
 #[test]
 fn hover_on_undefined_macro_shows_error() {
-    let text = "$undefined_macro(123)\n";
+    let text = "$macro.undefined_macro(123)\n";
     let hover =
         hover_for(text, Position::new(0, 5), None).expect("hover found for undefined macro");
     if let HoverContents::Markup(m) = hover.contents {
@@ -268,7 +278,7 @@ fn hover_on_macro_defined_in_settings_file_ref() {
     let doc_path = dir.join("sub/note.tmt");
     std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
     let doc_text =
-        "@settings(file:\"file:default.config.tmt\")\n\n$youtube_video(\"Pm_h6FnF8HU\")\n";
+        "@settings(file:\"file:default.config.tmt\")\n\n$macro.youtube_video(\"Pm_h6FnF8HU\")\n";
     let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
 
     let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
@@ -284,7 +294,7 @@ fn hover_on_macro_defined_in_settings_file_ref() {
     }
 
     // Test embed with macro
-    let embed_doc = "@settings(file:\"file:default.config.tmt\")\n\n@embed($youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n";
+    let embed_doc = "@settings(file:\"file:default.config.tmt\")\n\n@embed($macro.youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n";
     let hover2 = hover_for(embed_doc, Position::new(2, 10), Some(&uri))
         .expect("hover found for embed macro");
     if let HoverContents::Markup(m) = hover2.contents {
@@ -322,7 +332,7 @@ fn hover_on_macro_auto_discovered_from_workspace_config() {
     // Note has NO header at all!
     let doc_path = dir.join("10-19 Journal/12 Daily/2024/12/$2024-12-26.tmt");
     std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
-    let doc_text = "@embed($youtube_video(\"Pm_h6FnF8HU\"))[Low]\n\n@embed($twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n";
+    let doc_text = "@embed($macro.youtube_video(\"Pm_h6FnF8HU\"))[Low]\n\n@embed($macro.twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n";
     let uri = Uri::from_str(&format!("file://{}", doc_path.display()).replace(' ', "%20")).unwrap();
 
     // Hover on youtube_video
@@ -374,7 +384,7 @@ fn hover_on_macro_defined_in_config_import() {
     .unwrap();
 
     let doc_path = dir.join("note.tmt");
-    let doc_text = "@config(import: \"custom.config.tmt\")\n\n$wiki(\"Rust\")\n";
+    let doc_text = "@config(import: \"custom.config.tmt\")\n\n$macro.wiki(\"Rust\")\n";
     let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
 
     let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))

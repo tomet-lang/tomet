@@ -263,7 +263,7 @@ fn render_element_value(cx: &RenderCtx, value: &ElementValue, out: &mut String) 
         // `tomet_load::Vault`. Rendering nothing would hide it, and
         // evaluating it here is what this crate stopped doing: what a
         // `${...}` means is settled by `tomet-transform`'s
-        // `resolve_interpolations` before any converter sees the tree.
+        // `resolve_expressions` before any converter sees the tree.
         //
         // This used to evaluate with `evaluate_with_config` -- no
         // `EvaluationContext` and no vault config, so `${self.path}`

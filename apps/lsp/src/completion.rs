@@ -46,15 +46,21 @@ pub fn completions_for_with_uri(
     }
 
     if prefix.ends_with("${") || prefix.ends_with("${ ") {
+        // What may start an expression: the functions called by a bare name,
+        // and the reserved values with the members worth offering first.
         let compute_funcs = [
             ("add", "Arithmetic addition function `add(a, b)`"),
             ("sub", "Arithmetic subtraction function `sub(a, b)`"),
             ("mul", "Arithmetic multiplication function `mul(a, b)`"),
             ("div", "Floating-point division function `div(a, b)`"),
             ("mod", "Integer modulo function `mod(a, b)`"),
-            ("uuid", "Generate UUID v4 identifier `uuid()`"),
-            ("date", "Current date formatted string `date(format)`"),
-            ("time", "Current time formatted string `time(format)`"),
+            ("not", "Negation `not(bool)`"),
+            ("exists", "Whether a value is not null `exists(value)`"),
+            ("link", "A link to a document or an element `link(target)`"),
+            ("tmt", "A document by its path `tmt(\"path\")`"),
+            ("ref", "A document by its note name `ref(\"name\")`"),
+            ("emoji", "An emoji by name `emoji(\"sparkles\")`"),
+            ("unicode", "A character by code point `unicode(0x2713)`"),
         ];
 
         for (func, detail) in compute_funcs {
@@ -62,6 +68,29 @@ pub fn completions_for_with_uri(
                 label: format!("{func}(...)"),
                 insert_text: Some(format!("{func}()")),
                 kind: Some(CompletionItemKind::FUNCTION),
+                detail: Some(detail.to_string()),
+                ..CompletionItem::default()
+            });
+        }
+
+        let reserved = [
+            ("self", "The document this expression is written in"),
+            ("macro", "The macros defined in settings: `macro.name(...)`"),
+            ("vault", "The vault's root directory: `vault.docs`"),
+            (
+                "vars",
+                "Values passed to `tomet new --var` (only when creating a document)",
+            ),
+            (
+                "generate",
+                "`generate.uuid()` and `generate.now()` (only when creating a document)",
+            ),
+        ];
+        for (name, detail) in reserved {
+            items.push(CompletionItem {
+                label: name.to_string(),
+                insert_text: Some(name.to_string()),
+                kind: Some(CompletionItemKind::VARIABLE),
                 detail: Some(detail.to_string()),
                 ..CompletionItem::default()
             });

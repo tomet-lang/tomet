@@ -101,9 +101,15 @@ fn prepare_document(mut doc: tomet::ast::Document, opts: &ProcessOptions) -> tom
         }
     }
 
-    // 2. Expand macros in element arguments and interpolation expressions
-    let config = tomet::semantics::document_config(&doc);
-    tomet_transform::expand_document_macros(&mut doc, &config);
+    // 2. Resolve every `${...}`: macros, references inside the document, and
+    // the rest. There is no disk here, so an expression that reaches for
+    // another document stays as written, which is what `NoResolver` gives.
+    let here = opts.current_path.as_deref().unwrap_or("document.tmt");
+    Vault::from_sources(PrinterConfig::default(), ".", &[]).prepare(
+        &mut doc,
+        std::path::Path::new(here),
+        &tomet::vault::NoResolver,
+    );
 
     // 3. Resolve links against cached index or vault_files option
     let lock = GLOBAL_VAULT_INDEX.lock().unwrap();

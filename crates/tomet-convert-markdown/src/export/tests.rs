@@ -455,7 +455,7 @@ fn table_exports_to_markdown() {
 /// what is left of the one that said it did.
 ///
 /// It used to assert the expanded macro. That expansion now happens in
-/// `tomet-transform`'s `resolve_interpolations`, before any converter
+/// `tomet-transform`'s `resolve_expressions`, before any converter
 /// sees the tree, and is pinned there -- because four converters each
 /// deciding it produced three different answers for the same document.
 ///

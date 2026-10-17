@@ -22,9 +22,7 @@ pub(crate) fn render_file(
     let (mut doc, _bindings) = vault
         .parse(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
-    vault
-        .prepare(&mut doc, file)
-        .map_err(|e| anyhow::anyhow!("{}: index query failed -- {e}", file.display()))?;
+    vault.prepare(&mut doc, file);
     let options = tomet_html::RenderOptions {
         number_headings: advanced,
         auto_slug_headings: advanced,

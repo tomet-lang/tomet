@@ -9,9 +9,7 @@ pub(crate) fn to_typst(file: &PathBuf, out: &Option<PathBuf>) -> anyhow::Result<
     let (mut doc, _bindings) = vault
         .parse(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
-    vault
-        .prepare(&mut doc, file)
-        .map_err(|e| anyhow::anyhow!("{}: index query failed -- {e}", file.display()))?;
+    vault.prepare(&mut doc, file);
     let typst = tomet_typst::to_typst(&doc);
     match out {
         Some(path) => fs::write(path, typst)?,

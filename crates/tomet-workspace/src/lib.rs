@@ -49,7 +49,7 @@ mod tests {
         assert!(result.contains("@kind(task)"));
         assert!(result.contains("@meta"));
         assert!(!result.contains("type: task"));
-        assert!(result.contains("$youtube_ch(\"@realakibaboyz\")"));
+        assert!(result.contains("$macro.youtube_ch(\"@realakibaboyz\")"));
     }
 
     #[test]

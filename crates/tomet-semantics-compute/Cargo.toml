@@ -7,7 +7,6 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-tomet-address = { workspace = true }
 tomet-ast = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-semantics = { workspace = true }

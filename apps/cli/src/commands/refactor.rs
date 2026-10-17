@@ -152,7 +152,7 @@ mod tests {
 
         let refactored = fs::read_to_string(&src_file).unwrap();
         assert!(refactored.contains("@kind(note)"));
-        assert!(refactored.contains("$gh(\"tomet/tomet\")"));
+        assert!(refactored.contains("$macro.gh(\"tomet/tomet\")"));
 
         let _ = fs::remove_dir_all(&temp_dir);
     }

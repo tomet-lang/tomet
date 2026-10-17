@@ -93,3 +93,36 @@ pub struct EvalContext<'a> {
     /// `vars`, the values passed to `tomet new`. Only read in [`Phase::Create`].
     pub vars: &'a EvalValue,
 }
+
+/// The real clock written in a fixed offset, and real random UUIDs.
+///
+/// `generate.now()` is a datetime, and a datetime carries its offset. The
+/// vault's settings say which one a field wants (`offset: "+09:00"`), so a
+/// document created in Tokyo says `+09:00` and not UTC.
+pub struct OffsetGenerate {
+    pub offset: time::UtcOffset,
+}
+
+impl Generate for OffsetGenerate {
+    fn now(&self) -> OffsetDateTime {
+        OffsetDateTime::now_utc().to_offset(self.offset)
+    }
+    fn uuid(&self) -> String {
+        uuid::Uuid::new_v4().to_string()
+    }
+}
+
+impl OffsetGenerate {
+    /// The real clock in UTC.
+    pub fn utc() -> Self {
+        Self {
+            offset: time::UtcOffset::UTC,
+        }
+    }
+
+    /// The real clock in the offset written as `+09:00`, `-05:30` or `Z`.
+    /// `None` when the text is not an offset.
+    pub fn from_offset_text(text: &str) -> Option<Self> {
+        super::datetime::parse_offset(text).map(|offset| Self { offset })
+    }
+}

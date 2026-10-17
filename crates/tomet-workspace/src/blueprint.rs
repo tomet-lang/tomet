@@ -20,10 +20,13 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::{Context, Result, bail};
 use tomet_ast::Value;
-use tomet_compute::EvaluationContext;
+use tomet_compute::eval::{
+    DocRef, EvalContext, EvalValue, Generate, MemoryResolver, OffsetGenerate, Phase,
+};
 use tomet_config::PrinterConfig;
 use tomet_semantics::{ElementKind, ValueExt, classify_std_lenient, normalized_element_args};
 use tomet_transform::instantiate_blueprint;
@@ -112,12 +115,32 @@ fn blueprint_name(path: &Path) -> Option<String> {
     found
 }
 
-/// Instantiates a blueprint file into formatted Tomet source text for `output_path`.
+/// Instantiates a blueprint file into formatted Tomet source text for the new
+/// document `target`, a path relative to the vault.
+///
+/// `vars` are the values passed to `tomet new --var key=value`, read in the
+/// blueprint as `${vars.key}`; `title` defaults to the file's name. The
+/// document being created is `self`, so `${self.filename}` is the new file's
+/// name. `${generate.now()}` is written in the offset the settings give
+/// `created` (or `modified`), UTC if neither has one.
+///
+/// An expression that has no value stays in the new document as written, so
+/// the person who made it can see what was left to fill in.
 pub fn instantiate_blueprint_file(
     blueprint_path: &Path,
-    output_path: &Path,
+    target: &Path,
     vars: &HashMap<String, Value>,
     config: &PrinterConfig,
+) -> Result<String> {
+    instantiate_blueprint_file_with(blueprint_path, target, vars, config, &generator_for(config))
+}
+
+fn instantiate_blueprint_file_with(
+    blueprint_path: &Path,
+    target: &Path,
+    vars: &HashMap<String, Value>,
+    config: &PrinterConfig,
+    generate: &dyn Generate,
 ) -> Result<String> {
     let src = fs::read_to_string(blueprint_path)
         .with_context(|| format!("failed to read blueprint at {}", blueprint_path.display()))?;
@@ -125,32 +148,57 @@ pub fn instantiate_blueprint_file(
     let mut doc = tomet_parser::parse_document(&src)
         .map_err(|e| anyhow::anyhow!("failed to parse blueprint: {e}"))?;
 
-    let filename = output_path
-        .file_name()
-        .and_then(|f| f.to_str())
-        .unwrap_or("document.tmt")
-        .to_string();
+    let self_doc = DocRef(target.to_string_lossy().replace('\\', "/"));
 
-    let default_title = output_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("Document")
-        .to_string();
+    let mut passed: Vec<(String, EvalValue)> = vars
+        .iter()
+        .map(|(key, value)| (key.clone(), EvalValue::from_ast(value, &self_doc)))
+        .collect();
+    passed.sort_by(|a, b| a.0.cmp(&b.0));
+    if !passed.iter().any(|(key, _)| key == "title") {
+        let default_title = target
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Document")
+            .to_string();
+        passed.push(("title".to_string(), EvalValue::String(default_title)));
+    }
+    let vars = EvalValue::Map(passed);
 
-    let mut ctx_vars = vars.clone();
-    ctx_vars
-        .entry("filename".to_string())
-        .or_insert(Value::String(filename));
-    ctx_vars
-        .entry("title".to_string())
-        .or_insert(Value::String(default_title));
+    // The new document stands in for itself: a reference to one of its own
+    // ids is answered from the blueprint it is being made from.
+    let resolver = MemoryResolver::new().with_document(&self_doc.0, Arc::new(doc.clone()));
 
-    let ctx = EvaluationContext { vars: ctx_vars };
+    let mut macros = tomet_semantics::document_config(&doc).macros;
+    for (name, template) in &config.macros {
+        macros
+            .entry(name.clone())
+            .or_insert_with(|| template.clone());
+    }
 
-    instantiate_blueprint(&mut doc, &ctx);
+    let cx = EvalContext {
+        phase: Phase::Create,
+        resolver: &resolver,
+        generate,
+        self_doc,
+        macros: &macros,
+        vars: &vars,
+    };
+    instantiate_blueprint(&mut doc, &cx);
 
-    let rendered = tomet_printer::document_to_tm_with_config(&doc, config);
-    Ok(rendered)
+    Ok(tomet_printer::document_to_tm_with_config(&doc, config))
+}
+
+/// The clock `generate.now()` reads: the real one, in the offset the settings
+/// give a creation date.
+fn generator_for(config: &PrinterConfig) -> OffsetGenerate {
+    ["created", "modified"]
+        .iter()
+        .find_map(|field| {
+            let offset = config.meta.fields.get(*field)?.offset.as_deref()?;
+            OffsetGenerate::from_offset_text(offset)
+        })
+        .unwrap_or_else(OffsetGenerate::utc)
 }
 
 /// Creates a new document from a blueprint and writes it to disk.
@@ -191,7 +239,7 @@ pub fn create_file_from_blueprint(
             .with_context(|| format!("failed to create directories for {}", parent.display()))?;
     }
 
-    let content = instantiate_blueprint_file(&blueprint_file, &target_abs_path, vars, config)?;
+    let content = instantiate_blueprint_file(&blueprint_file, target_rel_path, vars, config)?;
     fs::write(&target_abs_path, content)
         .with_context(|| format!("failed to write file {}", target_abs_path.display()))?;
 
@@ -208,7 +256,7 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/blueprints")).unwrap();
         fs::write(
             dir.join(".tomet/blueprints/daily-note.blueprint.tmt"),
-            "@kind(blueprint)\n@blueprint(daily-note)\n@meta{\n  id: ${uuid(\"nil\")}\n  title: ${title}\n}\n\n#[ Tasks for ${title} ] {id: tasks}\n",
+            "@kind(blueprint)\n@blueprint(daily-note)\n@meta{\n  id: ${generate.uuid()}\n  title: ${vars.title}\n}\n\n=[ Tasks for ${vars.title} ]#(tasks)\n",
         )
         .unwrap();
         dir
@@ -298,5 +346,105 @@ mod tests {
         assert!(!content.contains("@blueprint"));
 
         let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A clock stopped at the epoch and a UUID that is always the same.
+    struct Fixed;
+
+    impl Generate for Fixed {
+        fn now(&self) -> time::OffsetDateTime {
+            time::OffsetDateTime::UNIX_EPOCH
+        }
+        fn uuid(&self) -> String {
+            "00000000-0000-0000-0000-000000000000".to_string()
+        }
+    }
+
+    fn blueprint_file(name: &str, src: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("tm_blueprint_src_{name}_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("x.blueprint.tmt");
+        fs::write(&path, src).unwrap();
+        path
+    }
+
+    #[test]
+    fn generated_values_come_from_the_injected_clock_and_random_source() {
+        let file = blueprint_file(
+            "fixed",
+            "@blueprint(note)\n@meta{\n  id: ${generate.uuid()}\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  by: ${vars.author}\n}\n",
+        );
+        let mut vars = HashMap::new();
+        vars.insert("author".to_string(), Value::String("Ann".into()));
+
+        let content = instantiate_blueprint_file_with(
+            &file,
+            Path::new("notes/idea.tmt"),
+            &vars,
+            &PrinterConfig::default(),
+            &Fixed,
+        )
+        .unwrap();
+
+        assert!(
+            content.contains("id: 00000000-0000-0000-0000-000000000000"),
+            "{content}"
+        );
+        assert!(content.contains("day: 1970-01-01"), "{content}");
+        assert!(content.contains("file: idea.tmt"), "{content}");
+        assert!(content.contains("by: Ann"), "{content}");
+        let _ = fs::remove_dir_all(file.parent().unwrap());
+    }
+
+    #[test]
+    fn the_title_defaults_to_the_files_name_and_can_be_passed() {
+        let file = blueprint_file("title", "@blueprint(note)\n\n=[ ${vars.title} ]\n");
+        let config = PrinterConfig::default();
+        let made = |vars: &HashMap<String, Value>| {
+            instantiate_blueprint_file_with(
+                &file,
+                Path::new("a/my-note.tmt"),
+                vars,
+                &config,
+                &Fixed,
+            )
+            .unwrap()
+        };
+        assert!(made(&HashMap::new()).contains("my-note"));
+        let mut vars = HashMap::new();
+        vars.insert("title".to_string(), Value::String("Given".into()));
+        assert!(made(&vars).contains("Given"));
+        let _ = fs::remove_dir_all(file.parent().unwrap());
+    }
+
+    #[test]
+    fn an_expression_with_no_value_is_left_in_the_new_document() {
+        let file = blueprint_file("left", "@blueprint(note)\n@meta{ by: ${vars.author} }\n");
+        let content = instantiate_blueprint_file_with(
+            &file,
+            Path::new("n.tmt"),
+            &HashMap::new(),
+            &PrinterConfig::default(),
+            &Fixed,
+        )
+        .unwrap();
+        assert!(content.contains("${vars.author}"), "{content}");
+        let _ = fs::remove_dir_all(file.parent().unwrap());
+    }
+
+    #[test]
+    fn now_is_written_in_the_offset_the_settings_give_created() {
+        let mut config = PrinterConfig::default();
+        assert_eq!(generator_for(&config).now().offset().whole_hours(), 0);
+        config.meta.fields.insert(
+            "created".to_string(),
+            tomet_config::FieldConfig {
+                offset: Some("+09:00".to_string()),
+                ..Default::default()
+            },
+        );
+        assert_eq!(generator_for(&config).now().offset().whole_hours(), 9);
     }
 }

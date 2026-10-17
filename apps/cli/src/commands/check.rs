@@ -25,8 +25,11 @@ impl Findings {
             if let Ok(src) = std::fs::read_to_string(&blueprint_path)
                 && let Ok(blueprint_doc) = tomet_parser::parse_document(&src)
             {
-                let bp_diagnostics =
-                    tomet_validator::validate_against_blueprint_with(doc, &blueprint_doc, &bindings);
+                let bp_diagnostics = tomet_validator::validate_against_blueprint_with(
+                    doc,
+                    &blueprint_doc,
+                    &bindings,
+                );
                 diagnostics.extend(bp_diagnostics);
             }
         }
@@ -40,10 +43,7 @@ impl Findings {
         // Run on a copy: this reports on the document as written, and
         // `prepare` rewrites the tree.
         let mut prepared = doc.clone();
-        let unresolved = vault
-            .prepare(&mut prepared, file)
-            .map(|report| report.unresolved)
-            .unwrap_or_default();
+        let unresolved = vault.prepare(&mut prepared, file).unresolved;
 
         Findings {
             diagnostics,

@@ -2186,7 +2186,6 @@ name = "tomet-compute"
 version = "0.1.0"
 dependencies = [
  "time",
- "tomet-address",
  "tomet-ast",
  "tomet-parser",
  "tomet-semantics",
@@ -2333,8 +2332,10 @@ name = "tomet-load"
 version = "0.1.0"
 dependencies = [
  "tomet-ast",
+ "tomet-compute",
  "tomet-config",
  "tomet-indexer",
+ "tomet-links",
  "tomet-load-config",
  "tomet-parser",
  "tomet-search",
@@ -2452,7 +2453,6 @@ name = "tomet-search"
 version = "0.1.0"
 dependencies = [
  "tomet-ast",
- "tomet-compute",
  "tomet-parser",
  "tomet-semantics",
  "tomet-tree",
@@ -2529,6 +2529,7 @@ dependencies = [
 name = "tomet-transform"
 version = "0.1.0"
 dependencies = [
+ "time",
  "tomet-ast",
  "tomet-compute",
  "tomet-parser",
@@ -2648,6 +2649,7 @@ name = "tomet-workspace"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "time",
  "tomet-ast",
  "tomet-compute",
  "tomet-config",

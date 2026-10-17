@@ -9,6 +9,7 @@
 
 mod address;
 mod args;
+mod chars;
 mod context;
 mod datetime;
 mod error;
@@ -22,8 +23,10 @@ mod value;
 #[cfg(test)]
 mod tests;
 
-pub use context::{EvalContext, Generate, NoResolver, Phase, Resolver, SystemGenerate};
-pub use datetime::{format_datetime, parse_datetime};
+pub use context::{
+    EvalContext, Generate, NoResolver, OffsetGenerate, Phase, Resolver, SystemGenerate,
+};
+pub use datetime::{format_datetime, parse_datetime, parse_offset};
 pub use error::EvalError;
 pub use memory::MemoryResolver;
 pub use value::{Closure, DirRef, DocRef, Env, EvalValue, Namespace, Node};
@@ -277,7 +280,7 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
         "emoji" => match args.exactly(name, 1)?.pop() {
             Some(EvalValue::String(name)) => {
                 let key = name.trim().trim_matches(':');
-                crate::functions::emoji_for(key)
+                chars::emoji_for(key)
                     .map(|emoji| EvalValue::String(emoji.to_string()))
                     .ok_or_else(|| EvalError::message(format!("unknown emoji `{key}`")))
             }

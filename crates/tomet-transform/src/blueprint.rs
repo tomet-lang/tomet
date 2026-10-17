@@ -2,13 +2,14 @@
 
 use std::collections::HashMap;
 
-use tomet_ast::{Block, Document, ElementValue, Inline, ListItem, Sigil, Span, Text, Value};
-use tomet_compute::EvaluationContext;
+use tomet_ast::{Document, Sigil, Value};
+use tomet_compute::eval::EvalContext;
 use tomet_semantics::{ElementKind, classify_std_lenient, normalized_element_args};
 use tomet_tree::{
-    ValueExt, for_each_element_mut, for_each_top_level_element, for_each_top_level_element_mut,
-    retain_top_level_elements,
+    ValueExt, for_each_top_level_element, for_each_top_level_element_mut, retain_top_level_elements,
 };
+
+use crate::expressions::{Unresolved, resolve_expressions};
 
 /// Metadata and variable definitions extracted from a `@blueprint` directive.
 #[derive(Debug, Clone, PartialEq)]
@@ -62,10 +63,21 @@ pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
     result
 }
 
+/// What [`instantiate_blueprint`] did.
+#[derive(Debug, Default)]
+pub struct Instantiated {
+    /// Whether the document differs from the blueprint it started as.
+    pub changed: bool,
+    /// Expressions that could not be resolved. They are left in the
+    /// document as written, so the person who runs `tomet new` can see them.
+    pub unresolved: Vec<Unresolved>,
+}
+
 /// Instantiates a blueprint `doc` in-place by:
 /// 1. Promoting/converting `@blueprint(target)` to `@kind(target)` and stripping schema blocks.
-/// 2. Evaluating all `${...}` interpolation expressions and placeholders using `ctx`.
-pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> bool {
+/// 2. Resolving every `${...}` in it, with `cx` -- which is a creating context
+///    (`Phase::Create`), the only place `generate.*` and `vars` exist.
+pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiated {
     let mut changed = false;
 
     // Step 0: drop the blueprint's own `@kind(blueprint)`.
@@ -116,263 +128,49 @@ pub fn instantiate_blueprint(doc: &mut Document, ctx: &EvaluationContext) -> boo
         }
     });
 
-    let doc_snapshot = doc.clone();
-    let config = tomet_semantics::document_config(&doc_snapshot);
+    let promoted = doc.clone();
+    let unresolved = resolve_expressions(doc, cx);
+    changed |= *doc != promoted;
 
-    // Step 2: Evaluate element values, args, and block-level Interp (e.g. in @meta { ... })
-    for_each_element_mut(doc, |el| {
-        if el.placement == tomet_ast::Placement::Block
-            && let Some(ElementValue::Interp(expr)) = &el.value
-            && let Ok(val) = tomet_compute::evaluate_with_context(&doc_snapshot, expr, &config, ctx)
-        {
-            el.value = Some(ElementValue::from_map(val));
-            changed = true;
-        }
-        if let Some(value) = &mut el.value {
-            // A group holds its data as separate entries, so each pair's
-            // value is walked on its own rather than one `Value` tree.
-            for (_, val) in value.pairs_mut() {
-                if evaluate_value_recursively(val, &doc_snapshot, &config, ctx) {
-                    changed = true;
-                }
-            }
-        }
-
-        if let Some(args_val) = &mut el.args
-            && evaluate_value_recursively(args_val, &doc_snapshot, &config, ctx)
-        {
-            changed = true;
-        }
-    });
-
-    // Step 3: Evaluate inlines inside blocks recursively
-    if evaluate_blocks(&mut doc.blocks, &doc_snapshot, &config, ctx) {
-        changed = true;
-    }
-
-    changed
-}
-
-fn evaluate_blocks(
-    blocks: &mut [Block],
-    doc: &Document,
-    config: &tomet_semantics::DocumentConfig,
-    ctx: &EvaluationContext,
-) -> bool {
-    let mut changed = false;
-    for block in blocks {
-        match block {
-            Block::Paragraph(p) => {
-                if evaluate_inlines(&mut p.content, doc, config, ctx) {
-                    changed = true;
-                }
-            }
-            Block::Section(sec) => {
-                if evaluate_inlines(&mut sec.title, doc, config, ctx) {
-                    changed = true;
-                }
-                if let Some(args_val) = &mut sec.args
-                    && evaluate_value_recursively(args_val, doc, config, ctx)
-                {
-                    changed = true;
-                }
-                if let Some(value) = &mut sec.value {
-                    for (_, val) in value.pairs_mut() {
-                        if evaluate_value_recursively(val, doc, config, ctx) {
-                            changed = true;
-                        }
-                    }
-                }
-                if evaluate_blocks(&mut sec.blocks, doc, config, ctx) {
-                    changed = true;
-                }
-            }
-            Block::Element(el) => {
-                if let Some(content) = &mut el.content
-                    && evaluate_blocks(content, doc, config, ctx)
-                {
-                    changed = true;
-                }
-            }
-            Block::List(list) => {
-                if evaluate_list_items(&mut list.items, doc, config, ctx) {
-                    changed = true;
-                }
-            }
-        }
-    }
-    changed
-}
-
-fn evaluate_list_items(
-    items: &mut [ListItem],
-    doc: &Document,
-    config: &tomet_semantics::DocumentConfig,
-    ctx: &EvaluationContext,
-) -> bool {
-    let mut changed = false;
-    for item in items {
-        if let Some(content) = &mut item.element.content
-            && evaluate_blocks(content, doc, config, ctx)
-        {
-            changed = true;
-        }
-        if let Some(sub) = &mut item.sublist
-            && evaluate_list_items(&mut sub.items, doc, config, ctx)
-        {
-            changed = true;
-        }
-    }
-    changed
-}
-
-fn evaluate_inlines(
-    inlines: &mut Vec<Inline>,
-    doc: &Document,
-    config: &tomet_semantics::DocumentConfig,
-    ctx: &EvaluationContext,
-) -> bool {
-    let mut changed = false;
-    let mut new_content = Vec::new();
-    for inline in inlines.iter() {
-        match inline {
-            Inline::Element(el) if classify_std_lenient(el) == ElementKind::Interp => {
-                if let Some(ElementValue::Interp(expr)) = &el.value
-                    && let Ok(val) = tomet_compute::evaluate_with_context(doc, expr, config, ctx)
-                {
-                    new_content.push(Inline::Text(Text {
-                        value: value_to_display_string(&val),
-                        span: Span::default(),
-                    }));
-                    changed = true;
-                    continue;
-                }
-                new_content.push(inline.clone());
-            }
-            Inline::Text(t) => {
-                let expanded = expand_interpolations_in_string(&t.value, doc, config, ctx);
-                if expanded != t.value {
-                    new_content.push(Inline::Text(Text {
-                        value: expanded,
-                        span: t.span,
-                    }));
-                    changed = true;
-                } else {
-                    new_content.push(inline.clone());
-                }
-            }
-            other => new_content.push(other.clone()),
-        }
-    }
-    *inlines = new_content;
-    changed
-}
-
-fn evaluate_value_recursively(
-    val: &mut Value,
-    doc: &Document,
-    config: &tomet_semantics::DocumentConfig,
-    ctx: &EvaluationContext,
-) -> bool {
-    let mut changed = false;
-    match val {
-        Value::String(s) => {
-            let expanded = expand_interpolations_in_string(s, doc, config, ctx);
-            if &expanded != s {
-                *s = expanded;
-                changed = true;
-            }
-        }
-        // `${uuid}` in a value position (`@meta{uuid: ${uuid}}`) now
-        // parses directly to this, rather than to a `Value::String`
-        // `expand_interpolations_in_string` has to re-parse -- evaluate
-        // it in place and splice in the resolved value, same as that
-        // string path does, rather than leave the `$` wrapper for
-        // `for_each_element_mut`'s own top-level-interp branch below to
-        // mutate a second, incompatible way. Replacing `*val` here runs
-        // before `walk_element_mut` descends into it (`visit_mut` on the
-        // parent element runs to completion first), so that branch never
-        // gets a turn on an already-resolved value.
-        Value::Element(el) if matches!(el.sigil, Sigil::Dollar) => {
-            if let Some(ElementValue::Interp(expr)) = &el.value
-                && let Ok(evaluated) = tomet_compute::evaluate_with_context(doc, expr, config, ctx)
-            {
-                *val = evaluated;
-                changed = true;
-            }
-        }
-        Value::Seq(items) => {
-            for item in items {
-                if evaluate_value_recursively(item, doc, config, ctx) {
-                    changed = true;
-                }
-            }
-        }
-        Value::Map(entries) => {
-            for (_, v) in entries {
-                if evaluate_value_recursively(v, doc, config, ctx) {
-                    changed = true;
-                }
-            }
-        }
-        _ => {}
-    }
-    changed
-}
-
-fn expand_interpolations_in_string(
-    s: &str,
-    doc: &Document,
-    config: &tomet_semantics::DocumentConfig,
-    ctx: &EvaluationContext,
-) -> String {
-    let mut result = String::new();
-    let mut rest = s;
-
-    while let Some(start_idx) = rest.find("${") {
-        result.push_str(&rest[..start_idx]);
-        let after_start = &rest[start_idx + 2..];
-        if let Some(end_idx) = after_start.find('}') {
-            let expr_str = &after_start[..end_idx];
-            let parsed_interp = format!("${{{expr_str}}}");
-            if let Ok(parsed_doc) = tomet_parser::parse_document(&parsed_interp)
-                && let Some(Block::Element(el)) = parsed_doc.blocks.first()
-                && let Some(ElementValue::Interp(expr)) = &el.value
-                && let Ok(evaluated_val) =
-                    tomet_compute::evaluate_with_context(doc, expr, config, ctx)
-            {
-                result.push_str(&value_to_display_string(&evaluated_val));
-                rest = &after_start[end_idx + 1..];
-                continue;
-            }
-            // If evaluation failed or couldn't parse, fall back to literal
-            result.push_str("${");
-            result.push_str(expr_str);
-            result.push('}');
-            rest = &after_start[end_idx + 1..];
-        } else {
-            result.push_str("${");
-            rest = after_start;
-        }
-    }
-    result.push_str(rest);
-    result
-}
-
-fn value_to_display_string(val: &Value) -> String {
-    match val {
-        Value::String(s) => s.clone(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => f.to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Null => String::new(),
-        _ => format!("{val:?}"),
+    Instantiated {
+        changed,
+        unresolved,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use time::OffsetDateTime;
+    use tomet_compute::eval::{DocRef, EvalValue, Generate, NoResolver, Phase};
+
+    /// A clock stopped at the epoch and a UUID that is always the same, so a
+    /// blueprint's output is the same every time.
+    struct Fixed;
+
+    impl Generate for Fixed {
+        fn now(&self) -> OffsetDateTime {
+            OffsetDateTime::UNIX_EPOCH
+        }
+        fn uuid(&self) -> String {
+            "00000000-0000-0000-0000-000000000000".to_string()
+        }
+    }
+
+    fn instantiate(src: &str, vars: EvalValue) -> (Document, Instantiated) {
+        let mut doc = tomet_parser::parse_document(src).unwrap();
+        let macros = HashMap::new();
+        let cx = EvalContext {
+            phase: Phase::Create,
+            resolver: &NoResolver,
+            generate: &Fixed,
+            self_doc: DocRef("notes/plan.tmt".into()),
+            macros: &macros,
+            vars: &vars,
+        };
+        let report = instantiate_blueprint(&mut doc, &cx);
+        (doc, report)
+    }
 
     /// Instantiating leaves exactly one kind behind.
     ///
@@ -383,17 +181,15 @@ mod tests {
     /// both, which is what this pins.
     #[test]
     fn instantiating_leaves_one_kind() {
-        let mut doc = tomet_parser::parse_document(
-            "@kind(blueprint)\n@blueprint(daily-note){\n  version: \"1.0\"\n}\n\n#[ Plan ]\n",
-        )
-        .unwrap();
-        instantiate_blueprint(&mut doc, &EvaluationContext::default());
+        let (doc, _) = instantiate(
+            "@kind(blueprint)\n@blueprint(daily-note){\n  version: \"1.0\"\n}\n\n=[ Plan ]\n",
+            EvalValue::Null,
+        );
 
         // `@kind(blueprint)` and `@blueprint(daily-note)` sat on adjacent
         // lines with nothing between them, so they join into one
-        // paragraph (`docs/spec/syntax.tmt`'s `##[ 区切り ]`) -- a
-        // top-level element search has to follow, not a raw `doc.blocks`
-        // walk.
+        // paragraph -- a top-level element search has to follow, not a raw
+        // `doc.blocks` walk.
         let mut kinds = Vec::new();
         tomet_tree::for_each_top_level_element(&doc, |el| {
             if classify_std_lenient(el) == ElementKind::Kind
@@ -407,7 +203,7 @@ mod tests {
 
     #[test]
     fn extracts_blueprint_info() {
-        let src = "@blueprint(daily-note){\n  description: \"Daily note\"\n  vars: {\n    author: \"Alice\"\n  }\n}\n\n#[ Plan ] {id: plan}\n";
+        let src = "@blueprint(daily-note){\n  description: \"Daily note\"\n  vars: {\n    author: \"Alice\"\n  }\n}\n\n=[ Plan ]#(plan)\n";
         let doc = tomet_parser::parse_document(src).unwrap();
         let info = extract_blueprint_info(&doc).unwrap();
         assert_eq!(info.target_kind, "daily-note");
@@ -419,58 +215,57 @@ mod tests {
     }
 
     #[test]
-    fn instantiates_blueprint_to_kind_and_evaluates_interp() {
-        let src = "@blueprint(daily-note)\n@meta{\n  id: ${uuid(\"nil\")}\n  date: ${date(\"YYYY-MM-DD\")}\n  title: ${vars.title}\n}\n\n#[ Plan for ${vars.title} ] {id: plan}\n";
-        let mut doc = tomet_parser::parse_document(src).unwrap();
+    fn instantiates_blueprint_to_kind_and_resolves_expressions() {
+        let src = "@blueprint(daily-note)\n@meta{\n  id: ${generate.uuid()}\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  title: ${vars.title}\n}\n\n=[ Plan for ${vars.title} ]#(plan)\n";
+        let vars = EvalValue::Map(vec![(
+            "title".to_string(),
+            EvalValue::String("Sprint 42".into()),
+        )]);
+        let (doc, report) = instantiate(src, vars);
+        assert!(report.changed);
+        assert!(report.unresolved.is_empty(), "{:?}", report.unresolved);
 
-        let mut vars = HashMap::new();
-        vars.insert(
-            "vars".to_string(),
-            Value::Map(vec![(
-                "title".to_string(),
-                Value::String("Sprint 42".into()),
-            )]),
-        );
-        let ctx = EvaluationContext { vars };
-
-        let changed = instantiate_blueprint(&mut doc, &ctx);
-        assert!(changed);
-
-        // `@blueprint(daily-note)` and `@meta{...}` sat on adjacent
-        // lines, so they join into one paragraph the same way
-        // `instantiating_leaves_one_kind` does -- collect top-level
-        // elements instead of indexing `doc.blocks` directly.
+        // `@blueprint(daily-note)` and `@meta{...}` sat on adjacent lines, so
+        // they join into one paragraph the same way `instantiating_leaves_one_kind`
+        // does -- collect top-level elements instead of indexing `doc.blocks`.
         let mut top_level = Vec::new();
         tomet_tree::for_each_top_level_element(&doc, |el| top_level.push(el.clone()));
 
-        // Verify @blueprint became @kind(daily-note)
-        let first_el = top_level
+        let kind = top_level
             .iter()
             .find(|el| classify_std_lenient(el) == ElementKind::Kind)
             .expect("expected a @kind element");
-        assert_eq!(first_el.args, Some(Value::String("daily-note".into())));
+        assert_eq!(kind.args, Some(Value::String("daily-note".into())));
 
-        // Verify @meta fields
-        let meta_el = top_level
+        let meta = top_level
             .iter()
             .find(|el| classify_std_lenient(el) == ElementKind::Meta)
             .expect("expected a @meta element");
-        if let Some(Value::Map(entries)) = meta_el.value.as_ref().and_then(|v| v.as_data()) {
-            assert_eq!(
-                entries.iter().find(|(k, _)| k == "id").unwrap().1.clone(),
-                Value::String("00000000-0000-0000-0000-000000000000".into())
-            );
-            assert_eq!(
-                entries
-                    .iter()
-                    .find(|(k, _)| k == "title")
-                    .unwrap()
-                    .1
-                    .clone(),
-                Value::String("Sprint 42".into())
-            );
-        } else {
+        let Some(Value::Map(entries)) = meta.value.as_ref().and_then(|v| v.as_data()) else {
             panic!("expected meta map");
-        }
+        };
+        let get = |key: &str| entries.iter().find(|(k, _)| k == key).unwrap().1.clone();
+        assert_eq!(
+            get("id"),
+            Value::String("00000000-0000-0000-0000-000000000000".into())
+        );
+        assert_eq!(get("date"), Value::String("1970-01-01".into()));
+        assert_eq!(get("file"), Value::String("plan.tmt".into()));
+        assert_eq!(get("title"), Value::String("Sprint 42".into()));
+    }
+
+    #[test]
+    fn an_expression_with_no_value_is_left_and_reported() {
+        let (doc, report) = instantiate(
+            "@blueprint(note)\n@meta{ title: ${vars.title} }\n",
+            EvalValue::Map(vec![]),
+        );
+        assert_eq!(report.unresolved.len(), 1);
+        assert!(
+            report.unresolved[0].reason.contains("title"),
+            "{:?}",
+            report.unresolved
+        );
+        assert!(format!("{doc:?}").contains("Interp"));
     }
 }

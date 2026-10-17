@@ -293,7 +293,7 @@ fn macro_hover_over_stdio() {
                 "uri": "file:///tmp/macro_test.tmt",
                 "languageId": "tomet",
                 "version": 1,
-                "text": "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  }\n}\n\n$gh(101)\n",
+                "text": "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  }\n}\n\n$macro.gh(101)\n",
             }
         }),
     );
@@ -353,7 +353,7 @@ fn macro_hover_with_config_import_over_stdio() {
                 "uri": doc_uri,
                 "languageId": "tomet",
                 "version": 1,
-                "text": "@config(import:\"custom.config.tmt\")\n\n@embed($youtube_video(\"Pm_h6FnF8HU\"))[Video]\n",
+                "text": "@config(import:\"custom.config.tmt\")\n\n@embed($macro.youtube_video(\"Pm_h6FnF8HU\"))[Video]\n",
             }
         }),
     );
@@ -419,7 +419,7 @@ fn macro_hover_with_workspace_auto_config_over_stdio() {
                 "languageId": "tomet",
                 "version": 1,
                 // Zero configuration headers in note
-                "text": "@embed($twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n",
+                "text": "@embed($macro.twitter_post(\"kosekibijou\", \"1807568682631254496\"))[Bijou]\n",
             }
         }),
     );

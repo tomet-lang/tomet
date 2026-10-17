@@ -97,7 +97,7 @@ impl MacroPattern {
             })
             .collect();
 
-        format!("${}({})", self.name, formatted_args.join(", "))
+        format!("$macro.{}({})", self.name, formatted_args.join(", "))
     }
 }
 

@@ -87,7 +87,7 @@ mod tests {
         let tmpl_file = tmpl_dir.join("rfc.blueprint.tmt");
         fs::write(
             &tmpl_file,
-            "@kind(blueprint)\n@blueprint(rfc)\n@meta{\n  id: ${uuid(\"nil\")}\n  title: ${title}\n  author: ${vars.author}\n}\n\n#[ Motivation for ${title} ] {id: motivation}\n",
+            "@kind(blueprint)\n@blueprint(rfc)\n@meta{\n  id: ${generate.uuid()}\n  title: ${vars.title}\n  author: ${vars.author}\n}\n\n=[ Motivation for ${vars.title} ]#(motivation)\n",
         )
         .unwrap();
 
@@ -104,10 +104,7 @@ mod tests {
             "title".to_string(),
             Value::String("New Auth Protocol".into()),
         );
-        var_map.insert(
-            "vars".to_string(),
-            Value::Map(vec![("author".to_string(), Value::String("Bob".into()))]),
-        );
+        var_map.insert("author".to_string(), Value::String("Bob".into()));
 
         let created = create_file_from_blueprint(
             &temp_dir,

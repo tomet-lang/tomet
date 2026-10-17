@@ -1,7 +1,7 @@
 //! Parsing for `${...}` interpolation expressions.
 
 use crate::error::Result;
-use crate::value::{err, parse_quoted, skip_inline_ws};
+use crate::value::{err, parse_quoted};
 use tomet_ast::{BinaryOp, Element, InterpExpr, InterpExprKind, Literal, Sigil};
 use tomet_lexer::Cursor;
 use tomet_tree::element_new;
@@ -37,7 +37,7 @@ pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
     cur.eat_str("$");
     if cur.peek() == Some('{') {
         cur.eat_str("{");
-        skip_inline_ws(cur);
+        skip_expr_ws(cur);
         if cur.peek() == Some('}') {
             return Err(err(
                 cur.pos(),
@@ -45,7 +45,7 @@ pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
             ));
         }
         let expr = parse_interp_expr(cur)?;
-        skip_inline_ws(cur);
+        skip_expr_ws(cur);
         if !cur.eat_str("}") {
             return Err(err(cur.pos(), "unterminated '${', expected '}'"));
         }
@@ -66,11 +66,11 @@ pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
         };
         loop {
             let mut look = *cur;
-            skip_inline_ws(&mut look);
+            skip_expr_ws(&mut look);
             match look.peek() {
                 Some('.') => {
                     look.bump();
-                    skip_inline_ws(&mut look);
+                    skip_expr_ws(&mut look);
                     *cur = look;
                     let member = eat_interp_ident(cur)?.to_string();
                     expr = InterpExpr {
@@ -109,7 +109,7 @@ pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
 /// `true`, `false` and `null` are the only words that mean anything on
 /// their own, and they are values.
 pub(crate) fn parse_interp_expr(cur: &mut Cursor) -> Result<InterpExpr> {
-    skip_inline_ws(cur);
+    skip_expr_ws(cur);
     let start_pos = cur.pos();
 
     // `x => body` and `(a, b) => body`
@@ -130,10 +130,10 @@ pub(crate) fn parse_interp_expr(cur: &mut Cursor) -> Result<InterpExpr> {
     if look.peek().is_some_and(is_interp_ident_start)
         && let Ok(name) = eat_interp_ident(&mut look)
     {
-        skip_inline_ws(&mut look);
+        skip_expr_ws(&mut look);
         if look.peek() == Some(':') && look.peek_at(1) != Some('/') {
             look.bump(); // consume ':'
-            skip_inline_ws(&mut look);
+            skip_expr_ws(&mut look);
             *cur = look;
             let val_expr = parse_interp_expr(cur)?;
             return Ok(InterpExpr {
@@ -159,17 +159,17 @@ fn lambda_head<'a>(cur: &Cursor<'a>) -> Option<(Vec<String>, Cursor<'a>)> {
     let mut params = Vec::new();
     if look.peek() == Some('(') {
         look.bump();
-        skip_inline_ws(&mut look);
+        skip_expr_ws(&mut look);
         loop {
             if !look.peek().is_some_and(is_interp_ident_start) {
                 return None;
             }
             params.push(eat_interp_ident(&mut look).ok()?.to_string());
-            skip_inline_ws(&mut look);
+            skip_expr_ws(&mut look);
             match look.peek() {
                 Some(',') => {
                     look.bump();
-                    skip_inline_ws(&mut look);
+                    skip_expr_ws(&mut look);
                 }
                 Some(')') => {
                     look.bump();
@@ -183,11 +183,11 @@ fn lambda_head<'a>(cur: &Cursor<'a>) -> Option<(Vec<String>, Cursor<'a>)> {
     } else {
         return None;
     }
-    skip_inline_ws(&mut look);
+    skip_expr_ws(&mut look);
     if look.peek() == Some('=') && look.peek_at(1) == Some('>') {
         look.bump();
         look.bump();
-        skip_inline_ws(&mut look);
+        skip_expr_ws(&mut look);
         Some((params, look))
     } else {
         None
@@ -213,12 +213,12 @@ fn binary(
 
 /// `And ('||' And)*`
 fn parse_interp_or(cur: &mut Cursor) -> Result<InterpExpr> {
-    skip_inline_ws(cur);
+    skip_expr_ws(cur);
     let start_pos = cur.pos();
     let mut lhs = parse_interp_and(cur)?;
     loop {
         let mut look = *cur;
-        skip_inline_ws(&mut look);
+        skip_expr_ws(&mut look);
         if look.peek() == Some('|') && look.peek_at(1) == Some('|') {
             look.bump();
             look.bump();
@@ -235,12 +235,12 @@ fn parse_interp_or(cur: &mut Cursor) -> Result<InterpExpr> {
 
 /// `Comparison ('&&' Comparison)*`
 fn parse_interp_and(cur: &mut Cursor) -> Result<InterpExpr> {
-    skip_inline_ws(cur);
+    skip_expr_ws(cur);
     let start_pos = cur.pos();
     let mut lhs = parse_interp_comparison(cur)?;
     loop {
         let mut look = *cur;
-        skip_inline_ws(&mut look);
+        skip_expr_ws(&mut look);
         if look.peek() == Some('&') && look.peek_at(1) == Some('&') {
             look.bump();
             look.bump();
@@ -259,7 +259,7 @@ fn parse_interp_and(cur: &mut Cursor) -> Result<InterpExpr> {
 /// past it. `=>` is the lambda arrow and is not a comparison.
 fn take_comparison(cur: &mut Cursor) -> Result<Option<BinaryOp>> {
     let mut look = *cur;
-    skip_inline_ws(&mut look);
+    skip_expr_ws(&mut look);
     let (op, len) = match (look.peek(), look.peek_at(1)) {
         (Some('='), Some('=')) => (BinaryOp::Eq, 2),
         (Some('!'), Some('=')) => (BinaryOp::Ne, 2),
@@ -280,7 +280,7 @@ fn take_comparison(cur: &mut Cursor) -> Result<Option<BinaryOp>> {
 
 /// `Postfix (CompareOp Postfix)?` -- comparisons do not chain.
 fn parse_interp_comparison(cur: &mut Cursor) -> Result<InterpExpr> {
-    skip_inline_ws(cur);
+    skip_expr_ws(cur);
     let start_pos = cur.pos();
     let lhs = parse_interp_postfix(cur)?;
     let Some(op) = take_comparison(cur)? else {
@@ -299,7 +299,7 @@ fn parse_interp_comparison(cur: &mut Cursor) -> Result<InterpExpr> {
 
 /// `primary (. Ident | ( Args ))*`
 fn parse_interp_postfix(cur: &mut Cursor) -> Result<InterpExpr> {
-    skip_inline_ws(cur);
+    skip_expr_ws(cur);
     let start_pos = cur.pos();
     let mut expr = parse_interp_primary(cur, start_pos)?;
     loop {
@@ -317,11 +317,11 @@ fn parse_interp_postfix(cur: &mut Cursor) -> Result<InterpExpr> {
             continue;
         }
         let mut look = *cur;
-        skip_inline_ws(&mut look);
+        skip_expr_ws(&mut look);
         match look.peek() {
             Some('.') => {
                 look.bump();
-                skip_inline_ws(&mut look);
+                skip_expr_ws(&mut look);
                 *cur = look;
                 let member = eat_interp_ident(cur)?.to_string();
                 expr = InterpExpr {
@@ -358,10 +358,10 @@ fn parse_interp_postfix(cur: &mut Cursor) -> Result<InterpExpr> {
 /// way the argument is a literal and is never evaluated.
 fn parse_addr_literal(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr> {
     cur.bump(); // '('
-    skip_inline_ws(cur);
+    skip_expr_ws(cur);
     let (text, raw) = if cur.peek() == Some('"') {
         let quoted = parse_quoted(cur)?;
-        skip_inline_ws(cur);
+        skip_expr_ws(cur);
         (quoted, false)
     } else {
         let begin = cur.pos();
@@ -405,11 +405,11 @@ fn parse_hash_id(cur: &mut Cursor) -> Result<String> {
     let has_paren = cur.peek() == Some('(');
     if has_paren {
         cur.bump();
-        skip_inline_ws(cur);
+        skip_expr_ws(cur);
     }
     let name = eat_interp_ident(cur)?.to_string();
     if has_paren {
-        skip_inline_ws(cur);
+        skip_expr_ws(cur);
         if cur.peek() == Some(')') {
             cur.bump();
         } else {
@@ -442,7 +442,7 @@ fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr
         Some('(') => {
             cur.bump();
             let inner = parse_interp_expr(cur)?;
-            skip_inline_ws(cur);
+            skip_expr_ws(cur);
             if !cur.eat_str(")") {
                 return Err(err(cur.pos(), "expected ')'"));
             }
@@ -479,16 +479,16 @@ fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr
 
 fn parse_interp_call_args(cur: &mut Cursor) -> Result<Vec<InterpExpr>> {
     cur.eat_str("(");
-    skip_inline_ws(cur);
+    skip_expr_ws(cur);
     let mut args = Vec::new();
     if cur.peek() != Some(')') {
         loop {
             args.push(parse_interp_expr(cur)?);
-            skip_inline_ws(cur);
+            skip_expr_ws(cur);
             match cur.peek() {
                 Some(',') => {
                     cur.bump();
-                    skip_inline_ws(cur);
+                    skip_expr_ws(cur);
                 }
                 Some(')') => break,
                 _ => return Err(err(cur.pos(), "expected ',' or ')' in call arguments")),
@@ -553,4 +553,14 @@ fn eat_interp_ident<'a>(cur: &mut Cursor<'a>) -> Result<&'a str> {
         return Err(err(start, "expected an identifier"));
     }
     Ok(cur.eat_while(is_interp_ident_char))
+}
+
+/// Whitespace inside an expression, line breaks included. A chain of calls
+/// reads best with one call to a line, so `${...}` and a call's arguments may
+/// run over several lines. (Everywhere else in a `.tmt` value a line break
+/// ends the thing being read, which is why this is not `skip_inline_ws`.)
+fn skip_expr_ws(cur: &mut Cursor) {
+    while matches!(cur.peek(), Some(' ' | '\t' | '\n' | '\r')) {
+        cur.bump();
+    }
 }
