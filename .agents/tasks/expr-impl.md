@@ -31,15 +31,20 @@ Delete it when the list is empty.
    migrate or leave, it is the owner's call.
 5. The Markdown exporter writes `@link(tmt:path)` as the bare path (HTML makes a real anchor). Same for a
    hand-written link, so it is not specific to `.link()`.
-6. Unresolved expressions inside an included file are not reported by the including file's `tomet check`
-   (they are, when that file is checked). Make it report them if that turns out to be wanted.
-7. tree-sitter: a call inside a value group, `@meta{ id: ${f()} }`, errors in `scanner.c` (the scalar ends at `(`).
+6. tree-sitter: a call inside a value group, `@meta{ id: ${f()} }`, errors in `scanner.c` (the scalar ends at `(`).
    Recorded in `KNOWN_TS_ERRORS` (`tests/src/lib.rs`, `blueprints/daily-note.blueprint.tmt`). Fix the scanner or
    leave it. Also unchecked: the CST (`tomet-syntax-parser/src/cst.rs`, `parse_interp_expr`) ends `${...}` at the
    first matching `}`, so a `}` inside `addr(...)` would end it early.
-8. `check_field_types` is wired into `tomet check` (and so `stats`) only. The LSP and the bindings call
-    `validate_document_with` and do not pass the settings' field types.
-9. Not from this work, found on the way: `tomet check .` fails on 7 files of the `tmtroot` reorganization in
+7. `check_field_types` (the `type: uuid` / `type: datetime` check) reaches `tomet check` and so `stats` only. Held
+   on purpose, until the LSP gets document-level diagnostics; it is two separate things, not a missing argument:
+   - The LSP (`apps/lsp/src/diagnostic.rs`) never runs the document validator. It reports CST duplicate ids
+     (`validate_cst`) and parse errors, and has no vault: no unknown elements, singletons, arguments, blueprint
+     conformance or field types. That is a feature to design (finding the vault, loading vocabularies, reacting to
+     file changes), of which this check is one line.
+   - The bindings (`bindings/{js,java,python}`) build their `Vault` from `PrinterConfig::default()`, so the `meta`
+     type declarations are always empty. Passing the settings' source in is a small change to three public APIs.
+     `tomet-edit`'s post-edit report (`diagnostics.rs`) calls `validate_document` with no config either.
+8. Not from this work, found on the way: `tomet check .` fails on 7 files of the `tmtroot` reorganization in
     progress (`index/*.roots.tmt`, `dev/plans/roadmap.tmt`, `schema/vocabularies/writ.vocabulary.tmt`, three under
     `deprecated/`). (The `cargo fmt --check -p tomet-validator-core` failure noted earlier is gone.)
 

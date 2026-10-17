@@ -35,7 +35,7 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Entry, Id, Inline, InterpExpr, List, ListItem,
     Paragraph, Sigil, Span, Text, Value,
 };
-use tomet_expr::{EvalContext, EvalValue, evaluate};
+use tomet_expr::{EvalContext, EvalValue, Note, evaluate};
 use tomet_tree::list_item;
 
 /// A `${...}` that could not be resolved, left in the output as written.
@@ -94,7 +94,26 @@ impl Pass<'_> {
     /// Evaluates, or records why it could not and returns `None`.
     fn evaluate(&mut self, expr: &InterpExpr, span: Span) -> Option<EvalValue> {
         let here = self.cx.at_heading_level(self.level);
-        match evaluate(expr, &here) {
+        let evaluated = evaluate(expr, &here);
+        // What the evaluation noticed on the way. The expression has a value
+        // all the same -- the content is in the document -- so this is a
+        // warning beside it and not a failure of it.
+        for note in here.notes.take() {
+            match note {
+                Note::Included { from, unresolved } => self.unresolved.push(Unresolved {
+                    source: expr.to_string(),
+                    span,
+                    reason: format!(
+                        "`{}` has {unresolved} unresolved {}, left in the included content as \
+                         written and reported when `{}` is checked",
+                        from.0,
+                        if unresolved == 1 { "item" } else { "items" },
+                        from.0
+                    ),
+                }),
+            }
+        }
+        match evaluated {
             Ok(value) => Some(value),
             Err(reason) => {
                 self.fail(expr, span, reason.to_string());

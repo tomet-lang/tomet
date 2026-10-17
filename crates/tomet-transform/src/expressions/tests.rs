@@ -52,6 +52,7 @@ fn run_in(
         vars,
         includes: &[],
         heading_level: 0,
+        notes: Default::default(),
     };
     let mut doc = tomet_parser::parse_document(src).expect("source parses");
     let unresolved = resolve_expressions(&mut doc, &cx);
@@ -384,6 +385,7 @@ fn with_no_vault_a_reference_to_another_document_fails_and_stays() {
         vars: &vars,
         includes: &[],
         heading_level: 0,
+        notes: Default::default(),
     };
     let unresolved = resolve_expressions(&mut doc, &cx);
     assert_eq!(unresolved.len(), 1);

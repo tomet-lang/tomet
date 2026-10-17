@@ -350,6 +350,51 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    /// What stays unresolved in an included file is reported in that file,
+    /// in full. The file that includes it says only that it brought some
+    /// in, once per `include`, so the same fault is not counted again for
+    /// every file above it.
+    #[test]
+    fn an_include_says_it_brought_in_what_the_included_file_left_unresolved() {
+        let root = vault("include");
+        fs::write(root.join("b.tmt"), "One ${nope}, two ${#missing}.\n").unwrap();
+        fs::write(root.join("a.tmt"), "${include(tmt(\"b.tmt\"))}\n").unwrap();
+        fs::write(root.join("c.tmt"), "${include(tmt(\"a.tmt\"))}\n").unwrap();
+        fs::write(root.join("clean.tmt"), "Nothing to resolve.\n").unwrap();
+        fs::write(root.join("d.tmt"), "${include(tmt(\"clean.tmt\"))}\n").unwrap();
+
+        let vault = tomet_load::Vault::discover(&root);
+        let unresolved = |name: &str| {
+            let path = root.join(name);
+            let doc = tomet_parser::parse_document(&fs::read_to_string(&path).unwrap()).unwrap();
+            Findings::of(&vault, &path, &doc).unresolved
+        };
+
+        // The included file itself: both, each with its own reason.
+        assert_eq!(unresolved("b.tmt").len(), 2);
+
+        // The file that includes it: one, naming the file, not the two again.
+        let a = unresolved("a.tmt");
+        assert_eq!(a.len(), 1, "{a:?}");
+        assert!(
+            a[0].reason.contains("`b.tmt` has 2 unresolved items"),
+            "{a:?}"
+        );
+
+        // And the one above that counts the one it was told of, not the two.
+        let c = unresolved("c.tmt");
+        assert_eq!(c.len(), 1, "{c:?}");
+        assert!(
+            c[0].reason.contains("`a.tmt` has 1 unresolved item,"),
+            "{c:?}"
+        );
+
+        // An include of a file with nothing left unresolved says nothing.
+        assert!(unresolved("d.tmt").is_empty());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
     /// The vault's `@kind` binding reaches every file in the sweep, not
     /// just the first -- the vocabularies are loaded once for the run.
     #[test]

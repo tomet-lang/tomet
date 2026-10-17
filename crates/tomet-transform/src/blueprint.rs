@@ -169,6 +169,7 @@ mod tests {
             vars: &vars,
             includes: &[],
             heading_level: 0,
+            notes: Default::default(),
         };
         let report = instantiate_blueprint(&mut doc, &cx);
         (doc, report)

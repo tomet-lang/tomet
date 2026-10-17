@@ -20,7 +20,7 @@ use tomet_semantics::{ElementKind, classify_std_lenient, link_target_of};
 use tomet_tree::for_each_element_mut;
 
 use super::args::Args;
-use super::context::EvalContext;
+use super::context::{EvalContext, Note};
 use super::error::EvalError;
 use super::nodes::load;
 use super::value::{DocRef, EvalValue, Node};
@@ -56,10 +56,19 @@ pub(crate) fn include(args: Args, cx: &EvalContext) -> Result<EvalValue, EvalErr
 
     let mut chain = cx.includes.to_vec();
     chain.push(doc.clone());
-    let mut blocks = cx
+    let prepared = cx
         .resolver
         .prepare_blocks(&doc, selection, &chain)
         .map_err(|why| EvalError::Unresolved(format!("content of `{}`: {why}", doc.0)))?;
+    // What stayed unresolved inside is reported where it is written, when
+    // that file is checked. Here it is only said that it came along.
+    if prepared.unresolved > 0 {
+        cx.notes.push(Note::Included {
+            from: doc.clone(),
+            unresolved: prepared.unresolved,
+        });
+    }
+    let mut blocks = prepared.blocks;
 
     let wanted = level.unwrap_or(cx.heading_level + 1);
     if let Some(top) = top_section_level(&blocks) {

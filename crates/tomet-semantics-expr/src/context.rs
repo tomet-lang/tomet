@@ -6,7 +6,7 @@
 //! over in-memory sources and `tomet-load` over the disk.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use time::OffsetDateTime;
 use tomet_ast::{Block, Document};
@@ -53,7 +53,53 @@ pub trait Resolver {
         doc: &DocRef,
         blocks: Vec<Block>,
         includes: &[DocRef],
-    ) -> Result<Vec<Block>, String>;
+    ) -> Result<PreparedBlocks, String>;
+}
+
+/// Blocks prepared in their own file's context.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreparedBlocks {
+    pub blocks: Vec<Block>,
+    /// How many things in them could not be resolved. They are left in the
+    /// blocks as written, and reported when their own file is checked; this
+    /// is only the count, so the file that includes them can say it did.
+    pub unresolved: usize,
+}
+
+impl PreparedBlocks {
+    /// Blocks in which nothing was left unresolved.
+    pub fn clean(blocks: Vec<Block>) -> Self {
+        Self {
+            blocks,
+            unresolved: 0,
+        }
+    }
+}
+
+/// Something an evaluation noticed that is not part of its result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Note {
+    /// An `include` put in content from `from` that has `unresolved` things
+    /// left as written.
+    Included { from: DocRef, unresolved: usize },
+}
+
+/// Where an evaluation leaves its [`Note`]s.
+///
+/// Clones share one list, so a note written under a context made from this one
+/// (`at_heading_level`) is found by whoever holds the original.
+#[derive(Debug, Clone, Default)]
+pub struct Notes(Arc<Mutex<Vec<Note>>>);
+
+impl Notes {
+    pub fn push(&self, note: Note) {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).push(note);
+    }
+
+    /// Everything noted since the last call.
+    pub fn take(&self) -> Vec<Note> {
+        std::mem::take(&mut *self.0.lock().unwrap_or_else(|e| e.into_inner()))
+    }
 }
 
 /// A resolver for contexts that have no vault. Every lookup fails.
@@ -77,7 +123,7 @@ impl Resolver for NoResolver {
         doc: &DocRef,
         _blocks: Vec<Block>,
         _includes: &[DocRef],
-    ) -> Result<Vec<Block>, String> {
+    ) -> Result<PreparedBlocks, String> {
         Err(format!("no vault to prepare the content of `{}` in", doc.0))
     }
 }
@@ -122,6 +168,8 @@ pub struct EvalContext<'a> {
     /// the document, 1 under a `=[` heading, 2 under `==[`, and so on. An
     /// included heading goes one level below this.
     pub heading_level: usize,
+    /// Where the evaluation leaves what it noticed besides its result.
+    pub notes: Notes,
 }
 
 impl<'a> EvalContext<'a> {
@@ -136,6 +184,7 @@ impl<'a> EvalContext<'a> {
             vars: self.vars,
             includes: self.includes,
             heading_level: level,
+            notes: self.notes.clone(),
         }
     }
 }

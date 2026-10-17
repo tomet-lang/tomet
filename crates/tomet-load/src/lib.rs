@@ -505,9 +505,17 @@ mod tests {
         let prepared = vault.prepare(&mut doc, &root.join("a.tmt"));
         // `a` includes `b`, and `b` includes `a` back: that last include is
         // the cycle, and it stays as written inside `b`. `a` itself, which
-        // only includes `b`, resolved.
+        // only includes `b`, resolved -- and says that what it brought in
+        // from `b` has one thing left unresolved, which `b` reports in full.
         assert_eq!(outline(&doc), ["1:A", "2:B", "${include(tmt(\"a.tmt\"))}"]);
-        assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
+        assert_eq!(prepared.unresolved.len(), 1, "{:?}", prepared.unresolved);
+        assert!(
+            prepared.unresolved[0]
+                .reason
+                .contains("`b.tmt` has 1 unresolved item"),
+            "{:?}",
+            prepared.unresolved
+        );
         let _ = fs::remove_dir_all(&root);
     }
 

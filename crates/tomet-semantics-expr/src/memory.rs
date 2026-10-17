@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use tomet_ast::{Block, Document, Value};
 
-use super::context::Resolver;
+use super::context::{PreparedBlocks, Resolver};
 use super::value::{DirRef, DocRef, EvalValue};
 
 /// Documents by vault-relative path.
@@ -87,8 +87,8 @@ impl Resolver for MemoryResolver {
         _doc: &DocRef,
         blocks: Vec<Block>,
         _includes: &[DocRef],
-    ) -> Result<Vec<Block>, String> {
+    ) -> Result<PreparedBlocks, String> {
         // Nothing here evaluates; the blocks come back as they are.
-        Ok(blocks)
+        Ok(PreparedBlocks::clean(blocks))
     }
 }

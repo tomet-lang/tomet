@@ -62,6 +62,7 @@ fn run_with(
         vars,
         includes: &[],
         heading_level: 0,
+        notes: Default::default(),
     };
     evaluate(&parse(src), &cx)
 }
@@ -573,6 +574,7 @@ fn in_vault(src: &str) -> Result<EvalValue, EvalError> {
         vars: &vars,
         includes: &[],
         heading_level: 0,
+        notes: Default::default(),
     };
     evaluate(&parse(src), &cx)
 }
@@ -1067,6 +1069,7 @@ fn include_in(
         vars: &vars,
         includes,
         heading_level: level,
+        notes: Default::default(),
     };
     evaluate(&parse(src), &cx)
 }
@@ -1360,6 +1363,7 @@ fn in_list_vault(src: &str) -> Result<EvalValue, EvalError> {
         vars: &vars,
         includes: &[],
         heading_level: 0,
+        notes: Default::default(),
     };
     evaluate(&parse(src), &cx)
 }

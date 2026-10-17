@@ -465,6 +465,7 @@ fn evaluate_for_hover(
         vars: &vars,
         includes: &[],
         heading_level: 0,
+        notes: Default::default(),
     };
     evaluate(expr, &cx)
 }

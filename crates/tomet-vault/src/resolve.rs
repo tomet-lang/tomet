@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use tomet_ast::{Block, Document, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
-use tomet_expr::{DirRef, DocRef, EvalValue, Resolver, parse_datetime};
+use tomet_expr::{DirRef, DocRef, EvalValue, PreparedBlocks, Resolver, parse_datetime};
 
 /// The document's `@meta`, typed by the settings' `meta` declarations.
 ///
@@ -101,7 +101,7 @@ impl Resolver for Overlay<'_> {
         doc: &DocRef,
         blocks: Vec<Block>,
         includes: &[DocRef],
-    ) -> Result<Vec<Block>, String> {
+    ) -> Result<PreparedBlocks, String> {
         self.inner.prepare_blocks(doc, blocks, includes)
     }
 }

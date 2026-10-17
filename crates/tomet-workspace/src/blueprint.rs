@@ -216,6 +216,7 @@ fn instantiate_blueprint_file_with(
         vars: &vars,
         includes: &[],
         heading_level: 0,
+        notes: Default::default(),
     };
     let instantiated = instantiate_blueprint(&mut doc, &cx);
 

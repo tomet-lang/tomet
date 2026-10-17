@@ -39,7 +39,7 @@ use std::sync::Arc;
 
 use tomet_ast::{Block, Document, Span};
 use tomet_config::PrinterConfig;
-use tomet_expr::{DocRef, EvalContext, EvalValue, Phase, SystemGenerate};
+use tomet_expr::{DocRef, EvalContext, EvalValue, Phase, PreparedBlocks, SystemGenerate};
 use tomet_semantics::{Bindings, LoadedVocabularies};
 
 mod resolve;
@@ -158,6 +158,7 @@ impl Vault {
             vars: &EvalValue::Null,
             includes: &chain,
             heading_level: 0,
+            notes: Default::default(),
         };
         Prepared {
             unresolved: tomet_transform::resolve_expressions(doc, &cx),
@@ -169,15 +170,16 @@ impl Vault {
     /// macros, its `self`, its settings. This is what `include` asks of the
     /// resolver, so that an included file means what it means in its own place.
     ///
-    /// What could not be resolved inside is left in the blocks as written and not
-    /// reported here: it is reported when that file is checked on its own.
+    /// What could not be resolved inside is left in the blocks as written. It is
+    /// reported in full only when that file is checked on its own, so here it
+    /// is counted: the including file says that it brought some in.
     pub fn prepare_blocks(
         &self,
         doc: &DocRef,
         blocks: Vec<Block>,
         includes: &[DocRef],
         resolver: &dyn Resolver,
-    ) -> Result<Vec<Block>, String> {
+    ) -> Result<PreparedBlocks, String> {
         let source = resolver.document(doc)?;
         let overlay = Overlay {
             meta: typed_meta(&self.config, &source, doc),
@@ -195,10 +197,14 @@ impl Vault {
             vars: &EvalValue::Null,
             includes,
             heading_level: 0,
+            notes: Default::default(),
         };
         let mut holder = Document::new(blocks, Span::default());
-        tomet_transform::resolve_expressions(&mut holder, &cx);
-        Ok(holder.blocks)
+        let unresolved = tomet_transform::resolve_expressions(&mut holder, &cx).len();
+        Ok(PreparedBlocks {
+            blocks: holder.blocks,
+            unresolved,
+        })
     }
 
     /// `path` as the vault names a document: measured from the root, with

@@ -50,7 +50,8 @@ mod value;
 mod tests;
 
 pub use context::{
-    EvalContext, Generate, NoResolver, OffsetGenerate, Phase, Resolver, SystemGenerate,
+    EvalContext, Generate, NoResolver, Note, Notes, OffsetGenerate, Phase, PreparedBlocks,
+    Resolver, SystemGenerate,
 };
 pub use datetime::{format_datetime, parse_datetime, parse_offset};
 pub use error::EvalError;
