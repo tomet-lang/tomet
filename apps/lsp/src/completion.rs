@@ -340,7 +340,6 @@ fn describe_kind(name: &str) -> &'static str {
         "config" => "Document-wide configuration",
         "settings" => "Schema and settings block",
         "use" => "Bind a vocabulary as a namespace",
-        "include" => "Splice another document in at this point",
         "references" => "Remote connection container",
         "id" => "Attach attributes to a remote element by id",
         "link" => "Link to a url, file, or document",

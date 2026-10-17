@@ -27,12 +27,10 @@ pub enum ElementKind {
     /// vocabulary lives, so a path here would say it twice.
     ///
     /// Was `@import`, which carried two jobs at once: binding a namespace
-    /// and splicing a document in. They are [`ElementKind::Use`] and
-    /// [`ElementKind::Include`] now. See `docs/spec/vocabulary.tmt`.
+    /// and splicing a document in. Binding stayed here; splicing a document
+    /// in is the expression `${include(...)}`, not an element, so that there
+    /// is one way to say it.
     Use,
-    /// `@include(file)` -- splices another document in at this point.
-    /// Recognized only; nothing expands it yet.
-    Include,
     Blueprint,
     /// `@vocabulary(ns){...}` -- the header of a vocabulary document,
     /// naming the namespace it declares. See `docs/spec/vocabulary.tmt`.
@@ -211,7 +209,6 @@ impl ElementKind {
             ElementKind::Config => "config",
             ElementKind::Settings => "settings",
             ElementKind::Use => "use",
-            ElementKind::Include => "include",
             ElementKind::Blueprint => "blueprint",
             ElementKind::Vocabulary => "vocabulary",
             ElementKind::Element => "element",
@@ -278,14 +275,13 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 36] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
     ("config", ElementKind::Config),
     ("settings", ElementKind::Settings),
     ("use", ElementKind::Use),
-    ("include", ElementKind::Include),
     ("blueprint", ElementKind::Blueprint),
     // The vocabulary document's own six. They are here rather than in a
     // `@vocabulary(vocabulary)` document because reading that document
@@ -466,7 +462,7 @@ pub fn is_directive(kind: &ElementKind) -> bool {
     use ElementKind::*;
     matches!(
         kind,
-        Version | Kind | Meta | Config | Settings | Use | Include | Blueprint | Vocabulary
+        Version | Kind | Meta | Config | Settings | Use | Blueprint | Vocabulary
     )
 }
 
@@ -480,10 +476,8 @@ pub fn is_directive(kind: &ElementKind) -> bool {
 pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
-        Meta | Config | Settings | Use | Include | Blueprint | Hr | Callout | Card | Table
-        | Heading | Kind | Version | Vocabulary | Element | Param | Args | Data | Content => {
-            Shape::Block
-        }
+        Meta | Config | Settings | Use | Blueprint | Hr | Callout | Card | Table | Heading
+        | Kind | Version | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
         Em | Strong | Mark | Strikeout | Ruby | Caret => Shape::Inline,
         // Either shape. A link or an embed alone on a line is not a
         // structural error -- it is how you show one file or one image.
@@ -561,8 +555,8 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
     match kind {
         // Directives and vocabulary-document bookkeeping: `{data}`/
         // `(args)` only, no `[content]`.
-        Kind | Version | Meta | Config | Settings | Use | Include | Blueprint | Vocabulary
-        | Content | Args | Data => None,
+        Kind | Version | Meta | Config | Settings | Use | Blueprint | Vocabulary | Content
+        | Args | Data => None,
         // Self-closing; a fenced/backtick code body's `[content]` is
         // synthesized by the parser itself (`raw.rs`), not shaped
         // by an author, so there is nothing here for a shape check to
@@ -617,7 +611,7 @@ pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
     use crate::vocabulary::Region;
     use ElementKind::*;
     match kind {
-        Kind | Version | Meta | Config | Settings | Blueprint | Vocabulary | Use | Include => {
+        Kind | Version | Meta | Config | Settings | Blueprint | Vocabulary | Use => {
             Region::Preamble
         }
         _ => Region::Body,

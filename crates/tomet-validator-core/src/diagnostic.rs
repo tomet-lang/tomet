@@ -291,7 +291,7 @@ impl Diagnostic {
                 // One wording, in `tomet_semantics::UnknownName`. This arm
                 // used to carry its own copy and the two drifted -- it was
                 // still advising `@import(file:..., as:ns)` after that
-                // element had split into `@use` and `@include`.
+                // element had split into `@use` and the `include` expression.
                 write!(
                     f,
                     "{}",
