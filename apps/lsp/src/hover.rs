@@ -10,17 +10,34 @@ use crate::format::resolve_effective_config;
 use crate::position::{TextPositions, span_contains};
 use crate::symbol::{list_item_marker_text, sigil_display_name};
 
-/// Provides hover information for the symbol under the cursor.
+/// What an expression comes to, for a hover: given the document it is written
+/// in, and the expression.
+pub type Evaluate<'a> =
+    &'a dyn Fn(&Document, &tomet_ast::InterpExpr) -> Result<EvalValue, tomet_expr::EvalError>;
+
+/// Provides hover information for the symbol under the cursor, from the text
+/// alone.
+///
+/// An expression is evaluated against this one document and its settings, so
+/// what reaches for another file fails and says so. A document that has a
+/// vault is better served by [`hover_in`], with the vault's evaluation.
 pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> {
+    let doc = tomet_parser::parse_document(text).ok()?;
+    let config = resolve_effective_config(&doc, uri);
+    hover_in(text, pos, &|doc, expr| {
+        evaluate_for_hover(doc, expr, &config)
+    })
+}
+
+/// [`hover_for`], with `evaluate` deciding what an expression comes to.
+pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hover> {
     let doc = tomet_parser::parse_document(text).ok()?;
     let positions = TextPositions::new(text);
     let offset = positions.offset(pos);
 
-    let config = resolve_effective_config(&doc, uri);
-
     struct HoverFinder<'a> {
         doc: &'a Document,
-        config: &'a tomet_semantics::DocumentConfig,
+        evaluate: Evaluate<'a>,
         text: &'a str,
         positions: &'a TextPositions<'a>,
         pos: Position,
@@ -35,7 +52,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
                 let kind = classify_std_lenient(el);
                 let hover = if kind == ElementKind::Table {
                     table_hover(self.positions, self.text, self.pos, el)
-                } else if let Some(h) = macro_hover(self.positions, self.doc, self.config, el) {
+                } else if let Some(h) = macro_hover(self.positions, self.doc, self.evaluate, el) {
                     Some(h)
                 } else if kind == ElementKind::Bare {
                     Some(Hover {
@@ -147,7 +164,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
 
     let mut finder = HoverFinder {
         doc: &doc,
-        config: &config,
+        evaluate,
         text,
         positions: &positions,
         pos,
@@ -402,7 +419,7 @@ fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
 fn macro_hover(
     positions: &TextPositions<'_>,
     doc: &Document,
-    config: &tomet_semantics::DocumentConfig,
+    evaluate: Evaluate<'_>,
     el: &Element,
 ) -> Option<Hover> {
     let expr = if let Some(ElementValue::Interp(expr)) = el.value.as_ref() {
@@ -413,7 +430,7 @@ fn macro_hover(
         None
     }?;
 
-    let md = match evaluate_for_hover(doc, &expr, config) {
+    let md = match evaluate(doc, &expr) {
         Ok(val) => {
             let rendered = render_value(&val);
             let trimmed = rendered.trim();

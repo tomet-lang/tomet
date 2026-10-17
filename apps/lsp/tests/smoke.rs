@@ -316,7 +316,7 @@ fn macro_hover_over_stdio() {
 }
 
 #[test]
-fn macro_hover_with_config_import_over_stdio() {
+fn macro_hover_does_not_take_macros_from_an_imported_config_over_stdio() {
     let unique = format!(
         "tomet_smoke_import_{}_{}",
         std::process::id(),
@@ -369,11 +369,15 @@ fn macro_hover_with_config_import_over_stdio() {
     let hover_val = hover_resp["result"]["contents"]["value"]
         .as_str()
         .unwrap_or_else(|| panic!("expected hover value string, got {hover_resp:?}"));
+    // Hover shows what rendering shows, and rendering takes its macros from
+    // the document's own `@config` and the vault's settings -- not from a
+    // file the document imports. So the imported macro is not there, and the
+    // hover says so rather than showing a value the output would not have.
     assert!(
-        hover_val.contains("Macro Result"),
-        "got hover_val: {hover_val}"
+        hover_val.contains("Error"),
+        "an imported macro is not one rendering knows: {hover_val}"
     );
-    assert!(hover_val.contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU"));
+    assert!(!hover_val.contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU"));
 
     server.shutdown();
     let _ = std::fs::remove_dir_all(&dir);

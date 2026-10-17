@@ -255,7 +255,11 @@ fn detect_path_context(prefix: &str) -> Option<(&str, bool)> {
 fn find_project_root(start: &std::path::Path) -> std::path::PathBuf {
     let mut cur = start.to_path_buf();
     loop {
-        if cur.join("default.config.tmt").exists() || cur.join(".git").exists() {
+        // The directory a vault is: where its config is, under either name.
+        if cur.join("default.config.tmt").exists()
+            || cur.join("tomet.config.tmt").exists()
+            || cur.join(".git").exists()
+        {
             return cur;
         }
         if !cur.pop() {

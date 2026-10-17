@@ -39,7 +39,9 @@ use std::sync::Arc;
 
 use tomet_ast::{Block, Document, Span};
 use tomet_config::PrinterConfig;
-use tomet_expr::{DocRef, EvalContext, EvalValue, Phase, PreparedBlocks, SystemGenerate};
+use tomet_expr::{
+    DocRef, EvalContext, EvalError, EvalValue, Phase, PreparedBlocks, SystemGenerate,
+};
 use tomet_semantics::{Bindings, LoadedVocabularies};
 
 mod resolve;
@@ -57,6 +59,31 @@ pub use tomet_transform::{Unresolved, UnresolvedKind};
 #[derive(Debug, Default)]
 pub struct Prepared {
     pub unresolved: Vec<Unresolved>,
+}
+
+/// What an evaluation in one document is done in. See [`Vault::scope`].
+struct Scope<'a> {
+    overlay: Overlay<'a>,
+    macros: std::collections::HashMap<String, String>,
+    chain: Vec<DocRef>,
+    self_doc: DocRef,
+    vars: EvalValue,
+}
+
+impl Scope<'_> {
+    fn context(&self) -> EvalContext<'_> {
+        EvalContext {
+            phase: Phase::Output,
+            resolver: &self.overlay,
+            generate: &SystemGenerate,
+            self_doc: self.self_doc.clone(),
+            macros: &self.macros,
+            vars: &self.vars,
+            includes: &self.chain,
+            heading_level: 0,
+            notes: Default::default(),
+        }
+    }
 }
 
 /// A vault's config and the vocabularies it declares, resolved once.
@@ -137,31 +164,51 @@ impl Vault {
     /// commands and missing from the fourth -- which is the state
     /// interpolation was in before this existed.
     pub fn prepare(&self, doc: &mut Document, path: &Path, resolver: &dyn Resolver) -> Prepared {
+        let scope = self.scope(doc, path, resolver);
+        Prepared {
+            unresolved: tomet_transform::resolve_expressions(doc, &scope.context()),
+        }
+    }
+
+    /// What `expr`, written in `doc` (which sits at `path`), comes to when the
+    /// document is rendered: in the same scope [`Vault::prepare`] evaluates
+    /// every expression of it in, so what an editor shows for one expression
+    /// is what the output will show.
+    ///
+    /// The document is read as written (`#id`, `self.meta`), everything else
+    /// is asked of `resolver`. `generate.*` and `vars` fail, as they do when
+    /// rendering: they exist only when a document is created.
+    pub fn evaluate(
+        &self,
+        doc: &Document,
+        path: &Path,
+        expr: &tomet_ast::InterpExpr,
+        resolver: &dyn Resolver,
+    ) -> Result<EvalValue, EvalError> {
+        let scope = self.scope(doc, path, resolver);
+        tomet_expr::evaluate(expr, &scope.context())
+    }
+
+    /// Everything an evaluation of something written in `doc` needs that is
+    /// not the expression: where `self` is, what `#id` is answered from, the
+    /// macros in scope.
+    fn scope<'a>(&self, doc: &Document, path: &Path, resolver: &'a dyn Resolver) -> Scope<'a> {
         let self_doc = self.doc_ref(path);
         let snapshot = Arc::new(doc.clone());
-        let overlay = Overlay {
-            meta: typed_meta(&self.config, &snapshot, &self_doc),
-            path: self_doc.clone(),
-            snapshot,
-            inner: resolver,
-        };
-        let macros = self.evaluation_config(doc).macros;
-        // The document is the first of the chain of files being included, so
-        // a file that includes it back is a cycle at once, not one lap later.
-        let chain = [self_doc.clone()];
-        let cx = EvalContext {
-            phase: Phase::Output,
-            resolver: &overlay,
-            generate: &SystemGenerate,
+        Scope {
+            overlay: Overlay {
+                meta: typed_meta(&self.config, &snapshot, &self_doc),
+                path: self_doc.clone(),
+                snapshot,
+                inner: resolver,
+            },
+            macros: self.evaluation_config(doc).macros,
+            // The document is the first of the chain of files being included,
+            // so a file that includes it back is a cycle at once, not one lap
+            // later.
+            chain: vec![self_doc.clone()],
             self_doc,
-            macros: &macros,
-            vars: &EvalValue::Null,
-            includes: &chain,
-            heading_level: 0,
-            notes: Default::default(),
-        };
-        Prepared {
-            unresolved: tomet_transform::resolve_expressions(doc, &cx),
+            vars: EvalValue::Null,
         }
     }
 

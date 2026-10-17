@@ -27,7 +27,10 @@ Provides autocompletion items with document URI awareness for path completions.
 
 ====[fn definition_for]
 
-Provides Goto Definition target for reference links or interpolation expressions.
+Provides Goto Definition target for reference links or interpolation
+expressions, from the text alone: the references to a node of the same
+document. One into another document needs the vault
+([`Workspace::definition`](crate::Workspace::definition)).
 
 ==[Module diagnostic]
 
@@ -68,7 +71,23 @@ Resolves the merged configuration for a document by combining:
 
 ====[fn hover_for]
 
-Provides hover information for the symbol under the cursor.
+Provides hover information for the symbol under the cursor, from the text
+alone.
+
+An expression is evaluated against this one document and its settings, so
+what reaches for another file fails and says so. A document that has a
+vault is better served by [`hover_in`], with the vault's evaluation.
+
+====[fn hover_in]
+
+[`hover_for`], with `evaluate` deciding what an expression comes to.
+
+===[Type Aliases]
+
+====[type Evaluate]
+
+What an expression comes to, for a hover: given the document it is written
+in, and the expression.
 
 ==[Module position]
 

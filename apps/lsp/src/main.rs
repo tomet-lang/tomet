@@ -130,13 +130,15 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                 } else if req.method == HoverRequest::METHOD {
                     let params: lsp_types::HoverParams = serde_json::from_value(req.params)?;
                     let uri = &params.text_document_position_params.text_document.uri;
-                    let hover = documents.get(uri).and_then(|text| {
-                        tomet_lsp::hover_for(
-                            text,
-                            params.text_document_position_params.position,
-                            Some(uri),
-                        )
-                    });
+                    let position = params.text_document_position_params.position;
+                    // A file in a vault is answered by its vault; anything
+                    // else, from its text alone.
+                    let hover = match tomet_lsp::uri_to_file_path(uri) {
+                        Some(path) => workspace.hover(&path, position),
+                        None => documents
+                            .get(uri)
+                            .and_then(|text| tomet_lsp::hover_for(text, position, Some(uri))),
+                    };
                     let result = serde_json::to_value(hover)?;
                     connection
                         .sender
@@ -160,13 +162,16 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         .text_document
                         .uri
                         .clone();
-                    let def = documents.get(&uri).and_then(|text| {
-                        tomet_lsp::definition_for(
-                            text,
-                            params.text_document_position_params.position,
-                            &uri,
-                        )
-                    });
+                    let position = params.text_document_position_params.position;
+                    // A file in a vault is answered by its vault, which can
+                    // follow a reference into another document; anything
+                    // else, from its text alone.
+                    let def = match tomet_lsp::uri_to_file_path(&uri) {
+                        Some(path) => workspace.definition(&path, position),
+                        None => documents
+                            .get(&uri)
+                            .and_then(|text| tomet_lsp::definition_for(text, position, &uri)),
+                    };
                     let result = serde_json::to_value(def)?;
                     connection
                         .sender
@@ -174,16 +179,18 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                 } else if req.method == Completion::METHOD {
                     let params: lsp_types::CompletionParams = serde_json::from_value(req.params)?;
                     let uri = &params.text_document_position.text_document.uri;
-                    let items = documents
-                        .get(uri)
-                        .map(|text| {
-                            tomet_lsp::completions_for_with_uri(
-                                text,
-                                params.text_document_position.position,
-                                Some(uri),
-                            )
-                        })
-                        .unwrap_or_default();
+                    let position = params.text_document_position.position;
+                    // A file in a vault is answered by its vault; anything
+                    // else, from its text alone.
+                    let items = match tomet_lsp::uri_to_file_path(uri) {
+                        Some(path) => workspace.completions(&path, position, Some(uri)),
+                        None => documents
+                            .get(uri)
+                            .map(|text| {
+                                tomet_lsp::completions_for_with_uri(text, position, Some(uri))
+                            })
+                            .unwrap_or_default(),
+                    };
                     let result = serde_json::to_value(items)?;
                     connection
                         .sender

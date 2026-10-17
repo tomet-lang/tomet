@@ -223,6 +223,19 @@ impl Vault {
         self.core.prepare(doc, path, &self.resolver())
     }
 
+    /// What `expr`, written in `doc` at `path`, comes to when the document is
+    /// rendered -- see `tomet_vault::Vault::evaluate`. This supplies the
+    /// files the expression asks about, and the editor's unsaved text for the
+    /// ones it has open.
+    pub fn evaluate(
+        &self,
+        doc: &Document,
+        path: &Path,
+        expr: &tomet_ast::InterpExpr,
+    ) -> Result<tomet_expr::EvalValue, tomet_expr::EvalError> {
+        self.core.evaluate(doc, path, expr, &self.resolver())
+    }
+
     /// [`Vault::document`] followed by [`Vault::prepare`] -- what anything
     /// about to render a document wants.
     pub fn prepared_document(&self, path: &Path) -> Result<(Document, Bindings), LoadError> {
@@ -579,6 +592,52 @@ mod tests {
         vault.set_buffer(&root.join("lib.tmt"), "=[ Edited ]\n");
         vault.remove_buffer(&root.join("lib.tmt"));
         assert_eq!(prepared(&vault), ["1:Host", "2:Saved"]);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// An expression is evaluated the way rendering evaluates it: in the
+    /// vault, so it can ask about other documents, and about an open buffer
+    /// as the editor has it.
+    #[test]
+    fn an_expression_is_evaluated_in_the_vault() {
+        let root = include_vault(
+            "tomet_test_load_evaluate",
+            &[
+                ("host.tmt", "@meta{ title: Host }\n\n=[ Intro ]#(intro)\n"),
+                ("other.tmt", "@meta{ title: Saved }\n"),
+            ],
+        );
+        let vault = Vault::discover(&root);
+        let host = root.join("host.tmt");
+        let (doc, _) = vault.document(&host).unwrap();
+        let eval = |src: &str| {
+            let expr = match tomet_parser::parse_dollar_element_str(&format!("${{{src}}}"))
+                .unwrap()
+                .value
+            {
+                Some(tomet_ast::ElementValue::Interp(expr)) => expr,
+                other => panic!("not an expression: {other:?}"),
+            };
+            vault.evaluate(&doc, &host, &expr)
+        };
+        let text = |s: &str| tomet_expr::EvalValue::String(s.to_string());
+
+        assert_eq!(eval("self.meta.title").unwrap(), text("Host"));
+        assert_eq!(
+            eval("tmt(\"other.tmt\").meta.title").unwrap(),
+            text("Saved")
+        );
+        assert_eq!(eval("#intro.id").unwrap(), text("intro"));
+
+        // The other document is open in the editor, edited and not saved.
+        vault.set_buffer(&root.join("other.tmt"), "@meta{ title: Edited }\n");
+        assert_eq!(
+            eval("tmt(\"other.tmt\").meta.title").unwrap(),
+            text("Edited")
+        );
+
+        // As when rendering, what exists only when creating is not there.
+        assert!(eval("generate.uuid()").is_err());
         let _ = fs::remove_dir_all(&root);
     }
 

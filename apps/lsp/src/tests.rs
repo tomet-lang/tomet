@@ -703,3 +703,24 @@ fn what_an_element_holds_folds_too() {
         "the list inside the section: {starts:?}"
     );
 }
+
+/// A path that starts with `/` is measured from the vault -- where its config
+/// is, under either of the two names -- and not only from `default.config.tmt`.
+#[test]
+fn a_rooted_path_is_measured_from_a_vault_with_either_config_name() {
+    let root = std::env::temp_dir().join(format!("tomet_lsp_rooted_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("notes")).unwrap();
+    std::fs::write(root.join("tomet.config.tmt"), "@kind(config)\n").unwrap();
+    std::fs::write(root.join("top.png"), "").unwrap();
+    let uri = Uri::from_str(&format!("file://{}", root.join("notes/a.tmt").display())).unwrap();
+
+    let text = "@link(file:/";
+    let items = completions_for_with_uri(text, Position::new(0, 12), Some(&uri));
+    assert!(
+        items.iter().any(|i| i.label == "top.png"),
+        "from the vault root, not from notes/: {:?}",
+        items.iter().map(|i| &i.label).collect::<Vec<_>>()
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
