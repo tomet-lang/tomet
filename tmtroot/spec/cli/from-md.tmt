@@ -34,22 +34,23 @@ TUI の Migration タブ（@file(tmtroot/spec/cli/tui.tmt)）も、Markdown を 
 ディレクトリは、その下の Markdown を、vault の索引（`workspace.ignore` が効く）から数える。Markdown がなければ、`No .md files found in <ディレクトリ>`。
 
 @table
-|[ 指定                   ][ していること                                    ]
+|[ 指定                   ][ していること ]
+|[ 指定なし               ][ エラーにして、何も変換しない（`a directory is converted into files: pass --out <DIR> or --in-place ...`）。ディレクトリには、標準出力に出す先がないため。 ]
 |[ `--out <ディレクトリ>` ][ ディレクトリの中の並びを保って、`.tmt` を書く。 ]
-|[ `--in-place`           ][ それぞれの元の隣に書く。                        ]
-|[ `--dry-run`            ][ 変換して読めるかだけ確かめ、何も書かない。      ]
-|[ `--remove-original`    ][ 書き込みに成功したものの元を消す。              ]
+|[ `--in-place`           ][ それぞれの元の隣に書く。 ]
+|[ `--dry-run`            ][ 変換して読めるかだけ確かめ、何も書かない。 ]
+|[ `--remove-original`    ][ 書き込みに成功したものの元を消す。 ]
 
 終わりに、`Conversion finished: <n> total, <m> succeeded, <k> failed`（`--dry-run` なら `Dry-run finished: ...`）と出す。失敗した文書は、標準エラー出力に `Errors encountered (<k>):` として並べる。1つが失敗しても、残りを続ける。
+
+書き込めなかったファイルも、失敗に数える。変換しても、書けていなければ、変換していない。そのファイルの元は消さない。
 
 1つでも失敗すれば、`<k> file(s) failed conversion` で1。なければ0。
 
 =[ 現状の実装との差 ]
 
 - TUI の Migration は、表の整形の設定（`format.table_*`）を変換に渡さない。同じ Markdown でも、表の幅の整え方が、この CLI と違うことがある。
-- ディレクトリに `--out` も `--in-place` も `--dry-run` も付けないと、何も書かないのに、`Conversion finished: <n> total, <n> succeeded` と出す。書いたように見える。ファイル1つなら、標準出力に出す。
-- 書き込みに失敗したときの数え方。ディレクトリで書き込みに失敗したファイルは、`failed` にも数えず、`succeeded` に数えたまま、エラーを標準エラー出力に出すだけで、終了コードも0のまま。
 
 =[ まだ決まっていないこと ]
 
-- ディレクトリに出力の指定がないときの動き。標準出力にまとめて出すのか、エラーにするのか。
+- なし。

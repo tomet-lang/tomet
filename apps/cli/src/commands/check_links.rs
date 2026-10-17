@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Runs the broken-link check and prints its report. Returns `Ok(true)`
-/// if any broken link was found (distinct from `Err`, which means the
+/// if there is something to deal with -- a broken link, or a document that
+/// could not be read (distinct from `Err`, which means the
 /// check itself couldn't run) so `main` can exit non-zero without
 /// treating "found breakage" the same as "something went wrong".
 pub(crate) fn check_links_cmd(target_path: &Path, json: bool) -> anyhow::Result<bool> {
@@ -52,7 +53,52 @@ pub(crate) fn check_links_cmd(target_path: &Path, json: bool) -> anyhow::Result<
         }
     }
 
-    Ok(!report.broken.is_empty())
+    Ok(has_problems(&report))
+}
+
+/// Whether the run found something the person has to deal with: a link that
+/// is broken, or a document that could not be looked at.
+///
+/// The second counts. A document that could not be read has links nobody
+/// checked, and a run that exits 0 over it says they are fine -- the same
+/// reason `check` and `refactor --check` fail on a file they could not read.
+fn has_problems(report: &tomet_links::CheckReport) -> bool {
+    !report.broken.is_empty() || !report.errors.is_empty()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn a_clean_report_has_no_problems() {
+        assert!(!has_problems(&tomet_links::CheckReport::default()));
+    }
+
+    #[test]
+    fn a_broken_link_is_a_problem() {
+        let report = tomet_links::CheckReport {
+            broken: vec![tomet_links::BrokenLink {
+                source: PathBuf::from("a.tmt"),
+                target: "missing.png".to_string(),
+                span: tomet_ast::Span::new(0, 1),
+            }],
+            ..Default::default()
+        };
+        assert!(has_problems(&report));
+    }
+
+    /// No broken link was found, because the document that might have held
+    /// one could not be read.
+    #[test]
+    fn a_document_that_could_not_be_read_is_a_problem() {
+        let report = tomet_links::CheckReport {
+            errors: vec![(PathBuf::from("a.tmt"), "could not read".to_string())],
+            ..Default::default()
+        };
+        assert!(has_problems(&report));
+    }
 }
 
 /// The line and column of each broken link. A link carries a byte span into its

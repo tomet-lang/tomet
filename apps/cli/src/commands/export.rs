@@ -252,6 +252,7 @@ fn export_directory(
     }
 
     let mut exported_count = 0;
+    let mut failed = 0usize;
     let mut stale = StaleExports::default();
     // Discovered once for the whole run; the metadata table inside it is
     // filled by whichever document asks first -- see `export_one`.
@@ -277,14 +278,40 @@ fn export_directory(
 
         match export_one(&settings, file, relative_out.as_deref(), &mut stale) {
             Ok(()) => exported_count += 1,
-            Err(e) => eprintln!("Error exporting {}: {e}", file.display()),
+            Err(e) => {
+                failed += 1;
+                eprintln!("Error exporting {}: {e}", file.display());
+            }
         }
     }
 
+    // One document that fails does not stop the others, but it is not a
+    // success: under `--check` a document that could not be read has not been
+    // checked, and passing there says it is up to date.
     if check {
-        return report_stale(&stale, check);
+        if failed == 0 {
+            return report_stale(&stale, check);
+        }
+        for path in &stale.0 {
+            println!("Stale export: {}", path.display());
+        }
+        let differ = if stale.0.is_empty() {
+            String::new()
+        } else {
+            format!(", and {} export(s) differ from their source", stale.0.len())
+        };
+        return Err(anyhow::anyhow!(
+            "{failed} of {} file(s) could not be checked{differ}",
+            files.len()
+        ));
     }
     println!("Batch export finished: {exported_count} file(s) processed.");
+    if failed > 0 {
+        return Err(anyhow::anyhow!(
+            "{failed} of {} file(s) could not be exported",
+            files.len()
+        ));
+    }
     Ok(())
 }
 
@@ -362,6 +389,57 @@ mod tests {
             "a hand-edited export must not pass --check"
         );
 
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A directory with one document that cannot be exported, and one that can.
+    fn dir_with_a_broken_document(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("tomet_test_export_dir_{name}"));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("temp dir");
+        fs::write(dir.join("default.config.tmt"), "@kind(config)\n").expect("config");
+        fs::write(
+            dir.join("good.tmt"),
+            "@config(export: { type: commonmark, path: \"good.md\" })\n\n#[ Good ]\n",
+        )
+        .expect("good");
+        fs::write(dir.join("broken.tmt"), "=[ unterminated\n").expect("broken");
+        dir
+    }
+
+    /// A document that could not be exported is a document the run did not
+    /// do. The run said so on stderr and still exited 0, so a script that
+    /// exported a directory could not tell.
+    #[test]
+    fn a_directory_export_fails_when_a_document_could_not_be_exported() {
+        let dir = dir_with_a_broken_document("run");
+        let result = export_cmd(&dir, None, None, false, false);
+        assert!(result.is_err(), "the broken document must fail the run");
+        // The rest is still done: one bad document does not hide the others.
+        assert!(dir.join("good.md").is_file());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `--check` is a guard, and a guard that cannot read a document has not
+    /// checked it. Passing there is the same as saying it is up to date.
+    #[test]
+    fn check_fails_when_a_document_could_not_be_checked() {
+        let dir = dir_with_a_broken_document("check");
+        export_cmd(&dir.join("good.tmt"), None, None, false, false).expect("exports");
+        let result = export_cmd(&dir, None, None, false, true);
+        assert!(
+            result.is_err(),
+            "a document that cannot be read must not pass --check"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_directory_of_good_documents_still_passes() {
+        let dir = dir_with_a_broken_document("good");
+        fs::remove_file(dir.join("broken.tmt")).unwrap();
+        export_cmd(&dir, None, None, false, false).expect("exports");
+        export_cmd(&dir, None, None, false, true).expect("is up to date");
         let _ = fs::remove_dir_all(&dir);
     }
 
