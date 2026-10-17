@@ -45,3 +45,18 @@ Evaluates `expr` in `cx`.
 
 The names that stand for a value and that no lambda parameter may take.
 `vars` and `generate` exist only while a document is being created.
+
+===[const FUNCTIONS]
+
+The functions an expression can call by a bare name, each with a line
+saying what it does -- what an editor offers when `${` is typed.
+
+`addr` is read by the parser rather than called, and is listed because it
+is written like a call. Every other name is one [`builtin`] answers, which
+a test holds to; a function added there is added here, so the editor does
+not offer the language of last month.
+
+===[const RESERVED_NAMES]
+
+The names an expression can start with that are values, not functions,
+each with a line saying what it is.

@@ -267,7 +267,53 @@ fn macro_call(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, Eva
     Ok(EvalValue::String(text))
 }
 
-/// The functions that are called by a bare name.
+/// The functions an expression can call by a bare name, each with a line
+/// saying what it does -- what an editor offers when `${` is typed.
+///
+/// `addr` is read by the parser rather than called, and is listed because it
+/// is written like a call. Every other name is one [`builtin`] answers, which
+/// a test holds to; a function added there is added here, so the editor does
+/// not offer the language of last month.
+pub const FUNCTIONS: &[(&str, &str)] = &[
+    ("tmt", "A document by its path `tmt(\"path\")`"),
+    ("ref", "A document by its note name `ref(\"name\")`"),
+    (
+        "addr",
+        "An address written as text `addr(tmt:docs/a.tmt#intro)`",
+    ),
+    (
+        "include",
+        "A document's content, put here `include(tmt(\"path\"))`",
+    ),
+    ("link", "A link to a document or an element `link(target)`"),
+    ("add", "Arithmetic addition function `add(a, b)`"),
+    ("sub", "Arithmetic subtraction function `sub(a, b)`"),
+    ("mul", "Arithmetic multiplication function `mul(a, b)`"),
+    ("div", "Floating-point division function `div(a, b)`"),
+    ("mod", "Integer modulo function `mod(a, b)`"),
+    ("not", "Negation `not(bool)`"),
+    ("exists", "Whether a value is not null `exists(value)`"),
+    ("emoji", "An emoji by name `emoji(\"sparkles\")`"),
+    ("unicode", "A character by code point `unicode(0x2713)`"),
+];
+
+/// The names an expression can start with that are values, not functions,
+/// each with a line saying what it is.
+pub const RESERVED_NAMES: &[(&str, &str)] = &[
+    ("self", "The document this expression is written in"),
+    ("macro", "The macros defined in settings: `macro.name(...)`"),
+    ("vault", "The vault's root directory: `vault.docs`"),
+    (
+        "vars",
+        "Values passed to `tomet new --var` (only when creating a document)",
+    ),
+    (
+        "generate",
+        "`generate.uuid()` and `generate.now()` (only when creating a document)",
+    ),
+];
+
+/// The functions that are called by a bare name. Keep [`FUNCTIONS`] in step.
 fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalError> {
     match name {
         "tmt" => match args.exactly(name, 1)?.pop() {
