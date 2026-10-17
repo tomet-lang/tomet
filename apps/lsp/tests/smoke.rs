@@ -566,3 +566,33 @@ fn a_changed_config_changes_the_diagnostics() {
     server.shutdown();
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// A vocabulary the config declares and that is not there is the vault's
+/// problem, not a document's: it goes to the client's log, once.
+#[test]
+fn a_vault_with_a_missing_vocabulary_says_so_in_the_log() {
+    let root = std::env::temp_dir().join(format!("tomet_lsp_smoke_notice_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(
+        root.join("default.config.tmt"),
+        "@kind(config)\n@config{ vocabularies: list(\".tomet/vocabularies/missing.vocabulary.tmt\") }\n",
+    )
+    .unwrap();
+    let path = root.join("a.tmt");
+    let mut server = Server::start();
+    initialize(&mut server, json!({}));
+
+    open(&mut server, &path, "Text.\n");
+    let at_once = server.read_message();
+    assert!(diagnostics_array(&at_once).is_empty(), "{at_once:?}");
+
+    let logged = server.read_message();
+    assert_eq!(logged["method"], "window/logMessage", "{logged:?}");
+    assert_eq!(logged["params"]["type"], 2, "a warning: {logged:?}");
+    let message = logged["params"]["message"].as_str().unwrap();
+    assert!(message.contains("missing.vocabulary.tmt"), "{message}");
+
+    server.shutdown();
+    let _ = std::fs::remove_dir_all(&root);
+}

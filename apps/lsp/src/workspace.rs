@@ -8,7 +8,7 @@
 //! document the way the CLI does, from the file's own path, and asks it for
 //! the same findings `tomet check` reports.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -24,6 +24,13 @@ pub struct Workspace {
     vaults: HashMap<PathBuf, Vault>,
     /// What the editor holds open, saved or not.
     buffers: HashMap<PathBuf, String>,
+    /// What a vault said was wrong with its own setup (a declared vocabulary
+    /// that is not there) the last time it was built, by vault root. A vault
+    /// is built again on every save, and the same complaint should not be made
+    /// again each time it is.
+    reported: HashMap<PathBuf, HashSet<String>>,
+    /// Complaints not yet taken: see [`Workspace::take_notices`].
+    notices: Vec<String>,
 }
 
 impl Workspace {
@@ -92,9 +99,27 @@ impl Workspace {
                     vault.set_buffer(open, text);
                 }
             }
+            let now: HashSet<String> = vault.vocabulary_errors.iter().cloned().collect();
+            let before = self.reported.remove(&root).unwrap_or_default();
+            for problem in &vault.vocabulary_errors {
+                if !before.contains(problem) {
+                    self.notices
+                        .push(format!("{problem} (vault: {})", vault.root.display()));
+                }
+            }
+            self.reported.insert(root.clone(), now);
             self.vaults.insert(root.clone(), vault);
         }
         &self.vaults[&root]
+    }
+
+    /// What the vaults found wrong with their own setup since this was last
+    /// asked, once each: a vocabulary the config declares that does not exist,
+    /// or that does not name itself. Not about any document, so there is no
+    /// place in one to put it; the caller says it where the client keeps its
+    /// log.
+    pub fn take_notices(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.notices)
     }
 }
 
@@ -133,7 +158,7 @@ pub fn to_diagnostics(text: &str, findings: &Findings) -> Vec<Diagnostic> {
             range: positions.range(&u.span),
             severity: Some(DiagnosticSeverity::WARNING),
             source: Some("tomet".to_string()),
-            message: format!("unresolved ${{{}}} -- {}", u.source, u.reason),
+            message: u.message(),
             ..Diagnostic::default()
         });
     }
@@ -339,6 +364,50 @@ mod tests {
         assert!(ws.findings_diagnostics(&path).is_empty());
         ws.set_buffer(path.clone(), "@caution[ unterminated\n".to_string());
         assert!(ws.findings_diagnostics(&path).is_empty());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A vocabulary the config declares and that is not there is the vault's
+    /// own problem, not a document's. It is said once, however many times the
+    /// vault is built again, and said again if it is fixed and then broken.
+    #[test]
+    fn a_vault_complaint_is_made_once_until_it_is_fixed_and_broken_again() {
+        let root = vault(
+            "notices",
+            "@kind(config)\n@config{ vocabularies: list(\".tomet/vocabularies/missing.vocabulary.tmt\") }\n",
+            &[],
+        );
+        let path = root.join("a.tmt");
+        let mut ws = Workspace::new();
+        assert!(ws.take_notices().is_empty());
+
+        ws.set_buffer(path.clone(), "Text.\n".to_string());
+        let notices = ws.take_notices();
+        assert_eq!(notices.len(), 1, "{notices:?}");
+        assert!(notices[0].contains("missing.vocabulary.tmt"), "{notices:?}");
+        assert!(ws.take_notices().is_empty(), "taken, so not repeated");
+
+        // Saved: the vault is built again, and the problem is still there.
+        ws.files_changed();
+        ws.findings_diagnostics(&path);
+        assert!(ws.take_notices().is_empty());
+
+        // The vocabulary is written: nothing to say.
+        let declared = root.join(".tomet/vocabularies/missing.vocabulary.tmt");
+        fs::write(
+            &declared,
+            "@kind(vocabulary)\n@vocabulary(deck)\n\n@element(tile){}[ One tile. ]\n",
+        )
+        .unwrap();
+        ws.files_changed();
+        ws.findings_diagnostics(&path);
+        assert!(ws.take_notices().is_empty());
+
+        // Removed again: said again.
+        fs::remove_file(&declared).unwrap();
+        ws.files_changed();
+        ws.findings_diagnostics(&path);
+        assert_eq!(ws.take_notices().len(), 1);
         let _ = fs::remove_dir_all(&root);
     }
 

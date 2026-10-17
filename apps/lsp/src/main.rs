@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use lsp_server::{Connection, Message, RequestId, Response};
 use lsp_types::notification::{
     DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument,
-    DidSaveTextDocument, Notification as _, PublishDiagnostics,
+    DidSaveTextDocument, LogMessage, Notification as _, PublishDiagnostics,
 };
 use lsp_types::request::{
     Completion, DocumentSymbolRequest, FoldingRangeRequest, Formatting, GotoDefinition,
@@ -12,10 +12,10 @@ use lsp_types::request::{
 };
 use lsp_types::{
     CompletionOptions, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher,
-    FoldingRangeProviderCapability, GlobPattern, HoverProviderCapability, InitializeParams, OneOf,
-    PublishDiagnosticsParams, Registration, RegistrationParams, SaveOptions, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, Uri,
+    FoldingRangeProviderCapability, GlobPattern, HoverProviderCapability, InitializeParams,
+    LogMessageParams, MessageType, OneOf, PublishDiagnosticsParams, Registration,
+    RegistrationParams, SaveOptions, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, Uri,
 };
 use tomet_lsp::{Debounce, Workspace};
 
@@ -105,6 +105,9 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
         if debounce.due(Instant::now()) {
             refresh(&connection, &documents, &mut workspace, &mut from_vault)?;
         }
+        // A vault found something wrong with its own setup while it was built
+        // for the messages so far, or for the refresh.
+        log_notices(&connection, &mut workspace)?;
         let Some(msg) = received else {
             continue;
         };
@@ -296,6 +299,24 @@ fn refresh(
         }
         from_vault.insert(uri.clone(), now);
         publish(connection, uri.clone(), text, from_vault.get(uri))?;
+    }
+    Ok(())
+}
+
+/// Says what the vaults found wrong with their own setup in the client's log.
+/// It belongs to no document, so there is no line of one to underline.
+fn log_notices(connection: &Connection, workspace: &mut Workspace) -> anyhow::Result<()> {
+    for message in workspace.take_notices() {
+        let params = LogMessageParams {
+            typ: MessageType::WARNING,
+            message: format!("tomet: {message}"),
+        };
+        connection
+            .sender
+            .send(Message::Notification(lsp_server::Notification::new(
+                LogMessage::METHOD.to_string(),
+                params,
+            )))?;
     }
     Ok(())
 }
