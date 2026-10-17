@@ -153,6 +153,12 @@ fn select(
                 }
                 Ok((doc.clone(), vec![element_block(element)]))
             }
+            Node::List(list) => {
+                if heading.is_some() {
+                    return Err(not_a_section());
+                }
+                Ok((doc.clone(), vec![Block::List((**list).clone())]))
+            }
         },
         other => Err(EvalError::mismatch(
             "`include`",

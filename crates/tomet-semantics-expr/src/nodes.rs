@@ -30,7 +30,7 @@ fn filename(path: &str) -> &str {
 
 // ---- finding a node by id ----------------------------------------------------
 
-/// The node with unique id `id`, an element or a section.
+/// The node with unique id `id`: an element, a section or a list.
 pub(crate) fn find_node(doc: &Document, id: &str) -> Option<Node> {
     doc.blocks.iter().find_map(|block| in_block(block, id))
 }
@@ -56,6 +56,9 @@ fn in_block(block: &Block, id: &str) -> Option<Node> {
 }
 
 fn in_list(list: &List, id: &str) -> Option<Node> {
+    if list.id.as_ref().is_some_and(|i| i.0 == id) {
+        return Some(Node::List(Box::new(list.clone())));
+    }
     list.connects
         .iter()
         .find_map(|conn| in_element(conn, id))
@@ -121,6 +124,10 @@ fn block_value(doc: &DocRef, block: &Block) -> EvalValue {
             doc: doc.clone(),
             node: Box::new(Node::Section(Box::new(sec.clone()))),
         },
+        Block::List(list) => EvalValue::Node {
+            doc: doc.clone(),
+            node: Box::new(Node::List(Box::new(list.clone()))),
+        },
         other => EvalValue::Fragment(vec![other.clone()]),
     }
 }
@@ -158,10 +165,33 @@ fn prop(doc: &DocRef, args: &Option<Value>, value: &Option<ElementValue>) -> Eva
     EvalValue::from_ast(&merged, doc)
 }
 
-fn child_blocks(node: &Node) -> &[Block] {
+/// What a node holds, as blocks: an element's or a section's body, and for a
+/// list the list itself, since its items are its body.
+fn child_blocks(node: &Node) -> Vec<Block> {
     match node {
-        Node::Element(el) => el.content.as_deref().unwrap_or(&[]),
-        Node::Section(sec) => &sec.blocks,
+        Node::Element(el) => el.content.clone().unwrap_or_default(),
+        Node::Section(sec) => sec.blocks.clone(),
+        Node::List(list) => vec![Block::List((**list).clone())],
+    }
+}
+
+/// The things `.item(n)` counts in a node: the blocks of an element or a
+/// section, and the items of a list. An item is an element, so it is a node
+/// like any other (its `#(id)` is found by `#id` as well).
+fn children(doc: &DocRef, node: &Node) -> Vec<EvalValue> {
+    match node {
+        Node::Element(_) | Node::Section(_) => child_blocks(node)
+            .iter()
+            .map(|b| block_value(doc, b))
+            .collect(),
+        Node::List(list) => list
+            .items
+            .iter()
+            .map(|item| EvalValue::Node {
+                doc: doc.clone(),
+                node: Box::new(Node::Element(Box::new(item.element.clone()))),
+            })
+            .collect(),
     }
 }
 
@@ -170,6 +200,8 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
         "prop" => Ok(match node {
             Node::Element(el) => prop(doc, &el.args, &el.value),
             Node::Section(sec) => prop(doc, &sec.args, &sec.value),
+            // A list has neither arguments nor a value group.
+            Node::List(_) => prop(doc, &None, &None),
         }),
         "id" => Ok(node
             .id()
@@ -178,11 +210,13 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
         "sigil" => Ok(EvalValue::String(match node {
             Node::Element(el) => el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
             Node::Section(_) => "section".to_string(),
+            Node::List(_) => "list".to_string(),
         })),
         "connects" => {
             let connects = match node {
                 Node::Element(el) => &el.connects,
                 Node::Section(sec) => &sec.connects,
+                Node::List(list) => &list.connects,
             };
             Ok(EvalValue::Seq(
                 connects
@@ -194,7 +228,7 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
                     .collect(),
             ))
         }
-        "content" => Ok(EvalValue::Fragment(child_blocks(node).to_vec())),
+        "content" => Ok(EvalValue::Fragment(child_blocks(node))),
         _ => Err(EvalError::UnknownMember {
             on: "element",
             member: member.to_string(),
@@ -222,11 +256,7 @@ pub(crate) fn node_method(
                 .exactly(".item", 1)?
                 .try_into()
                 .unwrap_or_else(|_| unreachable!("`exactly` returned one value"));
-            let children: Vec<EvalValue> = child_blocks(node)
-                .iter()
-                .map(|b| block_value(doc, b))
-                .collect();
-            index_into(&children, &index)
+            index_into(&children(doc, node), &index)
         }
         "prop" => {
             let key = match args.exactly(".prop", 1)?.pop() {

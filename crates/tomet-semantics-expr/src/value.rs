@@ -18,7 +18,7 @@
 use std::rc::Rc;
 
 use time::OffsetDateTime;
-use tomet_ast::{Block, Element, InterpExpr, Section, Value};
+use tomet_ast::{Block, Element, InterpExpr, List, Section, Value};
 
 /// A document, by vault-relative path with `/` separators. A reference: the
 /// content is fetched through the [`super::Resolver`] when it is needed.
@@ -29,14 +29,21 @@ pub struct DocRef(pub String);
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DirRef(pub String);
 
-/// A node that can carry a unique id: an element or a section.
+/// A node that can carry a unique id: an element, a section or a list.
 ///
-/// Both are needed because a heading's id attaches to the whole section
-/// (heading and everything under it), not to a lone element.
+/// A heading's id attaches to the whole section (heading and everything
+/// under it), not to a lone element, and a list's to the whole list, not to
+/// one of its items -- which is why each is a node of its own.
+///
+/// A list has an `id` in the tree, but no syntax writes one yet (a trailing
+/// `#(id)` belongs to the last item). It is addressed here by the same rules
+/// as the others, so that when a spelling is chosen nothing in the evaluator
+/// has to change.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     Element(Box<Element>),
     Section(Box<Section>),
+    List(Box<List>),
 }
 
 impl Node {
@@ -45,6 +52,7 @@ impl Node {
         match self {
             Node::Element(el) => el.id.as_ref().map(|id| id.0.as_str()),
             Node::Section(sec) => sec.id.as_ref().map(|id| id.0.as_str()),
+            Node::List(list) => list.id.as_ref().map(|id| id.0.as_str()),
         }
     }
 }
@@ -214,7 +222,7 @@ impl EvalValue {
 
     /// Writes the value back as `.tmt` data. `None` for the values that only
     /// exist while evaluating: documents, directories, functions, datetimes
-    /// and namespaces, and a section (which is not an element).
+    /// and namespaces, and a section or a list (which are not elements).
     pub fn to_ast(&self) -> Option<Value> {
         Some(match self {
             EvalValue::Null => Value::Null,
@@ -237,7 +245,7 @@ impl EvalValue {
             ),
             EvalValue::Node { node, .. } => match &**node {
                 Node::Element(el) => Value::Element(el.clone()),
-                Node::Section(_) => return None,
+                Node::Section(_) | Node::List(_) => return None,
             },
             EvalValue::Fragment(blocks) => Value::Blocks(blocks.clone()),
             EvalValue::Document(_)
