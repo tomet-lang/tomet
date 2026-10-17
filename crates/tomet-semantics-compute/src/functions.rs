@@ -261,7 +261,13 @@ fn call_emoji(args: &[Value]) -> Result<Value, ComputeError> {
             });
         }
     };
-    let emoji = match name {
+    Ok(Value::String(emoji_for(name).unwrap_or(name).to_string()))
+}
+
+/// The emoji a name stands for, with its aliases. `None` for a name this
+/// table does not know. One table, read by this module and by `eval`.
+pub(crate) fn emoji_for(name: &str) -> Option<&'static str> {
+    Some(match name {
         "sparkles" | "sparkle" => "✨",
         "tada" | "party" => "🎉",
         "check" | "white_check_mark" => "✅",
@@ -295,9 +301,8 @@ fn call_emoji(args: &[Value]) -> Result<Value, ComputeError> {
         "sun" => "☀️",
         "moon" => "🌙",
         "coffee" => "☕",
-        other => other,
-    };
-    Ok(Value::String(emoji.to_string()))
+        _ => return None,
+    })
 }
 
 fn call_tmt(args: &[Value]) -> Result<Value, ComputeError> {

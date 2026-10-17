@@ -17,8 +17,22 @@
 //!   | `add`, `sub`, `mul`, `div`, `mod`. Type promotion produces integers when both arguments
 //!   | are integers, or floats when mixing. Integer overflow automatically promotes to `f64`
 //!   | rather than panicking. `div` provides true division (e.g. `div(7, 2)` produces `3.5`).
+//!
+//! =[ Two evaluators ]
+//!
+//! - (`evaluate*` in this module: the older one)
+//!   | Returns [`Value`], falls back from a name to a document id to a macro, and keeps `eq`/`and`
+//!   | and the other comparison functions. It still serves the callers that have not moved over,
+//!   | and goes when they have.
+//! - ([`eval`]: the one that follows `tmtroot/spec/expressions/`)
+//!   | Returns [`eval::EvalValue`], which is not the `.tmt` data model: it also holds documents,
+//!   | directories, functions and datetimes. A name is looked up in the one table its position
+//!   | selects. Operators and methods never convert what they are given. Documents, directories and
+//!   | the clock reach it only through [`eval::Resolver`] and [`eval::Generate`], so it still
+//!   | performs no I/O.
 
 mod error;
+pub mod eval;
 mod functions;
 
 pub use error::ComputeError;

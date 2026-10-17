@@ -33,9 +33,12 @@ already-built values; the evaluator never reaches for them.
       `functions.rs` needed arms for all three. The design adds Document, Directory, Function,
       DateTime on top, which belong to evaluation only. `Value::Blocks` is the natural payload of the
       fragment.
-- [x] DECIDED (user, 2026-10-17): the resolver interface — how L2 asks for a document, a directory
-      listing, a vault index — is a trait defined in `tomet-vault` (L5), implemented in
-      `tomet-load` (L6), handed to the evaluator through the evaluation context.
+- [x] DECIDED (user, 2026-10-17), CORRECTED while starting Step 2: the resolver interface — how the evaluator
+      asks for a document, a directory listing, a typed meta map — is a trait handed to the evaluator through
+      the evaluation context. It must be defined in `tomet-semantics-compute` (L2): an L2 crate cannot name a
+      trait defined in `tomet-vault` (L5). `tomet-vault` (L5, in-memory sources) and `tomet-load` (L6, disk)
+      implement it. The clock and the random source (`generate.*`) are injected the same way (a `Generate`
+      trait, with a system implementation), which also settles the open item about deterministic tests.
 - [x] DECIDED (user, 2026-10-17): the reserved-names table is one const table in
       `tomet-semantics-compute`, read by the lambda-parameter check, `check`, and the LSP.
 - [x] PROVISIONAL (user: "たぶんそれでいい", 2026-10-17): the evaluation "time" (出力時 / 作成時) is a field
@@ -79,28 +82,55 @@ Files: `tomet-syntax-parser/src/interp.rs`, `tomet-syntax-ast/src/lib.rs` (`Inte
 
 ## Step 2: evaluator and value types (L2)
 
+Strategy: build the new evaluator beside the old one (`tomet-semantics-compute/src/eval/`), with its own
+entry point and `EvalValue`, tested in isolation. The old `evaluate*` functions keep serving the existing
+callers until Step 3 switches them, so no document changes meaning halfway and every sub-step leaves the
+workspace green. Order: 2a skeleton (value, error, context, traits) -> 2b core (names, literals, operators,
+lambdas, collection methods) -> 2c documents and addresses -> 2d datetime and `generate` -> 2e fragments,
+`emoji`, `unicode` -> 2f macros and the phase check.
+
 Files: `tomet-semantics-compute/src/{lib,functions,error}.rs`, `tomet-semantics-address`.
 
-- [ ] Evaluation value type and conversions (Step 0).
-- [ ] Name resolution by position: call names -> builtin functions; value names -> reserved values
-      (`self macro vault`, plus `vars generate` at 作成時); no chained fallback; unknown name is an
-      error; bare `${intro}` and bare `${gh}` are errors; `macro.` required for macros.
-- [ ] Member dispatch by receiver type: document, element, directory, Seq, Map, string, datetime.
-- [ ] Operators: `== !=` (1 == 1.0 true, cross-type false), ordering (numbers, strings, datetimes),
+- [x] 2a Evaluation value type `EvalValue` and conversions to/from `tomet_ast::Value`, `EvalError`, `EvalContext`
+      (`Phase`, `Resolver`, `Generate`), `Env`. `Node` holds an element or a section: the old address code only
+      looked for `Element`s, so a heading's id was never found; the new type has to find both.
+- [x] 2b Name resolution by position: call names -> builtin functions; value names -> lambda parameters, then
+      reserved values (`self macro vault`, plus `vars generate` at 作成時); no chained fallback; unknown name is
+      an error; `macro.` required for macros. `RESERVED_VALUES` is the one table (Step 0 decision).
+- [x] 2c Member dispatch by receiver type: document (`path filename meta kind`, `.item(n)`), node (`prop id sigil
+      connects content`, `.item(n)`, `.prop(key)`), directory (`docs`), Seq, Map, string. Datetime is 2d. A node has
+      only its own members: the old "direct property access" fallback (`#intro.tags`) is gone, as the spec says.
+- [x] 2c Addresses: `#id`, `doc#id`, `#item(n)` (an `item` id is positional only when called), `tmt(...)`,
+      `ref(...)`, `addr(...)` and `"...".addr()`, with `file:` and `https:` reported as not supported. A node
+      is an element or a section, found by id anywhere in the document. `MemoryResolver` (in-memory, untyped
+      meta) serves the tests and later the vault's own resolver wraps the same idea. 17 tests.
+- [x] 2b Operators: `== !=` (1 == 1.0 true, cross-type false), ordering (numbers, strings, datetimes),
       `&&` `||` short-circuit and Bool-only; `not(x)` Bool-only (no truthiness); `exists`.
-- [ ] Remove functions `eq ne gt gte lt lte and or contains date time`; keep
-      `add sub mul div mod not exists emoji unicode tmt ref`; add `addr include link`.
+- [x] 2e The new evaluator has only `add sub mul div mod not exists emoji unicode tmt ref link` as functions; `eq ne
+      gt gte lt lte and or contains date time uuid` do not exist there (tested). The OLD evaluator still has them
+      and is removed in Step 3 with its callers. `include` is Step 4.
 - [ ] Strictness: unknown input is an error (`date("hello")`, `uuid("bogus")`, `emoji("nope")`).
-- [ ] `generate.now()` -> datetime, `generate.uuid()`; dedicated "作成時専用" error outside 作成時.
-- [ ] Datetime value: ordering, `.format("YYYY-MM-DD HH:mm")` with tokens `YYYY YY MM DD HH mm ss`,
-      other characters pass through, no offset conversion.
-- [ ] String method `.addr()`: interpret a run-time string with the same rules as `addr(...)`; an uninterpretable
-      string is an error. (`addr(...)` itself takes only literals.)
-- [ ] Methods: Seq `.filter .sort .map .join .contains .len`; Map `.get .contains`;
-      string `.contains`; document `.link()`; lambdas as values, evaluated in a local scope;
-      lambda parameter may not reuse a reserved name; Null receiver is an error.
-- [ ] Type mismatch errors carry enough to say what to use (`include(...)`, `.join(", ")`).
-- [ ] Tests move with each function; the old `functions.rs` doc table is rewritten.
+- [x] 2b `generate.now()` -> datetime, `generate.uuid()` through the injected `Generate`; `PhaseOnly` error when
+      rendering (it fires at the name `generate` or `vars`, before any call). The system clock is UTC; applying
+      a field's configured offset belongs to the vault (Step 3).
+- [x] 2d Datetime value: ordering and equality (the same instant at two offsets is equal), `.format` with `YYYY YY MM
+      DD HH mm ss`, other characters pass through, no offset conversion. `parse_datetime` (RFC 3339 or a bare
+      date as midnight UTC) and `format_datetime` are public for the vault to build typed meta with.
+- [x] 2c String method `.addr()`: interprets a run-time string with the same rules as `addr(...)`; an
+      uninterpretable string is `BadAddress`. (`addr(...)` itself takes only literals.)
+- [x] 2e `link(x)` and `.link()` on a document or an element with an id build `@link(tmt:path[#id])` in a one-
+      paragraph `Fragment`. `emoji` and `unicode` ported, with one emoji table shared with the old evaluator.
+- [x] 2b Methods: Seq `.filter .sort .map .join .contains .len .item`; Map `.get .contains`; string `.contains`;
+      lambdas as values with closures; a lambda parameter may not reuse a reserved name; a Null receiver is an
+      error (`UnknownMember`). `.sort` puts items whose key is `Null` last, whichever way the rest are
+      ordered (decided by the assistant, user delegated; spec updated), and checks the other keys are of one kind
+      first so the comparison is a total order. (`.link()` is 2e, done.)
+- [x] 2b Macro calls `macro.name(...)` (positional `${1}` and named `${key}` placeholders, scalars only).
+- [x] 2b 46 tests in `eval/tests.rs`; `eval` is clippy-clean.
+- [ ] (moved to Step 3) Type mismatch errors for a value placed where output goes: they must say what to use
+      (`include(...)`, `.join(", ")`). The evaluator returns the value; the position rules live in the pass.
+- [ ] (at the Step 3 cutover) Delete the old `evaluate*`, `EvaluationContext`, `functions.rs` and their tests; the
+      crate `//!` doc already describes both evaluators and loses the older one then.
 
 ## Step 3: context and the single evaluation path (L5)
 
