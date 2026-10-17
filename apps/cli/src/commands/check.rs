@@ -103,7 +103,7 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
                 json_files.push(serde_json::json!({
                     "file": file.display().to_string(),
                     "errors": [{
-                        "message": format!("unresolved ${{{}}}: {}", u.source, u.reason),
+                        "message": u.message(),
                         "severity": "warning",
                     }],
                 }));
@@ -111,11 +111,10 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
         } else {
             for u in &unresolved {
                 eprintln!(
-                    "{}:{}: warning: unresolved ${{{}}} -- {}",
+                    "{}:{}: warning: {}",
                     file.display(),
                     index.line_col(u.span.start).line,
-                    u.source,
-                    u.reason
+                    u.message()
                 );
             }
         }

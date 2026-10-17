@@ -87,7 +87,7 @@ mod vocabulary;
 
 pub use findings::{Findings, is_error};
 pub use resolver::DiskResolver;
-pub use tomet_vault::{Prepared, Unresolved};
+pub use tomet_vault::{Prepared, Unresolved, UnresolvedKind};
 
 /// A vault found on disk: `tomet_vault::Vault` plus the parts that need
 /// a filesystem.

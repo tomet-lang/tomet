@@ -73,11 +73,10 @@ pub fn new_cmd(
     // came from.
     for u in &created.unfilled {
         eprintln!(
-            "{}:{}: warning: unresolved ${{{}}} -- {}",
+            "{}:{}: warning: {}",
             created.blueprint.display(),
             u.line,
-            u.source,
-            u.reason
+            u.message
         );
     }
     if !created.unfilled.is_empty() {

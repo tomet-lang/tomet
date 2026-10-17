@@ -38,15 +38,42 @@ use tomet_ast::{
 use tomet_expr::{EvalContext, EvalValue, Note, evaluate};
 use tomet_tree::list_item;
 
-/// A `${...}` that could not be resolved, left in the output as written.
+/// Something the pass left as it found it, and says so.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Unresolved {
-    /// The expression as written, without the surrounding `${` and `}`.
+    pub kind: UnresolvedKind,
+    /// What it was, as written: the expression without the surrounding `${`
+    /// and `}`, or the id as `#(x)`.
     pub source: String,
     /// Where it sits in the document that was passed in.
     pub span: Span,
-    /// Why: what the evaluator said, or what the value could not be placed as.
+    /// Why: what the evaluator said, what the value could not be placed as,
+    /// or what was done with the id.
     pub reason: String,
+}
+
+/// What an [`Unresolved`] is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnresolvedKind {
+    /// A `${...}` that has no value, and is left in the output as written.
+    Expression,
+    /// An id that a node already had earlier in the document, so this one was
+    /// dropped. Not an expression: it is found after splicing, where a file
+    /// included twice puts one id on two nodes.
+    DroppedId,
+}
+
+impl Unresolved {
+    /// One line a person can read, without the file or the line: what
+    /// `tomet check` and the language server both show.
+    pub fn message(&self) -> String {
+        match self.kind {
+            UnresolvedKind::Expression => {
+                format!("unresolved ${{{}}} -- {}", self.source, self.reason)
+            }
+            UnresolvedKind::DroppedId => self.reason.clone(),
+        }
+    }
 }
 
 /// Replaces every `${...}` in `doc` with what it stands for.
@@ -101,6 +128,7 @@ impl Pass<'_> {
         for note in here.notes.take() {
             match note {
                 Note::Included { from, unresolved } => self.unresolved.push(Unresolved {
+                    kind: UnresolvedKind::Expression,
                     source: expr.to_string(),
                     span,
                     reason: format!(
@@ -124,6 +152,7 @@ impl Pass<'_> {
 
     fn fail(&mut self, expr: &InterpExpr, span: Span, reason: String) {
         self.unresolved.push(Unresolved {
+            kind: UnresolvedKind::Expression,
             source: expr.to_string(),
             span,
             reason,
@@ -448,6 +477,7 @@ impl Ids {
         }
         *id = None;
         self.report.push(Unresolved {
+            kind: UnresolvedKind::DroppedId,
             source: format!("#({taken})"),
             span,
             reason: format!(

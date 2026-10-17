@@ -46,7 +46,7 @@ mod resolve;
 
 pub use resolve::{Overlay, typed_meta};
 pub use tomet_expr::{DirRef, MemoryResolver, NoResolver, Resolver};
-pub use tomet_transform::Unresolved;
+pub use tomet_transform::{Unresolved, UnresolvedKind};
 
 /// What [`Vault::prepare`] could not do.
 ///

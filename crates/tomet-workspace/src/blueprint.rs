@@ -123,6 +123,8 @@ pub struct Unfilled {
     pub line: usize,
     /// Why it has no value.
     pub reason: String,
+    /// One line to show: what `tomet check` shows for the same thing.
+    pub message: String,
 }
 
 /// A new document made from a blueprint, not yet written anywhere.
@@ -227,6 +229,7 @@ fn instantiate_blueprint_file_with(
         .into_iter()
         .map(|u| Unfilled {
             line: 1 + src[..u.span.start.min(src.len())].matches('\n').count(),
+            message: u.message(),
             source: u.source,
             reason: u.reason,
         })

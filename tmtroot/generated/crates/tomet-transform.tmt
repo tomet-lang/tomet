@@ -103,7 +103,13 @@ in a resolver that returns the document from before this pass rewrote it.
 
 ====[struct Unresolved]
 
-A `${...}` that could not be resolved, left in the output as written.
+Something the pass left as it found it, and says so.
+
+===[Enums]
+
+====[enum UnresolvedKind]
+
+What an [`Unresolved`] is about.
 
 ===[Functions]
 

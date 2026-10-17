@@ -231,6 +231,11 @@ fn an_expression_that_fails_is_written_back_as_its_own_source() {
     assert_eq!(unresolved.len(), 2);
     assert_eq!(unresolved[0].source, "nope");
     assert!(unresolved[0].reason.contains("unknown name"));
+    assert_eq!(unresolved[0].kind, UnresolvedKind::Expression);
+    assert_eq!(
+        unresolved[0].message(),
+        format!("unresolved ${{nope}} -- {}", unresolved[0].reason)
+    );
     assert!(unresolved[1].reason.contains("unknown function"));
 }
 
@@ -422,6 +427,10 @@ fn an_id_used_twice_after_an_include_keeps_the_first_and_reports_the_later() {
         unresolved[0].reason.contains("already used"),
         "{unresolved:?}"
     );
+    // It is not an expression, and does not read as one.
+    assert_eq!(unresolved[0].kind, UnresolvedKind::DroppedId);
+    assert_eq!(unresolved[0].message(), unresolved[0].reason);
+    assert!(!unresolved[0].message().contains("${"), "{unresolved:?}");
 
     let ids: Vec<Option<String>> = doc
         .blocks

@@ -28,10 +28,6 @@ Delete it when the list is empty.
    `type:` declarations are always empty there and `check_field_types` finds nothing. Passing the settings' source in
    is a small change to three public APIs. `tomet-edit`'s post-edit report (`diagnostics.rs`) calls
    `validate_document` with no config either.
-4. `tomet check` reports a duplicate id twice for a document that has one in itself: the error (`duplicate id`) and
-   a warning that reads `unresolved ${#(a)}` -- the note that the later id was dropped, which `Unresolved` has no way
-   to say is not an expression (`tomet-transform/src/expressions.rs`, `Ids`). A kind on `Unresolved` would fix the
-   wording; the LSP shows both as `check` does.
 
 ## Decided to leave (2026-10-18, by the owner)
 
