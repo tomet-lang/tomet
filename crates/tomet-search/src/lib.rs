@@ -13,7 +13,7 @@
 //! - (`structural`) AST element query matching by tag, key, and value content.
 //!
 //! Querying documents by their metadata is not done here: it is an expression
-//! (`vault.docs.filter(d => ...)`), evaluated by `tomet-compute`.
+//! (`vault.docs.filter(d => ...)`), evaluated by `tomet-expr`.
 
 pub mod structural;
 

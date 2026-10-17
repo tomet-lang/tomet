@@ -1,8 +1,8 @@
 [package]
-name = "tomet-compute"
+name = "tomet-expr"
 version.workspace = true
 edition.workspace = true
-description = "Expression evaluation for ${...} interpolation expressions in Tomet documents."
+description = "Expression evaluation for the ${...} expressions of a Tomet document."
 license.workspace = true
 repository.workspace = true
 

@@ -2155,8 +2155,8 @@ dependencies = [
  "serde_json",
  "tokio",
  "tomet-ast",
- "tomet-compute",
  "tomet-config",
+ "tomet-expr",
  "tomet-formatter",
  "tomet-html",
  "tomet-indexer",
@@ -2179,18 +2179,6 @@ dependencies = [
  "tove",
  "uuid",
  "walkdir",
-]
-
-[[package]]
-name = "tomet-compute"
-version = "0.1.0"
-dependencies = [
- "time",
- "tomet-ast",
- "tomet-parser",
- "tomet-semantics",
- "tomet-tree",
- "uuid",
 ]
 
 [[package]]
@@ -2220,6 +2208,18 @@ dependencies = [
  "tomet-parser",
  "tomet-tree",
  "tomet-validator",
+]
+
+[[package]]
+name = "tomet-expr"
+version = "0.1.0"
+dependencies = [
+ "time",
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-tree",
+ "uuid",
 ]
 
 [[package]]
@@ -2257,7 +2257,7 @@ name = "tomet-html"
 version = "0.1.0"
 dependencies = [
  "tomet-ast",
- "tomet-compute",
+ "tomet-expr",
  "tomet-parser",
  "tomet-semantics",
  "tomet-tree",
@@ -2332,8 +2332,8 @@ name = "tomet-load"
 version = "0.1.0"
 dependencies = [
  "tomet-ast",
- "tomet-compute",
  "tomet-config",
+ "tomet-expr",
  "tomet-indexer",
  "tomet-links",
  "tomet-load-config",
@@ -2362,8 +2362,8 @@ dependencies = [
  "serde_json",
  "tomet-address",
  "tomet-ast",
- "tomet-compute",
  "tomet-cst",
+ "tomet-expr",
  "tomet-formatter",
  "tomet-lexer",
  "tomet-load-config",
@@ -2381,7 +2381,7 @@ dependencies = [
  "pulldown-cmark",
  "serde_yaml",
  "tomet-ast",
- "tomet-compute",
+ "tomet-expr",
  "tomet-html",
  "tomet-parser",
  "tomet-semantics",
@@ -2504,10 +2504,10 @@ version = "0.1.0"
 dependencies = [
  "serde_json",
  "tomet-ast",
- "tomet-compute",
  "tomet-config",
  "tomet-cst",
  "tomet-edit",
+ "tomet-expr",
  "tomet-formatter",
  "tomet-html",
  "tomet-load-config",
@@ -2531,7 +2531,7 @@ version = "0.1.0"
 dependencies = [
  "time",
  "tomet-ast",
- "tomet-compute",
+ "tomet-expr",
  "tomet-parser",
  "tomet-search",
  "tomet-semantics",
@@ -2636,8 +2636,8 @@ name = "tomet-vault"
 version = "0.1.0"
 dependencies = [
  "tomet-ast",
- "tomet-compute",
  "tomet-config",
+ "tomet-expr",
  "tomet-parser",
  "tomet-search",
  "tomet-semantics",
@@ -2651,8 +2651,8 @@ dependencies = [
  "anyhow",
  "time",
  "tomet-ast",
- "tomet-compute",
  "tomet-config",
+ "tomet-expr",
  "tomet-formatter",
  "tomet-indexer",
  "tomet-load-config",

@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use tomet_ast::{Document, Sigil, Value};
-use tomet_compute::eval::EvalContext;
+use tomet_expr::EvalContext;
 use tomet_semantics::{ElementKind, classify_std_lenient, normalized_element_args};
 use tomet_tree::{
     ValueExt, for_each_top_level_element, for_each_top_level_element_mut, retain_top_level_elements,
@@ -142,7 +142,7 @@ pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiat
 mod tests {
     use super::*;
     use time::OffsetDateTime;
-    use tomet_compute::eval::{DocRef, EvalValue, Generate, NoResolver, Phase};
+    use tomet_expr::{DocRef, EvalValue, Generate, NoResolver, Phase};
 
     /// A clock stopped at the epoch and a UUID that is always the same, so a
     /// blueprint's output is the same every time.

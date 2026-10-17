@@ -35,7 +35,7 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, List, ListItem, Paragraph,
     Sigil, Span, Text, Value,
 };
-use tomet_compute::eval::{EvalContext, EvalValue, evaluate};
+use tomet_expr::{EvalContext, EvalValue, evaluate};
 use tomet_tree::list_item;
 
 /// A `${...}` that could not be resolved, left in the output as written.

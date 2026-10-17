@@ -38,14 +38,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tomet_ast::Document;
-use tomet_compute::eval::{DocRef, EvalContext, EvalValue, Phase, SystemGenerate};
 use tomet_config::PrinterConfig;
+use tomet_expr::{DocRef, EvalContext, EvalValue, Phase, SystemGenerate};
 use tomet_semantics::{Bindings, LoadedVocabularies};
 
 mod resolve;
 
 pub use resolve::{Overlay, typed_meta};
-pub use tomet_compute::eval::{DirRef, MemoryResolver, NoResolver, Resolver};
+pub use tomet_expr::{DirRef, MemoryResolver, NoResolver, Resolver};
 pub use tomet_transform::Unresolved;
 
 /// What [`Vault::prepare`] could not do.

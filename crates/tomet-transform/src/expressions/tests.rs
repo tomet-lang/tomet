@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use tomet_ast::{Block, ElementValue, Inline, Sigil, Value};
-use tomet_compute::eval::{
+use tomet_expr::{
     DocRef, EvalContext, EvalValue, MemoryResolver, NoResolver, Phase, Resolver, SystemGenerate,
 };
 

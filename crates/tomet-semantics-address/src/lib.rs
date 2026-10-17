@@ -8,7 +8,7 @@
 //! read.
 //!
 //! An expression's `#id` and `doc#id` are not resolved here any more: that
-//! is the evaluator's job (`tomet-compute`), which answers it through a
+//! is the evaluator's job (`tomet-expr`), which answers it through a
 //! resolver so that it can reach other documents.
 //!
 //! Actually resolving a `@config(import:...)` reference -- reading and

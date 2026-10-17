@@ -53,7 +53,7 @@ path = "src/block_value_loss.rs"
 
 [dependencies]
 tomet-ast = { workspace = true }
-tomet-compute = { workspace = true }
+tomet-expr = { workspace = true }
 tomet-config = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-edit = { workspace = true }

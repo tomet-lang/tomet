@@ -14,7 +14,7 @@ path = "src/main.rs"
 [dependencies]
 tomet-address = { workspace = true }
 tomet-ast = { workspace = true }
-tomet-compute = { workspace = true }
+tomet-expr = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-formatter = { workspace = true }
 tomet-lexer = { workspace = true }

@@ -5,8 +5,8 @@
 use std::sync::Arc;
 
 use tomet_ast::{Document, Value};
-use tomet_compute::eval::{DirRef, DocRef, EvalValue, Resolver, parse_datetime};
 use tomet_config::{FieldConfig, PrinterConfig};
+use tomet_expr::{DirRef, DocRef, EvalValue, Resolver, parse_datetime};
 
 /// The document's `@meta`, typed by the settings' `meta` declarations.
 ///
@@ -99,7 +99,7 @@ impl Resolver for Overlay<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_compute::eval::MemoryResolver;
+    use tomet_expr::MemoryResolver;
 
     fn config(settings: &str) -> PrinterConfig {
         tomet_config::load_config_from_str(settings).expect("valid settings")

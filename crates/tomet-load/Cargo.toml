@@ -9,7 +9,7 @@ repository.workspace = true
 [dependencies]
 tomet-ast = { workspace = true }
 tomet-config = { workspace = true }
-tomet-compute = { workspace = true }
+tomet-expr = { workspace = true }
 tomet-indexer = { workspace = true }
 tomet-links = { workspace = true }
 tomet-load-config = { workspace = true }

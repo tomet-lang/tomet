@@ -24,10 +24,8 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, bail};
 use tomet_ast::Value;
-use tomet_compute::eval::{
-    DocRef, EvalContext, EvalValue, Generate, MemoryResolver, OffsetGenerate, Phase,
-};
 use tomet_config::PrinterConfig;
+use tomet_expr::{DocRef, EvalContext, EvalValue, Generate, MemoryResolver, OffsetGenerate, Phase};
 use tomet_semantics::{ElementKind, ValueExt, classify_std_lenient, normalized_element_args};
 use tomet_transform::instantiate_blueprint;
 

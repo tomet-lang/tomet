@@ -2,9 +2,7 @@ use std::ops::ControlFlow;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
 use tomet_ast::{Document, Element, ElementValue, Value};
-use tomet_compute::eval::{
-    DocRef, EvalContext, EvalValue, MemoryResolver, Phase, SystemGenerate, evaluate,
-};
+use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, Phase, SystemGenerate, evaluate};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, normalized_element_args};
 use tomet_tree::{ValueExt, Visitor, walk_document};
 
@@ -454,7 +452,7 @@ fn evaluate_for_hover(
     doc: &Document,
     expr: &tomet_ast::InterpExpr,
     config: &tomet_semantics::DocumentConfig,
-) -> Result<EvalValue, tomet_compute::eval::EvalError> {
+) -> Result<EvalValue, tomet_expr::EvalError> {
     let here = "document.tmt";
     let resolver = MemoryResolver::new().with_document(here, std::sync::Arc::new(doc.clone()));
     let vars = EvalValue::Null;
@@ -487,7 +485,7 @@ fn render_value(value: &EvalValue) -> String {
                 .collect();
             format!("{{{}}}", entries.join(", "))
         }
-        EvalValue::DateTime(dt) => tomet_compute::eval::format_datetime(dt, "YYYY-MM-DD HH:mm:ss"),
+        EvalValue::DateTime(dt) => tomet_expr::format_datetime(dt, "YYYY-MM-DD HH:mm:ss"),
         EvalValue::Document(doc) => format!("document {}", doc.0),
         EvalValue::Directory(dir) => format!("directory {}", dir.0),
         EvalValue::Node { node, .. } => match node.id() {

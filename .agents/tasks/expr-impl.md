@@ -25,7 +25,7 @@ already-built values; the evaluator never reaches for them.
 
 ## Step 0: settle before coding (needs the user)
 
-- [x] DECIDED (user, 2026-10-17): a separate evaluation value type in `tomet-semantics-compute`, with
+- [x] DECIDED (user, 2026-10-17): a separate evaluation value type in `tomet-semantics-expr`, with
       conversions to/from `tomet_ast::Value`. Today `tomet_ast::Value` is both the `.tmt` data model
       and the evaluation result, and it is already stretched: `Call`, `Element` and `Blocks` are "only
       ever produced by `tomet-syntax-parser` reading source text, never by deserializing inbound data"
@@ -35,12 +35,12 @@ already-built values; the evaluator never reaches for them.
       fragment.
 - [x] DECIDED (user, 2026-10-17), CORRECTED while starting Step 2: the resolver interface — how the evaluator
       asks for a document, a directory listing, a typed meta map — is a trait handed to the evaluator through
-      the evaluation context. It must be defined in `tomet-semantics-compute` (L2): an L2 crate cannot name a
+      the evaluation context. It must be defined in `tomet-semantics-expr` (L2): an L2 crate cannot name a
       trait defined in `tomet-vault` (L5). `tomet-vault` (L5, in-memory sources) and `tomet-load` (L6, disk)
       implement it. The clock and the random source (`generate.*`) are injected the same way (a `Generate`
       trait, with a system implementation), which also settles the open item about deterministic tests.
 - [x] DECIDED (user, 2026-10-17): the reserved-names table is one const table in
-      `tomet-semantics-compute`, read by the lambda-parameter check, `check`, and the LSP.
+      `tomet-semantics-expr`, read by the lambda-parameter check, `check`, and the LSP.
 - [x] PROVISIONAL (user: "たぶんそれでいい", 2026-10-17): the evaluation "time" (出力時 / 作成時) is a field
       on the evaluation context; `generate.*` fails with a dedicated error outside 作成時.
       Revisit if the field turns out awkward when Step 3 wires `tomet new`.
@@ -82,14 +82,14 @@ Files: `tomet-syntax-parser/src/interp.rs`, `tomet-syntax-ast/src/lib.rs` (`Inte
 
 ## Step 2: evaluator and value types (L2)
 
-Strategy: build the new evaluator beside the old one (`tomet-semantics-compute/src/eval/`), with its own
+Strategy: build the new evaluator beside the old one (`tomet-semantics-expr/src/eval/`), with its own
 entry point and `EvalValue`, tested in isolation. The old `evaluate*` functions keep serving the existing
 callers until Step 3 switches them, so no document changes meaning halfway and every sub-step leaves the
 workspace green. Order: 2a skeleton (value, error, context, traits) -> 2b core (names, literals, operators,
 lambdas, collection methods) -> 2c documents and addresses -> 2d datetime and `generate` -> 2e fragments,
 `emoji`, `unicode` -> 2f macros and the phase check.
 
-Files: `tomet-semantics-compute/src/{lib,functions,error}.rs`, `tomet-semantics-address`.
+Files: `tomet-semantics-expr/src/{lib,functions,error}.rs`, `tomet-semantics-address`.
 
 - [x] 2a Evaluation value type `EvalValue` and conversions to/from `tomet_ast::Value`, `EvalError`, `EvalContext`
       (`Phase`, `Resolver`, `Generate`), `Env`. `Node` holds an element or a section: the old address code only
@@ -168,6 +168,15 @@ mechanical part of Step 6.
       fine); `#item(n)` counts every block, not only elements as `addressable.tmt` says; `find_node` looks at
       elements and sections, not at a list's own `#(id)`; `.link()` produces `tmt:` links where the old
       `filter` produced `ref:`.
+
+## Rename (done after Step 3)
+
+`tomet-compute` (directory `tomet-semantics-compute`) is now `tomet-expr` (`crates/tomet-semantics-expr`), and the
+`eval` module was flattened into the crate root: `tomet_expr::{evaluate, EvalValue, EvalContext, ...}`. `EvalValue`
+keeps its name (a `Value` would clash with `tomet_ast::Value` in the files that use both). Not touched:
+`tmtroot/generated/**` (written by `twrit api`, which this environment lacks; `crates/tomet-compute.tmt` there is
+stale and will be replaced when it is regenerated), `tmtroot/deprecated/**`, and one comment in the frozen fixture
+`tests/fixtures/cheatsheet.tmt`.
 
 ## Step 4: include (L5/L6)
 

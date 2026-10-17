@@ -4,7 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use tomet_ast::Document;
-use tomet_compute::eval::{DirRef, DocRef, EvalValue, Resolver};
+use tomet_expr::{DirRef, DocRef, EvalValue, Resolver};
 
 use crate::Vault;
 
@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn the_evaluator_runs_over_the_disk_through_this_resolver() {
         use std::collections::HashMap;
-        use tomet_compute::eval::{EvalContext, Phase, SystemGenerate, evaluate};
+        use tomet_expr::{EvalContext, Phase, SystemGenerate, evaluate};
 
         let root = fixture("tomet_test_disk_resolver_eval");
         let vault = Vault::discover(&root);
