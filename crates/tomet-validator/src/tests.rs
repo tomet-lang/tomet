@@ -823,3 +823,33 @@ fn an_undeclared_field_or_a_type_with_no_form_is_left_alone() {
     assert_eq!(field_diagnostics(source, &[("title", "string")]), vec![]);
     assert_eq!(field_diagnostics(source, &[("id", "uuid")]).len(), 1);
 }
+
+#[test]
+fn a_datetime_field_has_to_read_as_one() {
+    let declared = [("created", "datetime")];
+    for good in [
+        "2026-10-17",
+        "2026-10-17T09:00:00+09:00",
+        "2026-10-17T09:00",
+        "2026-10-17 09:00:00",
+    ] {
+        let source = format!("@meta{{ created: {good} }}\n");
+        assert_eq!(field_diagnostics(&source, &declared), vec![], "{good}");
+    }
+    for bad in ["yesterday", "2026-13-01", "2026-10-17T25:00", "2026-1-1"] {
+        let source = format!("@meta{{ created: \"{bad}\" }}\n");
+        let errors = field_diagnostics(&source, &declared);
+        assert_eq!(errors.len(), 1, "{bad}: {errors:?}");
+        assert!(
+            errors[0].to_string().contains("not a valid datetime"),
+            "{}",
+            errors[0]
+        );
+    }
+    // Absent, empty and not yet evaluated are not reported, as for `uuid`.
+    assert_eq!(field_diagnostics("@meta{ title: x }\n", &declared), vec![]);
+    assert_eq!(
+        field_diagnostics("@meta{ created: ${generate.now()} }\n", &declared),
+        vec![]
+    );
+}

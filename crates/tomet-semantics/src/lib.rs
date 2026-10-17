@@ -27,6 +27,10 @@
 //!   | a document into a structured [`DocumentConfig`].
 //! - (Metadata Extraction (`meta`))
 //!   | Extracts top-level `@meta` values via [`document_meta`].
+//! - (Datetimes (`datetime`))
+//!   | The one definition of what text reads as a date or a date and a time,
+//!   | as plain parts (`datetime::parse_datetime_parts`). The evaluator, `tomet check`
+//!   | and `tomet format` all read a `datetime` field by it.
 //! - (Structural Helpers)
 //!   | Heading level clamping (`heading`) and
 //!   | table parsing (`table`).
@@ -40,6 +44,7 @@
 
 mod connect_member;
 pub mod data;
+pub mod datetime;
 pub mod elements;
 pub mod flatten;
 mod kind;

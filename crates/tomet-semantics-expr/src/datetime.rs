@@ -1,52 +1,32 @@
 //! Datetimes: reading them from text and writing them with a format string.
 
-use time::format_description::well_known::Rfc3339;
 use time::{Date, Month, OffsetDateTime, PrimitiveDateTime, Time, UtcOffset};
+use tomet_semantics::datetime::{parse_datetime_parts, parse_offset_seconds};
 
-/// Reads RFC 3339 (`2026-10-17T09:00:00+09:00`) or a bare date
-/// (`2026-10-17`, taken as midnight UTC). `None` for anything else.
+/// Reads a date, or a date and a time, as a datetime.
+///
+/// What text reads as one is `tomet_semantics::datetime`'s to say -- the same
+/// reading `tomet check` and `tomet format` use. This only gives the parts a
+/// clock type; a value with no offset is UTC.
 ///
 /// What the vault uses to turn a `datetime` field into a value.
 pub fn parse_datetime(text: &str) -> Option<OffsetDateTime> {
-    let text = text.trim();
-    if let Ok(parsed) = OffsetDateTime::parse(text, &Rfc3339) {
-        return Some(parsed);
-    }
-    let mut parts = text.split('-');
-    let (year, month, day) = (parts.next()?, parts.next()?, parts.next()?);
-    if parts.next().is_some() || year.len() != 4 || month.len() != 2 || day.len() != 2 {
-        return None;
-    }
+    let parts = parse_datetime_parts(text)?;
     let date = Date::from_calendar_date(
-        year.parse().ok()?,
-        Month::try_from(month.parse::<u8>().ok()?).ok()?,
-        day.parse().ok()?,
+        i32::from(parts.year),
+        Month::try_from(parts.month).ok()?,
+        parts.day,
     )
     .ok()?;
-    Some(PrimitiveDateTime::new(date, Time::MIDNIGHT).assume_utc())
+    let time =
+        Time::from_hms_nano(parts.hour, parts.minute, parts.second, parts.nanosecond).ok()?;
+    let offset = UtcOffset::from_whole_seconds(parts.offset_seconds).ok()?;
+    Some(PrimitiveDateTime::new(date, time).assume_offset(offset))
 }
 
 /// Reads a UTC offset written `+09:00`, `-05:30` or `Z`. `None` for anything else.
 pub fn parse_offset(text: &str) -> Option<UtcOffset> {
-    let text = text.trim();
-    if text == "Z" {
-        return Some(UtcOffset::UTC);
-    }
-    let (sign, rest) = match text.as_bytes().first()? {
-        b'+' => (1i8, &text[1..]),
-        b'-' => (-1i8, &text[1..]),
-        _ => return None,
-    };
-    let (hours, minutes) = rest.split_once(':')?;
-    if hours.len() != 2 || minutes.len() != 2 {
-        return None;
-    }
-    let (hours, minutes) = (hours.parse::<i8>().ok()?, minutes.parse::<i8>().ok()?);
-    // No offset in use is further than 18 hours from UTC.
-    if !(0..=18).contains(&hours) || !(0..60).contains(&minutes) {
-        return None;
-    }
-    UtcOffset::from_hms(sign * hours, sign * minutes, 0).ok()
+    UtcOffset::from_whole_seconds(parse_offset_seconds(text)?).ok()
 }
 
 /// Writes `value` with `format`. The symbols are `YYYY` `YY` `MM` (month)
@@ -90,21 +70,14 @@ mod tests {
         parse_datetime(text).unwrap_or_else(|| panic!("`{text}` should parse"))
     }
 
+    // What text reads as a datetime is tested where it is defined
+    // (`tomet_semantics::datetime`); these are the conversion into a clock.
+
     #[test]
     fn rfc_3339_keeps_its_offset() {
         let dt = at("2026-10-17T09:05:07+09:00");
         assert_eq!(dt.offset().whole_hours(), 9);
         assert_eq!(format_datetime(&dt, "HH:mm:ss"), "09:05:07");
-    }
-
-    #[test]
-    fn an_offset_is_read_with_its_sign() {
-        assert_eq!(parse_offset("+09:00").unwrap().whole_hours(), 9);
-        assert_eq!(parse_offset("-05:30").unwrap().whole_minutes(), -330);
-        assert_eq!(parse_offset("Z"), Some(UtcOffset::UTC));
-        for bad in ["", "09:00", "+9:00", "+09", "+25:00", "x"] {
-            assert_eq!(parse_offset(bad), None, "{bad}");
-        }
     }
 
     #[test]
@@ -115,17 +88,48 @@ mod tests {
     }
 
     #[test]
-    fn text_that_is_not_a_datetime_is_none() {
-        for text in [
-            "",
-            "hello",
-            "2026-13-01",
-            "2026-1-1",
-            "2026-01-01-01",
-            "26-01-01",
+    fn the_looser_iso_8601_forms_are_read() {
+        for (text, rendered) in [
+            ("2026-10-17T09:00", "2026-10-17 09:00:00"),
+            ("2026-10-17 09:00", "2026-10-17 09:00:00"),
+            ("2026-10-17 09:05:07", "2026-10-17 09:05:07"),
+            ("2026-10-17T09:05:07Z", "2026-10-17 09:05:07"),
+            ("2026-10-17T09:05+09:00", "2026-10-17 09:05:00"),
+            ("2026-10-17T09:05:07.5", "2026-10-17 09:05:07"),
         ] {
+            let dt = at(text);
+            assert_eq!(
+                format_datetime(&dt, "YYYY-MM-DD HH:mm:ss"),
+                rendered,
+                "{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_missing_offset_is_utc_and_a_given_one_is_kept() {
+        assert_eq!(at("2026-10-17T09:00").offset().whole_hours(), 0);
+        assert_eq!(at("2026-10-17T09:00+09:00").offset().whole_hours(), 9);
+        assert_eq!(
+            at("2026-10-17 09:00:00-05:30").offset().whole_minutes(),
+            -330
+        );
+        assert_eq!(at("2026-10-17T09:00:00.25").nanosecond(), 250_000_000);
+    }
+
+    #[test]
+    fn text_that_is_not_a_datetime_is_none() {
+        for text in ["", "hello", "2026-13-01", "2026-02-30", "2026-01-01T24:00"] {
             assert_eq!(parse_datetime(text), None, "{text}");
         }
+    }
+
+    #[test]
+    fn an_offset_is_a_utc_offset() {
+        assert_eq!(parse_offset("+09:00").unwrap().whole_hours(), 9);
+        assert_eq!(parse_offset("-05:30").unwrap().whole_minutes(), -330);
+        assert_eq!(parse_offset("Z"), Some(UtcOffset::UTC));
+        assert_eq!(parse_offset("x"), None);
     }
 
     #[test]

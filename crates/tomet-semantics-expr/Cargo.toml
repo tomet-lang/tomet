@@ -13,5 +13,5 @@ tomet-semantics = { workspace = true }
 tomet-tree = { workspace = true }
 
 #= Crates.io
-time = { workspace = true, features = ["parsing"] }
+time = { workspace = true }
 uuid = { workspace = true }

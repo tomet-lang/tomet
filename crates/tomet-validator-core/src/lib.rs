@@ -396,10 +396,9 @@ pub fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>)
 /// which is all this needs of them: the validator sits below the crate that
 /// reads settings, so the caller hands the declarations over as plain data.
 ///
-/// Only a `type:` with a form can be wrong, and only `uuid` has one so far.
-/// A field the document does not write, an empty one (the state in which
-/// `tomet format` generates one), and a `${...}` not yet evaluated are not
-/// reported.
+/// Only a `type:` with a form can be wrong: `uuid` and `datetime`. A field the
+/// document does not write, an empty one (the state in which `tomet format`
+/// generates one), and a `${...}` not yet evaluated are not reported.
 pub fn check_field_types(
     doc: &Document,
     field_types: &std::collections::BTreeMap<String, String>,
@@ -425,16 +424,16 @@ pub fn check_field_types(
             let Some(field_type) = field_types.get(field) else {
                 continue;
             };
-            let well_formed = match (field_type.as_str(), value) {
-                ("uuid", Value::String(text)) => text.is_empty() || is_uuid(text),
-                ("uuid", Value::Null) => true,
+            let Some(has_form) = form_of(field_type) else {
+                continue;
+            };
+            let well_formed = match value {
+                Value::String(text) => text.is_empty() || has_form(text),
+                Value::Null => true,
                 // `${...}` keeps its place in the tree until it is evaluated,
                 // and what it comes to is not known here.
-                ("uuid", Value::Element(el)) if matches!(el.sigil, tomet_ast::Sigil::Dollar) => {
-                    true
-                }
-                ("uuid", _) => false,
-                _ => true,
+                Value::Element(el) if matches!(el.sigil, tomet_ast::Sigil::Dollar) => true,
+                _ => false,
             };
             if !well_formed {
                 errors.push(Diagnostic::InvalidFieldValue {
@@ -446,6 +445,18 @@ pub fn check_field_types(
             }
         }
     });
+}
+
+/// What a `type:` with a form checks its text against, or `None` for a type
+/// that is only a label.
+fn form_of(field_type: &str) -> Option<fn(&str) -> bool> {
+    match field_type {
+        "uuid" => Some(is_uuid),
+        // The one definition of what a datetime field holds, which the
+        // evaluator reads a field by and `tomet format` rewrites by.
+        "datetime" => Some(|text| tomet_semantics::datetime::parse_datetime_parts(text).is_some()),
+        _ => None,
+    }
 }
 
 /// The 8-4-4-4-12 hexadecimal form, in either case. The version and variant

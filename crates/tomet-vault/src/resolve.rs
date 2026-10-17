@@ -13,7 +13,8 @@ use tomet_expr::{DirRef, DocRef, EvalValue, Resolver, parse_datetime};
 /// - a `list` field is a list: a lone value is wrapped, and the list is
 ///   empty when the document lacks the field;
 /// - a `datetime` field is a datetime when its text reads as one, and stays
-///   text when it does not (`tomet check` is what reports the bad one);
+///   text when it does not (`tomet check` is what reports the bad one, by
+///   the same `parse_datetime`);
 /// - every other declared field is `Null` when the document lacks it;
 /// - a key that is neither declared nor written is absent from the map, so
 ///   reading it is an error and a typo cannot turn into an answer of "no".
@@ -179,6 +180,19 @@ mod tests {
             field(&meta, "created"),
             Some(&EvalValue::String("yesterday".into()))
         );
+    }
+
+    /// The forms `tomet format` rewrites as RFC 3339 are datetimes here too;
+    /// a missing offset is UTC.
+    #[test]
+    fn the_looser_iso_8601_forms_are_datetimes_too() {
+        for text in ["2026-10-17", "2026-10-17T09:00", "2026-10-17 09:00:00"] {
+            let meta = meta_of(&format!("@meta{{ created: \"{text}\" }}\n"));
+            assert!(
+                matches!(field(&meta, "created"), Some(EvalValue::DateTime(_))),
+                "{text}"
+            );
+        }
     }
 
     #[test]

@@ -37,13 +37,9 @@ Delete it when the list is empty.
    Recorded in `KNOWN_TS_ERRORS` (`tests/src/lib.rs`, `blueprints/daily-note.blueprint.tmt`). Fix the scanner or
    leave it. Also unchecked: the CST (`tomet-syntax-parser/src/cst.rs`, `parse_interp_expr`) ends `${...}` at the
    first matching `}`, so a `}` inside `addr(...)` would end it early.
-8. `tomet check` checks the form of `type: uuid` only. A `datetime` field that does not read as one is not
-   reported either, although the `typed_meta` doc in `tomet-vault/src/resolve.rs` says `tomet check` reports it
-   (`check_field_types` in `tomet-validator-core` is where it would go; `types.expr.tmt` records the gap). Either
-   add the check or correct that comment.
-9. `check_field_types` is wired into `tomet check` (and so `stats`) only. The LSP and the bindings call
+8. `check_field_types` is wired into `tomet check` (and so `stats`) only. The LSP and the bindings call
     `validate_document_with` and do not pass the settings' field types.
-10. Not from this work, found on the way: `tomet check .` fails on 7 files of the `tmtroot` reorganization in
+9. Not from this work, found on the way: `tomet check .` fails on 7 files of the `tmtroot` reorganization in
     progress (`index/*.roots.tmt`, `dev/plans/roadmap.tmt`, `schema/vocabularies/writ.vocabulary.tmt`, three under
     `deprecated/`). (The `cargo fmt --check -p tomet-validator-core` failure noted earlier is gone.)
 
