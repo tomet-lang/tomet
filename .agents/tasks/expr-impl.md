@@ -24,15 +24,14 @@ Delete it when the list is empty.
 1. `file:` and `https:` addresses are an error (`address.rs`); their values are undecided (`address.expr.tmt`).
 2. Open in the spec pages, decide when needed: a non-recursive `.docs`, datetime members (`.year`) and offset
    conversion, `.group` and other collection methods, an `emoji` table users can extend (`extension.expr.tmt`).
-3. `check_field_types` (the `type: uuid` / `type: datetime` check) reaches `tomet check` and so `stats` only. Held
-   on purpose, until the LSP gets document-level diagnostics; it is two separate things, not a missing argument:
-   - The LSP (`apps/lsp/src/diagnostic.rs`) never runs the document validator. It reports CST duplicate ids
-     (`validate_cst`) and parse errors, and has no vault: no unknown elements, singletons, arguments, blueprint
-     conformance or field types. That is a feature to design (finding the vault, loading vocabularies, reacting to
-     file changes), of which this check is one line.
-   - The bindings (`bindings/{js,java,python}`) build their `Vault` from `PrinterConfig::default()`, so the `meta`
-     type declarations are always empty. Passing the settings' source in is a small change to three public APIs.
-     `tomet-edit`'s post-edit report (`diagnostics.rs`) calls `validate_document` with no config either.
+3. The bindings (`bindings/{js,java,python}`) build their `Vault` from `PrinterConfig::default()`, so the `meta`
+   `type:` declarations are always empty there and `check_field_types` finds nothing. Passing the settings' source in
+   is a small change to three public APIs. `tomet-edit`'s post-edit report (`diagnostics.rs`) calls
+   `validate_document` with no config either.
+4. `tomet check` reports a duplicate id twice for a document that has one in itself: the error (`duplicate id`) and
+   a warning that reads `unresolved ${#(a)}` -- the note that the later id was dropped, which `Unresolved` has no way
+   to say is not an expression (`tomet-transform/src/expressions.rs`, `Ids`). A kind on `Unresolved` would fix the
+   wording; the LSP shows both as `check` does.
 
 ## Decided to leave (2026-10-18, by the owner)
 

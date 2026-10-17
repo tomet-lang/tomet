@@ -60,11 +60,16 @@
 //! reason -- before it, each parsed on its own and interpolation was
 //! decided four different ways, one per converter.
 //!
-//! The LSP must not, and is deliberately left out. An editor wants the
-//! document @em[as written] -- rewriting the tree under the cursor would move
-//! every span the editor maps positions with. `tomet check` is the middle
-//! case -- it prepares a copy to report what could not be resolved, and
-//! validates the original.
+//! The LSP must not. An editor wants the document @em[as written] --
+//! rewriting the tree under the cursor would move every span the editor maps
+//! positions with. `tomet check` is the middle case -- it prepares a copy to
+//! report what could not be resolved, and validates the original -- and that
+//! is [`Vault::findings`], which `tomet check`, `tomet stats` and the LSP all
+//! ask, so the three say the same thing about a document.
+//!
+//! An editor holds documents that are not saved. [`Vault::set_buffer`] tells
+//! the vault about one, and a document that reads that file -- an `include` of
+//! it -- reads the editor's text.
 
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -76,9 +81,11 @@ use tomet_config::PrinterConfig;
 use tomet_semantics::Bindings;
 use vocabulary::load_vocabularies;
 
+mod findings;
 mod resolver;
 mod vocabulary;
 
+pub use findings::{Findings, is_error};
 pub use resolver::DiskResolver;
 pub use tomet_vault::{Prepared, Unresolved};
 
@@ -169,6 +176,31 @@ impl Vault {
                 &self.core.root,
             )
         })
+    }
+
+    /// Tells the vault that an editor holds `path` open with `text`, which
+    /// may not have been saved. A document that asks for that file -- an
+    /// `include` of it, a `#id` in it, its `@meta` -- is answered from `text`
+    /// from now on, not from the disk.
+    ///
+    /// Text that does not parse is no buffer at all: the file is read from
+    /// the disk again, as if it had never been opened.
+    pub fn set_buffer(&self, path: &Path, text: &str) {
+        match self.parse(text) {
+            Ok((doc, _)) => {
+                self.cache_document(&self.doc_ref(path).0, doc);
+            }
+            Err(_) => self.remove_buffer(path),
+        }
+    }
+
+    /// Forgets what [`Vault::set_buffer`] was told about `path`: the next
+    /// time it is asked for it is read from the disk.
+    pub fn remove_buffer(&self, path: &Path) {
+        self.docs
+            .lock()
+            .expect("the document cache is never held across a panic")
+            .remove(&self.doc_ref(path).0);
     }
 
     /// Reads, parses, and binds one file in this vault.
@@ -516,6 +548,37 @@ mod tests {
             "{:?}",
             prepared.unresolved
         );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// An editor's unsaved text stands in for the file: the including
+    /// document is prepared from it, not from what is on the disk.
+    #[test]
+    fn an_open_buffer_is_what_an_include_reads() {
+        let root = include_vault(
+            "tomet_test_load_include_buffer",
+            &[
+                ("host.tmt", "=[ Host ]\n\n${include(tmt(\"lib.tmt\"))}\n"),
+                ("lib.tmt", "=[ Saved ]\n"),
+            ],
+        );
+        let vault = Vault::discover(&root);
+        let prepared = |vault: &Vault| {
+            let (doc, _) = vault.prepared_document(&root.join("host.tmt")).unwrap();
+            outline(&doc)
+        };
+        assert_eq!(prepared(&vault), ["1:Host", "2:Saved"]);
+
+        vault.set_buffer(&root.join("lib.tmt"), "=[ Edited ]\n");
+        assert_eq!(prepared(&vault), ["1:Host", "2:Edited"]);
+
+        // Text that does not parse is no buffer: the disk is read again.
+        vault.set_buffer(&root.join("lib.tmt"), "@caution[ unterminated\n");
+        assert_eq!(prepared(&vault), ["1:Host", "2:Saved"]);
+
+        vault.set_buffer(&root.join("lib.tmt"), "=[ Edited ]\n");
+        vault.remove_buffer(&root.join("lib.tmt"));
+        assert_eq!(prepared(&vault), ["1:Host", "2:Saved"]);
         let _ = fs::remove_dir_all(&root);
     }
 

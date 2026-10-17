@@ -1,12 +1,13 @@
 @kind(api)
 
-@meta{crate: tomet-lsp, dependencies: list(tomet-address, tomet-ast, tomet-cst, tomet-expr, tomet-formatter, tomet-lexer, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator), dependents: list()}
+@meta{crate: tomet-lsp, dependencies: list(tomet-address, tomet-ast, tomet-cst, tomet-expr, tomet-formatter, tomet-lexer, tomet-load, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator), dependents: list()}
 
 =[tomet-lsp]
 
 Language server library for Tomet (`tomet-lsp`).
-Provides diagnostics (parser & validator), document formatting,
-hover, document symbols, goto definition, and completions.
+Provides diagnostics (what the text alone says, and what `tomet check`
+says of a document in its vault), document formatting, hover, document
+symbols, goto definition, and completions.
 
 ==[Module completion]
 
@@ -82,6 +83,10 @@ Spans and parse errors carry byte offsets only. Build one of these per
 request, from the text the request is about, and pass it down: building it
 is one pass over the text, and every conversion after that is cheap.
 
+===[Functions]
+
+====[fn uri_to_file_path]
+
 ==[Module symbol]
 
 ===[Functions]
@@ -89,3 +94,38 @@ is one pass over the text, and every conversion after that is cheap.
 ====[fn document_symbols_for]
 
 Provides document symbols for outline navigation in the editor.
+
+==[Module workspace]
+
+The vaults the open documents belong to, and the diagnostics that need one.
+
+[`diagnostics_for`](crate::diagnostics_for) reads a document from its text
+alone: what the parser and the CST validator can say. What `tomet check`
+says needs more -- the vocabularies in scope, the blueprint the `@kind`
+names, the settings' field types, the files an `include` reads -- and all
+of that belongs to a vault. [`Workspace`] finds the vault of each open
+document the way the CLI does, from the file's own path, and asks it for
+the same findings `tomet check` reports.
+
+===[Structs]
+
+====[struct Workspace]
+
+The open documents, and the vaults they are in.
+
+====[struct Debounce]
+
+Waits until things have stopped changing: each [`touch`](Debounce::touch)
+pushes the moment back, and [`due`](Debounce::due) says when it has come.
+
+What a vault is asked for on every keystroke would be wasted work for a
+document being typed into, so it is done once the typing pauses.
+
+===[Functions]
+
+====[fn to_diagnostics]
+
+`findings` of the document with text `text`, as LSP diagnostics.
+
+The validator's duplicate-id finding is left out: the CST validator
+reports the same thing from `diagnostics_for`, on the exact tokens.

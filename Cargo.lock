@@ -2331,7 +2331,9 @@ dependencies = [
  "tomet-search",
  "tomet-semantics",
  "tomet-transform",
+ "tomet-validator",
  "tomet-vault",
+ "tomet-workspace",
 ]
 
 [[package]]
@@ -2356,6 +2358,7 @@ dependencies = [
  "tomet-expr",
  "tomet-formatter",
  "tomet-lexer",
+ "tomet-load",
  "tomet-load-config",
  "tomet-parser",
  "tomet-semantics",

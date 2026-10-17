@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-load, dependencies: list(tomet-ast, tomet-config, tomet-expr, tomet-indexer, tomet-links, tomet-load-config, tomet-parser, tomet-search, tomet-semantics, tomet-transform, tomet-vault), dependents: list(tomet, tomet-cli)}
+@meta{crate: tomet-load, dependencies: list(tomet-ast, tomet-config, tomet-expr, tomet-indexer, tomet-links, tomet-load-config, tomet-parser, tomet-search, tomet-semantics, tomet-transform, tomet-validator, tomet-vault, tomet-workspace), dependents: list(tomet, tomet-cli, tomet-lsp)}
 
 =[tomet-load]
 
@@ -66,11 +66,16 @@ Anything producing output does: `export`, `html` (and so `serve`),
 reason -- before it, each parsed on its own and interpolation was
 decided four different ways, one per converter.
 
-The LSP must not, and is deliberately left out. An editor wants the
-document @em[as written] -- rewriting the tree under the cursor would move
-every span the editor maps positions with. `tomet check` is the middle
-case -- it prepares a copy to report what could not be resolved, and
-validates the original.
+The LSP must not. An editor wants the document @em[as written] --
+rewriting the tree under the cursor would move every span the editor maps
+positions with. `tomet check` is the middle case -- it prepares a copy to
+report what could not be resolved, and validates the original -- and that
+is [`Vault::findings`], which `tomet check`, `tomet stats` and the LSP all
+ask, so the three say the same thing about a document.
+
+An editor holds documents that are not saved. [`Vault::set_buffer`] tells
+the vault about one, and a document that reads that file -- an `include` of
+it -- reads the editor's text.
 
 ==[Structs]
 

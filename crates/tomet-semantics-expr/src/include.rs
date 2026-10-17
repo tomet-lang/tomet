@@ -1,6 +1,6 @@
 //! `include(target)`: another document's content, put where the call is.
 //!
-//! The target is a document (its body) or an element or section found by id
+//! The target is a document (its body) or an element, section or list found by id
 //! (that node, a section with everything under it). The result is a
 //! fragment, built in four steps:
 //!

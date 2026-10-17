@@ -96,7 +96,7 @@ pub(crate) fn whole_document_range(text: &str) -> Range {
     Range::new(Position::new(0, 0), Position::new(end_line, end_char))
 }
 
-pub(crate) fn uri_to_file_path(u: &Uri) -> Option<std::path::PathBuf> {
+pub fn uri_to_file_path(u: &Uri) -> Option<std::path::PathBuf> {
     let s = u.as_str();
     let stripped = s.strip_prefix("file://")?;
     let decoded = percent_decode_str(stripped);

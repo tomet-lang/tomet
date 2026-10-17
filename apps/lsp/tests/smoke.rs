@@ -444,3 +444,125 @@ fn macro_hover_with_workspace_auto_config_over_stdio() {
     server.shutdown();
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A vault in a temp directory whose settings declare `id` a `type: uuid`.
+fn uuid_vault(name: &str) -> std::path::PathBuf {
+    let root = std::env::temp_dir().join(format!("tomet_lsp_smoke_{name}_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(
+        root.join("default.config.tmt"),
+        "@kind(config)\n@config{ meta: { id: { type: uuid } } }\n",
+    )
+    .unwrap();
+    root
+}
+
+fn open(server: &mut Server, path: &std::path::Path, text: &str) {
+    server.send_notification(
+        "textDocument/didOpen",
+        json!({
+            "textDocument": {
+                "uri": format!("file://{}", path.display()),
+                "languageId": "tomet",
+                "version": 1,
+                "text": text,
+            }
+        }),
+    );
+}
+
+fn initialize(server: &mut Server, capabilities: Value) {
+    let init = server.send_request(
+        "initialize",
+        json!({"processId": Value::Null, "rootUri": Value::Null, "capabilities": capabilities}),
+    );
+    assert!(init.get("error").is_none(), "initialize failed: {init:?}");
+    server.send_notification("initialized", json!({}));
+}
+
+/// What the vault says -- here, the settings' `type: uuid` -- arrives after
+/// the typing pauses, on top of what the text alone said at once.
+#[test]
+fn the_vaults_diagnostics_follow_the_text_after_a_pause() {
+    let root = uuid_vault("pause");
+    let path = root.join("a.tmt");
+    let mut server = Server::start();
+    initialize(&mut server, json!({}));
+
+    open(&mut server, &path, "@meta{ id: not-a-uuid }\n");
+    let at_once = server.read_message();
+    assert!(
+        diagnostics_array(&at_once).is_empty(),
+        "the text alone has nothing to say: {at_once:?}"
+    );
+
+    let after_pause = server.read_message();
+    let diags = diagnostics_array(&after_pause);
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert_eq!(diags[0]["severity"], 1);
+    assert!(
+        diags[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("not a valid uuid"),
+        "{diags:?}"
+    );
+
+    server.shutdown();
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// A client that can register watchers is asked to watch `.tmt` files.
+#[test]
+fn a_client_that_can_watch_files_is_asked_to() {
+    let mut server = Server::start();
+    initialize(
+        &mut server,
+        json!({"workspace": {"didChangeWatchedFiles": {"dynamicRegistration": true}}}),
+    );
+    let request = server.read_message();
+    assert_eq!(
+        request["method"], "client/registerCapability",
+        "{request:?}"
+    );
+    let registration = &request["params"]["registrations"][0];
+    assert_eq!(registration["method"], "workspace/didChangeWatchedFiles");
+    assert_eq!(
+        registration["registerOptions"]["watchers"][0]["globPattern"],
+        "**/*.tmt"
+    );
+    server.shutdown();
+}
+
+/// The settings change on the disk: the diagnostics are asked for again.
+#[test]
+fn a_changed_config_changes_the_diagnostics() {
+    let root = uuid_vault("config");
+    let path = root.join("a.tmt");
+    let mut server = Server::start();
+    initialize(&mut server, json!({}));
+
+    open(&mut server, &path, "@meta{ id: not-a-uuid }\n");
+    let _at_once = server.read_message();
+    let first = server.read_message();
+    assert_eq!(diagnostics_array(&first).len(), 1, "{first:?}");
+
+    // The declaration is dropped, and the server is told a file changed.
+    std::fs::write(root.join("default.config.tmt"), "@kind(config)\n").unwrap();
+    server.send_notification(
+        "workspace/didChangeWatchedFiles",
+        json!({"changes": [{
+            "uri": format!("file://{}", root.join("default.config.tmt").display()),
+            "type": 2,
+        }]}),
+    );
+    let second = server.read_message();
+    assert!(
+        diagnostics_array(&second).is_empty(),
+        "nothing declares `id` any more: {second:?}"
+    );
+
+    server.shutdown();
+    let _ = std::fs::remove_dir_all(&root);
+}

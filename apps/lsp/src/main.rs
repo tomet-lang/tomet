@@ -1,25 +1,40 @@
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
-use lsp_server::{Connection, Message, Response};
+use lsp_server::{Connection, Message, RequestId, Response};
 use lsp_types::notification::{
-    DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
-    PublishDiagnostics,
+    DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument,
+    DidSaveTextDocument, Notification as _, PublishDiagnostics,
 };
 use lsp_types::request::{
     Completion, DocumentSymbolRequest, FoldingRangeRequest, Formatting, GotoDefinition,
-    HoverRequest, Request as _,
+    HoverRequest, RegisterCapability, Request as _,
 };
 use lsp_types::{
-    CompletionOptions, FoldingRangeProviderCapability, HoverProviderCapability, InitializeParams,
-    OneOf, PublishDiagnosticsParams, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, Uri,
+    CompletionOptions, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher,
+    FoldingRangeProviderCapability, GlobPattern, HoverProviderCapability, InitializeParams, OneOf,
+    PublishDiagnosticsParams, Registration, RegistrationParams, SaveOptions, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, Uri,
 };
+use tomet_lsp::{Debounce, Workspace};
 
 fn main() -> anyhow::Result<()> {
     let (connection, io_threads) = Connection::stdio();
 
     let capabilities = ServerCapabilities {
-        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+        // Saves are told to the server too: a saved file is a changed file on
+        // the disk, which a document that includes it may read.
+        text_document_sync: Some(TextDocumentSyncCapability::Options(
+            TextDocumentSyncOptions {
+                open_close: Some(true),
+                change: Some(TextDocumentSyncKind::FULL),
+                save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
+                    include_text: Some(false),
+                })),
+                ..Default::default()
+            },
+        )),
         document_formatting_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
@@ -42,7 +57,20 @@ fn main() -> anyhow::Result<()> {
         ..Default::default()
     };
     let init_params = connection.initialize(serde_json::to_value(capabilities)?)?;
-    let _init_params: InitializeParams = serde_json::from_value(init_params)?;
+    let init_params: InitializeParams = serde_json::from_value(init_params)?;
+
+    // Documents read other files (an `include`, a vocabulary, the config), so
+    // a change to any `.tmt` file on the disk is worth hearing about -- from
+    // the editor's own saves, and from git, a formatter, another program.
+    let can_watch = init_params
+        .capabilities
+        .workspace
+        .and_then(|w| w.did_change_watched_files)
+        .and_then(|w| w.dynamic_registration)
+        .unwrap_or(false);
+    if can_watch {
+        register_file_watcher(&connection)?;
+    }
 
     main_loop(connection)?;
     io_threads.join()?;
@@ -54,7 +82,32 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
     // `Hash` and `Eq` compare the text alone, so it is safe as a key.
     #[allow(clippy::mutable_key_type)]
     let mut documents: HashMap<Uri, String> = HashMap::new();
-    for msg in &connection.receiver {
+    let mut workspace = Workspace::new();
+    // What the vault said about each open document the last time it was asked,
+    // published together with what the text alone says.
+    #[allow(clippy::mutable_key_type)]
+    let mut from_vault: HashMap<Uri, Vec<lsp_types::Diagnostic>> = HashMap::new();
+    let mut debounce = Debounce::new(VAULT_DIAGNOSTICS_DELAY);
+    loop {
+        // Waiting for a message is also waiting for the pause that the
+        // vault's diagnostics are due after.
+        let received = match debounce.wait(Instant::now()) {
+            None => match connection.receiver.recv() {
+                Ok(msg) => Some(msg),
+                Err(_) => break,
+            },
+            Some(wait) => match connection.receiver.recv_timeout(wait) {
+                Ok(msg) => Some(msg),
+                Err(e) if e.is_timeout() => None,
+                Err(_) => break,
+            },
+        };
+        if debounce.due(Instant::now()) {
+            refresh(&connection, &documents, &mut workspace, &mut from_vault)?;
+        }
+        let Some(msg) = received else {
+            continue;
+        };
         match msg {
             Message::Request(req) => {
                 if connection.handle_shutdown(&req)? {
@@ -150,7 +203,16 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         serde_json::from_value(note.params)?;
                     let uri = params.text_document.uri;
                     documents.insert(uri.clone(), params.text_document.text.clone());
-                    publish(&connection, uri, &params.text_document.text)?;
+                    if let Some(path) = tomet_lsp::uri_to_file_path(&uri) {
+                        workspace.set_buffer(path, params.text_document.text.clone());
+                        debounce.touch(Instant::now());
+                    }
+                    publish(
+                        &connection,
+                        uri.clone(),
+                        &params.text_document.text,
+                        from_vault.get(&uri),
+                    )?;
                 }
                 DidChangeTextDocument::METHOD => {
                     let params: lsp_types::DidChangeTextDocumentParams =
@@ -158,7 +220,14 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                     let uri = params.text_document.uri;
                     if let Some(change) = params.content_changes.into_iter().next_back() {
                         documents.insert(uri.clone(), change.text.clone());
-                        publish(&connection, uri, &change.text)?;
+                        if let Some(path) = tomet_lsp::uri_to_file_path(&uri) {
+                            workspace.set_buffer(path, change.text.clone());
+                            debounce.touch(Instant::now());
+                        }
+                        // The text alone is checked now; the vault, once the
+                        // typing pauses. Until then the vault's last answer
+                        // stands.
+                        publish(&connection, uri.clone(), &change.text, from_vault.get(&uri))?;
                     }
                 }
                 DidCloseTextDocument::METHOD => {
@@ -166,7 +235,19 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         serde_json::from_value(note.params)?;
                     let uri = params.text_document.uri;
                     documents.remove(&uri);
+                    from_vault.remove(&uri);
+                    if let Some(path) = tomet_lsp::uri_to_file_path(&uri) {
+                        workspace.close(&path);
+                        // What was open and read it may read the disk's now.
+                        debounce.touch(Instant::now());
+                    }
                     publish_diagnostics(&connection, uri, Vec::new())?;
+                }
+                // A file was saved, or changed behind the editor's back: a
+                // config, a vocabulary, a document that others include.
+                DidSaveTextDocument::METHOD | DidChangeWatchedFiles::METHOD => {
+                    workspace.files_changed();
+                    debounce.touch(Instant::now());
                 }
                 _ => {}
             },
@@ -176,9 +257,73 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn publish(connection: &Connection, uri: Uri, text: &str) -> anyhow::Result<()> {
-    let diagnostics = tomet_lsp::diagnostics_for(text);
+/// How long the typing has to pause before the vault is asked about the open
+/// documents. What the text alone says (the parser, the CST validator) does
+/// not wait.
+const VAULT_DIAGNOSTICS_DELAY: Duration = Duration::from_millis(300);
+
+/// What the text alone says, and `from_vault` -- what the vault said about the
+/// document the last time it was asked.
+fn publish(
+    connection: &Connection,
+    uri: Uri,
+    text: &str,
+    from_vault: Option<&Vec<lsp_types::Diagnostic>>,
+) -> anyhow::Result<()> {
+    let mut diagnostics = tomet_lsp::diagnostics_for(text);
+    diagnostics.extend(from_vault.into_iter().flatten().cloned());
     publish_diagnostics(connection, uri, diagnostics)
+}
+
+/// Asks the vault about every open document again and publishes the ones it
+/// now says something different about. A document nothing changed for is not
+/// published again: a client redraws on every publish.
+#[allow(clippy::mutable_key_type)]
+fn refresh(
+    connection: &Connection,
+    documents: &HashMap<Uri, String>,
+    workspace: &mut Workspace,
+    from_vault: &mut HashMap<Uri, Vec<lsp_types::Diagnostic>>,
+) -> anyhow::Result<()> {
+    for (uri, text) in documents {
+        let Some(path) = tomet_lsp::uri_to_file_path(uri) else {
+            continue;
+        };
+        let now = workspace.findings_diagnostics(&path);
+        let before = from_vault.get(uri).map(Vec::as_slice).unwrap_or_default();
+        if now == before {
+            continue;
+        }
+        from_vault.insert(uri.clone(), now);
+        publish(connection, uri.clone(), text, from_vault.get(uri))?;
+    }
+    Ok(())
+}
+
+/// Asks the client to tell us when a `.tmt` file changes on the disk.
+fn register_file_watcher(connection: &Connection) -> anyhow::Result<()> {
+    let params = RegistrationParams {
+        registrations: vec![Registration {
+            id: "tomet-watch-tmt".to_string(),
+            method: DidChangeWatchedFiles::METHOD.to_string(),
+            register_options: Some(serde_json::to_value(
+                DidChangeWatchedFilesRegistrationOptions {
+                    watchers: vec![FileSystemWatcher {
+                        glob_pattern: GlobPattern::String("**/*.tmt".to_string()),
+                        kind: None,
+                    }],
+                },
+            )?),
+        }],
+    };
+    connection
+        .sender
+        .send(Message::Request(lsp_server::Request::new(
+            RequestId::from("tomet-register-watch".to_string()),
+            RegisterCapability::METHOD.to_string(),
+            params,
+        )))?;
+    Ok(())
 }
 
 fn publish_diagnostics(

@@ -149,7 +149,7 @@ pub enum EvalValue {
     /// A call literal other than `list(...)`, kept as written
     /// (`enum(a, b)`). `list(...)` becomes a [`EvalValue::Seq`].
     Call(String, Vec<EvalValue>),
-    /// An element or a section, with the document it came from.
+    /// An element, a section or a list, with the document it came from.
     Node {
         doc: DocRef,
         node: Box<Node>,

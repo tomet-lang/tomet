@@ -1,84 +1,8 @@
 use std::path::{Path, PathBuf};
 
+use tomet_load::{Findings, is_error};
+
 use crate::util::{format_parse_error, read};
-
-/// What checking finds in one document that parsed: the validator's
-/// diagnostics, and the `${...}` that had no value.
-///
-/// It is what `check` reports and what `stats` counts, so the two agree
-/// about which documents fail and how many warnings there are.
-pub(crate) struct Findings {
-    pub(crate) diagnostics: Vec<tomet_validator::Diagnostic>,
-    pub(crate) unresolved: Vec<tomet_load::Unresolved>,
-}
-
-impl Findings {
-    pub(crate) fn of(vault: &tomet_load::Vault, file: &Path, doc: &tomet_ast::Document) -> Self {
-        let bindings = vault.bindings(doc);
-        let mut diagnostics = tomet_validator::validate_document_with(doc, &bindings);
-
-        // The settings' `type:` declarations, which the validator is handed
-        // as plain data -- it sits below the crate that reads settings.
-        let field_types = vault
-            .config
-            .meta
-            .fields
-            .iter()
-            .filter_map(|(name, field)| Some((name.clone(), field.field_type.clone()?)))
-            .collect();
-        tomet_validator::check_field_types(doc, &field_types, &mut diagnostics);
-
-        if let Some(kind) = tomet_semantics::document_kind(doc)
-            && kind != "blueprint"
-            && let Some(blueprint_path) =
-                tomet_workspace::blueprint::find_blueprint(&vault.root, &kind, &vault.config)
-        {
-            if let Ok(src) = std::fs::read_to_string(&blueprint_path)
-                && let Ok(blueprint_doc) = tomet_parser::parse_document(&src)
-            {
-                let bp_diagnostics = tomet_validator::validate_against_blueprint_with(
-                    doc,
-                    &blueprint_doc,
-                    &bindings,
-                );
-                diagnostics.extend(bp_diagnostics);
-            }
-        }
-
-        // A `${...}` with no value is not an error: a document showing one
-        // as an example is a legitimate document, and `export` leaves it
-        // in the output as written. Saying so here is what tells that
-        // apart from a typo, which otherwise renders as itself and is
-        // never mentioned by anything.
-        //
-        // Run on a copy: this reports on the document as written, and
-        // `prepare` rewrites the tree.
-        let mut prepared = doc.clone();
-        let unresolved = vault.prepare(&mut prepared, file).unresolved;
-
-        Findings {
-            diagnostics,
-            unresolved,
-        }
-    }
-
-    /// Whether `check` fails this document.
-    pub(crate) fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(is_error)
-    }
-
-    /// How many warnings `check` reports for this document.
-    pub(crate) fn warnings(&self) -> usize {
-        self.unresolved.len() + self.diagnostics.iter().filter(|d| !is_error(d)).count()
-    }
-}
-
-/// A warning is the document telling you about itself -- `@draft`,
-/// `@fixme`. It is reported and does not fail the run: marking a gap has
-/// to stay cheaper than leaving it unmarked.
-fn is_error(d: &tomet_validator::Diagnostic) -> bool {
-    d.severity() == tomet_validator::Severity::Error
-}
 
 /// Checks one file, or every `.tmt` under a directory.
 ///
@@ -163,7 +87,7 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
             }
         };
 
-        let findings = Findings::of(&vault, file, &doc);
+        let findings = vault.findings(file, &doc);
         // One index per file: diagnostics carry byte spans, and this is where
         // they become the line:column a reader sees.
         let index = tomet_lexer::LineIndex::new(&src);
@@ -367,7 +291,7 @@ mod tests {
         let unresolved = |name: &str| {
             let path = root.join(name);
             let doc = tomet_parser::parse_document(&fs::read_to_string(&path).unwrap()).unwrap();
-            Findings::of(&vault, &path, &doc).unresolved
+            vault.findings(&path, &doc).unresolved
         };
 
         // The included file itself: both, each with its own reason.

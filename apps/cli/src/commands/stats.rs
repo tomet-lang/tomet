@@ -3,8 +3,6 @@ use std::path::{Path, PathBuf};
 
 use tomet_stats::{LinkKind, Stats, measure};
 
-use super::check::Findings;
-
 /// A file that could not be measured, and why.
 ///
 /// The text report only counts these. Which file and where is in the JSON,
@@ -123,7 +121,7 @@ fn collect_report(path: &Path) -> anyhow::Result<(Report, usize)> {
             }
         };
 
-        let findings = Findings::of(&vault, file, &doc);
+        let findings = vault.findings(file, &doc);
         warnings += findings.warnings();
         if findings.has_errors() {
             invalid += 1;
