@@ -62,9 +62,10 @@ fn test_blueprint_end_to_end_lifecycle() {
     vars.insert("author".to_string(), Value::String("Alice".into()));
 
     let doc_rel_path = Path::new("journal/2026-09-01.tmt");
-    let doc_abs_path =
+    let created =
         create_file_from_blueprint(&temp_dir, "daily-note", doc_rel_path, &vars, &config, false)
             .expect("creation should succeed");
+    let doc_abs_path = created.path;
 
     assert!(doc_abs_path.is_file());
     let doc_content = fs::read_to_string(&doc_abs_path).unwrap();

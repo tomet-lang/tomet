@@ -63,10 +63,33 @@ pub fn new_cmd(
         var_map.insert(k.clone(), Value::String(v.clone()));
     }
 
-    let created_path =
+    let created =
         create_file_from_blueprint(&root, &blueprint_name, path, &var_map, &config, force)?;
 
-    println!("Created {}", created_path.display());
+    println!("Created {}", created.path.display());
+
+    // The expressions with no value are in the new file as written. Said here
+    // in the form `tomet check` uses, pointing at the blueprint line they
+    // came from.
+    for u in &created.unfilled {
+        eprintln!(
+            "{}:{}: warning: unresolved ${{{}}} -- {}",
+            created.blueprint.display(),
+            u.line,
+            u.source,
+            u.reason
+        );
+    }
+    if !created.unfilled.is_empty() {
+        eprintln!(
+            "{} left as written in {}",
+            match created.unfilled.len() {
+                1 => "1 expression".to_string(),
+                n => format!("{n} expressions"),
+            },
+            created.path.display()
+        );
+    }
     Ok(())
 }
 
@@ -116,8 +139,8 @@ mod tests {
         )
         .unwrap();
 
-        assert!(created.is_file());
-        let content = fs::read_to_string(&created).unwrap();
+        assert!(created.path.is_file());
+        let content = fs::read_to_string(&created.path).unwrap();
         assert!(content.contains("@kind(rfc)"));
         assert!(content.contains("New Auth Protocol"));
         assert!(content.contains("Bob"));

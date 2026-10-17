@@ -79,7 +79,7 @@ $include(addr(tmt:docs/a.tmt))
 式には評価される時が2つある。
 
 - 出力時: `export` などの出力の準備で評価される。何度評価しても同じ結果になる式だけが使える。
-- 作成時: `tomet new` がブループリントから文書を作るとき。結果はソースに書き込まれる。`generate.*` は作成時にだけ使える（@file(tmtroot/spec/expressions/func.expr.tmt)）。
+- 作成時: `tomet new` がブループリントから文書を作るとき。結果はソースに書き込まれる。`generate.*` は作成時にだけ使える（@file(tmtroot/spec/expressions/func.expr.tmt)）。値の出なかった式は、書いたまま新しい文書に残り、`tomet new` がブループリントの行番号を付けて警告する（文書は作られ、終了コードは変わらない）。
 
 出力時の評価は1つの準備段階にまとめる。本文、引数、`filter` の中の式は、同じ評価器が位置の規則に従って解決する。
 

@@ -113,6 +113,38 @@ fn blueprint_name(path: &Path) -> Option<String> {
     found
 }
 
+/// An expression in a blueprint that had no value, and so stands in the new
+/// document as written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unfilled {
+    /// The expression as written, without the surrounding `${` and `}`.
+    pub source: String,
+    /// The 1-based line it is written on in the blueprint file.
+    pub line: usize,
+    /// Why it has no value.
+    pub reason: String,
+}
+
+/// A new document made from a blueprint, not yet written anywhere.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Instantiation {
+    /// The document, as Tomet source text.
+    pub content: String,
+    /// What it was left to fill in, in the order the blueprint has them.
+    pub unfilled: Vec<Unfilled>,
+}
+
+/// A new document written to disk by [`create_file_from_blueprint`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Created {
+    /// Where the new document is.
+    pub path: PathBuf,
+    /// The blueprint file it was made from, which [`Unfilled::line`] counts in.
+    pub blueprint: PathBuf,
+    /// What the new document was left to fill in.
+    pub unfilled: Vec<Unfilled>,
+}
+
 /// Instantiates a blueprint file into formatted Tomet source text for the new
 /// document `target`, a path relative to the vault.
 ///
@@ -123,13 +155,14 @@ fn blueprint_name(path: &Path) -> Option<String> {
 /// `created` (or `modified`), UTC if neither has one.
 ///
 /// An expression that has no value stays in the new document as written, so
-/// the person who made it can see what was left to fill in.
+/// the person who made it can see what was left to fill in; each one is also
+/// returned in [`Instantiation::unfilled`], so the caller can say so.
 pub fn instantiate_blueprint_file(
     blueprint_path: &Path,
     target: &Path,
     vars: &HashMap<String, Value>,
     config: &PrinterConfig,
-) -> Result<String> {
+) -> Result<Instantiation> {
     instantiate_blueprint_file_with(blueprint_path, target, vars, config, &generator_for(config))
 }
 
@@ -139,7 +172,7 @@ fn instantiate_blueprint_file_with(
     vars: &HashMap<String, Value>,
     config: &PrinterConfig,
     generate: &dyn Generate,
-) -> Result<String> {
+) -> Result<Instantiation> {
     let src = fs::read_to_string(blueprint_path)
         .with_context(|| format!("failed to read blueprint at {}", blueprint_path.display()))?;
 
@@ -184,9 +217,24 @@ fn instantiate_blueprint_file_with(
         includes: &[],
         heading_level: 0,
     };
-    instantiate_blueprint(&mut doc, &cx);
+    let instantiated = instantiate_blueprint(&mut doc, &cx);
 
-    Ok(tomet_printer::document_to_tm_with_config(&doc, config))
+    // The spans belong to the blueprint as it was read, not to the document
+    // about to be printed, so the line is a line of the blueprint.
+    let unfilled = instantiated
+        .unresolved
+        .into_iter()
+        .map(|u| Unfilled {
+            line: 1 + src[..u.span.start.min(src.len())].matches('\n').count(),
+            source: u.source,
+            reason: u.reason,
+        })
+        .collect();
+
+    Ok(Instantiation {
+        content: tomet_printer::document_to_tm_with_config(&doc, config),
+        unfilled,
+    })
 }
 
 /// The clock `generate.now()` reads: the real one, in the offset the settings
@@ -202,6 +250,10 @@ fn generator_for(config: &PrinterConfig) -> OffsetGenerate {
 }
 
 /// Creates a new document from a blueprint and writes it to disk.
+///
+/// What the document was left to fill in is in [`Created::unfilled`]; it is
+/// written anyway, since the expressions are still there to be filled in by
+/// hand.
 pub fn create_file_from_blueprint(
     root: &Path,
     blueprint_name: &str,
@@ -209,7 +261,7 @@ pub fn create_file_from_blueprint(
     vars: &HashMap<String, Value>,
     config: &PrinterConfig,
     overwrite: bool,
-) -> Result<PathBuf> {
+) -> Result<Created> {
     let blueprint_file = find_blueprint(root, blueprint_name, config).ok_or_else(|| {
         let known = list_blueprints(root, config)
             .into_iter()
@@ -239,11 +291,15 @@ pub fn create_file_from_blueprint(
             .with_context(|| format!("failed to create directories for {}", parent.display()))?;
     }
 
-    let content = instantiate_blueprint_file(&blueprint_file, target_rel_path, vars, config)?;
-    fs::write(&target_abs_path, content)
+    let made = instantiate_blueprint_file(&blueprint_file, target_rel_path, vars, config)?;
+    fs::write(&target_abs_path, made.content)
         .with_context(|| format!("failed to write file {}", target_abs_path.display()))?;
 
-    Ok(target_abs_path)
+    Ok(Created {
+        path: target_abs_path,
+        blueprint: blueprint_file,
+        unfilled: made.unfilled,
+    })
 }
 
 #[cfg(test)]
@@ -340,7 +396,8 @@ mod tests {
         )
         .unwrap();
 
-        let content = fs::read_to_string(&created).unwrap();
+        assert!(created.unfilled.is_empty(), "{:?}", created.unfilled);
+        let content = fs::read_to_string(&created.path).unwrap();
         assert!(content.contains("@kind(daily-note)"));
         assert!(content.contains("Tasks for 2026-09-01 Daily"));
         assert!(!content.contains("@blueprint"));
@@ -386,7 +443,8 @@ mod tests {
             &PrinterConfig::default(),
             &Fixed,
         )
-        .unwrap();
+        .unwrap()
+        .content;
 
         assert!(
             content.contains("id: 00000000-0000-0000-0000-000000000000"),
@@ -411,6 +469,7 @@ mod tests {
                 &Fixed,
             )
             .unwrap()
+            .content
         };
         assert!(made(&HashMap::new()).contains("my-note"));
         let mut vars = HashMap::new();
@@ -422,7 +481,7 @@ mod tests {
     #[test]
     fn an_expression_with_no_value_is_left_in_the_new_document() {
         let file = blueprint_file("left", "@blueprint(note)\n@meta{ by: ${vars.author} }\n");
-        let content = instantiate_blueprint_file_with(
+        let made = instantiate_blueprint_file_with(
             &file,
             Path::new("n.tmt"),
             &HashMap::new(),
@@ -430,8 +489,63 @@ mod tests {
             &Fixed,
         )
         .unwrap();
-        assert!(content.contains("${vars.author}"), "{content}");
+        assert!(made.content.contains("${vars.author}"), "{}", made.content);
         let _ = fs::remove_dir_all(file.parent().unwrap());
+    }
+
+    /// What is left is also said, with the line of the blueprint it is
+    /// written on -- the new document has no line to point at that the person
+    /// did not already have to search for.
+    #[test]
+    fn an_expression_with_no_value_is_reported_with_its_line_in_the_blueprint() {
+        let file = blueprint_file(
+            "reported",
+            "@blueprint(note)\n\n@meta{\n  by: ${vars.author}\n  on: ${generate.uuid()}\n}\n",
+        );
+        let made = instantiate_blueprint_file_with(
+            &file,
+            Path::new("n.tmt"),
+            &HashMap::new(),
+            &PrinterConfig::default(),
+            &Fixed,
+        )
+        .unwrap();
+        assert_eq!(made.unfilled.len(), 1, "{:?}", made.unfilled);
+        assert_eq!(made.unfilled[0].source, "vars.author");
+        assert_eq!(made.unfilled[0].line, 4);
+        assert!(
+            made.unfilled[0].reason.contains("author"),
+            "{}",
+            made.unfilled[0].reason
+        );
+        let _ = fs::remove_dir_all(file.parent().unwrap());
+    }
+
+    #[test]
+    fn creating_a_file_reports_what_it_was_left_to_fill_in() {
+        let root = vault("unfilled");
+        fs::write(
+            root.join(".tomet/blueprints/daily-note.blueprint.tmt"),
+            "@blueprint(daily-note)\n@meta{ by: ${vars.author} }\n",
+        )
+        .unwrap();
+        let config = declaring(&[".tomet/blueprints/daily-note.blueprint.tmt"]);
+
+        let created = create_file_from_blueprint(
+            &root,
+            "daily-note",
+            Path::new("n.tmt"),
+            &HashMap::new(),
+            &config,
+            false,
+        )
+        .unwrap();
+
+        assert!(created.path.is_file());
+        assert!(created.blueprint.ends_with("daily-note.blueprint.tmt"));
+        assert_eq!(created.unfilled.len(), 1, "{:?}", created.unfilled);
+        assert_eq!(created.unfilled[0].line, 2);
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
