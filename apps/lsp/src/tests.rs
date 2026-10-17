@@ -57,6 +57,87 @@ fn definition_finds_matching_id() {
     assert!(def.is_some());
 }
 
+/// Where a go-to-definition on `(line, col)` of `text` lands, as a start line.
+fn definition_line(text: &str, line: u32, col: u32) -> Option<u32> {
+    let uri = Uri::from_str("file:///test.tmt").unwrap();
+    match definition_for(text, Position::new(line, col), &uri)? {
+        lsp_types::GotoDefinitionResponse::Scalar(location) => Some(location.range.start.line),
+        other => panic!("expected one location, got {other:?}"),
+    }
+}
+
+/// A reference is written the way the language writes one -- a link to an
+/// anchor, or `#x` in an expression -- and lands on the node with that id.
+#[test]
+fn definition_follows_the_references_the_language_writes() {
+    let target = "=[ Intro ]#(intro)\n\n";
+    for (label, text, line, col) in [
+        (
+            "link to an anchor",
+            format!("{target}@link(#intro)\n"),
+            2,
+            8,
+        ),
+        ("link by scheme", format!("{target}@link(id:intro)\n"), 2, 8),
+        (
+            "id in an expression",
+            format!("{target}${{#intro}}\n"),
+            2,
+            3,
+        ),
+        (
+            "same document by name",
+            format!("{target}${{self#intro}}\n"),
+            2,
+            3,
+        ),
+        (
+            "inside a call and a chain",
+            format!("{target}${{include(#intro).len()}}\n"),
+            2,
+            10,
+        ),
+    ] {
+        assert_eq!(definition_line(&text, line, col), Some(0), "{label}");
+    }
+}
+
+/// With two references in one expression, the one under the cursor wins.
+#[test]
+fn definition_takes_the_reference_under_the_cursor() {
+    let text = "=[ A ]#(a)\n\n=[ B ]#(b)\n\n${add(#a, #b)}\n";
+    assert_eq!(definition_line(text, 4, 7), Some(0), "on #a");
+    assert_eq!(definition_line(text, 4, 11), Some(2), "on #b");
+}
+
+/// What is not a reference to this document's own node does not jump:
+/// a bare name (which the expression language does not allow), a node that
+/// is not there, and another document.
+#[test]
+fn definition_does_not_jump_where_there_is_nothing_to_jump_to() {
+    let target = "=[ Intro ]#(intro)\n\n";
+    assert_eq!(
+        definition_line(&format!("{target}${{intro}}\n"), 2, 3),
+        None,
+        "a bare name is not an id"
+    );
+    assert_eq!(
+        definition_line(&format!("{target}${{#nope}}\n"), 2, 3),
+        None,
+        "no such id"
+    );
+    assert_eq!(
+        definition_line(&format!("{target}${{tmt(\"b.tmt\")#intro}}\n"), 2, 20),
+        None,
+        "another document"
+    );
+    assert_eq!(
+        definition_line(&format!("{target}@link(tmt:b.tmt#intro)\n"), 2, 8),
+        None,
+        "another document"
+    );
+}
+
 #[test]
 fn completions_returns_items() {
     let items = completions_for("", Position::new(0, 0));
@@ -109,6 +190,46 @@ fn completions_trigger_prefix() {
         !interp_items
             .iter()
             .any(|i| i.label == "uuid(...)" || i.label == "date(...)")
+    );
+}
+
+/// What is offered after `${` is what the evaluator knows, all of it -- so a
+/// function added to the language is offered without the editor being told.
+#[test]
+fn an_expression_is_offered_every_function_and_reserved_name_the_evaluator_has() {
+    let items = completions_for("${", Position::new(0, 2));
+    for (name, _) in tomet_expr::FUNCTIONS {
+        assert!(
+            items.iter().any(|i| i.label == format!("{name}(...)")),
+            "{name} is not offered"
+        );
+    }
+    for (name, _) in tomet_expr::RESERVED_NAMES {
+        assert!(
+            items.iter().any(|i| i.label == *name),
+            "{name} is not offered"
+        );
+    }
+    // The two the editor used to leave out.
+    assert!(items.iter().any(|i| i.label == "include(...)"));
+    assert!(items.iter().any(|i| i.label == "addr(...)"));
+}
+
+/// An address starts with one of the schemes the address parser reads, under
+/// the spelling it reads (`tmt:`, not the `tm:` it used to be), and a
+/// function is offered inside `${...}` only: outside it, one cannot be written.
+#[test]
+fn outside_an_expression_the_address_schemes_are_offered_and_no_functions() {
+    let items = completions_for("", Position::new(0, 0));
+    let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+    for scheme in ["tmt", "id", "ref", "file", "dir", "url"] {
+        assert!(labels.contains(&scheme), "{scheme} is not offered");
+    }
+    assert!(!labels.contains(&"tm"), "`tm:` is no longer a scheme");
+    assert!(!labels.contains(&"unresolved"), "not something to type");
+    assert!(
+        !labels.iter().any(|l| l.ends_with("(...)")),
+        "no function belongs outside `${{...}}`: {labels:?}"
     );
 }
 
@@ -560,4 +681,25 @@ fn main() {
     let code_range = ranges.iter().find(|r| r.start_line == 8);
     assert!(code_range.is_some());
     assert_eq!(code_range.unwrap().end_line, 12);
+}
+
+/// A section and a list inside an element's `[...]` fold on their own, as
+/// well as the element they are in.
+#[test]
+fn what_an_element_holds_folds_too() {
+    let text = "@card[\n=[ Inner ]\n\nfirst\n\nsecond\n\n- a\n- b\n]\n";
+    let ranges = folding_ranges_for(text);
+    let starts: Vec<(u32, u32)> = ranges.iter().map(|r| (r.start_line, r.end_line)).collect();
+    assert!(
+        starts.iter().any(|&(start, _)| start == 0),
+        "the element: {starts:?}"
+    );
+    assert!(
+        starts.iter().any(|&(start, _)| start == 1),
+        "the section inside it: {starts:?}"
+    );
+    assert!(
+        starts.iter().any(|&(start, end)| start == 7 && end == 8),
+        "the list inside the section: {starts:?}"
+    );
 }

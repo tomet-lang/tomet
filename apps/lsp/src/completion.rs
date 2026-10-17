@@ -47,23 +47,9 @@ pub fn completions_for_with_uri(
 
     if prefix.ends_with("${") || prefix.ends_with("${ ") {
         // What may start an expression: the functions called by a bare name,
-        // and the reserved values with the members worth offering first.
-        let compute_funcs = [
-            ("add", "Arithmetic addition function `add(a, b)`"),
-            ("sub", "Arithmetic subtraction function `sub(a, b)`"),
-            ("mul", "Arithmetic multiplication function `mul(a, b)`"),
-            ("div", "Floating-point division function `div(a, b)`"),
-            ("mod", "Integer modulo function `mod(a, b)`"),
-            ("not", "Negation `not(bool)`"),
-            ("exists", "Whether a value is not null `exists(value)`"),
-            ("link", "A link to a document or an element `link(target)`"),
-            ("tmt", "A document by its path `tmt(\"path\")`"),
-            ("ref", "A document by its note name `ref(\"name\")`"),
-            ("emoji", "An emoji by name `emoji(\"sparkles\")`"),
-            ("unicode", "A character by code point `unicode(0x2713)`"),
-        ];
-
-        for (func, detail) in compute_funcs {
+        // and the reserved values with the members worth offering first. Both
+        // lists are the evaluator's own, so what is offered is what exists.
+        for (func, detail) in tomet_expr::FUNCTIONS {
             items.push(CompletionItem {
                 label: format!("{func}(...)"),
                 insert_text: Some(format!("{func}()")),
@@ -72,21 +58,7 @@ pub fn completions_for_with_uri(
                 ..CompletionItem::default()
             });
         }
-
-        let reserved = [
-            ("self", "The document this expression is written in"),
-            ("macro", "The macros defined in settings: `macro.name(...)`"),
-            ("vault", "The vault's root directory: `vault.docs`"),
-            (
-                "vars",
-                "Values passed to `tomet new --var` (only when creating a document)",
-            ),
-            (
-                "generate",
-                "`generate.uuid()` and `generate.now()` (only when creating a document)",
-            ),
-        ];
-        for (name, detail) in reserved {
+        for (name, detail) in tomet_expr::RESERVED_NAMES {
             items.push(CompletionItem {
                 label: name.to_string(),
                 insert_text: Some(name.to_string()),
@@ -109,45 +81,42 @@ pub fn completions_for_with_uri(
         });
     }
 
-    let inferred_keys = [
-        ("url", "URL link reference"),
-        ("file", "File reference path"),
-        ("tm", "Reference to another Tomet document"),
-        (
-            "id",
-            "Element id (definition attribute, or a same-document reference key)",
-        ),
-        ("ref", "Search project by filename/title"),
-        ("tag", "Tag classification"),
-    ];
-
-    for (key, detail) in inferred_keys {
+    // The schemes an address can start with, from the one list the address
+    // parser reads, so a scheme renamed there is renamed here. `unresolved`
+    // is what the tooling writes for a reference that did not resolve, never
+    // something to type.
+    for scheme in tomet_address::EXPLICIT_SCHEMES {
+        if scheme == "unresolved" {
+            continue;
+        }
         items.push(CompletionItem {
-            label: key.to_string(),
+            label: scheme.to_string(),
             kind: Some(CompletionItemKind::PROPERTY),
-            detail: Some(detail.to_string()),
+            detail: Some(scheme_detail(scheme).to_string()),
             ..CompletionItem::default()
         });
     }
-
-    let compute_funcs = [
-        ("add", "Arithmetic addition function `add(a, b)`"),
-        ("sub", "Arithmetic subtraction function `sub(a, b)`"),
-        ("mul", "Arithmetic multiplication function `mul(a, b)`"),
-        ("div", "Floating-point division function `div(a, b)`"),
-        ("mod", "Integer modulo function `mod(a, b)`"),
-    ];
-
-    for (func, detail) in compute_funcs {
-        items.push(CompletionItem {
-            label: format!("{func}(...)"),
-            kind: Some(CompletionItemKind::FUNCTION),
-            detail: Some(detail.to_string()),
-            ..CompletionItem::default()
-        });
-    }
+    items.push(CompletionItem {
+        label: "tag".to_string(),
+        kind: Some(CompletionItemKind::PROPERTY),
+        detail: Some("Tag classification".to_string()),
+        ..CompletionItem::default()
+    });
 
     items
+}
+
+/// One line saying what an address scheme points at.
+fn scheme_detail(scheme: &str) -> &'static str {
+    match scheme {
+        "tmt" => "Another Tomet document: `tmt:path/to/doc.tmt#id`",
+        "id" => "An element of this document, by its id: `id:intro`",
+        "ref" => "A note found by file name: `ref:Note Name`",
+        "file" => "A file, by path: `file:path/to/file`",
+        "dir" => "A directory, by path: `dir:path/to/dir`",
+        "url" => "A web address: `url:https://example.com`",
+        _ => "An address",
+    }
 }
 
 fn path_completions(prefix: &str, uri: Option<&Uri>) -> Option<Vec<CompletionItem>> {

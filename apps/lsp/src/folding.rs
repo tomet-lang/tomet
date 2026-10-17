@@ -69,6 +69,11 @@ fn collect_block_folding_ranges(
             if let Some(val) = &el.value {
                 collect_element_value_folding_ranges(index, val, ranges);
             }
+            // What the element holds folds on its own too: a section or a
+            // list inside `@x[ ... ]` is a place to fold, not only the `@x`.
+            for child in el.content.iter().flatten() {
+                collect_block_folding_ranges(index, child, ranges);
+            }
         }
         Block::Paragraph(_) => {}
         Block::List(list) => collect_list_folding_ranges(index, list, ranges),
@@ -93,6 +98,9 @@ fn collect_list_folding_ranges(index: &LineIndex<'_>, list: &List, ranges: &mut 
     for item in &list.items {
         if let Some(val) = &item.element.value {
             collect_element_value_folding_ranges(index, val, ranges);
+        }
+        for child in item.element.content.iter().flatten() {
+            collect_block_folding_ranges(index, child, ranges);
         }
         if let Some(sub) = &item.sublist {
             collect_list_folding_ranges(index, sub, ranges);
