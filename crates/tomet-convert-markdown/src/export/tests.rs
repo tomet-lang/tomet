@@ -433,6 +433,62 @@ fn wikilink_exports_to_markdown() {
     assert_eq!(to_markdown(&doc), "[[name]] and [[name|display]]\n\n");
 }
 
+/// A paragraph holding one `@link(target)`, with `label` as its content when
+/// there is one.
+fn link_doc(target: &str, label: Option<&str>) -> Document {
+    let mut el = tomet_tree::element_new(Sigil::named("link"));
+    el.args = Some(Value::Map(vec![(
+        "target".to_string(),
+        Value::String(target.to_string()),
+    )]));
+    if let Some(label) = label {
+        el.content = Some(wrap_content(vec![Inline::Text(Text::new(
+            label,
+            Span::dummy(),
+        ))]));
+    }
+    Document {
+        blocks: vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Element(el)],
+            Span::dummy(),
+        ))],
+        span: Span::dummy(),
+    }
+}
+
+/// A path with no label used to come out bare, which is text and not a link
+/// -- HTML makes an anchor of the same thing. The target is the path as
+/// written, as it is in HTML.
+#[test]
+fn an_unlabeled_path_link_is_a_link() {
+    assert_eq!(
+        to_markdown(&link_doc("tmt:docs/a.tmt#intro", None)),
+        "[docs/a.tmt#intro](docs/a.tmt#intro)\n\n"
+    );
+    assert_eq!(
+        to_markdown(&link_doc("file:docs/a.png", None)),
+        "[docs/a.png](docs/a.png)\n\n"
+    );
+}
+
+#[test]
+fn a_labeled_path_link_keeps_its_label() {
+    assert_eq!(
+        to_markdown(&link_doc("tmt:docs/a.tmt#intro", Some("the intro"))),
+        "[the intro](docs/a.tmt#intro)\n\n"
+    );
+}
+
+/// A URL on its own is already a link to a reader and to most renderers, so
+/// it stays as it was.
+#[test]
+fn an_unlabeled_url_stays_bare() {
+    assert_eq!(
+        to_markdown(&link_doc("https://example.com", None)),
+        "https://example.com\n\n"
+    );
+}
+
 #[test]
 fn table_exports_to_markdown() {
     let mut el = tomet_tree::element_new(Sigil::named("table"));

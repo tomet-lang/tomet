@@ -509,10 +509,16 @@ fn render_link(cx: &MarkdownCtx, el: &Element) -> String {
             }
         }
         _ => {
-            if text.is_empty() || text == target {
-                target.to_string()
-            } else {
-                format!("[{text}]({target})")
+            let unlabeled = text.is_empty() || text == target;
+            match scheme {
+                // A URL on its own is what a reader and most renderers
+                // already take for a link.
+                TargetScheme::Url if unlabeled => target.to_string(),
+                // A path is not: written bare it is text, where HTML makes
+                // an anchor of it. The target is the path as written, as it
+                // is in HTML -- not where the document is exported to.
+                _ if unlabeled => format!("[{target}]({target})"),
+                _ => format!("[{text}]({target})"),
             }
         }
     }
