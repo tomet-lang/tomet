@@ -440,7 +440,9 @@ fn run_app<B: ratatui::backend::Backend>(
                                 app.next_tab();
                             }
                         },
-                        KeyCode::Up | KeyCode::Char('k') if key.modifiers.is_empty() => {
+                        KeyCode::Up | KeyCode::Char('k')
+                            if key.modifiers.is_empty() && moves_up(key.code, app.active_tab) =>
+                        {
                             match app.focused_pane {
                                 FocusedPane::List => app.move_up(),
                                 FocusedPane::Preview => app.scroll_preview_up(3),
@@ -547,5 +549,50 @@ fn run_app<B: ratatui::backend::Backend>(
                 _ => {}
             }
         }
+    }
+}
+
+/// Whether `code` moves the list up in `tab`.
+///
+/// `Up` always does. `k` does too -- except in the tabs where `k` is a
+/// command: BatchMeta's "set the key" and StructuralGrep's "set the key to
+/// search". When this arm took `k` first, those commands, listed after it,
+/// could never be reached.
+fn moves_up(code: KeyCode, tab: app::ActiveTab) -> bool {
+    match code {
+        KeyCode::Up => true,
+        KeyCode::Char('k') => !matches!(
+            tab,
+            app::ActiveTab::BatchMeta | app::ActiveTab::StructuralGrep
+        ),
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use app::ActiveTab;
+
+    #[test]
+    fn k_moves_up_where_it_is_not_a_command() {
+        assert!(moves_up(KeyCode::Char('k'), ActiveTab::Explorer));
+        assert!(moves_up(KeyCode::Char('k'), ActiveTab::Migration));
+    }
+
+    /// In BatchMeta and StructuralGrep `k` starts typing a key, so it must
+    /// not also be taken as "up"; the arrow still moves.
+    #[test]
+    fn k_is_left_to_the_tabs_that_use_it() {
+        for tab in [ActiveTab::BatchMeta, ActiveTab::StructuralGrep] {
+            assert!(!moves_up(KeyCode::Char('k'), tab), "{tab:?}");
+            assert!(moves_up(KeyCode::Up, tab), "{tab:?}");
+        }
+    }
+
+    #[test]
+    fn other_keys_do_not_move_up() {
+        assert!(!moves_up(KeyCode::Char('j'), ActiveTab::Explorer));
+        assert!(!moves_up(KeyCode::Down, ActiveTab::Explorer));
     }
 }
