@@ -6,7 +6,7 @@ Delete it when the list is empty.
 
 ## State
 
-- Spec: every page under `tmtroot/spec/expressions/` says "実装済み". Three (`address`, `types`, `func`) keep a short
+- Spec: every page under `tmtroot/spec/expressions/` says "実装済み". Two (`address`, `types`) keep a short
   "現状の実装との差"; every page keeps its own "まだ決まっていないこと".
 - Syntax (`tomet-syntax-parser/src/interp.rs`, `tomet-syntax-ast`): literals, `( )`, comparison, `&&`, `||`, lambdas
   (`=>`, read only in `lambda_head`, it may become `:>`), `doc#id`, `addr(...)`, line breaks inside `${...}`.
@@ -21,32 +21,31 @@ Delete it when the list is empty.
 
 ## Remaining
 
-1. `type: uuid` is generated (`tomet-format-field-utils`) but `tomet check` does not check its form.
-   Spec: `types.expr.tmt`. Look at the `tomet-validator*` crates and `FieldConfig::field_type`.
-2. `tomet new` leaves expressions that had no value in the new file without saying so. `instantiate_blueprint`
-   already returns them (`Instantiated::unresolved`); `create_file_from_blueprint` drops them. Return and print them.
-3. `#item(n)` counts every block; `addressable.tmt` says "elements only". `nodes.rs` (`root_item`,
-   `block_value`, `node_method`), then fix whichever of the spec and the code is wrong.
-4. A list's own `#(id)` is not addressable: `Node` is an element or a section (`value.rs`, `find_node` in `nodes.rs`).
-5. `file:` and `https:` addresses are an error (`address.rs`); their values are undecided (`address.expr.tmt`).
-6. Open in the spec pages, decide when needed: a non-recursive `.docs`, datetime members (`.year`) and offset
+1. `file:` and `https:` addresses are an error (`address.rs`); their values are undecided (`address.expr.tmt`).
+2. Open in the spec pages, decide when needed: a non-recursive `.docs`, datetime members (`.year`) and offset
    conversion, `.group` and other collection methods, an `emoji` table users can extend (`extension.expr.tmt`).
-7. `tmtroot/generated/**` is written by `twrit api` (a sibling repository; `just docs`). It was not regenerated:
+3. `tmtroot/generated/**` is written by `twrit api` (a sibling repository; `just docs`). It was not regenerated:
    `generated/crates/tomet-compute.tmt` is stale (the crate is `tomet-expr`) and other pages still say
-   `tomet-compute`.
-8. `tmtroot/deprecated/**` still has old forms (`$gh(...)`, `${filter(...)}`, `${uuid()}`). Left alone on purpose;
+   `tomet-compute`; `generated/crates/tomet-workspace.tmt` does not know `Created` / `Instantiation` / `Unfilled`.
+4. `tmtroot/deprecated/**` still has old forms (`$gh(...)`, `${filter(...)}`, `${uuid()}`). Left alone on purpose;
    migrate or leave, it is the owner's call.
-9. The Markdown exporter writes `@link(tmt:path)` as the bare path (HTML makes a real anchor). Same for a
+5. The Markdown exporter writes `@link(tmt:path)` as the bare path (HTML makes a real anchor). Same for a
    hand-written link, so it is not specific to `.link()`.
-10. Unresolved expressions inside an included file are not reported by the including file's `tomet check`
-    (they are, when that file is checked). Make it report them if that turns out to be wanted.
-11. tree-sitter: a call inside a value group, `@meta{ id: ${f()} }`, errors in `scanner.c` (the scalar ends at `(`).
-    Recorded in `KNOWN_TS_ERRORS` (`tests/src/lib.rs`, `blueprints/daily-note.blueprint.tmt`). Fix the scanner or
-    leave it. Also unchecked: the CST (`tomet-syntax-parser/src/cst.rs`, `parse_interp_expr`) ends `${...}` at the
-    first matching `}`, so a `}` inside `addr(...)` would end it early.
-12. Not from this work, found on the way: `cargo fmt --check -p tomet-validator-core` fails on `src/lib.rs`;
-    `tomet check .` fails on 7 files of the `tmtroot` reorganization in progress (`index/*.roots.tmt`,
-    `dev/plans/roadmap.tmt`, `schema/vocabularies/writ.vocabulary.tmt`, three under `deprecated/`).
+6. Unresolved expressions inside an included file are not reported by the including file's `tomet check`
+   (they are, when that file is checked). Make it report them if that turns out to be wanted.
+7. tree-sitter: a call inside a value group, `@meta{ id: ${f()} }`, errors in `scanner.c` (the scalar ends at `(`).
+   Recorded in `KNOWN_TS_ERRORS` (`tests/src/lib.rs`, `blueprints/daily-note.blueprint.tmt`). Fix the scanner or
+   leave it. Also unchecked: the CST (`tomet-syntax-parser/src/cst.rs`, `parse_interp_expr`) ends `${...}` at the
+   first matching `}`, so a `}` inside `addr(...)` would end it early.
+8. `tomet check` checks the form of `type: uuid` only. A `datetime` field that does not read as one is not
+   reported either, although the `typed_meta` doc in `tomet-vault/src/resolve.rs` says `tomet check` reports it
+   (`check_field_types` in `tomet-validator-core` is where it would go; `types.expr.tmt` records the gap). Either
+   add the check or correct that comment.
+9. `check_field_types` is wired into `tomet check` (and so `stats`) only. The LSP and the bindings call
+    `validate_document_with` and do not pass the settings' field types.
+10. Not from this work, found on the way: `tomet check .` fails on 7 files of the `tmtroot` reorganization in
+    progress (`index/*.roots.tmt`, `dev/plans/roadmap.tmt`, `schema/vocabularies/writ.vocabulary.tmt`, three under
+    `deprecated/`). (The `cargo fmt --check -p tomet-validator-core` failure noted earlier is gone.)
 
 ## How to work on it
 
