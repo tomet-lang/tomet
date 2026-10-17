@@ -17,6 +17,17 @@ impl Findings {
         let bindings = vault.bindings(doc);
         let mut diagnostics = tomet_validator::validate_document_with(doc, &bindings);
 
+        // The settings' `type:` declarations, which the validator is handed
+        // as plain data -- it sits below the crate that reads settings.
+        let field_types = vault
+            .config
+            .meta
+            .fields
+            .iter()
+            .filter_map(|(name, field)| Some((name.clone(), field.field_type.clone()?)))
+            .collect();
+        tomet_validator::check_field_types(doc, &field_types, &mut diagnostics);
+
         if let Some(kind) = tomet_semantics::document_kind(doc)
             && kind != "blueprint"
             && let Some(blueprint_path) =
@@ -302,6 +313,39 @@ mod tests {
         // And the good one alone passes, so the sweep is not failing
         // everything indiscriminately.
         check(&root.join("good.tmt"), false, true, false).expect("the good file passes");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A field the settings declare `type: uuid` has to hold a UUID. The
+    /// declaration is the vault's, so it reaches the check from the config,
+    /// not from anything the document says.
+    #[test]
+    fn a_uuid_field_is_checked_against_the_settings_declaration() {
+        let root = vault("uuid");
+        fs::write(
+            root.join("default.config.tmt"),
+            "@kind(config)\n@config{ meta: { id: { type: uuid } } }\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("good.tmt"),
+            "@meta{ id: 123e4567-e89b-42d3-a456-426614174000 }\n",
+        )
+        .unwrap();
+        fs::write(root.join("bad.tmt"), "@meta{ id: not-a-uuid }\n").unwrap();
+
+        check(&root.join("good.tmt"), false, true, false).expect("a UUID passes");
+        let err = check(&root.join("bad.tmt"), false, true, false).expect_err("not a UUID");
+        assert!(err.to_string().contains("1 of"), "{err}");
+
+        // The same document is fine where the settings declare nothing.
+        fs::write(
+            root.join("default.config.tmt"),
+            "@kind(config)\n@config{}\n",
+        )
+        .unwrap();
+        check(&root.join("bad.tmt"), false, true, false).expect("nothing declares `id`");
 
         let _ = fs::remove_dir_all(&root);
     }

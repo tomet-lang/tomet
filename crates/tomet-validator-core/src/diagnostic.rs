@@ -179,6 +179,18 @@ pub enum Diagnostic {
     /// `SettingsSchema` no caller ever built, so a document could declare
     /// `singleton: true` and be obeyed by nothing at all.
     RetiredSettingsKey { key: String, span: Span },
+    /// A `@meta` field the settings declare with a `type:` that has a form,
+    /// holding something that does not have it -- a `type: uuid` field that
+    /// is not a UUID.
+    ///
+    /// `span` is the `@meta` element: a value in a `{...}` group has no span
+    /// of its own, so the field is named instead of pointed at.
+    InvalidFieldValue {
+        field: String,
+        field_type: String,
+        value: String,
+        span: Span,
+    },
 }
 
 impl Diagnostic {
@@ -196,6 +208,7 @@ impl Diagnostic {
             Diagnostic::DuplicateSingleton { duplicate, .. } => *duplicate,
             Diagnostic::OutsidePreamble { span, .. } => *span,
             Diagnostic::RetiredSettingsKey { span, .. } => *span,
+            Diagnostic::InvalidFieldValue { span, .. } => *span,
             Diagnostic::UnknownArgument { span, .. } => *span,
             Diagnostic::MissingRequiredArgument { span, .. } => *span,
             Diagnostic::Draft { span, .. } => *span,
@@ -433,6 +446,18 @@ impl Diagnostic {
                     _ => "remove it",
                 };
                 write!(f, "`{key}` in `@settings` is retired; {advice}")
+            }
+            Diagnostic::InvalidFieldValue {
+                field,
+                field_type,
+                value,
+                ..
+            } => {
+                write!(
+                    f,
+                    "`{field}` in `@meta` is declared `type: {field_type}`, \
+                     but `{value}` is not a valid {field_type}"
+                )
             }
         }
     }

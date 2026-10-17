@@ -75,7 +75,11 @@ pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagn
 }
 
 /// Enforces the `singleton` and `region` axes.
-pub fn check_singletons_and_regions(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+pub fn check_singletons_and_regions(
+    doc: &Document,
+    bindings: &Bindings,
+    errors: &mut Vec<Diagnostic>,
+) {
     use tomet_ast::{Block, Inline};
     use tomet_semantics::Region;
 
@@ -384,6 +388,89 @@ pub fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>)
             }
         }
     });
+}
+
+/// Checks the form of the `@meta` fields the settings declare a `type:` for.
+///
+/// `field_types` is the settings' `meta` declarations as `name -> type`,
+/// which is all this needs of them: the validator sits below the crate that
+/// reads settings, so the caller hands the declarations over as plain data.
+///
+/// Only a `type:` with a form can be wrong, and only `uuid` has one so far.
+/// A field the document does not write, an empty one (the state in which
+/// `tomet format` generates one), and a `${...}` not yet evaluated are not
+/// reported.
+pub fn check_field_types(
+    doc: &Document,
+    field_types: &std::collections::BTreeMap<String, String>,
+    errors: &mut Vec<Diagnostic>,
+) {
+    use tomet_ast::Value;
+
+    if field_types.is_empty() {
+        return;
+    }
+    let mut checked = false;
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        if checked
+            || tomet_semantics::classify_std_lenient(el) != tomet_semantics::ElementKind::Meta
+        {
+            return;
+        }
+        checked = true;
+        let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el) else {
+            return;
+        };
+        for (field, value) in &entries {
+            let Some(field_type) = field_types.get(field) else {
+                continue;
+            };
+            let well_formed = match (field_type.as_str(), value) {
+                ("uuid", Value::String(text)) => text.is_empty() || is_uuid(text),
+                ("uuid", Value::Null) => true,
+                // `${...}` keeps its place in the tree until it is evaluated,
+                // and what it comes to is not known here.
+                ("uuid", Value::Element(el)) if matches!(el.sigil, tomet_ast::Sigil::Dollar) => {
+                    true
+                }
+                ("uuid", _) => false,
+                _ => true,
+            };
+            if !well_formed {
+                errors.push(Diagnostic::InvalidFieldValue {
+                    field: field.clone(),
+                    field_type: field_type.clone(),
+                    value: describe_value(value),
+                    span: el.span,
+                });
+            }
+        }
+    });
+}
+
+/// The 8-4-4-4-12 hexadecimal form, in either case. The version and variant
+/// are not looked at: what the settings ask for is an identifier of this
+/// shape, not a particular way of drawing one.
+fn is_uuid(text: &str) -> bool {
+    text.len() == 36
+        && text.char_indices().all(|(i, c)| match i {
+            8 | 13 | 18 | 23 => c == '-',
+            _ => c.is_ascii_hexdigit(),
+        })
+}
+
+/// A value as a reader would have written it, for a message.
+fn describe_value(value: &tomet_ast::Value) -> String {
+    use tomet_ast::Value;
+    match value {
+        Value::String(text) => text.clone(),
+        Value::Bool(b) => b.to_string(),
+        Value::Int(n) => n.to_string(),
+        Value::Float(n) => n.to_string(),
+        Value::Seq(_) => "a list".to_string(),
+        Value::Map(_) => "a map".to_string(),
+        _ => "something else".to_string(),
+    }
 }
 
 pub fn check_dangling_anchors(doc: &Document, errors: &mut Vec<Diagnostic>) {

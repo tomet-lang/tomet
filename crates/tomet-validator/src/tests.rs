@@ -755,3 +755,71 @@ fn empty_anchor_is_reported() {
         Diagnostic::DanglingAnchor { anchor, .. } if anchor.is_empty()
     ));
 }
+
+fn field_diagnostics(source: &str, declared: &[(&str, &str)]) -> Vec<Diagnostic> {
+    let types = declared
+        .iter()
+        .map(|(field, field_type)| (field.to_string(), field_type.to_string()))
+        .collect();
+    let mut errors = Vec::new();
+    check_field_types(&parse(source), &types, &mut errors);
+    errors
+}
+
+const UUID: &str = "123e4567-e89b-42d3-a456-426614174000";
+
+#[test]
+fn a_uuid_field_holding_a_uuid_is_clean() {
+    let source = format!("@meta{{\n  id: {UUID}\n}}\n");
+    assert_eq!(field_diagnostics(&source, &[("id", "uuid")]), vec![]);
+    let upper = format!("@meta{{ id: {} }}\n", UUID.to_uppercase());
+    assert_eq!(field_diagnostics(&upper, &[("id", "uuid")]), vec![]);
+}
+
+#[test]
+fn a_uuid_field_holding_anything_else_is_reported() {
+    for bad in [
+        "not-a-uuid",
+        "123e4567e89b42d3a456426614174000",
+        "123e4567-e89b-42d3-a456-42661417400",
+        "123e4567-e89b-42d3-a456-42661417400g",
+    ] {
+        let source = format!("@meta{{ id: \"{bad}\" }}\n");
+        let errors = field_diagnostics(&source, &[("id", "uuid")]);
+        assert_eq!(errors.len(), 1, "{bad}: {errors:?}");
+        assert!(
+            matches!(&errors[0], Diagnostic::InvalidFieldValue { field, value, .. }
+                if field == "id" && value == bad),
+            "{errors:?}"
+        );
+        assert_eq!(errors[0].severity(), Severity::Error);
+    }
+    let number = field_diagnostics("@meta{ id: 42 }\n", &[("id", "uuid")]);
+    assert_eq!(number.len(), 1, "{number:?}");
+}
+
+/// What is not there to be wrong is not reported: a field the document
+/// leaves out, one left empty for `tomet format` to generate, and an
+/// expression that has not been evaluated yet (a blueprint's
+/// `${generate.uuid()}`).
+#[test]
+fn an_absent_empty_or_unevaluated_uuid_is_not_reported() {
+    let declared = [("id", "uuid")];
+    assert_eq!(field_diagnostics("@meta{ title: x }\n", &declared), vec![]);
+    assert_eq!(field_diagnostics("@meta{ id: \"\" }\n", &declared), vec![]);
+    assert_eq!(
+        field_diagnostics("@meta{ id: ${generate.uuid()} }\n", &declared),
+        vec![]
+    );
+    assert_eq!(field_diagnostics("plain\n", &declared), vec![]);
+}
+
+/// Only the fields the settings declare are looked at, and only the types
+/// that have a form.
+#[test]
+fn an_undeclared_field_or_a_type_with_no_form_is_left_alone() {
+    let source = "@meta{ id: nonsense, title: nonsense }\n";
+    assert_eq!(field_diagnostics(source, &[]), vec![]);
+    assert_eq!(field_diagnostics(source, &[("title", "string")]), vec![]);
+    assert_eq!(field_diagnostics(source, &[("id", "uuid")]).len(), 1);
+}

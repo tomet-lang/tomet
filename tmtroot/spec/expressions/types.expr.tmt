@@ -19,7 +19,7 @@
 |[ `uint`     ][ 整数   ][ Null               ]
 |[ `uuid`     ][ 文字列 ][ Null               ]
 
-- `uuid` は、文字列に形式の検査が付いた型。`tomet check` が検査する（@file(tmtroot/spec/expressions/func.expr.tmt)）。
+- `uuid` は、文字列に形式の検査が付いた型。`tomet check` が、ハイフンで区切った 8-4-4-4-12 桁の16進数（大文字小文字は問わない）かを検査し、違えばエラーにする。バージョンは見ない。書かれていないフィールド、空のフィールド（`tomet format` が生成する前の状態）、まだ評価されていない `${...}`（ブループリントの `${generate.uuid()}`）は検査しない（@file(tmtroot/spec/expressions/func.expr.tmt)）。
 - 一覧にない宣言や、宣言のないフィールドは、書かれた形のまま読む。宣言のないキーを読むときは `.meta.get(キー, 既定値)`（@file(tmtroot/spec/expressions/self.expr.tmt)）。
 - `list` だけは、ないときに Null ではなく空の Seq になる。タグのない文書に `d.meta.tags.contains("rust")` と書いても、エラーにならず偽になる。
 - Null の値に、メソッドは呼べない（エラー）。
@@ -81,7 +81,6 @@ ${generate.now().format("YYYY-MM-DD HH:mm")}
 
 =[ 現状の実装との差 ]
 
-- `type: uuid` の形式を `tomet check` が検査する、という部分は未実装。生成（空なら UUID を埋める）だけが既にある。
 - 日時として読めないテキストは、日時にならずテキストのまま残る。`.format` を呼ぶと、メンバーがないというエラーになる。
 
 =[ まだ決まっていないこと ]
