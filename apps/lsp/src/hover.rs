@@ -463,6 +463,8 @@ fn evaluate_for_hover(
         self_doc: DocRef(here.to_string()),
         macros: &config.macros,
         vars: &vars,
+        includes: &[],
+        heading_level: 0,
     };
     evaluate(expr, &cx)
 }

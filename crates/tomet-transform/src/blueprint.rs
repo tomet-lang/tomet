@@ -167,6 +167,8 @@ mod tests {
             self_doc: DocRef("notes/plan.tmt".into()),
             macros: &macros,
             vars: &vars,
+            includes: &[],
+            heading_level: 0,
         };
         let report = instantiate_blueprint(&mut doc, &cx);
         (doc, report)

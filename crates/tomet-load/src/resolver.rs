@@ -3,7 +3,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use tomet_ast::Document;
+use tomet_ast::{Block, Document};
 use tomet_expr::{DirRef, DocRef, EvalValue, Resolver};
 
 use crate::Vault;
@@ -70,6 +70,15 @@ impl Resolver for DiskResolver<'_> {
     fn meta(&self, doc: &DocRef) -> Result<EvalValue, String> {
         let document = self.document(doc)?;
         Ok(tomet_vault::typed_meta(&self.vault.config, &document, doc))
+    }
+
+    fn prepare_blocks(
+        &self,
+        doc: &DocRef,
+        blocks: Vec<Block>,
+        includes: &[DocRef],
+    ) -> Result<Vec<Block>, String> {
+        self.vault.prepare_blocks(doc, blocks, includes, self)
     }
 }
 
@@ -204,6 +213,8 @@ mod tests {
             self_doc: DocRef("index.tmt".into()),
             macros: &macros,
             vars: &vars,
+            includes: &[],
+            heading_level: 0,
         };
         let element = tomet_parser::parse_dollar_element_str(
             "${vault.docs.filter(d => d.meta.tags.contains(\"rust\")).map(d => d.path)}",

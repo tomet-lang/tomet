@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use time::OffsetDateTime;
-use tomet_ast::Document;
+use tomet_ast::{Block, Document};
 
 use super::value::{DirRef, DocRef, EvalValue};
 
@@ -40,6 +40,20 @@ pub trait Resolver {
     /// `Null` when the document lacks them. A key that is not declared and
     /// not present is absent from the map.
     fn meta(&self, doc: &DocRef) -> Result<EvalValue, String>;
+    /// Prepares `blocks`, which were read from `doc`, as `doc` itself would
+    /// be prepared: its own expressions evaluated in its own context, its
+    /// macros, its `self`. This is what makes an included file mean what it
+    /// means in its own place, before it is put into another.
+    ///
+    /// `includes` is the chain of documents being included at this moment,
+    /// outermost first, ending with `doc`; the preparation must pass it on so
+    /// that an include inside can see it is going in a circle.
+    fn prepare_blocks(
+        &self,
+        doc: &DocRef,
+        blocks: Vec<Block>,
+        includes: &[DocRef],
+    ) -> Result<Vec<Block>, String>;
 }
 
 /// A resolver for contexts that have no vault. Every lookup fails.
@@ -57,6 +71,14 @@ impl Resolver for NoResolver {
     }
     fn meta(&self, doc: &DocRef) -> Result<EvalValue, String> {
         Err(format!("no vault to read the metadata of `{}` from", doc.0))
+    }
+    fn prepare_blocks(
+        &self,
+        doc: &DocRef,
+        _blocks: Vec<Block>,
+        _includes: &[DocRef],
+    ) -> Result<Vec<Block>, String> {
+        Err(format!("no vault to prepare the content of `{}` in", doc.0))
     }
 }
 
@@ -92,6 +114,30 @@ pub struct EvalContext<'a> {
     pub macros: &'a HashMap<String, String>,
     /// `vars`, the values passed to `tomet new`. Only read in [`Phase::Create`].
     pub vars: &'a EvalValue,
+    /// The documents being included right now, outermost first, when this
+    /// expression sits in an included file. Empty for a document that is
+    /// being prepared on its own.
+    pub includes: &'a [DocRef],
+    /// The level of the heading this expression sits under: 0 at the top of
+    /// the document, 1 under a `=[` heading, 2 under `==[`, and so on. An
+    /// included heading goes one level below this.
+    pub heading_level: usize,
+}
+
+impl<'a> EvalContext<'a> {
+    /// The same context for an expression under a heading of `level`.
+    pub fn at_heading_level(&self, level: usize) -> EvalContext<'a> {
+        EvalContext {
+            phase: self.phase,
+            resolver: self.resolver,
+            generate: self.generate,
+            self_doc: self.self_doc.clone(),
+            macros: self.macros,
+            vars: self.vars,
+            includes: self.includes,
+            heading_level: level,
+        }
+    }
 }
 
 /// The real clock written in a fixed offset, and real random UUIDs.

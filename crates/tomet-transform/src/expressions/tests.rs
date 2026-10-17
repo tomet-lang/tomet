@@ -50,6 +50,8 @@ fn run_in(
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
         vars,
+        includes: &[],
+        heading_level: 0,
     };
     let mut doc = tomet_parser::parse_document(src).expect("source parses");
     let unresolved = resolve_expressions(&mut doc, &cx);
@@ -380,6 +382,8 @@ fn with_no_vault_a_reference_to_another_document_fails_and_stays() {
         self_doc: DocRef("here.tmt".into()),
         macros: &macros,
         vars: &vars,
+        includes: &[],
+        heading_level: 0,
     };
     let unresolved = resolve_expressions(&mut doc, &cx);
     assert_eq!(unresolved.len(), 1);
@@ -402,4 +406,78 @@ fn a_macro_in_an_element_argument_is_expanded_and_stays_text() {
         panic!("a link");
     };
     assert_eq!(link.args, Some(Value::String("https://x/issues/7".into())));
+}
+
+// ---- unique ids after splicing ----------------------------------------------
+
+#[test]
+fn an_id_used_twice_after_an_include_keeps_the_first_and_reports_the_later() {
+    // `here.tmt` has `#(c1)` and includes a copy of itself's `c1` element.
+    let (doc, unresolved) = run("@card(n: 5)#(c1)\n\n${include(tmt(\"here.tmt\")#c1)}\n");
+    assert_eq!(unresolved.len(), 1, "{unresolved:?}");
+    assert_eq!(unresolved[0].source, "#(c1)");
+    assert!(
+        unresolved[0].reason.contains("already used"),
+        "{unresolved:?}"
+    );
+
+    let ids: Vec<Option<String>> = doc
+        .blocks
+        .iter()
+        .filter_map(|b| match b {
+            Block::Element(el) => Some(el.id.as_ref().map(|i| i.0.clone())),
+            _ => None,
+        })
+        .collect();
+    // The original keeps its id; the included copy has none.
+    assert_eq!(ids, [Some("c1".to_string()), None]);
+}
+
+#[test]
+fn ids_that_are_each_used_once_are_left_alone() {
+    let (doc, unresolved) = run("@card(n: 1)#(a)\n\n@card(n: 2)#(b)\n");
+    assert!(unresolved.is_empty(), "{unresolved:?}");
+    let ids: Vec<String> = doc
+        .blocks
+        .iter()
+        .filter_map(|b| match b {
+            Block::Element(el) => el.id.as_ref().map(|i| i.0.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(ids, ["a", "b"]);
+}
+
+#[test]
+fn a_section_id_is_claimed_too() {
+    let (doc, unresolved) = run("=[ One ]#(s)\n\n=[ Two ]#(s)\n");
+    assert_eq!(unresolved.len(), 1, "{unresolved:?}");
+    let ids: Vec<Option<String>> = doc
+        .blocks
+        .iter()
+        .filter_map(|b| match b {
+            Block::Section(s) => Some(s.id.as_ref().map(|i| i.0.clone())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(ids, [Some("s".to_string()), None]);
+}
+
+#[test]
+fn an_include_lands_one_heading_below_the_section_it_sits_in() {
+    let (doc, unresolved) = run("=[ Host ]\n\n${include(tmt(\"here.tmt\")#top)}\n");
+    assert!(unresolved.is_empty(), "{unresolved:?}");
+    let Block::Section(host) = &doc.blocks[0] else {
+        panic!("a section");
+    };
+    let included: Vec<usize> = host
+        .blocks
+        .iter()
+        .filter_map(|b| match b {
+            Block::Section(s) => Some(s.level),
+            _ => None,
+        })
+        .collect();
+    // `top` is a level-1 heading in `here.tmt`; under a level-1 host it is 2.
+    assert_eq!(included, [2]);
 }

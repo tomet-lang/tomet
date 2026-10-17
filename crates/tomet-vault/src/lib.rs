@@ -37,7 +37,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use tomet_ast::Document;
+use tomet_ast::{Block, Document, Span};
 use tomet_config::PrinterConfig;
 use tomet_expr::{DocRef, EvalContext, EvalValue, Phase, SystemGenerate};
 use tomet_semantics::{Bindings, LoadedVocabularies};
@@ -146,6 +146,9 @@ impl Vault {
             inner: resolver,
         };
         let macros = self.evaluation_config(doc).macros;
+        // The document is the first of the chain of files being included, so
+        // a file that includes it back is a cycle at once, not one lap later.
+        let chain = [self_doc.clone()];
         let cx = EvalContext {
             phase: Phase::Output,
             resolver: &overlay,
@@ -153,10 +156,49 @@ impl Vault {
             self_doc,
             macros: &macros,
             vars: &EvalValue::Null,
+            includes: &chain,
+            heading_level: 0,
         };
         Prepared {
             unresolved: tomet_transform::resolve_expressions(doc, &cx),
         }
+    }
+
+    /// Prepares `blocks`, which were read from the document `doc`, the way that
+    /// document is prepared on its own: its expressions in its own context, its
+    /// macros, its `self`, its settings. This is what `include` asks of the
+    /// resolver, so that an included file means what it means in its own place.
+    ///
+    /// What could not be resolved inside is left in the blocks as written and not
+    /// reported here: it is reported when that file is checked on its own.
+    pub fn prepare_blocks(
+        &self,
+        doc: &DocRef,
+        blocks: Vec<Block>,
+        includes: &[DocRef],
+        resolver: &dyn Resolver,
+    ) -> Result<Vec<Block>, String> {
+        let source = resolver.document(doc)?;
+        let overlay = Overlay {
+            meta: typed_meta(&self.config, &source, doc),
+            path: doc.clone(),
+            snapshot: source.clone(),
+            inner: resolver,
+        };
+        let macros = self.evaluation_config(&source).macros;
+        let cx = EvalContext {
+            phase: Phase::Output,
+            resolver: &overlay,
+            generate: &SystemGenerate,
+            self_doc: doc.clone(),
+            macros: &macros,
+            vars: &EvalValue::Null,
+            includes,
+            heading_level: 0,
+        };
+        let mut holder = Document::new(blocks, Span::default());
+        tomet_transform::resolve_expressions(&mut holder, &cx);
+        Ok(holder.blocks)
     }
 
     /// `path` as the vault names a document: measured from the root, with

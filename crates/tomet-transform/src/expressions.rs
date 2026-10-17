@@ -32,8 +32,8 @@
 //! in a resolver that returns the document from before this pass rewrote it.
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, List, ListItem, Paragraph,
-    Sigil, Span, Text, Value,
+    Block, Document, Element, ElementValue, Entry, Id, Inline, InterpExpr, List, ListItem,
+    Paragraph, Sigil, Span, Text, Value,
 };
 use tomet_expr::{EvalContext, EvalValue, evaluate};
 use tomet_tree::list_item;
@@ -54,17 +54,29 @@ pub fn resolve_expressions(doc: &mut Document, cx: &EvalContext) -> Vec<Unresolv
     let mut pass = Pass {
         cx,
         unresolved: Vec::new(),
+        level: cx.heading_level,
     };
     doc.blocks = std::mem::take(&mut doc.blocks)
         .into_iter()
         .flat_map(|block| pass.block(block))
         .collect();
+
+    let mut ids = Ids {
+        seen: std::collections::HashSet::new(),
+        report: Vec::new(),
+    };
+    ids.blocks(&mut doc.blocks);
+    pass.unresolved.extend(ids.report);
     pass.unresolved
 }
 
 struct Pass<'a> {
     cx: &'a EvalContext<'a>,
     unresolved: Vec<Unresolved>,
+    /// The level of the heading the pass is inside: 0 at the top, and the
+    /// section's own level while its blocks are being resolved. An `include`
+    /// puts its headings one below this.
+    level: usize,
 }
 
 /// The expression an element carries, when the element is a `${...}`.
@@ -81,7 +93,8 @@ fn dollar_expr(el: &Element) -> Option<&InterpExpr> {
 impl Pass<'_> {
     /// Evaluates, or records why it could not and returns `None`.
     fn evaluate(&mut self, expr: &InterpExpr, span: Span) -> Option<EvalValue> {
-        match evaluate(expr, self.cx) {
+        let here = self.cx.at_heading_level(self.level);
+        match evaluate(expr, &here) {
             Ok(value) => Some(value),
             Err(reason) => {
                 self.fail(expr, span, reason.to_string());
@@ -123,7 +136,9 @@ impl Pass<'_> {
                 sec.args = sec.args.map(|v| self.value(v));
                 sec.value = sec.value.map(|v| self.element_value(v));
                 sec.connects = sec.connects.into_iter().map(|c| self.element(c)).collect();
+                let outer = std::mem::replace(&mut self.level, sec.level);
                 sec.blocks = sec.blocks.into_iter().flat_map(|b| self.block(b)).collect();
+                self.level = outer;
                 vec![Block::Section(sec)]
             }
             Block::List(list) => vec![Block::List(self.list(list))],
@@ -386,6 +401,94 @@ fn to_items(value: EvalValue, span: Span) -> Result<Vec<ListItem>, String> {
             ))
         })
         .collect()
+}
+
+// ---- unique ids -------------------------------------------------------------
+
+/// Keeps the first use of each id and drops the later ones, reporting each.
+///
+/// A file included twice, or an included file whose id the including file
+/// already has, puts one id on two nodes. The source files are each fine --
+/// an id only has to be unique within its own document -- so this is found
+/// here, after the splicing, and not by `tomet check` on either file. The
+/// first one stays so that a reference that worked still does; the later ones
+/// lose the id rather than being renamed, because a renamed id is one nobody
+/// wrote and nobody can refer to.
+struct Ids {
+    seen: std::collections::HashSet<String>,
+    report: Vec<Unresolved>,
+}
+
+impl Ids {
+    fn claim(&mut self, id: &mut Option<Id>, span: Span) {
+        let Some(taken) = id.as_ref().map(|i| i.0.clone()) else {
+            return;
+        };
+        if self.seen.insert(taken.clone()) {
+            return;
+        }
+        *id = None;
+        self.report.push(Unresolved {
+            source: format!("#({taken})"),
+            span,
+            reason: format!(
+                "the id `{taken}` is already used earlier in the document; this one was dropped"
+            ),
+        });
+    }
+
+    fn blocks(&mut self, blocks: &mut [Block]) {
+        for block in blocks {
+            match block {
+                Block::Paragraph(paragraph) => {
+                    for inline in &mut paragraph.content {
+                        if let Inline::Element(el) = inline {
+                            self.element(el);
+                        }
+                    }
+                }
+                Block::Element(el) => self.element(el),
+                Block::Section(section) => {
+                    self.claim(&mut section.id, section.span);
+                    for conn in &mut section.connects {
+                        self.element(conn);
+                    }
+                    self.blocks(&mut section.blocks);
+                }
+                Block::List(list) => self.list(list),
+            }
+        }
+    }
+
+    fn list(&mut self, list: &mut List) {
+        self.claim(&mut list.id, list.span);
+        for conn in &mut list.connects {
+            self.element(conn);
+        }
+        for item in &mut list.items {
+            self.element(&mut item.element);
+            if let Some(sub) = &mut item.sublist {
+                self.list(sub);
+            }
+        }
+    }
+
+    fn element(&mut self, el: &mut Element) {
+        self.claim(&mut el.id, el.span);
+        if let Some(content) = &mut el.content {
+            self.blocks(content);
+        }
+        for conn in &mut el.connects {
+            self.element(conn);
+        }
+        if let Some(ElementValue::Group(entries)) = &mut el.value {
+            for entry in entries {
+                if let Entry::Element(child) = entry {
+                    self.element(child);
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

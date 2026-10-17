@@ -181,6 +181,8 @@ fn instantiate_blueprint_file_with(
         self_doc,
         macros: &macros,
         vars: &vars,
+        includes: &[],
+        heading_level: 0,
     };
     instantiate_blueprint(&mut doc, &cx);
 

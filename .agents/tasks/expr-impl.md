@@ -178,17 +178,27 @@ keeps its name (a `Value` would clash with `tomet_ast::Value` in the files that 
 stale and will be replaced when it is regenerated), `tmtroot/deprecated/**`, and one comment in the frozen fixture
 `tests/fixtures/cheatsheet.tmt`.
 
-## Step 4: include (L5/L6)
+## Step 4: include (done)
 
-- [ ] `include(doc)`, `include(doc#id)`; body only for a whole document (no `@meta @config @kind` etc.);
-      a section id takes the whole section; value targets are an error.
-- [ ] Heading level: auto one below the host heading; `level: n` absolute; `heading: false`.
-- [ ] Evaluate the included content in its own file's context, then splice; cycle detection with the
-      include stack, depth limit.
-- [ ] Duplicate ids after splicing: diagnostic, later one dropped from the output.
-- [ ] Rewrite `./` `../` link targets for the including file.
-- [ ] Dependency tracking: `serve` reload and the `tomet-workspace-links` cache must learn that a
-      document depends on the files it includes.
+- [x] `include(doc)`, `include(doc#id)`: body only for a whole document (no `@meta @config @kind @version
+      @settings @use @blueprint`, taken out of adjacent-line paragraphs too); an id takes the whole section; an
+      inline element goes in a paragraph of its own. `heading:` on a document or an element is an error.
+- [x] Heading level: one below the heading the expression sits under (the pass tracks the section level and
+      derives the context with `at_heading_level`); `level: n` absolute; `heading: false`. Nested includes compose.
+- [x] The included content is prepared in its own file's context: `Resolver::prepare_blocks`, implemented by
+      `Vault::prepare_blocks` (own settings, macros, `self`, typed meta; references from that file as written) and
+      reached through `Overlay` and `DiskResolver`. Unresolved expressions inside are left as written and are
+      reported when that file is checked itself.
+- [x] Cycles: the chain of files being included starts with the document itself, so `A -> B -> A` stops at B's
+      `include(A)`; depth is limited to 16 (`MAX_INCLUDE_DEPTH`). A document including its own part is a cycle.
+- [x] Duplicate ids after splicing: the first keeps the id, later ones lose it and are reported (also covers
+      hand-written duplicates). No automatic renaming.
+- [x] `./` and `../` targets of `@link` and `@embed` are rewritten for the including file; `#anchor` kept.
+- [x] Dependency tracking: nothing to do today. `serve` re-reads and re-prepares on every request, `export --check`
+      compares outputs, and the link cache stores links of source files. A future incremental builder must learn
+      the includes.
+- [ ] Open: the old `@include(file)` element (`ElementKind::Include`, "recognized only; nothing expands it yet") and
+      the expression `include(...)` say the same thing. One of them should go; asked of the user.
 
 ## Step 5: filter and the old forms
 
@@ -221,7 +231,8 @@ Breaking changes and a rough count of files that use them today (`.tmt` / `.rs`)
 
 ## Step 7: spec sync and close
 
-- [ ] For each shipped area, flip the file's "状態" line and delete its "現状の実装との差" section.
+- [x] Every spec file's "状態" line is "実装済み"; three keep a short "現状の実装との差" (address, types, func): `#item(n)`
+      counting, a list's own id, `file:`/`https:` values, `type: uuid` checking, `tomet new` reporting.
 - [ ] Remaining small open items stay in each file's "まだ決まっていないこと".
 - [ ] Verify: `just test`, `just test-suite`, `just docs-check`, `just writ-check`.
 - [ ] Fold anything worth keeping into doc comments; delete this file.

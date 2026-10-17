@@ -39,6 +39,7 @@ mod context;
 mod datetime;
 mod error;
 mod fragments;
+mod include;
 mod memory;
 mod methods;
 mod nodes;
@@ -53,6 +54,7 @@ pub use context::{
 };
 pub use datetime::{format_datetime, parse_datetime, parse_offset};
 pub use error::EvalError;
+pub use include::MAX_INCLUDE_DEPTH;
 pub use memory::MemoryResolver;
 pub use value::{Closure, DirRef, DocRef, Env, EvalValue, Namespace, Node};
 
@@ -298,6 +300,7 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
                 .unwrap_or_else(|_| unreachable!("`exactly` returned two values"));
             arithmetic(name, &a, &b)
         }
+        "include" => include::include(args, cx),
         "link" => match args.exactly(name, 1)?.pop() {
             Some(target) => fragments::link_fragment(&target),
             None => unreachable!("`exactly` returned one value"),

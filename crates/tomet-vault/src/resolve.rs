@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use tomet_ast::{Document, Value};
+use tomet_ast::{Block, Document, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_expr::{DirRef, DocRef, EvalValue, Resolver, parse_datetime};
 
@@ -93,6 +93,15 @@ impl Resolver for Overlay<'_> {
         } else {
             self.inner.meta(doc)
         }
+    }
+
+    fn prepare_blocks(
+        &self,
+        doc: &DocRef,
+        blocks: Vec<Block>,
+        includes: &[DocRef],
+    ) -> Result<Vec<Block>, String> {
+        self.inner.prepare_blocks(doc, blocks, includes)
     }
 }
 

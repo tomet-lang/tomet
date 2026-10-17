@@ -398,4 +398,139 @@ mod tests {
 
         let _ = fs::remove_dir_all(&root);
     }
+
+    // ---- include -------------------------------------------------------------
+
+    /// `level:title` for each section and `text` for each paragraph, in order.
+    fn outline(doc: &Document) -> Vec<String> {
+        fn text(inlines: &[Inline]) -> String {
+            inlines
+                .iter()
+                .filter_map(|i| match i {
+                    Inline::Text(t) => Some(t.value.as_str()),
+                    _ => None,
+                })
+                .collect()
+        }
+        fn walk(out: &mut Vec<String>, blocks: &[Block]) {
+            for block in blocks {
+                match block {
+                    Block::Section(s) => {
+                        out.push(format!("{}:{}", s.level, text(&s.title).trim()));
+                        walk(out, &s.blocks);
+                    }
+                    Block::Paragraph(p) => out.push(text(&p.content).trim().to_string()),
+                    _ => {}
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(&mut out, &doc.blocks);
+        out
+    }
+
+    fn include_vault(name: &str, files: &[(&str, &str)]) -> PathBuf {
+        let root = std::env::temp_dir().join(name);
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("temp dir");
+        fs::write(root.join("default.config.tmt"), "@kind(config)\n").expect("config");
+        for (path, source) in files {
+            let full = root.join(path);
+            fs::create_dir_all(full.parent().unwrap()).expect("dirs");
+            fs::write(full, source).expect("file");
+        }
+        root
+    }
+
+    #[test]
+    fn an_included_file_is_prepared_in_its_own_place_and_lands_under_the_heading() {
+        let root = include_vault(
+            "tomet_test_load_include_own",
+            &[
+                (
+                    "host.tmt",
+                    "=[ Host ]\n\nhere is ${self.path}\n\n${include(tmt(\"parts/a.tmt\"))}\n",
+                ),
+                (
+                    "parts/a.tmt",
+                    "@meta{ title: A }\n\n=[ A ]\n\nI am ${self.path} (${self.meta.title})\n",
+                ),
+            ],
+        );
+        let vault = Vault::discover(&root);
+        let (doc, _) = vault
+            .prepared_document(&root.join("host.tmt"))
+            .expect("host");
+        assert_eq!(
+            outline(&doc),
+            [
+                "1:Host",
+                "here is host.tmt",
+                // `self` in the included file is the included file, and the
+                // heading is one below the one it landed under.
+                "2:A",
+                "I am parts/a.tmt (A)",
+            ]
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn includes_nest_and_each_level_shifts_what_is_inside_it() {
+        let root = include_vault(
+            "tomet_test_load_include_nest",
+            &[
+                ("top.tmt", "=[ Top ]\n\n${include(tmt(\"mid.tmt\"))}\n"),
+                ("mid.tmt", "=[ Mid ]\n\n${include(tmt(\"leaf.tmt\"))}\n"),
+                ("leaf.tmt", "=[ Leaf ]\n\nleaf text\n"),
+            ],
+        );
+        let vault = Vault::discover(&root);
+        let (doc, _) = vault.prepared_document(&root.join("top.tmt")).expect("top");
+        assert_eq!(outline(&doc), ["1:Top", "2:Mid", "3:Leaf", "leaf text"]);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn two_files_that_include_each_other_are_reported_and_left_as_written() {
+        let root = include_vault(
+            "tomet_test_load_include_cycle",
+            &[
+                ("a.tmt", "=[ A ]\n\n${include(tmt(\"b.tmt\"))}\n"),
+                ("b.tmt", "=[ B ]\n\n${include(tmt(\"a.tmt\"))}\n"),
+            ],
+        );
+        let vault = Vault::discover(&root);
+        let (mut doc, _) = vault.document(&root.join("a.tmt")).expect("a");
+        let prepared = vault.prepare(&mut doc, &root.join("a.tmt"));
+        // `a` includes `b`, and `b` includes `a` back: that last include is
+        // the cycle, and it stays as written inside `b`. `a` itself, which
+        // only includes `b`, resolved.
+        assert_eq!(outline(&doc), ["1:A", "2:B", "${include(tmt(\"a.tmt\"))}"]);
+        assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_section_is_included_by_its_id() {
+        let root = include_vault(
+            "tomet_test_load_include_section",
+            &[
+                (
+                    "host.tmt",
+                    "=[ Host ]\n\n${include(tmt(\"lib.tmt\")#shared, heading: false)}\n",
+                ),
+                (
+                    "lib.tmt",
+                    "=[ Other ]\n\nnot this\n\n=[ Shared ]#(shared)\n\nuse this\n\n==[ Deep ]\n\nand this\n",
+                ),
+            ],
+        );
+        let vault = Vault::discover(&root);
+        let (doc, _) = vault
+            .prepared_document(&root.join("host.tmt"))
+            .expect("host");
+        assert_eq!(outline(&doc), ["1:Host", "use this", "2:Deep", "and this"]);
+        let _ = fs::remove_dir_all(&root);
+    }
 }

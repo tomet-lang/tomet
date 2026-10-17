@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use tomet_ast::{Document, Value};
+use tomet_ast::{Block, Document, Value};
 
 use super::context::Resolver;
 use super::value::{DirRef, DocRef, EvalValue};
@@ -80,5 +80,15 @@ impl Resolver for MemoryResolver {
             Some(meta) => EvalValue::from_ast(&meta, doc),
             None => EvalValue::from_ast(&Value::Map(Vec::new()), doc),
         })
+    }
+
+    fn prepare_blocks(
+        &self,
+        _doc: &DocRef,
+        blocks: Vec<Block>,
+        _includes: &[DocRef],
+    ) -> Result<Vec<Block>, String> {
+        // Nothing here evaluates; the blocks come back as they are.
+        Ok(blocks)
     }
 }
