@@ -129,3 +129,14 @@
 (scalar) @string.special
 
 (punctuation) @punctuation.delimiter
+
+; Expressions: operators, lambdas, `doc#id`, `addr(...)`, named arguments
+(interp_binary ["||" "&&" "==" "!=" "<=" ">=" "<" ">"] @punctuation.special)
+(interp_lambda "=>" @punctuation.special)
+(interp_lambda params: (identifier) @variable.parameter)
+(interp_hash "#" @punctuation.special)
+(interp_addr) @string.special
+(interp_named_arg name: (identifier) @property)
+(interp_member member: (identifier) @function)
+(interp_group "(" @punctuation.bracket)
+(interp_group ")" @punctuation.bracket)

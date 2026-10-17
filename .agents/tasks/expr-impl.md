@@ -47,25 +47,35 @@ already-built values; the evaluator never reaches for them.
 Files: `tomet-syntax-parser/src/interp.rs`, `tomet-syntax-ast/src/lib.rs` (`InterpExprKind`,
 `Display`), `tomet-syntax-ast/src/cst_ast.rs`, `tomet-syntax-cst`.
 
-- [ ] Literals `true` `false` `null` (reuse the `.tmt` value tokens).
-- [ ] Grouping `( expr )`; distinguish from a lambda parameter list by the `=>` after `)`.
-- [ ] Comparison `== != < <= > >=` (non-chaining), `&&`, `||`; precedence per `operators.expr.tmt`.
-      Binary operators need surrounding whitespace (`a-b` stays one identifier). Lone `&` / `|` is an
-      error with a hint.
-- [ ] Lambda `x => expr`, `(a, b) => expr`; keep the `=>` token in one place (it may become `:>`).
-- [ ] Postfix `#` with a document on the left: `doc#id`, `doc#(id)`, `doc#item(0)`; leading `#x`
-      stays `self#x`. `.` after it is a member step.
-- [ ] `addr(` raw argument: read to the matching `)`; quoted form too. The only special lexing rule.
-      Fixes the `tmt:path` / named-argument (`name: expr`) clash.
+- [x] Literals `true` `false` `null` (reuse the `.tmt` value tokens). `nullable` and `true-ish` stay names.
+- [x] Grouping `( expr )`; distinguished from a lambda parameter list by the `=>` after `)` (`lambda_head`). The group is kept as a node so printing gives the parentheses back.
+- [x] Comparison `== != < <= > >=` (non-chaining), `&&`, `||`; precedence per `operators.expr.tmt`.
+      Whitespace around them is optional (no operator symbol is an identifier character); the spec was
+      corrected to say so. Lone `=`, `&`, `|` are errors that name the fix.
+- [x] Lambda `x => expr`, `(a, b) => expr`. The `=>` token is read in one place (`lambda_head`; it may become `:>`).
+- [x] Postfix `#` with a document on the left: `doc#id`, `doc#(id)`, `doc#item(0)` (`InterpExprKind::DocId`);
+      the hash must touch what is on its left. Leading `#x` stays `Id` and means `self#x`. `.` and `(...)`
+      after it are ordinary members and calls. Evaluation of `DocId` is Step 2 (`NotYetSupported` for now).
+- [x] `addr(` raw argument: read to the matching `)` (parentheses nest); quoted form too (`InterpExprKind::Addr`,
+      `raw` keeps the spelling). The only special lexing rule; fixes the `tmt:path` / named-argument clash.
+      Works braceless (`$addr(...)`). The argument is a literal and is never evaluated: the spec had a
+      contradiction (`addr(#note.prop.source)` read as raw text vs as an expression), resolved with the user
+      by adding a string method `.addr()` for run-time strings (Step 2). The spec was updated.
 - [ ] Remove bare-identifier-as-document-id from the evaluator side (Step 2), keep parsing it.
-- [ ] Printer: `tomet-format-printer` and `InterpExpr` `Display` must round-trip all of the above;
-      `tomet format` normalizes operator spacing.
-- [ ] Parser tests in `crates/tomet-syntax-parser/src/tests/interpolation.rs`; a `||` inside a table
-      cell and a `|`-initial line must not break table parsing.
-- [ ] `tree-sitter-tomet` grammar (hand-maintained, highlighting only) and a new fixture under
-      `tests/fixtures/` (corpus: add, do not edit existing). Run
-      `cargo test -p tomet-tests -p tree-sitter-tomet`.
-- [ ] `apps/tui/src/ui/highlight.rs`, editors' syntaxes if they list `$` forms.
+- [x] Printer: `tomet-format-printer` prints an expression through `InterpExpr` `Display`, which now covers all of
+      the above and is a fixed point (tested). `tomet format` is whitespace-only and does not touch expression
+      interiors; the spec said it would, and was corrected.
+- [x] Parser tests in `crates/tomet-syntax-parser/src/tests/interpolation.rs` (18 new). A `||` inside a table
+      cell parses. Still to check: the CST parser (`cst.rs` `parse_interp_expr`) reads `${...}` as opaque tokens up to
+      the matching `}`, so a `}` inside a string literal or an `addr(...)` would end it early.
+      `tomet check` (AST parser) handles `${"}"}`; the CST path (used by edit/LSP tooling) is unverified.
+- [x] `tree-sitter-tomet` grammar (operators, group, lambda, `doc#id`, `addr(`, named args, member after a call),
+      regenerated with the pinned `tree-sitter-cli@0.26.12` (`npx -y tree-sitter-cli@0.26.12 generate`, ABI 14 as
+      before), queries extended. New fixture `tests/fixtures/syntax/expression.tmt` with its `tests/ref` files
+      and `SYNTAX.md` rows. Known approximation: `addr(` stops at the first `)` here, nested parentheses are
+      only handled by the real parser.
+- [x] `apps/tui/src/ui/highlight.rs` fallback takes `${...}` as one span. The editors' own query files
+      (`editors/{helix,neovim,zed}`) are separate, differ from `tree-sitter-tomet/queries`, and were not touched.
 
 ## Step 2: evaluator and value types (L2)
 
@@ -84,6 +94,8 @@ Files: `tomet-semantics-compute/src/{lib,functions,error}.rs`, `tomet-semantics-
 - [ ] `generate.now()` -> datetime, `generate.uuid()`; dedicated "作成時専用" error outside 作成時.
 - [ ] Datetime value: ordering, `.format("YYYY-MM-DD HH:mm")` with tokens `YYYY YY MM DD HH mm ss`,
       other characters pass through, no offset conversion.
+- [ ] String method `.addr()`: interpret a run-time string with the same rules as `addr(...)`; an uninterpretable
+      string is an error. (`addr(...)` itself takes only literals.)
 - [ ] Methods: Seq `.filter .sort .map .join .contains .len`; Map `.get .contains`;
       string `.contains`; document `.link()`; lambdas as values, evaluated in a local scope;
       lambda parameter may not reuse a reserved name; Null receiver is an error.

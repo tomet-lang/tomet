@@ -306,6 +306,31 @@ const CASES: &[Case] = &[
     case(None, "メンバ参照", "${a.b.c}\n"),
     case(None, "関数呼び出し", "${sum(1, 2)}\n"),
     case(None, "`$name(...)` 形式", "$uuid()\n"),
+    case(Some("式の部品"), "`true` `false` `null` は値", "${true}\n"),
+    case(None, "`null`", "${null}\n"),
+    case(
+        None,
+        "比較は連鎖しない。`==` `!=` `<` `<=` `>` `>=`",
+        "${a >= 1}\n",
+    ),
+    case(None, "`&&` は `||` より強く結びつく", "${a || b && c}\n"),
+    case(None, "括弧は木に残る", "${(a || b) && c}\n"),
+    case(None, "無名関数", "${xs.filter(d => d.n == 1)}\n"),
+    case(
+        None,
+        "引数が複数の無名関数は括弧で囲む",
+        "${(a, b) => a < b}\n",
+    ),
+    case(
+        None,
+        "`#` の左に文書。左を省くと `self`",
+        "${tmt(\"a.tmt\")#intro.prop}\n",
+    ),
+    case(
+        None,
+        "`addr(` は中身を生の文字列として読む",
+        "${addr(tmt:docs/a.tmt#intro)}\n",
+    ),
     // ---- connect ----------------------------------------------------
     case(
         Some("コネクト `:`"),
@@ -829,12 +854,23 @@ fn interp_str(expr: &InterpExpr) -> String {
         K::Literal(Literal::Int(i)) => i.to_string(),
         K::Literal(Literal::Float(f)) => f.to_string(),
         K::Literal(Literal::String(s)) => format!("{s:?}"),
+        K::Literal(Literal::Bool(b)) => b.to_string(),
+        K::Literal(Literal::Null) => "null".to_string(),
         K::Call { callee, args } => {
             let inner: Vec<String> = args.iter().map(interp_str).collect();
             format!("{}({})", interp_str(callee), inner.join(", "))
         }
         K::Member { object, member } => format!("{}.{member}", interp_str(object)),
         K::NamedArg { name, value } => format!("{name}: {}", interp_str(value)),
+        K::Binary { op, lhs, rhs } => {
+            format!("({} {} {})", interp_str(lhs), op.symbol(), interp_str(rhs))
+        }
+        K::Group(inner) => format!("({})", interp_str(inner)),
+        K::DocId { doc, id } => format!("{}#{id}", interp_str(doc)),
+        K::Addr { text, .. } => format!("addr({text})"),
+        K::Lambda { params, body } => {
+            format!("lambda({}) => {}", params.join(", "), interp_str(body))
+        }
     }
 }
 

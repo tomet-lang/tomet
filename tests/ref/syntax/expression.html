@@ -1,0 +1,6 @@
+<h1>リテラル</h1>
+${true}${false}${null}${42}${-3}${1.5}${"text"}<h1>比較と論理</h1>
+${d.meta.created &gt;= "2026-01-01" &amp;&amp; not(d.meta.draft == true)}${a == b}${a != b || c &lt; d}${x &lt;= 1 &amp;&amp; y &gt;= 2}${(a || b) &amp;&amp; c}<h1>無名関数</h1>
+${xs.filter(d =&gt; d.meta.tags.contains("rust"))}${xs.sort(d =&gt; d.meta.created, "desc").map(d =&gt; d.link())}${xs.filter((a, b) =&gt; a &gt; b)}<h1>文書とアドレス</h1>
+${#intro.prop.tags}${self#intro.prop.tags.item(2)}${tmt("docs/a.tmt")#intro}${tmt("docs/a.tmt")#intro.prop}${#note.prop.source.addr().prop.title}<h1>addr</h1>
+${addr(tmt:docs/a.tmt#intro)}${addr(dir:docs/my-notes).docs}${include(addr(tmt:docs/a.tmt#intro), heading: false)}${include(addr(tmt:docs/a.tmt))}${addr(dir:docs)}<p>本文の中にも置ける -- ${a == b} や ${slug-of(title)} のように。</p>

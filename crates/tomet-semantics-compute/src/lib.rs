@@ -105,6 +105,13 @@ pub fn evaluate_with_context(
         InterpExprKind::Literal(Literal::Int(i)) => Ok(Value::Int(*i)),
         InterpExprKind::Literal(Literal::Float(f)) => Ok(Value::Float(*f)),
         InterpExprKind::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
+        InterpExprKind::Literal(Literal::Bool(b)) => Ok(Value::Bool(*b)),
+        InterpExprKind::Literal(Literal::Null) => Ok(Value::Null),
+        InterpExprKind::Group(inner) => evaluate_with_context(doc, inner, config, ctx),
+        InterpExprKind::DocId { .. } => Err(ComputeError::NotYetSupported("a document address")),
+        InterpExprKind::Addr { .. } => Err(ComputeError::NotYetSupported("an address literal")),
+        InterpExprKind::Binary { .. } => Err(ComputeError::NotYetSupported("an operator")),
+        InterpExprKind::Lambda { .. } => Err(ComputeError::NotYetSupported("a lambda")),
         InterpExprKind::Id(_) => Ok(tomet_address::resolve_reference(doc, expr)?),
         InterpExprKind::Identifier(id) => {
             if let Some(val) = ctx.get_var(id) {

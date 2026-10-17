@@ -1,0 +1,37 @@
+@meta{id: doc-expression}
+
+=[リテラル]
+`${true}`
+`${false}`
+`${null}`
+`${42}`
+`${-3}`
+`${1.5}`
+`${"text"}`
+
+=[比較と論理]
+`${d.meta.created >= "2026-01-01" && not(d.meta.draft == true)}`
+`${a == b}`
+`${a != b || c < d}`
+`${x <= 1 && y >= 2}`
+`${(a || b) && c}`
+
+=[無名関数]
+`${xs.filter(d => d.meta.tags.contains("rust"))}`
+`${xs.sort(d => d.meta.created, "desc").map(d => d.link())}`
+`${xs.filter((a, b) => a > b)}`
+
+=[文書とアドレス]
+`${#intro.prop.tags}`
+`${self#intro.prop.tags.item(2)}`
+`${tmt("docs/a.tmt")#intro}`
+`${tmt("docs/a.tmt")#intro.prop}`
+`${#note.prop.source.addr().prop.title}`
+
+=[addr]
+`${addr(tmt:docs/a.tmt#intro)}`
+`${addr(dir:docs/my-notes).docs}`
+`${include(addr(tmt:docs/a.tmt#intro), heading: false)}`
+`${include(addr(tmt:docs/a.tmt))}`
+`${addr(dir:docs)}`
+本文の中にも置ける -- `${a == b}` や `${slug-of(title)}` のように。

@@ -31,6 +31,9 @@ pub enum ComputeError {
         right: Value,
     },
     DivisionByZero,
+    /// Syntax the parser reads but the evaluator does not run yet
+    /// (operators, lambdas). Reported rather than evaluated wrongly.
+    NotYetSupported(&'static str),
 }
 
 impl fmt::Display for ComputeError {
@@ -58,6 +61,9 @@ impl fmt::Display for ComputeError {
                 "`{function}` cannot order {left:?} against {right:?} -- compare two numbers, or two strings"
             ),
             ComputeError::DivisionByZero => write!(f, "division by zero"),
+            ComputeError::NotYetSupported(what) => {
+                write!(f, "{what} is not supported by the evaluator yet")
+            }
         }
     }
 }

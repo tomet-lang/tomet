@@ -245,12 +245,19 @@ fn collect_field_paths(expr: &InterpExpr, out: &mut BTreeSet<String>) {
             }
         }
         InterpExprKind::NamedArg { value, .. } => collect_field_paths(value, out),
+        InterpExprKind::Binary { lhs, rhs, .. } => {
+            collect_field_paths(lhs, out);
+            collect_field_paths(rhs, out);
+        }
+        InterpExprKind::Group(inner) => collect_field_paths(inner, out),
+        InterpExprKind::DocId { doc, .. } => collect_field_paths(doc, out),
+        InterpExprKind::Lambda { body, .. } => collect_field_paths(body, out),
         InterpExprKind::Identifier(_) | InterpExprKind::Member { .. } => {
             if let Some(path) = dotted_path(expr) {
                 out.insert(path);
             }
         }
-        InterpExprKind::Literal(_) | InterpExprKind::Id(_) => {}
+        InterpExprKind::Literal(_) | InterpExprKind::Id(_) | InterpExprKind::Addr { .. } => {}
     }
 }
 

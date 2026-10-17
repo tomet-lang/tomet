@@ -38,6 +38,7 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [インライン記法](#インライン記法)
 - [区切りとコードブロック](#区切りとコードブロック)
 - [補間 `${...}`](#補間-)
+- [式の部品](#式の部品)
 - [コネクト `:`](#コネクト-)
 - [名前付きコネクト `:name(...)`](#名前付きコネクト-name)
 - [id `#(...)`](#id-)
@@ -1171,6 +1172,107 @@ $uuid()
 ```
 Interp $
   interp  uuid()
+```
+
+## 式の部品
+
+### `true` `false` `null` は値
+
+```tmt
+${true}
+```
+
+```
+Interp $
+  interp  true
+```
+
+### `null`
+
+```tmt
+${null}
+```
+
+```
+Interp $
+  interp  null
+```
+
+### 比較は連鎖しない。`==` `!=` `<` `<=` `>` `>=`
+
+```tmt
+${a >= 1}
+```
+
+```
+Interp $
+  interp  (a >= 1)
+```
+
+### `&&` は `||` より強く結びつく
+
+```tmt
+${a || b && c}
+```
+
+```
+Interp $
+  interp  (a || (b && c))
+```
+
+### 括弧は木に残る
+
+```tmt
+${(a || b) && c}
+```
+
+```
+Interp $
+  interp  (((a || b)) && c)
+```
+
+### 無名関数
+
+```tmt
+${xs.filter(d => d.n == 1)}
+```
+
+```
+Interp $
+  interp  xs.filter(lambda(d) => (d.n == 1))
+```
+
+### 引数が複数の無名関数は括弧で囲む
+
+```tmt
+${(a, b) => a < b}
+```
+
+```
+Interp $
+  interp  lambda(a, b) => (a < b)
+```
+
+### `#` の左に文書。左を省くと `self`
+
+```tmt
+${tmt("a.tmt")#intro.prop}
+```
+
+```
+Interp $
+  interp  tmt("a.tmt")#intro.prop
+```
+
+### `addr(` は中身を生の文字列として読む
+
+```tmt
+${addr(tmt:docs/a.tmt#intro)}
+```
+
+```
+Interp $
+  interp  addr(tmt:docs/a.tmt#intro)
 ```
 
 ## コネクト `:`

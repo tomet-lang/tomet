@@ -267,7 +267,21 @@ fn highlight_tomet_line(line: &str) -> Line<'static> {
                     }
                 }
             } else {
+                // `${ ... }` is one expression: take it to the matching `}`,
+                // so an operator inside (`<`, `||`) is not read as the start
+                // of some other construct.
                 i += 2;
+                let mut depth = 1;
+                let mut in_string = false;
+                while i < len && depth > 0 {
+                    match chars[i] {
+                        '"' => in_string = !in_string,
+                        '{' if !in_string => depth += 1,
+                        '}' if !in_string => depth -= 1,
+                        _ => {}
+                    }
+                    i += 1;
+                }
             }
             let text: String = chars[start..i].iter().collect();
             spans.push(Span::styled(

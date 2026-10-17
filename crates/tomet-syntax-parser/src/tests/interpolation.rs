@@ -34,6 +34,17 @@ fn describe(expr: &InterpExpr) -> String {
         InterpExprKind::Literal(Literal::Int(i)) => format!("Int({i})"),
         InterpExprKind::Literal(Literal::Float(f)) => format!("Float({f})"),
         InterpExprKind::Literal(Literal::String(s)) => format!("String({s:?})"),
+        InterpExprKind::Literal(Literal::Bool(b)) => format!("Bool({b})"),
+        InterpExprKind::Literal(Literal::Null) => "Null".to_string(),
+        InterpExprKind::Binary { op, lhs, rhs } => {
+            format!("({} {} {})", describe(lhs), op.symbol(), describe(rhs))
+        }
+        InterpExprKind::Group(inner) => format!("Group({})", describe(inner)),
+        InterpExprKind::DocId { doc, id } => format!("DocId({}, {id})", describe(doc)),
+        InterpExprKind::Addr { text, raw } => format!("Addr({text:?}, raw={raw})"),
+        InterpExprKind::Lambda { params, body } => {
+            format!("Lambda([{}], {})", params.join(", "), describe(body))
+        }
         InterpExprKind::Call { callee, args } => {
             let args: Vec<_> = args.iter().map(describe).collect();
             format!("Call({}, [{}])", describe(callee), args.join(", "))
@@ -257,4 +268,334 @@ fn interpolation_inside_element_content_and_section() {
         }
         other => panic!("expected section, got {other:?}"),
     }
+}
+
+/// Parses `${src}` as a standalone line and returns its description.
+fn described(src: &str) -> String {
+    let doc = parse_document(&format!("${{{src}}}\n")).unwrap();
+    describe(interp_expr(&doc.blocks[0]))
+}
+
+/// Parses `${src}` and prints the expression back with `Display`.
+fn printed(src: &str) -> String {
+    let doc = parse_document(&format!("${{{src}}}\n")).unwrap();
+    interp_expr(&doc.blocks[0]).to_string()
+}
+
+#[test]
+fn true_false_and_null_are_literals() {
+    assert_eq!(described("true"), "Bool(true)");
+    assert_eq!(described("false"), "Bool(false)");
+    assert_eq!(described("null"), "Null");
+}
+
+#[test]
+fn a_word_that_only_starts_like_a_literal_is_still_a_name() {
+    // They are values, not keywords: `nullable` and `true-ish` are names.
+    assert_eq!(described("nullable"), "Identifier(nullable)");
+    assert_eq!(described("true-ish"), "Identifier(true-ish)");
+}
+
+#[test]
+fn parentheses_group_and_are_kept_in_the_tree() {
+    assert_eq!(described("(a)"), "Group(Identifier(a))");
+    assert_eq!(
+        described("(a || b) && c"),
+        "(Group((Identifier(a) || Identifier(b))) && Identifier(c))"
+    );
+}
+
+#[test]
+fn all_six_comparisons_parse() {
+    let cases = [
+        ("a == b", "(Identifier(a) == Identifier(b))"),
+        ("a != b", "(Identifier(a) != Identifier(b))"),
+        ("a < b", "(Identifier(a) < Identifier(b))"),
+        ("a <= b", "(Identifier(a) <= Identifier(b))"),
+        ("a > b", "(Identifier(a) > Identifier(b))"),
+        ("a >= b", "(Identifier(a) >= Identifier(b))"),
+    ];
+    for (src, expected) in cases {
+        assert_eq!(described(src), expected, "source: {src}");
+    }
+}
+
+#[test]
+fn comparison_needs_no_spaces_to_be_unambiguous() {
+    // Only `-` is part of an identifier; none of the comparison symbols is.
+    assert_eq!(described("a>=1"), "(Identifier(a) >= Int(1))");
+    assert_eq!(described("a==b"), "(Identifier(a) == Identifier(b))");
+}
+
+#[test]
+fn comparison_binds_tighter_than_and_which_binds_tighter_than_or() {
+    assert_eq!(
+        described("a == 1 && b != 2 || c"),
+        "(((Identifier(a) == Int(1)) && (Identifier(b) != Int(2))) || Identifier(c))"
+    );
+    assert_eq!(
+        described("a || b && c"),
+        "(Identifier(a) || (Identifier(b) && Identifier(c)))"
+    );
+}
+
+#[test]
+fn postfix_binds_tighter_than_any_operator() {
+    assert_eq!(
+        described("d.meta.draft == true"),
+        "(Member(Member(Identifier(d), meta), draft) == Bool(true))"
+    );
+    assert_eq!(
+        described("exists(d.meta.title) && d.meta.title.contains(\"x\")"),
+        "(Call(Identifier(exists), [Member(Member(Identifier(d), meta), title)]) && \
+         Call(Member(Member(Member(Identifier(d), meta), title), contains), [String(\"x\")]))"
+    );
+}
+
+#[test]
+fn comparisons_do_not_chain() {
+    let err = parse_document("${a < b < c}\n").unwrap_err();
+    assert!(err.to_string().contains("chained"), "got: {err}");
+    // Grouping one side is the way out.
+    assert_eq!(
+        described("(a < b) == c"),
+        "(Group((Identifier(a) < Identifier(b))) == Identifier(c))"
+    );
+}
+
+#[test]
+fn a_lone_equals_ampersand_or_bar_is_an_error_that_names_the_fix() {
+    for (src, hint) in [("${a = b}", "=="), ("${a & b}", "&&"), ("${a | b}", "||")] {
+        let err = parse_document(&format!("{src}\n")).unwrap_err();
+        assert!(err.to_string().contains(hint), "{src}: got {err}");
+    }
+}
+
+#[test]
+fn a_lambda_takes_one_parameter_without_parentheses() {
+    assert_eq!(
+        described("d => d.meta.draft"),
+        "Lambda([d], Member(Member(Identifier(d), meta), draft))"
+    );
+}
+
+#[test]
+fn a_lambda_takes_several_parameters_in_parentheses() {
+    assert_eq!(
+        described("(a, b) => a >= b"),
+        "Lambda([a, b], (Identifier(a) >= Identifier(b)))"
+    );
+    assert_eq!(described("(a) => a"), "Lambda([a], Identifier(a))");
+}
+
+#[test]
+fn a_lambda_body_runs_to_the_end_of_the_argument() {
+    assert_eq!(
+        described("f(d => d.x, \"desc\")"),
+        "Call(Identifier(f), [Lambda([d], Member(Identifier(d), x)), String(\"desc\")])"
+    );
+    assert_eq!(
+        described("xs.filter(d => d.n > 1 && d.m).sort(d => d.k, \"desc\")"),
+        "Call(Member(Call(Member(Identifier(xs), filter), \
+         [Lambda([d], ((Member(Identifier(d), n) > Int(1)) && Member(Identifier(d), m)))]), sort), \
+         [Lambda([d], Member(Identifier(d), k)), String(\"desc\")])"
+    );
+}
+
+#[test]
+fn a_lambda_head_is_not_confused_with_a_named_argument_or_a_group() {
+    assert_eq!(
+        described("f(x: 1)"),
+        "Call(Identifier(f), [NamedArg(x, Int(1))])"
+    );
+    assert_eq!(described("(x)"), "Group(Identifier(x))");
+    assert_eq!(
+        described("f(x => x, y: 2)"),
+        "Call(Identifier(f), [Lambda([x], Identifier(x)), NamedArg(y, Int(2))])"
+    );
+}
+
+#[test]
+fn the_arrow_is_not_a_comparison() {
+    // `=>` is the lambda arrow; `>=` is a comparison. A stray arrow in an
+    // operand position is a plain syntax error, not a silent comparison.
+    assert!(parse_document("${a => }\n").is_err());
+    assert_eq!(described("a >= b"), "(Identifier(a) >= Identifier(b))");
+}
+
+#[test]
+fn operators_work_inside_the_braceless_call_form() {
+    let doc = parse_document("$f(a == b, c && d)\n").unwrap();
+    assert_eq!(
+        describe(interp_expr(&doc.blocks[0])),
+        "Call(Identifier(f), [(Identifier(a) == Identifier(b)), (Identifier(c) && Identifier(d))])"
+    );
+}
+
+#[test]
+fn display_gives_back_the_canonical_spelling() {
+    let cases = [
+        ("a>=1", "a >= 1"),
+        ("a  ==   b", "a == b"),
+        ("(a||b)&&c", "(a || b) && c"),
+        ("d=>d.x", "d => d.x"),
+        ("(a,b)=>a<b", "(a, b) => a < b"),
+        ("true", "true"),
+        ("null", "null"),
+        ("xs.filter(d => d.n != null)", "xs.filter(d => d.n != null)"),
+    ];
+    for (src, expected) in cases {
+        assert_eq!(printed(src), expected, "source: {src}");
+        // The canonical spelling is a fixed point.
+        assert_eq!(printed(expected), expected, "not stable: {expected}");
+    }
+}
+
+#[test]
+fn an_operator_inside_a_table_cell_does_not_split_the_cell() {
+    let doc = parse_document("@table\n|[ a ][ ${x || y} ]\n|[ b ][ ${p && q} ]\n").unwrap();
+    let rendered = format!("{doc:?}");
+    assert!(
+        rendered.contains("Or") || rendered.contains("||"),
+        "got: {rendered}"
+    );
+}
+
+#[test]
+fn a_hash_after_a_document_expression_picks_an_element_in_it() {
+    assert_eq!(described("self#intro"), "DocId(Identifier(self), intro)");
+    assert_eq!(
+        described("tmt(\"docs/a.tmt\")#intro"),
+        "DocId(Call(Identifier(tmt), [String(\"docs/a.tmt\")]), intro)"
+    );
+    // The parenthesized id is the same id.
+    assert_eq!(described("self#(intro)"), "DocId(Identifier(self), intro)");
+}
+
+#[test]
+fn steps_after_a_document_id_are_members_and_calls_on_the_element() {
+    assert_eq!(
+        described("tmt(\"a.tmt\")#intro.prop.tags.item(2)"),
+        "Call(Member(Member(Member(DocId(Call(Identifier(tmt), [String(\"a.tmt\")]), intro), prop), tags), item), [Int(2)])"
+    );
+    assert_eq!(
+        described("self#item(0)"),
+        "Call(DocId(Identifier(self), item), [Int(0)])"
+    );
+}
+
+#[test]
+fn the_leading_hash_is_still_an_id_on_its_own() {
+    // `#intro` is `self#intro`; the parser keeps the short form as `Id` and
+    // leaves the meaning to the evaluator.
+    assert_eq!(
+        described("#intro.prop.tags"),
+        "Member(Member(Id(intro), prop), tags)"
+    );
+}
+
+#[test]
+fn a_hash_after_a_space_is_not_a_document_boundary() {
+    assert!(parse_document("${self #intro}\n").is_err());
+}
+
+#[test]
+fn a_document_id_prints_back_without_spaces() {
+    assert_eq!(
+        printed("tmt(\"a.tmt\")#(intro).prop"),
+        "tmt(\"a.tmt\")#intro.prop"
+    );
+    assert_eq!(printed("self#intro"), "self#intro");
+}
+
+#[test]
+fn addr_reads_a_link_style_address_as_raw_text() {
+    assert_eq!(
+        described("addr(tmt:docs/a.tmt#intro)"),
+        "Addr(\"tmt:docs/a.tmt#intro\", raw=true)"
+    );
+    // The in-document steps ride along inside the same text.
+    assert_eq!(
+        described("addr(tmt:docs/a.tmt#intro.prop.tags.item(2))"),
+        "Addr(\"tmt:docs/a.tmt#intro.prop.tags.item(2)\", raw=true)"
+    );
+    // `ident:` is a named argument everywhere else, and a hyphen is part of an
+    // identifier; none of that applies inside `addr(`.
+    assert_eq!(
+        described("addr(dir:docs/my-notes)"),
+        "Addr(\"dir:docs/my-notes\", raw=true)"
+    );
+}
+
+#[test]
+fn addr_with_no_document_on_the_left_is_the_current_document() {
+    assert_eq!(described("addr(#intro)"), "Addr(\"#intro\", raw=true)");
+}
+
+#[test]
+fn addr_takes_a_quoted_form_for_text_the_raw_form_cannot_carry() {
+    assert_eq!(
+        described("addr(\"tmt:docs/a (copy).tmt#intro\")"),
+        "Addr(\"tmt:docs/a (copy).tmt#intro\", raw=false)"
+    );
+    // Nested parentheses balance in the raw form; an unbalanced one needs quotes.
+    assert_eq!(
+        described("addr(tmt:docs/a(1).tmt)"),
+        "Addr(\"tmt:docs/a(1).tmt\", raw=true)"
+    );
+}
+
+#[test]
+fn addr_can_be_followed_by_steps_and_used_as_an_argument() {
+    assert_eq!(
+        described("addr(dir:docs).docs"),
+        "Member(Addr(\"dir:docs\", raw=true), docs)"
+    );
+    assert_eq!(
+        described("include(addr(tmt:docs/a.tmt#intro), heading: false)"),
+        "Call(Identifier(include), [Addr(\"tmt:docs/a.tmt#intro\", raw=true), NamedArg(heading, Bool(false))])"
+    );
+}
+
+#[test]
+fn addr_works_in_the_braceless_call_form() {
+    let doc = parse_document("$include(addr(tmt:docs/a.tmt))\n").unwrap();
+    assert_eq!(
+        describe(interp_expr(&doc.blocks[0])),
+        "Call(Identifier(include), [Addr(\"tmt:docs/a.tmt\", raw=true)])"
+    );
+    let doc = parse_document("$addr(dir:docs)\n").unwrap();
+    assert_eq!(
+        describe(interp_expr(&doc.blocks[0])),
+        "Addr(\"dir:docs\", raw=true)"
+    );
+}
+
+#[test]
+fn addr_that_is_unterminated_or_empty_is_an_error() {
+    assert!(parse_document("${addr(tmt:docs/a.tmt}\n").is_err());
+    assert!(parse_document("${addr()}\n").is_err());
+    assert!(parse_document("${addr(\"\")}\n").is_err());
+}
+
+#[test]
+fn a_method_named_addr_is_an_ordinary_call() {
+    // Only a bare `addr(` is raw. `x.addr()` is a method on a string value.
+    assert_eq!(
+        described("#note.prop.source.addr()"),
+        "Call(Member(Member(Member(Id(note), prop), source), addr), [])"
+    );
+}
+
+#[test]
+fn addr_prints_back_in_the_spelling_it_was_written() {
+    assert_eq!(
+        printed("addr(tmt:docs/a.tmt#intro)"),
+        "addr(tmt:docs/a.tmt#intro)"
+    );
+    assert_eq!(
+        printed("addr(\"tmt:docs/a (copy).tmt\")"),
+        "addr(\"tmt:docs/a (copy).tmt\")"
+    );
+    assert_eq!(printed("addr( tmt:docs/a.tmt )"), "addr(tmt:docs/a.tmt)");
 }

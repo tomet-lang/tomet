@@ -972,6 +972,77 @@ pub enum InterpExprKind {
         name: String,
         value: Box<InterpExpr>,
     },
+    /// `lhs op rhs`. Comparison and `&&` / `||` only; see
+    /// `tmtroot/spec/expressions/operators.expr.tmt`.
+    Binary {
+        op: BinaryOp,
+        lhs: Box<InterpExpr>,
+        rhs: Box<InterpExpr>,
+    },
+    /// `doc#id` -- the element with that unique id inside `doc`, where `doc`
+    /// is any expression that yields a document. The leading form `#id`
+    /// (no document on the left) is [`InterpExprKind::Id`] and means the
+    /// same thing with `self` on the left.
+    DocId {
+        doc: Box<InterpExpr>,
+        id: String,
+    },
+    /// `addr(tmt:docs/a.tmt#intro)` or `addr("...")` -- an address written as
+    /// text. `raw` records the spelling the author used, so printing gives
+    /// it back: the raw form reads everything up to the matching `)` without
+    /// treating `:`, `.`, `-` or `/` as expression symbols.
+    Addr {
+        text: String,
+        raw: bool,
+    },
+    /// `( expr )`. Kept as a node, not dropped, so printing a parsed
+    /// expression gives back the parentheses the author wrote.
+    Group(Box<InterpExpr>),
+    /// `x => body` or `(a, b) => body`. The body is one expression.
+    Lambda {
+        params: Vec<String>,
+        body: Box<InterpExpr>,
+    },
+}
+
+/// A binary operator in an expression.
+///
+/// There is no arithmetic and no `!`: both are deliberately functions
+/// (`add`, `not`), because `-` already means a list marker and part of an
+/// identifier, and the expression language keeps symbols to the minimum.
+/// `&&` and `||` are the only operators that may skip their right-hand
+/// side, which is why they are symbols and not functions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BinaryOp {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+}
+
+impl BinaryOp {
+    /// The spelling in source.
+    pub fn symbol(self) -> &'static str {
+        match self {
+            BinaryOp::Eq => "==",
+            BinaryOp::Ne => "!=",
+            BinaryOp::Lt => "<",
+            BinaryOp::Le => "<=",
+            BinaryOp::Gt => ">",
+            BinaryOp::Ge => ">=",
+            BinaryOp::And => "&&",
+            BinaryOp::Or => "||",
+        }
+    }
+
+    /// Whether this is one of the six comparisons, which do not chain.
+    pub fn is_comparison(self) -> bool {
+        !matches!(self, BinaryOp::And | BinaryOp::Or)
+    }
 }
 
 /// The source spelling of an interpolation expression -- the interior of
@@ -995,19 +1066,7 @@ impl fmt::Display for InterpExpr {
             InterpExprKind::Id(name) => write!(f, "#{name}"),
             InterpExprKind::Literal(Literal::Int(i)) => write!(f, "{i}"),
             InterpExprKind::Literal(Literal::Float(x)) => write!(f, "{x}"),
-            InterpExprKind::Literal(Literal::String(s)) => {
-                f.write_str("\"")?;
-                for c in s.chars() {
-                    match c {
-                        '"' => f.write_str("\\\"")?,
-                        '\\' => f.write_str("\\\\")?,
-                        '\n' => f.write_str("\\n")?,
-                        '\t' => f.write_str("\\t")?,
-                        other => f.write_char(other)?,
-                    }
-                }
-                f.write_str("\"")
-            }
+            InterpExprKind::Literal(Literal::String(s)) => write_quoted(f, s),
             InterpExprKind::Call { callee, args } => {
                 write!(f, "{callee}(")?;
                 for (i, arg) in args.iter().enumerate() {
@@ -1018,10 +1077,71 @@ impl fmt::Display for InterpExpr {
                 }
                 f.write_str(")")
             }
+            InterpExprKind::Literal(Literal::Bool(b)) => write!(f, "{b}"),
+            InterpExprKind::Literal(Literal::Null) => f.write_str("null"),
             InterpExprKind::Member { object, member } => write!(f, "{object}.{member}"),
             InterpExprKind::NamedArg { name, value } => write!(f, "{name}: {value}"),
+            InterpExprKind::Binary { op, lhs, rhs } => {
+                write!(f, "{lhs} {} {rhs}", op.symbol())
+            }
+            InterpExprKind::DocId { doc, id } => write!(f, "{doc}#{id}"),
+            InterpExprKind::Addr { text, raw } => {
+                if *raw && addr_text_is_safe_raw(text) {
+                    write!(f, "addr({text})")
+                } else {
+                    f.write_str("addr(")?;
+                    write_quoted(f, text)?;
+                    f.write_str(")")
+                }
+            }
+            InterpExprKind::Group(inner) => write!(f, "({inner})"),
+            InterpExprKind::Lambda { params, body } => {
+                match params.as_slice() {
+                    [only] => f.write_str(only)?,
+                    many => write!(f, "({})", many.join(", "))?,
+                }
+                write!(f, " => {body}")
+            }
         }
     }
+}
+
+/// A string literal as `parse_quoted` reads it back.
+fn write_quoted(f: &mut fmt::Formatter<'_>, s: &str) -> fmt::Result {
+    f.write_str("\"")?;
+    for c in s.chars() {
+        match c {
+            '"' => f.write_str("\\\"")?,
+            '\\' => f.write_str("\\\\")?,
+            '\n' => f.write_str("\\n")?,
+            '\t' => f.write_str("\\t")?,
+            other => f.write_char(other)?,
+        }
+    }
+    f.write_str("\"")
+}
+
+/// Whether `addr(` can be written back in its raw form: the text must read
+/// back as the same text, which means no line break, balanced parentheses,
+/// no surrounding space and no leading quote.
+fn addr_text_is_safe_raw(text: &str) -> bool {
+    if text.is_empty() || text.trim() != text || text.starts_with('"') || text.contains('\n') {
+        return false;
+    }
+    let mut depth = 0usize;
+    for c in text.chars() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                if depth == 0 {
+                    return false;
+                }
+                depth -= 1;
+            }
+            _ => {}
+        }
+    }
+    depth == 0
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1029,6 +1149,8 @@ pub enum Literal {
     Int(i64),
     Float(f64),
     String(String),
+    Bool(bool),
+    Null,
 }
 
 #[cfg(test)]

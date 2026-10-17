@@ -36,7 +36,14 @@ module.exports = grammar({
 	// so this needs GLR resolution rather than a lookahead-free CFG
 	// rewrite (there isn't one: the ambiguity is in the language, not the
 	// grammar's phrasing).
-	conflicts: ($) => [[$.section], [$.map], [$.children]],
+	conflicts: ($) => [
+		[$.section],
+		[$.map],
+		[$.children],
+		// `(a)` is a group or the start of `(a) => ...`; only the `=>` after the
+		// `)` decides, which a lookahead of one token cannot see.
+		[$._interp_operand, $.interp_lambda],
+	],
 
 	rules: {
 		document: ($) => repeat(choice($._block, $._newline)),
@@ -396,7 +403,100 @@ module.exports = grammar({
 				seq(token(prec(1, "${")), $._interp_expr, "}"),
 				seq("$", $.interp_call),
 			),
-		_interp_expr: ($) => choice($.interp_call, $.identifier, $.number, $.string),
+		// The expression language, as far as highlighting needs it: operators
+		// (`==` `!=` `<` `<=` `>` `>=` `&&` `||`), `( expr )`, lambdas
+		// (`x => body`, `(a, b) => body`), `doc#id`, and `addr(...)`. See
+		// `tmtroot/spec/expressions/`. Precedence is only here to keep the tree
+		// unambiguous; the real parser (`tomet-parser/src/interp.rs`) is the
+		// authority. `true` / `false` / `null` read as plain identifiers.
+		_interp_expr: ($) =>
+			choice($.interp_binary, $.interp_lambda, $._interp_operand),
+		_interp_operand: ($) =>
+			choice(
+				$.interp_call,
+				$.interp_hash_call,
+				$.interp_member,
+				$.interp_hash,
+				$.interp_group,
+				$.interp_addr,
+				$.identifier,
+				$.number,
+				$.string,
+			),
+		interp_binary: ($) =>
+			choice(
+				prec.left(1, seq($._interp_expr, "||", $._interp_expr)),
+				prec.left(2, seq($._interp_expr, "&&", $._interp_expr)),
+				prec.left(
+					3,
+					seq(
+						$._interp_expr,
+						choice("==", "!=", "<=", ">=", "<", ">"),
+						$._interp_expr,
+					),
+				),
+			),
+		interp_group: ($) => seq("(", $._interp_expr, ")"),
+		// A call's arguments: expressions, or `name: expr`.
+		_interp_args: ($) =>
+			seq($._interp_arg, repeat(seq(",", $._interp_arg))),
+		_interp_arg: ($) => choice($.interp_named_arg, $._interp_expr),
+		interp_named_arg: ($) =>
+			seq(field("name", $.identifier), ":", $._interp_expr),
+		// `.name` after something that is not a bare name: `addr(...).docs`,
+		// `x.addr().prop`, `doc#(id).prop`.
+		interp_member: ($) =>
+			prec.left(
+				seq(
+					field("object", choice(
+						$.interp_call,
+						$.interp_hash_call,
+						$.interp_hash,
+						$.interp_group,
+						$.interp_addr,
+					)),
+					".",
+					field("member", $.identifier),
+				),
+			),
+		interp_lambda: ($) =>
+			prec.right(
+				0,
+				seq(
+					field(
+						"params",
+						choice(
+							$.identifier,
+							seq("(", $.identifier, repeat(seq(",", $.identifier)), ")"),
+						),
+					),
+					"=>",
+					$._interp_expr,
+				),
+			),
+		// `#id`, `#(id)`, and `doc#id`. The document on the left is any call or
+		// name; the id's own `.steps` are part of the `identifier` token.
+		interp_hash: ($) =>
+			seq(
+				optional(field("doc", choice($.interp_call, $.identifier))),
+				"#",
+				choice($.identifier, seq("(", $.identifier, ")")),
+			),
+		// A call whose callee is a `#` address: `#item(0)`, `doc#id.item(2)`.
+		// Kept apart from `interp_call` so that `$name(...)` can never start
+		// with `#`.
+		interp_hash_call: ($) =>
+			prec.left(
+				seq(
+					field("name", $.interp_hash),
+					"(",
+					optional($._interp_args),
+					")",
+				),
+			),
+		// `addr(` reads raw text up to the first `)`. The real parser also
+		// balances nested parentheses; this approximation does not.
+		interp_addr: (_$) => token(prec(3, seq("addr(", /[^)\n]*/, ")"))),
 		// A call's callee may itself be a call followed by `.name`, which
 		// is how `${ref(id(x).contents(y))}` reads: member access binds to
 		// whatever precedes it, then takes its own argument list.
@@ -406,7 +506,7 @@ module.exports = grammar({
 					field("name", choice($.identifier, $.interp_call)),
 					repeat(seq(".", field("member", $.identifier))),
 					"(",
-					optional(seq($._interp_expr, repeat(seq(",", $._interp_expr)))),
+					optional($._interp_args),
 					")",
 				),
 			),
