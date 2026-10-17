@@ -47,7 +47,7 @@ mkShell rec {
     binaryen # wasm-opt: the size a browser downloads is after this
     twiggy # which crates the wasm size is spent in
     #== Tree-sitter @dir(crates/tree-sitter-tomet)
-    tree-sitter # regenerates parser.c/grammar.json/node-types.json from grammar.js
+    tree-sitter # for running things by hand; regenerate with `just gen-treesitter`, which pins 0.26.12 -- this nixpkgs version writes different files
     #== Python
     python313
     #== Pandoc

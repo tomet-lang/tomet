@@ -42,6 +42,22 @@ jobs:
       - name: Rustfmt
         run: cargo fmt --all -- --check
 
+      # ── Generated grammar ──────────────────────────────────
+      # `parser.c`, `grammar.json` and `node-types.json` are generated from
+      # `grammar.js` and committed, because the editors build them from this
+      # repository. Fail when they are stale. The version is the one
+      # `just gen-treesitter` pins: another version writes different files.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: tree-sitter generated files are up to date
+        run: |
+          cd crates/tree-sitter-tomet
+          sha256sum src/parser.c src/grammar.json src/node-types.json > $RUNNER_TEMP/tree-sitter.sum
+          npx -y tree-sitter-cli@0.26.12 generate
+          sha256sum --check $RUNNER_TEMP/tree-sitter.sum
+
       # ── Docs Check ────────────────────────────────────────
       # Verify .tmt documents: syntax, formatting, and export
       # consistency using the tomet binary built above.
