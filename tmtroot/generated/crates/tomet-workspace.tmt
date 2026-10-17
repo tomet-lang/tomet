@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-workspace, dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-formatter, tomet-indexer, tomet-load-config, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-transform, tomet-tree), dependents: list(tomet-cli, tomet-tests, tomet-tui)}
+@meta{crate: tomet-workspace, dependencies: list(tomet-ast, tomet-config, tomet-expr, tomet-formatter, tomet-indexer, tomet-load-config, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-transform, tomet-tree), dependents: list(tomet-cli, tomet-tests, tomet-tui)}
 
 =[tomet-workspace]
 
@@ -47,6 +47,21 @@ where it is written, instead of at every document that wanted it.
 A name -> path map was rejected as a duplicate: the name would appear
 in the key, in the path, and again in the file's own `@blueprint(X)`.
 
+===[Structs]
+
+====[struct Unfilled]
+
+An expression in a blueprint that had no value, and so stands in the new
+document as written.
+
+====[struct Instantiation]
+
+A new document made from a blueprint, not yet written anywhere.
+
+====[struct Created]
+
+A new document written to disk by [`create_file_from_blueprint`].
+
 ===[Functions]
 
 ====[fn list_blueprints]
@@ -70,11 +85,26 @@ The blueprint named `name`, among the ones `config` declares.
 
 ====[fn instantiate_blueprint_file]
 
-Instantiates a blueprint file into formatted Tomet source text for `output_path`.
+Instantiates a blueprint file into formatted Tomet source text for the new
+document `target`, a path relative to the vault.
+
+`vars` are the values passed to `tomet new --var key=value`, read in the
+blueprint as `${vars.key}`; `title` defaults to the file's name. The
+document being created is `self`, so `${self.filename}` is the new file's
+name. `${generate.now()}` is written in the offset the settings give
+`created` (or `modified`), UTC if neither has one.
+
+An expression that has no value stays in the new document as written, so
+the person who made it can see what was left to fill in; each one is also
+returned in [`Instantiation::unfilled`], so the caller can say so.
 
 ====[fn create_file_from_blueprint]
 
 Creates a new document from a blueprint and writes it to disk.
+
+What the document was left to fill in is in [`Created::unfilled`]; it is
+written anyway, since the expressions are still there to be filled in by
+hand.
 
 ==[Module diff]
 

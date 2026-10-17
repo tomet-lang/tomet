@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-ast, dependencies: list(tomet-cst), dependents: list(tomet, tomet-address, tomet-cli, tomet-compute, tomet-config, tomet-edit, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-merge, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule, tomet-vault, tomet-workspace, tove)}
+@meta{crate: tomet-ast, dependencies: list(tomet-cst), dependents: list(tomet, tomet-address, tomet-cli, tomet-config, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-merge, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule, tomet-vault, tomet-workspace, tove)}
 
 =[tomet-ast]
 
@@ -236,6 +236,16 @@ computed downstream in `tomet-semantics`, which is what lets the parser
 build the tree without consulting any element vocabulary.
 
 ===[enum InterpExprKind]
+
+===[enum BinaryOp]
+
+A binary operator in an expression.
+
+There is no arithmetic and no `!`: both are deliberately functions
+(`add`, `not`), because `-` already means a list marker and part of an
+identifier, and the expression language keeps symbols to the minimum.
+`&&` and `||` are the only operators that may skip their right-hand
+side, which is why they are symbols and not functions.
 
 ===[enum Literal]
 

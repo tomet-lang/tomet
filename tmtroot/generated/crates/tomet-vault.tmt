@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-vault, dependencies: list(tomet-ast, tomet-compute, tomet-config, tomet-parser, tomet-search, tomet-semantics, tomet-transform), dependents: list(tomet, tomet-load)}
+@meta{crate: tomet-vault, dependencies: list(tomet-ast, tomet-config, tomet-expr, tomet-parser, tomet-search, tomet-semantics, tomet-transform), dependents: list(tomet, tomet-load)}
 
 =[tomet-vault]
 
@@ -33,18 +33,18 @@ parse through `from_sources` added about 1% to the module and reaching
 
 ==[Preparing]
 
-`${filter(...)}` in an `@kind(doc.index)` document is answered from a
-table of every document in the vault. Building that table is a walk of
-the disk, so [`Vault::prepare`] takes it as a closure that is only
-called when a document actually asks: a document with no query pays
-nothing, and a caller with no table passes an empty one and gets the
-query left unexpanded.
+[`Vault::prepare`] resolves every `${...}` in a document, once, against a
+[`Resolver`] the caller supplies. What the vault adds is what only it
+knows: the macros in scope, the settings' `type:` declarations that make
+`.meta` typed, and the document being prepared standing for its own path
+as it was written. Where the other documents come from -- the disk, a
+host's memory -- is the caller's resolver; `tomet-load` supplies the disk.
 
 ==[Structs]
 
 ===[struct Prepared]
 
-What [`Vault::prepare`] did, and what it could not do.
+What [`Vault::prepare`] could not do.
 
 `unresolved` is not an error: an expression with no value is left in
 the output as written, so a document showing `${...}` as an example

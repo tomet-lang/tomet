@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-semantics, dependencies: list(tomet-ast, tomet-parser, tomet-tree), dependents: list(tomet, tomet-cli, tomet-compute, tomet-config, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tui, tomet-typst, tomet-validator, tomet-vault, tomet-workspace)}
+@meta{crate: tomet-semantics, dependencies: list(tomet-address, tomet-ast, tomet-parser, tomet-tree), dependents: list(tomet, tomet-cli, tomet-config, tomet-expr, tomet-field-utils, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tui, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-semantics]
 
@@ -30,6 +30,9 @@ prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
 - ("Document Configuration (`config`)") Merges `@config` and `@settings` blocks across
 a document into a structured [`DocumentConfig`].
 - ("Metadata Extraction (`meta`)") Extracts top-level `@meta` values via [`document_meta`].
+- ("Datetimes (`datetime`)") The one definition of what text reads as a date or a date and a time,
+as plain parts (`datetime::parse_datetime_parts`). The evaluator, `tomet check`
+and `tomet format` all read a `datetime` field by it.
 - ("Structural Helpers") Heading level clamping (`heading`) and
 table parsing (`table`).
 - ("Element Data Extraction (`data`)") Extracts and normalizes an element's `{...}` data group via [`data::element_data`].
@@ -52,6 +55,45 @@ them need to know `ElementValue::Group`'s shape themselves.
 An element's value as data: a `{...}` group's `key: value` pairs, or
 `None` if the element has no value group at all (or an interpolated
 one, `${...}`, which is not data).
+
+==[Module datetime]
+
+What text reads as a date, or a date and a time.
+
+The one definition of what a `datetime` field holds. The evaluator reads a
+field with it, `tomet check` checks a field with it, and `tomet format`
+decides with it what to rewrite as RFC 3339. It gives the parts and
+nothing else -- no clock type -- so a crate that only needs to know
+whether text reads as a datetime does not carry one.
+
+===[Structs]
+
+====[struct DateTimeParts]
+
+A date, or a date and a time, as written.
+
+===[Functions]
+
+====[fn parse_datetime_parts]
+
+Reads a date, or a date and a time: `2026-10-17`, `2026-10-17T09:00`,
+`2026-10-17 09:00:00`, `2026-10-17T09:00:00.5+09:00`.
+
+- The date is `YYYY-MM-DD`; with nothing after it the time is midnight.
+- The time follows after a `T` or a space, as `HH:MM`, or `HH:MM:SS`
+
+with an optional fraction.
+
+- An offset (`Z`, `+09:00`) may close it. Without one the value is read
+
+as UTC, which is what a bare date has always been.
+
+`None` for anything else, including a day the month does not have.
+
+====[fn parse_offset_seconds]
+
+Reads a UTC offset written `+09:00`, `-05:30` or `Z`, as seconds east of
+UTC. `None` for anything else.
 
 ==[Module elements]
 
@@ -204,15 +246,6 @@ live entirely in the target string itself. This is the canonical
 extraction, adopted by `tomet-html`/`tomet-markdown`/`tomet-links`
 instead of each reading `el.args` raw.
 
-====[Enums]
-
-=====[enum TargetScheme]
-
-What kind of thing a `target` string points at, derived purely from the
-string's own scheme prefix (never from which key/element name carried
-it -- there's only ever one key, `target`, for both `@link` and
-`@embed`).
-
 ====[Functions]
 
 =====[fn link_target]
@@ -250,21 +283,7 @@ a document without one in hand.
 
 =====[fn target_scheme]
 
-====[Constants]
-
-=====[const EXPLICIT_SCHEMES]
-
-Classifies a `target` string's scheme and strips a recognized explicit
-prefix (`tm:`/`id:`/`ref:`/`file:`/`dir:`) off of it, if any -- an implicit
-shape (`scheme://...`, a leading `/`, `./`, `../`, or no recognizable
-prefix at all) is returned unchanged since there's nothing to strip.
-The explicit scheme prefixes, without their `:`.
-
-One list. This crate's own `positional` module has to know the
-same set -- the parser splits a bare `tm:foo` into a map entry keyed
-`tm`, and recovering that means knowing which keys are schemes -- and
-it used to carry a hand-copied second copy that nothing held to this
-one.
+Classifies a `target` string's scheme and strips a recognized explicit prefix.
 
 ==[Module flatten]
 

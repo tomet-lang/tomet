@@ -79,6 +79,18 @@ Enforces the `singleton` and `region` axes.
 
 ===[fn check_retired_settings_keys]
 
+===[fn check_field_types]
+
+Checks the form of the `@meta` fields the settings declare a `type:` for.
+
+`field_types` is the settings' `meta` declarations as `name -> type`,
+which is all this needs of them: the validator sits below the crate that
+reads settings, so the caller hands the declarations over as plain data.
+
+Only a `type:` with a form can be wrong: `uuid` and `datetime`. A field the
+document does not write, an empty one (the state in which `tomet format`
+generates one), and a `${...}` not yet evaluated are not reported.
+
 ===[fn check_dangling_anchors]
 
 ===[fn validate_cst]

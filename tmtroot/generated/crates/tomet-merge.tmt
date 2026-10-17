@@ -1,0 +1,107 @@
+@kind(api)
+
+@meta{crate: tomet-merge, dependencies: list(tomet-ast, tomet-parser, tomet-printer), dependents: list(tomet)}
+
+=[tomet-merge]
+
+Three-way merge for `.tmt` notes, at the AST level rather than the text
+level.
+
+A textual `diff3` treats a note as lines. Tomet documents are trees of
+`@element(args)[content]{data}` nodes, and most real edits touch
+different nodes -- editing one `{data}` key on a device while another
+device edits an unrelated block's `[content]` is not a conflict in any
+meaningful sense, even though the two edits may land on adjacent lines.
+Diffing the tree instead of the text is what lets those edits merge
+silently, which is the entire point of doing this instead of shelling
+out to `git merge-file`.
+
+# Algorithm
+
+[`merge`] walks `base`, `local` and `remote` together, top-down:
+
+1. At each level, align the child sequence of `base` against `local`
+and against `remote` with an LCS-style alignment (the same technique
+a line-based diff uses, applied to sibling nodes instead of lines).
+Alignment is structural -- two nodes are "the same" position if they
+are AST-equal, not by any synthetic identity tomet would have to
+invent and inject into the user's document.
+2. A child unchanged on one side and changed on the other resolves to
+the changed side. A child added on only one side is kept. A child
+removed on only one side is dropped.
+3. A single base block changed on @em[both] sides recurses via
+`merge_one`, into every part of it independently:
+
+- `content: Vec<Block>` (a `Paragraph`'s `Vec<Inline>`, or an
+
+`Element`'s own `[content]`/`children`, both `Vec<Block>`) gets
+the same diff3 treatment as step 1; a single-`Text`-per-side
+inline conflict (within a `Paragraph`) recurses once more,
+character by character (`merge_text`). This is what lets two
+edits to different words in the same sentence merge silently.
+
+- ("`merge_value`/`merge_value_map`") `args`/`{data}` (`Element.value`'s `Group`) recurse by key:editing
+
+two different
+keys never conflicts, and a `Value::Map`/`Value::Seq` inside a
+value recurses further still. This only narrows a `{data}`
+group made of plain `key: value` pairs -- one holding a nested
+element (rather than only pairs) isn't narrowed
+(`.agents/tasks/merge-tree-diff.md`).
+Each part narrows independently; the recursion only gives up on
+the @em[whole] block (step 4) when at least one part's shape itself
+differs (e.g. `[content]` present on one side and absent on the
+other) rather than merely disagreeing in value.
+4. A conflict `merge_one` can't narrow any further is recorded
+in-place as one `@conflict` element -- `tomet`'s own `std` element
+for exactly this, bare and needing no `@use`. `a`/`b` are
+structural names, not "mine"/"theirs": the side that merged the
+note has no way to tell a later reader (on another device, or
+itself after the app restarts) which one was whose, so the stored
+document doesn't claim to know either -- see an editor or UI resolution
+module for how a mine/theirs @em[display] label still gets derived, without
+being stored. Two roles, depending on where the conflict sits:
+
+- @strong[As a sequence of blocks/inlines], `a`/`b` each hold the
+
+disputed stretch's own blocks directly (`Value::Blocks`, `tomet`'s
+`key: [...]` value grammar) -- no marker triple, no terminator;
+`@conflict`'s own `(args)` is the whole thing. At the
+`Document.blocks`/`children`/`content` level this is a block-
+placed element; inside a paragraph's inline content, the same
+element inline, with `a`/`b` each wrapping their inline run in
+one `Paragraph` to fit the same `Vec<Block>` shape.
+
+- @strong[As a single value] (a `{data}` key, or `args`), it becomes
+
+`@conflict(a: ..., b: ...)` sitting where the value went, using
+named args rather than `{value}` -- a value slot only permits
+`(args)` on an embedded element -- with `a`/`b` as plain scalars
+(whatever the disputed value itself was), not `Value::Blocks`.
+
+# What this crate assumes
+
+A `base` is always available: a caller only invokes this crate for an
+actual three-way merge, where a merge base commit or document ancestor
+is known. Linking two vaults or documents that do not share history is a
+separate operation (such as vault adoption), not a merge, and is not this
+crate's problem.
+
+# Module layout
+
+- ("the module", "via [`merge()`] the function") `merge` merge half:the
+
+of the algorithm above.
+
+- `resolve` markers back out once a side has been picked.:strips
+- `find_conflicts` markers back out without removing them, for:reads
+
+showing the user what's in conflict.
+
+- `markers`: the `@conflict` marker shape itself (construction and
+
+detection), shared by all three.
+
+- `diff3`: the plain three-way sequence alignment every level of the
+
+tree reuses; has no idea it's being used for an AST.

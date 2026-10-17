@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-transform, dependencies: list(tomet-ast, tomet-compute, tomet-parser, tomet-search, tomet-semantics, tomet-style, tomet-tree), dependents: list(tomet-js, tomet-load, tomet-tests, tomet-tui, tomet-vault, tomet-workspace)}
+@meta{crate: tomet-transform, dependencies: list(tomet-ast, tomet-expr, tomet-parser, tomet-search, tomet-semantics, tomet-style, tomet-tree), dependents: list(tomet-js, tomet-load, tomet-tests, tomet-tui, tomet-vault, tomet-workspace)}
 
 =[tomet-transform]
 
@@ -8,12 +8,12 @@ Pure in-memory AST refactoring and structural transformations for Tomet document
 
 Provides:
 
+- (expressions) Every `${...}` in a document resolved once, in one pass, with the
+evaluator's typed values put back according to where each expression sits.
 - (macro_rewrite) Reverse URL-to-macro pattern matching and rewriting.
 - (directive) Directive promotion (`@meta.type` -> `@kind`) and Value DSL normalization.
 - (structural) Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
 - (meta) Batch `@meta` key/value updates.
-- (index_query) `${filter(...)}` in an `@kind(index)` document,
-expanded into the `@file` entries it selects.
 
 ==[Module blueprint]
 
@@ -25,6 +25,10 @@ Blueprint schema extraction, transformation, and instantiation.
 
 Metadata and variable definitions extracted from a `@blueprint` directive.
 
+====[struct Instantiated]
+
+What [`instantiate_blueprint`] did.
+
 ===[Functions]
 
 ====[fn extract_blueprint_info]
@@ -35,7 +39,8 @@ Extracts [`BlueprintInfo`] from `doc` if it declares a top-level `@blueprint` di
 
 Instantiates a blueprint `doc` in-place by:
 1. Promoting/converting `@blueprint(target)` to `@kind(target)` and stripping schema blocks.
-2. Evaluating all `${...}` interpolation expressions and placeholders using `ctx`.
+2. Resolving every `${...}` in it, with `cx` -- which is a creating context
+(`Phase::Create`), the only place `generate.*` and `vars` exist.
 
 ==[Module directive]
 
@@ -56,101 +61,43 @@ Returns `true` if a directive was created and inserted.
 
 Promotes `@meta`'s `type:` field to a top-level `@kind(...)` element.
 
-==[Module index_query]
+==[Module expressions]
 
-`${filter(...)}` -- the one query node an `@kind(doc.index)` document
-may write, and the pass that replaces it with the `@link(ref:...)`
-entries it selects, in place among whatever else the author wrote by
-hand.
+Resolving every `${...}` in a document, once, before anything renders it.
 
-===[Why this is not a builtin function]
+This is the single place where an expression's value is put back into a
+document. It replaces three passes that each handled some positions: the
+body (`interp`), the arguments of elements (`macro_expand`, called by one
+binding only) and the index queries (`index_query`). What a value does at
+a position is one table, in `tmtroot/spec/expressions/overview.expr.tmt`;
+in short:
 
-Every other `${...}` evaluates to a single `Value` and renders as
-text. `filter` expands into @em[several] AST nodes, so it can never go
-through `tomet_compute::call`'s one-value path. This pass therefore
-pattern-matches `filter` as an @strong[unevaluated] `InterpExpr::Call` and
-reads its argument list as a small query language. Its arguments are
-ordinary expressions and are evaluated the ordinary way, once per
-candidate file.
+- data (arguments, properties): any value that can be data is kept;
+- inside a paragraph: a scalar is text, a fragment of one paragraph is
 
-`by(...)` is read here for the same reason, and a smaller one: it
-names a @em[field] rather than a value, so evaluating it would resolve
-the very path the sort needs to keep.
+spliced in, anything else is a mismatch;
 
-===[Why the rows arrive as a parameter]
+- on a line of its own: a scalar is a paragraph, a fragment is its blocks;
+- as a list item: a list gives one item per element, a scalar gives one;
+- a document, an element, a directory, a function or a datetime has no
 
-Building the table means reading every `.tmt` in the vault, and this
-crate sits below the one allowed to do that (`crate-layering` in the
-root `.writ.tmt`: `tomet-transform` is layer 4, `tomet-indexer` is
-layer 5). So the I/O happens there, the table arrives here as plain
-data, and this pass stays pure and testable without a directory.
+place in output at all.
 
-===[Absent, versus nobody has it]
-
-Every row's evaluation context is given @em[every] field path any row in
-the table has, with [`Value::Null`] for the ones this row lacks. That
-is what makes `exists(meta.draft)` answerable -- an unfilled context
-would fail to resolve the name instead of reporting it absent.
-
-A path no file in the vault has is deliberately left out, so it still
-fails to resolve. That is the typo case: `meta.tgs` should say so
-rather than quietly match nothing.
-
-===[Functions]
-
-====[fn expand_index_queries]
-
-Replaces every `${filter(...)}` in `doc` with the `@link(ref:...)`
-entries it selects, in the order `by(...)` asks for -- in place,
-whether the query sat at the top level or as a list item nested
-arbitrarily deep under hand-written entries (see [`rewrite_blocks`]/
-[`rewrite_list_value`]).
-
-Returns how many query nodes were expanded. This is a count for a
-caller that wants one (`Prepared::expanded_queries`); whether to run
-this pass at all is [`is_index_document`]'s question, not this
-function's -- it rewrites whatever queries it finds regardless of
-`@kind`.
-
-Only a query that is a whole block, or a whole list item, is expanded.
-One sitting inside running text (`索引は ${filter(...)} で書く`) is left
-exactly as it is: it would have to expand into several elements in the
-middle of a sentence, or several list items in the middle of one, and
-there is no sensible answer to what that means.
-
-==[Module interp]
-
-Resolving `${...}` before anything renders.
-
-===[Why this is a pass and not a renderer's job]
-
-It was a renderer's job, four times over, and the four disagreed:
-markdown evaluated with an [`EvaluationContext`], HTML evaluated
-without one (so `${self.path}` resolved in one and not the other, and
-the vault's macros expanded in neither), Typst and Pandoc did not
-evaluate at all. The same document produced three different answers
-depending on what it was being turned into.
-
-A `${...}` means one thing. Deciding what it means is the language's
-job, so it is settled here, once, before any converter sees the tree --
-and a converter that never meets an `InterpExpr` has nothing left to
-disagree about.
-
-===[What a failure does]
+===[A value that does not fit]
 
 Nothing is dropped and nothing is fatal. An expression that cannot be
-resolved is replaced by its own source spelling, so the output shows
-`${some_id}` exactly as written, and is reported in the returned
-[`Unresolved`] list so `tomet check` can warn about it. That keeps a
-document that shows `${...}` as an example working, while still giving
-a typo somewhere to surface.
+evaluated, or whose value has no place at its position, is written back
+as its own source (`${...}`) and reported in the returned [`Unresolved`]
+list, so `tomet check` can warn about it. That keeps a document that
+shows `${...}` as an example working, and still gives a typo somewhere
+to surface.
 
-===[`filter` is not ours]
+===[What an expression sees]
 
-`${filter(...)}` is an index query: it expands into several elements
-rather than into text, and [`crate::index_query`] owns it. It is
-skipped here rather than reported, because "unknown function `filter`"
-would be a lie.
+The caller's [`EvalContext`] decides: which phase, which documents, which
+macros. References resolve through its resolver, so a caller that wants
+them answered from the document @strong[as written] -- and it should -- hands
+in a resolver that returns the document from before this pass rewrote it.
 
 ===[Structs]
 
@@ -160,14 +107,9 @@ A `${...}` that could not be resolved, left in the output as written.
 
 ===[Functions]
 
-====[fn resolve_interpolations]
+====[fn resolve_expressions]
 
-Replaces every `${...}` in `doc` with the text it stands for.
-
-`config` carries the macros in scope (the document's own and the
-vault's, already merged by the caller) and `ctx` the variables --
-`self.path` and the rest. Both are the caller's to supply because this
-crate cannot read a config file or know where a document sits.
+Replaces every `${...}` in `doc` with what it stands for.
 
 ==[Module links]
 
@@ -185,17 +127,6 @@ Walks `doc` and resolves any `ref:` targets and local `@embed` targets using `re
 
 - Resolved links have their target rewritten according to `mode`.
 - Unresolved links are rewritten to the `unresolved:` scheme (e.g. `unresolved:Note Name`).
-
-==[Module macro_expand]
-
-Forward macro expansion and dollar expression evaluation.
-
-===[Functions]
-
-====[fn expand_document_macros]
-
-Expands `$macro(...)` or `${...}` expressions within element arguments (e.g. `@link($macro.https(...))`)
-using the provided [`DocumentConfig`].
 
 ==[Module macro_rewrite]
 

@@ -24,18 +24,7 @@ Delete it when the list is empty.
 1. `file:` and `https:` addresses are an error (`address.rs`); their values are undecided (`address.expr.tmt`).
 2. Open in the spec pages, decide when needed: a non-recursive `.docs`, datetime members (`.year`) and offset
    conversion, `.group` and other collection methods, an `emoji` table users can extend (`extension.expr.tmt`).
-3. `tmtroot/generated/**` is written by `twrit api` (a sibling repository; `just docs`). It was not regenerated:
-   `generated/crates/tomet-compute.tmt` is stale (the crate is `tomet-expr`) and other pages still say
-   `tomet-compute`; `generated/crates/tomet-workspace.tmt` does not know `Created` / `Instantiation` / `Unfilled`.
-4. `tmtroot/deprecated/**` still has old forms (`$gh(...)`, `${filter(...)}`, `${uuid()}`). Left alone on purpose;
-   migrate or leave, it is the owner's call.
-5. The Markdown exporter writes `@link(tmt:path)` as the bare path (HTML makes a real anchor). Same for a
-   hand-written link, so it is not specific to `.link()`.
-6. tree-sitter: a call inside a value group, `@meta{ id: ${f()} }`, errors in `scanner.c` (the scalar ends at `(`).
-   Recorded in `KNOWN_TS_ERRORS` (`tests/src/lib.rs`, `blueprints/daily-note.blueprint.tmt`). Fix the scanner or
-   leave it. Also unchecked: the CST (`tomet-syntax-parser/src/cst.rs`, `parse_interp_expr`) ends `${...}` at the
-   first matching `}`, so a `}` inside `addr(...)` would end it early.
-7. `check_field_types` (the `type: uuid` / `type: datetime` check) reaches `tomet check` and so `stats` only. Held
+3. `check_field_types` (the `type: uuid` / `type: datetime` check) reaches `tomet check` and so `stats` only. Held
    on purpose, until the LSP gets document-level diagnostics; it is two separate things, not a missing argument:
    - The LSP (`apps/lsp/src/diagnostic.rs`) never runs the document validator. It reports CST duplicate ids
      (`validate_cst`) and parse errors, and has no vault: no unknown elements, singletons, arguments, blueprint
@@ -44,14 +33,26 @@ Delete it when the list is empty.
    - The bindings (`bindings/{js,java,python}`) build their `Vault` from `PrinterConfig::default()`, so the `meta`
      type declarations are always empty. Passing the settings' source in is a small change to three public APIs.
      `tomet-edit`'s post-edit report (`diagnostics.rs`) calls `validate_document` with no config either.
-8. Not from this work, found on the way: `tomet check .` fails on 7 files of the `tmtroot` reorganization in
-    progress (`index/*.roots.tmt`, `dev/plans/roadmap.tmt`, `schema/vocabularies/writ.vocabulary.tmt`, three under
-    `deprecated/`). (The `cargo fmt --check -p tomet-validator-core` failure noted earlier is gone.)
+
+## Decided to leave (2026-10-18, by the owner)
+
+- `tmtroot/deprecated/**`: ignored. Its old forms (`$gh(...)`, `${filter(...)}`, `${uuid()}`) are not migrated, and
+  what `tomet check` and `twrit check` report about it (three of the failing files, 41 `document-placement`
+  violations, many unresolved-expression warnings) is not worked on.
+- The other failures of `tomet check .` (`index/*.roots.tmt`, `dev/plans/roadmap.tmt`,
+  `schema/vocabularies/writ.vocabulary.tmt`): ignored. They belong to the `tmtroot` reorganization in progress.
+- Seen and not touched, since a writ is the owner's: `file-io-doors` reports `crates/tomet-vault/src/lib.rs:23`, a
+  doc comment that names `std::fs` in a crate that is not a door (it predates this work). `tomet format --check .`
+  also reports `tmtroot/dev/project-layout.tmt`.
 
 ## How to work on it
 
+- `twrit` comes from the flake: `nix develop -c twrit check .` and `nix develop -c twrit api .`, which
+  regenerates `tmtroot/generated/**` (it does not delete the page of a crate that was renamed away). The sibling
+  `../twrit/target/debug/twrit` also works and gave the same results.
+
 - Build and test: `cargo test --workspace --exclude tomet-python --exclude tomet-java` (the Python and Java
-  bindings need toolchains this setup lacks). Expect about 1140 tests, all passing.
+  bindings need toolchains this setup lacks). Expect about 1170 tests, all passing.
 - Docs: `./target/debug/tomet check tmtroot/spec`, `format --check tmtroot/spec/expressions`, `export --check .`.
 - tree-sitter: edit `crates/tree-sitter-tomet/grammar.js`, then `just gen-treesitter` (pins
   `tree-sitter-cli@0.26.12`, which writes different files from nixpkgs' 0.26.11), then `just gen-treesitter-check`.

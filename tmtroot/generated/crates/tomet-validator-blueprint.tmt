@@ -1,0 +1,37 @@
+@kind(api)
+
+@meta{crate: tomet-validator-blueprint, dependencies: list(tomet-ast, tomet-parser, tomet-semantics, tomet-tree, tomet-validator-core, tomet-validator-rule), dependents: list(tomet-validator)}
+
+=[tomet-validator-blueprint]
+
+Blueprint structural validation against a target document.
+
+Extracts structural schemas (required meta keys, required sections, and section-level
+`:rule` constraints) from blueprint documents (`@kind(blueprint)`), and validates
+target documents for conformance.
+
+==[Structs]
+
+===[struct BlueprintSchema]
+
+Structural requirement extracted from a blueprint.
+
+===[struct RequiredSection]
+
+==[Functions]
+
+===[fn extract_blueprint_schema]
+
+Extracts the [`BlueprintSchema`] requirements from a blueprint document.
+
+===[fn validate_against_blueprint]
+
+Validates `doc` against `blueprint` using standard bindings.
+
+===[fn validate_against_blueprint_with]
+
+Validates `doc` against `blueprint` with explicit vocabulary `bindings`.
+
+===[fn validate_against_schema]
+
+Validates `doc` against an extracted [`BlueprintSchema`].

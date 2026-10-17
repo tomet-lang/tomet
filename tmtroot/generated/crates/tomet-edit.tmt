@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-edit, dependencies: list(tomet-ast, tomet-cst, tomet-parser, tomet-tree, tomet-validator), dependents: list(tomet, tomet-tests)}
+@meta{crate: tomet-edit, dependencies: list(tomet-address, tomet-ast, tomet-cst, tomet-parser, tomet-tree, tomet-validator), dependents: list(tomet, tomet-tests)}
 
 =[tomet-edit]
 
@@ -27,6 +27,36 @@ without fragile structured-mark nesting.
 - ("Post-Edit Diagnostics") Collaborative engines merge writes without rejecting them. [`diagnose_doc`] exports the edited
 document to source text and re-parses it with the full validator to report duplicate IDs,
 schema errors, or broken syntax after concurrent merges.
+
+==[Module address]
+
+Address-based resolution and editing operations for [`EditDoc`].
+
+Provides resolution of address strings (such as `#intro`, `#item(0)`,
+`#intro.item(1)`, `#meta.icon`, etc.) to [`NodeId`]s, attribute values,
+or text content, along with high-level mutation helpers.
+
+===[Structs]
+
+====[struct AddressPath]
+
+A parsed intra-document address path.
+
+===[Enums]
+
+====[enum BaseTarget]
+
+The base/root anchor target of an address path.
+
+====[enum Step]
+
+A traversal step along an address path.
+
+===[Functions]
+
+====[fn parse_address_path]
+
+Parses a Tomet address string into an [`AddressPath`].
 
 ==[Module diagnostics]
 
