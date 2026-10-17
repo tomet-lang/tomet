@@ -192,14 +192,6 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // `@deck.card{ title: 混在, (a)[ ... ] }`. Predates this list and has
     // nothing to do with the sigil work.
     ("syntax/sigils.tmt", &["title: 混在,"]),
-    // A missing token, which `ts_error_texts` reports as empty text, and a
-    // call inside a value group: `@meta{ uuid: ${generate.uuid()} }`. The
-    // external scanner reads `${...}` as a bare scalar and ends it at the
-    // first `(`, so `${uuid}` happens to pass and `${f()}` leaves the `()`
-    // as an error node. `interpolation` is only reachable from text
-    // positions in `grammar.js`; value positions need the scanner taught
-    // the `${` form. Highlighting only -- `tomet-parser` is right.
-    ("blueprints/daily-note.blueprint.tmt", &["()", MISSING_NODE]),
     // Two shapes at once, neither of them new. `children` and `value` are
     // alternatives in `value_group`, so a group holding a pair *and* an
     // element errors (the same limitation `syntax/sigils.tmt` records);

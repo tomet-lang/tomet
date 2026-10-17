@@ -636,3 +636,24 @@ fn an_unterminated_multi_line_expression_is_still_an_error() {
 fn a_raw_address_still_ends_at_the_line() {
     assert!(parse_document("${addr(tmt:a\n.tmt)}\n").is_err());
 }
+
+/// The CST ends `${...}` at its own closing `}`: braces inside it are
+/// counted, and a string literal is one token, so a `}` in a string does not
+/// end the expression early.
+#[test]
+fn the_cst_keeps_a_brace_inside_an_interpolation_within_it() {
+    use tomet_cst::SyntaxKind;
+    for (src, expected) in [
+        ("${\"a}b\"} tail #(x)\n", "{\"a}b\"}"),
+        ("${addr(tmt:a.tmt#x)} tail #(x)\n", "{addr(tmt:a.tmt#x)}"),
+        ("${f(\"{\")} tail\n", "{f(\"{\")}"),
+    ] {
+        let root = crate::parse_cst(src);
+        let interps: Vec<String> = root
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::INTERP_EXPR)
+            .map(|n| n.text().to_string())
+            .collect();
+        assert_eq!(interps, [expected], "{src:?}");
+    }
+}

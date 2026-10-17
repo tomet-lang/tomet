@@ -175,6 +175,17 @@ bool tree_sitter_tomet_external_scanner_scan(void *payload, TSLexer *lexer,
     return false;
   }
 
+  // `${...}` is an interpolation, not a scalar that ends at its `{`: left to
+  // the grammar's own `interpolation` rule, which is valid wherever a value
+  // is. Without this the `$` alone would be taken as the scalar and the
+  // `{...}` after it read as a second group.
+  if (lexer->lookahead == '$') {
+    lexer->advance(lexer, false);
+    if (lexer->lookahead == '{') {
+      return false;
+    }
+  }
+
   // If this starts with an identifier-shaped run, check what follows it
   // *before* committing to a scalar: a `:` right after means this is
   // actually a `map_entry` key, not a bare scalar, no matter what the rest

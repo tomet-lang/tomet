@@ -562,6 +562,44 @@ mod tests {
         assert!(find_kind(tree.root_node(), "interp_call").is_some());
     }
 
+    /// `${...}` is one `interpolation` wherever a value is, not a `$` scalar
+    /// followed by a stray `{...}` group -- which is how a value position read
+    /// it before, and with a call inside it also left an error node.
+    #[test]
+    fn interpolation_in_a_value_position_is_one_interpolation() {
+        for (src, expected) in [
+            ("@meta{ id: ${f()} }\n", 1),
+            ("@meta{ id: ${f} }\n", 1),
+            ("@meta{ ${f()} }\n", 1),
+            ("@x(${a.b})\n", 1),
+            ("@x(tags: list(${a}, b, ${c(1)}))\n", 2),
+            (
+                "@meta{\n  id: ${generate.uuid()}\n  by: ${vars.author}\n}\n",
+                2,
+            ),
+        ] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}: {}",
+                tree.root_node().to_sexp()
+            );
+            assert_eq!(
+                count_kind(tree.root_node(), "interpolation"),
+                expected,
+                "{src:?}: {}",
+                tree.root_node().to_sexp()
+            );
+        }
+    }
+
+    fn count_kind(node: Node, kind: &str) -> usize {
+        usize::from(node.kind() == kind)
+            + (0..node.named_child_count() as u32)
+                .map(|i| count_kind(node.named_child(i).unwrap(), kind))
+                .sum::<usize>()
+    }
+
     #[test]
     fn bare_non_colon_scalar_parses_cleanly() {
         // Used to be a known limitation (see `scanner.c`'s module doc for

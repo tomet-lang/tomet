@@ -743,7 +743,7 @@ module.exports = grammar({
 		// why `@id(list(a, b))`/`@meta{list(a, b)}` -- a bare `list(...)`
 		// occupying the *whole* `(args)`/`{value}` -- still errors,
 		// unlike `a: list(...)` under a named key).
-		value: ($) => choice($.map, $.string, $.scalar),
+		value: ($) => choice($.map, $.string, $.interpolation, $.scalar),
 		// Entries are separated by a comma, one-or-more newlines, or both --
 		// but never consumed by `map_entry` itself (unlike a trailing comma
 		// after the *last* entry, which belongs to whatever encloses the
@@ -848,6 +848,7 @@ module.exports = grammar({
 				$.call,
 				$.string,
 				$.braced_map,
+				$.interpolation,
 				$._value_scalar,
 				alias(/[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*/, $.scalar),
 			),

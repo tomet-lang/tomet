@@ -2158,6 +2158,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "interpolation"
+        },
+        {
+          "type": "SYMBOL",
           "name": "scalar"
         }
       ]
@@ -2353,6 +2357,10 @@
         {
           "type": "SYMBOL",
           "name": "braced_map"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "interpolation"
         },
         {
           "type": "SYMBOL",
