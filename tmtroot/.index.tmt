@@ -1,8 +1,8 @@
 @kind(doc.index)
 
 // 読む順。ここに並べた順と入れ子が、そのまま索引ページになる。
-// 手書きの @link(ref:"...") と ${filter(...)} は自由に混ぜてよい --
-// クエリは展開されると手書きと同じ @link(ref:"...") の並びになる。
+// 手書きの @link(ref:"...") と ${vault.docs.filter(...)...} は自由に混ぜてよい --
+// 式は展開されると手書きと同じ @link(...) の並びになる。
 //
 // 仕様は索引そのもの(*.index.tmt)を除く -- 目次が目次を載せても仕方がない。
 
@@ -10,12 +10,27 @@
 - @link(ref:"contributing")
 - @link(ref:"agents")
 - ドキュメント
-  - ${filter(contains(path, "docs/"), by(path))}
+  - ${vault.docs
+      .filter(d => d.path.contains("docs/"))
+      .sort(d => d.path)
+      .map(d => d.link())}
 - クレート
-  - ${filter(contains(path, "generated/"), by(path))}
+  - ${vault.docs
+      .filter(d => d.path.contains("generated/"))
+      .sort(d => d.path)
+      .map(d => d.link())}
 - 何がどこにあるか
-  - ${filter(contains(path, "tmtroot/docs/moc/"), by(path))}
+  - ${vault.docs
+      .filter(d => d.path.contains("tmtroot/docs/moc/"))
+      .sort(d => d.path)
+      .map(d => d.link())}
 - なぜあるのか
-  - ${filter(contains(path, "tmtroot/docs/why/"), by(path))}
+  - ${vault.docs
+      .filter(d => d.path.contains("tmtroot/docs/why/"))
+      .sort(d => d.path)
+      .map(d => d.link())}
 - 仕様
-  - ${filter(contains(path, "tmtroot/docs/spec/"), not(contains(filename, ".index.")), by(path))}
+  - ${vault.docs
+      .filter(d => d.path.contains("tmtroot/docs/spec/") && not(d.filename.contains(".index.")))
+      .sort(d => d.path)
+      .map(d => d.link())}
