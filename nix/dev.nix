@@ -5,8 +5,7 @@
   fenix,
   tomet,
   tomet-lsp,
-  twrit,
-  tomet-shelf,
+  tools,
   ...
 }:
 let
@@ -28,8 +27,7 @@ mkShell rec {
     #= Develop
     tomet
     tomet-lsp
-    twrit
-    tomet-shelf
+    tools
     pagefind
     just
     deno

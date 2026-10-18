@@ -38,8 +38,17 @@ flake-parts.lib.mkFlake { inherit inputs; } {
           tomet-lsp
           ;
         fenix = inputs.fenix.packages.${pkgs.stdenv.hostPlatform.system};
-        twrit = inputs.twrit.packages.${pkgs.stdenv.hostPlatform.system}.twrit;
-        tomet-shelf = inputs.tomet-shelf.packages.${pkgs.stdenv.hostPlatform.system}.tomet-shelf;
+        # The other tools; tomet itself is the one built from this checkout.
+        tools =
+          let
+            system = pkgs.stdenv.hostPlatform.system;
+            sisho = inputs.sisho.packages.${system};
+          in
+          inputs.sisho.legacyPackages.${system}.combine [
+            sisho.sisho
+            sisho.twrit
+            sisho.tomet-shelf
+          ];
       };
 
       treefmt = import ./formatter.nix {
