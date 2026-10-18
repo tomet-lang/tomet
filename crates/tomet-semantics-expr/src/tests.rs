@@ -734,6 +734,23 @@ fn a_directory_lists_the_documents_under_it() {
 }
 
 #[test]
+fn children_are_the_documents_directly_in_the_directory() {
+    // `docs` goes down into `docs/sub`; `children` does not.
+    assert_eq!(
+        in_vault("addr(dir:docs).children.map(d => d.path)").unwrap(),
+        seq(vec![text("docs/a.tmt")])
+    );
+    assert_eq!(
+        in_vault("vault.children.map(d => d.path)").unwrap(),
+        seq(vec![text("here.tmt")])
+    );
+    assert_eq!(
+        in_vault("addr(dir:docs/sub).children.len()").unwrap(),
+        int(1)
+    );
+}
+
+#[test]
 fn addr_reads_a_link_style_address() {
     assert_eq!(in_vault("addr(tmt:docs/a.tmt#top.prop.x)").unwrap(), int(7));
     assert_eq!(
@@ -893,12 +910,78 @@ fn format_wants_a_string_and_a_datetime_has_no_other_members() {
         Err(EvalError::TypeMismatch { got: "int", .. })
     ));
     assert_eq!(
-        create("vars.late.year", with_dates()),
+        create("vars.late.century", with_dates()),
         Err(EvalError::UnknownMember {
             on: "datetime",
-            member: "year".to_string()
+            member: "century".to_string()
         })
     );
+}
+
+#[test]
+fn a_datetime_has_its_parts_in_its_own_offset() {
+    // 12:30 at +09:00: the parts are the ones written, not the UTC ones.
+    for (expr, want) in [
+        ("year", 2026),
+        ("month", 6),
+        ("day", 1),
+        ("hour", 12),
+        ("minute", 30),
+        ("second", 0),
+    ] {
+        assert_eq!(
+            create(&format!("vars.late.{expr}"), with_dates()).unwrap(),
+            int(want),
+            "{expr}"
+        );
+    }
+    assert_eq!(
+        create("vars.late.offset", with_dates()).unwrap(),
+        text("+09:00")
+    );
+    assert_eq!(
+        create("vars.early.offset", with_dates()).unwrap(),
+        text("+00:00")
+    );
+    assert_eq!(
+        create("vars.late.year == 2026", with_dates()).unwrap(),
+        EvalValue::Bool(true)
+    );
+}
+
+#[test]
+fn at_gives_the_same_instant_in_another_offset() {
+    // 12:30 at +09:00 is 03:30 UTC.
+    assert_eq!(
+        create("vars.late.at(\"Z\").format(\"HH:mm\")", with_dates()).unwrap(),
+        text("03:30")
+    );
+    assert_eq!(
+        create(
+            "vars.early.at(\"-05:30\").format(\"YYYY-MM-DD HH:mm\")",
+            with_dates()
+        )
+        .unwrap(),
+        text("2025-12-31 18:30")
+    );
+    assert_eq!(
+        create("vars.late.at(\"-05:00\").offset", with_dates()).unwrap(),
+        text("-05:00")
+    );
+    // The instant is the same, so it compares equal.
+    assert_eq!(
+        create("vars.late.at(\"Z\") == vars.late", with_dates()).unwrap(),
+        EvalValue::Bool(true)
+    );
+}
+
+#[test]
+fn at_wants_an_offset() {
+    assert!(matches!(
+        create("vars.late.at(1)", with_dates()),
+        Err(EvalError::TypeMismatch { got: "int", .. })
+    ));
+    assert!(create("vars.late.at(\"Tokyo\")", with_dates()).is_err());
 }
 
 #[test]

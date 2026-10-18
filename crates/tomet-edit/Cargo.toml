@@ -13,3 +13,7 @@ tomet-cst = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-tree = { workspace = true }
 tomet-validator = { workspace = true }
+tomet-vault = { workspace = true }
+
+[dev-dependencies]
+tomet-config = { workspace = true }

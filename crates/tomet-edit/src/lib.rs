@@ -25,7 +25,8 @@
 //! - (Post-Edit Diagnostics)
 //!   | Collaborative engines merge writes without rejecting them. [`diagnose_doc`] exports the edited
 //!   | document to source text and re-parses it with the full validator to report duplicate IDs,
-//!   | schema errors, or broken syntax after concurrent merges.
+//!   | schema errors, or broken syntax after concurrent merges. [`diagnose_doc_in`] does it as a
+//!   | document of a vault: its vocabularies, the types its settings declare, its blueprint.
 
 pub mod address;
 pub mod diagnostics;
@@ -36,7 +37,7 @@ pub mod node;
 pub mod op;
 
 pub use address::{AddressPath, BaseTarget, Step, parse_address_path};
-pub use diagnostics::{PostEditReport, diagnose_doc};
+pub use diagnostics::{PostEditReport, diagnose_doc, diagnose_doc_in};
 pub use doc::EditDoc;
 pub use export::export_doc;
 pub use import::{import_cst, import_source};

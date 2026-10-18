@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-edit, dependencies: list(tomet-address, tomet-ast, tomet-cst, tomet-parser, tomet-tree, tomet-validator), dependents: list(tomet, tomet-tests)}
+@meta{crate: tomet-edit, dependencies: list(tomet-address, tomet-ast, tomet-config, tomet-cst, tomet-parser, tomet-tree, tomet-validator, tomet-vault), dependents: list(tomet, tomet-tests)}
 
 =[tomet-edit]
 
@@ -26,7 +26,8 @@ without fragile structured-mark nesting.
 [`EditOp::SetAttribute`] allows key-level manipulation of an element's `{}` data, `()` args, and `#()` id slot.
 - ("Post-Edit Diagnostics") Collaborative engines merge writes without rejecting them. [`diagnose_doc`] exports the edited
 document to source text and re-parses it with the full validator to report duplicate IDs,
-schema errors, or broken syntax after concurrent merges.
+schema errors, or broken syntax after concurrent merges. [`diagnose_doc_in`] does it as a
+document of a vault: its vocabularies, the types its settings declare, its blueprint.
 
 ==[Module address]
 
@@ -79,6 +80,16 @@ The diagnostic report of an edited document.
 
 Diagnoses an [`EditDoc`] by exporting to source, parsing with [`parse_document`],
 and running [`validate_document`].
+
+That knows `std` alone, as a document in a vault with no settings and no
+vocabularies would; [`diagnose_doc_in`] is the report for a document in a vault.
+
+====[fn diagnose_doc_in]
+
+Diagnoses an [`EditDoc`] as a document of `vault`: what `tomet check`
+finds without the disk ([`Vault::diagnostics`]) -- the vocabularies the
+document has in scope, the types the vault's settings declare for `@meta`
+fields, and the blueprint of `blueprints` that its `@kind` names.
 
 ==[Module doc]
 

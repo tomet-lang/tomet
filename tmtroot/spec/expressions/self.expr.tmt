@@ -42,16 +42,16 @@
 ディレクトリの値は、ディレクトリへの参照。`addr(dir:docs/notes)` が作る。`vault` は vault のルートのディレクトリ。
 
 @table
-|[ メンバー ][ 指すもの ]
-|[ `.docs`  ][ その下（サブディレクトリも含む）にあるすべての文書。文書の Seq ]
+|[ メンバー    ][ 指すもの ]
+|[ `.docs`     ][ その下（サブディレクトリも含む）にあるすべての文書。文書の Seq ]
+|[ `.children` ][ そのディレクトリの直下にある文書だけ。サブディレクトリの中は含まない。文書の Seq ]
 
 ```tm
 ${vault.docs}
 ${addr(dir:docs/notes).docs}
+${addr(dir:docs/notes).children}
 ```
 
+`.docs` と `.children` は別の名前で持つ。片方をもう片方の意味で読まないため（`.path` と `.filename` を分けたのと同じ理由）。
+
 文書の集まりを絞り込み、並べ、リンクにする方法は @file(tmtroot/spec/expressions/filter.expr.tmt)。
-
-=[ まだ決まっていないこと ]
-
-- `.docs` の絞り込みに使う、非再帰の指定。

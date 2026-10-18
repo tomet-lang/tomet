@@ -161,6 +161,7 @@ fn member_value(value: EvalValue, member: &str, cx: &EvalContext) -> Result<Eval
         EvalValue::Document(doc) => nodes::document_member(doc, member, cx),
         EvalValue::Node { doc, node } => nodes::node_member(doc, node, member),
         EvalValue::Directory(dir) => nodes::directory_member(dir, member, cx),
+        EvalValue::DateTime(value) => datetime::member(value, member),
         EvalValue::Map(entries) => entries
             .iter()
             .find(|(k, _)| k == member)

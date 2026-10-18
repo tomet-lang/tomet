@@ -89,6 +89,22 @@ pub(crate) fn call_method(
                 value, &format,
             )))
         }
+        (EvalValue::DateTime(value), "at") => {
+            let [offset] = take::<1>(member, args)?;
+            let EvalValue::String(offset) = offset else {
+                return Err(EvalError::mismatch(
+                    "`.at`",
+                    "an offset string such as \"+09:00\"",
+                    offset.type_name(),
+                ));
+            };
+            let offset = super::datetime::parse_offset(&offset).ok_or_else(|| {
+                EvalError::message(format!(
+                    "`.at` wants an offset such as \"+09:00\" or \"Z\", not `{offset}`"
+                ))
+            })?;
+            Ok(EvalValue::DateTime(value.to_offset(offset)))
+        }
         (EvalValue::Map(entries), "get") => {
             let [key, default] = take::<2>(member, args)?;
             let EvalValue::String(key) = key else {

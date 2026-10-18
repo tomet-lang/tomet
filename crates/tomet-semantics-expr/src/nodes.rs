@@ -28,6 +28,30 @@ fn filename(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }
 
+/// The directory a path is in; the vault root (`""`) for a path with no `/`.
+fn parent_dir(path: &str) -> &str {
+    path.rsplit_once('/').map_or("", |(dir, _)| dir)
+}
+
+/// The documents under `dir` that `keep` lets through, as a list.
+fn directory_docs(
+    dir: &DirRef,
+    cx: &EvalContext,
+    keep: impl Fn(&DocRef) -> bool,
+) -> Result<EvalValue, EvalError> {
+    cx.resolver
+        .dir_docs(dir)
+        .map(|docs| {
+            EvalValue::Seq(
+                docs.into_iter()
+                    .filter(|doc| keep(doc))
+                    .map(EvalValue::Document)
+                    .collect(),
+            )
+        })
+        .map_err(|why| EvalError::Unresolved(format!("directory `{}`: {why}", dir.0)))
+}
+
 // ---- finding a node by id ----------------------------------------------------
 
 /// The node with unique id `id`: an element, a section or a list.
@@ -347,11 +371,8 @@ pub(crate) fn directory_member(
     cx: &EvalContext,
 ) -> Result<EvalValue, EvalError> {
     match member {
-        "docs" => cx
-            .resolver
-            .dir_docs(dir)
-            .map(|docs| EvalValue::Seq(docs.into_iter().map(EvalValue::Document).collect()))
-            .map_err(|why| EvalError::Unresolved(format!("directory `{}`: {why}", dir.0))),
+        "docs" => directory_docs(dir, cx, |_| true),
+        "children" => directory_docs(dir, cx, |doc| parent_dir(&doc.0) == dir.0),
         _ => Err(EvalError::UnknownMember {
             on: "directory",
             member: member.to_string(),

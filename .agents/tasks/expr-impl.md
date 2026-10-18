@@ -1,8 +1,8 @@
-# Expression language: what is left
+# Expression language: what is left (nothing to build)
 
 The `$` expression language is designed (`tmtroot/spec/expressions/`, 12 pages) and implemented. This file is
-the list of what remains, so the work can be picked up from here without the conversation that produced it.
-Delete it when the list is empty.
+the record of what was settled and what was left alone on purpose.
+Delete it once the "Decided to leave" notes have a home in a writ or a spec page.
 
 ## State
 
@@ -21,12 +21,17 @@ Delete it when the list is empty.
 
 ## Remaining
 
-1. `file:` and `https:` addresses are an error (`address.rs`); their values are undecided (`address.expr.tmt`).
-2. Open in the spec pages, decide when needed: a non-recursive `.docs`, datetime members (`.year`) and offset
-   conversion, `.group` and other collection methods, an `emoji` table users can extend (`extension.expr.tmt`).
-3. `tomet-edit`'s post-edit report (`diagnostics.rs`) calls `validate_document` with no config, so the `meta`
-   `type:` declarations are not checked there. (The bindings take the settings and blueprints now:
-   `tmtroot/spec/bindings/validate.tmt`.)
+Nothing is being built. Settled on 2026-10-18 and written into the spec pages:
+
+- `file:` and `https:` addresses are not values (an error, by decision): `address.expr.tmt`.
+- A list has no source spelling for an id: `address.expr.tmt`.
+- `.children` (direct documents of a directory) next to `.docs`: `self.expr.tmt`.
+- Datetime `.year .month .day .hour .minute .second .offset` and `.at(offset)`: `types.expr.tmt`.
+- The bindings take settings and blueprints (`tmtroot/spec/bindings/validate.tmt`); `tomet-edit` has
+  `diagnose_doc_in` for a document in a vault.
+
+Open in the spec pages and left open on purpose, decide when a use appears: `.group` and other collection
+methods, a user-extensible `emoji` table, adding functions and macros as a language feature.
 
 ## Decided to leave (2026-10-18, by the owner)
 

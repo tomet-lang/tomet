@@ -2193,10 +2193,12 @@ version = "0.1.0"
 dependencies = [
  "tomet-address",
  "tomet-ast",
+ "tomet-config",
  "tomet-cst",
  "tomet-parser",
  "tomet-tree",
  "tomet-validator",
+ "tomet-vault",
 ]
 
 [[package]]

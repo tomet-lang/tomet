@@ -3,6 +3,9 @@
 use time::{Date, Month, OffsetDateTime, PrimitiveDateTime, Time, UtcOffset};
 use tomet_semantics::datetime::{parse_datetime_parts, parse_offset_seconds};
 
+use super::error::EvalError;
+use super::value::EvalValue;
+
 /// Reads a date, or a date and a time, as a datetime.
 ///
 /// What text reads as one is `tomet_semantics::datetime`'s to say -- the same
@@ -27,6 +30,34 @@ pub fn parse_datetime(text: &str) -> Option<OffsetDateTime> {
 /// Reads a UTC offset written `+09:00`, `-05:30` or `Z`. `None` for anything else.
 pub fn parse_offset(text: &str) -> Option<UtcOffset> {
     UtcOffset::from_whole_seconds(parse_offset_seconds(text)?).ok()
+}
+
+/// `value.member` for a datetime, without a call: the parts of the value as
+/// it is written, in its own offset. `.year` and the rest are integers;
+/// `.offset` is text, `+09:00`, and `+00:00` for UTC.
+pub(crate) fn member(value: &OffsetDateTime, member: &str) -> Result<EvalValue, EvalError> {
+    Ok(match member {
+        "year" => EvalValue::Int(i64::from(value.year())),
+        "month" => EvalValue::Int(i64::from(u8::from(value.month()))),
+        "day" => EvalValue::Int(i64::from(value.day())),
+        "hour" => EvalValue::Int(i64::from(value.hour())),
+        "minute" => EvalValue::Int(i64::from(value.minute())),
+        "second" => EvalValue::Int(i64::from(value.second())),
+        "offset" => EvalValue::String(offset_text(value.offset())),
+        _ => {
+            return Err(EvalError::UnknownMember {
+                on: "datetime",
+                member: member.to_string(),
+            });
+        }
+    })
+}
+
+/// An offset as `+09:00`; the sign is always written.
+fn offset_text(offset: UtcOffset) -> String {
+    let minutes = offset.whole_minutes();
+    let sign = if minutes < 0 { '-' } else { '+' };
+    format!("{sign}{:02}:{:02}", minutes.abs() / 60, minutes.abs() % 60)
 }
 
 /// Writes `value` with `format`. The symbols are `YYYY` `YY` `MM` (month)
