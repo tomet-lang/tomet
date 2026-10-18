@@ -1,4 +1,5 @@
-use std::path::{Path, PathBuf};
+use std::io::{self, Write};
+use std::path::Path;
 
 use tomet_load::{Findings, is_error};
 
@@ -11,7 +12,7 @@ use crate::util::{format_parse_error, read};
 /// -- while the js/java/python bindings and `apps/web` all ran the
 /// validator. Vocabularies have to be read from disk, which is why the
 /// resolving lives here and not in the validator.
-pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyhow::Result<()> {
+pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow::Result<()> {
     if data {
         if !path.is_file() {
             return Err(anyhow::anyhow!(
@@ -39,12 +40,15 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
     // seven files times eighty-five documents -- which is why the front
     // door has a vault and a per-document call rather than one function.
     let vault = tomet_load::Vault::discover(path);
-    for problem in &vault.vocabulary_errors {
-        eprintln!("warning: {problem}");
+    if !vault.vocabulary_errors.is_empty() {
+        let mut err_out = io::stderr().lock();
+        for problem in &vault.vocabulary_errors {
+            let _ = writeln!(err_out, "warning: {problem}");
+        }
     }
 
     let files = if path.is_file() {
-        vec![path.clone()]
+        vec![path.to_path_buf()]
     } else if path.is_dir() {
         tomet_indexer::collect_tm_files_with_config(path, &vault.config, &vault.root)
     } else {
@@ -54,11 +58,12 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
     let mut checked = 0usize;
     let mut failed = 0usize;
     let mut warned = 0usize;
-    let mut json_files: Vec<serde_json::Value> = Vec::new();
+    let mut json_files: Vec<serde_json::Value> = Vec::with_capacity(if json { files.len() } else { 0 });
 
+    let mut err_out = io::stderr().lock();
     for file in &files {
         let Ok(src) = std::fs::read_to_string(file) else {
-            eprintln!("could not read {}", file.display());
+            let _ = writeln!(err_out, "could not read {}", file.display());
             failed += 1;
             continue;
         };
@@ -80,7 +85,7 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
                         }
                     }));
                 } else {
-                    report_parse_error(file, &src, &err, false);
+                    let _ = writeln!(err_out, "{}", format_parse_error(file, &src, &err));
                 }
                 failed += 1;
                 continue;
@@ -110,7 +115,8 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
             }
         } else {
             for u in &unresolved {
-                eprintln!(
+                let _ = writeln!(
+                    err_out,
                     "{}:{}: warning: {}",
                     file.display(),
                     index.line_col(u.span.start).line,
@@ -128,26 +134,29 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
         }
 
         if json {
+            let error_list: Vec<serde_json::Value> = diagnostics
+                .iter()
+                .map(|d| serde_json::json!({
+                    "message": d.message_in(&index),
+                    "severity": if is_error(d) { "error" } else { "warning" },
+                }))
+                .collect();
             json_files.push(serde_json::json!({
                 "file": file.display().to_string(),
-                "errors": diagnostics
-                    .iter()
-                    .map(|d| serde_json::json!({
-                        "message": d.message_in(&index),
-                        "severity": if is_error(d) { "error" } else { "warning" },
-                    }))
-                    .collect::<Vec<_>>(),
+                "errors": error_list,
             }));
         } else {
             for d in &diagnostics {
                 let label = if is_error(d) { "" } else { "warning: " };
-                eprintln!("{}: {label}{}", file.display(), d.message_in(&index));
+                let _ = writeln!(err_out, "{}: {label}{}", file.display(), d.message_in(&index));
             }
         }
     }
+    drop(err_out);
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&json_files)?);
+        let mut out = io::stdout().lock();
+        writeln!(out, "{}", serde_json::to_string_pretty(&json_files)?)?;
     }
 
     if failed > 0 {
@@ -160,15 +169,16 @@ pub(crate) fn check(path: &PathBuf, data: bool, quiet: bool, json: bool) -> anyh
         // The count is printed on a green run too. A document with gaps
         // still passes, and saying so is the only way the marks stay
         // visible rather than becoming decoration.
+        let mut out = io::stdout().lock();
         let gaps = if warned > 0 {
             format!(" ({warned} warning(s))")
         } else {
             String::new()
         };
         if files.len() == 1 {
-            println!("OK{gaps}");
+            writeln!(out, "OK{gaps}")?;
         } else {
-            println!("OK: {checked} file(s){gaps}");
+            writeln!(out, "OK: {checked} file(s){gaps}")?;
         }
     }
     Ok(())
@@ -198,6 +208,7 @@ fn report_parse_error(file: &Path, src: &str, err: &tomet_parser::Error, json: b
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::PathBuf;
 
     fn vault(name: &str) -> PathBuf {
         let dir =

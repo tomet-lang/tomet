@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
+use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 
 use tomet_stats::{LinkKind, Stats, measure};
@@ -144,11 +146,12 @@ fn collect_report(path: &Path) -> anyhow::Result<(Report, usize)> {
 /// is out -- the convention `check` already follows.
 pub(crate) fn stats_cmd(path: &Path, json: bool) -> anyhow::Result<()> {
     let (report, files) = collect_report(path)?;
+    let mut out = io::stdout().lock();
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&to_json(&report))?);
+        writeln!(out, "{}", serde_json::to_string_pretty(&to_json(&report))?)?;
     } else {
-        print!("{}", render(&report));
+        out.write_all(render(&report).as_bytes())?;
     }
 
     if report.failed() > 0 {
@@ -264,11 +267,11 @@ fn columns_of(stats: &Stats) -> [usize; 5] {
 /// The table follows `scc`'s shape -- a row per category, a column per
 /// measure, rules between the header, the rows and the total.
 fn render(report: &Report) -> String {
-    let rows: Vec<(String, [usize; 5])> = report
+    let rows: Vec<(&str, [usize; 5])> = report
         .kinds
         .iter()
         .map(|(kind, stats)| {
-            let label = kind.clone().unwrap_or_else(|| KIND_NONE.to_string());
+            let label = kind.as_deref().unwrap_or(KIND_NONE);
             (label, columns_of(stats))
         })
         .collect();
@@ -294,32 +297,36 @@ fn render(report: &Report) -> String {
     let line_width = label_width + widths.iter().map(|w| w + 2).sum::<usize>();
     let rule = "─".repeat(line_width);
 
-    let row = |label: &str, cells: Option<&[usize; 5]>| {
+    let mut out = String::with_capacity(1024);
+    let append_row = |out: &mut String, label: &str, cells: Option<&[usize; 5]>| {
         let pad = label_width - label.chars().count();
-        let mut line = format!("{label}{}", " ".repeat(pad));
+        let _ = write!(out, "{label}{}", " ".repeat(pad));
         for (i, width) in widths.iter().enumerate() {
-            let cell = match cells {
-                Some(cells) => group(cells[i]),
-                None => COLUMNS[i].to_string(),
-            };
-            line.push_str(&format!("  {cell:>width$}"));
+            match cells {
+                Some(cells) => {
+                    let cell = group(cells[i]);
+                    let _ = write!(out, "  {cell:>width$}");
+                }
+                None => {
+                    let col = COLUMNS[i];
+                    let _ = write!(out, "  {col:>width$}");
+                }
+            }
         }
-        line.push('\n');
-        line
+        out.push('\n');
     };
 
-    let mut out = String::new();
     out.push_str(&rule);
     out.push('\n');
-    out.push_str(&row(KIND_HEADER, None));
+    append_row(&mut out, KIND_HEADER, None);
     out.push_str(&rule);
     out.push('\n');
     for (label, cells) in &rows {
-        out.push_str(&row(label, Some(cells)));
+        append_row(&mut out, label, Some(cells));
     }
     out.push_str(&rule);
     out.push('\n');
-    out.push_str(&row(KIND_TOTAL, Some(&total)));
+    append_row(&mut out, KIND_TOTAL, Some(&total));
     out.push_str(&rule);
     out.push('\n');
 

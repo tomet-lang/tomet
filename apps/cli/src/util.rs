@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub(crate) fn format_parse_error(path: &Path, src: &str, err: &tomet_parser::Error) -> String {
     let line_num = err.line;
@@ -32,7 +32,7 @@ pub(crate) fn format_parse_error(path: &Path, src: &str, err: &tomet_parser::Err
 /// Pandoc bridge depends on: `pandoc -t json x.docx | tomet from-pandoc -`
 /// has nowhere to put a temporary file. Nothing else changes -- a real
 /// path is still read from disk.
-pub(crate) fn read(file: &PathBuf) -> anyhow::Result<String> {
+pub(crate) fn read(file: &Path) -> anyhow::Result<String> {
     if is_stdin(file) {
         let mut buf = String::new();
         std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf)?;

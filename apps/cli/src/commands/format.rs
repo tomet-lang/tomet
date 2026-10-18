@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 /// Formats one file's source through the config that governs it.
@@ -56,11 +57,12 @@ pub(crate) fn format_cmd(
     if paths.len() == 1 && paths[0].is_file() && !write && !check {
         let src = fs::read_to_string(&paths[0])?;
         let formatted = format_file(&paths[0], &src);
-        print!("{formatted}");
+        let mut out = io::stdout().lock();
+        out.write_all(formatted.as_bytes())?;
         return Ok(());
     }
 
-    let mut files = Vec::new();
+    let mut files = Vec::with_capacity(paths.len());
     let mut skipped = 0usize;
     for path in paths {
         if path.is_file() {
@@ -99,8 +101,9 @@ pub(crate) fn format_cmd(
         if unformatted.is_empty() {
             return Ok(());
         }
+        let mut out = io::stdout().lock();
         for file in &unformatted {
-            println!("{}", file.display());
+            writeln!(out, "{}", file.display())?;
         }
         return Err(anyhow::anyhow!(
             "{} of {} file(s) not formatted",
@@ -111,6 +114,7 @@ pub(crate) fn format_cmd(
 
     if write {
         let mut changed = 0;
+        let mut out = io::stdout().lock();
         for file in &files {
             match fs::read_to_string(file) {
                 Ok(src) => {
@@ -121,7 +125,7 @@ pub(crate) fn format_cmd(
                     match fs::write(file, formatted) {
                         Ok(()) => {
                             if files.len() > 1 || paths[0].is_dir() {
-                                println!("{}", file.display());
+                                writeln!(out, "{}", file.display())?;
                             }
                             changed += 1;
                         }
@@ -132,16 +136,17 @@ pub(crate) fn format_cmd(
             }
         }
         if files.len() > 1 || paths[0].is_dir() {
-            println!("Formatted {changed} of {} file(s).", files.len());
+            writeln!(out, "Formatted {changed} of {} file(s).", files.len())?;
         }
         return Ok(());
     }
 
+    let mut out = io::stdout().lock();
     for file in &files {
         let src = fs::read_to_string(file)?;
         let formatted = format_file(file, &src);
-        println!("==> {} <==", file.display());
-        print!("{formatted}");
+        writeln!(out, "==> {} <==", file.display())?;
+        out.write_all(formatted.as_bytes())?;
     }
     Ok(())
 }
