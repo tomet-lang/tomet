@@ -35,3 +35,16 @@ def format(source: str) -> str:
 def validate(source: str) -> list[dict[str, Any]]:
     """Validate .tmt source text and return a list of validation errors."""
     ...
+
+def validate_with(
+    source: str,
+    vocabularies: list[str],
+    config: str | None = None,
+    blueprints: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Validate .tmt source text the way `tomet check` does, given the pieces of
+    the vault as source text: vocabularies, the settings (`config`) and blueprints.
+
+    Settings that do not parse raise ValueError; a vocabulary or blueprint that
+    does not is skipped. An expression that reaches another document is not reported."""
+    ...

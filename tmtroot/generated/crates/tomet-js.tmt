@@ -80,21 +80,35 @@ Format `.tmt` source text with lossless whitespace hygiene and span preservation
 
 Validate `.tmt` source text and return an array of validation diagnostics.
 
+This is [`validate_with`] with nothing passed: `std` alone, the default
+settings, no blueprint.
+
 ===[fn validate_with]
 
-Validate `.tmt` source text against `std` plus the vocabularies given
-as source text.
+Validate `.tmt` source text the way `tomet check` does, given the pieces
+of the vault as source text.
 
-A host that has the vault's `@vocabulary(...)` files can pass their
-contents here. Without them, `validate` knows only `std`, so every
-element a vocabulary declares comes back as unknown -- correct, since
-nothing said it existed, but not useful in an editor that could have
-said so.
+A host that has the vault's files can pass their contents. Without them,
+`validate` knows only `std`, so every element a vocabulary declares comes
+back as unknown -- correct, since nothing said it existed, but not useful
+in an editor that could have said so.
 
-A source that does not parse, carries no `@vocabulary(ns)` header, or
-claims a reserved or already-taken namespace is skipped: it declares no
-namespace, so there is nothing to bind. `doc.index` is always known, as
-it is to the CLI. Check vocabularies themselves with `tomet check`.
+- `vocabularies`: `@vocabulary(ns)` documents. A source that does not
+
+parse, carries no header, or claims a reserved or already-taken
+namespace is skipped: it declares no namespace, so there is nothing to
+bind. `doc.index` is always known, as it is to the CLI.
+
+- `options.config`: the settings. They declare the `type:` of `@meta`
+
+fields, which is what is checked. One that does not parse is an error.
+
+- `options.blueprints`: a document is checked against the one for its
+
+`@kind`. One that does not parse is skipped.
+
+An expression that reaches another document is not reported: none is
+given to reach. Check vocabularies themselves with `tomet check`.
 
 ===[fn highlight_spans]
 

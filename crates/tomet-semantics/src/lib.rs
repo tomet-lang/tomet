@@ -59,7 +59,7 @@ pub use data::element_data;
 pub use elements::config::{DocumentConfig, ExportType, document_config};
 pub use elements::footnote::{self, FootnoteItem, FootnoteRegistry};
 pub use elements::heading::heading_level;
-pub use elements::meta::{document_kind, document_meta, document_version};
+pub use elements::meta::{document_blueprint, document_kind, document_meta, document_version};
 pub use elements::table::{TableCell, TableRow, parse_table_rows};
 pub use elements::tag::{self, extract_tags};
 pub use elements::target::{

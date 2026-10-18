@@ -2635,6 +2635,7 @@ dependencies = [
  "tomet-search",
  "tomet-semantics",
  "tomet-transform",
+ "tomet-validator",
 ]
 
 [[package]]

@@ -50,33 +50,16 @@ impl Vault {
     /// itself is not changed, so the spans in the findings are the ones in the
     /// text the caller has.
     pub fn findings(&self, path: &Path, doc: &Document) -> Findings {
-        let bindings = self.bindings(doc);
-        let mut diagnostics = tomet_validator::validate_document_with(doc, &bindings);
-
-        // The settings' `type:` declarations, which the validator is handed
-        // as plain data -- it sits below the crate that reads settings.
-        let field_types = self
-            .config
-            .meta
-            .fields
-            .iter()
-            .filter_map(|(name, field)| Some((name.clone(), field.field_type.clone()?)))
-            .collect();
-        tomet_validator::check_field_types(doc, &field_types, &mut diagnostics);
-
-        if let Some(kind) = tomet_semantics::document_kind(doc)
-            && kind != "blueprint"
-            && let Some(blueprint_path) =
+        // The blueprint for the document's kind, if the vault declares one:
+        // the one part of the check that needs the disk.
+        let blueprint = tomet_semantics::document_kind(doc)
+            .filter(|kind| kind != "blueprint")
+            .and_then(|kind| {
                 tomet_workspace::blueprint::find_blueprint(&self.root, &kind, &self.config)
-            && let Ok(src) = std::fs::read_to_string(&blueprint_path)
-            && let Ok(blueprint_doc) = tomet_parser::parse_document(&src)
-        {
-            diagnostics.extend(tomet_validator::validate_against_blueprint_with(
-                doc,
-                &blueprint_doc,
-                &bindings,
-            ));
-        }
+            })
+            .and_then(|path| std::fs::read_to_string(path).ok())
+            .and_then(|src| tomet_parser::parse_document(&src).ok());
+        let diagnostics = self.diagnostics(doc, blueprint.as_slice());
 
         // A `${...}` with no value is not an error: a document showing one
         // as an example is a legitimate document, and `export` leaves it

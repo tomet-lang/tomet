@@ -65,6 +65,29 @@ pub fn document_kind(doc: &Document) -> Option<String> {
     found
 }
 
+/// The kind of document a blueprint is for: what its `@blueprint(X)` names,
+/// as `@blueprint(X)` or `@blueprint(target: X)`. `None` for a document that
+/// is not a blueprint.
+pub fn document_blueprint(doc: &Document) -> Option<String> {
+    let mut found = None;
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        if found.is_some() || classify_std_lenient(el) != ElementKind::Blueprint {
+            return;
+        }
+        let Some(args) = normalized_element_args(el) else {
+            return;
+        };
+        found = match args.as_str() {
+            Some(name) => Some(name.to_string()),
+            None => args
+                .get("target")
+                .and_then(|v| v.as_str())
+                .map(str::to_string),
+        };
+    });
+    found
+}
+
 /// Returns this document's declared language/syntax version (e.g. `"1.0"`),
 /// resolved strictly from top-level `@version(...)` / `<version>(...)` elements.
 pub fn document_version(doc: &Document) -> Option<String> {
@@ -103,6 +126,28 @@ fn value_to_version_string(v: &Value) -> String {
 mod tests {
     use super::*;
     use tomet_parser::parse_document;
+
+    #[test]
+    fn a_blueprint_names_the_kind_it_is_for() {
+        for src in [
+            "@blueprint(daily-note)\n",
+            "@kind(blueprint)\n@blueprint(daily-note)\n\n=[ Tasks ]\n",
+            "@blueprint(target: daily-note)\n",
+        ] {
+            let doc = parse_document(src).unwrap();
+            assert_eq!(
+                document_blueprint(&doc).as_deref(),
+                Some("daily-note"),
+                "{src:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_document_that_is_not_a_blueprint_names_no_kind() {
+        let doc = parse_document("@kind(note)\n\n=[ Title ]\n").unwrap();
+        assert_eq!(document_blueprint(&doc), None);
+    }
 
     #[test]
     fn finds_meta_value_from_a_meta_element() {

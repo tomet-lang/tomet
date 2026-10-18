@@ -1,0 +1,54 @@
+@meta{
+  id: bindings.validate
+}
+
+JS・Java・Python の `validate`: vault をディスクではなくソース文字列で受け取り、`tomet check` と同じ検査をする。
+
+状態: 実装済み。ただし、末尾の「現状の実装との差」にある点を除く。
+
+=[ 何を渡せるか ]
+
+バインディングはディスクを読まない（ブラウザで動く JS はそもそも読めない）。`tomet check` が vault から拾うものを、呼び出し側がソース文字列で渡す。
+
+@table
+|[ 渡すもの       ][ 何のため ]
+|[ 語彙           ][ 文書が使う `@vocabulary(ns)` の文書。渡さなければ `std` だけを知っていて、語彙の要素はすべて未知になる ]
+|[ 設定           ][ 設定の文書（`default.config.tmt` が持つもの）。`meta` の `type:` 宣言を与え、`uuid` と `datetime` のフィールドの形を調べさせる ]
+|[ ブループリント ][ `@blueprint(kind)` の文書。文書の `@kind` と一致するものに適合するかを調べる ]
+
+入口は、言語ごとに名前が違う。
+
+@table
+|[ 言語   ][ 入口 ]
+|[ JS     ][ `validate(source)` と `validateWith(source, vocabularies, { config, blueprints })` ]
+|[ Python ][ `validate(source)` と `validate_with(source, vocabularies, config=None, blueprints=None)` ]
+|[ Java   ][ `validateJson(source)`、`validateJsonWith(source, vocabulariesJson)`、`validateJsonWithSettings(source, vocabulariesJson, config, blueprintsJson)`。配列は JSON 文字列、`null` は「渡さない」 ]
+
+`validate(source)` は、何も渡さない `validateWith` と同じ。
+
+=[ 何を調べるか ]
+
+`Vault::diagnostics`（@file(tmtroot/spec/cli/check.tmt) の「何を調べるか」から、ディスクを要るものを除いたもの）。
+
+- 構文の検査、名前空間、一つしか置けない要素、同一文書内のアンカー、`doc.index` は常に知っている。
+- 渡した設定が宣言する `type:` に、`@meta` のフィールドが合っているか。
+- 渡したブループリントのうち、文書の `@kind` を名指すものに適合しているか。`@kind` が `blueprint` の文書は、ブループリントを当てない。
+
+3つの入口と、CLI・LSP の `Vault::findings` は、同じ `Vault::diagnostics` を呼ぶ。`validate_sources` が、ソース文字列を `Vault` に組み立てる共通の部分。
+
+=[ 失敗の扱い ]
+
+- 検査する文書が構文として読めなければ、エラー（JS は例外、Python は `ValueError`、Java は `TometException`）。
+- 設定が読めなければ、同じくエラー。黙って既定の設定で検査すると、`type:` の検査が何も言わずに外れる。
+- 読めない語彙とブループリントは、読み飛ばす。そのものの検査は `tomet check` の仕事。
+
+=[ 現状の実装との差 ]
+
+- 他の文書に届く式（`${doc#id}`、`include`）は報告しない。届く先の文書を渡す手段がない。
+- Java の名前は、既存の `validateJsonWith` の延長で `validateJsonWithSettings` とした。他の言語の `validateWith` とは揃っていない。
+- `tomet-edit` の編集後の報告（`diagnostics.rs`）は、設定を受け取らない。
+
+=[ まだ決まっていないこと ]
+
+- 他の文書を渡して、届く式も調べさせるか。
+- 設定を、ソース文字列でなく構造として渡せるようにするか。

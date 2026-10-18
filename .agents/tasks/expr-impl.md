@@ -24,10 +24,9 @@ Delete it when the list is empty.
 1. `file:` and `https:` addresses are an error (`address.rs`); their values are undecided (`address.expr.tmt`).
 2. Open in the spec pages, decide when needed: a non-recursive `.docs`, datetime members (`.year`) and offset
    conversion, `.group` and other collection methods, an `emoji` table users can extend (`extension.expr.tmt`).
-3. The bindings (`bindings/{js,java,python}`) build their `Vault` from `PrinterConfig::default()`, so the `meta`
-   `type:` declarations are always empty there and `check_field_types` finds nothing. Passing the settings' source in
-   is a small change to three public APIs. `tomet-edit`'s post-edit report (`diagnostics.rs`) calls
-   `validate_document` with no config either.
+3. `tomet-edit`'s post-edit report (`diagnostics.rs`) calls `validate_document` with no config, so the `meta`
+   `type:` declarations are not checked there. (The bindings take the settings and blueprints now:
+   `tmtroot/spec/bindings/validate.tmt`.)
 
 ## Decided to leave (2026-10-18, by the owner)
 

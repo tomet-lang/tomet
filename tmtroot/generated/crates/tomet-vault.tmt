@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-vault, dependencies: list(tomet-ast, tomet-config, tomet-expr, tomet-parser, tomet-search, tomet-semantics, tomet-transform), dependents: list(tomet, tomet-load)}
+@meta{crate: tomet-vault, dependencies: list(tomet-ast, tomet-config, tomet-expr, tomet-parser, tomet-search, tomet-semantics, tomet-transform, tomet-validator), dependents: list(tomet, tomet-load)}
 
 =[tomet-vault]
 
@@ -58,3 +58,29 @@ A vault's config and the vocabularies it declares, resolved once.
 "Vault" is the directory the config file sits in. Whether `root` names
 a directory that exists is not this type's concern; it only decides
 what `${self.path}` is measured from.
+
+==[Functions]
+
+===[fn validate_sources]
+
+Validates `source` the way a host with no disk can: what `tomet check` says
+of it, given the vault's pieces as text.
+
+- `vocabularies`: `@vocabulary(ns)` documents. One that does not parse, has
+
+no header, or claims a reserved or already-taken namespace is skipped: it
+binds no namespace.
+
+- `config`: the settings, as a config document (what `default.config.tmt`
+
+holds). Without it the defaults are used, and nothing declares a `type:`.
+One that does not parse is an error: a host that passes settings means
+them.
+
+- `blueprints`: `@blueprint(kind)` documents. A document is checked against
+
+the one for its `@kind`, if there is one. One that does not parse is
+skipped.
+
+An expression that reaches another document is not reported, since no
+document is given to reach: it would come back unresolved every time.

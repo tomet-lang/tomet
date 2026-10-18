@@ -199,29 +199,62 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_format(
         .unwrap_or(std::ptr::null_mut())
 }
 
+/// A string that may be `null` on the Java side, as `None`.
+fn get_optional_string(env: &mut JNIEnv, j_str: &JString) -> Result<Option<String>, String> {
+    if j_str.is_null() {
+        return Ok(None);
+    }
+    get_string(env, j_str).map(Some)
+}
+
+/// A JSON array of strings that may be `null` on the Java side, as a list.
+fn get_string_list(env: &mut JNIEnv, json: &JString) -> Result<Vec<String>, String> {
+    match get_optional_string(env, json)? {
+        Some(text) => serde_json::from_str(&text).map_err(|e| e.to_string()),
+        None => Ok(Vec::new()),
+    }
+}
+
+/// Validates `source` with what the host passed, and gives the diagnostics as
+/// a JSON string: the one place the three `validate*` entry points do it.
+fn validate_json(
+    env: &mut JNIEnv,
+    source: &JString,
+    vocabularies_json: &JString,
+    config: &JString,
+    blueprints_json: &JString,
+) -> jstring {
+    let result = (|| -> Result<String, String> {
+        let source = get_string(env, source)?;
+        let vocabularies = get_string_list(env, vocabularies_json)?;
+        let config = get_optional_string(env, config)?;
+        let blueprints = get_string_list(env, blueprints_json)?;
+        let diagnostics =
+            tomet::vault::validate_sources(&source, &vocabularies, config.as_deref(), &blueprints)?;
+        serde_json::to_string(&diagnostics).map_err(|e| e.to_string())
+    })();
+    match result {
+        Ok(json) => env
+            .new_string(json)
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut()),
+        Err(e) => throw_err(env, e),
+    }
+}
+
 /// Validate `.tmt` source text and return a JSON list of validation errors.
+///
+/// `std` alone, the default settings, no blueprint: `validateJsonWithSettings`
+/// with nothing passed.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_org_tomet_tomet_Tomet_validateJson(
     mut env: JNIEnv,
     _class: JClass,
     source: JString,
 ) -> jstring {
-    let src = match get_string(&mut env, &source) {
-        Ok(s) => s,
-        Err(e) => return throw_err(&mut env, e),
-    };
-    let doc = match parse(&src) {
-        Ok(d) => d,
-        Err(e) => return throw_err(&mut env, e),
-    };
-    let diagnostics = tomet::validator::validate_document(&doc);
-    let json = match serde_json::to_string(&diagnostics) {
-        Ok(j) => j,
-        Err(e) => return throw_err(&mut env, e),
-    };
-    env.new_string(json)
-        .map(|s| s.into_raw())
-        .unwrap_or(std::ptr::null_mut())
+    // `null` for each of the three things that were not passed.
+    let none = JString::from(jni::objects::JObject::null());
+    validate_json(&mut env, &source, &none, &none, &none)
 }
 
 /// Validate `.tmt` source text against `std` plus vocabularies passed as
@@ -240,39 +273,34 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_validateJsonWith(
     source: JString,
     vocabularies_json: JString,
 ) -> jstring {
-    let src = match get_string(&mut env, &source) {
-        Ok(s) => s,
-        Err(e) => return throw_err(&mut env, e),
-    };
-    let vocab_json = match get_string(&mut env, &vocabularies_json) {
-        Ok(s) => s,
-        Err(e) => return throw_err(&mut env, e),
-    };
-    let vocabularies: Vec<String> = match serde_json::from_str(&vocab_json) {
-        Ok(v) => v,
-        Err(e) => return throw_err(&mut env, e),
-    };
-    let labels: Vec<String> = (0..vocabularies.len())
-        .map(|i| format!("vocabularies[{i}]"))
-        .collect();
-    let sources: Vec<(&str, &str)> = labels
-        .iter()
-        .map(String::as_str)
-        .zip(vocabularies.iter().map(String::as_str))
-        .collect();
-    let vault = Vault::from_sources(PrinterConfig::default(), ".", &sources);
-    let (doc, bindings) = match vault.parse(&src) {
-        Ok(parsed) => parsed,
-        Err(e) => return throw_err(&mut env, e),
-    };
-    let diagnostics = tomet::validator::validate_document_with(&doc, &bindings);
-    let json = match serde_json::to_string(&diagnostics) {
-        Ok(j) => j,
-        Err(e) => return throw_err(&mut env, e),
-    };
-    env.new_string(json)
-        .map(|s| s.into_raw())
-        .unwrap_or(std::ptr::null_mut())
+    let none = JString::from(jni::objects::JObject::null());
+    validate_json(&mut env, &source, &vocabularies_json, &none, &none)
+}
+
+/// Validate `.tmt` source text the way `tomet check` does, given the pieces of
+/// the vault as source text: vocabularies and blueprints as JSON arrays of
+/// source strings, and the settings as one source string. Each may be
+/// `null`.
+///
+/// Settings that do not parse are an error; a vocabulary or a blueprint that
+/// does not is skipped. An expression that reaches another document is not
+/// reported: none is given to reach.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_org_tomet_tomet_Tomet_validateJsonWithSettings(
+    mut env: JNIEnv,
+    _class: JClass,
+    source: JString,
+    vocabularies_json: JString,
+    config: JString,
+    blueprints_json: JString,
+) -> jstring {
+    validate_json(
+        &mut env,
+        &source,
+        &vocabularies_json,
+        &config,
+        &blueprints_json,
+    )
 }
 
 #[cfg(test)]

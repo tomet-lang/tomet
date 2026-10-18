@@ -330,41 +330,61 @@ pub mod highlight;
 pub use highlight::{HighlightSpan, compute_highlight_spans};
 
 /// Validate `.tmt` source text and return an array of validation diagnostics.
+///
+/// This is [`validate_with`] with nothing passed: `std` alone, the default
+/// settings, no blueprint.
 #[wasm_bindgen(js_name = validate)]
 pub fn validate(source: &str) -> Result<JsValue, JsValue> {
-    let doc = parse_plain(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
-    let diagnostics = tomet::validator::validate_document(&doc);
-    serde_wasm_bindgen::to_value(&diagnostics).map_err(|e| JsValue::from_str(&e.to_string()))
+    validate_with(source, Vec::new(), None)
 }
 
-/// Validate `.tmt` source text against `std` plus the vocabularies given
-/// as source text.
+/// What [`validate_with`] takes besides the source and the vocabularies.
+#[derive(serde::Deserialize, Default)]
+struct ValidateOptions {
+    /// The settings, as a config document (what `default.config.tmt` holds).
+    config: Option<String>,
+    /// `@blueprint(kind)` documents, as source text.
+    blueprints: Option<Vec<String>>,
+}
+
+/// Validate `.tmt` source text the way `tomet check` does, given the pieces
+/// of the vault as source text.
 ///
-/// A host that has the vault's `@vocabulary(...)` files can pass their
-/// contents here. Without them, `validate` knows only `std`, so every
-/// element a vocabulary declares comes back as unknown -- correct, since
-/// nothing said it existed, but not useful in an editor that could have
-/// said so.
+/// A host that has the vault's files can pass their contents. Without them,
+/// `validate` knows only `std`, so every element a vocabulary declares comes
+/// back as unknown -- correct, since nothing said it existed, but not useful
+/// in an editor that could have said so.
 ///
-/// A source that does not parse, carries no `@vocabulary(ns)` header, or
-/// claims a reserved or already-taken namespace is skipped: it declares no
-/// namespace, so there is nothing to bind. `doc.index` is always known, as
-/// it is to the CLI. Check vocabularies themselves with `tomet check`.
+/// - `vocabularies`: `@vocabulary(ns)` documents. A source that does not
+///   parse, carries no header, or claims a reserved or already-taken
+///   namespace is skipped: it declares no namespace, so there is nothing to
+///   bind. `doc.index` is always known, as it is to the CLI.
+/// - `options.config`: the settings. They declare the `type:` of `@meta`
+///   fields, which is what is checked. One that does not parse is an error.
+/// - `options.blueprints`: a document is checked against the one for its
+///   `@kind`. One that does not parse is skipped.
+///
+/// An expression that reaches another document is not reported: none is
+/// given to reach. Check vocabularies themselves with `tomet check`.
 #[wasm_bindgen(js_name = validateWith)]
-pub fn validate_with(source: &str, vocabularies: Vec<String>) -> Result<JsValue, JsValue> {
-    let labels: Vec<String> = (0..vocabularies.len())
-        .map(|i| format!("vocabularies[{i}]"))
-        .collect();
-    let sources: Vec<(&str, &str)> = labels
-        .iter()
-        .map(String::as_str)
-        .zip(vocabularies.iter().map(String::as_str))
-        .collect();
-    let vault = Vault::from_sources(PrinterConfig::default(), ".", &sources);
-    let (doc, bindings) = vault
-        .parse(source)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
-    let diagnostics = tomet::validator::validate_document_with(&doc, &bindings);
+pub fn validate_with(
+    source: &str,
+    vocabularies: Vec<String>,
+    options: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let options: ValidateOptions = match options {
+        Some(value) if !value.is_undefined() && !value.is_null() => {
+            serde_wasm_bindgen::from_value(value).map_err(|e| JsValue::from_str(&e.to_string()))?
+        }
+        _ => ValidateOptions::default(),
+    };
+    let diagnostics = tomet::vault::validate_sources(
+        source,
+        &vocabularies,
+        options.config.as_deref(),
+        &options.blueprints.unwrap_or_default(),
+    )
+    .map_err(|e| JsValue::from_str(&e))?;
     serde_wasm_bindgen::to_value(&diagnostics).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 

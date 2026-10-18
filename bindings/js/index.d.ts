@@ -149,6 +149,27 @@ export function formatSource(source: string): string;
  */
 export function validate(source: string): ValidationError[];
 
+/** What `validateWith` is given besides vocabularies; each part is optional. */
+export interface ValidateOptions {
+  /** The settings, as a config document (what `default.config.tmt` holds): they declare the types of `@meta` fields. */
+  config?: string;
+  /** Blueprints as source text; the one whose `@blueprint(kind)` matches the document's `@kind` is checked against. */
+  blueprints?: string[];
+}
+
+/**
+ * Validate `.tmt` source text the way `tomet check` does, given the pieces of
+ * the vault as source text: vocabularies, settings and blueprints.
+ *
+ * Settings that do not parse throw; a vocabulary or blueprint that does not is
+ * skipped. An expression that reaches another document is not reported.
+ */
+export function validateWith(
+  source: string,
+  vocabularies: string[],
+  options?: ValidateOptions | null,
+): ValidationError[];
+
 /**
  * Initialize the WebAssembly module.
  */

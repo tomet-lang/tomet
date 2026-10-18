@@ -196,6 +196,12 @@ tree-shape choice unrelated to whether it opened its own line.
 Returns this document's declared kind string (e.g. `"j.daily"`, `"config"`, `"image_note"`),
 resolved strictly from top-level `@kind(...)` / `<kind>(...)` elements.
 
+=====[fn document_blueprint]
+
+The kind of document a blueprint is for: what its `@blueprint(X)` names,
+as `@blueprint(X)` or `@blueprint(target: X)`. `None` for a document that
+is not a blueprint.
+
 =====[fn document_version]
 
 Returns this document's declared language/syntax version (e.g. `"1.0"`),

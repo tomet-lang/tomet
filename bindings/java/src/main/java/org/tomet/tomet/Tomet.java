@@ -129,4 +129,26 @@ public final class Tomet {
      */
     public static native String validateJsonWith(String source, String vocabulariesJson)
             throws TometException;
+
+    /**
+     * Validates .tmt source text the way {@code tomet check} does, given the
+     * pieces of the vault as source text.
+     *
+     * <p>Settings that do not parse throw; a vocabulary or a blueprint that
+     * does not is skipped. An expression that reaches another document is not
+     * reported. Each argument but {@code source} may be {@code null}.
+     *
+     * @param source            Tomet source text
+     * @param vocabulariesJson  JSON array of vocabulary source strings
+     * @param config            the settings as a config document (what {@code default.config.tmt} holds): the
+     *                          types of {@code @meta} fields
+     * @param blueprintsJson    JSON array of blueprint source strings; the one whose
+     *                          {@code @blueprint(kind)} matches the document's
+     *                          {@code @kind} is checked against
+     * @return JSON string containing the array of validation diagnostics
+     * @throws TometException if syntax parsing fails or the settings do not read
+     */
+    public static native String validateJsonWithSettings(
+            String source, String vocabulariesJson, String config, String blueprintsJson)
+            throws TometException;
 }

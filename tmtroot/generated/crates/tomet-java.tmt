@@ -42,6 +42,9 @@ Format `.tmt` source text with lossless whitespace hygiene and span preservation
 
 Validate `.tmt` source text and return a JSON list of validation errors.
 
+`std` alone, the default settings, no blueprint: `validateJsonWithSettings`
+with nothing passed.
+
 ===[fn Java_org_tomet_tomet_Tomet_validateJsonWith]
 
 Validate `.tmt` source text against `std` plus vocabularies passed as
@@ -53,3 +56,14 @@ parse, has no `@vocabulary(ns)` header, or claims a reserved or
 already-taken namespace is skipped -- it binds no namespace. `doc.index`
 is always known, as it is to the CLI. Check vocabularies themselves with
 `tomet check`.
+
+===[fn Java_org_tomet_tomet_Tomet_validateJsonWithSettings]
+
+Validate `.tmt` source text the way `tomet check` does, given the pieces of
+the vault as source text: vocabularies and blueprints as JSON arrays of
+source strings, and the settings as one source string. Each may be
+`null`.
+
+Settings that do not parse are an error; a vocabulary or a blueprint that
+does not is skipped. An expression that reaches another document is not
+reported: none is given to reach.

@@ -110,41 +110,48 @@ fn format(source: &str) -> String {
 }
 
 /// Validate `.tmt` source text and return a list of validation errors.
+///
+/// This is `validate_with` with nothing passed: `std` alone, the default
+/// settings, no blueprint.
 #[pyfunction]
 fn validate<'py>(py: Python<'py>, source: &str) -> PyResult<Bound<'py, PyAny>> {
-    let doc = parse(source)?;
-    let diagnostics = tomet_crate::validator::validate_document(&doc);
-    pythonize::pythonize(py, &diagnostics).map_err(|e| PyValueError::new_err(e.to_string()))
+    validate_with(py, source, Vec::new(), None, None)
 }
 
-/// Validate `.tmt` source text against `std` plus the vocabularies given
-/// as source text.
+/// Validate `.tmt` source text the way `tomet check` does, given the pieces of
+/// the vault as source text.
 ///
-/// Without them, `validate` knows only `std`, so every element a
-/// vocabulary declares comes back as unknown. A source that does not
-/// parse, has no `@vocabulary(ns)` header, or claims a reserved or
-/// already-taken namespace is skipped -- it binds no namespace. `doc.index`
-/// is always known, as it is to the CLI. Check vocabularies themselves with
-/// `tomet check`.
+/// Without them, `validate` knows only `std`, so every element a vocabulary
+/// declares comes back as unknown.
+///
+/// - `vocabularies`: `@vocabulary(ns)` documents. A source that does not
+///   parse, has no header, or claims a reserved or already-taken namespace is
+///   skipped -- it binds no namespace. `doc.index` is always known, as it is
+///   to the CLI.
+/// - `config`: the settings, as a config document (what `default.config.tmt`
+///   holds). They declare the `type:` of `@meta` fields, which is what is
+///   checked. One that does not parse raises `ValueError`.
+/// - `blueprints`: `@blueprint(kind)` documents. A document is checked against
+///   the one for its `@kind`. One that does not parse is skipped.
+///
+/// An expression that reaches another document is not reported: none is given
+/// to reach. Check vocabularies themselves with `tomet check`.
 #[pyfunction]
+#[pyo3(signature = (source, vocabularies, config=None, blueprints=None))]
 fn validate_with<'py>(
     py: Python<'py>,
     source: &str,
     vocabularies: Vec<String>,
+    config: Option<String>,
+    blueprints: Option<Vec<String>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let labels: Vec<String> = (0..vocabularies.len())
-        .map(|i| format!("vocabularies[{i}]"))
-        .collect();
-    let sources: Vec<(&str, &str)> = labels
-        .iter()
-        .map(String::as_str)
-        .zip(vocabularies.iter().map(String::as_str))
-        .collect();
-    let vault = Vault::from_sources(PrinterConfig::default(), ".", &sources);
-    let (doc, bindings) = vault
-        .parse(source)
-        .map_err(|e| PyValueError::new_err(e.to_string()))?;
-    let diagnostics = tomet_crate::validator::validate_document_with(&doc, &bindings);
+    let diagnostics = tomet_crate::vault::validate_sources(
+        source,
+        &vocabularies,
+        config.as_deref(),
+        &blueprints.unwrap_or_default(),
+    )
+    .map_err(PyValueError::new_err)?;
     pythonize::pythonize(py, &diagnostics).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 

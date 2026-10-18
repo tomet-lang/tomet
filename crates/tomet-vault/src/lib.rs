@@ -49,6 +49,7 @@ mod resolve;
 pub use resolve::{Overlay, typed_meta};
 pub use tomet_expr::{DirRef, MemoryResolver, NoResolver, Resolver};
 pub use tomet_transform::{Unresolved, UnresolvedKind};
+pub use tomet_validator::Diagnostic;
 
 /// What [`Vault::prepare`] could not do.
 ///
@@ -59,6 +60,51 @@ pub use tomet_transform::{Unresolved, UnresolvedKind};
 #[derive(Debug, Default)]
 pub struct Prepared {
     pub unresolved: Vec<Unresolved>,
+}
+
+/// Validates `source` the way a host with no disk can: what `tomet check` says
+/// of it, given the vault's pieces as text.
+///
+/// - `vocabularies`: `@vocabulary(ns)` documents. One that does not parse, has
+///   no header, or claims a reserved or already-taken namespace is skipped: it
+///   binds no namespace.
+/// - `config`: the settings, as a config document (what `default.config.tmt`
+///   holds). Without it the defaults are used, and nothing declares a `type:`.
+///   One that does not parse is an error: a host that passes settings means
+///   them.
+/// - `blueprints`: `@blueprint(kind)` documents. A document is checked against
+///   the one for its `@kind`, if there is one. One that does not parse is
+///   skipped.
+///
+/// An expression that reaches another document is not reported, since no
+/// document is given to reach: it would come back unresolved every time.
+pub fn validate_sources(
+    source: &str,
+    vocabularies: &[String],
+    config: Option<&str>,
+    blueprints: &[String],
+) -> Result<Vec<Diagnostic>, String> {
+    let config = match config {
+        Some(text) => {
+            tomet_config::load_config_from_str(text).map_err(|e| format!("config: {e}"))?
+        }
+        None => PrinterConfig::default(),
+    };
+    let labels: Vec<String> = (0..vocabularies.len())
+        .map(|i| format!("vocabularies[{i}]"))
+        .collect();
+    let sources: Vec<(&str, &str)> = labels
+        .iter()
+        .map(String::as_str)
+        .zip(vocabularies.iter().map(String::as_str))
+        .collect();
+    let vault = Vault::from_sources(config, ".", &sources);
+    let (doc, _) = vault.parse(source).map_err(|e| e.to_string())?;
+    let blueprints: Vec<Document> = blueprints
+        .iter()
+        .filter_map(|src| tomet_parser::parse_document(src).ok())
+        .collect();
+    Ok(vault.diagnostics(&doc, &blueprints))
 }
 
 /// What an evaluation in one document is done in. See [`Vault::scope`].
@@ -132,6 +178,44 @@ impl Vault {
             }
         }
         Self::new(config, root.into(), loaded)
+    }
+
+    /// What checking finds wrong with `doc`, without reading anything: the
+    /// validator's diagnostics against the vocabularies it has in scope, the
+    /// blueprint its `@kind` names if one of `blueprints` is for that kind, and
+    /// the `type:` the settings declare for its `@meta` fields.
+    ///
+    /// This is the part of `tomet check` that needs no disk, so a host with
+    /// none -- the bindings in a browser -- gets the same answer as the CLI
+    /// gives. What does need it (an expression that reaches another document,
+    /// finding the blueprint's file) is added by whoever has one:
+    /// `tomet-load`'s `Vault::findings`.
+    pub fn diagnostics(&self, doc: &Document, blueprints: &[Document]) -> Vec<Diagnostic> {
+        let bindings = self.bindings(doc);
+        let mut diagnostics = tomet_validator::validate_document_with(doc, &bindings);
+
+        // The settings' `type:` declarations, which the validator is handed
+        // as plain data -- it sits below the crate that reads settings.
+        let field_types = self
+            .config
+            .meta
+            .fields
+            .iter()
+            .filter_map(|(name, field)| Some((name.clone(), field.field_type.clone()?)))
+            .collect();
+        tomet_validator::check_field_types(doc, &field_types, &mut diagnostics);
+
+        if let Some(kind) = tomet_semantics::document_kind(doc)
+            && kind != "blueprint"
+            && let Some(blueprint) = blueprints
+                .iter()
+                .find(|b| tomet_semantics::document_blueprint(b).as_deref() == Some(kind.as_str()))
+        {
+            diagnostics.extend(tomet_validator::validate_against_blueprint_with(
+                doc, blueprint, &bindings,
+            ));
+        }
+        diagnostics
     }
 
     /// The names in scope for `doc`: `std`, the document's own `@kind`,
@@ -286,6 +370,87 @@ impl Vault {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const BLUEPRINT: &str = "@kind(blueprint)\n@blueprint(note)\n@meta{\n  date: \"2026\"\n}\n\n=[ Items ]#(items):rule(allow: list(task))\n";
+    const UUID_SETTINGS: &str = "@kind(config)\n@config{ meta: { id: { type: uuid } } }\n";
+
+    fn texts(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// The settings a host passes are in force: without them nothing declares
+    /// a `type:`, with them a field that has the wrong form is reported.
+    #[test]
+    fn settings_given_as_text_declare_the_types_of_fields() {
+        let source = "@meta{ id: not-a-uuid }\n";
+        assert!(validate_sources(source, &[], None, &[]).unwrap().is_empty());
+
+        let found = validate_sources(source, &[], Some(UUID_SETTINGS), &[]).unwrap();
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].to_string().contains("not a valid uuid"));
+    }
+
+    /// A document is checked against the blueprint for its `@kind`, if the
+    /// host passed one, and against none otherwise.
+    #[test]
+    fn a_blueprint_given_as_text_is_checked_against() {
+        let bad = "@kind(note)\n@meta{ date: \"2026-10-13\" }\n\n=[ Items ]#(items)\n@heading[ Disallowed ]\n";
+        let good = "@kind(note)\n@meta{ date: \"2026-10-13\" }\n\n=[ Items ]#(items)\n@task[ Clean room ]\n";
+        let blueprints = texts(&[BLUEPRINT]);
+
+        assert!(
+            !validate_sources(bad, &[], None, &blueprints)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            validate_sources(good, &[], None, &blueprints)
+                .unwrap()
+                .is_empty()
+        );
+        // Nothing passed, nothing to hold it to.
+        assert!(validate_sources(bad, &[], None, &[]).unwrap().is_empty());
+        // A blueprint for another kind does not apply.
+        let other = texts(&[
+            "@kind(blueprint)\n@blueprint(memo)\n\n=[ Items ]#(items):rule(allow: list(task))\n",
+        ]);
+        assert!(validate_sources(bad, &[], None, &other).unwrap().is_empty());
+    }
+
+    /// Settings that do not read are an error, not the defaults: a host that
+    /// passes them means them. A blueprint that does not read is skipped, like
+    /// a vocabulary.
+    #[test]
+    fn settings_that_do_not_read_are_an_error_and_a_bad_blueprint_is_skipped() {
+        let err =
+            validate_sources("text\n", &[], Some("@caution[ unterminated\n"), &[]).unwrap_err();
+        assert!(err.starts_with("config:"), "{err}");
+        assert!(
+            validate_sources("text\n", &[], None, &texts(&["@caution[ unterminated\n"])).is_ok()
+        );
+    }
+
+    /// The vocabularies still bind, and an expression that reaches another
+    /// document is not reported -- there is none to reach.
+    #[test]
+    fn vocabularies_still_bind_and_a_reaching_expression_is_not_reported() {
+        let vocab = texts(&[ACME]);
+        assert!(
+            validate_sources("@kind(acme)\n", &vocab, None, &[])
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            !validate_sources("@nonesuch{}\n", &[], None, &[])
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            validate_sources("${tmt(\"other.tmt\").meta.title}\n", &[], None, &[])
+                .unwrap()
+                .is_empty()
+        );
+    }
 
     const ACME: &str = "@kind(vocabulary)\n@vocabulary(acme){ version: \"1.0.0\" }\n";
 
