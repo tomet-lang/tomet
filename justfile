@@ -36,10 +36,6 @@ gen-treesitter-check:
     cd crates/tree-sitter-tomet && npx -y tree-sitter-cli@0.26.12 generate
     cd crates/tree-sitter-tomet && sha256sum --check "{{ justfile_directory() }}/target/tree-sitter.sum"
 
-# Launch the TUI workbench.
-tui path=".":
-    cargo run -p tomet-cli -- tui {{path}}
-
 # Check formatting across workspace.
 format-check:
     cargo fmt --all -- --check

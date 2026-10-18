@@ -6,9 +6,6 @@ members = [
   "apps/cli",
   "apps/lsp",
 
-  #= Apps
-  "apps/tui",
-
   #= Bindings
   "bindings/java",
   "bindings/js",
@@ -157,21 +154,14 @@ tove = { path = "crates/tove", version = "0.1.0" }
 tree-sitter-tomet = { path = "crates/tree-sitter-tomet", version = "0.1.0" }
 #= Facade
 tomet = { path = "crates/tomet", version = "0.1.0" }
-#= Apps
-tomet-tui = { path = "apps/tui" }
 #= Corpus -- deterministic synthetic input, shared by every benchmark
 tomet-synth = { git = "https://github.com/tomet-lang/tomet-corpus.git" }
 
 #= Crates.io
 anyhow = "1"
-axum = { version = "0.8", default-features = false, features = [
-  "http1",
-  "tokio",
-] }
 clap = { version = "4.6", features = ["derive"] }
 # No plotters/rayon: the benches are for numbers and CI baselines, not HTML reports.
 criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
-crossterm = "0.28"
 cxx = "1"
 directories = "6.0"
 ignore = "0.4"
@@ -183,7 +173,6 @@ nanoid = "0.4"
 pulldown-cmark = "0.13"
 pyo3 = { version = "0.23", features = ["serde"] }
 pythonize = "0.23"
-ratatui = "0.29"
 rayon = "1"
 regex = "1.12"
 rowan = "0.16"
@@ -193,7 +182,6 @@ serde_json = { version = "1", features = ["preserve_order"] }
 serde-wasm-bindgen = "0.6"
 serde_yaml = "0.9"
 time = "0.3"
-tokio = "1"
 toml = { version = "0.9", features = ["preserve_order"] }
 tree-sitter = "0.26"
 tree-sitter-language = "0.1"

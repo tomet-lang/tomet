@@ -180,24 +180,6 @@ Options:
 - `--remove-original`: Remove original `.md` file(s) after conversion (only with --in-place or --out).
 - `--dry-run`: Dry-run mode: convert and validate in memory without writing files.
 
-==[ tomet serve ]
-
-Serve a `.tmt` file as HTML over HTTP on 127.0.0.1, re-rendering it fresh on every request (just reload the page after editing)
-
-```text
-tomet serve [OPTIONS] <FILE>
-```
-
-Arguments:
-
-- `<FILE>`
-
-Options:
-
-- `-p, --port <PORT>` Default: `8787`.
-- `--advanced`: Number headings sequentially by nesting level (1, 1.1, 1.2, 2, ...) instead of the plain, unnumbered default.
-- `--lang <LANG>`: `<html lang="...">` for the page shell. Defaults to "ja".
-
 ==[ tomet format ]
 
 Normalize a `.tmt`/`.tmt` file's whitespace (line endings, trailing whitespace, blank lines, final newline). A directory formats every `.tmt`/`.tmt` file found under it (same file discovery as `export`/ `check-links`: honors `.gitignore` and the project config's `ignore_files`). A file named explicitly is held to the same rule: one the config excludes (`workspace.ignore`/`workspace.unswept`, e.g. the frozen test corpus) is skipped with a warning unless `--force` is given. Prints to stdout by default; see `--in-place`/`--check`
@@ -229,22 +211,6 @@ Options:
 - `-o, --out <OUT>`: Write to this file instead of stdout.
 - `--check`: Fail if `--out`'s file is missing or out of date, without writing.
 
-==[ tomet tui ]
-
-Launch the interactive TUI workbench for Markdown migration, batch metadata editing, and structural AST refactoring
-
-```text
-tomet tui [OPTIONS] [PATH]
-```
-
-Arguments:
-
-- `[PATH]`: Target directory or file path (defaults to current directory ".").
-
-Options:
-
-- `-c, --config <CONFIG>`: Optional path to custom formatting configuration file (.tmt).
-
 ==[ tomet export ]
 
 Export a `.tmt` document or directory of documents based on `@config` settings or CLI overrides
@@ -263,22 +229,6 @@ Options:
 - `-o, --out <OUT>`: Output destination file or directory path. Overrides `@config`.
 - `--advanced`: Number headings sequentially by nesting level for HTML export.
 - `--check`: Compare each declared output against what the source renders to now, without writing anything. Exits non-zero if any differ or are missing -- a generated file that disagrees with its source is a failure with a mechanical fix.
-
-==[ tomet check-links ]
-
-Check every `@file`/`<embed>` link in a `.tmt`/`.tmt` document or directory for broken (non-existent) local-file targets. Uses an SQLite cache (keyed by source-file mtime) in the user's cache directory -- `~/.cache/tomet/` on Unix, never inside the vault -- so re-checking a large vault doesn't re-parse unchanged files. Exits non-zero if any broken link is found
-
-```text
-tomet check-links [OPTIONS] [PATH]
-```
-
-Arguments:
-
-- `[PATH]`: Target file or directory path (defaults to current directory ".").
-
-Options:
-
-- `--json`: Print the report as JSON instead of human-readable text.
 
 ==[ tomet refactor ]
 

@@ -13,7 +13,6 @@
 @table
 |[ 分類               ][ コマンド      ][ していること ]
 |[ 調べる             ][ `check`       ][ 文書が正しいか調べる（@file(tmtroot/spec/cli/check.tmt)） ]
-|[                    ][ `check-links` ][ ローカルファイルへのリンクの切れを調べる（@file(tmtroot/spec/cli/check-links.tmt)） ]
 |[                    ][ `stats`       ][ 文字、要素、リンク、見出しを数える（@file(tmtroot/spec/cli/stats.tmt)） ]
 |[                    ][ `ast`         ][ 構文木を表示する（@file(tmtroot/spec/cli/ast.tmt)） ]
 |[                    ][ `roundtrip`   ][ データファイルの保存と読み込みが損なわれないか確かめる（@file(tmtroot/spec/cli/roundtrip.tmt)） ]
@@ -27,11 +26,11 @@
 |[                    ][ `to-pandoc`   ][ Pandoc の構文木（JSON）にする（@file(tmtroot/spec/cli/to-pandoc.tmt)） ]
 |[                    ][ `from-pandoc` ][ Pandoc の構文木（JSON）から `.tmt` にする（@file(tmtroot/spec/cli/from-pandoc.tmt)） ]
 |[                    ][ `export`      ][ 文書が宣言した設定に従って書き出す（@file(tmtroot/spec/cli/export.tmt)） ]
-|[ 見る・補助         ][ `tui`         ][ 端末の作業台（@file(tmtroot/spec/cli/tui.tmt)） ]
-|[                    ][ `serve`       ][ 文書を HTTP で見せる（@file(tmtroot/spec/cli/serve.tmt)） ]
-|[                    ][ `cli-docs`    ][ このコマンドの一覧を生成する（@file(tmtroot/spec/cli/cli-docs.tmt)） ]
+|[ 補助               ][ `cli-docs`    ][ このコマンドの一覧を生成する（@file(tmtroot/spec/cli/cli-docs.tmt)） ]
 
 言語サーバー `tomet-lsp` は別の実行ファイル（@file(tmtroot/spec/lsp/overview.tmt)）。
+
+vault 全体の宣言・走査・キャッシュ・画面にかかわるコマンド（`check-links`、`serve`、`tui`）は、`tomet` にはない。エコシステムを束ねる `sisho` のコマンドで、`tomet` はそれを知らない。rustc が言語を扱い、cargo が依存や workspace を扱うのと同じ分け方で、文書だけで意味が決まるものが `tomet` に残る。`sisho tomet <コマンド>` で、ここにあるコマンドに届く。
 
 =[ vault ]
 
@@ -45,8 +44,7 @@ vault が決めるのは、設定、語彙、`workspace.ignore` などの除外�
 
 - 結果（変換した文書、表、`OK`）は標準出力に出す。問題、警告、進み具合は標準エラー出力に出す。パイプにつないだとき、結果だけが流れるため。
 - 終了コードは、成功が0、失敗が1。コマンドが動かなかった（引数が違う、パスがない、読めない）ときも1。
-- 複数の文書を扱うコマンドは、1つの文書で失敗しても残りを続け、最後にまとめて失敗にする（`check`、`stats`、`refactor`、`from-md`、`export`、`check-links`）。調べられなかった文書は、調べていない文書なので、失敗に数える。
-- `check-links` は、リンクの切れか、読めなかった文書を見つけたとき1で終わる。調べること自体ができなかったときも1。
+- 複数の文書を扱うコマンドは、1つの文書で失敗しても残りを続け、最後にまとめて失敗にする（`check`、`stats`、`refactor`、`from-md`、`export`）。調べられなかった文書は、調べていない文書なので、失敗に数える。
 
 =[ 共通の形 ]
 
@@ -54,11 +52,11 @@ vault が決めるのは、設定、語彙、`workspace.ignore` などの除外�
 
 @table
 |[ 綴り               ][ 意味 ][ あるコマンド ]
-|[ `PATH`             ][ 対象のファイルかディレクトリ。省くと `.` ][ `check`、`stats`、`export`、`check-links`、`refactor`、`tui` ]
+|[ `PATH`             ][ 対象のファイルかディレクトリ。省くと `.` ][ `check`、`stats`、`export`、`refactor` ]
 |[ `--check`          ][ 書かずに、書く必要があるかを調べる。必要なら非ゼロで終わる ][ `format`、`export`、`refactor`、`cli-docs` ]
 |[ `--in-place`、`-i` ][ ファイルをその場で書き換える。なければ、結果を標準出力に出す ][ `format`、`refactor`、`from-md` ]
 |[ `--out`、`-o`      ][ 結果を標準出力ではなく、ここに書く ][ `html`、`to-md`、`to-typst`、`to-pandoc`、`from-pandoc`、`from-md`、`export`、`cli-docs` ]
-|[ `--json`           ][ 人が読む形ではなく、JSON で出す ][ `check`、`stats`、`check-links` ]
+|[ `--json`           ][ 人が読む形ではなく、JSON で出す ][ `check`、`stats` ]
 |[ `--force`          ][ 設定の除外（`workspace.ignore`、`workspace.unswept`）を外す ][ `format`、`refactor` ]
 |[ `--quiet`、`-q`    ][ 成功の `OK` を出さない ][ `check` ]
 
@@ -66,17 +64,17 @@ vault が決めるのは、設定、語彙、`workspace.ignore` などの除外�
 
 ファイルの代わりに `-` を渡すと、標準入力から読む。パイプでつなぐためで、`ast`、`roundtrip`、`to-md`、`to-typst`、`to-pandoc`、`from-pandoc` で使える。
 
-`html` と `serve` は標準入力を読まない。
+`html` は標準入力を読まない。
 
 =[ 式の評価 ]
 
-文書を別の形に書き出すコマンド（`html`、`to-md`、`to-typst`、`to-pandoc`、`export`、`serve`）は、書き出す前に、文書の `${...}` をすべて、その vault で評価した値に置き換える（@file(tmtroot/spec/expressions/overview.expr.tmt)）。評価できなかったものは、書かれたままの文字として出す。変換器は、式があることを知らない。
+文書を別の形に書き出すコマンド（`html`、`to-md`、`to-typst`、`to-pandoc`、`export`）は、書き出す前に、文書の `${...}` をすべて、その vault で評価した値に置き換える（@file(tmtroot/spec/expressions/overview.expr.tmt)）。評価できなかったものは、書かれたままの文字として出す。変換器は、式があることを知らない。
 
 `html`、`to-md`、`to-typst`、`to-pandoc` は、標準出力に出す結果の末尾に改行を1つ付ける。`--out` に書くときは付けない。
 
 =[ 設定のファイル名 ]
 
-設定は `default.config.tmt` か `tomet.config.tmt`。`--config` を受けるのは `tui` だけ。
+設定は `default.config.tmt` か `tomet.config.tmt`。設定のファイルを直接渡すオプションは、`tomet` にはない（`sisho tui` が `--config` を受ける）。
 
 =[ 現状の実装との差 ]
 

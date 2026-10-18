@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-parser, dependencies: list(tomet-ast, tomet-cst, tomet-lexer, tomet-semantics, tomet-tree, tove), dependents: list(tomet, tomet-address, tomet-benches, tomet-cli, tomet-config, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-lsp, tomet-markdown, tomet-merge, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-tests, tomet-transform, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-rule, tomet-vault, tomet-workspace)}
+@meta{crate: tomet-parser, dependencies: list(tomet-ast, tomet-cst, tomet-lexer, tomet-semantics, tomet-tree, tove), dependents: list(tomet, tomet-address, tomet-benches, tomet-cli, tomet-config, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-lsp, tomet-markdown, tomet-merge, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-stats, tomet-tests, tomet-transform, tomet-tree, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-parser]
 

@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-cli, dependencies: list(tomet-ast, tomet-config, tomet-expr, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-load-config, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-tree, tomet-tui, tomet-typst, tomet-validator, tomet-workspace, tove), dependents: list()}
+@meta{crate: tomet-cli, dependencies: list(tomet-ast, tomet-config, tomet-expr, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-load, tomet-load-config, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-tree, tomet-typst, tomet-validator, tomet-workspace, tove), dependents: list()}
 
 =[tomet-cli]
 
@@ -13,7 +13,13 @@ validator, formatter, and converter components for `.tmt` document processing.
 
 ==[Subcommands]
 
-- ("Inspection & Validation") `check`, `check-links`, `ast`, `roundtrip`, and `stats`.
+- ("Inspection & Validation") `check`, `ast`, `roundtrip`, and `stats`.
 - ("Transformation & Formatting") `format` and `refactor`.
 - (Converters) `html`, `to-md`, `from-md`, `to-typst`, `to-pandoc`, `from-pandoc`, and `export`.
-- ("Documentation & Ecosystem") `cli-docs`, `tui`, and `serve`.
+- (Authoring) `new`.
+- (Documentation) `cli-docs`.
+
+The project-level commands -- `check-links`, `serve` and `tui` -- are
+`sisho`'s: they follow a vault's declarations, caches and screens rather
+than a document alone, as `cargo` does for the language `rustc` compiles.
+`sisho tomet <command>` reaches the commands above from there.

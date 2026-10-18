@@ -1,6 +1,5 @@
 pub mod ast;
 pub mod check;
-pub mod check_links;
 pub mod cli_docs;
 pub mod export;
 pub mod format;
@@ -10,7 +9,6 @@ pub mod html;
 pub mod new;
 pub mod refactor;
 pub mod roundtrip;
-pub mod serve;
 pub mod stats;
 pub mod to_md;
 pub mod to_pandoc;

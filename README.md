@@ -29,8 +29,7 @@ Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and 
 tomet/
 ├── apps/
 │   ├── cli/              # Main CLI binary (`tomet`)
-│   ├── lsp/              # Language Server Protocol implementation (`tomet-lsp`)
-│   └── tui/              # Interactive TUI workbench (`tomet-tui`)
+│   └── lsp/              # Language Server Protocol implementation (`tomet-lsp`)
 ├── bindings/             # Language bindings (Java, JS, Python)
 ├── editors/              # Editor extensions (VS Code, Zed, Helix, Neovim)
 ├── crates/

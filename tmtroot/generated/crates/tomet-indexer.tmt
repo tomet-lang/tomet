@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-indexer, dependencies: list(tomet-ast, tomet-config, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree), dependents: list(tomet-cli, tomet-links, tomet-load, tomet-tui, tomet-workspace)}
+@meta{crate: tomet-indexer, dependencies: list(tomet-ast, tomet-config, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree), dependents: list(tomet-cli, tomet-links, tomet-load, tomet-workspace)}
 
 =[tomet-indexer]
 

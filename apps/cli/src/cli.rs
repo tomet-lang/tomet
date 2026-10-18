@@ -143,21 +143,6 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Serve a `.tmt` file as HTML over HTTP on 127.0.0.1, re-rendering it
-    /// fresh on every request (just reload the page after editing).
-    Serve {
-        file: PathBuf,
-        #[arg(short, long, default_value_t = 8787)]
-        port: u16,
-        /// Number headings sequentially by nesting level (1, 1.1, 1.2, 2,
-        /// ...) instead of the plain, unnumbered default.
-        #[arg(long)]
-        advanced: bool,
-        /// `<html lang="...">` for the page shell. Defaults to "ja".
-        #[arg(long)]
-        lang: Option<String>,
-    },
-
     /// Normalize a `.tmt`/`.tmt` file's whitespace (line endings, trailing
     /// whitespace, blank lines, final newline). A directory formats every
     /// `.tmt`/`.tmt` file found under it (same file discovery as `export`/
@@ -197,17 +182,6 @@ pub enum Command {
         check: bool,
     },
 
-    /// Launch the interactive TUI workbench for Markdown migration,
-    /// batch metadata editing, and structural AST refactoring.
-    Tui {
-        /// Target directory or file path (defaults to current directory ".").
-        #[arg(default_value = ".")]
-        path: PathBuf,
-        /// Optional path to custom formatting configuration file (.tmt).
-        #[arg(short, long)]
-        config: Option<PathBuf>,
-    },
-
     /// Export a `.tmt` document or directory of documents based on `@config` settings or CLI overrides.
     Export {
         /// Target file or directory path (defaults to current directory ".").
@@ -228,21 +202,6 @@ pub enum Command {
         /// is a failure with a mechanical fix.
         #[arg(long)]
         check: bool,
-    },
-
-    /// Check every `@file`/`<embed>` link in a `.tmt`/`.tmt` document or
-    /// directory for broken (non-existent) local-file targets. Uses an
-    /// SQLite cache (keyed by source-file mtime) in the user's cache
-    /// directory -- `~/.cache/tomet/` on Unix, never inside the vault --
-    /// so re-checking a large vault doesn't re-parse unchanged files.
-    /// Exits non-zero if any broken link is found.
-    CheckLinks {
-        /// Target file or directory path (defaults to current directory ".").
-        #[arg(default_value = ".")]
-        path: PathBuf,
-        /// Print the report as JSON instead of human-readable text.
-        #[arg(long)]
-        json: bool,
     },
 
     /// Refactor .tmt file(s) across a workspace (URL macros, @meta.type -> @kind).
