@@ -18,6 +18,9 @@
 //! than a document alone, as `cargo` does for the language `rustc` compiles.
 //! `sisho tomet <command>` reaches the commands above from there.
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 mod cli;
 mod commands;
 mod util;

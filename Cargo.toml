@@ -169,6 +169,7 @@ jni = "0.21"
 js-sys = "0.3"
 lsp-server = "0.10"
 lsp-types = "0.97"
+mimalloc = { version = "0.1", default-features = false }
 nanoid = "0.4"
 pulldown-cmark = "0.13"
 pyo3 = { version = "0.23", features = ["serde"] }
@@ -190,6 +191,13 @@ uuid = { version = "1.23", features = ["v4", "js"] }
 walkdir = "2"
 wasm-bindgen = "=0.2.127"
 zed_extension_api = "0.7"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
 
 [profile.dev.package."*"]
 opt-level = 3
