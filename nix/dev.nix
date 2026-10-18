@@ -6,7 +6,7 @@
   tomet,
   tomet-lsp,
   twrit,
-  tmtbook,
+  tomet-shelf,
   ...
 }:
 let
@@ -29,7 +29,7 @@ mkShell rec {
     tomet
     tomet-lsp
     twrit
-    tmtbook
+    tomet-shelf
     pagefind
     just
     deno

@@ -30,8 +30,8 @@ jobs:
       - name: Enable Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@main
 
-      - name: Build docs site with tmtbook
-        run: nix run github:tomet-lang/tomet-book#tmtbook -- build tmtroot
+      - name: Build docs site with tomet-shelf
+        run: nix run github:tomet-lang/tomet-shelf#tomet-shelf -- build tmtroot
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
