@@ -3,7 +3,11 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "tomet", about = "Parse and inspect Tomet (.tmt) files")]
+#[command(
+    name = "tomet",
+    version,
+    about = "Parse and inspect Tomet (.tmt) files"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
