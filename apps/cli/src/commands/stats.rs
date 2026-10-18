@@ -3,7 +3,19 @@ use std::fmt::Write as _;
 use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 
+use rayon::prelude::*;
 use tomet_stats::{LinkKind, Stats, measure};
+
+enum StatsFileResult {
+    Unreadable,
+    ParseError(tomet_parser::Error),
+    Measured {
+        warnings: usize,
+        has_errors: bool,
+        kind: Option<String>,
+        stats: Stats,
+    },
+}
 
 /// A file that could not be measured, and why.
 ///
@@ -91,6 +103,10 @@ impl Report {
 /// the way `check` does. Returns the report and how many files were looked
 /// at.
 ///
+/// Multi-file stats run per-file measurements in parallel across rayon worker
+/// threads. Results are collected into memory and merged in file order to build
+/// the final report; output is produced only after all files have completed.
+///
 /// The files are found the way `check` finds them, through the vault, so
 /// `workspace.ignore` applies. A file that cannot be read or parsed is left
 /// out of the numbers, and the sweep goes on.
@@ -105,33 +121,60 @@ fn collect_report(path: &Path) -> anyhow::Result<(Report, usize)> {
         return Err(anyhow::anyhow!("path '{}' does not exist", path.display()));
     };
 
+    // Phase 1: Per-file, in parallel, pure
+    let results: Vec<StatsFileResult> = files
+        .par_iter()
+        .map(|file| {
+            let Ok(src) = std::fs::read_to_string(file) else {
+                return StatsFileResult::Unreadable;
+            };
+            let doc = match tomet_parser::parse_document(&src) {
+                Ok(doc) => doc,
+                Err(err) => return StatsFileResult::ParseError(err),
+            };
+
+            let findings = vault.findings(file, &doc);
+            let warnings = findings.warnings();
+            let has_errors = findings.has_errors();
+            let kind = tomet_semantics::document_kind(&doc);
+            let stats = measure(&doc);
+
+            StatsFileResult::Measured {
+                warnings,
+                has_errors,
+                kind,
+                stats,
+            }
+        })
+        .collect();
+
+    // Phase 2: In order, serial
     let mut by_kind: BTreeMap<Option<String>, Stats> = BTreeMap::new();
     let mut failures: Vec<Failure> = Vec::new();
     let mut invalid = 0usize;
     let mut warnings = 0usize;
 
-    for file in &files {
-        let Ok(src) = std::fs::read_to_string(file) else {
-            failures.push(Failure::unreadable(file));
-            continue;
-        };
-        let doc = match tomet_parser::parse_document(&src) {
-            Ok(doc) => doc,
-            Err(err) => {
-                failures.push(Failure::parse(file, &err));
-                continue;
+    for (file, res) in files.iter().zip(results) {
+        match res {
+            StatsFileResult::Unreadable => {
+                failures.push(Failure::unreadable(file));
             }
-        };
-
-        let findings = vault.findings(file, &doc);
-        warnings += findings.warnings();
-        if findings.has_errors() {
-            invalid += 1;
+            StatsFileResult::ParseError(err) => {
+                failures.push(Failure::parse(file, &err));
+            }
+            StatsFileResult::Measured {
+                warnings: w,
+                has_errors,
+                kind,
+                stats,
+            } => {
+                warnings += w;
+                if has_errors {
+                    invalid += 1;
+                }
+                by_kind.entry(kind).or_default().merge(stats);
+            }
         }
-        by_kind
-            .entry(tomet_semantics::document_kind(&doc))
-            .or_default()
-            .merge(measure(&doc));
     }
 
     Ok((

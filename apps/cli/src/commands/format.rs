@@ -2,6 +2,15 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
+use rayon::prelude::*;
+
+enum FormatWriteResult {
+    Unchanged,
+    Written,
+    ReadError(io::Error),
+    WriteError(io::Error),
+}
+
 /// Formats one file's source through the config that governs it.
 ///
 /// `tomet format` used to call `format_source`, which takes no config at
@@ -44,6 +53,17 @@ fn collect_dir(dir: &Path, force: bool) -> Vec<PathBuf> {
     tomet_indexer::collect_tm_files_with_config(dir, &config, &root)
 }
 
+/// Formats one or more files or directories.
+///
+/// Under `--check`, formatting checks run in parallel across rayon worker threads,
+/// reporting unformatted files in file order, or aborting on the first unreadable
+/// file in file order.
+///
+/// Under `-i` (write), files are formatted and written in parallel across worker
+/// threads. Before this change, a failed write to standard output (for example
+/// piped to `head`) stopped the loop at that file and left subsequent files
+/// unformatted. Now every file is written first, and the file listing is printed
+/// afterwards.
 pub(crate) fn format_cmd(
     paths: &[PathBuf],
     write: bool,
@@ -91,10 +111,21 @@ pub(crate) fn format_cmd(
     }
 
     if check {
+        // Phase 1: Per-file, in parallel, pure
+        let results: Vec<io::Result<bool>> = files
+            .par_iter()
+            .map(|file| {
+                let src = fs::read_to_string(file)?;
+                let is_unformatted = format_file(file, &src) != src;
+                Ok(is_unformatted)
+            })
+            .collect();
+
+        // Phase 2: In order, serial
         let mut unformatted = Vec::new();
-        for file in &files {
-            let src = fs::read_to_string(file)?;
-            if format_file(file, &src) != src {
+        for (file, res) in files.iter().zip(results) {
+            let is_unformatted = res?;
+            if is_unformatted {
                 unformatted.push(file);
             }
         }
@@ -113,26 +144,43 @@ pub(crate) fn format_cmd(
     }
 
     if write {
-        let mut changed = 0;
-        let mut out = io::stdout().lock();
-        for file in &files {
-            match fs::read_to_string(file) {
+        // Phase 1: Per-file, in parallel, writes directly
+        let results: Vec<FormatWriteResult> = files
+            .par_iter()
+            .map(|file| match fs::read_to_string(file) {
                 Ok(src) => {
                     let formatted = format_file(file, &src);
                     if formatted == src {
-                        continue;
-                    }
-                    match fs::write(file, formatted) {
-                        Ok(()) => {
-                            if files.len() > 1 || paths[0].is_dir() {
-                                writeln!(out, "{}", file.display())?;
-                            }
-                            changed += 1;
+                        FormatWriteResult::Unchanged
+                    } else {
+                        match fs::write(file, formatted) {
+                            Ok(()) => FormatWriteResult::Written,
+                            Err(e) => FormatWriteResult::WriteError(e),
                         }
-                        Err(e) => eprintln!("Error writing {}: {e}", file.display()),
                     }
                 }
-                Err(e) => eprintln!("Error reading {}: {e}", file.display()),
+                Err(e) => FormatWriteResult::ReadError(e),
+            })
+            .collect();
+
+        // Phase 2: In order, serial
+        let mut changed = 0;
+        let mut out = io::stdout().lock();
+        for (file, res) in files.iter().zip(results) {
+            match res {
+                FormatWriteResult::Unchanged => {}
+                FormatWriteResult::Written => {
+                    if files.len() > 1 || paths[0].is_dir() {
+                        writeln!(out, "{}", file.display())?;
+                    }
+                    changed += 1;
+                }
+                FormatWriteResult::WriteError(e) => {
+                    eprintln!("Error writing {}: {e}", file.display());
+                }
+                FormatWriteResult::ReadError(e) => {
+                    eprintln!("Error reading {}: {e}", file.display());
+                }
             }
         }
         if files.len() > 1 || paths[0].is_dir() {

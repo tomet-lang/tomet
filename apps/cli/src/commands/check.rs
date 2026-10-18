@@ -1,9 +1,24 @@
 use std::io::{self, Write};
 use std::path::Path;
 
+use rayon::prelude::*;
 use tomet_load::{Findings, is_error};
 
 use crate::util::{format_parse_error, read};
+
+enum CheckFileResult {
+    ReadError,
+    ParseError {
+        json_entry: Option<serde_json::Value>,
+        text: String,
+    },
+    Checked {
+        warnings: usize,
+        has_errors: bool,
+        stderr_lines: Vec<String>,
+        json_entries: Vec<serde_json::Value>,
+    },
+}
 
 /// Checks one file, or every `.tmt` under a directory.
 ///
@@ -12,6 +27,13 @@ use crate::util::{format_parse_error, read};
 /// -- while the js/java/python bindings and `apps/web` all ran the
 /// validator. Vocabularies have to be read from disk, which is why the
 /// resolving lives here and not in the validator.
+///
+/// Multi-file checking runs in parallel across rayon worker threads, and
+/// produces all output (stderr diagnostics, summary, and JSON) in file order
+/// after every file has completed. Unlike the earlier serial loop that printed
+/// diagnostics as each file was checked, nothing is printed while files are being
+/// processed, and for a large vault with many findings the full result is held
+/// in memory until the end.
 pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow::Result<()> {
     if data {
         if !path.is_file() {
@@ -58,97 +80,146 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
     let mut checked = 0usize;
     let mut failed = 0usize;
     let mut warned = 0usize;
-    let mut json_files: Vec<serde_json::Value> = Vec::with_capacity(if json { files.len() } else { 0 });
+    let mut json_files: Vec<serde_json::Value> =
+        Vec::with_capacity(if json { files.len() } else { 0 });
 
-    let mut err_out = io::stderr().lock();
-    for file in &files {
-        let Ok(src) = std::fs::read_to_string(file) else {
-            let _ = writeln!(err_out, "could not read {}", file.display());
-            failed += 1;
-            continue;
-        };
+    // Phase 1: Per-file, in parallel, pure
+    let results: Vec<CheckFileResult> = files
+        .par_iter()
+        .map(|file| {
+            let Ok(src) = std::fs::read_to_string(file) else {
+                return CheckFileResult::ReadError;
+            };
 
-        // Report and keep going, the convention `check_vault` and
-        // `refactor --check` already follow: one broken file should not
-        // hide the state of the rest.
-        let doc = match tomet_parser::parse_document(&src) {
-            Ok(doc) => doc,
-            Err(err) => {
-                if json {
-                    json_files.push(serde_json::json!({
+            let doc = match tomet_parser::parse_document(&src) {
+                Ok(doc) => doc,
+                Err(err) => {
+                    let (json_entry, text) = if json {
+                        (
+                            Some(serde_json::json!({
+                                "file": file.display().to_string(),
+                                "error": {
+                                    "message": err.message,
+                                    "line": err.line,
+                                    "column": err.column,
+                                    "offset": err.offset,
+                                }
+                            })),
+                            String::new(),
+                        )
+                    } else {
+                        (None, format_parse_error(file, &src, &err))
+                    };
+                    return CheckFileResult::ParseError { json_entry, text };
+                }
+            };
+
+            let findings = vault.findings(file, &doc);
+            let index = tomet_lexer::LineIndex::new(&src);
+            let warnings = findings.warnings();
+            let has_errors = findings.has_errors();
+            let Findings {
+                diagnostics,
+                unresolved,
+            } = findings;
+
+            let mut stderr_lines = Vec::new();
+            let mut json_entries = Vec::new();
+
+            if json {
+                for u in &unresolved {
+                    json_entries.push(serde_json::json!({
                         "file": file.display().to_string(),
-                        "error": {
-                            "message": err.message,
-                            "line": err.line,
-                            "column": err.column,
-                            "offset": err.offset,
-                        }
+                        "errors": [{
+                            "message": u.message(),
+                            "severity": "warning",
+                        }],
+                    }));
+                }
+            } else {
+                for u in &unresolved {
+                    stderr_lines.push(format!(
+                        "{}:{}: warning: {}",
+                        file.display(),
+                        index.line_col(u.span.start).line,
+                        u.message()
+                    ));
+                }
+            }
+
+            let failed = if diagnostics.is_empty() {
+                false
+            } else {
+                if json {
+                    let error_list: Vec<serde_json::Value> = diagnostics
+                        .iter()
+                        .map(|d| {
+                            serde_json::json!({
+                                "message": d.message_in(&index),
+                                "severity": if is_error(d) { "error" } else { "warning" },
+                            })
+                        })
+                        .collect();
+                    json_entries.push(serde_json::json!({
+                        "file": file.display().to_string(),
+                        "errors": error_list,
                     }));
                 } else {
-                    let _ = writeln!(err_out, "{}", format_parse_error(file, &src, &err));
+                    for d in &diagnostics {
+                        let label = if is_error(d) { "" } else { "warning: " };
+                        stderr_lines.push(format!(
+                            "{}: {label}{}",
+                            file.display(),
+                            d.message_in(&index)
+                        ));
+                    }
+                }
+                has_errors
+            };
+
+            CheckFileResult::Checked {
+                warnings,
+                has_errors: failed,
+                stderr_lines,
+                json_entries,
+            }
+        })
+        .collect();
+
+    // Phase 2: In order, serial
+    let mut err_out = io::stderr().lock();
+    for (file, res) in files.iter().zip(results) {
+        match res {
+            CheckFileResult::ReadError => {
+                let _ = writeln!(err_out, "could not read {}", file.display());
+                failed += 1;
+            }
+            CheckFileResult::ParseError { json_entry, text } => {
+                if let Some(entry) = json_entry {
+                    json_files.push(entry);
+                } else {
+                    let _ = writeln!(err_out, "{text}");
                 }
                 failed += 1;
-                continue;
             }
-        };
-
-        let findings = vault.findings(file, &doc);
-        // One index per file: diagnostics carry byte spans, and this is where
-        // they become the line:column a reader sees.
-        let index = tomet_lexer::LineIndex::new(&src);
-        checked += 1;
-        warned += findings.warnings();
-        let has_errors = findings.has_errors();
-        let Findings {
-            diagnostics,
-            unresolved,
-        } = findings;
-        if json {
-            for u in &unresolved {
-                json_files.push(serde_json::json!({
-                    "file": file.display().to_string(),
-                    "errors": [{
-                        "message": u.message(),
-                        "severity": "warning",
-                    }],
-                }));
-            }
-        } else {
-            for u in &unresolved {
-                let _ = writeln!(
-                    err_out,
-                    "{}:{}: warning: {}",
-                    file.display(),
-                    index.line_col(u.span.start).line,
-                    u.message()
-                );
-            }
-        }
-
-        if diagnostics.is_empty() {
-            continue;
-        }
-
-        if has_errors {
-            failed += 1;
-        }
-
-        if json {
-            let error_list: Vec<serde_json::Value> = diagnostics
-                .iter()
-                .map(|d| serde_json::json!({
-                    "message": d.message_in(&index),
-                    "severity": if is_error(d) { "error" } else { "warning" },
-                }))
-                .collect();
-            json_files.push(serde_json::json!({
-                "file": file.display().to_string(),
-                "errors": error_list,
-            }));
-        } else {
-            for d in &diagnostics {
-                let label = if is_error(d) { "" } else { "warning: " };
-                let _ = writeln!(err_out, "{}: {label}{}", file.display(), d.message_in(&index));
+            CheckFileResult::Checked {
+                warnings,
+                has_errors,
+                stderr_lines,
+                json_entries,
+            } => {
+                checked += 1;
+                warned += warnings;
+                if has_errors {
+                    failed += 1;
+                }
+                if json {
+                    json_files.extend(json_entries);
+                } else {
+                    for line in stderr_lines {
+                        let _ = writeln!(err_out, "{line}");
+                    }
+                }
             }
         }
     }
