@@ -46,89 +46,145 @@ fn find_matching(src: &str, open_pos: usize, open: char, close: char) -> Option<
 ///
 /// Swaps `()` and `[]` for elements carrying both args and content groups based on configured element rules.
 pub fn format_element_group_order(src: &str, config: &PrinterConfig) -> String {
-    let mut current = src.to_string();
-    let mut iterations = 0;
-    const MAX_ITERATIONS: usize = 200;
+    const MAX_SWAPS: usize = 200;
+    let mut swaps = Vec::new();
+    collect_swaps(src, config, &mut swaps, MAX_SWAPS);
 
-    while iterations < MAX_ITERATIONS {
-        if let Some(next) = find_and_swap_one_element(&current, config) {
-            current = next;
-            iterations += 1;
-        } else {
+    if swaps.is_empty() {
+        return src.to_string();
+    }
+
+    // Sort by span length ascending (innermost / shortest span first).
+    // Because swapping does not change byte length:
+    // (len(part1) + len(gap) + len(part2) == len(part2) + len(gap) + len(part1)),
+    // every offset remains strictly invariant during and after each swap.
+    swaps.sort_by_key(|s| s.close_second - s.open_first);
+
+    let mut buf = src.as_bytes().to_vec();
+
+    for target in swaps {
+        let part1 = buf[target.open_first..target.gap_start].to_vec();
+        let gap = buf[target.gap_start..target.gap_end].to_vec();
+        let part2 = buf[target.gap_end..=target.close_second].to_vec();
+
+        let mut offset = target.open_first;
+        buf[offset..offset + part2.len()].copy_from_slice(&part2);
+        offset += part2.len();
+        buf[offset..offset + gap.len()].copy_from_slice(&gap);
+        offset += gap.len();
+        buf[offset..offset + part1.len()].copy_from_slice(&part1);
+    }
+
+    String::from_utf8(buf).unwrap_or_else(|_| src.to_string())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SwapTarget {
+    open_first: usize,
+    gap_start: usize,
+    gap_end: usize,
+    close_second: usize,
+}
+
+fn collect_swaps(src: &str, config: &PrinterConfig, swaps: &mut Vec<SwapTarget>, limit: usize) {
+    let Ok(doc) = parse_document(src) else { return };
+    for block in &doc.blocks {
+        collect_swaps_in_block(block, src, config, swaps, limit);
+        if swaps.len() >= limit {
             break;
         }
     }
-    current
 }
 
-fn find_and_swap_one_element(src: &str, config: &PrinterConfig) -> Option<String> {
-    let doc = parse_document(src).ok()?;
-    for block in &doc.blocks {
-        if let Some(swapped) = find_swap_in_block(block, src, config) {
-            return Some(swapped);
-        }
+fn collect_swaps_in_block(
+    block: &Block,
+    src: &str,
+    config: &PrinterConfig,
+    swaps: &mut Vec<SwapTarget>,
+    limit: usize,
+) {
+    if swaps.len() >= limit {
+        return;
     }
-    None
-}
-
-fn find_swap_in_block(block: &Block, src: &str, config: &PrinterConfig) -> Option<String> {
     match block {
         Block::Paragraph(p) => {
             for inline in &p.content {
-                if let Some(swapped) = find_swap_in_inline(inline, src, config) {
-                    return Some(swapped);
+                collect_swaps_in_inline(inline, src, config, swaps, limit);
+                if swaps.len() >= limit {
+                    return;
                 }
             }
         }
         Block::Element(el) => {
-            if let Some(swapped) = check_and_swap_element(el, src, config) {
-                return Some(swapped);
-            }
+            collect_swaps_in_element(el, src, config, swaps, limit);
         }
         Block::Section(sec) => {
             for inline in &sec.title {
-                if let Some(swapped) = find_swap_in_inline(inline, src, config) {
-                    return Some(swapped);
+                collect_swaps_in_inline(inline, src, config, swaps, limit);
+                if swaps.len() >= limit {
+                    return;
                 }
             }
             for conn in &sec.connects {
-                if let Some(swapped) = check_and_swap_element(conn, src, config) {
-                    return Some(swapped);
+                collect_swaps_in_element(conn, src, config, swaps, limit);
+                if swaps.len() >= limit {
+                    return;
                 }
             }
             for child in &sec.blocks {
-                if let Some(swapped) = find_swap_in_block(child, src, config) {
-                    return Some(swapped);
+                collect_swaps_in_block(child, src, config, swaps, limit);
+                if swaps.len() >= limit {
+                    return;
                 }
             }
         }
-        Block::List(list) => return find_swap_in_list(list, src, config),
+        Block::List(list) => collect_swaps_in_list(list, src, config, swaps, limit),
     }
-    None
 }
 
-fn find_swap_in_list(list: &List, src: &str, config: &PrinterConfig) -> Option<String> {
+fn collect_swaps_in_list(
+    list: &List,
+    src: &str,
+    config: &PrinterConfig,
+    swaps: &mut Vec<SwapTarget>,
+    limit: usize,
+) {
     for item in &list.items {
-        if let Some(swapped) = check_and_swap_element(&item.element, src, config) {
-            return Some(swapped);
+        collect_swaps_in_element(&item.element, src, config, swaps, limit);
+        if swaps.len() >= limit {
+            return;
         }
-        if let Some(sub) = &item.sublist
-            && let Some(swapped) = find_swap_in_list(sub, src, config)
-        {
-            return Some(swapped);
+        if let Some(sub) = &item.sublist {
+            collect_swaps_in_list(sub, src, config, swaps, limit);
+            if swaps.len() >= limit {
+                return;
+            }
         }
-    }
-    None
-}
-
-fn find_swap_in_inline(inline: &Inline, src: &str, config: &PrinterConfig) -> Option<String> {
-    match inline {
-        Inline::Element(el) => check_and_swap_element(el, src, config),
-        _ => None,
     }
 }
 
-fn check_and_swap_element(el: &Element, src: &str, config: &PrinterConfig) -> Option<String> {
+fn collect_swaps_in_inline(
+    inline: &Inline,
+    src: &str,
+    config: &PrinterConfig,
+    swaps: &mut Vec<SwapTarget>,
+    limit: usize,
+) {
+    if let Inline::Element(el) = inline {
+        collect_swaps_in_element(el, src, config, swaps, limit);
+    }
+}
+
+fn collect_swaps_in_element(
+    el: &Element,
+    src: &str,
+    config: &PrinterConfig,
+    swaps: &mut Vec<SwapTarget>,
+    limit: usize,
+) {
+    if swaps.len() >= limit {
+        return;
+    }
     // 1. Check if this element itself needs swapping
     let elem_name = el.sigil.name().map(|n| n.name.as_str()).unwrap_or("");
     if let Some(order) = config.element_group_order(elem_name)
@@ -141,42 +197,46 @@ fn check_and_swap_element(el: &Element, src: &str, config: &PrinterConfig) -> Op
         let end = el.span.end;
         if start < end
             && end <= src.len()
-            && let Some(swapped) = try_swap_element_groups(src, start, end, order)
+            && let Some(target) = detect_swap_element_groups(src, start, end, order)
         {
-            return Some(swapped);
+            swaps.push(target);
+            if swaps.len() >= limit {
+                return;
+            }
         }
     }
 
     // 2. Otherwise recursively check children
     if let Some(blocks) = &el.content {
         for block in blocks {
-            if let Some(swapped) = find_swap_in_block(block, src, config) {
-                return Some(swapped);
+            collect_swaps_in_block(block, src, config, swaps, limit);
+            if swaps.len() >= limit {
+                return;
             }
         }
     }
     if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
         for child in children {
-            if let Some(swapped) = check_and_swap_element(child, src, config) {
-                return Some(swapped);
+            collect_swaps_in_element(child, src, config, swaps, limit);
+            if swaps.len() >= limit {
+                return;
             }
         }
     }
     for conn in &el.connects {
-        if let Some(swapped) = check_and_swap_element(conn, src, config) {
-            return Some(swapped);
+        collect_swaps_in_element(conn, src, config, swaps, limit);
+        if swaps.len() >= limit {
+            return;
         }
     }
-
-    None
 }
 
-fn try_swap_element_groups(
+fn detect_swap_element_groups(
     src: &str,
     start: usize,
     end: usize,
     order: GroupOrder,
-) -> Option<String> {
+) -> Option<SwapTarget> {
     let bytes = src.as_bytes();
     let mut pos = start;
 
@@ -217,17 +277,12 @@ fn try_swap_element_groups(
             let close_bracket = find_matching(src, open_bracket, '[', ']')?;
 
             if order == GroupOrder::ContentFirst {
-                let args_part = &src[open_paren..=close_paren];
-                let gap = &src[close_paren + 1..open_bracket];
-                let content_part = &src[open_bracket..=close_bracket];
-
-                let mut out = String::with_capacity(src.len());
-                out.push_str(&src[..open_paren]);
-                out.push_str(content_part);
-                out.push_str(gap);
-                out.push_str(args_part);
-                out.push_str(&src[close_bracket + 1..]);
-                return Some(out);
+                return Some(SwapTarget {
+                    open_first: open_paren,
+                    gap_start: close_paren + 1,
+                    gap_end: open_bracket,
+                    close_second: close_bracket,
+                });
             }
         }
     } else if bytes[pos] == b'[' {
@@ -242,17 +297,12 @@ fn try_swap_element_groups(
             let close_paren = find_matching(src, open_paren, '(', ')')?;
 
             if order == GroupOrder::ArgsFirst {
-                let content_part = &src[open_bracket..=close_bracket];
-                let gap = &src[close_bracket + 1..open_paren];
-                let args_part = &src[open_paren..=close_paren];
-
-                let mut out = String::with_capacity(src.len());
-                out.push_str(&src[..open_bracket]);
-                out.push_str(args_part);
-                out.push_str(gap);
-                out.push_str(content_part);
-                out.push_str(&src[close_paren + 1..]);
-                return Some(out);
+                return Some(SwapTarget {
+                    open_first: open_bracket,
+                    gap_start: close_bracket + 1,
+                    gap_end: open_paren,
+                    close_second: close_paren,
+                });
             }
         }
     }

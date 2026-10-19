@@ -1669,6 +1669,8 @@ name = "tomet-benches"
 version = "0.2.0"
 dependencies = [
  "criterion",
+ "tomet-config",
+ "tomet-formatter",
  "tomet-parser",
  "tomet-synth",
  "tomet-tests",

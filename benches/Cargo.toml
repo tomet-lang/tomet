@@ -18,7 +18,14 @@ name = "parse"
 path = "benches/parse.rs"
 harness = false
 
+[[bench]]
+name = "format"
+path = "benches/format.rs"
+harness = false
+
 [dependencies]
+tomet-formatter = { workspace = true }
+tomet-config = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-synth = { workspace = true }
 # The frozen `.tmt` corpus and its allow-list of known-unparseable files.
@@ -26,3 +33,4 @@ tomet-tests = { path = "../tests" }
 
 #= Crates.io
 criterion = { workspace = true }
+

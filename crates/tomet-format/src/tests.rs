@@ -320,3 +320,61 @@ fn test_format_element_group_order_link_override_global() {
         "@link[Example](\"https://example.com\")\n\n@card(foo: 1)[Bar Content]\n"
     );
 }
+
+#[test]
+fn format_element_group_order_scaling_is_linear_not_quadratic() {
+    let config = PrinterConfig {
+        format: FormatConfig {
+            link_group_order: Some(GroupOrder::ContentFirst),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let make_doc = |n: usize| -> String {
+        let mut s = String::new();
+        for i in 0..n {
+            s.push_str(&format!(
+                "Paragraph with @link(ref:\"target_{i}\")[Link {i}] and some text.\n\n"
+            ));
+        }
+        s
+    };
+
+    let doc_small = make_doc(20);
+    let doc_large = make_doc(80); // 4x elements and ~4x document size
+
+    // Warm up
+    let _ = format_source_with_config(&doc_small, &config);
+    let _ = format_source_with_config(&doc_large, &config);
+
+    // Measure medians over several iterations to avoid noise
+    let mut times_small = Vec::new();
+    let mut times_large = Vec::new();
+    for _ in 0..9 {
+        let t0 = std::time::Instant::now();
+        let _ = format_source_with_config(&doc_small, &config);
+        times_small.push(t0.elapsed());
+
+        let t0 = std::time::Instant::now();
+        let _ = format_source_with_config(&doc_large, &config);
+        times_large.push(t0.elapsed());
+    }
+
+    times_small.sort();
+    times_large.sort();
+    let med_small = times_small[4].as_nanos() as f64;
+    let med_large = times_large[4].as_nanos() as f64;
+
+    let ratio = med_large / med_small.max(1.0);
+
+    // For a 4x increase in input size:
+    // - Linear O(N) scaling yields ratio ~ 4.0.
+    // - Quadratic O(N^2) scaling (e.g. re-parsing per swapped element) yields ratio ~ 16.0.
+    // The test asserts ratio < 10.0, which decisively fails on O(N^2) while leaving
+    // plenty of headroom for linear scaling noise.
+    assert!(
+        ratio < 10.0,
+        "Scaling ratio {ratio:.2} exceeds threshold 10.0 for 4x size increase (small: {med_small:.0}ns, large: {med_large:.0}ns)"
+    );
+}

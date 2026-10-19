@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-benches, dependencies: list(tomet-parser, tomet-tests), dependents: list()}
+@meta{crate: tomet-benches, dependencies: list(tomet-config, tomet-formatter, tomet-parser, tomet-tests), dependents: list()}
 
 =[tomet-benches]
 
