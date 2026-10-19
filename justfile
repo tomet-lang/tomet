@@ -74,33 +74,15 @@ docs:
     if [ -n "$twrit_bin" ]; then \
         "$twrit_bin" api .; \
     fi
-    ./target/debug/tomet export .
-    ./target/debug/tomet format .
+    PATH="{{ justfile_directory() }}/target/debug:$PATH" sisho fix .
 
 # The placement check stays here because it is this repository's docs
 # layout, not a rule of the language. It is `twrit`'s job when `twrit`
 # reads `.writ.tmt` itself.
 docs-check:
     cargo build -p tomet-cli
-    ./target/debug/tomet check .
-    ./target/debug/tomet format --check .
-    ./target/debug/tomet export --check .
+    PATH="{{ justfile_directory() }}/target/debug:$PATH" sisho check .
     ./target/debug/tomet cli-docs --check --out tmtroot/generated/cli.tmt
-    @twrit_bin=""; \
-    for cand in \
-        ../twrit/target/debug/twrit \
-        ../../../../twrit/target/debug/twrit; do \
-        if [ -x "$cand" ]; then \
-            twrit_bin="$cand"; \
-            break; \
-        fi; \
-    done; \
-    if [ -z "$twrit_bin" ] && command -v twrit >/dev/null 2>&1; then \
-        twrit_bin=twrit; \
-    fi; \
-    if [ -n "$twrit_bin" ]; then \
-        "$twrit_bin" check .; \
-    fi
 
 # Run the two guards that `.writ.tmt` entries name but nothing executed.
 #
