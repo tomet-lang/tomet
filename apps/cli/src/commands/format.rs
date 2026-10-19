@@ -55,15 +55,15 @@ fn collect_dir(dir: &Path, force: bool) -> Vec<PathBuf> {
 
 /// Formats one or more files or directories.
 ///
-/// Under `--check`, formatting checks run in parallel across rayon worker threads,
-/// reporting unformatted files in file order, or aborting on the first unreadable
-/// file in file order.
+/// Under `--check`, formatting checks run in parallel across rayon worker threads
+/// governed by the jobserver gate, reporting unformatted files in file order, or
+/// aborting on the first unreadable file in file order.
 ///
 /// Under `-i` (write), files are formatted and written in parallel across worker
-/// threads. Before this change, a failed write to standard output (for example
-/// piped to `head`) stopped the loop at that file and left subsequent files
-/// unformatted. Now every file is written first, and the file listing is printed
-/// afterwards.
+/// threads governed by the jobserver gate. Before this change, a failed write to
+/// standard output (for example piped to `head`) stopped the loop at that file and
+/// left subsequent files unformatted. Now every file is written first, and the
+/// file listing is printed afterwards.
 pub(crate) fn format_cmd(
     paths: &[PathBuf],
     write: bool,
@@ -115,11 +115,13 @@ pub(crate) fn format_cmd(
         let results: Vec<io::Result<bool>> = files
             .par_iter()
             .map(|file| {
+                let _token = crate::gate::acquire();
                 let src = fs::read_to_string(file)?;
                 let is_unformatted = format_file(file, &src) != src;
                 Ok(is_unformatted)
             })
             .collect();
+        crate::gate::reclaim_implicit_token();
 
         // Phase 2: In order, serial
         let mut unformatted = Vec::new();
@@ -147,21 +149,25 @@ pub(crate) fn format_cmd(
         // Phase 1: Per-file, in parallel, writes directly
         let results: Vec<FormatWriteResult> = files
             .par_iter()
-            .map(|file| match fs::read_to_string(file) {
-                Ok(src) => {
-                    let formatted = format_file(file, &src);
-                    if formatted == src {
-                        FormatWriteResult::Unchanged
-                    } else {
-                        match fs::write(file, formatted) {
-                            Ok(()) => FormatWriteResult::Written,
-                            Err(e) => FormatWriteResult::WriteError(e),
+            .map(|file| {
+                let _token = crate::gate::acquire();
+                match fs::read_to_string(file) {
+                    Ok(src) => {
+                        let formatted = format_file(file, &src);
+                        if formatted == src {
+                            FormatWriteResult::Unchanged
+                        } else {
+                            match fs::write(file, formatted) {
+                                Ok(()) => FormatWriteResult::Written,
+                                Err(e) => FormatWriteResult::WriteError(e),
+                            }
                         }
                     }
+                    Err(e) => FormatWriteResult::ReadError(e),
                 }
-                Err(e) => FormatWriteResult::ReadError(e),
             })
             .collect();
+        crate::gate::reclaim_implicit_token();
 
         // Phase 2: In order, serial
         let mut changed = 0;

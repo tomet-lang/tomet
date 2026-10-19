@@ -28,12 +28,12 @@ enum CheckFileResult {
 /// validator. Vocabularies have to be read from disk, which is why the
 /// resolving lives here and not in the validator.
 ///
-/// Multi-file checking runs in parallel across rayon worker threads, and
-/// produces all output (stderr diagnostics, summary, and JSON) in file order
-/// after every file has completed. Unlike the earlier serial loop that printed
-/// diagnostics as each file was checked, nothing is printed while files are being
-/// processed, and for a large vault with many findings the full result is held
-/// in memory until the end.
+/// Multi-file checking runs in parallel across rayon worker threads governed
+/// by the jobserver gate, and produces all output (stderr diagnostics, summary,
+/// and JSON) in file order after every file has completed. Unlike the earlier
+/// serial loop that printed diagnostics as each file was checked, nothing is
+/// printed while files are being processed, and for a large vault with many
+/// findings the full result is held in memory until the end.
 pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow::Result<()> {
     if data {
         if !path.is_file() {
@@ -87,6 +87,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
     let results: Vec<CheckFileResult> = files
         .par_iter()
         .map(|file| {
+            let _token = crate::gate::acquire();
             let Ok(src) = std::fs::read_to_string(file) else {
                 return CheckFileResult::ReadError;
             };
@@ -185,6 +186,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
             }
         })
         .collect();
+    crate::gate::reclaim_implicit_token();
 
     // Phase 2: In order, serial
     let mut err_out = io::stderr().lock();

@@ -104,8 +104,9 @@ impl Report {
 /// at.
 ///
 /// Multi-file stats run per-file measurements in parallel across rayon worker
-/// threads. Results are collected into memory and merged in file order to build
-/// the final report; output is produced only after all files have completed.
+/// threads governed by the jobserver gate. Results are collected into memory
+/// and merged in file order to build the final report; output is produced only
+/// after all files have completed.
 ///
 /// The files are found the way `check` finds them, through the vault, so
 /// `workspace.ignore` applies. A file that cannot be read or parsed is left
@@ -125,6 +126,7 @@ fn collect_report(path: &Path) -> anyhow::Result<(Report, usize)> {
     let results: Vec<StatsFileResult> = files
         .par_iter()
         .map(|file| {
+            let _token = crate::gate::acquire();
             let Ok(src) = std::fs::read_to_string(file) else {
                 return StatsFileResult::Unreadable;
             };
@@ -147,6 +149,7 @@ fn collect_report(path: &Path) -> anyhow::Result<(Report, usize)> {
             }
         })
         .collect();
+    crate::gate::reclaim_implicit_token();
 
     // Phase 2: In order, serial
     let mut by_kind: BTreeMap<Option<String>, Stats> = BTreeMap::new();

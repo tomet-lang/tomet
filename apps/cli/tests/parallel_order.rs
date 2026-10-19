@@ -41,12 +41,10 @@ impl TempVaultGuard {
 impl Drop for TempVaultGuard {
     fn drop(&mut self) {
         for file in &self.unreadable_files {
-            if file.exists() {
-                if let Ok(meta) = fs::metadata(file) {
-                    let mut perms = meta.permissions();
-                    perms.set_mode(0o644);
-                    let _ = fs::set_permissions(file, perms);
-                }
+            if let Ok(meta) = fs::metadata(file) {
+                let mut perms = meta.permissions();
+                perms.set_mode(0o644);
+                let _ = fs::set_permissions(file, perms);
             }
         }
         let _ = fs::remove_dir_all(&self.path);
@@ -405,4 +403,138 @@ fn test_parallel_determinism_and_order() {
     assert_deterministic_50_runs(&["format", "--check"], vault_dir);
     assert_deterministic_50_runs(&["stats"], vault_dir);
     assert_deterministic_50_runs(&["stats", "--json"], vault_dir);
+}
+
+#[test]
+fn test_jobserver_identical_output() {
+    let temp_root = std::env::temp_dir().join(format!(
+        "tomet_jobserver_test_{}_{}",
+        std::process::id(),
+        nanoid::nanoid!()
+    ));
+
+    let mut guard = TempVaultGuard::new(temp_root);
+    setup_vault(&mut guard);
+    let vault_str = guard.path.to_str().unwrap();
+    let bin = bin_path();
+
+    for subcmd in [&["check"][..], &["format", "--check"][..], &["stats"][..]] {
+        let mut full_args = subcmd.to_vec();
+        full_args.push(vault_str);
+
+        let baseline = run_cmd(&bin, &full_args);
+
+        let client = jobserver::Client::new(1).unwrap();
+        let mut cmd = Command::new(&bin);
+        cmd.args(&full_args);
+        client.configure(&mut cmd);
+        let output = cmd.output().expect("failed to run tomet with jobserver");
+
+        assert_eq!(
+            baseline.status.code(),
+            output.status.code(),
+            "exit code differed for {full_args:?}"
+        );
+        assert_eq!(
+            baseline.stdout, output.stdout,
+            "stdout differed for {full_args:?}"
+        );
+        assert_eq!(
+            baseline.stderr, output.stderr,
+            "stderr differed for {full_args:?}"
+        );
+    }
+}
+
+#[test]
+fn test_broken_jobserver_prints_warning_and_preserves_output() {
+    let temp_root = std::env::temp_dir().join(format!(
+        "tomet_broken_jobserver_{}_{}",
+        std::process::id(),
+        nanoid::nanoid!()
+    ));
+
+    let mut guard = TempVaultGuard::new(temp_root);
+    setup_vault(&mut guard);
+    let vault_str = guard.path.to_str().unwrap();
+    let bin = bin_path();
+
+    for subcmd in [&["check"][..], &["format", "--check"][..], &["stats"][..]] {
+        let mut full_args = subcmd.to_vec();
+        full_args.push(vault_str);
+
+        let baseline = run_cmd(&bin, &full_args);
+
+        let output = Command::new(&bin)
+            .args(&full_args)
+            .env("MAKEFLAGS", "--jobserver-auth=998,999")
+            .output()
+            .expect("failed to run tomet");
+
+        assert_eq!(
+            baseline.status.code(),
+            output.status.code(),
+            "exit code differed for {full_args:?}"
+        );
+        assert_eq!(
+            baseline.stdout, output.stdout,
+            "stdout differed for {full_args:?}"
+        );
+
+        let stderr_text = String::from_utf8_lossy(&output.stderr);
+        let warning_lines: Vec<_> = stderr_text
+            .lines()
+            .filter(|l| l.starts_with("warning: failed to connect to jobserver"))
+            .collect();
+        assert_eq!(
+            warning_lines.len(),
+            1,
+            "expected exactly one warning line, got:\n{stderr_text}"
+        );
+
+        let baseline_stderr = String::from_utf8_lossy(&baseline.stderr);
+        let non_warning_lines: Vec<_> = stderr_text
+            .lines()
+            .filter(|l| !l.starts_with("warning: failed to connect to jobserver"))
+            .collect();
+        let expected_baseline_lines: Vec<_> = baseline_stderr.lines().collect();
+        assert_eq!(non_warning_lines, expected_baseline_lines);
+    }
+}
+
+#[test]
+fn test_inherited_jobserver_does_not_leak_tokens() {
+    let temp_root = std::env::temp_dir().join(format!(
+        "tomet_leak_test_{}_{}",
+        std::process::id(),
+        nanoid::nanoid!()
+    ));
+
+    let mut guard = TempVaultGuard::new(temp_root);
+    setup_vault(&mut guard);
+    let vault_str = guard.path.to_str().unwrap();
+    let bin = bin_path();
+
+    for subcmd in [&["check"][..], &["format", "--check"][..], &["stats"][..]] {
+        let mut full_args = subcmd.to_vec();
+        full_args.push(vault_str);
+
+        let client = jobserver::Client::new(1).unwrap();
+        let mut cmd = Command::new(&bin);
+        cmd.args(&full_args);
+        client.configure(&mut cmd);
+        let output = cmd.output().expect("failed to run tomet");
+        assert!(output.status.code().is_some());
+
+        let mut tokens = Vec::new();
+        while client.available().unwrap_or(0) > 0 {
+            tokens.push(client.acquire().unwrap());
+        }
+        assert_eq!(
+            tokens.len(),
+            1,
+            "pipe should have exactly 1 token after running {full_args:?}, but had {}",
+            tokens.len()
+        );
+    }
 }

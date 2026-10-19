@@ -23,6 +23,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 mod cli;
 mod commands;
+mod gate;
 mod util;
 
 use std::process::ExitCode;
@@ -46,6 +47,8 @@ use commands::to_pandoc::to_pandoc;
 use commands::to_typst::to_typst;
 
 fn main() -> ExitCode {
+    gate::init_from_env();
+
     let cli = Cli::parse();
 
     let result = match &cli.command {

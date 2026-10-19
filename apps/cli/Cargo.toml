@@ -36,6 +36,7 @@ tove = { workspace = true }
 #= Crates.io
 anyhow = { workspace = true }
 clap = { workspace = true }
+jobserver = { workspace = true }
 mimalloc = { workspace = true }
 nanoid = { workspace = true }
 rayon = { workspace = true }
