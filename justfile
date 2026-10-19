@@ -59,21 +59,6 @@ format-check:
 docs:
     cargo build -p tomet-cli
     ./target/debug/tomet cli-docs --out tmtroot/generated/cli.tmt
-    @twrit_bin=""; \
-    for cand in \
-        ../twrit/target/debug/twrit \
-        ../../../../twrit/target/debug/twrit; do \
-        if [ -x "$cand" ]; then \
-            twrit_bin="$cand"; \
-            break; \
-        fi; \
-    done; \
-    if [ -z "$twrit_bin" ] && command -v twrit >/dev/null 2>&1; then \
-        twrit_bin=twrit; \
-    fi; \
-    if [ -n "$twrit_bin" ]; then \
-        "$twrit_bin" api .; \
-    fi
     PATH="{{ justfile_directory() }}/target/debug:$PATH" sisho fix .
 
 # The placement check stays here because it is this repository's docs
