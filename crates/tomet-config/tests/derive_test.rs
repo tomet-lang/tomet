@@ -1,7 +1,9 @@
+extern crate tomet_config as tomet_spec;
+
 use tomet_ast::Value;
+use tomet_config::Config;
 use tomet_config::all_config_specs;
 use tomet_config::schema::{ConfigEntrySpec, ConfigSpecProvider};
-use tomet_config::Config;
 use tomet_tree::ValueExt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -110,15 +112,50 @@ fn test_all_config_specs_coverage() {
     );
 
     let format_group = specs.iter().find(|g| g.name == "format").unwrap();
-    assert!(format_group.entries.iter().any(|e| e.key == "heading.space_inside_brackets"));
-    assert!(format_group.entries.iter().any(|e| e.key == "link.no_space"));
-    assert!(format_group.entries.iter().any(|e| e.key == "table.adjust_width"));
+    assert!(
+        format_group
+            .entries
+            .iter()
+            .any(|e| e.key == "heading.space_inside_brackets")
+    );
+    assert!(
+        format_group
+            .entries
+            .iter()
+            .any(|e| e.key == "link.no_space")
+    );
+    assert!(
+        format_group
+            .entries
+            .iter()
+            .any(|e| e.key == "table.adjust_width")
+    );
 
     let meta_group = specs.iter().find(|g| g.name == "meta").unwrap();
-    assert!(meta_group.entries.iter().any(|e| e.key == "meta.always_newline"));
-    assert!(meta_group.entries.iter().any(|e| e.key == "meta.<field>.type"));
+    assert!(
+        meta_group
+            .entries
+            .iter()
+            .any(|e| e.key == "meta.always_newline")
+    );
+    assert!(
+        meta_group
+            .entries
+            .iter()
+            .any(|e| e.key == "meta.<field>.type")
+    );
 
     let workspace_group = specs.iter().find(|g| g.name == "workspace").unwrap();
-    assert!(workspace_group.entries.iter().any(|e| e.key == "workspace.ignore"));
-    assert!(workspace_group.entries.iter().any(|e| e.key == "workspace.unswept"));
+    assert!(
+        workspace_group
+            .entries
+            .iter()
+            .any(|e| e.key == "workspace.ignore")
+    );
+    assert!(
+        workspace_group
+            .entries
+            .iter()
+            .any(|e| e.key == "workspace.unswept")
+    );
 }

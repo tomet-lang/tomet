@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use tomet_ast::Value;
-use tomet_config_derive::Config;
+use tomet_spec_derive::Config;
 use tomet_tree::ValueExt;
 
 fn parse_macros_map(value: &Value) -> Option<HashMap<String, String>> {

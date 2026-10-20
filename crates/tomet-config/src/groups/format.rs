@@ -1,7 +1,7 @@
 //! Formatting and printer rule configuration ([`FormatConfig`], [`GroupOrder`]).
 
 use tomet_ast::Value;
-use tomet_config_derive::Config;
+use tomet_spec_derive::Config;
 use tomet_tree::ValueExt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

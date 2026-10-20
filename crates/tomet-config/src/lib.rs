@@ -14,6 +14,14 @@
 //!   - (tree) AST tree normalization and path lookup utilities.
 
 extern crate self as tomet_config;
+extern crate self as tomet_spec;
+
+#[doc(hidden)]
+pub mod __private {
+    pub use crate::tree::{collect_paths, get_path};
+    pub use tomet_ast::Value;
+    pub use tomet_tree::ValueExt;
+}
 
 pub mod discovery;
 pub mod groups;
@@ -26,7 +34,7 @@ pub use groups::{
     WorkspaceConfig, format, macros, meta, registry, workspace,
 };
 pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
-pub use tomet_config_derive::Config;
+pub use tomet_spec_derive::Config;
 
 use tomet_ast::{Document, Value};
 use tree::merge_entry;

@@ -1,0 +1,11 @@
+@kind(api)
+
+@meta{crate: tomet-spec-derive, dependencies: list(), dependents: list(tomet-config, tomet-spec)}
+
+=[tomet-spec-derive]
+
+Procedural derive macro for Tomet configuration groups.
+
+==[Functions]
+
+===[fn derive_config]

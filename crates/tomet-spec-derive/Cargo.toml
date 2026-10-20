@@ -1,8 +1,8 @@
 [package]
-name = "tomet-config-derive"
+name = "tomet-spec-derive"
 version.workspace = true
 edition.workspace = true
-description = "Procedural derive macro for Tomet configuration groups and runtime specification extraction."
+description = "Procedural derive macro for configuration groups and runtime specification extraction."
 license.workspace = true
 repository.workspace = true
 

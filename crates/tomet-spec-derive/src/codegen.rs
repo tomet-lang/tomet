@@ -21,7 +21,7 @@ pub fn generate_config_impl(container: &ContainerConfig, fields: &[FieldConfig])
         if f.flatten {
             let field_ty = &f.ty;
             spec_entries.push(quote! {
-                entries.extend(<#field_ty as ::tomet_config::schema::ConfigSpecProvider>::spec().entries);
+                entries.extend(<#field_ty as ::tomet_spec::schema::ConfigSpecProvider>::spec().entries);
             });
             continue;
         }
@@ -36,7 +36,7 @@ pub fn generate_config_impl(container: &ContainerConfig, fields: &[FieldConfig])
         };
 
         spec_entries.push(quote! {
-            entries.push(::tomet_config::schema::ConfigEntrySpec {
+            entries.push(::tomet_spec::schema::ConfigEntrySpec {
                 key: #key,
                 value_type: #value_type,
                 default_value: #default_val_tokens,
@@ -73,7 +73,7 @@ pub fn generate_config_impl(container: &ContainerConfig, fields: &[FieldConfig])
             .into_iter()
             .map(|parts| {
                 quote! {
-                    ::tomet_config::tree::get_path(root, &[ #( #parts ),* ])
+                    ::tomet_spec::__private::get_path(root, &[ #( #parts ),* ])
                 }
             })
             .collect();
@@ -101,11 +101,11 @@ pub fn generate_config_impl(container: &ContainerConfig, fields: &[FieldConfig])
     }
 
     quote! {
-        impl ::tomet_config::schema::ConfigSpecProvider for #struct_ident {
-            fn spec() -> ::tomet_config::schema::ConfigGroupSpec {
+        impl ::tomet_spec::schema::ConfigSpecProvider for #struct_ident {
+            fn spec() -> ::tomet_spec::schema::ConfigGroupSpec {
                 let mut entries = Vec::new();
                 #( #spec_entries )*
-                ::tomet_config::schema::ConfigGroupSpec {
+                ::tomet_spec::schema::ConfigGroupSpec {
                     name: #group_name,
                     description: #group_doc,
                     entries,
@@ -115,7 +115,7 @@ pub fn generate_config_impl(container: &ContainerConfig, fields: &[FieldConfig])
 
         impl #struct_ident {
             /// Extracts configuration from a normalized AST configuration root.
-            pub fn from_root(root: &::tomet_ast::Value) -> Self {
+            pub fn from_root(root: &::tomet_spec::__private::Value) -> Self {
                 let mut cfg = Self::default();
                 #( #field_extractions )*
                 cfg
@@ -134,9 +134,9 @@ fn generate_typed_extraction(
     if type_str == "bool" {
         quote! {
             if let Some(v) = #lookup {
-                if let Some(b) = ::tomet_tree::ValueExt::as_bool(v) {
+                if let Some(b) = ::tomet_spec::__private::ValueExt::as_bool(v) {
                     cfg.#field_ident = b;
-                } else if let Some(s) = ::tomet_tree::ValueExt::as_str(v) {
+                } else if let Some(s) = ::tomet_spec::__private::ValueExt::as_str(v) {
                     if s == "true" || s == "1" {
                         cfg.#field_ident = true;
                     } else if s == "false" || s == "0" {
@@ -148,9 +148,9 @@ fn generate_typed_extraction(
     } else if type_str == "Option < bool >" || type_str == "Option<bool>" {
         quote! {
             if let Some(v) = #lookup {
-                if let Some(b) = ::tomet_tree::ValueExt::as_bool(v) {
+                if let Some(b) = ::tomet_spec::__private::ValueExt::as_bool(v) {
                     cfg.#field_ident = Some(b);
-                } else if let Some(s) = ::tomet_tree::ValueExt::as_str(v) {
+                } else if let Some(s) = ::tomet_spec::__private::ValueExt::as_str(v) {
                     if s == "true" || s == "1" {
                         cfg.#field_ident = Some(true);
                     } else if s == "false" || s == "0" {
@@ -161,16 +161,16 @@ fn generate_typed_extraction(
         }
     } else if type_str == "String" {
         quote! {
-            if let Some(s) = (#lookup).and_then(::tomet_tree::ValueExt::as_str) {
+            if let Some(s) = (#lookup).and_then(::tomet_spec::__private::ValueExt::as_str) {
                 cfg.#field_ident = s.to_string();
             }
         }
     } else if type_str == "Option < String >" || type_str == "Option<String>" {
         quote! {
             if let Some(v) = #lookup {
-                if let Some(s) = ::tomet_tree::ValueExt::as_str(v) {
+                if let Some(s) = ::tomet_spec::__private::ValueExt::as_str(v) {
                     cfg.#field_ident = Some(s.to_string());
-                } else if let Some(b) = ::tomet_tree::ValueExt::as_bool(v) {
+                } else if let Some(b) = ::tomet_spec::__private::ValueExt::as_bool(v) {
                     cfg.#field_ident = Some(b.to_string());
                 }
             }
@@ -182,7 +182,7 @@ fn generate_typed_extraction(
         || type_str == "i32"
     {
         quote! {
-            if let Some(n) = (#lookup).and_then(::tomet_tree::ValueExt::as_i64) {
+            if let Some(n) = (#lookup).and_then(::tomet_spec::__private::ValueExt::as_i64) {
                 cfg.#field_ident = n as #ty;
             }
         }
@@ -192,14 +192,14 @@ fn generate_typed_extraction(
         || type_str.starts_with("Option<u64>")
     {
         quote! {
-            if let Some(n) = (#lookup).and_then(::tomet_tree::ValueExt::as_i64) {
+            if let Some(n) = (#lookup).and_then(::tomet_spec::__private::ValueExt::as_i64) {
                 cfg.#field_ident = Some(n as _);
             }
         }
     } else if type_str.contains("Vec < String >") || type_str.contains("Vec<String>") {
         quote! {
             if let Some(v) = #lookup {
-                ::tomet_config::tree::collect_paths(v, &mut cfg.#field_ident);
+                ::tomet_spec::__private::collect_paths(v, &mut cfg.#field_ident);
             }
         }
     } else {

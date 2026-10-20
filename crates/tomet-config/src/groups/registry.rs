@@ -1,6 +1,6 @@
 //! Blueprint and vocabulary file registry declarations ([`RegistryConfig`]).
 
-use tomet_config_derive::Config;
+use tomet_spec_derive::Config;
 
 /// Blueprint and vocabulary file registry declarations.
 #[derive(Debug, Clone, Default, PartialEq, Config)]

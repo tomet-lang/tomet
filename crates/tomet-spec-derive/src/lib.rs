@@ -21,9 +21,12 @@ pub fn derive_config(input: TokenStream) -> TokenStream {
             semi_token: s.semi_token,
         },
         _ => {
-            return syn::Error::new_spanned(input, "#[derive(Config)] is only supported on structs")
-                .to_compile_error()
-                .into();
+            return syn::Error::new_spanned(
+                input,
+                "#[derive(Config)] is only supported on structs",
+            )
+            .to_compile_error()
+            .into();
         }
     };
 

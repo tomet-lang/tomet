@@ -185,13 +185,12 @@ impl FieldConfig {
 }
 
 fn extract_doc_comment(attr: &Attribute) -> Option<String> {
-    if let Meta::NameValue(meta) = &attr.meta {
-        if let Expr::Lit(ExprLit {
+    if let Meta::NameValue(meta) = &attr.meta
+        && let Expr::Lit(ExprLit {
             lit: Lit::Str(s), ..
         }) = &meta.value
-        {
-            return Some(s.value());
-        }
+    {
+        return Some(s.value());
     }
     None
 }
@@ -231,18 +230,18 @@ fn infer_type_string(ty: &Type) -> String {
                     "usize" | "u32" | "u64" | "i32" | "i64" => "int".to_string(),
                     "f64" | "f32" => "float".to_string(),
                     "Option" => {
-                        if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                            if let Some(syn::GenericArgument::Type(inner)) = args.args.first() {
-                                return infer_type_string(inner);
-                            }
+                        if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                            && let Some(syn::GenericArgument::Type(inner)) = args.args.first()
+                        {
+                            return infer_type_string(inner);
                         }
                         "any".to_string()
                     }
                     "Vec" => {
-                        if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                            if let Some(syn::GenericArgument::Type(inner)) = args.args.first() {
-                                return format!("list({})", infer_type_string(inner));
-                            }
+                        if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                            && let Some(syn::GenericArgument::Type(inner)) = args.args.first()
+                        {
+                            return format!("list({})", infer_type_string(inner));
                         }
                         "list".to_string()
                     }

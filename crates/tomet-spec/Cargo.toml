@@ -1,0 +1,21 @@
+[package]
+name = "tomet-spec"
+version.workspace = true
+edition.workspace = true
+description = "Automated .tmt specification and reference generation for CLI commands and configuration schemas."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-config = { workspace = true }
+tomet-formatter = { workspace = true }
+tomet-printer = { workspace = true }
+tomet-spec-derive = { workspace = true }
+tomet-tree = { workspace = true }
+
+#= Crates.io
+clap = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

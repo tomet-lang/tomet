@@ -1721,6 +1721,7 @@ dependencies = [
  "tomet-parser",
  "tomet-printer",
  "tomet-semantics",
+ "tomet-spec",
  "tomet-stats",
  "tomet-tree",
  "tomet-typst",
@@ -1737,19 +1738,10 @@ name = "tomet-config"
 version = "0.2.0"
 dependencies = [
  "tomet-ast",
- "tomet-config-derive",
  "tomet-parser",
  "tomet-semantics",
+ "tomet-spec-derive",
  "tomet-tree",
-]
-
-[[package]]
-name = "tomet-config-derive"
-version = "0.2.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -2034,6 +2026,29 @@ dependencies = [
  "tomet-ast",
  "tomet-parser",
  "tomet-tree",
+]
+
+[[package]]
+name = "tomet-spec"
+version = "0.2.0"
+dependencies = [
+ "clap",
+ "tomet-ast",
+ "tomet-config",
+ "tomet-formatter",
+ "tomet-parser",
+ "tomet-printer",
+ "tomet-spec-derive",
+ "tomet-tree",
+]
+
+[[package]]
+name = "tomet-spec-derive"
+version = "0.2.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]

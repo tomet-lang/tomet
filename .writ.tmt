@@ -30,9 +30,10 @@ does not relax the rule to fit the change it wanted to make.
       "crates/tomet-edit",
       "crates/tomet-merge",
       "crates/tomet-stats",
+      "crates/tomet-spec",
       "crates/tomet-vault"
       )
-    4: list( "crates/tomet-config*" )
+    4: list( "crates/tomet-config*", "crates/tomet-spec-derive" )
     3: list( "crates/tomet-validator*" )
     2: list( "crates/tomet-semantics*" )
     1: list( "crates/tomet-syntax-*", "crates/tove" )
@@ -61,6 +62,8 @@ editing runtimes, and it shares no prefix with the producer groups.
 @dir(crates/tomet-merge) is likewise listed by name: it is pure in-memory three-way AST merge and conflict resolution over parsed documents, and it shares no prefix with the producer groups.
 
 @dir(crates/tomet-stats) is likewise listed by name: it is pure in-memory document statistics and metrics calculation over a parsed AST, and it shares no prefix with the producer groups.
+
+@dir(crates/tomet-spec) is likewise listed by name: it is pure in-memory `.tmt` specification generation for CLI commands and configuration schemas, and it shares no prefix with the producer groups.
 
 @dir(crates/tomet-vault) is likewise listed by name: it is the disk-free half of what `tomet-load` assembles (a vault's config and vocabularies, parse, bind, prepare), so that a caller with no filesystem can use it. `tomet-load` sits above it and adds the reading.
 

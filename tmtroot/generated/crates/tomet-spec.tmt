@@ -1,0 +1,104 @@
+@kind(api)
+
+@meta{crate: tomet-spec, dependencies: list(tomet-ast, tomet-config, tomet-formatter, tomet-parser, tomet-printer, tomet-spec-derive, tomet-tree), dependents: list(tomet-cli)}
+
+=[tomet-spec]
+
+==[tomet-spec]
+
+Automated `.tmt` specification and reference generation for CLI commands (`clap`)
+and configuration schemas (`#[derive(Config)]`).
+
+==[Architecture & Responsibilities]
+
+- ("Single-Crate Consumer Surface") Re-exports [`Config`] (`#[derive(Config)]`), [`ConfigSpecProvider`],
+[`ConfigGroupSpec`], and [`ConfigEntrySpec`] so external repositories
+can define configuration schemas and render `.tmt` specifications by
+depending only on `tomet-spec`.
+- ("Pure In-Memory AST & `.tmt` Generators")
+  - ([`cli`]) Converts `clap::Command` introspection trees into `.tmt` [`Document`](tomet_ast::Document) ASTs and formatted strings.
+  - ([`config`]) Converts [`ConfigGroupSpec`] slices into `.tmt` [`Document`](tomet_ast::Document) ASTs and formatted strings.
+  - ([`util`]) Shared inline code escaping and AST construction utilities.
+
+==[Module cli]
+
+CLI command reference generator from `clap::Command` definitions.
+
+===[Functions]
+
+====[fn render]
+
+Renders a complete formatted CLI specification `.tmt` string from a `clap::Command`.
+
+====[fn document]
+
+Builds a Tomet [`Document`] AST representing the CLI command hierarchy and options.
+
+====[fn push_command]
+
+Appends sections, usage, arguments, options, and subcommands for `cmd` into `out`.
+
+==[Module config]
+
+Configuration reference generator from [`ConfigGroupSpec`] schemas.
+
+===[Functions]
+
+====[fn render]
+
+Renders a complete formatted configuration specification `.tmt` string from [`ConfigGroupSpec`] slices.
+
+====[fn document]
+
+Builds a Tomet [`Document`] AST representing the configuration groups and entries.
+
+====[fn push_group]
+
+Appends a level-2 section and entry list for `group` into `out`.
+
+====[fn entry_item]
+
+Builds a list item element describing a single [`ConfigEntrySpec`].
+
+==[Module util]
+
+Shared AST helpers and formatting utilities for specification generators.
+
+===[Functions]
+
+====[fn dummy]
+
+Returns a dummy source span for synthesized AST nodes.
+
+====[fn text]
+
+Builds a plain text inline node.
+
+====[fn code]
+
+Builds an inline `@raw` code span node.
+
+====[fn paragraph]
+
+Wraps inline nodes into a paragraph block.
+
+====[fn code_block]
+
+Builds a block-level `@raw(lang: "text")` code block element.
+
+====[fn list]
+
+Builds an unordered list from an iterator of list item elements.
+
+====[fn inlines]
+
+Parses text with `` `code` `` spans turned into inline `@raw` code spans,
+and escapes element-like trigger words (`@`, `$`, `^`).
+
+====[fn guard_triggers]
+
+Splits plain text so every element-looking word (`@foo`, `$bar`, `^baz`) is wrapped in a code span.
+
+====[fn paragraphs]
+
+Splits prose on blank lines (`\n\n`) and normalizes internal whitespace per paragraph.

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 use tomet_ast::Value;
-use tomet_config_derive::Config;
+use tomet_spec_derive::Config;
 use tomet_tree::ValueExt;
 
 /// Per-field metadata schema and constraint rules.

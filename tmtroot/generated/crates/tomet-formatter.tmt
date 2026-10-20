@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-formatter, dependencies: list(tomet-ast, tomet-config, tomet-parser), dependents: list(tomet, tomet-benches, tomet-cli, tomet-lsp, tomet-printer, tomet-tests, tomet-workspace)}
+@meta{crate: tomet-formatter, dependencies: list(tomet-ast, tomet-config, tomet-parser), dependents: list(tomet, tomet-benches, tomet-cli, tomet-lsp, tomet-printer, tomet-spec, tomet-tests, tomet-workspace)}
 
 =[tomet-formatter]
 

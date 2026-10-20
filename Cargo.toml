@@ -41,7 +41,6 @@ members = [
 
   #= Config -- PrinterConfig discovery & loading; the producers sit on this
   "crates/tomet-config",
-  "crates/tomet-config-derive",
 
   #= Load -- the front door: config + vocabularies + parse + bind
   "crates/tomet-load",
@@ -61,6 +60,10 @@ members = [
 
   #= Stats -- pure in-memory document statistics & metrics
   "crates/tomet-stats",
+
+  #= Spec -- pure in-memory .tmt specification generation for CLI & Config
+  "crates/tomet-spec",
+  "crates/tomet-spec-derive",
 
   #= Vault -- a vault's config and vocabularies, no disk
   "crates/tomet-vault",
@@ -129,6 +132,9 @@ tomet-edit = { path = "crates/tomet-edit", version = "0.2.0" }
 tomet-merge = { path = "crates/tomet-merge", version = "0.2.0" }
 #= Stats
 tomet-stats = { path = "crates/tomet-stats", version = "0.2.0" }
+#= Spec
+tomet-spec = { path = "crates/tomet-spec", version = "0.2.0" }
+tomet-spec-derive = { path = "crates/tomet-spec-derive", version = "0.2.0" }
 #= Vault
 tomet-vault = { path = "crates/tomet-vault", version = "0.2.0" }
 #= Convert
@@ -145,7 +151,6 @@ tomet-printer = { path = "crates/tomet-format-printer", version = "0.2.0" }
 tomet-style = { path = "crates/tomet-format-style", version = "0.2.0" }
 #= Workspace
 tomet-config = { path = "crates/tomet-config", version = "0.2.0" }
-tomet-config-derive = { path = "crates/tomet-config-derive", version = "0.2.0" }
 tomet-indexer = { path = "crates/tomet-workspace-indexer", version = "0.2.0" }
 tomet-links = { path = "crates/tomet-workspace-links", version = "0.2.0", default-features = false }
 tomet-load = { path = "crates/tomet-load", version = "0.2.0" }
