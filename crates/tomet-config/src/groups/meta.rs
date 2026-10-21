@@ -2,46 +2,73 @@
 
 use std::collections::BTreeMap;
 use tomet_ast::Value;
+use tomet_config_derive::Config;
 use tomet_tree::ValueExt;
 
-use crate::tree::get_path;
-
-#[derive(Debug, Clone, Default, PartialEq)]
+/// Per-field metadata schema and constraint rules.
+#[derive(Debug, Clone, Default, PartialEq, Config)]
+#[config(group = "meta_field")]
 pub struct FieldConfig {
+    /// Expected semantic data type of the metadata field (e.g. `string`, `list`, `datetime`).
+    #[config(key = "meta.<field>.type", type = "string")]
     pub field_type: Option<String>,
+
+    /// Datetime or string format pattern (e.g. `rfc3339`).
+    #[config(key = "meta.<field>.format", type = "string")]
     pub format: Option<String>,
+
+    /// Fixed timezone offset string (e.g. `+09:00`).
+    #[config(key = "meta.<field>.offset", type = "string")]
     pub offset: Option<String>,
+
+    /// Force trailing newline formatting for this field in `@meta{ ... }`.
+    #[config(key = "meta.<field>.always_newline", default = false)]
     pub always_newline: bool,
+
+    /// Fixed or maximum list length.
+    #[config(key = "meta.<field>.length", type = "int")]
     pub length: Option<usize>,
+
+    /// Static string prefix.
+    #[config(key = "meta.<field>.prefix", type = "string")]
     pub prefix: Option<String>,
+
+    /// Force presence validation.
+    #[config(key = "meta.<field>.force", type = "bool")]
     pub force: Option<bool>,
+
+    /// Allow overwriting during migrations.
+    #[config(key = "meta.<field>.overwrite", type = "bool")]
     pub overwrite: Option<bool>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct MetaConfig {
-    pub always_newline: bool,
-    pub fields: BTreeMap<String, FieldConfig>,
-}
-
-impl MetaConfig {
-    /// Extracts metadata configuration from a normalized configuration root.
-    pub fn from_root(root: &Value) -> Self {
-        let mut cfg = Self::default();
-
-        if let Some(b) = get_path(root, &["meta", "always_newline"]).and_then(|v| v.as_bool()) {
-            cfg.always_newline = b;
-        }
-        if let Some(Value::Map(map)) = get_path(root, &["meta"]) {
-            for (k, v) in map {
-                if k != "always_newline" && matches!(v, Value::Map(_)) {
-                    parse_meta_field_props(k, v, &mut cfg.fields);
-                }
+fn parse_meta_fields(value: &Value) -> Option<BTreeMap<String, FieldConfig>> {
+    let mut fields = BTreeMap::new();
+    if let Value::Map(map) = value {
+        for (k, v) in map {
+            if k != "always_newline" && matches!(v, Value::Map(_)) {
+                parse_meta_field_props(k, v, &mut fields);
             }
         }
-
-        cfg
     }
+    Some(fields)
+}
+
+/// Document metadata formatting and schema rules.
+#[derive(Debug, Clone, Default, PartialEq, Config)]
+#[config(group = "meta")]
+pub struct MetaConfig {
+    /// Always write metadata keys on separate newlines.
+    #[config(key = "meta.always_newline", default = false)]
+    pub always_newline: bool,
+
+    /// Per-field schema attributes template for specification generation.
+    #[config(flatten)]
+    pub field_schema: FieldConfig,
+
+    /// Parsed per-field configuration instances.
+    #[config(key = "meta", type = "map", hide, parse_with = "parse_meta_fields")]
+    pub fields: BTreeMap<String, FieldConfig>,
 }
 
 fn parse_meta_field_props(

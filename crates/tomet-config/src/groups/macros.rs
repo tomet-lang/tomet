@@ -3,30 +3,33 @@
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use tomet_ast::Value;
+use tomet_config_derive::Config;
 use tomet_tree::ValueExt;
 
-use crate::tree::get_path;
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct MacrosConfig {
-    pub entries: HashMap<String, String>,
-}
-
-impl MacrosConfig {
-    /// Extracts macro templates from a normalized configuration root.
-    pub fn from_root(root: &Value) -> Self {
-        let mut entries = HashMap::new();
-        for macro_path in [&["macros"][..], &["macro"][..]] {
-            if let Some(Value::Map(map)) = get_path(root, macro_path) {
-                for (mk, mv) in map {
-                    if let Some(template) = mv.as_str() {
-                        entries.insert(mk.clone(), template.to_string());
-                    }
-                }
+fn parse_macros_map(value: &Value) -> Option<HashMap<String, String>> {
+    let mut entries = HashMap::new();
+    if let Value::Map(map) = value {
+        for (mk, mv) in map {
+            if let Some(template) = mv.as_str() {
+                entries.insert(mk.clone(), template.to_string());
             }
         }
-        Self { entries }
     }
+    Some(entries)
+}
+
+/// Macro template expansions and URL prefix templates.
+#[derive(Debug, Clone, Default, PartialEq, Config)]
+#[config(group = "macros")]
+pub struct MacrosConfig {
+    /// User-defined macro templates (e.g. `${1}` positional parameters).
+    #[config(
+        key = "macros",
+        alias = "macro",
+        type = "map(string, string)",
+        parse_with = "parse_macros_map"
+    )]
+    pub entries: HashMap<String, String>,
 }
 
 impl Deref for MacrosConfig {

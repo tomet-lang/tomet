@@ -169,15 +169,22 @@ pub enum Command {
         force: bool,
     },
 
-    /// Write the CLI reference -- every subcommand with its usage, arguments
-    /// and options -- as a `.tmt`, generated from the clap definitions.
-    /// Prints to stdout unless `--out` is given; with `--check` it exits
-    /// non-zero when that file is not what would be written.
-    CliDocs {
-        /// Write to this file instead of stdout.
+    /// Generate automated reference specifications (`cli` or `config`) in `.tmt` format.
+    ///
+    /// The target defaults to `cli` when omitted. With `--all`, writes both `cli.tmt`
+    /// and `config.tmt` into the directory specified by `--out`. With `--check`, exits
+    /// non-zero if target files on disk disagree with newly generated output.
+    Spec {
+        /// Documentation target to generate (`cli` | `config`).
+        #[arg(value_name = "TARGET")]
+        target: Option<crate::commands::spec::SpecTarget>,
+        /// Generate all declared specification targets. Requires `--out <DIR>`.
+        #[arg(long, conflicts_with = "target", requires = "out")]
+        all: bool,
+        /// Write to this file or directory instead of stdout.
         #[arg(short, long)]
         out: Option<PathBuf>,
-        /// Fail if `--out`'s file is missing or out of date, without writing.
+        /// Fail if output files are missing or out of date, without writing.
         #[arg(long, requires = "out")]
         check: bool,
     },

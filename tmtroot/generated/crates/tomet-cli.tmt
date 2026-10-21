@@ -17,7 +17,7 @@ validator, formatter, and converter components for `.tmt` document processing.
 - ("Transformation & Formatting") `format` and `refactor`.
 - (Converters) `html`, `to-md`, `from-md`, `to-typst`, `to-pandoc`, `from-pandoc`, and `export`.
 - (Authoring) `new`.
-- (Documentation) `cli-docs`.
+- (Documentation) `spec`.
 
 The project-level commands -- `check-links`, `serve` and `tui` -- are
 `sisho`'s: they follow a vault's declarations, caches and screens rather

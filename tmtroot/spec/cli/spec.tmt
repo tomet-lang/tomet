@@ -1,0 +1,25 @@
+@meta{
+  id: cli.spec
+}
+
+`tomet spec`: コマンド体系（CLI）や設定スキーマ（Config）の仕様・リファレンスを、`.tmt` として自動生成する。
+
+状態: 実装済み。
+
+共通の決まりは @file(tmtroot/spec/cli/overview.tmt)。生成したものは @file(tmtroot/generated/cli.tmt) と @file(tmtroot/generated/config.tmt)。
+
+=[ 動き ]
+
+- `tomet spec cli`: コマンドの定義（`apps/cli/src/cli.rs`、clap）から作る。定義が唯一の元（Single Source of Truth）。
+- `tomet spec config`: 設定構造体（`crates/tomet-config/`、`#[derive(Config)]`）から作る。構造体の doc-comment と属性定義が唯一の元。
+- `--all`: すべての仕様（`cli.tmt` および `config.tmt`）を一度に生成する。`--out <DIR>` が必須。
+- 文書（AST）として組み立ててから印字し、整形器を通す。文字列を貼り合わせない。説明文に含まれる要素記号やバッククォートは安全にコードスパンへエスケープされる。出力は `tomet format --check` を最初から通る。
+- 生成した文書の先頭に、生成したものであること、直接編集しないことの注意を置く。
+
+=[ 出力先 ]
+
+- 単一ターゲット（`cli` または `config`）の既定は標準出力。
+- `--out <PATH>`: 単一ターゲット時はファイル（またはディレクトリならその配下）に書く。`--all` 時は指定ディレクトリ配下に書く。親ディレクトリがなければ作る。
+- `--check --out <PATH>`: 何も書かずに、ファイルが今書き出すものと同じかを調べる。違えば `<PATH> is out of date; regenerate it with `tomet spec <TARGET> --out <PATH>``。同じなら0。
+
+新しいオプションや設定項目を足したのに仕様を作り直していない、ということを、`just docs-check` が `--check` で見つける。

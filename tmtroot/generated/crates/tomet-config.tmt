@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-config, dependencies: list(tomet-ast, tomet-parser, tomet-semantics, tomet-tree), dependents: list(tomet, tomet-benches, tomet-cli, tomet-edit, tomet-field-utils, tomet-formatter, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-printer, tomet-style, tomet-tests, tomet-vault, tomet-workspace)}
+@meta{crate: tomet-config, dependencies: list(tomet-ast, tomet-config-derive, tomet-parser, tomet-semantics, tomet-tree), dependents: list(tomet, tomet-benches, tomet-cli, tomet-edit, tomet-field-utils, tomet-formatter, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-printer, tomet-style, tomet-tests, tomet-vault, tomet-workspace)}
 
 =[tomet-config]
 
@@ -54,6 +54,8 @@ Formatting and printer rule configuration ([`FormatConfig`], [`GroupOrder`]).
 
 =====[struct FormatConfig]
 
+Formatting and printer rule configuration.
+
 ====[Enums]
 
 =====[enum GroupOrder]
@@ -66,6 +68,8 @@ Macro template definitions ([`MacrosConfig`]).
 
 =====[struct MacrosConfig]
 
+Macro template expansions and URL prefix templates.
+
 ===[Module meta]
 
 Metadata styling rules and per-field constraints ([`MetaConfig`], [`FieldConfig`]).
@@ -74,7 +78,11 @@ Metadata styling rules and per-field constraints ([`MetaConfig`], [`FieldConfig`
 
 =====[struct FieldConfig]
 
+Per-field metadata schema and constraint rules.
+
 =====[struct MetaConfig]
+
+Document metadata formatting and schema rules.
 
 ===[Module registry]
 
@@ -84,6 +92,8 @@ Blueprint and vocabulary file registry declarations ([`RegistryConfig`]).
 
 =====[struct RegistryConfig]
 
+Blueprint and vocabulary file registry declarations.
+
 ===[Module workspace]
 
 Workspace-level configuration ([`WorkspaceConfig`]).
@@ -91,6 +101,35 @@ Workspace-level configuration ([`WorkspaceConfig`]).
 ====[Structs]
 
 =====[struct WorkspaceConfig]
+
+Workspace-level configuration for vault indexing and file discovery.
+
+==[Module schema]
+
+Runtime configuration schema models and trait definitions.
+
+===[Structs]
+
+====[struct ConfigEntrySpec]
+
+Specification of a single configuration key/entry.
+
+====[struct ConfigGroupSpec]
+
+Specification of a configuration group (e.g. `@config.format`, `@config.workspace`).
+
+===[Traits]
+
+====[trait ConfigSpecProvider]
+
+Trait implemented by configuration structs (typically via `#[derive(Config)]`)
+to provide runtime schema metadata.
+
+===[Functions]
+
+====[fn all_config_specs]
+
+Returns the runtime specifications of all registered configuration groups.
 
 ==[Module tree]
 

@@ -32,7 +32,7 @@ does not relax the rule to fit the change it wanted to make.
       "crates/tomet-stats",
       "crates/tomet-vault"
       )
-    4: list( "crates/tomet-config" )
+    4: list( "crates/tomet-config*" )
     3: list( "crates/tomet-validator*" )
     2: list( "crates/tomet-semantics*" )
     1: list( "crates/tomet-syntax-*", "crates/tove" )

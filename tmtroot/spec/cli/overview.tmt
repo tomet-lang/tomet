@@ -6,7 +6,7 @@
 
 状態: 実装済み。ただし、各ページ末尾の「現状の実装との差」にある点を除く。
 
-オプションの一覧は、`tomet cli-docs` が定義から生成する @file(tmtroot/generated/cli.tmt)。ここには、その一覧に載らない決まり（何を保証するか、どこへ出すか、いつ失敗するか）を書く。
+オプションの一覧は、`tomet spec cli` が定義から生成する @file(tmtroot/generated/cli.tmt)。ここには、その一覧に載らない決まり（何を保証するか、どこへ出すか、いつ失敗するか）を書く。
 
 =[ コマンド ]
 
@@ -26,7 +26,7 @@
 |[                    ][ `to-pandoc`   ][ Pandoc の構文木（JSON）にする（@file(tmtroot/spec/cli/to-pandoc.tmt)） ]
 |[                    ][ `from-pandoc` ][ Pandoc の構文木（JSON）から `.tmt` にする（@file(tmtroot/spec/cli/from-pandoc.tmt)） ]
 |[                    ][ `export`      ][ 文書が宣言した設定に従って書き出す（@file(tmtroot/spec/cli/export.tmt)） ]
-|[ 補助               ][ `cli-docs`    ][ このコマンドの一覧を生成する（@file(tmtroot/spec/cli/cli-docs.tmt)） ]
+|[ 補助               ][ `spec`        ][ CLI や設定の仕様・リファレンスを生成する（@file(tmtroot/spec/cli/spec.tmt)） ]
 
 言語サーバー `tomet-lsp` は別の実行ファイル（@file(tmtroot/spec/lsp/overview.tmt)）。
 
@@ -53,9 +53,9 @@ vault が決めるのは、設定、語彙、`workspace.ignore` などの除外�
 @table
 |[ 綴り               ][ 意味 ][ あるコマンド ]
 |[ `PATH`             ][ 対象のファイルかディレクトリ。省くと `.` ][ `check`、`stats`、`export`、`refactor` ]
-|[ `--check`          ][ 書かずに、書く必要があるかを調べる。必要なら非ゼロで終わる ][ `format`、`export`、`refactor`、`cli-docs` ]
+|[ `--check`          ][ 書かずに、書く必要があるかを調べる。必要なら非ゼロで終わる ][ `format`、`export`、`refactor`、`spec` ]
 |[ `--in-place`、`-i` ][ ファイルをその場で書き換える。なければ、結果を標準出力に出す ][ `format`、`refactor`、`from-md` ]
-|[ `--out`、`-o`      ][ 結果を標準出力ではなく、ここに書く ][ `html`、`to-md`、`to-typst`、`to-pandoc`、`from-pandoc`、`from-md`、`export`、`cli-docs` ]
+|[ `--out`、`-o`      ][ 結果を標準出力ではなく、ここに書く ][ `html`、`to-md`、`to-typst`、`to-pandoc`、`from-pandoc`、`from-md`、`export`、`spec` ]
 |[ `--json`           ][ 人が読む形ではなく、JSON で出す ][ `check`、`stats` ]
 |[ `--force`          ][ 設定の除外（`workspace.ignore`、`workspace.unswept`）を外す ][ `format`、`refactor` ]
 |[ `--quiet`、`-q`    ][ 成功の `OK` を出さない ][ `check` ]

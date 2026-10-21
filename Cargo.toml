@@ -41,6 +41,7 @@ members = [
 
   #= Config -- PrinterConfig discovery & loading; the producers sit on this
   "crates/tomet-config",
+  "crates/tomet-config-derive",
 
   #= Load -- the front door: config + vocabularies + parse + bind
   "crates/tomet-load",
@@ -144,6 +145,7 @@ tomet-printer = { path = "crates/tomet-format-printer", version = "0.2.0" }
 tomet-style = { path = "crates/tomet-format-style", version = "0.2.0" }
 #= Workspace
 tomet-config = { path = "crates/tomet-config", version = "0.2.0" }
+tomet-config-derive = { path = "crates/tomet-config-derive", version = "0.2.0" }
 tomet-indexer = { path = "crates/tomet-workspace-indexer", version = "0.2.0" }
 tomet-links = { path = "crates/tomet-workspace-links", version = "0.2.0", default-features = false }
 tomet-load = { path = "crates/tomet-load", version = "0.2.0" }
@@ -172,9 +174,11 @@ lsp-server = "0.10"
 lsp-types = "0.97"
 mimalloc = { version = "0.1", default-features = false }
 nanoid = "0.4"
+proc-macro2 = "1.0"
 pulldown-cmark = "0.13"
 pyo3 = { version = "0.23", features = ["serde"] }
 pythonize = "0.23"
+quote = "1.0"
 rayon = "1"
 regex = "1.12"
 rowan = "0.16"
@@ -183,6 +187,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde-wasm-bindgen = "0.6"
 serde_yaml = "0.9"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
 time = "0.3"
 toml = { version = "0.9", features = ["preserve_order"] }
 tree-sitter = "0.26"

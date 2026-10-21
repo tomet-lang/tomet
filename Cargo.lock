@@ -1728,9 +1728,19 @@ name = "tomet-config"
 version = "0.2.0"
 dependencies = [
  "tomet-ast",
+ "tomet-config-derive",
  "tomet-parser",
  "tomet-semantics",
  "tomet-tree",
+]
+
+[[package]]
+name = "tomet-config-derive"
+version = "0.2.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]

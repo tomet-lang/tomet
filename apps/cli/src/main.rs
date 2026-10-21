@@ -11,7 +11,7 @@
 //! - (Transformation & Formatting) `format` and `refactor`.
 //! - (Converters) `html`, `to-md`, `from-md`, `to-typst`, `to-pandoc`, `from-pandoc`, and `export`.
 //! - (Authoring) `new`.
-//! - (Documentation) `cli-docs`.
+//! - (Documentation) `spec`.
 //!
 //! The project-level commands -- `check-links`, `serve` and `tui` -- are
 //! `sisho`'s: they follow a vault's declarations, caches and screens rather
@@ -33,7 +33,6 @@ use clap::Parser;
 use cli::{Cli, Command};
 use commands::ast::ast;
 use commands::check::check;
-use commands::cli_docs::cli_docs_cmd;
 use commands::export::export_cmd;
 use commands::format::format_cmd;
 use commands::from_md::from_md_cmd;
@@ -84,7 +83,12 @@ fn main() -> ExitCode {
             check,
             force,
         } => format_cmd(paths, *in_place, *check, *force),
-        Command::CliDocs { out, check } => cli_docs_cmd(out.as_deref(), *check),
+        Command::Spec {
+            target,
+            all,
+            out,
+            check,
+        } => commands::spec::spec_cmd(*target, *all, out.as_deref(), *check),
         Command::Export {
             path,
             r#type,

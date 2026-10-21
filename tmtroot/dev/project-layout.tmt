@@ -1,4 +1,4 @@
--@file(CONTRIBUTING.md) | 共通の規則 
+-@file(CONTRIBUTING.md) | 共通の規則
 -@file(AGENTS.md)       | AI特有の制約
 
 =@dir(tmtroot)

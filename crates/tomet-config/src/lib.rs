@@ -13,8 +13,11 @@
 //!   - (discovery) Configuration parsing and error handling.
 //!   - (tree) AST tree normalization and path lookup utilities.
 
+extern crate self as tomet_config;
+
 pub mod discovery;
 pub mod groups;
+pub mod schema;
 pub mod tree;
 
 pub use discovery::{ConfigError, load_config_from_str};
@@ -22,6 +25,8 @@ pub use groups::{
     FieldConfig, FormatConfig, GroupOrder, MacrosConfig, MetaConfig, RegistryConfig,
     WorkspaceConfig, format, macros, meta, registry, workspace,
 };
+pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
+pub use tomet_config_derive::Config;
 
 use tomet_ast::{Document, Value};
 use tree::merge_entry;

@@ -58,7 +58,7 @@ format-check:
 # Generate and update all derived documentation across the workspace.
 docs:
     cargo build -p tomet-cli
-    ./target/debug/tomet cli-docs --out tmtroot/generated/cli.tmt
+    ./target/debug/tomet spec --all --out tmtroot/generated
     PATH="{{ justfile_directory() }}/target/debug:$PATH" sisho fix .
 
 # The placement check stays here because it is this repository's docs
@@ -67,7 +67,7 @@ docs:
 docs-check:
     cargo build -p tomet-cli
     PATH="{{ justfile_directory() }}/target/debug:$PATH" sisho check .
-    ./target/debug/tomet cli-docs --check --out tmtroot/generated/cli.tmt
+    ./target/debug/tomet spec --all --check --out tmtroot/generated
 
 # Run the two guards that `.writ.tmt` entries name but nothing executed.
 #
