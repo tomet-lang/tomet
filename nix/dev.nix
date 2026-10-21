@@ -21,6 +21,9 @@ let
     fenix.targets.wasm32-unknown-unknown.stable.rust-std
     fenix.targets.wasm32-wasip2.stable.rust-std
   ];
+  rustTargetUpper = lib.toUpper (
+    builtins.replaceStrings [ "-" ] [ "_" ] pkgs.stdenv.hostPlatform.rust.rustcTarget
+  );
 in
 mkShell rec {
   buildInputs = with pkgs; [
@@ -62,10 +65,11 @@ mkShell rec {
 
   PYO3_PYTHON = "${pkgs.python313}/bin/python3";
   PYO3_USE_ABI3_FORWARD_COMPATIBILITY = "1";
+  "CARGO_TARGET_${rustTargetUpper}_RUSTFLAGS" = "-C link-args=-Wl,-rpath,${pkgs.python313}/lib";
 
   shellHook = ''
     alias nvim='nvim --cmd "set rtp+=$PWD/editors/neovim"'
 
-    echo "🧪 Rust Tomet"
+    echo "🦀📚 Rust Tomet"
   '';
 }
