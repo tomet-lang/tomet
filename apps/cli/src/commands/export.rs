@@ -312,7 +312,7 @@ fn export_directory(
     let results: Vec<Result<OneFileExport, String>> = files
         .par_iter()
         .map(|file| {
-            let _token = crate::gate::acquire();
+            let _token = jobserver_gate::acquire();
             let relative_out = if let Some(out_dir) = override_out {
                 if let Ok(rel) = file.strip_prefix(dir_path) {
                     let parent = rel.parent().unwrap_or_else(|| Path::new(""));
@@ -326,6 +326,7 @@ fn export_directory(
             export_one(&settings, file, relative_out.as_deref()).map_err(|e| e.to_string())
         })
         .collect();
+    jobserver_gate::reclaim_implicit_token();
 
     // Phase 2: Emit output and diagnostics in exact file order
     let mut exported_count = 0;

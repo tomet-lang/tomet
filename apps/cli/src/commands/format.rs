@@ -115,13 +115,13 @@ pub(crate) fn format_cmd(
         let results: Vec<io::Result<bool>> = files
             .par_iter()
             .map(|file| {
-                let _token = crate::gate::acquire();
+                let _token = jobserver_gate::acquire();
                 let src = fs::read_to_string(file)?;
                 let is_unformatted = format_file(file, &src) != src;
                 Ok(is_unformatted)
             })
             .collect();
-        crate::gate::reclaim_implicit_token();
+        jobserver_gate::reclaim_implicit_token();
 
         // Phase 2: In order, serial
         let mut unformatted = Vec::new();
@@ -150,7 +150,7 @@ pub(crate) fn format_cmd(
         let results: Vec<FormatWriteResult> = files
             .par_iter()
             .map(|file| {
-                let _token = crate::gate::acquire();
+                let _token = jobserver_gate::acquire();
                 match fs::read_to_string(file) {
                     Ok(src) => {
                         let formatted = format_file(file, &src);
@@ -167,7 +167,7 @@ pub(crate) fn format_cmd(
                 }
             })
             .collect();
-        crate::gate::reclaim_implicit_token();
+        jobserver_gate::reclaim_implicit_token();
 
         // Phase 2: In order, serial
         let mut changed = 0;

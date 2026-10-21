@@ -169,6 +169,7 @@ directories = "6.0"
 ignore = "0.4"
 jni = "0.21"
 jobserver = "0.1"
+jobserver-gate = { git = "https://github.com/tomet-lang/jobserver-gate.git" }
 js-sys = "0.3"
 lsp-server = "0.10"
 lsp-types = "0.97"

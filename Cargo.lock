@@ -861,6 +861,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jobserver-gate"
+version = "0.1.0"
+source = "git+https://github.com/tomet-lang/jobserver-gate.git#9bf7703366ee404b1671e1ebbc4d0a88e6de3dd7"
+dependencies = [
+ "jobserver",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1693,6 +1701,7 @@ dependencies = [
  "anyhow",
  "clap",
  "jobserver",
+ "jobserver-gate",
  "mimalloc",
  "nanoid",
  "rayon",

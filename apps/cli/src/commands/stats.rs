@@ -126,7 +126,7 @@ fn collect_report(path: &Path) -> anyhow::Result<(Report, usize)> {
     let results: Vec<StatsFileResult> = files
         .par_iter()
         .map(|file| {
-            let _token = crate::gate::acquire();
+            let _token = jobserver_gate::acquire();
             let Ok(src) = std::fs::read_to_string(file) else {
                 return StatsFileResult::Unreadable;
             };
@@ -149,7 +149,7 @@ fn collect_report(path: &Path) -> anyhow::Result<(Report, usize)> {
             }
         })
         .collect();
-    crate::gate::reclaim_implicit_token();
+    jobserver_gate::reclaim_implicit_token();
 
     // Phase 2: In order, serial
     let mut by_kind: BTreeMap<Option<String>, Stats> = BTreeMap::new();

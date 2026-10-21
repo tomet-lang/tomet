@@ -87,7 +87,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
     let results: Vec<CheckFileResult> = files
         .par_iter()
         .map(|file| {
-            let _token = crate::gate::acquire();
+            let _token = jobserver_gate::acquire();
             let Ok(src) = std::fs::read_to_string(file) else {
                 return CheckFileResult::ReadError;
             };
@@ -186,7 +186,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
             }
         })
         .collect();
-    crate::gate::reclaim_implicit_token();
+    jobserver_gate::reclaim_implicit_token();
 
     // Phase 2: In order, serial
     let mut err_out = io::stderr().lock();
