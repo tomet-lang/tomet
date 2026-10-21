@@ -403,6 +403,7 @@ fn test_parallel_determinism_and_order() {
     assert_deterministic_50_runs(&["format", "--check"], vault_dir);
     assert_deterministic_50_runs(&["stats"], vault_dir);
     assert_deterministic_50_runs(&["stats", "--json"], vault_dir);
+    assert_deterministic_50_runs(&["export", "--check"], vault_dir);
 }
 
 #[test]
@@ -418,7 +419,12 @@ fn test_jobserver_identical_output() {
     let vault_str = guard.path.to_str().unwrap();
     let bin = bin_path();
 
-    for subcmd in [&["check"][..], &["format", "--check"][..], &["stats"][..]] {
+    for subcmd in [
+        &["check"][..],
+        &["format", "--check"][..],
+        &["stats"][..],
+        &["export", "--check"][..],
+    ] {
         let mut full_args = subcmd.to_vec();
         full_args.push(vault_str);
 
