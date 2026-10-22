@@ -23,6 +23,11 @@ name = "format"
 path = "benches/format.rs"
 harness = false
 
+[[bench]]
+name = "divan"
+path = "benches/divan.rs"
+harness = false
+
 [dependencies]
 tomet-formatter = { workspace = true }
 tomet-config = { workspace = true }
@@ -33,4 +38,5 @@ tomet-tests = { path = "../tests" }
 
 #= Crates.io
 criterion = { workspace = true }
+divan = { workspace = true }
 

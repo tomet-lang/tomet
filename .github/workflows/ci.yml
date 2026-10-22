@@ -35,6 +35,10 @@ jobs:
       - name: Run tests
         run: cargo test --workspace
 
+      # ── Benchmarks ─────────────────────────────────────────
+      - name: Check benchmark compilation and dry-run
+        run: cargo bench -p tomet-benches -- --test
+
       # ── Lint ───────────────────────────────────────────────
       - name: Clippy
         run: cargo clippy --workspace --all-targets

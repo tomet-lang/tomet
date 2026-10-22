@@ -171,6 +171,7 @@ clap = { version = "4.6", features = ["derive"] }
 criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
 cxx = "1"
 directories = "6.0"
+divan = "0.1"
 ignore = "0.4"
 jni = "0.21"
 jobserver = "0.1"
