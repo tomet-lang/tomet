@@ -730,7 +730,7 @@ fn value_to_plain(v: &Value) -> String {
         Value::Null => String::new(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) => f.to_string(),
+        Value::Float(f) => motem::float_text(*f),
         Value::String(s) => s.clone(),
         Value::Seq(items) => items
             .iter()

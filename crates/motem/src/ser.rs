@@ -46,7 +46,9 @@ impl ser::Serializer for ValueSerializer {
         Ok(Value::Int(v as i64))
     }
     fn serialize_u64(self, v: u64) -> Result<Value> {
-        Ok(Value::Int(v as i64))
+        i64::try_from(v)
+            .map(Value::Int)
+            .map_err(|_| Error::msg(format!("{v} is out of range for a 64-bit signed integer")))
     }
     fn serialize_f32(self, v: f32) -> Result<Value> {
         Ok(Value::Float(v as f64))

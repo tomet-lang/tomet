@@ -136,7 +136,7 @@ pub fn scalar_string(v: &Value) -> Option<String> {
         Value::Null => Some(String::new()),
         Value::Bool(b) => Some(b.to_string()),
         Value::Int(i) => Some(i.to_string()),
-        Value::Float(f) => Some(f.to_string()),
+        Value::Float(f) => Some(motem::float_text(*f)),
         Value::String(s) => Some(s.clone()),
         Value::Seq(items) => {
             let parts: Option<Vec<String>> = items.iter().map(scalar_string).collect();

@@ -32,10 +32,6 @@ is genuinely part of rebuilding a whole document from its AST.
 Formats a string scalar for Tomet source text, wrapping in `"` and escaping
 inner quotes and special characters only when necessary.
 
-===[fn write_scalar_string]
-
-Appends a safely quoted/escaped string scalar to `out`.
-
 ===[fn render_nested]
 
 Renders a value that sits @em[inside] another one.

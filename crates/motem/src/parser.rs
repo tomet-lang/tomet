@@ -272,23 +272,110 @@ pub fn try_parse_call_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Opti
     if !cur.eat_str(")") {
         return Some(Err(err(cur.pos(), "expected ')'")));
     }
+    if name == "float" {
+        let start = cur.pos();
+        return Some(construct_float(args).map_err(|message| err(start, message)));
+    }
     Some(Ok(Value::Call(name, args)))
 }
 
-pub fn scalar_from_text(s: &str) -> Value {
+/// `float(x)`: the literal constructor for a float, the only way to spell
+/// `nan` and the infinities (which are plain strings as bare scalars).
+///
+/// `float()` is `0.0`; an int widens; a string is parsed the way Rust and
+/// Python parse one (`float(inf)`, `float(-inf)`, `float(nan)`, `float(1.5)`).
+/// Anything else, or more than one argument, is an error, as is a finite
+/// spelling that overflows (`float(1e999)`).
+fn construct_float(args: Vec<Value>) -> std::result::Result<Value, String> {
+    let mut args = args.into_iter();
+    let arg = args.next();
+    if args.next().is_some() {
+        return Err("float() takes at most one argument".to_string());
+    }
+    match arg {
+        None => Ok(Value::Float(0.0)),
+        Some(Value::Int(i)) => Ok(Value::Float(i as f64)),
+        Some(Value::Float(f)) => Ok(Value::Float(f)),
+        Some(Value::String(s)) => {
+            let text = s.trim();
+            let spells_non_finite = text
+                .trim_start_matches(['+', '-'])
+                .starts_with(|c: char| c.is_ascii_alphabetic());
+            match text.parse::<f64>() {
+                Ok(f) if f.is_finite() || spells_non_finite => Ok(Value::Float(f)),
+                Ok(_) => Err(format!("float `{text}` is out of range")),
+                Err(_) => Err(format!("float() cannot convert `{text}` to a float")),
+            }
+        }
+        Some(other) => Err(format!("float() takes a number or a string, got {other:?}")),
+    }
+}
+
+/// What a bare scalar's text is, by the JSON number grammar.
+enum Number {
+    Int,
+    Float,
+}
+
+/// Classifies `s` as `-?(0|[1-9][0-9]*)` (int), the same followed by a
+/// fraction (`.digits`) and/or an exponent (`e[+-]digits`) (float), or
+/// neither. A leading zero (`007`), a leading `+`, and a bare `.5` or `5.`
+/// are none of these, so they stay strings.
+fn classify_number(s: &str) -> Option<Number> {
+    let b = s.as_bytes();
+    let digits = |mut i: usize| {
+        let start = i;
+        while b.get(i).is_some_and(u8::is_ascii_digit) {
+            i += 1;
+        }
+        (i > start).then_some(i)
+    };
+    let mut i = usize::from(b.first() == Some(&b'-'));
+    match b.get(i)? {
+        b'0' => i += 1,
+        b'1'..=b'9' => i = digits(i)?,
+        _ => return None,
+    }
+    let mut float = false;
+    if b.get(i) == Some(&b'.') {
+        i = digits(i + 1)?;
+        float = true;
+    }
+    if matches!(b.get(i), Some(b'e' | b'E')) {
+        i += 1;
+        if matches!(b.get(i), Some(b'+' | b'-')) {
+            i += 1;
+        }
+        i = digits(i)?;
+        float = true;
+    }
+    (i == b.len()).then_some(if float { Number::Float } else { Number::Int })
+}
+
+/// Types the text of a bare scalar (see the crate-level "Scalars" section).
+///
+/// `null`, `true` and `false` are the only keywords. A number is an `i64` or
+/// an `f64` by the JSON grammar; a number that does not fit is an error
+/// rather than a lossy value. Everything else is a string, so no text is ever
+/// changed by reading it.
+pub fn scalar_from_text(s: &str) -> std::result::Result<Value, String> {
     match s {
-        "" | "null" => return Value::Null,
-        "true" => return Value::Bool(true),
-        "false" => return Value::Bool(false),
+        "null" => return Ok(Value::Null),
+        "true" => return Ok(Value::Bool(true)),
+        "false" => return Ok(Value::Bool(false)),
         _ => {}
     }
-    if let Ok(i) = s.parse::<i64>() {
-        return Value::Int(i);
+    match classify_number(s) {
+        Some(Number::Int) => s
+            .parse::<i64>()
+            .map(Value::Int)
+            .map_err(|_| format!("integer `{s}` is out of range for a 64-bit integer")),
+        Some(Number::Float) => match s.parse::<f64>() {
+            Ok(f) if f.is_finite() => Ok(Value::Float(f)),
+            _ => Err(format!("float `{s}` is out of range")),
+        },
+        None => Ok(Value::String(s.to_string())),
     }
-    if let Ok(f) = s.parse::<f64>() {
-        return Value::Float(f);
-    }
-    Value::String(s.to_string())
 }
 
 pub fn parse_quoted(cur: &mut Cursor) -> Result<String> {
@@ -423,11 +510,12 @@ pub fn parse_entry_value_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> R
             Ok(v)
         }
         _ => {
+            let start = cur.pos();
             let raw = eat_scalar_raw(cur).trim();
             if raw.is_empty() {
                 return Err(err(cur.pos(), "expected a value"));
             }
-            Ok(scalar_from_text(raw))
+            scalar_from_text(raw).map_err(|message| err(start, message))
         }
     }
 }

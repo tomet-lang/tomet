@@ -1900,6 +1900,7 @@ dependencies = [
 name = "tomet-html"
 version = "0.2.0"
 dependencies = [
+ "motem",
  "tomet-ast",
  "tomet-expr",
  "tomet-parser",
@@ -2024,6 +2025,7 @@ dependencies = [
 name = "tomet-markdown"
 version = "0.2.0"
 dependencies = [
+ "motem",
  "nanoid",
  "pulldown-cmark",
  "serde_yaml",

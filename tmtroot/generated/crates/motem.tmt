@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: motem, dependencies: list(tomet-ast, tomet-lexer), dependents: list(tomet-cli, tomet-edit, tomet-parser, tomet-printer, tomet-semantics, tomet-style)}
+@meta{crate: motem, dependencies: list(tomet-ast, tomet-lexer), dependents: list(tomet-cli, tomet-edit, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style)}
 
 =[motem]
 
@@ -25,6 +25,7 @@ motem provides:
 - (from_value) Convert a [`Value`] into a Rust type via Serde deserializer.
 - (to_value) Convert a Rust type into a [`Value`] via Serde serializer.
 - (write_key) Write a map key, quoted only when it is not an identifier. Every printer that emits `key: value` calls it.
+- (float_text) Spell a float so it reads back as a float. Every printer that emits a [`Value::Float`] calls it.
 
 ==[Keys]
 
@@ -38,6 +39,31 @@ plain.key: 1
 
 A quoted string is a key only when a `:` follows it; otherwise it is a
 value. The empty key is the positional-entry marker, so `"": v` is an error.
+
+==[Scalars]
+
+A bare (unquoted) scalar is typed by its text, and only these are not
+strings:
+
+- `null`, `true`, `false`: the only keywords (`NULL`, `~`, `yes` are strings).
+- An int, `-?(0|[1-9][0-9]*)`, that fits an `i64`.
+- A float: an int followed by a fraction (`.5` after digits) and/or an
+
+exponent (`e3`, `E-3`), that is finite.
+
+Everything else is a string, so reading a bare scalar never changes its
+text: `007`, `+1`, `.5`, `5.`, `1_000`, `0x10`, `nan` and `inf` are strings.
+A number that has the shape of an int or float but does not fit (`i64`
+overflow, `1e999`) is an error, never a silently lossy value.
+
+`float(x)` is the literal constructor for a float (`float()` is `0.0`, an
+int widens, a string is parsed). It is the way to write `float(nan)`,
+`float(inf)` and `float(-inf)`, which have no bare spelling. The printer
+writes a float with a `.` or exponent (`1.0`, never `1`), so a float reads
+back as a float, and a non-finite one as the constructor.
+
+Serializing a `u64` above `i64::MAX` is an error rather than a wrapped
+value, since [`Value::Int`] is an `i64`.
 
 ==[Module de]
 
@@ -143,6 +169,13 @@ entry/sequence item.
 
 ====[fn scalar_from_text]
 
+Types the text of a bare scalar (see the crate-level "Scalars" section).
+
+`null`, `true` and `false` are the only keywords. A number is an `i64` or
+an `f64` by the JSON grammar; a number that does not fit is an error
+rather than a lossy value. Everything else is a string, so no text is ever
+changed by reading it.
+
 ====[fn parse_quoted]
 
 ====[fn parse_one_entry]
@@ -187,6 +220,17 @@ nested maps use `{ ... }`, and a sequence prints as `list(...)`.
 ===[Functions]
 
 ====[fn print_value]
+
+====[fn write_float]
+
+Writes a float so it reads back as the same float, never as an int:
+`1.0` stays `1.0` and `1e21` stays `1e21`. A non-finite float has no bare
+spelling, so it is written with the `float(...)` constructor
+(`float(nan)`, `float(inf)`, `float(-inf)`).
+
+====[fn float_text]
+
+[`write_float`] as an owned string, for callers that build with `format!`.
 
 ====[fn write_scalar_string]
 

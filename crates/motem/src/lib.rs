@@ -18,6 +18,7 @@
 //! - (from_value) Convert a [`Value`] into a Rust type via Serde deserializer.
 //! - (to_value) Convert a Rust type into a [`Value`] via Serde serializer.
 //! - (write_key) Write a map key, quoted only when it is not an identifier. Every printer that emits `key: value` calls it.
+//! - (float_text) Spell a float so it reads back as a float. Every printer that emits a [`Value::Float`] calls it.
 //!
 //! =[ Keys ]
 //!
@@ -31,6 +32,30 @@
 //!
 //! A quoted string is a key only when a `:` follows it; otherwise it is a
 //! value. The empty key is the positional-entry marker, so `"": v` is an error.
+//!
+//! =[ Scalars ]
+//!
+//! A bare (unquoted) scalar is typed by its text, and only these are not
+//! strings:
+//!
+//! - `null`, `true`, `false`: the only keywords (`NULL`, `~`, `yes` are strings).
+//! - An int, `-?(0|[1-9][0-9]*)`, that fits an `i64`.
+//! - A float: an int followed by a fraction (`.5` after digits) and/or an
+//!   exponent (`e3`, `E-3`), that is finite.
+//!
+//! Everything else is a string, so reading a bare scalar never changes its
+//! text: `007`, `+1`, `.5`, `5.`, `1_000`, `0x10`, `nan` and `inf` are strings.
+//! A number that has the shape of an int or float but does not fit (`i64`
+//! overflow, `1e999`) is an error, never a silently lossy value.
+//!
+//! `float(x)` is the literal constructor for a float (`float()` is `0.0`, an
+//! int widens, a string is parsed). It is the way to write `float(nan)`,
+//! `float(inf)` and `float(-inf)`, which have no bare spelling. The printer
+//! writes a float with a `.` or exponent (`1.0`, never `1`), so a float reads
+//! back as a float, and a non-finite one as the constructor.
+//!
+//! Serializing a `u64` above `i64::MAX` is an error rather than a wrapped
+//! value, since [`Value::Int`] is an `i64`.
 
 pub mod de;
 pub mod error;
@@ -49,7 +74,7 @@ pub use parser::{
     skip_inline_ws, skip_line_comment, skip_ws_and_newlines, skip_ws_newlines_and_comments,
     starts_absolute_path, try_parse_call, try_parse_call_with,
 };
-pub use print::{key_text, print_value, write_key, write_scalar_string};
+pub use print::{float_text, key_text, print_value, write_float, write_key, write_scalar_string};
 pub use ser::to_value;
 pub use tomet_ast::Value;
 
@@ -374,5 +399,190 @@ mod tests {
             from_str::<BTreeMap<String, String>>(&text).unwrap(),
             managed
         );
+    }
+
+    fn scalar(src: &str) -> Value {
+        parse_value(src).unwrap()
+    }
+
+    #[test]
+    fn only_null_true_and_false_are_keywords() {
+        assert_eq!(scalar("null"), Value::Null);
+        assert_eq!(scalar("true"), Value::Bool(true));
+        assert_eq!(scalar("false"), Value::Bool(false));
+        for other in ["NULL", "Null", "~", "True", "FALSE", "yes", "on", "no"] {
+            assert_eq!(scalar(other), text(other), "{other}");
+        }
+    }
+
+    #[test]
+    fn numbers_follow_the_json_grammar() {
+        assert_eq!(scalar("0"), Value::Int(0));
+        assert_eq!(scalar("-0"), Value::Int(0));
+        assert_eq!(scalar("42"), Value::Int(42));
+        assert_eq!(scalar("-17"), Value::Int(-17));
+        assert_eq!(scalar("9223372036854775807"), Value::Int(i64::MAX));
+        assert_eq!(scalar("-9223372036854775808"), Value::Int(i64::MIN));
+        assert_eq!(scalar("1.50"), Value::Float(1.5));
+        assert_eq!(scalar("-0.5"), Value::Float(-0.5));
+        assert_eq!(scalar("1e3"), Value::Float(1000.0));
+        assert_eq!(scalar("1E+3"), Value::Float(1000.0));
+        assert_eq!(scalar("25e-1"), Value::Float(2.5));
+    }
+
+    #[test]
+    fn text_that_is_not_json_number_stays_a_string() {
+        for other in [
+            "007",
+            "+1",
+            "-",
+            "1_000",
+            "0x10",
+            "0b1",
+            ".5",
+            "5.",
+            "1e",
+            "1e+",
+            "1.2.3",
+            "nan",
+            "NaN",
+            "inf",
+            "-inf",
+            "infinity",
+            "2024-01-02",
+            "12:30",
+            "<b>",
+        ] {
+            // in a value position: a bare `12:30` at the top is `12: 30`
+            assert_eq!(
+                parse_value(&format!("k: {other}")).unwrap(),
+                map(&[("k", text(other))]),
+                "{other}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_number_that_does_not_fit_is_an_error_not_a_lossy_value() {
+        for src in [
+            "9223372036854775808",
+            "-9223372036854775809",
+            "1e999",
+            "-1e999",
+        ] {
+            let err = parse_value(src).unwrap_err().to_string();
+            assert!(err.contains("out of range"), "{src}: {err}");
+        }
+    }
+
+    #[test]
+    fn the_float_constructor_spells_what_a_bare_scalar_cannot() {
+        assert_eq!(scalar("float()"), Value::Float(0.0));
+        assert_eq!(scalar("float(2)"), Value::Float(2.0));
+        assert_eq!(scalar("float(1.5)"), Value::Float(1.5));
+        assert_eq!(scalar("float(\"2.5\")"), Value::Float(2.5));
+        assert_eq!(scalar("float(inf)"), Value::Float(f64::INFINITY));
+        assert_eq!(scalar("float(-inf)"), Value::Float(f64::NEG_INFINITY));
+        assert_eq!(scalar("float(infinity)"), Value::Float(f64::INFINITY));
+        assert!(matches!(scalar("float(nan)"), Value::Float(f) if f.is_nan()));
+    }
+
+    #[test]
+    fn the_float_constructor_rejects_what_does_not_convert() {
+        for src in [
+            "float(1, 2)",
+            "float(abc)",
+            "float(true)",
+            "float(null)",
+            "float(list(1))",
+            "float(\"1e999\")",
+        ] {
+            assert!(parse_value(src).is_err(), "{src}");
+        }
+    }
+
+    #[test]
+    fn a_float_prints_so_it_reads_back_as_a_float() {
+        for (f, printed) in [
+            (1.0, "1.0"),
+            (-0.0, "-0.0"),
+            (1.5, "1.5"),
+            (1e21, "1e21"),
+            (1e-7, "1e-7"),
+            (0.1 + 0.2, "0.30000000000000004"),
+        ] {
+            assert_eq!(float_text(f), printed);
+            let line = print_value(&map(&[("k", Value::Float(f))]));
+            assert_eq!(parse_value(&line).unwrap(), map(&[("k", Value::Float(f))]));
+        }
+        for f in [f64::MAX, f64::MIN, f64::MIN_POSITIVE, f64::EPSILON] {
+            assert_eq!(scalar(&float_text(f)), Value::Float(f));
+        }
+    }
+
+    #[test]
+    fn a_non_finite_float_prints_as_the_constructor() {
+        assert_eq!(float_text(f64::INFINITY), "float(inf)");
+        assert_eq!(float_text(f64::NEG_INFINITY), "float(-inf)");
+        assert_eq!(float_text(f64::NAN), "float(nan)");
+        assert_eq!(
+            scalar(&float_text(f64::NEG_INFINITY)),
+            Value::Float(f64::NEG_INFINITY)
+        );
+        assert!(matches!(scalar(&float_text(f64::NAN)), Value::Float(f) if f.is_nan()));
+    }
+
+    #[test]
+    fn an_int_extreme_reads_back_as_an_int() {
+        for i in [0, -1, i64::MAX, i64::MIN] {
+            let line = print_value(&map(&[("k", Value::Int(i))]));
+            assert_eq!(parse_value(&line).unwrap(), map(&[("k", Value::Int(i))]));
+        }
+    }
+
+    #[test]
+    fn a_string_is_quoted_only_when_bare_text_would_read_back_differently() {
+        for (s, printed) in [
+            // read back as a string, so bare
+            ("007", "k: 007"),
+            ("+1", "k: +1"),
+            ("inf", "k: inf"),
+            ("NULL", "k: NULL"),
+            ("1_000", "k: 1_000"),
+            // would read back as something else (or not at all), so quoted
+            ("null", "k: \"null\""),
+            ("true", "k: \"true\""),
+            ("12", "k: \"12\""),
+            ("1.0", "k: \"1.0\""),
+            ("1e3", "k: \"1e3\""),
+            ("9223372036854775808", "k: \"9223372036854775808\""),
+            ("", "k: \"\""),
+        ] {
+            let value = map(&[("k", text(s))]);
+            assert_eq!(print_value(&value), printed, "{s:?}");
+            assert_eq!(parse_value(printed).unwrap(), value, "{s:?}");
+        }
+    }
+
+    #[test]
+    fn a_float_field_keeps_its_float_spelling_through_serde() {
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Sample {
+            x: f64,
+            n: i64,
+        }
+        let sample = Sample { x: 1.0, n: 1 };
+        let text = to_string(&sample).unwrap();
+        assert_eq!(text, "x: 1.0\nn: 1");
+        assert_eq!(from_str::<Sample>(&text).unwrap(), sample);
+        // an int widens to a float field, as in serde_json
+        assert_eq!(from_str::<f64>("1").unwrap(), 1.0);
+    }
+
+    #[test]
+    fn an_unsigned_integer_beyond_i64_is_an_error_not_a_wrapped_value() {
+        assert_eq!(to_string(&(i64::MAX as u64)).unwrap(), i64::MAX.to_string());
+        let err = to_string(&u64::MAX).unwrap_err().to_string();
+        assert!(err.contains("out of range"), "{err}");
     }
 }

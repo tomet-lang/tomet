@@ -4,7 +4,7 @@
 
 use tomet_ast::Value;
 
-use crate::parser::is_ident_char;
+use crate::parser::{is_ident_char, scalar_from_text};
 
 pub fn print_value(value: &Value) -> String {
     let mut out = String::new();
@@ -27,7 +27,7 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
         }
         Value::String(s) => write_scalar_string(s, out),
         Value::Int(i) => out.push_str(&i.to_string()),
-        Value::Float(f) => out.push_str(&f.to_string()),
+        Value::Float(f) => write_float(*f, out),
         Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
         Value::Null => out.push_str("null"),
         Value::Call(name, args) => {
@@ -145,6 +145,27 @@ fn is_iso8601(s: &str) -> bool {
     false
 }
 
+/// Writes a float so it reads back as the same float, never as an int:
+/// `1.0` stays `1.0` and `1e21` stays `1e21`. A non-finite float has no bare
+/// spelling, so it is written with the `float(...)` constructor
+/// (`float(nan)`, `float(inf)`, `float(-inf)`).
+pub fn write_float(f: f64, out: &mut String) {
+    if f.is_nan() {
+        out.push_str("float(nan)");
+    } else if f.is_infinite() {
+        out.push_str(if f > 0.0 { "float(inf)" } else { "float(-inf)" });
+    } else {
+        out.push_str(&format!("{f:?}"));
+    }
+}
+
+/// [`write_float`] as an owned string, for callers that build with `format!`.
+pub fn float_text(f: f64) -> String {
+    let mut out = String::new();
+    write_float(f, &mut out);
+    out
+}
+
 pub fn write_scalar_string(s: &str, out: &mut String) {
     if is_iso8601(s) {
         out.push_str(s);
@@ -164,10 +185,11 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
         Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '~')
     );
 
+    // Quoted unless the bare text reads back as this same string: a keyword,
+    // a number, and an out-of-range number (which would not read back at all)
+    // all need quotes.
     let needs_quotes = s.is_empty()
-        || matches!(s, "true" | "false" | "null" | "~")
-        || s.parse::<i64>().is_ok()
-        || s.parse::<f64>().is_ok()
+        || !matches!(scalar_from_text(s), Ok(Value::String(_)))
         || s.trim() != s
         || starts_with_special
         || s.contains([

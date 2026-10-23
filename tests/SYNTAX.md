@@ -1053,7 +1053,7 @@ Paragraph
 List ordered=false
   Items:
     Bare
-      args    {12: 1}
+      args    {12: "01"}
       content
         Paragraph
           Text "本文"

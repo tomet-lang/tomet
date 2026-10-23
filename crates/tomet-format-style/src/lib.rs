@@ -58,52 +58,11 @@ pub fn quote_scalar_string(s: &str) -> String {
 }
 
 /// Appends a safely quoted/escaped string scalar to `out`.
-pub fn write_scalar_string(s: &str, out: &mut String) {
-    if is_iso8601(s) {
-        out.push_str(s);
-        return;
-    }
-
-    if (s.starts_with("${") && s.ends_with('}'))
-        || (s.starts_with('$') && s.contains('(') && s.ends_with(')'))
-    {
-        out.push_str(s);
-        return;
-    }
-
-    let first_char = s.chars().next();
-    let starts_with_special = matches!(
-        first_char,
-        Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '~')
-    );
-
-    let needs_quotes = s.is_empty()
-        || matches!(s, "true" | "false" | "null" | "~")
-        || s.parse::<i64>().is_ok()
-        || s.parse::<f64>().is_ok()
-        || s.trim() != s
-        || starts_with_special
-        || s.contains([
-            '"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ',
-        ]);
-
-    if needs_quotes {
-        out.push('"');
-        for c in s.chars() {
-            match c {
-                '"' => out.push_str("\\\""),
-                '\\' => out.push_str("\\\\"),
-                '\n' => out.push_str("\\n"),
-                '\r' => out.push_str("\\r"),
-                '\t' => out.push_str("\\t"),
-                _ => out.push(c),
-            }
-        }
-        out.push('"');
-    } else {
-        out.push_str(s);
-    }
-}
+///
+/// This is `motem`'s own, not a copy: what needs quotes is decided by what the
+/// parser reads back as something other than the same string, so the two
+/// cannot drift apart.
+pub use motem::write_scalar_string;
 
 /// Renders a `Vec<Block>` slot (an element's `[content]`, or a `key:
 /// [...]` value) back into `.tmt` source text.
@@ -174,7 +133,7 @@ pub fn render_value_inner_with_blocks(
         Value::Null => String::new(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) => f.to_string(),
+        Value::Float(f) => motem::float_text(*f),
         Value::String(s) => quote_scalar_string(s),
         // `list(...)` is the only surviving list-value spelling -- `[...]`
         // was retired since it already means `[content]` at the element

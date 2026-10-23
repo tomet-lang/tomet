@@ -117,7 +117,7 @@ fn value_to_version_string(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) => f.to_string(),
+        Value::Float(f) => motem::float_text(*f),
         _ => format!("{v:?}"),
     }
 }
@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn extracts_document_version_from_version_directive() {
         let doc = parse_document("@version(1.0)\n\n#[ Doc ]\n").unwrap();
-        assert_eq!(document_version(&doc), Some("1".to_string()));
+        assert_eq!(document_version(&doc), Some("1.0".to_string()));
 
         let doc2 = parse_document("@version(\"1.0\")\n").unwrap();
         assert_eq!(document_version(&doc2), Some("1.0".to_string()));
