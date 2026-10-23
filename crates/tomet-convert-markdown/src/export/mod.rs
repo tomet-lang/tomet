@@ -20,7 +20,8 @@ use tomet_ast::{
 };
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
-    is_directive, link_target, normalized_element_args, path_target, target_scheme,
+    is_attribute_key, is_directive, link_target, normalized_element_args, path_target,
+    target_scheme,
 };
 
 struct MarkdownCtx<'a> {
@@ -712,11 +713,14 @@ fn conflict_sides(el: &Element) -> (Vec<Block>, Vec<Block>) {
 fn push_data_attrs(out: &mut String, args: &Value) {
     if let Some(map) = as_map(args) {
         for (k, v) in map {
-            out.push_str(&format!(
-                " data-{}=\"{}\"",
-                escape_attr(k),
-                escape_attr(&value_to_plain(v))
-            ));
+            // A key that cannot be part of an attribute name would add
+            // attributes of its own (see `tomet_semantics::is_attribute_key`).
+            if is_attribute_key(k) {
+                out.push_str(&format!(
+                    " data-{k}=\"{}\"",
+                    escape_attr(&value_to_plain(v))
+                ));
+            }
         }
     }
 }

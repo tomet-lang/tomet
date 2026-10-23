@@ -167,3 +167,24 @@ fn preserves_colon_in_url_values() {
         )])
     );
 }
+
+/// A quoted key is a map key (`motem` reads it, the tomet value grammar
+/// delegates to it), so a path can key an entry in a document's `{...}` data
+/// and in its `(args)` as well as in a standalone motem file.
+#[test]
+fn a_quoted_key_is_a_map_key() {
+    let v = parse_value("\"tmtroot/a.tmt\": ../x\nplain: 1").unwrap();
+    assert_eq!(
+        v,
+        Value::Map(vec![
+            ("tmtroot/a.tmt".into(), Value::String("../x".into())),
+            ("plain".into(), Value::Int(1)),
+        ])
+    );
+}
+
+/// A quoted string that is not followed by `:` is still a value.
+#[test]
+fn a_quoted_string_without_a_colon_is_still_a_value() {
+    assert_eq!(parse_value("\"a/b\"").unwrap(), Value::String("a/b".into()));
+}

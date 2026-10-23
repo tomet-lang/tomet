@@ -596,3 +596,11 @@ fn standalone_task_element_exports_to_markdown() {
     let md = to_markdown(&doc);
     assert_eq!(md.trim(), "[x] Single task");
 }
+
+#[test]
+fn a_key_that_is_not_an_attribute_name_adds_no_attribute() {
+    let doc = tomet_parser::parse_document("@x(\"a onclick=alert(1)\": 1, plain: 2)\n").unwrap();
+    let md = to_markdown(&doc);
+    assert!(md.contains(" data-plain=\"2\""), "{md}");
+    assert!(!md.contains("onclick="), "{md}");
+}

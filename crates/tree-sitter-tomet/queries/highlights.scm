@@ -124,6 +124,7 @@
 ; structurally (that inference is `tomet-html`'s job, not the
 ; grammar's) -- highlighting the `map_entry` key is close enough here.
 (map_entry key: (identifier) @property)
+(map_entry key: (string) @property)
 
 (string) @string
 (scalar) @string.special

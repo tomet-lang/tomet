@@ -3,8 +3,8 @@
 
 use crate::elements::{HeadingState, render_element};
 use crate::util::{
-    escape_attr, escape_html, id_attr, inlines_to_plain, push_named_attrs, split_attrs,
-    value_to_plain,
+    escape_attr, escape_html, id_attr, inlines_to_plain, push_data_attr, push_named_attrs,
+    split_attrs, value_to_plain,
 };
 use crate::{HeadingInfo, RenderCtx};
 use tomet_ast::{Block, Element, Inline, List, Section, Sigil, Span, Value};
@@ -239,11 +239,7 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
             match marker {
                 Value::Map(map) => {
                     for (k, v) in map {
-                        out.push_str(&format!(
-                            " data-{}=\"{}\"",
-                            escape_attr(k),
-                            escape_attr(&value_to_plain(v))
-                        ));
+                        push_data_attr(out, k, &value_to_plain(v));
                     }
                 }
                 Value::Element(_) => {}

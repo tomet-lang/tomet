@@ -208,6 +208,42 @@ bool tree_sitter_tomet_external_scanner_scan(void *payload, TSLexer *lexer,
     }
   }
 
+  // A quoted string followed by `:` is a map key too (`"tmtroot/a.tmt": 1`,
+  // `tomet-parser`'s `parse_one_entry_with`), so decline the same way and
+  // let the internal `string` token and `map_entry` win. A quoted string
+  // with no `:` after it stays a scalar, as it always was. `://` is a URI,
+  // not a key -- the parser's `is_scheme_uri_colon` -- so it is not declined.
+  // The probe stops at a newline: a key is written on one line.
+  if (lexer->lookahead == '"') {
+    lexer->advance(lexer, false);
+    while (!lexer->eof(lexer) && lexer->lookahead != '"' &&
+           lexer->lookahead != '\n' && lexer->lookahead != '\r') {
+      if (lexer->lookahead == '\\') {
+        lexer->advance(lexer, false);
+        if (lexer->eof(lexer)) {
+          break;
+        }
+      }
+      lexer->advance(lexer, false);
+    }
+    if (lexer->lookahead == '"') {
+      lexer->advance(lexer, false);
+      while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+        lexer->advance(lexer, false);
+      }
+      if (lexer->lookahead == ':') {
+        lexer->advance(lexer, false);
+        if (lexer->lookahead != '/') {
+          return false;
+        }
+        lexer->advance(lexer, false);
+        if (lexer->lookahead != '/') {
+          return false;
+        }
+      }
+    }
+  }
+
   // Not a `key:` after all (or never looked like one to begin with) --
   // keep consuming exactly like the old regex did: everything up to the
   // next terminator/EOF, so multi-word bare scalars (`{hello world}`) and

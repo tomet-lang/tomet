@@ -517,6 +517,25 @@ Block  @memo
 unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
 ```
 
+### 引用符つきのキー。パスや空白を含むキーはこう書く。引用符つきの文字列は、直後に `:` があるときだけキーになる
+
+```tmt
+@memo{ "a/b.tmt": 1, plain: 2 }
+```
+
+```
+Block  @memo
+  group
+    a/b.tmt: 1
+    plain: 2
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
+```
+
 ## `(args)` と値の文法
 
 ### `key: value`
@@ -590,6 +609,23 @@ unknown element `memo`: only `std` and this document's own `@kind` may be writte
 ```
 Block  @memo
   args    {s: "a, b: c"}
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `@use`
+```
+
+### 引用符つきのキー
+
+```tmt
+@memo("a/b.tmt": 1, plain: 2)
+```
+
+```
+Block  @memo
+  args    {a/b.tmt: 1, plain: 2}
 ```
 
 検証:

@@ -4,6 +4,8 @@
 
 use tomet_ast::Value;
 
+use crate::parser::is_ident_char;
+
 pub fn print_value(value: &Value) -> String {
     let mut out = String::new();
     write_value(value, &mut out, true);
@@ -93,7 +95,7 @@ fn write_args(value: &Value, out: &mut String) {
             out.push_str(", ");
         }
         if !key.is_empty() {
-            out.push_str(key);
+            write_key(key, out);
             out.push_str(": ");
         }
         write_value(v, out, false);
@@ -106,7 +108,7 @@ fn write_map(entries: &[(String, Value)], out: &mut String, top_level: bool) {
             if i > 0 {
                 out.push('\n');
             }
-            out.push_str(key);
+            write_key(key, out);
             out.push_str(": ");
             write_value(value, out, false);
         }
@@ -116,7 +118,7 @@ fn write_map(entries: &[(String, Value)], out: &mut String, top_level: bool) {
             if i > 0 {
                 out.push_str(", ");
             }
-            out.push_str(key);
+            write_key(key, out);
             out.push_str(": ");
             write_value(value, out, false);
         }
@@ -173,19 +175,46 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
         ]);
 
     if needs_quotes {
-        out.push('"');
-        for c in s.chars() {
-            match c {
-                '"' => out.push_str("\\\""),
-                '\\' => out.push_str("\\\\"),
-                '\n' => out.push_str("\\n"),
-                '\r' => out.push_str("\\r"),
-                '\t' => out.push_str("\\t"),
-                _ => out.push(c),
-            }
-        }
-        out.push('"');
+        write_quoted(s, out);
     } else {
         out.push_str(s);
     }
+}
+
+/// Writes a map key: bare when it is a non-empty run of [`is_ident_char`],
+/// quoted (`"tmtroot/a/b.tmt"`) otherwise, so the output reads back as the
+/// same key. Every printer that emits `key: value` goes through here.
+///
+/// An empty key is [`crate::POSITIONAL_ENTRY_KEY`] and has no keyed spelling; callers
+/// print such an entry as a bare value. It is quoted here only so a stray one
+/// fails to parse instead of reading back as something else.
+pub fn write_key(key: &str, out: &mut String) {
+    if !key.is_empty() && key.chars().all(is_ident_char) {
+        out.push_str(key);
+    } else {
+        write_quoted(key, out);
+    }
+}
+
+/// [`write_key`] as an owned string, for callers that build with `format!`.
+pub fn key_text(key: &str) -> String {
+    let mut out = String::new();
+    write_key(key, &mut out);
+    out
+}
+
+/// Writes `s` as a `"..."` string, with the escapes `parse_quoted` reads.
+fn write_quoted(s: &str, out: &mut String) {
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            _ => out.push(c),
+        }
+    }
+    out.push('"');
 }

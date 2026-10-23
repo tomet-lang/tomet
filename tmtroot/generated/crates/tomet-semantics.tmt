@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-semantics, dependencies: list(tomet-address, tomet-ast, tomet-parser, tomet-tree), dependents: list(tomet, tomet-cli, tomet-config, tomet-expr, tomet-field-utils, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule, tomet-vault, tomet-workspace)}
+@meta{crate: tomet-semantics, dependencies: list(motem, tomet-address, tomet-ast, tomet-parser, tomet-tree), dependents: list(tomet, tomet-cli, tomet-config, tomet-expr, tomet-field-utils, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-semantics]
 
@@ -319,6 +319,15 @@ use `.` as a namespace separator, but map keys deliberately do not.
 An element's data, ready for a string-valued attribute map.
 
 ===[Functions]
+
+====[fn is_attribute_key]
+
+Whether `key` can be spliced into an attribute name (`data-{key}`).
+
+Exactly the keys motem writes bare (letters, digits, `_`, `-`, `.`). A key
+that needs quotes -- a path, a key with a space, `"` or `>` -- cannot be
+part of an attribute name, and spliced in it would add attributes of its own.
+The empty key is the positional marker and is not judged here.
 
 ====[fn flatten_element_data]
 

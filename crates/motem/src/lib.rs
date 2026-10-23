@@ -17,6 +17,20 @@
 //! - (to_string) Render a Rust type into motem data text via Serde.
 //! - (from_value) Convert a [`Value`] into a Rust type via Serde deserializer.
 //! - (to_value) Convert a Rust type into a [`Value`] via Serde serializer.
+//! - (write_key) Write a map key, quoted only when it is not an identifier. Every printer that emits `key: value` calls it.
+//!
+//! =[ Keys ]
+//!
+//! A map key is a bare identifier (letters, digits, `_`, `-`, `.`) or a quoted
+//! string, so a key can be a path or a URL:
+//!
+//! ```text
+//! "tmtroot/schema/rust.vocabulary.tmt": "../vocabularies/rust.vocabulary.tmt"
+//! plain.key: 1
+//! ```
+//!
+//! A quoted string is a key only when a `:` follows it; otherwise it is a
+//! value. The empty key is the positional-entry marker, so `"": v` is an error.
 
 pub mod de;
 pub mod error;
@@ -35,7 +49,7 @@ pub use parser::{
     skip_inline_ws, skip_line_comment, skip_ws_and_newlines, skip_ws_newlines_and_comments,
     starts_absolute_path, try_parse_call, try_parse_call_with,
 };
-pub use print::{print_value, write_scalar_string};
+pub use print::{key_text, print_value, write_key, write_scalar_string};
 pub use ser::to_value;
 pub use tomet_ast::Value;
 
@@ -226,6 +240,139 @@ mod tests {
         assert_eq!(
             normalized,
             Value::Seq(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
+        );
+    }
+
+    fn map(entries: &[(&str, Value)]) -> Value {
+        Value::Map(
+            entries
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+        )
+    }
+
+    fn text(s: &str) -> Value {
+        Value::String(s.into())
+    }
+
+    #[test]
+    fn a_quoted_string_before_a_colon_is_a_key() {
+        let src = r#"
+            "tmtroot/a/b.tmt": "../vocab/b.tmt"
+            "with space": 1
+            plain.key: 2
+        "#;
+        assert_eq!(
+            parse_value(src).unwrap(),
+            map(&[
+                ("tmtroot/a/b.tmt", text("../vocab/b.tmt")),
+                ("with space", Value::Int(1)),
+                ("plain.key", Value::Int(2)),
+            ])
+        );
+    }
+
+    #[test]
+    fn a_quoted_key_can_hold_a_nested_map() {
+        let src = r#"
+            "tmtroot/w.tmt": {
+                git: "https://example.com/v.git"
+                rev: main
+                path: "w.tmt"
+            }
+        "#;
+        assert_eq!(
+            parse_value(src).unwrap(),
+            map(&[(
+                "tmtroot/w.tmt",
+                map(&[
+                    ("git", text("https://example.com/v.git")),
+                    ("rev", text("main")),
+                    ("path", text("w.tmt")),
+                ])
+            )])
+        );
+    }
+
+    #[test]
+    fn a_quoted_string_without_a_colon_stays_a_value() {
+        assert_eq!(parse_value("\"hello\"").unwrap(), text("hello"));
+        assert_eq!(
+            parse_value("\"x\", k: 1").unwrap(),
+            map(&[(POSITIONAL_ENTRY_KEY, text("x")), ("k", Value::Int(1))])
+        );
+    }
+
+    #[test]
+    fn a_quoted_key_must_not_be_empty() {
+        let err = parse_value("\"\": 1").unwrap_err().to_string();
+        assert!(
+            err.contains("must not be empty"),
+            "unexpected message: {err}"
+        );
+    }
+
+    #[test]
+    fn an_unterminated_quoted_key_reports_the_string() {
+        let err = parse_value("\"a/b: 1").unwrap_err().to_string();
+        assert!(err.contains("unterminated"), "unexpected message: {err}");
+    }
+
+    #[test]
+    fn keys_are_quoted_only_when_they_need_to_be() {
+        let value = map(&[
+            ("a.b-c_d", Value::Int(1)),
+            ("日誌", Value::Int(2)),
+            ("a/b", Value::Int(3)),
+            ("with space", Value::Int(4)),
+            ("say \"hi\"", Value::Int(5)),
+            ("", Value::Int(6)),
+        ]);
+        assert_eq!(
+            print_value(&value),
+            "a.b-c_d: 1\n日誌: 2\n\"a/b\": 3\n\"with space\": 4\n\"say \\\"hi\\\"\": 5\n\"\": 6"
+        );
+        assert_eq!(key_text("plain"), "plain");
+        assert_eq!(key_text("a/b"), "\"a/b\"");
+    }
+
+    #[test]
+    fn keys_that_need_quotes_read_back_as_the_same_keys() {
+        let value = map(&[
+            ("a/b.tmt", text("x")),
+            ("with space", Value::Int(1)),
+            ("say \"hi\"", Value::Bool(true)),
+            (
+                "nested",
+                map(&[("c/d", Value::Int(2)), ("e", Value::Int(3))]),
+            ),
+        ]);
+        assert_eq!(parse_value(&print_value(&value)).unwrap(), value);
+    }
+
+    #[test]
+    fn a_map_keyed_by_paths_round_trips_through_serde() {
+        use std::collections::BTreeMap;
+
+        let mut managed = BTreeMap::new();
+        managed.insert(
+            "tmtroot/schema/rust.vocabulary.tmt".to_string(),
+            "../v/rust".to_string(),
+        );
+        managed.insert(
+            "tmtroot/schema/writ.vocabulary.tmt".to_string(),
+            "../v/writ".to_string(),
+        );
+
+        let text = to_string(&managed).unwrap();
+        assert!(
+            text.contains("\"tmtroot/schema/rust.vocabulary.tmt\": "),
+            "{text}"
+        );
+        assert_eq!(
+            from_str::<BTreeMap<String, String>>(&text).unwrap(),
+            managed
         );
     }
 }

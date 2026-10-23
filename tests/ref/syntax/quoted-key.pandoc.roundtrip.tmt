@@ -1,0 +1,8 @@
+@meta{plain.key: "2", "tmtroot/schema/rust.vocabulary.tmt": ../vocabularies/rust.vocabulary.tmt, "with space": "1"}
+
+=[Quoted map keys]
+A key that is not an identifier is written as a quoted string.
+@ns.thing("a/b.tmt": 1, plain: 2)[]
+@ns.thing[]{ "a/b": {"c d": 3} }
+A quoted string with no `:` after it is still a value, not a key.
+@ns.thing[]{ value: a/b.tmt }

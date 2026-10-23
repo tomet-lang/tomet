@@ -156,3 +156,26 @@ fn test_renders_task_element() {
     assert!(html.contains("<div class=\"tm-element tm-task\" data-status=\"done\"><input type=\"checkbox\" class=\"tm-task-checkbox\" disabled checked> Finished work</div>\n"), "got {html}");
     assert!(html.contains("<div class=\"tm-element tm-task\" data-status=\"todo\"><input type=\"checkbox\" class=\"tm-task-checkbox\" disabled> Pending work</div>\n"), "got {html}");
 }
+
+/// A key that needs quotes cannot be part of an attribute name: spliced into
+/// `data-{key}` it would add attributes of its own. It is left out of the
+/// readable projection, and the exact copy keeps it.
+#[test]
+fn a_key_that_is_not_an_attribute_name_cannot_add_attributes() {
+    let doc = parse_document("@x(\"a onclick=alert(1)\": 1, plain: 2)\n").unwrap();
+    let body = render_body(&doc);
+    // The key appears only inside the quoted value of `data-tomet-data`.
+    assert_eq!(
+        body.trim(),
+        "<div class=\"tm-element tm-x\" data-plain=\"2\" \
+         data-tomet-data=\"{&quot;args&quot;:{&quot;a onclick=alert(1)&quot;:1,&quot;plain&quot;:2}}\"></div>"
+    );
+}
+
+#[test]
+fn a_path_key_stays_out_of_data_attributes_and_in_the_exact_copy() {
+    let doc = parse_document("@x(\"tmtroot/a.tmt\": 1)\n").unwrap();
+    let body = render_body(&doc);
+    assert!(!body.contains("data-tmtroot"), "{body}");
+    assert!(body.contains("tmtroot/a.tmt"), "exact copy: {body}");
+}

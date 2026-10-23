@@ -56,6 +56,16 @@ impl FlatData {
     }
 }
 
+/// Whether `key` can be spliced into an attribute name (`data-{key}`).
+///
+/// Exactly the keys motem writes bare (letters, digits, `_`, `-`, `.`). A key
+/// that needs quotes -- a path, a key with a space, `"` or `>` -- cannot be
+/// part of an attribute name, and spliced in it would add attributes of its own.
+/// The empty key is the positional marker and is not judged here.
+pub fn is_attribute_key(key: &str) -> bool {
+    key.chars().all(motem::is_ident_char)
+}
+
 /// Flattens `el`'s `(args)` and `{value}` for an attribute map.
 ///
 /// A `${...}` interpolation is not data and is skipped; so are the
@@ -80,8 +90,10 @@ pub fn flatten_data(args: Option<&Value>, value: Option<&Value>) -> FlatData {
             Value::Map(entries) => {
                 for (k, v) in entries {
                     match scalar_string(v) {
-                        Some(s) => pairs.push((k.clone(), s)),
-                        None => lossy = true,
+                        // A key that cannot be spliced into `data-{key}` has no
+                        // readable projection; the exact copy carries it.
+                        Some(s) if is_attribute_key(k) => pairs.push((k.clone(), s)),
+                        _ => lossy = true,
                     }
                 }
             }

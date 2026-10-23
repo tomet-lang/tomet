@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: motem, dependencies: list(tomet-ast, tomet-lexer), dependents: list(tomet-cli, tomet-parser)}
+@meta{crate: motem, dependencies: list(tomet-ast, tomet-lexer), dependents: list(tomet-cli, tomet-edit, tomet-parser, tomet-printer, tomet-semantics, tomet-style)}
 
 =[motem]
 
@@ -24,6 +24,20 @@ motem provides:
 - (to_string) Render a Rust type into motem data text via Serde.
 - (from_value) Convert a [`Value`] into a Rust type via Serde deserializer.
 - (to_value) Convert a Rust type into a [`Value`] via Serde serializer.
+- (write_key) Write a map key, quoted only when it is not an identifier. Every printer that emits `key: value` calls it.
+
+==[Keys]
+
+A map key is a bare identifier (letters, digits, `_`, `-`, `.`) or a quoted
+string, so a key can be a path or a URL:
+
+```text
+"tmtroot/schema/rust.vocabulary.tmt": "../vocabularies/rust.vocabulary.tmt"
+plain.key: 1
+```
+
+A quoted string is a key only when a `:` follows it; otherwise it is a
+value. The empty key is the positional-entry marker, so `"": v` is an error.
 
 ==[Module de]
 
@@ -135,6 +149,13 @@ entry/sequence item.
 
 ====[fn parse_one_entry_with]
 
+Parses one `key: value` entry, or a bare value as a positional entry.
+
+A key is a bare identifier (`is_ident_char`) or a quoted string
+(`"tmtroot/a/b.tmt": value`), which lets a key be a path or a URL. A quoted
+string with no `:` after it is a positional value, not a key. An empty
+quoted key is an error: `""` is [`POSITIONAL_ENTRY_KEY`].
+
 ====[fn parse_map_body]
 
 ====[fn parse_map_body_with]
@@ -168,6 +189,20 @@ nested maps use `{ ... }`, and a sequence prints as `list(...)`.
 ====[fn print_value]
 
 ====[fn write_scalar_string]
+
+====[fn write_key]
+
+Writes a map key: bare when it is a non-empty run of [`is_ident_char`],
+quoted (`"tmtroot/a/b.tmt"`) otherwise, so the output reads back as the
+same key. Every printer that emits `key: value` goes through here.
+
+An empty key is [`crate::POSITIONAL_ENTRY_KEY`] and has no keyed spelling; callers
+print such an entry as a bare value. It is quoted here only so a stray one
+fails to parse instead of reading back as something else.
+
+====[fn key_text]
+
+[`write_key`] as an owned string, for callers that build with `format!`.
 
 ==[Module ser]
 

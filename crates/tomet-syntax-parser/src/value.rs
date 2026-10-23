@@ -44,7 +44,9 @@ impl motem::ValueHook for TometValueHook {
         if cur.peek() == Some('@') && crate::element::is_element_start(cur, false) {
             let el = match crate::element::parse_element(cur, false) {
                 Ok(el) => el,
-                Err(e) => return Some(Err(motem::Error::at(e.message, e.line, e.column, e.offset))),
+                Err(e) => {
+                    return Some(Err(motem::Error::at(e.message, e.line, e.column, e.offset)));
+                }
             };
             return Some(Ok(Value::Element(Box::new(el))));
         }
@@ -53,7 +55,9 @@ impl motem::ValueHook for TometValueHook {
         if cur.peek() == Some('$') && crate::interp::is_interp_start(cur) {
             let el = match crate::interp::parse_dollar_element(cur) {
                 Ok(el) => el,
-                Err(e) => return Some(Err(motem::Error::at(e.message, e.line, e.column, e.offset))),
+                Err(e) => {
+                    return Some(Err(motem::Error::at(e.message, e.line, e.column, e.offset)));
+                }
             };
             return Some(Ok(Value::Element(Box::new(el))));
         }
@@ -71,7 +75,9 @@ impl motem::ValueHook for TometValueHook {
                 &[],
             ) {
                 Ok(blocks) => blocks,
-                Err(e) => return Some(Err(motem::Error::at(e.message, e.line, e.column, e.offset))),
+                Err(e) => {
+                    return Some(Err(motem::Error::at(e.message, e.line, e.column, e.offset)));
+                }
             };
             if !cur.eat_str("]") {
                 return Some(Err(motem::Error::at_offset("expected ']'", cur.pos())));

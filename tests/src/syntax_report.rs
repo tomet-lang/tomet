@@ -153,6 +153,11 @@ const CASES: &[Case] = &[
         "@memo{\n  (1)\n  [ ひとつ ]\n}\n",
     ),
     case(None, "空のグループ", "@memo{}\n"),
+    case(
+        None,
+        "引用符つきのキー。パスや空白を含むキーはこう書く。引用符つきの文字列は、直後に `:` があるときだけキーになる",
+        "@memo{ \"a/b.tmt\": 1, plain: 2 }\n",
+    ),
     // ---- args and the value DSL -------------------------------------
     case(
         Some("`(args)` と値の文法"),
@@ -167,6 +172,11 @@ const CASES: &[Case] = &[
     ),
     case(None, "入れ子のマップ", "@memo(m: { x: 1 })\n"),
     case(None, "引用符つき文字列", "@memo(s: \"a, b: c\")\n"),
+    case(
+        None,
+        "引用符つきのキー",
+        "@memo(\"a/b.tmt\": 1, plain: 2)\n",
+    ),
     case(
         None,
         "スカラーは型が推論される",

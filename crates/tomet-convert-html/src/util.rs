@@ -1,7 +1,7 @@
 //! Attribute, value and escaping helpers shared by the renderers.
 
 use tomet_ast::{Block, Element, Id, Inline, Value};
-use tomet_semantics::{EXACT_DATA_KEY, flatten_data};
+use tomet_semantics::{EXACT_DATA_KEY, flatten_data, is_attribute_key};
 
 /// Flattens inline content to plain text -- used for the `alt` attribute,
 /// which can't itself carry markup.
@@ -88,7 +88,18 @@ pub(crate) fn push_named_attrs(
         out.push_str(&format!(" class=\"{}\"", escape_attr(class)));
     }
     for (k, v) in data {
-        out.push_str(&format!(" data-{}=\"{}\"", escape_attr(k), escape_attr(v)));
+        push_data_attr(out, k, v);
+    }
+}
+
+/// Appends ` data-{key}="{value}"`, or nothing when `key` cannot be part of an
+/// attribute name (see [`tomet_semantics::is_attribute_key`]): a key such as
+/// `"a onclick=x"` would otherwise add attributes of its own. `flatten_data`
+/// keeps such a key in the exact copy; the paths that do not go through it
+/// drop it.
+pub(crate) fn push_data_attr(out: &mut String, key: &str, value: &str) {
+    if is_attribute_key(key) {
+        out.push_str(&format!(" data-{key}=\"{}\"", escape_attr(value)));
     }
 }
 
@@ -147,7 +158,7 @@ pub(crate) fn push_data_attrs(out: &mut String, args: Option<&Value>, skip: &[&s
                 if skip.contains(&k.as_str()) {
                     continue;
                 }
-                out.push_str(&format!(" data-{}=\"{}\"", escape_attr(k), escape_attr(v)));
+                push_data_attr(out, k, v);
             }
         }
         // A positional group (`@x(1)`) has no key to project onto, so

@@ -783,7 +783,10 @@ module.exports = grammar({
 			seq(
 				field(
 					"key",
-					alias(token(prec(1, /[A-Za-z_][A-Za-z0-9_.-]*/)), $.identifier),
+					choice(
+						alias(token(prec(1, /[A-Za-z_][A-Za-z0-9_.-]*/)), $.identifier),
+						$.string,
+					),
 				),
 				choice(
 					seq(":", optional(field("value", $._entry_value))),

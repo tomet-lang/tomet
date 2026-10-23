@@ -201,14 +201,14 @@ pub fn render_value_inner_with_blocks(
                         let val_str = render_nested_with_blocks(val, config, render_blocks);
                         // An empty key is the parser's positional-entry
                         // sentinel (`k.is_empty()`, since a real map key
-                        // can never be empty -- `eat_ident` never matches
-                        // one): `(a, key:value)` mixes a bare positional
+                        // can never be empty -- an empty quoted key is
+                        // a parse error): `(a, key:value)` mixes a bare positional
                         // value with named ones, and the bare one prints
                         // bare too, not as `: a`.
                         if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang")) {
                             parts.push(val_str);
                         } else {
-                            parts.push(format!("{k}: {val_str}"));
+                            parts.push(format!("{}: {val_str}", motem::key_text(k)));
                         }
                     }
                     parts.join(", ")
@@ -223,7 +223,7 @@ pub fn render_value_inner_with_blocks(
                     if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang")) {
                         parts.push(val_str);
                     } else {
-                        parts.push(format!("{k}: {val_str}"));
+                        parts.push(format!("{}: {val_str}", motem::key_text(k)));
                     }
                 }
                 parts.join(", ")
@@ -299,7 +299,8 @@ pub fn render_value_inner_with_blocks(
                             match entry {
                                 Entry::Pair(k, v) => {
                                     s.push_str(&format!(
-                                        "{k}: {}",
+                                        "{}: {}",
+                                        motem::key_text(k),
                                         render_nested_with_blocks(v, config, render_blocks)
                                     ));
                                 }
@@ -403,7 +404,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
             let field_cfg = config.meta.fields.get(k);
             let val_str = render_meta_field_value(v, field_cfg, config);
             out.push_str("  ");
-            out.push_str(k);
+            motem::write_key(k, &mut out);
             if val_str.starts_with('\n') || val_str.is_empty() {
                 out.push(':');
             } else {
@@ -551,6 +552,26 @@ mod tests {
         assert_eq!(
             render_meta_element(&el, &cfg),
             "@meta{\n  id: doc-12345678\n}"
+        );
+    }
+
+    #[test]
+    fn render_meta_element_quotes_keys_that_are_not_identifiers() {
+        let mut el = tomet_tree::element_new(Sigil::named("meta"));
+        el.value = Some(ElementValue::from_map(Value::Map(vec![
+            ("plain.key".to_string(), Value::Int(1)),
+            ("tmtroot/a b.tmt".to_string(), Value::Int(2)),
+        ])));
+        let cfg = PrinterConfig {
+            meta: tomet_config::MetaConfig {
+                always_newline: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert_eq!(
+            render_meta_element(&el, &cfg),
+            "@meta{\n  plain.key: 1\n  \"tmtroot/a b.tmt\": 2\n}"
         );
     }
 

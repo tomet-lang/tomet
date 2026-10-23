@@ -322,27 +322,47 @@ pub fn parse_one_entry(cur: &mut Cursor) -> Result<(String, Value)> {
     parse_one_entry_with(cur, &mut NoHook)
 }
 
+/// Parses one `key: value` entry, or a bare value as a positional entry.
+///
+/// A key is a bare identifier (`is_ident_char`) or a quoted string
+/// (`"tmtroot/a/b.tmt": value`), which lets a key be a path or a URL. A quoted
+/// string with no `:` after it is a positional value, not a key. An empty
+/// quoted key is an error: `""` is [`POSITIONAL_ENTRY_KEY`].
 pub fn parse_one_entry_with<H: ValueHook>(
     cur: &mut Cursor,
     hook: &mut H,
 ) -> Result<(String, Value)> {
     let checkpoint = cur.pos();
-    if !starts_absolute_path(cur) {
-        let key = eat_ident(cur);
-        if !key.is_empty() {
-            skip_inline_ws(cur);
-            if !is_scheme_uri_colon(cur) && cur.peek() == Some(':') {
-                let key = key.to_string();
-                cur.bump();
-                skip_inline_ws(cur);
-                let value = parse_entry_value_with(cur, hook)?;
-                return Ok((key, value));
+    if let Some(key) = eat_key(cur) {
+        skip_inline_ws(cur);
+        if !is_scheme_uri_colon(cur) && cur.peek() == Some(':') {
+            if key.is_empty() {
+                return Err(err(checkpoint, "a quoted key must not be empty"));
             }
+            cur.bump();
+            skip_inline_ws(cur);
+            let value = parse_entry_value_with(cur, hook)?;
+            return Ok((key, value));
         }
     }
     cur.set_pos(checkpoint);
     let value = parse_entry_value_with(cur, hook)?;
     Ok((POSITIONAL_ENTRY_KEY.to_string(), value))
+}
+
+/// Reads the text that may be a key: a quoted string, or a non-empty
+/// identifier that is not an absolute path. Whether it is a key is decided by
+/// the `:` after it, so the caller restores the cursor when it is not.
+fn eat_key(cur: &mut Cursor) -> Option<String> {
+    if cur.peek() == Some('"') {
+        // An unterminated string is no key; the positional parse reports it.
+        return parse_quoted(cur).ok();
+    }
+    if starts_absolute_path(cur) {
+        return None;
+    }
+    let key = eat_ident(cur);
+    (!key.is_empty()).then(|| key.to_string())
 }
 
 pub fn parse_map_body(cur: &mut Cursor) -> Result<Value> {

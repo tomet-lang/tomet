@@ -70,7 +70,7 @@ fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
                     if k.is_empty() {
                         out.push_str(v);
                     } else {
-                        out.push_str(k);
+                        motem::write_key(k, out);
                         out.push_str(": ");
                         out.push_str(v);
                     }
@@ -86,7 +86,7 @@ fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
                     if k.is_empty() {
                         out.push_str(v);
                     } else {
-                        out.push_str(k);
+                        motem::write_key(k, out);
                         out.push_str(": ");
                         out.push_str(v);
                     }

@@ -311,6 +311,61 @@ mod tests {
         }
     }
 
+    /// Kinds of every `map_entry`'s `key` field, in source order.
+    fn map_entry_key_kinds(node: Node) -> Vec<&'static str> {
+        let mut kinds = Vec::new();
+        let mut stack = vec![node];
+        while let Some(n) = stack.pop() {
+            if n.kind() == "map_entry"
+                && let Some(key) = n.child_by_field_name("key")
+            {
+                kinds.push(key.kind());
+            }
+            let mut cursor = n.walk();
+            let children: Vec<_> = n.children(&mut cursor).collect();
+            stack.extend(children.into_iter().rev());
+        }
+        kinds
+    }
+
+    #[test]
+    fn a_quoted_string_before_a_colon_is_a_map_key() {
+        // `tomet-parser` reads `"a/b": 1` as a keyed entry wherever it reads
+        // `a: 1`: in `{value}`, in `(args)`, nested, and mixed with bare keys.
+        for (src, keys) in [
+            ("@meta{ \"a/b\": 1 }\n", vec!["string"]),
+            (
+                "@meta{\n  \"a/b\": 1\n  c: 2\n}\n",
+                vec!["string", "identifier"],
+            ),
+            (
+                "@meta{\n  c: 2\n  \"a/b\": 1\n}\n",
+                vec!["identifier", "string"],
+            ),
+            ("@x(\"a/b\": 1, c: 2)\n", vec!["string", "identifier"]),
+            ("@x{ k: { \"c d\": 3 } }\n", vec!["identifier", "string"]),
+        ] {
+            let tree = parse(src);
+            let root = tree.root_node();
+            assert!(!root.has_error(), "expected no errors for {src:?}");
+            assert_eq!(map_entry_key_kinds(root), keys, "for {src:?}");
+        }
+    }
+
+    #[test]
+    fn a_quoted_string_without_a_colon_is_still_a_value() {
+        for src in ["@x(\"a/b\")\n", "@x{ \"a/b\" }\n"] {
+            let tree = parse(src);
+            let root = tree.root_node();
+            assert!(!root.has_error(), "expected no errors for {src:?}");
+            let keys = map_entry_key_kinds(root);
+            assert!(
+                !keys.contains(&"string"),
+                "a quoted value must not become a key in {src:?}: {keys:?}"
+            );
+        }
+    }
+
     #[test]
     fn parses_list_value_markers() {
         // `- (T)`/`- (?)`/etc, with a space before the marker (the real

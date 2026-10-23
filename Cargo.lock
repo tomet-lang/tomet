@@ -1842,6 +1842,7 @@ dependencies = [
 name = "tomet-edit"
 version = "0.2.0"
 dependencies = [
+ "motem",
  "tomet-address",
  "tomet-ast",
  "tomet-config",
@@ -2073,6 +2074,7 @@ dependencies = [
 name = "tomet-printer"
 version = "0.2.0"
 dependencies = [
+ "motem",
  "tomet-ast",
  "tomet-config",
  "tomet-field-utils",
@@ -2108,6 +2110,7 @@ dependencies = [
 name = "tomet-semantics"
 version = "0.2.0"
 dependencies = [
+ "motem",
  "serde_json",
  "tomet-address",
  "tomet-ast",
@@ -2155,6 +2158,7 @@ dependencies = [
 name = "tomet-style"
 version = "0.2.0"
 dependencies = [
+ "motem",
  "tomet-ast",
  "tomet-config",
  "tomet-field-utils",

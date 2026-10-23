@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+motem = { workspace = true }
 tomet-address = { workspace = true }
 tomet-ast = { workspace = true }
 tomet-tree = { workspace = true }

@@ -67,8 +67,8 @@ pub use elements::target::{
     target_scheme,
 };
 pub use flatten::{
-    EXACT_DATA_KEY, FlatData, POSITIONAL_KEY, flatten_data, flatten_element_data, scalar_string,
-    value_to_json,
+    EXACT_DATA_KEY, FlatData, POSITIONAL_KEY, flatten_data, flatten_element_data, is_attribute_key,
+    scalar_string, value_to_json,
 };
 pub use kind::{
     BUILTIN_KINDS, ContentShape, ElementKind, Shape, UnknownName, builtin_content_shape,
