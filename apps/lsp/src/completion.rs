@@ -32,6 +32,32 @@ pub fn completions_for_with_uri(
     // where the element may be *placed*, not how it is spelled, so it is
     // reported in the completion detail instead of splitting the list
     // across two sigils.
+    // `::` opening a line starts a declaration about the document: only the
+    // built-ins that are declarations (the ones that belong in the preamble)
+    // are offered. The sigil is typed already, so the name goes in alone.
+    //
+    // `@` still lists them too: the old spelling reads until it is migrated
+    // away, and dropping it from there is part of retiring it.
+    if let Some(typed) = prefix.trim_start().strip_prefix("::")
+        && typed
+            .chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    {
+        for (name, kind) in BUILTIN_KINDS.iter() {
+            if tomet_semantics::builtin_region(kind) != tomet_semantics::Region::Preamble {
+                continue;
+            }
+            items.push(CompletionItem {
+                label: name.to_string(),
+                insert_text: Some(name.to_string()),
+                kind: Some(CompletionItemKind::KEYWORD),
+                detail: Some(detail_for(name, kind)),
+                ..CompletionItem::default()
+            });
+        }
+        return items;
+    }
+
     if prefix.ends_with('@') {
         for (name, kind) in BUILTIN_KINDS.iter() {
             items.push(CompletionItem {

@@ -551,6 +551,46 @@ fn completions_suggest_kind_and_version() {
 }
 
 #[test]
+fn double_colon_at_the_start_of_a_line_offers_the_declarations() {
+    for (line, col) in [("::", 2), ("::ki", 4), ("  ::me", 6)] {
+        let items = completions_for(line, Position::new(0, col));
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        for want in [
+            "kind",
+            "meta",
+            "config",
+            "use",
+            "version",
+            "settings",
+            "blueprint",
+            "vocabulary",
+        ] {
+            assert!(labels.contains(&want), "{line:?}: {want} in {labels:?}");
+        }
+        // content is not a declaration about the document
+        for not in ["callout", "link", "em", "table", "ftn"] {
+            assert!(!labels.contains(&not), "{line:?}: {not} in {labels:?}");
+        }
+        // the sigil is already typed, so the name is inserted alone
+        let kind = items.iter().find(|i| i.label == "kind").unwrap();
+        assert_eq!(kind.insert_text.as_deref(), Some("kind"));
+    }
+}
+
+#[test]
+fn a_double_colon_inside_a_line_is_not_a_declaration() {
+    for (line, col) in [("std::", 5), ("text ::", 7)] {
+        let items = completions_for(line, Position::new(0, col));
+        assert!(
+            !items
+                .iter()
+                .any(|i| i.label == "kind" && i.insert_text.as_deref() == Some("kind")),
+            "{line:?}"
+        );
+    }
+}
+
+#[test]
 fn completions_for_file_path() {
     let current = std::env::current_dir().unwrap();
     let test_file = current.join("test_dummy.tmt");

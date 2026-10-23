@@ -355,10 +355,16 @@ fn render_meta_field_value(
 /// produces for `@meta`; anything else renders as a bare `@meta` (with
 /// args, if any).
 pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
+    // the spelling it was written with: `@meta` or `::meta`
+    let head = if el.sigil.is_document() {
+        "::meta"
+    } else {
+        "@meta"
+    };
     if config.meta.always_newline
         && let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el)
     {
-        let mut out = String::from("@meta{\n");
+        let mut out = format!("{head}{{\n");
         for (k, v) in &entries {
             let field_cfg = config.meta.fields.get(k);
             let val_str = render_meta_field_value(v, field_cfg, config);
@@ -376,7 +382,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
         return out;
     }
 
-    let mut out = String::from("@meta");
+    let mut out = String::from(head);
     if let Some(args) = &el.args {
         out.push('(');
         out.push_str(&render_args_with_config(args, config));
@@ -492,6 +498,25 @@ mod tests {
         )])));
         let cfg = PrinterConfig::default();
         assert_eq!(render_meta_element(&el, &cfg), "@meta{id: doc-12345678}");
+    }
+
+    #[test]
+    fn render_meta_element_keeps_the_double_colon_it_was_written_with() {
+        let mut el = tomet_tree::element_new(Sigil::document("meta"));
+        el.value = Some(ElementValue::from_map(Value::Map(vec![(
+            "id".to_string(),
+            Value::String("doc-12345678".to_string()),
+        )])));
+        assert_eq!(
+            render_meta_element(&el, &PrinterConfig::default()),
+            "::meta{id: doc-12345678}"
+        );
+        let mut cfg = PrinterConfig::default();
+        cfg.meta.always_newline = true;
+        assert_eq!(
+            render_meta_element(&el, &cfg),
+            "::meta{\n  id: doc-12345678\n}"
+        );
     }
 
     #[test]

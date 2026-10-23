@@ -63,6 +63,11 @@
 (inline_element "@" @tag)
 (inline_element name: (identifier) @tag)
 
+; A `::name` declaration about the document: the same colours as an element,
+; since it is one -- its sigil says where it belongs, not what it looks like.
+(document_element "::" @tag)
+(document_element name: (identifier) @tag)
+
 ; `${...}` / `$call(...)` interpolation
 (interpolation "${" @punctuation.special)
 (interpolation "}" @punctuation.special)
@@ -97,6 +102,12 @@
 (inline_element (content_group "]" @tag))
 (inline_element (value_group "{" @tag))
 (inline_element (value_group "}" @tag))
+(document_element (args_group "(" @tag))
+(document_element (args_group ")" @tag))
+(document_element (content_group "[" @tag))
+(document_element (content_group "]" @tag))
+(document_element (value_group "{" @tag))
+(document_element (value_group "}" @tag))
 
 ; Connect framing: named connects (:rule()) use subdued punctuation gray
 (connect ":" @punctuation.special)
@@ -117,6 +128,7 @@
 
 ; Bare colons on inline elements and sections (:(), :{}) use distinct keyword color
 (inline_element ":" @keyword.control)
+(document_element ":" @keyword.control)
 (section ":" @keyword.control)
 
 ; well-known `@(url:..)`/`@(file:..)`/`@(ref:..)` link-shaped elements

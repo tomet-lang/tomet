@@ -10,6 +10,7 @@
 		{ "include": "#thematic-break" },
 		{ "include": "#list-marker" },
 		{ "include": "#marked-content" },
+		{ "include": "#document-element" },
 		{ "include": "#inline" }
 	],
 	"repository": {
@@ -456,6 +457,33 @@
 			]
 		},
 
+		"document-element": {
+			"comment": "`::name`, a declaration about the document. It is only a block: the `::` has to open a line, so `std::vec` and a `::` in the middle of a sentence stay text. What follows the name is read as after an `@`.",
+			"patterns": [
+				{
+					"comment": "`::name` with groups: ::kind(config) / ::meta{ ... }",
+					"begin": "^[ \\t]*(::)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*[(\\[{])",
+					"beginCaptures": {
+						"1": { "name": "entity.name.tag.sigil.tomet entity.name.tag.tomet" },
+						"2": { "name": "entity.name.tag.tomet" }
+					},
+					"end": "(?<=\\]|\\)|\\})(?![ \\t]*[(\\[{])|^(?=[ \\t]*$)",
+					"patterns": [
+						{ "include": "#element-round-group" },
+						{ "include": "#element-square-group" },
+						{ "include": "#element-curly-group" }
+					]
+				},
+				{
+					"comment": "A bare `::name` that starts and ends its own line.",
+					"match": "^[ \\t]*(::)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)[ \\t]*$",
+					"captures": {
+						"1": { "name": "entity.name.tag.sigil.tomet entity.name.tag.tomet" },
+						"2": { "name": "entity.name.tag.tomet" }
+					}
+				}
+			]
+		},
 		"element": {
 			"comment": "`@name` is the only element sigil; `#` carries no syntax at all and is free. Shape comes from position rather than spelling. The name is required -- a name-less `@(...)` stopped forming an element. Names are ASCII, `.`-separated for namespaces (`@deck.ref`). The alternative refuses a `@` preceded by a word character, which is the half that keeps an email address prose.",
 			"patterns": [

@@ -37,10 +37,22 @@
 //! =[ Files ]
 //!
 //! A standalone motem file (`.mtm`) is a top-level map written as bare
-//! `key: value` lines, with no braces around it. [`parse_file`] reads one: it
-//! is [`parse_value`] that also insists every entry has a key, so a lone
-//! scalar or a bare value among the entries is an error at that entry. `tomet
-//! check` and `tomet format` take a `.mtm` next to a `.tmt`.
+//! `key: value` lines, with no braces around it, and may open with
+//! declarations about the file:
+//!
+//! ```text
+//! ::kind(catalog, 2)
+//! ::use(deck)
+//!
+//! "tmtroot/a.tmt": "../a.tmt"
+//! ```
+//!
+//! [`parse_file`] reads one into a [`File`]. A declaration is `::name`, then
+//! positional arguments in `(...)` and a map in `{...}`, either or both, and
+//! ends its line; they go before the first entry. What a name means is not
+//! decided here. The body is [`parse_value`] that also insists every entry has
+//! a key, so a lone scalar or a bare value among the entries is an error at
+//! that entry. `tomet check` and `tomet format` take a `.mtm` next to a `.tmt`.
 //!
 //! A document with nothing in it, or only whitespace and comments, is the
 //! empty map, so a config file may be empty and a reader fills in every
@@ -101,14 +113,14 @@ pub mod print;
 
 pub use error::{Error, Result};
 pub use parser::{
-    LITERAL_CONSTRUCTORS, NoHook, POSITIONAL_ENTRY_KEY, ValueHook, duplicate_key_error, eat_ident,
-    eat_name, eat_name_segment, eat_scalar_raw, err, is_ident_char, is_inline_ws, is_name_char,
-    is_name_start, is_name_start_at, is_scheme_uri_colon, parse_entry_value,
-    parse_entry_value_with, parse_file, parse_map_body, parse_map_body_with, parse_one_entry,
-    parse_one_entry_with, parse_quoted, parse_value, parse_value_at, parse_value_at_with,
-    parse_value_with, scalar_from_text, skip_block_comment, skip_inline_ws, skip_line_comment,
-    skip_ws_and_newlines, skip_ws_newlines_and_comments, starts_absolute_path, try_parse_call,
-    try_parse_call_with,
+    Declaration, File, LITERAL_CONSTRUCTORS, NoHook, POSITIONAL_ENTRY_KEY, ValueHook,
+    duplicate_key_error, eat_ident, eat_name, eat_name_segment, eat_scalar_raw, err, is_ident_char,
+    is_inline_ws, is_name_char, is_name_start, is_name_start_at, is_scheme_uri_colon,
+    parse_entry_value, parse_entry_value_with, parse_file, parse_map_body, parse_map_body_with,
+    parse_one_entry, parse_one_entry_with, parse_quoted, parse_value, parse_value_at,
+    parse_value_at_with, parse_value_with, scalar_from_text, skip_block_comment, skip_inline_ws,
+    skip_line_comment, skip_ws_and_newlines, skip_ws_newlines_and_comments, starts_absolute_path,
+    try_parse_call, try_parse_call_with,
 };
 pub use print::{
     float_text, key_text, print_value, quoted_text, write_float, write_key, write_scalar_string,
@@ -617,17 +629,121 @@ mod tests {
         }
     }
 
+    fn declared(f: &File) -> Vec<(String, Vec<Value>, Option<Value>)> {
+        f.header
+            .iter()
+            .map(|d| (d.name.clone(), d.args.clone(), d.data.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn a_file_may_open_with_declarations() {
+        let f = parse_file(
+            "// header\n::kind(catalog, 2)\n::use(deck)\n::meta{ id: x, n: 1 }\n\n\"a/b\": 1\nm: { k: v }\n",
+        )
+        .unwrap();
+        assert_eq!(
+            declared(&f),
+            [
+                (
+                    "kind".to_string(),
+                    vec![text("catalog"), Value::Int(2)],
+                    None
+                ),
+                ("use".to_string(), vec![text("deck")], None),
+                (
+                    "meta".to_string(),
+                    vec![],
+                    Some(map(&[("id", text("x")), ("n", Value::Int(1))]))
+                ),
+            ]
+        );
+        assert_eq!(
+            f.body,
+            map(&[("a/b", Value::Int(1)), ("m", map(&[("k", text("v"))]))])
+        );
+    }
+
+    #[test]
+    fn a_declaration_may_have_both_groups_and_a_comment_after_it() {
+        let f = parse_file("::x(a, b){ c: 1 } // note\n").unwrap();
+        assert_eq!(
+            declared(&f),
+            [(
+                "x".to_string(),
+                vec![text("a"), text("b")],
+                Some(map(&[("c", Value::Int(1))]))
+            )]
+        );
+        let f = parse_file("::x{ c: 1 }(a)\n").unwrap();
+        assert_eq!(f.header[0].args, [text("a")]);
+        // a bare name is a declaration with nothing in it
+        let f = parse_file("::draft\n").unwrap();
+        assert_eq!(declared(&f), [("draft".to_string(), vec![], None)]);
+    }
+
+    #[test]
+    fn a_file_with_only_a_header_has_an_empty_body() {
+        let f = parse_file("::kind(catalog)\n").unwrap();
+        assert_eq!(f.body, Value::Map(vec![]));
+        assert_eq!(f.header.len(), 1);
+    }
+
+    #[test]
+    fn a_declaration_records_where_it_starts() {
+        let f = parse_file("// c\n::kind(a)\n  ::use(b)\n").unwrap();
+        assert_eq!(f.header[0].offset, 5);
+        assert_eq!(f.header[1].offset, 17);
+    }
+
+    #[test]
+    fn a_declaration_below_the_first_entry_is_an_error_that_says_where_it_goes() {
+        let err = parse_file("a: 1\n::kind(x)\n").unwrap_err();
+        assert!(err.message.contains("top of the file"), "{}", err.message);
+        assert_eq!((err.line, err.column), (2, 1));
+    }
+
+    #[test]
+    fn what_is_not_a_declaration_is_what_it_was() {
+        // no name, or no `::` at the start of an entry: not a declaration
+        assert!(parse_file("::(x)\n").is_err());
+        assert!(parse_file("::\n").is_err());
+        assert_eq!(
+            parse_file("a: std::vec\n").unwrap().body,
+            map(&[("a", text("std::vec"))])
+        );
+        // the entry that follows the header is held to the file's own rule
+        assert!(parse_file("::kind(x)\nstray\n").is_err());
+    }
+
+    #[test]
+    fn something_after_a_declaration_on_its_line_is_an_error() {
+        assert!(parse_file("::kind(x) trailing\n").is_err());
+        assert!(parse_file("::kind(x\n").is_err());
+    }
+
+    #[test]
+    fn two_files_with_one_meaning_are_equal_whatever_their_offsets() {
+        let a = parse_file("::kind(x)\na: 1\n").unwrap();
+        let b = parse_file("\n\n::kind(x)   // c\n\na: 1\n").unwrap();
+        assert_eq!(a, b);
+    }
+
     #[test]
     fn a_file_is_a_map_of_keyed_entries() {
         assert_eq!(
-            parse_file("a: 1\n// note\n\"b/c\": list(x)\n").unwrap(),
+            parse_file("a: 1\n// note\n\"b/c\": list(x)\n")
+                .unwrap()
+                .body,
             map(&[("a", Value::Int(1)), ("b/c", Value::Seq(vec![text("x")]))])
         );
-        assert_eq!(parse_file("").unwrap(), Value::Map(vec![]));
+        assert_eq!(parse_file("").unwrap().body, Value::Map(vec![]));
         assert_eq!(
-            parse_file("// only a comment\n").unwrap(),
+            parse_file("// only a comment\n").unwrap().body,
             Value::Map(vec![])
         );
+        // and no declarations
+        assert!(parse_file("a: 1\n").unwrap().header.is_empty());
     }
 
     #[test]

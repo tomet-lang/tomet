@@ -161,6 +161,19 @@ mod tests {
     }
 
     #[test]
+    fn declarations_at_the_top_are_formatted_like_the_rest() {
+        let src = "::kind(catalog, 2)   \r\n\r\n\r\n::meta{ id: x }  \r\n\r\n\"a\": 1   \r\n";
+        assert_eq!(
+            format_data_source(src),
+            "::kind(catalog, 2)\n\n::meta{ id: x }\n\n\"a\": 1\n"
+        );
+        // the value is the same, header included
+        let before = motem_syntax::parse_file(src).unwrap();
+        let after = motem_syntax::parse_file(&format_data_source(src)).unwrap();
+        assert_eq!(before, after);
+    }
+
+    #[test]
     fn a_file_that_does_not_parse_is_returned_as_it_came() {
         for src in [
             "a: \"never closed  \n\n\n",

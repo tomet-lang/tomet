@@ -252,6 +252,35 @@ pub fn try_parse_call(cur: &mut Cursor) -> Option<Result<Value>> {
     try_parse_call_with(cur, &mut NoHook)
 }
 
+/// The arguments of a call, the `(` already read: values separated by `,`,
+/// through the closing `)`.
+fn parse_call_args<H: ValueHook>(
+    cur: &mut Cursor,
+    hook: &mut H,
+    raw_args: bool,
+) -> Result<Vec<Value>> {
+    let mut args = Vec::new();
+    loop {
+        skip_ws_newlines_and_comments(cur);
+        if cur.peek() == Some(')') {
+            break;
+        }
+        args.push(parse_entry_value_impl(cur, hook, raw_args)?);
+        skip_ws_newlines_and_comments(cur);
+        match cur.peek() {
+            Some(',') => {
+                cur.bump();
+            }
+            Some(')') => break,
+            _ => return Err(err(cur.pos(), "expected ',' or ')' in call arguments")),
+        }
+    }
+    if !cur.eat_str(")") {
+        return Err(err(cur.pos(), "expected ')'"));
+    }
+    Ok(args)
+}
+
 /// The callees the parser resolves to a plain [`Value`] at parse time: the
 /// literal constructors. Any other `name(...)` stays a [`Value::Call`] for a
 /// later pass to judge (`enum(...)` among them, which has no meaning yet).
@@ -274,30 +303,10 @@ pub fn try_parse_call_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Opti
     cur.bump();
     // `string(a)` is the text `a`, so its bare arguments are not typed.
     let raw_args = name == "string";
-    let mut args = Vec::new();
-    loop {
-        skip_ws_newlines_and_comments(cur);
-        if cur.peek() == Some(')') {
-            break;
-        }
-        match parse_entry_value_impl(cur, hook, raw_args) {
-            Ok(v) => args.push(v),
-            Err(e) => return Some(Err(e)),
-        }
-        skip_ws_newlines_and_comments(cur);
-        match cur.peek() {
-            Some(',') => {
-                cur.bump();
-            }
-            Some(')') => break,
-            _ => {
-                return Some(Err(err(cur.pos(), "expected ',' or ')' in call arguments")));
-            }
-        }
-    }
-    if !cur.eat_str(")") {
-        return Some(Err(err(cur.pos(), "expected ')'")));
-    }
+    let args = match parse_call_args(cur, hook, raw_args) {
+        Ok(args) => args,
+        Err(e) => return Some(Err(e)),
+    };
     let resolved = match name.as_str() {
         "list" => Ok(Value::Seq(args)),
         "string" => construct_string(args),
@@ -557,22 +566,105 @@ pub fn parse_map_body_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Resu
     parse_map_body_impl(cur, hook, false)
 }
 
-/// Parse a standalone motem file (`.mtm`): a map of `key: value` entries.
+/// A declaration about a file, written `::name(args){data}` at its top: what
+/// the file is (`::kind(catalog, 2)`), what it brings in (`::use(deck)`), the
+/// information about it (`::meta{ id: x }`).
 ///
-/// This is [`parse_value`] with the one rule that makes a file a file: every
-/// entry has a key. A source that is a lone scalar (`123`), or that has a bare
-/// value among its entries (`a: 1`, then `stray`), is an error at that entry,
-/// where `parse_value` would read the first as a scalar and keep the second
-/// as a positional entry. An empty file, or one with only comments, is the
-/// empty map.
-pub fn parse_file(src: &str) -> Result<Value> {
+/// The arguments are values, positional, as in any motem call; the data is a
+/// map. What a name means is not for this crate to say: it reads the shape.
+#[derive(Debug, Clone)]
+pub struct Declaration {
+    pub name: String,
+    pub args: Vec<Value>,
+    pub data: Option<Value>,
+    /// Where the `::` is, in bytes. Not part of what the declaration says, so
+    /// two files that say the same thing are equal wherever they say it.
+    pub offset: usize,
+}
+
+impl PartialEq for Declaration {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.args == other.args && self.data == other.data
+    }
+}
+
+/// A standalone motem file: its declarations, then its entries.
+#[derive(Debug, Clone, PartialEq)]
+pub struct File {
+    /// The `::name` declarations at the top, in order.
+    pub header: Vec<Declaration>,
+    /// The entries: a [`Value::Map`] of `key: value`.
+    pub body: Value,
+}
+
+/// Parse a standalone motem file (`.mtm`): declarations, then a map of
+/// `key: value` entries.
+///
+/// The body is [`parse_value`] with the one rule that makes a file a file:
+/// every entry has a key. A source that is a lone scalar (`123`), or that has
+/// a bare value among its entries (`a: 1`, then `stray`), is an error at that
+/// entry, where `parse_value` would read the first as a scalar and keep the
+/// second as a positional entry. A declaration below the first entry is an
+/// error too: they go at the top. An empty file, or one with only comments, has
+/// no declarations and the empty map.
+pub fn parse_file(src: &str) -> Result<File> {
     let mut cur = Cursor::new(src);
-    let value = parse_map_body_impl(&mut cur, &mut NoHook, true).map_err(|e| e.located_in(src))?;
+    let mut header = Vec::new();
+    loop {
+        skip_ws_newlines_and_comments(&mut cur);
+        if !cur.starts_with("::") {
+            break;
+        }
+        header.push(parse_declaration(&mut cur).map_err(|e| e.located_in(src))?);
+    }
+    let body = parse_map_body_impl(&mut cur, &mut NoHook, true).map_err(|e| e.located_in(src))?;
     skip_ws_newlines_and_comments(&mut cur);
     if !cur.is_eof() {
         return Err(err(cur.pos(), "unexpected trailing content").located_in(src));
     }
-    Ok(value)
+    Ok(File { header, body })
+}
+
+/// One `::name(args){data}` declaration, ending its line. The `::` is next.
+fn parse_declaration(cur: &mut Cursor) -> Result<Declaration> {
+    let offset = cur.pos();
+    cur.eat_str("::");
+    let Some(name) = eat_name(cur) else {
+        return Err(err(offset, "expected a name after '::'"));
+    };
+    let (mut args, mut data) = (None, None);
+    loop {
+        skip_inline_ws(cur);
+        match cur.peek() {
+            Some('(') if args.is_none() => {
+                cur.bump();
+                args = Some(parse_call_args(cur, &mut NoHook, false)?);
+            }
+            Some('{') if data.is_none() => {
+                cur.bump();
+                let map = parse_map_body_impl(cur, &mut NoHook, false)?;
+                skip_ws_newlines_and_comments(cur);
+                if !cur.eat_str("}") {
+                    return Err(err(cur.pos(), "expected '}'"));
+                }
+                data = Some(map);
+            }
+            _ => break,
+        }
+    }
+    skip_inline_ws(cur);
+    if cur.starts_with("//") {
+        skip_line_comment(cur);
+    }
+    if !matches!(cur.peek(), None | Some('\n') | Some('\r')) {
+        return Err(err(cur.pos(), "unexpected content after a declaration"));
+    }
+    Ok(Declaration {
+        name: name.to_string(),
+        args: args.unwrap_or_default(),
+        data,
+        offset,
+    })
 }
 
 fn parse_map_body_impl<H: ValueHook>(
@@ -588,6 +680,12 @@ fn parse_map_body_impl<H: ValueHook>(
             break;
         }
         let entry_start = cur.pos();
+        if keyed_only && cur.starts_with("::") {
+            return Err(err(
+                entry_start,
+                "a declaration `::name` goes at the top of the file, before the entries",
+            ));
+        }
         let (key, value) = parse_one_entry_with(cur, hook)?;
         if keyed_only && key == POSITIONAL_ENTRY_KEY {
             return Err(err(

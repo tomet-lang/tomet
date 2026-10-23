@@ -43,6 +43,8 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [名前付きコネクト `:name(...)`](#名前付きコネクト-name)
 - [id `#(...)`](#id-)
 - [コメント](#コメント)
+- [文書の宣言](#文書の宣言)
+- [脚注](#脚注)
 - [撤去された構文](#撤去された構文)
 - [綴りを失ったまま、代わりが未決のもの](#綴りを失ったまま、代わりが未決のもの)
 - [紛らわしいが、これが正しい](#紛らわしいが、これが正しい)
@@ -1627,6 +1629,105 @@ Paragraph
 ```
 Paragraph
   Text "本文  の続き"
+```
+
+## 文書の宣言
+
+### 行頭の `::名前` は、文書自身についての宣言。`@名前` と同じ groups を取り、先頭の並び（preamble）に置く。名前は構文では選ばない（判定は検証の仕事）
+
+```tmt
+::kind(note)
+::meta{ id: x }
+```
+
+```
+Block  ::kind
+  args    "note"
+Block  ::meta
+  group
+    id: "x"
+```
+
+### groups の全部と、後置のコネクトも取れる
+
+```tmt
+::x(a)[ b ]{ c: 1 }#(i):rule(allow:list(k))
+```
+
+```
+Block  ::x
+  args    "a"
+  content
+    Paragraph
+      Text "b"
+  group
+    c: 1
+  id      "i"
+  connect
+    Inline @rule
+      args    {allow: list("k")}
+```
+
+検証:
+
+```
+unknown element `x`: only `std` and this document's own `@kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `@use`
+```
+
+### 次の行の `::` は、前の宣言のコネクトではなく、次の宣言
+
+```tmt
+::kind(note)
+::use(deck)
+```
+
+```
+Block  ::kind
+  args    "note"
+Block  ::use
+  args    "deck"
+```
+
+### 行頭でない `::` は、ただの文字（`std::vec`）。名前が無い `::(x)` も文字
+
+```tmt
+std::vec と ::kind(x) と
+
+::(x)
+```
+
+```
+Paragraph
+  Text "std::vec と ::kind(x) と"
+Paragraph
+  Text "::(x)"
+```
+
+## 脚注
+
+### `@ftn(id)[文]` が定義、内容の無い `@ftn(id)` が参照、`@ftn[文]` はその場かぎりの脚注
+
+```tmt
+参照@ftn(a) と その場かぎり@ftn[文]
+
+@ftn(a)[定義]
+```
+
+```
+Paragraph
+  Text "参照"
+  Inline @ftn
+    args    "a"
+  Text " と その場かぎり"
+  Inline @ftn
+    content
+      Paragraph
+        Text "文"
+Block  @ftn
+  args    "a"
+  content
+    Paragraph
+      Text "定義"
 ```
 
 ## 撤去された構文

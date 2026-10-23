@@ -44,10 +44,22 @@ value. The empty key is the positional-entry marker, so `"": v` is an error.
 ==[Files]
 
 A standalone motem file (`.mtm`) is a top-level map written as bare
-`key: value` lines, with no braces around it. [`parse_file`] reads one: it
-is [`parse_value`] that also insists every entry has a key, so a lone
-scalar or a bare value among the entries is an error at that entry. `tomet
-check` and `tomet format` take a `.mtm` next to a `.tmt`.
+`key: value` lines, with no braces around it, and may open with
+declarations about the file:
+
+```text
+::kind(catalog, 2)
+::use(deck)
+
+"tmtroot/a.tmt": "../a.tmt"
+```
+
+[`parse_file`] reads one into a [`File`]. A declaration is `::name`, then
+positional arguments in `(...)` and a map in `{...}`, either or both, and
+ends its line; they go before the first entry. What a name means is not
+decided here. The body is [`parse_value`] that also insists every entry has
+a key, so a lone scalar or a bare value among the entries is an error at
+that entry. `tomet check` and `tomet format` take a `.mtm` next to a `.tmt`.
 
 A document with nothing in it, or only whitespace and comments, is the
 empty map, so a config file may be empty and a reader fills in every
@@ -132,6 +144,19 @@ normalized to `Value::Seq` downstream).
 ====[struct NoHook]
 
 The default no-op hook for pure motem documents.
+
+====[struct Declaration]
+
+A declaration about a file, written `::name(args){data}` at its top: what
+the file is (`::kind(catalog, 2)`), what it brings in (`::use(deck)`), the
+information about it (`::meta{ id: x }`).
+
+The arguments are values, positional, as in any motem call; the data is a
+map. What a name means is not for this crate to say: it reads the shape.
+
+====[struct File]
+
+A standalone motem file: its declarations, then its entries.
 
 ===[Traits]
 
@@ -253,14 +278,16 @@ things to a reader that keeps the first, the last, or both.
 
 ====[fn parse_file]
 
-Parse a standalone motem file (`.mtm`): a map of `key: value` entries.
+Parse a standalone motem file (`.mtm`): declarations, then a map of
+`key: value` entries.
 
-This is [`parse_value`] with the one rule that makes a file a file: every
-entry has a key. A source that is a lone scalar (`123`), or that has a bare
-value among its entries (`a: 1`, then `stray`), is an error at that entry,
-where `parse_value` would read the first as a scalar and keep the second
-as a positional entry. An empty file, or one with only comments, is the
-empty map.
+The body is [`parse_value`] with the one rule that makes a file a file:
+every entry has a key. A source that is a lone scalar (`123`), or that has
+a bare value among its entries (`a: 1`, then `stray`), is an error at that
+entry, where `parse_value` would read the first as a scalar and keep the
+second as a positional entry. A declaration below the first entry is an
+error too: they go at the top. An empty file, or one with only comments, has
+no declarations and the empty map.
 
 ====[fn parse_entry_value]
 

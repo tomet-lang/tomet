@@ -212,6 +212,10 @@
           "named": true
         },
         {
+          "type": "document_element",
+          "named": true
+        },
+        {
           "type": "fenced_code_block",
           "named": true
         },
@@ -237,6 +241,52 @@
         },
         {
           "type": "titled_thematic_break",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "document_element",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "args_group",
+          "named": true
+        },
+        {
+          "type": "connect",
+          "named": true
+        },
+        {
+          "type": "content_group",
+          "named": true
+        },
+        {
+          "type": "id_group",
+          "named": true
+        },
+        {
+          "type": "marked_content",
+          "named": true
+        },
+        {
+          "type": "value_group",
           "named": true
         }
       ]
@@ -1683,6 +1733,10 @@
   },
   {
     "type": ":",
+    "named": false
+  },
+  {
+    "type": "::",
     "named": false
   },
   {

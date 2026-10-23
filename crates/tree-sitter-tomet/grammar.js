@@ -71,6 +71,7 @@ module.exports = grammar({
 				$.thematic_break,
 				$.fenced_code_block,
 				$.list,
+				$.document_element,
 				$.paragraph,
 				$.line_comment,
 				prec(1, $.block_comment),
@@ -525,6 +526,23 @@ module.exports = grammar({
 		// for `tomet-parser`, not for syntax highlighting -- so this
 		// grammar has one element rule.
 		element: ($) => $.inline_element,
+		// ---- `::name` declarations ------------------------------------------
+		//
+		// A declaration about the document, not content in it. It is only
+		// ever a *block*: `::` has to open a line, which this grammar
+		// expresses by listing the rule among `_block`s, so a `::` in the
+		// middle of a line (`std::vec`) is lexed as the two `:` it is. The
+		// real parser reads what follows the name exactly as it does after
+		// an `@`, and so does this.
+		document_element: ($) =>
+			prec.right(
+				3,
+				seq(
+					token(prec(2, "::")),
+					field("name", $._element_name),
+					repeat(choice($._element_group, $.connect, $.id_group)),
+				),
+			),
 		// `prec.right(3, ...)` wraps the *whole* rule (not just the trailing
 		// `repeat($._element_group)`, unlike an earlier revision) --
 		// `ordered_list_item`/`unordered_list_item`'s own trailing `{attrs}`

@@ -424,6 +424,34 @@ const CASES: &[Case] = &[
     // ---- comments ---------------------------------------------------
     case(Some("コメント"), "行コメント", "// 消える\n本文\n"),
     case(None, "ブロックコメント", "本文 /* 消える */ の続き\n"),
+    // ---- document declarations --------------------------------------
+    case(
+        Some("文書の宣言"),
+        "行頭の `::名前` は、文書自身についての宣言。`@名前` と同じ groups を取り、\
+         先頭の並び（preamble）に置く。名前は構文では選ばない（判定は検証の仕事）",
+        "::kind(note)\n::meta{ id: x }\n",
+    ),
+    case(
+        None,
+        "groups の全部と、後置のコネクトも取れる",
+        "::x(a)[ b ]{ c: 1 }#(i):rule(allow:list(k))\n",
+    ),
+    case(
+        None,
+        "次の行の `::` は、前の宣言のコネクトではなく、次の宣言",
+        "::kind(note)\n::use(deck)\n",
+    ),
+    case(
+        None,
+        "行頭でない `::` は、ただの文字（`std::vec`）。名前が無い `::(x)` も文字",
+        "std::vec と ::kind(x) と\n\n::(x)\n",
+    ),
+    // ---- footnotes --------------------------------------------------
+    case(
+        Some("脚注"),
+        "`@ftn(id)[文]` が定義、内容の無い `@ftn(id)` が参照、`@ftn[文]` はその場かぎりの脚注",
+        "参照@ftn(a) と その場かぎり@ftn[文]\n\n@ftn(a)[定義]\n",
+    ),
 ];
 
 /// Constructs that were retired, are easy to misread, or are rejected.

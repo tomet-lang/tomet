@@ -989,4 +989,106 @@ mod tests {
             tree.root_node().to_sexp()
         );
     }
+
+    fn nodes_of_kind<'t>(tree: &'t tree_sitter::Tree, kind: &str) -> Vec<Node<'t>> {
+        let mut out = Vec::new();
+        let mut cursor = tree.walk();
+        'walk: loop {
+            if cursor.node().kind() == kind {
+                out.push(cursor.node());
+            }
+            if cursor.goto_first_child() {
+                continue;
+            }
+            loop {
+                if cursor.goto_next_sibling() {
+                    continue 'walk;
+                }
+                if !cursor.goto_parent() {
+                    break 'walk;
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn a_double_colon_line_is_a_document_declaration() {
+        let src = "::kind(config)\n::meta{ id: x }\n\n=[ T ]\n";
+        let tree = parse(src);
+        assert!(
+            !tree.root_node().has_error(),
+            "{}",
+            tree.root_node().to_sexp()
+        );
+        let decls = nodes_of_kind(&tree, "document_element");
+        assert_eq!(decls.len(), 2);
+        let name = decls[0].child_by_field_name("name").unwrap();
+        assert_eq!(name.utf8_text(src.as_bytes()).unwrap(), "kind");
+        assert_eq!(
+            decls[0].utf8_text(src.as_bytes()).unwrap(),
+            "::kind(config)"
+        );
+    }
+
+    #[test]
+    fn a_declaration_takes_groups_an_id_and_a_connect() {
+        let tree = parse("::x(a)[ b ]{ c: 1 }#(i):rule(allow:list(k))\n");
+        assert!(
+            !tree.root_node().has_error(),
+            "{}",
+            tree.root_node().to_sexp()
+        );
+        assert_eq!(nodes_of_kind(&tree, "document_element").len(), 1);
+        assert_eq!(nodes_of_kind(&tree, "connect").len(), 1);
+        assert_eq!(nodes_of_kind(&tree, "id_group").len(), 1);
+    }
+
+    #[test]
+    fn a_double_colon_that_does_not_open_a_line_is_not_one() {
+        for src in [
+            "std::vec is a type\n",
+            "text ::kind(x) in the middle\n",
+            "Rust's mem::swap(a, b) swaps\n",
+        ] {
+            let tree = parse(src);
+            assert!(
+                nodes_of_kind(&tree, "document_element").is_empty(),
+                "{src:?}: {}",
+                tree.root_node().to_sexp()
+            );
+        }
+    }
+
+    #[test]
+    fn the_next_declaration_is_not_a_connect_of_the_one_before() {
+        let tree = parse("::kind(config)\n::meta{ id: x }\n");
+        assert_eq!(nodes_of_kind(&tree, "document_element").len(), 2);
+        assert!(nodes_of_kind(&tree, "connect").is_empty());
+    }
+
+    #[test]
+    fn highlights_colour_a_declaration_like_an_element() {
+        use tree_sitter::StreamingIterator;
+        let src = "::kind(config)\n";
+        let tree = parse(src);
+        let query = tree_sitter::Query::new(&LANGUAGE.into(), HIGHLIGHTS_QUERY).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), src.as_bytes());
+        let mut captured: Vec<(String, String)> = Vec::new();
+        while let Some(m) = matches.next() {
+            for c in m.captures {
+                captured.push((
+                    query.capture_names()[c.index as usize].to_string(),
+                    src[c.node.byte_range()].to_string(),
+                ));
+            }
+        }
+        for want in ["::", "kind", "(", ")"] {
+            assert!(
+                captured.contains(&("tag".to_string(), want.to_string())),
+                "{want:?} in {captured:?}"
+            );
+        }
+    }
 }

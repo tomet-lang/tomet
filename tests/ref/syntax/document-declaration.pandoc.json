@@ -1,0 +1,259 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {
+    "id": {
+      "t": "MetaInlines",
+      "c": [
+        {
+          "t": "Str",
+          "c": "doc-sample"
+        }
+      ]
+    },
+    "title": {
+      "t": "MetaInlines",
+      "c": [
+        {
+          "t": "Str",
+          "c": "A"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "note"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "with"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "a"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "preamble"
+        }
+      ]
+    }
+  },
+  "blocks": [
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "Declarations"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "Rust"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "writes"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "std::vec"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "mem::swap(a,"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "b);"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "a"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "::kind(x)"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "in"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "the"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "middle"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "of"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "a"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "line"
+        },
+        {
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Str",
+          "c": "is"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "only"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "text."
+        }
+      ]
+    },
+    {
+      "t": "CodeBlock",
+      "c": [
+        [
+          "",
+          [
+            "tmt"
+          ],
+          []
+        ],
+        "::kind(config)"
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "A"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "declaration"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "stays"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "out"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "of"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "the"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "output."
+        }
+      ]
+    }
+  ]
+}
