@@ -1,5 +1,5 @@
-@kind(vocabulary)
-@vocabulary(idea){
+::kind(vocabulary)
+::vocabulary(idea){
   version: "1.0.0"
   open: true
 }

@@ -26,7 +26,7 @@ pub fn document(
     title: &str,
     intro_paragraphs: &[&str],
 ) -> Document {
-    let mut meta = element_new(Sigil::named("meta")).with_placement(Placement::Block);
+    let mut meta = element_new(Sigil::document("meta")).with_placement(Placement::Block);
     meta.value = Some(ElementValue::from_map(Value::Map(vec![(
         "id".to_string(),
         Value::String(doc_id.to_string()),

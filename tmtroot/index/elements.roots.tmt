@@ -1,4 +1,4 @@
-@kind(roots)
+::kind(roots)
 
 @root(elements.index)
 | About Element

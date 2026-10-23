@@ -1,5 +1,5 @@
-@kind(expr)
-@meta{
+::kind(expr)
+::meta{
   id: expr.func
 }
 

@@ -1,4 +1,4 @@
-@kind(doc.index)
+::kind(doc.index)
 
 // 読む順。ここに並べた順と入れ子が、そのまま索引ページになる。
 // 手書きの @link(ref:"...") と ${vault.docs.filter(...)...} は自由に混ぜてよい --

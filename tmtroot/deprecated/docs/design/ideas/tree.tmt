@@ -1,4 +1,4 @@
-@kind(idea)
+::kind(idea)
 
 |-- apps/
 |  |-- cli/

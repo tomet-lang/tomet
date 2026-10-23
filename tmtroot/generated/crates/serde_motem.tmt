@@ -1,6 +1,6 @@
-@kind(api)
+::kind(api)
 
-@meta{crate: serde_motem, dependencies: list(motem-syntax, tomet-ast), dependents: list(motem)}
+::meta{crate: serde_motem, dependencies: list(motem-syntax, tomet-ast), dependents: list(motem)}
 
 =[serde_motem]
 

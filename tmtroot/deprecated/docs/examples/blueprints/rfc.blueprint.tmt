@@ -1,12 +1,12 @@
-@kind(blueprint)
-@blueprint(rfc){
+::kind(blueprint)
+::blueprint(rfc){
   description: "Request for Comments template"
   vars: {
     title: { type: string, prompt: "RFC Title" }
     author: { type: string, default: "Anonymous" }
   }
 }
-@meta{
+::meta{
   id: ${uuid()}
   title: ${vars.title}
   author: ${vars.author}

@@ -1,6 +1,6 @@
-@version(1.0)
-@kind(config)
-@config{
+::version(1.0)
+::kind(config)
+::config{
   format: {
     meta: { always_newline: true, format: yaml }
     heading: { space_inside_brackets: true }

@@ -1,6 +1,6 @@
-@kind(api)
+::kind(api)
 
-@meta{crate: tomet-search, dependencies: list(tomet-ast, tomet-parser, tomet-semantics, tomet-tree), dependents: list(tomet-load, tomet-transform, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-search, dependencies: list(tomet-ast, tomet-parser, tomet-semantics, tomet-tree), dependents: list(tomet-load, tomet-transform, tomet-vault, tomet-workspace)}
 
 =[tomet-search]
 

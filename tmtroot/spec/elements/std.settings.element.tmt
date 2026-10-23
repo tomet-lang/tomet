@@ -1,5 +1,5 @@
-@kind(element)
-@meta{
+::kind(element)
+::meta{
   id: std.settings
 }
 

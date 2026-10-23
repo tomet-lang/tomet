@@ -1,5 +1,5 @@
-@kind(vocabulary)
-@vocabulary(scenario){ version: "1.0.0" }
+::kind(vocabulary)
+::vocabulary(scenario){ version: "1.0.0" }
 
 @element(line){
   display: block

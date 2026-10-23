@@ -1,6 +1,6 @@
-@kind(blueprint)
-@blueprint(daily-note)
-@meta{
+::kind(blueprint)
+::blueprint(daily-note)
+::meta{
   id: ${uuid()}
   date: ${date("YYYY-MM-DD")}
   title: ${title}

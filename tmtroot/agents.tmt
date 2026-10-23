@@ -1,4 +1,4 @@
-@config(
+::config(
   export: {
     type: commonmark,
     path: "AGENTS.md"

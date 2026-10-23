@@ -1,6 +1,6 @@
-@kind(api)
+::kind(api)
 
-@meta{crate: tree-sitter-tomet, dependencies: list(), dependents: list(tomet-tests)}
+::meta{crate: tree-sitter-tomet, dependencies: list(), dependents: list(tomet-tests)}
 
 =[tree-sitter-tomet]
 

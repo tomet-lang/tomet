@@ -1,6 +1,6 @@
-@kind(api)
+::kind(api)
 
-@meta{crate: motem-syntax, dependencies: list(tomet-ast, tomet-lexer), dependents: list(motem, serde_motem, tomet-edit, tomet-formatter, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style)}
+::meta{crate: motem-syntax, dependencies: list(tomet-ast, tomet-lexer), dependents: list(motem, serde_motem, tomet-edit, tomet-formatter, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style)}
 
 =[motem-syntax]
 

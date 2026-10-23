@@ -1,4 +1,4 @@
-@kind(todo)
+::kind(todo)
 
 - `tellme`, `show`
 - @type(list)

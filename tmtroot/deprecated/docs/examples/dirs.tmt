@@ -1,4 +1,4 @@
-@kind(dirs)
+::kind(dirs)
 
 @file(README.md)
 [ このリポジトリが何であるか、どう建てるか ]

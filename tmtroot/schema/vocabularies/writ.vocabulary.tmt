@@ -1,5 +1,5 @@
-@kind(vocabulary)
-@vocabulary(writ){
+::kind(vocabulary)
+::vocabulary(writ){
   version: "1.0.0"
 }
 @element(rule){

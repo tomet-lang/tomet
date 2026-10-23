@@ -1,6 +1,6 @@
-@kind(api)
+::kind(api)
 
-@meta{crate: tomet-js, dependencies: list(tomet, tomet-cst, tomet-lexer, tomet-links, tomet-transform), dependents: list()}
+::meta{crate: tomet-js, dependencies: list(tomet, tomet-cst, tomet-lexer, tomet-links, tomet-transform), dependents: list()}
 
 =[tomet-js]
 

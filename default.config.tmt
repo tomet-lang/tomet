@@ -1,6 +1,6 @@
-@kind(config)
-@meta{id: doc-kWBcIUUz}
-@config{
+::kind(config)
+::meta{id: doc-kWBcIUUz}
+::config{
   macros: {
     gh: "https://github.com/tomet/tomet/issues/${1}"
     gh_pr: "https://github.com/tomet/tomet/pull/${1}"

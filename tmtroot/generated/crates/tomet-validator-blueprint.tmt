@@ -1,6 +1,6 @@
-@kind(api)
+::kind(api)
 
-@meta{crate: tomet-validator-blueprint, dependencies: list(tomet-ast, tomet-parser, tomet-semantics, tomet-tree, tomet-validator-core, tomet-validator-rule), dependents: list(tomet-validator)}
+::meta{crate: tomet-validator-blueprint, dependencies: list(tomet-ast, tomet-parser, tomet-semantics, tomet-tree, tomet-validator-core, tomet-validator-rule), dependents: list(tomet-validator)}
 
 =[tomet-validator-blueprint]
 

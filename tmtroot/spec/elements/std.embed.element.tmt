@@ -1,4 +1,4 @@
-@kind(element)
-@meta{
+::kind(element)
+::meta{
   id: std.embed
 }
