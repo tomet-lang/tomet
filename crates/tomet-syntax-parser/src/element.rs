@@ -843,6 +843,12 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
                          write a bare value in '(args)' instead",
                     ));
                 }
+                if entries
+                    .iter()
+                    .any(|e| matches!(e, Entry::Pair(k, _) if *k == key))
+                {
+                    return Err(motem::duplicate_key_error(entry_start, &key).into());
+                }
                 entries.push(Entry::Pair(key, value));
             }
         }

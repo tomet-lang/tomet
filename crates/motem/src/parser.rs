@@ -5,6 +5,8 @@
 //! A list value is spelled `list(...)` (a `Value::Call`,
 //! normalized to `Value::Seq` downstream).
 
+use std::collections::HashSet;
+
 use crate::error::{Error, Result};
 use tomet_ast::{Name, Value};
 use tomet_lexer::Cursor;
@@ -456,14 +458,45 @@ pub fn parse_map_body(cur: &mut Cursor) -> Result<Value> {
     parse_map_body_with(cur, &mut NoHook)
 }
 
+/// A map with more entries than this tracks its keys in a set rather than
+/// scanning them for each new one.
+const KEY_SCAN_LIMIT: usize = 16;
+
+/// The error for a named key written twice in one map. Positional entries
+/// (`POSITIONAL_ENTRY_KEY`) are not keys and may repeat.
+pub fn duplicate_key_error(pos: usize, key: &str) -> Error {
+    err(pos, format!("duplicate key `{key}`"))
+}
+
+/// Parses `key: value` entries until a closer or the end, as a `Value::Map`.
+///
+/// A named key may appear once: a second one is an error at its position
+/// ([`duplicate_key_error`]), compared after unquoting, so `"a": 1, a: 2` is
+/// a duplicate too. A map that held the same key twice would mean different
+/// things to a reader that keeps the first, the last, or both.
 pub fn parse_map_body_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Result<Value> {
-    let mut entries = Vec::new();
+    let mut entries: Vec<(String, Value)> = Vec::new();
+    let mut seen: Option<HashSet<String>> = None;
     loop {
         skip_ws_newlines_and_comments(cur);
         if matches!(cur.peek(), None | Some(')') | Some('}') | Some(']')) {
             break;
         }
-        entries.push(parse_one_entry_with(cur, hook)?);
+        let entry_start = cur.pos();
+        let (key, value) = parse_one_entry_with(cur, hook)?;
+        if key != POSITIONAL_ENTRY_KEY {
+            let duplicate = if entries.len() < KEY_SCAN_LIMIT {
+                entries.iter().any(|(k, _)| *k == key)
+            } else {
+                let seen =
+                    seen.get_or_insert_with(|| entries.iter().map(|(k, _)| k.clone()).collect());
+                !seen.insert(key.clone())
+            };
+            if duplicate {
+                return Err(duplicate_key_error(entry_start, &key));
+            }
+        }
+        entries.push((key, value));
         skip_inline_ws(cur);
         if cur.starts_with("//") {
             skip_line_comment(cur);

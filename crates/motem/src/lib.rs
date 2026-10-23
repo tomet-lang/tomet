@@ -66,13 +66,14 @@ pub mod ser;
 pub use de::from_value;
 pub use error::{Error, Result};
 pub use parser::{
-    NoHook, POSITIONAL_ENTRY_KEY, ValueHook, eat_ident, eat_name, eat_name_segment, eat_scalar_raw,
-    err, is_ident_char, is_inline_ws, is_name_char, is_name_start, is_name_start_at,
-    is_scheme_uri_colon, parse_entry_value, parse_entry_value_with, parse_map_body,
-    parse_map_body_with, parse_one_entry, parse_one_entry_with, parse_quoted, parse_value,
-    parse_value_at, parse_value_at_with, parse_value_with, scalar_from_text, skip_block_comment,
-    skip_inline_ws, skip_line_comment, skip_ws_and_newlines, skip_ws_newlines_and_comments,
-    starts_absolute_path, try_parse_call, try_parse_call_with,
+    NoHook, POSITIONAL_ENTRY_KEY, ValueHook, duplicate_key_error, eat_ident, eat_name,
+    eat_name_segment, eat_scalar_raw, err, is_ident_char, is_inline_ws, is_name_char,
+    is_name_start, is_name_start_at, is_scheme_uri_colon, parse_entry_value,
+    parse_entry_value_with, parse_map_body, parse_map_body_with, parse_one_entry,
+    parse_one_entry_with, parse_quoted, parse_value, parse_value_at, parse_value_at_with,
+    parse_value_with, scalar_from_text, skip_block_comment, skip_inline_ws, skip_line_comment,
+    skip_ws_and_newlines, skip_ws_newlines_and_comments, starts_absolute_path, try_parse_call,
+    try_parse_call_with,
 };
 pub use print::{float_text, key_text, print_value, write_float, write_key, write_scalar_string};
 pub use ser::to_value;
@@ -577,6 +578,48 @@ mod tests {
         assert_eq!(from_str::<Sample>(&text).unwrap(), sample);
         // an int widens to a float field, as in serde_json
         assert_eq!(from_str::<f64>("1").unwrap(), 1.0);
+    }
+
+    #[test]
+    fn a_repeated_named_key_is_an_error_at_the_second_one() {
+        let err = parse_value("a: 1\nb: 2\na: 3").unwrap_err();
+        assert!(err.to_string().contains("duplicate key `a`"), "{err}");
+        assert_eq!(err.line, 3, "the error points at the second `a`");
+    }
+
+    #[test]
+    fn a_quoted_and_a_bare_spelling_of_one_key_are_a_duplicate() {
+        let err = parse_value("\"a\": 1\na: 2").unwrap_err().to_string();
+        assert!(err.contains("duplicate key `a`"), "{err}");
+    }
+
+    #[test]
+    fn a_nested_map_is_checked_on_its_own() {
+        let err = parse_value("m: { x: 1, x: 2 }").unwrap_err().to_string();
+        assert!(err.contains("duplicate key `x`"), "{err}");
+        // the same key in two different maps is fine
+        assert!(parse_value("a: { x: 1 }\nb: { x: 2 }").is_ok());
+    }
+
+    #[test]
+    fn positional_entries_may_repeat() {
+        assert_eq!(
+            parse_value("\"x\", \"x\", k: 1").unwrap(),
+            map(&[
+                (POSITIONAL_ENTRY_KEY, text("x")),
+                (POSITIONAL_ENTRY_KEY, text("x")),
+                ("k", Value::Int(1)),
+            ])
+        );
+    }
+
+    #[test]
+    fn a_repeated_key_is_found_in_a_large_map_too() {
+        let mut src: String = (0..40).map(|i| format!("k{i}: {i}\n")).collect();
+        assert!(parse_value(&src).is_ok());
+        src.push_str("k3: 0");
+        let err = parse_value(&src).unwrap_err().to_string();
+        assert!(err.contains("duplicate key `k3`"), "{err}");
     }
 
     #[test]
