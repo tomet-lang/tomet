@@ -21,6 +21,7 @@ members = [
   #= Public -- external ecosystem adapters
   "crates/serde_motem",
   "crates/tree-sitter-tomet",
+  "crates/tree-sitter-motem",
 
   #= Syntax -- grammar/parsing
   "crates/tomet-syntax-cst",
@@ -162,6 +163,7 @@ tomet-workspace = { path = "crates/tomet-workspace", version = "0.3.0" }
 motem-syntax = { path = "crates/motem-syntax", version = "0.3.0" }
 serde_motem = { path = "crates/serde_motem", version = "0.3.0" }
 tree-sitter-tomet = { path = "crates/tree-sitter-tomet", version = "0.3.0" }
+tree-sitter-motem = { path = "crates/tree-sitter-motem", version = "0.3.0" }
 #= Facade
 tomet = { path = "crates/tomet", version = "0.3.0" }
 motem = { path = "crates/motem", version = "0.3.0" }

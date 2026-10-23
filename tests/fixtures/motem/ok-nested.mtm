@@ -1,0 +1,20 @@
+map: { a: 1, b: { c: 2, d: list(x, y) } }
+multi: {
+  x: 1
+  y: 2
+}
+empty-map: {}
+empty-list: list()
+names: list(a, b, c)
+numbers: list(1, 2.5, -3)
+spread: list(
+  alpha,
+  beta, // second
+  gamma
+)
+text: string(abc)
+count: int("12")
+unit: float(1)
+custom: enum(card, 2)
+split:
+  value on the next line

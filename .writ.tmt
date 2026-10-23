@@ -36,7 +36,7 @@ does not relax the rule to fit the change it wanted to make.
     3: list( "crates/tomet-validator*" )
     2: list( "crates/tomet-semantics*", "crates/motem" )
     1: list( "crates/tomet-syntax-*", "crates/motem-syntax", "crates/serde_motem" )
-    0: list( "crates/tree-sitter-tomet" )
+    0: list( "crates/tree-sitter-tomet", "crates/tree-sitter-motem" )
   }
 }
 

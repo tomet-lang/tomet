@@ -20,6 +20,10 @@ name = "corpus"
 path = "src/corpus.rs"
 
 [[test]]
+name = "motem"
+path = "src/motem.rs"
+
+[[test]]
 name = "roundtrip"
 path = "src/roundtrip.rs"
 
@@ -57,6 +61,7 @@ tomet-expr = { workspace = true }
 tomet-config = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-edit = { workspace = true }
+motem-syntax = { workspace = true }
 tomet-formatter = { workspace = true }
 tomet-html = { workspace = true }
 tomet-load-config = { workspace = true }
@@ -70,6 +75,7 @@ tomet-tree = { workspace = true }
 tomet-typst = { workspace = true }
 tomet-validator = { workspace = true }
 tomet-workspace = { workspace = true }
+tree-sitter-motem = { workspace = true }
 tree-sitter-tomet = { workspace = true }
 
 #= Crates.io

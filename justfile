@@ -12,9 +12,9 @@ build:
 test:
     cargo test --workspace
 
-# Run tree-sitter-tomet tests only.
+# Run the tree-sitter grammars' tests only.
 test-treesitter:
-    cargo test -p tree-sitter-tomet
+    cargo test -p tree-sitter-tomet -p tree-sitter-motem
 
 # Run the cross-crate corpus/round-trip/snapshot suite only.
 test-suite:
@@ -27,7 +27,8 @@ update-refs:
 # Regenerate Tree-sitter parser C files (src/parser.c, src/grammar.json) from grammar.js and test.
 gen-treesitter:
     cd crates/tree-sitter-tomet && npx -y tree-sitter-cli@0.26.12 generate
-    cargo test -p tree-sitter-tomet
+    cd crates/tree-sitter-motem && npx -y tree-sitter-cli@0.26.12 generate
+    cargo test -p tree-sitter-tomet -p tree-sitter-motem
 
 # Fails when the committed parser.c, grammar.json and node-types.json are not what
 # grammar.js generates -- the same check CI runs.
@@ -35,6 +36,9 @@ gen-treesitter-check:
     cd crates/tree-sitter-tomet && sha256sum src/parser.c src/grammar.json src/node-types.json > "{{ justfile_directory() }}/target/tree-sitter.sum"
     cd crates/tree-sitter-tomet && npx -y tree-sitter-cli@0.26.12 generate
     cd crates/tree-sitter-tomet && sha256sum --check "{{ justfile_directory() }}/target/tree-sitter.sum"
+    cd crates/tree-sitter-motem && sha256sum src/parser.c src/grammar.json src/node-types.json > "{{ justfile_directory() }}/target/tree-sitter-motem.sum"
+    cd crates/tree-sitter-motem && npx -y tree-sitter-cli@0.26.12 generate
+    cd crates/tree-sitter-motem && sha256sum --check "{{ justfile_directory() }}/target/tree-sitter-motem.sum"
 
 # Check formatting across workspace.
 format-check:

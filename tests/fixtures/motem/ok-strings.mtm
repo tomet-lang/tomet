@@ -1,0 +1,8 @@
+plain: "a string"
+escapes: "tab\there \"quoted\" back\\slash\nnewline"
+multi: "first line
+  second line, with a // not a comment
+
+  and a blank line before this one"
+"quoted key": "quoted value"
+"a/b: c": 1

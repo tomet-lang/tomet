@@ -1,0 +1,19 @@
+nothing: null
+yes: true
+no: false
+count: 42
+negative: -7
+ratio: 2.5
+exponent: -12.5e3
+leading-zero: 007
+plus: +1
+word: hello
+words: two words and more
+host: localhost:8080
+time: 12:30
+url: https://example.com/a//b?x=1
+relative: ../vocab/x.tmt
+absolute: /usr/local/bin
+dotted.key: ok
+note: see: this one
+sep: 1 b: 2
