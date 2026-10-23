@@ -1044,7 +1044,14 @@ dependencies = [
 name = "motem"
 version = "0.2.0"
 dependencies = [
- "serde",
+ "motem-syntax",
+ "serde_motem",
+]
+
+[[package]]
+name = "motem-syntax"
+version = "0.2.0"
+dependencies = [
  "tomet-ast",
  "tomet-lexer",
 ]
@@ -1509,6 +1516,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_motem"
+version = "0.2.0"
+dependencies = [
+ "motem-syntax",
+ "serde",
+ "tomet-ast",
+]
+
+[[package]]
 name = "serde_repr"
 version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1842,7 +1858,7 @@ dependencies = [
 name = "tomet-edit"
 version = "0.2.0"
 dependencies = [
- "motem",
+ "motem-syntax",
  "tomet-address",
  "tomet-ast",
  "tomet-config",
@@ -1900,7 +1916,7 @@ dependencies = [
 name = "tomet-html"
 version = "0.2.0"
 dependencies = [
- "motem",
+ "motem-syntax",
  "tomet-ast",
  "tomet-expr",
  "tomet-parser",
@@ -2025,7 +2041,7 @@ dependencies = [
 name = "tomet-markdown"
 version = "0.2.0"
 dependencies = [
- "motem",
+ "motem-syntax",
  "nanoid",
  "pulldown-cmark",
  "serde_yaml",
@@ -2063,7 +2079,7 @@ dependencies = [
 name = "tomet-parser"
 version = "0.2.0"
 dependencies = [
- "motem",
+ "motem-syntax",
  "tomet-ast",
  "tomet-cst",
  "tomet-lexer",
@@ -2076,7 +2092,7 @@ dependencies = [
 name = "tomet-printer"
 version = "0.2.0"
 dependencies = [
- "motem",
+ "motem-syntax",
  "tomet-ast",
  "tomet-config",
  "tomet-field-utils",
@@ -2112,7 +2128,7 @@ dependencies = [
 name = "tomet-semantics"
 version = "0.2.0"
 dependencies = [
- "motem",
+ "motem-syntax",
  "serde_json",
  "tomet-address",
  "tomet-ast",
@@ -2160,7 +2176,7 @@ dependencies = [
 name = "tomet-style"
 version = "0.2.0"
 dependencies = [
- "motem",
+ "motem-syntax",
  "tomet-ast",
  "tomet-config",
  "tomet-field-utils",

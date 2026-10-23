@@ -1,7 +1,7 @@
 use serde::de::{self, Deserialize, IntoDeserializer, Visitor};
 use tomet_ast::Value;
 
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, Segment};
 
 pub fn from_value<T: for<'de> Deserialize<'de>>(value: Value) -> Result<T> {
     T::deserialize(ValueDeserializer(value))
@@ -24,6 +24,7 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
             Value::String(s) => visitor.visit_string(s),
             Value::Seq(items) => visitor.visit_seq(SeqAccess {
                 iter: items.into_iter(),
+                index: 0,
             }),
             Value::Map(entries) => visitor.visit_map(MapAccess {
                 iter: entries.into_iter(),
@@ -78,6 +79,7 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
 
 struct SeqAccess {
     iter: std::vec::IntoIter<Value>,
+    index: usize,
 }
 
 impl<'de> de::SeqAccess<'de> for SeqAccess {
@@ -87,7 +89,13 @@ impl<'de> de::SeqAccess<'de> for SeqAccess {
         seed: T,
     ) -> Result<Option<T::Value>> {
         match self.iter.next() {
-            Some(v) => seed.deserialize(ValueDeserializer(v)).map(Some),
+            Some(v) => {
+                let index = self.index;
+                self.index += 1;
+                seed.deserialize(ValueDeserializer(v))
+                    .map(Some)
+                    .map_err(|e| e.within(Segment::Index(index)))
+            }
             None => Ok(None),
         }
     }
@@ -98,7 +106,8 @@ impl<'de> de::SeqAccess<'de> for SeqAccess {
 
 struct MapAccess {
     iter: std::vec::IntoIter<(String, Value)>,
-    value: Option<Value>,
+    /// The entry whose key was just handed out, until its value is asked for.
+    value: Option<(String, Value)>,
 }
 
 impl<'de> de::MapAccess<'de> for MapAccess {
@@ -106,7 +115,7 @@ impl<'de> de::MapAccess<'de> for MapAccess {
     fn next_key_seed<K: de::DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>> {
         match self.iter.next() {
             Some((k, v)) => {
-                self.value = Some(v);
+                self.value = Some((k.clone(), v));
                 seed.deserialize(ValueDeserializer(Value::String(k)))
                     .map(Some)
             }
@@ -114,11 +123,12 @@ impl<'de> de::MapAccess<'de> for MapAccess {
         }
     }
     fn next_value_seed<V: de::DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value> {
-        let v = self
+        let (key, v) = self
             .value
             .take()
             .ok_or_else(|| Error::msg("value requested before key"))?;
         seed.deserialize(ValueDeserializer(v))
+            .map_err(|e| e.within(Segment::Key(key)))
     }
     fn size_hint(&self) -> Option<usize> {
         Some(self.iter.len())
@@ -137,12 +147,21 @@ impl<'de> de::EnumAccess<'de> for EnumAccess {
         self,
         seed: S,
     ) -> Result<(S::Value, VariantAccess)> {
-        let v = seed.deserialize(ValueDeserializer(Value::String(self.variant)))?;
-        Ok((v, VariantAccess { value: self.value }))
+        let v = seed.deserialize(ValueDeserializer(Value::String(self.variant.clone())))?;
+        Ok((
+            v,
+            VariantAccess {
+                variant: self.variant,
+                value: self.value,
+            },
+        ))
     }
 }
 
+/// The payload of an externally tagged variant, written as the one-entry map
+/// `{ Variant: payload }`, so its errors are under that key.
 struct VariantAccess {
+    variant: String,
     value: Value,
 }
 
@@ -153,9 +172,11 @@ impl<'de> de::VariantAccess<'de> for VariantAccess {
     }
     fn newtype_variant_seed<T: de::DeserializeSeed<'de>>(self, seed: T) -> Result<T::Value> {
         seed.deserialize(ValueDeserializer(self.value))
+            .map_err(|e| e.within(Segment::Key(self.variant)))
     }
     fn tuple_variant<V: Visitor<'de>>(self, _len: usize, visitor: V) -> Result<V::Value> {
         de::Deserializer::deserialize_seq(ValueDeserializer(self.value), visitor)
+            .map_err(|e| e.within(Segment::Key(self.variant)))
     }
     fn struct_variant<V: Visitor<'de>>(
         self,
@@ -163,5 +184,6 @@ impl<'de> de::VariantAccess<'de> for VariantAccess {
         visitor: V,
     ) -> Result<V::Value> {
         de::Deserializer::deserialize_map(ValueDeserializer(self.value), visitor)
+            .map_err(|e| e.within(Segment::Key(self.variant)))
     }
 }

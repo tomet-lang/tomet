@@ -63,7 +63,7 @@ impl FlatData {
 /// part of an attribute name, and spliced in it would add attributes of its own.
 /// The empty key is the positional marker and is not judged here.
 pub fn is_attribute_key(key: &str) -> bool {
-    key.chars().all(motem::is_ident_char)
+    key.chars().all(motem_syntax::is_ident_char)
 }
 
 /// Flattens `el`'s `(args)` and `{value}` for an attribute map.
@@ -136,7 +136,7 @@ pub fn scalar_string(v: &Value) -> Option<String> {
         Value::Null => Some(String::new()),
         Value::Bool(b) => Some(b.to_string()),
         Value::Int(i) => Some(i.to_string()),
-        Value::Float(f) => Some(motem::float_text(*f)),
+        Value::Float(f) => Some(motem_syntax::float_text(*f)),
         Value::String(s) => Some(s.clone()),
         Value::Seq(items) => {
             let parts: Option<Vec<String>> = items.iter().map(scalar_string).collect();

@@ -8,7 +8,7 @@ repository.workspace = true
 
 [dependencies]
 tomet-address = { workspace = true }
-motem = { workspace = true }
+motem-syntax = { workspace = true }
 tomet-ast = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-parser = { workspace = true }

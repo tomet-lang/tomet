@@ -117,7 +117,7 @@ fn value_to_version_string(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) => motem::float_text(*f),
+        Value::Float(f) => motem_syntax::float_text(*f),
         _ => format!("{v:?}"),
     }
 }

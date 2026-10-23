@@ -1,0 +1,11 @@
+[package]
+name = "motem-syntax"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "motem, the data language dual to tomet: syntax (parser and printer)"
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-lexer = { workspace = true }

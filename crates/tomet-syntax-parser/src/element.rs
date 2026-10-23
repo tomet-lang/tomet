@@ -847,7 +847,7 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
                     .iter()
                     .any(|e| matches!(e, Entry::Pair(k, _) if *k == key))
                 {
-                    return Err(motem::duplicate_key_error(entry_start, &key).into());
+                    return Err(motem_syntax::duplicate_key_error(entry_start, &key).into());
                 }
                 entries.push(Entry::Pair(key, value));
             }

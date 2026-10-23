@@ -301,7 +301,11 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
             // `render_nested`, not `render_value_inner_with_config`: a
             // nested map needs its own braces here or `m: { k: v }`
             // prints as `m: k: v` and reparses as a string.
-            Entry::Pair(k, v) => format!("{}: {}", motem::key_text(k), render_nested(v, config)),
+            Entry::Pair(k, v) => format!(
+                "{}: {}",
+                motem_syntax::key_text(k),
+                render_nested(v, config)
+            ),
             Entry::Element(child) => render_element(child, config),
         })
         .collect();

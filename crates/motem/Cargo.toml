@@ -4,11 +4,8 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "motem, the data language dual to tomet: parser and serialization format"
+description = "The crate to depend on when using motem, the data language dual to tomet, from Rust."
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-lexer = { workspace = true }
-
-#= Crates.io
-serde = { workspace = true }
+motem-syntax = { workspace = true }
+serde_motem = { workspace = true }
