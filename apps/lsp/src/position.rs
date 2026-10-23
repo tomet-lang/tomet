@@ -59,6 +59,21 @@ impl<'a> TextPositions<'a> {
         self.position(end)
     }
 
+    /// From the byte `offset` to the end of its line: where an error that
+    /// points at one place is underlined.
+    pub fn offset_to_line_end(&self, offset: usize) -> Range {
+        let start = self.position(offset);
+        let end = self.line_end(start.line);
+        Range::new(
+            start,
+            if end.character >= start.character {
+                end
+            } else {
+                start
+            },
+        )
+    }
+
     /// The byte offset of an LSP position. A character past the end of its
     /// line resolves to the end of the line; a line past the end of the text
     /// resolves to the end of the text.

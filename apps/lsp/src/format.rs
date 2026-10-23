@@ -4,10 +4,17 @@ use tomet_ast::Document;
 use crate::position::{uri_to_file_path, whole_document_range};
 
 /// Formats the document using `tomet-formatter` with loaded or inferred configuration.
+///
+/// A `.mtm` is formatted by whitespace alone, whatever the config says, as
+/// `tomet format` does.
 pub fn format_edits(text: &str, uri: Option<&Uri>) -> Vec<TextEdit> {
-    let path = uri.and_then(uri_to_file_path);
-    let config = tomet_load_config::config_for(path.as_deref(), text);
-    let formatted = tomet_formatter::format_source_with_config(text, &config);
+    let formatted = if uri.is_some_and(crate::data::is_data_uri) {
+        tomet_formatter::format_data_source(text)
+    } else {
+        let path = uri.and_then(uri_to_file_path);
+        let config = tomet_load_config::config_for(path.as_deref(), text);
+        tomet_formatter::format_source_with_config(text, &config)
+    };
     if formatted == text {
         return Vec::new();
     }

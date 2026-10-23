@@ -600,3 +600,76 @@ fn a_vault_with_a_missing_vocabulary_says_so_in_the_log() {
     server.shutdown();
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// A `.mtm` is data: the motem parser's diagnostics and the whitespace
+/// formatter, and nothing a document gets (no hover, symbols, completion),
+/// and the vault never hears of it -- here the vault would call the file
+/// invalid, since `id` has to be a UUID.
+#[test]
+fn a_motem_file_is_served_as_data_and_never_reaches_the_vault() {
+    let root = uuid_vault("mtm");
+    let path = root.join("catasto.mtm");
+    let uri = format!("file://{}", path.display());
+    let mut server = Server::start();
+    initialize(&mut server, json!({}));
+
+    open(&mut server, &path, "id: not-a-uuid\nstray\n");
+    let at_once = server.read_message();
+    let diags = diagnostics_array(&at_once);
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert!(
+        diags[0]["message"].as_str().unwrap().contains("key: value"),
+        "{diags:?}"
+    );
+    assert_eq!(
+        diags[0]["range"]["start"],
+        json!({"line": 1, "character": 0})
+    );
+
+    // Nothing else is published for it, not even after the vault's pause. The
+    // answer to the next request is the next message the server sends.
+    std::thread::sleep(std::time::Duration::from_millis(600));
+    let position = json!({"textDocument": {"uri": uri}, "position": {"line": 0, "character": 1}});
+    for method in [
+        "textDocument/hover",
+        "textDocument/definition",
+        "textDocument/completion",
+    ] {
+        let answer = server.send_request(method, position.clone());
+        assert_eq!(answer["id"].is_number(), true, "{method}: {answer:?}");
+        assert!(answer["result"].is_null(), "{method}: {answer:?}");
+    }
+    for method in ["textDocument/documentSymbol", "textDocument/foldingRange"] {
+        let answer = server.send_request(method, json!({"textDocument": {"uri": uri}}));
+        assert!(answer["result"].is_null(), "{method}: {answer:?}");
+    }
+
+    // Fixed, and ragged: the whitespace formatter answers
+    server.send_notification(
+        "textDocument/didChange",
+        json!({
+            "textDocument": {"uri": uri, "version": 2},
+            "contentChanges": [{"text": "// c  \r\nid: x   \r\n\r\n\r\nm: \"a  \r\nb\"\r\n"}],
+        }),
+    );
+    let fixed = server.read_message();
+    assert!(diagnostics_array(&fixed).is_empty(), "{fixed:?}");
+    let formatted = server.send_request(
+        "textDocument/formatting",
+        json!({"textDocument": {"uri": uri}, "options": {"tabSize": 2, "insertSpaces": true}}),
+    );
+    assert_eq!(
+        formatted["result"][0]["newText"], "// c\nid: x\n\nm: \"a  \r\nb\"\n",
+        "{formatted:?}"
+    );
+
+    server.send_notification(
+        "textDocument/didClose",
+        json!({"textDocument": {"uri": uri}}),
+    );
+    let closed = server.read_message();
+    assert!(diagnostics_array(&closed).is_empty(), "{closed:?}");
+
+    server.shutdown();
+    let _ = std::fs::remove_dir_all(&root);
+}

@@ -1,9 +1,11 @@
 //! Language server library for Tomet (`tomet-lsp`).
 //! Provides diagnostics (what the text alone says, and what `tomet check`
 //! says of a document in its vault), document formatting, hover, document
-//! symbols, goto definition, and completions.
+//! symbols, goto definition, and completions. A standalone motem file
+//! (`.mtm`) is served as data: see [`data`].
 
 pub mod completion;
+pub mod data;
 pub mod definition;
 pub mod diagnostic;
 pub mod folding;
@@ -16,6 +18,7 @@ mod vault_definition;
 pub mod workspace;
 
 pub use completion::{completions_for, completions_for_with_uri};
+pub use data::{data_diagnostics_for, is_data_uri, request_is_for_data};
 pub use definition::definition_for;
 pub use diagnostic::diagnostics_for;
 pub use folding::folding_ranges_for;

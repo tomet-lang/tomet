@@ -116,6 +116,15 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                 if connection.handle_shutdown(&req)? {
                     break;
                 }
+                // A `.mtm` is data: it is formatted (below), and the features
+                // that read a document have nothing to say about it.
+                if req.method != Formatting::METHOD && tomet_lsp::request_is_for_data(&req.params) {
+                    connection.sender.send(Message::Response(Response::new_ok(
+                        req.id,
+                        serde_json::Value::Null,
+                    )))?;
+                    continue;
+                }
                 if req.method == Formatting::METHOD {
                     let params: lsp_types::DocumentFormattingParams =
                         serde_json::from_value(req.params)?;
@@ -213,7 +222,9 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         serde_json::from_value(note.params)?;
                     let uri = params.text_document.uri;
                     documents.insert(uri.clone(), params.text_document.text.clone());
-                    if let Some(path) = tomet_lsp::uri_to_file_path(&uri) {
+                    if !tomet_lsp::is_data_uri(&uri)
+                        && let Some(path) = tomet_lsp::uri_to_file_path(&uri)
+                    {
                         workspace.set_buffer(path, params.text_document.text.clone());
                         debounce.touch(Instant::now());
                     }
@@ -230,7 +241,9 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                     let uri = params.text_document.uri;
                     if let Some(change) = params.content_changes.into_iter().next_back() {
                         documents.insert(uri.clone(), change.text.clone());
-                        if let Some(path) = tomet_lsp::uri_to_file_path(&uri) {
+                        if !tomet_lsp::is_data_uri(&uri)
+                            && let Some(path) = tomet_lsp::uri_to_file_path(&uri)
+                        {
                             workspace.set_buffer(path, change.text.clone());
                             debounce.touch(Instant::now());
                         }
@@ -246,7 +259,9 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                     let uri = params.text_document.uri;
                     documents.remove(&uri);
                     from_vault.remove(&uri);
-                    if let Some(path) = tomet_lsp::uri_to_file_path(&uri) {
+                    if !tomet_lsp::is_data_uri(&uri)
+                        && let Some(path) = tomet_lsp::uri_to_file_path(&uri)
+                    {
                         workspace.close(&path);
                         // What was open and read it may read the disk's now.
                         debounce.touch(Instant::now());
@@ -280,6 +295,10 @@ fn publish(
     text: &str,
     from_vault: Option<&Vec<lsp_types::Diagnostic>>,
 ) -> anyhow::Result<()> {
+    // A `.mtm` is read by the motem parser, and the vault has no say.
+    if tomet_lsp::is_data_uri(&uri) {
+        return publish_diagnostics(connection, uri, tomet_lsp::data_diagnostics_for(text));
+    }
     let mut diagnostics = tomet_lsp::diagnostics_for(text);
     diagnostics.extend(from_vault.into_iter().flatten().cloned());
     publish_diagnostics(connection, uri, diagnostics)
@@ -296,6 +315,9 @@ fn refresh(
     from_vault: &mut HashMap<Uri, Vec<lsp_types::Diagnostic>>,
 ) -> anyhow::Result<()> {
     for (uri, text) in documents {
+        if tomet_lsp::is_data_uri(uri) {
+            continue;
+        }
         let Some(path) = tomet_lsp::uri_to_file_path(uri) else {
             continue;
         };

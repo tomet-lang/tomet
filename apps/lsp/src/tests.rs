@@ -3,8 +3,9 @@ use std::str::FromStr;
 use lsp_types::{CompletionItemKind, DiagnosticSeverity, HoverContents, Position, Uri};
 
 use crate::{
-    completions_for, completions_for_with_uri, definition_for, diagnostics_for,
-    document_symbols_for, folding_ranges_for, format_edits, hover_for,
+    completions_for, completions_for_with_uri, data_diagnostics_for, definition_for,
+    diagnostics_for, document_symbols_for, folding_ranges_for, format_edits, hover_for,
+    is_data_uri,
 };
 
 #[test]
@@ -766,4 +767,70 @@ fn a_rooted_path_is_measured_from_a_vault_with_either_config_name() {
         items.iter().map(|i| &i.label).collect::<Vec<_>>()
     );
     let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn a_mtm_uri_is_data_and_nothing_else_is() {
+    for (uri, data) in [
+        ("file:///v/catasto.mtm", true),
+        ("file:///v/Catasto.MTM", true),
+        ("file:///v/catasto.mtm?x=1#top", true),
+        ("file:///v/a.tmt", false),
+        ("file:///v/a.mtm.tmt", false),
+        ("file:///v/mtm", false),
+        ("untitled:Untitled-1", false),
+    ] {
+        assert_eq!(is_data_uri(&Uri::from_str(uri).unwrap()), data, "{uri}");
+    }
+}
+
+#[test]
+fn a_motem_file_has_diagnostics_from_the_motem_parser_only() {
+    assert_eq!(
+        data_diagnostics_for("// header\n\"a/b\": 1\nm: { x: list(1) }\n"),
+        Vec::new()
+    );
+    // a tomet reading of this text would find `=[ ... ]` a heading and `@x` an element
+    assert_eq!(data_diagnostics_for("note: =[ not a heading ]\n").len(), 0);
+
+    let diags = data_diagnostics_for("a: 1\nstray\n");
+    assert_eq!(diags.len(), 1);
+    assert_eq!(diags[0].severity, Some(DiagnosticSeverity::ERROR));
+    assert_eq!(diags[0].source.as_deref(), Some("tomet"));
+    assert!(
+        diags[0].message.contains("key: value"),
+        "{}",
+        diags[0].message
+    );
+    assert_eq!(diags[0].range.start, Position::new(1, 0));
+    assert_eq!(diags[0].range.end, Position::new(1, 5));
+}
+
+#[test]
+fn an_unterminated_string_is_underlined_from_its_opening_quote() {
+    let diags = data_diagnostics_for("a: 1\nb: \"never closed\nc: 2\n");
+    assert_eq!(diags.len(), 1);
+    assert_eq!(diags[0].range.start, Position::new(1, 3));
+}
+
+#[test]
+fn a_motem_file_is_formatted_by_whitespace_and_a_document_is_not() {
+    let mtm = Uri::from_str("file:///v/c.mtm").unwrap();
+    let edits = format_edits(
+        "// c  \r\na: 1   \r\n\r\n\r\nb: \"x  \r\ny\"\r\n",
+        Some(&mtm),
+    );
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].new_text, "// c\na: 1\n\nb: \"x  \r\ny\"\n");
+    assert!(format_edits("a: 1\n", Some(&mtm)).is_empty());
+
+    // a `.mtm` that does not parse is not touched
+    assert!(format_edits("a: \"open   \n\n\n", Some(&mtm)).is_empty());
+
+    // the same text is a heading to the document formatter and not a motem file
+    let tmt = Uri::from_str("file:///v/c.tmt").unwrap();
+    let edits = format_edits("# Heading   \n", Some(&tmt));
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].new_text, "# Heading\n");
+    assert!(format_edits("# Heading   \n", Some(&mtm)).is_empty());
 }

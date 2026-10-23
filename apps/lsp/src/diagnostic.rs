@@ -35,15 +35,5 @@ pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
 }
 
 fn error_range(err: &tomet_parser::Error, positions: &TextPositions<'_>) -> Range {
-    // From where the error is to the end of that line.
-    let start = positions.position(err.offset);
-    let end = positions.line_end(start.line);
-    Range::new(
-        start,
-        if end.character >= start.character {
-            end
-        } else {
-            start
-        },
-    )
+    positions.offset_to_line_end(err.offset)
 }

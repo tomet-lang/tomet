@@ -2023,6 +2023,7 @@ dependencies = [
  "anyhow",
  "lsp-server",
  "lsp-types",
+ "motem",
  "serde_json",
  "tomet-address",
  "tomet-ast",
