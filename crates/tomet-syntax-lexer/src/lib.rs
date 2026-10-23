@@ -366,10 +366,6 @@ pub fn tokenize(src: &str) -> Vec<(SyntaxKind, &str)> {
                 cursor.bump();
                 tokens.push((SyntaxKind::TILDE, cursor.slice_from(start)));
             }
-            '^' => {
-                cursor.bump();
-                tokens.push((SyntaxKind::CARET, cursor.slice_from(start)));
-            }
             ';' => {
                 cursor.bump();
                 tokens.push((SyntaxKind::SEMI, cursor.slice_from(start)));
@@ -567,7 +563,7 @@ mod tests {
     fn test_tokenize_lossless_roundtrip() {
         let samples = [
             "#[ Heading 1 ]\n\nSome paragraph with @tag(id: 123){ key: \"value\" }[ Content ]\n",
-            "// A comment\n@config(format:json)+++\n{\n  \"format\": { \"meta\": \"yaml\" }\n}\n+++\n",
+            "// A comment\n::config(format:json)+++\n{\n  \"format\": { \"meta\": \"yaml\" }\n}\n+++\n",
             "- Item 1\n- Item 2\n  - Subitem 2.1\n\n@task[ Do something ]\n",
         ];
 

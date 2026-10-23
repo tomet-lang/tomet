@@ -14,19 +14,19 @@
 //!
 //! - (Element Classification (`kind`))
 //!   | Canonical recognition of Tomet's built-in vocabulary
-//!   | (`@meta`, `@config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`,
+//!   | (`::meta`, `::config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`,
 //!   | `raw`, `quote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`) via [`ElementKind`].
 //! - (Link Target Extraction (`target`))
 //!   | Canonical extraction of link targets and scheme
 //!   | prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
 //! - **Positional Argument Normalization (`positional`))
 //!   | Unifies positional argument mapping
-//!   | (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and `@settings` custom schemas.
+//!   | (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and `::settings` custom schemas.
 //! - (Document Configuration (`config`))
-//!   | Merges `@config` and `@settings` blocks across
+//!   | Merges `::config` and `::settings` blocks across
 //!   | a document into a structured [`DocumentConfig`].
 //! - (Metadata Extraction (`meta`))
-//!   | Extracts top-level `@meta` values via [`document_meta`].
+//!   | Extracts top-level `::meta` values via [`document_meta`].
 //! - (Datetimes (`datetime`))
 //!   | The one definition of what text reads as a date or a date and a time,
 //!   | as plain parts (`datetime::parse_datetime_parts`). The evaluator, `tomet check`
@@ -72,7 +72,7 @@ pub use flatten::{
 pub use kind::{
     BUILTIN_KINDS, ContentShape, ElementKind, Shape, UnknownName, builtin_content_shape,
     builtin_region, builtin_singleton, classify_std, classify_std_lenient, classify_std_name,
-    is_directive, required_shape, shape_mismatch,
+    is_directive, refuse_declaration_as_element, required_shape, shape_mismatch,
 };
 pub use positional::{
     LIST_MARKER_POSITIONAL_KEY, builtin_positional_arg_keys, normalized_element_args,

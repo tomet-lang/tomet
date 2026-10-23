@@ -55,7 +55,7 @@ fn render_block(cx: &MarkdownCtx, block: &Block, out: &mut String) {
     match block {
         Block::Paragraph(p) => {
             // Same reasoning as `tomet-html`'s `render_block`: an
-            // all-invisible-element paragraph (e.g. adjacent `@meta(...)`
+            // all-invisible-element paragraph (e.g. adjacent `::meta(...)`
             // lines with no blank line between them) must not leave a
             // stray blank paragraph behind.
             let text = inline_to_md(cx, &p.content);
@@ -204,13 +204,6 @@ fn element_to_md(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
                 } else {
                     String::new()
                 }
-            } else {
-                String::new()
-            }
-        }
-        "caret" => {
-            if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
-                format!("[^{idx}]")
             } else {
                 String::new()
             }

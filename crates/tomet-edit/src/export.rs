@@ -49,12 +49,13 @@ fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
         }
         NodeKind::BlockElement {
             name,
+            declaration,
             id_attr,
             args,
             data,
             content,
         } => {
-            out.push('@');
+            out.push_str(if *declaration { "::" } else { "@" });
             out.push_str(name);
             if let Some(id) = id_attr {
                 out.push_str("#(");

@@ -160,7 +160,7 @@ fn block_value(doc: &DocRef, block: &Block) -> EvalValue {
 
 /// An element's `(args)` and `{value}` seen as one map: the value's keys win
 /// on a conflict, since `{value}` is where an element's real data usually
-/// lives (`@meta{...}`) while `(args)` tends toward attributes. When neither is
+/// lives (`::meta{...}`) while `(args)` tends toward attributes. When neither is
 /// a map, whichever scalar group there is.
 fn prop(doc: &DocRef, args: &Option<Value>, value: &Option<ElementValue>) -> EvalValue {
     let args_map = match args {

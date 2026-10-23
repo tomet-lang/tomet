@@ -42,7 +42,7 @@ impl ExportType {
     }
 }
 
-/// Extracted document configuration settings from top-level `@config` elements.
+/// Extracted document configuration settings from top-level `::config` elements.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DocumentConfig {
     /// Target export types specified by `export.type` (or `export_type`).
@@ -61,11 +61,11 @@ pub struct DocumentConfig {
     pub table_max_col_width: Option<usize>,
     /// Table default alignment ("left", "center", "right").
     pub table_align: Option<String>,
-    /// User-defined macro templates specified by `macros` map in `@config`.
+    /// User-defined macro templates specified by `macros` map in `::config`.
     pub macros: HashMap<String, String>,
-    /// Imported configuration file paths specified by `import` or `imports` in `@config`.
+    /// Imported configuration file paths specified by `import` or `imports` in `::config`.
     pub imports: Vec<String>,
-    /// Raw key-value entries collected from `@config` element args and value groups.
+    /// Raw key-value entries collected from `::config` element args and value groups.
     pub entries: Vec<(String, Value)>,
 }
 
@@ -79,10 +79,10 @@ impl DocumentConfig {
     }
 }
 
-/// Returns this document's `@config` and `@settings` settings merged from
+/// Returns this document's `::config` and `::settings` settings merged from
 /// all configuration elements in the document -- top-level per
 /// [`tomet_tree::for_each_top_level_element`], which still counts a
-/// `@config`/`@settings` that joined an adjacent paragraph
+/// `::config`/`::settings` that joined an adjacent paragraph
 /// (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), not just a raw `doc.blocks`
 /// walk.
 pub fn document_config(doc: &Document) -> DocumentConfig {
@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn parses_grouped_export_config_args() {
         let doc = parse_document(
-            "@config(\n  export: {\n    type: commonmark\n    path: \"README.md\"\n  }\n)\n",
+            "::config(\n  export: {\n    type: commonmark\n    path: \"README.md\"\n  }\n)\n",
         )
         .unwrap();
 
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn parses_grouped_export_config_with_sequence_and_map_paths() {
         let doc = parse_document(
-            "@config(\n  export: {\n    type: list(commonmark, html)\n    path: {\n      commonmark: \"README.md\"\n      html: \"index.html\"\n    }\n  }\n)\n",
+            "::config(\n  export: {\n    type: list(commonmark, html)\n    path: {\n      commonmark: \"README.md\"\n      html: \"index.html\"\n    }\n  }\n)\n",
         )
         .unwrap();
 
@@ -339,14 +339,14 @@ mod tests {
     #[test]
     fn parses_table_adjust_width_config() {
         let doc =
-            parse_document("@settings{\n  table: {\n    adjust_width: true\n  }\n}\n").unwrap();
+            parse_document("::settings{\n  table: {\n    adjust_width: true\n  }\n}\n").unwrap();
         let config = document_config(&doc);
         assert!(config.table_adjust_width);
     }
 
     #[test]
     fn parses_macros_config() {
-        let doc = parse_document("@config{\n  macros: {\n    gh: \"https://github.com/org/repo/issues/$1\"\n    jira: \"https://jira.org/browse/$1\"\n  }\n}\n").unwrap();
+        let doc = parse_document("::config{\n  macros: {\n    gh: \"https://github.com/org/repo/issues/$1\"\n    jira: \"https://jira.org/browse/$1\"\n  }\n}\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(
             config.macros.get("gh").map(|s| s.as_str()),

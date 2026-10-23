@@ -5,8 +5,8 @@ use tomet_semantics::{ElementKind, classify_std_lenient};
 use tomet_tree::{DocumentExt, ElementExt, element_new, for_each_top_level_element_mut};
 
 /// Promotes a property `prop_key` from an element matching `source_filter` into a new top-level
-/// directive `@target_directive_name(val)` (or `@target_directive_name{...}`), inserting it at `target_index`
-/// (or automatically after any `@version` directive, or at position 0).
+/// declaration `::target_directive_name(val)` (or `::target_directive_name{...}`), inserting it at `target_index`
+/// (or automatically after any `::version` directive, or at position 0).
 ///
 /// If the property is absent, empty, or null, it is simply removed without creating a directive.
 /// Returns `true` if a directive was created and inserted.
@@ -21,7 +21,7 @@ where
     F: FnMut(&Element) -> bool,
 {
     // Top-level per `for_each_top_level_element_mut`, not a raw
-    // `doc.blocks` walk: the source element (`@meta`, typically) may have
+    // `doc.blocks` walk: the source element (`::meta`, typically) may have
     // joined an adjacent paragraph (`docs/spec/syntax.tmt`'s
     // `##[ 区切り ]`) and come back as `Inline::Element` there instead of
     // its own `Block::Element` -- still top-level, just a different
@@ -61,14 +61,14 @@ where
         }
     };
 
-    let mut new_directive = element_new(Sigil::named(target_directive_name));
+    let mut new_directive = element_new(Sigil::document(target_directive_name));
     new_directive.args = Some(prop_val);
 
     doc.insert_block(insert_pos, Block::Element(new_directive));
     true
 }
 
-/// Promotes `@meta`'s `type:` field to a top-level `@kind(...)` element.
+/// Promotes `::meta`'s `type:` field to a top-level `::kind(...)` element.
 pub fn promote_meta_type_to_kind(doc: &mut Document) -> bool {
     promote_prop_to_directive(
         doc,

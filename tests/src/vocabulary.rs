@@ -94,8 +94,8 @@ const CASES: &[Case] = &[
         // `~` is the probe: read as YAML it is null, read by Tomet's own
         // value grammar it is the string "~". `a: 1` would have parsed
         // identically either way and quietly passed.
-        known: "@meta(yaml){ a: ~ }",
-        unknown: "@zzz(yaml){ a: ~ }",
+        known: "::meta(yaml){ a: ~ }",
+        unknown: "::zzz(yaml){ a: ~ }",
         known_ident: "meta",
         unknown_ident: "zzz",
         kind: Ident::ElementName,
@@ -103,8 +103,8 @@ const CASES: &[Case] = &[
     Case {
         label: "`#config` sets no document-wide lexing mode \
                 (was element.rs `is_config`, threaded as `running_format`)",
-        known: "@config(format:json){ a: 1 }\n\n@x{ b: 2 }\n",
-        unknown: "@zzz(format:json){ a: 1 }\n\n@x{ b: 2 }\n",
+        known: "::config(format:json){ a: 1 }\n\n@x{ b: 2 }\n",
+        unknown: "::zzz(format:json){ a: 1 }\n\n@x{ b: 2 }\n",
         known_ident: "config",
         unknown_ident: "zzz",
         kind: Ident::ElementName,
@@ -229,7 +229,7 @@ fn rename_namespace(el: &mut Element, ident: &str) {
 fn sigil_name_mut(sigil: &mut Sigil) -> Option<&mut Name> {
     match sigil {
         Sigil::Named(name) | Sigil::Document(name) => Some(name),
-        Sigil::Bare | Sigil::Dollar | Sigil::Caret(_) => None,
+        Sigil::Bare | Sigil::Dollar => None,
     }
 }
 

@@ -12,13 +12,13 @@
 
 文書ごとに、次を決める。
 
-+ 書き出す形式。`--type` があればそれ（`commonmark`、`html`、`all`）。なければ、文書の `@config` が宣言した形式。どちらもなければ、CommonMark。`all` は、文書が宣言した形式のすべて。宣言がなければ、CommonMark と HTML。
++ 書き出す形式。`--type` があればそれ（`commonmark`、`html`、`all`）。なければ、文書の `::config` が宣言した形式。どちらもなければ、CommonMark。`all` は、文書が宣言した形式のすべて。宣言がなければ、CommonMark と HTML。
 + 形式ごとの出力先（下記）。
 + 文書を、その vault で読み、`${...}` を評価した値に置き換えて（@file(tmtroot/spec/cli/overview.tmt) の「式の評価」）、形式に変換する。
 
 形式と拡張子の対応は、CommonMark が `.md`、HTML が `.html`、Typst が `.typ`、Pandoc が `.json`。知らない形式は `unsupported export type: <形式>` のエラー。
 
-HTML は、独立したページ（`<title>` は `@meta` の `title`、なければファイル名）。`--advanced` で見出しに連番を振る。`lang` は既定。
+HTML は、独立したページ（`<title>` は `::meta` の `title`、なければファイル名）。`--advanced` で見出しに連番を振る。`lang` は既定。
 
 =[ 出力先 ]
 

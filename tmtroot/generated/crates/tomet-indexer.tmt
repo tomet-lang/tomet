@@ -21,7 +21,7 @@ Used by CLI commands (`check`, `export`, `format`, `lint`) and TUI components
 (Explorer, BatchMeta, Migration view).
 - ("Core Capabilities")
   - Path Filtering & Discovery: Fast directory walks using `ignore::WalkBuilder`.
-Metadata Extraction: Extracts `@meta` and `@config` key-value pairs without full AST retention.
+Metadata Extraction: Extracts `::meta` and `::config` key-value pairs without full AST retention.
 Stateful Workspace Index ([`workspace_scan::WorkspaceIndex`]): Flat in-memory catalog
 with zero-I/O derived views, compaction of single-child directory chains, and incremental updates.
 
@@ -75,7 +75,7 @@ and typed into a text box. A predicate needs the value itself: a list
 of tags has to stay a list for `contains` to look inside it, and a
 number has to stay a number for `gt` to order it.
 
-`@config` is deliberately absent. It configures export and printing,
+`::config` is deliberately absent. It configures export and printing,
 not what the document @em[is], so filtering an index on it would be
 filtering on machinery.
 
@@ -99,7 +99,7 @@ own directory;
 process's working directory.
 
 The last is the one that is easy to get wrong by doing nothing.
-`@config(export: path)` did exactly that: it handed the string
+`::config(export: path)` did exactly that: it handed the string
 straight to `fs::write`, so `tmtroot/readme.tmt` declaring
 `README.ja.md` wrote to the repository root or to `docs/` depending
 on where you happened to be standing. Running the export from the

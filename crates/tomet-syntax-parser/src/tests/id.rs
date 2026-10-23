@@ -170,12 +170,12 @@ fn list_item_sugar_with_no_trailing_group_has_no_id() {
 
 #[test]
 fn hash_not_followed_by_paren_after_an_element_does_not_error() {
-    // Regression: `#` immediately after `@meta{...}`'s closing `}` used
+    // Regression: `#` immediately after `::meta{...}`'s closing `}` used
     // to be wrongly claimed by `parse_groups`'s id arm (within the same
     // "one newline of gap tolerance" that lets an element's own groups
     // split across lines), erroring on "expected '(' after '#'" instead
     // of leaving an unrelated next line alone.
-    let doc = parse_document("@meta{a: 1}\n#[ Title ]\n").unwrap();
+    let doc = parse_document("::meta{a: 1}\n#[ Title ]\n").unwrap();
     assert_eq!(doc.blocks.len(), 2);
     assert!(matches!(&doc.blocks[0], Block::Element(_)));
     assert!(matches!(&doc.blocks[1], Block::Paragraph(_)));

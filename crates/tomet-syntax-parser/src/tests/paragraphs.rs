@@ -7,7 +7,7 @@ fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
     // line happened to start with one. A continuation line is not
     // block context, so the element belongs to the running text; a
     // blank line is what opens a block.
-    let doc = parse_document("text\n@meta{key:value}\n").unwrap();
+    let doc = parse_document("text\n@note{key:value}\n").unwrap();
     assert_eq!(doc.blocks.len(), 1);
     match &doc.blocks[0] {
         Block::Paragraph(p) => {
@@ -18,7 +18,7 @@ fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
             assert_eq!(&p.content[1], &sb());
             match &p.content[2] {
                 Inline::Element(el) => {
-                    assert_eq!(el.sigil, Sigil::named("meta"));
+                    assert_eq!(el.sigil, Sigil::named("note"));
                     assert_eq!(el.placement, tomet_ast::Placement::Inline);
                 }
                 other => panic!("expected an element, got {other:?}"),
@@ -28,11 +28,11 @@ fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
     }
 
     // With the blank line, it is a block.
-    let doc = parse_document("text\n\n@meta{key:value}\n").unwrap();
+    let doc = parse_document("text\n\n@note{key:value}\n").unwrap();
     assert_eq!(doc.blocks.len(), 2);
     match &doc.blocks[1] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("meta"));
+            assert_eq!(el.sigil, Sigil::named("note"));
             assert_eq!(el.placement, tomet_ast::Placement::Block);
         }
         other => panic!("expected an element, got {other:?}"),
@@ -43,16 +43,16 @@ fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
 fn adjacent_elements_with_no_blank_line_isolate_by_default() {
     // `docs/spec/syntax.tmt`'s `##[ 継続 ]`: a bare element that opens
     // its own line isolates as its own block by default, whether or
-    // not a blank line follows -- `@meta{...}` immediately followed
-    // by `@settings{...}` (no blank line, no `\`) stays two
+    // not a blank line follows -- `@note{...}` immediately followed
+    // by `@memo{...}` (no blank line, no `\`) stays two
     // independent `Block::Element`s, not one `Block::Paragraph`.
     // `docs/examples/dirs.tmt`'s file listing depends on this.
-    let doc = parse_document("@meta{ type:#settings }\n@settings{ key:value }\n").unwrap();
+    let doc = parse_document("@note{ type:#settings }\n@memo{ key:value }\n").unwrap();
     assert_eq!(doc.blocks.len(), 2);
     match (&doc.blocks[0], &doc.blocks[1]) {
         (Block::Element(a), Block::Element(b)) => {
-            assert_eq!(a.sigil, Sigil::named("meta"));
-            assert_eq!(b.sigil, Sigil::named("settings"));
+            assert_eq!(a.sigil, Sigil::named("note"));
+            assert_eq!(b.sigil, Sigil::named("memo"));
         }
         other => panic!("expected two elements, got {other:?}"),
     }
@@ -61,9 +61,9 @@ fn adjacent_elements_with_no_blank_line_isolate_by_default() {
 #[test]
 fn a_leading_continuation_joins_adjacent_elements() {
     // The `\` override (`docs/spec/syntax.tmt`'s `##[ 継続 ]`) for the
-    // case above: with it, `@settings{...}` joins `@meta{...}`'s
+    // case above: with it, `@memo{...}` joins `@note{...}`'s
     // paragraph instead of standing alone.
-    let doc = parse_document("@meta{ type:#settings }\n\\@settings{ key:value }\n").unwrap();
+    let doc = parse_document("@note{ type:#settings }\n\\@memo{ key:value }\n").unwrap();
     assert_eq!(doc.blocks.len(), 1);
     match &doc.blocks[0] {
         Block::Paragraph(p) => {
@@ -75,10 +75,7 @@ fn a_leading_continuation_joins_adjacent_elements() {
                     _ => None,
                 })
                 .collect();
-            assert_eq!(
-                elements,
-                vec![Sigil::named("meta"), Sigil::named("settings")]
-            );
+            assert_eq!(elements, vec![Sigil::named("note"), Sigil::named("memo")]);
         }
         other => panic!("expected one paragraph, got {other:?}"),
     }

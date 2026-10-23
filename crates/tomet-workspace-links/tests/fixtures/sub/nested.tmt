@@ -1,4 +1,4 @@
-@meta{}
+::meta{}
 
 @link(./sibling.txt)
 [ Source-relative: resolves next to this file, in sub/. ]

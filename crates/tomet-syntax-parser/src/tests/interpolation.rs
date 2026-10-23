@@ -4,7 +4,7 @@ use super::*;
 /// Some(ElementValue::Interp(expr))`) -- same shape as `@name{value}`,
 /// not a bespoke `Inline` variant. A standalone `${x}` line therefore
 /// collapses to `Block::Element` exactly like a standalone
-/// `@meta{...}` does (`document.rs::parse_paragraph`'s one-element
+/// `::meta{...}` does (`document.rs::parse_paragraph`'s one-element
 /// collapse), which is why these tests destructure `Block::Element`
 /// rather than `Block::Paragraph`.
 fn interp_expr(block: &Block) -> &InterpExpr {

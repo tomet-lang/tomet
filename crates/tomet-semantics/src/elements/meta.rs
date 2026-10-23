@@ -3,19 +3,19 @@ use tomet_tree::ValueExt;
 
 use crate::{ElementKind, classify_std_lenient};
 
-/// Returns this document's `@meta` element's parsed data, if it has one --
+/// Returns this document's `::meta` element's parsed data, if it has one --
 /// the `{...}` value group read via [`crate::data::element_data`].
 /// Callers pull whatever key they care about (`title`, `date`, `tags`, ...) out
 /// of the returned map themselves.
 ///
-/// `None` if the document has no `@meta` element, or that element has no
-/// `{value}` group at all. Only the first top-level `@meta` is considered
-/// -- `@meta` is documented as `singleton: true` (see
+/// `None` if the document has no `::meta` element, or that element has no
+/// `{value}` group at all. Only the first top-level `::meta` is considered
+/// -- `::meta` is documented as `singleton: true` (see
 /// `docs/spec/builtin-settings.tmt`), so a well-formed document
 /// never has more than one anyway.
 ///
 /// "Top-level" is [`tomet_tree::for_each_top_level_element`], not a raw
-/// `doc.blocks` walk: `@meta` still counts as top-level after joining an
+/// `doc.blocks` walk: `::meta` still counts as top-level after joining an
 /// adjacent paragraph (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), a
 /// tree-shape choice unrelated to whether it opened its own line.
 pub fn document_meta(doc: &Document) -> Option<Value> {
@@ -35,7 +35,7 @@ fn meta_data(el: &Element) -> Option<Value> {
 use crate::positional::normalized_element_args;
 
 /// Returns this document's declared kind string (e.g. `"j.daily"`, `"config"`, `"image_note"`),
-/// resolved strictly from top-level `@kind(...)` / `<kind>(...)` elements.
+/// resolved strictly from top-level `::kind(...)` / `<kind>(...)` elements.
 pub fn document_kind(doc: &Document) -> Option<String> {
     let mut found = None;
     tomet_tree::for_each_top_level_element(doc, |el| {
@@ -65,8 +65,8 @@ pub fn document_kind(doc: &Document) -> Option<String> {
     found
 }
 
-/// The kind of document a blueprint is for: what its `@blueprint(X)` names,
-/// as `@blueprint(X)` or `@blueprint(target: X)`. `None` for a document that
+/// The kind of document a blueprint is for: what its `::blueprint(X)` names,
+/// as `::blueprint(X)` or `::blueprint(target: X)`. `None` for a document that
 /// is not a blueprint.
 pub fn document_blueprint(doc: &Document) -> Option<String> {
     let mut found = None;
@@ -89,7 +89,7 @@ pub fn document_blueprint(doc: &Document) -> Option<String> {
 }
 
 /// Returns this document's declared language/syntax version (e.g. `"1.0"`),
-/// resolved strictly from top-level `@version(...)` / `<version>(...)` elements.
+/// resolved strictly from top-level `::version(...)` / `<version>(...)` elements.
 pub fn document_version(doc: &Document) -> Option<String> {
     let mut found = None;
     tomet_tree::for_each_top_level_element(doc, |el| {
@@ -130,9 +130,9 @@ mod tests {
     #[test]
     fn a_blueprint_names_the_kind_it_is_for() {
         for src in [
-            "@blueprint(daily-note)\n",
-            "@kind(blueprint)\n@blueprint(daily-note)\n\n=[ Tasks ]\n",
-            "@blueprint(target: daily-note)\n",
+            "::blueprint(daily-note)\n",
+            "::kind(blueprint)\n::blueprint(daily-note)\n\n=[ Tasks ]\n",
+            "::blueprint(target: daily-note)\n",
         ] {
             let doc = parse_document(src).unwrap();
             assert_eq!(
@@ -145,13 +145,13 @@ mod tests {
 
     #[test]
     fn a_document_that_is_not_a_blueprint_names_no_kind() {
-        let doc = parse_document("@kind(note)\n\n=[ Title ]\n").unwrap();
+        let doc = parse_document("::kind(note)\n\n=[ Title ]\n").unwrap();
         assert_eq!(document_blueprint(&doc), None);
     }
 
     #[test]
     fn finds_meta_value_from_a_meta_element() {
-        let doc = parse_document("@meta{ title: Hello }\n").unwrap();
+        let doc = parse_document("::meta{ title: Hello }\n").unwrap();
         let value = document_meta(&doc).expect("expected #meta value");
         match value {
             Value::Map(map) => {
@@ -172,48 +172,48 @@ mod tests {
 
     #[test]
     fn meta_element_without_a_value_group_is_none() {
-        let doc = parse_document("@meta\n").unwrap();
+        let doc = parse_document("::meta\n").unwrap();
         assert_eq!(document_meta(&doc), None);
     }
 
     #[test]
     fn extracts_document_kind_from_kind_directive() {
-        let doc = parse_document("@kind(j.daily)\n\n#[ Daily Note ]\n").unwrap();
+        let doc = parse_document("::kind(j.daily)\n\n#[ Daily Note ]\n").unwrap();
         assert_eq!(document_kind(&doc), Some("j.daily".to_string()));
 
-        let doc2 = parse_document("@kind(config)\n").unwrap();
+        let doc2 = parse_document("::kind(config)\n").unwrap();
         assert_eq!(document_kind(&doc2), Some("config".to_string()));
 
-        // No @kind directive -> returns None
-        let doc3 = parse_document("@meta{\n  title: Test\n}\n").unwrap();
+        // No ::kind directive -> returns None
+        let doc3 = parse_document("::meta{\n  title: Test\n}\n").unwrap();
         assert_eq!(document_kind(&doc3), None);
     }
 
     #[test]
     fn a_kind_may_name_a_version_after_it() {
-        let doc = parse_document("@kind(j.daily, 2)\n\n#[ Daily Note ]\n").unwrap();
+        let doc = parse_document("::kind(j.daily, 2)\n\n#[ Daily Note ]\n").unwrap();
         assert_eq!(document_kind(&doc), Some("j.daily".to_string()));
-        let doc = parse_document("@kind(config, 12)\n").unwrap();
+        let doc = parse_document("::kind(config, 12)\n").unwrap();
         assert_eq!(document_kind(&doc), Some("config".to_string()));
     }
 
     #[test]
     fn extracts_document_version_from_version_directive() {
-        let doc = parse_document("@version(1.0)\n\n#[ Doc ]\n").unwrap();
+        let doc = parse_document("::version(1.0)\n\n#[ Doc ]\n").unwrap();
         assert_eq!(document_version(&doc), Some("1.0".to_string()));
 
-        let doc2 = parse_document("@version(\"1.0\")\n").unwrap();
+        let doc2 = parse_document("::version(\"1.0\")\n").unwrap();
         assert_eq!(document_version(&doc2), Some("1.0".to_string()));
 
-        // No @version directive -> returns None
-        let doc3 = parse_document("@meta{\n  title: Test\n}\n").unwrap();
+        // No ::version directive -> returns None
+        let doc3 = parse_document("::meta{\n  title: Test\n}\n").unwrap();
         assert_eq!(document_version(&doc3), None);
     }
 
     #[test]
     fn normalizes_list_call_in_meta_value_to_seq() {
-        let doc = parse_document("@meta{\n  tags: list(rust, tomet)\n}\n").unwrap();
-        let value = document_meta(&doc).expect("expected @meta value");
+        let doc = parse_document("::meta{\n  tags: list(rust, tomet)\n}\n").unwrap();
+        let value = document_meta(&doc).expect("expected ::meta value");
         match value {
             Value::Map(entries) => {
                 let tags = entries.iter().find(|(k, _)| k == "tags").map(|(_, v)| v);

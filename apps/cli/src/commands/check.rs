@@ -27,7 +27,7 @@ enum CheckFileResult {
 /// to check against.
 ///
 /// Checking is not parsing. This used to return OK the moment a document
-/// parsed, so two `@meta`, or an element name that exists nowhere, passed
+/// parsed, so two `::meta`, or an element name that exists nowhere, passed
 /// -- while the js/java/python bindings and `apps/web` all ran the
 /// validator. Vocabularies have to be read from disk, which is why the
 /// resolving lives here and not in the validator.
@@ -309,12 +309,12 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/vocabularies")).unwrap();
         fs::write(
             dir.join("default.config.tmt"),
-            "@kind(config)\n@config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
+            "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
         )
         .unwrap();
         fs::write(
             dir.join(".tomet/vocabularies/deck.vocabulary.tmt"),
-            "@kind(vocabulary)\n@vocabulary(deck)\n\n@element(card){}[ One card. ]\n",
+            "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(card){}[ One card. ]\n",
         )
         .unwrap();
         dir
@@ -325,11 +325,11 @@ mod tests {
     #[test]
     fn a_directory_is_swept_and_reports_every_failure() {
         let root = vault("sweep");
-        fs::write(root.join("good.tmt"), "@kind(deck)\n\n@card{}\n").unwrap();
-        fs::write(root.join("bad.tmt"), "@kind(deck)\n\n@nonesuch{}\n").unwrap();
+        fs::write(root.join("good.tmt"), "::kind(deck)\n\n@card{}\n").unwrap();
+        fs::write(root.join("bad.tmt"), "::kind(deck)\n\n@nonesuch{}\n").unwrap();
         fs::write(
             root.join("worse.tmt"),
-            "@kind(deck)\n@meta{a:1}\n@meta{b:2}\n",
+            "::kind(deck)\n::meta{a:1}\n::meta{b:2}\n",
         )
         .unwrap();
 
@@ -350,7 +350,7 @@ mod tests {
     #[test]
     fn a_motem_file_is_checked_beside_the_documents() {
         let root = vault("mtm");
-        fs::write(root.join("good.tmt"), "@kind(deck)\n\n@card{}\n").unwrap();
+        fs::write(root.join("good.tmt"), "::kind(deck)\n\n@card{}\n").unwrap();
         fs::write(
             root.join("ok.mtm"),
             "// header\n\"tmtroot/a.tmt\": \"../a.tmt\"\nm: { x: 1 }\n",
@@ -388,7 +388,7 @@ mod tests {
         let root = vault("mtm_unswept");
         fs::write(
             root.join("default.config.tmt"),
-            "@kind(config)\n@config{ workspace: { unswept: list(\"frozen\") } }\n",
+            "::kind(config)\n::config{ workspace: { unswept: list(\"frozen\") } }\n",
         )
         .unwrap();
         fs::create_dir_all(root.join("frozen")).unwrap();
@@ -406,15 +406,15 @@ mod tests {
         let root = vault("uuid");
         fs::write(
             root.join("default.config.tmt"),
-            "@kind(config)\n@config{ meta: { id: { type: uuid } } }\n",
+            "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n",
         )
         .unwrap();
         fs::write(
             root.join("good.tmt"),
-            "@meta{ id: 123e4567-e89b-42d3-a456-426614174000 }\n",
+            "::meta{ id: 123e4567-e89b-42d3-a456-426614174000 }\n",
         )
         .unwrap();
-        fs::write(root.join("bad.tmt"), "@meta{ id: not-a-uuid }\n").unwrap();
+        fs::write(root.join("bad.tmt"), "::meta{ id: not-a-uuid }\n").unwrap();
 
         check(&root.join("good.tmt"), false, true, false).expect("a UUID passes");
         let err = check(&root.join("bad.tmt"), false, true, false).expect_err("not a UUID");
@@ -423,7 +423,7 @@ mod tests {
         // The same document is fine where the settings declare nothing.
         fs::write(
             root.join("default.config.tmt"),
-            "@kind(config)\n@config{}\n",
+            "::kind(config)\n::config{}\n",
         )
         .unwrap();
         check(&root.join("bad.tmt"), false, true, false).expect("nothing declares `id`");
@@ -476,13 +476,13 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// The vault's `@kind` binding reaches every file in the sweep, not
+    /// The vault's `::kind` binding reaches every file in the sweep, not
     /// just the first -- the vocabularies are loaded once for the run.
     #[test]
     fn the_vocabulary_reaches_every_file_in_the_sweep() {
         let root = vault("shared");
         for name in ["a.tmt", "b.tmt", "c.tmt"] {
-            fs::write(root.join(name), "@kind(deck)\n\n@card{}\n").unwrap();
+            fs::write(root.join(name), "::kind(deck)\n\n@card{}\n").unwrap();
         }
         check(&root, false, true, false).expect("all three resolve `card`");
         let _ = fs::remove_dir_all(&root);
@@ -523,26 +523,26 @@ mod tests {
         let root = vault("blueprint_check");
         fs::write(
             root.join("default.config.tmt"),
-            "@kind(settings)\n@settings{\n  blueprints: list(\"bp.tmt\")\n}\n",
+            "::kind(settings)\n::settings{\n  blueprints: list(\"bp.tmt\")\n}\n",
         )
         .unwrap();
         fs::write(
             root.join("bp.tmt"),
-            "@kind(blueprint)\n@blueprint(note)\n@meta{\n  date: \"2026\"\n}\n\n=[ Items ]#(items):rule(allow: list(task))\n",
+            "::kind(blueprint)\n::blueprint(note)\n::meta{\n  date: \"2026\"\n}\n\n=[ Items ]#(items):rule(allow: list(task))\n",
         )
         .unwrap();
 
         // bad.tmt has a disallowed heading inside the items section
         fs::write(
             root.join("bad.tmt"),
-            "@kind(note)\n@meta{\n  date: \"2026-10-13\"\n}\n\n=[ Items ]#(items)\n@heading[ Disallowed ]\n",
+            "::kind(note)\n::meta{\n  date: \"2026-10-13\"\n}\n\n=[ Items ]#(items)\n@heading[ Disallowed ]\n",
         )
         .unwrap();
 
         // good.tmt adheres to the blueprint
         fs::write(
             root.join("good.tmt"),
-            "@kind(note)\n@meta{\n  date: \"2026-10-13\"\n}\n\n=[ Items ]#(items)\n@task[ Clean room ]\n",
+            "::kind(note)\n::meta{\n  date: \"2026-10-13\"\n}\n\n=[ Items ]#(items)\n@task[ Clean room ]\n",
         )
         .unwrap();
 

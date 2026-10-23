@@ -63,8 +63,8 @@ means "this changed", not "this broke". Read the diff, decide whether the
 new output is better, and only then accept it.
 
 Some references are legitimately empty: a config-only document such as
-`test.config.tmt` renders to nothing in HTML/Typst, because `@meta` and
-`@config` are invisible in output formats.
+`test.config.tmt` renders to nothing in HTML/Typst, because `::meta` and
+`::config` are invisible in output formats.
 
 `fixtures/examples/bookmark.tmt` used to be a known-wrong reference: it
 wrote `@bookmark(...){ id: ..., tags: [...] }+++ ... +++`, and `{value}`

@@ -21,7 +21,7 @@ pub struct FieldConfig {
     #[config(key = "meta.<field>.offset", type = "string")]
     pub offset: Option<String>,
 
-    /// Force trailing newline formatting for this field in `@meta{ ... }`.
+    /// Force trailing newline formatting for this field in `::meta{ ... }`.
     #[config(key = "meta.<field>.always_newline", default = false)]
     pub always_newline: bool,
 

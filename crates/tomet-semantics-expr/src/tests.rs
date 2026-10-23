@@ -525,8 +525,8 @@ fn named_arguments_outside_a_call_are_rejected() {
 
 // ---- documents, addresses, directories -------------------------------------
 
-const HERE: &str = "@kind(note)
-@meta{
+const HERE: &str = "::kind(note)
+::meta{
   title: Here
   tags: list(a, b)
 }
@@ -538,14 +538,14 @@ Some body.
 @card(n: 1, tags: list(x, y, z)){ extra: yes }#(c1)
 ";
 
-const DOC_A: &str = "@meta{
+const DOC_A: &str = "::meta{
   title: A
 }
 
 @card(x: 7)#(top)
 ";
 
-const DOC_B: &str = "@meta{
+const DOC_B: &str = "::meta{
   title: B
 }
 ";
@@ -1098,8 +1098,8 @@ fn unicode_takes_a_code_point_as_a_number_or_hex_text() {
 
 // ---- include ----------------------------------------------------------------
 
-const GUIDE: &str = "@kind(note)
-@meta{ title: Guide }
+const GUIDE: &str = "::kind(note)
+::meta{ title: Guide }
 
 =[ Install ]#(install)
 
@@ -1124,7 +1124,7 @@ fn guide_vault() -> MemoryResolver {
     MemoryResolver::new()
         .with_source("docs/guide.tmt", GUIDE)
         .unwrap()
-        .with_source("here.tmt", "@meta{ title: Here }\n")
+        .with_source("here.tmt", "::meta{ title: Here }\n")
         .unwrap()
         .with_source("docs/sub/host.tmt", "Host\n")
         .unwrap()
@@ -1229,7 +1229,7 @@ fn a_document_is_included_without_its_own_declarations() {
             "e:card"
         ]
     );
-    // `@kind` and `@meta` are the document's own business.
+    // `::kind` and `::meta` are the document's own business.
     assert!(!all.iter().any(|line| line == "e:kind" || line == "e:meta"));
 }
 

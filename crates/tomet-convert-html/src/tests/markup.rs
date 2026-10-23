@@ -77,7 +77,7 @@ fn renders_table_element_to_html() {
 
 #[test]
 fn test_renders_inline_footnote() {
-    let src = "Prose with @footnote[a short note] here.\n";
+    let src = "Prose with @ftn[a short note] here.\n";
     let doc = parse_document(src).unwrap();
     let html = render_body(&doc);
 
@@ -99,7 +99,8 @@ fn test_renders_inline_footnote() {
 
 #[test]
 fn test_renders_separated_footnote_with_multiple_references() {
-    let src = "Prose A^(note1) and Prose B^footnote(note1).\n\n@footnote(note1)[Shared footnote explanation.]\n";
+    let src =
+        "Prose A@ftn(note1) and Prose B@ftn(note1).\n\n@ftn(note1)[Shared footnote explanation.]\n";
     let doc = parse_document(src).unwrap();
     let html = render_body(&doc);
 
@@ -119,15 +120,4 @@ fn test_renders_separated_footnote_with_multiple_references() {
             html.contains("<li id=\"fn-1\">\n<p>Shared footnote explanation. <span class=\"footnote-backrefs\"><a href=\"#fnref-1-1\" role=\"doc-backlink\" class=\"footnote-backref\">^1</a> <a href=\"#fnref-1-2\" role=\"doc-backlink\" class=\"footnote-backref\">^2</a></span></p>\n</li>"),
             "expected shared footnote item with multiple backlinks: {html}"
         );
-}
-
-#[test]
-fn test_ftn_renders_the_same_as_the_caret_and_footnote_spelling() {
-    let old = "Prose A^(note1) and Prose B^footnote(note1).\n\n@footnote(note1)[Shared footnote explanation.]\n";
-    let new =
-        "Prose A@ftn(note1) and Prose B@ftn(note1).\n\n@ftn(note1)[Shared footnote explanation.]\n";
-    assert_eq!(
-        render_body(&parse_document(new).unwrap()),
-        render_body(&parse_document(old).unwrap())
-    );
 }

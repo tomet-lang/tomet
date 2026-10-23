@@ -13,9 +13,6 @@ use crate::vocabulary::{Bindings, ElementDecl};
 /// it is a widely used custom element in the docs and dropping its
 /// positional key would silently change how `(warning)` reads.
 pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
-    if sigil.is_caret() {
-        return &["id"];
-    }
     let Some(name) = sigil.name() else {
         return &[];
     };
@@ -23,7 +20,7 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         return &[];
     }
     match name.name.as_str() {
-        "footnote" | "ftn" => &["id"],
+        "ftn" => &["id"],
         // The second slot is the version of that kind, an integer of 1 or more,
         // and may be left out. The validator checks the value; nothing reads it yet.
         "kind" => &["kind", "version"],
@@ -40,8 +37,8 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         // validator checks the value; nothing reads it yet.
         "use" => &["target", "version"],
         // The kind the blueprint produces. `target` and not `kind`:
-        // `@kind(blueprint)` sits directly above it, and `kind` there would
-        // mean the output's kind while `@kind` means this file's.
+        // `::kind(blueprint)` sits directly above it, and `kind` there would
+        // mean the output's kind while `::kind` means this file's.
         "blueprint" => &["target"],
         "callout" => &["variant"],
         "heading" => &["level"],
@@ -102,7 +99,7 @@ const POSITIONAL_ENTRY_KEY: &str = "";
 
 /// Scoped to elements whose *first* positional slot is `"target"`
 /// (`@link`/`@embed`'s builtin default; a custom element could once be
-/// given that slot through `@settings`, which is a `@vocabulary` question
+/// given that slot through `::settings`, which is a `::vocabulary` question
 /// now and unread either way) -- when that's the only legitimate
 /// key defined, any *other* single key present is unambiguously an
 /// artifact of the parser's `identifier:` rule splitting a bare
@@ -166,7 +163,7 @@ fn fill_positional_slots(positional_keys: &[String], mut entries: Vec<(String, V
 /// A vocabulary's half is the `@param`s marked `positional: true`, in
 /// declaration order. There is no separate `positional: [ ... ]` list
 /// because that would state an order the declarations already carry; an
-/// `@settings` key spelled exactly that way was deleted for being the
+/// `::settings` key spelled exactly that way was deleted for being the
 /// duplicate `explicit-form-first` names outright.
 fn positional_keys(sigil: &Sigil, bindings: &Bindings) -> Vec<String> {
     let builtin = builtin_positional_arg_keys(sigil);
@@ -221,7 +218,7 @@ fn scalar_to_plain(v: &Value) -> String {
 /// use [`normalized_element_args_in`], which also reads what a vocabulary
 /// declares -- the same split as `validate_document` and
 /// `validate_document_with`, and for the same reason: most callers here
-/// (HTML, Typst, `@meta` reading) have no vault to resolve against.
+/// (HTML, Typst, `::meta` reading) have no vault to resolve against.
 ///
 /// This is deliberately *not* the `_with_schema` twin that used to sit
 /// here. That one took a `SettingsSchema` no caller ever built, so its
@@ -316,7 +313,7 @@ mod tests {
 
     #[test]
     fn kind_and_use_take_an_optional_version_after_the_name() {
-        // `@kind(name, 2)` is two bare entries; `@kind(name)` is one scalar.
+        // `::kind(name, 2)` is two bare entries; `::kind(name)` is one scalar.
         for (sigil, name_key) in [("kind", "kind"), ("use", "target")] {
             let mut el = element_new(Sigil::named(sigil));
             el.args = Some(Value::Map(vec![
@@ -471,7 +468,7 @@ mod tests {
     /// them, sentinel keys and all.
     ///
     /// Two tests used to sit here giving `link` a second `predicate` slot
-    /// and `task` a `title`/`priority` pair through an `@settings`
+    /// and `task` a `title`/`priority` pair through an `::settings`
     /// `elements: { <name>: { positional: [...] } }` map. That surface is
     /// gone -- it was a second source for a fact the parameter
     /// declarations already order, and nothing outside those tests ever

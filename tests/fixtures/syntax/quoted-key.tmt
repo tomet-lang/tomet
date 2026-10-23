@@ -1,8 +1,8 @@
-@kind(fixture)
+::kind(fixture)
 // A quoted string before `:` is a map key, so a path or a URL can key an
 // entry. It works in `{value}` groups and in `(args)` alike, because both
 // read entries through the same value grammar as a standalone motem file.
-@meta{
+::meta{
   "tmtroot/schema/rust.vocabulary.tmt": "../vocabularies/rust.vocabulary.tmt"
   "with space": 1
   plain.key: 2

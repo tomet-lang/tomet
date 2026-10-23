@@ -1,5 +1,5 @@
-@kind(fixture)
-@meta{ id: doc-fences }
+::kind(fixture)
+::meta{ id: doc-fences }
 
 =[ 逐語本文 ]
 

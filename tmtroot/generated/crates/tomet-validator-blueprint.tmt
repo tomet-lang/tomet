@@ -7,7 +7,7 @@
 Blueprint structural validation against a target document.
 
 Extracts structural schemas (required meta keys, required sections, and section-level
-`:rule` constraints) from blueprint documents (`@kind(blueprint)`), and validates
+`:rule` constraints) from blueprint documents (`::kind(blueprint)`), and validates
 target documents for conformance.
 
 ==[Structs]

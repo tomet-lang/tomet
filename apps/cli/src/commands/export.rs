@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
 use tomet_load::Vault;
-use tomet_semantics::{document_config, ExportType};
+use tomet_semantics::{ExportType, document_config};
 
 use crate::util::{format_parse_error, meta_title};
 
@@ -401,12 +401,12 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         let sub = root.join("sub");
         fs::create_dir_all(&sub).expect("temp dirs");
-        fs::write(root.join("default.config.tmt"), "@kind(config)\n").expect("config");
+        fs::write(root.join("default.config.tmt"), "::kind(config)\n").expect("config");
 
         let src = sub.join("doc.tmt");
         fs::write(
             &src,
-            "@config(export: { type: commonmark, path: \"out.md\" })\n\n#[ Title ]\n",
+            "::config(export: { type: commonmark, path: \"out.md\" })\n\n#[ Title ]\n",
         )
         .expect("write source");
 
@@ -441,7 +441,7 @@ mod tests {
         fs::write(
             &src,
             format!(
-                "@config(export: {{ type: commonmark, path: \"{}\" }})\n\n#[ Title ]\n",
+                "::config(export: {{ type: commonmark, path: \"{}\" }})\n\n#[ Title ]\n",
                 out.display()
             ),
         )
@@ -464,10 +464,10 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("tomet_test_export_dir_{name}"));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("temp dir");
-        fs::write(dir.join("default.config.tmt"), "@kind(config)\n").expect("config");
+        fs::write(dir.join("default.config.tmt"), "::kind(config)\n").expect("config");
         fs::write(
             dir.join("good.tmt"),
-            "@config(export: { type: commonmark, path: \"good.md\" })\n\n#[ Good ]\n",
+            "::config(export: { type: commonmark, path: \"good.md\" })\n\n#[ Good ]\n",
         )
         .expect("good");
         fs::write(dir.join("broken.tmt"), "=[ unterminated\n").expect("broken");
@@ -518,7 +518,7 @@ mod tests {
         let out_file = temp_dir.join("test_out.md");
 
         let src_content = format!(
-            "@config(\n  export: {{\n    type: commonmark\n    path: \"{}\"\n  }}\n)\n=[ Hello Export ]\n",
+            "::config(\n  export: {{\n    type: commonmark\n    path: \"{}\"\n  }}\n)\n=[ Hello Export ]\n",
             out_file.display()
         );
         fs::write(&src_file, src_content).unwrap();

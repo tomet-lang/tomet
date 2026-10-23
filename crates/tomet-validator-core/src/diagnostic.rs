@@ -35,7 +35,7 @@ pub enum Diagnostic {
     },
     /// An intra-document anchor reference points to an anchor ID that does not exist in the document.
     DanglingAnchor { anchor: String, span: Span },
-    /// A required `@meta` field defined in the blueprint is missing from the document.
+    /// A required `::meta` field defined in the blueprint is missing from the document.
     MissingRequiredMetaKey {
         key: String,
         kind: String,
@@ -57,7 +57,7 @@ pub enum Diagnostic {
     UnknownElement {
         name: String,
         /// Set when the name is namespaced and that namespace is not in
-        /// scope -- a missing `@use` rather than a misspelled element.
+        /// scope -- a missing `::use` rather than a misspelled element.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         unbound_namespace: Option<String>,
         span: Span,
@@ -65,8 +65,8 @@ pub enum Diagnostic {
     /// A second copy of an element that may appear at most once.
     ///
     /// `singleton` was declared in `docs/spec/builtin-settings.tmt` for
-    /// six elements and enforced nowhere, so a document with two `@meta`
-    /// -- or two `@kind`, which is two answers to what the document is --
+    /// six elements and enforced nowhere, so a document with two `::meta`
+    /// -- or two `::kind`, which is two answers to what the document is --
     /// passed every check this project had.
     DuplicateSingleton {
         name: String,
@@ -77,25 +77,24 @@ pub enum Diagnostic {
     /// document's body has started.
     ///
     /// The preamble is the run of such elements at the top of the file;
-    /// the first block that is not one of them ends it. A `@kind` below
+    /// the first block that is not one of them ends it. A `::kind` below
     /// that point is a directive nobody reading top-down would meet in
     /// time.
     OutsidePreamble { name: String, span: Span },
-    /// A `::name` declaration for an element that is content, not a
-    /// declaration about the document: it belongs in the body, written `@name`.
+    /// An element written with the sigil of the other kind: a declaration
+    /// about the document written `@name` (it is `::name`), or content written
+    /// `::name` (it is `@name`).
     ///
-    /// The sigil says "this describes the document", and what an element is
-    /// follows from the `Region` its vocabulary declares. The opposite
-    /// mistake -- a declaration written `@name` -- is not reported yet, while
-    /// the old spelling is still being migrated away from.
+    /// The sigil says whether something describes the document, and which an
+    /// element is follows from the `Region` its vocabulary declares.
     WrongSigil {
         name: String,
         written: &'static str,
         expected: &'static str,
         span: Span,
     },
-    /// An element written with the wrong sigil for its shape -- `@meta`
-    /// instead of `#meta`, or `#em` instead of `@em`.
+    /// An element in the wrong position for its shape -- a block element
+    /// inside running text, or an inline one standing alone as a block.
     ShapeMismatch {
         name: String,
         found: &'static str,
@@ -119,7 +118,7 @@ pub enum Diagnostic {
         argument: String,
         span: Span,
     },
-    /// The version after the name in `@kind(name, 2)` or `@use(ns, 2)` is not an
+    /// The version after the name in `::kind(name, 2)` or `::use(ns, 2)` is not an
     /// integer of 1 or more. `found` is the value as written.
     InvalidVersion {
         element: String,
@@ -127,7 +126,7 @@ pub enum Diagnostic {
         span: Span,
     },
     /// A built-in element that takes a fixed number of positional arguments was
-    /// given more: `@kind(a, 1, 2)`.
+    /// given more: `::kind(a, 1, 2)`.
     TooManyArguments {
         element: String,
         takes: usize,
@@ -193,11 +192,11 @@ pub enum Diagnostic {
         element_span: Span,
         span: Span,
     },
-    /// A top-level `@settings`/`@config` key that has been retired.
+    /// A top-level `::settings`/`::config` key that has been retired.
     ///
     /// `elements:` described what a custom element takes -- its `args`,
     /// `required`, `positional`, `content`, `placement` and `singleton`.
-    /// A `@vocabulary` document says all of that now, at the declaration
+    /// A `::vocabulary` document says all of that now, at the declaration
     /// rather than in a settings map beside it, so the settings copy was
     /// the second place one fact lived.
     ///
@@ -206,11 +205,11 @@ pub enum Diagnostic {
     /// `SettingsSchema` no caller ever built, so a document could declare
     /// `singleton: true` and be obeyed by nothing at all.
     RetiredSettingsKey { key: String, span: Span },
-    /// A `@meta` field the settings declare with a `type:` that has a form,
+    /// A `::meta` field the settings declare with a `type:` that has a form,
     /// holding something that does not have it -- a `type: uuid` field that
     /// is not a UUID.
     ///
-    /// `span` is the `@meta` element: a value in a `{...}` group has no span
+    /// `span` is the `::meta` element: a value in a `{...}` group has no span
     /// of its own, so the field is named instead of pointed at.
     InvalidFieldValue {
         field: String,
@@ -308,7 +307,7 @@ impl Diagnostic {
             Diagnostic::MissingRequiredMetaKey { key, kind, .. } => {
                 write!(
                     f,
-                    "document of kind `{kind}` is missing required @meta field `{key}`"
+                    "document of kind `{kind}` is missing required ::meta field `{key}`"
                 )
             }
             Diagnostic::MissingRequiredSection {
@@ -334,13 +333,14 @@ impl Diagnostic {
                 // One wording, in `tomet_semantics::UnknownName`. This arm
                 // used to carry its own copy and the two drifted -- it was
                 // still advising `@import(file:..., as:ns)` after that
-                // element had split into `@use` and the `include` expression.
+                // element had split into `::use` and the `include` expression.
                 write!(
                     f,
                     "{}",
                     tomet_semantics::UnknownName {
                         name: name.clone(),
                         unbound_namespace: unbound_namespace.clone(),
+                        declaration: false,
                     }
                 )
             }
@@ -431,7 +431,7 @@ impl Diagnostic {
             Diagnostic::InvalidVersion { element, found, .. } => {
                 write!(
                     f,
-                    "the version in `@{element}(...)` must be an integer of 1 or more, found {found}"
+                    "the version in `::{element}(...)` must be an integer of 1 or more, found {found}"
                 )
             }
             Diagnostic::TooManyArguments { element, takes, .. } => {
@@ -487,7 +487,7 @@ impl Diagnostic {
                 // than telling them it is gone.
                 let advice = match key.as_str() {
                     "elements" => {
-                        "declare elements in a `@vocabulary` document instead -- \
+                        "declare elements in a `::vocabulary` document instead -- \
                          `@element` carries `display`, `region` and `singleton`, \
                          and `@param` carries the arguments (docs/spec/vocabulary.tmt)"
                     }
@@ -499,7 +499,7 @@ impl Diagnostic {
                     }
                     _ => "remove it",
                 };
-                write!(f, "`{key}` in `@settings` is retired; {advice}")
+                write!(f, "`{key}` in `::settings` is retired; {advice}")
             }
             Diagnostic::InvalidFieldValue {
                 field,
@@ -509,7 +509,7 @@ impl Diagnostic {
             } => {
                 write!(
                     f,
-                    "`{field}` in `@meta` is declared `type: {field_type}`, \
+                    "`{field}` in `::meta` is declared `type: {field_type}`, \
                      but `{value}` is not a valid {field_type}"
                 )
             }

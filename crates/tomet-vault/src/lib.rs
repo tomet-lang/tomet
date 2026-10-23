@@ -65,15 +65,15 @@ pub struct Prepared {
 /// Validates `source` the way a host with no disk can: what `tomet check` says
 /// of it, given the vault's pieces as text.
 ///
-/// - `vocabularies`: `@vocabulary(ns)` documents. One that does not parse, has
+/// - `vocabularies`: `::vocabulary(ns)` documents. One that does not parse, has
 ///   no header, or claims a reserved or already-taken namespace is skipped: it
 ///   binds no namespace.
 /// - `config`: the settings, as a config document (what `default.config.tmt`
 ///   holds). Without it the defaults are used, and nothing declares a `type:`.
 ///   One that does not parse is an error: a host that passes settings means
 ///   them.
-/// - `blueprints`: `@blueprint(kind)` documents. A document is checked against
-///   the one for its `@kind`, if there is one. One that does not parse is
+/// - `blueprints`: `::blueprint(kind)` documents. A document is checked against
+///   the one for its `::kind`, if there is one. One that does not parse is
 ///   skipped.
 ///
 /// An expression that reaches another document is not reported, since no
@@ -182,8 +182,8 @@ impl Vault {
 
     /// What checking finds wrong with `doc`, without reading anything: the
     /// validator's diagnostics against the vocabularies it has in scope, the
-    /// blueprint its `@kind` names if one of `blueprints` is for that kind, and
-    /// the `type:` the settings declare for its `@meta` fields.
+    /// blueprint its `::kind` names if one of `blueprints` is for that kind, and
+    /// the `type:` the settings declare for its `::meta` fields.
     ///
     /// This is the part of `tomet check` that needs no disk, so a host with
     /// none -- the bindings in a browser -- gets the same answer as the CLI
@@ -218,8 +218,8 @@ impl Vault {
         diagnostics
     }
 
-    /// The names in scope for `doc`: `std`, the document's own `@kind`,
-    /// and anything it brings in with `@use`.
+    /// The names in scope for `doc`: `std`, the document's own `::kind`,
+    /// and anything it brings in with `::use`.
     ///
     /// This is what makes an element name mean something. Matching on a
     /// bare `Sigil::Named` instead is the shortcut that drops the
@@ -349,7 +349,7 @@ impl Vault {
         DocRef(rel.strip_prefix("./").unwrap_or(&rel).to_string())
     }
 
-    /// The macros in scope for `doc`: its own `@config`, then the vault's
+    /// The macros in scope for `doc`: its own `::config`, then the vault's
     /// for every name it did not claim.
     ///
     /// The document wins a collision, which is the direction every other
@@ -371,8 +371,8 @@ impl Vault {
 mod tests {
     use super::*;
 
-    const BLUEPRINT: &str = "@kind(blueprint)\n@blueprint(note)\n@meta{\n  date: \"2026\"\n}\n\n=[ Items ]#(items):rule(allow: list(task))\n";
-    const UUID_SETTINGS: &str = "@kind(config)\n@config{ meta: { id: { type: uuid } } }\n";
+    const BLUEPRINT: &str = "::kind(blueprint)\n::blueprint(note)\n::meta{\n  date: \"2026\"\n}\n\n=[ Items ]#(items):rule(allow: list(task))\n";
+    const UUID_SETTINGS: &str = "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n";
 
     fn texts(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
@@ -382,7 +382,7 @@ mod tests {
     /// a `type:`, with them a field that has the wrong form is reported.
     #[test]
     fn settings_given_as_text_declare_the_types_of_fields() {
-        let source = "@meta{ id: not-a-uuid }\n";
+        let source = "::meta{ id: not-a-uuid }\n";
         assert!(validate_sources(source, &[], None, &[]).unwrap().is_empty());
 
         let found = validate_sources(source, &[], Some(UUID_SETTINGS), &[]).unwrap();
@@ -390,12 +390,12 @@ mod tests {
         assert!(found[0].to_string().contains("not a valid uuid"));
     }
 
-    /// A document is checked against the blueprint for its `@kind`, if the
+    /// A document is checked against the blueprint for its `::kind`, if the
     /// host passed one, and against none otherwise.
     #[test]
     fn a_blueprint_given_as_text_is_checked_against() {
-        let bad = "@kind(note)\n@meta{ date: \"2026-10-13\" }\n\n=[ Items ]#(items)\n@heading[ Disallowed ]\n";
-        let good = "@kind(note)\n@meta{ date: \"2026-10-13\" }\n\n=[ Items ]#(items)\n@task[ Clean room ]\n";
+        let bad = "::kind(note)\n::meta{ date: \"2026-10-13\" }\n\n=[ Items ]#(items)\n@heading[ Disallowed ]\n";
+        let good = "::kind(note)\n::meta{ date: \"2026-10-13\" }\n\n=[ Items ]#(items)\n@task[ Clean room ]\n";
         let blueprints = texts(&[BLUEPRINT]);
 
         assert!(
@@ -412,7 +412,7 @@ mod tests {
         assert!(validate_sources(bad, &[], None, &[]).unwrap().is_empty());
         // A blueprint for another kind does not apply.
         let other = texts(&[
-            "@kind(blueprint)\n@blueprint(memo)\n\n=[ Items ]#(items):rule(allow: list(task))\n",
+            "::kind(blueprint)\n::blueprint(memo)\n\n=[ Items ]#(items):rule(allow: list(task))\n",
         ]);
         assert!(validate_sources(bad, &[], None, &other).unwrap().is_empty());
     }
@@ -436,7 +436,7 @@ mod tests {
     fn vocabularies_still_bind_and_a_reaching_expression_is_not_reported() {
         let vocab = texts(&[ACME]);
         assert!(
-            validate_sources("@kind(acme)\n", &vocab, None, &[])
+            validate_sources("::kind(acme)\n", &vocab, None, &[])
                 .unwrap()
                 .is_empty()
         );
@@ -452,14 +452,14 @@ mod tests {
         );
     }
 
-    const ACME: &str = "@kind(vocabulary)\n@vocabulary(acme){ version: \"1.0.0\" }\n";
+    const ACME: &str = "::kind(vocabulary)\n::vocabulary(acme){ version: \"1.0.0\" }\n";
 
     #[test]
     fn a_vocabulary_handed_in_as_text_binds_like_one_read_from_disk() {
         let vault = Vault::from_sources(PrinterConfig::default(), ".", &[("acme.tmt", ACME)]);
         assert!(vault.vocabulary_errors.is_empty());
 
-        let (_, bindings) = vault.parse("@kind(acme)\n").expect("parses");
+        let (_, bindings) = vault.parse("::kind(acme)\n").expect("parses");
         assert!(bindings.kind.is_some());
     }
 
@@ -470,7 +470,7 @@ mod tests {
             ".",
             &[(
                 "doc.tmt",
-                "@kind(vocabulary)\n@vocabulary(doc){ version: \"1.0.0\" }\n",
+                "::kind(vocabulary)\n::vocabulary(doc){ version: \"1.0.0\" }\n",
             )],
         );
         assert!(
@@ -487,7 +487,7 @@ mod tests {
     #[test]
     fn without_a_vocabulary_the_kind_does_not_bind() {
         let vault = Vault::from_sources(PrinterConfig::default(), ".", &[]);
-        let (_, bindings) = vault.parse("@kind(acme)\n").expect("parses");
+        let (_, bindings) = vault.parse("::kind(acme)\n").expect("parses");
         assert!(bindings.kind.is_none());
     }
 
@@ -540,14 +540,14 @@ mod tests {
     #[test]
     fn a_document_reads_its_own_meta_typed_by_the_settings() {
         let config =
-            tomet_config::load_config_from_str("@settings{ meta: { tags: { type: list } } }\n")
+            tomet_config::load_config_from_str("::settings{ meta: { tags: { type: list } } }\n")
                 .unwrap();
         let vault = Vault::from_sources(config, "/v", &[]);
         // No `tags` written: still a list, so `.contains` answers instead of failing.
         let (doc, prepared) = prepared(
             &vault,
             "/v/a.tmt",
-            "@meta{ title: A }\n\nrust? ${self.meta.tags.contains(\"rust\")}\n",
+            "::meta{ title: A }\n\nrust? ${self.meta.tags.contains(\"rust\")}\n",
         );
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
         assert_eq!(text_of(&doc), "rust? false");
@@ -556,14 +556,14 @@ mod tests {
     #[test]
     fn macros_from_the_vault_and_the_document_are_both_in_scope() {
         let config = tomet_config::load_config_from_str(
-            "@settings{ macros: { gh: \"https://gh/${1}\", site: \"vault\" } }\n",
+            "::settings{ macros: { gh: \"https://gh/${1}\", site: \"vault\" } }\n",
         )
         .unwrap();
         let vault = Vault::from_sources(config, "/v", &[]);
         let (doc, prepared) = prepared(
             &vault,
             "/v/a.tmt",
-            "@config{ macros: { site: \"doc\" } }\n\n${macro.gh(1)} ${macro.site()}\n",
+            "::config{ macros: { site: \"doc\" } }\n\n${macro.gh(1)} ${macro.site()}\n",
         );
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
         // The document wins a collision.

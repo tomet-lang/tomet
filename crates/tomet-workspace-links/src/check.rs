@@ -58,7 +58,7 @@ fn is_external(target: &str) -> bool {
 
 /// The rule itself lives in `tomet-indexer` because it is not a link
 /// rule: it is what a relative path written inside a document means,
-/// and `@config(export: path)` needs the same answer.
+/// and `::config(export: path)` needs the same answer.
 ///
 /// (For `file:` specifically, a leading `/` is a placeholder pending a
 /// decision -- see this module's doc.)
@@ -298,7 +298,7 @@ mod kind_tests {
         let dir = root.join("spec");
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("syntax.tmt");
-        std::fs::write(&file, "@kind(config)\n").unwrap();
+        std::fs::write(&file, "::kind(config)\n").unwrap();
         // As `collect_all_paths_with_config` builds it: files and
         // directories alike.
         (root.clone(), HashSet::from([dir, file]))

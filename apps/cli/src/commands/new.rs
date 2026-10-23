@@ -109,7 +109,7 @@ mod tests {
         let tmpl_file = tmpl_dir.join("rfc.blueprint.tmt");
         fs::write(
             &tmpl_file,
-            "@kind(blueprint)\n@blueprint(rfc)\n@meta{\n  id: ${generate.uuid()}\n  title: ${vars.title}\n  author: ${vars.author}\n}\n\n=[ Motivation for ${vars.title} ]#(motivation)\n",
+            "::kind(blueprint)\n::blueprint(rfc)\n::meta{\n  id: ${generate.uuid()}\n  title: ${vars.title}\n  author: ${vars.author}\n}\n\n=[ Motivation for ${vars.title} ]#(motivation)\n",
         )
         .unwrap();
 
@@ -140,7 +140,7 @@ mod tests {
 
         assert!(created.path.is_file());
         let content = fs::read_to_string(&created.path).unwrap();
-        assert!(content.contains("@kind(rfc)"));
+        assert!(content.contains("::kind(rfc)"));
         assert!(content.contains("New Auth Protocol"));
         assert!(content.contains("Bob"));
     }

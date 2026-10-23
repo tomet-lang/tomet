@@ -7,14 +7,14 @@
 
 綴りは `blueprint` ひとつ。`template` という語は使わない。
 
-=[ 1. @blueprint による定義 ]
+=[ 1. ::blueprint による定義 ]
 
-ブループリントは、先頭に `@kind(blueprint)` と `@blueprint(target-kind)` を宣言した通常の `.tmt` ファイルです。
+ブループリントは、先頭に `::kind(blueprint)` と `::blueprint(target-kind)` を宣言した通常の `.tmt` ファイルです。
 
 ```tm
-@kind(blueprint)
-@blueprint(daily-note)
-@meta{
+::kind(blueprint)
+::blueprint(daily-note)
+::meta{
   id: ${generate.uuid()}
   date: ${generate.now().format("YYYY-MM-DD")}
   title: ${vars.title}
@@ -26,7 +26,7 @@
 #[ Review ] {id: review}
 ```
 
-**置き場所は自由で、代わりに vault が宣言する。** 設定の `blueprints` にパスを並べ、各ファイルは `@blueprint(X)` で自分の名前を名乗る。慣習でファイルを探しにいくことはしない —— 探して当たらなかったことは見えないが、宣言したパスが無いことは見えるため。
+**置き場所は自由で、代わりに vault が宣言する。** 設定の `blueprints` にパスを並べ、各ファイルは `::blueprint(X)` で自分の名前を名乗る。慣習でファイルを探しにいくことはしない —— 探して当たらなかったことは見えないが、宣言したパスが無いことは見えるため。
 
 ```tm
 blueprints: [
@@ -65,7 +65,7 @@ UUID の形式の検査は式ではなく、フィールドの型（`type: uuid`
 
 =[ 4. 構造検証（ブループリント検証） ]
 
-生成されたドキュメントは `@kind(daily-note)` を持ちます。`tomet-validator` および LSP は、プロジェクト内の `@blueprint(daily-note)` と照合し、以下の構造整合性を検証します。
+生成されたドキュメントは `::kind(daily-note)` を持ちます。`tomet-validator` および LSP は、プロジェクト内の `::blueprint(daily-note)` と照合し、以下の構造整合性を検証します。
 
-1. **必須 `@meta` フィールド**: ブループリントに定義されたメタデータキーの存在をチェック。
+1. **必須 `::meta` フィールド**: ブループリントに定義されたメタデータキーの存在をチェック。
 2. **必須セクション**: `{id: ...}` が付与された見出し（例: `#[ Review ] {id: review}`）がドキュメントに存在するかをチェック。

@@ -193,15 +193,15 @@ pub enum Command {
         check: bool,
     },
 
-    /// Export a `.tmt` document or directory of documents based on `@config` settings or CLI overrides.
+    /// Export a `.tmt` document or directory of documents based on `::config` settings or CLI overrides.
     Export {
         /// Target file or directory path (defaults to current directory ".").
         #[arg(default_value = ".")]
         path: PathBuf,
-        /// Target format (`commonmark` | `html` | `all`). Overrides @config.
+        /// Target format (`commonmark` | `html` | `all`). Overrides ::config.
         #[arg(short = 't', long)]
         r#type: Option<String>,
-        /// Output destination file or directory path. Overrides @config.
+        /// Output destination file or directory path. Overrides ::config.
         #[arg(short, long)]
         out: Option<PathBuf>,
         /// Number headings sequentially by nesting level for HTML export.
@@ -215,7 +215,7 @@ pub enum Command {
         check: bool,
     },
 
-    /// Refactor .tmt file(s) across a workspace (URL macros, @meta.type -> @kind).
+    /// Refactor .tmt file(s) across a workspace (URL macros, ::meta.type -> ::kind).
     Refactor {
         /// Target file or directory path (defaults to current directory ".").
         #[arg(default_value = ".")]
@@ -226,7 +226,7 @@ pub enum Command {
         /// Only rewrite URLs matching macros.
         #[arg(long)]
         url_macros: bool,
-        /// Only promote @meta.type to @kind.
+        /// Only promote ::meta.type to ::kind.
         #[arg(long)]
         meta_kind: bool,
         /// Check/dry-run mode without modifying files (exits non-zero if changes are needed).
@@ -244,7 +244,7 @@ pub enum Command {
         /// Target file path to create (defaults to "document.tmt" if omitted when --list is not used).
         #[arg(default_value = "document.tmt")]
         path: PathBuf,
-        /// Blueprint name, as the blueprint gives it in `@blueprint(...)`
+        /// Blueprint name, as the blueprint gives it in `::blueprint(...)`
         /// (e.g. "daily-note", "rfc"). Resolved among the blueprints the
         /// vault declares in `blueprints`, never searched for on disk.
         #[arg(short, long)]

@@ -34,9 +34,9 @@ I/O, resolves no external file, and executes nothing. The same input text
 produces the same tree, in predictable time.
 
 File resolution is split, now: `tomet-address` recognizes a
-`@config(import:)`/`@settings(file:)` reference without reading it, and
+`::config(import:)`/`::settings(file:)` reference without reading it, and
 actually reading a file is layer 5's job -- `tomet-load`/`tomet-load-config`
-for vocabularies and workspace config, or (for `@config(import:)`
+for vocabularies and workspace config, or (for `::config(import:)`
 specifically) `apps/lsp`'s own merge. Either way, it happens after
 parsing, never during it.
 

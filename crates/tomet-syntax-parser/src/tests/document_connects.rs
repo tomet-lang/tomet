@@ -85,8 +85,11 @@ fn a_declaration_inside_a_code_fence_is_code() {
     assert!(!element(&doc.blocks[0]).sigil.is_document());
 }
 
+/// The parser knows no vocabulary, so `@kind` is an element like any other
+/// to it. That a declaration must be written `::kind` is validation's call
+/// (`WrongSigil`), not the grammar's.
 #[test]
-fn the_old_spelling_still_reads() {
+fn the_parser_does_not_refuse_a_declaration_name_after_an_at_sign() {
     let doc = parse_document("@kind(config)\n@meta{ id: x }\n").unwrap();
     assert_eq!(element(&doc.blocks[0]).sigil, Sigil::named("kind"));
     assert_eq!(element(&doc.blocks[1]).sigil, Sigil::named("meta"));
@@ -98,4 +101,21 @@ fn the_span_covers_the_double_colon() {
     let doc = parse_document(src).unwrap();
     let el = element(&doc.blocks[0]);
     assert_eq!(&src[el.span.start..el.span.end], "::kind(config)");
+}
+
+#[test]
+fn a_broken_declaration_is_an_error_and_not_a_paragraph() {
+    for src in [
+        "::kind(config\n",
+        "::meta{ a: 1, a: 2 }\n",
+        "::kind(config) trailing\n",
+    ] {
+        assert!(parse_document(src).is_err(), "{src:?}");
+    }
+}
+
+#[test]
+fn a_trailing_comment_may_follow_a_declaration() {
+    let doc = parse_document("::kind(config) // the kind\n").unwrap();
+    assert!(element(&doc.blocks[0]).sigil.is_document());
 }

@@ -2,7 +2,7 @@
 //! document, and the documents there are.
 //!
 //! The text alone knows the built-in elements and the address schemes
-//! ([`completions_for_with_uri`]). It cannot know that `@kind(deck)` brings a
+//! ([`completions_for_with_uri`]). It cannot know that `::kind(deck)` brings a
 //! `card`, which ids a document has, or which documents a vault holds -- those
 //! belong to the vault the document is in, the same one diagnostics and hover
 //! answer from.
@@ -167,7 +167,7 @@ fn ids(vault: &Vault, text: &str, pos: Position, other: Option<&str>) -> Vec<Com
 }
 
 /// The elements of the vocabularies `text` has in scope: the bare names of the
-/// vocabulary its `@kind` binds, and `ns.name` for each one it `@use`s.
+/// vocabulary its `::kind` binds, and `ns.name` for each one it `::use`s.
 fn vocabulary_elements(vault: &Vault, text: &str, pos: Position) -> Vec<CompletionItem> {
     let Some(doc) = parse_while_typing(vault, text, pos) else {
         return Vec::new();

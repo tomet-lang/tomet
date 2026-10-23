@@ -19,8 +19,8 @@ pub fn format_edits(text: &str, uri: Option<&Uri>) -> Vec<TextEdit> {
 
 /// Resolves the merged configuration for a document by combining:
 /// 1. Workspace config discovered from ancestor directories (`default.config.tmt` / `tomet.config.tmt`)
-/// 2. Explicit `@config(import: ...)` / `@config(file: ...)` imported configs
-/// 3. Document's local `@config` definitions (highest precedence)
+/// 2. Explicit `::config(import: ...)` / `::config(file: ...)` imported configs
+/// 3. Document's local `::config` definitions (highest precedence)
 pub fn resolve_effective_config(
     doc: &Document,
     uri: Option<&Uri>,
@@ -40,7 +40,7 @@ pub fn resolve_effective_config(
         }
     }
 
-    // 2. Merge macros from explicit @config(import: ...) / @settings references in the document
+    // 2. Merge macros from explicit ::config(import: ...) / ::settings references in the document
     let mut import_targets = config.imports.clone();
     for block in &doc.blocks {
         if let tomet_ast::Block::Element(el) = block

@@ -55,8 +55,8 @@ names. There is exactly one of each, so a directory for any of them would
 hold a single file and answer no question.
 
 There was a fourth, `docs.settings.tmt`, holding settings every document
-here loaded with `@settings(file:...)`. It declared one custom element and
-a rendering style, and nothing read either: a `@vocabulary` document says
+here loaded with `::settings(file:...)`. It declared one custom element and
+a rendering style, and nothing read either: a `::vocabulary` document says
 what an element is now, and the style key had no consumer at all. The
 settings line went with the file rather than being left pointing at
 nothing.
@@ -159,14 +159,14 @@ find . -name '.writ.tmt' -not -path './target/*' \
 }
 
 `.md` under `spec/` and `guide/` is exported from the sibling `.tmt` via
-`@config(export:)`. Do not hand-edit it. Edit the `.tmt` and re-export.
+`::config(export:)`. Do not hand-edit it. Edit the `.tmt` and re-export.
 
 `.gitattributes` marks those two paths `linguist-generated` so GitHub
 collapses them in diffs, scoped by path so that the hand-written `.md` under
 `develop/` and `design/` stays a normal reviewable file.
 
 This rule governs no file today: nothing under `spec/` or `guide/` declares
-`@config(export:)`, and no `.md` exists there. It is written down because
+`::config(export:)`, and no `.md` exists there. It is written down because
 the `.gitattributes` entries are already in place, and because the first
 export will otherwise arrive with nobody having decided this.
 
@@ -176,7 +176,7 @@ scoped to its own directory, so this one cannot reach `/AGENTS.md`.
 
 @file(docs/README.tmt) is still not exported, but every bug this entry has
 blamed for that is now gone. It named two export bugs -- backticks escaped
-in prose, and a `<div>` for the `@settings` header -- and then the fold
+in prose, and a `<div>` for the `::settings` header -- and then the fold
 that put an ASCII space into every hand-wrapped Japanese paragraph.
 `normalize_text` now joins a fold between two wide characters with
 nothing, so `tomet to-md docs/README.tmt` produces none of the three.

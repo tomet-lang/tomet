@@ -19,8 +19,8 @@
 //!  | line or EOF only, not at the next line merely *looking* like a new
 //!  | block. `tomet-parser`'s own lazy-continuation check also ends a
 //!  | paragraph early when the next line is an element trigger (`<T>`/
-//!  | `@name`, see `document.rs`'s `Stop::Paragraph`) -- e.g. `@meta{...}`
-//!  | immediately followed by `@settings{...}` with no blank line between
+//!  | `@name`, see `document.rs`'s `Stop::Paragraph`) -- e.g. `::meta{...}`
+//!  | immediately followed by `::settings{...}` with no blank line between
 //!  | them becomes two separate top-level elements in the real parser.
 //!  | This grammar doesn't simulate that either, so it still merges such
 //!  | adjacent elements into one `paragraph` node.
@@ -45,7 +45,7 @@
 //! -| **`//`/`/* */` comments aren't understood inside a `(...)`/`{...}`
 //!  | group's value content at all.** `tomet-parser` does support
 //!  | them there (`value.rs::skip_line_comment`, used from
-//!  | `parse_map`/`parse_flat_map`), e.g. `@config(...)`'s several-line
+//!  | `parse_map`/`parse_flat_map`), e.g. `::config(...)`'s several-line
 //!  | body in `tests/fixtures/cheatsheet.tmt` uses `///`/`//`-prefixed lines as a
 //!  | doc-comment convention -- but `map`/`children`/`_entry_sep` have no
 //!  | rule admitting a bare comment line at all, so a comment anywhere in
@@ -85,7 +85,7 @@
 //! -| **A bare `list(...)` occupying the *whole* `(args)`/`{value}`
 //!  | doesn't parse as `call`, unlike the same call under a named key
 //!  | (`a: list(...)`, which works fine).** `@id(list(a, b))` and
-//!  | `@meta{list(a, b)}` both land in an `ERROR` even with `$.call`
+//!  | `::meta{list(a, b)}` both land in an `ERROR` even with `$.call`
 //!  | added as an alternative to `args_group`/`value_group`'s shared
 //!  | `value` rule -- tried and reverted, since it changed nothing:
 //!  | whatever conflicts an identifier-then-`(` at that exact position
@@ -333,13 +333,13 @@ mod tests {
         // `tomet-parser` reads `"a/b": 1` as a keyed entry wherever it reads
         // `a: 1`: in `{value}`, in `(args)`, nested, and mixed with bare keys.
         for (src, keys) in [
-            ("@meta{ \"a/b\": 1 }\n", vec!["string"]),
+            ("::meta{ \"a/b\": 1 }\n", vec!["string"]),
             (
-                "@meta{\n  \"a/b\": 1\n  c: 2\n}\n",
+                "::meta{\n  \"a/b\": 1\n  c: 2\n}\n",
                 vec!["string", "identifier"],
             ),
             (
-                "@meta{\n  c: 2\n  \"a/b\": 1\n}\n",
+                "::meta{\n  c: 2\n  \"a/b\": 1\n}\n",
                 vec!["identifier", "string"],
             ),
             ("@x(\"a/b\": 1, c: 2)\n", vec!["string", "identifier"]),
@@ -623,13 +623,13 @@ mod tests {
     #[test]
     fn interpolation_in_a_value_position_is_one_interpolation() {
         for (src, expected) in [
-            ("@meta{ id: ${f()} }\n", 1),
-            ("@meta{ id: ${f} }\n", 1),
-            ("@meta{ ${f()} }\n", 1),
+            ("::meta{ id: ${f()} }\n", 1),
+            ("::meta{ id: ${f} }\n", 1),
+            ("::meta{ ${f()} }\n", 1),
             ("@x(${a.b})\n", 1),
             ("@x(tags: list(${a}, b, ${c(1)}))\n", 2),
             (
-                "@meta{\n  id: ${generate.uuid()}\n  by: ${vars.author}\n}\n",
+                "::meta{\n  id: ${generate.uuid()}\n  by: ${vars.author}\n}\n",
                 2,
             ),
         ] {
@@ -714,7 +714,7 @@ mod tests {
         // The other half of the same regression guard: an identifier-
         // shaped bare word immediately followed by `:` must still become
         // a `map_entry` key, not the new bare-scalar token.
-        let src = "@meta(format:json)\n";
+        let src = "::meta(format:json)\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
         let entry = find_kind(tree.root_node(), "map_entry").expect("expected a map_entry node");
@@ -842,7 +842,7 @@ mod tests {
     #[test]
     fn highlights_captures_call_and_brackets_as_function() {
         use tree_sitter::StreamingIterator;
-        let src = "@meta(tags: list(1, 2))\n";
+        let src = "::meta(tags: list(1, 2))\n";
         let tree = parse(src);
         let query_src = include_str!("../queries/highlights.scm");
         let query = tree_sitter::Query::new(&LANGUAGE.into(), query_src).unwrap();
@@ -920,7 +920,7 @@ mod tests {
 
     #[test]
     fn parses_single_quoted_strings() {
-        let src = "@settings(title: 'my title') { path: 'foo/bar' }\n";
+        let src = "::settings(title: 'my title') { path: 'foo/bar' }\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
         assert!(find_kind(tree.root_node(), "string").is_some());
@@ -928,7 +928,7 @@ mod tests {
 
     #[test]
     fn parses_colon_less_braced_maps() {
-        let src = "@settings {\n  elements {\n    bookmark {\n      title: { type: string }\n    }\n  }\n}\n";
+        let src = "::settings {\n  elements {\n    bookmark {\n      title: { type: string }\n    }\n  }\n}\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
     }
@@ -941,7 +941,7 @@ mod tests {
         // grammar's other known-narrow cases -- it derailed the entire
         // enclosing block into an `ERROR` that swallowed everything after
         // it too.
-        let src = "@meta{\nid: doc-1\nflags:\nrating:\nreviewed:\ntype: j.daily\n}\n";
+        let src = "::meta{\nid: doc-1\nflags:\nrating:\nreviewed:\ntype: j.daily\n}\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
     }
@@ -956,9 +956,9 @@ mod tests {
         // and the broader one found while fixing it (an earlier, non-last
         // `list(...)`-valued entry, still followed by more entries).
         for src in [
-            "@meta{\naliases: list()\n}\n",
-            "@meta{\naliases: list()\nflags: x\n}\n",
-            "@meta{\naliases: list(a, b)\nflags: x\n}\n",
+            "::meta{\naliases: list()\n}\n",
+            "::meta{\naliases: list()\nflags: x\n}\n",
+            "::meta{\naliases: list(a, b)\nflags: x\n}\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -974,7 +974,7 @@ mod tests {
         // leading space/tab from `_value_scalar` must not exclude *all*
         // whitespace, or multi-word bare values would break, and the tail
         // must still allow colons (URLs, timestamps).
-        let src = "@meta{\na: hello world\nb: 12:34\nc: https://example.com/x\n}\n";
+        let src = "::meta{\na: hello world\nb: 12:34\nc: https://example.com/x\n}\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
     }

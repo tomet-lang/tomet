@@ -38,7 +38,6 @@ pub enum SyntaxKind {
     QUESTION,    // `?`
     AMPERSAND,   // `&`
     TILDE,       // `~`
-    CARET,       // `^`
     SEMI,        // `;`
     UNDERSCORE,  // `_`
 

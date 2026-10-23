@@ -1,6 +1,6 @@
 //! Applies `tomet_config::PrinterConfig`'s style rules (meta format,
 //! link-key spacing (`target`, `@link`/`<embed>`'s one shared key), per-field
-//! `@meta` formatting) to a single
+//! `::meta` formatting) to a single
 //! `tomet_ast::Value` or `Element`, returning `.tmt`-syntax text.
 //! Deliberately scoped to single nodes -- no `Document`, no tree
 //! position, no recursion into sibling/child elements of other kinds --
@@ -8,7 +8,7 @@
 //! `tomet-formatter` (patches specific spans of existing `.tmt` text)
 //! can depend on this without a circular dependency (`tomet-printer`
 //! already depends on `tomet-formatter`). `render_meta_element`
-//! specifically covers only `@meta` elements' actual shape per the
+//! specifically covers only `::meta` elements' actual shape per the
 //! grammar (`args` an optional format map, `value` always
 //! `ElementValue::from_map(Value::Map(...))`) -- not the general
 //! element-rendering logic for every other sigil/kind, which stays in
@@ -347,19 +347,19 @@ fn render_meta_field_value(
     }
 }
 
-/// Renders an `@meta(...){...}` element per `config`'s meta format
+/// Renders an `::meta(...){...}` element per `config`'s meta format
 /// settings (multi-line, one field per line with per-field formatting
-/// rules, if `config.meta.always_newline`; else a single `@meta{k: v, ...}`
-/// line). Scoped to `@meta`'s actual shape -- `value` must be
+/// rules, if `config.meta.always_newline`; else a single `::meta{k: v, ...}`
+/// line). Scoped to `::meta`'s actual shape -- `value` must be
 /// `ElementValue::from_map(Value::Map(...))`, which is all the grammar ever
-/// produces for `@meta`; anything else renders as a bare `@meta` (with
+/// produces for `::meta`; anything else renders as a bare `::meta` (with
 /// args, if any).
 pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
-    // the spelling it was written with: `@meta` or `::meta`
+    // the spelling it was written with: `::meta` or `::meta`
     let head = if el.sigil.is_document() {
         "::meta"
     } else {
-        "@meta"
+        "::meta"
     };
     if config.meta.always_newline
         && let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el)
@@ -491,13 +491,13 @@ mod tests {
 
     #[test]
     fn render_meta_element_single_line_by_default() {
-        let mut el = tomet_tree::element_new(Sigil::named("meta"));
+        let mut el = tomet_tree::element_new(Sigil::document("meta"));
         el.value = Some(ElementValue::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )])));
         let cfg = PrinterConfig::default();
-        assert_eq!(render_meta_element(&el, &cfg), "@meta{id: doc-12345678}");
+        assert_eq!(render_meta_element(&el, &cfg), "::meta{id: doc-12345678}");
     }
 
     #[test]
@@ -521,7 +521,7 @@ mod tests {
 
     #[test]
     fn render_meta_element_multiline_when_always_newline_configured() {
-        let mut el = tomet_tree::element_new(Sigil::named("meta"));
+        let mut el = tomet_tree::element_new(Sigil::document("meta"));
         el.value = Some(ElementValue::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
@@ -535,13 +535,13 @@ mod tests {
         };
         assert_eq!(
             render_meta_element(&el, &cfg),
-            "@meta{\n  id: doc-12345678\n}"
+            "::meta{\n  id: doc-12345678\n}"
         );
     }
 
     #[test]
     fn render_meta_element_quotes_keys_that_are_not_identifiers() {
-        let mut el = tomet_tree::element_new(Sigil::named("meta"));
+        let mut el = tomet_tree::element_new(Sigil::document("meta"));
         el.value = Some(ElementValue::from_map(Value::Map(vec![
             ("plain.key".to_string(), Value::Int(1)),
             ("tmtroot/a b.tmt".to_string(), Value::Int(2)),
@@ -555,7 +555,7 @@ mod tests {
         };
         assert_eq!(
             render_meta_element(&el, &cfg),
-            "@meta{\n  plain.key: 1\n  \"tmtroot/a b.tmt\": 2\n}"
+            "::meta{\n  plain.key: 1\n  \"tmtroot/a b.tmt\": 2\n}"
         );
     }
 

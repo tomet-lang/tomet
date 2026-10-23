@@ -97,11 +97,13 @@ fn count_heading_level(raw: &str) -> usize {
 }
 
 fn import_block_element(node: &SyntaxNode) -> NodeKind {
-    let name = node
+    let sigil = node
         .children()
         .find(|c| c.kind() == K::SIGIL)
-        .map(|sigil| sigil.text().to_string().trim_start_matches('@').to_string())
+        .map(|sigil| sigil.text().to_string())
         .unwrap_or_default();
+    let declaration = sigil.starts_with("::");
+    let name = sigil.trim_start_matches(['@', ':']).to_string();
 
     let id_attr = node.children().find(|c| c.kind() == K::ID_GROUP).map(|id| {
         let t = id.text().to_string();
@@ -132,6 +134,7 @@ fn import_block_element(node: &SyntaxNode) -> NodeKind {
 
     NodeKind::BlockElement {
         name,
+        declaration,
         id_attr,
         args,
         data,

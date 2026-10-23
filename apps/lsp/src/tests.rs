@@ -144,7 +144,7 @@ fn completions_returns_items() {
     assert!(!items.is_empty());
     // Each built-in is offered with the sigil its shape requires, so
     // an accepted completion is one that validates.
-    assert!(items.iter().any(|i| i.label == "@meta"));
+    assert!(items.iter().any(|i| i.label == "::meta"));
     assert!(items.iter().any(|i| i.label == "@link"));
     // `callout` joined `BUILTIN_KINDS`, so it is offered again. It
     // had been special-cased in eight places while the list did not
@@ -158,13 +158,16 @@ fn completions_returns_items() {
 
 #[test]
 fn completions_trigger_prefix() {
-    // One sigil, so `@` offers every built-in whatever its shape.
-    // Where each may be placed is said in the detail line instead.
+    // `@` offers the body elements whatever their shape; where each may be
+    // placed is said in the detail line. The declarations about the
+    // document are `::`'s, so they are not offered here.
     let at_items = completions_for("@", Position::new(0, 1));
     assert!(at_items.iter().any(|i| i.label == "link"));
-    assert!(at_items.iter().any(|i| i.label == "config"));
-    let config = at_items.iter().find(|i| i.label == "config").unwrap();
+    assert!(at_items.iter().all(|i| i.label != "config"));
+    let decl_items = completions_for("::", Position::new(0, 2));
+    let config = decl_items.iter().find(|i| i.label == "config").unwrap();
     assert!(config.detail.as_deref().unwrap().ends_with("(block)"));
+    assert!(decl_items.iter().all(|i| i.label != "link"));
     // `link` takes either shape -- a link alone on a line is how you
     // show one file -- so its detail carries no placement note.
     let link = at_items.iter().find(|i| i.label == "link").unwrap();
@@ -321,7 +324,7 @@ fn completions_with_multibyte_characters() {
 
 #[test]
 fn hover_on_macro_evaluation() {
-    let text = "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n\n$macro.gh(42)\n\n$macro.greet(\"Alice\", \"Bob\")\n\n${macro.copyright()}\n\n$emoji(\"sparkles\")\n";
+    let text = "::config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n\n$macro.gh(42)\n\n$macro.greet(\"Alice\", \"Bob\")\n\n${macro.copyright()}\n\n$emoji(\"sparkles\")\n";
 
     // Hover on $macro.gh(42) (line 8, char 2)
     let hover = hover_for(text, Position::new(8, 2), None).expect("hover found for $gh");
@@ -392,14 +395,14 @@ fn hover_on_macro_defined_in_settings_file_ref() {
     let config_path = dir.join("default.config.tmt");
     std::fs::write(
         &config_path,
-        "@config{\n  macros: {\n    youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n",
+        "::config{\n  macros: {\n    youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n",
     )
     .unwrap();
 
     let doc_path = dir.join("sub/note.tmt");
     std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
     let doc_text =
-        "@settings(file:\"file:default.config.tmt\")\n\n$macro.youtube_video(\"Pm_h6FnF8HU\")\n";
+        "::settings(file:\"file:default.config.tmt\")\n\n$macro.youtube_video(\"Pm_h6FnF8HU\")\n";
     let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
 
     let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
@@ -415,7 +418,7 @@ fn hover_on_macro_defined_in_settings_file_ref() {
     }
 
     // Test embed with macro
-    let embed_doc = "@settings(file:\"file:default.config.tmt\")\n\n@embed($macro.youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n";
+    let embed_doc = "::settings(file:\"file:default.config.tmt\")\n\n@embed($macro.youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n";
     let hover2 = hover_for(embed_doc, Position::new(2, 10), Some(&uri))
         .expect("hover found for embed macro");
     if let HoverContents::Markup(m) = hover2.contents {
@@ -446,7 +449,7 @@ fn hover_on_macro_auto_discovered_from_workspace_config() {
     let config_path = dir.join("default.config.tmt");
     std::fs::write(
         &config_path,
-        "@config{\n  macros: {\n    youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n    twitter_post: \"https://x.com/${1}/status/${2}\"\n  }\n}\n",
+        "::config{\n  macros: {\n    youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n    twitter_post: \"https://x.com/${1}/status/${2}\"\n  }\n}\n",
     )
     .unwrap();
 
@@ -500,16 +503,16 @@ fn hover_on_macro_defined_in_config_import() {
     let config_path = dir.join("custom.config.tmt");
     std::fs::write(
         &config_path,
-        "@config{\n  macros: {\n    wiki: \"https://ja.wikipedia.org/wiki/${1}\"\n  }\n}\n",
+        "::config{\n  macros: {\n    wiki: \"https://ja.wikipedia.org/wiki/${1}\"\n  }\n}\n",
     )
     .unwrap();
 
     let doc_path = dir.join("note.tmt");
-    let doc_text = "@config(import: \"custom.config.tmt\")\n\n$macro.wiki(\"Rust\")\n";
+    let doc_text = "::config(import: \"custom.config.tmt\")\n\n$macro.wiki(\"Rust\")\n";
     let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
 
     let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
-        .expect("hover found for @config(import:...) macro");
+        .expect("hover found for ::config(import:...) macro");
     if let HoverContents::Markup(m) = hover.contents {
         assert!(m.value.contains("Macro Result"));
         assert!(m.value.contains("https://ja.wikipedia.org/wiki/Rust"));
@@ -522,7 +525,7 @@ fn hover_on_macro_defined_in_config_import() {
 
 #[test]
 fn hover_on_kind_and_version() {
-    let doc_text = "@version(1.0)\n@kind(j.daily)\n\n#[ Title ]\n";
+    let doc_text = "::version(1.0)\n::kind(j.daily)\n\n#[ Title ]\n";
     let hover_ver =
         hover_for(doc_text, Position::new(0, 3), None).expect("hover found for #version");
     if let HoverContents::Markup(m) = hover_ver.contents {
@@ -543,9 +546,9 @@ fn hover_on_kind_and_version() {
 
 #[test]
 fn completions_suggest_kind_and_version() {
-    // `kind` and `version` are block directives, offered under the one
-    // element sigil like everything else.
-    let items = completions_for("@", Position::new(0, 1));
+    // `kind` and `version` are declarations about the document, so `::`
+    // offers them.
+    let items = completions_for("::", Position::new(0, 2));
     assert!(items.iter().any(|i| i.label == "kind"));
     assert!(items.iter().any(|i| i.label == "version"));
 }
@@ -751,7 +754,7 @@ fn a_rooted_path_is_measured_from_a_vault_with_either_config_name() {
     let root = std::env::temp_dir().join(format!("tomet_lsp_rooted_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("notes")).unwrap();
-    std::fs::write(root.join("tomet.config.tmt"), "@kind(config)\n").unwrap();
+    std::fs::write(root.join("tomet.config.tmt"), "::kind(config)\n").unwrap();
     std::fs::write(root.join("top.png"), "").unwrap();
     let uri = Uri::from_str(&format!("file://{}", root.join("notes/a.tmt").display())).unwrap();
 

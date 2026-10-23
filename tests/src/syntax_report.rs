@@ -123,7 +123,7 @@ const CASES: &[Case] = &[
     case(
         None,
         "`${...}` は展開されず逐語で残る",
-        "@config[\n```\n{\"gh\": \"x/${1}\"}\n```\n]\n",
+        "::config[\n```\n{\"gh\": \"x/${1}\"}\n```\n]\n",
     ),
     // ---- value groups -----------------------------------------------
     case(
@@ -833,16 +833,6 @@ fn element_head(el: &Element) -> String {
         }
         Sigil::Bare => "Bare".to_string(),
         Sigil::Dollar => "Interp $".to_string(),
-        Sigil::Caret(name) => {
-            let placement = match el.placement {
-                Placement::Block => "Block ",
-                Placement::Inline => "Inline",
-            };
-            match name {
-                Some(n) => format!("{placement} ^{n}"),
-                None => format!("{placement} ^"),
-            }
-        }
     }
 }
 

@@ -28,11 +28,11 @@ fn duplicate_top_level_ids_are_reported() {
 }
 
 /// `singleton` was declared for six elements and enforced nowhere,
-/// so two `@meta` -- or two `@kind`, which is two answers to what the
+/// so two `::meta` -- or two `::kind`, which is two answers to what the
 /// document is -- passed every check this project had.
 #[test]
 fn a_second_singleton_is_reported() {
-    let doc = parse("@kind(note)\n@meta{a: 1}\n@meta{b: 2}\n\n#[ T ]\n");
+    let doc = parse("::kind(note)\n::meta{a: 1}\n::meta{b: 2}\n\n#[ T ]\n");
     let errors = validate_document(&doc);
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -47,7 +47,7 @@ fn a_second_singleton_is_reported() {
 #[test]
 fn a_vocabularys_singleton_is_enforced_too() {
     let vocab = tomet_parser::parse_document(
-        "@kind(vocabulary)\n@vocabulary(deck)\n\n@element(spread){ singleton: true }[ One. ]\n",
+        "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(spread){ singleton: true }[ One. ]\n",
     )
     .expect("vocabulary parses");
     let bindings = Bindings {
@@ -55,7 +55,7 @@ fn a_vocabularys_singleton_is_enforced_too() {
         ..Bindings::default()
     };
 
-    let doc = parse("@kind(deck)\n\n#[ T ]\n\n@spread{}\n@spread{}\n");
+    let doc = parse("::kind(deck)\n\n#[ T ]\n\n@spread{}\n@spread{}\n");
     let errors = validate_document_with(&doc, &bindings);
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -134,9 +134,10 @@ fn a_typoed_connect_name_is_reported() {
 /// requires this check to live in the validator rather than earlier.
 #[test]
 fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
-    let vocab =
-        tomet_parser::parse_document("@kind(vocabulary)\n@vocabulary(ns)\n\n@element(mycard){}\n")
-            .expect("vocabulary parses");
+    let vocab = tomet_parser::parse_document(
+        "::kind(vocabulary)\n::vocabulary(ns)\n\n@element(mycard){}\n",
+    )
+    .expect("vocabulary parses");
     let bindings = Bindings {
         used: std::collections::BTreeMap::from([(
             "ns".to_string(),
@@ -206,7 +207,7 @@ fn a_heading_rule_connect_is_not_misclassified_as_an_unknown_element() {
 /// The first block that is not one of them ends it.
 #[test]
 fn a_preamble_element_after_the_body_is_reported() {
-    let doc = parse("@kind(note)\n\n#[ T ]\n\n@use(deck)\n");
+    let doc = parse("::kind(note)\n\n#[ T ]\n\n::use(deck)\n");
     let errors = validate_document(&doc);
     assert!(
         errors
@@ -216,12 +217,12 @@ fn a_preamble_element_after_the_body_is_reported() {
     );
 }
 
-/// Several `@use` in the preamble is fine -- you bring in several
+/// Several `::use` in the preamble is fine -- you bring in several
 /// vocabularies. That `use` is preamble-only and not a singleton is
 /// what proves the two axes are independent.
 #[test]
 fn several_preamble_elements_are_fine_when_they_are_not_singletons() {
-    let doc = parse("@kind(note)\n@use(deck)\n@use(cards)\n\n#[ T ]\n");
+    let doc = parse("::kind(note)\n::use(deck)\n::use(cards)\n\n#[ T ]\n");
     let errors = validate_document(&doc);
     assert!(
         !errors.iter().any(|e| matches!(
@@ -269,14 +270,14 @@ fn a_run_of_double_colon_declarations_at_the_top_is_the_preamble() {
 #[test]
 fn the_two_spellings_share_one_preamble_and_one_singleton_count() {
     // transitional: the old spelling still reads, and counts as the same element
-    let errors = validate_document(&parse("@kind(note)\n::kind(note)\n"));
+    let errors = validate_document(&parse("::kind(note)\n::kind(note)\n"));
     assert!(
         errors
             .iter()
             .any(|e| matches!(e, Diagnostic::DuplicateSingleton { name, .. } if name == "kind")),
         "{errors:?}"
     );
-    let errors = validate_document(&parse("::kind(note)\n@meta{ id: x }\n\n=[ T ]\n"));
+    let errors = validate_document(&parse("::kind(note)\n::meta{ id: x }\n\n=[ T ]\n"));
     assert!(
         !errors
             .iter()
@@ -302,7 +303,7 @@ fn a_body_element_written_with_double_colon_is_reported_with_the_sigil_to_use() 
 #[test]
 fn a_user_declared_preamble_element_is_a_declaration() {
     let vocab = tomet_semantics::Vocabulary::from_document(&parse(
-        "@kind(vocabulary)\n@vocabulary(deck){}\n\n@element(character){ region: preamble, singleton: true }[ A character. ]\n",
+        "::kind(vocabulary)\n::vocabulary(deck){}\n\n@element(character){ region: preamble, singleton: true }[ A character. ]\n",
     ))
     .expect("a vocabulary");
     let bindings = Bindings::for_document(&parse("::kind(deck)\n"), [vocab]);
@@ -320,8 +321,8 @@ fn a_user_declared_preamble_element_is_a_declaration() {
 /// A vocabulary with a declared parameter list.
 fn deck_with_params() -> Bindings {
     let vocab = tomet_semantics::Vocabulary::from_document(&parse(
-        r#"@kind(vocabulary)
-@vocabulary(deck){}
+        r#"::kind(vocabulary)
+::vocabulary(deck){}
 
 @element(card){
   @args{
@@ -334,21 +335,21 @@ fn deck_with_params() -> Bindings {
 "#,
     ))
     .expect("a vocabulary");
-    Bindings::for_document(&parse("@kind(deck)\n"), [vocab])
+    Bindings::for_document(&parse("::kind(deck)\n"), [vocab])
 }
 
 /// A positional argument fills the slot its `@param` declares, so it
 /// is not reported as an unknown argument keyed `""`.
 #[test]
 fn a_positional_argument_lands_on_its_declared_slot() {
-    let doc = parse("@kind(deck)\n\n@card(3)\n");
+    let doc = parse("::kind(deck)\n\n@card(3)\n");
     let errors = validate_document_with(&doc, &deck_with_params());
     assert!(errors.is_empty(), "{errors:?}");
 }
 
 #[test]
 fn an_undeclared_argument_is_reported() {
-    let doc = parse("@kind(deck)\n\n@card(id: 3, colour: red)\n");
+    let doc = parse("::kind(deck)\n\n@card(id: 3, colour: red)\n");
     let errors = validate_document_with(&doc, &deck_with_params());
     assert!(
         errors.iter().any(|e| matches!(
@@ -363,12 +364,12 @@ fn an_undeclared_argument_is_reported() {
 /// `check_content_shape`'s own tests.
 fn deck_with_content_allow() -> Bindings {
     let vocab = tomet_semantics::Vocabulary::from_document(&parse(
-        r#"@kind(vocabulary)
-@vocabulary(deck){}
+        r#"::kind(vocabulary)
+::vocabulary(deck){}
 
 @element(list){
   display: block
-  // `item` resolves bare here (the document's own `@kind(deck)`), which
+  // `item` resolves bare here (the document's own `::kind(deck)`), which
   // `Bindings::classify` normalizes to `deck.item` even though it's
   // written bare -- same pre-existing quirk `check_one_rule`'s own doc
   // comment notes for `:rule(allow:...)`, so the allow-list has to name
@@ -383,12 +384,12 @@ fn deck_with_content_allow() -> Bindings {
 "#,
     ))
     .expect("a vocabulary");
-    Bindings::for_document(&parse("@kind(deck)\n"), [vocab])
+    Bindings::for_document(&parse("::kind(deck)\n"), [vocab])
 }
 
 #[test]
 fn content_allowed_by_name_is_clean() {
-    let doc = parse("@kind(deck)\n\n@list[\n  @item[ one ]\n  @item[ two ]\n]\n");
+    let doc = parse("::kind(deck)\n\n@list[\n  @item[ one ]\n  @item[ two ]\n]\n");
     let errors = validate_document_with(&doc, &deck_with_content_allow());
     assert!(
         !errors
@@ -400,7 +401,7 @@ fn content_allowed_by_name_is_clean() {
 
 #[test]
 fn content_not_in_the_allow_list_is_reported() {
-    let doc = parse("@kind(deck)\n\n@list[\n  @em[ not an item ]\n]\n");
+    let doc = parse("::kind(deck)\n\n@list[\n  @em[ not an item ]\n]\n");
     let errors = validate_document_with(&doc, &deck_with_content_allow());
     assert!(
         errors.iter().any(|e| matches!(
@@ -414,7 +415,7 @@ fn content_not_in_the_allow_list_is_reported() {
 
 #[test]
 fn content_declared_inline_only_rejects_multiple_blocks() {
-    let doc = parse("@kind(deck)\n\n@item[\n  one\n\n  two\n]\n");
+    let doc = parse("::kind(deck)\n\n@item[\n  one\n\n  two\n]\n");
     let errors = validate_document_with(&doc, &deck_with_content_allow());
     assert!(
         errors.iter().any(|e| matches!(
@@ -452,7 +453,7 @@ fn a_builtin_block_permitting_kind_allows_multiple_paragraphs() {
 
 #[test]
 fn a_missing_required_argument_is_reported() {
-    let doc = parse("@kind(deck)\n\n@card(tags: a)\n");
+    let doc = parse("::kind(deck)\n\n@card(tags: a)\n");
     let errors = validate_document_with(&doc, &deck_with_params());
     assert!(
         errors.iter().any(|e| matches!(
@@ -472,7 +473,7 @@ fn a_missing_required_argument_is_reported() {
 /// `Bindings::classify`.
 #[test]
 fn an_element_embedded_in_another_elements_args_is_still_checked() {
-    let doc = parse("@meta(icon: @doc.icon(pkg:\"lucide\"))\n");
+    let doc = parse("::meta(icon: @doc.icon(pkg:\"lucide\"))\n");
     let errors = validate_document(&doc);
     assert!(
         errors.iter().any(|e| matches!(
@@ -485,13 +486,13 @@ fn an_element_embedded_in_another_elements_args_is_still_checked() {
 
 #[test]
 fn a_valid_embedded_doc_icon_has_no_errors() {
-    let doc = parse("@meta(icon: @doc.icon(\"triangle\", pkg:\"lucide\"))\n");
+    let doc = parse("::meta(icon: @doc.icon(\"triangle\", pkg:\"lucide\"))\n");
     assert_eq!(validate_document(&doc), vec![]);
 }
 
 #[test]
 fn an_unregistered_name_under_doc_is_still_unknown_when_embedded() {
-    let doc = parse("@meta(icon: @doc.glyph(\"triangle\"))\n");
+    let doc = parse("::meta(icon: @doc.glyph(\"triangle\"))\n");
     let errors = validate_document(&doc);
     assert!(
         errors
@@ -506,7 +507,7 @@ fn an_unregistered_name_under_doc_is_still_unknown_when_embedded() {
 /// the vocabulary has no spelling for yet.
 #[test]
 fn an_element_with_no_args_declaration_is_not_checked() {
-    let doc = parse("@kind(deck)\n\n@plain(anything: 1)\n");
+    let doc = parse("::kind(deck)\n\n@plain(anything: 1)\n");
     let errors = validate_document_with(&doc, &deck_with_params());
     assert!(
         !errors
@@ -521,7 +522,7 @@ fn an_element_with_no_args_declaration_is_not_checked() {
 #[test]
 fn draft_and_fixme_are_warnings_that_carry_their_note() {
     let doc = parse(
-        "@kind(note)\n\n@draft[ ローカル保存の理由 ]\n\n地の文に @fixme[ 直す ] も置ける。\n",
+        "::kind(note)\n\n@draft[ ローカル保存の理由 ]\n\n地の文に @fixme[ 直す ] も置ける。\n",
     );
     let diagnostics = validate_document(&doc);
 
@@ -545,7 +546,7 @@ fn draft_and_fixme_are_warnings_that_carry_their_note() {
 /// run.
 #[test]
 fn conflict_is_a_warning() {
-    let doc = parse("@kind(note)\n\n@conflict(a: [ ローカル ], b: [ リモート ])\n");
+    let doc = parse("::kind(note)\n\n@conflict(a: [ ローカル ], b: [ リモート ])\n");
     let diagnostics = validate_document(&doc);
 
     let conflict = diagnostics
@@ -560,7 +561,7 @@ fn conflict_is_a_warning() {
 /// a `ShapeMismatch`.
 #[test]
 fn an_unfinished_marker_is_not_a_shape_error_in_either_position() {
-    let doc = parse("@kind(note)\n\n@draft[ 節まるごと ]\n\n文の途中の @draft[ 一語 ] も可。\n");
+    let doc = parse("::kind(note)\n\n@draft[ 節まるごと ]\n\n文の途中の @draft[ 一語 ] も可。\n");
     assert!(
         !validate_document(&doc)
             .iter()
@@ -574,19 +575,19 @@ fn an_unfinished_marker_is_not_a_shape_error_in_either_position() {
 /// is correct and not merely unfinished.
 #[test]
 fn an_unknown_element_is_still_an_error() {
-    let doc = parse("@kind(note)\n\n@nonesuch{}\n");
+    let doc = parse("::kind(note)\n\n@nonesuch{}\n");
     let diagnostics = validate_document(&doc);
     assert!(diagnostics.iter().all(|d| d.severity() == Severity::Error));
 }
 
-/// `elements:` described a custom element in `@settings`; a
-/// `@vocabulary` document says all of it now, so the settings copy is
+/// `elements:` described a custom element in `::settings`; a
+/// `::vocabulary` document says all of it now, so the settings copy is
 /// reported rather than skipped -- skipping is how it survived being
 /// read by nothing.
 #[test]
 fn a_retired_settings_key_is_reported() {
     let doc = parse(
-        "@kind(settings)\n@settings{\n\
+        "::kind(settings)\n::settings{\n\
          elements: { bookmark: { singleton: false } }\n}\n",
     );
     let errors = validate_document(&doc);
@@ -603,7 +604,7 @@ fn a_retired_settings_key_is_reported() {
 #[test]
 fn the_types_map_is_retired_too_and_says_it_has_no_replacement() {
     let doc = parse(
-        "@kind(settings)\n@settings{\n\
+        "::kind(settings)\n::settings{\n\
          types: { bookmark: { style: one_line } }\n}\n",
     );
     let errors = validate_document(&doc);
@@ -622,7 +623,7 @@ fn the_types_map_is_retired_too_and_says_it_has_no_replacement() {
 #[test]
 fn a_settings_document_using_only_live_keys_is_clean() {
     let doc = parse(
-        "@kind(config)\n@config{\n\
+        "::kind(config)\n::config{\n\
          format: { callout: { style: { content: block } } }\n\
          macros: { gh: \"https://example.com/${1}\" }\n}\n",
     );
@@ -644,7 +645,7 @@ fn a_settings_document_using_only_live_keys_is_clean() {
 /// saying so here is what keeps these tests about duplicate ids.
 fn with_deck() -> Bindings {
     let vocab = tomet_parser::parse_document(
-        "@kind(vocabulary)\n@vocabulary(deck)\n\n@element(task){}[ A task. ]\n@element(ref){}[ A ref. ]\n",
+        "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(task){}[ A task. ]\n@element(ref){}[ A ref. ]\n",
     )
     .expect("vocabulary parses");
     Bindings {
@@ -855,9 +856,9 @@ const UUID: &str = "123e4567-e89b-42d3-a456-426614174000";
 
 #[test]
 fn a_uuid_field_holding_a_uuid_is_clean() {
-    let source = format!("@meta{{\n  id: {UUID}\n}}\n");
+    let source = format!("::meta{{\n  id: {UUID}\n}}\n");
     assert_eq!(field_diagnostics(&source, &[("id", "uuid")]), vec![]);
-    let upper = format!("@meta{{ id: {} }}\n", UUID.to_uppercase());
+    let upper = format!("::meta{{ id: {} }}\n", UUID.to_uppercase());
     assert_eq!(field_diagnostics(&upper, &[("id", "uuid")]), vec![]);
 }
 
@@ -869,7 +870,7 @@ fn a_uuid_field_holding_anything_else_is_reported() {
         "123e4567-e89b-42d3-a456-42661417400",
         "123e4567-e89b-42d3-a456-42661417400g",
     ] {
-        let source = format!("@meta{{ id: \"{bad}\" }}\n");
+        let source = format!("::meta{{ id: \"{bad}\" }}\n");
         let errors = field_diagnostics(&source, &[("id", "uuid")]);
         assert_eq!(errors.len(), 1, "{bad}: {errors:?}");
         assert!(
@@ -879,7 +880,7 @@ fn a_uuid_field_holding_anything_else_is_reported() {
         );
         assert_eq!(errors[0].severity(), Severity::Error);
     }
-    let number = field_diagnostics("@meta{ id: 42 }\n", &[("id", "uuid")]);
+    let number = field_diagnostics("::meta{ id: 42 }\n", &[("id", "uuid")]);
     assert_eq!(number.len(), 1, "{number:?}");
 }
 
@@ -890,10 +891,10 @@ fn a_uuid_field_holding_anything_else_is_reported() {
 #[test]
 fn an_absent_empty_or_unevaluated_uuid_is_not_reported() {
     let declared = [("id", "uuid")];
-    assert_eq!(field_diagnostics("@meta{ title: x }\n", &declared), vec![]);
-    assert_eq!(field_diagnostics("@meta{ id: \"\" }\n", &declared), vec![]);
+    assert_eq!(field_diagnostics("::meta{ title: x }\n", &declared), vec![]);
+    assert_eq!(field_diagnostics("::meta{ id: \"\" }\n", &declared), vec![]);
     assert_eq!(
-        field_diagnostics("@meta{ id: ${generate.uuid()} }\n", &declared),
+        field_diagnostics("::meta{ id: ${generate.uuid()} }\n", &declared),
         vec![]
     );
     assert_eq!(field_diagnostics("plain\n", &declared), vec![]);
@@ -903,7 +904,7 @@ fn an_absent_empty_or_unevaluated_uuid_is_not_reported() {
 /// that have a form.
 #[test]
 fn an_undeclared_field_or_a_type_with_no_form_is_left_alone() {
-    let source = "@meta{ id: nonsense, title: nonsense }\n";
+    let source = "::meta{ id: nonsense, title: nonsense }\n";
     assert_eq!(field_diagnostics(source, &[]), vec![]);
     assert_eq!(field_diagnostics(source, &[("title", "string")]), vec![]);
     assert_eq!(field_diagnostics(source, &[("id", "uuid")]).len(), 1);
@@ -918,11 +919,11 @@ fn a_datetime_field_has_to_read_as_one() {
         "2026-10-17T09:00",
         "2026-10-17 09:00:00",
     ] {
-        let source = format!("@meta{{ created: {good} }}\n");
+        let source = format!("::meta{{ created: {good} }}\n");
         assert_eq!(field_diagnostics(&source, &declared), vec![], "{good}");
     }
     for bad in ["yesterday", "2026-13-01", "2026-10-17T25:00", "2026-1-1"] {
-        let source = format!("@meta{{ created: \"{bad}\" }}\n");
+        let source = format!("::meta{{ created: \"{bad}\" }}\n");
         let errors = field_diagnostics(&source, &declared);
         assert_eq!(errors.len(), 1, "{bad}: {errors:?}");
         assert!(
@@ -932,9 +933,9 @@ fn a_datetime_field_has_to_read_as_one() {
         );
     }
     // Absent, empty and not yet evaluated are not reported, as for `uuid`.
-    assert_eq!(field_diagnostics("@meta{ title: x }\n", &declared), vec![]);
+    assert_eq!(field_diagnostics("::meta{ title: x }\n", &declared), vec![]);
     assert_eq!(
-        field_diagnostics("@meta{ created: ${generate.now()} }\n", &declared),
+        field_diagnostics("::meta{ created: ${generate.now()} }\n", &declared),
         vec![]
     );
 }
@@ -944,9 +945,9 @@ fn a_datetime_field_has_to_read_as_one() {
 #[test]
 fn a_version_after_the_name_of_kind_and_use_is_fine_when_it_is_an_integer() {
     for src in [
-        "@kind(note)\n@use(deck)\n",
-        "@kind(note, 1)\n@use(deck, 3)\n",
-        "@kind(note, version: 2)\n",
+        "::kind(note)\n::use(deck)\n",
+        "::kind(note, 1)\n::use(deck, 3)\n",
+        "::kind(note, version: 2)\n",
     ] {
         let errors = validate_document(&parse(src));
         assert!(
@@ -963,12 +964,12 @@ fn a_version_after_the_name_of_kind_and_use_is_fine_when_it_is_an_integer() {
 #[test]
 fn a_version_that_is_not_an_integer_of_one_or_more_is_reported() {
     for (src, element, found) in [
-        ("@kind(note, 1.0)\n", "kind", "1.0"),
-        ("@kind(note, \"x\")\n", "kind", "\"x\""),
-        ("@kind(note, 0)\n", "kind", "0"),
-        ("@kind(note, -1)\n", "kind", "-1"),
-        ("@kind(note)\n@use(deck, 1.0)\n", "use", "1.0"),
-        ("@kind(note)\n@use(deck, 0)\n", "use", "0"),
+        ("::kind(note, 1.0)\n", "kind", "1.0"),
+        ("::kind(note, \"x\")\n", "kind", "\"x\""),
+        ("::kind(note, 0)\n", "kind", "0"),
+        ("::kind(note, -1)\n", "kind", "-1"),
+        ("::kind(note)\n::use(deck, 1.0)\n", "use", "1.0"),
+        ("::kind(note)\n::use(deck, 0)\n", "use", "0"),
     ] {
         let errors = validate_document(&parse(src));
         assert!(
@@ -985,8 +986,8 @@ fn a_version_that_is_not_an_integer_of_one_or_more_is_reported() {
 #[test]
 fn kind_and_use_take_a_name_and_a_version_and_nothing_more() {
     for (src, element) in [
-        ("@kind(note, 1, 2)\n", "kind"),
-        ("@kind(note)\n@use(deck, 1, 2)\n", "use"),
+        ("::kind(note, 1, 2)\n", "kind"),
+        ("::kind(note)\n::use(deck, 1, 2)\n", "use"),
     ] {
         let errors = validate_document(&parse(src));
         assert!(
@@ -1001,7 +1002,7 @@ fn kind_and_use_take_a_name_and_a_version_and_nothing_more() {
 
 #[test]
 fn the_version_messages_say_what_to_write() {
-    let errors = validate_document(&parse("@kind(note, 1.0)\n"));
+    let errors = validate_document(&parse("::kind(note, 1.0)\n"));
     let message = errors
         .iter()
         .find(|e| matches!(e, Diagnostic::InvalidVersion { .. }))
@@ -1009,10 +1010,10 @@ fn the_version_messages_say_what_to_write() {
         .to_string();
     assert_eq!(
         message,
-        "the version in `@kind(...)` must be an integer of 1 or more, found 1.0"
+        "the version in `::kind(...)` must be an integer of 1 or more, found 1.0"
     );
 
-    let errors = validate_document(&parse("@kind(note, 1, 2)\n"));
+    let errors = validate_document(&parse("::kind(note, 1, 2)\n"));
     let message = errors
         .iter()
         .find(|e| matches!(e, Diagnostic::TooManyArguments { .. }))

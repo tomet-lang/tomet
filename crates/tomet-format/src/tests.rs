@@ -3,7 +3,7 @@ use tomet_config::{FieldConfig, FormatConfig, GroupOrder};
 
 #[test]
 fn format_source_with_config_leaves_meta_block_completely_untouched() {
-    let src = "@meta{title: Hello}\n\n#[ Hello ]\n\nSome body text.\n";
+    let src = "::meta{title: Hello}\n\n#[ Hello ]\n\nSome body text.\n";
     let mut config = PrinterConfig::default();
     config.meta.fields.insert(
         "id".to_string(),

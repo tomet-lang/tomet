@@ -8,6 +8,11 @@ pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
     completions_for_with_uri(text, pos, None)
 }
 
+/// Whether a built-in is a declaration about the document (`::name`).
+fn is_declaration(kind: &ElementKind) -> bool {
+    tomet_semantics::builtin_region(kind) == tomet_semantics::Region::Preamble
+}
+
 /// Provides autocompletion items with document URI awareness for path completions.
 pub fn completions_for_with_uri(
     text: &str,
@@ -28,23 +33,22 @@ pub fn completions_for_with_uri(
     // which are not built-in at all, and omitted `link`/`embed`/`table`.
     // Bare names are reserved for exactly this set now, so offering a
     // non-builtin one would suggest something that fails to validate.
-    // Every element is spelled `@name`, whatever its shape. Shape decides
-    // where the element may be *placed*, not how it is spelled, so it is
-    // reported in the completion detail instead of splitting the list
-    // across two sigils.
-    // `::` opening a line starts a declaration about the document: only the
-    // built-ins that are declarations (the ones that belong in the preamble)
-    // are offered. The sigil is typed already, so the name goes in alone.
     //
-    // `@` still lists them too: the old spelling reads until it is migrated
-    // away, and dropping it from there is part of retiring it.
+    // The spelling follows the element's `Region`, not its shape: a
+    // declaration about the document (the ones that belong in the
+    // preamble) is `::name`, anything else is `@name`. Where in a body an
+    // element may be *placed* is reported in the completion detail instead.
+    //
+    // `::` opening a line starts a declaration: only the built-ins that are
+    // declarations are offered. The sigil is typed already, so the name goes
+    // in alone.
     if let Some(typed) = prefix.trim_start().strip_prefix("::")
         && typed
             .chars()
             .all(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | '.'))
     {
         for (name, kind) in BUILTIN_KINDS.iter() {
-            if tomet_semantics::builtin_region(kind) != tomet_semantics::Region::Preamble {
+            if !is_declaration(kind) {
                 continue;
             }
             items.push(CompletionItem {
@@ -60,6 +64,9 @@ pub fn completions_for_with_uri(
 
     if prefix.ends_with('@') {
         for (name, kind) in BUILTIN_KINDS.iter() {
+            if is_declaration(kind) {
+                continue;
+            }
             items.push(CompletionItem {
                 label: name.to_string(),
                 insert_text: Some(name.to_string()),
@@ -96,11 +103,12 @@ pub fn completions_for_with_uri(
         return items;
     }
 
-    // Unprefixed: offer every built-in under the one element sigil.
+    // Unprefixed: offer every built-in under the sigil its region requires.
     for (name, kind) in BUILTIN_KINDS.iter() {
+        let sigil = if is_declaration(kind) { "::" } else { "@" };
         items.push(CompletionItem {
-            label: format!("@{name}"),
-            insert_text: Some(format!("@{name}")),
+            label: format!("{sigil}{name}"),
+            insert_text: Some(format!("{sigil}{name}")),
             kind: Some(CompletionItemKind::KEYWORD),
             detail: Some(detail_for(name, kind)),
             ..CompletionItem::default()

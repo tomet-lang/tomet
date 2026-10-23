@@ -60,7 +60,7 @@ pub(crate) fn vault_for(file: &Path) -> tomet_load::Vault {
     }
 }
 
-/// Pulls a `title` string out of the document's `@meta` block, if it has
+/// Pulls a `title` string out of the document's `::meta` block, if it has
 /// one -- `<title>`/`html`/`serve` prefer this over the filename when
 /// present (see `.agents/tasks/ssg-readiness.md` step 1).
 pub(crate) fn meta_title(doc: &tomet_ast::Document) -> Option<String> {

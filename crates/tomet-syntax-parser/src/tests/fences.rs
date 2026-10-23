@@ -54,7 +54,7 @@ fn interpolation_does_not_expand_inside_a_fenced_raw_body_in_content() {
     // `default.config.tmt` stores macro templates such as
     // `"https://github.com/.../${1}"` that must reach
     // `tomet-transform`'s `MacroPattern::from_template` verbatim.
-    let doc = parse_document("@config[\n```\n{\"gh\": \"x/${1}\"}\n```\n]\n").unwrap();
+    let doc = parse_document("::config[\n```\n{\"gh\": \"x/${1}\"}\n```\n]\n").unwrap();
     assert_eq!(nested_raw_body(&doc), "{\"gh\": \"x/${1}\"}");
 }
 

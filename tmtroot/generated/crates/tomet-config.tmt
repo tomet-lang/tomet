@@ -36,7 +36,7 @@ to construct; nothing in this crate ever produces it.
 
 ==[Module groups]
 
-Root configuration groups corresponding to `@settings{ ... }` / `@config{ ... }` sections.
+Root configuration groups corresponding to `::settings{ ... }` / `::config{ ... }` sections.
 
 Each submodule defines a dedicated strongly-typed configuration struct for a specific domain:
 
@@ -116,7 +116,7 @@ Specification of a single configuration key/entry.
 
 ====[struct ConfigGroupSpec]
 
-Specification of a configuration group (e.g. `@config.format`, `@config.workspace`).
+Specification of a configuration group (e.g. `::config.format`, `::config.workspace`).
 
 ===[Traits]
 

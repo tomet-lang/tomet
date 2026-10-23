@@ -192,7 +192,6 @@
 				{ "include": "#strong" },
 				{ "include": "#emphasis" },
 				{ "include": "#interpolation" },
-				{ "include": "#footnote-hook" },
 				{ "include": "#named-connect" },
 				{ "include": "#bare-connect" },
 				{ "include": "#connect" },
@@ -208,7 +207,6 @@
 				{ "include": "#code-span" },
 				{ "include": "#autolink" },
 				{ "include": "#interpolation" },
-				{ "include": "#footnote-hook" },
 				{ "include": "#named-connect" },
 				{ "include": "#bare-connect" },
 				{ "include": "#connect" },
@@ -283,21 +281,6 @@
 				{ "include": "#bare-connect-round-group" },
 				{ "include": "#bare-connect-square-group" },
 				{ "include": "#bare-connect-curly-group" }
-			]
-		},
-
-		"footnote-hook": {
-			"comment": "Footnote hook syntax: `^name(...)`, `^(...)`. Subdued punctuation gray styling.",
-			"begin": "(?<![A-Za-z0-9_.-])(\\^)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)?(?=[ \\t]*[(\\[{])",
-			"beginCaptures": {
-				"1": { "name": "punctuation.definition.footnote.sigil.tomet punctuation.definition.tag.tomet" },
-				"2": { "name": "punctuation.definition.footnote.name.tomet punctuation.definition.tag.tomet" }
-			},
-			"end": "(?<=\\]|\\)|\\})(?![ \\t]*[(\\[{])|^(?=[ \\t]*$)",
-			"patterns": [
-				{ "include": "#connect-round-group" },
-				{ "include": "#connect-square-group" },
-				{ "include": "#connect-curly-group" }
 			]
 		},
 

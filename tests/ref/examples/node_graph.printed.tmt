@@ -1,4 +1,4 @@
-@kind(node-graph)
+::kind(node-graph)
 
 =[Nodes]
 @node(type: textarea)[開幕。]{ id: dsaf-asdf, x: 123, y: 456 }

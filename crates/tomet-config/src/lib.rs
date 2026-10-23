@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn test_settings_field_config_parsing() {
-        let settings_src = r#"@settings{
+        let settings_src = r#"::settings{
   meta: {
     aliases: {
       type: list
@@ -129,7 +129,7 @@ mod tests {
 
     #[test]
     fn callout_style_is_read_from_format_and_no_longer_from_elements() {
-        let live = r#"@config{ format: { callout: { style: { content: block } } } }
+        let live = r#"::config{ format: { callout: { style: { content: block } } } }
 "#;
         assert_eq!(
             load_config_from_str(live)
@@ -139,7 +139,7 @@ mod tests {
             Some("block".to_string())
         );
 
-        let retired = r#"@config{ elements: { callout: { style: { content: block } } } }
+        let retired = r#"::config{ elements: { callout: { style: { content: block } } } }
 "#;
         assert_eq!(
             load_config_from_str(retired)
@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_ignore_files_config_parsing() {
-        let settings_src = r#"@settings{
+        let settings_src = r#"::settings{
   ignore: {
     files: list("00-09 System/01 Apps/obsidian")
   }
@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_heading_and_link_spacing_config() {
-        let src = r#"@config(
+        let src = r#"::config(
   format: {
     heading: { space_inside_brackets: true }
     link: { no_space: true }
@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_group_order_config() {
-        let src1 = r#"@config(
+        let src1 = r#"::config(
   format: {
     element: { group_order: "content_first" }
   }
@@ -190,7 +190,7 @@ mod tests {
         let cfg1 = load_config_from_str(src1).expect("failed to parse config");
         assert_eq!(cfg1.format.group_order, Some(GroupOrder::ContentFirst));
 
-        let src2 = r#"@config(
+        let src2 = r#"::config(
   format: {
     group_order: "[]()"
   }
@@ -199,7 +199,7 @@ mod tests {
         let cfg2 = load_config_from_str(src2).expect("failed to parse config");
         assert_eq!(cfg2.format.group_order, Some(GroupOrder::ContentFirst));
 
-        let src3 = r#"@config(
+        let src3 = r#"::config(
   format: {
     group_order: "args_first"
   }
@@ -208,7 +208,7 @@ mod tests {
         let cfg3 = load_config_from_str(src3).expect("failed to parse config");
         assert_eq!(cfg3.format.group_order, Some(GroupOrder::ArgsFirst));
 
-        let src4 = r#"@config(
+        let src4 = r#"::config(
   format: {
     link: { group_order: "content_first" }
   }
@@ -223,7 +223,7 @@ mod tests {
         );
         assert_eq!(cfg4.element_group_order("other"), None);
 
-        let src5 = r#"@config(
+        let src5 = r#"::config(
   format: {
     element: { group_order: "args_first" }
     link: { group_order: "[]()" }
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_dot_notation_variants() {
-        let src_deep_dot = r#"@config{
+        let src_deep_dot = r#"::config{
   callout.style.content: "quote"
   list.multiline.style.content: "box"
   table.adjust_width: true
@@ -263,7 +263,7 @@ mod tests {
         assert_eq!(cfg.format.table_max_col_width, Some(80));
         assert_eq!(cfg.format.table_align.as_deref(), Some("center"));
 
-        let src_mixed = r#"@config{
+        let src_mixed = r#"::config{
   callout: {
     style.content: "custom"
   }
@@ -282,7 +282,7 @@ mod tests {
             Some("bullet")
         );
 
-        let src_format = r#"@config{
+        let src_format = r#"::config{
   format.callout.style.content: "formatted"
   format.table.max_col_width: 100
 }
@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     fn test_dot_notation_meta_and_merge() {
-        let src = r#"@config{
+        let src = r#"::config{
   meta.always_newline: true
   meta: {
     url.wiki: { type: list, always_newline: true }

@@ -27,7 +27,7 @@ ${macro.gh("tomet/tomet")}
 設定の `macros` に、名前とテンプレートを書く。
 
 ```tm
-@settings{
+::settings{
   macros: {
     gh: "https://github.com/tomet/tomet/issues/${1}"
   }

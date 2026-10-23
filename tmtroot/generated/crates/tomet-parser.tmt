@@ -31,7 +31,6 @@ editor syntax highlighting.
 line-oriented fence scan they share.
 - (inline) Inline scanning, formatting delimiters (`*em*`, `**strong**`, `==mark==`), autolinks.
 - (interp) `${...}` interpolation expressions (identifiers, member chains, calls, literals).
-- (caret) `^(id)` or `^name(id)` caret reference element parsing.
 - (value) Lightweight Tomet data grammar (maps, sequences, scalars, comments).
 - (cst) Lossless Concrete Syntax Tree parsing powered by `tomet-cst`.
 - (error) Parse errors: a message plus a byte offset, with line and column resolved once at the entry points (`located_in`).
@@ -81,7 +80,3 @@ Guaranteed Invariant: `parse_cst(src).text().to_string() == src`.
 ===[fn parse_dollar_element_str]
 
 Parse a `$func(args)` or `${expr}` dollar element directly from a string slice.
-
-===[fn parse_caret_element_str]
-
-Parse a `^(id)` or `^name(id)` caret reference element directly from a string slice.

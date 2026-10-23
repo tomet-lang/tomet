@@ -1,5 +1,5 @@
-@settings(file:docs/docs.settings.tmt)
-@kind(todo)
+::settings(file:docs/docs.settings.tmt)
+::kind(todo)
 
 - testファイルを別途用意しろ。
 - ちゃんと分割しろ

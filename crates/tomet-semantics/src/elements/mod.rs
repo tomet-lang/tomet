@@ -7,10 +7,10 @@
 //! and connect evaluation), this module houses the logic specific to individual
 //! built-in element families:
 //!
-//! - (config) Document configuration (`@config`, `@settings`).
-//! - (footnote) Footnote collection and indexing (`@ftn(id)[...]`, and `@ftn(id)` to refer to one; the old `@footnote` and `^(id)` still read).
+//! - (config) Document configuration (`::config`, `::settings`).
+//! - (footnote) Footnote collection and indexing (`@ftn(id)[...]`, and `@ftn(id)` to refer to one).
 //! - (heading) Heading level calculation and bounds clamping (`heading`).
-//! - (meta) Document metadata and frontmatter extraction (`@meta`, `@kind`, `@version`).
+//! - (meta) Document metadata and frontmatter extraction (`::meta`, `::kind`, `::version`).
 //! - (table) Table rows and cell structures (`@table`).
 //! - (tag) Tag collection (`#tag`).
 //! - (target) Target URI and scheme resolution (`@link`, `@embed`, `@file`, `@dir`).

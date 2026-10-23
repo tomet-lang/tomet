@@ -31,7 +31,7 @@ impl ChildItem {
 /// Target attribute slot or group on an element.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AttrGroup {
-    /// `{ key: value, ... }` data map (e.g. in `@meta{ ... }`).
+    /// `{ key: value, ... }` data map (e.g. in `::meta{ ... }`).
     Data,
     /// `( key: value, ... )` arguments (e.g. in `@callout(type: "info")`).
     Args,
@@ -235,6 +235,7 @@ impl Node {
     pub fn block_element(
         id: NodeId,
         name: impl Into<String>,
+        declaration: bool,
         id_attr: Option<impl Into<String>>,
         args: Vec<(String, String)>,
         data: Vec<(String, String)>,
@@ -244,6 +245,7 @@ impl Node {
             id,
             kind: NodeKind::BlockElement {
                 name: name.into(),
+                declaration,
                 id_attr: id_attr.map(Into::into),
                 args,
                 data,
@@ -267,9 +269,12 @@ pub enum NodeKind {
     },
     /// A paragraph whose content is maintained as raw text.
     Paragraph { text: String },
-    /// A block element (e.g. `@callout`, `@note`, `@table`, `@meta`).
+    /// A block element (e.g. `@callout`, `@note`, `@table`, `::meta`).
     BlockElement {
         name: String,
+        /// Written as a document declaration (`::name`) rather than an
+        /// element (`@name`); export keeps the spelling it was read with.
+        declaration: bool,
         id_attr: Option<String>,
         args: Vec<(String, String)>,
         data: Vec<(String, String)>,

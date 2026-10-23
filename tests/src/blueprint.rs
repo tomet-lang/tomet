@@ -19,14 +19,14 @@ fn test_blueprint_end_to_end_lifecycle() {
     let tmpl_dir = temp_dir.join(".tomet/blueprints");
     fs::create_dir_all(&tmpl_dir).unwrap();
 
-    let blueprint_src = r#"@kind(blueprint)
-@blueprint(daily-note){
+    let blueprint_src = r#"::kind(blueprint)
+::blueprint(daily-note){
   description: "Daily Standup & Plan"
   vars: {
     author: { type: string, default: "Anonymous" }
   }
 }
-@meta{
+::meta{
   id: ${generate.uuid()}
   date: ${generate.now().format("YYYY-MM-DD")}
   author: ${vars.author}
@@ -70,9 +70,9 @@ fn test_blueprint_end_to_end_lifecycle() {
     assert!(doc_abs_path.is_file());
     let doc_content = fs::read_to_string(&doc_abs_path).unwrap();
 
-    // Verify converted @kind(daily-note)
-    assert!(doc_content.contains("@kind(daily-note)"));
-    assert!(!doc_content.contains("@blueprint"));
+    // Verify converted ::kind(daily-note)
+    assert!(doc_content.contains("::kind(daily-note)"));
+    assert!(!doc_content.contains("::blueprint"));
     assert!(doc_content.contains("author: Alice"));
     assert!(doc_content.contains("2026-09-01"));
 
@@ -100,7 +100,7 @@ fn test_blueprint_end_to_end_lifecycle() {
             .contains("missing required section `Review` (id: review)")
     );
 
-    // 6. Test converters (HTML, Markdown, Typst ignore @blueprint)
+    // 6. Test converters (HTML, Markdown, Typst ignore ::blueprint)
     let html_out = tomet_html::render_body(&blueprint_ast);
     assert!(!html_out.contains("blueprint"));
     let md_out = tomet_markdown::to_markdown(&blueprint_ast);

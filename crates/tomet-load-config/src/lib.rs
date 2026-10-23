@@ -64,7 +64,7 @@ pub fn load_config_from_file(path: &Path) -> Result<Config, ConfigError> {
 ///
 /// The nearest `default.config.tmt`/`tomet.config.tmt` up the tree wins,
 /// because that file's position is what says where the vault begins.
-/// With no vault to find, the document's own `@config` is used, and
+/// With no vault to find, the document's own `::config` is used, and
 /// failing that the defaults.
 pub fn config_for(path: Option<&Path>, src: &str) -> Config {
     if let Some(path) = path

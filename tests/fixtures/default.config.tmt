@@ -1,5 +1,5 @@
-@kind(config)
-@config{
+::kind(config)
+::config{
   format: {
     meta: {
       always_newline: true

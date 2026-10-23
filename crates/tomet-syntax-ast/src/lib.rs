@@ -10,7 +10,7 @@
 //!   | It contains only struct/enum definitions and pure inherent methods for construction
 //!   | (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`, `Span::union()`).
 //! - (Clear Crate Boundaries)
-//!   | Semantics: Classification of element meanings (links, `@meta`, `@config`) lives in `tomet-semantics`.
+//!   | Semantics: Classification of element meanings (links, `::meta`, `::config`) lives in `tomet-semantics`.
 //!   | Traversal & Manipulation: Generic tree traversal algorithms live in `tomet-tree`.
 //!   | Formatting & Printing: Serialization to `.tmt` text lives in `tomet-style` and `tomet-printer`.
 //!   | Validation: Field formatting and lint validation live in `tomet-validator`.
@@ -124,7 +124,7 @@ pub enum Value {
     /// evaluated for a reader of either.
     Call(String, Vec<Value>),
     /// A real, `@`-sigiled element sitting where a value goes --
-    /// `@meta(icon: @doc.icon("triangle"))`. Unlike [`Value::Call`], this
+    /// `::meta(icon: @doc.icon("triangle"))`. Unlike [`Value::Call`], this
     /// is the same [`Element`] any other position produces: it has a
     /// `sigil`, classifies and validates through `Bindings` like any other
     /// element (an unregistered name is still an error here), and can
@@ -590,8 +590,8 @@ impl std::ops::DerefMut for Text {
 /// The separator is `.`: `deck.bookmark` is `Name { namespace:
 /// Some("deck"), name: "bookmark" }`. Exactly two namespaces may be
 /// written bare: `std`, which the language carries, and the document's
-/// own `@kind`, declared on its first line. A name from any other
-/// namespace -- anything brought in with `@use` -- is always written
+/// own `::kind`, declared on its first line. A name from any other
+/// namespace -- anything brought in with `::use` -- is always written
 /// out, and a bare name in neither of the two is an error rather than
 /// falling back to a `Custom` kind. That check is `Bindings::classify`
 /// in `tomet-semantics`, not the free `classify_std` beside it, which only
@@ -692,10 +692,6 @@ pub enum Sigil {
     /// `InterpExpr` inside the `ElementValue::Interp` value group carries
     /// its own path/call name.
     Dollar,
-    /// `^` or `^name` reference pin -- structurally a sigil that introduces
-    /// an element cross-reference or hook pin, optionally filtered by a target
-    /// element kind name (e.g. `^footnote(...)` or `^fig(...)`).
-    Caret(Option<Name>),
     /// `::name` -- a declaration about the document itself, not content in it.
     ///
     /// Structurally the same as [`Sigil::Named`]: an element with a mandatory
@@ -716,7 +712,7 @@ impl Sigil {
     pub fn name(&self) -> Option<&Name> {
         match self {
             Sigil::Named(name) | Sigil::Document(name) => Some(name),
-            Sigil::Bare | Sigil::Dollar | Sigil::Caret(_) => None,
+            Sigil::Bare | Sigil::Dollar => None,
         }
     }
 
@@ -730,24 +726,6 @@ impl Sigil {
         matches!(self, Sigil::Document(_))
     }
 
-    /// Creates a Caret sigil with an optional target kind name.
-    pub fn caret(name: Option<impl Into<String>>) -> Self {
-        Sigil::Caret(name.map(|n| Name::bare(n)))
-    }
-
-    /// Whether this sigil is a Caret (`^` or `^name`).
-    pub fn is_caret(&self) -> bool {
-        matches!(self, Sigil::Caret(_))
-    }
-
-    /// The target kind name of a Caret sigil, if filtered (e.g. `Some("footnote")` for `^footnote(...)`).
-    pub fn caret_target_kind(&self) -> Option<&Name> {
-        match self {
-            Sigil::Caret(Some(name)) => Some(name),
-            _ => None,
-        }
-    }
-
     /// An element with a bare (un-namespaced) name.
     pub fn named(name: impl Into<String>) -> Self {
         Sigil::Named(Name::bare(name))
@@ -756,12 +734,12 @@ impl Sigil {
     /// Whether this element carries the bare (un-namespaced) name `name`.
     ///
     /// This is the check almost every consumer wants: a bare name resolves
-    /// in `std` or in the document's own `@kind` namespace, never in one
-    /// brought in with `@use`, so `is_bare_named("meta")` asks "is this
+    /// in `std` or in the document's own `::kind` namespace, never in one
+    /// brought in with `::use`, so `is_bare_named("meta")` asks "is this
     /// *the* `meta` element" and cannot be satisfied by a user-defined
     /// `deck.meta`.
     ///
-    /// It is a spelling test, not a resolution. A `@kind(writ)` document
+    /// It is a spelling test, not a resolution. A `::kind(writ)` document
     /// writes its own `@layers` bare as well; telling that apart from a
     /// `std` name is `Bindings::classify`'s job.
     pub fn is_bare_named(&self, name: &str) -> bool {
@@ -1198,21 +1176,5 @@ mod tests {
 
         assert_eq!(span, dummy);
         assert!(!span.exact_eq(&dummy));
-    }
-
-    #[test]
-    fn test_sigil_caret() {
-        let bare_caret = Sigil::caret(None::<&str>);
-        assert!(bare_caret.is_caret());
-        assert_eq!(bare_caret.name(), None);
-        assert_eq!(bare_caret.caret_target_kind(), None);
-
-        let named_caret = Sigil::caret(Some("footnote"));
-        assert!(named_caret.is_caret());
-        assert_eq!(named_caret.name(), None);
-        assert_eq!(
-            named_caret.caret_target_kind().map(|n| n.name.as_str()),
-            Some("footnote")
-        );
     }
 }

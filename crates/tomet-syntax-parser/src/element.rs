@@ -209,7 +209,7 @@ fn skip_lookahead_gap(cur: &mut Cursor) {
 /// `allow_colon_connect` gates the `:(...)`/`:{...}`/`:name(...)` connect
 /// branch in [`parse_groups_with_pipe_stack`] (a bare, colon-less
 /// trailing group is *always* claimed regardless -- see
-/// `docs/spec/syntax.tmt`'s `@meta(format:yaml) {...}` example, real
+/// `docs/spec/syntax.tmt`'s `::meta(format:yaml) {...}` example, real
 /// usage that must keep working). Every context that reaches a sigil's
 /// own top-level groups passes `true`: a list item's own groups used to
 /// pass `false` (no `connects` field to put a named one in), but
@@ -532,7 +532,7 @@ fn claimed_something(el: &Element) -> bool {
 ///   with a colon in front of it.
 /// - [`content_lands_at`] rejects a *colon-less* candidate that an inner
 ///   element occupying the end of the content would itself reach past --
-///   `@meta(format:yaml) {...}` must still belong to `@meta`, not to
+///   `::meta(format:yaml) {...}` must still belong to `::meta`, not to
 ///   this sugar body, the same real, existing usage a bare trailing
 ///   group has always been claimed by first (`parse_groups_with_pipe_stack`'s
 ///   colon branch doc comment). A colon-prefixed candidate can't suffer

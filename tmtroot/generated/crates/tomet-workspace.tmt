@@ -31,7 +31,7 @@ Represents a workspace file with its metadata.
 Blueprint discovery and file instantiation across a workspace.
 
 A vault declares its blueprints in its config, as a list of paths, and
-each blueprint names itself with `@blueprint(X)`. Nothing is derived
+each blueprint names itself with `::blueprint(X)`. Nothing is derived
 from a filename and nothing is searched for by convention.
 
 That is a change from what this did, and the reason is in this
@@ -45,7 +45,7 @@ error to the declaration: a path that is not there is reported once,
 where it is written, instead of at every document that wanted it.
 
 A name -> path map was rejected as a duplicate: the name would appear
-in the key, in the path, and again in the file's own `@blueprint(X)`.
+in the key, in the path, and again in the file's own `::blueprint(X)`.
 
 ===[Structs]
 
@@ -160,7 +160,7 @@ Refactors source text, returning the transformed and formatted text alongside th
 the whole document back, and `tomet_ast` has no comment node at all --
 `//` and `/* */` exist in the source text and nowhere in the tree, so
 anything that round-trips through the AST loses them. Measured, not
-assumed: a file carrying `@meta{ type: note }` and a `//` line comes
+assumed: a file carrying `::meta{ type: note }` and a `//` line comes
 back with the comment gone.
 
 The counting half is sound, because it counts rule hits rather than a

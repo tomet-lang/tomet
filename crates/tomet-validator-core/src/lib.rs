@@ -19,7 +19,9 @@ pub fn classify_in(
     bindings: &Bindings,
 ) -> Result<tomet_semantics::ElementKind, tomet_semantics::UnknownName> {
     match &el.sigil {
-        tomet_ast::Sigil::Named(name) => bindings.classify(name),
+        tomet_ast::Sigil::Named(name) => {
+            tomet_semantics::refuse_declaration_as_element(name, bindings.classify(name)?)
+        }
         _ => tomet_semantics::classify_std(el),
     }
 }
@@ -37,10 +39,21 @@ pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagn
 
     tomet_tree::for_each_element(doc, |el| {
         if let Err(unknown) = classify_in(el, bindings) {
-            errors.push(Diagnostic::UnknownElement {
-                name: unknown.name,
-                unbound_namespace: unknown.unbound_namespace,
-                span: el.span,
+            // a declaration written as an element is not unknown, it is
+            // spelled wrongly: say which spelling it takes
+            errors.push(if unknown.declaration {
+                Diagnostic::WrongSigil {
+                    name: unknown.name,
+                    written: "@",
+                    expected: "::",
+                    span: el.span,
+                }
+            } else {
+                Diagnostic::UnknownElement {
+                    name: unknown.name,
+                    unbound_namespace: unknown.unbound_namespace,
+                    span: el.span,
+                }
             });
             return;
         }
@@ -147,6 +160,14 @@ pub fn check_singletons_and_regions(
                 name: name.clone(),
                 written: "::",
                 expected: "@",
+                span: el.span,
+            });
+        }
+        if !document && declared == Some(Region::Preamble) {
+            errors.push(Diagnostic::WrongSigil {
+                name: name.clone(),
+                written: "@",
+                expected: "::",
                 span: el.span,
             });
         }
@@ -340,7 +361,7 @@ pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Dia
     });
 }
 
-/// `@kind(name, version)` and `@use(ns, version)`: a version, when written, is an
+/// `::kind(name, version)` and `::use(ns, version)`: a version, when written, is an
 /// integer of 1 or more, and the name and the version are all they take.
 ///
 /// `1.0` is the case this exists for: a semver habit that would read as a
@@ -495,7 +516,7 @@ pub fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>)
     });
 }
 
-/// Checks the form of the `@meta` fields the settings declare a `type:` for.
+/// Checks the form of the `::meta` fields the settings declare a `type:` for.
 ///
 /// `field_types` is the settings' `meta` declarations as `name -> type`,
 /// which is all this needs of them: the validator sits below the crate that

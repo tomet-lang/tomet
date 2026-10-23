@@ -77,7 +77,7 @@ Enforces the `singleton` and `region` axes.
 
 ===[fn check_version_slot]
 
-`@kind(name, version)` and `@use(ns, version)`: a version, when written, is an
+`::kind(name, version)` and `::use(ns, version)`: a version, when written, is an
 integer of 1 or more, and the name and the version are all they take.
 
 `1.0` is the case this exists for: a semver habit that would read as a
@@ -89,7 +89,7 @@ float, and a document names only the major version.
 
 ===[fn check_field_types]
 
-Checks the form of the `@meta` fields the settings declare a `type:` for.
+Checks the form of the `::meta` fields the settings declare a `type:` for.
 
 `field_types` is the settings' `meta` declarations as `name -> type`,
 which is all this needs of them: the validator sits below the crate that

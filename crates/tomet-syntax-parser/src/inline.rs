@@ -1,6 +1,5 @@
 //! Parsing for inline sequences, text normalization, and inline delimiters (`*em*`, `**strong**`, `==mark==`).
 
-use crate::caret::{is_caret_start, parse_caret_element};
 use crate::element::{LineEnd, element_ends_line, is_element_start, parse_element};
 use crate::error::Result;
 use crate::interp::{is_interp_start, parse_dollar_element};
@@ -329,15 +328,6 @@ pub(crate) fn parse_inline_seq<'a>(
         if cur.peek() == Some('$') && is_interp_start(cur) {
             flush_text(&mut items, cur, &mut text_start, pipe_cols);
             items.push(Inline::Element(parse_dollar_element(cur)?));
-            text_start = cur.pos();
-            continue;
-        }
-        if cur.peek() == Some('^') && is_caret_start(cur) {
-            flush_text(&mut items, cur, &mut text_start, pipe_cols);
-            items.push(Inline::Element(parse_caret_element(
-                cur,
-                allow_colon_connect,
-            )?));
             text_start = cur.pos();
             continue;
         }

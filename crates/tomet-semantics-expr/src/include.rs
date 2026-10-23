@@ -5,7 +5,7 @@
 //! fragment, built in four steps:
 //!
 //! 1. the selection is read as written, minus the declarations a document
-//!    makes about itself (`@meta`, `@config`, `@kind`, ...);
+//!    makes about itself (`::meta`, `::config`, `::kind`, ...);
 //! 2. it is prepared **in its own file's context** -- its expressions, its
 //!    macros, its `self` -- by the resolver, so it means here what it means
 //!    there;

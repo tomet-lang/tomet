@@ -5,13 +5,13 @@
 
 =[ 全容 ]
 
-`@settings` は **Tomet がどう振る舞うか**を書く。整形、マクロ、vault が持つ
+`::settings` は **Tomet がどう振る舞うか**を書く。整形、マクロ、vault が持つ
 ファイルの一覧。
 
 ```tm
-@config(import:@target)
+::config(import:@target)
 
-@settings{
+::settings{
   format: {
     meta: { always_newline: true }
     heading: { space_inside_brackets: true }
@@ -34,12 +34,12 @@
 
 #[ 要素はここには書かない ]
 
-どの要素名が存在し、何を取るのかは `@vocabulary` 文書が言う。`@settings` に
+どの要素名が存在し、何を取るのかは `::vocabulary` 文書が言う。`::settings` に
 `elements` を書く綴りは撤去され、書かれていれば `tomet check` が報告する。
 
 ```tm
-@kind(vocabulary)
-@vocabulary(deck){ version: "1.0.0" }
+::kind(vocabulary)
+::vocabulary(deck){ version: "1.0.0" }
 
 @element(card){
   display: block

@@ -59,9 +59,9 @@ fn directives_have_no_markdown_output() {
     // `import` from `BUILTIN_KINDS` made it a `Custom` kind again, and the
     // div came straight back.
     for src in [
-        "@settings(file:project.settings.tmt)\n",
-        "@use(deck)\n",
-        "@meta{type: note}\n",
+        "::settings(file:project.settings.tmt)\n",
+        "::use(deck)\n",
+        "::meta{type: note}\n",
     ] {
         let doc = tomet_parser::parse_document(src).unwrap();
         assert_eq!(to_markdown(&doc).trim(), "", "for {src:?}");
@@ -73,7 +73,7 @@ fn adjacent_meta_blocks_have_no_visible_output() {
     // Hand-built `Document` (doesn't go through `tomet_parser::
     // parse_document`, so it's independent of the parser's own
     // paragraph-continuation rules -- `tomet-parser` no longer
-    // folds adjacent `@meta(...)` elements with no blank line between
+    // folds adjacent `::meta(...)` elements with no blank line between
     // them into one `Block::Paragraph`; each becomes its own
     // `Block::Element` now, see `document.rs`'s `Stop::Paragraph`).
     // Kept as a regression test for the shape this crate must still
@@ -84,7 +84,7 @@ fn adjacent_meta_blocks_have_no_visible_output() {
     // behind in the exported Markdown.
     fn meta_element(tag: &str) -> Element {
         Element {
-            sigil: Sigil::named("meta"),
+            sigil: Sigil::document("meta"),
             placement: Placement::Inline,
             args: Some(Value::String(tag.to_string())),
             content: None,
@@ -371,7 +371,7 @@ fn thematic_break() {
 
 #[test]
 fn config_element_exports_as_nothing() {
-    let mut el = tomet_tree::element_new(Sigil::named("config"));
+    let mut el = tomet_tree::element_new(Sigil::document("config"));
     el.args = Some(Value::Map(vec![(
         "format".to_string(),
         Value::String("json".to_string()),
@@ -536,8 +536,7 @@ fn an_unprepared_interpolation_renders_as_its_own_source() {
 #[test]
 fn inline_footnote_exports_to_markdown() {
     let doc =
-        tomet_parser::parse_document("This has a footnote @footnote[a short note] in text.\n")
-            .unwrap();
+        tomet_parser::parse_document("This has a footnote @ftn[a short note] in text.\n").unwrap();
     let md = to_markdown(&doc);
     assert!(
         md.contains("This has a footnote [^1] in text."),
@@ -547,12 +546,12 @@ fn inline_footnote_exports_to_markdown() {
 }
 
 #[test]
-fn separated_footnote_with_multiple_carets() {
+fn separated_footnote_with_multiple_references() {
     let src = "\
-Prose A ^(shared).
-Prose B ^(shared).
+Prose A @ftn(shared).
+Prose B @ftn(shared).
 
-@footnote(shared)[Shared footnote explanation.]
+@ftn(shared)[Shared footnote explanation.]
 ";
     let doc = tomet_parser::parse_document(src).unwrap();
     let md = to_markdown(&doc);
@@ -563,21 +562,7 @@ Prose B ^(shared).
         "got: {md}"
     );
     // Ensure definition block was not rendered in place
-    assert!(!md.contains("@footnote"), "got: {md}");
-}
-
-#[test]
-fn ftn_exports_as_the_caret_and_footnote_spelling_does() {
-    let old = "Prose A ^(shared).\nProse B ^(shared).\n\n@footnote(shared)[Shared footnote explanation.]\n";
-    let new = "Prose A @ftn(shared).\nProse B @ftn(shared).\n\n@ftn(shared)[Shared footnote explanation.]\n";
-    let md = |src: &str| to_markdown(&tomet_parser::parse_document(src).unwrap());
-    assert_eq!(md(new), md(old));
-    assert!(
-        md(new).contains("[^1]: Shared footnote explanation."),
-        "got: {}",
-        md(new)
-    );
-    assert!(!md(new).contains("@ftn"), "got: {}", md(new));
+    assert!(!md.contains("@ftn"), "got: {md}");
 }
 
 #[test]

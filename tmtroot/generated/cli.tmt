@@ -222,7 +222,7 @@ Options:
 
 ==[ tomet export ]
 
-Export a `.tmt` document or directory of documents based on `@config` settings or CLI overrides
+Export a `.tmt` document or directory of documents based on `::config` settings or CLI overrides
 
 ```text
 tomet export [OPTIONS] [PATH]
@@ -234,14 +234,14 @@ Arguments:
 
 Options:
 
-- `-t, --type <TYPE>`: Target format (`commonmark` | `html` | `all`). Overrides `@config`.
-- `-o, --out <OUT>`: Output destination file or directory path. Overrides `@config`.
+- `-t, --type <TYPE>`: Target format (`commonmark` | `html` | `all`). Overrides ::config.
+- `-o, --out <OUT>`: Output destination file or directory path. Overrides ::config.
 - `--advanced`: Number headings sequentially by nesting level for HTML export.
 - `--check`: Compare each declared output against what the source renders to now, without writing anything. Exits non-zero if any differ or are missing -- a generated file that disagrees with its source is a failure with a mechanical fix.
 
 ==[ tomet refactor ]
 
-Refactor .tmt file(s) across a workspace (URL macros, `@meta.type` -> `@kind)`
+Refactor .tmt file(s) across a workspace (URL macros, ::meta.type -> ::kind)
 
 ```text
 tomet refactor [OPTIONS] [PATH]
@@ -255,7 +255,7 @@ Options:
 
 - `-i, --in-place`: Write modified files in place.
 - `--url-macros`: Only rewrite URLs matching macros.
-- `--meta-kind`: Only promote `@meta.type` to `@kind`.
+- `--meta-kind`: Only promote ::meta.type to ::kind.
 - `--check`: Check/dry-run mode without modifying files (exits non-zero if changes are needed). Conflicts with `--in-place`.
 - `--force`: Refactor files and directories the project config excludes (`workspace.ignore`, `workspace.unswept`) as well. Without it, a file named explicitly that the config excludes is skipped with a warning, as it would be in a directory sweep.
 
@@ -273,7 +273,7 @@ Arguments:
 
 Options:
 
-- `-b, --blueprint <BLUEPRINT>`: Blueprint name, as the blueprint gives it in `@blueprint(...)` (e.g. "daily-note", "rfc"). Resolved among the blueprints the vault declares in `blueprints`, never searched for on disk.
+- `-b, --blueprint <BLUEPRINT>`: Blueprint name, as the blueprint gives it in `::blueprint(...)` (e.g. "daily-note", "rfc"). Resolved among the blueprints the vault declares in `blueprints`, never searched for on disk.
 - `-l, --list`: List the blueprints this vault declares instead of creating a file.
 - `-f, --force`: Overwrite target file if it already exists.
 - `--var <VARS>`: Pass custom variable as `key=value`. Can be specified multiple times.

@@ -6,7 +6,7 @@
 =[ 全容 ]
 
 ```tm
-@config{
+::config{
   format: {
     table: { adjust_width: auto }
   }

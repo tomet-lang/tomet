@@ -13,7 +13,7 @@
 //!   | document language setting, and semantic CSS classes for callouts and custom elements.
 //!
 //! This is a generic, data-driven mapping: most `<T>`/`@name` elements become `<div>`/`<span>`
-//! tags carrying `args` as `data-*` attributes. Built-in elements like `@link`, `@meta`, and
+//! tags carrying `args` as `data-*` attributes. Built-in elements like `@link`, `::meta`, and
 //! `@links{}` containers receive dedicated HTML representations.
 
 mod block;
@@ -226,7 +226,7 @@ pub fn render_body_with_outline(
 ) -> (String, Vec<HeadingInfo>) {
     let mut out = String::new();
     let mut state = HeadingState::default();
-    // Only `doc.*` needs binding here -- a document's own `@vocabulary`
+    // Only `doc.*` needs binding here -- a document's own `::vocabulary`
     // declarations have no bearing on this crate's syntactic, semantics-free
     // rendering, but `doc.icon`'s positional `name` still has to resolve to
     // that key (not the parser's positional sentinel) for `custom_element`

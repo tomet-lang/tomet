@@ -17,11 +17,11 @@ use crate::ast::{
 
 /// Converts a Tomet document to Pandoc's AST.
 ///
-/// `@meta` feeds Pandoc's document-level `meta` map rather than being
+/// `::meta` feeds Pandoc's document-level `meta` map rather than being
 /// dropped with the other directives. That map is what becomes YAML
 /// frontmatter, `\title{}`, docx document properties and so on, so
-/// `@meta{title: x}` survives into every output format. The sibling
-/// writers have nowhere to put `@meta` and drop it; this is deliberately
+/// `::meta{title: x}` survives into every output format. The sibling
+/// writers have nowhere to put `::meta` and drop it; this is deliberately
 /// not symmetric with them.
 pub fn to_pandoc(doc: &Document) -> PandocDoc {
     let mut blocks = Vec::new();
@@ -64,10 +64,10 @@ fn meta_value(v: &Value) -> MetaValue {
                 .collect(),
         ),
         // A call (e.g. `:rule`'s `allow:list(...)`) has no meaning as
-        // document metadata; nothing writes one into `@meta` today.
+        // document metadata; nothing writes one into `::meta` today.
         Value::Call(..) => MetaValue::MetaString(String::new()),
         // Same treatment as `Call`: Pandoc's `MetaValue` has no element
-        // concept, and `@meta(icon: @doc.icon("x"))`'s whole point is that
+        // concept, and `::meta(icon: @doc.icon("x"))`'s whole point is that
         // nothing resolves or renders the embedded element anyway.
         Value::Element(_) => MetaValue::MetaString(String::new()),
         // Same treatment as `Element`/`Call`: no metadata concept for
@@ -78,7 +78,7 @@ fn meta_value(v: &Value) -> MetaValue {
 
 /// A document-level block. Yields nothing for a directive, and for a
 /// paragraph that turns out to hold only directives -- otherwise every
-/// `@meta` line would leave an empty `Para` behind, the same trap the
+/// `::meta` line would leave an empty `Para` behind, the same trap the
 /// Markdown and HTML writers guard against.
 fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
     match block {
@@ -713,7 +713,7 @@ fn table_alignment(el: &Element) -> Alignment {
 /// not a builtin, so a round-tripped document stopped validating.
 ///
 /// A key rather than another class, because a class collides: a document
-/// whose `@kind` names a vocabulary declaring `bare` writes `@bare`
+/// whose `::kind` names a vocabulary declaring `bare` writes `@bare`
 /// unqualified, and `tomet-bare` would then mean two things. `tomet-data`
 /// established the reserved-key convention this follows.
 pub(crate) const SIGIL_KEY: &str = "tomet-sigil";
@@ -899,8 +899,8 @@ mod tests {
 
     #[test]
     fn meta_feeds_the_document_metadata_map() {
-        let doc =
-            parse_document("@meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n").unwrap();
+        let doc = parse_document("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n")
+            .unwrap();
         let pandoc = to_pandoc(&doc);
         assert_eq!(
             pandoc.meta.get("title"),
@@ -919,7 +919,8 @@ mod tests {
 
         // list(...) call literal converts identically to [a, b]
         let doc_call =
-            parse_document("@meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n").unwrap();
+            parse_document("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n")
+                .unwrap();
         let pandoc_call = to_pandoc(&doc_call);
         assert_eq!(
             pandoc_call.meta.get("tags"),
@@ -934,7 +935,7 @@ mod tests {
     fn a_meta_number_becomes_a_string() {
         // Pandoc metadata has no numeric type. Recorded rather than
         // hidden: this is the one lossy edge of the meta mapping.
-        let doc = parse_document("@meta{year: 2026}\n").unwrap();
+        let doc = parse_document("::meta{year: 2026}\n").unwrap();
         assert_eq!(
             to_pandoc(&doc).meta.get("year"),
             Some(&MetaValue::MetaString("2026".into()))
@@ -943,11 +944,10 @@ mod tests {
 
     #[test]
     fn directives_produce_nothing() {
-        assert!(convert("@meta{type: note}\n").is_empty());
-        assert!(convert("@settings(file:project.settings.tmt)\n").is_empty());
-        // ...and a paragraph that held only directives leaves no empty
-        // `Para` behind either.
-        assert!(convert("@meta{a: 1} @meta{b: 2}\n").is_empty());
+        assert!(convert("::meta{type: note}\n").is_empty());
+        assert!(convert("::settings(file:project.settings.tmt)\n").is_empty());
+        // ...and neither do several in a row.
+        assert!(convert("::meta{a: 1}\n::meta{b: 2}\n").is_empty());
     }
 
     #[test]

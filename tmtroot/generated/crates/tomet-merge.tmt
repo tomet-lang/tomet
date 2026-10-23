@@ -54,7 +54,7 @@ differs (e.g. `[content]` present on one side and absent on the
 other) rather than merely disagreeing in value.
 4. A conflict `merge_one` can't narrow any further is recorded
 in-place as one `@conflict` element -- `tomet`'s own `std` element
-for exactly this, bare and needing no `@use`. `a`/`b` are
+for exactly this, bare and needing no `::use`. `a`/`b` are
 structural names, not "mine"/"theirs": the side that merged the
 note has no way to tell a later reader (on another device, or
 itself after the app restarts) which one was whose, so the stored

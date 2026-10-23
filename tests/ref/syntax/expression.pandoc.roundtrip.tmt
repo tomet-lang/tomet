@@ -1,4 +1,4 @@
-@meta{id: doc-expression}
+::meta{id: doc-expression}
 
 =[リテラル]
 `${true}`

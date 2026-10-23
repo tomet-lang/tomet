@@ -17,7 +17,7 @@ pub struct ConfigEntrySpec {
     pub aliases: &'static [&'static str],
 }
 
-/// Specification of a configuration group (e.g. `@config.format`, `@config.workspace`).
+/// Specification of a configuration group (e.g. `::config.format`, `::config.workspace`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigGroupSpec {
     /// Name of the group (e.g. `"format"`, `"workspace"`).

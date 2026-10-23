@@ -37,7 +37,7 @@
 |[ `generate.uuid()` ][ 新しい UUID v4       ]
 
 ```tm
-@meta{
+::meta{
   id: ${generate.uuid()}
   created: ${generate.now()}
   date: ${generate.now().format("YYYY-MM-DD")}

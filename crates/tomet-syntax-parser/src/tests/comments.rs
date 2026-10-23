@@ -220,11 +220,11 @@ fn a_double_slash_line_inside_a_multiline_content_is_a_comment() {
 #[test]
 fn own_line_comment_works_inside_a_paren_group() {
     // The original trigger case: a `//` comment on its own line between
-    // entries in `@config(...)`'s `(args)` map.
-    let doc = parse_document("@config(\n  format:json\n  // a note\n)\n").unwrap();
+    // entries in `::config(...)`'s `(args)` map.
+    let doc = parse_document("::config(\n  format:json\n  // a note\n)\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("config"));
+            assert_eq!(el.sigil, Sigil::document("config"));
             assert_eq!(
                 el.args,
                 Some(Value::Map(vec![(
@@ -239,7 +239,7 @@ fn own_line_comment_works_inside_a_paren_group() {
 
 #[test]
 fn own_line_comment_works_inside_a_lightweight_value_group() {
-    let doc = parse_document("@meta{\n  key: value\n  // a note\n}\n").unwrap();
+    let doc = parse_document("::meta{\n  key: value\n  // a note\n}\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(

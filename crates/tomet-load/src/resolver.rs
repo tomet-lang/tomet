@@ -88,8 +88,8 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    const SETTINGS: &str = "@kind(config)
-@settings{
+    const SETTINGS: &str = "::kind(config)
+::settings{
   meta: {
     tags: { type: list }
     created: { type: datetime }
@@ -104,10 +104,10 @@ mod tests {
         fs::write(root.join("default.config.tmt"), SETTINGS).expect("config");
         fs::write(
             root.join("notes/rust.tmt"),
-            "@meta{ tags: list(rust), created: \"2026-01-01\" }\n\n=[ Rust ]#(top)\n",
+            "::meta{ tags: list(rust), created: \"2026-01-01\" }\n\n=[ Rust ]#(top)\n",
         )
         .expect("rust");
-        fs::write(root.join("notes/deep/go.tmt"), "@meta{ title: Go }\n").expect("go");
+        fs::write(root.join("notes/deep/go.tmt"), "::meta{ title: Go }\n").expect("go");
         fs::write(root.join("index.tmt"), "Index\n").expect("index");
         root
     }

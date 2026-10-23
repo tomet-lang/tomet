@@ -47,14 +47,6 @@ pub(crate) fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inl
                 ));
             }
         }
-        "caret" => {
-            if let Some((idx, backlink)) = cx.footnotes.get_ref(&el.span) {
-                out.push_str(&format!(
-                    "<sup><a href=\"#fn-{}\" id=\"{}\" class=\"footnote-ref\">[{}]</a></sup>",
-                    idx, backlink, idx
-                ));
-            }
-        }
         "link" => render_link_element(cx, el, out, inline),
         "file" | "dir" => render_path_element(cx, el, out, inline),
         "embed" => render_embed_element(el, out),

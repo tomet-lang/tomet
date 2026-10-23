@@ -239,17 +239,17 @@ A blueprint declares what it is, what it targets, and what it says about
 itself -- in that order, in the three slots every element has.
 
 ```tmt
-@kind(blueprint)
-@blueprint(writ){
+::kind(blueprint)
+::blueprint(writ){
   version: "1.0.0"
   description: "twrit"
 }
 ```
 
-`@kind(blueprint)` is written, never inferred from `@blueprint` being
+`::kind(blueprint)` is written, never inferred from `::blueprint` being
 present. The target is the positional argument, normalized to `target`.
-`@blueprint`'s `{...}` holds the blueprint's own metadata and never the
-target. Instantiating promotes `@blueprint(X)` to `@kind(X)`.
+`::blueprint`'s `{...}` holds the blueprint's own metadata and never the
+target. Instantiating promotes `::blueprint(X)` to `::kind(X)`.
 
 ---[ Why ]---
 
@@ -258,16 +258,16 @@ says where each one goes. A blueprint has all three and nothing else --
 what it is, what it is parameterised by, what it records about itself. The
 shape is not invented for blueprints; it is the shape, applied.
 
-`@kind` is the one answer to "what is this document". Inferring it from an
+`::kind` is the one answer to "what is this document". Inferring it from an
 element's presence makes a second path to the same question, and a second
-path is what has gone wrong every time: `@meta{type:}` beside `@kind`, the
+path is what has gone wrong every time: `::meta{type:}` beside `::kind`, the
 identifier rules differing between element arguments and interpolation, `-`
 and `#` taking different groups from `@name`.
 
 Rejected, and worth naming because the code accepted all of them at once:
 
-- `@blueprint(kind: writ)`. Both spellings behave identically:
-  `document_kind` narrows to `@kind` elements with `classify_lenient`
+- `::blueprint(kind: writ)`. Both spellings behave identically:
+  `document_kind` narrows to `::kind` elements with `classify_lenient`
   before it reads any argument, so a blueprint's key is never mistaken for
   the document's own kind whatever it is called. This is a choice for the
   reader, not a collision being avoided -- and worth saying so, because a
@@ -275,25 +275,25 @@ Rejected, and worth naming because the code accepted all of them at once:
   hunting for one. What it costs is that `kind` would appear twice in
   three lines meaning two different things: this file's kind, and the
   output's.
-- `@blueprint(target: writ)`. Spelling the key is not wrong, only
+- `::blueprint(target: writ)`. Spelling the key is not wrong, only
   redundant: `embed` and `link` already normalize a positional to `target`,
-  and `@kind(writ)` is positional too, so promotion becomes the same value
+  and `::kind(writ)` is positional too, so promotion becomes the same value
   moving rather than a change of shape.
 - `@target(writ)` as a separate element. It makes the promotion easy to
   see, but the target is a fact *about the blueprint* and belongs with its
   other facts. One element fewer.
-- A document counting as a blueprint because it has any `@kind` at all.
+- A document counting as a blueprint because it has any `::kind` at all.
   That is what `extract_blueprint_schema` did, and it is why nothing could
   tell a blueprint from the documents it describes.
 
-None of this was written down when `@blueprint` was implemented in
+None of this was written down when `::blueprint` was implemented in
 `bb38aff`, and it appears nowhere in @dir(docs/spec/). That is the whole reason
 this entry exists.
 
 ---[ Guard ]---
 
-None yet. Two halves are checkable: no document carries `@blueprint`
-without `@kind(blueprint)`, and `@blueprint`'s args are a bare positional
+None yet. Two halves are checkable: no document carries `::blueprint`
+without `::kind(blueprint)`, and `::blueprint`'s args are a bare positional
 rather than a `target:`/`kind:` map.
 
 ==[ explicit-form-first ]
@@ -328,10 +328,10 @@ that*, the explanation belongs there instead.
 Every asymmetry this repository has had to remove was a duplicate that
 had been mistaken for a convenience.
 
-- `@meta{ type: }` beside `@kind(...)`. The same fact in two places; by
+- `::meta{ type: }` beside `::kind(...)`. The same fact in two places; by
   the time anyone counted, eleven files under @dir(docs/) had drifted back to
   the old spelling.
-- `@blueprint`'s three argument forms -- positional, `target:`, `kind:`.
+- `::blueprint`'s three argument forms -- positional, `target:`, `kind:`.
   Three ways to say one thing, none of them chosen.
 - Three template lookup directories times three filename spellings, which
   is how `docs/docs.settings.tmt` pointed at a file that does not exist
@@ -369,14 +369,14 @@ spelling wearing the word.
   guard: { runs: "tomet refactor --check --meta-kind" }
 }
 
-A document declares its kind with a top-level `@kind(...)`. The `type:`
-field inside `@meta` is the superseded spelling and does not appear in this
+A document declares its kind with a top-level `::kind(...)`. The `type:`
+field inside `::meta` is the superseded spelling and does not appear in this
 repository -- not in documentation, not in examples, not in fixtures.
 
 ---[ Why ]---
 
 A kind selects the schema that validates the document, so it is a directive
-about the document, not a field of its metadata. Buried inside `@meta` it
+about the document, not a field of its metadata. Buried inside `::meta` it
 was reachable only through a nested lookup, and a reader had to open a map
 to find out what they were holding.
 

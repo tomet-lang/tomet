@@ -65,8 +65,6 @@ pub struct Stats {
     pub document: usize,
     /// Dynamic substitution elements (`${...}`).
     pub dollar: usize,
-    /// Caret elements (`^` and `^name`).
-    pub caret: usize,
     /// Bare list item elements (`- ...`).
     pub bare: usize,
     /// Frequency of named elements by their tag name.
@@ -80,9 +78,9 @@ pub struct Stats {
 }
 
 impl Stats {
-    /// Total number of elements (`named + document + dollar + caret + bare`).
+    /// Total number of elements (`named + document + dollar + bare`).
     pub fn elements(&self) -> usize {
-        self.named + self.document + self.dollar + self.caret + self.bare
+        self.named + self.document + self.dollar + self.bare
     }
 
     /// Total number of internal links.
@@ -108,7 +106,6 @@ impl Stats {
         self.named += other.named;
         self.document += other.document;
         self.dollar += other.dollar;
-        self.caret += other.caret;
         self.bare += other.bare;
         for (name, n) in other.by_name {
             *self.by_name.entry(name).or_default() += n;
@@ -147,7 +144,6 @@ pub fn measure(doc: &Document) -> Stats {
                 *stats.by_name.entry(format!("::{name}")).or_default() += 1;
             }
             Sigil::Dollar => stats.dollar += 1,
-            Sigil::Caret(_) => stats.caret += 1,
             Sigil::Bare => stats.bare += 1,
         }
 

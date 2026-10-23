@@ -202,14 +202,34 @@ pub(crate) fn parse_block_seq(
             }
             continue;
         }
+        // A declaration is only ever a block, so the join/isolate rule has
+        // nothing to decide for it. It is not allowed to fall back to
+        // running text either: `::kind(a, ` is a broken declaration, not a
+        // paragraph that happens to start with two colons.
+        if is_document_element_start(&cur) {
+            let el = parse_element_with_pipe_stack(&mut cur, true, pipe_stack)?
+                .with_placement(Placement::Block);
+            let mut rest = cur;
+            skip_inline_ws(&mut rest);
+            if !matches!(rest.peek(), None | Some('\n') | Some('\r'))
+                && !rest.starts_with("//")
+                && !rest.starts_with("/*")
+            {
+                return Err(crate::value::err(
+                    rest.pos(),
+                    "a `::` declaration stands alone on its line",
+                ));
+            }
+            consume_bare_line_end(&mut cur);
+            push_block(&mut doc_blocks, &mut stack, Block::Element(el));
+            continue;
+        }
         // Join/isolate rule (`docs/spec/syntax.tmt`'s `##[ 継続 ]`): a bare
         // element that opens its own line isolates as its own block by
         // default -- `docs/examples/dirs.tmt`'s file listing depends on
         // this -- and joins whatever follows only when its line ends with
         // an explicit trailing `\`.
-        if (cur.peek() == Some('@') && is_element_start(&cur, true))
-            || is_document_element_start(&cur)
-        {
+        if cur.peek() == Some('@') && is_element_start(&cur, true) {
             match element_ends_line(&cur) {
                 LineEnd::Bare => {
                     let el = parse_element_with_pipe_stack(&mut cur, true, pipe_stack)?

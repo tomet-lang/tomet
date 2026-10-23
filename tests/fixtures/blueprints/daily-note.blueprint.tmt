@@ -1,7 +1,7 @@
-@settings(file:docs/docs.settings.tmt)
-@kind(blueprint)
-@blueprint(daily-note)
-@meta{
+::settings(file:docs/docs.settings.tmt)
+::kind(blueprint)
+::blueprint(daily-note)
+::meta{
   uuid: ${generate.uuid()}
 }
 

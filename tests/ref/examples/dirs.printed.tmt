@@ -1,6 +1,6 @@
-@settings(file: docs/docs.settings.tmt)
+::settings(file: docs/docs.settings.tmt)
 
-@kind(bookmark)
+::kind(bookmark)
 
 @file(readme.md)[説明]
 

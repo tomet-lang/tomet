@@ -45,7 +45,7 @@ pub const CONNECT_MEMBERS: [(&str, ConnectMember); 1] = [("rule", ConnectMember:
 ///
 /// Simpler than [`crate::kind::UnknownName`]: a connect name is never
 /// namespaced (see [`classify_connect_member`]'s first check), so there
-/// is no "missing `@use`" reading to distinguish -- an unrecognized
+/// is no "missing `::use`" reading to distinguish -- an unrecognized
 /// connect name is unconditionally a typo or an unimplemented member.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnknownConnectMember {

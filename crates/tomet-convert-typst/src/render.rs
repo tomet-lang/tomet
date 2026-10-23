@@ -52,7 +52,7 @@ fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
         Block::Paragraph(p) => {
             // Same reasoning as `tomet-convert-markdown`'s `render_block`:
             // an all-invisible-element paragraph (e.g. adjacent
-            // `@meta(...)` lines with no blank line between them) must
+            // `::meta(...)` lines with no blank line between them) must
             // not leave a stray blank paragraph behind.
             let text = inline_to_typst(cx, &p.content);
             if !text.trim().is_empty() {
@@ -190,14 +190,7 @@ fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
                     String::new()
                 }
             } else {
-                // Block footnote definition: will be rendered at caret pin location or leftover
-                String::new()
-            }
-        }
-        "caret" => {
-            if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
-                render_footnote_ref_or_def(cx, idx, None)
-            } else {
+                // Block footnote definition: will be rendered where it is referred to, or left over
                 String::new()
             }
         }

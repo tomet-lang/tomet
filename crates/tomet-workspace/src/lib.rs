@@ -25,13 +25,13 @@ mod tests {
 
     #[test]
     fn test_refactor_source_end_to_end() {
-        let src = r#"@version(1.0)
-@meta{
+        let src = r#"::version(1.0)
+::meta{
   id: doc-test1234
   type: task
   created: 2026-04-12T18:00:00+09:00
 }
-@config{
+::config{
   macros: {
     youtube_ch: "https://www.youtube.com/${1}"
   }
@@ -46,8 +46,8 @@ mod tests {
         let (result, count) = refactor_source(src, &cfg, &opts).unwrap();
         assert!(count >= 1);
 
-        assert!(result.contains("@kind(task)"));
-        assert!(result.contains("@meta"));
+        assert!(result.contains("::kind(task)"));
+        assert!(result.contains("::meta"));
         assert!(!result.contains("type: task"));
         assert!(result.contains("$macro.youtube_ch(\"@realakibaboyz\")"));
     }
@@ -56,8 +56,8 @@ mod tests {
     fn test_structural_apply_action() {
         let mut matches = vec![FileDiff::new(
             "test.tmt".into(),
-            "@meta{author: Charlie}\n".into(),
-            "@meta{author: Charlie}\n".into(),
+            "::meta{author: Charlie}\n".into(),
+            "::meta{author: Charlie}\n".into(),
             1,
         )];
 

@@ -114,7 +114,7 @@ mod tests {
         let _ = fs::remove_dir_all(&temp_dir);
         let _ = fs::create_dir_all(&temp_dir);
 
-        fs::write(temp_dir.join("fine.tmt"), "@kind(note)\n\n=[ Title ]\n").unwrap();
+        fs::write(temp_dir.join("fine.tmt"), "::kind(note)\n\n=[ Title ]\n").unwrap();
         fs::write(temp_dir.join("broken.tmt"), "=[ unterminated\n").unwrap();
 
         let res = refactor_cmd(&temp_dir, false, false, false, true, false);
@@ -132,12 +132,12 @@ mod tests {
         let _ = fs::create_dir_all(&temp_dir);
         let src_file = temp_dir.join("doc.tmt");
 
-        let src_content = r#"@version(1.0)
-@meta{
+        let src_content = r#"::version(1.0)
+::meta{
   type: note
   title: "My Title"
 }
-@config{
+::config{
   macros: {
     gh: "https://github.com/${1}"
   }
@@ -151,7 +151,7 @@ mod tests {
         assert!(res.is_ok());
 
         let refactored = fs::read_to_string(&src_file).unwrap();
-        assert!(refactored.contains("@kind(note)"));
+        assert!(refactored.contains("::kind(note)"));
         assert!(refactored.contains("$macro.gh(\"tomet/tomet\")"));
 
         let _ = fs::remove_dir_all(&temp_dir);
@@ -167,11 +167,11 @@ mod tests {
         let _ = fs::create_dir_all(&frozen_dir);
         fs::write(
             vault.join("default.config.tmt"),
-            "@kind(config)\n@config{ workspace: { unswept: list(\"tests/fixtures\") } }\n",
+            "::kind(config)\n::config{ workspace: { unswept: list(\"tests/fixtures\") } }\n",
         )
         .unwrap();
         let frozen = frozen_dir.join("f.tmt");
-        let old = "@meta{\n  type: note\n}\n";
+        let old = "::meta{\n  type: note\n}\n";
         fs::write(&frozen, old).unwrap();
 
         refactor_cmd(&frozen, true, false, false, false, false).unwrap();

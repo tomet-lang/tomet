@@ -37,8 +37,8 @@ pub fn diagnose_doc(doc: &EditDoc) -> PostEditReport {
 
 /// Diagnoses an [`EditDoc`] as a document of `vault`: what `tomet check`
 /// finds without the disk ([`Vault::diagnostics`]) -- the vocabularies the
-/// document has in scope, the types the vault's settings declare for `@meta`
-/// fields, and the blueprint of `blueprints` that its `@kind` names.
+/// document has in scope, the types the vault's settings declare for `::meta`
+/// fields, and the blueprint of `blueprints` that its `::kind` names.
 pub fn diagnose_doc_in(doc: &EditDoc, vault: &Vault, blueprints: &[Document]) -> PostEditReport {
     let source = export_doc(doc);
     match parse_document(&source) {
@@ -52,11 +52,11 @@ mod tests {
     use super::*;
     use crate::import::import_source;
 
-    const SETTINGS: &str = "@kind(config)\n@config{ meta: { id: { type: uuid } } }\n";
+    const SETTINGS: &str = "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n";
 
     #[test]
     fn a_document_in_a_vault_is_held_to_the_types_its_settings_declare() {
-        let doc = import_source("@meta{ id: not-a-uuid }\n");
+        let doc = import_source("::meta{ id: not-a-uuid }\n");
         let plain = Vault::from_sources(Default::default(), ".", &[]);
         let typed = Vault::from_sources(
             tomet_config::load_config_from_str(SETTINGS).unwrap(),

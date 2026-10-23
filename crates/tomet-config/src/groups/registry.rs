@@ -10,7 +10,7 @@ pub struct RegistryConfig {
     #[config(key = "blueprints", type = "list(string)")]
     pub blueprints: Vec<String>,
 
-    /// Vocabulary files this vault declares, each naming itself with `@vocabulary(ns)`.
+    /// Vocabulary files this vault declares, each naming itself with `::vocabulary(ns)`.
     #[config(key = "vocabularies", type = "list(string)")]
     pub vocabularies: Vec<String>,
 }

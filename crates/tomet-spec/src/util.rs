@@ -75,14 +75,14 @@ pub fn inlines(s: &str) -> Vec<Inline> {
     out
 }
 
-/// Splits plain text so every element-looking word (`@foo`, `$bar`, `^baz`) is wrapped in a code span.
+/// Splits plain text so every element-looking word (`@foo`, `$bar`) is wrapped in a code span.
 pub fn guard_triggers(s: &str) -> Vec<Inline> {
     let mut out = Vec::new();
     let mut plain = String::new();
     let mut rest = s;
     while let Some((at, c)) = rest
         .char_indices()
-        .find(|&(i, c)| matches!(c, '@' | '$' | '^') && starts_element(&rest[i + c.len_utf8()..]))
+        .find(|&(i, c)| matches!(c, '@' | '$') && starts_element(&rest[i + c.len_utf8()..]))
     {
         plain.push_str(&rest[..at]);
         let word_end = rest[at..]

@@ -1,10 +1,10 @@
-@settings(file: docs/docs.settings.tmt)
+::settings(file: docs/docs.settings.tmt)
 
-@kind(blueprint)
+::kind(blueprint)
 
-@blueprint(daily-note)
+::blueprint(daily-note)
 
-@meta{uuid: ${generate.uuid()}}
+::meta{uuid: ${generate.uuid()}}
 
 =[TODO] #(todo)
 

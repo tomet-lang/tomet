@@ -88,8 +88,8 @@ vocabularies would; [`diagnose_doc_in`] is the report for a document in a vault.
 
 Diagnoses an [`EditDoc`] as a document of `vault`: what `tomet check`
 finds without the disk ([`Vault::diagnostics`]) -- the vocabularies the
-document has in scope, the types the vault's settings declare for `@meta`
-fields, and the blueprint of `blueprints` that its `@kind` names.
+document has in scope, the types the vault's settings declare for `::meta`
+fields, and the blueprint of `blueprints` that its `::kind` names.
 
 ==[Module doc]
 

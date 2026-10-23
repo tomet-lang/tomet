@@ -6,7 +6,7 @@
 //! `tomet_config::PrinterConfig` (see that crate for config
 //! loading/discovery) to drive formatting choices: meta format
 //! (yaml/json/toml), link-key spacing, callout/list style, via
-//! `tomet-style`'s single-node renderers. Also owns `@meta` id
+//! `tomet-style`'s single-node renderers. Also owns `::meta` id
 //! auto-generation (`ensure_document_id_with_config`, which mutates the
 //! AST directly), built on the pure generate/validate/convert helpers
 //! in `tomet-field-utils`.

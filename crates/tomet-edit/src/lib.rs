@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn set_attribute_data_adds_or_updates_key() {
-        let src = "@meta{ x: 1 }\n\nBody text.\n";
+        let src = "::meta{ x: 1 }\n\nBody text.\n";
         let mut doc = import_source(src);
 
         let meta_id = doc
@@ -208,13 +208,13 @@ mod tests {
         let exported = export_doc(&doc);
         assert_eq!(
             exported,
-            "@meta{x: 1, icon: @doc.icon(star, pkg: tabler)}\n\nBody text.\n"
+            "::meta{x: 1, icon: @doc.icon(star, pkg: tabler)}\n\nBody text.\n"
         );
     }
 
     #[test]
     fn set_attribute_replaces_existing_key() {
-        let src = "@meta{ icon: @doc.icon(old) }\n\nBody.\n";
+        let src = "::meta{ icon: @doc.icon(old) }\n\nBody.\n";
         let mut doc = import_source(src);
 
         let meta_id = doc
@@ -228,12 +228,12 @@ mod tests {
             .unwrap();
 
         let exported = export_doc(&doc);
-        assert_eq!(exported, "@meta{icon: @doc.icon(new)}\n\nBody.\n");
+        assert_eq!(exported, "::meta{icon: @doc.icon(new)}\n\nBody.\n");
     }
 
     #[test]
     fn set_attribute_deletes_key_when_value_is_none() {
-        let src = "@meta{ x: 1, y: 2 }\n\nBody.\n";
+        let src = "::meta{ x: 1, y: 2 }\n\nBody.\n";
         let mut doc = import_source(src);
 
         let meta_id = doc
@@ -247,7 +247,7 @@ mod tests {
             .unwrap();
 
         let exported = export_doc(&doc);
-        assert_eq!(exported, "@meta{y: 2}\n\nBody.\n");
+        assert_eq!(exported, "::meta{y: 2}\n\nBody.\n");
     }
 
     #[test]
@@ -302,6 +302,7 @@ mod tests {
             meta_id,
             NodeKind::BlockElement {
                 name: "meta".to_string(),
+                declaration: true,
                 id_attr: None,
                 args: Vec::new(),
                 data: Vec::new(),
@@ -332,7 +333,7 @@ mod tests {
         let exported = export_doc(&doc);
         assert_eq!(
             exported,
-            "@meta{icon: @doc.icon(star, pkg: tabler)}\n\nJust a note.\n"
+            "::meta{icon: @doc.icon(star, pkg: tabler)}\n\nJust a note.\n"
         );
     }
 
@@ -377,7 +378,7 @@ mod tests {
 
     #[test]
     fn address_text_and_property_queries() {
-        let src = "@meta#(main-meta){ icon: @doc.icon(star), title: \"Doc\" }\n\n@callout#(warn)(type: \"warning\")[ Be careful! ]\n";
+        let src = "::meta#(main-meta){ icon: @doc.icon(star), title: \"Doc\" }\n\n@callout#(warn)(type: \"warning\")[ Be careful! ]\n";
         let doc = import_source(src);
 
         // Query element properties
@@ -418,7 +419,7 @@ mod tests {
         );
 
         // Mutate meta property via address
-        let src_meta = "@meta#(cfg){ version: 1 }\n\nText.\n";
+        let src_meta = "::meta#(cfg){ version: 1 }\n\nText.\n";
         let mut doc_meta = import_source(src_meta);
         doc_meta.set_prop_at("#cfg.version", Some("2")).unwrap();
         doc_meta
@@ -427,7 +428,7 @@ mod tests {
         let exported_meta = export_doc(&doc_meta);
         assert_eq!(
             exported_meta,
-            "@meta#(cfg){version: 2, author: \"Tomet\"}\n\nText.\n"
+            "::meta#(cfg){version: 2, author: \"Tomet\"}\n\nText.\n"
         );
     }
 
@@ -488,7 +489,7 @@ mod tests {
 
     #[test]
     fn find_element_by_name_and_meta_helpers() {
-        let src = "@meta{ version: 1 }\n\n// comment\n@callout(info)[ Notice ]\n";
+        let src = "::meta{ version: 1 }\n\n// comment\n@callout(info)[ Notice ]\n";
         let doc = import_source(src);
 
         // Find elements by sigil/name
@@ -512,8 +513,8 @@ mod tests {
 
     #[test]
     fn ensure_meta_node_and_set_meta_data_on_existing_and_missing() {
-        // 1. Existing @meta: updates and adds keys
-        let src_existing = "@meta{ a: 1 }\n\nBody text.\n";
+        // 1. Existing ::meta: updates and adds keys
+        let src_existing = "::meta{ a: 1 }\n\nBody text.\n";
         let mut doc = import_source(src_existing);
         let orig_meta_id = doc.meta_node().unwrap();
 
@@ -522,14 +523,14 @@ mod tests {
         assert_eq!(doc.meta_node(), Some(orig_meta_id));
 
         let exported = export_doc(&doc);
-        assert_eq!(exported, "@meta{a: 10, b: 2}\n\nBody text.\n");
+        assert_eq!(exported, "::meta{a: 10, b: 2}\n\nBody text.\n");
 
         // Delete a key
         doc.set_meta_data("b", None::<String>).unwrap();
         let exported_del = export_doc(&doc);
-        assert_eq!(exported_del, "@meta{a: 10}\n\nBody text.\n");
+        assert_eq!(exported_del, "::meta{a: 10}\n\nBody text.\n");
 
-        // 2. Missing @meta: automatically creates @meta at top with spacing trivia
+        // 2. Missing ::meta: automatically creates ::meta at top with spacing trivia
         let src_none = "Just a note.\n";
         let mut doc_none = import_source(src_none);
         assert_eq!(doc_none.meta_node(), None);
@@ -542,14 +543,14 @@ mod tests {
         let exported_none = export_doc(&doc_none);
         assert_eq!(
             exported_none,
-            "@meta{icon: @doc.icon(star, pkg: tabler)}\n\nJust a note.\n"
+            "::meta{icon: @doc.icon(star, pkg: tabler)}\n\nJust a note.\n"
         );
 
         // 3. ensure_meta_node on empty document
         let mut doc_empty = EditDoc::new();
         let empty_meta_id = doc_empty.ensure_meta_node();
         assert_eq!(doc_empty.ensure_meta_node(), empty_meta_id); // idempotent
-        assert_eq!(export_doc(&doc_empty), "@meta\n");
+        assert_eq!(export_doc(&doc_empty), "::meta\n");
     }
 
     #[test]

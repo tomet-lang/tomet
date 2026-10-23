@@ -11,9 +11,9 @@ Provides:
 - (expressions) Every `${...}` in a document resolved once, in one pass, with the
 evaluator's typed values put back according to where each expression sits.
 - (macro_rewrite) Reverse URL-to-macro pattern matching and rewriting.
-- (directive) Directive promotion (`@meta.type` -> `@kind`) and Value DSL normalization.
+- (directive) Directive promotion (`::meta.type` -> `::kind`) and Value DSL normalization.
 - (structural) Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
-- (meta) Batch `@meta` key/value updates.
+- (meta) Batch `::meta` key/value updates.
 
 ==[Module blueprint]
 
@@ -23,7 +23,7 @@ Blueprint schema extraction, transformation, and instantiation.
 
 ====[struct BlueprintInfo]
 
-Metadata and variable definitions extracted from a `@blueprint` directive.
+Metadata and variable definitions extracted from a `::blueprint` directive.
 
 ====[struct Instantiated]
 
@@ -33,12 +33,12 @@ What [`instantiate_blueprint`] did.
 
 ====[fn extract_blueprint_info]
 
-Extracts [`BlueprintInfo`] from `doc` if it declares a top-level `@blueprint` directive.
+Extracts [`BlueprintInfo`] from `doc` if it declares a top-level `::blueprint` directive.
 
 ====[fn instantiate_blueprint]
 
 Instantiates a blueprint `doc` in-place by:
-1. Promoting/converting `@blueprint(target)` to `@kind(target)` and stripping schema blocks.
+1. Promoting/converting `::blueprint(target)` to `::kind(target)` and stripping schema blocks.
 2. Resolving every `${...}` in it, with `cx` -- which is a creating context
 (`Phase::Create`), the only place `generate.*` and `vars` exist.
 
@@ -51,15 +51,15 @@ Directive promotion and Value DSL normalization transformations.
 ====[fn promote_prop_to_directive]
 
 Promotes a property `prop_key` from an element matching `source_filter` into a new top-level
-directive `@target_directive_name(val)` (or `@target_directive_name{...}`), inserting it at `target_index`
-(or automatically after any `@version` directive, or at position 0).
+declaration `::target_directive_name(val)` (or `::target_directive_name{...}`), inserting it at `target_index`
+(or automatically after any `::version` directive, or at position 0).
 
 If the property is absent, empty, or null, it is simply removed without creating a directive.
 Returns `true` if a directive was created and inserted.
 
 ====[fn promote_meta_type_to_kind]
 
-Promotes `@meta`'s `type:` field to a top-level `@kind(...)` element.
+Promotes `::meta`'s `type:` field to a top-level `::kind(...)` element.
 
 ==[Module expressions]
 
@@ -162,7 +162,7 @@ Metadata element manipulation in documents.
 
 ====[fn set_meta_in_doc]
 
-Updates or inserts a key-value pair in a target directive/metadata block (e.g. `@meta`).
+Updates or inserts a key-value pair in a target directive/metadata block (e.g. `::meta`).
 If the target block is not found, prepends a new directive block at position 0.
 
 ==[Module structural]

@@ -7,7 +7,7 @@ use tomet_expr::{
 
 use super::*;
 
-const NOTE: &str = "@meta{
+const NOTE: &str = "::meta{
   title: Note
   tags: list(a, b)
 }
@@ -23,9 +23,9 @@ fn vault() -> MemoryResolver {
     MemoryResolver::new()
         .with_source("here.tmt", NOTE)
         .unwrap()
-        .with_source("docs/a.tmt", "@meta{ title: A }\n")
+        .with_source("docs/a.tmt", "::meta{ title: A }\n")
         .unwrap()
-        .with_source("docs/b.tmt", "@meta{ title: B }\n")
+        .with_source("docs/b.tmt", "::meta{ title: B }\n")
         .unwrap()
 }
 
@@ -265,7 +265,7 @@ fn a_value_in_an_element_argument_keeps_its_type() {
 #[test]
 fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
     let (doc, unresolved) =
-        run("@meta{ n: ${add(1, 1)}, names: ${addr(dir:docs).docs.map(d => d.path)} }\n");
+        run("::meta{ n: ${add(1, 1)}, names: ${addr(dir:docs).docs.map(d => d.path)} }\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let Block::Element(el) = &doc.blocks[0] else {
         panic!("an element block");
@@ -331,7 +331,7 @@ fn a_reference_is_answered_from_the_document_the_resolver_holds() {
 fn creating_a_document_reads_vars_and_generates() {
     let vars = EvalValue::Map(vec![("title".into(), EvalValue::String("Plan".into()))]);
     let (doc, unresolved) = run_with(
-        "@meta{ id: ${generate.uuid()}, title: ${vars.title} }\n\nPlan for ${vars.title}\n",
+        "::meta{ id: ${generate.uuid()}, title: ${vars.title} }\n\nPlan for ${vars.title}\n",
         Phase::Create,
         &vars,
     );
@@ -361,7 +361,7 @@ fn creating_a_document_reads_vars_and_generates() {
 
 #[test]
 fn creation_only_names_are_refused_when_rendering() {
-    let (doc, unresolved) = run("@meta{ id: ${generate.uuid()} }\n");
+    let (doc, unresolved) = run("::meta{ id: ${generate.uuid()} }\n");
     assert!(reasons(&unresolved)[0].contains("when a document is being created"));
     let Block::Element(el) = &doc.blocks[0] else {
         panic!("meta");

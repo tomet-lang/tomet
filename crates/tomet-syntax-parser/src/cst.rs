@@ -536,11 +536,6 @@ impl<'a> CstParser<'a> {
         let p = self.pos;
         let is_element = match self.current_kind() {
             Some(K::AT) => self.kind_at(p + 1) == Some(K::IDENT) && self.groups_follow(p + 2),
-            Some(K::CARET) => {
-                self.kind_at(p + 1) == Some(K::L_PAREN)
-                    || (self.kind_at(p + 1) == Some(K::IDENT)
-                        && self.kind_at(p + 2) == Some(K::L_PAREN))
-            }
             Some(K::DOLLAR) => {
                 self.kind_at(p + 1) == Some(K::L_BRACE)
                     || (self.kind_at(p + 1) == Some(K::IDENT)
@@ -832,10 +827,10 @@ mod tests {
     fn test_cst_lossless_roundtrip_all_syntaxes() {
         let cases = [
             "#[ Heading ]\n\nParagraph text with *em* and @tag[ content ].\n",
-            "@config{ format: json }\n",
+            "::config{ format: json }\n",
             "- item 1\n- item 2\n-. ordered 1\n\n```rust\nfn main() {}\n```\n",
             "// Comment line\n@card(id: 123){ priority: high }[ Note ]\n",
-            "=[ A ]=\n== B ==\n=\n---\n---[ x ]---\n\ntext ^n(1) ${a.b} $f(x) @l[t](ref:y):rule(a)\n",
+            "=[ A ]=\n== B ==\n=\n---\n---[ x ]---\n\ntext ${a.b} $f(x) @l[t](ref:y):rule(a)\n",
             // Unterminated everything: still lossless.
             "@a(b: {c: [1, 2\n=[ open\n${ x\n@f[ never closed",
             "",
@@ -920,7 +915,7 @@ mod tests {
 
     #[test]
     fn inline_elements_are_structured() {
-        let src = "See @link[label](ref:x) and ^note(1) and ${a.b} and $sum(1, 2).\n";
+        let src = "See @link[label](ref:x) and @ftn(1) and ${a.b} and $sum(1, 2).\n";
         let root = parse_cst(src);
         let para = find(&root, K::PARAGRAPH).unwrap();
         let elements: Vec<_> = para
@@ -932,7 +927,7 @@ mod tests {
         assert_eq!(child_kinds(&elements[0]), [K::SIGIL, K::CONTENT, K::ARGS]);
         assert_eq!(elements[0].text().to_string(), "@link[label](ref:x)");
         assert_eq!(child_kinds(&elements[1]), [K::SIGIL, K::ARGS]);
-        assert_eq!(elements[1].text().to_string(), "^note(1)");
+        assert_eq!(elements[1].text().to_string(), "@ftn(1)");
         assert_eq!(child_kinds(&elements[2]), [K::SIGIL, K::INTERP_EXPR]);
         assert_eq!(elements[2].text().to_string(), "${a.b}");
         assert_eq!(child_kinds(&elements[3]), [K::SIGIL, K::ARGS]);
@@ -943,7 +938,7 @@ mod tests {
     }
 
     #[test]
-    fn plain_at_and_caret_are_text() {
+    fn plain_at_and_dollar_are_text() {
         for src in [
             "mail me @ home\n",
             "a@b.com\n",
@@ -1017,7 +1012,7 @@ mod tests {
             child_kinds(&parse_cst("@card(id: a){ p: 1 }\n")),
             [K::BLOCK_ELEMENT]
         );
-        assert_eq!(child_kinds(&parse_cst("@meta\n")), [K::BLOCK_ELEMENT]);
+        assert_eq!(child_kinds(&parse_cst("::meta\n")), [K::BLOCK_ELEMENT]);
         let root = parse_cst("@link[a](ref:b) trailing\n");
         assert_eq!(child_kinds(&root), [K::PARAGRAPH]);
         assert_eq!(count(&root, K::INLINE_ELEMENT), 1);
@@ -1043,7 +1038,7 @@ mod tests {
 
     #[test]
     fn value_data_holds_entries() {
-        let root = parse_cst("@meta{\n  _id: intro\n  tags: [a, b]\n}\n");
+        let root = parse_cst("::meta{\n  _id: intro\n  tags: [a, b]\n}\n");
         let data = find(&root, K::VALUE_DATA).unwrap();
         let entries: Vec<_> = data.children().map(|n| n.text().to_string()).collect();
         assert_eq!(entries, ["_id: intro", "tags: [a, b]"]);
@@ -1181,7 +1176,7 @@ mod tests {
         // Same regression this session's AST-path fix covers: `#` must be
         // immediately followed by `(` to be the id slot, elsewhere it's
         // free text -- confirmed here for the lossless tree too.
-        let root = parse_cst("@meta{a: 1}\n#[ Title ]\n");
+        let root = parse_cst("::meta{a: 1}\n#[ Title ]\n");
         assert_eq!(count(&root, K::ID_GROUP), 0);
         assert_eq!(child_kinds(&root), [K::BLOCK_ELEMENT, K::PARAGRAPH]);
     }

@@ -97,7 +97,7 @@ and escapes element-like trigger words (`@`, `$`, `^`).
 
 ====[fn guard_triggers]
 
-Splits plain text so every element-looking word (`@foo`, `$bar`, `^baz`) is wrapped in a code span.
+Splits plain text so every element-looking word (`@foo`, `$bar`) is wrapped in a code span.
 
 ====[fn paragraphs]
 

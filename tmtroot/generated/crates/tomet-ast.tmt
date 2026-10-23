@@ -14,7 +14,7 @@ Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
 - ("Pure Data Models & Structural Accessors Only") `tomet-ast` is the foundational dependency-free crate referenced across the workspace.
 It contains only struct/enum definitions and pure inherent methods for construction
 (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`, `Span::union()`).
-- ("Clear Crate Boundaries") Semantics: Classification of element meanings (links, `@meta`, `@config`) lives in `tomet-semantics`.
+- ("Clear Crate Boundaries") Semantics: Classification of element meanings (links, `::meta`, `::config`) lives in `tomet-semantics`.
 Traversal & Manipulation: Generic tree traversal algorithms live in `tomet-tree`.
 Formatting & Printing: Serialization to `.tmt` text lives in `tomet-style` and `tomet-printer`.
 Validation: Field formatting and lint validation live in `tomet-validator`.
@@ -125,8 +125,8 @@ An element's name, split into its optional namespace and its own name.
 The separator is `.`: `deck.bookmark` is `Name { namespace:
 Some("deck"), name: "bookmark" }`. Exactly two namespaces may be
 written bare: `std`, which the language carries, and the document's
-own `@kind`, declared on its first line. A name from any other
-namespace -- anything brought in with `@use` -- is always written
+own `::kind`, declared on its first line. A name from any other
+namespace -- anything brought in with `::use` -- is always written
 out, and a bare name in neither of the two is an error rather than
 falling back to a `Custom` kind. That check is `Bindings::classify`
 in `tomet-semantics`, not the free `classify_std` beside it, which only

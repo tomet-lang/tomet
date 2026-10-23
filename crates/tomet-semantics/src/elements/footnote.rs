@@ -101,7 +101,7 @@ impl FootnoteRegistry {
                     let id = get_element_id(el);
                     if let Some(id_str) = id {
                         if el.content.is_none() {
-                            // `@ftn(id)`: a reference, as `^(id)` was
+                            // `@ftn(id)`: a reference to the definition with that id
                             note_reference(
                                 &mut registry,
                                 &mut id_to_index,
@@ -146,19 +146,6 @@ impl FootnoteRegistry {
                             .insert(span_key(&el.span), (index, backlink_id));
                     }
                 }
-                ElementKind::Caret => {
-                    // Check target kind filter: None or a footnote's name
-                    let target_kind = el.sigil.caret_target_kind();
-                    if let Some(target) = target_kind
-                        && target.name != "footnote"
-                        && target.name != "ftn"
-                    {
-                        return;
-                    }
-                    if let Some(id_str) = get_element_id(el) {
-                        note_reference(&mut registry, &mut id_to_index, &defs, id_str, &el.span);
-                    }
-                }
                 _ => {}
             }
         });
@@ -197,7 +184,7 @@ mod tests {
 
     #[test]
     fn test_inline_footnote_numbering() {
-        let src = "First@footnote[one] and second@footnote[two].\n";
+        let src = "First@ftn[one] and second@ftn[two].\n";
         let doc = parse_document(src).unwrap();
         let registry = FootnoteRegistry::from_document(&doc);
 
@@ -209,28 +196,8 @@ mod tests {
     }
 
     #[test]
-    fn test_reference_and_definition_resolution() {
-        let src = "See ^(intro) and ^footnote(intro) and ^(other).\n\n@footnote(intro)[Introduction text]\n\n@footnote(other)| Other text\n";
-        let doc = parse_document(src).unwrap();
-        let registry = FootnoteRegistry::from_document(&doc);
-
-        assert_eq!(registry.items.len(), 2);
-        // "intro" is the first referenced footnote
-        assert_eq!(registry.items[0].index, 1);
-        assert_eq!(registry.items[0].id.as_deref(), Some("intro"));
-        assert_eq!(registry.items[0].backlinks.len(), 2); // referenced twice: ^(intro) and ^footnote(intro)
-        assert!(registry.items[0].definition.is_some());
-
-        // "other" is the second referenced footnote
-        assert_eq!(registry.items[1].index, 2);
-        assert_eq!(registry.items[1].id.as_deref(), Some("other"));
-        assert_eq!(registry.items[1].backlinks.len(), 1);
-        assert!(registry.items[1].definition.is_some());
-    }
-
-    #[test]
     fn test_numeric_footnote_id_resolution() {
-        let src = "Item ^(1) and ^(2).\n\n@footnote(1)[Note 1]\n@footnote(2)[Note 2]\n";
+        let src = "Item @ftn(1) and @ftn(2).\n\n@ftn(1)[Note 1]\n@ftn(2)[Note 2]\n";
         let doc = parse_document(src).unwrap();
         let registry = FootnoteRegistry::from_document(&doc);
 
@@ -244,7 +211,7 @@ mod tests {
         assert!(registry.items[1].definition.is_some());
     }
 
-    /// `@ftn` is the short name; the definition and the reference are the same
+    /// The definition and the reference are the same
     /// element, told apart by whether it has content.
     #[test]
     fn ftn_defines_with_content_and_refers_without() {
@@ -283,13 +250,5 @@ mod tests {
         let registry = FootnoteRegistry::from_document(&parse_document(src).unwrap());
         assert_eq!(registry.items.len(), 2);
         assert_eq!(registry.items[0].id, None);
-    }
-
-    #[test]
-    fn the_old_names_keep_working_beside_the_new_one() {
-        let src = "A@ftn(n) and B^(n) and C@footnote(n).\n\n@footnote(n)[Both spellings]\n";
-        let registry = FootnoteRegistry::from_document(&parse_document(src).unwrap());
-        assert_eq!(registry.items.len(), 1);
-        assert_eq!(registry.items[0].backlinks.len(), 3);
     }
 }

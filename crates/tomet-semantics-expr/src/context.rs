@@ -34,7 +34,7 @@ pub trait Resolver {
     fn note(&self, name: &str) -> Result<DocRef, String>;
     /// Every document under `dir`, subdirectories included.
     fn dir_docs(&self, dir: &DirRef) -> Result<Vec<DocRef>, String>;
-    /// The document's `@meta`, typed by the settings' `type:` declarations:
+    /// The document's `::meta`, typed by the settings' `type:` declarations:
     /// a `list` field is a list (empty when the document lacks it), a
     /// `datetime` field is a datetime, and the other declared fields are
     /// `Null` when the document lacks them. A key that is not declared and

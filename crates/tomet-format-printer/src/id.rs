@@ -6,7 +6,7 @@ use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
 use tomet_style::quote_scalar_string;
 use tomet_tree::element_new;
 
-/// Ensures that a document has an `id` field in its `@meta` block if configured to do so.
+/// Ensures that a document has an `id` field in its `::meta` block if configured to do so.
 pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig) {
     let Some(id_cfg) = config.meta.fields.get("id") else {
         return;
@@ -56,7 +56,7 @@ pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig
 
     if !meta_found && (force || overwrite) {
         let new_id = generate_id_for_field(id_cfg);
-        let mut meta_el = element_new(Sigil::named("meta"));
+        let mut meta_el = element_new(Sigil::document("meta"));
         meta_el.value = Some(ElementValue::Group(vec![Entry::Pair(
             "id".to_string(),
             Value::String(new_id),

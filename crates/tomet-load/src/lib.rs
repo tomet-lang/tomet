@@ -49,7 +49,7 @@
 //! formats its own parse errors (the CLI does) wants `parse` + `prepare`.
 //!
 //! Preparing asks the vault's files questions -- which documents are under a
-//! directory, what a note name stands for, what another document's `@meta`
+//! directory, what a note name stands for, what another document's `::meta`
 //! says -- through [`Vault::resolver`], and a document is read at most once
 //! however many expressions ask for it.
 //!
@@ -180,7 +180,7 @@ impl Vault {
 
     /// Tells the vault that an editor holds `path` open with `text`, which
     /// may not have been saved. A document that asks for that file -- an
-    /// `include` of it, a `#id` in it, its `@meta` -- is answered from `text`
+    /// `include` of it, a `#id` in it, its `::meta` -- is answered from `text`
     /// from now on, not from the disk.
     ///
     /// Text that does not parse is no buffer at all: the file is read from
@@ -335,7 +335,7 @@ mod tests {
         fs::create_dir_all(root.join("notes")).expect("temp dirs");
         fs::write(
             root.join("default.config.tmt"),
-            "@kind(config)\n@settings{ meta: { tags: { type: list }, created: { type: datetime } } }\n",
+            "::kind(config)\n::settings{ meta: { tags: { type: list }, created: { type: datetime } } }\n",
         )
         .expect("config");
         for (file, tags, created) in [
@@ -345,7 +345,7 @@ mod tests {
         ] {
             fs::write(
                 root.join("notes").join(file),
-                format!("@meta{{ tags: {tags}, created: \"{created}\" }}\n\n=[ Note ]\n"),
+                format!("::meta{{ tags: {tags}, created: \"{created}\" }}\n\n=[ Note ]\n"),
             )
             .expect("note");
         }
@@ -478,7 +478,7 @@ mod tests {
         let root = std::env::temp_dir().join(name);
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("temp dir");
-        fs::write(root.join("default.config.tmt"), "@kind(config)\n").expect("config");
+        fs::write(root.join("default.config.tmt"), "::kind(config)\n").expect("config");
         for (path, source) in files {
             let full = root.join(path);
             fs::create_dir_all(full.parent().unwrap()).expect("dirs");
@@ -498,7 +498,7 @@ mod tests {
                 ),
                 (
                     "parts/a.tmt",
-                    "@meta{ title: A }\n\n=[ A ]\n\nI am ${self.path} (${self.meta.title})\n",
+                    "::meta{ title: A }\n\n=[ A ]\n\nI am ${self.path} (${self.meta.title})\n",
                 ),
             ],
         );
@@ -603,8 +603,8 @@ mod tests {
         let root = include_vault(
             "tomet_test_load_evaluate",
             &[
-                ("host.tmt", "@meta{ title: Host }\n\n=[ Intro ]#(intro)\n"),
-                ("other.tmt", "@meta{ title: Saved }\n"),
+                ("host.tmt", "::meta{ title: Host }\n\n=[ Intro ]#(intro)\n"),
+                ("other.tmt", "::meta{ title: Saved }\n"),
             ],
         );
         let vault = Vault::discover(&root);
@@ -630,7 +630,7 @@ mod tests {
         assert_eq!(eval("#intro.id").unwrap(), text("intro"));
 
         // The other document is open in the editor, edited and not saved.
-        vault.set_buffer(&root.join("other.tmt"), "@meta{ title: Edited }\n");
+        vault.set_buffer(&root.join("other.tmt"), "::meta{ title: Edited }\n");
         assert_eq!(
             eval("tmt(\"other.tmt\").meta.title").unwrap(),
             text("Edited")

@@ -417,7 +417,7 @@ mod tests {
 
     #[test]
     fn test_process_document_with_meta_title() {
-        let src = "@meta{\n  title: \"My Meta Title\"\n}\n\n=[ Document Title ]\n\n==[ Section One ]\n\nContent.\n";
+        let src = "::meta{\n  title: \"My Meta Title\"\n}\n\n=[ Document Title ]\n\n==[ Section One ]\n\nContent.\n";
         let doc = parse_plain(src).unwrap();
         let opts = ProcessOptions {
             advanced: Some(true),
@@ -452,7 +452,7 @@ mod tests {
 
     #[test]
     fn test_process_document_data_only() {
-        let src = "@version(1.0)\n@meta{\n  title: \"Just Config\"\n}\n";
+        let src = "::version(1.0)\n::meta{\n  title: \"Just Config\"\n}\n";
         let doc = parse_plain(src).unwrap();
         let opts = ProcessOptions::default();
         let res = process_document_internal(doc, &opts);

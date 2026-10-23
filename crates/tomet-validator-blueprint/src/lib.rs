@@ -1,7 +1,7 @@
 //! Blueprint structural validation against a target document.
 //!
 //! Extracts structural schemas (required meta keys, required sections, and section-level
-//! `:rule` constraints) from blueprint documents (`@kind(blueprint)`), and validates
+//! `:rule` constraints) from blueprint documents (`::kind(blueprint)`), and validates
 //! target documents for conformance.
 
 use tomet_ast::{Block, Document, Element, Inline, Section, Span, Value};
@@ -113,7 +113,7 @@ pub fn validate_against_schema(
     let mut errors = Vec::new();
     let doc_span = doc.span;
 
-    // 1. Verify required @meta keys
+    // 1. Verify required ::meta keys
     let mut doc_meta_keys = Vec::new();
     let mut doc_meta_span = doc_span;
 
@@ -272,19 +272,19 @@ mod tests {
     #[test]
     fn a_plain_kind_document_is_not_a_blueprint() {
         let doc = tomet_parser::parse_document(
-            "@kind(daily-note)\n@meta{\n  id: doc-1\n}\n\n=[ Plan ] {id: plan}\n",
+            "::kind(daily-note)\n::meta{\n  id: doc-1\n}\n\n=[ Plan ] {id: plan}\n",
         )
         .unwrap();
         assert!(
             extract_blueprint_schema(&doc).is_none(),
-            "a document with a kind but no `@blueprint` must not read as a schema"
+            "a document with a kind but no `::blueprint` must not read as a schema"
         );
     }
 
     #[test]
     fn a_blueprint_still_extracts_its_schema() {
         let doc = tomet_parser::parse_document(
-            "@kind(blueprint)\n@blueprint(daily-note)\n\n=[ Plan ] {id: plan}\n",
+            "::kind(blueprint)\n::blueprint(daily-note)\n\n=[ Plan ] {id: plan}\n",
         )
         .unwrap();
         assert!(
@@ -296,10 +296,10 @@ mod tests {
     #[test]
     fn validates_matching_document_successfully() {
         let blueprint = parse(
-            "@blueprint(daily-note)\n@meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n=[ Plan ] {id: plan}\n\n=[ Review ] {id: review}\n",
+            "::blueprint(daily-note)\n::meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n=[ Plan ] {id: plan}\n\n=[ Review ] {id: review}\n",
         );
         let doc = parse(
-            "@kind(daily-note)\n@meta{\n  id: doc-123\n  date: 2026-09-01\n}\n\n=[ Plan ] {id: plan}\n- ( ) My task\n\n=[ Review ] {id: review}\nGood day.\n",
+            "::kind(daily-note)\n::meta{\n  id: doc-123\n  date: 2026-09-01\n}\n\n=[ Plan ] {id: plan}\n- ( ) My task\n\n=[ Review ] {id: review}\nGood day.\n",
         );
 
         let errors = validate_against_blueprint(&doc, &blueprint);
@@ -309,10 +309,10 @@ mod tests {
     #[test]
     fn reports_missing_meta_key_and_missing_section() {
         let blueprint = parse(
-            "@blueprint(daily-note)\n@meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n=[ Plan ]#(plan)\n\n=[ Review ]#(review)\n",
+            "::blueprint(daily-note)\n::meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n=[ Plan ]#(plan)\n\n=[ Review ]#(review)\n",
         );
         let doc = parse(
-            "@kind(daily-note)\n@meta{\n  id: doc-123\n}\n\n=[ Plan ]#(plan)\n- ( ) My task\n",
+            "::kind(daily-note)\n::meta{\n  id: doc-123\n}\n\n=[ Plan ]#(plan)\n- ( ) My task\n",
         );
 
         let errors = validate_against_blueprint(&doc, &blueprint);
@@ -329,13 +329,11 @@ mod tests {
 
     #[test]
     fn enforces_blueprint_section_rule_constraint() {
-        let blueprint = parse(
-            "@blueprint(task-list)\n\n=[ Tasks ]#(tasks):rule(allow: list(task))\n",
-        );
+        let blueprint =
+            parse("::blueprint(task-list)\n\n=[ Tasks ]#(tasks):rule(allow: list(task))\n");
         // doc has a section with a heading that is not allowed
-        let doc_bad = parse(
-            "@kind(task-list)\n\n=[ Tasks ]#(tasks)\n@heading[ Not allowed here ]\n",
-        );
+        let doc_bad =
+            parse("::kind(task-list)\n\n=[ Tasks ]#(tasks)\n@heading[ Not allowed here ]\n");
         let errors = validate_against_blueprint(&doc_bad, &blueprint);
         assert_eq!(errors.len(), 1);
         assert!(matches!(
@@ -344,10 +342,11 @@ mod tests {
         ));
 
         // doc with only allowed elements
-        let doc_good = parse(
-            "@kind(task-list)\n\n=[ Tasks ]#(tasks)\n@task[ Do something ]\n",
-        );
+        let doc_good = parse("::kind(task-list)\n\n=[ Tasks ]#(tasks)\n@task[ Do something ]\n");
         let errors_good = validate_against_blueprint(&doc_good, &blueprint);
-        assert!(errors_good.is_empty(), "expected no errors, got: {errors_good:?}");
+        assert!(
+            errors_good.is_empty(),
+            "expected no errors, got: {errors_good:?}"
+        );
     }
 }

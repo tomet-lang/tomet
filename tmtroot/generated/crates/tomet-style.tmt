@@ -6,7 +6,7 @@
 
 Applies `tomet_config::PrinterConfig`'s style rules (meta format,
 link-key spacing (`target`, `@link`/`<embed>`'s one shared key), per-field
-`@meta` formatting) to a single
+`::meta` formatting) to a single
 `tomet_ast::Value` or `Element`, returning `.tmt`-syntax text.
 Deliberately scoped to single nodes -- no `Document`, no tree
 position, no recursion into sibling/child elements of other kinds --
@@ -14,7 +14,7 @@ so both `tomet-printer` (rebuilds a whole `Document`) and
 `tomet-formatter` (patches specific spans of existing `.tmt` text)
 can depend on this without a circular dependency (`tomet-printer`
 already depends on `tomet-formatter`). `render_meta_element`
-specifically covers only `@meta` elements' actual shape per the
+specifically covers only `::meta` elements' actual shape per the
 grammar (`args` an optional format map, `value` always
 `ElementValue::from_map(Value::Map(...))`) -- not the general
 element-rendering logic for every other sigil/kind, which stays in
@@ -62,12 +62,12 @@ supplied explicitly. See [`BlockRenderer`].
 
 ===[fn render_meta_element]
 
-Renders an `@meta(...){...}` element per `config`'s meta format
+Renders an `::meta(...){...}` element per `config`'s meta format
 settings (multi-line, one field per line with per-field formatting
-rules, if `config.meta.always_newline`; else a single `@meta{k: v, ...}`
-line). Scoped to `@meta`'s actual shape -- `value` must be
+rules, if `config.meta.always_newline`; else a single `::meta{k: v, ...}`
+line). Scoped to `::meta`'s actual shape -- `value` must be
 `ElementValue::from_map(Value::Map(...))`, which is all the grammar ever
-produces for `@meta`; anything else renders as a bare `@meta` (with
+produces for `::meta`; anything else renders as a bare `::meta` (with
 args, if any).
 
 ==[Type Aliases]

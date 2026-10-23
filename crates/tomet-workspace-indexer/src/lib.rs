@@ -15,7 +15,7 @@
 //!    | (Explorer, BatchMeta, Migration view).
 //! - (Core Capabilities)
 //!   -| Path Filtering & Discovery: Fast directory walks using `ignore::WalkBuilder`.
-//!    | Metadata Extraction: Extracts `@meta` and `@config` key-value pairs without full AST retention.
+//!    | Metadata Extraction: Extracts `::meta` and `::config` key-value pairs without full AST retention.
 //!    | Stateful Workspace Index ([`workspace_scan::WorkspaceIndex`]): Flat in-memory catalog
 //!    | with zero-I/O derived views, compaction of single-child directory chains, and incremental updates.
 //!
@@ -46,7 +46,7 @@ pub mod workspace_scan;
 ///   process's working directory.
 ///
 /// The last is the one that is easy to get wrong by doing nothing.
-/// `@config(export: path)` did exactly that: it handed the string
+/// `::config(export: path)` did exactly that: it handed the string
 /// straight to `fs::write`, so `tmtroot/readme.tmt` declaring
 /// `README.ja.md` wrote to the repository root or to `docs/` depending
 /// on where you happened to be standing. Running the export from the
@@ -301,7 +301,7 @@ fn is_tm_file(p: &Path) -> bool {
 /// of tags has to stay a list for `contains` to look inside it, and a
 /// number has to stay a number for `gt` to order it.
 ///
-/// `@config` is deliberately absent. It configures export and printing,
+/// `::config` is deliberately absent. It configures export and printing,
 /// not what the document *is*, so filtering an index on it would be
 /// filtering on machinery.
 #[derive(Debug, Clone, PartialEq)]
@@ -462,7 +462,7 @@ mod tests {
 
     #[test]
     fn test_is_path_ignored_with_config_from_settings() {
-        let settings_src = r#"@settings{
+        let settings_src = r#"::settings{
   ignore: {
     files: list("00-09 System/01 Apps/obsidian")
   }
@@ -481,7 +481,7 @@ mod tests {
 
     #[test]
     fn test_extract_metadata_collects_meta_and_config_fields() {
-        let src = "@meta{author: Alice}\n\n@config{lang: en}\n\n#[Doc]\n";
+        let src = "::meta{author: Alice}\n\n::config{lang: en}\n\n#[Doc]\n";
         let map = extract_metadata(src);
         assert_eq!(map.get("meta.author"), Some(&"Alice".to_string()));
         assert_eq!(map.get("config.lang"), Some(&"en".to_string()));
@@ -612,16 +612,16 @@ mod metadata_table_tests {
 
     #[test]
     fn kind_comes_from_the_kind_element() {
-        let fields = fields_of("@kind(writ)\n\n#[ Title ]\n");
+        let fields = fields_of("::kind(writ)\n\n#[ Title ]\n");
         assert_eq!(fields.get("kind"), Some(&Value::String("writ".to_string())));
-        // No `@kind` means no row entry at all, which is what lets the
+        // No `::kind` means no row entry at all, which is what lets the
         // query pass tell "absent here" from "nobody has this field".
         assert_eq!(fields_of("#[ Title ]\n").get("kind"), None);
     }
 
     #[test]
     fn a_list_stays_a_list() {
-        let fields = fields_of("@meta{ tags: list(rust, cli) }\n\n#[ Title ]\n");
+        let fields = fields_of("::meta{ tags: list(rust, cli) }\n\n#[ Title ]\n");
         // Not the display string "[rust, cli]" that `extract_metadata`
         // produces (a search-index rendering, not `.tmt` syntax, so it
         // is unaffected by `list(...)` replacing the `[...]` literal) --
@@ -637,7 +637,7 @@ mod metadata_table_tests {
 
     #[test]
     fn a_nested_map_is_recorded_at_every_depth() {
-        let fields = fields_of("@meta{ url: { wiki: \"https://example.test\" } }\n\n#[ T ]\n");
+        let fields = fields_of("::meta{ url: { wiki: \"https://example.test\" } }\n\n#[ T ]\n");
         assert!(matches!(fields.get("meta"), Some(Value::Map(_))));
         assert!(matches!(fields.get("meta.url"), Some(Value::Map(_))));
         assert_eq!(

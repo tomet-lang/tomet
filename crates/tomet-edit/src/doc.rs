@@ -141,15 +141,15 @@ impl EditDoc {
         })
     }
 
-    /// Returns the top-level `@meta` element node ID, if present.
+    /// Returns the top-level `::meta` element node ID, if present.
     pub fn meta_node(&self) -> Option<NodeId> {
         self.find_element_by_name("meta")
     }
 
-    /// Ensures that a top-level `@meta` element exists.
+    /// Ensures that a top-level `::meta` element exists.
     ///
-    /// If an existing `@meta` block element is found, returns its [`NodeId`].
-    /// Otherwise, inserts a new `@meta` block element at index 0 with standard
+    /// If an existing `::meta` block element is found, returns its [`NodeId`].
+    /// Otherwise, inserts a new `::meta` block element at index 0 with standard
     /// spacing trivia and returns the newly allocated [`NodeId`].
     pub fn ensure_meta_node(&mut self) -> NodeId {
         if let Some(id) = self.meta_node() {
@@ -161,6 +161,7 @@ impl EditDoc {
             meta_id,
             NodeKind::BlockElement {
                 name: "meta".to_string(),
+                declaration: true,
                 id_attr: None,
                 args: Vec::new(),
                 data: Vec::new(),
@@ -173,7 +174,7 @@ impl EditDoc {
         self.insert_node(meta_node);
         self.root_children_mut().insert(0, ChildItem::Node(meta_id));
 
-        // Insert spacing trivia after @meta
+        // Insert spacing trivia after ::meta
         if self.root_children().len() > 1 {
             self.root_children_mut()
                 .insert(1, ChildItem::Trivia("\n\n".to_string()));
@@ -185,7 +186,7 @@ impl EditDoc {
         meta_id
     }
 
-    /// Reads a property value from the top-level `@meta` block, if present.
+    /// Reads a property value from the top-level `::meta` block, if present.
     pub fn meta_data(&self, key: &str) -> Option<String> {
         let meta_id = self.meta_node()?;
         let node = self.get(meta_id)?;
@@ -197,9 +198,9 @@ impl EditDoc {
         }
     }
 
-    /// Sets, updates, or deletes a key in the top-level `@meta` block's data map.
+    /// Sets, updates, or deletes a key in the top-level `::meta` block's data map.
     ///
-    /// If no `@meta` block exists and `value` is `Some`, a new `@meta` block is
+    /// If no `::meta` block exists and `value` is `Some`, a new `::meta` block is
     /// created at index 0 automatically.
     pub fn set_meta_data(
         &mut self,

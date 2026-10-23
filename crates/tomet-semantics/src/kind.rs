@@ -4,29 +4,29 @@ use tomet_ast::{Element, Name, Placement, Sigil};
 /// stringly-typed `kind: String` that `tomet-html` and
 /// `tomet-markdown/export.rs` each used to compute independently.
 ///
-/// This only expresses *recognition* ("this element is `@meta`"), not
-/// *action* ("`@meta` produces no output") -- consumers still decide for
+/// This only expresses *recognition* ("this element is `::meta`"), not
+/// *action* ("`::meta` produces no output") -- consumers still decide for
 /// themselves what to do with a given kind, since the same kind can mean
 /// different things for different output formats (e.g. `Meta` renders as
 /// nothing in both HTML and CommonMark today, but for unrelated reasons
 /// specific to each format).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ElementKind {
-    /// `@kind(name)` or `@kind(name, version)` -- the kind of this document.
+    /// `::kind(name)` or `::kind(name, version)` -- the kind of this document.
     /// The version is an integer of 1 or more and may be left out. `tomet check`
     /// rejects any other value; nothing reads it yet.
     Kind,
     Version,
     Meta,
     Config,
-    /// `@settings{...}` -- the schema/config block. Not previously in
+    /// `::settings{...}` -- the schema/config block. Not previously in
     /// `BUILTIN_KINDS` despite three places matching it by raw string; a
     /// bare name has to be built-in now, so it is listed properly.
     Settings,
-    /// `@use(ns)` -- brings a vocabulary into scope, by the name it gives
+    /// `::use(ns)` -- brings a vocabulary into scope, by the name it gives
     /// itself. `{ as: other }` renames it, and is only for a collision.
     ///
-    /// `@use(ns, version)` also says which version of it is wanted: an
+    /// `::use(ns, version)` also says which version of it is wanted: an
     /// integer of 1 or more, which may be left out. `tomet check` rejects any
     /// other value; nothing reads it yet, so the namespace binds the same either
     /// way.
@@ -40,7 +40,7 @@ pub enum ElementKind {
     /// is one way to say it.
     Use,
     Blueprint,
-    /// `@vocabulary(ns){...}` -- the header of a vocabulary document,
+    /// `::vocabulary(ns){...}` -- the header of a vocabulary document,
     /// naming the namespace it declares. See `docs/spec/vocabulary.tmt`.
     Vocabulary,
     /// `@element(name){...}[prose]` -- one element declared by a
@@ -69,7 +69,7 @@ pub enum ElementKind {
     /// note against it.
     ///
     /// In `std` because an unfinished spot happens in every kind, so no
-    /// kind's vocabulary can own it and a shared one would need `@use` in
+    /// kind's vocabulary can own it and a shared one would need `::use` in
     /// every document that ever has a gap.
     Draft,
     /// `@fixme[ what is wrong ]` -- there is text here and it needs
@@ -99,7 +99,7 @@ pub enum ElementKind {
     /// In `std`, bare, for the same reason as [`Draft`](ElementKind::Draft)/
     /// [`Fixme`](ElementKind::Fixme): a conflict can happen while editing
     /// any kind of document, so no single kind's vocabulary can own it,
-    /// and a shared vocabulary would need `@use` everywhere a merge might
+    /// and a shared vocabulary would need `::use` everywhere a merge might
     /// ever collide.
     Conflict,
     /// The one officially-supported link element, `@link(target:...)`
@@ -194,10 +194,9 @@ pub enum ElementKind {
     /// syntax with fixed grammar-level meaning, not an arbitrary
     /// user-chosen element name.
     Interp,
-    /// `@footnote` -- an inline or block footnote definition.
+    /// `@ftn` -- a footnote: a definition when it has content, a
+    /// reference to the one with the same id when it has none.
     Footnote,
-    /// `Sigil::Caret` -- `^(id)` or `^name(id)` reference pin.
-    Caret,
     /// `@tag` -- topic/category tag.
     Tag,
     /// `@task(status)[ ... ]` -- an actionable task item.
@@ -247,7 +246,6 @@ impl ElementKind {
             ElementKind::Bare => "bare",
             ElementKind::Interp => "interp",
             ElementKind::Footnote => "ftn",
-            ElementKind::Caret => "caret",
             ElementKind::Tag => "tag",
             ElementKind::Task => "task",
         }
@@ -264,21 +262,21 @@ impl ElementKind {
 /// bare names resolve here and nowhere else -- a user-defined element must
 /// be namespaced (`deck.bookmark`), which is why an unrecognized bare name
 /// is an error rather than a `Custom` kind. The only other namespace whose
-/// names may be written bare is the document's own `@kind`, and `std` wins
+/// names may be written bare is the document's own `::kind`, and `std` wins
 /// any collision between the two: a vocabulary may not declare a name that
 /// appears here, so the shorthand is never ambiguous.
 ///
-/// **Why `std` lives in Rust rather than in a `@vocabulary(std)` document,
+/// **Why `std` lives in Rust rather than in a `::vocabulary(std)` document,
 /// and what has to change.** These entries carry behavior, not just shape:
 /// `@link`'s target kind is derived from the target string's own scheme
-/// prefix (`crate::target::target_scheme`), `@meta` selects an embedded
+/// prefix (`crate::target::target_scheme`), `::meta` selects an embedded
 /// format, `@raw` takes a raw body. A vocabulary document declares
 /// names, arguments and constraints; it cannot yet declare any of that, so
 /// moving `std` into one would either lose the behavior or smuggle it in
 /// under a key that means "call into the binary".
 ///
 /// That is a limit of the vocabulary format, not a property of `std`, and
-/// the author's decision is that it has to go: `@vocabulary(std)` must
+/// the author's decision is that it has to go: `::vocabulary(std)` must
 /// eventually be writable. Until then, treat this list as the one
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
@@ -292,10 +290,10 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
     ("use", ElementKind::Use),
     ("blueprint", ElementKind::Blueprint),
     // The vocabulary document's own six. They are here rather than in a
-    // `@vocabulary(vocabulary)` document because reading that document
+    // `::vocabulary(vocabulary)` document because reading that document
     // would need the machinery it defines. The cost is that a kind's
     // vocabulary can no longer declare any of these six names -- a
-    // namespace brought in with `@use` still can, since it is never
+    // namespace brought in with `::use` still can, since it is never
     // written bare.
     ("vocabulary", ElementKind::Vocabulary),
     ("element", ElementKind::Element),
@@ -331,18 +329,7 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
     ("task", ElementKind::Task),
 ];
 
-/// Names a built-in element used to have, and still reads as, until the
-/// documents using them are migrated: `(old, current)`.
-///
-/// Not in [`BUILTIN_KINDS`], which holds one name per kind. A vocabulary may
-/// not take one either: they resolve as the kind they stand for.
-const RETIRED_NAMES: [(&str, &str); 1] = [("footnote", "ftn")];
-
 fn builtin_kind(name: &str) -> Option<ElementKind> {
-    let name = RETIRED_NAMES
-        .iter()
-        .find(|(old, _)| *old == name)
-        .map_or(name, |(_, current)| *current);
     BUILTIN_KINDS
         .iter()
         .find(|(builtin, _)| *builtin == name)
@@ -352,7 +339,7 @@ fn builtin_kind(name: &str) -> Option<ElementKind> {
 /// Classifies a [`Name`] against the `std` vocabulary alone.
 ///
 /// `std` alone is the whole of what this sees. A document may also write
-/// its own `@kind`'s namespace bare, and names it brought in with `@use`
+/// its own `::kind`'s namespace bare, and names it brought in with `::use`
 /// resolve too -- none of that is here, because none of it is knowable
 /// from a `Name`. That resolution is `Bindings::classify`; this is the
 /// narrower question underneath it.
@@ -375,12 +362,32 @@ pub fn classify_std_name(name: &Name) -> Result<ElementKind, UnknownName> {
     builtin_kind(&name.name).ok_or_else(|| UnknownName {
         name: name.to_string(),
         unbound_namespace: None,
+        declaration: false,
     })
+}
+
+/// A declaration about the document is written `::name`. Written `@name` it
+/// is refused -- the element sigil is for content -- and means nothing: it is
+/// not classified as the declaration, so nothing reads it as one.
+///
+/// `kind` is what the bare name resolved to; `name` is as written.
+pub fn refuse_declaration_as_element(
+    name: &Name,
+    kind: ElementKind,
+) -> Result<ElementKind, UnknownName> {
+    if name.is_bare() && builtin_region(&kind) == crate::vocabulary::Region::Preamble {
+        return Err(UnknownName {
+            name: name.to_string(),
+            unbound_namespace: None,
+            declaration: true,
+        });
+    }
+    Ok(kind)
 }
 
 /// An unrecognized bare element name.
 ///
-/// A bare name resolves only in `std` or the document's own `@kind`
+/// A bare name resolves only in `std` or the document's own `::kind`
 /// namespace, so this is what a `#tag` alone on a line reports --
 /// deliberately, since hashtags are not a feature and a bare unknown name
 /// is far more likely to be a typo or a missing namespace binding.
@@ -394,17 +401,28 @@ pub struct UnknownName {
     pub name: String,
     /// Set when the name is namespaced and that namespace is not in
     /// scope at all. The distinction matters to whoever has to fix it:
-    /// a missing `@use` is a different edit from a typo in the element.
+    /// a missing `::use` is a different edit from a typo in the element.
     pub unbound_namespace: Option<String>,
+    /// Set when the name is one of the declarations about the document
+    /// (`kind`, `meta`, ...) written as an element, `::kind`. It is not unknown
+    /// -- it is spelled for something else: a declaration is `::kind`.
+    pub declaration: bool,
 }
 
 impl std::fmt::Display for UnknownName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.declaration {
+            return write!(
+                f,
+                "`{0}` is a declaration about the document: write `::{0}`, not `@{0}`",
+                self.name
+            );
+        }
         if let Some(namespace) = &self.unbound_namespace {
             return write!(
                 f,
                 "`{}`: the namespace `{namespace}` is not in scope -- declare its \
-                 vocabulary in `vocabularies` and write `@use({namespace})`",
+                 vocabulary in `vocabularies` and write `::use({namespace})`",
                 self.name
             );
         }
@@ -417,9 +435,9 @@ impl std::fmt::Display for UnknownName {
         }
         write!(
             f,
-            "unknown element `{}`: only `std` and this document's own `@kind` may be \
+            "unknown element `{}`: only `std` and this document's own `::kind` may be \
              written bare; namespace it (`ns.{}`), or declare the vocabulary that has it \
-             and bind it with `@use`",
+             and bind it with `::use`",
             self.name, self.name
         )
     }
@@ -429,7 +447,7 @@ impl std::error::Error for UnknownName {}
 
 /// Classifies `el` by its `Sigil`, against the `std` vocabulary alone.
 ///
-/// The `_std` is the whole caveat. For a document carrying a `@kind`,
+/// The `_std` is the whole caveat. For a document carrying a `::kind`,
 /// this returns [`UnknownName`] for every element that document's own
 /// vocabulary declares, which is correct for what it asks and wrong for
 /// what a caller usually wants. `Bindings::classify` is the one that
@@ -453,10 +471,10 @@ pub fn classify_std(el: &Element) -> Result<ElementKind, UnknownName> {
     match &el.sigil {
         // `::name` and `@name` mean the same by name; whether the spelling
         // fits the element's `Region` is a separate check.
-        Sigil::Named(name) | Sigil::Document(name) => classify_std_name(name),
+        Sigil::Named(name) => refuse_declaration_as_element(name, classify_std_name(name)?),
+        Sigil::Document(name) => classify_std_name(name),
         Sigil::Bare => Ok(ElementKind::Bare),
         Sigil::Dollar => Ok(ElementKind::Interp),
-        Sigil::Caret(_) => Ok(ElementKind::Caret),
     }
 }
 
@@ -478,7 +496,7 @@ pub fn classify_std_lenient(el: &Element) -> ElementKind {
 /// Every writer needs this and each used to keep its own copy of the
 /// list, which is how `settings` and `import` came to be missing from all
 /// three of them: they joined [`BUILTIN_KINDS`] after those lists were
-/// written, so `@settings(file:...)` exported as a stray `<div>`.
+/// written, so `::settings(file:...)` exported as a stray `<div>`.
 pub fn is_directive(kind: &ElementKind) -> bool {
     use ElementKind::*;
     matches!(
@@ -499,7 +517,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     Some(match kind {
         Meta | Config | Settings | Use | Blueprint | Hr | Callout | Card | Table | Heading
         | Kind | Version | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
-        Em | Strong | Mark | Strikeout | Ruby | Caret => Shape::Inline,
+        Em | Strong | Mark | Strikeout | Ruby => Shape::Inline,
         // Either shape. A link or an embed alone on a line is not a
         // structural error -- it is how you show one file or one image.
         // What `shape_mismatch` is for is the case that breaks something:
@@ -601,7 +619,7 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         // can too; a table's rows/cells; a task's details.
         Quote | Callout | Card | Table | Footnote | Task => Some(ContentShape::Block),
         // Not a built-in bare name at all.
-        Custom(_) | Bare | Interp | Caret => None,
+        Custom(_) | Bare | Interp => None,
     }
 }
 
@@ -611,7 +629,7 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
 /// `docs/spec/builtin-settings.tmt` listed them as `singleton: true`
 /// while no code read the word; this is that list, in code.
 ///
-/// `@use` is deliberately absent, and is the proof the two axes are
+/// `::use` is deliberately absent, and is the proof the two axes are
 /// separate: it may only sit in the preamble, and you write several,
 /// because you bring in several vocabularies.
 pub fn builtin_singleton(kind: &ElementKind) -> bool {
@@ -699,8 +717,42 @@ mod tests {
             Err(UnknownName {
                 name: "caution".to_string(),
                 unbound_namespace: None,
+                declaration: false,
             })
         );
+    }
+
+    #[test]
+    fn a_declaration_is_classified_by_its_double_colon_and_refused_as_an_element() {
+        for name in [
+            "kind",
+            "meta",
+            "config",
+            "settings",
+            "use",
+            "blueprint",
+            "version",
+            "vocabulary",
+        ] {
+            assert!(
+                classify_std(&element_new(Sigil::document(name))).is_ok(),
+                "::{name}"
+            );
+            let err = classify_std(&element_new(Sigil::named(name))).unwrap_err();
+            assert!(err.declaration, "@{name}");
+            assert!(
+                err.to_string().contains(&format!("write `::{name}`")),
+                "{err}"
+            );
+            // and it is not read as the declaration, however leniently
+            assert_eq!(
+                classify_std_lenient(&element_new(Sigil::named(name))),
+                ElementKind::Custom(name.to_string())
+            );
+        }
+        // content keeps its sigil
+        assert!(classify_std(&element_new(Sigil::named("callout"))).is_ok());
+        assert!(classify_std(&element_new(Sigil::document("callout"))).is_ok());
     }
 
     #[test]
@@ -738,8 +790,8 @@ mod tests {
     }
 
     #[test]
-    fn named_at_sigil_is_recognized() {
-        let el = element_new(Sigil::named("meta"));
+    fn double_colon_sigil_is_recognized() {
+        let el = element_new(Sigil::document("meta"));
         assert_eq!(classify_std_lenient(&el), ElementKind::Meta);
     }
 
@@ -787,7 +839,7 @@ mod tests {
 
     #[test]
     fn shape_mismatch_reports_a_block_element_put_in_running_text() {
-        let el = element_new(Sigil::named("meta")).with_placement(Placement::Inline);
+        let el = element_new(Sigil::document("meta")).with_placement(Placement::Inline);
         assert_eq!(shape_mismatch(&el), Some((Shape::Inline, Shape::Block)));
     }
 
@@ -799,7 +851,7 @@ mod tests {
 
     #[test]
     fn a_correctly_placed_element_has_no_mismatch() {
-        let meta = element_new(Sigil::named("meta")).with_placement(Placement::Block);
+        let meta = element_new(Sigil::document("meta")).with_placement(Placement::Block);
         let em = element_new(Sigil::named("em")).with_placement(Placement::Inline);
         assert_eq!(shape_mismatch(&meta), None);
         assert_eq!(shape_mismatch(&em), None);

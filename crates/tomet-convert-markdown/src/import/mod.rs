@@ -149,7 +149,7 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
     let mut stack: Vec<Frame> = vec![Frame::Blocks(Vec::new())];
 
     if let Some(entries) = frontmatter {
-        let mut meta_el = element_new(Sigil::named("meta"));
+        let mut meta_el = element_new(Sigil::document("meta"));
         meta_el.value = Some(tomet_ast::ElementValue::from_map(Value::Map(entries)));
         push_block(&mut stack, Block::Element(meta_el));
     }

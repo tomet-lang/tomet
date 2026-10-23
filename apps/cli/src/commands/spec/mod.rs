@@ -45,10 +45,15 @@ pub fn spec_cmd(
     };
 
     let out_path = resolve_target_file(out, filename);
-    write_or_check(&out_path, &rendered, check, match target {
-        SpecTarget::Cli => "cli",
-        SpecTarget::Config => "config",
-    })
+    write_or_check(
+        &out_path,
+        &rendered,
+        check,
+        match target {
+            SpecTarget::Cli => "cli",
+            SpecTarget::Config => "config",
+        },
+    )
 }
 
 fn generate_all(out_dir: &Path, check: bool) -> anyhow::Result<()> {
@@ -108,19 +113,27 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("tomet_test_spec_all_{}", nanoid::nanoid!()));
         let out_dir = dir.join("generated");
 
-        assert!(spec_cmd(None, true, Some(&out_dir), true).is_err(), "should fail before writing");
+        assert!(
+            spec_cmd(None, true, Some(&out_dir), true).is_err(),
+            "should fail before writing"
+        );
 
         spec_cmd(None, true, Some(&out_dir), false).unwrap();
         assert!(out_dir.join("cli.tmt").exists());
         assert!(out_dir.join("config.tmt").exists());
 
-        assert!(spec_cmd(None, true, Some(&out_dir), true).is_ok(), "check must pass after write");
+        assert!(
+            spec_cmd(None, true, Some(&out_dir), true).is_ok(),
+            "check must pass after write"
+        );
 
         // Stale detection
         fs::write(out_dir.join("config.tmt"), "stale content\n").unwrap();
-        assert!(spec_cmd(None, true, Some(&out_dir), true).is_err(), "must detect drift in config.tmt");
+        assert!(
+            spec_cmd(None, true, Some(&out_dir), true).is_err(),
+            "must detect drift in config.tmt"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
 }
-

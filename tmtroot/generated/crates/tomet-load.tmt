@@ -55,7 +55,7 @@ already has in hand, the second goes to disk for it. A caller that
 formats its own parse errors (the CLI does) wants `parse` + `prepare`.
 
 Preparing asks the vault's files questions -- which documents are under a
-directory, what a note name stands for, what another document's `@meta`
+directory, what a note name stands for, what another document's `::meta`
 says -- through [`Vault::resolver`], and a document is read at most once
 however many expressions ask for it.
 

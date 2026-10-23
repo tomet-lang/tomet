@@ -1,8 +1,8 @@
-@settings(file: docs/docs.settings.tmt)
+::settings(file: docs/docs.settings.tmt)
 
-@config(style: structural)
+::config(style: structural)
 
-@meta{key: value, type: person}
+::meta{key: value, type: person}
 
 ${some_id}
 

@@ -44,7 +44,7 @@
 //!    other) rather than merely disagreeing in value.
 //! 4. A conflict `merge_one` can't narrow any further is recorded
 //!    in-place as one `@conflict` element -- `tomet`'s own `std` element
-//!    for exactly this, bare and needing no `@use`. `a`/`b` are
+//!    for exactly this, bare and needing no `::use`. `a`/`b` are
 //!    structural names, not "mine"/"theirs": the side that merged the
 //!    note has no way to tell a later reader (on another device, or
 //!    itself after the app restarts) which one was whose, so the stored
@@ -125,7 +125,7 @@ mod tests {
         // a change in node kind, so this exercises the whole-block
         // marker fallback rather than the inline recursion.
         let base = doc("Original.\n");
-        let local = doc("@meta{ x: 1 }\n");
+        let local = doc("::meta{ x: 1 }\n");
         let remote = doc("Theirs.\n");
 
         let result = merge(&base, &local, &remote);
@@ -136,7 +136,7 @@ mod tests {
             doc(concat!(
                 "@conflict(\n",
                 "  a: [\n",
-                "    @meta{ x: 1 }\n",
+                "    ::meta{ x: 1 }\n",
                 "  ]\n",
                 "  b: [ Theirs. ]\n",
                 ")\n",
@@ -249,62 +249,62 @@ mod tests {
 
     #[test]
     fn edits_to_different_data_keys_merge_cleanly() {
-        let base = doc("@meta{ x: 1, y: 2 }\n");
-        let local = doc("@meta{ x: 10, y: 2 }\n");
-        let remote = doc("@meta{ x: 1, y: 20 }\n");
+        let base = doc("::meta{ x: 1, y: 2 }\n");
+        let local = doc("::meta{ x: 10, y: 2 }\n");
+        let remote = doc("::meta{ x: 1, y: 20 }\n");
 
         let result = merge(&base, &local, &remote);
 
         assert!(result.clean);
-        assert_eq!(result.document, doc("@meta{ x: 10, y: 20 }\n"));
+        assert_eq!(result.document, doc("::meta{ x: 10, y: 20 }\n"));
     }
 
     #[test]
     fn editing_the_same_data_key_produces_a_value_conflict() {
-        let base = doc("@meta{ x: 1 }\n");
-        let local = doc("@meta{ x: 2 }\n");
-        let remote = doc("@meta{ x: 3 }\n");
+        let base = doc("::meta{ x: 1 }\n");
+        let local = doc("::meta{ x: 2 }\n");
+        let remote = doc("::meta{ x: 3 }\n");
 
         let result = merge(&base, &local, &remote);
 
         assert!(!result.clean);
-        assert_eq!(result.document, doc("@meta{ x: @conflict(a: 2, b: 3) }\n"));
+        assert_eq!(result.document, doc("::meta{ x: @conflict(a: 2, b: 3) }\n"));
     }
 
     #[test]
     fn resolving_a_data_key_conflict_leaves_a_plain_value() {
-        let base = doc("@meta{ x: 1 }\n");
-        let local = doc("@meta{ x: 2 }\n");
-        let remote = doc("@meta{ x: 3 }\n");
+        let base = doc("::meta{ x: 1 }\n");
+        let local = doc("::meta{ x: 2 }\n");
+        let remote = doc("::meta{ x: 3 }\n");
         let merged = merge(&base, &local, &remote).document;
 
         let resolved = resolve(&merged, &[ConflictResolution::B]);
 
-        assert_eq!(resolved, doc("@meta{ x: 3 }\n"));
+        assert_eq!(resolved, doc("::meta{ x: 3 }\n"));
     }
 
     #[test]
     fn a_key_deleted_on_one_side_and_untouched_on_the_other_is_dropped() {
-        let base = doc("@meta{ x: 1, y: 2 }\n");
-        let local = doc("@meta{ y: 2 }\n"); // local deleted x
-        let remote = doc("@meta{ x: 1, y: 2 }\n"); // remote left it alone
+        let base = doc("::meta{ x: 1, y: 2 }\n");
+        let local = doc("::meta{ y: 2 }\n"); // local deleted x
+        let remote = doc("::meta{ x: 1, y: 2 }\n"); // remote left it alone
 
         let result = merge(&base, &local, &remote);
 
         assert!(result.clean);
-        assert_eq!(result.document, doc("@meta{ y: 2 }\n"));
+        assert_eq!(result.document, doc("::meta{ y: 2 }\n"));
     }
 
     #[test]
     fn a_key_deleted_on_one_side_and_modified_on_the_other_keeps_the_edit() {
-        let base = doc("@meta{ x: 1 }\n");
-        let local = doc("@meta{}\n"); // local deleted x
-        let remote = doc("@meta{ x: 9 }\n"); // remote modified it
+        let base = doc("::meta{ x: 1 }\n");
+        let local = doc("::meta{}\n"); // local deleted x
+        let remote = doc("::meta{ x: 9 }\n"); // remote modified it
 
         let result = merge(&base, &local, &remote);
 
         assert!(result.clean);
-        assert_eq!(result.document, doc("@meta{ x: 9 }\n"));
+        assert_eq!(result.document, doc("::meta{ x: 9 }\n"));
     }
 
     #[test]

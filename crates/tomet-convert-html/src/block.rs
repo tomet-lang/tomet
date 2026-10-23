@@ -31,7 +31,7 @@ pub(crate) fn render_block(
 ) {
     match block {
         Block::Paragraph(p) => {
-            // Elements with no visible output (`@meta`, ...) placed on
+            // Elements with no visible output (`::meta`, ...) placed on
             // adjacent lines with no blank line between them lazily
             // continue into one paragraph together with the inter-element
             // whitespace text (see `document.rs::parse_paragraph`) -- if

@@ -1,4 +1,4 @@
-@kind(fixture)
+::kind(fixture)
 
 =[値位置のブロック内容]
 `key: [...]` は `(args)`/`{value}` のどんなキーでも書ける。要素自身の

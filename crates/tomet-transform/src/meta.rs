@@ -4,7 +4,7 @@ use tomet_ast::{Block, Document, Element, ElementValue, Placement, Sigil, Value}
 use tomet_semantics::classify_std_lenient;
 use tomet_tree::{ElementExt, for_each_element_mut};
 
-/// Updates or inserts a key-value pair in a target directive/metadata block (e.g. `@meta`).
+/// Updates or inserts a key-value pair in a target directive/metadata block (e.g. `::meta`).
 /// If the target block is not found, prepends a new directive block at position 0.
 pub fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_val: &str) -> bool {
     let mut found = false;

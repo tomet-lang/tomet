@@ -1,6 +1,5 @@
 //! The parser's unit tests, by topic.
 
-mod caret;
 mod comments;
 mod connects;
 mod document_connects;

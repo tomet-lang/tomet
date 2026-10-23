@@ -44,8 +44,8 @@ impl Vault {
     /// What checking finds in `doc`, which was read from `path` in this vault.
     ///
     /// The document is validated as written, against the vocabularies it has
-    /// in scope, the blueprint its `@kind` names (if the vault declares one),
-    /// and the `type:` the settings declare for its `@meta` fields. Then a
+    /// in scope, the blueprint its `::kind` names (if the vault declares one),
+    /// and the `type:` the settings declare for its `::meta` fields. Then a
     /// copy of it is prepared, to report what could not be resolved; `doc`
     /// itself is not changed, so the spans in the findings are the ones in the
     /// text the caller has.

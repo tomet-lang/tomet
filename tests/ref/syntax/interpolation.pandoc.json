@@ -65,7 +65,7 @@
               [],
               []
             ],
-            "@kind(node-graph)"
+            "::kind(node-graph)"
           ]
         },
         {

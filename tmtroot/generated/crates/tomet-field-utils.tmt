@@ -4,7 +4,7 @@
 
 =[tomet-field-utils]
 
-Small pure helpers for `@meta` field values, driven by
+Small pure helpers for `::meta` field values, driven by
 `tomet_config::FieldConfig`: id generation/validation
 (`generate_id_for_field`/`is_valid_id_format`) and ISO8601/RFC3339
 timestamp conversion (`is_iso8601`/`format_rfc3339`). None of these

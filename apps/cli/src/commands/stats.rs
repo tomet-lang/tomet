@@ -47,7 +47,7 @@ impl Failure {
     }
 }
 
-/// Everything a run found: the sum, the same numbers split by the `@kind`
+/// Everything a run found: the sum, the same numbers split by the `::kind`
 /// each document declares (`None` for a document that declares none), the
 /// files that could not be measured, and what `check` would say.
 struct Report {
@@ -57,7 +57,7 @@ struct Report {
     failures: Vec<Failure>,
     /// Documents that parsed, and so are in the numbers, but that `check`
     /// fails for what they say (an element that does not exist, two
-    /// `@meta`).
+    /// `::meta`).
     invalid: usize,
     /// The warnings `check` reports, over the documents that parsed.
     warnings: usize,
@@ -228,7 +228,6 @@ fn stats_json(stats: &Stats) -> serde_json::Map<String, serde_json::Value> {
             "named": stats.named,
             "document": stats.document,
             "dollar": stats.dollar,
-            "caret": stats.caret,
             "bare": stats.bare,
             "by_name": by_name,
         },
@@ -247,7 +246,7 @@ fn stats_json(stats: &Stats) -> serde_json::Map<String, serde_json::Value> {
     }
 }
 
-/// The whole run as JSON: the totals, then the same shape once per `@kind`
+/// The whole run as JSON: the totals, then the same shape once per `::kind`
 /// (`"kind": null` for documents that declare none), what `check` would
 /// say (`check`), and the files that could not be measured (`errors`, the
 /// only place the text report leaves out).
@@ -308,7 +307,7 @@ fn columns_of(stats: &Stats) -> [usize; 5] {
     ]
 }
 
-/// The report as text: a table with a row per `@kind` and a total, then
+/// The report as text: a table with a row per `::kind` and a total, then
 /// the breakdowns that do not fit a column.
 ///
 /// The table follows `scc`'s shape -- a row per category, a column per
@@ -382,11 +381,10 @@ fn render(report: &Report) -> String {
     notes.push((
         "Elements",
         format!(
-            "@ {} / :: {} / ${{}} {} / ^ {} / - {}",
+            "@ {} / :: {} / ${{}} {} / - {}",
             group(stats.named),
             group(stats.document),
             group(stats.dollar),
-            group(stats.caret),
             group(stats.bare)
         ),
     ));
@@ -526,14 +524,13 @@ mod tests {
 
     #[test]
     fn each_sigil_is_counted_on_its_own() {
-        let stats = measure_src("@note[ ${meta.title} ^(n1) ]\n\n- あ\n- い\n");
+        let stats = measure_src("@note[ ${meta.title} ]\n\n- あ\n- い\n");
         assert_eq!(stats.dollar, 1);
-        assert_eq!(stats.caret, 1);
         assert_eq!(stats.bare, 2);
         // Just `@note` -- the list itself is `Block::List` now, not a
         // named `@ul` element, so it contributes nothing here.
         assert_eq!(stats.named, 1);
-        assert_eq!(stats.elements(), 5);
+        assert_eq!(stats.elements(), 4);
         assert_eq!(stats.by_name.get("note"), Some(&1));
         assert_eq!(stats.by_name.get("ul"), None);
     }
@@ -673,9 +670,9 @@ mod tests {
     #[test]
     fn documents_are_grouped_by_their_declared_kind() {
         let report = report_of(&[
-            ("deck", "@kind(deck)\n\n@note[ ab ]\n"),
-            ("deck", "@kind(deck)\n\n@note[ c ]\n"),
-            ("writ", "@kind(writ)\n\n@note[ dddd ]\n"),
+            ("deck", "::kind(deck)\n\n@note[ ab ]\n"),
+            ("deck", "::kind(deck)\n\n@note[ c ]\n"),
+            ("writ", "::kind(writ)\n\n@note[ dddd ]\n"),
             ("", "@note[ e ]\n"),
         ]);
         let rows: Vec<(Option<&str>, usize, usize)> = report
@@ -695,7 +692,7 @@ mod tests {
     #[test]
     fn the_table_has_a_row_per_kind_and_a_total() {
         let report = report_of(&[
-            ("deck", "@kind(deck)\n\n@note[ ab ]\n"),
+            ("deck", "::kind(deck)\n\n@note[ ab ]\n"),
             ("", "@note[ e ]\n"),
         ]);
         let text = render(&report);
@@ -721,13 +718,13 @@ mod tests {
 
     #[test]
     fn the_breakdowns_sit_under_the_total() {
-        let mut report = report_of(&[("", "@note[ a ${x} ^(n) ]\n\n@note[ b ]\n")]);
+        let mut report = report_of(&[("", "@note[ a ${x} ]\n\n@note[ b ]\n")]);
         report.warnings = 12;
         report.invalid = 3;
         let text = render(&report);
         let after_total = text.split("Total").nth(1).expect("has a total row");
         // A symbol for each kind of element: the sigil it is written with.
-        assert!(after_total.contains("@ 2 / :: 0 / ${} 1 / ^ 1 / - 0"), "{text}");
+        assert!(after_total.contains("@ 2 / :: 0 / ${} 1 / - 0"), "{text}");
         assert!(after_total.contains("file 0 / dir 0 / embed 0 / tmt 0 / ref 0"));
         assert!(after_total.contains("deepest level 0"));
         assert!(
@@ -770,7 +767,7 @@ mod tests {
     #[test]
     fn json_carries_the_totals_the_kinds_the_check_and_the_failures() {
         let mut report = report_of(&[
-            ("deck", "@kind(deck)\n\n@note[ ab ]\n"),
+            ("deck", "::kind(deck)\n\n@note[ ab ]\n"),
             ("", "@note[ e ]\n"),
         ]);
         report.warnings = 5;

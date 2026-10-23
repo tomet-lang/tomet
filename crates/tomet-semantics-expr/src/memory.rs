@@ -10,7 +10,7 @@ use super::value::{DirRef, DocRef, EvalValue};
 
 /// Documents by vault-relative path.
 ///
-/// `meta` is the document's `@meta` as written, with no settings applied: a
+/// `meta` is the document's `::meta` as written, with no settings applied: a
 /// `list` field that the document lacks is simply absent here. The vault's
 /// resolver, which knows the settings, is what gives the typed view.
 #[derive(Default)]

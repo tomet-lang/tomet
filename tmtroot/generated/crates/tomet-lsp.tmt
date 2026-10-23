@@ -62,8 +62,8 @@ Formats the document using `tomet-formatter` with loaded or inferred configurati
 
 Resolves the merged configuration for a document by combining:
 1. Workspace config discovered from ancestor directories (`default.config.tmt` / `tomet.config.tmt`)
-2. Explicit `@config(import: ...)` / `@config(file: ...)` imported configs
-3. Document's local `@config` definitions (highest precedence)
+2. Explicit `::config(import: ...)` / `::config(file: ...)` imported configs
+3. Document's local `::config` definitions (highest precedence)
 
 ==[Module hover]
 
@@ -120,7 +120,7 @@ The vaults the open documents belong to, and the diagnostics that need one.
 
 [`diagnostics_for`](crate::diagnostics_for) reads a document from its text
 alone: what the parser and the CST validator can say. What `tomet check`
-says needs more -- the vocabularies in scope, the blueprint the `@kind`
+says needs more -- the vocabularies in scope, the blueprint the `::kind`
 names, the settings' field types, the files an `include` reads -- and all
 of that belongs to a vault. [`Workspace`] finds the vault of each open
 document the way the CLI does, from the file's own path, and asks it for

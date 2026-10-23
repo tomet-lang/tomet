@@ -1,5 +1,5 @@
-@kind(fixture)
-@meta{ id: doc-groups }
+::kind(fixture)
+::meta{ id: doc-groups }
 
 =[ シジルは同じグループを取る ]
 

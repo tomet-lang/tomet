@@ -1,5 +1,5 @@
-@kind(fixture)
-@meta{
+::kind(fixture)
+::meta{
   id: doc-pipe-table
 }
 

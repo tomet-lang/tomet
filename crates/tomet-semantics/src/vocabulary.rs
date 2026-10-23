@@ -1,4 +1,4 @@
-//! What a `@vocabulary(ns)` document declares, and how a name resolves
+//! What a `::vocabulary(ns)` document declares, and how a name resolves
 //! against the namespaces a document has in scope.
 //!
 //! Extraction is pure: it takes a parsed [`Document`] and reads it. The
@@ -10,8 +10,8 @@
 //! rules from it are enforced here:
 //!
 //! - Exactly two namespaces may be written bare -- `std`, because the
-//!   language carries it, and the document's own `@kind`, because it is
-//!   declared on the first line. Anything brought in with `@use` is
+//!   language carries it, and the document's own `::kind`, because it is
+//!   declared on the first line. Anything brought in with `::use` is
 //!   always written out.
 //! - `std` wins every collision, and cannot be shadowed: a vocabulary
 //!   that declares a name already in [`BUILTIN_KINDS`] is rejected at the
@@ -21,7 +21,7 @@
 //!   itself, resolved the same unconditional way `std` is in
 //!   [`Bindings::classify`]/[`Bindings::declaration`] -- but, unlike
 //!   `std`, never written bare: `@doc.icon(...)` needs its full name, just
-//!   never an `@use(doc)` in front of it.
+//!   never an `::use(doc)` in front of it.
 
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
@@ -35,7 +35,7 @@ use crate::positional::normalized_element_args;
 /// Where an element is allowed to sit in a document.
 ///
 /// Distinct from an element's *shape*, which is whether it stands as a
-/// block or belongs to running text. `@use` has `Region::Preamble` and is
+/// block or belongs to running text. `::use` has `Region::Preamble` and is
 /// not a singleton -- you bring in several vocabularies -- which is the
 /// proof the two axes are independent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -124,7 +124,7 @@ impl ElementDecl {
 pub struct Vocabulary {
     pub namespace: String,
     pub elements: BTreeMap<String, ElementDecl>,
-    /// `@vocabulary(ns){ open: true }` -- any name resolves in this
+    /// `::vocabulary(ns){ open: true }` -- any name resolves in this
     /// namespace, declared or not.
     ///
     /// For a sketchpad. `docs/design/ideas/` writes elements that do not
@@ -152,8 +152,8 @@ pub struct Vocabulary {
 pub const RESERVED_NAMESPACES: [&str; 1] = ["doc"];
 
 /// The vocabularies tomet ships hardcoded in Rust rather than as a vault's
-/// `@vocabulary(ns)` document -- the same reason `std`'s elements are a
-/// Rust table (`BUILTIN_KINDS`) rather than a `@vocabulary(std)` document:
+/// `::vocabulary(ns)` document -- the same reason `std`'s elements are a
+/// Rust table (`BUILTIN_KINDS`) rather than a `::vocabulary(std)` document:
 /// see `kind.rs`'s doc comment on why that is a limit of the vocabulary
 /// format, not a permanent design.
 ///
@@ -161,7 +161,7 @@ pub const RESERVED_NAMESPACES: [&str; 1] = ["doc"];
 /// (`ul`/`ol`/`@link`) plus `${filter(...)}`/`${by(...)}`, which are neither
 /// elements nor registered functions -- `tomet-transform::index_query`
 /// pattern-matches them directly, with no dependency on `Bindings` at all.
-/// This vocabulary exists purely so `@kind(doc.index)` resolves instead of
+/// This vocabulary exists purely so `::kind(doc.index)` resolves instead of
 /// being rejected as unknown.
 ///
 /// `doc` (bare namespace, not `doc.index`) is the opposite case: it
@@ -169,7 +169,7 @@ pub const RESERVED_NAMESPACES: [&str; 1] = ["doc"];
 /// resolves as running text. `std` used to have its own `icon`, recognized
 /// but never drawing anything (`docs/spec/builtin-elements.tmt`'s old
 /// "recognized, does nothing" table) -- worse than not having it, the same
-/// way `@config(style:)` is worse than unimplemented, because a bare
+/// way `::config(style:)` is worse than unimplemented, because a bare
 /// `@icon` looked like the real spelling while doing nothing. `doc.icon`
 /// replaces it under a namespace that says the opposite by construction:
 /// Tomet resolves and draws nothing here, on purpose, forever -- an
@@ -234,10 +234,10 @@ static DOC_VOCAB: LazyLock<Vocabulary> = LazyLock::new(|| {
 impl Vocabulary {
     /// Reads a parsed vocabulary document.
     ///
-    /// Returns `None` when the document has no `@vocabulary(ns)` header:
+    /// Returns `None` when the document has no `::vocabulary(ns)` header:
     /// a vocabulary is one because it says so, never because it happens
-    /// to contain `@element`. That is the same rule `@blueprint` needed
-    /// after `extract_blueprint_schema` had counted any `@kind` at all.
+    /// to contain `@element`. That is the same rule `::blueprint` needed
+    /// after `extract_blueprint_schema` had counted any `::kind` at all.
     pub fn from_document(doc: &Document) -> Option<Self> {
         let (namespace, open) = header(doc)?;
         let mut vocab = Vocabulary {
@@ -330,7 +330,7 @@ impl LoadedVocabularies {
     pub fn add(&mut self, label: &str, doc: &Document) {
         let Some(vocab) = Vocabulary::from_document(doc) else {
             self.errors.push(format!(
-                "declared vocabulary names no namespace -- it needs `@vocabulary(<ns>)`: {label}"
+                "declared vocabulary names no namespace -- it needs `::vocabulary(<ns>)`: {label}"
             ));
             return;
         };
@@ -377,10 +377,10 @@ impl LoadedVocabularies {
 /// The namespaces in scope for one document.
 #[derive(Debug, Clone, Default)]
 pub struct Bindings {
-    /// The vocabulary named by the document's `@kind(X)`. Its names may
+    /// The vocabulary named by the document's `::kind(X)`. Its names may
     /// be written bare.
     pub kind: Option<Vocabulary>,
-    /// Vocabularies brought in with `@use`, by the name each one calls
+    /// Vocabularies brought in with `::use`, by the name each one calls
     /// itself. Never written bare.
     pub used: BTreeMap<String, Vocabulary>,
 }
@@ -396,8 +396,8 @@ impl Bindings {
     /// reading them off disk; a wasm host that has the sources instead
     /// can pass them straight in.
     ///
-    /// A document's `@kind(X)` binds the vocabulary calling itself `X`.
-    /// Everything else has to be asked for with `@use`.
+    /// A document's `::kind(X)` binds the vocabulary calling itself `X`.
+    /// Everything else has to be asked for with `::use`.
     pub fn for_document<I>(doc: &Document, available: I) -> Self
     where
         I: IntoIterator<Item = Vocabulary>,
@@ -431,10 +431,12 @@ impl Bindings {
         let unknown = || UnknownName {
             name: name.to_string(),
             unbound_namespace: None,
+            declaration: false,
         };
         let unbound = |namespace: &str| UnknownName {
             name: name.to_string(),
             unbound_namespace: Some(namespace.to_string()),
+            declaration: false,
         };
 
         let Some(namespace) = name.namespace.as_deref() else {
@@ -455,8 +457,8 @@ impl Bindings {
         }
 
         // `doc` is tomet's own second reserved namespace, resolved the
-        // same unconditional way as `std` just above -- no `@use`, no
-        // `@vocabulary(doc)` document, works even with `Bindings::default()`.
+        // same unconditional way as `std` just above -- no `::use`, no
+        // `::vocabulary(doc)` document, works even with `Bindings::default()`.
         // Still a real, closed vocabulary: `doc.glyph` (undeclared) is
         // `unknown()`, not silently accepted.
         if namespace == "doc" {
@@ -496,15 +498,15 @@ impl Bindings {
     }
 }
 
-/// The namespaces a document asks for with `@use`.
+/// The namespaces a document asks for with `::use`.
 ///
 /// The argument is the namespace, not a path. The vault already says
 /// where each vocabulary lives, so naming the file here would write the
 /// path twice -- and a vocabulary names itself, so the path was never
 /// the thing being identified anyway.
 ///
-/// It also makes the two ways into scope use one currency: `@kind(writ)`
-/// binds by name, and so does `@use(deck)`. The earlier path form forced
+/// It also makes the two ways into scope use one currency: `::kind(writ)`
+/// binds by name, and so does `::use(deck)`. The earlier path form forced
 /// a step between them (path -> file -> namespace) that nothing could
 /// take without carrying paths through this layer, which is why it had
 /// been trimming a filename stem and hoping.
@@ -536,7 +538,7 @@ fn builtin(name: &str) -> Option<ElementKind> {
         .map(|(_, kind)| kind.clone())
 }
 
-/// The namespace a `@vocabulary(ns)` header names, and whether it is open.
+/// The namespace a `::vocabulary(ns)` header names, and whether it is open.
 fn header(doc: &Document) -> Option<(String, bool)> {
     let mut found = None;
     tomet_tree::for_each_top_level_element(doc, |el| {
@@ -554,7 +556,7 @@ fn header(doc: &Document) -> Option<(String, bool)> {
     found
 }
 
-/// The positional argument of `@vocabulary(x)` / `@element(x)`, however
+/// The positional argument of `::vocabulary(x)` / `@element(x)`, however
 /// it normalized.
 fn positional_name(el: &tomet_ast::Element) -> Option<String> {
     let args = normalized_element_args(el)?;
@@ -683,7 +685,7 @@ mod tests {
 
     fn vocab(src: &str) -> Vocabulary {
         let doc = tomet_parser::parse_document(src).expect("vocabulary parses");
-        Vocabulary::from_document(&doc).expect("has a @vocabulary header")
+        Vocabulary::from_document(&doc).expect("has a ::vocabulary header")
     }
 
     fn name(s: &str) -> Name {
@@ -693,8 +695,8 @@ mod tests {
         }
     }
 
-    const WRIT: &str = r#"@kind(vocabulary)
-@vocabulary(writ){ version: "1.0.0" }
+    const WRIT: &str = r#"::kind(vocabulary)
+::vocabulary(writ){ version: "1.0.0" }
 
 @element(layers){ display: block, singleton: true }[ Layers. ]
 @element(pure){ display: block }[ Purity. ]
@@ -719,8 +721,8 @@ mod tests {
     #[test]
     fn reads_the_parameters_an_element_declares() {
         let v = vocab(
-            r#"@kind(vocabulary)
-@vocabulary(deck){ version: "1.0.0" }
+            r#"::kind(vocabulary)
+::vocabulary(deck){ version: "1.0.0" }
 
 @element(card){
   display: block
@@ -761,8 +763,8 @@ mod tests {
     #[test]
     fn reads_content_allow_as_a_name_list() {
         let v = vocab(
-            r#"@kind(vocabulary)
-@vocabulary(deck){ version: "1.0.0" }
+            r#"::kind(vocabulary)
+::vocabulary(deck){ version: "1.0.0" }
 
 @element(card){
   display: block
@@ -786,8 +788,8 @@ mod tests {
     #[test]
     fn reads_content_allow_inline_and_any() {
         let v = vocab(
-            r#"@kind(vocabulary)
-@vocabulary(deck){ version: "1.0.0" }
+            r#"::kind(vocabulary)
+::vocabulary(deck){ version: "1.0.0" }
 
 @element(label){
   @content{ allow: inline }
@@ -808,8 +810,8 @@ mod tests {
     #[test]
     fn no_content_declaration_is_none() {
         let v = vocab(
-            r#"@kind(vocabulary)
-@vocabulary(deck){ version: "1.0.0" }
+            r#"::kind(vocabulary)
+::vocabulary(deck){ version: "1.0.0" }
 
 @element(plain){
   display: block
@@ -829,16 +831,16 @@ mod tests {
 
     /// A document is a vocabulary because it says so, not because it
     /// happens to hold `@element` -- the mistake `extract_blueprint_schema`
-    /// made, where any `@kind` at all counted as a blueprint.
+    /// made, where any `::kind` at all counted as a blueprint.
     #[test]
     fn a_document_without_the_header_is_not_a_vocabulary() {
-        let doc = tomet_parser::parse_document("@kind(note)\n\n@element(x){}[ y ]\n").unwrap();
+        let doc = tomet_parser::parse_document("::kind(note)\n\n@element(x){}[ y ]\n").unwrap();
         assert!(Vocabulary::from_document(&doc).is_none());
     }
 
     #[test]
     fn shadowing_a_builtin_is_reported_at_the_declaration() {
-        let v = vocab("@vocabulary(deck)\n\n@element(link){}[ Mine. ]\n@element(ref){}[ Ok. ]\n");
+        let v = vocab("::vocabulary(deck)\n\n@element(link){}[ Mine. ]\n@element(ref){}[ Ok. ]\n");
         assert_eq!(v.shadowed_builtins(), ["link"]);
         assert!(vocab(WRIT).shadowed_builtins().is_empty());
     }
@@ -860,12 +862,12 @@ mod tests {
         assert!(b.classify(&name("nope")).is_err());
     }
 
-    /// Bare resolves to `std` first, and `@use`d namespaces are never
+    /// Bare resolves to `std` first, and `::use`d namespaces are never
     /// written bare -- the two halves of "exactly two namespaces may be
     /// omitted".
     #[test]
     fn std_wins_and_used_namespaces_are_never_bare() {
-        let deck = vocab("@vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
+        let deck = vocab("::vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
         let b = Bindings {
             kind: Some(vocab(WRIT)),
             used: [("deck".to_string(), deck)].into_iter().collect(),
@@ -879,7 +881,7 @@ mod tests {
         );
         assert!(
             b.classify(&name("ref")).is_err(),
-            "a @use'd name written bare must not resolve"
+            "a `::use`d name written bare must not resolve"
         );
         assert!(
             b.classify(&name("std.layers")).is_err(),
@@ -897,7 +899,7 @@ mod tests {
     /// all along.
     #[test]
     fn a_caller_that_cannot_read_files_can_pass_the_vocabularies_in() {
-        let doc = tomet_parser::parse_document("@kind(writ)\n\n@layers{ 1: list(\"a\") }\n")
+        let doc = tomet_parser::parse_document("::kind(writ)\n\n@layers{ 1: list(\"a\") }\n")
             .expect("document parses");
 
         // Nothing in scope: `std` only, so the kind's element is unknown.
@@ -913,15 +915,15 @@ mod tests {
         assert!(bound.classify(&name("nonesuch")).is_err());
     }
 
-    /// `@use` names the namespace, and that is what puts it in scope.
+    /// `::use` names the namespace, and that is what puts it in scope.
     ///
     /// It used to name a file, which meant this had to guess the
     /// namespace from a filename stem -- and the vault had already
     /// declared that path, so the document was repeating it.
     #[test]
     fn use_brings_a_namespace_into_scope_by_name() {
-        let deck = vocab("@vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
-        let doc = tomet_parser::parse_document("@kind(writ)\n@use(deck)\n\n@deck.ref(id:1)\n")
+        let deck = vocab("::vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
+        let doc = tomet_parser::parse_document("::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n")
             .expect("document parses");
 
         let bound = Bindings::for_document(&doc, [vocab(WRIT), deck]);
@@ -931,7 +933,7 @@ mod tests {
         );
         assert!(
             bound.classify(&name("ref")).is_err(),
-            "a @use'd namespace is never written bare"
+            "a `::use`d namespace is never written bare"
         );
     }
 
@@ -939,10 +941,10 @@ mod tests {
     /// the same with or without it.
     #[test]
     fn a_version_after_the_name_does_not_change_what_binds() {
-        let deck = vocab("@vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
+        let deck = vocab("::vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
         for src in [
-            "@kind(writ, 1)\n@use(deck, 3)\n\n@deck.ref(id:1)\n",
-            "@kind(writ)\n@use(deck)\n\n@deck.ref(id:1)\n",
+            "::kind(writ, 1)\n::use(deck, 3)\n\n@deck.ref(id:1)\n",
+            "::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n",
         ] {
             let doc = tomet_parser::parse_document(src).expect("document parses");
             let bound = Bindings::for_document(&doc, [vocab(WRIT), deck.clone()]);
@@ -955,15 +957,15 @@ mod tests {
     /// scope. Only the document's own kind binds without being written.
     #[test]
     fn an_available_vocabulary_is_not_in_scope_unless_the_document_asks() {
-        let deck = vocab("@vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
+        let deck = vocab("::vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
         let doc =
-            tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
 
         let bound = Bindings::for_document(&doc, [vocab(WRIT), deck]);
         assert!(bound.classify(&name("layers")).is_ok());
         assert!(
             bound.classify(&name("deck.ref")).is_err(),
-            "available is not the same as bound -- `@use` is what asks"
+            "available is not the same as bound -- `::use` is what asks"
         );
     }
 
@@ -988,12 +990,12 @@ mod tests {
         assert!(!index.open);
     }
 
-    /// `@kind(doc.index)` resolves the same way `@kind(writ)` does once its
+    /// `::kind(doc.index)` resolves the same way `::kind(writ)` does once its
     /// vocabulary is in `available` -- the hardcoded and vault-declared
     /// paths meet at the same `Bindings::for_document`.
     #[test]
     fn kind_doc_index_binds_from_the_builtin_vocabulary() {
-        let doc = tomet_parser::parse_document("@kind(doc.index)\n\n#[ An index ]\n")
+        let doc = tomet_parser::parse_document("::kind(doc.index)\n\n#[ An index ]\n")
             .expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert!(bound.kind.is_some());
@@ -1019,12 +1021,12 @@ mod tests {
 
     /// Unlike `deck` in
     /// [`an_available_vocabulary_is_not_in_scope_unless_the_document_asks`],
-    /// `doc` never needs `@use`: it is reserved, so no vault vocabulary may
+    /// `doc` never needs `::use`: it is reserved, so no vault vocabulary may
     /// ever claim it, which is what makes binding it unconditionally safe.
     #[test]
     fn doc_icon_resolves_with_no_use_or_vocabulary_declaration() {
         let doc =
-            tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert_eq!(
             bound.classify(&name("doc.icon")),
@@ -1039,7 +1041,7 @@ mod tests {
     #[test]
     fn doc_rejects_a_name_it_does_not_declare() {
         let doc =
-            tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert!(bound.classify(&name("doc.glyph")).is_err());
     }
@@ -1047,11 +1049,11 @@ mod tests {
     /// `name` (positional, required) and `pkg` (named, optional) reach
     /// `check_arguments` through the same `declaration()` a vault
     /// vocabulary's `@param`s would, even though nothing declared a
-    /// `@vocabulary(doc)` document anywhere.
+    /// `::vocabulary(doc)` document anywhere.
     #[test]
     fn doc_icon_declares_name_and_pkg() {
         let doc =
-            tomet_parser::parse_document("@kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         let decl = bound
             .declaration(&name("doc.icon"))
@@ -1066,7 +1068,7 @@ mod tests {
     }
 
     fn vocab_src(ns: &str) -> String {
-        format!("@kind(vocabulary)\n@vocabulary({ns}){{ version: \"1.0.0\" }}\n")
+        format!("::kind(vocabulary)\n::vocabulary({ns}){{ version: \"1.0.0\" }}\n")
     }
 
     #[test]

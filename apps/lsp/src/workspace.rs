@@ -2,7 +2,7 @@
 //!
 //! [`diagnostics_for`](crate::diagnostics_for) reads a document from its text
 //! alone: what the parser and the CST validator can say. What `tomet check`
-//! says needs more -- the vocabularies in scope, the blueprint the `@kind`
+//! says needs more -- the vocabularies in scope, the blueprint the `::kind`
 //! names, the settings' field types, the files an `include` reads -- and all
 //! of that belongs to a vault. [`Workspace`] finds the vault of each open
 //! document the way the CLI does, from the file's own path, and asks it for
@@ -279,12 +279,12 @@ mod tests {
     fn a_field_type_the_settings_declare_is_checked() {
         let root = vault(
             "types",
-            "@kind(config)\n@config{ meta: { id: { type: uuid } } }\n",
+            "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n",
             &[],
         );
         let path = root.join("a.tmt");
         let mut ws = Workspace::new();
-        ws.set_buffer(path.clone(), "@meta{ id: not-a-uuid }\n".to_string());
+        ws.set_buffer(path.clone(), "::meta{ id: not-a-uuid }\n".to_string());
 
         let diags = ws.findings_diagnostics(&path);
         assert_eq!(diags.len(), 1, "{:?}", messages(&diags));
@@ -293,7 +293,7 @@ mod tests {
 
         ws.set_buffer(
             path.clone(),
-            "@meta{ id: 123e4567-e89b-42d3-a456-426614174000 }\n".to_string(),
+            "::meta{ id: 123e4567-e89b-42d3-a456-426614174000 }\n".to_string(),
         );
         assert!(ws.findings_diagnostics(&path).is_empty());
         let _ = fs::remove_dir_all(&root);
@@ -305,18 +305,18 @@ mod tests {
     fn the_vaults_vocabulary_is_in_scope() {
         let root = vault(
             "vocab",
-            "@kind(config)\n@config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
+            "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
             &[(
                 ".tomet/vocabularies/deck.vocabulary.tmt",
-                "@kind(vocabulary)\n@vocabulary(deck)\n\n@element(card){}[ One card. ]\n",
+                "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(card){}[ One card. ]\n",
             )],
         );
         let path = root.join("a.tmt");
         let mut ws = Workspace::new();
-        ws.set_buffer(path.clone(), "@kind(deck)\n\n@card{}\n".to_string());
+        ws.set_buffer(path.clone(), "::kind(deck)\n\n@card{}\n".to_string());
         assert!(ws.findings_diagnostics(&path).is_empty());
 
-        ws.set_buffer(path.clone(), "@kind(deck)\n\n@nonesuch{}\n".to_string());
+        ws.set_buffer(path.clone(), "::kind(deck)\n\n@nonesuch{}\n".to_string());
         let diags = ws.findings_diagnostics(&path);
         assert_eq!(diags.len(), 1, "{:?}", messages(&diags));
         assert!(diags[0].message.contains("unknown element"));
@@ -329,7 +329,7 @@ mod tests {
     /// was dropped -- a warning, as it is there.
     #[test]
     fn a_duplicate_id_error_is_not_reported_twice() {
-        let root = vault("dup", "@kind(config)\n", &[]);
+        let root = vault("dup", "::kind(config)\n", &[]);
         let path = root.join("a.tmt");
         let mut ws = Workspace::new();
         ws.set_buffer(path.clone(), "=[ One ]#(a)\n=[ Two ]#(a)\n".to_string());
@@ -350,7 +350,7 @@ mod tests {
     fn an_include_follows_the_included_files_unsaved_text() {
         let root = vault(
             "include",
-            "@kind(config)\n",
+            "::kind(config)\n",
             &[("b.tmt", "Mine: ${nope}.\n")],
         );
         let (a, b) = (root.join("a.tmt"), root.join("b.tmt"));
@@ -375,7 +375,7 @@ mod tests {
     /// A buffer opened before its vault was built is told to it when it is.
     #[test]
     fn buffers_are_told_to_a_vault_built_after_them() {
-        let root = vault("late", "@kind(config)\n", &[("b.tmt", "Mine: ${nope}.\n")]);
+        let root = vault("late", "::kind(config)\n", &[("b.tmt", "Mine: ${nope}.\n")]);
         let (a, b) = (root.join("a.tmt"), root.join("b.tmt"));
         let mut ws = Workspace::new();
         ws.set_buffer(b.clone(), "Mine: fine.\n".to_string());
@@ -387,15 +387,15 @@ mod tests {
 
     #[test]
     fn a_changed_config_is_read_after_files_changed() {
-        let root = vault("config", "@kind(config)\n", &[]);
+        let root = vault("config", "::kind(config)\n", &[]);
         let path = root.join("a.tmt");
         let mut ws = Workspace::new();
-        ws.set_buffer(path.clone(), "@meta{ id: not-a-uuid }\n".to_string());
+        ws.set_buffer(path.clone(), "::meta{ id: not-a-uuid }\n".to_string());
         assert!(ws.findings_diagnostics(&path).is_empty());
 
         fs::write(
             root.join("default.config.tmt"),
-            "@kind(config)\n@config{ meta: { id: { type: uuid } } }\n",
+            "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n",
         )
         .unwrap();
         ws.files_changed();
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn nothing_open_and_text_that_does_not_parse_give_nothing() {
-        let root = vault("none", "@kind(config)\n", &[]);
+        let root = vault("none", "::kind(config)\n", &[]);
         let path = root.join("a.tmt");
         let mut ws = Workspace::new();
         assert!(ws.findings_diagnostics(&path).is_empty());
@@ -421,7 +421,7 @@ mod tests {
     fn a_vault_complaint_is_made_once_until_it_is_fixed_and_broken_again() {
         let root = vault(
             "notices",
-            "@kind(config)\n@config{ vocabularies: list(\".tomet/vocabularies/missing.vocabulary.tmt\") }\n",
+            "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/missing.vocabulary.tmt\") }\n",
             &[],
         );
         let path = root.join("a.tmt");
@@ -443,7 +443,7 @@ mod tests {
         let declared = root.join(".tomet/vocabularies/missing.vocabulary.tmt");
         fs::write(
             &declared,
-            "@kind(vocabulary)\n@vocabulary(deck)\n\n@element(tile){}[ One tile. ]\n",
+            "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(tile){}[ One tile. ]\n",
         )
         .unwrap();
         ws.files_changed();
@@ -473,8 +473,8 @@ mod tests {
     fn hover_evaluates_an_expression_in_the_vault() {
         let root = vault(
             "hover",
-            "@kind(config)\n@config{ macros: { gh: \"https://github.com/o/r/issues/${1}\" } }\n",
-            &[("b.tmt", "@meta{ title: Saved }\n")],
+            "::kind(config)\n::config{ macros: { gh: \"https://github.com/o/r/issues/${1}\" } }\n",
+            &[("b.tmt", "::meta{ title: Saved }\n")],
         );
         let (a, b) = (root.join("a.tmt"), root.join("b.tmt"));
         let mut ws = Workspace::new();
@@ -490,7 +490,7 @@ mod tests {
         assert!(hover_text(ws.hover(&a, at(2))).contains("https://github.com/o/r/issues/7"));
 
         // `b.tmt` is edited in the editor and not saved.
-        ws.set_buffer(b.clone(), "@meta{ title: Edited }\n".to_string());
+        ws.set_buffer(b.clone(), "::meta{ title: Edited }\n".to_string());
         assert!(hover_text(ws.hover(&a, at(0))).contains("Edited"));
         let _ = fs::remove_dir_all(&root);
     }
@@ -499,7 +499,7 @@ mod tests {
     /// rendered, so it is not on hover either.
     #[test]
     fn hover_does_not_know_what_rendering_does_not() {
-        let root = vault("hover_create", "@kind(config)\n", &[]);
+        let root = vault("hover_create", "::kind(config)\n", &[]);
         let a = root.join("a.tmt");
         let mut ws = Workspace::new();
         ws.set_buffer(a.clone(), "${generate.uuid()}\n".to_string());
@@ -510,7 +510,7 @@ mod tests {
 
     #[test]
     fn hover_on_nothing_open_is_nothing() {
-        let root = vault("hover_none", "@kind(config)\n", &[]);
+        let root = vault("hover_none", "::kind(config)\n", &[]);
         let mut ws = Workspace::new();
         assert!(
             ws.hover(&root.join("a.tmt"), lsp_types::Position::new(0, 0))
@@ -533,18 +533,18 @@ mod tests {
         ws.completions(&path, lsp_types::Position::new(line, character), None)
     }
 
-    const DECK: &str = "@kind(vocabulary)\n@vocabulary(deck)\n\n@element(tile){\n  display: block\n  @args{\n    @param(label){ type: string, positional: true }[ The label. ]\n  }\n}[ One tile. ]\n";
+    const DECK: &str = "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(tile){\n  display: block\n  @args{\n    @param(label){ type: string, positional: true }[ The label. ]\n  }\n}[ One tile. ]\n";
 
-    /// After `@`, the elements of the vocabulary the document's `@kind` binds
+    /// After `@`, the elements of the vocabulary the document's `::kind` binds
     /// are offered with the built-in ones, which the text alone cannot know.
     #[test]
     fn at_offers_the_elements_of_the_vocabulary_in_scope() {
         let root = vault(
             "at",
-            "@kind(config)\n@config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
+            "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
             &[(".tomet/vocabularies/deck.vocabulary.tmt", DECK)],
         );
-        let in_deck = completions_at_the_end(&root, "@kind(deck)\n\n@");
+        let in_deck = completions_at_the_end(&root, "::kind(deck)\n\n@");
         let names = labels(&in_deck);
         assert!(names.contains(&"tile"), "{names:?}");
         assert!(names.contains(&"link"), "a built-in is still offered");
@@ -558,7 +558,7 @@ mod tests {
         );
 
         // A document that does not bind the vocabulary does not get it.
-        let elsewhere = completions_at_the_end(&root, "@kind(other)\n\n@");
+        let elsewhere = completions_at_the_end(&root, "::kind(other)\n\n@");
         assert!(!labels(&elsewhere).contains(&"tile"));
         let _ = fs::remove_dir_all(&root);
     }
@@ -567,7 +567,7 @@ mod tests {
     /// even though the line being typed does not parse.
     #[test]
     fn a_reference_is_offered_the_ids_of_the_document() {
-        let root = vault("ids", "@kind(config)\n", &[]);
+        let root = vault("ids", "::kind(config)\n", &[]);
         for typing in ["${#", "@link(#"] {
             let items = completions_at_the_end(
                 &root,
@@ -581,7 +581,7 @@ mod tests {
     /// A `#` that declares an id is not a reference.
     #[test]
     fn a_declaration_is_not_offered_ids() {
-        let root = vault("decl", "@kind(config)\n", &[]);
+        let root = vault("decl", "::kind(config)\n", &[]);
         let items = completions_at_the_end(&root, "=[ A ]#(alpha)\n\n=[ B ]#(");
         assert!(!labels(&items).contains(&"alpha"));
         let _ = fs::remove_dir_all(&root);
@@ -592,7 +592,7 @@ mod tests {
     fn a_reference_into_another_document_is_offered_its_ids() {
         let root = vault(
             "other_ids",
-            "@kind(config)\n",
+            "::kind(config)\n",
             &[("b.tmt", "=[ One ]#(one)\n\n=[ Two ]#(two)\n")],
         );
         for typing in ["${tmt(\"b.tmt\")#", "@link(tmt:b.tmt#"] {
@@ -606,7 +606,7 @@ mod tests {
     /// its root, the way the language measures them.
     #[test]
     fn a_document_path_is_offered_the_documents_of_the_vault() {
-        let root = vault("paths", "@kind(config)\n", &[("b.tmt", "text\n")]);
+        let root = vault("paths", "::kind(config)\n", &[("b.tmt", "text\n")]);
         fs::create_dir_all(root.join("sub")).unwrap();
         fs::write(root.join("sub/c.tmt"), "text\n").unwrap();
         for typing in ["${tmt(\"", "@link(tmt:"] {
@@ -620,7 +620,7 @@ mod tests {
 
     #[test]
     fn completion_on_nothing_open_is_nothing() {
-        let root = vault("complete_none", "@kind(config)\n", &[]);
+        let root = vault("complete_none", "::kind(config)\n", &[]);
         let mut ws = Workspace::new();
         let items = ws.completions(&root.join("a.tmt"), lsp_types::Position::new(0, 0), None);
         assert!(items.is_empty());
@@ -649,7 +649,7 @@ mod tests {
     fn a_reference_into_another_document_jumps_to_its_node() {
         let root = vault(
             "jump_id",
-            "@kind(config)\n",
+            "::kind(config)\n",
             &[("b.tmt", "=[ One ]#(one)\n\ntext\n\n=[ Two ]#(two)\n")],
         );
         let b = root.join("b.tmt");
@@ -674,7 +674,7 @@ mod tests {
     /// A reference to a document, with no node named, lands at its start.
     #[test]
     fn a_reference_to_a_document_jumps_to_its_start() {
-        let root = vault("jump_doc", "@kind(config)\n", &[("b.tmt", "text\n")]);
+        let root = vault("jump_doc", "::kind(config)\n", &[("b.tmt", "text\n")]);
         let mut ws = Workspace::new();
         ws.set_buffer(
             root.join("a.tmt"),
@@ -688,7 +688,7 @@ mod tests {
     /// `./` and `../` are measured from the document the link is in.
     #[test]
     fn a_relative_path_is_measured_from_the_document() {
-        let root = vault("jump_rel", "@kind(config)\n", &[]);
+        let root = vault("jump_rel", "::kind(config)\n", &[]);
         fs::create_dir_all(root.join("notes")).unwrap();
         fs::write(root.join("notes/near.tmt"), "=[ N ]#(n)\n").unwrap();
         fs::write(root.join("far.tmt"), "=[ F ]#(f)\n").unwrap();
@@ -718,7 +718,7 @@ mod tests {
     /// A note, by the name it is known by.
     #[test]
     fn a_note_reference_jumps_to_the_note() {
-        let root = vault("jump_note", "@kind(config)\n", &[("Weekly.tmt", "text\n")]);
+        let root = vault("jump_note", "::kind(config)\n", &[("Weekly.tmt", "text\n")]);
         let mut ws = Workspace::new();
         ws.set_buffer(root.join("a.tmt"), "@link(ref:Weekly)\n".to_string());
         assert_eq!(jump(&mut ws, &root, 0, 12), Some(("Weekly.tmt".into(), 0)));
@@ -730,7 +730,7 @@ mod tests {
     fn a_reference_to_nothing_does_not_jump() {
         let root = vault(
             "jump_none",
-            "@kind(config)\n",
+            "::kind(config)\n",
             &[("b.tmt", "=[ One ]#(one)\n")],
         );
         let mut ws = Workspace::new();
@@ -747,7 +747,7 @@ mod tests {
     /// The same-document jump is answered here too, in the file's own URI.
     #[test]
     fn a_reference_within_the_document_still_jumps() {
-        let root = vault("jump_self", "@kind(config)\n", &[]);
+        let root = vault("jump_self", "::kind(config)\n", &[]);
         let mut ws = Workspace::new();
         ws.set_buffer(
             root.join("a.tmt"),

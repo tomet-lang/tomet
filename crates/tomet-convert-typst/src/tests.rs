@@ -108,8 +108,8 @@ fn renders_embed_as_image_with_alt() {
 
 #[test]
 fn meta_and_config_have_no_visible_output() {
-    assert_eq!(typst("@meta{ key: value }\n"), "");
-    assert_eq!(typst("@config(format:json)\n"), "");
+    assert_eq!(typst("::meta{ key: value }\n"), "");
+    assert_eq!(typst("::config(format:json)\n"), "");
 }
 
 #[test]
@@ -139,17 +139,17 @@ fn renders_interp_as_inert_raw_text() {
 
 #[test]
 fn renders_inline_footnote() {
-    let src = "Prose with @footnote[a note] here.\n";
+    let src = "Prose with @ftn[a note] here.\n";
     assert_eq!(typst(src), "Prose with #footnote[a note] here.\n\n");
 }
 
 #[test]
-fn renders_separated_footnote_with_multiple_carets() {
+fn renders_separated_footnote_with_multiple_references() {
     let src = "\
-Prose A ^(shared).
-Prose B ^(shared).
+Prose A @ftn(shared).
+Prose B @ftn(shared).
 
-@footnote(shared)[Shared footnote explanation.]
+@ftn(shared)[Shared footnote explanation.]
 ";
     let out = typst(src);
     assert!(
@@ -160,20 +160,7 @@ Prose B ^(shared).
         out.contains("Prose B #footnote(<fn-shared>)."),
         "got: {out}"
     );
-    assert!(!out.contains("@footnote"), "got: {out}");
-}
-
-#[test]
-fn ftn_renders_as_the_caret_and_footnote_spelling_does() {
-    let old = "Prose A ^(shared).\nProse B ^(shared).\n\n@footnote(shared)[Shared footnote explanation.]\n";
-    let new = "Prose A @ftn(shared).\nProse B @ftn(shared).\n\n@ftn(shared)[Shared footnote explanation.]\n";
-    assert_eq!(typst(new), typst(old));
-    assert!(
-        typst(new).contains("Prose A #footnote[Shared footnote explanation.] <fn-shared>."),
-        "got: {}",
-        typst(new)
-    );
-    assert!(!typst(new).contains("@ftn"), "got: {}", typst(new));
+    assert!(!out.contains("@ftn"), "got: {out}");
 }
 
 #[test]

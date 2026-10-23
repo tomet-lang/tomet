@@ -121,8 +121,8 @@ pub fn for_each_element_in_block(block: &Block, mut f: impl FnMut(&Element)) {
 ///
 /// Before `docs/spec/syntax.tmt`'s `##[ 区切り ]`, that was simply every
 /// `Block::Element` in `doc.blocks` -- a bare element with nothing
-/// adjacent to join always stood alone, so `@kind`/`@blueprint`/`@meta`/
-/// `@vocabulary`/... were always found this way, and more than one
+/// adjacent to join always stood alone, so `::kind`/`::blueprint`/`::meta`/
+/// `::vocabulary`/... were always found this way, and more than one
 /// caller across the workspace grew its own copy of that same loop. Now
 /// one can join an adjacent paragraph instead (no blank line, no `;`
 /// separator) and come back as an `Inline::Element` inside a
@@ -137,7 +137,7 @@ pub fn for_each_element_in_block(block: &Block, mut f: impl FnMut(&Element)) {
 /// This is the one place that decision lives. A caller that wants "the
 /// declarations at the top of this document" should call this instead of
 /// walking `doc.blocks` by hand -- that hand-rolled loop is exactly what
-/// stopped finding a joined `@blueprint`/`@vocabulary`/`@meta` the moment
+/// stopped finding a joined `::blueprint`/`::vocabulary`/`::meta` the moment
 /// this rule shipped, in more than one crate at once.
 pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
     for block in &doc.blocks {
@@ -157,7 +157,7 @@ pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
 }
 
 /// [`for_each_top_level_element`], mutably -- for a caller that rewrites a
-/// top-level declaration in place (`@blueprint(x)` becoming `@kind(x)`,
+/// top-level declaration in place (`::blueprint(x)` becoming `::kind(x)`,
 /// say) without changing how many elements are there.
 pub fn for_each_top_level_element_mut(doc: &mut Document, mut f: impl FnMut(&mut Element)) {
     for block in &mut doc.blocks {

@@ -66,7 +66,7 @@ what `${self.path}` is measured from.
 Validates `source` the way a host with no disk can: what `tomet check` says
 of it, given the vault's pieces as text.
 
-- `vocabularies`: `@vocabulary(ns)` documents. One that does not parse, has
+- `vocabularies`: `::vocabulary(ns)` documents. One that does not parse, has
 
 no header, or claims a reserved or already-taken namespace is skipped: it
 binds no namespace.
@@ -77,9 +77,9 @@ holds). Without it the defaults are used, and nothing declares a `type:`.
 One that does not parse is an error: a host that passes settings means
 them.
 
-- `blueprints`: `@blueprint(kind)` documents. A document is checked against
+- `blueprints`: `::blueprint(kind)` documents. A document is checked against
 
-the one for its `@kind`, if there is one. One that does not parse is
+the one for its `::kind`, if there is one. One that does not parse is
 skipped.
 
 An expression that reaches another document is not reported, since no

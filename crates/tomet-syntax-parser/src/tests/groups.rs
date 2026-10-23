@@ -107,7 +107,7 @@ fn an_unbalanced_bracket_inside_a_content_still_errors() {
 fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
     // `()`/`{}` written out (as opposed to the group being omitted
     // entirely, which leaves `args`/`value` as `None`) is a valid,
-    // deliberately-empty map -- matches the spec's own `@meta{}` etc.
+    // deliberately-empty map -- matches the spec's own `::meta{}` etc.
     let doc = parse_document("@T()\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
@@ -117,7 +117,7 @@ fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
         other => panic!("expected an element, got {other:?}"),
     }
 
-    let doc = parse_document("@meta{}\n").unwrap();
+    let doc = parse_document("::meta{}\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(el.value, Some(ElementValue::from_map(Value::Map(vec![]))));

@@ -204,11 +204,11 @@ fn a_quoted_string_without_a_colon_is_still_a_value() {
 /// loop of its own.
 #[test]
 fn a_repeated_key_is_an_error_in_args_and_in_a_group() {
-    for src in ["@meta(a: 1, a: 2)\n", "@meta{\n  a: 1\n  a: 2\n}\n"] {
+    for src in ["::meta(a: 1, a: 2)\n", "::meta{\n  a: 1\n  a: 2\n}\n"] {
         let err = parse_document(src).unwrap_err().to_string();
         assert!(err.contains("duplicate key `a`"), "{src:?}: {err}");
     }
-    for src in ["@meta(a: 1, b: 2)\n", "@meta{\n  a: 1\n  b: 2\n}\n"] {
+    for src in ["::meta(a: 1, b: 2)\n", "::meta{\n  a: 1\n  b: 2\n}\n"] {
         assert!(parse_document(src).is_ok(), "{src:?}");
     }
 }

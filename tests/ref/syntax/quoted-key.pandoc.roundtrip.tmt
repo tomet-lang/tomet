@@ -1,4 +1,4 @@
-@meta{plain.key: "2", "tmtroot/schema/rust.vocabulary.tmt": ../vocabularies/rust.vocabulary.tmt, "with space": "1"}
+::meta{plain.key: "2", "tmtroot/schema/rust.vocabulary.tmt": ../vocabularies/rust.vocabulary.tmt, "with space": "1"}
 
 =[Quoted map keys]
 A key that is not an identifier is written as a quoted string.

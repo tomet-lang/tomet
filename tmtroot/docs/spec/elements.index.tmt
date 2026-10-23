@@ -7,13 +7,13 @@ Tometの仕様、Markdownの基本的な記法
 言語を制御するうえで必要な語彙
 
 ```tm
-@version
-@meta
-@config
-@setting
-@kind
-@blueprint
-@vocabulary
+::version
+::meta
+::config
+::settings
+::kind
+::blueprint
+::vocabulary
 ```
 
 ---[ Expression ]---

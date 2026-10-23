@@ -1,7 +1,7 @@
 //! Blueprint discovery and file instantiation across a workspace.
 //!
 //! A vault declares its blueprints in its config, as a list of paths, and
-//! each blueprint names itself with `@blueprint(X)`. Nothing is derived
+//! each blueprint names itself with `::blueprint(X)`. Nothing is derived
 //! from a filename and nothing is searched for by convention.
 //!
 //! That is a change from what this did, and the reason is in this
@@ -15,7 +15,7 @@
 //! where it is written, instead of at every document that wanted it.
 //!
 //! A name -> path map was rejected as a duplicate: the name would appear
-//! in the key, in the path, and again in the file's own `@blueprint(X)`.
+//! in the key, in the path, and again in the file's own `::blueprint(X)`.
 
 use std::collections::HashMap;
 use std::fs;
@@ -64,7 +64,7 @@ pub fn declaration_errors(root: &Path, config: &PrinterConfig) -> Vec<String> {
         }
         match blueprint_name(&path) {
             None => errors.push(format!(
-                "declared blueprint names no target -- it needs `@blueprint(<name>)`: {declared}"
+                "declared blueprint names no target -- it needs `::blueprint(<name>)`: {declared}"
             )),
             Some(name) => {
                 if let Some(first) = seen.get(&name) {
@@ -89,7 +89,7 @@ pub fn find_blueprint(root: &Path, name: &str, config: &PrinterConfig) -> Option
 }
 
 /// The target a blueprint file names for itself, from its
-/// `@blueprint(X)`.
+/// `::blueprint(X)`.
 fn blueprint_name(path: &Path) -> Option<String> {
     let src = fs::read_to_string(path).ok()?;
     let doc = tomet_parser::parse_document(&src).ok()?;
@@ -299,7 +299,7 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/blueprints")).unwrap();
         fs::write(
             dir.join(".tomet/blueprints/daily-note.blueprint.tmt"),
-            "@kind(blueprint)\n@blueprint(daily-note)\n@meta{\n  id: ${generate.uuid()}\n  title: ${vars.title}\n}\n\n=[ Tasks for ${vars.title} ]#(tasks)\n",
+            "::kind(blueprint)\n::blueprint(daily-note)\n::meta{\n  id: ${generate.uuid()}\n  title: ${vars.title}\n}\n\n=[ Tasks for ${vars.title} ]#(tasks)\n",
         )
         .unwrap();
         dir
@@ -385,9 +385,9 @@ mod tests {
 
         assert!(created.unfilled.is_empty(), "{:?}", created.unfilled);
         let content = fs::read_to_string(&created.path).unwrap();
-        assert!(content.contains("@kind(daily-note)"));
+        assert!(content.contains("::kind(daily-note)"));
         assert!(content.contains("Tasks for 2026-09-01 Daily"));
-        assert!(!content.contains("@blueprint"));
+        assert!(!content.contains("::blueprint"));
 
         let _ = fs::remove_dir_all(&root);
     }
@@ -418,7 +418,7 @@ mod tests {
     fn generated_values_come_from_the_injected_clock_and_random_source() {
         let file = blueprint_file(
             "fixed",
-            "@blueprint(note)\n@meta{\n  id: ${generate.uuid()}\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  by: ${vars.author}\n}\n",
+            "::blueprint(note)\n::meta{\n  id: ${generate.uuid()}\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  by: ${vars.author}\n}\n",
         );
         let mut vars = HashMap::new();
         vars.insert("author".to_string(), Value::String("Ann".into()));
@@ -445,7 +445,7 @@ mod tests {
 
     #[test]
     fn the_title_defaults_to_the_files_name_and_can_be_passed() {
-        let file = blueprint_file("title", "@blueprint(note)\n\n=[ ${vars.title} ]\n");
+        let file = blueprint_file("title", "::blueprint(note)\n\n=[ ${vars.title} ]\n");
         let config = PrinterConfig::default();
         let made = |vars: &HashMap<String, Value>| {
             instantiate_blueprint_file_with(
@@ -467,7 +467,7 @@ mod tests {
 
     #[test]
     fn an_expression_with_no_value_is_left_in_the_new_document() {
-        let file = blueprint_file("left", "@blueprint(note)\n@meta{ by: ${vars.author} }\n");
+        let file = blueprint_file("left", "::blueprint(note)\n::meta{ by: ${vars.author} }\n");
         let made = instantiate_blueprint_file_with(
             &file,
             Path::new("n.tmt"),
@@ -487,7 +487,7 @@ mod tests {
     fn an_expression_with_no_value_is_reported_with_its_line_in_the_blueprint() {
         let file = blueprint_file(
             "reported",
-            "@blueprint(note)\n\n@meta{\n  by: ${vars.author}\n  on: ${generate.uuid()}\n}\n",
+            "::blueprint(note)\n\n::meta{\n  by: ${vars.author}\n  on: ${generate.uuid()}\n}\n",
         );
         let made = instantiate_blueprint_file_with(
             &file,
@@ -513,7 +513,7 @@ mod tests {
         let root = vault("unfilled");
         fs::write(
             root.join(".tomet/blueprints/daily-note.blueprint.tmt"),
-            "@blueprint(daily-note)\n@meta{ by: ${vars.author} }\n",
+            "::blueprint(daily-note)\n::meta{ by: ${vars.author} }\n",
         )
         .unwrap();
         let config = declaring(&[".tomet/blueprints/daily-note.blueprint.tmt"]);

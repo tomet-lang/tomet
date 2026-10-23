@@ -1,5 +1,5 @@
-@kind(doc.index)
-@meta{ id: doc-index-query }
+::kind(doc.index)
+::meta{ id: doc-index-query }
 
 =[ 索引の問い合わせ ]
 

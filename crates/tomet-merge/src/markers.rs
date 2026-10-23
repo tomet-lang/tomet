@@ -4,7 +4,7 @@
 //! that's each of those modules' own job -- this only knows what a single
 //! marker or value looks like.
 //!
-//! `@conflict` is `tomet`'s own std element now (bare, no `@use`), with
+//! `@conflict` is `tomet`'s own std element now (bare, no `::use`), with
 //! `a`/`b` holding real block content directly (`Value::Blocks`) rather
 //! than the three positional range markers (`mine`/`theirs`/`end`) this
 //! crate used to scatter through the block/inline sequence under the

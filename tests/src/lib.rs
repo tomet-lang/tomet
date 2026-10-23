@@ -120,7 +120,7 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // for the retired `+++` fence -- see `syntax/fences.tmt`'s own entry.
     (
         "cheatsheet.tmt",
-        &["@config(", "や", "]", MISSING_NODE, "`"],
+        &["(\n  style: structural", "や", "]", MISSING_NODE, "`"],
     ),
     // The combine notation (`-@name(...)`): `grammar.js`'s
     // `ordered_list_item`/`unordered_list_item` only ever produce a
@@ -206,7 +206,7 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // `grammar.js` yet:
     //
     // 1. `Value::Element` (`@name(...)` sitting where a value goes,
-    //    e.g. `@meta(icon: @doc.icon("triangle"))`) has no grammar.js
+    //    e.g. `::meta(icon: @doc.icon("triangle"))`) has no grammar.js
     //    counterpart at all -- `_entry_value`/the seq-item rule offer no
     //    "element" alternative, so even the single-`@doc.icon` case
     //    errors.

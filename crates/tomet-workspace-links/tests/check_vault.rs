@@ -100,12 +100,12 @@ fn reports_broken_link_when_anchor_does_not_exist_in_target_doc() {
     std::fs::create_dir_all(&temp_dir).unwrap();
 
     let target_doc = temp_dir.join("target.tmt");
-    std::fs::write(&target_doc, "@meta{}\n\n=[ Heading ] #(real_anchor)\n").unwrap();
+    std::fs::write(&target_doc, "::meta{}\n\n=[ Heading ] #(real_anchor)\n").unwrap();
 
     let referencing_doc = temp_dir.join("referencing.tmt");
     std::fs::write(
         &referencing_doc,
-        "@meta{}\n\n@link(target:tmt:target.tmt#real_anchor)\n@link(target:tmt:target.tmt#no_such_anchor)\n",
+        "::meta{}\n\n@link(target:tmt:target.tmt#real_anchor)\n@link(target:tmt:target.tmt#no_such_anchor)\n",
     )
     .unwrap();
 

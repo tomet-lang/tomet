@@ -1,6 +1,6 @@
-@kind(fixture)
+::kind(fixture)
 
-@meta{x: @conflict(a: 2, b: 3)}
+::meta{x: @conflict(a: 2, b: 3)}
 
 =[文書本体でのブロック内容]
 @conflict(a: [ローカル側で書かれた内容。

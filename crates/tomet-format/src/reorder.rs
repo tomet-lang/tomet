@@ -188,7 +188,7 @@ fn collect_swaps_in_element(
     // 1. Check if this element itself needs swapping
     let elem_name = el.sigil.name().map(|n| n.name.as_str()).unwrap_or("");
     if let Some(order) = config.element_group_order(elem_name)
-        && matches!(el.sigil, Sigil::Named(_) | Sigil::Caret(_))
+        && matches!(el.sigil, Sigil::Named(_))
         && el.args.is_some()
         && el.content.is_some()
         && !el.span.is_dummy()
@@ -240,8 +240,8 @@ fn detect_swap_element_groups(
     let bytes = src.as_bytes();
     let mut pos = start;
 
-    // Skip sigil '@' or '^'
-    if pos < end && (bytes[pos] == b'@' || bytes[pos] == b'^') {
+    // Skip sigil '@'
+    if pos < end && bytes[pos] == b'@' {
         pos += 1;
         if pos < end && bytes[pos] == b'[' {
             let close = find_matching(src, pos, '[', ']')?;

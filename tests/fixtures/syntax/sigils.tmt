@@ -1,5 +1,5 @@
-@kind(fixture)
-@meta{ id: doc-sigils }
+::kind(fixture)
+::meta{ id: doc-sigils }
 
 =[ シジルは形を表す ]
 
@@ -12,7 +12,7 @@
 
 @deck.bookmark(name: foo, count: 3)[ 名前空間つき ]
 
-@use(deck)
+::use(deck)
 
 =[ インライン要素 ]
 

@@ -22,7 +22,7 @@
 //!
 //! [`format_source_with_config`] formats tables according to `PrinterConfig`
 //! (e.g. `table.adjust_width`, `table.max_col_width`, `table.align`) and
-//! applies [`format_source`]. It never alters document metadata (`@meta`)
+//! applies [`format_source`]. It never alters document metadata (`::meta`)
 //! or injects structural elements.
 
 pub mod clean;

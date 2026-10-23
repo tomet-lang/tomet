@@ -21,9 +21,9 @@
 
 =[ 何ごとに数えるか ]
 
-結果は、全体と、文書が宣言した `@kind` ごとの内訳の両方。`@kind` を宣言しない文書は、`(none)` の行に入る。
+結果は、全体と、文書が宣言した `::kind` ごとの内訳の両方。`::kind` を宣言しない文書は、`(none)` の行に入る。
 
-内訳は、文書の数が多い `@kind` から、同数なら文字が多い方から、それも同じなら名前の順に並べる。`(none)` は最後。
+内訳は、文書の数が多い `::kind` から、同数なら文字が多い方から、それも同じなら名前の順に並べる。`(none)` は最後。
 
 =[ 文書の見つけ方 ]
 
@@ -42,8 +42,8 @@
 
 標準出力に出す。
 
-- 指定なしは、人が読む表。`@kind` ごとの行と合計の行があり、列は `Files`、`Characters`、`Elements`、`Links`、`Headings`。千の位に `,` を打つ。表の下に、要素の印ごとの内訳、リンクの種類ごとの内訳、いちばん深い見出しの水準、`Check`（`failed <n> / warnings <n>`）、要素の名前ごとの内訳を出す。
-- `--json` は、同じ内容を JSON にする: 合計（`files`、`characters`、`elements`、`links`、`headings`）、`check`（`failed` と `warnings`）、`kinds`（`kind` と同じ形の合計を、`@kind` ごとに）、`errors`（数えられなかった文書の `file`、`line`、`column`、`message`）。`kind` は、宣言のない文書では `null`。`files` は数えられた文書の数で、`errors` の文書は含まない。
+- 指定なしは、人が読む表。`::kind` ごとの行と合計の行があり、列は `Files`、`Characters`、`Elements`、`Links`、`Headings`。千の位に `,` を打つ。表の下に、要素の印ごとの内訳、リンクの種類ごとの内訳、いちばん深い見出しの水準、`Check`（`failed <n> / warnings <n>`）、要素の名前ごとの内訳を出す。
+- `--json` は、同じ内容を JSON にする: 合計（`files`、`characters`、`elements`、`links`、`headings`）、`check`（`failed` と `warnings`）、`kinds`（`kind` と同じ形の合計を、`::kind` ごとに）、`errors`（数えられなかった文書の `file`、`line`、`column`、`message`）。`kind` は、宣言のない文書では `null`。`files` は数えられた文書の数で、`errors` の文書は含まない。
 
 数えられなかった文書の理由は、表の形では件数だけ。どれがなぜかは、`--json` の `errors` か、`tomet check` で見る。
 

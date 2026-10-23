@@ -4,9 +4,9 @@
 //! - (expressions)| Every `${...}` in a document resolved once, in one pass, with the
 //!                | evaluator's typed values put back according to where each expression sits.
 //! - (macro_rewrite) Reverse URL-to-macro pattern matching and rewriting.
-//! - (directive) Directive promotion (`@meta.type` -> `@kind`) and Value DSL normalization.
+//! - (directive) Directive promotion (`::meta.type` -> `::kind`) and Value DSL normalization.
 //! - (structural) Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
-//! - (meta) Batch `@meta` key/value updates.
+//! - (meta) Batch `::meta` key/value updates.
 
 pub mod blueprint;
 pub mod directive;
@@ -55,12 +55,12 @@ mod tests {
 
     #[test]
     fn test_promote_meta_type_to_kind() {
-        // `@version` and `@meta` sit on adjacent lines with no blank line
+        // `::version` and `::meta` sit on adjacent lines with no blank line
         // or `;` between them, so they join into one `Block::Paragraph`
         // under the default placement rule (`docs/spec/syntax.tmt`'s
         // `##[ 区切り ]`) -- `doc.blocks.len()` no longer tracks "how many
         // top-level declarations", only `for_each_top_level_element` does.
-        let mut doc = parse_doc("@version(1.0)\n@meta{\n  type: task\n  id: doc-1\n}\n");
+        let mut doc = parse_doc("::version(1.0)\n::meta{\n  type: task\n  id: doc-1\n}\n");
         assert!(promote_meta_type_to_kind(&mut doc));
 
         let mut sigils = Vec::new();

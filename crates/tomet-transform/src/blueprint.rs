@@ -11,7 +11,7 @@ use tomet_tree::{
 
 use crate::expressions::{Unresolved, resolve_expressions};
 
-/// Metadata and variable definitions extracted from a `@blueprint` directive.
+/// Metadata and variable definitions extracted from a `::blueprint` directive.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlueprintInfo {
     pub target_kind: String,
@@ -19,7 +19,7 @@ pub struct BlueprintInfo {
     pub vars_schema: HashMap<String, Value>,
 }
 
-/// Extracts [`BlueprintInfo`] from `doc` if it declares a top-level `@blueprint` directive.
+/// Extracts [`BlueprintInfo`] from `doc` if it declares a top-level `::blueprint` directive.
 pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
     let mut result = None;
     for_each_top_level_element(doc, |el| {
@@ -74,17 +74,17 @@ pub struct Instantiated {
 }
 
 /// Instantiates a blueprint `doc` in-place by:
-/// 1. Promoting/converting `@blueprint(target)` to `@kind(target)` and stripping schema blocks.
+/// 1. Promoting/converting `::blueprint(target)` to `::kind(target)` and stripping schema blocks.
 /// 2. Resolving every `${...}` in it, with `cx` -- which is a creating context
 ///    (`Phase::Create`), the only place `generate.*` and `vars` exist.
 pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiated {
     let mut changed = false;
 
-    // Step 0: drop the blueprint's own `@kind(blueprint)`.
+    // Step 0: drop the blueprint's own `::kind(blueprint)`.
     //
     // It says what the *blueprint* is, and the blueprint is what stops
     // existing here. Leaving it produces a document with two kinds --
-    // `@kind(blueprint)` from the source and `@kind(daily-note)` from the
+    // `::kind(blueprint)` from the source and `::kind(daily-note)` from the
     // promotion below -- which is what running `tomet new` for the first
     // time after the shape was decided actually produced.
     let mut dropped_own_kind = false;
@@ -104,10 +104,10 @@ pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiat
     });
     changed |= dropped_own_kind;
 
-    // Step 1: Transform @blueprint -> @kind
+    // Step 1: Transform ::blueprint -> ::kind
     for_each_top_level_element_mut(doc, |el| {
         if classify_std_lenient(el) == ElementKind::Blueprint {
-            // The target is `@blueprint`'s positional argument, which
+            // The target is `::blueprint`'s positional argument, which
             // `tomet-semantics::positional` normalizes to `target`.
             // This used to also accept a spelled-out `target:` and a
             // `kind:`, three spellings for one thing that nobody had
@@ -119,7 +119,7 @@ pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiat
                 .unwrap_or("unknown")
                 .to_string();
 
-            el.sigil = Sigil::named("kind");
+            el.sigil = Sigil::document("kind");
             el.args = Some(Value::String(target_kind));
             // `{version, description}` describes the blueprint, not the
             // document it produces, so it does not survive promotion.
@@ -177,19 +177,19 @@ mod tests {
 
     /// Instantiating leaves exactly one kind behind.
     ///
-    /// A blueprint carries two: `@kind(blueprint)`, saying what the file
-    /// is, and `@blueprint(target)`, saying what it produces. Only the
+    /// A blueprint carries two: `::kind(blueprint)`, saying what the file
+    /// is, and `::blueprint(target)`, saying what it produces. Only the
     /// second survives -- the first describes a thing that stops existing.
     /// The first run of `tomet new` after the shape was decided emitted
     /// both, which is what this pins.
     #[test]
     fn instantiating_leaves_one_kind() {
         let (doc, _) = instantiate(
-            "@kind(blueprint)\n@blueprint(daily-note){\n  version: \"1.0\"\n}\n\n=[ Plan ]\n",
+            "::kind(blueprint)\n::blueprint(daily-note){\n  version: \"1.0\"\n}\n\n=[ Plan ]\n",
             EvalValue::Null,
         );
 
-        // `@kind(blueprint)` and `@blueprint(daily-note)` sat on adjacent
+        // `::kind(blueprint)` and `::blueprint(daily-note)` sat on adjacent
         // lines with nothing between them, so they join into one
         // paragraph -- a top-level element search has to follow, not a raw
         // `doc.blocks` walk.
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn extracts_blueprint_info() {
-        let src = "@blueprint(daily-note){\n  description: \"Daily note\"\n  vars: {\n    author: \"Alice\"\n  }\n}\n\n=[ Plan ]#(plan)\n";
+        let src = "::blueprint(daily-note){\n  description: \"Daily note\"\n  vars: {\n    author: \"Alice\"\n  }\n}\n\n=[ Plan ]#(plan)\n";
         let doc = tomet_parser::parse_document(src).unwrap();
         let info = extract_blueprint_info(&doc).unwrap();
         assert_eq!(info.target_kind, "daily-note");
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn instantiates_blueprint_to_kind_and_resolves_expressions() {
-        let src = "@blueprint(daily-note)\n@meta{\n  id: ${generate.uuid()}\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  title: ${vars.title}\n}\n\n=[ Plan for ${vars.title} ]#(plan)\n";
+        let src = "::blueprint(daily-note)\n::meta{\n  id: ${generate.uuid()}\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  title: ${vars.title}\n}\n\n=[ Plan for ${vars.title} ]#(plan)\n";
         let vars = EvalValue::Map(vec![(
             "title".to_string(),
             EvalValue::String("Sprint 42".into()),
@@ -228,7 +228,7 @@ mod tests {
         assert!(report.changed);
         assert!(report.unresolved.is_empty(), "{:?}", report.unresolved);
 
-        // `@blueprint(daily-note)` and `@meta{...}` sat on adjacent lines, so
+        // `::blueprint(daily-note)` and `::meta{...}` sat on adjacent lines, so
         // they join into one paragraph the same way `instantiating_leaves_one_kind`
         // does -- collect top-level elements instead of indexing `doc.blocks`.
         let mut top_level = Vec::new();
@@ -237,13 +237,13 @@ mod tests {
         let kind = top_level
             .iter()
             .find(|el| classify_std_lenient(el) == ElementKind::Kind)
-            .expect("expected a @kind element");
+            .expect("expected a ::kind element");
         assert_eq!(kind.args, Some(Value::String("daily-note".into())));
 
         let meta = top_level
             .iter()
             .find(|el| classify_std_lenient(el) == ElementKind::Meta)
-            .expect("expected a @meta element");
+            .expect("expected a ::meta element");
         let Some(Value::Map(entries)) = meta.value.as_ref().and_then(|v| v.as_data()) else {
             panic!("expected meta map");
         };
@@ -260,7 +260,7 @@ mod tests {
     #[test]
     fn an_expression_with_no_value_is_left_and_reported() {
         let (doc, report) = instantiate(
-            "@blueprint(note)\n@meta{ title: ${vars.title} }\n",
+            "::blueprint(note)\n::meta{ title: ${vars.title} }\n",
             EvalValue::Map(vec![]),
         );
         assert_eq!(report.unresolved.len(), 1);

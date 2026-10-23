@@ -12,7 +12,7 @@
 //!   `@line[セリフ]{ value: 天音かなた }`. When the exact copy *is*
 //!   present (see `tomet_semantics::flatten`) both groups come back
 //!   intact.
-//! - **A number in `@meta` returns as a string.** Pandoc metadata has no
+//! - **A number in `::meta` returns as a string.** Pandoc metadata has no
 //!   numeric type.
 //! - **An element inside a `{...}` group returns as body content.**
 //!   Pandoc cannot say "this `Div` was a group entry rather than part of
@@ -104,13 +104,13 @@ fn structure_sections(blocks: Vec<TmBlock>) -> Vec<TmBlock> {
     doc_blocks
 }
 
-/// Rebuilds `@meta{...}` from Pandoc's metadata map.
+/// Rebuilds `::meta{...}` from Pandoc's metadata map.
 fn meta_element(meta: &crate::ast::Meta) -> Element {
     let entries: Vec<(String, Value)> = meta
         .iter()
         .map(|(k, v)| (k.clone(), meta_value_to_value(v)))
         .collect();
-    let mut el = element_new(Sigil::named("meta")).with_placement(Placement::Block);
+    let mut el = element_new(Sigil::document("meta")).with_placement(Placement::Block);
     el.value = Some(ElementValue::from_map(Value::Map(entries)));
     el
 }
@@ -812,7 +812,7 @@ mod tests {
 
     #[test]
     fn meta_survives_a_round_trip() {
-        let doc = parse_document("@meta{title: Hello, draft: true}\n\n本文\n").unwrap();
+        let doc = parse_document("::meta{title: Hello, draft: true}\n\n本文\n").unwrap();
         let back = from_pandoc(&to_pandoc(&doc));
         let TmBlock::Element(el) = &back.blocks[0] else {
             panic!("expected the meta element");

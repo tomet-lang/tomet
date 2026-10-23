@@ -72,7 +72,7 @@ fn a_named_connect_round_trips_on_a_heading() {
 fn connects_survive_the_four_specially_printed_kinds() {
     for src in [
         "@hr:rule(allow: list(card))\n",
-        "@meta{a: 1}:rule(allow: list(card))\n",
+        "::meta{a: 1}:rule(allow: list(card))\n",
         "@raw[x]:rule(allow: list(card))\n",
     ] {
         let doc = tomet_parser::parse_document(src).unwrap();
@@ -258,7 +258,7 @@ fn test_wikilink_no_space_setting() {
 
 #[test]
 fn test_nanoid_generation_and_ensure_document_id() {
-    let settings_src = r#"@settings{
+    let settings_src = r#"::settings{
   meta: {
     id: {
       type: nanoid
@@ -287,7 +287,7 @@ fn test_nanoid_generation_and_ensure_document_id() {
 
 #[test]
 fn test_nanoid_force_and_overwrite_behavior() {
-    let settings_src = r#"@settings{
+    let settings_src = r#"::settings{
   meta: {
     id: {
       type: nanoid

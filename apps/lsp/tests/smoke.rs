@@ -293,7 +293,7 @@ fn macro_hover_over_stdio() {
                 "uri": "file:///tmp/macro_test.tmt",
                 "languageId": "tomet",
                 "version": 1,
-                "text": "@config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  }\n}\n\n$macro.gh(101)\n",
+                "text": "::config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  }\n}\n\n$macro.gh(101)\n",
             }
         }),
     );
@@ -330,7 +330,7 @@ fn macro_hover_does_not_take_macros_from_an_imported_config_over_stdio() {
     let config_path = dir.join("custom.config.tmt");
     std::fs::write(
         &config_path,
-        "@config{\n  macros: {\n    youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n",
+        "::config{\n  macros: {\n    youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n",
     )
     .unwrap();
 
@@ -353,7 +353,7 @@ fn macro_hover_does_not_take_macros_from_an_imported_config_over_stdio() {
                 "uri": doc_uri,
                 "languageId": "tomet",
                 "version": 1,
-                "text": "@config(import:\"custom.config.tmt\")\n\n@embed($macro.youtube_video(\"Pm_h6FnF8HU\"))[Video]\n",
+                "text": "::config(import:\"custom.config.tmt\")\n\n@embed($macro.youtube_video(\"Pm_h6FnF8HU\"))[Video]\n",
             }
         }),
     );
@@ -370,7 +370,7 @@ fn macro_hover_does_not_take_macros_from_an_imported_config_over_stdio() {
         .as_str()
         .unwrap_or_else(|| panic!("expected hover value string, got {hover_resp:?}"));
     // Hover shows what rendering shows, and rendering takes its macros from
-    // the document's own `@config` and the vault's settings -- not from a
+    // the document's own `::config` and the vault's settings -- not from a
     // file the document imports. So the imported macro is not there, and the
     // hover says so rather than showing a value the output would not have.
     assert!(
@@ -398,7 +398,7 @@ fn macro_hover_with_workspace_auto_config_over_stdio() {
     let config_path = dir.join("default.config.tmt");
     std::fs::write(
         &config_path,
-        "@config{\n  macros: {\n    twitter_post: \"https://x.com/${1}/status/${2}\"\n  }\n}\n",
+        "::config{\n  macros: {\n    twitter_post: \"https://x.com/${1}/status/${2}\"\n  }\n}\n",
     )
     .unwrap();
 
@@ -456,7 +456,7 @@ fn uuid_vault(name: &str) -> std::path::PathBuf {
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(
         root.join("default.config.tmt"),
-        "@kind(config)\n@config{ meta: { id: { type: uuid } } }\n",
+        "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n",
     )
     .unwrap();
     root
@@ -494,7 +494,7 @@ fn the_vaults_diagnostics_follow_the_text_after_a_pause() {
     let mut server = Server::start();
     initialize(&mut server, json!({}));
 
-    open(&mut server, &path, "@meta{ id: not-a-uuid }\n");
+    open(&mut server, &path, "::meta{ id: not-a-uuid }\n");
     let at_once = server.read_message();
     assert!(
         diagnostics_array(&at_once).is_empty(),
@@ -547,13 +547,13 @@ fn a_changed_config_changes_the_diagnostics() {
     let mut server = Server::start();
     initialize(&mut server, json!({}));
 
-    open(&mut server, &path, "@meta{ id: not-a-uuid }\n");
+    open(&mut server, &path, "::meta{ id: not-a-uuid }\n");
     let _at_once = server.read_message();
     let first = server.read_message();
     assert_eq!(diagnostics_array(&first).len(), 1, "{first:?}");
 
     // The declaration is dropped, and the server is told a file changed.
-    std::fs::write(root.join("default.config.tmt"), "@kind(config)\n").unwrap();
+    std::fs::write(root.join("default.config.tmt"), "::kind(config)\n").unwrap();
     server.send_notification(
         "workspace/didChangeWatchedFiles",
         json!({"changes": [{
@@ -580,7 +580,7 @@ fn a_vault_with_a_missing_vocabulary_says_so_in_the_log() {
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(
         root.join("default.config.tmt"),
-        "@kind(config)\n@config{ vocabularies: list(\".tomet/vocabularies/missing.vocabulary.tmt\") }\n",
+        "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/missing.vocabulary.tmt\") }\n",
     )
     .unwrap();
     let path = root.join("a.tmt");

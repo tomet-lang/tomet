@@ -25,8 +25,8 @@ character" check.
 line or EOF only, not at the next line merely @em[looking] like a new
 block. `tomet-parser`'s own lazy-continuation check also ends a
 paragraph early when the next line is an element trigger (`<T>`/
-`@name`, see `document.rs`'s `Stop::Paragraph`) -- e.g. `@meta{...}`
-immediately followed by `@settings{...}` with no blank line between
+`@name`, see `document.rs`'s `Stop::Paragraph`) -- e.g. `::meta{...}`
+immediately followed by `::settings{...}` with no blank line between
 them becomes two separate top-level elements in the real parser.
 This grammar doesn't simulate that either, so it still merges such
 adjacent elements into one `paragraph` node.
@@ -51,7 +51,7 @@ lookahead (or an external scanner) to resolve properly.
 - @strong[`//`/`/* */` comments aren't understood inside a `(...)`/`{...}`
 | group's value content at all.] `tomet-parser` does support
 them there (`value.rs::skip_line_comment`, used from
-`parse_map`/`parse_flat_map`), e.g. `@config(...)`'s several-line
+`parse_map`/`parse_flat_map`), e.g. `::config(...)`'s several-line
 body in `tests/fixtures/cheatsheet.tmt` uses `///`/`//`-prefixed lines as a
 doc-comment convention -- but `map`/`children`/`_entry_sep` have no
 rule admitting a bare comment line at all, so a comment anywhere in
@@ -91,7 +91,7 @@ below for the pinned exact shape.
 - @strong[A bare `list(...)` occupying the @em[whole] `(args)`/`{value}`
 | doesn't parse as `call`, unlike the same call under a named key
 | (`a: list(...)`, which works fine).] `@id(list(a, b))` and
-`@meta{list(a, b)}` both land in an `ERROR` even with `$.call`
+`::meta{list(a, b)}` both land in an `ERROR` even with `$.call`
 added as an alternative to `args_group`/`value_group`'s shared
 `value` rule -- tried and reverted, since it changed nothing:
 whatever conflicts an identifier-then-`(` at that exact position

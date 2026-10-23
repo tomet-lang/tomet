@@ -17,9 +17,9 @@ use crate::diff::FileDiff;
 /// Configuration options for workspace and document refactoring passes.
 #[derive(Debug, Clone)]
 pub struct RefactorOptions {
-    /// Rewrite URLs matching `@config` macro patterns to `$macro(...)` invocations.
+    /// Rewrite URLs matching `::config` macro patterns to `$macro(...)` invocations.
     pub url_to_macros: bool,
-    /// Promote `@meta` `type:` field to top-level `@kind(...)` element.
+    /// Promote `::meta` `type:` field to top-level `::kind(...)` element.
     pub meta_type_to_kind: bool,
     /// Also refactor files and directories the project config excludes
     /// (`workspace.ignore`, `workspace.unswept`). Off by default: a file
@@ -68,7 +68,7 @@ pub fn refactor_document(
 /// the whole document back, and `tomet_ast` has no comment node at all --
 /// `//` and `/* */` exist in the source text and nowhere in the tree, so
 /// anything that round-trips through the AST loses them. Measured, not
-/// assumed: a file carrying `@meta{ type: note }` and a `//` line comes
+/// assumed: a file carrying `::meta{ type: note }` and a `//` line comes
 /// back with the comment gone.
 ///
 /// The counting half is sound, because it counts rule hits rather than a

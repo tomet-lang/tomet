@@ -1,7 +1,7 @@
 //! The values an expression evaluates to.
 //!
 //! This is not [`tomet_ast::Value`]. That type is the `.tmt` data model: what
-//! `@meta{...}` and `(args)` hold, and what serde reads and writes. An
+//! `::meta{...}` and `(args)` hold, and what serde reads and writes. An
 //! expression also produces things that only exist while evaluating -- a
 //! reference to a document, a directory, a function -- and putting those in
 //! the data model would make it carry values that can never be saved.

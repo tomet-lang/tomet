@@ -1,5 +1,5 @@
-@kind(fixture)
-@meta{ x: @conflict(a: 2, b: 3) }
+::kind(fixture)
+::meta{ x: @conflict(a: 2, b: 3) }
 
 =[ 文書本体でのブロック内容 ]
 
