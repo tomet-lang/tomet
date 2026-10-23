@@ -33,6 +33,11 @@
 //! A quoted string is a key only when a `:` follows it; otherwise it is a
 //! value. The empty key is the positional-entry marker, so `"": v` is an error.
 //!
+//! A document with nothing in it, or only whitespace and comments, is the
+//! empty map, so a config file may be empty and `from_str` fills in every
+//! optional field. Only the document may be empty: a value slot (`k:`) still
+//! needs a value.
+//!
 //! A named key may appear once in a map: writing it again is an error at the
 //! second one (`duplicate key `a``), whether it is spelled bare or quoted.
 //! Positional entries have no key and may repeat.
@@ -726,6 +731,24 @@ mod tests {
                 !matches!(scalar(&format!("{name}()")), Value::Call(..)),
                 "{name}"
             );
+        }
+    }
+
+    #[test]
+    fn an_empty_document_is_an_empty_map() {
+        for src in ["", "  \n\t\n", "// nothing here\n", "// a\n// b"] {
+            assert_eq!(parse_value(src).unwrap(), Value::Map(vec![]), "{src:?}");
+        }
+        let all_optional: std::collections::BTreeMap<String, i32> = from_str("").unwrap();
+        assert!(all_optional.is_empty());
+        assert_eq!(print_value(&Value::Map(vec![])), "");
+    }
+
+    #[test]
+    fn a_value_slot_still_needs_a_value() {
+        // only the document is allowed to be empty; `k:` and `f()` arguments are not
+        for src in ["k:", "k: // nothing\n", "k: list(,)"] {
+            assert!(parse_value(src).is_err(), "{src:?}");
         }
     }
 

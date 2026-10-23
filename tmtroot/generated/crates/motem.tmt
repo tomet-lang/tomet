@@ -40,6 +40,11 @@ plain.key: 1
 A quoted string is a key only when a `:` follows it; otherwise it is a
 value. The empty key is the positional-entry marker, so `"": v` is an error.
 
+A document with nothing in it, or only whitespace and comments, is the
+empty map, so a config file may be empty and `from_str` fills in every
+optional field. Only the document may be empty: a value slot (`k:`) still
+needs a value.
+
 A named key may appear once in a map: writing it again is an error at the
 second one (`duplicate key `a``), whether it is spelled bare or quoted.
 Positional entries have no key and may repeat.
@@ -138,9 +143,14 @@ embedded values (e.g. `@element` or `$interp`) at value positions.
 
 Parse an entire source string as one `Value` using pure motem syntax.
 
+A source with nothing but whitespace and comments is the empty map.
+
 ====[fn parse_value_with]
 
 Parse an entire source string as one `Value` with a custom [`ValueHook`].
+
+A source with nothing but whitespace and comments is the empty map. Only
+the document may be empty: a value slot inside it (`k:`) still needs a value.
 
 ====[fn err]
 

@@ -36,13 +36,23 @@ where
 }
 
 /// Parse an entire source string as one `Value` using pure motem syntax.
+///
+/// A source with nothing but whitespace and comments is the empty map.
 pub fn parse_value(src: &str) -> Result<Value> {
     parse_value_with(src, &mut NoHook)
 }
 
 /// Parse an entire source string as one `Value` with a custom [`ValueHook`].
+///
+/// A source with nothing but whitespace and comments is the empty map. Only
+/// the document may be empty: a value slot inside it (`k:`) still needs a value.
 pub fn parse_value_with<H: ValueHook>(src: &str, hook: &mut H) -> Result<Value> {
     let mut cur = Cursor::new(src);
+    skip_ws_newlines_and_comments(&mut cur);
+    if cur.is_eof() {
+        return Ok(Value::Map(Vec::new()));
+    }
+    cur.set_pos(0);
     let value = parse_value_at_with(&mut cur, hook).map_err(|e| e.located_in(src))?;
     skip_ws_newlines_and_comments(&mut cur);
     if !cur.is_eof() {
