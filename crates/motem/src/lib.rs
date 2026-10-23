@@ -7,7 +7,7 @@
 //! =[ Overview ]
 //!
 //! motem provides:
-//! - Pure syntax parsing for values, maps, sequences (`list(...)`), and expressions into [`Value`].
+//! - Pure syntax parsing for values, maps, and sequences (`list(...)`) into [`Value`].
 //! - Serde integration ([`from_str`], [`to_string`]) for serializing and deserializing Rust types.
 //! - AST and parser primitives shared with the document-level parser (`tomet-syntax-parser`).
 //!
@@ -33,6 +33,10 @@
 //! A quoted string is a key only when a `:` follows it; otherwise it is a
 //! value. The empty key is the positional-entry marker, so `"": v` is an error.
 //!
+//! A named key may appear once in a map: writing it again is an error at the
+//! second one (`duplicate key `a``), whether it is spelled bare or quoted.
+//! Positional entries have no key and may repeat.
+//!
 //! =[ Scalars ]
 //!
 //! A bare (unquoted) scalar is typed by its text, and only these are not
@@ -48,14 +52,34 @@
 //! A number that has the shape of an int or float but does not fit (`i64`
 //! overflow, `1e999`) is an error, never a silently lossy value.
 //!
-//! `float(x)` is the literal constructor for a float (`float()` is `0.0`, an
-//! int widens, a string is parsed). It is the way to write `float(nan)`,
-//! `float(inf)` and `float(-inf)`, which have no bare spelling. The printer
-//! writes a float with a `.` or exponent (`1.0`, never `1`), so a float reads
-//! back as a float, and a non-finite one as the constructor.
+//! The printer writes a float with a `.` or exponent (`1.0`, never `1`), so a
+//! float reads back as a float. A non-finite float has no bare spelling and is
+//! written with the `float(...)` constructor (see below).
 //!
 //! Serializing a `u64` above `i64::MAX` is an error rather than a wrapped
 //! value, since [`Value::Int`] is an `i64`.
+//!
+//! =[ Constructors ]
+//!
+//! `name(arg, ...)` with a name in [`LITERAL_CONSTRUCTORS`] is resolved by the
+//! parser to the plain value it stands for, so a reader never sees these as a
+//! [`Value::Call`]. Arguments are positional only. They convert as Python's
+//! `str`, `int` and `float` do, and more than one argument is an error where
+//! the table says at most one.
+//!
+//! - `list(a, b)` is a sequence ([`Value::Seq`]); `list()` is empty.
+//! - `string(x)` is the text of `x`; `string()` is `""`. A bare `x` is taken
+//!   as written, not typed, so `string(a)` is `"a"` and `string(1.50)` is
+//!   `"1.50"`. A quoted string is itself; a nested constructor's value is
+//!   rendered the way it is written; a sequence, map or other call is an error.
+//! - `int(x)` is an int: `int()` is `0`, a float truncates toward zero, a
+//!   string is read as a decimal `i64` (`int("1.5")` is an error).
+//! - `float(x)` is a float: `float()` is `0.0`, an int widens, a string is
+//!   parsed. It is the only way to write `float(nan)`, `float(inf)` and
+//!   `float(-inf)`.
+//!
+//! Any other callee (`enum(...)`, a typo) stays a [`Value::Call`] for a later
+//! pass to judge; motem does not.
 
 pub mod de;
 pub mod error;
@@ -66,8 +90,8 @@ pub mod ser;
 pub use de::from_value;
 pub use error::{Error, Result};
 pub use parser::{
-    NoHook, POSITIONAL_ENTRY_KEY, ValueHook, duplicate_key_error, eat_ident, eat_name,
-    eat_name_segment, eat_scalar_raw, err, is_ident_char, is_inline_ws, is_name_char,
+    LITERAL_CONSTRUCTORS, NoHook, POSITIONAL_ENTRY_KEY, ValueHook, duplicate_key_error, eat_ident,
+    eat_name, eat_name_segment, eat_scalar_raw, err, is_ident_char, is_inline_ws, is_name_char,
     is_name_start, is_name_start_at, is_scheme_uri_colon, parse_entry_value,
     parse_entry_value_with, parse_map_body, parse_map_body_with, parse_one_entry,
     parse_one_entry_with, parse_quoted, parse_value, parse_value_at, parse_value_at_with,
@@ -81,35 +105,13 @@ pub use tomet_ast::Value;
 
 /// Parse a motem data document into `T` via Serde.
 pub fn from_str<T: for<'de> serde::Deserialize<'de>>(src: &str) -> Result<T> {
-    let value = normalize_list_calls(parse_value(src)?);
-    de::from_value(value)
+    de::from_value(parse_value(src)?)
 }
 
 /// Render `T` into motem data text via Serde.
 pub fn to_string<T: serde::Serialize + ?Sized>(value: &T) -> Result<String> {
     let v = ser::to_value(value)?;
     Ok(print::print_value(&v))
-}
-
-/// Normalizes `list(...)` calls into `Value::Seq` so Serde sequence deserialization
-/// works seamlessly.
-pub fn normalize_list_calls(value: Value) -> Value {
-    match value {
-        Value::Call(name, args) if name == "list" => {
-            Value::Seq(args.into_iter().map(normalize_list_calls).collect())
-        }
-        Value::Call(name, args) => {
-            Value::Call(name, args.into_iter().map(normalize_list_calls).collect())
-        }
-        Value::Seq(items) => Value::Seq(items.into_iter().map(normalize_list_calls).collect()),
-        Value::Map(entries) => Value::Map(
-            entries
-                .into_iter()
-                .map(|(k, v)| (k, normalize_list_calls(v)))
-                .collect(),
-        ),
-        other => other,
-    }
 }
 
 #[cfg(test)]
@@ -192,7 +194,7 @@ mod tests {
     #[test]
     fn call_syntax_has_no_serde_equivalent() {
         let err = de::from_value::<i32>(Value::Call(
-            "list".into(),
+            "enum".into(),
             vec![Value::String("card".into())],
         ))
         .unwrap_err();
@@ -203,10 +205,10 @@ mod tests {
     #[test]
     fn call_syntax_prints_back_as_a_call() {
         let v = Value::Call(
-            "list".into(),
+            "enum".into(),
             vec![Value::String("card".into()), Value::Int(2)],
         );
-        assert_eq!(print::print_value(&v), "list(card, 2)");
+        assert_eq!(print::print_value(&v), "enum(card, 2)");
     }
 
     #[test]
@@ -254,17 +256,8 @@ mod tests {
 
     #[test]
     fn parse_list_call() {
-        let val = parse_value("list(1, 2, 3)").unwrap();
         assert_eq!(
-            val,
-            Value::Call(
-                "list".into(),
-                vec![Value::Int(1), Value::Int(2), Value::Int(3)]
-            )
-        );
-        let normalized = normalize_list_calls(val);
-        assert_eq!(
-            normalized,
+            parse_value("list(1, 2, 3)").unwrap(),
             Value::Seq(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
         );
     }
@@ -620,6 +613,120 @@ mod tests {
         src.push_str("k3: 0");
         let err = parse_value(&src).unwrap_err().to_string();
         assert!(err.contains("duplicate key `k3`"), "{err}");
+    }
+
+    #[test]
+    fn list_is_a_sequence_not_a_call() {
+        assert_eq!(scalar("list()"), Value::Seq(vec![]));
+        assert_eq!(
+            scalar("list(card, ns.mycard, 3, list(x))"),
+            Value::Seq(vec![
+                text("card"),
+                text("ns.mycard"),
+                Value::Int(3),
+                Value::Seq(vec![text("x")]),
+            ])
+        );
+        assert_eq!(
+            from_str::<Vec<i32>>("list(1, 2, 3)").unwrap(),
+            vec![1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn string_takes_a_bare_argument_as_written() {
+        for (src, want) in [
+            ("string()", ""),
+            ("string(a)", "a"),
+            ("string(hello world)", "hello world"),
+            ("string(1.50)", "1.50"),
+            ("string(007)", "007"),
+            ("string(true)", "true"),
+            ("string(null)", "null"),
+            ("string(inf)", "inf"),
+            ("string(\"x y\")", "x y"),
+            // out of range as a number, but it is only text here
+            ("string(9223372036854775808)", "9223372036854775808"),
+            ("string(int(5))", "5"),
+            ("string(float(1))", "1.0"),
+            ("string(float(nan))", "nan"),
+            ("string(float(-inf))", "-inf"),
+        ] {
+            assert_eq!(scalar(src), text(want), "{src}");
+        }
+    }
+
+    #[test]
+    fn string_rejects_what_has_no_text() {
+        for src in [
+            "string(a, b)",
+            "string(list(1))",
+            "string(enum(a))",
+            "string({a: 1})",
+        ] {
+            assert!(parse_value(src).is_err(), "{src}");
+        }
+    }
+
+    #[test]
+    fn int_converts_the_way_python_does() {
+        for (src, want) in [
+            ("int()", 0),
+            ("int(5)", 5),
+            ("int(-5)", -5),
+            ("int(\"7\")", 7),
+            ("int(007)", 7),
+            ("int(+5)", 5),
+            ("int(1.9)", 1),
+            ("int(-1.9)", -1),
+            ("int(1e3)", 1000),
+            ("int(float(2))", 2),
+        ] {
+            assert_eq!(scalar(src), Value::Int(want), "{src}");
+        }
+    }
+
+    #[test]
+    fn int_rejects_what_does_not_convert() {
+        for src in [
+            "int(1, 2)",
+            "int(\"1.5\")",
+            "int(0x10)",
+            "int(abc)",
+            "int(true)",
+            "int(null)",
+            "int(list(1))",
+            "int(1e30)",
+            "int(float(inf))",
+        ] {
+            assert!(parse_value(src).is_err(), "{src}");
+        }
+    }
+
+    #[test]
+    fn a_constructor_error_points_at_the_call() {
+        let err = parse_value("k: int(abc)").unwrap_err();
+        assert!(err.message.contains("cannot convert `abc`"), "{err}");
+        assert_eq!((err.line, err.column), (1, 4), "{err}");
+    }
+
+    #[test]
+    fn a_callee_that_is_not_a_constructor_stays_a_call() {
+        assert_eq!(
+            scalar("enum(a, b)"),
+            Value::Call("enum".into(), vec![text("a"), text("b")])
+        );
+        assert_eq!(
+            scalar("other(1)"),
+            Value::Call("other".into(), vec![Value::Int(1)])
+        );
+        // every table entry resolves, so none of them is ever a `Call`
+        for name in LITERAL_CONSTRUCTORS {
+            assert!(
+                !matches!(scalar(&format!("{name}()")), Value::Call(..)),
+                "{name}"
+            );
+        }
     }
 
     #[test]

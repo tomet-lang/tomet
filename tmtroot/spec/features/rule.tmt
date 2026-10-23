@@ -9,8 +9,8 @@
 現状（MVP、`rule` connect の一号）:
 
 - 検証対象は既定で子孫全部。`direct:true` で直下の子だけに絞れる。
-- |`allow:` は `list(...)` で書く（`enum(...)` も同じ形。パーサは呼び出し名を
-  |判断しない、`tomet-semantics` の閉じた表の仕事）。
+- |`allow:` は `list(...)` で書く（`enum(...)` も同じ形で受け付ける。パーサは
+  |`list` を列に解決し、`enum` など他の呼び出し名は判断せず残す）。
 - |`allow:` に書いた名前自体は検証しない。descendant が実際に何に
   |classify されるかとだけ突き合わせる。
 - |具体的な綴りは `connects/rule.tmt`、設計の経緯は

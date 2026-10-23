@@ -23,8 +23,11 @@ pub fn decode_rule_args(connect_el: &Element) -> Option<RuleArgs> {
     };
 
     let allow_value = entries.iter().find(|(k, _)| k == "allow").map(|(_, v)| v)?;
-    let Value::Call(_callee, items) = allow_value else {
-        return None;
+    let items = match allow_value {
+        Value::Seq(items) => items,
+        // `enum(...)` is written the same way, but means nothing of its own yet.
+        Value::Call(callee, items) if callee == "enum" => items,
+        _ => return None,
     };
     let mut allow = Vec::with_capacity(items.len());
     for item in items {
@@ -103,6 +106,24 @@ mod tests {
     fn no_args_at_all_is_none() {
         let mut connect = element_new(Sigil::named("rule"));
         connect.args = None;
+        assert_eq!(decode_rule_args(&connect), None);
+    }
+
+    #[test]
+    fn enum_is_written_the_same_way_as_list() {
+        let connect = parse_connect("@x[a]:rule(allow: enum(card))\n");
+        assert_eq!(
+            decode_rule_args(&connect),
+            Some(RuleArgs {
+                allow: vec![Name::bare("card")],
+                direct: false,
+            })
+        );
+    }
+
+    #[test]
+    fn allow_with_another_callee_is_none() {
+        let connect = parse_connect("@x[a]:rule(allow: lst(card))\n");
         assert_eq!(decode_rule_args(&connect), None);
     }
 

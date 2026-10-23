@@ -9,10 +9,7 @@ fn parses_flat_map() {
             ("title".into(), Value::String("value".into())),
             (
                 "tags".into(),
-                Value::Call(
-                    "list".into(),
-                    vec![Value::String("a".into()), Value::String("b".into())]
-                )
+                Value::Seq(vec![Value::String("a".into()), Value::String("b".into())])
             ),
         ])
     );
@@ -114,37 +111,50 @@ fn parses_scalars() {
 }
 
 #[test]
-fn parses_call_syntax() {
+fn a_list_call_is_a_sequence() {
     assert_eq!(
         parse_value("list(card)").unwrap(),
-        Value::Call("list".into(), vec![Value::String("card".into())])
+        Value::Seq(vec![Value::String("card".into())])
     );
     assert_eq!(
         parse_value("list(card, ns.mycard)").unwrap(),
-        Value::Call(
-            "list".into(),
-            vec![
-                Value::String("card".into()),
-                Value::String("ns.mycard".into())
-            ]
-        )
+        Value::Seq(vec![
+            Value::String("card".into()),
+            Value::String("ns.mycard".into())
+        ])
     );
     assert_eq!(
         parse_value("list(a, list(b))").unwrap(),
-        Value::Call(
-            "list".into(),
-            vec![
-                Value::String("a".into()),
-                Value::Call("list".into(), vec![Value::String("b".into())])
-            ]
-        )
+        Value::Seq(vec![
+            Value::String("a".into()),
+            Value::Seq(vec![Value::String("b".into())])
+        ])
     );
     assert_eq!(
         parse_value("allow: list(card)").unwrap(),
         Value::Map(vec![(
             "allow".into(),
-            Value::Call("list".into(), vec![Value::String("card".into())])
+            Value::Seq(vec![Value::String("card".into())])
         )])
+    );
+}
+
+/// The parser resolves exactly the literal constructors (`list`, `string`,
+/// `int`, `float`); any other callee is left as an inert `Value::Call` for
+/// `tomet-semantics` to judge.
+#[test]
+fn only_the_literal_constructors_are_resolved() {
+    assert_eq!(
+        parse_value("enum(card)").unwrap(),
+        Value::Call("enum".into(), vec![Value::String("card".into())])
+    );
+    assert_eq!(
+        parse_value("k: int(\"5\")").unwrap(),
+        Value::Map(vec![("k".into(), Value::Int(5))])
+    );
+    assert_eq!(
+        parse_value("k: string(1.50)").unwrap(),
+        Value::Map(vec![("k".into(), Value::String("1.50".into()))])
     );
 }
 

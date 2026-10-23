@@ -1387,7 +1387,7 @@ unknown element `x`: only `std` and this document's own `@kind` may be written b
 unknown connect `:as`; only a closed set may follow `:` (currently: rule)
 ```
 
-### `list(...)`/`enum(...)` は即座に確定するリテラル呼び出し。コネクトの名前と同じく、パーサは呼び出し名を判断しない
+### `list(...)` は即座に確定するリテラル呼び出しで、パーサが列に解決する。`list`/`string`/`int`/`float` 以外の呼び出し名は、コネクトの名前と同じくパーサは判断せず、そのまま残す
 
 ```tmt
 @x(a: list(card, ns.mycard))

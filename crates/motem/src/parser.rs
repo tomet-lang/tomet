@@ -242,21 +242,35 @@ pub fn try_parse_call(cur: &mut Cursor) -> Option<Result<Value>> {
     try_parse_call_with(cur, &mut NoHook)
 }
 
+/// The callees the parser resolves to a plain [`Value`] at parse time: the
+/// literal constructors. Any other `name(...)` stays a [`Value::Call`] for a
+/// later pass to judge (`enum(...)` among them, which has no meaning yet).
+///
+/// - `list(a, b)` is a [`Value::Seq`].
+/// - `string(a)` is the text of `a` ([`construct_string`]); a bare `a` is
+///   taken as written, so `string(1.50)` is `"1.50"`.
+/// - `int(x)` and `float(x)` convert like Python's ([`construct_int`],
+///   [`construct_float`]).
+pub const LITERAL_CONSTRUCTORS: &[&str] = &["list", "string", "int", "float"];
+
 pub fn try_parse_call_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Option<Result<Value>> {
     let mut look = *cur;
+    let call_start = cur.pos();
     let name = eat_name_segment(&mut look)?.to_string();
     if look.peek() != Some('(') {
         return None;
     }
     *cur = look;
     cur.bump();
+    // `string(a)` is the text `a`, so its bare arguments are not typed.
+    let raw_args = name == "string";
     let mut args = Vec::new();
     loop {
         skip_ws_newlines_and_comments(cur);
         if cur.peek() == Some(')') {
             break;
         }
-        match parse_entry_value_with(cur, hook) {
+        match parse_entry_value_impl(cur, hook, raw_args) {
             Ok(v) => args.push(v),
             Err(e) => return Some(Err(e)),
         }
@@ -274,11 +288,68 @@ pub fn try_parse_call_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Opti
     if !cur.eat_str(")") {
         return Some(Err(err(cur.pos(), "expected ')'")));
     }
-    if name == "float" {
-        let start = cur.pos();
-        return Some(construct_float(args).map_err(|message| err(start, message)));
+    let resolved = match name.as_str() {
+        "list" => Ok(Value::Seq(args)),
+        "string" => construct_string(args),
+        "int" => construct_int(args),
+        "float" => construct_float(args),
+        _ => return Some(Ok(Value::Call(name, args))),
+    };
+    Some(resolved.map_err(|message| err(call_start, message)))
+}
+
+/// The one argument of a constructor that takes at most one, `None` for no
+/// argument; more than one is an error.
+fn at_most_one(name: &str, args: Vec<Value>) -> std::result::Result<Option<Value>, String> {
+    let mut args = args.into_iter();
+    let arg = args.next();
+    if args.next().is_some() {
+        return Err(format!("{name}() takes at most one argument"));
     }
-    Some(Ok(Value::Call(name, args)))
+    Ok(arg)
+}
+
+/// `string(x)`: the text of `x`. `string()` is `""`. A bare argument arrives
+/// as its written text (see [`parse_entry_value_impl`]), so `string(a)` is
+/// `"a"` and `string(1.50)` is `"1.50"`; a quoted string is itself; the value
+/// of a nested constructor (`string(int(5))`) is rendered the way it is
+/// written. A list, a map, or any other call has no text and is an error.
+fn construct_string(args: Vec<Value>) -> std::result::Result<Value, String> {
+    Ok(Value::String(match at_most_one("string", args)? {
+        None => String::new(),
+        Some(Value::String(s)) => s,
+        Some(Value::Int(i)) => i.to_string(),
+        Some(Value::Bool(b)) => b.to_string(),
+        Some(Value::Null) => "null".to_string(),
+        Some(Value::Float(f)) if f.is_finite() => format!("{f:?}"),
+        Some(Value::Float(f)) if f.is_nan() => "nan".to_string(),
+        Some(Value::Float(f)) => (if f > 0.0 { "inf" } else { "-inf" }).to_string(),
+        Some(other) => return Err(format!("string() takes a scalar, got {other:?}")),
+    }))
+}
+
+/// `int(x)`: `int()` is `0`; an int is itself; a float truncates toward zero
+/// (and must fit an `i64`); a string is parsed as a decimal `i64`, so `"1.5"`
+/// and `"0x10"` are errors. A bool or anything else is an error.
+fn construct_int(args: Vec<Value>) -> std::result::Result<Value, String> {
+    match at_most_one("int", args)? {
+        None => Ok(Value::Int(0)),
+        Some(Value::Int(i)) => Ok(Value::Int(i)),
+        Some(Value::Float(f)) => {
+            // `i64::MAX as f64` rounds up to 2^63, so the upper bound is exclusive.
+            if f.is_finite() && f >= i64::MIN as f64 && f < i64::MAX as f64 {
+                Ok(Value::Int(f.trunc() as i64))
+            } else {
+                Err(format!("float `{f}` is out of range for a 64-bit integer"))
+            }
+        }
+        Some(Value::String(s)) => s
+            .trim()
+            .parse::<i64>()
+            .map(Value::Int)
+            .map_err(|_| format!("int() cannot convert `{}` to an integer", s.trim())),
+        Some(other) => Err(format!("int() takes a number or a string, got {other:?}")),
+    }
 }
 
 /// `float(x)`: the literal constructor for a float, the only way to spell
@@ -289,12 +360,7 @@ pub fn try_parse_call_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Opti
 /// Anything else, or more than one argument, is an error, as is a finite
 /// spelling that overflows (`float(1e999)`).
 fn construct_float(args: Vec<Value>) -> std::result::Result<Value, String> {
-    let mut args = args.into_iter();
-    let arg = args.next();
-    if args.next().is_some() {
-        return Err("float() takes at most one argument".to_string());
-    }
-    match arg {
+    match at_most_one("float", args)? {
         None => Ok(Value::Float(0.0)),
         Some(Value::Int(i)) => Ok(Value::Float(i as f64)),
         Some(Value::Float(f)) => Ok(Value::Float(f)),
@@ -520,6 +586,17 @@ pub fn parse_entry_value(cur: &mut Cursor) -> Result<Value> {
 }
 
 pub fn parse_entry_value_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Result<Value> {
+    parse_entry_value_impl(cur, hook, false)
+}
+
+/// [`parse_entry_value_with`], optionally taking a bare scalar as its written
+/// text (a `Value::String`) instead of typing it. `string(...)` reads its
+/// arguments that way.
+fn parse_entry_value_impl<H: ValueHook>(
+    cur: &mut Cursor,
+    hook: &mut H,
+    raw_scalars: bool,
+) -> Result<Value> {
     skip_ws_newlines_and_comments(cur);
     if let Some(result) = hook.try_parse_value(cur) {
         return result;
@@ -547,6 +624,9 @@ pub fn parse_entry_value_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> R
             let raw = eat_scalar_raw(cur).trim();
             if raw.is_empty() {
                 return Err(err(cur.pos(), "expected a value"));
+            }
+            if raw_scalars {
+                return Ok(Value::String(raw.to_string()));
             }
             scalar_from_text(raw).map_err(|message| err(start, message))
         }

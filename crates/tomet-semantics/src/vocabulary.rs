@@ -608,12 +608,7 @@ fn content_allow_from_element(el: &Element) -> Option<ContentAllow> {
     match data.get("allow")? {
         Value::String(s) if s == "inline" => Some(ContentAllow::Inline),
         Value::String(s) if s == "any" => Some(ContentAllow::Any),
-        // `list(...)` -- `element_data` already ran this through
-        // `normalize_data_value`, which turns `Value::Call("list", args)`
-        // into `Value::Seq(args)` before this ever sees it (unlike
-        // `:rule(allow:list(...))`'s own reader, `tomet-semantics-
-        // validator::rule::decode_rule_args`, which reads straight off
-        // `(args)` with no normalization pass in between).
+        // `list(...)` -- the parser resolves it to a `Value::Seq`.
         Value::Seq(items) => {
             let mut names = Vec::with_capacity(items.len());
             for item in items {

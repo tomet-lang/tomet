@@ -67,7 +67,7 @@ fn named_connect_reads_into_connects() {
                 rule.args,
                 Some(Value::Map(vec![(
                     "allow".into(),
-                    Value::Call("list".into(), vec![Value::String("card".into())])
+                    Value::Seq(vec![Value::String("card".into())])
                 )]))
             );
         }

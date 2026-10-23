@@ -206,11 +206,7 @@ impl EvalValue {
             ),
             Value::Call(name, args) => {
                 let args = args.iter().map(|v| Self::from_ast(v, doc)).collect();
-                if name == "list" {
-                    EvalValue::Seq(args)
-                } else {
-                    EvalValue::Call(name.clone(), args)
-                }
+                EvalValue::Call(name.clone(), args)
             }
             Value::Element(el) => EvalValue::Node {
                 doc: doc.clone(),
@@ -278,8 +274,8 @@ mod tests {
     }
 
     #[test]
-    fn a_list_literal_is_a_seq_and_other_calls_are_kept() {
-        let list = Value::Call("list".into(), vec![Value::Int(1), Value::Int(2)]);
+    fn a_list_is_a_seq_and_a_call_is_kept() {
+        let list = Value::Seq(vec![Value::Int(1), Value::Int(2)]);
         assert_eq!(
             EvalValue::from_ast(&list, &doc()),
             EvalValue::Seq(vec![EvalValue::Int(1), EvalValue::Int(2)])

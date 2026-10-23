@@ -14,7 +14,7 @@ standalone motem file is a top-level map written as bare `key: value` lines.
 
 motem provides:
 
-- Pure syntax parsing for values, maps, sequences (`list(...)`), and expressions into [`Value`].
+- Pure syntax parsing for values, maps, and sequences (`list(...)`) into [`Value`].
 - Serde integration ([`from_str`], [`to_string`]) for serializing and deserializing Rust types.
 - AST and parser primitives shared with the document-level parser (`tomet-syntax-parser`).
 
@@ -40,6 +40,10 @@ plain.key: 1
 A quoted string is a key only when a `:` follows it; otherwise it is a
 value. The empty key is the positional-entry marker, so `"": v` is an error.
 
+A named key may appear once in a map: writing it again is an error at the
+second one (`duplicate key `a``), whether it is spelled bare or quoted.
+Positional entries have no key and may repeat.
+
 ==[Scalars]
 
 A bare (unquoted) scalar is typed by its text, and only these are not
@@ -56,14 +60,39 @@ text: `007`, `+1`, `.5`, `5.`, `1_000`, `0x10`, `nan` and `inf` are strings.
 A number that has the shape of an int or float but does not fit (`i64`
 overflow, `1e999`) is an error, never a silently lossy value.
 
-`float(x)` is the literal constructor for a float (`float()` is `0.0`, an
-int widens, a string is parsed). It is the way to write `float(nan)`,
-`float(inf)` and `float(-inf)`, which have no bare spelling. The printer
-writes a float with a `.` or exponent (`1.0`, never `1`), so a float reads
-back as a float, and a non-finite one as the constructor.
+The printer writes a float with a `.` or exponent (`1.0`, never `1`), so a
+float reads back as a float. A non-finite float has no bare spelling and is
+written with the `float(...)` constructor (see below).
 
 Serializing a `u64` above `i64::MAX` is an error rather than a wrapped
 value, since [`Value::Int`] is an `i64`.
+
+==[Constructors]
+
+`name(arg, ...)` with a name in [`LITERAL_CONSTRUCTORS`] is resolved by the
+parser to the plain value it stands for, so a reader never sees these as a
+[`Value::Call`]. Arguments are positional only. They convert as Python's
+`str`, `int` and `float` do, and more than one argument is an error where
+the table says at most one.
+
+- `list(a, b)` is a sequence ([`Value::Seq`]); `list()` is empty.
+- `string(x)` is the text of `x`; `string()` is `""`. A bare `x` is taken
+
+as written, not typed, so `string(a)` is `"a"` and `string(1.50)` is
+`"1.50"`. A quoted string is itself; a nested constructor's value is
+rendered the way it is written; a sequence, map or other call is an error.
+
+- `int(x)` is an int: `int()` is `0`, a float truncates toward zero, a
+
+string is read as a decimal `i64` (`int("1.5")` is an error).
+
+- `float(x)` is a float: `float()` is `0.0`, an int widens, a string is
+
+parsed. It is the only way to write `float(nan)`, `float(inf)` and
+`float(-inf)`.
+
+Any other callee (`enum(...)`, a typo) stays a [`Value::Call`] for a later
+pass to judge; motem does not.
 
 ==[Module de]
 
@@ -191,7 +220,19 @@ quoted key is an error: `""` is [`POSITIONAL_ENTRY_KEY`].
 
 ====[fn parse_map_body]
 
+====[fn duplicate_key_error]
+
+The error for a named key written twice in one map. Positional entries
+(`POSITIONAL_ENTRY_KEY`) are not keys and may repeat.
+
 ====[fn parse_map_body_with]
+
+Parses `key: value` entries until a closer or the end, as a `Value::Map`.
+
+A named key may appear once: a second one is an error at its position
+([`duplicate_key_error`]), compared after unquoting, so `"a": 1, a: 2` is
+a duplicate too. A map that held the same key twice would mean different
+things to a reader that keeps the first, the last, or both.
 
 ====[fn parse_entry_value]
 
@@ -206,6 +247,21 @@ quoted key is an error: `""` is [`POSITIONAL_ENTRY_KEY`].
 ====[fn is_scheme_uri_colon]
 
 ===[Constants]
+
+====[const LITERAL_CONSTRUCTORS]
+
+The callees the parser resolves to a plain [`Value`] at parse time: the
+literal constructors. Any other `name(...)` stays a [`Value::Call`] for a
+later pass to judge (`enum(...)` among them, which has no meaning yet).
+
+- `list(a, b)` is a [`Value::Seq`].
+- `string(a)` is the text of `a` ([`construct_string`]); a bare `a` is
+
+taken as written, so `string(1.50)` is `"1.50"`.
+
+- `int(x)` and `float(x)` convert like Python's ([`construct_int`],
+
+[`construct_float`]).
 
 ====[const POSITIONAL_ENTRY_KEY]
 
@@ -271,8 +327,3 @@ Parse a motem data document into `T` via Serde.
 ===[fn to_string]
 
 Render `T` into motem data text via Serde.
-
-===[fn normalize_list_calls]
-
-Normalizes `list(...)` calls into `Value::Seq` so Serde sequence deserialization
-works seamlessly.

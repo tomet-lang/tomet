@@ -438,10 +438,10 @@ mod tests {
     fn a_call_renders_as_name_and_parenthesized_args() {
         assert_eq!(
             render_value_inner(&Value::Call(
-                "list".into(),
+                "enum".into(),
                 vec![Value::String("card".into())]
             )),
-            "list(card)"
+            "enum(card)"
         );
     }
 

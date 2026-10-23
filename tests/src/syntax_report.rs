@@ -361,8 +361,9 @@ const CASES: &[Case] = &[
     ),
     case(
         None,
-        "`list(...)`/`enum(...)` は即座に確定するリテラル呼び出し。\
-         コネクトの名前と同じく、パーサは呼び出し名を判断しない",
+        "`list(...)` は即座に確定するリテラル呼び出しで、パーサが列に解決する。\
+         `list`/`string`/`int`/`float` 以外の呼び出し名は、コネクトの名前と同じく\
+         パーサは判断せず、そのまま残す",
         "@x(a: list(card, ns.mycard))\n",
     ),
     case(
@@ -817,9 +818,11 @@ fn value_str(v: &Value) -> String {
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
         Value::String(s) => format!("{s:?}"),
+        // Written as the source spells it: `[...]` is block content here
+        // (`Value::Blocks` below), not a list.
         Value::Seq(items) => {
             let inner: Vec<String> = items.iter().map(value_str).collect();
-            format!("[{}]", inner.join(", "))
+            format!("list({})", inner.join(", "))
         }
         Value::Map(entries) => {
             let inner: Vec<String> = entries

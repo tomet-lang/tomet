@@ -259,10 +259,7 @@ fn own_line_comment_works_inside_a_call() {
     let v = parse_value("list(\n  a,\n  // a note\n  b,\n)").unwrap();
     assert_eq!(
         v,
-        Value::Call(
-            "list".into(),
-            vec![Value::String("a".into()), Value::String("b".into())]
-        )
+        Value::Seq(vec![Value::String("a".into()), Value::String("b".into())])
     );
 }
 

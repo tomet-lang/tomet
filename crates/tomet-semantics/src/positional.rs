@@ -233,7 +233,7 @@ pub fn normalized_element_args_in(el: &Element, bindings: &Bindings) -> Option<V
     let args = el.args.as_ref()?;
     let positional_keys = positional_keys(&el.sigil, bindings);
 
-    let result = match args {
+    match args {
         Value::Map(entries) => {
             if positional_keys.is_empty() {
                 Some(Value::Map(entries.clone()))
@@ -265,9 +265,7 @@ pub fn normalized_element_args_in(el: &Element, bindings: &Bindings) -> Option<V
             Some(first) => Some(Value::Map(vec![(first.clone(), scalar.clone())])),
             None => Some(scalar.clone()),
         },
-    };
-
-    result.map(crate::normalize::normalize_data_value)
+    }
 }
 
 #[cfg(test)]

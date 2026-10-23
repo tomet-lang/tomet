@@ -104,14 +104,17 @@ pub enum Value {
     /// Insertion-ordered key/value pairs (a `.tmt` map has no inherent
     /// sort order, so preserve whatever order the source used).
     Map(Vec<(String, Value)>),
-    /// `name(arg, arg, ...)` -- an immediately-resolved literal, e.g.
-    /// `list(card, ns.mycard)`. Positional-only: a call's arguments are
-    /// never `key: value` pairs, an ordered sequence is enough for what
-    /// this exists to express. The callee is an uninterpreted `String`;
-    /// the parser accepts any identifier here without judging whether
-    /// `list`/`enum`/a typo is real, the same way it never judges a
-    /// `:name(...)` connect's name -- only `tomet-semantics` knows which
-    /// callees are real.
+    /// `name(arg, arg, ...)` -- a call the parser did not resolve.
+    /// Positional-only: a call's arguments are never `key: value` pairs, an
+    /// ordered sequence is enough for what this exists to express.
+    ///
+    /// The parser resolves exactly the literal constructors
+    /// (`motem::LITERAL_CONSTRUCTORS`: `list`, `string`, `int`, `float`) to
+    /// the plain value they stand for, so `list(card)` is a [`Value::Seq`]
+    /// and never a `Call`. Every other callee -- `enum`, a typo -- is kept
+    /// here as an uninterpreted `String`, the same way the parser never
+    /// judges a `:name(...)` connect's name; only `tomet-semantics` knows
+    /// which of those are real.
     ///
     /// Deliberately not the same mechanism as `${func(args)}`'s
     /// `InterpExprKind::Call`: that callee can itself be a path

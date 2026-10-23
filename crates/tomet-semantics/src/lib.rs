@@ -48,7 +48,6 @@ pub mod datetime;
 pub mod elements;
 pub mod flatten;
 mod kind;
-mod normalize;
 mod positional;
 pub mod vocabulary;
 
@@ -75,7 +74,6 @@ pub use kind::{
     builtin_region, builtin_singleton, classify_std, classify_std_lenient, classify_std_name,
     is_directive, required_shape, shape_mismatch,
 };
-pub use normalize::normalize_data_value;
 pub use positional::{
     LIST_MARKER_POSITIONAL_KEY, builtin_positional_arg_keys, normalized_element_args,
     normalized_element_args_in, normalized_list_marker,

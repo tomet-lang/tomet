@@ -8,9 +8,8 @@
 /// `None` if the element has no value group at all (or an interpolated
 /// one, `${...}`, which is not data).
 pub fn element_data(el: &tomet_ast::Element) -> Option<tomet_ast::Value> {
-    let data = match el.value.as_ref()? {
+    match el.value.as_ref()? {
         tomet_ast::ElementValue::Group(_) => el.value.as_ref()?.as_data(),
         tomet_ast::ElementValue::Interp(_) => None,
-    }?;
-    Some(crate::normalize::normalize_data_value(data))
+    }
 }
