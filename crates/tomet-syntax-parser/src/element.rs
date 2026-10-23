@@ -35,6 +35,25 @@ pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
     if look.bump() != Some('@') {
         return false;
     }
+    name_and_tail_start(look, block_context)
+}
+
+/// Whether a declaration about the document, `::name`, starts at `cur`.
+///
+/// Only a block can be one -- the `::` has to open a line -- so there is no
+/// `block_context` to pass: every call site is a block dispatch. Nowhere else
+/// asks, so in running text, in a `{...}` entry list, `std::vec` and a `::`
+/// in the middle of a line stay what they were: text.
+///
+/// What follows the `::` is read exactly as what follows an `@`.
+pub(crate) fn is_document_element_start(cur: &Cursor) -> bool {
+    let mut look = *cur;
+    look.eat_str("::") && name_and_tail_start(look, true)
+}
+
+/// The part of [`is_element_start`] after the sigil: the name, and what has to
+/// follow it for the sigil to start an element rather than prose.
+fn name_and_tail_start(mut look: Cursor, block_context: bool) -> bool {
     // The name is mandatory. A nameless `@(url:...)` used to infer its
     // kind from an args key; that inference was retired in favour of the
     // one `@link(target:...)` element, but the syntax outlived it and
@@ -206,12 +225,22 @@ pub(crate) fn parse_element_with_pipe_stack(
     parent_pipe_stack: &[usize],
 ) -> Result<Element> {
     let start_pos = cur.pos();
-    if !cur.eat_str("@") {
-        return Err(err(cur.pos(), "expected '@'"));
+    let document = cur.eat_str("::");
+    if !document && !cur.eat_str("@") {
+        return Err(err(cur.pos(), "expected '@' or '::'"));
     }
     let sigil = match eat_name(cur) {
+        Some(name) if document => Sigil::Document(name),
         Some(name) => Sigil::Named(name),
-        None => return Err(err(cur.pos(), "expected an element name after '@'")),
+        None => {
+            return Err(err(
+                cur.pos(),
+                format!(
+                    "expected an element name after '{}'",
+                    if document { "::" } else { "@" }
+                ),
+            ));
+        }
     };
 
     let mut el = element_new(sigil);
@@ -287,7 +316,8 @@ pub(crate) fn parse_groups_with_pipe_stack(
         let newlines = skip_element_gap(cur);
         if newlines <= 1 {
             let colon_pos = cur.pos();
-            if allow_colon_connect && cur.eat_str(":") {
+            // `::` is a declaration's sigil, not a connect that starts with a colon
+            if allow_colon_connect && !cur.starts_with("::") && cur.eat_str(":") {
                 skip_inline_ws(cur);
                 // `:name(...)` -- a connect, not the bare merge below. A
                 // name is checked for *before* `(`/`{` so this wins the

@@ -696,15 +696,38 @@ pub enum Sigil {
     /// an element cross-reference or hook pin, optionally filtered by a target
     /// element kind name (e.g. `^footnote(...)` or `^fig(...)`).
     Caret(Option<Name>),
+    /// `::name` -- a declaration about the document itself, not content in it.
+    ///
+    /// Structurally the same as [`Sigil::Named`]: an element with a mandatory
+    /// name and the same groups. The sigil says *where* it belongs -- in the
+    /// document's preamble, the run of `::` blocks at the top -- so the
+    /// preamble can be found without loading any vocabulary. Which names may
+    /// be written this way is the `Region` a vocabulary declares for them;
+    /// see `tmtroot/dev/design/document-connects.tmt`.
+    Document(Name),
 }
 
 impl Sigil {
     /// This element's name, if it has one.
+    ///
+    /// A `::name` has one just as an `@name` does, so consumers that look an
+    /// element up by name read both spellings the same way; the ones that
+    /// care which was written ask [`Sigil::is_document`].
     pub fn name(&self) -> Option<&Name> {
         match self {
-            Sigil::Named(name) => Some(name),
+            Sigil::Named(name) | Sigil::Document(name) => Some(name),
             Sigil::Bare | Sigil::Dollar | Sigil::Caret(_) => None,
         }
+    }
+
+    /// A document declaration with a bare (un-namespaced) name.
+    pub fn document(name: impl Into<String>) -> Self {
+        Sigil::Document(Name::bare(name))
+    }
+
+    /// Whether this sigil is `::` -- a declaration about the document.
+    pub fn is_document(&self) -> bool {
+        matches!(self, Sigil::Document(_))
     }
 
     /// Creates a Caret sigil with an optional target kind name.

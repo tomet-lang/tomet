@@ -4,8 +4,8 @@
 //! elements, thematic breaks) into a [`Document`].
 
 use crate::element::{
-    LineEnd, consume_trailing_continuation, element_ends_line, is_element_start,
-    leading_continuation, parse_element_with_pipe_stack,
+    LineEnd, consume_trailing_continuation, element_ends_line, is_document_element_start,
+    is_element_start, leading_continuation, parse_element_with_pipe_stack,
 };
 use crate::error::Result;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_soft_break};
@@ -207,7 +207,9 @@ pub(crate) fn parse_block_seq(
         // default -- `docs/examples/dirs.tmt`'s file listing depends on
         // this -- and joins whatever follows only when its line ends with
         // an explicit trailing `\`.
-        if cur.peek() == Some('@') && is_element_start(&cur, true) {
+        if (cur.peek() == Some('@') && is_element_start(&cur, true))
+            || is_document_element_start(&cur)
+        {
             match element_ends_line(&cur) {
                 LineEnd::Bare => {
                     let el = parse_element_with_pipe_stack(&mut cur, true, pipe_stack)?

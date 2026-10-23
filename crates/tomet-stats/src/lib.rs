@@ -61,6 +61,8 @@ pub struct Stats {
     pub words: usize,
     /// Named elements (`@name`).
     pub named: usize,
+    /// Declarations about the document (`::name`).
+    pub document: usize,
     /// Dynamic substitution elements (`${...}`).
     pub dollar: usize,
     /// Caret elements (`^` and `^name`).
@@ -78,9 +80,9 @@ pub struct Stats {
 }
 
 impl Stats {
-    /// Total number of elements (`named + dollar + caret + bare`).
+    /// Total number of elements (`named + document + dollar + caret + bare`).
     pub fn elements(&self) -> usize {
-        self.named + self.dollar + self.caret + self.bare
+        self.named + self.document + self.dollar + self.caret + self.bare
     }
 
     /// Total number of internal links.
@@ -104,6 +106,7 @@ impl Stats {
         self.characters_with_whitespace += other.characters_with_whitespace;
         self.words += other.words;
         self.named += other.named;
+        self.document += other.document;
         self.dollar += other.dollar;
         self.caret += other.caret;
         self.bare += other.bare;
@@ -138,6 +141,10 @@ pub fn measure(doc: &Document) -> Stats {
             Sigil::Named(name) => {
                 stats.named += 1;
                 *stats.by_name.entry(name.to_string()).or_default() += 1;
+            }
+            Sigil::Document(name) => {
+                stats.document += 1;
+                *stats.by_name.entry(format!("::{name}")).or_default() += 1;
             }
             Sigil::Dollar => stats.dollar += 1,
             Sigil::Caret(_) => stats.caret += 1,

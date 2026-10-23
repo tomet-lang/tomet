@@ -440,7 +440,9 @@ impl std::error::Error for UnknownName {}
 /// write `@link` explicitly.
 pub fn classify_std(el: &Element) -> Result<ElementKind, UnknownName> {
     match &el.sigil {
-        Sigil::Named(name) => classify_std_name(name),
+        // `::name` and `@name` mean the same by name; whether the spelling
+        // fits the element's `Region` is a separate check.
+        Sigil::Named(name) | Sigil::Document(name) => classify_std_name(name),
         Sigil::Bare => Ok(ElementKind::Bare),
         Sigil::Dollar => Ok(ElementKind::Interp),
         Sigil::Caret(_) => Ok(ElementKind::Caret),

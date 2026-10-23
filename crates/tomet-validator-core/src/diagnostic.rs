@@ -81,6 +81,19 @@ pub enum Diagnostic {
     /// that point is a directive nobody reading top-down would meet in
     /// time.
     OutsidePreamble { name: String, span: Span },
+    /// A `::name` declaration for an element that is content, not a
+    /// declaration about the document: it belongs in the body, written `@name`.
+    ///
+    /// The sigil says "this describes the document", and what an element is
+    /// follows from the `Region` its vocabulary declares. The opposite
+    /// mistake -- a declaration written `@name` -- is not reported yet, while
+    /// the old spelling is still being migrated away from.
+    WrongSigil {
+        name: String,
+        written: &'static str,
+        expected: &'static str,
+        span: Span,
+    },
     /// An element written with the wrong sigil for its shape -- `@meta`
     /// instead of `#meta`, or `#em` instead of `@em`.
     ShapeMismatch {
@@ -221,6 +234,7 @@ impl Diagnostic {
             Diagnostic::ShapeMismatch { span, .. } => *span,
             Diagnostic::DuplicateSingleton { duplicate, .. } => *duplicate,
             Diagnostic::OutsidePreamble { span, .. } => *span,
+            Diagnostic::WrongSigil { span, .. } => *span,
             Diagnostic::RetiredSettingsKey { span, .. } => *span,
             Diagnostic::InvalidFieldValue { span, .. } => *span,
             Diagnostic::UnknownArgument { span, .. } => *span,
@@ -365,6 +379,18 @@ impl Diagnostic {
                     f,
                     "`{name}` belongs in the preamble -- before the document's body \
                      starts, not after it"
+                )
+            }
+            Diagnostic::WrongSigil {
+                name,
+                written,
+                expected,
+                ..
+            } => {
+                write!(
+                    f,
+                    "`{name}` is written `{written}{name}`, but it is content, not a \
+                     declaration about the document: write `{expected}{name}`"
                 )
             }
             Diagnostic::ShapeMismatch {

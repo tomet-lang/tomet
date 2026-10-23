@@ -84,26 +84,72 @@ pub fn check_singletons_and_regions(
     use tomet_ast::{Block, Inline};
     use tomet_semantics::Region;
 
-    let constraints = |el: &tomet_ast::Element| -> Option<(String, bool, Region)> {
+    /// What the validator holds an element to.
+    ///
+    /// `region` is where the element *belongs*: a `::name` is a declaration
+    /// whatever its name, so it is held to the preamble even when no
+    /// vocabulary is in scope to say what it is. `declared` is what the
+    /// name's own declaration says, when it can be classified at all -- the
+    /// two differ exactly when the sigil is wrong.
+    struct Held {
+        name: String,
+        singleton: bool,
+        region: Region,
+        declared: Option<Region>,
+        document: bool,
+    }
+
+    let constraints = |el: &tomet_ast::Element| -> Option<Held> {
         let name = el.sigil.name()?;
-        let kind = classify_in(el, bindings).ok()?;
-        let (singleton, region) = match bindings.declaration(name) {
-            Some(decl) => (decl.singleton, decl.region),
-            None => (
-                tomet_semantics::builtin_singleton(&kind),
-                tomet_semantics::builtin_region(&kind),
-            ),
+        let document = el.sigil.is_document();
+        let (singleton, declared) = match classify_in(el, bindings) {
+            Ok(kind) => match bindings.declaration(name) {
+                Some(decl) => (decl.singleton, Some(decl.region)),
+                None => (
+                    tomet_semantics::builtin_singleton(&kind),
+                    Some(tomet_semantics::builtin_region(&kind)),
+                ),
+            },
+            // a name nothing declares: reported as unknown elsewhere
+            Err(_) if document => (false, None),
+            Err(_) => return None,
         };
-        Some((name.to_string(), singleton, region))
+        let region = if document {
+            Region::Preamble
+        } else {
+            declared?
+        };
+        Some(Held {
+            name: name.to_string(),
+            singleton,
+            region,
+            declared,
+            document,
+        })
     };
 
     let mut in_preamble = true;
     let mut seen: Vec<(String, tomet_ast::Span)> = Vec::new();
 
     let mut visit = |el: &tomet_ast::Element, in_place: bool| {
-        let Some((name, singleton, region)) = constraints(el) else {
+        let Some(Held {
+            name,
+            singleton,
+            region,
+            declared,
+            document,
+        }) = constraints(el)
+        else {
             return;
         };
+        if document && declared == Some(Region::Body) {
+            errors.push(Diagnostic::WrongSigil {
+                name: name.clone(),
+                written: "::",
+                expected: "@",
+                span: el.span,
+            });
+        }
         if singleton {
             if let Some((_, first)) = seen.iter().find(|(seen_name, _)| *seen_name == name) {
                 errors.push(Diagnostic::DuplicateSingleton {
@@ -127,7 +173,7 @@ pub fn check_singletons_and_regions(
         match block {
             Block::Element(el) => {
                 let still_preamble = constraints(el)
-                    .map(|(_, _, region)| region == Region::Preamble)
+                    .map(|held| held.region == Region::Preamble)
                     .unwrap_or(false);
                 visit(el, in_preamble);
                 if !still_preamble {
@@ -139,7 +185,7 @@ pub fn check_singletons_and_regions(
                     match inline {
                         Inline::Element(el) => {
                             let still_preamble = constraints(el)
-                                .map(|(_, _, region)| region == Region::Preamble)
+                                .map(|held| held.region == Region::Preamble)
                                 .unwrap_or(false);
                             visit(el, in_preamble);
                             if !still_preamble {

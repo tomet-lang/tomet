@@ -3,6 +3,7 @@
 mod caret;
 mod comments;
 mod connects;
+mod document_connects;
 mod elements;
 mod fences;
 mod groups;

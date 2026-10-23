@@ -200,6 +200,7 @@ pub(crate) fn extract_inlines_text(inlines: &[Inline]) -> String {
 pub(crate) fn sigil_display_name(sigil: &Sigil) -> String {
     match sigil {
         Sigil::Named(name) => format!("@{name}"),
+        Sigil::Document(name) => format!("::{name}"),
         Sigil::Bare => "(bare)".to_string(),
         Sigil::Dollar => "${...}".to_string(),
         Sigil::Caret(name) => match name {

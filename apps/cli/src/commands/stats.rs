@@ -226,6 +226,7 @@ fn stats_json(stats: &Stats) -> serde_json::Map<String, serde_json::Value> {
         "elements": {
             "total": stats.elements(),
             "named": stats.named,
+            "document": stats.document,
             "dollar": stats.dollar,
             "caret": stats.caret,
             "bare": stats.bare,
@@ -381,8 +382,9 @@ fn render(report: &Report) -> String {
     notes.push((
         "Elements",
         format!(
-            "@ {} / ${{}} {} / ^ {} / - {}",
+            "@ {} / :: {} / ${{}} {} / ^ {} / - {}",
             group(stats.named),
+            group(stats.document),
             group(stats.dollar),
             group(stats.caret),
             group(stats.bare)
@@ -725,7 +727,7 @@ mod tests {
         let text = render(&report);
         let after_total = text.split("Total").nth(1).expect("has a total row");
         // A symbol for each kind of element: the sigil it is written with.
-        assert!(after_total.contains("@ 2 / ${} 1 / ^ 1 / - 0"), "{text}");
+        assert!(after_total.contains("@ 2 / :: 0 / ${} 1 / ^ 1 / - 0"), "{text}");
         assert!(after_total.contains("file 0 / dir 0 / embed 0 / tmt 0 / ref 0"));
         assert!(after_total.contains("deepest level 0"));
         assert!(

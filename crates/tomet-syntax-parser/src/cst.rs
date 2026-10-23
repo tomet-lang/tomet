@@ -183,7 +183,7 @@ impl<'a> CstParser<'a> {
     /// Index just past everything an element starting at `i` (its sigil is
     /// `@name`) owns, using only bracket matching.
     fn element_end(&self, mut i: usize) -> usize {
-        i += 2; // `@` and the name
+        i += self.sigil_len_at(i).unwrap_or(2); // `@name`, or `::name`
         let mut seen = [false; 3]; // args, content, value: each at most once
         let mut seen_id = false;
         loop {
@@ -228,10 +228,26 @@ impl<'a> CstParser<'a> {
         }
     }
 
-    /// Is the `@` at `i` a block element: an element that owns the rest of
-    /// its line?
+    /// The number of tokens in the `@name` or `::name` sigil at `i`, if one starts there.
+    ///
+    /// `::` is two `COLON` tokens; it is a sigil only with a name right after.
+    fn sigil_len_at(&self, i: usize) -> Option<usize> {
+        match self.kind_at(i) {
+            Some(K::AT) if self.kind_at(i + 1) == Some(K::IDENT) => Some(2),
+            Some(K::COLON)
+                if self.kind_at(i + 1) == Some(K::COLON)
+                    && self.kind_at(i + 2) == Some(K::IDENT) =>
+            {
+                Some(3)
+            }
+            _ => None,
+        }
+    }
+
+    /// Is the `@` or `::` at `i` a block element: an element that owns the
+    /// rest of its line?
     fn is_block_element_at(&self, i: usize) -> bool {
-        if self.kind_at(i) != Some(K::AT) || self.kind_at(i + 1) != Some(K::IDENT) {
+        if self.sigil_len_at(i).is_none() {
             return false;
         }
         let end = self.element_end(i);
@@ -304,7 +320,7 @@ impl<'a> CstParser<'a> {
             Some(K::MINUS) => self.is_thematic_break_at(i) || self.is_list_start_at(i),
             Some(K::BACKTICK) => self.is_code_block_start_at(i),
             Some(K::LT) => true,
-            Some(K::AT) => self.is_block_element_at(i),
+            Some(K::AT | K::COLON) => self.is_block_element_at(i),
             _ => false,
         }
     }
@@ -364,7 +380,7 @@ impl<'a> CstParser<'a> {
             }
             K::MINUS if self.is_list_start_at(self.pos) => self.parse_list(),
             K::BACKTICK if self.is_code_block_start_at(self.pos) => self.parse_code_block(),
-            K::AT if self.is_block_element_at(self.pos) => self.parse_block_element(),
+            K::AT | K::COLON if self.is_block_element_at(self.pos) => self.parse_block_element(),
             K::LT => self.parse_block_element(),
             _ => self.parse_paragraph(),
         }
@@ -567,6 +583,12 @@ impl<'a> CstParser<'a> {
                 if self.current_kind() == Some(K::GT) {
                     self.bump();
                 }
+            }
+            // `::name`
+            Some(K::COLON) if self.sigil_len_at(self.pos) == Some(3) => {
+                self.bump();
+                self.bump();
+                self.bump();
             }
             Some(_) => {
                 self.bump();
@@ -1162,5 +1184,68 @@ mod tests {
         let root = parse_cst("@meta{a: 1}\n#[ Title ]\n");
         assert_eq!(count(&root, K::ID_GROUP), 0);
         assert_eq!(child_kinds(&root), [K::BLOCK_ELEMENT, K::PARAGRAPH]);
+    }
+
+    #[test]
+    fn a_document_declaration_is_a_block_element_with_a_double_colon_sigil() {
+        let src = "::kind(config)\n::meta{ id: x }\n\n=[ T ]\n";
+        let root = parse_cst(src);
+        assert_eq!(root.text().to_string(), src);
+        assert_eq!(
+            child_kinds(&root),
+            [K::BLOCK_ELEMENT, K::BLOCK_ELEMENT, K::SECTION]
+        );
+        let kind = find(&root, K::BLOCK_ELEMENT).unwrap();
+        assert_eq!(child_kinds(&kind), [K::SIGIL, K::ARGS]);
+        let sigil = find(&kind, K::SIGIL).unwrap();
+        assert_eq!(sigil.text().to_string(), "::kind");
+        let tokens: Vec<_> = sigil
+            .children_with_tokens()
+            .filter_map(|e| e.into_token())
+            .map(|t| t.kind())
+            .collect();
+        assert_eq!(tokens, [K::COLON, K::COLON, K::IDENT]);
+    }
+
+    #[test]
+    fn a_declaration_takes_groups_and_connects_like_an_at_element() {
+        let src = "::x(a)[ b ]{ c: 1 }#(i):rule(allow:list(k))\n";
+        let root = parse_cst(src);
+        assert_eq!(root.text().to_string(), src);
+        let el = find(&root, K::BLOCK_ELEMENT).unwrap();
+        assert_eq!(
+            child_kinds(&el),
+            [
+                K::SIGIL,
+                K::ARGS,
+                K::CONTENT,
+                K::VALUE_DATA,
+                K::ID_GROUP,
+                K::CONNECT
+            ]
+        );
+    }
+
+    #[test]
+    fn the_next_declaration_is_not_a_connect_of_the_one_before() {
+        let root = parse_cst("::kind(config)\n::meta{ id: x }\n");
+        assert_eq!(count(&root, K::CONNECT), 0);
+        assert_eq!(count(&root, K::BLOCK_ELEMENT), 2);
+    }
+
+    #[test]
+    fn a_double_colon_that_starts_no_declaration_is_text() {
+        for src in [
+            "std::vec is a type\n",
+            "text ::kind(x) in the middle\n",
+            "::\n",
+            "::(x)\n",
+            ":::kind(x)\n",
+        ] {
+            let root = parse_cst(src);
+            assert_eq!(root.text().to_string(), src);
+            assert_eq!(count(&root, K::BLOCK_ELEMENT), 0, "{src:?}");
+            assert_eq!(count(&root, K::INLINE_ELEMENT), 0, "{src:?}");
+        }
     }
 }

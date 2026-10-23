@@ -796,6 +796,13 @@ fn element_head(el: &Element) -> String {
             };
             format!("{placement} @{name}")
         }
+        Sigil::Document(name) => {
+            let placement = match el.placement {
+                Placement::Block => "Block ",
+                Placement::Inline => "Inline",
+            };
+            format!("{placement} ::{name}")
+        }
         Sigil::Bare => "Bare".to_string(),
         Sigil::Dollar => "Interp $".to_string(),
         Sigil::Caret(name) => {

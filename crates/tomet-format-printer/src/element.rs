@@ -222,6 +222,10 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             out.push('@');
             out.push_str(&name.to_string());
         }
+        Sigil::Document(name) => {
+            out.push_str("::");
+            out.push_str(&name.to_string());
+        }
         Sigil::Bare => {}
         Sigil::Dollar => {
             out.push('$');
