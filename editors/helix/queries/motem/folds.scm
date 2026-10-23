@@ -1,0 +1,1 @@
+../../../../crates/tree-sitter-motem/queries/folds.scm

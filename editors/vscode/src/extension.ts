@@ -344,6 +344,9 @@ async function startClient(): Promise<void> {
 		documentSelector: [
 			{ scheme: "file", language: "tomet" },
 			{ scheme: "untitled", language: "tomet" },
+			// a standalone motem file: diagnostics and formatting only
+			{ scheme: "file", language: "motem" },
+			{ scheme: "untitled", language: "motem" },
 		],
 	};
 

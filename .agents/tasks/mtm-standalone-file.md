@@ -31,10 +31,35 @@ leaves it out; `collect_tm_and_mtm_files` is the one that reaches it).
 - `format`: whitespace only (`tomet_formatter::format_data_source`); a quoted
   string is copied exactly, a file that does not parse is left alone.
 
-Still open: stage B LSP (diagnostics, formatting, the `**/*.tmt` watcher in
-`apps/lsp/src/main.rs`), C `tree-sitter-motem` (a second hand-maintained
-grammar, layer 0, with its own corpus in `tomet-tests`), D editors (VS Code,
-Zed, Helix, Neovim: register `.mtm`, highlight with C; VS Code uses TextMate).
+## Done: stages B-D (LSP, grammar, editors)
+
+- LSP: `apps/lsp/src/data.rs`. A `.mtm` is routed by extension: `parse_file`
+  diagnostics, `format_data_source` formatting, every other request answers
+  null, and the vault never sees it (`main.rs`, `refresh`). No file watcher is
+  needed: nothing reads a `.mtm` from a document.
+- `crates/tree-sitter-motem`: a separate grammar, no external scanner (a key,
+  a scalar's first word and a callee are one token, told apart by the next
+  one). Queries: highlights, brackets, folds, indents.
+- Drift guard: `tests/src/motem.rs` runs `tests/fixtures/motem/*.mtm` through
+  both; `GRAMMAR_ACCEPTS` lists what the grammar reads that the parser rejects.
+- Editors: VS Code (TextMate grammar, language, LSP selector), Helix, Neovim.
+  `src/extension.ts` type-checks (`npm ci && npx tsc --noEmit`).
+- Writ: `crates/tree-sitter-motem` is in `crate-layering` layer 0.
+- Header: `::name(args){data}` at the top of a `.mtm` is read by `motem-syntax`
+  (`File { header, body }`) and highlighted by tree-sitter-motem and the TextMate
+  grammar; `tests/fixtures/motem/ok-declarations.mtm` guards it.
+
+## Still open
+
+- **Zed**: add `languages/motem/` (config.toml, queries symlinked to
+  `crates/tree-sitter-motem/queries`), `[grammars.motem]` in
+  `editors/zed/extension.toml` and `"Motem"` in the language server's
+  `languages`. Held back: `extension.toml` pins `rev` per grammar, and none of
+  the existing commits holds `crates/tree-sitter-motem`, so adding it now
+  breaks the extension. Do it once a pushed commit has the crate.
+- `ln -sfr` in `just setup-helix` made a stray `queries/tomet/tomet -> .`
+  link on the second run; the recipe uses `-n` now. Remove the stray link if it
+  is in a checkout.
 
 ## To decide
 

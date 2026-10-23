@@ -1,6 +1,7 @@
 # Tomet for Helix
 
-Syntax highlighting, indentation, and language server support for Tomet (`.tmt`) files in Helix.
+Syntax highlighting, indentation, and language server support for Tomet (`.tmt`) files in Helix, and
+highlighting, diagnostics and formatting for standalone motem data files (`.mtm`).
 
 ## Requirements
 
@@ -43,13 +44,17 @@ name = "tomet"
 source = { git = "https://github.com/tefww/tomet", rev = "main", subpath = "crates/tree-sitter-tomet" }
 ```
 
+[`languages.toml`](languages.toml) also declares `motem` (`.mtm`) and its grammar,
+`crates/tree-sitter-motem`; copy those two entries as well to open `.mtm` files.
+
 ### 2. Install Tree-sitter Queries
 
 Copy or symlink the query files in `queries/tomet/` to your Helix runtime directory:
 
 ```sh
-mkdir -p ~/.config/helix/runtime/queries/tomet
+mkdir -p ~/.config/helix/runtime/queries/tomet ~/.config/helix/runtime/queries/motem
 cp queries/tomet/*.scm ~/.config/helix/runtime/queries/tomet/
+cp queries/motem/*.scm ~/.config/helix/runtime/queries/motem/
 ```
 
 ### 3. Fetch and Build Grammar

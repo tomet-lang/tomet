@@ -52,7 +52,13 @@
 //! ends its line; they go before the first entry. What a name means is not
 //! decided here. The body is [`parse_value`] that also insists every entry has
 //! a key, so a lone scalar or a bare value among the entries is an error at
-//! that entry. `tomet check` and `tomet format` take a `.mtm` next to a `.tmt`.
+//! that entry.
+//!
+//! The tools know a `.mtm` as data, not as a document: `tomet check` and
+//! `tomet format` take one next to a `.tmt`; `tomet-lsp` gives it this
+//! parser's diagnostics and a whitespace formatter and nothing a document gets;
+//! `tree-sitter-motem` highlights it in Helix, Neovim and Zed, and VS Code has a
+//! TextMate grammar. None of them loads it into a vault.
 //!
 //! A document with nothing in it, or only whitespace and comments, is the
 //! empty map, so a config file may be empty and a reader fills in every

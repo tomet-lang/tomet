@@ -1,0 +1,97 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "motem",
+	"scopeName": "source.motem",
+	"comment": "motem, a standalone data file (.mtm). Hand-maintained, like the tree-sitter grammar: a scalar is typed from where it sits (after a ':' or in a call), not from the whole line, so a value that is not one thing to the end of its line is left unscoped.",
+	"patterns": [
+		{ "include": "#comment" },
+		{ "include": "#declaration" },
+		{ "include": "#key" },
+		{ "include": "#value" },
+		{ "include": "#punctuation" }
+	],
+	"repository": {
+		"comment": {
+			"name": "comment.line.double-slash.motem",
+			"match": "(?<!:)//.*$"
+		},
+		"declaration": {
+			"comment": "::name, a declaration about the file, at the start of a line: ::kind(catalog, 2). Its (args) and {data} are scoped by the patterns that follow.",
+			"match": "^(\\s*)(::)([A-Za-z_][A-Za-z0-9_.\\-]*)",
+			"captures": {
+				"2": { "name": "punctuation.definition.tag.motem" },
+				"3": { "name": "entity.name.tag.motem" }
+			}
+		},
+		"key": {
+			"comment": "A word or a quoted string with a ':' after it; '://' is part of a URL, not a key.",
+			"patterns": [
+				{
+					"match": "(?<![^\\s,{(])(\"(?:[^\"\\\\]|\\\\.)*\")(?=\\s*:(?!//))",
+					"captures": {
+						"1": { "name": "support.type.property-name.motem" }
+					}
+				},
+				{
+					"match": "(?<![^\\s,{(])([A-Za-z0-9_.\\-]+)(?=\\s*:(?!//))",
+					"name": "support.type.property-name.motem"
+				}
+			]
+		},
+		"value": {
+			"patterns": [
+				{ "include": "#string" },
+				{ "include": "#call" },
+				{ "include": "#keyword" },
+				{ "include": "#number" }
+			]
+		},
+		"string": {
+			"name": "string.quoted.double.motem",
+			"begin": "\"",
+			"end": "\"",
+			"beginCaptures": { "0": { "name": "punctuation.definition.string.begin.motem" } },
+			"endCaptures": { "0": { "name": "punctuation.definition.string.end.motem" } },
+			"patterns": [
+				{
+					"name": "constant.character.escape.motem",
+					"match": "\\\\."
+				}
+			]
+		},
+		"call": {
+			"comment": "name(...), the '(' right after the name. list, string, int and float are resolved by the parser.",
+			"patterns": [
+				{
+					"match": "(?<![\\w.\\-])(list|string|int|float)(?=\\()",
+					"name": "support.function.builtin.motem"
+				},
+				{
+					"match": "(?<![\\w.\\-])([A-Za-z_][\\w.\\-]*)(?=\\()",
+					"name": "entity.name.function.motem"
+				}
+			]
+		},
+		"keyword": {
+			"comment": "Only when null, true or false is the whole scalar: after a ':' or in a call, and nothing else before the end of the entry.",
+			"match": "(?<=[:,(])(\\s*)(null|true|false)(?=\\s*(?:$|[,)}]|//))",
+			"captures": {
+				"2": { "name": "constant.language.motem" }
+			}
+		},
+		"number": {
+			"comment": "A JSON number, as the parser types it: no leading zero, no '+', no bare '.5'.",
+			"match": "(?<=[:,(])(\\s*)(-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?=\\s*(?:$|[,)}]|//))",
+			"captures": {
+				"2": { "name": "constant.numeric.motem" }
+			}
+		},
+		"punctuation": {
+			"patterns": [
+				{ "match": "[{}()]", "name": "punctuation.section.motem" },
+				{ "match": ",", "name": "punctuation.separator.comma.motem" },
+				{ "match": ":(?!//)", "name": "punctuation.separator.key-value.motem" }
+			]
+		}
+	}
+}

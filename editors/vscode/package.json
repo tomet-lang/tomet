@@ -1,7 +1,7 @@
 {
 	"name": "tomet",
 	"displayName": "Tomet",
-	"description": "Syntax highlighting and language server support for Tomet (.tmt) files.",
+	"description": "Syntax highlighting and language server support for Tomet (.tmt) and motem (.mtm) files.",
 	"version": "0.1.0",
 	"publisher": "tomet-lang",
 	"license": "MIT OR Apache-2.0",
@@ -29,6 +29,17 @@
 					".tmt"
 				],
 				"configuration": "./language-configuration.json"
+			},
+			{
+				"id": "motem",
+				"aliases": [
+					"motem",
+					"Motem"
+				],
+				"extensions": [
+					".mtm"
+				],
+				"configuration": "./language-configuration-motem.json"
 			}
 		],
 		"grammars": [
@@ -36,6 +47,11 @@
 				"language": "tomet",
 				"scopeName": "source.tomet",
 				"path": "./syntaxes/tomet.tmLanguage.json"
+			},
+			{
+				"language": "motem",
+				"scopeName": "source.motem",
+				"path": "./syntaxes/motem.tmLanguage.json"
 			}
 		],
 		"configurationDefaults": {
@@ -43,6 +59,9 @@
 				"editor.wordWrap": "on",
 				"editor.formatOnSave": true,
 				"editor.bracketPairColorization.enabled": false
+			},
+			"[motem]": {
+				"editor.formatOnSave": true
 			}
 		},
 		"commands": [

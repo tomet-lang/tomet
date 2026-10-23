@@ -1,4 +1,4 @@
-# Helix language configuration for Tomet (.tmt)
+# Helix language configuration for Tomet (.tmt) and motem (.mtm)
 # Merge or reference this in ~/.config/helix/languages.toml
 
 [[language]]
@@ -12,9 +12,24 @@ block-comment-tokens = { start = "/*", end = "*/" }
 indent = { tab-width = 2, unit = "  " }
 language-servers = ["tomet-lsp"]
 
+# A standalone motem data file. tomet-lsp serves it diagnostics and formatting.
+[[language]]
+name = "motem"
+scope = "source.motem"
+file-types = ["mtm"]
+roots = ["tomet.config.tmt", "default.config.tmt", ".git"]
+comment-token = "//"
+indent = { tab-width = 2, unit = "  " }
+language-servers = ["tomet-lsp"]
+auto-format = true
+
 [language-server.tomet-lsp]
 command = "tomet-lsp"
 
 [[grammar]]
 name = "tomet"
 source = { git = "https://github.com/tefww/tomet", rev = "main", subpath = "crates/tree-sitter-tomet" }
+
+[[grammar]]
+name = "motem"
+source = { git = "https://github.com/tefww/tomet", rev = "main", subpath = "crates/tree-sitter-motem" }

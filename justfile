@@ -96,12 +96,13 @@ setup-helix:
     @mkdir -p .helix
     @ln -sfr editors/helix/languages.toml .helix/languages.toml
     @mkdir -p ~/.config/helix/runtime/queries
-    @ln -sfr editors/helix/queries/tomet ~/.config/helix/runtime/queries/tomet
-    @echo "✅ Linked .helix/languages.toml and ~/.config/helix/runtime/queries/tomet"
-    @if command -v hx >/dev/null 2>&1; then hx --health tomet; fi
+    @ln -sfrn editors/helix/queries/tomet ~/.config/helix/runtime/queries/tomet
+    @ln -sfrn editors/helix/queries/motem ~/.config/helix/runtime/queries/motem
+    @echo "✅ Linked .helix/languages.toml and ~/.config/helix/runtime/queries/{tomet,motem}"
+    @if command -v hx >/dev/null 2>&1; then hx --health tomet; hx --health motem; fi
 
 # Remove Helix development runtime queries.
 clean-helix:
-    @rm -rf ~/.config/helix/runtime/queries/tomet
-    @echo "🧹 Removed ~/.config/helix/runtime/queries/tomet"
+    @rm -rf ~/.config/helix/runtime/queries/tomet ~/.config/helix/runtime/queries/motem
+    @echo "🧹 Removed ~/.config/helix/runtime/queries/{tomet,motem}"
 

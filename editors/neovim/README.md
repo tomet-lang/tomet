@@ -1,10 +1,10 @@
 # tomet.nvim
 
-Neovim plugin providing syntax highlighting, Tree-sitter queries, filetype detection, and language server support for Tomet (`.tmt`) files.
+Neovim plugin providing syntax highlighting, Tree-sitter queries, filetype detection, and language server support for Tomet (`.tmt`) files, and for standalone motem data files (`.mtm`, filetype `motem`).
 
 ## Features
 
-- **Filetype Detection:** Automatically detects `.tmt` files as `tomet` filetype.
+- **Filetype Detection:** Automatically detects `.tmt` files as `tomet` filetype, and `.mtm` files as `motem`.
 - **Tree-sitter Support:** Includes `highlights.scm`, `indents.scm`, `brackets.scm`, and `injections.scm`.
 - **LSP Auto-Attach:** Automatically connects `tomet-lsp` to Tomet buffers when available on `$PATH`.
 - **Buffer Settings:** Configures comments (`//`, `/* */`) and standard 2-space indentation.
@@ -22,7 +22,7 @@ Neovim plugin providing syntax highlighting, Tree-sitter queries, filetype detec
 ```lua
 {
   "tefww/tomet",
-  ft = { "tomet" },
+  ft = { "tomet", "motem" },
   config = function()
     require("tomet").setup({
       -- Options (defaults shown):
@@ -40,7 +40,7 @@ Or when developing locally:
 ```lua
 {
   dir = "/path/to/tomet/editors/neovim",
-  ft = { "tomet" },
+  ft = { "tomet", "motem" },
   config = function()
     require("tomet").setup()
   end,

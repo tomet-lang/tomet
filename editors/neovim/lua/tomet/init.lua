@@ -22,6 +22,19 @@ function M.setup(opts)
         filetype = "tomet",
       }
     end
+    if not parser_config.motem then
+      parser_config.motem = {
+        install_info = {
+          url = opts.treesitter_url or "https://github.com/tefww/tomet",
+          files = { "src/parser.c" },
+          branch = "main",
+          location = "crates/tree-sitter-motem",
+          generate_requires_npm = false,
+          requires_generate_from_grammar = false,
+        },
+        filetype = "motem",
+      }
+    end
   end
 
   -- Auto-start LSP unless explicitly disabled
