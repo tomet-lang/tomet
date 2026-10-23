@@ -331,3 +331,8 @@ fails to parse instead of reading back as something else.
 ====[fn key_text]
 
 [`write_key`] as an owned string, for callers that build with `format!`.
+
+====[fn quoted_text]
+
+`s` as a `"..."` string whatever it holds, where [`key_text`] quotes only what
+has to be. For a place that uses `.` as a separator: a bare key may hold one.

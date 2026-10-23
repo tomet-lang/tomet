@@ -110,7 +110,9 @@ pub use parser::{
     skip_ws_and_newlines, skip_ws_newlines_and_comments, starts_absolute_path, try_parse_call,
     try_parse_call_with,
 };
-pub use print::{float_text, key_text, print_value, write_float, write_key, write_scalar_string};
+pub use print::{
+    float_text, key_text, print_value, quoted_text, write_float, write_key, write_scalar_string,
+};
 pub use tomet_ast::Value;
 
 #[cfg(test)]

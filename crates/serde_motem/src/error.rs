@@ -49,14 +49,25 @@ impl fmt::Display for Error {
             Error::Data { message, path } => {
                 for (i, segment) in path.iter().enumerate() {
                     match segment {
-                        Segment::Key(key) if i == 0 => f.write_str(&motem_syntax::key_text(key))?,
-                        Segment::Key(key) => write!(f, ".{}", motem_syntax::key_text(key))?,
+                        Segment::Key(key) if i == 0 => f.write_str(&segment_text(key))?,
+                        Segment::Key(key) => write!(f, ".{}", segment_text(key))?,
                         Segment::Index(index) => write!(f, "[{index}]")?,
                     }
                 }
                 write!(f, ": {message}")
             }
         }
+    }
+}
+
+/// A key as one step of a path. A `.` separates the steps, and a bare key may hold
+/// one (`a.tmt`), so a key with a `.` is quoted here though it need not be
+/// anywhere else: `"a.tmt".source`, not `a.tmt.source`.
+fn segment_text(key: &str) -> String {
+    if key.contains('.') {
+        motem_syntax::quoted_text(key)
+    } else {
+        motem_syntax::key_text(key)
     }
 }
 

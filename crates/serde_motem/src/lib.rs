@@ -17,7 +17,8 @@
 //! [`Error::Data`] is a value that does not fit the Rust type, with the path
 //! from the document root to that value, written the way the document spells
 //! it: `bookmarks[1].path: invalid type: integer `1`, expected a string`. A
-//! key that is not a bare identifier is quoted (`"a/b"[1]`), and an enum
+//! key that is not a bare identifier is quoted (`"a/b"[1]`), and so is one that holds a
+//! `.`, which would read as a step (`"a.tmt".source`). An enum
 //! variant is a key (`effect.Blur`). A `missing field` error is at the map
 //! that lacks the field. There is no line or column on a data error, because a
 //! [`Value`] carries no positions.
@@ -226,6 +227,22 @@ mod tests {
         use std::collections::BTreeMap;
         let err = failure::<BTreeMap<String, Vec<i32>>>(r#""a/b": list(1, x)"#);
         assert!(err.starts_with("\"a/b\"[1]: "), "{err}");
+    }
+
+    #[test]
+    fn a_key_holding_a_dot_is_quoted_so_it_is_not_taken_for_two_steps() {
+        use std::collections::BTreeMap;
+        // `a.tmt` is a bare key, but in a path the dot separates steps
+        let err = failure::<BTreeMap<String, Bookmark>>("a.tmt: { label: x }");
+        assert!(err.starts_with("\"a.tmt\": "), "{err}");
+        assert!(err.contains("missing field `path`"), "{err}");
+
+        let err = failure::<BTreeMap<String, Bookmark>>("a.tmt: { label: x, path: 1 }");
+        assert!(err.starts_with("\"a.tmt\".path: "), "{err}");
+
+        // a key without a dot stays bare
+        let err = failure::<BTreeMap<String, Bookmark>>("a-b: { label: x, path: 1 }");
+        assert!(err.starts_with("a-b.path: "), "{err}");
     }
 
     #[test]

@@ -225,6 +225,14 @@ pub fn key_text(key: &str) -> String {
     out
 }
 
+/// `s` as a `"..."` string whatever it holds, where [`key_text`] quotes only what
+/// has to be. For a place that uses `.` as a separator: a bare key may hold one.
+pub fn quoted_text(s: &str) -> String {
+    let mut out = String::new();
+    write_quoted(s, &mut out);
+    out
+}
+
 /// Writes `s` as a `"..."` string, with the escapes `parse_quoted` reads.
 fn write_quoted(s: &str, out: &mut String) {
     out.push('"');
