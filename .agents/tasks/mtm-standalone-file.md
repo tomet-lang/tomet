@@ -42,7 +42,9 @@ leaves it out; `collect_tm_and_mtm_files` is the one that reaches it).
   one). Queries: highlights, brackets, folds, indents.
 - Drift guard: `tests/src/motem.rs` runs `tests/fixtures/motem/*.mtm` through
   both; `GRAMMAR_ACCEPTS` lists what the grammar reads that the parser rejects.
-- Editors: VS Code (TextMate grammar, language, LSP selector), Helix, Neovim.
+- Editors: VS Code (TextMate grammar, language, LSP selector), Helix, Neovim, Zed
+  (`languages/motem/`, `[grammars.motem]`; both grammars pinned to `1242ff9a`, the
+  first pushed commit with `crates/tree-sitter-motem`).
   `src/extension.ts` type-checks (`npm ci && npx tsc --noEmit`).
 - Writ: `crates/tree-sitter-motem` is in `crate-layering` layer 0.
 - Header: `::name(args){data}` at the top of a `.mtm` is read by `motem-syntax`
@@ -51,12 +53,6 @@ leaves it out; `collect_tm_and_mtm_files` is the one that reaches it).
 
 ## Still open
 
-- **Zed**: add `languages/motem/` (config.toml, queries symlinked to
-  `crates/tree-sitter-motem/queries`), `[grammars.motem]` in
-  `editors/zed/extension.toml` and `"Motem"` in the language server's
-  `languages`. Held back: `extension.toml` pins `rev` per grammar, and none of
-  the existing commits holds `crates/tree-sitter-motem`, so adding it now
-  breaks the extension. Do it once a pushed commit has the crate.
 - `ln -sfr` in `just setup-helix` made a stray `queries/tomet/tomet -> .`
   link on the second run; the recipe uses `-n` now. Remove the stray link if it
   is in a checkout.
