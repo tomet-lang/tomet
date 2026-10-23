@@ -23,7 +23,7 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         return &[];
     }
     match name.name.as_str() {
-        "footnote" => &["id"],
+        "footnote" | "ftn" => &["id"],
         // The second slot is the version of that kind, an integer of 1 or more,
         // and may be left out. The validator checks the value; nothing reads it yet.
         "kind" => &["kind", "version"],

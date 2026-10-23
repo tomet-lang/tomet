@@ -37,7 +37,7 @@ pub(crate) fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inl
                 render_element_value(cx, value, out);
             }
         }
-        "footnote" => {
+        "ftn" => {
             if (inline || el.placement == tomet_ast::Placement::Inline)
                 && let Some((idx, backlink)) = cx.footnotes.get_ref(&el.span)
             {

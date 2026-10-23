@@ -567,6 +567,20 @@ Prose B ^(shared).
 }
 
 #[test]
+fn ftn_exports_as_the_caret_and_footnote_spelling_does() {
+    let old = "Prose A ^(shared).\nProse B ^(shared).\n\n@footnote(shared)[Shared footnote explanation.]\n";
+    let new = "Prose A @ftn(shared).\nProse B @ftn(shared).\n\n@ftn(shared)[Shared footnote explanation.]\n";
+    let md = |src: &str| to_markdown(&tomet_parser::parse_document(src).unwrap());
+    assert_eq!(md(new), md(old));
+    assert!(
+        md(new).contains("[^1]: Shared footnote explanation."),
+        "got: {}",
+        md(new)
+    );
+    assert!(!md(new).contains("@ftn"), "got: {}", md(new));
+}
+
+#[test]
 fn tag_elements_export_to_markdown() {
     let src = "@tag(rust, tomet) and @tag(spec)\n";
     let doc = tomet_parser::parse_document(src).unwrap();

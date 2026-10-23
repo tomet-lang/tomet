@@ -120,3 +120,14 @@ fn test_renders_separated_footnote_with_multiple_references() {
             "expected shared footnote item with multiple backlinks: {html}"
         );
 }
+
+#[test]
+fn test_ftn_renders_the_same_as_the_caret_and_footnote_spelling() {
+    let old = "Prose A^(note1) and Prose B^footnote(note1).\n\n@footnote(note1)[Shared footnote explanation.]\n";
+    let new =
+        "Prose A@ftn(note1) and Prose B@ftn(note1).\n\n@ftn(note1)[Shared footnote explanation.]\n";
+    assert_eq!(
+        render_body(&parse_document(new).unwrap()),
+        render_body(&parse_document(old).unwrap())
+    );
+}

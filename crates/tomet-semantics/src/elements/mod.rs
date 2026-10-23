@@ -8,7 +8,7 @@
 //! built-in element families:
 //!
 //! - (config) Document configuration (`@config`, `@settings`).
-//! - (footnote) Footnote collection and indexing (`<footnote>`, `^id`).
+//! - (footnote) Footnote collection and indexing (`@ftn(id)[...]`, and `@ftn(id)` to refer to one; the old `@footnote` and `^(id)` still read).
 //! - (heading) Heading level calculation and bounds clamping (`heading`).
 //! - (meta) Document metadata and frontmatter extraction (`@meta`, `@kind`, `@version`).
 //! - (table) Table rows and cell structures (`@table`).

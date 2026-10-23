@@ -1,0 +1,263 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {},
+  "blocks": [
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "First"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "reference"
+        },
+        {
+          "t": "Span",
+          "c": [
+            [
+              "",
+              [
+                "tomet-ftn"
+              ],
+              [
+                [
+                  "value",
+                  "shared"
+                ]
+              ]
+            ],
+            []
+          ]
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "second"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "reference"
+        },
+        {
+          "t": "Span",
+          "c": [
+            [
+              "",
+              [
+                "tomet-ftn"
+              ],
+              [
+                [
+                  "value",
+                  "shared"
+                ]
+              ]
+            ],
+            []
+          ]
+        },
+        {
+          "t": "Str",
+          "c": ","
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "then"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "a"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "note"
+        },
+        {
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Str",
+          "c": "that"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "is"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "used"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "once"
+        },
+        {
+          "t": "Span",
+          "c": [
+            [
+              "",
+              [
+                "tomet-ftn"
+              ],
+              []
+            ],
+            [
+              {
+                "t": "Str",
+                "c": "written"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "where"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "it"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "is"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "used"
+              }
+            ]
+          ]
+        },
+        {
+          "t": "Str",
+          "c": "."
+        }
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-ftn"
+          ],
+          [
+            [
+              "value",
+              "shared"
+            ]
+          ]
+        ],
+        [
+          {
+            "t": "Para",
+            "c": [
+              {
+                "t": "Str",
+                "c": "One"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "definition,"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "however"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "many"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "places"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "refer"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "to"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "it."
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  ]
+}

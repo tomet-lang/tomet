@@ -197,7 +197,7 @@ fn element_to_md(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
         "link" => render_link(cx, el),
         "file" | "dir" => render_path(cx, el, inline),
         "embed" => render_embed(el),
-        "footnote" => {
+        "ftn" => {
             if inline || el.placement == Placement::Inline {
                 if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
                     format!("[^{idx}]")

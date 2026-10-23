@@ -164,6 +164,19 @@ Prose B ^(shared).
 }
 
 #[test]
+fn ftn_renders_as_the_caret_and_footnote_spelling_does() {
+    let old = "Prose A ^(shared).\nProse B ^(shared).\n\n@footnote(shared)[Shared footnote explanation.]\n";
+    let new = "Prose A @ftn(shared).\nProse B @ftn(shared).\n\n@ftn(shared)[Shared footnote explanation.]\n";
+    assert_eq!(typst(new), typst(old));
+    assert!(
+        typst(new).contains("Prose A #footnote[Shared footnote explanation.] <fn-shared>."),
+        "got: {}",
+        typst(new)
+    );
+    assert!(!typst(new).contains("@ftn"), "got: {}", typst(new));
+}
+
+#[test]
 fn renders_tag_elements() {
     let src = "@tag(rust, tomet) and @tag(spec)\n";
     assert_eq!(

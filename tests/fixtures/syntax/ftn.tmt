@@ -1,0 +1,7 @@
+// Footnotes: `@ftn(id)[text]` defines one, `@ftn(id)` refers to it, and
+// `@ftn[text]` is a note that is only used once, where it stands.
+
+First reference@ftn(shared) and second reference@ftn(shared), then a note
+that is used once@ftn[written where it is used].
+
+@ftn(shared)[One definition, however many places refer to it.]

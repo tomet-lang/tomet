@@ -32,13 +32,49 @@ pub struct FootnoteRegistry {
     span_to_ref: HashMap<(usize, usize), (usize, String)>,
 }
 
+/// Counts one more occurrence of footnote `id` in prose, numbering it if it is new.
+///
+/// The definition is the element with content that carries the id; the first
+/// pass found them all, so a reference may come before its definition.
+fn note_reference(
+    registry: &mut FootnoteRegistry,
+    id_to_index: &mut HashMap<String, usize>,
+    defs: &HashMap<String, Element>,
+    id: String,
+    span: &Span,
+) {
+    let index = if let Some(&idx) = id_to_index.get(&id) {
+        idx
+    } else {
+        let idx = registry.items.len() + 1;
+        let definition = defs.get(&id).cloned();
+        id_to_index.insert(id.clone(), idx);
+        registry.items.push(FootnoteItem {
+            index: idx,
+            id: Some(id),
+            definition,
+            backlinks: Vec::new(),
+        });
+        idx
+    };
+    let item = &mut registry.items[index - 1];
+    let ref_num = item.backlinks.len() + 1;
+    let backlink_id = format!("fnref-{}-{}", index, ref_num);
+    item.backlinks.push(backlink_id.clone());
+    registry
+        .span_to_ref
+        .insert(span_key(span), (index, backlink_id));
+}
+
 impl FootnoteRegistry {
     /// Scans `doc` in document order and resolves all footnotes and references.
     pub fn from_document(doc: &Document) -> Self {
-        // Pass 1: Collect definitions (@footnote(id))
+        // Pass 1: Collect definitions, `@ftn(id)[text]`. One without content,
+        // `@ftn(id)`, is a reference to one and defines nothing.
         let mut defs: HashMap<String, Element> = HashMap::new();
         for_each_element(doc, |el| {
             if classify_std_lenient(el) == ElementKind::Footnote
+                && el.content.is_some()
                 && let Some(id) = get_element_id(el)
             {
                 defs.insert(id, el.clone());
@@ -53,16 +89,28 @@ impl FootnoteRegistry {
             let kind = classify_std_lenient(el);
             match kind {
                 ElementKind::Footnote => {
-                    // Block-placed footnote with ID is a separated definition block,
-                    // not an in-text reference occurrence.
-                    let is_block_def =
-                        el.placement == Placement::Block && get_element_id(el).is_some();
+                    // Block-placed footnote with ID and content is a separated
+                    // definition block, not an in-text reference occurrence.
+                    let is_block_def = el.placement == Placement::Block
+                        && el.content.is_some()
+                        && get_element_id(el).is_some();
                     if is_block_def {
                         return;
                     }
 
                     let id = get_element_id(el);
                     if let Some(id_str) = id {
+                        if el.content.is_none() {
+                            // `@ftn(id)`: a reference, as `^(id)` was
+                            note_reference(
+                                &mut registry,
+                                &mut id_to_index,
+                                &defs,
+                                id_str,
+                                &el.span,
+                            );
+                            return;
+                        }
                         let index = if let Some(&idx) = id_to_index.get(&id_str) {
                             idx
                         } else {
@@ -99,35 +147,16 @@ impl FootnoteRegistry {
                     }
                 }
                 ElementKind::Caret => {
-                    // Check target kind filter: None or "footnote"
+                    // Check target kind filter: None or a footnote's name
                     let target_kind = el.sigil.caret_target_kind();
                     if let Some(target) = target_kind
                         && target.name != "footnote"
+                        && target.name != "ftn"
                     {
                         return;
                     }
                     if let Some(id_str) = get_element_id(el) {
-                        let index = if let Some(&idx) = id_to_index.get(&id_str) {
-                            idx
-                        } else {
-                            let idx = registry.items.len() + 1;
-                            id_to_index.insert(id_str.clone(), idx);
-                            let def = defs.get(&id_str).cloned();
-                            registry.items.push(FootnoteItem {
-                                index: idx,
-                                id: Some(id_str.clone()),
-                                definition: def,
-                                backlinks: Vec::new(),
-                            });
-                            idx
-                        };
-                        let item = &mut registry.items[index - 1];
-                        let ref_num = item.backlinks.len() + 1;
-                        let backlink_id = format!("fnref-{}-{}", index, ref_num);
-                        item.backlinks.push(backlink_id.clone());
-                        registry
-                            .span_to_ref
-                            .insert(span_key(&el.span), (index, backlink_id));
+                        note_reference(&mut registry, &mut id_to_index, &defs, id_str, &el.span);
                     }
                 }
                 _ => {}
@@ -213,5 +242,54 @@ mod tests {
         assert_eq!(registry.items[1].index, 2);
         assert_eq!(registry.items[1].id.as_deref(), Some("2"));
         assert!(registry.items[1].definition.is_some());
+    }
+
+    /// `@ftn` is the short name; the definition and the reference are the same
+    /// element, told apart by whether it has content.
+    #[test]
+    fn ftn_defines_with_content_and_refers_without() {
+        let src = "See @ftn(intro) and @ftn(intro) and @ftn(other).\n\n@ftn(intro)[Introduction text]\n\n@ftn(other)| Other text\n";
+        let doc = parse_document(src).unwrap();
+        let registry = FootnoteRegistry::from_document(&doc);
+
+        assert_eq!(registry.items.len(), 2);
+        assert_eq!(registry.items[0].index, 1);
+        assert_eq!(registry.items[0].id.as_deref(), Some("intro"));
+        assert_eq!(registry.items[0].backlinks.len(), 2);
+        let def = registry.items[0].definition.as_ref().expect("a definition");
+        assert!(
+            def.content.is_some(),
+            "the definition is the one with content"
+        );
+
+        assert_eq!(registry.items[1].index, 2);
+        assert_eq!(registry.items[1].id.as_deref(), Some("other"));
+        assert_eq!(registry.items[1].backlinks.len(), 1);
+        assert!(registry.items[1].definition.is_some());
+    }
+
+    #[test]
+    fn a_reference_before_its_definition_and_a_missing_one_are_both_fine() {
+        let src = "A@ftn(later) and B@ftn(nowhere).\n\n@ftn(later)[Defined below]\n";
+        let registry = FootnoteRegistry::from_document(&parse_document(src).unwrap());
+        assert_eq!(registry.items.len(), 2);
+        assert!(registry.items[0].definition.is_some());
+        assert!(registry.items[1].definition.is_none());
+    }
+
+    #[test]
+    fn ftn_inline_with_content_is_an_unnamed_footnote() {
+        let src = "First@ftn[one] and second@ftn[two].\n";
+        let registry = FootnoteRegistry::from_document(&parse_document(src).unwrap());
+        assert_eq!(registry.items.len(), 2);
+        assert_eq!(registry.items[0].id, None);
+    }
+
+    #[test]
+    fn the_old_names_keep_working_beside_the_new_one() {
+        let src = "A@ftn(n) and B^(n) and C@footnote(n).\n\n@footnote(n)[Both spellings]\n";
+        let registry = FootnoteRegistry::from_document(&parse_document(src).unwrap());
+        assert_eq!(registry.items.len(), 1);
+        assert_eq!(registry.items[0].backlinks.len(), 3);
     }
 }

@@ -246,7 +246,7 @@ impl ElementKind {
             ElementKind::Custom(name) => name,
             ElementKind::Bare => "bare",
             ElementKind::Interp => "interp",
-            ElementKind::Footnote => "footnote",
+            ElementKind::Footnote => "ftn",
             ElementKind::Caret => "caret",
             ElementKind::Tag => "tag",
             ElementKind::Task => "task",
@@ -326,12 +326,23 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
     ("card", ElementKind::Card),
     ("table", ElementKind::Table),
     ("heading", ElementKind::Heading),
-    ("footnote", ElementKind::Footnote),
+    ("ftn", ElementKind::Footnote),
     ("tag", ElementKind::Tag),
     ("task", ElementKind::Task),
 ];
 
+/// Names a built-in element used to have, and still reads as, until the
+/// documents using them are migrated: `(old, current)`.
+///
+/// Not in [`BUILTIN_KINDS`], which holds one name per kind. A vocabulary may
+/// not take one either: they resolve as the kind they stand for.
+const RETIRED_NAMES: [(&str, &str); 1] = [("footnote", "ftn")];
+
 fn builtin_kind(name: &str) -> Option<ElementKind> {
+    let name = RETIRED_NAMES
+        .iter()
+        .find(|(old, _)| *old == name)
+        .map_or(name, |(_, current)| *current);
     BUILTIN_KINDS
         .iter()
         .find(|(builtin, _)| *builtin == name)
