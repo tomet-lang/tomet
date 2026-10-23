@@ -75,6 +75,14 @@ Enforces the `singleton` and `region` axes.
 
 ===[fn check_arguments]
 
+===[fn check_version_slot]
+
+`@kind(name, version)` and `@use(ns, version)`: a version, when written, is an
+integer of 1 or more, and the name and the version are all they take.
+
+`1.0` is the case this exists for: a semver habit that would read as a
+float, and a document names only the major version.
+
 ===[fn check_content_shape]
 
 ===[fn check_retired_settings_keys]

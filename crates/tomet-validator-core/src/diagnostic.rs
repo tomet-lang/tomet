@@ -106,6 +106,20 @@ pub enum Diagnostic {
         argument: String,
         span: Span,
     },
+    /// The version after the name in `@kind(name, 2)` or `@use(ns, 2)` is not an
+    /// integer of 1 or more. `found` is the value as written.
+    InvalidVersion {
+        element: String,
+        found: String,
+        span: Span,
+    },
+    /// A built-in element that takes a fixed number of positional arguments was
+    /// given more: `@kind(a, 1, 2)`.
+    TooManyArguments {
+        element: String,
+        takes: usize,
+        span: Span,
+    },
     /// `@draft[ ... ]` -- the document says it is unfinished here.
     ///
     /// A warning, not an error: an unfinished document is a normal state
@@ -211,6 +225,8 @@ impl Diagnostic {
             Diagnostic::InvalidFieldValue { span, .. } => *span,
             Diagnostic::UnknownArgument { span, .. } => *span,
             Diagnostic::MissingRequiredArgument { span, .. } => *span,
+            Diagnostic::InvalidVersion { span, .. } => *span,
+            Diagnostic::TooManyArguments { span, .. } => *span,
             Diagnostic::Draft { span, .. } => *span,
             Diagnostic::Fixme { span, .. } => *span,
             Diagnostic::Conflict { span, .. } => *span,
@@ -385,6 +401,18 @@ impl Diagnostic {
                 element, argument, ..
             } => {
                 write!(f, "`{element}` requires the argument `{argument}`")
+            }
+            Diagnostic::InvalidVersion { element, found, .. } => {
+                write!(
+                    f,
+                    "the version in `@{element}(...)` must be an integer of 1 or more, found {found}"
+                )
+            }
+            Diagnostic::TooManyArguments { element, takes, .. } => {
+                write!(
+                    f,
+                    "`{element}` takes at most {takes} arguments: the name, then an optional version"
+                )
             }
             Diagnostic::Draft { note, .. } => {
                 if note.is_empty() {

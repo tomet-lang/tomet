@@ -853,3 +853,88 @@ fn a_datetime_field_has_to_read_as_one() {
         vec![]
     );
 }
+
+/// A document names only the major version, as an integer of 1 or more, and it
+/// may leave the version out.
+#[test]
+fn a_version_after_the_name_of_kind_and_use_is_fine_when_it_is_an_integer() {
+    for src in [
+        "@kind(note)\n@use(deck)\n",
+        "@kind(note, 1)\n@use(deck, 3)\n",
+        "@kind(note, version: 2)\n",
+    ] {
+        let errors = validate_document(&parse(src));
+        assert!(
+            !errors.iter().any(|e| matches!(
+                e,
+                Diagnostic::InvalidVersion { .. } | Diagnostic::TooManyArguments { .. }
+            )),
+            "{src:?}: {errors:?}"
+        );
+    }
+}
+
+/// `1.0` is the semver habit this check exists for.
+#[test]
+fn a_version_that_is_not_an_integer_of_one_or_more_is_reported() {
+    for (src, element, found) in [
+        ("@kind(note, 1.0)\n", "kind", "1.0"),
+        ("@kind(note, \"x\")\n", "kind", "\"x\""),
+        ("@kind(note, 0)\n", "kind", "0"),
+        ("@kind(note, -1)\n", "kind", "-1"),
+        ("@kind(note)\n@use(deck, 1.0)\n", "use", "1.0"),
+        ("@kind(note)\n@use(deck, 0)\n", "use", "0"),
+    ] {
+        let errors = validate_document(&parse(src));
+        assert!(
+            errors.iter().any(|e| matches!(
+                e,
+                Diagnostic::InvalidVersion { element: el, found: f, .. }
+                    if el == element && f == found
+            )),
+            "{src:?}: {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn kind_and_use_take_a_name_and_a_version_and_nothing_more() {
+    for (src, element) in [
+        ("@kind(note, 1, 2)\n", "kind"),
+        ("@kind(note)\n@use(deck, 1, 2)\n", "use"),
+    ] {
+        let errors = validate_document(&parse(src));
+        assert!(
+            errors.iter().any(|e| matches!(
+                e,
+                Diagnostic::TooManyArguments { element: el, takes: 2, .. } if el == element
+            )),
+            "{src:?}: {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn the_version_messages_say_what_to_write() {
+    let errors = validate_document(&parse("@kind(note, 1.0)\n"));
+    let message = errors
+        .iter()
+        .find(|e| matches!(e, Diagnostic::InvalidVersion { .. }))
+        .expect("an invalid version is reported")
+        .to_string();
+    assert_eq!(
+        message,
+        "the version in `@kind(...)` must be an integer of 1 or more, found 1.0"
+    );
+
+    let errors = validate_document(&parse("@kind(note, 1, 2)\n"));
+    let message = errors
+        .iter()
+        .find(|e| matches!(e, Diagnostic::TooManyArguments { .. }))
+        .expect("an extra argument is reported")
+        .to_string();
+    assert_eq!(
+        message,
+        "`kind` takes at most 2 arguments: the name, then an optional version"
+    );
+}

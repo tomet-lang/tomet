@@ -57,6 +57,7 @@ pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagn
     check_singletons_and_regions(doc, bindings, errors);
     check_retired_settings_keys(doc, errors);
     check_arguments(doc, bindings, errors);
+    check_version_slot(doc, bindings, errors);
     check_unfinished(doc, errors);
     check_content_shape(doc, bindings, errors);
     check_dangling_anchors(doc, errors);
@@ -291,6 +292,64 @@ pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Dia
             }
         }
     });
+}
+
+/// `@kind(name, version)` and `@use(ns, version)`: a version, when written, is an
+/// integer of 1 or more, and the name and the version are all they take.
+///
+/// `1.0` is the case this exists for: a semver habit that would read as a
+/// float, and a document names only the major version.
+pub fn check_version_slot(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+    use tomet_ast::Value;
+    use tomet_semantics::ElementKind;
+
+    const TAKES: usize = 2;
+
+    tomet_tree::for_each_element(doc, |el| {
+        if !matches!(
+            classify_in(el, bindings),
+            Ok(ElementKind::Kind | ElementKind::Use)
+        ) {
+            return;
+        }
+        let Some(name) = el.sigil.name() else { return };
+        let Some(Value::Map(entries)) = tomet_semantics::normalized_element_args(el) else {
+            return;
+        };
+
+        // The slots take the first positional entries in order; one left over
+        // after that is an argument the element has no slot for.
+        if entries.iter().any(|(key, _)| key.is_empty()) {
+            errors.push(Diagnostic::TooManyArguments {
+                element: name.to_string(),
+                takes: TAKES,
+                span: el.span,
+            });
+        }
+        if let Some((_, version)) = entries.iter().find(|(key, _)| key == "version")
+            && !matches!(version, Value::Int(n) if *n >= 1)
+        {
+            errors.push(Diagnostic::InvalidVersion {
+                element: name.to_string(),
+                found: version_as_written(version),
+                span: el.span,
+            });
+        }
+    });
+}
+
+/// A version value the way a reader wrote it: strings quoted, floats with their
+/// point (`1.0`, not `1`).
+fn version_as_written(value: &tomet_ast::Value) -> String {
+    use tomet_ast::Value;
+    match value {
+        Value::String(s) => format!("{s:?}"),
+        Value::Float(f) => format!("{f:?}"),
+        Value::Int(n) => n.to_string(),
+        Value::Bool(b) => b.to_string(),
+        Value::Null => "null".to_string(),
+        _ => "a value that is not a number".to_string(),
+    }
 }
 
 pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {

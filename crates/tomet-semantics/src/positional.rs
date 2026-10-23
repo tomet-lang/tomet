@@ -24,8 +24,8 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
     }
     match name.name.as_str() {
         "footnote" => &["id"],
-        // The second slot is the version of that kind, an integer, and may
-        // be left out. Declared only: nothing reads or checks it yet.
+        // The second slot is the version of that kind, an integer of 1 or more,
+        // and may be left out. The validator checks the value; nothing reads it yet.
         "kind" => &["kind", "version"],
         "version" => &["version"],
         "raw" => &["lang"],
@@ -36,8 +36,8 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         "file" | "dir" => &["target"],
         // The namespace to bring into scope. The vault says where it
         // lives, so this names it, not its file. The second slot is the
-        // version wanted, an integer, and may be left out. Declared only:
-        // nothing reads or checks it yet.
+        // version wanted, an integer of 1 or more, and may be left out. The
+        // validator checks the value; nothing reads it yet.
         "use" => &["target", "version"],
         // The kind the blueprint produces. `target` and not `kind`:
         // `@kind(blueprint)` sits directly above it, and `kind` there would
