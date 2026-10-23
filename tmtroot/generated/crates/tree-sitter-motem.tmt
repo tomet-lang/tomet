@@ -31,6 +31,9 @@ the parser also does.
 - @strong[A top-level bare value is accepted.] A `.mtm` file is `key: value`
 entries only (`motem_syntax::parse_file`); the grammar reads a stray
 value as the value it is.
+- @strong[A declaration may stand anywhere an entry may.] The parser reads
+`::name(args){data}` only before the first entry; the grammar has no
+notion of "before", so one after an entry is read as a declaration too.
 - @strong[No block comments.] motem has `//` only; `/* */` is a tomet
 document construct.
 

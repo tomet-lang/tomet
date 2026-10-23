@@ -26,6 +26,11 @@
   ")"
 ] @punctuation.bracket
 
+; `::name(args){data}`, a declaration about the file: coloured like an element
+; in a document, since the tomet grammar does the same for `::name`.
+(declaration "::" @tag)
+(declaration name: (name) @tag)
+
 ; `list(...)`, `string(...)`, `int(...)`, `float(...)` are resolved by the
 ; parser; any other callee is left for a later pass.
 (call

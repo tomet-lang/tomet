@@ -8,6 +8,11 @@
 // call (`list(...)` among them), or a bare scalar, which may hold spaces
 // (`hello world`) and stops at a `,` `)` `}` or a `//` comment.
 //
+// A file may open with declarations about itself: `::name`, then `(args)`
+// and a `{map}`, either or both, on one line (`::kind(catalog, 2)`). The
+// parser wants them before the first entry; the grammar accepts one wherever
+// an entry may stand.
+//
 // A key and the first word of a bare scalar are the same token (`word`), and
 // the token after it says which it was: `:` makes it a key, `(` a callee.
 // That is a one-token decision for the parser, so the grammar needs no
@@ -32,7 +37,30 @@ module.exports = grammar({
 	rules: {
 		source_file: ($) => repeat($._item),
 
-		_item: ($) => choice($.pair, $._bare_value, ",", $._newline),
+		_item: ($) =>
+			choice($.declaration, $.pair, $._bare_value, ",", $._newline),
+
+		// `::name(args){data}`. The `::` is its own token: where an entry may
+		// start it is read as the sigil, and after a key it is two `:` as before.
+		// `prec.right`: a `{` right after a declaration is its data, not the
+		// start of the next entry.
+		declaration: ($) =>
+			prec.right(
+				seq(
+					"::",
+					field("name", alias($.word, $.name)),
+					optional(field("arguments", $.arguments)),
+					optional(field("data", $.map)),
+				),
+			),
+
+		// The `(...)` of a declaration, the `(` right after the name.
+		arguments: ($) =>
+			seq(
+				token.immediate("("),
+				repeat(choice($._value, ",", $._newline)),
+				")",
+			),
 
 		_newline: (_) => /\n/,
 

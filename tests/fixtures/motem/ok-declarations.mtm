@@ -1,0 +1,8 @@
+// A file may open with declarations about itself.
+::kind(catalog, 2)
+::use(deck)
+::meta{ title: "Catalog", tags: list(a, b) }
+::config(format: json){ strict: true }
+
+"tmtroot/a.tmt": "../a.tmt"
+m: { git: x, rev: y }

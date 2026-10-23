@@ -19,6 +19,10 @@ const GRAMMAR_ACCEPTS: &[(&str, &str)] = &[
         "a file is `key: value` entries; the grammar reads a stray value as a value",
     ),
     (
+        "err-declaration-after-entry.mtm",
+        "the parser wants declarations before the first entry; the grammar has no notion of before",
+    ),
+    (
         "err-duplicate-key.mtm",
         "a repeated key is a meaning, not a shape",
     ),
