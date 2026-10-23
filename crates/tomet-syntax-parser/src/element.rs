@@ -769,7 +769,10 @@ fn parse_id_scalar(cur: &mut Cursor) -> Result<String> {
 
 /// Parses a `|content` run as a block sequence -- identical to `[content]`,
 /// bounded by the end of the marked run instead of `]`.
-fn parse_pipe_content(cur: &mut Cursor, parent_stack: &[usize]) -> Result<Vec<Block>> {
+///
+/// Also what a `key: | prose` value is (`crate::value::TometValueHook`), so
+/// an element's trailing prose and a map entry's prose are one grammar.
+pub(crate) fn parse_pipe_content(cur: &mut Cursor, parent_stack: &[usize]) -> Result<Vec<Block>> {
     let col = cur.column();
     if !cur.eat_str("|") {
         return Err(err(cur.pos(), "expected '|'"));

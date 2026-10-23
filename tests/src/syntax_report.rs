@@ -171,6 +171,12 @@ const CASES: &[Case] = &[
         "@memo(xs: list(1, 2, 3))\n",
     ),
     case(None, "入れ子のマップ", "@memo(m: { x: 1 })\n"),
+    case(
+        None,
+        "値位置の `|` は括弧のない `[ ... ]`。散文の `,` や `}` では閉じず、\
+         `|` で始まらない次の行が次のキーになる",
+        "@memo(\n  a: | x, y }\n     | z\n  b: 2\n)\n",
+    ),
     case(None, "引用符つき文字列", "@memo(s: \"a, b: c\")\n"),
     case(
         None,

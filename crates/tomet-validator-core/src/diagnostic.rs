@@ -103,16 +103,16 @@ pub enum Diagnostic {
     },
     /// An argument the element's vocabulary entry does not declare.
     ///
-    /// Only reported for an element whose declaration has `@args` at all.
-    /// No `@args` means "nothing said", not "takes none" -- saying the
-    /// second is `@data`'s `open: false`, and there is no `@args`
+    /// Only reported for an element whose declaration has `args:` at all.
+    /// No `args:` means "nothing said", not "takes none" -- saying the
+    /// second is `@data`'s `open: false`, and there is no `args:`
     /// equivalent yet.
     UnknownArgument {
         element: String,
         argument: String,
         span: Span,
     },
-    /// A `@param` marked `required: true` with no argument to fill it.
+    /// A parameter marked `required: true` with no argument to fill it.
     MissingRequiredArgument {
         element: String,
         argument: String,
@@ -176,11 +176,11 @@ pub enum Diagnostic {
     /// `[content]`/`|content` holds more than a single plain paragraph
     /// (multiple paragraphs, a nested heading/list/element, ...) where
     /// `name`'s content-shape -- built in (`tomet_semantics::
-    /// builtin_content_shape`), or a vocabulary's own `@content{allow:
-    /// inline}` -- only permits one.
+    /// builtin_content_shape`), or a vocabulary's own `content: { allow:
+    /// inline }` -- only permits one.
     ContentNotInline { name: String, span: Span },
     /// A descendant found inside `[content]`/`|content` whose classified
-    /// name is not in the `@content{allow:list(...)}` that `element`'s
+    /// name is not in the `content: { allow: list(...) }` that `element`'s
     /// vocabulary declares. `span` is the offending descendant's own
     /// span; `element_span` is the enclosing element's, so a reader can
     /// see both "found here" and "restricted here" -- same split
@@ -420,7 +420,7 @@ impl Diagnostic {
                 write!(
                     f,
                     "`{element}` has no argument `{argument}`; its vocabulary \
-                     declares the ones it takes with `@param`"
+                     declares the ones it takes under `args:`"
                 )
             }
             Diagnostic::MissingRequiredArgument {
@@ -476,7 +476,7 @@ impl Diagnostic {
                 write!(
                     f,
                     "`{name}` is not allowed in `{element}`'s content; its vocabulary's \
-                     `@content{{allow:...}}` permits only {}",
+                     `content: {{ allow: ... }}` permits only {}",
                     allowed.join(", ")
                 )
             }
@@ -488,8 +488,8 @@ impl Diagnostic {
                 let advice = match key.as_str() {
                     "elements" => {
                         "declare elements in a `::vocabulary` document instead -- \
-                         `@element` carries `display`, `region` and `singleton`, \
-                         and `@param` carries the arguments (docs/spec/vocabulary.tmt)"
+                         each entry of `::elements` carries `display`, `region` and \
+                         `singleton`, and its `args` carry the arguments"
                     }
                     "types" => {
                         "it has no replacement: nothing read it, and per-element \

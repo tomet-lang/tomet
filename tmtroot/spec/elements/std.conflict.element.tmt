@@ -24,7 +24,7 @@
 ```
 
 どちらも同じ要素、同じ形。`[content]`がブロック列を持てる/持てないかは
-置かれた場所の型（`@content{allow:}`相当）で決まり、要素の綴りは変わらない。
+置かれた場所の型（`content: { allow: }`相当）で決まり、要素の綴りは変わらない。
 
 旧い書き方（immermemoの`@mobile.conflict(mine)` / `(theirs)` / `(end)`を
 地の文に3つ並べる range marker方式）は、tometの`[content]`がブロック列を

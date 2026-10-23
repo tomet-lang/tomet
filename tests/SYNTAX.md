@@ -602,6 +602,30 @@ Block  @memo
 unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
+### 値位置の `|` は括弧のない `[ ... ]`。散文の `,` や `}` では閉じず、`|` で始まらない次の行が次のキーになる
+
+```tmt
+@memo(
+  a: | x, y }
+     | z
+  b: 2
+)
+```
+
+```
+Block  @memo
+  args    {a: [Paragraph
+  Text "x, y }"
+  SoftBreak
+  Text "z"], b: 2}
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
 ### 引用符つき文字列
 
 ```tmt

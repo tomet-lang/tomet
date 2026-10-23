@@ -1,12 +1,17 @@
 ::kind(vocabulary)
 ::vocabulary(node-graph){ version: "1.0.0" }
 
-@element(node){
-  display: block
-  @args{
-    @param(type){ type: string, required: true }[ ノードの種類。`textarea` / `number` / `export`。 ]
+::elements{
+  node: {
+    display: block
+    about: | グラフのノードひとつ。`{x, y}` が座標、`[content]` が中身。
+           | @file(docs/examples/node_graph.tmt) が使い方の見本。
+    args: {
+      type: {
+        type: string
+        required: true
+        about: | ノードの種類。`textarea` / `number` / `export`。
+      }
+    }
   }
-}[
-  グラフのノードひとつ。`{x, y}` が座標、`[content]` が中身。
-  @file(docs/examples/node_graph.tmt) が使い方の見本。
-]
+}

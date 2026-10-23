@@ -26,7 +26,7 @@
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
-use tomet_ast::{Document, Element, Name, Value};
+use tomet_ast::{Document, Name, Value};
 use tomet_tree::ValueExt;
 
 use crate::kind::{BUILTIN_KINDS, ElementKind, Shape, UnknownName, classify_std_lenient};
@@ -47,7 +47,7 @@ pub enum Region {
     Body,
 }
 
-/// One parameter, as `@param(name){ ... }` declares it.
+/// One parameter, as an entry of an element's `args:` map declares it.
 ///
 /// `param` and not `arg`: parameter is the declaration side, argument is
 /// the call side, so `(args)` needs no rename.
@@ -56,7 +56,7 @@ pub enum Region {
 /// produces it -- `uint` arrives as a string, `list(string)` as a
 /// sequence -- because
 /// checking a value against it needs a type language this project has not
-/// settled: `@param(name)`'s own type is an identifier rather than a
+/// settled: a parameter's own `type:` is an identifier rather than a
 /// string, `default:`'s type depends on `type:`, and `type:`'s type is a
 /// type. Interpreting it here would mean deciding all three by accident.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -66,7 +66,7 @@ pub struct ParamDecl {
     pub ty: Option<Value>,
     pub required: bool,
     /// Whether this parameter may be filled by position rather than by
-    /// name. The *order* comes from where the `@param` sits, which is why
+    /// name. The *order* comes from where the entry sits in `args:`, which is why
     /// there is no separate `positional: [ ... ]` list -- that would state
     /// an order the declarations already carry.
     pub positional: bool,
@@ -75,7 +75,8 @@ pub struct ParamDecl {
 
 /// One element, as a vocabulary declares it.
 ///
-/// `@args` and `@content` are read; `@data` is not yet.
+/// `args:` and `content:` are read; `@data` is not yet. `about:`, the
+/// element's prose, is not read either.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ElementDecl {
     /// The shape this element may take, or `None` for either.
@@ -84,14 +85,14 @@ pub struct ElementDecl {
     pub singleton: bool,
     /// `(args)`, in declaration order.
     pub params: Vec<ParamDecl>,
-    /// `@content{allow:}`, or `None` when the element declared no
-    /// `@content` at all -- distinct from `Some(ContentAllow::Any)`
-    /// (`@content{allow: any}`, written out), the same "absent says
+    /// `content: { allow: }`, or `None` when the element declared no
+    /// `content:` at all -- distinct from `Some(ContentAllow::Any)`
+    /// (`content: { allow: any }`, written out), the same "absent says
     /// nothing, not none" reasoning `@data`'s `open:` already has.
     pub content_allow: Option<ContentAllow>,
 }
 
-/// `@content{allow:}`'s value -- what a vocabulary's own element may hold
+/// `content: { allow: }`'s value -- what a vocabulary's own element may hold
 /// in `[content]`/`|content` (`Vec<Block>`, see `tmtroot/docs/spec/
 /// feature/content-shape.tmt`).
 #[derive(Debug, Clone, PartialEq)]
@@ -236,7 +237,7 @@ impl Vocabulary {
     ///
     /// Returns `None` when the document has no `::vocabulary(ns)` header:
     /// a vocabulary is one because it says so, never because it happens
-    /// to contain `@element`. That is the same rule `::blueprint` needed
+    /// to contain `::elements`. That is the same rule `::blueprint` needed
     /// after `extract_blueprint_schema` had counted any `::kind` at all.
     pub fn from_document(doc: &Document) -> Option<Self> {
         let (namespace, open) = header(doc)?;
@@ -247,13 +248,15 @@ impl Vocabulary {
         };
 
         tomet_tree::for_each_top_level_element(doc, |el| {
-            if classify_std_lenient(el) != ElementKind::Element {
+            if classify_std_lenient(el) != ElementKind::Elements {
                 return;
             }
-            let Some(name) = positional_name(el) else {
+            let Some(data) = crate::data::element_data(el) else {
                 return;
             };
-            vocab.elements.insert(name, decl_from_element(el));
+            for (name, decl) in data.as_map().unwrap_or_default() {
+                vocab.elements.insert(name.clone(), decl_from_value(decl));
+            }
         });
 
         Some(vocab)
@@ -556,8 +559,7 @@ fn header(doc: &Document) -> Option<(String, bool)> {
     found
 }
 
-/// The positional argument of `::vocabulary(x)` / `@element(x)`, however
-/// it normalized.
+/// The positional argument of `::vocabulary(x)`, however it normalized.
 fn positional_name(el: &tomet_ast::Element) -> Option<String> {
     let args = normalized_element_args(el)?;
     if let Some(s) = args.as_str() {
@@ -571,43 +573,34 @@ fn positional_name(el: &tomet_ast::Element) -> Option<String> {
     None
 }
 
-fn decl_from_element(el: &tomet_ast::Element) -> ElementDecl {
-    let Some(data) = crate::data::element_data(el) else {
-        return ElementDecl::default();
-    };
-
+/// One entry of `::elements{}`: the map of fields an element declares.
+///
+/// A value that is not a map declares nothing, the same as an empty one.
+/// `about` is the element's prose and is not read: nothing in the checker
+/// needs it.
+fn decl_from_value(decl: &Value) -> ElementDecl {
     ElementDecl {
-        display: match data.get("display").and_then(|v| v.as_str()) {
+        display: match decl.get("display").and_then(|v| v.as_str()) {
             Some("block") => Some(Shape::Block),
             Some("inline") => Some(Shape::Inline),
             _ => None,
         },
-        region: match data.get("region").and_then(|v| v.as_str()) {
+        region: match decl.get("region").and_then(|v| v.as_str()) {
             Some("preamble") => Region::Preamble,
             _ => Region::Body,
         },
-        singleton: data
+        singleton: decl
             .get("singleton")
             .and_then(|v| v.as_bool())
             .unwrap_or(false),
-        params: params_from_element(el),
-        content_allow: content_allow_from_element(el),
+        params: decl.get("args").map(params_from_value).unwrap_or_default(),
+        content_allow: decl.get("content").and_then(content_allow_from_value),
     }
 }
 
-/// The `@content{allow:}` declared inside an `@element`, if any.
-///
-/// Same shape as [`params_from_element`]'s search for `@args`: `@content`
-/// is one of `@element`'s own `{...}` children, found by classified kind
-/// rather than by position.
-fn content_allow_from_element(el: &Element) -> Option<ContentAllow> {
-    let value = el.value.as_ref()?;
-    let content_el = value
-        .as_children()
-        .into_iter()
-        .find(|child| classify_std_lenient(child) == ElementKind::Content)?;
-    let data = crate::data::element_data(content_el)?;
-    match data.get("allow")? {
+/// The `content: { allow: }` an element declares, if any.
+fn content_allow_from_value(content: &Value) -> Option<ContentAllow> {
+    match content.get("allow")? {
         Value::String(s) if s == "inline" => Some(ContentAllow::Inline),
         Value::String(s) if s == "any" => Some(ContentAllow::Any),
         // `list(...)` -- the parser resolves it to a `Value::Seq`.
@@ -633,50 +626,30 @@ fn name_from_dotted(s: &str) -> Name {
     }
 }
 
-/// The `@param` declarations inside an `@element`'s `@args`.
+/// The parameters in an element's `args:` map, in the order written.
 ///
-/// Two levels of `as_children`, because that is the shape: `{...}` holds
-/// entries in source order, and an entry is a pair or an element. `@args`
-/// is one of the elements; each `@param` inside it is another. Nothing
-/// here reads a name off a *pair*, so `args: something` in the data half
-/// is not mistaken for the slot description.
-///
-/// An `@element` with no `@args` declares no parameters, which is not the
-/// same as declaring that it takes none -- that distinction belongs to
-/// `@data`'s `open:` and is not built yet.
-fn params_from_element(el: &Element) -> Vec<ParamDecl> {
-    let Some(value) = el.value.as_ref() else {
-        return Vec::new();
-    };
-    let Some(args) = value
-        .as_children()
-        .into_iter()
-        .find(|child| classify_std_lenient(child) == ElementKind::Args)
-    else {
-        return Vec::new();
-    };
-    let Some(args_value) = args.value.as_ref() else {
-        return Vec::new();
-    };
-    args_value
-        .as_children()
-        .into_iter()
-        .filter(|child| classify_std_lenient(child) == ElementKind::Param)
-        .filter_map(param_from_element)
+/// Each key is a parameter's name and its value the map of fields that
+/// describes it. An element with no `args:` declares no parameters, which
+/// is not the same as declaring that it takes none -- that distinction
+/// belongs to `@data`'s `open:` and is not built yet.
+fn params_from_value(args: &Value) -> Vec<ParamDecl> {
+    args.as_map()
+        .unwrap_or_default()
+        .iter()
+        .map(|(name, spec)| ParamDecl {
+            name: name.clone(),
+            ty: spec.get("type").cloned(),
+            required: spec
+                .get("required")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            positional: spec
+                .get("positional")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            default: spec.get("default").cloned(),
+        })
         .collect()
-}
-
-fn param_from_element(el: &Element) -> Option<ParamDecl> {
-    let name = positional_name(el)?;
-    let data = crate::data::element_data(el);
-    let get = |key: &str| data.as_ref().and_then(|d| d.get(key).cloned());
-    Some(ParamDecl {
-        name,
-        ty: get("type"),
-        required: get("required").and_then(|v| v.as_bool()).unwrap_or(false),
-        positional: get("positional").and_then(|v| v.as_bool()).unwrap_or(false),
-        default: get("default"),
-    })
 }
 
 #[cfg(test)]
@@ -698,8 +671,17 @@ mod tests {
     const WRIT: &str = r#"::kind(vocabulary)
 ::vocabulary(writ){ version: "1.0.0" }
 
-@element(layers){ display: block, singleton: true }[ Layers. ]
-@element(pure){ display: block }[ Purity. ]
+::elements{
+  layers: {
+    display: block
+    singleton: true
+    about: | Layers.
+  }
+  pure: {
+    display: block
+    about: | Purity.
+  }
+}
 "#;
 
     #[test]
@@ -715,24 +697,33 @@ mod tests {
         assert!(!v.elements["pure"].singleton);
     }
 
-    /// `@args`' `@param` declarations are read, in the order they are
-    /// written -- which is what makes a separate `positional: [ ... ]`
-    /// list a duplicate rather than a shorthand.
+    /// `args:`' entries are read, in the order they are written -- which is
+    /// what makes a separate `positional: [ ... ]` list a duplicate rather
+    /// than a shorthand.
     #[test]
     fn reads_the_parameters_an_element_declares() {
         let v = vocab(
             r#"::kind(vocabulary)
 ::vocabulary(deck){ version: "1.0.0" }
 
-@element(card){
-  display: block
-  @args{
-    @param(id){ type: uint, positional: true, required: true }[ 通し番号。 ]
-    @param(tags){ type: list(string) }[ タグ。 ]
+::elements{
+  card: {
+    display: block
+    args: {
+      id: {
+        type: uint
+        positional: true
+        required: true
+        about: | 通し番号。
+      }
+      tags: {
+        type: list(string)
+        about: | タグ。
+      }
+    }
+    about: | カード一枚。
   }
-}[
-  カード一枚。
-]
+}
 "#,
         );
         let card = &v.elements["card"];
@@ -766,12 +757,13 @@ mod tests {
             r#"::kind(vocabulary)
 ::vocabulary(deck){ version: "1.0.0" }
 
-@element(card){
-  display: block
-  @content{ allow: list(link, em, ns.widget) }
-}[
-  カード一枚。
-]
+::elements{
+  card: {
+    display: block
+    content: { allow: list(link, em, ns.widget) }
+    about: | カード一枚。
+  }
+}
 "#,
         );
         let card = &v.elements["card"];
@@ -791,13 +783,16 @@ mod tests {
             r#"::kind(vocabulary)
 ::vocabulary(deck){ version: "1.0.0" }
 
-@element(label){
-  @content{ allow: inline }
-}[ 短い説明。 ]
-
-@element(box){
-  @content{ allow: any }
-}[ 何でも。 ]
+::elements{
+  label: {
+    content: { allow: inline }
+    about: | 短い説明。
+  }
+  box: {
+    content: { allow: any }
+    about: | 何でも。
+  }
+}
 "#,
         );
         assert_eq!(
@@ -813,15 +808,18 @@ mod tests {
             r#"::kind(vocabulary)
 ::vocabulary(deck){ version: "1.0.0" }
 
-@element(plain){
-  display: block
-}[ 何も宣言しない。 ]
+::elements{
+  plain: {
+    display: block
+    about: | 何も宣言しない。
+  }
+}
 "#,
         );
         assert_eq!(v.elements["plain"].content_allow, None);
     }
 
-    /// An element with no `@args` declares no parameters. That is not the
+    /// An element with no `args:` declares no parameters. That is not the
     /// same as declaring it takes none, which is `@data`'s `open:` and is
     /// not built.
     #[test]
@@ -830,17 +828,17 @@ mod tests {
     }
 
     /// A document is a vocabulary because it says so, not because it
-    /// happens to hold `@element` -- the mistake `extract_blueprint_schema`
+    /// happens to hold `::elements` -- the mistake `extract_blueprint_schema`
     /// made, where any `::kind` at all counted as a blueprint.
     #[test]
     fn a_document_without_the_header_is_not_a_vocabulary() {
-        let doc = tomet_parser::parse_document("::kind(note)\n\n@element(x){}[ y ]\n").unwrap();
+        let doc = tomet_parser::parse_document("::kind(note)\n\n::elements{ x: {} }\n").unwrap();
         assert!(Vocabulary::from_document(&doc).is_none());
     }
 
     #[test]
     fn shadowing_a_builtin_is_reported_at_the_declaration() {
-        let v = vocab("::vocabulary(deck)\n\n@element(link){}[ Mine. ]\n@element(ref){}[ Ok. ]\n");
+        let v = vocab("::vocabulary(deck)\n\n::elements{ link: {}, ref: {} }\n");
         assert_eq!(v.shadowed_builtins(), ["link"]);
         assert!(vocab(WRIT).shadowed_builtins().is_empty());
     }
@@ -867,7 +865,7 @@ mod tests {
     /// omitted".
     #[test]
     fn std_wins_and_used_namespaces_are_never_bare() {
-        let deck = vocab("::vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
+        let deck = vocab("::vocabulary(deck)\n\n::elements{ ref: {} }\n");
         let b = Bindings {
             kind: Some(vocab(WRIT)),
             used: [("deck".to_string(), deck)].into_iter().collect(),
@@ -922,7 +920,7 @@ mod tests {
     /// declared that path, so the document was repeating it.
     #[test]
     fn use_brings_a_namespace_into_scope_by_name() {
-        let deck = vocab("::vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
+        let deck = vocab("::vocabulary(deck)\n\n::elements{ ref: {} }\n");
         let doc = tomet_parser::parse_document("::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n")
             .expect("document parses");
 
@@ -941,7 +939,7 @@ mod tests {
     /// the same with or without it.
     #[test]
     fn a_version_after_the_name_does_not_change_what_binds() {
-        let deck = vocab("::vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
+        let deck = vocab("::vocabulary(deck)\n\n::elements{ ref: {} }\n");
         for src in [
             "::kind(writ, 1)\n::use(deck, 3)\n\n@deck.ref(id:1)\n",
             "::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n",
@@ -957,7 +955,7 @@ mod tests {
     /// scope. Only the document's own kind binds without being written.
     #[test]
     fn an_available_vocabulary_is_not_in_scope_unless_the_document_asks() {
-        let deck = vocab("::vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
+        let deck = vocab("::vocabulary(deck)\n\n::elements{ ref: {} }\n");
         let doc =
             tomet_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
 

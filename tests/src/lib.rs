@@ -237,7 +237,13 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // it from a `MISSING ")"` to a plain `ERROR`), so pinning one exact
     // string is not meaningful for this particular gap.
     ("syntax/block-value.tmt", &[ANY_ERROR]),
-    // Same gap as `syntax/block-value.tmt` just above, hit again by
+    // `key: | ...` is the bracket-less spelling of the same `Value::Blocks`
+    // (see `syntax/block-value.tmt` just above), so it inherits that gap
+    // rather than adding one: `_entry_value` has no block-content
+    // alternative, bracketed or not. Not ported: `grammar.js` is unchanged
+    // and `parser.c` was not regenerated.
+    ("syntax/pipe-value.tmt", &[ANY_ERROR]),
+    // Same gap as `syntax/block-value.tmt` above, hit again by
     // `@conflict`'s own positional shorthand (`@conflict([...], [...])`).
     ("syntax/conflict.tmt", &[ANY_ERROR]),
     // All new to `tomet-parser`, none ported to `grammar.js`: a

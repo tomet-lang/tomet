@@ -41,18 +41,24 @@
 ::kind(vocabulary)
 ::vocabulary(deck){ version: "1.0.0" }
 
-@element(card){
-  display: block
-  @args{ @param(id){ type: uint, positional: true }[ 通し番号。 ] }
-}[
-  カード一枚。
-]
+::elements{
+  card: {
+    display: block
+    about: | カード一枚。
+    args: {
+      id: {
+        type: uint
+        positional: true
+        about: | 通し番号。
+      }
+    }
+  }
+}
 ```
 
-@link[`spec/vocabulary.tmt`](file:docs/spec/vocabulary.tmt) を参照。
+@link[`spec/features/vocabulary.tmt`](file:spec/features/vocabulary.tmt) を参照。
 
 #[ 未実装 ]
 
 - 独自言語
-- `@data` の `open:` と `@content` の `allow:` はパースされるが、まだ読まれない
-  （`@args` の `@param` は実装済み）
+- `@data` の `open:` はまだ読まれない（`args:` と `content: { allow: }` は実装済み）

@@ -43,22 +43,19 @@ pub enum ElementKind {
     /// `::vocabulary(ns){...}` -- the header of a vocabulary document,
     /// naming the namespace it declares. See `docs/spec/vocabulary.tmt`.
     Vocabulary,
-    /// `@element(name){...}[prose]` -- one element declared by a
-    /// vocabulary.
-    Element,
-    /// `@param(name){type: ...}` -- one named, typed entry, in either
-    /// `@args` or `@data`. Parameter is the declaration side; argument is
-    /// the call side, which is why the surface slot stays `(args)`.
-    Param,
-    /// `@args{...}` -- inside `@element`, the description of that
-    /// element's `(args)` slot.
-    Args,
-    /// `@data{...}` -- inside `@element`, the description of that
-    /// element's `{...}` slot.
+    /// `::elements{ name: { ... } }` -- the elements a vocabulary declares,
+    /// one map entry each, keyed by the element's name.
+    ///
+    /// Every level is the same shape, a map of fields: an element holds
+    /// `display`, `region`, `singleton`, `args`, `content` and `about`, and
+    /// `args` holds one such map per parameter, keyed by the parameter's
+    /// name and ordered as written, which is what orders the positional
+    /// slots. Nothing below this element is itself an element, so a name
+    /// is only ever a key.
+    Elements,
+    /// `@data{...}` -- the description of an element's `{...}` slot.
+    /// Declared by no vocabulary yet.
     Data,
-    /// `@content{...}` -- inside `@element`, the description of that
-    /// element's `[content]` slot.
-    Content,
     /// `@draft[ what is missing ]` -- there is no text here yet, and the
     /// element stands in place of it.
     ///
@@ -218,11 +215,8 @@ impl ElementKind {
             ElementKind::Use => "use",
             ElementKind::Blueprint => "blueprint",
             ElementKind::Vocabulary => "vocabulary",
-            ElementKind::Element => "element",
-            ElementKind::Param => "param",
-            ElementKind::Args => "args",
+            ElementKind::Elements => "elements",
             ElementKind::Data => "data",
-            ElementKind::Content => "content",
             ElementKind::Draft => "draft",
             ElementKind::Fixme => "fixme",
             ElementKind::Conflict => "conflict",
@@ -281,7 +275,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 32] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
@@ -289,18 +283,15 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 35] = [
     ("settings", ElementKind::Settings),
     ("use", ElementKind::Use),
     ("blueprint", ElementKind::Blueprint),
-    // The vocabulary document's own six. They are here rather than in a
+    // The vocabulary document's own three. They are here rather than in a
     // `::vocabulary(vocabulary)` document because reading that document
     // would need the machinery it defines. The cost is that a kind's
-    // vocabulary can no longer declare any of these six names -- a
+    // vocabulary can no longer declare any of these three names -- a
     // namespace brought in with `::use` still can, since it is never
     // written bare.
     ("vocabulary", ElementKind::Vocabulary),
-    ("element", ElementKind::Element),
-    ("param", ElementKind::Param),
-    ("args", ElementKind::Args),
+    ("elements", ElementKind::Elements),
     ("data", ElementKind::Data),
-    ("content", ElementKind::Content),
     // Marks on the document about the document. `//(TODO)` was the first
     // spelling tried and cannot work: `tomet_ast` has no comment node, so
     // a comment marker is invisible to every consumer and is dropped by
@@ -501,7 +492,7 @@ pub fn is_directive(kind: &ElementKind) -> bool {
     use ElementKind::*;
     matches!(
         kind,
-        Version | Kind | Meta | Config | Settings | Use | Blueprint | Vocabulary
+        Version | Kind | Meta | Config | Settings | Use | Blueprint | Vocabulary | Elements
     )
 }
 
@@ -516,7 +507,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
         Meta | Config | Settings | Use | Blueprint | Hr | Callout | Card | Table | Heading
-        | Kind | Version | Vocabulary | Element | Param | Args | Data | Content => Shape::Block,
+        | Kind | Version | Vocabulary | Elements | Data => Shape::Block,
         Em | Strong | Mark | Strikeout | Ruby => Shape::Inline,
         // Either shape. A link or an embed alone on a line is not a
         // structural error -- it is how you show one file or one image.
@@ -594,8 +585,8 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
     match kind {
         // Directives and vocabulary-document bookkeeping: `{data}`/
         // `(args)` only, no `[content]`.
-        Kind | Version | Meta | Config | Settings | Use | Blueprint | Vocabulary | Content
-        | Args | Data => None,
+        Kind | Version | Meta | Config | Settings | Use | Blueprint | Vocabulary | Elements
+        | Data => None,
         // Self-closing; a fenced/backtick code body's `[content]` is
         // synthesized by the parser itself (`raw.rs`), not shaped
         // by an author, so there is nothing here for a shape check to
@@ -609,11 +600,10 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         // because it can't hold blocks: `a`/`b` each can, just not
         // through this slot).
         Conflict => None,
-        // Short single-run labels: a vocabulary-doc prose description, a
-        // one-line note, a display label, character-level running text,
-        // a heading's title.
-        Element | Param | Draft | Fixme | File | Dir | Link | Embed | Em | Strong | Mark
-        | Strikeout | Ruby | Heading => Some(ContentShape::Inline),
+        // Short single-run labels: a one-line note, a display label,
+        // character-level running text, a heading's title.
+        Draft | Fixme | File | Dir | Link | Embed | Em | Strong | Mark | Strikeout | Ruby
+        | Heading => Some(ContentShape::Inline),
         // May hold multiple paragraphs, headings, lists: a blockquote
         // commonly spans several paragraphs; an admonition/card/footnote
         // can too; a table's rows/cells; a task's details.
@@ -636,7 +626,7 @@ pub fn builtin_singleton(kind: &ElementKind) -> bool {
     use ElementKind::*;
     matches!(
         kind,
-        Kind | Version | Meta | Config | Settings | Blueprint | Vocabulary
+        Kind | Version | Meta | Config | Settings | Blueprint | Vocabulary | Elements
     )
 }
 
@@ -650,7 +640,7 @@ pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
     use crate::vocabulary::Region;
     use ElementKind::*;
     match kind {
-        Kind | Version | Meta | Config | Settings | Blueprint | Vocabulary | Use => {
+        Kind | Version | Meta | Config | Settings | Blueprint | Vocabulary | Elements | Use => {
             Region::Preamble
         }
         _ => Region::Body,

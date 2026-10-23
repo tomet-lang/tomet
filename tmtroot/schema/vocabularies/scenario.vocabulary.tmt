@@ -1,12 +1,18 @@
 ::kind(vocabulary)
 ::vocabulary(scenario){ version: "1.0.0" }
 
-@element(line){
-  display: block
-  @args{
-    @param(speaker){ type: string, positional: true, required: true }[ 話者。 ]
+::elements{
+  line: {
+    display: block
+    about: | 台詞ひとつ。`[content]` が台詞。
+           | @file(docs/examples/scenario.tmt) が使い方の見本。
+    args: {
+      speaker: {
+        type: string
+        positional: true
+        required: true
+        about: | 話者。
+      }
+    }
   }
-}[
-  台詞ひとつ。`[content]` が台詞。
-  @file(docs/examples/scenario.tmt) が使い方の見本。
-]
+}

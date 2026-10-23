@@ -19,13 +19,13 @@
 パーサは要素の種類を見て分岐しない。どの要素でも同じ文法で`Vec<Block>`を
 作るだけで、「この要素にそれを許すか」は一切パーサの仕事ではない。
 
-許すかどうかは`tomet-semantics`の仕事。`@element`は`@content{allow:}`で
+許すかどうかは`tomet-semantics`の仕事。vocabularyの要素は`content: { allow: }`で
 宣言する：
 
 ```tm
-@content{ allow: list(link, em, strong, mark) }  // この名前だけ許す
-@content{ allow: inline }                        // display: inline のもの全部
-@content{ allow: any }
+content: { allow: list(link, em, strong, mark) }  // この名前だけ許す
+content: { allow: inline }                        // display: inline のもの全部
+content: { allow: any }
 ```
 
 `allow:`の値は`list(...)`——`:rule(allow:list(...))`が既に使っている

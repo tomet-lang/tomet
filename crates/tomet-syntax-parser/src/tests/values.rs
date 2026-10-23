@@ -212,3 +212,71 @@ fn a_repeated_key_is_an_error_in_args_and_in_a_group() {
         assert!(parse_document(src).is_ok(), "{src:?}");
     }
 }
+
+/// `key: | prose` is block content as a value, the `|content` run an
+/// element's trailing prose already uses. The text after the marker is
+/// prose: a `,` or `}` in it does not end the entry, and the entries that
+/// follow still parse.
+#[test]
+fn a_pipe_value_is_block_content_that_commas_do_not_end() {
+    let v = parse_value("about: | One rule, with {braces} and a comma.\nnext: 1").unwrap();
+    let Value::Map(entries) = v else {
+        panic!("expected a map, got {v:?}");
+    };
+    assert_eq!(entries.len(), 2, "{entries:?}");
+    assert_eq!(entries[0].0, "about");
+    let Value::Blocks(blocks) = &entries[0].1 else {
+        panic!("expected block content, got {:?}", entries[0].1);
+    };
+    match first_para(blocks) {
+        [Inline::Text(t)] => assert_eq!(t.value, "One rule, with {braces} and a comma."),
+        other => panic!("expected a single text run, got {other:?}"),
+    }
+    assert_eq!(entries[1].0, "next");
+}
+
+/// Continuation lines line up their `|` under the first one, as an
+/// element's trailing prose does; the next line without a marker is the
+/// next entry.
+#[test]
+fn a_pipe_value_continues_on_aligned_pipe_lines() {
+    let src = "about: | first line\n       | second line\nnext: 1";
+    let Value::Map(entries) = parse_value(src).unwrap() else {
+        panic!("expected a map");
+    };
+    assert_eq!(entries.len(), 2, "{entries:?}");
+    let Value::Blocks(blocks) = &entries[0].1 else {
+        panic!("expected block content");
+    };
+    let text: String = first_para(blocks)
+        .iter()
+        .map(|i| match i {
+            Inline::Text(t) => t.value.clone(),
+            Inline::SoftBreak(_) => "\n".to_string(),
+            other => panic!("unexpected {other:?}"),
+        })
+        .collect();
+    assert_eq!(text, "first line\nsecond line");
+    assert_eq!(entries[1].0, "next");
+}
+
+/// The shape a vocabulary writes: a pipe value among the keys of nested
+/// maps, closed by `}` on the line after it.
+#[test]
+fn a_pipe_value_inside_nested_maps() {
+    let src = "args: {\n  id: {\n    type: string\n    about: | The id.\n  }\n}";
+    let Value::Map(entries) = parse_value(src).unwrap() else {
+        panic!("expected a map");
+    };
+    let Value::Map(args) = &entries[0].1 else {
+        panic!("expected args map");
+    };
+    let Value::Map(id) = &args[0].1 else {
+        panic!("expected id map");
+    };
+    assert_eq!(
+        id.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>(),
+        ["type", "about"]
+    );
+    assert!(matches!(id[1].1, Value::Blocks(_)));
+}

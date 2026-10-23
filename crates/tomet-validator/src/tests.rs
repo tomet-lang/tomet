@@ -47,7 +47,7 @@ fn a_second_singleton_is_reported() {
 #[test]
 fn a_vocabularys_singleton_is_enforced_too() {
     let vocab = tomet_parser::parse_document(
-        "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(spread){ singleton: true }[ One. ]\n",
+        "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ spread: { singleton: true } }\n",
     )
     .expect("vocabulary parses");
     let bindings = Bindings {
@@ -135,7 +135,7 @@ fn a_typoed_connect_name_is_reported() {
 #[test]
 fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
     let vocab = tomet_parser::parse_document(
-        "::kind(vocabulary)\n::vocabulary(ns)\n\n@element(mycard){}\n",
+        "::kind(vocabulary)\n::vocabulary(ns)\n\n::elements{ mycard: {} }\n",
     )
     .expect("vocabulary parses");
     let bindings = Bindings {
@@ -303,7 +303,7 @@ fn a_body_element_written_with_double_colon_is_reported_with_the_sigil_to_use() 
 #[test]
 fn a_user_declared_preamble_element_is_a_declaration() {
     let vocab = tomet_semantics::Vocabulary::from_document(&parse(
-        "::kind(vocabulary)\n::vocabulary(deck){}\n\n@element(character){ region: preamble, singleton: true }[ A character. ]\n",
+        "::kind(vocabulary)\n::vocabulary(deck){}\n\n::elements{ character: { region: preamble, singleton: true } }\n",
     ))
     .expect("a vocabulary");
     let bindings = Bindings::for_document(&parse("::kind(deck)\n"), [vocab]);
@@ -324,21 +324,31 @@ fn deck_with_params() -> Bindings {
         r#"::kind(vocabulary)
 ::vocabulary(deck){}
 
-@element(card){
-  @args{
-    @param(id){ positional: true, required: true }[ 通し番号。 ]
-    @param(tags){}[ タグ。 ]
+::elements{
+  card: {
+    args: {
+      id: {
+        positional: true
+        required: true
+        about: | 通し番号。
+      }
+      tags: {
+        about: | タグ。
+      }
+    }
+    about: | カード。
   }
-}[ カード。 ]
-
-@element(plain){}[ 宣言なし。 ]
+  plain: {
+    about: | 宣言なし。
+  }
+}
 "#,
     ))
     .expect("a vocabulary");
     Bindings::for_document(&parse("::kind(deck)\n"), [vocab])
 }
 
-/// A positional argument fills the slot its `@param` declares, so it
+/// A positional argument fills the slot its `args:` entry declares, so it
 /// is not reported as an unknown argument keyed `""`.
 #[test]
 fn a_positional_argument_lands_on_its_declared_slot() {
@@ -360,27 +370,30 @@ fn an_undeclared_argument_is_reported() {
     );
 }
 
-/// A vocabulary with `@content{allow:}` declared, for
+/// A vocabulary with `content: { allow: }` declared, for
 /// `check_content_shape`'s own tests.
 fn deck_with_content_allow() -> Bindings {
     let vocab = tomet_semantics::Vocabulary::from_document(&parse(
         r#"::kind(vocabulary)
 ::vocabulary(deck){}
 
-@element(list){
-  display: block
-  // `item` resolves bare here (the document's own `::kind(deck)`), which
-  // `Bindings::classify` normalizes to `deck.item` even though it's
-  // written bare -- same pre-existing quirk `check_one_rule`'s own doc
-  // comment notes for `:rule(allow:...)`, so the allow-list has to name
-  // it the same way.
-  @content{ allow: list(deck.item) }
-}[ カードの一覧。 ]
-
-@element(item){
-  display: block
-  @content{ allow: inline }
-}[ 一覧の一項目。 ]
+::elements{
+  list: {
+    display: block
+    // `item` resolves bare here (the document's own `::kind(deck)`), which
+    // `Bindings::classify` normalizes to `deck.item` even though it's
+    // written bare -- same pre-existing quirk `check_one_rule`'s own doc
+    // comment notes for `:rule(allow:...)`, so the allow-list has to name
+    // it the same way.
+    content: { allow: list(deck.item) }
+    about: | カードの一覧。
+  }
+  item: {
+    display: block
+    content: { allow: inline }
+    about: | 一覧の一項目。
+  }
+}
 "#,
     ))
     .expect("a vocabulary");
@@ -645,7 +658,7 @@ fn a_settings_document_using_only_live_keys_is_clean() {
 /// saying so here is what keeps these tests about duplicate ids.
 fn with_deck() -> Bindings {
     let vocab = tomet_parser::parse_document(
-        "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(task){}[ A task. ]\n@element(ref){}[ A ref. ]\n",
+        "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ task: {}, ref: {} }\n",
     )
     .expect("vocabulary parses");
     Bindings {

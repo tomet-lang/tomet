@@ -1,0 +1,74 @@
+vocabulary は、ある kind の文書が使える要素の名前と、その要素が取るものを宣言する
+文書。`::vocabulary(ns)` で名前空間を名乗り、`::elements` に要素を並べる。
+
+```tm
+::kind(vocabulary)
+::vocabulary(deck){ version: "1.0.0" }
+
+::elements{
+  card: {
+    display: block
+    about: | カード一枚。
+    args: {
+      id: {
+        type: uint
+        positional: true
+        required: true
+        about: | 通し番号。
+      }
+    }
+  }
+}
+```
+
+#[ 名前はキー ]
+
+`::elements` の中身は、要素の名前をキーにしたマップ。`args` の中身は、引数の名前を
+キーにしたマップ。どの段も「キー: フィールドのマップ」という同じ形で、要素と引数で
+別の記法を覚える必要がない。名前を `@element(card)` のように括弧の引数へ入れる綴りは
+無い。
+
+`args` のキーの並びが、位置引数の順序を決める。`positional: true` の引数が、書かれた
+順に位置引数の枠を埋める。順序を別に書く `positional: [ ... ]` のような一覧は要らない。
+
+#[ 要素のフィールド ]
+
+|[ フィールド  ][ 既定  ][ 意味 ]
+|[ `display`   ][ 両方  ][ `block` か `inline`。置かれた形がこれと違えば報告される ]
+|[ `region`    ][ body  ][ `preamble` なら文書の頭にだけ置ける ]
+|[ `singleton` ][ false ][ 一つの文書に一つまで ]
+|[ `args`      ][ なし  ][ 引数のマップ。無いのは「何も言わない」で、「取らない」ではない ]
+|[ `content`   ][ なし  ][ `{ allow: }`。`[content]` に何を許すか ]
+|[ `about`     ][ なし  ][ 要素の散文。検査は読まない ]
+
+`content` の `allow:` は、`list(a, b)`（この名前だけ）、`inline`（段落一つだけ）、
+`any` のいずれか。詳細は @link[`content-shape.tmt`](file:spec/features/content-shape.tmt)。
+
+#[ 引数のフィールド ]
+
+|[ フィールド  ][ 既定  ][ 意味 ]
+|[ `type`      ][ なし  ][ 宣言された型。読まれるだけで、値は検査されない ]
+|[ `positional` ][ false ][ 名前でなく位置で埋められる ]
+|[ `required`  ][ false ][ 無ければ報告される ]
+|[ `default`   ][ なし  ][ 省略時の値 ]
+|[ `about`     ][ なし  ][ 引数の散文。検査は読まない ]
+
+#[ 散文は `about:` ]
+
+要素も引数も、説明は `about:` に書く。値は `|` で始まる散文で、これは `[ ... ]` の
+括弧のない形（@link[`pipe.tmt`](file:tests/fixtures/syntax/pipe.tmt)）。次の行が
+同じ列の `|` で始まる限り続き、`|` だけの行は段落を分ける。続かない最初の行が、
+次のキーになる。散文の中の `,` や `}` では値は閉じない。
+
+#[ 旧形式は無い ]
+
+`@element(name){ @args{ @param(name){...} } }[ 散文 ]` の綴りと、`@content{ allow: }` は
+撤去された。互換の読み取りは無い。組み込みで予約される vocabulary 文書の名前は
+`vocabulary`、`elements`、`data` の三つで、`element`、`param`、`args`、`content` は
+ふつうの名前として宣言できる。
+
+#[ 未実装 ]
+
+- `data` の `open:`。
+- 知らないキーの報告。`display` の綴り間違いや、`args` の外に置かれた `positional` は、
+  今は黙って読み捨てられる。

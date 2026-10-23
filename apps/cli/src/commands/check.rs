@@ -314,7 +314,7 @@ mod tests {
         .unwrap();
         fs::write(
             dir.join(".tomet/vocabularies/deck.vocabulary.tmt"),
-            "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(card){}[ One card. ]\n",
+            "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ card: {} }\n",
         )
         .unwrap();
         dir

@@ -308,7 +308,7 @@ mod tests {
             "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
             &[(
                 ".tomet/vocabularies/deck.vocabulary.tmt",
-                "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(card){}[ One card. ]\n",
+                "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ card: {} }\n",
             )],
         );
         let path = root.join("a.tmt");
@@ -443,7 +443,7 @@ mod tests {
         let declared = root.join(".tomet/vocabularies/missing.vocabulary.tmt");
         fs::write(
             &declared,
-            "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(tile){}[ One tile. ]\n",
+            "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ tile: {} }\n",
         )
         .unwrap();
         ws.files_changed();
@@ -533,7 +533,7 @@ mod tests {
         ws.completions(&path, lsp_types::Position::new(line, character), None)
     }
 
-    const DECK: &str = "::kind(vocabulary)\n::vocabulary(deck)\n\n@element(tile){\n  display: block\n  @args{\n    @param(label){ type: string, positional: true }[ The label. ]\n  }\n}[ One tile. ]\n";
+    const DECK: &str = "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{\n  tile: {\n    display: block\n    args: {\n      label: {\n        type: string\n        positional: true\n        about: | The label.\n      }\n    }\n    about: | One tile.\n  }\n}\n";
 
     /// After `@`, the elements of the vocabulary the document's `::kind` binds
     /// are offered with the built-in ones, which the text alone cannot know.

@@ -1,7 +1,7 @@
 `:rule(allow:list(...), direct:@bool)` — 一つの文書（や blueprint）の中の
 特定の箇所に「ここの中身はこれしか許さない」を直接書く機能。
 
-`@element`/`@content{allow:}` が要素の**型**を宣言する側（vocabulary）
+`::elements`/`content: { allow: }` が要素の**型**を宣言する側（vocabulary）
 なのに対し、こちらは文書の**特定の位置**に効く制約。vocabulary とは別軸
 なので、`elements.index.tmt`/`vocabulary` 側にではなく、この feature に
 属する。

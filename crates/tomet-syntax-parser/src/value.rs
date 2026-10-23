@@ -94,6 +94,18 @@ impl motem_syntax::ValueHook for TometValueHook {
             return Some(Ok(Value::Blocks(blocks)));
         }
 
+        // `key: | prose` -- the `|content` run as a value (`Value::Blocks`),
+        // the same grammar an element's trailing `| prose` uses. The run
+        // ends where the marker column stops continuing it, which is what
+        // keeps a `,` or `}` inside the prose from closing the entry.
+        if cur.peek() == Some('|') {
+            return Some(
+                crate::element::parse_pipe_content(cur, &[])
+                    .map(Value::Blocks)
+                    .map_err(|e| motem_syntax::Error::at(e.message, e.line, e.column, e.offset)),
+            );
+        }
+
         None
     }
 }
