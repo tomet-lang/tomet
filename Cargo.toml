@@ -18,7 +18,7 @@ members = [
   "crates/tomet",
 
   #= Public -- external ecosystem adapters
-  "crates/tove",
+  "crates/motem",
   "crates/tree-sitter-tomet",
 
   #= Syntax -- grammar/parsing
@@ -157,7 +157,7 @@ tomet-load = { path = "crates/tomet-load", version = "0.2.0" }
 tomet-load-config = { path = "crates/tomet-load-config", version = "0.2.0" }
 tomet-workspace = { path = "crates/tomet-workspace", version = "0.2.0" }
 #= Public
-tove = { path = "crates/tove", version = "0.2.0" }
+motem = { path = "crates/motem", version = "0.2.0" }
 tree-sitter-tomet = { path = "crates/tree-sitter-tomet", version = "0.2.0" }
 #= Facade
 tomet = { path = "crates/tomet", version = "0.2.0" }

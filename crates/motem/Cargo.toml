@@ -1,10 +1,10 @@
 [package]
-name = "tove"
+name = "motem"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Tomet Object & Value Expression (TOVE) parser and serialization format"
+description = "motem, the data language dual to tomet: parser and serialization format"
 
 [dependencies]
 tomet-ast = { workspace = true }

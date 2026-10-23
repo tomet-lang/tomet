@@ -1,18 +1,20 @@
-//! =[ tove ]
+//! =[ motem ]
 //!
-//! A lightweight, expressive data language and parser crate for Tomet.
+//! The data language dual to tomet (`tmt` / `mtm`): a lightweight, expressive
+//! syntax for values, maps and sequences, and the parser crate for it. A
+//! standalone motem file is a top-level map written as bare `key: value` lines.
 //!
 //! =[ Overview ]
 //!
-//! TOVE provides:
+//! motem provides:
 //! - Pure syntax parsing for values, maps, sequences (`list(...)`), and expressions into [`Value`].
 //! - Serde integration ([`from_str`], [`to_string`]) for serializing and deserializing Rust types.
 //! - AST and parser primitives shared with the document-level parser (`tomet-syntax-parser`).
 //!
 //! =[ Key Functions ]
 //!
-//! - (from_str) Parse a TOVE data document into a Rust type via Serde.
-//! - (to_string) Render a Rust type into TOVE data text via Serde.
+//! - (from_str) Parse a motem data document into a Rust type via Serde.
+//! - (to_string) Render a Rust type into motem data text via Serde.
 //! - (from_value) Convert a [`Value`] into a Rust type via Serde deserializer.
 //! - (to_value) Convert a Rust type into a [`Value`] via Serde serializer.
 
@@ -37,13 +39,13 @@ pub use print::{print_value, write_scalar_string};
 pub use ser::to_value;
 pub use tomet_ast::Value;
 
-/// Parse a TOVE data document into `T` via Serde.
+/// Parse a motem data document into `T` via Serde.
 pub fn from_str<T: for<'de> serde::Deserialize<'de>>(src: &str) -> Result<T> {
     let value = normalize_list_calls(parse_value(src)?);
     de::from_value(value)
 }
 
-/// Render `T` into TOVE data text via Serde.
+/// Render `T` into motem data text via Serde.
 pub fn to_string<T: serde::Serialize + ?Sized>(value: &T) -> Result<String> {
     let v = ser::to_value(value)?;
     Ok(print::print_value(&v))
@@ -183,7 +185,7 @@ mod tests {
     #[test]
     fn parse_map_and_nested() {
         let src = r#"
-            title: "Tove Language"
+            title: "Motem Language"
             count: 42
             nested: {
                 flag: true
@@ -194,7 +196,7 @@ mod tests {
             Value::Map(entries) => {
                 assert_eq!(entries.len(), 3);
                 assert_eq!(entries[0].0, "title");
-                assert_eq!(entries[0].1, Value::String("Tove Language".into()));
+                assert_eq!(entries[0].1, Value::String("Motem Language".into()));
                 assert_eq!(entries[1].0, "count");
                 assert_eq!(entries[1].1, Value::Int(42));
                 assert_eq!(entries[2].0, "nested");

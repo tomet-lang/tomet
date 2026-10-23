@@ -1,16 +1,18 @@
 @kind(api)
 
-@meta{crate: tove, dependencies: list(tomet-ast, tomet-lexer), dependents: list(tomet-cli, tomet-parser)}
+@meta{crate: motem, dependencies: list(tomet-ast, tomet-lexer), dependents: list(tomet-cli, tomet-parser)}
 
-=[tove]
+=[motem]
 
-==[tove]
+==[motem]
 
-A lightweight, expressive data language and parser crate for Tomet.
+The data language dual to tomet (`tmt` / `mtm`): a lightweight, expressive
+syntax for values, maps and sequences, and the parser crate for it. A
+standalone motem file is a top-level map written as bare `key: value` lines.
 
 ==[Overview]
 
-TOVE provides:
+motem provides:
 
 - Pure syntax parsing for values, maps, sequences (`list(...)`), and expressions into [`Value`].
 - Serde integration ([`from_str`], [`to_string`]) for serializing and deserializing Rust types.
@@ -18,8 +20,8 @@ TOVE provides:
 
 ==[Key Functions]
 
-- (from_str) Parse a TOVE data document into a Rust type via Serde.
-- (to_string) Render a Rust type into TOVE data text via Serde.
+- (from_str) Parse a motem data document into a Rust type via Serde.
+- (to_string) Render a Rust type into motem data text via Serde.
 - (from_value) Convert a [`Value`] into a Rust type via Serde deserializer.
 - (to_value) Convert a Rust type into a [`Value`] via Serde serializer.
 
@@ -41,7 +43,7 @@ TOVE provides:
 
 ==[Module parser]
 
-Parsing for TOVE (Tomet Object & Value Expression):
+Parsing for motem data:
 map bodies (`key: value`), `{ ... }` blocks, `"..."` strings,
 `call(...)` expressions, and bare scalars.
 
@@ -52,7 +54,7 @@ normalized to `Value::Seq` downstream).
 
 ====[struct NoHook]
 
-The default no-op hook for pure TOVE documents.
+The default no-op hook for pure motem documents.
 
 ===[Traits]
 
@@ -65,7 +67,7 @@ embedded values (e.g. `@element` or `$interp`) at value positions.
 
 ====[fn parse_value]
 
-Parse an entire source string as one `Value` using pure TOVE syntax.
+Parse an entire source string as one `Value` using pure motem syntax.
 
 ====[fn parse_value_with]
 
@@ -157,7 +159,7 @@ Sentinel key for a positional (unkeyed) entry inside a map body.
 
 ==[Module print]
 
-Renders a `Value` back into TOVE data text:
+Renders a `Value` back into motem data text:
 a top-level map is written as bare `key: value` lines (no enclosing braces);
 nested maps use `{ ... }`, and a sequence prints as `list(...)`.
 
@@ -185,11 +187,11 @@ nested maps use `{ ... }`, and a sequence prints as `list(...)`.
 
 ===[fn from_str]
 
-Parse a TOVE data document into `T` via Serde.
+Parse a motem data document into `T` via Serde.
 
 ===[fn to_string]
 
-Render `T` into TOVE data text via Serde.
+Render `T` into motem data text via Serde.
 
 ===[fn normalize_list_calls]
 

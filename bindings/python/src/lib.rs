@@ -3,7 +3,7 @@
 //! =[ Overview ]
 //!
 //! Provides native Python interoperability for parsing Tomet documents, loading
-//! TOVE data into Python dictionaries, and converting documents into HTML,
+//! motem data into Python dictionaries, and converting documents into HTML,
 //! Markdown, Typst, and Pandoc formats. It also exposes document formatting,
 //! printing, and validation.
 //!

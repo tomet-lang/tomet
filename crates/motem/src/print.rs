@@ -1,4 +1,4 @@
-//! Renders a `Value` back into TOVE data text:
+//! Renders a `Value` back into motem data text:
 //! a top-level map is written as bare `key: value` lines (no enclosing braces);
 //! nested maps use `{ ... }`, and a sequence prints as `list(...)`.
 
@@ -49,8 +49,8 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
             }
         }
         // Best-effort only: `print_value` has no document-level block
-        // renderer to call (it's a generic TOVE-data printer, used by
-        // `tove`'s own tests/convenience function, not by
+        // renderer to call (it's a generic motem-data printer, used by
+        // `motem`'s own tests/convenience function, not by
         // `tomet-format-printer`, which has its own real block renderer
         // and never calls through here). Plain text keeps this
         // exhaustive without pretending to round-trip nested structure.

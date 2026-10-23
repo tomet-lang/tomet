@@ -39,7 +39,7 @@ tomet/
 │   ├── tomet-convert-*   # Document format converters: html, markdown, typst, pandoc
 │   ├── tomet-format-*    # Source output: formatter, printer, style, field-utils
 │   ├── tomet-workspace*  # Multi-file I/O: workspace, indexer, links, config
-│   ├── tove/             # TOVE data language parser and Serde adapter
+│   ├── motem/            # motem data language parser and Serde adapter
 │   └── tree-sitter-tomet/# Tree-sitter grammar for editor syntax highlighting
 └── tmtroot/              # Canonical source documents and generated API docs
     ├── generated/crates/ # Generated API docs for workspace crates

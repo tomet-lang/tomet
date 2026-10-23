@@ -68,7 +68,7 @@ Options:
 
 ==[ tomet roundtrip ]
 
-Parse a data file into a generic value, then render it back out through `tove` and reparse that -- confirms the save/load round trip is lossless
+Parse a data file into a generic value, then render it back out through `motem` and reparse that -- confirms the save/load round trip is lossless
 
 ```text
 tomet roundtrip <FILE>

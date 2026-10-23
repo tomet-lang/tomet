@@ -36,7 +36,7 @@ does not relax the rule to fit the change it wanted to make.
     4: list( "crates/tomet-config*", "crates/tomet-spec-derive" )
     3: list( "crates/tomet-validator*" )
     2: list( "crates/tomet-semantics*" )
-    1: list( "crates/tomet-syntax-*", "crates/tove" )
+    1: list( "crates/tomet-syntax-*", "crates/motem" )
     0: list( "crates/tree-sitter-tomet" )
   }
 }
@@ -50,7 +50,7 @@ Layer 0 depends on no workspace member at all. Things may depend on it --
 is the hand-maintained grammar approximation and is only worth having while
 it stays independent of the parser.
 
-@dir(crates/tove) is listed by name in layer 1. It is a value expression parser and serialization format used by the parser, and shares no prefix with the syntax group.
+@dir(crates/motem) is listed by name in layer 1. It is the data language dual to tomet, with its parser and serialization format, used by the parser, and shares no prefix with the syntax group.
 
 @dir(crates/serde_tomet), @dir(crates/tomet-extract) and @dir(crates/tomet-search) are listed by name in layer 5. They are ecosystem
 adapters and pure in-memory query engines rather than internal syntax or semantics producers, and their names carry no prefix shared

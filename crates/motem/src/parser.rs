@@ -1,4 +1,4 @@
-//! Parsing for TOVE (Tomet Object & Value Expression):
+//! Parsing for motem data:
 //! map bodies (`key: value`), `{ ... }` blocks, `"..."` strings,
 //! `call(...)` expressions, and bare scalars.
 //!
@@ -15,7 +15,7 @@ pub trait ValueHook {
     fn try_parse_value(&mut self, cur: &mut Cursor) -> Option<Result<Value>>;
 }
 
-/// The default no-op hook for pure TOVE documents.
+/// The default no-op hook for pure motem documents.
 pub struct NoHook;
 
 impl ValueHook for NoHook {
@@ -33,7 +33,7 @@ where
     }
 }
 
-/// Parse an entire source string as one `Value` using pure TOVE syntax.
+/// Parse an entire source string as one `Value` using pure motem syntax.
 pub fn parse_value(src: &str) -> Result<Value> {
     parse_value_with(src, &mut NoHook)
 }

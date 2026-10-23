@@ -34,8 +34,8 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl From<tove::Error> for Error {
-    fn from(e: tove::Error) -> Self {
+impl From<motem::Error> for Error {
+    fn from(e: motem::Error) -> Self {
         Error {
             message: e.message,
             line: e.line,
