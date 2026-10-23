@@ -935,6 +935,22 @@ mod tests {
         );
     }
 
+    /// A version after the name is declared, not acted on: the namespace binds
+    /// the same with or without it.
+    #[test]
+    fn a_version_after_the_name_does_not_change_what_binds() {
+        let deck = vocab("@vocabulary(deck)\n\n@element(ref){}[ A card ref. ]\n");
+        for src in [
+            "@kind(writ, 1)\n@use(deck, 3)\n\n@deck.ref(id:1)\n",
+            "@kind(writ)\n@use(deck)\n\n@deck.ref(id:1)\n",
+        ] {
+            let doc = tomet_parser::parse_document(src).expect("document parses");
+            let bound = Bindings::for_document(&doc, [vocab(WRIT), deck.clone()]);
+            assert!(bound.classify(&name("layers")).is_ok(), "{src}");
+            assert!(bound.classify(&name("deck.ref")).is_ok(), "{src}");
+        }
+    }
+
     /// A vocabulary that is available but not asked for stays out of
     /// scope. Only the document's own kind binds without being written.
     #[test]

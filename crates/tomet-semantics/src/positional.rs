@@ -24,7 +24,9 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
     }
     match name.name.as_str() {
         "footnote" => &["id"],
-        "kind" => &["kind"],
+        // The second slot is the version of that kind, an integer, and may
+        // be left out. Declared only: nothing reads or checks it yet.
+        "kind" => &["kind", "version"],
         "version" => &["version"],
         "raw" => &["lang"],
         "embed" | "link" => &["target"],
@@ -33,8 +35,10 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         // `@link`, there is no scheme prefix to carry it.
         "file" | "dir" => &["target"],
         // The namespace to bring into scope. The vault says where it
-        // lives, so this names it, not its file.
-        "use" => &["target"],
+        // lives, so this names it, not its file. The second slot is the
+        // version wanted, an integer, and may be left out. Declared only:
+        // nothing reads or checks it yet.
+        "use" => &["target", "version"],
         // The kind the blueprint produces. `target` and not `kind`:
         // `@kind(blueprint)` sits directly above it, and `kind` there would
         // mean the output's kind while `@kind` means this file's.
@@ -308,6 +312,37 @@ mod tests {
                 ("b".to_string(), Value::Int(2)),
             ]))
         );
+    }
+
+    #[test]
+    fn kind_and_use_take_an_optional_version_after_the_name() {
+        // `@kind(name, 2)` is two bare entries; `@kind(name)` is one scalar.
+        for (sigil, name_key) in [("kind", "kind"), ("use", "target")] {
+            let mut el = element_new(Sigil::named(sigil));
+            el.args = Some(Value::Map(vec![
+                (String::new(), Value::String("deck".to_string())),
+                (String::new(), Value::Int(2)),
+            ]));
+            assert_eq!(
+                normalized_element_args(&el),
+                Some(Value::Map(vec![
+                    (name_key.to_string(), Value::String("deck".to_string())),
+                    ("version".to_string(), Value::Int(2)),
+                ])),
+                "@{sigil}(deck, 2)"
+            );
+
+            // the version may be left out
+            el.args = Some(Value::String("deck".to_string()));
+            assert_eq!(
+                normalized_element_args(&el),
+                Some(Value::Map(vec![(
+                    name_key.to_string(),
+                    Value::String("deck".to_string())
+                )])),
+                "@{sigil}(deck)"
+            );
+        }
     }
 
     #[test]

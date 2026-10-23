@@ -12,6 +12,9 @@ use tomet_ast::{Element, Name, Placement, Sigil};
 /// specific to each format).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ElementKind {
+    /// `@kind(name)` or `@kind(name, version)` -- the kind of this document.
+    /// The version is an integer and may be left out; it is declared, and
+    /// nothing reads or checks it yet.
     Kind,
     Version,
     Meta,
@@ -22,6 +25,10 @@ pub enum ElementKind {
     Settings,
     /// `@use(ns)` -- brings a vocabulary into scope, by the name it gives
     /// itself. `{ as: other }` renames it, and is only for a collision.
+    ///
+    /// `@use(ns, version)` also says which version of it is wanted: an
+    /// integer, which may be left out. Declared only; nothing reads or
+    /// checks it yet, so the namespace binds the same either way.
     ///
     /// The namespace, not a path: the vault declares where each
     /// vocabulary lives, so a path here would say it twice.

@@ -190,6 +190,14 @@ mod tests {
     }
 
     #[test]
+    fn a_kind_may_name_a_version_after_it() {
+        let doc = parse_document("@kind(j.daily, 2)\n\n#[ Daily Note ]\n").unwrap();
+        assert_eq!(document_kind(&doc), Some("j.daily".to_string()));
+        let doc = parse_document("@kind(config, 12)\n").unwrap();
+        assert_eq!(document_kind(&doc), Some("config".to_string()));
+    }
+
+    #[test]
     fn extracts_document_version_from_version_directive() {
         let doc = parse_document("@version(1.0)\n\n#[ Doc ]\n").unwrap();
         assert_eq!(document_version(&doc), Some("1.0".to_string()));
