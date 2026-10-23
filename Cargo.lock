@@ -1906,6 +1906,7 @@ dependencies = [
 name = "tomet-formatter"
 version = "0.2.0"
 dependencies = [
+ "motem-syntax",
  "tomet-ast",
  "tomet-config",
  "tomet-parser",

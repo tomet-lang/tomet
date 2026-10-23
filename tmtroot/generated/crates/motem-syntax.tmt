@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: motem-syntax, dependencies: list(tomet-ast, tomet-lexer), dependents: list(motem, serde_motem, tomet-edit, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style)}
+@meta{crate: motem-syntax, dependencies: list(tomet-ast, tomet-lexer), dependents: list(motem, serde_motem, tomet-edit, tomet-formatter, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style)}
 
 =[motem-syntax]
 
@@ -40,6 +40,14 @@ plain.key: 1
 
 A quoted string is a key only when a `:` follows it; otherwise it is a
 value. The empty key is the positional-entry marker, so `"": v` is an error.
+
+==[Files]
+
+A standalone motem file (`.mtm`) is a top-level map written as bare
+`key: value` lines, with no braces around it. [`parse_file`] reads one: it
+is [`parse_value`] that also insists every entry has a key, so a lone
+scalar or a bare value among the entries is an error at that entry. `tomet
+check` and `tomet format` take a `.mtm` next to a `.tmt`.
 
 A document with nothing in it, or only whitespace and comments, is the
 empty map, so a config file may be empty and a reader fills in every
@@ -212,6 +220,10 @@ changed by reading it.
 
 ====[fn parse_quoted]
 
+Reads a `"..."` string, with `\"`, `\\`, `\n` and `\t` escapes; a raw newline
+is part of the text. A string that never closes is an error at its opening
+quote, not at the end of the file where it ran out.
+
 ====[fn parse_one_entry]
 
 ====[fn parse_one_entry_with]
@@ -238,6 +250,17 @@ A named key may appear once: a second one is an error at its position
 ([`duplicate_key_error`]), compared after unquoting, so `"a": 1, a: 2` is
 a duplicate too. A map that held the same key twice would mean different
 things to a reader that keeps the first, the last, or both.
+
+====[fn parse_file]
+
+Parse a standalone motem file (`.mtm`): a map of `key: value` entries.
+
+This is [`parse_value`] with the one rule that makes a file a file: every
+entry has a key. A source that is a lone scalar (`123`), or that has a bare
+value among its entries (`a: 1`, then `stray`), is an error at that entry,
+where `parse_value` would read the first as a scalar and keep the second
+as a positional entry. An empty file, or one with only comments, is the
+empty map.
 
 ====[fn parse_entry_value]
 

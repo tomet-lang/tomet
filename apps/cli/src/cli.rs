@@ -19,6 +19,9 @@ pub enum Command {
     /// whether it is valid: it parses, and every element it writes exists
     /// in a namespace the document has in scope.
     ///
+    /// A `.mtm` file is a standalone motem file and is swept with them: it
+    /// is valid when it parses and is a map of `key: value` entries.
+    ///
     /// A directory is swept the way `format --check` and `check-links`
     /// sweep one -- through the workspace index, so `workspace.ignore`
     /// applies and hidden files like `.writ.tmt` are included. One
@@ -143,11 +146,12 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Normalize a `.tmt`/`.tmt` file's whitespace (line endings, trailing
+    /// Normalize a `.tmt` or `.mtm` file's whitespace (line endings, trailing
     /// whitespace, blank lines, final newline). A directory formats every
-    /// `.tmt`/`.tmt` file found under it (same file discovery as `export`/
-    /// `check-links`: honors `.gitignore` and the project config's
-    /// `ignore_files`). A file named explicitly is held to the same rule: one
+    /// `.tmt` and `.mtm` file found under it (same file discovery as
+    /// `check`: honors `.gitignore` and the project config's `ignore_files`).
+    /// Inside a `.mtm`, a quoted string is left exactly as written, and a
+    /// `.mtm` that does not parse is left alone. A file named explicitly is held to the same rule: one
     /// the config excludes (`workspace.ignore`/`workspace.unswept`, e.g. the
     /// frozen test corpus) is skipped with a warning unless `--force` is
     /// given. Prints to stdout by default; see `--in-place`/`--check`.

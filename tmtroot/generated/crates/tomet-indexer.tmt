@@ -15,6 +15,8 @@ for Tomet workspaces.
   - `tomet-indexer` discovers `.tmt` and `.md` files across a workspace directory tree.
 It respects `.gitignore`, hidden files, and `ignore_files` rules configured in
 `default.config.tmt` / `tomet.config.tmt`.
+Standalone motem files (`.mtm`) are not documents and are not indexed; only
+[`collect_tm_and_mtm_files`] reaches them, for the commands that parse or reformat.
 Used by CLI commands (`check`, `export`, `format`, `lint`) and TUI components
 (Explorer, BatchMeta, Migration view).
 - ("Core Capabilities")
@@ -148,6 +150,21 @@ if it's a single file), auto-discovering the nearest
 Same as [`collect_tm_files`] but with an explicit `config`/
 `config_root` instead of auto-discovering one.
 
+===[fn collect_tm_and_mtm_files]
+
+Collects every `.tmt`/`.tm` document and every `.mtm` motem file under
+`path`, the way [`collect_tm_files`] collects documents alone.
+
+A `.mtm` is data, not a document: it has no vocabulary, no headings and
+nothing to link to, so the index, the vault and the link checker keep
+using [`collect_tm_files`]. This is for the commands that read a file only
+to parse or reformat it (`check`, `format`), and so can take both.
+
+===[fn collect_tm_and_mtm_files_with_config]
+
+Same as [`collect_tm_and_mtm_files`] but with an explicit `config`/
+`config_root` instead of auto-discovering one.
+
 ===[fn collect_all_paths_with_config]
 
 Every non-ignored path under `path` (or just `path` itself if it's a
@@ -158,6 +175,10 @@ primitive other extension-filtered scans (this crate's own
 and `tomet-links`'s existence checks) can build on, so
 `.hidden(false)`/`.git_ignore(true)`/`is_path_ignored` semantics can't
 drift between independently-configured `WalkBuilder`s.
+
+===[fn is_mtm_file]
+
+Whether `p` is a standalone motem file (`.mtm`).
 
 ===[fn collect_metadata_table]
 

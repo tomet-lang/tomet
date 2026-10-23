@@ -26,6 +26,7 @@
 //! or injects structural elements.
 
 pub mod clean;
+pub mod data;
 pub mod reorder;
 pub mod table;
 
@@ -33,6 +34,7 @@ pub mod table;
 mod tests;
 
 pub use clean::clean_whitespace;
+pub use data::format_data_source;
 pub use reorder::format_element_group_order;
 pub use table::format_tables_with_config;
 

@@ -456,6 +456,9 @@ pub fn scalar_from_text(s: &str) -> std::result::Result<Value, String> {
     }
 }
 
+/// Reads a `"..."` string, with `\"`, `\\`, `\n` and `\t` escapes; a raw newline
+/// is part of the text. A string that never closes is an error at its opening
+/// quote, not at the end of the file where it ran out.
 pub fn parse_quoted(cur: &mut Cursor) -> Result<String> {
     let start = cur.pos();
     if !cur.eat_str("\"") {
@@ -464,7 +467,7 @@ pub fn parse_quoted(cur: &mut Cursor) -> Result<String> {
     let mut out = String::new();
     loop {
         match cur.bump() {
-            None => return Err(err(cur.pos(), "unterminated string")),
+            None => return Err(err(start, "unterminated string")),
             Some('"') => break,
             Some('\\') => match cur.bump() {
                 Some('"') => out.push('"'),
@@ -472,7 +475,7 @@ pub fn parse_quoted(cur: &mut Cursor) -> Result<String> {
                 Some('n') => out.push('\n'),
                 Some('t') => out.push('\t'),
                 Some(other) => out.push(other),
-                None => return Err(err(cur.pos(), "unterminated string escape")),
+                None => return Err(err(start, "unterminated string")),
             },
             Some(c) => out.push(c),
         }
@@ -551,6 +554,32 @@ pub fn duplicate_key_error(pos: usize, key: &str) -> Error {
 /// a duplicate too. A map that held the same key twice would mean different
 /// things to a reader that keeps the first, the last, or both.
 pub fn parse_map_body_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Result<Value> {
+    parse_map_body_impl(cur, hook, false)
+}
+
+/// Parse a standalone motem file (`.mtm`): a map of `key: value` entries.
+///
+/// This is [`parse_value`] with the one rule that makes a file a file: every
+/// entry has a key. A source that is a lone scalar (`123`), or that has a bare
+/// value among its entries (`a: 1`, then `stray`), is an error at that entry,
+/// where `parse_value` would read the first as a scalar and keep the second
+/// as a positional entry. An empty file, or one with only comments, is the
+/// empty map.
+pub fn parse_file(src: &str) -> Result<Value> {
+    let mut cur = Cursor::new(src);
+    let value = parse_map_body_impl(&mut cur, &mut NoHook, true).map_err(|e| e.located_in(src))?;
+    skip_ws_newlines_and_comments(&mut cur);
+    if !cur.is_eof() {
+        return Err(err(cur.pos(), "unexpected trailing content").located_in(src));
+    }
+    Ok(value)
+}
+
+fn parse_map_body_impl<H: ValueHook>(
+    cur: &mut Cursor,
+    hook: &mut H,
+    keyed_only: bool,
+) -> Result<Value> {
     let mut entries: Vec<(String, Value)> = Vec::new();
     let mut seen: Option<HashSet<String>> = None;
     loop {
@@ -560,6 +589,12 @@ pub fn parse_map_body_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Resu
         }
         let entry_start = cur.pos();
         let (key, value) = parse_one_entry_with(cur, hook)?;
+        if keyed_only && key == POSITIONAL_ENTRY_KEY {
+            return Err(err(
+                entry_start,
+                "expected a `key: value` entry, found a bare value",
+            ));
+        }
         if key != POSITIONAL_ENTRY_KEY {
             let duplicate = if entries.len() < KEY_SCAN_LIMIT {
                 entries.iter().any(|(k, _)| *k == key)

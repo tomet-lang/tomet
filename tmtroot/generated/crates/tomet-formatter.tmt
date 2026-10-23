@@ -1,6 +1,6 @@
 @kind(api)
 
-@meta{crate: tomet-formatter, dependencies: list(tomet-ast, tomet-config, tomet-parser), dependents: list(tomet, tomet-benches, tomet-cli, tomet-lsp, tomet-printer, tomet-spec, tomet-tests, tomet-workspace)}
+@meta{crate: tomet-formatter, dependencies: list(motem-syntax, tomet-ast, tomet-config, tomet-parser), dependents: list(tomet, tomet-benches, tomet-cli, tomet-lsp, tomet-printer, tomet-spec, tomet-tests, tomet-workspace)}
 
 =[tomet-formatter]
 
@@ -43,6 +43,26 @@ blocks, and any `(content:raw)` element).
 Normalizes whitespace (LF line endings, no trailing whitespace, collapsed excess
 blank lines, exactly one final newline) while losslessly preserving literal whitespace
 and blank lines inside raw/verbatim content.
+
+==[Module data]
+
+Whitespace-hygiene formatting for a standalone motem file (`.mtm`).
+
+===[Functions]
+
+====[fn format_data_source]
+
+Normalizes the whitespace of a `.mtm` file: LF line endings, no trailing
+whitespace, runs of blank lines collapsed to one, no leading blank lines,
+exactly one final newline. Comments stay where they are.
+
+Text inside a quoted string is data, so it is copied exactly: a newline,
+trailing spaces or a CR inside `"..."` is part of the value.
+
+It never changes what the file means. A file that does not parse is
+returned as it came, since the scan below cannot know where a string
+starts in text the parser does not accept; so is any result that would
+read back as a different value.
 
 ==[Module reorder]
 

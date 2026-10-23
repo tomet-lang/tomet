@@ -34,6 +34,14 @@
 //! A quoted string is a key only when a `:` follows it; otherwise it is a
 //! value. The empty key is the positional-entry marker, so `"": v` is an error.
 //!
+//! =[ Files ]
+//!
+//! A standalone motem file (`.mtm`) is a top-level map written as bare
+//! `key: value` lines, with no braces around it. [`parse_file`] reads one: it
+//! is [`parse_value`] that also insists every entry has a key, so a lone
+//! scalar or a bare value among the entries is an error at that entry. `tomet
+//! check` and `tomet format` take a `.mtm` next to a `.tmt`.
+//!
 //! A document with nothing in it, or only whitespace and comments, is the
 //! empty map, so a config file may be empty and a reader fills in every
 //! optional field. Only the document may be empty: a value slot (`k:`) still
@@ -96,7 +104,7 @@ pub use parser::{
     LITERAL_CONSTRUCTORS, NoHook, POSITIONAL_ENTRY_KEY, ValueHook, duplicate_key_error, eat_ident,
     eat_name, eat_name_segment, eat_scalar_raw, err, is_ident_char, is_inline_ws, is_name_char,
     is_name_start, is_name_start_at, is_scheme_uri_colon, parse_entry_value,
-    parse_entry_value_with, parse_map_body, parse_map_body_with, parse_one_entry,
+    parse_entry_value_with, parse_file, parse_map_body, parse_map_body_with, parse_one_entry,
     parse_one_entry_with, parse_quoted, parse_value, parse_value_at, parse_value_at_with,
     parse_value_with, scalar_from_text, skip_block_comment, skip_inline_ws, skip_line_comment,
     skip_ws_and_newlines, skip_ws_newlines_and_comments, starts_absolute_path, try_parse_call,
@@ -243,6 +251,21 @@ mod tests {
     fn an_unterminated_quoted_key_reports_the_string() {
         let err = parse_value("\"a/b: 1").unwrap_err().to_string();
         assert!(err.contains("unterminated"), "unexpected message: {err}");
+    }
+
+    #[test]
+    fn an_unterminated_string_is_reported_where_it_opens() {
+        // (source, line, column of the opening quote)
+        for (src, line, column) in [
+            ("a: \"never closed", 1, 4),
+            ("a: 1\nb: \"open\nstill open\n", 2, 4),
+            ("\"a/b: 1", 1, 1),
+            ("a: \"ends in a backslash\\", 1, 4),
+        ] {
+            let err = parse_value(src).unwrap_err();
+            assert!(err.message.contains("unterminated"), "{src:?}: {err}");
+            assert_eq!((err.line, err.column), (line, column), "{src:?}");
+        }
     }
 
     #[test]
@@ -590,6 +613,50 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    #[test]
+    fn a_file_is_a_map_of_keyed_entries() {
+        assert_eq!(
+            parse_file("a: 1\n// note\n\"b/c\": list(x)\n").unwrap(),
+            map(&[("a", Value::Int(1)), ("b/c", Value::Seq(vec![text("x")]))])
+        );
+        assert_eq!(parse_file("").unwrap(), Value::Map(vec![]));
+        assert_eq!(
+            parse_file("// only a comment\n").unwrap(),
+            Value::Map(vec![])
+        );
+    }
+
+    #[test]
+    fn a_file_rejects_what_is_not_a_keyed_entry() {
+        // (source, line, column) of the offending entry
+        for (src, line, column) in [
+            ("123", 1, 1),
+            ("\"just a string\"", 1, 1),
+            ("a: 1\nstray\nb: 2", 2, 1),
+            ("a: 1\n\n  \"x\", b: 2", 3, 3),
+        ] {
+            let err = parse_file(src).unwrap_err();
+            assert!(
+                err.message.contains("key: value"),
+                "{src:?}: {}",
+                err.message
+            );
+            assert_eq!((err.line, err.column), (line, column), "{src:?}");
+        }
+    }
+
+    #[test]
+    fn a_file_keeps_the_syntax_errors_of_a_value() {
+        assert!(
+            parse_file("a: 1\na: 2")
+                .unwrap_err()
+                .message
+                .contains("duplicate key")
+        );
+        assert!(parse_file("a: \"x").is_err());
+        assert!(parse_file("a: 1 }").is_err());
     }
 
     #[test]

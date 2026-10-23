@@ -18,7 +18,14 @@ enum FormatWriteResult {
 /// editor wrote on save was a document `format --check` called
 /// unformatted -- a guard rejecting what the tool everyone uses
 /// produces. Both go through `tomet_load_config::config_for` now.
+///
+/// A `.mtm` is formatted by whitespace alone, whatever the config says: it is
+/// data with no tables or element groups, and reprinting it from its value
+/// would drop the comments.
 fn format_file(path: &Path, src: &str) -> String {
+    if tomet_indexer::is_mtm_file(path) {
+        return tomet_formatter::format_data_source(src);
+    }
     let config = tomet_load_config::config_for(Some(path), src);
     tomet_formatter::format_source_with_config(src, &config)
 }
@@ -35,11 +42,11 @@ fn is_excluded_by_config(path: &Path) -> bool {
         .is_some_and(|(config, _, root)| tomet_indexer::is_excluded_by_config(path, &root, &config))
 }
 
-/// Every `.tmt` file under `dir`; with `force`, the config's exclusions
+/// Every `.tmt` and `.mtm` file under `dir`; with `force`, the config's exclusions
 /// (`ignore`, `unswept`) are not applied. `.gitignore` still is.
 fn collect_dir(dir: &Path, force: bool) -> Vec<PathBuf> {
     if !force {
-        return tomet_indexer::collect_tm_files(dir);
+        return tomet_indexer::collect_tm_and_mtm_files(dir);
     }
     let (mut config, _, root) = tomet_load_config::find_config_file(dir).unwrap_or_else(|| {
         (
@@ -50,7 +57,7 @@ fn collect_dir(dir: &Path, force: bool) -> Vec<PathBuf> {
     });
     config.workspace.ignore.clear();
     config.workspace.unswept.clear();
-    tomet_indexer::collect_tm_files_with_config(dir, &config, &root)
+    tomet_indexer::collect_tm_and_mtm_files_with_config(dir, &config, &root)
 }
 
 /// Formats one or more files or directories.
@@ -105,7 +112,7 @@ pub(crate) fn format_cmd(
 
     if files.is_empty() {
         if skipped == 0 {
-            println!("No .tmt files found");
+            println!("No .tmt or .mtm files found");
         }
         return Ok(());
     }
@@ -274,6 +281,38 @@ mod tests {
         assert_eq!(res2, "# Heading 2\n");
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    /// A `.mtm` is formatted by whitespace only, in a directory sweep as well
+    /// as when named, and a comment survives.
+    #[test]
+    fn a_motem_file_is_formatted_beside_the_documents() {
+        let dir = std::env::temp_dir().join(format!("tomet_test_fmt_mtm_{}", nanoid::nanoid!()));
+        let _ = fs::create_dir_all(&dir);
+        let doc = dir.join("a.tmt");
+        let data = dir.join("catasto.mtm");
+        fs::write(&doc, "# Heading   \n").unwrap();
+        fs::write(
+            &data,
+            "// keep me  \r\na: 1   \r\n\r\n\r\nb: \"x  \r\ny\"\r\n",
+        )
+        .unwrap();
+
+        assert!(format_cmd(std::slice::from_ref(&data), false, true, false).is_err());
+        format_cmd(std::slice::from_ref(&dir), true, false, false).unwrap();
+        assert_eq!(fs::read_to_string(&doc).unwrap(), "# Heading\n");
+        assert_eq!(
+            fs::read_to_string(&data).unwrap(),
+            "// keep me\na: 1\n\nb: \"x  \r\ny\"\n"
+        );
+        assert!(format_cmd(&[dir.clone()], false, true, false).is_ok());
+
+        // one that does not parse is left as it is
+        fs::write(&data, "a: \"open   \n\n\n").unwrap();
+        format_cmd(&[data.clone()], true, false, false).unwrap();
+        assert_eq!(fs::read_to_string(&data).unwrap(), "a: \"open   \n\n\n");
+
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

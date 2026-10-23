@@ -9,6 +9,8 @@
 //!   -| `tomet-indexer` discovers `.tmt` and `.md` files across a workspace directory tree.
 //!    | It respects `.gitignore`, hidden files, and `ignore_files` rules configured in
 //!    | `default.config.tmt` / `tomet.config.tmt`.
+//!    | Standalone motem files (`.mtm`) are not documents and are not indexed; only
+//!    | [`collect_tm_and_mtm_files`] reaches them, for the commands that parse or reformat.
 //!    | Used by CLI commands (`check`, `export`, `format`, `lint`) and TUI components
 //!    | (Explorer, BatchMeta, Migration view).
 //! - (Core Capabilities)
@@ -166,9 +168,48 @@ pub fn collect_tm_files_with_config(
     config: &PrinterConfig,
     config_root: &Path,
 ) -> Vec<PathBuf> {
+    collect_files_with_config(path, config, config_root, is_tm_file)
+}
+
+/// Collects every `.tmt`/`.tm` document and every `.mtm` motem file under
+/// `path`, the way [`collect_tm_files`] collects documents alone.
+///
+/// A `.mtm` is data, not a document: it has no vocabulary, no headings and
+/// nothing to link to, so the index, the vault and the link checker keep
+/// using [`collect_tm_files`]. This is for the commands that read a file only
+/// to parse or reformat it (`check`, `format`), and so can take both.
+pub fn collect_tm_and_mtm_files(path: &Path) -> Vec<PathBuf> {
+    let (config, _, config_root) = tomet_load_config::find_config_file(path).unwrap_or_else(|| {
+        (
+            PrinterConfig::default(),
+            path.to_path_buf(),
+            path.to_path_buf(),
+        )
+    });
+    collect_tm_and_mtm_files_with_config(path, &config, &config_root)
+}
+
+/// Same as [`collect_tm_and_mtm_files`] but with an explicit `config`/
+/// `config_root` instead of auto-discovering one.
+pub fn collect_tm_and_mtm_files_with_config(
+    path: &Path,
+    config: &PrinterConfig,
+    config_root: &Path,
+) -> Vec<PathBuf> {
+    collect_files_with_config(path, config, config_root, |p| {
+        is_tm_file(p) || is_mtm_file(p)
+    })
+}
+
+fn collect_files_with_config(
+    path: &Path,
+    config: &PrinterConfig,
+    config_root: &Path,
+    accept: impl Fn(&Path) -> bool,
+) -> Vec<PathBuf> {
     let mut files = Vec::new();
     if path.is_file() {
-        if is_tm_file(path) {
+        if accept(path) {
             files.push(path.to_path_buf());
         }
     } else if path.is_dir() {
@@ -183,7 +224,7 @@ pub fn collect_tm_files_with_config(
             if is_path_unswept(p, Some(config_root), config) {
                 continue;
             }
-            if is_tm_file(p) {
+            if accept(p) {
                 files.push(p.to_path_buf());
             }
         }
@@ -233,6 +274,13 @@ pub fn collect_all_paths_with_config(
         }
     }
     paths
+}
+
+/// Whether `p` is a standalone motem file (`.mtm`).
+pub fn is_mtm_file(p: &Path) -> bool {
+    p.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("mtm"))
 }
 
 fn is_tm_file(p: &Path) -> bool {
@@ -454,6 +502,35 @@ mod tests {
             .filter_map(|p| p.file_name().and_then(|n| n.to_str()))
             .collect();
         assert_eq!(names, vec!["a.tmt", "b.tmt"]);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_collect_tm_and_mtm_files_adds_mtm_and_leaves_the_document_sweep_alone() {
+        let dir = std::env::temp_dir().join(format!("tm_indexer_mtm_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        std::fs::write(dir.join("a.tmt"), "#[A]\n").unwrap();
+        std::fs::write(dir.join("sub/catasto.mtm"), "k: v\n").unwrap();
+        std::fs::write(dir.join("c.md"), "# C\n").unwrap();
+
+        let names = |files: Vec<PathBuf>| -> Vec<String> {
+            files
+                .iter()
+                .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(String::from))
+                .collect()
+        };
+        assert_eq!(
+            names(collect_tm_and_mtm_files(&dir)),
+            ["a.tmt", "catasto.mtm"]
+        );
+        assert_eq!(names(collect_tm_files(&dir)), ["a.tmt"]);
+        // a file named outright is taken by the same rule
+        assert_eq!(
+            collect_tm_and_mtm_files(&dir.join("sub/catasto.mtm")),
+            [dir.join("sub/catasto.mtm")]
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }

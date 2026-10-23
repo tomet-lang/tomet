@@ -20,7 +20,11 @@ enum CheckFileResult {
     },
 }
 
-/// Checks one file, or every `.tmt` under a directory.
+/// Checks one file, or every `.tmt` and `.mtm` under a directory.
+///
+/// A `.mtm` is a standalone motem file, not a document: it is parsed as
+/// motem and must be a map of `key: value` entries, and has no vocabulary
+/// to check against.
 ///
 /// Checking is not parsing. This used to return OK the moment a document
 /// parsed, so two `@meta`, or an element name that exists nowhere, passed
@@ -72,7 +76,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
     let files = if path.is_file() {
         vec![path.to_path_buf()]
     } else if path.is_dir() {
-        tomet_indexer::collect_tm_files_with_config(path, &vault.config, &vault.root)
+        tomet_indexer::collect_tm_and_mtm_files_with_config(path, &vault.config, &vault.root)
     } else {
         return Err(anyhow::anyhow!("path '{}' does not exist", path.display()));
     };
@@ -92,27 +96,21 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
                 return CheckFileResult::ReadError;
             };
 
+            if tomet_indexer::is_mtm_file(file) {
+                return match motem::syntax::parse_file(&src) {
+                    Ok(_) => CheckFileResult::Checked {
+                        warnings: 0,
+                        has_errors: false,
+                        stderr_lines: Vec::new(),
+                        json_entries: Vec::new(),
+                    },
+                    Err(err) => parse_failure(file, &src, &err.into(), json),
+                };
+            }
+
             let doc = match tomet_parser::parse_document(&src) {
                 Ok(doc) => doc,
-                Err(err) => {
-                    let (json_entry, text) = if json {
-                        (
-                            Some(serde_json::json!({
-                                "file": file.display().to_string(),
-                                "error": {
-                                    "message": err.message,
-                                    "line": err.line,
-                                    "column": err.column,
-                                    "offset": err.offset,
-                                }
-                            })),
-                            String::new(),
-                        )
-                    } else {
-                        (None, format_parse_error(file, &src, &err))
-                    };
-                    return CheckFileResult::ParseError { json_entry, text };
-                }
+                Err(err) => return parse_failure(file, &src, &err, json),
             };
 
             let findings = vault.findings(file, &doc);
@@ -257,6 +255,28 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
     Ok(())
 }
 
+/// One file that did not parse, as the sweep reports it: JSON when asked for,
+/// else the source line with a caret.
+fn parse_failure(file: &Path, src: &str, err: &tomet_parser::Error, json: bool) -> CheckFileResult {
+    let (json_entry, text) = if json {
+        (
+            Some(serde_json::json!({
+                "file": file.display().to_string(),
+                "error": {
+                    "message": err.message,
+                    "line": err.line,
+                    "column": err.column,
+                    "offset": err.offset,
+                }
+            })),
+            String::new(),
+        )
+    } else {
+        (None, format_parse_error(file, src, err))
+    };
+    CheckFileResult::ParseError { json_entry, text }
+}
+
 fn report_parse_error(file: &Path, src: &str, err: &tomet_parser::Error, json: bool) {
     if json {
         let value = serde_json::json!({
@@ -320,6 +340,60 @@ mod tests {
         // And the good one alone passes, so the sweep is not failing
         // everything indiscriminately.
         check(&root.join("good.tmt"), false, true, false).expect("the good file passes");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A `.mtm` is checked next to the `.tmt` files: parsed as motem, and a
+    /// file is a map of `key: value` entries. One bad file does not hide
+    /// the others, and a directory run reaches it.
+    #[test]
+    fn a_motem_file_is_checked_beside_the_documents() {
+        let root = vault("mtm");
+        fs::write(root.join("good.tmt"), "@kind(deck)\n\n@card{}\n").unwrap();
+        fs::write(
+            root.join("ok.mtm"),
+            "// header\n\"tmtroot/a.tmt\": \"../a.tmt\"\nm: { x: 1 }\n",
+        )
+        .unwrap();
+        fs::write(root.join("empty.mtm"), "").unwrap();
+        check(&root, false, true, false).expect("documents and good motem files pass");
+        check(&root.join("ok.mtm"), false, true, false).expect("a file named outright");
+
+        // a syntax error, a lone scalar, a bare value among the entries
+        for (name, src) in [
+            ("syntax.mtm", "a: \"never closed\n"),
+            ("scalar.mtm", "123\n"),
+            ("bare.mtm", "a: 1\nstray\n"),
+            ("dup.mtm", "a: 1\na: 2\n"),
+        ] {
+            fs::write(root.join(name), src).unwrap();
+            let err = check(&root.join(name), false, true, false)
+                .expect_err(&format!("{name} is not a motem file"));
+            assert!(err.to_string().contains("1 of"), "{name}: {err}");
+            fs::remove_file(root.join(name)).unwrap();
+        }
+
+        // a bad one in a directory is counted, and the good files around it are not
+        fs::write(root.join("bad.mtm"), "a: 1\nstray\n").unwrap();
+        let err = check(&root, false, true, false).expect_err("one bad motem file");
+        assert!(err.to_string().starts_with("1 of"), "{err}");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The config's exclusions apply to a `.mtm` as they do to a `.tmt`.
+    #[test]
+    fn a_motem_file_the_config_leaves_alone_is_not_swept() {
+        let root = vault("mtm_unswept");
+        fs::write(
+            root.join("default.config.tmt"),
+            "@kind(config)\n@config{ workspace: { unswept: list(\"frozen\") } }\n",
+        )
+        .unwrap();
+        fs::create_dir_all(root.join("frozen")).unwrap();
+        fs::write(root.join("frozen/bad.mtm"), "stray\n").unwrap();
+        check(&root, false, true, false).expect("the frozen directory is not swept");
 
         let _ = fs::remove_dir_all(&root);
     }
