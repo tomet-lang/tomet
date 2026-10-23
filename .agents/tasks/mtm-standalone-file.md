@@ -51,12 +51,6 @@ leaves it out; `collect_tm_and_mtm_files` is the one that reaches it).
   (`File { header, body }`) and highlighted by tree-sitter-motem and the TextMate
   grammar; `tests/fixtures/motem/ok-declarations.mtm` guards it.
 
-## Still open
-
-- `ln -sfr` in `just setup-helix` made a stray `queries/tomet/tomet -> .`
-  link on the second run; the recipe uses `-n` now. Remove the stray link if it
-  is in a checkout.
-
 ## To decide
 
 - What `.mtm` means to `tomet`: `tomet roundtrip`, `tomet check`/`format` over
