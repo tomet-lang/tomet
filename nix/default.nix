@@ -28,6 +28,18 @@ flake-parts.lib.mkFlake { inherit inputs; } {
           tomet-lsp
           vscodeExtension
           ;
+
+        # What CI builds and sends to Cachix (.github/workflows/nix-ci.yml).
+        ci = pkgs.linkFarm "ci" [
+          {
+            name = "tomet";
+            path = tomet;
+          }
+          {
+            name = "tomet-lsp";
+            path = tomet-lsp;
+          }
+        ];
       };
 
       devShells.default = pkgs.callPackage ./dev.nix {
@@ -48,6 +60,8 @@ flake-parts.lib.mkFlake { inherit inputs; } {
             sisho.sisho
             sisho.twrit
             sisho.tomet-shelf
+            # `sisho check` runs `catasto check` beside `tomet` and `twrit`.
+            sisho.catasto
           ];
       };
 
