@@ -1042,7 +1042,7 @@ dependencies = [
 
 [[package]]
 name = "motem"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "motem-syntax",
  "serde_motem",
@@ -1050,7 +1050,7 @@ dependencies = [
 
 [[package]]
 name = "motem-syntax"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-lexer",
@@ -1517,7 +1517,7 @@ dependencies = [
 
 [[package]]
 name = "serde_motem"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "motem-syntax",
  "serde",
@@ -1744,7 +1744,7 @@ dependencies = [
 
 [[package]]
 name = "tomet"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-config",
@@ -1767,7 +1767,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-address"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde",
  "tomet-ast",
@@ -1777,7 +1777,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-ast"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde",
  "tomet-cst",
@@ -1786,7 +1786,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-benches"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "criterion",
  "divan",
@@ -1799,7 +1799,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1838,7 +1838,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-config"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-parser",
@@ -1849,14 +1849,14 @@ dependencies = [
 
 [[package]]
 name = "tomet-cst"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rowan",
 ]
 
 [[package]]
 name = "tomet-edit"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "motem-syntax",
  "tomet-address",
@@ -1871,7 +1871,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-expr"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "time",
  "tomet-ast",
@@ -1883,7 +1883,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-extract"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-cst",
@@ -1894,7 +1894,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-field-utils"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "nanoid",
  "tomet-config",
@@ -1904,7 +1904,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-formatter"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "motem-syntax",
  "tomet-ast",
@@ -1915,7 +1915,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-html"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "motem-syntax",
  "tomet-ast",
@@ -1927,7 +1927,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-indexer"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ignore",
  "tomet-ast",
@@ -1940,7 +1940,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-java"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "jni",
  "serde",
@@ -1950,7 +1950,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-js"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "getrandom 0.2.17",
  "js-sys",
@@ -1967,7 +1967,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-lexer"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-cst",
@@ -1975,7 +1975,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-links"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "directories",
  "rusqlite",
@@ -1991,7 +1991,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-load"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-config",
@@ -2010,7 +2010,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-load-config"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-config",
  "tomet-parser",
@@ -2018,7 +2018,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-lsp"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "lsp-server",
@@ -2041,7 +2041,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-markdown"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "motem-syntax",
  "nanoid",
@@ -2057,7 +2057,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-merge"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-parser",
@@ -2066,7 +2066,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-pandoc"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2079,7 +2079,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-parser"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "motem-syntax",
  "tomet-ast",
@@ -2092,7 +2092,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-printer"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "motem-syntax",
  "tomet-ast",
@@ -2108,7 +2108,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-python"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "pyo3",
  "pythonize",
@@ -2118,7 +2118,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-search"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-parser",
@@ -2128,7 +2128,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-semantics"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "motem-syntax",
  "serde_json",
@@ -2140,7 +2140,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-spec"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap",
  "tomet-ast",
@@ -2154,7 +2154,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-spec-derive"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2163,7 +2163,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-stats"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2176,7 +2176,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-style"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "motem-syntax",
  "tomet-ast",
@@ -2193,7 +2193,7 @@ source = "git+https://github.com/tomet-lang/tomet-corpus.git#c1d45569eacc3530a66
 
 [[package]]
 name = "tomet-tests"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "motem-syntax",
  "serde_json",
@@ -2222,7 +2222,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-transform"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "time",
  "tomet-ast",
@@ -2236,7 +2236,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-tree"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-parser",
@@ -2244,7 +2244,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-typst"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-parser",
@@ -2254,7 +2254,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-validator"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde",
  "tomet-ast",
@@ -2269,7 +2269,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-validator-blueprint"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-parser",
@@ -2281,7 +2281,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-validator-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde",
  "tomet-address",
@@ -2294,7 +2294,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-validator-rule"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-parser",
@@ -2305,7 +2305,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-vault"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tomet-ast",
  "tomet-config",
@@ -2319,7 +2319,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-workspace"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "time",
@@ -2339,7 +2339,7 @@ dependencies = [
 
 [[package]]
 name = "tomet-zed"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "zed_extension_api",
 ]
@@ -2411,7 +2411,7 @@ checksum = "ca0d1bf6fdd806e43ae5198f82f527056d359def39e54e67a0f478ac09dac081"
 
 [[package]]
 name = "tree-sitter-motem"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "cc",
  "tree-sitter",
@@ -2420,7 +2420,7 @@ dependencies = [
 
 [[package]]
 name = "tree-sitter-tomet"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "cc",
  "tree-sitter",
