@@ -85,16 +85,18 @@ Arguments:
 Convert a `.tmt` file to HTML: a standalone page, or just the rendered body with `--body`
 
 ```text
-tomet html [OPTIONS] <FILE>
+tomet html [OPTIONS] <PATH>
 ```
 
 Arguments:
 
-- `<FILE>`
+- `<PATH>`: The document to convert: a file, a directory of them, or `-` for standard input.
 
 Options:
 
-- `-o, --out <OUT>`: Write to this path instead of stdout.
+- `-o, --out <OUT>`: Write to this path instead of stdout: a file, or a directory (a file gets one named after it; a directory is written into, with its sub-directories kept). Conflicts with `--in-place`.
+- `-i, --in-place`: Write next to each source, with the new extension.
+- `--dry-run`: Dry-run mode: convert and validate in memory without writing files.
 - `--advanced`: Number headings sequentially by nesting level (1, 1.1, 1.2, 2, ...) instead of the plain, unnumbered default.
 - `--lang <LANG>`: `<html lang="...">` for the page shell. Defaults to "ja".
 - `--body`: Emit just the rendered body, with no `<html>`/`<head>` shell, for templating into a page of your own. `--lang` has no effect alongside this, since the shell is what carries it.
@@ -104,64 +106,73 @@ Options:
 Convert a `.tmt` file to CommonMark. Lossy for constructs with no Markdown equivalent (`@links{}`, and any `@T` element the importer never produces); `tomet-markdown`'s module docs list what falls back to HTML passthrough
 
 ```text
-tomet to-md [OPTIONS] <FILE>
+tomet to-md [OPTIONS] <PATH>
 ```
 
 Arguments:
 
-- `<FILE>`
+- `<PATH>`: The document to convert: a file, a directory of them, or `-` for standard input.
 
 Options:
 
-- `-o, --out <OUT>`: Write to this path instead of stdout.
+- `-o, --out <OUT>`: Write to this path instead of stdout: a file, or a directory (a file gets one named after it; a directory is written into, with its sub-directories kept). Conflicts with `--in-place`.
+- `-i, --in-place`: Write next to each source, with the new extension.
+- `--dry-run`: Dry-run mode: convert and validate in memory without writing files.
 
 ==[ tomet to-typst ]
 
 Convert a `.tmt` file to Typst markup source. Lossy for constructs with no Typst equivalent -- see `tomet-convert-typst`'s crate doc
 
 ```text
-tomet to-typst [OPTIONS] <FILE>
+tomet to-typst [OPTIONS] <PATH>
 ```
 
 Arguments:
 
-- `<FILE>`
+- `<PATH>`: The document to convert: a file, a directory of them, or `-` for standard input.
 
 Options:
 
-- `-o, --out <OUT>`: Write to this path instead of stdout.
+- `-o, --out <OUT>`: Write to this path instead of stdout: a file, or a directory (a file gets one named after it; a directory is written into, with its sub-directories kept). Conflicts with `--in-place`.
+- `-i, --in-place`: Write next to each source, with the new extension.
+- `--dry-run`: Dry-run mode: convert and validate in memory without writing files.
 
 ==[ tomet to-pandoc ]
 
 Convert a `.tmt` file to Pandoc's JSON AST, which `pandoc -f json` reads -- the bridge to every format Pandoc writes (docx, LaTeX, EPUB, org, ...). Pass `-` to read the `.tmt` from stdin
 
 ```text
-tomet to-pandoc [OPTIONS] <FILE>
+tomet to-pandoc [OPTIONS] <PATH>
 ```
 
 Arguments:
 
-- `<FILE>`
+- `<PATH>`: The document to convert: a file, a directory of them, or `-` for standard input.
 
 Options:
 
-- `-o, --out <OUT>`: Write to this path instead of stdout.
+- `-o, --out <OUT>`: Write to this path instead of stdout: a file, or a directory (a file gets one named after it; a directory is written into, with its sub-directories kept). Conflicts with `--in-place`.
+- `-i, --in-place`: Write next to each source, with the new extension.
+- `--dry-run`: Dry-run mode: convert and validate in memory without writing files.
 
 ==[ tomet from-pandoc ]
 
-Convert Pandoc's JSON AST (`pandoc -t json <file>`) to Tomet (.tmt) -- the bridge from every format Pandoc reads. Pass `-` to read the JSON from stdin, which is the usual way: `pandoc -t json x.docx | tomet from-pandoc -`
+Convert Pandoc's JSON AST (`pandoc -t json <file>`) to Tomet (.tmt) -- the bridge from every format Pandoc reads. Pass `-` to read the JSON from stdin, which is the usual way: `pandoc -t json x.docx | tomet from-pandoc -`. Not for a directory: Pandoc's JSON is one document
 
 ```text
-tomet from-pandoc [OPTIONS] <FILE>
+tomet from-pandoc [OPTIONS] <PATH>
 ```
 
 Arguments:
 
-- `<FILE>`: Target `.json` file, or `-` for stdin.
+- `<PATH>`: The document to convert: a file, a directory of them, or `-` for standard input.
 
 Options:
 
-- `-o, --out <OUT>`: Write to this path instead of stdout.
+- `-o, --out <OUT>`: Write to this path instead of stdout: a file, or a directory (a file gets one named after it; a directory is written into, with its sub-directories kept). Conflicts with `--in-place`.
+- `-i, --in-place`: Write next to each source, with the new extension.
+- `--dry-run`: Dry-run mode: convert and validate in memory without writing files.
+- `--remove-original`: Remove the original file after conversion (only with --in-place or --out).
 
 ==[ tomet from-md ]
 
@@ -173,14 +184,14 @@ tomet from-md [OPTIONS] <PATH>
 
 Arguments:
 
-- `<PATH>`: Target .md file or directory containing .md files.
+- `<PATH>`: The document to convert: a file, a directory of them, or `-` for standard input.
 
 Options:
 
-- `-o, --out <OUT>`: Write to this path instead of stdout (for single file) or target output directory (for directory).
-- `-i, --in-place`: Write converted `.tmt` file(s) in place.
-- `--remove-original`: Remove original `.md` file(s) after conversion (only with --in-place or --out).
+- `-o, --out <OUT>`: Write to this path instead of stdout: a file, or a directory (a file gets one named after it; a directory is written into, with its sub-directories kept). Conflicts with `--in-place`.
+- `-i, --in-place`: Write next to each source, with the new extension.
 - `--dry-run`: Dry-run mode: convert and validate in memory without writing files.
+- `--remove-original`: Remove original `.md` file(s) after conversion (only with --in-place or --out).
 
 ==[ tomet format ]
 

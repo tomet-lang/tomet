@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(
@@ -11,6 +11,26 @@ use clap::{Parser, Subcommand};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
+}
+
+/// What the six conversion commands read and where they write: the same for
+/// all of them (`commands::convert` is the engine).
+#[derive(Args)]
+pub struct ConvertArgs {
+    /// The document to convert: a file, a directory of them, or `-` for
+    /// standard input.
+    pub path: PathBuf,
+    /// Write to this path instead of stdout: a file, or a directory (a
+    /// file gets one named after it; a directory is written into, with its
+    /// sub-directories kept).
+    #[arg(short, long, conflicts_with = "in_place")]
+    pub out: Option<PathBuf>,
+    /// Write next to each source, with the new extension.
+    #[arg(short = 'i', long, alias = "write")]
+    pub in_place: bool,
+    /// Dry-run mode: convert and validate in memory without writing files.
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Subcommand)]
@@ -74,10 +94,8 @@ pub enum Command {
     /// Convert a `.tmt` file to HTML: a standalone page, or just the
     /// rendered body with `--body`.
     Html {
-        file: PathBuf,
-        /// Write to this path instead of stdout.
-        #[arg(short, long)]
-        out: Option<PathBuf>,
+        #[command(flatten)]
+        io: ConvertArgs,
         /// Number headings sequentially by nesting level (1, 1.1, 1.2, 2,
         /// ...) instead of the plain, unnumbered default.
         #[arg(long)]
@@ -96,55 +114,41 @@ pub enum Command {
     /// never produces); `tomet-markdown`'s module docs list what falls
     /// back to HTML passthrough.
     ToMd {
-        file: PathBuf,
-        /// Write to this path instead of stdout.
-        #[arg(short, long)]
-        out: Option<PathBuf>,
+        #[command(flatten)]
+        io: ConvertArgs,
     },
     /// Convert a `.tmt` file to Typst markup source. Lossy for constructs
     /// with no Typst equivalent -- see `tomet-convert-typst`'s crate doc.
     ToTypst {
-        file: PathBuf,
-        /// Write to this path instead of stdout.
-        #[arg(short, long)]
-        out: Option<PathBuf>,
+        #[command(flatten)]
+        io: ConvertArgs,
     },
     /// Convert a `.tmt` file to Pandoc's JSON AST, which `pandoc -f json`
     /// reads -- the bridge to every format Pandoc writes (docx, LaTeX,
     /// EPUB, org, ...). Pass `-` to read the `.tmt` from stdin.
     ToPandoc {
-        file: PathBuf,
-        /// Write to this path instead of stdout.
-        #[arg(short, long)]
-        out: Option<PathBuf>,
+        #[command(flatten)]
+        io: ConvertArgs,
     },
     /// Convert Pandoc's JSON AST (`pandoc -t json <file>`) to Tomet
     /// (.tmt) -- the bridge from every format Pandoc reads. Pass `-` to
     /// read the JSON from stdin, which is the usual way:
-    /// `pandoc -t json x.docx | tomet from-pandoc -`.
+    /// `pandoc -t json x.docx | tomet from-pandoc -`. Not for a directory:
+    /// Pandoc's JSON is one document.
     FromPandoc {
-        /// Target `.json` file, or `-` for stdin.
-        file: PathBuf,
-        /// Write to this path instead of stdout.
-        #[arg(short, long)]
-        out: Option<PathBuf>,
+        #[command(flatten)]
+        io: ConvertArgs,
+        /// Remove the original file after conversion (only with --in-place or --out).
+        #[arg(long)]
+        remove_original: bool,
     },
     /// Convert CommonMark Markdown (.md) to Tomet (.tmt).
     FromMd {
-        /// Target .md file or directory containing .md files.
-        path: PathBuf,
-        /// Write to this path instead of stdout (for single file) or target output directory (for directory).
-        #[arg(short, long)]
-        out: Option<PathBuf>,
-        /// Write converted `.tmt` file(s) in place.
-        #[arg(short = 'i', long, alias = "write")]
-        in_place: bool,
+        #[command(flatten)]
+        io: ConvertArgs,
         /// Remove original `.md` file(s) after conversion (only with --in-place or --out).
         #[arg(long)]
         remove_original: bool,
-        /// Dry-run mode: convert and validate in memory without writing files.
-        #[arg(long)]
-        dry_run: bool,
     },
     /// Normalize a `.tmt` or `.mtm` file's whitespace (line endings, trailing
     /// whitespace, blank lines, final newline). A directory formats every

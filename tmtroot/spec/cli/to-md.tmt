@@ -2,7 +2,7 @@
   id: cli.to-md
 }
 
-`tomet to-md <FILE>`: 文書を CommonMark にする。
+`tomet to-md <PATH>`: 文書を CommonMark にする。
 
 状態: 実装済み。
 
@@ -10,9 +10,9 @@
 
 =[ 動き ]
 
-+ `FILE` を読む。`-` なら標準入力。その vault で読み、`${...}` を評価した値に置き換える（@file(tmtroot/spec/cli/overview.tmt) の「式の評価」）。
++ `PATH` を読む。`-` なら標準入力。その vault で読み、`${...}` を評価した値に置き換える（@file(tmtroot/spec/cli/overview.tmt) の「式の評価」）。
 + CommonMark にする。
-+ 標準出力に出す。`--out` があれば、そのファイルに書く。
++ 出す。出力先と、ディレクトリや `--dry-run` の扱いは、@file(tmtroot/spec/cli/overview.tmt) の「変換コマンドの入力と出力先」。
 
 `tomet export` が CommonMark に書き出すときと、同じ変換器と同じ式の評価を使う。
 

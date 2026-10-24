@@ -19,33 +19,11 @@ TUI の Migration タブ（@file(tmtroot/spec/cli/tui.tmt)）も、Markdown を 
 - 出力は、設定に従って整えた `.tmt`。
 - 出力した `.tmt` を、もう一度読んでみて、読めなければ、その文書の変換は失敗にする（`generated .tmt has parse error: ...`）。書き込む前の検査なので、読めない `.tmt` はできない。
 
-=[ ファイル1つ ]
+=[ 入力と出力先 ]
 
-@table
-|[ 指定                ][ していること ]
-|[ 指定なし            ][ `.tmt` を標準出力に出す。何も書かない。 ]
-|[ `--out <パス>`      ][ そのパスに書く。パスがディレクトリなら、その中に `<元の名前>.tmt` として。親のディレクトリがなければ作る。`Converted <元> -> <先>` と出す。 ]
-|[ `--in-place`        ][ 元の隣に、拡張子を `.tmt` にして書く。`Converted <元> -> <先>` と出す。 ]
-|[ `--dry-run`         ][ 変換して読めるかだけ確かめ、何も書かない。`OK (dry-run): <元>` と出す。 ]
-|[ `--remove-original` ][ 書き込みに成功したあと、元の Markdown を消す。`--out` か `--in-place` のときだけ。 ]
+`PATH` はファイルか、ディレクトリか、`-`（標準入力）。出力先、`--in-place`、`--dry-run`、`--remove-original` の扱いは、全部の変換コマンドで同じ。@file(tmtroot/spec/cli/overview.tmt) の「変換コマンドの入力と出力先」。
 
-=[ ディレクトリ ]
-
-ディレクトリは、その下の Markdown を、vault の索引（`workspace.ignore` が効く）から数える。Markdown がなければ、`No .md files found in <ディレクトリ>`。
-
-@table
-|[ 指定                   ][ していること ]
-|[ 指定なし               ][ エラーにして、何も変換しない（`a directory is converted into files: pass --out <DIR> or --in-place ...`）。ディレクトリには、標準出力に出す先がないため。 ]
-|[ `--out <ディレクトリ>` ][ ディレクトリの中の並びを保って、`.tmt` を書く。 ]
-|[ `--in-place`           ][ それぞれの元の隣に書く。 ]
-|[ `--dry-run`            ][ 変換して読めるかだけ確かめ、何も書かない。 ]
-|[ `--remove-original`    ][ 書き込みに成功したものの元を消す。 ]
-
-終わりに、`Conversion finished: <n> total, <m> succeeded, <k> failed`（`--dry-run` なら `Dry-run finished: ...`）と出す。失敗した文書は、標準エラー出力に `Errors encountered (<k>):` として並べる。1つが失敗しても、残りを続ける。
-
-書き込めなかったファイルも、失敗に数える。変換しても、書けていなければ、変換していない。そのファイルの元は消さない。
-
-1つでも失敗すれば、`<k> file(s) failed conversion` で1。なければ0。
+ディレクトリは、その下の Markdown を、vault の索引（`workspace.ignore` が効く）から数える。
 
 =[ 現状の実装との差 ]
 

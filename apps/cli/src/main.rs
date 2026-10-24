@@ -29,20 +29,27 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use cli::{Cli, Command};
+use cli::{Cli, Command, ConvertArgs};
 use commands::ast::ast;
 use commands::check::check;
+use commands::convert::{Direction, HtmlOptions, Plan, Source, Target};
 use commands::export::export_cmd;
 use commands::format::format_cmd;
-use commands::from_md::from_md_cmd;
-use commands::from_pandoc::from_pandoc;
-use commands::html::html;
 use commands::refactor::refactor_cmd;
 use commands::roundtrip::roundtrip;
 use commands::stats::stats_cmd;
-use commands::to_md::to_md;
-use commands::to_pandoc::to_pandoc;
-use commands::to_typst::to_typst;
+
+/// Runs one of the six conversion commands: `direction` is all that sets them
+/// apart.
+fn convert(io: &ConvertArgs, direction: Direction, remove_original: bool) -> anyhow::Result<()> {
+    let plan = Plan {
+        out: io.out.as_deref(),
+        in_place: io.in_place,
+        dry_run: io.dry_run,
+        remove_original,
+    };
+    commands::convert::run(&io.path, &direction, &plan)
+}
 
 fn main() -> ExitCode {
     jobserver_gate::init_from_env();
@@ -59,23 +66,30 @@ fn main() -> ExitCode {
         Command::Ast { file, data } => ast(file, *data),
         Command::Roundtrip { file } => roundtrip(file),
         Command::Html {
-            file,
-            out,
+            io,
             advanced,
             lang,
             body,
-        } => html(file, out, *advanced, lang.clone(), *body),
-        Command::ToMd { file, out } => to_md(file, out),
-        Command::ToTypst { file, out } => to_typst(file, out),
-        Command::ToPandoc { file, out } => to_pandoc(file, out),
-        Command::FromPandoc { file, out } => from_pandoc(file, out),
-        Command::FromMd {
-            path,
-            out,
-            in_place,
+        } => convert(
+            io,
+            Direction::To(Target::Html(HtmlOptions {
+                advanced: *advanced,
+                lang: lang.clone(),
+                body: *body,
+            })),
+            false,
+        ),
+        Command::ToMd { io } => convert(io, Direction::To(Target::CommonMark), false),
+        Command::ToTypst { io } => convert(io, Direction::To(Target::Typst), false),
+        Command::ToPandoc { io } => convert(io, Direction::To(Target::Pandoc), false),
+        Command::FromPandoc {
+            io,
             remove_original,
-            dry_run,
-        } => from_md_cmd(path, out.as_deref(), *in_place, *remove_original, *dry_run),
+        } => convert(io, Direction::From(Source::Pandoc), *remove_original),
+        Command::FromMd {
+            io,
+            remove_original,
+        } => convert(io, Direction::From(Source::CommonMark), *remove_original),
         Command::Format {
             paths,
             in_place,

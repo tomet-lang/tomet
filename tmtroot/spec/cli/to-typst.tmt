@@ -2,7 +2,7 @@
   id: cli.to-typst
 }
 
-`tomet to-typst <FILE>`: 文書を Typst の記法にする。
+`tomet to-typst <PATH>`: 文書を Typst の記法にする。
 
 状態: 実装済み。
 
@@ -10,9 +10,9 @@
 
 =[ 動き ]
 
-+ `FILE` を読む。`-` なら標準入力。その vault で読み、`${...}` を評価した値に置き換える（@file(tmtroot/spec/cli/overview.tmt) の「式の評価」）。
++ `PATH` を読む。`-` なら標準入力。その vault で読み、`${...}` を評価した値に置き換える（@file(tmtroot/spec/cli/overview.tmt) の「式の評価」）。
 + Typst の記法にする。
-+ 標準出力に出す。`--out` があれば、そのファイルに書く。
++ 出す。出力先と、ディレクトリや `--dry-run` の扱いは、@file(tmtroot/spec/cli/overview.tmt) の「変換コマンドの入力と出力先」。
 
 `tomet export` が Typst に書き出すときと、同じ変換器を使う。
 

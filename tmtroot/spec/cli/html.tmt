@@ -2,7 +2,7 @@
   id: cli.html
 }
 
-`tomet html <FILE>`: 文書を HTML にする。独立したページか、本文だけ。
+`tomet html <PATH>`: 文書を HTML にする。独立したページか、本文だけ。
 
 状態: 実装済み。
 
@@ -10,15 +10,13 @@
 
 =[ 動き ]
 
-+ `FILE` を、その vault で読み、`${...}` を評価した値に置き換える（@file(tmtroot/spec/cli/overview.tmt) の「式の評価」）。
++ `PATH` を、その vault で読み、`${...}` を評価した値に置き換える（@file(tmtroot/spec/cli/overview.tmt) の「式の評価」）。`-` なら標準入力。
 + HTML にする。
-+ 標準出力に出す。`--out` があれば、そのファイルに書く。
-
-`FILE` に `-`（標準入力）は使えない。
++ 出す。出力先と、ディレクトリや `--dry-run` の扱いは、@file(tmtroot/spec/cli/overview.tmt) の「変換コマンドの入力と出力先」。
 
 =[ 出力の形 ]
 
-- 既定は、`<html>` と `<head>` を持つ独立したページ。`<title>` は、文書の `::meta` の `title`、なければファイル名（拡張子なし）。`<html lang>` は `--lang`、なければ `ja`。
+- 既定は、`<html>` と `<head>` を持つ独立したページ。`<title>` は、文書の `::meta` の `title`、なければファイル名（拡張子なし。標準入力なら `Tomet`）。`<html lang>` は `--lang`、なければ `ja`。
 - `--body` は、ページの殻を付けず、本文だけを出す。自分のページに埋め込むため。`<title>` と `lang` は殻にあるので、`--body` では使わない。
 - `--advanced` は、見出しに連番を振り（1、1.1、1.2、2、…）、見出しから識別子を自動で作る。なければ、番号も自動の識別子もなし。
 

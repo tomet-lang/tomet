@@ -44,7 +44,7 @@ vault が決めるのは、設定、語彙、`workspace.ignore` などの除外�
 
 - 結果（変換した文書、表、`OK`）は標準出力に出す。問題、警告、進み具合は標準エラー出力に出す。パイプにつないだとき、結果だけが流れるため。
 - 終了コードは、成功が0、失敗が1。コマンドが動かなかった（引数が違う、パスがない、読めない）ときも1。
-- 複数の文書を扱うコマンドは、1つの文書で失敗しても残りを続け、最後にまとめて失敗にする（`check`、`stats`、`refactor`、`from-md`、`export`）。調べられなかった文書は、調べていない文書なので、失敗に数える。
+- 複数の文書を扱うコマンドは、1つの文書で失敗しても残りを続け、最後にまとめて失敗にする（`check`、`stats`、`refactor`、ディレクトリを渡された変換コマンド、`export`）。調べられなかった文書は、調べていない文書なので、失敗に数える。
 
 =[ 共通の形 ]
 
@@ -54,23 +54,60 @@ vault が決めるのは、設定、語彙、`workspace.ignore` などの除外�
 |[ 綴り               ][ 意味 ][ あるコマンド ]
 |[ `PATH`             ][ 対象のファイルかディレクトリ。省くと `.` ][ `check`、`stats`、`export`、`refactor` ]
 |[ `--check`          ][ 書かずに、書く必要があるかを調べる。必要なら非ゼロで終わる ][ `format`、`export`、`refactor`、`spec` ]
-|[ `--in-place`、`-i` ][ ファイルをその場で書き換える。なければ、結果を標準出力に出す ][ `format`、`refactor`、`from-md` ]
+|[ `--in-place`、`-i` ][ ファイルをその場で書き換える（変換コマンドは、元の隣に拡張子を替えて書く）。なければ、結果を標準出力に出す ][ `format`、`refactor`、`html`、`to-md`、`to-typst`、`to-pandoc`、`from-md`、`from-pandoc` ]
 |[ `--out`、`-o`      ][ 結果を標準出力ではなく、ここに書く ][ `html`、`to-md`、`to-typst`、`to-pandoc`、`from-pandoc`、`from-md`、`export`、`spec` ]
+|[ `--dry-run`        ][ 変換して確かめ、何も書かない ][ `html`、`to-md`、`to-typst`、`to-pandoc`、`from-md`、`from-pandoc` ]
 |[ `--json`           ][ 人が読む形ではなく、JSON で出す ][ `check`、`stats` ]
 |[ `--force`          ][ 設定の除外（`workspace.ignore`、`workspace.unswept`）を外す ][ `format`、`refactor` ]
 |[ `--quiet`、`-q`    ][ 成功の `OK` を出さない ][ `check` ]
 
 =[ 標準入力 ]
 
-ファイルの代わりに `-` を渡すと、標準入力から読む。パイプでつなぐためで、`ast`、`roundtrip`、`to-md`、`to-typst`、`to-pandoc`、`from-pandoc` で使える。
-
-`html` は標準入力を読まない。
+ファイルの代わりに `-` を渡すと、標準入力から読む。パイプでつなぐためで、`ast`、`roundtrip`、`html`、`to-md`、`to-typst`、`to-pandoc`、`from-md`、`from-pandoc` で使える。
 
 =[ 式の評価 ]
 
 文書を別の形に書き出すコマンド（`html`、`to-md`、`to-typst`、`to-pandoc`、`export`）は、書き出す前に、文書の `${...}` をすべて、その vault で評価した値に置き換える（@file(tmtroot/spec/expressions/overview.expr.tmt)）。評価できなかったものは、書かれたままの文字として出す。変換器は、式があることを知らない。
 
-`html`、`to-md`、`to-typst`、`to-pandoc` は、標準出力に出す結果の末尾に改行を1つ付ける。`--out` に書くときは付けない。
+=[ 変換コマンドの入力と出力先 ]
+
+`html`、`to-md`、`to-typst`、`to-pandoc`、`from-md`、`from-pandoc` は、同じ入力と出力先の決まりで動く。コマンドが違うのは、何から何へ変換するかだけ。
+
+入力の `PATH` は、ファイル、ディレクトリ、`-`（標準入力）のどれか。標準出力に出す結果は、ファイルに書くものと1バイトも違わない（末尾に改行を足さない）。
+
+出力ファイルの拡張子は、`html` が `.html`、`to-md` が `.md`、`to-typst` が `.typ`、`to-pandoc` が `.json`、`from-md` と `from-pandoc` が `.tmt`。
+
+===[ ファイル1つ ]
+
+@table
+|[ 指定                ][ していること ]
+|[ 指定なし            ][ 結果を標準出力に出す。何も書かない。 ]
+|[ `--out <パス>`      ][ そのパスに書く。パスがディレクトリなら、その中に `<元の名前>.<拡張子>` として（標準入力なら `output.<拡張子>`）。親のディレクトリがなければ作る。`Converted <元> -> <先>` と出す。 ]
+|[ `--in-place`        ][ 元の隣に、拡張子を替えて書く。`Converted <元> -> <先>` と出す。標準入力には元のファイルがないので、`cannot convert in place: standard input is not a file` で1。何も読まずに断る。 ]
+|[ `--dry-run`         ][ 変換して読めるかだけ確かめ、何も書かない。`OK (dry-run): <元>` と出す。 ]
+|[ `--remove-original` ][ 書き込みに成功したあと、元を消す。`from-md` と `from-pandoc` だけ。`--out` か `--in-place` のときだけ。変換は移行であり、`.tmt` の元は捨てるものではないため。 ]
+
+`--out` と `--in-place` は同時に使えない（引数の誤りで2）。
+
+===[ ディレクトリ ]
+
+ディレクトリは、その下の、変換元の形式のファイルを数える。`html`、`to-md`、`to-typst`、`to-pandoc` は `.tmt`、`from-md` は Markdown で、どちらも vault の索引（`workspace.ignore` が効く）から選ぶ。なければ、`No .tmt files found in <ディレクトリ>`（`from-md` は `.md`）。
+
+`from-pandoc` はディレクトリを受けない。Pandoc の JSON は1つの文書で、ふつうはパイプで渡すため（`a directory can be converted from md, not from pandoc: ...` で1）。
+
+@table
+|[ 指定                   ][ していること ]
+|[ 指定なし               ][ エラーにして、何も変換しない（`a directory is converted into files: pass --out <DIR> or --in-place ...`）。ディレクトリには、標準出力に出す先がないため。 ]
+|[ `--out <ディレクトリ>` ][ ディレクトリの中の並びを保って書く。 ]
+|[ `--in-place`           ][ それぞれの元の隣に書く。 ]
+|[ `--dry-run`            ][ 変換して読めるかだけ確かめ、何も書かない。 ]
+|[ `--remove-original`    ][ 書き込みに成功したものの元を消す（`from-md`）。 ]
+
+終わりに、`Conversion finished: <n> total, <m> succeeded, <k> failed`（`--dry-run` なら `Dry-run finished: ...`）と出す。失敗した文書は、標準エラー出力に `Errors encountered (<k>):` として並べる。1つが失敗しても、残りを続ける。
+
+書き込めなかったファイルも、失敗に数える。変換しても、書けていなければ、変換していない。そのファイルの元は消さない。
+
+1つでも失敗すれば、`<k> file(s) failed conversion` で1。なければ0。
 
 =[ 設定のファイル名 ]
 
@@ -78,9 +115,8 @@ vault が決めるのは、設定、語彙、`workspace.ignore` などの除外�
 
 =[ 現状の実装との差 ]
 
-- `html`、`to-md`、`to-typst`、`to-pandoc` は、標準出力に書くとき、結果の末尾に改行を1つ足す（`--out` に書くときは足さない）。同じ文書でも、標準出力と `--out` で、1バイト違う。`from-pandoc`、`from-md`（ファイル1つ）、`export` は足さない。
+- 差はない。
 
 =[ まだ決まっていないこと ]
 
-- 標準出力に書くときの末尾の改行を、揃えるか。
 - `check`・`stats` 以外の、複数の文書を扱うコマンドの `--json`。
