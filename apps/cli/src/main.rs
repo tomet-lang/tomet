@@ -7,16 +7,16 @@
 //!
 //! =[ Subcommands ]
 //!
-//! - (Inspection & Validation) `check`, `ast`, `roundtrip`, and `stats`.
+//! - (Inspection & Validation) `check`, `check-links`, `ast`, `roundtrip`, and `stats`.
 //! - (Transformation & Formatting) `format` and `refactor`.
 //! - (Converters) `html`, `to-md`, `from-md`, `to-typst`, `to-pandoc`, `from-pandoc`, and `export`.
 //! - (Authoring) `new`.
 //! - (Documentation) `spec`.
 //!
-//! The project-level commands -- `check-links`, `serve` and `tui` -- are
-//! `sisho`'s: they follow a vault's declarations, caches and screens rather
-//! than a document alone, as `cargo` does for the language `rustc` compiles.
-//! `sisho tomet <command>` reaches the commands above from there.
+//! The project-level commands -- `serve` and `tui` -- are `sisho`'s: they
+//! follow a vault's screens rather than a document alone, as `cargo` does for
+//! the language `rustc` compiles. `sisho tomet <command>` reaches the commands
+//! above from there.
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -32,6 +32,7 @@ use clap::Parser;
 use cli::{Cli, Command, ConvertArgs};
 use commands::ast::ast;
 use commands::check::check;
+use commands::check_links::check_links_cmd;
 use commands::convert::{Direction, HtmlOptions, Plan, Source, Target};
 use commands::export::export_cmd;
 use commands::format::format_cmd;
@@ -63,6 +64,7 @@ fn main() -> ExitCode {
             quiet,
             json,
         } => check(path, *data, *quiet, *json),
+        Command::CheckLinks { path, json } => check_links_cmd(path, *json),
         Command::Ast { file, data } => ast(file, *data),
         Command::Roundtrip { file } => roundtrip(file),
         Command::Html {
@@ -129,9 +131,41 @@ fn main() -> ExitCode {
 
     match result {
         Ok(()) => ExitCode::SUCCESS,
+        // A reader that went away early (`| head`) is not a failure to report.
+        Err(e) if is_broken_pipe(&e) => ExitCode::from(BROKEN_PIPE),
         Err(e) => {
             eprintln!("{e}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// The exit code of a command whose reader closed the pipe: 128 plus SIGPIPE.
+const BROKEN_PIPE: u8 = 141;
+
+fn is_broken_pipe(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|io| io.kind() == std::io::ErrorKind::BrokenPipe)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_closed_pipe_is_found_under_the_context_around_it() {
+        let closed = std::io::Error::from(std::io::ErrorKind::BrokenPipe);
+        let error = anyhow::Error::new(closed).context("writing the report");
+        assert!(is_broken_pipe(&error));
+    }
+
+    #[test]
+    fn any_other_error_is_reported() {
+        let denied = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        assert!(!is_broken_pipe(&anyhow::Error::new(denied)));
+        assert!(!is_broken_pipe(&anyhow::anyhow!("check failed")));
     }
 }

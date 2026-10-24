@@ -13,6 +13,7 @@
 @table
 |[ 分類               ][ コマンド      ][ していること ]
 |[ 調べる             ][ `check`       ][ 文書が正しいか調べる（@file(tmtroot/spec/cli/check.tmt)） ]
+|[                    ][ `check-links` ][ 他のファイルや文書へのリンクが切れていないか調べる（@file(tmtroot/spec/cli/check-links.tmt)） ]
 |[                    ][ `stats`       ][ 文字、要素、リンク、見出しを数える（@file(tmtroot/spec/cli/stats.tmt)） ]
 |[                    ][ `ast`         ][ 構文木を表示する（@file(tmtroot/spec/cli/ast.tmt)） ]
 |[                    ][ `roundtrip`   ][ データファイルの保存と読み込みが損なわれないか確かめる（@file(tmtroot/spec/cli/roundtrip.tmt)） ]
@@ -30,7 +31,7 @@
 
 言語サーバー `tomet-lsp` は別の実行ファイル（@file(tmtroot/spec/lsp/overview.tmt)）。
 
-vault 全体の宣言・走査・キャッシュ・画面にかかわるコマンド（`check-links`、`serve`、`tui`）は、`tomet` にはない。エコシステムを束ねる `sisho` のコマンドで、`tomet` はそれを知らない。rustc が言語を扱い、cargo が依存や workspace を扱うのと同じ分け方で、文書だけで意味が決まるものが `tomet` に残る。`sisho tomet <コマンド>` で、ここにあるコマンドに届く。
+vault の画面にかかわるコマンド（`serve`、`tui`）は、`tomet` にはない。エコシステムを束ねる `sisho` のコマンドで、`tomet` はそれを知らない。rustc が言語を扱い、cargo が依存や workspace を扱うのと同じ分け方で、文書だけで意味が決まるものが `tomet` に残る。`sisho tomet <コマンド>` で、ここにあるコマンドに届く。
 
 =[ vault ]
 
@@ -44,7 +45,7 @@ vault が決めるのは、設定、語彙、`workspace.ignore` などの除外�
 
 - 結果（変換した文書、表、`OK`）は標準出力に出す。問題、警告、進み具合は標準エラー出力に出す。パイプにつないだとき、結果だけが流れるため。
 - 終了コードは、成功が0、失敗が1。コマンドが動かなかった（引数が違う、パスがない、読めない）ときも1。
-- 複数の文書を扱うコマンドは、1つの文書で失敗しても残りを続け、最後にまとめて失敗にする（`check`、`stats`、`refactor`、ディレクトリを渡された変換コマンド、`export`）。調べられなかった文書は、調べていない文書なので、失敗に数える。
+- 複数の文書を扱うコマンドは、1つの文書で失敗しても残りを続け、最後にまとめて失敗にする（`check`、`check-links`、`stats`、`refactor`、ディレクトリを渡された変換コマンド、`export`）。調べられなかった文書は、調べていない文書なので、失敗に数える。
 
 =[ 共通の形 ]
 
@@ -52,12 +53,12 @@ vault が決めるのは、設定、語彙、`workspace.ignore` などの除外�
 
 @table
 |[ 綴り               ][ 意味 ][ あるコマンド ]
-|[ `PATH`             ][ 対象のファイルかディレクトリ。省くと `.` ][ `check`、`stats`、`export`、`refactor` ]
+|[ `PATH`             ][ 対象のファイルかディレクトリ。省くと `.` ][ `check`、`check-links`、`stats`、`export`、`refactor` ]
 |[ `--check`          ][ 書かずに、書く必要があるかを調べる。必要なら非ゼロで終わる ][ `format`、`export`、`refactor`、`spec` ]
 |[ `--in-place`、`-i` ][ ファイルをその場で書き換える（変換コマンドは、元の隣に拡張子を替えて書く）。なければ、結果を標準出力に出す ][ `format`、`refactor`、`html`、`to-md`、`to-typst`、`to-pandoc`、`from-md`、`from-pandoc` ]
 |[ `--out`、`-o`      ][ 結果を標準出力ではなく、ここに書く ][ `html`、`to-md`、`to-typst`、`to-pandoc`、`from-pandoc`、`from-md`、`export`、`spec` ]
 |[ `--dry-run`        ][ 変換して確かめ、何も書かない ][ `html`、`to-md`、`to-typst`、`to-pandoc`、`from-md`、`from-pandoc` ]
-|[ `--json`           ][ 人が読む形ではなく、JSON で出す ][ `check`、`stats` ]
+|[ `--json`           ][ 人が読む形ではなく、JSON で出す ][ `check`、`check-links`、`stats` ]
 |[ `--force`          ][ 設定の除外（`workspace.ignore`、`workspace.unswept`）を外す ][ `format`、`refactor` ]
 |[ `--quiet`、`-q`    ][ 成功の `OK` を出さない ][ `check` ]
 
@@ -119,4 +120,4 @@ vault が決めるのは、設定、語彙、`workspace.ignore` などの除外�
 
 =[ まだ決まっていないこと ]
 
-- `check`・`stats` 以外の、複数の文書を扱うコマンドの `--json`。
+- `check`・`check-links`・`stats` 以外の、複数の文書を扱うコマンドの `--json`。

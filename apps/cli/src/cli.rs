@@ -81,6 +81,22 @@ pub enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Check every `@file`, `@dir`, `@embed` and `@link` in a document, or in
+    /// every document under a directory, for a local target that does not
+    /// exist.
+    ///
+    /// What it learns about a document is kept in an SQLite cache in the
+    /// user's cache directory (`~/.cache/tomet/` on Unix), never inside the
+    /// vault, so checking a large vault again does not parse what has not
+    /// changed. Exits 1 if a link is broken or a document could not be read.
+    CheckLinks {
+        /// File or directory to check (defaults to ".").
+        #[arg(default_value = ".")]
+        path: PathBuf,
+        /// Print the report as JSON instead of human-readable text.
+        #[arg(long)]
+        json: bool,
+    },
     /// Parse a file and pretty-print the resulting AST.
     Ast {
         file: PathBuf,

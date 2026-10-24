@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod check;
+pub mod check_links;
 pub mod convert;
 pub mod export;
 pub mod format;

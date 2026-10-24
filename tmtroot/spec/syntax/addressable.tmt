@@ -138,5 +138,5 @@ ${#intro.prop(tags).item(2)}        関数呼び出し記法（等価）
 - `tomet` の CLI と LSP は、位置アドレスに `#(id)` を付与して `#(id)` に書き換える操作を提供する。
 - `tomet check` は、同一文書内の未解決なアンカー参照（存在しない `#anchor` や `id:anchor` を指す `@link` / `@embed`）をエラー（`dangling anchor`）として検出し、失敗する。
 - 式 `${#id...}` で存在しない ID やプロパティを参照した場合は警告（`unresolved ${...}`）として報告する。
-- ファイルをまたぐリンク（`tmt:path#anchor` や `ref:Note#anchor`）のアンカー存在は、`sisho check-links` によってワークスペース全体で検査される。
+- ファイルをまたぐリンク（`tmt:path#anchor` や `ref:Note#anchor`）のアンカー存在は、`tomet check-links` によってワークスペース全体で検査される。
 - `tomet check` は、位置アドレスを使った `@link` に「壊れやすい参照」の警告を出せる。既定は警告なしで、有効にするのはオプトイン。
