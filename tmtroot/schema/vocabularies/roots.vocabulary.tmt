@@ -1,0 +1,25 @@
+::kind(vocabulary)
+::vocabulary(roots){
+  version: "1.0.0"
+}
+
+::elements{
+  root: {
+    display: block
+    singleton: false
+    about: | 索引の一つの根。指す先の名前かパスを一つ受け取る。
+    args: {
+      target: {
+        type: string
+        positional: true
+        about: | 指す先。文書のパス(`elements.roots.tmt`)か、名前(`std.meta`)。
+      }
+    }
+  }
+}
+
+@dir(tmtroot/index/) の索引のための語彙。`::kind(roots)` の文書は、`root` で
+文書の根を並べる。`.roots.tmt` が各 `*.roots.tmt` を指し、そこから索引をたどる。
+
+構想段階で、根が何を指すかはまだ決まっていない。決まるまでは、`root` は
+パスか名前を一つ受け取る要素としてだけ宣言する。

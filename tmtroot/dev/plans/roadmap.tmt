@@ -1,7 +1,7 @@
 ::kind(todo)
 
 - `tellme`, `show`
-- @type(list)
+- `@type(list)`
 - rust用の追加要素
 - `:rule()`にnamespace
 ---

@@ -99,10 +99,11 @@ ${sum(a, b)}
 ```
 // 現在のコードでは、src:になってしまっているので、要変更
 
-@codeblock(lang:sh)[
-sudo whoami
-ls --help
-]
+// [ NOT implemented -- @codeblock という要素は無い ]
+// @codeblock(lang:sh)[
+//   sudo whoami
+//   ls --help
+// ]
 
 // A `+++` fence carries a raw body, the same treatment as a codeblock --
 // byte-safe against an embedded "]" and newline-preserving (no inline

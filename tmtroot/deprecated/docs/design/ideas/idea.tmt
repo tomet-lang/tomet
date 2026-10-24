@@ -109,14 +109,14 @@
 
 行を独占する。その後に何かを記入することは基本無い(書けるけど。行の最初にスペースすらもかけないってこと。)。
 
-@codeblock(lang:tm)[
-  @config()
-  @meta(){}
-  ==[]{}
-  @index()
-  @codeblock()
-  @quote[]
-]
+```tm
+@config()
+@meta(){}
+==[]{}
+@index()
+@codeblock()
+@quote[]
+```
 
 ==[ 例外 ]
 

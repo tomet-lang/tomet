@@ -59,6 +59,7 @@
     "tmtroot/schema/vocabularies/scenario.vocabulary.tmt",
     "tmtroot/schema/vocabularies/video.vocabulary.tmt",
     "tmtroot/schema/vocabularies/idea.vocabulary.tmt",
+    "tmtroot/schema/vocabularies/roots.vocabulary.tmt",
   )
   workspace: {
     ignore: list( "00-09 System/01 Apps/obsidian" )
