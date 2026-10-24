@@ -770,14 +770,14 @@ fn a_rooted_path_is_measured_from_a_vault_with_either_config_name() {
 }
 
 #[test]
-fn a_mtm_uri_is_data_and_nothing_else_is() {
+fn a_ctmt_uri_is_data_and_nothing_else_is() {
     for (uri, data) in [
-        ("file:///v/catasto.mtm", true),
-        ("file:///v/Catasto.MTM", true),
-        ("file:///v/catasto.mtm?x=1#top", true),
+        ("file:///v/catasto.ctmt", true),
+        ("file:///v/Catasto.CTMT", true),
+        ("file:///v/catasto.ctmt?x=1#top", true),
         ("file:///v/a.tmt", false),
-        ("file:///v/a.mtm.tmt", false),
-        ("file:///v/mtm", false),
+        ("file:///v/a.ctmt.tmt", false),
+        ("file:///v/ctmt", false),
         ("untitled:Untitled-1", false),
     ] {
         assert_eq!(is_data_uri(&Uri::from_str(uri).unwrap()), data, "{uri}");
@@ -785,7 +785,7 @@ fn a_mtm_uri_is_data_and_nothing_else_is() {
 }
 
 #[test]
-fn a_motem_file_has_diagnostics_from_the_motem_parser_only() {
+fn a_cotomet_file_has_diagnostics_from_the_cotomet_parser_only() {
     assert_eq!(
         data_diagnostics_for("// header\n\"a/b\": 1\nm: { x: list(1) }\n"),
         Vec::new()
@@ -814,23 +814,23 @@ fn an_unterminated_string_is_underlined_from_its_opening_quote() {
 }
 
 #[test]
-fn a_motem_file_is_formatted_by_whitespace_and_a_document_is_not() {
-    let mtm = Uri::from_str("file:///v/c.mtm").unwrap();
+fn a_cotomet_file_is_formatted_by_whitespace_and_a_document_is_not() {
+    let ctmt = Uri::from_str("file:///v/c.ctmt").unwrap();
     let edits = format_edits(
         "// c  \r\na: 1   \r\n\r\n\r\nb: \"x  \r\ny\"\r\n",
-        Some(&mtm),
+        Some(&ctmt),
     );
     assert_eq!(edits.len(), 1);
     assert_eq!(edits[0].new_text, "// c\na: 1\n\nb: \"x  \r\ny\"\n");
-    assert!(format_edits("a: 1\n", Some(&mtm)).is_empty());
+    assert!(format_edits("a: 1\n", Some(&ctmt)).is_empty());
 
-    // a `.mtm` that does not parse is not touched
-    assert!(format_edits("a: \"open   \n\n\n", Some(&mtm)).is_empty());
+    // a `.ctmt` that does not parse is not touched
+    assert!(format_edits("a: \"open   \n\n\n", Some(&ctmt)).is_empty());
 
-    // the same text is a heading to the document formatter and not a motem file
+    // the same text is a heading to the document formatter and not a cotomet file
     let tmt = Uri::from_str("file:///v/c.tmt").unwrap();
     let edits = format_edits("# Heading   \n", Some(&tmt));
     assert_eq!(edits.len(), 1);
     assert_eq!(edits[0].new_text, "# Heading\n");
-    assert!(format_edits("# Heading   \n", Some(&mtm)).is_empty());
+    assert!(format_edits("# Heading   \n", Some(&ctmt)).is_empty());
 }

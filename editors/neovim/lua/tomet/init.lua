@@ -22,17 +22,17 @@ function M.setup(opts)
         filetype = "tomet",
       }
     end
-    if not parser_config.motem then
-      parser_config.motem = {
+    if not parser_config.cotomet then
+      parser_config.cotomet = {
         install_info = {
           url = opts.treesitter_url or "https://github.com/tefww/tomet",
           files = { "src/parser.c" },
           branch = "main",
-          location = "crates/tree-sitter-motem",
+          location = "crates/tree-sitter-cotomet",
           generate_requires_npm = false,
           requires_generate_from_grammar = false,
         },
-        filetype = "motem",
+        filetype = "cotomet",
       }
     end
   end

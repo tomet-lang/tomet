@@ -301,7 +301,7 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
             // prints as `m: k: v` and reparses as a string.
             Entry::Pair(k, v) => format!(
                 "{}: {}",
-                motem_syntax::key_text(k),
+                cotomet_syntax::key_text(k),
                 render_nested(v, config)
             ),
             Entry::Element(child) => render_element(child, config),

@@ -1,6 +1,6 @@
 //! An element's value as data.
 //!
-//! `{...}` is the only data syntax motem has; `element_data` is the single
+//! `{...}` is the only data syntax cotomet has; `element_data` is the single
 //! place every caller reads an element's `{...}` group through, so none of
 //! them need to know `ElementValue::Group`'s shape themselves.
 

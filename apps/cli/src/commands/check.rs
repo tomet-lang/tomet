@@ -20,10 +20,10 @@ enum CheckFileResult {
     },
 }
 
-/// Checks one file, or every `.tmt` and `.mtm` under a directory.
+/// Checks one file, or every `.tmt` and `.ctmt` under a directory.
 ///
-/// A `.mtm` is a standalone motem file, not a document: it is parsed as
-/// motem and must be a map of `key: value` entries, and has no vocabulary
+/// A `.ctmt` is a standalone cotomet file, not a document: it is parsed as
+/// cotomet and must be a map of `key: value` entries, and has no vocabulary
 /// to check against.
 ///
 /// Checking is not parsing. This used to return OK the moment a document
@@ -76,7 +76,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
     let files = if path.is_file() {
         vec![path.to_path_buf()]
     } else if path.is_dir() {
-        tomet_indexer::collect_tm_and_mtm_files_with_config(path, &vault.config, &vault.root)
+        tomet_indexer::collect_tm_and_ctmt_files_with_config(path, &vault.config, &vault.root)
     } else {
         return Err(anyhow::anyhow!("path '{}' does not exist", path.display()));
     };
@@ -96,8 +96,8 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
                 return CheckFileResult::ReadError;
             };
 
-            if tomet_indexer::is_mtm_file(file) {
-                return match motem::syntax::parse_file(&src) {
+            if tomet_indexer::is_ctmt_file(file) {
+                return match cotomet::syntax::parse_file(&src) {
                     Ok(_) => CheckFileResult::Checked {
                         warnings: 0,
                         has_errors: false,
@@ -344,55 +344,55 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// A `.mtm` is checked next to the `.tmt` files: parsed as motem, and a
+    /// A `.ctmt` is checked next to the `.tmt` files: parsed as cotomet, and a
     /// file is a map of `key: value` entries. One bad file does not hide
     /// the others, and a directory run reaches it.
     #[test]
-    fn a_motem_file_is_checked_beside_the_documents() {
-        let root = vault("mtm");
+    fn a_cotomet_file_is_checked_beside_the_documents() {
+        let root = vault("ctmt");
         fs::write(root.join("good.tmt"), "::kind(deck)\n\n@card{}\n").unwrap();
         fs::write(
-            root.join("ok.mtm"),
+            root.join("ok.ctmt"),
             "// header\n\"tmtroot/a.tmt\": \"../a.tmt\"\nm: { x: 1 }\n",
         )
         .unwrap();
-        fs::write(root.join("empty.mtm"), "").unwrap();
-        check(&root, false, true, false).expect("documents and good motem files pass");
-        check(&root.join("ok.mtm"), false, true, false).expect("a file named outright");
+        fs::write(root.join("empty.ctmt"), "").unwrap();
+        check(&root, false, true, false).expect("documents and good cotomet files pass");
+        check(&root.join("ok.ctmt"), false, true, false).expect("a file named outright");
 
         // a syntax error, a lone scalar, a bare value among the entries
         for (name, src) in [
-            ("syntax.mtm", "a: \"never closed\n"),
-            ("scalar.mtm", "123\n"),
-            ("bare.mtm", "a: 1\nstray\n"),
-            ("dup.mtm", "a: 1\na: 2\n"),
+            ("syntax.ctmt", "a: \"never closed\n"),
+            ("scalar.ctmt", "123\n"),
+            ("bare.ctmt", "a: 1\nstray\n"),
+            ("dup.ctmt", "a: 1\na: 2\n"),
         ] {
             fs::write(root.join(name), src).unwrap();
             let err = check(&root.join(name), false, true, false)
-                .expect_err(&format!("{name} is not a motem file"));
+                .expect_err(&format!("{name} is not a cotomet file"));
             assert!(err.to_string().contains("1 of"), "{name}: {err}");
             fs::remove_file(root.join(name)).unwrap();
         }
 
         // a bad one in a directory is counted, and the good files around it are not
-        fs::write(root.join("bad.mtm"), "a: 1\nstray\n").unwrap();
-        let err = check(&root, false, true, false).expect_err("one bad motem file");
+        fs::write(root.join("bad.ctmt"), "a: 1\nstray\n").unwrap();
+        let err = check(&root, false, true, false).expect_err("one bad cotomet file");
         assert!(err.to_string().starts_with("1 of"), "{err}");
 
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// The config's exclusions apply to a `.mtm` as they do to a `.tmt`.
+    /// The config's exclusions apply to a `.ctmt` as they do to a `.tmt`.
     #[test]
-    fn a_motem_file_the_config_leaves_alone_is_not_swept() {
-        let root = vault("mtm_unswept");
+    fn a_cotomet_file_the_config_leaves_alone_is_not_swept() {
+        let root = vault("ctmt_unswept");
         fs::write(
             root.join("default.config.tmt"),
             "::kind(config)\n::config{ workspace: { unswept: list(\"frozen\") } }\n",
         )
         .unwrap();
         fs::create_dir_all(root.join("frozen")).unwrap();
-        fs::write(root.join("frozen/bad.mtm"), "stray\n").unwrap();
+        fs::write(root.join("frozen/bad.ctmt"), "stray\n").unwrap();
         check(&root, false, true, false).expect("the frozen directory is not swept");
 
         let _ = fs::remove_dir_all(&root);

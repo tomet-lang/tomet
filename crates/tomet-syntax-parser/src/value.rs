@@ -1,4 +1,4 @@
-//! Parsing for `Value`: delegates core value and map parsing to the `motem-syntax` crate,
+//! Parsing for `Value`: delegates core value and map parsing to the `cotomet-syntax` crate,
 //! while providing custom hooks for embedded elements (`@element`) and
 //! dollar expressions (`$interp`) within Tomet documents.
 
@@ -6,7 +6,7 @@ use crate::error::{Error, Result};
 use tomet_ast::Value;
 use tomet_lexer::Cursor;
 
-pub(crate) use motem_syntax::{
+pub(crate) use cotomet_syntax::{
     POSITIONAL_ENTRY_KEY, eat_name, eat_scalar_raw, is_name_start_at, skip_inline_ws,
     skip_line_comment, skip_ws_and_newlines, skip_ws_newlines_and_comments,
 };
@@ -14,7 +14,7 @@ pub(crate) use motem_syntax::{
 /// Parse an entire source string as one `Value` (a data-only `.tmt`
 /// document -- no headings, prose, or top-level elements).
 pub fn parse_value(src: &str) -> Result<Value> {
-    motem_syntax::parse_value_with(src, &mut TometValueHook).map_err(Into::into)
+    cotomet_syntax::parse_value_with(src, &mut TometValueHook).map_err(Into::into)
 }
 
 pub(crate) fn err(pos: usize, message: impl Into<String>) -> Error {
@@ -27,25 +27,25 @@ pub(crate) fn err(pos: usize, message: impl Into<String>) -> Error {
 }
 
 pub(crate) fn skip_block_comment(cur: &mut Cursor) -> Result<()> {
-    motem_syntax::skip_block_comment(cur).map_err(Into::into)
+    cotomet_syntax::skip_block_comment(cur).map_err(Into::into)
 }
 
 pub(crate) fn parse_quoted(cur: &mut Cursor) -> Result<String> {
-    motem_syntax::parse_quoted(cur).map_err(Into::into)
+    cotomet_syntax::parse_quoted(cur).map_err(Into::into)
 }
 
-/// A [`motem_syntax::ValueHook`] allowing embedded elements (`@...`) and dollar expressions (`$...`)
+/// A [`cotomet_syntax::ValueHook`] allowing embedded elements (`@...`) and dollar expressions (`$...`)
 /// to be parsed inside value positions within Tomet.
 pub(crate) struct TometValueHook;
 
-impl motem_syntax::ValueHook for TometValueHook {
-    fn try_parse_value(&mut self, cur: &mut Cursor) -> Option<motem_syntax::Result<Value>> {
+impl cotomet_syntax::ValueHook for TometValueHook {
+    fn try_parse_value(&mut self, cur: &mut Cursor) -> Option<cotomet_syntax::Result<Value>> {
         // A real, `@`-sigiled element sitting in a value slot
         if cur.peek() == Some('@') && crate::element::is_element_start(cur, false) {
             let el = match crate::element::parse_element(cur, false) {
                 Ok(el) => el,
                 Err(e) => {
-                    return Some(Err(motem_syntax::Error::at(
+                    return Some(Err(cotomet_syntax::Error::at(
                         e.message, e.line, e.column, e.offset,
                     )));
                 }
@@ -58,7 +58,7 @@ impl motem_syntax::ValueHook for TometValueHook {
             let el = match crate::interp::parse_dollar_element(cur) {
                 Ok(el) => el,
                 Err(e) => {
-                    return Some(Err(motem_syntax::Error::at(
+                    return Some(Err(cotomet_syntax::Error::at(
                         e.message, e.line, e.column, e.offset,
                     )));
                 }
@@ -69,7 +69,7 @@ impl motem_syntax::ValueHook for TometValueHook {
         // `key: [ ... ]` -- block content as a value (`Value::Blocks`),
         // the same recursive grammar `[content]` uses, bounded by `]`
         // instead of consuming an enclosing element's own closer. Without
-        // this hook, `motem`'s own value grammar rejects `[` outright
+        // this hook, `cotomet`'s own value grammar rejects `[` outright
         // ("'[...]' list literal was removed").
         if cur.peek() == Some('[') {
             cur.bump();
@@ -80,13 +80,13 @@ impl motem_syntax::ValueHook for TometValueHook {
             ) {
                 Ok(blocks) => blocks,
                 Err(e) => {
-                    return Some(Err(motem_syntax::Error::at(
+                    return Some(Err(cotomet_syntax::Error::at(
                         e.message, e.line, e.column, e.offset,
                     )));
                 }
             };
             if !cur.eat_str("]") {
-                return Some(Err(motem_syntax::Error::at_offset(
+                return Some(Err(cotomet_syntax::Error::at_offset(
                     "expected ']'",
                     cur.pos(),
                 )));
@@ -102,7 +102,7 @@ impl motem_syntax::ValueHook for TometValueHook {
             return Some(
                 crate::element::parse_pipe_content(cur, &[])
                     .map(Value::Blocks)
-                    .map_err(|e| motem_syntax::Error::at(e.message, e.line, e.column, e.offset)),
+                    .map_err(|e| cotomet_syntax::Error::at(e.message, e.line, e.column, e.offset)),
             );
         }
 
@@ -111,9 +111,9 @@ impl motem_syntax::ValueHook for TometValueHook {
 }
 
 pub(crate) fn parse_value_at(cur: &mut Cursor) -> Result<Value> {
-    motem_syntax::parse_value_at_with(cur, &mut TometValueHook).map_err(Into::into)
+    cotomet_syntax::parse_value_at_with(cur, &mut TometValueHook).map_err(Into::into)
 }
 
 pub(crate) fn parse_one_entry(cur: &mut Cursor) -> Result<(String, Value)> {
-    motem_syntax::parse_one_entry_with(cur, &mut TometValueHook).map_err(Into::into)
+    cotomet_syntax::parse_one_entry_with(cur, &mut TometValueHook).map_err(Into::into)
 }

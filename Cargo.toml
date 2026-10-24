@@ -16,12 +16,12 @@ members = [
 
   #= Facade -- the one crate a Rust consumer depends on
   "crates/tomet",
-  "crates/motem",
+  "crates/cotomet",
 
   #= Public -- external ecosystem adapters
-  "crates/serde_motem",
+  "crates/serde_cotomet",
   "crates/tree-sitter-tomet",
-  "crates/tree-sitter-motem",
+  "crates/tree-sitter-cotomet",
 
   #= Syntax -- grammar/parsing
   "crates/tomet-syntax-cst",
@@ -29,7 +29,7 @@ members = [
   "crates/tomet-syntax-tree",
   "crates/tomet-syntax-lexer",
   "crates/tomet-syntax-parser",
-  "crates/motem-syntax",
+  "crates/cotomet-syntax",
 
   #= Semantics -- classification/eval/resolve
   "crates/tomet-semantics",
@@ -160,13 +160,13 @@ tomet-load = { path = "crates/tomet-load", version = "0.4.0" }
 tomet-load-config = { path = "crates/tomet-load-config", version = "0.4.0" }
 tomet-workspace = { path = "crates/tomet-workspace", version = "0.4.0" }
 #= Public
-motem-syntax = { path = "crates/motem-syntax", version = "0.4.0" }
-serde_motem = { path = "crates/serde_motem", version = "0.4.0" }
+cotomet-syntax = { path = "crates/cotomet-syntax", version = "0.4.0" }
+serde_cotomet = { path = "crates/serde_cotomet", version = "0.4.0" }
 tree-sitter-tomet = { path = "crates/tree-sitter-tomet", version = "0.4.0" }
-tree-sitter-motem = { path = "crates/tree-sitter-motem", version = "0.4.0" }
+tree-sitter-cotomet = { path = "crates/tree-sitter-cotomet", version = "0.4.0" }
 #= Facade
 tomet = { path = "crates/tomet", version = "0.4.0" }
-motem = { path = "crates/motem", version = "0.4.0" }
+cotomet = { path = "crates/cotomet", version = "0.4.0" }
 #= Corpus -- deterministic synthetic input, shared by every benchmark
 tomet-synth = { git = "https://github.com/tomet-lang/tomet-corpus.git" }
 

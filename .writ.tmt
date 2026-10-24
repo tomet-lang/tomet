@@ -34,9 +34,9 @@ does not relax the rule to fit the change it wanted to make.
       )
     4: list( "crates/tomet-config*", "crates/tomet-spec-derive" )
     3: list( "crates/tomet-validator*" )
-    2: list( "crates/tomet-semantics*", "crates/motem" )
-    1: list( "crates/tomet-syntax-*", "crates/motem-syntax", "crates/serde_motem" )
-    0: list( "crates/tree-sitter-tomet", "crates/tree-sitter-motem" )
+    2: list( "crates/tomet-semantics*", "crates/cotomet" )
+    1: list( "crates/tomet-syntax-*", "crates/cotomet-syntax", "crates/serde_cotomet" )
+    0: list( "crates/tree-sitter-tomet", "crates/tree-sitter-cotomet" )
   }
 }
 
@@ -49,12 +49,12 @@ Layer 0 depends on no workspace member at all. Things may depend on it --
 is the hand-maintained grammar approximation and is only worth having while
 it stays independent of the parser.
 
-@dir(crates/motem-syntax) and @dir(crates/serde_motem) are listed by name in layer 1. motem is the data language dual to tomet.
-`motem-syntax` is its syntax (parser and printer), used by the tomet parser; `serde_motem` reads and writes Rust types through serde,
+@dir(crates/cotomet-syntax) and @dir(crates/serde_cotomet) are listed by name in layer 1. cotomet is the data language dual to tomet.
+`cotomet-syntax` is its syntax (parser and printer), used by the tomet parser; `serde_cotomet` reads and writes Rust types through serde,
 and depends on the syntax alone. Neither shares a prefix with the tomet syntax group.
 
-@dir(crates/motem) is the public facade over those two, and holds no logic of its own. It sits in layer 2, above both, so a crate in
-layer 1 that needs motem's syntax depends on `motem-syntax` and not on the facade.
+@dir(crates/cotomet) is the public facade over those two, and holds no logic of its own. It sits in layer 2, above both, so a crate in
+layer 1 that needs cotomet's syntax depends on `cotomet-syntax` and not on the facade.
 
 @dir(crates/tomet-extract) and @dir(crates/tomet-search) are listed by name in layer 5. They are pure in-memory extraction and query
 engines rather than internal syntax or semantics producers, and their names carry no prefix shared with the producer groups.

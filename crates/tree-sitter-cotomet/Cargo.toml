@@ -1,0 +1,17 @@
+[package]
+name = "tree-sitter-cotomet"
+version.workspace = true
+edition.workspace = true
+description = "Rust binding for the cotomet tree-sitter grammar."
+license.workspace = true
+repository.workspace = true
+build = "build.rs"
+
+[dependencies]
+tree-sitter-language = { workspace = true }
+
+[build-dependencies]
+cc = "1"
+
+[dev-dependencies]
+tree-sitter = { workspace = true }

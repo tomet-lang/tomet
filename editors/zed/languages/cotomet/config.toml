@@ -1,0 +1,16 @@
+name = "Cotomet"
+grammar = "cotomet"
+path_suffixes = ["ctmt"]
+line_comment = "//"
+
+[[brackets]]
+start = "{"
+end = "}"
+close = true
+newline = true
+
+[[brackets]]
+start = "("
+end = ")"
+close = true
+newline = true

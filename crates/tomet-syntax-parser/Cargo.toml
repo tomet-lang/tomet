@@ -11,7 +11,7 @@ tomet-ast = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-lexer = { workspace = true }
 tomet-tree = { workspace = true }
-motem-syntax = { workspace = true }
+cotomet-syntax = { workspace = true }
 
 #= Crates.io
 unicode-width = { workspace = true }

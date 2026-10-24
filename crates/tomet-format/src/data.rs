@@ -1,6 +1,6 @@
-//! Whitespace-hygiene formatting for a standalone motem file (`.mtm`).
+//! Whitespace-hygiene formatting for a standalone cotomet file (`.ctmt`).
 
-/// Normalizes the whitespace of a `.mtm` file: LF line endings, no trailing
+/// Normalizes the whitespace of a `.ctmt` file: LF line endings, no trailing
 /// whitespace, runs of blank lines collapsed to one, no leading blank lines,
 /// exactly one final newline. Comments stay where they are.
 ///
@@ -12,11 +12,11 @@
 /// starts in text the parser does not accept; so is any result that would
 /// read back as a different value.
 pub fn format_data_source(src: &str) -> String {
-    let Ok(before) = motem_syntax::parse_file(src) else {
+    let Ok(before) = cotomet_syntax::parse_file(src) else {
         return src.to_string();
     };
     let formatted = scan(src);
-    match motem_syntax::parse_file(&formatted) {
+    match cotomet_syntax::parse_file(&formatted) {
         Ok(after) if after == before => formatted,
         _ => src.to_string(),
     }
@@ -154,8 +154,8 @@ mod tests {
             "\"k  \": \"v \r\n w\"\r\n",
             "",
         ] {
-            let before = motem_syntax::parse_file(src).unwrap();
-            let after = motem_syntax::parse_file(&format_data_source(src)).unwrap();
+            let before = cotomet_syntax::parse_file(src).unwrap();
+            let after = cotomet_syntax::parse_file(&format_data_source(src)).unwrap();
             assert_eq!(before, after, "{src:?}");
         }
     }
@@ -168,8 +168,8 @@ mod tests {
             "::kind(catalog, 2)\n\n::meta{ id: x }\n\n\"a\": 1\n"
         );
         // the value is the same, header included
-        let before = motem_syntax::parse_file(src).unwrap();
-        let after = motem_syntax::parse_file(&format_data_source(src)).unwrap();
+        let before = cotomet_syntax::parse_file(src).unwrap();
+        let after = cotomet_syntax::parse_file(&format_data_source(src)).unwrap();
         assert_eq!(before, after);
     }
 

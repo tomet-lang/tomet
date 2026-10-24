@@ -14,7 +14,7 @@ test:
 
 # Run the tree-sitter grammars' tests only.
 test-treesitter:
-    cargo test -p tree-sitter-tomet -p tree-sitter-motem
+    cargo test -p tree-sitter-tomet -p tree-sitter-cotomet
 
 # Run the cross-crate corpus/round-trip/snapshot suite only.
 test-suite:
@@ -27,8 +27,8 @@ update-refs:
 # Regenerate Tree-sitter parser C files (src/parser.c, src/grammar.json) from grammar.js and test.
 gen-treesitter:
     cd crates/tree-sitter-tomet && npx -y tree-sitter-cli@0.26.12 generate
-    cd crates/tree-sitter-motem && npx -y tree-sitter-cli@0.26.12 generate
-    cargo test -p tree-sitter-tomet -p tree-sitter-motem
+    cd crates/tree-sitter-cotomet && npx -y tree-sitter-cli@0.26.12 generate
+    cargo test -p tree-sitter-tomet -p tree-sitter-cotomet
 
 # Fails when the committed parser.c, grammar.json and node-types.json are not what
 # grammar.js generates -- the same check CI runs.
@@ -36,9 +36,9 @@ gen-treesitter-check:
     cd crates/tree-sitter-tomet && sha256sum src/parser.c src/grammar.json src/node-types.json > "{{ justfile_directory() }}/target/tree-sitter.sum"
     cd crates/tree-sitter-tomet && npx -y tree-sitter-cli@0.26.12 generate
     cd crates/tree-sitter-tomet && sha256sum --check "{{ justfile_directory() }}/target/tree-sitter.sum"
-    cd crates/tree-sitter-motem && sha256sum src/parser.c src/grammar.json src/node-types.json > "{{ justfile_directory() }}/target/tree-sitter-motem.sum"
-    cd crates/tree-sitter-motem && npx -y tree-sitter-cli@0.26.12 generate
-    cd crates/tree-sitter-motem && sha256sum --check "{{ justfile_directory() }}/target/tree-sitter-motem.sum"
+    cd crates/tree-sitter-cotomet && sha256sum src/parser.c src/grammar.json src/node-types.json > "{{ justfile_directory() }}/target/tree-sitter-cotomet.sum"
+    cd crates/tree-sitter-cotomet && npx -y tree-sitter-cli@0.26.12 generate
+    cd crates/tree-sitter-cotomet && sha256sum --check "{{ justfile_directory() }}/target/tree-sitter-cotomet.sum"
 
 # Check formatting across workspace.
 format-check:
@@ -97,12 +97,12 @@ setup-helix:
     @ln -sfr editors/helix/languages.toml .helix/languages.toml
     @mkdir -p ~/.config/helix/runtime/queries
     @ln -sfrn editors/helix/queries/tomet ~/.config/helix/runtime/queries/tomet
-    @ln -sfrn editors/helix/queries/motem ~/.config/helix/runtime/queries/motem
-    @echo "✅ Linked .helix/languages.toml and ~/.config/helix/runtime/queries/{tomet,motem}"
-    @if command -v hx >/dev/null 2>&1; then hx --health tomet; hx --health motem; fi
+    @ln -sfrn editors/helix/queries/cotomet ~/.config/helix/runtime/queries/cotomet
+    @echo "✅ Linked .helix/languages.toml and ~/.config/helix/runtime/queries/{tomet,cotomet}"
+    @if command -v hx >/dev/null 2>&1; then hx --health tomet; hx --health cotomet; fi
 
 # Remove Helix development runtime queries.
 clean-helix:
-    @rm -rf ~/.config/helix/runtime/queries/tomet ~/.config/helix/runtime/queries/motem
-    @echo "🧹 Removed ~/.config/helix/runtime/queries/{tomet,motem}"
+    @rm -rf ~/.config/helix/runtime/queries/tomet ~/.config/helix/runtime/queries/cotomet
+    @echo "🧹 Removed ~/.config/helix/runtime/queries/{tomet,cotomet}"
 

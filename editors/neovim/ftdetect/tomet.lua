@@ -1,7 +1,7 @@
--- Filetype detection for Tomet (.tmt) and motem (.mtm)
+-- Filetype detection for Tomet (.tmt) and cotomet (.ctmt)
 vim.filetype.add({
   extension = {
     tmt = "tomet",
-    mtm = "motem",
+    ctmt = "cotomet",
   },
 })

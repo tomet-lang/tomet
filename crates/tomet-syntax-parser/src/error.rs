@@ -34,8 +34,8 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl From<motem_syntax::Error> for Error {
-    fn from(e: motem_syntax::Error) -> Self {
+impl From<cotomet_syntax::Error> for Error {
+    fn from(e: cotomet_syntax::Error) -> Self {
         Error {
             message: e.message,
             line: e.line,

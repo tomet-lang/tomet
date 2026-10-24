@@ -59,10 +59,10 @@ pub fn quote_scalar_string(s: &str) -> String {
 
 /// Appends a safely quoted/escaped string scalar to `out`.
 ///
-/// This is `motem`'s own, not a copy: what needs quotes is decided by what the
+/// This is `cotomet`'s own, not a copy: what needs quotes is decided by what the
 /// parser reads back as something other than the same string, so the two
 /// cannot drift apart.
-pub use motem_syntax::write_scalar_string;
+pub use cotomet_syntax::write_scalar_string;
 
 /// Renders a `Vec<Block>` slot (an element's `[content]`, or a `key:
 /// [...]` value) back into `.tmt` source text.
@@ -133,7 +133,7 @@ pub fn render_value_inner_with_blocks(
         Value::Null => String::new(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) => motem_syntax::float_text(*f),
+        Value::Float(f) => cotomet_syntax::float_text(*f),
         Value::String(s) => quote_scalar_string(s),
         // `list(...)` is the only surviving list-value spelling -- `[...]`
         // was retired since it already means `[content]` at the element
@@ -167,7 +167,7 @@ pub fn render_value_inner_with_blocks(
                         if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang")) {
                             parts.push(val_str);
                         } else {
-                            parts.push(format!("{}: {val_str}", motem_syntax::key_text(k)));
+                            parts.push(format!("{}: {val_str}", cotomet_syntax::key_text(k)));
                         }
                     }
                     parts.join(", ")
@@ -182,7 +182,7 @@ pub fn render_value_inner_with_blocks(
                     if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang")) {
                         parts.push(val_str);
                     } else {
-                        parts.push(format!("{}: {val_str}", motem_syntax::key_text(k)));
+                        parts.push(format!("{}: {val_str}", cotomet_syntax::key_text(k)));
                     }
                 }
                 parts.join(", ")
@@ -259,7 +259,7 @@ pub fn render_value_inner_with_blocks(
                                 Entry::Pair(k, v) => {
                                     s.push_str(&format!(
                                         "{}: {}",
-                                        motem_syntax::key_text(k),
+                                        cotomet_syntax::key_text(k),
                                         render_nested_with_blocks(v, config, render_blocks)
                                     ));
                                 }
@@ -369,7 +369,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
             let field_cfg = config.meta.fields.get(k);
             let val_str = render_meta_field_value(v, field_cfg, config);
             out.push_str("  ");
-            motem_syntax::write_key(k, &mut out);
+            cotomet_syntax::write_key(k, &mut out);
             if val_str.starts_with('\n') || val_str.is_empty() {
                 out.push(':');
             } else {

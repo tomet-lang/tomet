@@ -1,9 +1,9 @@
-//! Zed editor extension for the Tomet document language and motem data files.
+//! Zed editor extension for the Tomet document language and cotomet data files.
 //!
 //! =[ Overview ]
 //!
-//! Provides Zed editor support for Tomet files (`.tmt`) and motem data files
-//! (`.mtm`), integrating syntax highlighting and launching the language server
+//! Provides Zed editor support for Tomet files (`.tmt`) and cotomet data files
+//! (`.ctmt`), integrating syntax highlighting and launching the language server
 //! (`tomet-lsp`).
 //!
 //! =[ Language Server ]

@@ -8,8 +8,8 @@ function M.setup(opts)
 
   vim.api.nvim_create_autocmd("FileType", {
     group = vim.api.nvim_create_augroup("tomet_lsp", { clear = true }),
-    -- a motem file (.mtm) is served diagnostics and formatting by the same server
-    pattern = { "tomet", "motem" },
+    -- a cotomet file (.ctmt) is served diagnostics and formatting by the same server
+    pattern = { "tomet", "cotomet" },
     callback = function(ev)
       local executable = type(cmd) == "table" and cmd[1] or cmd
       if vim.fn.executable(executable) ~= 1 then

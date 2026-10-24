@@ -5,7 +5,7 @@ use crate::position::{uri_to_file_path, whole_document_range};
 
 /// Formats the document using `tomet-formatter` with loaded or inferred configuration.
 ///
-/// A `.mtm` is formatted by whitespace alone, whatever the config says, as
+/// A `.ctmt` is formatted by whitespace alone, whatever the config says, as
 /// `tomet format` does.
 pub fn format_edits(text: &str, uri: Option<&Uri>) -> Vec<TextEdit> {
     let formatted = if uri.is_some_and(crate::data::is_data_uri) {

@@ -3,7 +3,7 @@ name = "Tomet"
 version = "0.1.0"
 schema_version = 1
 authors = ["kakusika"]
-description = "Syntax highlighting and language server support for Tomet (.tmt) and motem (.mtm) files."
+description = "Syntax highlighting and language server support for Tomet (.tmt) and cotomet (.ctmt) files."
 repository = "https://github.com/tomet-lang/tomet"
 
 [grammars.tomet]
@@ -11,11 +11,11 @@ repository = "https://github.com/tomet-lang/tomet"
 rev = "1242ff9a93824e7999883338d91a07742219fd95"
 path = "crates/tree-sitter-tomet"
 
-[grammars.motem]
+[grammars.cotomet]
 repository = "https://github.com/tomet-lang/tomet"
 rev = "1242ff9a93824e7999883338d91a07742219fd95"
-path = "crates/tree-sitter-motem"
+path = "crates/tree-sitter-cotomet"
 
 [language_servers.tomet-lsp]
 name = "Tomet Language Server"
-languages = ["Tomet", "Motem"]
+languages = ["Tomet", "Cotomet"]

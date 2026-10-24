@@ -109,7 +109,7 @@ pub enum Value {
     /// ordered sequence is enough for what this exists to express.
     ///
     /// The parser resolves exactly the literal constructors
-    /// (`motem_syntax::LITERAL_CONSTRUCTORS`: `list`, `string`, `int`, `float`) to
+    /// (`cotomet_syntax::LITERAL_CONSTRUCTORS`: `list`, `string`, `int`, `float`) to
     /// the plain value they stand for, so `list(card)` is a [`Value::Seq`]
     /// and never a `Call`. Every other callee -- `enum`, a typo -- is kept
     /// here as an uninterpreted `String`, the same way the parser never

@@ -178,9 +178,9 @@ fn preserves_colon_in_url_values() {
     );
 }
 
-/// A quoted key is a map key (`motem` reads it, the tomet value grammar
+/// A quoted key is a map key (`cotomet` reads it, the tomet value grammar
 /// delegates to it), so a path can key an entry in a document's `{...}` data
-/// and in its `(args)` as well as in a standalone motem file.
+/// and in its `(args)` as well as in a standalone cotomet file.
 #[test]
 fn a_quoted_key_is_a_map_key() {
     let v = parse_value("\"tmtroot/a.tmt\": ../x\nplain: 1").unwrap();
@@ -200,7 +200,7 @@ fn a_quoted_string_without_a_colon_is_still_a_value() {
 }
 
 /// A map holds a named key once, however it is spelled: in `(args)`, which
-/// shares `motem`'s map body, and in an element's `{...}` group, which has a
+/// shares `cotomet`'s map body, and in an element's `{...}` group, which has a
 /// loop of its own.
 #[test]
 fn a_repeated_key_is_an_error_in_args_and_in_a_group() {

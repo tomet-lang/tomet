@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-formatter, dependencies: list(motem-syntax, tomet-ast, tomet-config, tomet-parser), dependents: list(tomet, tomet-benches, tomet-cli, tomet-lsp, tomet-printer, tomet-spec, tomet-tests, tomet-workspace)}
+::meta{crate: tomet-formatter, dependencies: list(cotomet-syntax, tomet-ast, tomet-config, tomet-parser), dependents: list(tomet, tomet-benches, tomet-cli, tomet-lsp, tomet-printer, tomet-spec, tomet-tests, tomet-workspace)}
 
 =[tomet-formatter]
 
@@ -46,13 +46,13 @@ and blank lines inside raw/verbatim content.
 
 ==[Module data]
 
-Whitespace-hygiene formatting for a standalone motem file (`.mtm`).
+Whitespace-hygiene formatting for a standalone cotomet file (`.ctmt`).
 
 ===[Functions]
 
 ====[fn format_data_source]
 
-Normalizes the whitespace of a `.mtm` file: LF line endings, no trailing
+Normalizes the whitespace of a `.ctmt` file: LF line endings, no trailing
 whitespace, runs of blank lines collapsed to one, no leading blank lines,
 exactly one final newline. Comments stay where they are.
 

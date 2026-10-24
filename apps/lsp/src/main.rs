@@ -116,7 +116,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                 if connection.handle_shutdown(&req)? {
                     break;
                 }
-                // A `.mtm` is data: it is formatted (below), and the features
+                // A `.ctmt` is data: it is formatted (below), and the features
                 // that read a document have nothing to say about it.
                 if req.method != Formatting::METHOD && tomet_lsp::request_is_for_data(&req.params) {
                     connection.sender.send(Message::Response(Response::new_ok(
@@ -295,7 +295,7 @@ fn publish(
     text: &str,
     from_vault: Option<&Vec<lsp_types::Diagnostic>>,
 ) -> anyhow::Result<()> {
-    // A `.mtm` is read by the motem parser, and the vault has no say.
+    // A `.ctmt` is read by the cotomet parser, and the vault has no say.
     if tomet_lsp::is_data_uri(&uri) {
         return publish_diagnostics(connection, uri, tomet_lsp::data_diagnostics_for(text));
     }

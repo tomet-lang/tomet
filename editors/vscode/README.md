@@ -5,8 +5,8 @@ Syntax highlighting and language server support for
 
 ## Features
 
-- Syntax highlighting for `.tmt` (and `.tm`) files, and for standalone motem
-  data files (`.mtm`). A `.mtm` gets diagnostics and formatting from
+- Syntax highlighting for `.tmt` (and `.tm`) files, and for standalone cotomet
+  data files (`.ctmt`). A `.ctmt` gets diagnostics and formatting from
   `tomet-lsp`, and nothing a document gets (no hover, symbols or completion).
 - Language server features (diagnostics, formatting, folding, ...) provided by
   `tomet-lsp`.

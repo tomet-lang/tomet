@@ -12,7 +12,7 @@ name = "tomet-lsp"
 path = "src/main.rs"
 
 [dependencies]
-motem = { workspace = true }
+cotomet = { workspace = true }
 tomet-address = { workspace = true }
 tomet-ast = { workspace = true }
 tomet-expr = { workspace = true }

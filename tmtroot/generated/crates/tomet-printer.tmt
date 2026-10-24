@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-printer, dependencies: list(motem-syntax, tomet-ast, tomet-config, tomet-field-utils, tomet-formatter, tomet-markdown, tomet-parser, tomet-semantics, tomet-style, tomet-tree), dependents: list(tomet, tomet-cli, tomet-merge, tomet-pandoc, tomet-spec, tomet-tests, tomet-workspace)}
+::meta{crate: tomet-printer, dependencies: list(cotomet-syntax, tomet-ast, tomet-config, tomet-field-utils, tomet-formatter, tomet-markdown, tomet-parser, tomet-semantics, tomet-style, tomet-tree), dependents: list(tomet, tomet-cli, tomet-merge, tomet-pandoc, tomet-spec, tomet-tests, tomet-workspace)}
 
 =[tomet-printer]
 

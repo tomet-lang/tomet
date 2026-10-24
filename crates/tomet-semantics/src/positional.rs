@@ -189,7 +189,7 @@ fn scalar_to_plain(v: &Value) -> String {
         Value::Null => String::new(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) => motem_syntax::float_text(*f),
+        Value::Float(f) => cotomet_syntax::float_text(*f),
         Value::String(s) => s.clone(),
         Value::Seq(_) | Value::Map(_) | Value::Call(..) | Value::Element(_) | Value::Blocks(_) => {
             String::new()

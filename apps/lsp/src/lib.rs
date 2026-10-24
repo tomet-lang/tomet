@@ -1,8 +1,8 @@
 //! Language server library for Tomet (`tomet-lsp`).
 //! Provides diagnostics (what the text alone says, and what `tomet check`
 //! says of a document in its vault), document formatting, hover, document
-//! symbols, goto definition, and completions. A standalone motem file
-//! (`.mtm`) is served as data: see [`data`].
+//! symbols, goto definition, and completions. A standalone cotomet file
+//! (`.ctmt`) is served as data: see [`data`].
 
 pub mod completion;
 pub mod data;

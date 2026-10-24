@@ -32,7 +32,7 @@ tomet-tree = { workspace = true }
 tomet-typst = { workspace = true }
 tomet-validator = { workspace = true }
 tomet-workspace = { workspace = true }
-motem = { workspace = true }
+cotomet = { workspace = true }
 
 #= Crates.io
 anyhow = { workspace = true }

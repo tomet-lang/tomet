@@ -1,0 +1,371 @@
+::kind(api)
+
+::meta{crate: cotomet-syntax, dependencies: list(tomet-ast, tomet-lexer), dependents: list(cotomet, serde_cotomet, tomet-edit, tomet-formatter, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style, tomet-tests)}
+
+=[cotomet-syntax]
+
+==[cotomet-syntax]
+
+The syntax of cotomet, the data language dual to tomet (`tmt` / `ctmt`): a
+lightweight, expressive syntax for values, maps and sequences. A standalone
+cotomet file is a top-level map written as bare `key: value` lines.
+
+Depend on `cotomet` instead unless you are a crate below it; it re-exports this
+crate and `serde_cotomet`.
+
+==[Overview]
+
+cotomet-syntax provides:
+
+- Pure syntax parsing for values, maps, and sequences (`list(...)`) into [`Value`].
+- The printer for the same syntax ([`print_value`] and the spelling helpers).
+- AST and parser primitives shared with the document-level parser (`tomet-syntax-parser`).
+
+Serde integration lives in `serde_cotomet`.
+
+==[Key Functions]
+
+- (write_key) Write a map key, quoted only when it is not an identifier. Every printer that emits `key: value` calls it.
+- (float_text) Spell a float so it reads back as a float. Every printer that emits a [`Value::Float`] calls it.
+
+==[Keys]
+
+A map key is a bare identifier (letters, digits, `_`, `-`, `.`) or a quoted
+string, so a key can be a path or a URL:
+
+```text
+"tmtroot/schema/rust.vocabulary.tmt": "../vocabularies/rust.vocabulary.tmt"
+plain.key: 1
+```
+
+A quoted string is a key only when a `:` follows it; otherwise it is a
+value. The empty key is the positional-entry marker, so `"": v` is an error.
+
+==[Files]
+
+A standalone cotomet file (`.ctmt`) is a top-level map written as bare
+`key: value` lines, with no braces around it, and may open with
+declarations about the file:
+
+```text
+::kind(catalog, 2)
+::use(deck)
+
+"tmtroot/a.tmt": "../a.tmt"
+```
+
+[`parse_file`] reads one into a [`File`]. A declaration is `::name`, then
+positional arguments in `(...)` and a map in `{...}`, either or both, and
+ends its line; they go before the first entry. What a name means is not
+decided here. The body is [`parse_value`] that also insists every entry has
+a key, so a lone scalar or a bare value among the entries is an error at
+that entry.
+
+The tools know a `.ctmt` as data, not as a document: `tomet check` and
+`tomet format` take one next to a `.tmt`; `tomet-lsp` gives it this
+parser's diagnostics and a whitespace formatter and nothing a document gets;
+`tree-sitter-cotomet` highlights it in Helix, Neovim and Zed, and VS Code has a
+TextMate grammar. None of them loads it into a vault.
+
+A document with nothing in it, or only whitespace and comments, is the
+empty map, so a config file may be empty and a reader fills in every
+optional field. Only the document may be empty: a value slot (`k:`) still
+needs a value.
+
+A named key may appear once in a map: writing it again is an error at the
+second one (`duplicate key `a``), whether it is spelled bare or quoted.
+Positional entries have no key and may repeat.
+
+==[Scalars]
+
+A bare (unquoted) scalar is typed by its text, and only these are not
+strings:
+
+- `null`, `true`, `false`: the only keywords (`NULL`, `~`, `yes` are strings).
+- An int, `-?(0|[1-9][0-9]*)`, that fits an `i64`.
+- A float: an int followed by a fraction (`.5` after digits) and/or an
+
+exponent (`e3`, `E-3`), that is finite.
+
+Everything else is a string, so reading a bare scalar never changes its
+text: `007`, `+1`, `.5`, `5.`, `1_000`, `0x10`, `nan` and `inf` are strings.
+A number that has the shape of an int or float but does not fit (`i64`
+overflow, `1e999`) is an error, never a silently lossy value.
+
+The printer writes a float with a `.` or exponent (`1.0`, never `1`), so a
+float reads back as a float. A non-finite float has no bare spelling and is
+written with the `float(...)` constructor (see below).
+
+Serializing a `u64` above `i64::MAX` is an error rather than a wrapped
+value, since [`Value::Int`] is an `i64`.
+
+==[Constructors]
+
+`name(arg, ...)` with a name in [`LITERAL_CONSTRUCTORS`] is resolved by the
+parser to the plain value it stands for, so a reader never sees these as a
+[`Value::Call`]. Arguments are positional only. They convert as Python's
+`str`, `int` and `float` do, and more than one argument is an error where
+the table says at most one.
+
+- `list(a, b)` is a sequence ([`Value::Seq`]); `list()` is empty.
+- `string(x)` is the text of `x`; `string()` is `""`. A bare `x` is taken
+
+as written, not typed, so `string(a)` is `"a"` and `string(1.50)` is
+`"1.50"`. A quoted string is itself; a nested constructor's value is
+rendered the way it is written; a sequence, map or other call is an error.
+
+- `int(x)` is an int: `int()` is `0`, a float truncates toward zero, a
+
+string is read as a decimal `i64` (`int("1.5")` is an error).
+
+- `float(x)` is a float: `float()` is `0.0`, an int widens, a string is
+
+parsed. It is the only way to write `float(nan)`, `float(inf)` and
+`float(-inf)`.
+
+Any other callee (`enum(...)`, a typo) stays a [`Value::Call`] for a later
+pass to judge; cotomet does not.
+
+==[Module error]
+
+===[Structs]
+
+====[struct Error]
+
+===[Type Aliases]
+
+====[type Result]
+
+==[Module parser]
+
+Parsing for cotomet data:
+map bodies (`key: value`), `{ ... }` blocks, `"..."` strings,
+`call(...)` expressions, and bare scalars.
+
+A list value is spelled `list(...)` (a `Value::Call`,
+normalized to `Value::Seq` downstream).
+
+===[Structs]
+
+====[struct NoHook]
+
+The default no-op hook for pure cotomet documents.
+
+====[struct Declaration]
+
+A declaration about a file, written `::name(args){data}` at its top: what
+the file is (`::kind(catalog, 2)`), what it brings in (`::use(deck)`), the
+information about it (`::meta{ id: x }`).
+
+The arguments are values, positional, as in any cotomet call; the data is a
+map. What a name means is not for this crate to say: it reads the shape.
+
+====[struct File]
+
+A standalone cotomet file: its declarations, then its entries.
+
+===[Traits]
+
+====[trait ValueHook]
+
+A hook allowing callers (such as `tomet-syntax-parser`) to parse custom
+embedded values (e.g. `@element` or `$interp`) at value positions.
+
+===[Functions]
+
+====[fn parse_value]
+
+Parse an entire source string as one `Value` using pure cotomet syntax.
+
+A source with nothing but whitespace and comments is the empty map.
+
+====[fn parse_value_with]
+
+Parse an entire source string as one `Value` with a custom [`ValueHook`].
+
+A source with nothing but whitespace and comments is the empty map. Only
+the document may be empty: a value slot inside it (`k:`) still needs a value.
+
+====[fn err]
+
+====[fn is_ident_char]
+
+Characters legal inside a @strong[map key].
+
+====[fn is_name_start]
+
+First character of one segment of an element/identifier name.
+
+====[fn is_name_char]
+
+Subsequent characters of one segment of an element/identifier name.
+
+====[fn is_inline_ws]
+
+====[fn skip_inline_ws]
+
+====[fn skip_ws_and_newlines]
+
+====[fn skip_line_comment]
+
+`// ...` to end of line/EOF.
+
+====[fn skip_block_comment]
+
+====[fn skip_ws_newlines_and_comments]
+
+Like `skip_ws_and_newlines`, but also consumes `//` line comments.
+
+====[fn eat_ident]
+
+====[fn eat_name]
+
+Reads one `.`-separated name, or `None` if `cur` is not at a name start.
+
+====[fn eat_name_segment]
+
+====[fn is_name_start_at]
+
+Whether `cur` is at the start of a name, without consuming it.
+
+====[fn eat_scalar_raw]
+
+Raw scalar text stops at any character that could plausibly end an
+entry/sequence item.
+
+====[fn try_parse_call]
+
+`name(arg, arg, ...)` -- an immediately-resolved literal such as
+`list(card, ns.mycard)`.
+
+====[fn try_parse_call_with]
+
+====[fn scalar_from_text]
+
+Types the text of a bare scalar (see the crate-level "Scalars" section).
+
+`null`, `true` and `false` are the only keywords. A number is an `i64` or
+an `f64` by the JSON grammar; a number that does not fit is an error
+rather than a lossy value. Everything else is a string, so no text is ever
+changed by reading it.
+
+====[fn parse_quoted]
+
+Reads a `"..."` string, with `\"`, `\\`, `\n` and `\t` escapes; a raw newline
+is part of the text. A string that never closes is an error at its opening
+quote, not at the end of the file where it ran out.
+
+====[fn parse_one_entry]
+
+====[fn parse_one_entry_with]
+
+Parses one `key: value` entry, or a bare value as a positional entry.
+
+A key is a bare identifier (`is_ident_char`) or a quoted string
+(`"tmtroot/a/b.tmt": value`), which lets a key be a path or a URL. A quoted
+string with no `:` after it is a positional value, not a key. An empty
+quoted key is an error: `""` is [`POSITIONAL_ENTRY_KEY`].
+
+====[fn parse_map_body]
+
+====[fn duplicate_key_error]
+
+The error for a named key written twice in one map. Positional entries
+(`POSITIONAL_ENTRY_KEY`) are not keys and may repeat.
+
+====[fn parse_map_body_with]
+
+Parses `key: value` entries until a closer or the end, as a `Value::Map`.
+
+A named key may appear once: a second one is an error at its position
+([`duplicate_key_error`]), compared after unquoting, so `"a": 1, a: 2` is
+a duplicate too. A map that held the same key twice would mean different
+things to a reader that keeps the first, the last, or both.
+
+====[fn parse_file]
+
+Parse a standalone cotomet file (`.ctmt`): declarations, then a map of
+`key: value` entries.
+
+The body is [`parse_value`] with the one rule that makes a file a file:
+every entry has a key. A source that is a lone scalar (`123`), or that has
+a bare value among its entries (`a: 1`, then `stray`), is an error at that
+entry, where `parse_value` would read the first as a scalar and keep the
+second as a positional entry. A declaration below the first entry is an
+error too: they go at the top. An empty file, or one with only comments, has
+no declarations and the empty map.
+
+====[fn parse_entry_value]
+
+====[fn parse_entry_value_with]
+
+====[fn parse_value_at]
+
+====[fn parse_value_at_with]
+
+====[fn starts_absolute_path]
+
+====[fn is_scheme_uri_colon]
+
+===[Constants]
+
+====[const LITERAL_CONSTRUCTORS]
+
+The callees the parser resolves to a plain [`Value`] at parse time: the
+literal constructors. Any other `name(...)` stays a [`Value::Call`] for a
+later pass to judge (`enum(...)` among them, which has no meaning yet).
+
+- `list(a, b)` is a [`Value::Seq`].
+- `string(a)` is the text of `a` ([`construct_string`]); a bare `a` is
+
+taken as written, so `string(1.50)` is `"1.50"`.
+
+- `int(x)` and `float(x)` convert like Python's ([`construct_int`],
+
+[`construct_float`]).
+
+====[const POSITIONAL_ENTRY_KEY]
+
+Sentinel key for a positional (unkeyed) entry inside a map body.
+
+==[Module print]
+
+Renders a `Value` back into cotomet data text:
+a top-level map is written as bare `key: value` lines (no enclosing braces);
+nested maps use `{ ... }`, and a sequence prints as `list(...)`.
+
+===[Functions]
+
+====[fn print_value]
+
+====[fn write_float]
+
+Writes a float so it reads back as the same float, never as an int:
+`1.0` stays `1.0` and `1e21` stays `1e21`. A non-finite float has no bare
+spelling, so it is written with the `float(...)` constructor
+(`float(nan)`, `float(inf)`, `float(-inf)`).
+
+====[fn float_text]
+
+[`write_float`] as an owned string, for callers that build with `format!`.
+
+====[fn write_scalar_string]
+
+====[fn write_key]
+
+Writes a map key: bare when it is a non-empty run of [`is_ident_char`],
+quoted (`"tmtroot/a/b.tmt"`) otherwise, so the output reads back as the
+same key. Every printer that emits `key: value` goes through here.
+
+An empty key is [`crate::POSITIONAL_ENTRY_KEY`] and has no keyed spelling; callers
+print such an entry as a bare value. It is quoted here only so a stray one
+fails to parse instead of reading back as something else.
+
+====[fn key_text]
+
+[`write_key`] as an owned string, for callers that build with `format!`.
+
+====[fn quoted_text]
+
+`s` as a `"..."` string whatever it holds, where [`key_text`] quotes only what
+has to be. For a place that uses `.` as a separator: a bare key may hold one.

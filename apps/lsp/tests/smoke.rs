@@ -601,14 +601,14 @@ fn a_vault_with_a_missing_vocabulary_says_so_in_the_log() {
     let _ = std::fs::remove_dir_all(&root);
 }
 
-/// A `.mtm` is data: the motem parser's diagnostics and the whitespace
+/// A `.ctmt` is data: the cotomet parser's diagnostics and the whitespace
 /// formatter, and nothing a document gets (no hover, symbols, completion),
 /// and the vault never hears of it -- here the vault would call the file
 /// invalid, since `id` has to be a UUID.
 #[test]
-fn a_motem_file_is_served_as_data_and_never_reaches_the_vault() {
-    let root = uuid_vault("mtm");
-    let path = root.join("catasto.mtm");
+fn a_cotomet_file_is_served_as_data_and_never_reaches_the_vault() {
+    let root = uuid_vault("ctmt");
+    let path = root.join("catasto.ctmt");
     let uri = format!("file://{}", path.display());
     let mut server = Server::start();
     initialize(&mut server, json!({}));

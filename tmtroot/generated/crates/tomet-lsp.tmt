@@ -1,14 +1,14 @@
 ::kind(api)
 
-::meta{crate: tomet-lsp, dependencies: list(motem, tomet-address, tomet-ast, tomet-cst, tomet-expr, tomet-formatter, tomet-lexer, tomet-load, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator), dependents: list()}
+::meta{crate: tomet-lsp, dependencies: list(cotomet, tomet-address, tomet-ast, tomet-cst, tomet-expr, tomet-formatter, tomet-lexer, tomet-load, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator), dependents: list()}
 
 =[tomet-lsp]
 
 Language server library for Tomet (`tomet-lsp`).
 Provides diagnostics (what the text alone says, and what `tomet check`
 says of a document in its vault), document formatting, hover, document
-symbols, goto definition, and completions. A standalone motem file
-(`.mtm`) is served as data: see [`data`].
+symbols, goto definition, and completions. A standalone cotomet file
+(`.ctmt`) is served as data: see [`data`].
 
 ==[Module completion]
 
@@ -24,9 +24,9 @@ Provides autocompletion items with document URI awareness for path completions.
 
 ==[Module data]
 
-A standalone motem file (`.mtm`) as the language server serves it.
+A standalone cotomet file (`.ctmt`) as the language server serves it.
 
-It is data, not a document: the motem parser says what is wrong with it,
+It is data, not a document: the cotomet parser says what is wrong with it,
 the whitespace formatter formats it, and the features that read a document
 (hover, symbols, completion, folding, definition) have nothing to say. It
 never reaches the vault, which holds documents.
@@ -35,17 +35,17 @@ never reaches the vault, which holds documents.
 
 ====[fn is_data_uri]
 
-Whether `uri` names a `.mtm` file. The query and fragment are not part of
+Whether `uri` names a `.ctmt` file. The query and fragment are not part of
 the name.
 
 ====[fn request_is_for_data]
 
-Whether a request's `params` are about a `.mtm`: the document a request
+Whether a request's `params` are about a `.ctmt`: the document a request
 names is at `textDocument.uri` in all of them.
 
 ====[fn data_diagnostics_for]
 
-What the motem parser says of `text` as a standalone file: at most one
+What the cotomet parser says of `text` as a standalone file: at most one
 error, underlined from where it is to the end of its line.
 
 ==[Module definition]
@@ -85,7 +85,7 @@ Computes folding ranges for the given document text.
 
 Formats the document using `tomet-formatter` with loaded or inferred configuration.
 
-A `.mtm` is formatted by whitespace alone, whatever the config says, as
+A `.ctmt` is formatted by whitespace alone, whatever the config says, as
 `tomet format` does.
 
 ====[fn resolve_effective_config]
