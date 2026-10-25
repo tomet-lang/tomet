@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use tomet_ast::{Block, Document, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
-use tomet_expr::{DirRef, DocRef, EvalValue, PreparedBlocks, Resolver, shaped};
+use tomet_expr::{DirRef, DocRef, EvalValue, PreparedBlocks, Resolver, typed_value};
 use tomet_type::Type;
 
 /// The document's `::meta`, typed by the settings' `meta` declarations.
@@ -16,6 +16,8 @@ use tomet_type::Type;
 /// - a `datetime` field is a datetime when its text reads as one, and stays
 ///   text when it does not (`tomet check` is what reports the bad one, by
 ///   the same `parse_datetime`);
+/// - a field whose type is text (`string`, `version`, `uuid`, `nanoid`) is the
+///   text it was written as, so `rev: 1.10` is `"1.10"` and not `1.1`;
 /// - every other declared field is `Null` when the document lacks it;
 /// - a key that is neither declared nor written is absent from the map, so
 ///   reading it is an error and a typo cannot turn into an answer of "no".
@@ -29,10 +31,9 @@ pub fn typed_meta(config: &PrinterConfig, doc: &Document, doc_ref: &DocRef) -> E
     let mut entries: Vec<(String, EvalValue)> = written
         .iter()
         .map(|(key, value)| {
-            let value = EvalValue::from_ast(value, doc_ref);
             let value = match config.meta.fields.get(key) {
-                Some(field) => typed(field, Some(value)),
-                None => value,
+                Some(field) => typed(field, Some((value, doc_ref))),
+                None => EvalValue::from_ast(value, doc_ref),
             };
             (key.clone(), value)
         })
@@ -45,12 +46,12 @@ pub fn typed_meta(config: &PrinterConfig, doc: &Document, doc_ref: &DocRef) -> E
     EvalValue::Map(entries)
 }
 
-fn typed(field: &FieldConfig, value: Option<EvalValue>) -> EvalValue {
+fn typed(field: &FieldConfig, value: Option<(&Value, &DocRef)>) -> EvalValue {
     let ty = field.field_type.as_deref().and_then(Type::from_name);
     match (ty, value) {
         (Some(Type::List), None) => EvalValue::Seq(Vec::new()),
-        (Some(ty), Some(value)) => shaped(ty, value),
-        (None, Some(value)) => value,
+        (Some(ty), Some((value, doc))) => typed_value(ty, value, doc),
+        (None, Some((value, doc))) => EvalValue::from_ast(value, doc),
         (_, None) => EvalValue::Null,
     }
 }
@@ -117,6 +118,7 @@ mod tests {
     tags: { type: list }
     created: { type: datetime, format: rfc3339 }
     title: { type: string }
+    rev: { type: version }
     note: { always_newline: true }
   }
 }
@@ -155,6 +157,21 @@ mod tests {
                 EvalValue::String("b".into())
             ]))
         );
+    }
+
+    /// A field whose type is text is the text it was written as: a bare `1.10` is the
+    /// version `1.10`, not the number `1.1`; and a `title` of `2024` is `"2024"`.
+    #[test]
+    fn a_text_field_is_the_text_it_was_written_as() {
+        let meta = meta_of("::meta{ rev: 1.10, title: 2024 }\n");
+        assert_eq!(field(&meta, "rev"), Some(&EvalValue::String("1.10".into())));
+        assert_eq!(
+            field(&meta, "title"),
+            Some(&EvalValue::String("2024".into()))
+        );
+        // not declared: read as it is, as before
+        let meta = meta_of("::meta{ other: 1.10 }\n");
+        assert_eq!(field(&meta, "other"), Some(&EvalValue::Float(1.1)));
     }
 
     #[test]

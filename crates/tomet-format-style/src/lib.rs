@@ -134,6 +134,8 @@ pub fn render_value_inner_with_blocks(
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
         Value::Float(f) => cotomet_syntax::float_text(*f),
+        // As written: formatting must not turn `1.10` into `1.1`.
+        Value::Number(text) => text.clone(),
         Value::String(s) => quote_scalar_string(s),
         // `list(...)` is the only surviving list-value spelling -- `[...]`
         // was retired since it already means `[content]` at the element

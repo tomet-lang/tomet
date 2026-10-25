@@ -102,12 +102,11 @@ pub fn var_scope(
     for (name, decl) in decls {
         let given = passed.iter().rev().find(|(n, _)| n == name);
         let value = match (given, &decl.default) {
-            (Some((_, Value::String(text))), _) => Some(shaped(
-                decl.ty,
-                EvalValue::from_ast(&read_text(name, decl.ty, text)?, doc),
-            )),
+            (Some((_, Value::String(text))), _) => {
+                Some(typed_value(decl.ty, &read_text(name, decl.ty, text)?, doc))
+            }
             (Some((_, other)), _) => Some(EvalValue::from_ast(other, doc)),
-            (None, Some(default)) => Some(shaped(decl.ty, EvalValue::from_ast(default, doc))),
+            (None, Some(default)) => Some(typed_value(decl.ty, default, doc)),
             (None, None) => None,
         };
         match value {
@@ -129,6 +128,21 @@ fn read_text(name: &str, ty: Type, text: &str) -> Result<Value, VarError> {
         text: text.to_string(),
         why: err.to_string(),
     })
+}
+
+/// A value as the declared type reads it.
+///
+/// A type that is text -- `string`, `version`, `uuid`, `nanoid` -- reads a bare
+/// scalar as the text it was written as, so `1.10` for a `version` is the string
+/// `"1.10"` and not the number `1.1`, and `2024` for a `string` is `"2024"`.
+/// For any other type the value is read as it is, then [`shaped`].
+pub fn typed_value(ty: Type, value: &Value, doc: &DocRef) -> EvalValue {
+    match (ty, value.scalar_text()) {
+        (Type::String | Type::Version | Type::Uuid | Type::Nanoid, Some(text)) => {
+            EvalValue::String(text.into_owned())
+        }
+        _ => shaped(ty, EvalValue::from_ast(value, doc)),
+    }
 }
 
 /// A value, shaped by the declared type where it plainly can be: a datetime
@@ -242,5 +256,32 @@ mod tests {
             scope.values,
             EvalValue::Map(vec![("n".into(), EvalValue::String("many".into()))])
         );
+    }
+
+    #[test]
+    fn a_text_variable_is_the_text_it_was_written_as() {
+        let decls = vec![
+            (
+                "rev".to_string(),
+                decl(Some(Type::Version), Some(Value::Number("1.10".to_string()))),
+            ),
+            ("label".to_string(), decl(None, Some(Value::Int(2024)))),
+        ];
+        let scope = var_scope(&decls, &doc(), &[]).unwrap();
+        assert_eq!(
+            scope.values,
+            EvalValue::Map(vec![
+                ("rev".into(), EvalValue::String("1.10".into())),
+                ("label".into(), EvalValue::String("2024".into())),
+            ])
+        );
+        // passed as text, a version is held to its form
+        let decls = vec![("rev".to_string(), decl(Some(Type::Version), None))];
+        let ok = var_scope(&decls, &doc(), &passed("rev", "1.10.0")).unwrap();
+        assert_eq!(
+            ok.values,
+            EvalValue::Map(vec![("rev".into(), EvalValue::String("1.10.0".into()))])
+        );
+        assert!(var_scope(&decls, &doc(), &passed("rev", "1.0-beta")).is_err());
     }
 }

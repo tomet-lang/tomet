@@ -28,6 +28,7 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
         Value::String(s) => write_scalar_string(s, out),
         Value::Int(i) => out.push_str(&i.to_string()),
         Value::Float(f) => write_float(*f, out),
+        Value::Number(text) => out.push_str(text),
         Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
         Value::Null => out.push_str("null"),
         Value::Call(name, args) => {
@@ -155,7 +156,7 @@ pub fn write_float(f: f64, out: &mut String) {
     } else if f.is_infinite() {
         out.push_str(if f > 0.0 { "float(inf)" } else { "float(-inf)" });
     } else {
-        out.push_str(&format!("{f:?}"));
+        out.push_str(&Value::float_text(f));
     }
 }
 

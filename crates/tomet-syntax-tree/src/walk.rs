@@ -102,7 +102,12 @@ fn inlines_in_value(value: &Value, f: &mut dyn FnMut(&Inline)) {
         Value::Map(entries) => entries.iter().for_each(|(_, v)| inlines_in_value(v, f)),
         Value::Call(_, args) => args.iter().for_each(|a| inlines_in_value(a, f)),
         Value::Blocks(blocks) => blocks.iter().for_each(|b| inlines_in_block(b, f)),
-        Value::Null | Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::String(_) => {}
+        Value::Null
+        | Value::Bool(_)
+        | Value::Int(_)
+        | Value::Float(_)
+        | Value::Number(_)
+        | Value::String(_) => {}
     }
 }
 
@@ -332,9 +337,12 @@ fn walk_value<B>(value: &Value, visitor: &mut impl Visitor<B>) -> ControlFlow<B>
             }
             ControlFlow::Continue(())
         }
-        Value::Null | Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::String(_) => {
-            ControlFlow::Continue(())
-        }
+        Value::Null
+        | Value::Bool(_)
+        | Value::Int(_)
+        | Value::Float(_)
+        | Value::Number(_)
+        | Value::String(_) => ControlFlow::Continue(()),
     }
 }
 
@@ -458,9 +466,12 @@ fn walk_value_mut<B>(value: &mut Value, visitor: &mut impl VisitorMut<B>) -> Con
             }
             ControlFlow::Continue(())
         }
-        Value::Null | Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::String(_) => {
-            ControlFlow::Continue(())
-        }
+        Value::Null
+        | Value::Bool(_)
+        | Value::Int(_)
+        | Value::Float(_)
+        | Value::Number(_)
+        | Value::String(_) => ControlFlow::Continue(()),
     }
 }
 

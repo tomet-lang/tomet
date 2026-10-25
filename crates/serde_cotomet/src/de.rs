@@ -7,6 +7,48 @@ pub fn from_value<T: for<'de> Deserialize<'de>>(value: Value) -> Result<T> {
     T::deserialize(ValueDeserializer(value))
 }
 
+/// An integer target reads a [`Value::Number`] that is a whole number (`-0`, or
+/// one past an `i64`) as the integer it spells, to the width the target has.
+macro_rules! deserialize_integer {
+    ($($method:ident)*) => {$(
+        fn $method<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+            match self.0 {
+                // The narrowest visit that holds it: a primitive's visitor takes its own
+                // width and the next one up, not `i128` for every width.
+                Value::Number(text) => {
+                    if let Ok(n) = text.parse::<i64>() {
+                        visitor.visit_i64(n)
+                    } else if let Ok(n) = text.parse::<u64>() {
+                        visitor.visit_u64(n)
+                    } else if let Ok(n) = text.parse::<i128>() {
+                        visitor.visit_i128(n)
+                    } else if let Ok(n) = text.parse::<u128>() {
+                        visitor.visit_u128(n)
+                    } else {
+                        Err(Error::msg(format!("`{text}` is not an integer")))
+                    }
+                }
+                other => ValueDeserializer(other).deserialize_any(visitor),
+            }
+        }
+    )*};
+}
+
+/// A float target reads a [`Value::Number`] as the number it spells.
+macro_rules! deserialize_float {
+    ($($method:ident)*) => {$(
+        fn $method<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+            match self.0 {
+                Value::Number(text) => match text.parse::<f64>() {
+                    Ok(f) if f.is_finite() => visitor.visit_f64(f),
+                    _ => Err(Error::msg(format!("`{text}` is out of range for a float"))),
+                },
+                other => ValueDeserializer(other).deserialize_any(visitor),
+            }
+        }
+    )*};
+}
+
 /// A local newtype around `Value` -- `serde::Deserializer` is a foreign
 /// trait and `Value` is a foreign type (defined in `tomet-ast`), so
 /// the orphan rules require this wrapper to implement it here.
@@ -21,6 +63,12 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
             Value::Bool(b) => visitor.visit_bool(b),
             Value::Int(i) => visitor.visit_i64(i),
             Value::Float(f) => visitor.visit_f64(f),
+            // A target that does not say what it wants gets the number it is, as
+            // `serde_json` gives an `f64`; one too large to be one gets its text.
+            Value::Number(text) => match text.parse::<f64>() {
+                Ok(f) if f.is_finite() => visitor.visit_f64(f),
+                _ => visitor.visit_string(text),
+            },
             Value::String(s) => visitor.visit_string(s),
             Value::Seq(items) => visitor.visit_seq(SeqAccess {
                 iter: items.into_iter(),
@@ -70,9 +118,29 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
         }
     }
 
+    /// A `String` target is given the text a scalar was written as: `2024`, `true`
+    /// and `1.10` are each the text they were typed as. Nothing is lost on the
+    /// way, which is what a number that is really a version or a revision needs.
+    fn deserialize_string<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        match self.0.scalar_text().map(std::borrow::Cow::into_owned) {
+            Some(text) => visitor.visit_string(text),
+            None => self.deserialize_any(visitor),
+        }
+    }
+
+    fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        self.deserialize_string(visitor)
+    }
+
+    deserialize_integer!(
+        deserialize_i8 deserialize_i16 deserialize_i32 deserialize_i64 deserialize_i128
+        deserialize_u8 deserialize_u16 deserialize_u32 deserialize_u64 deserialize_u128
+    );
+
+    deserialize_float!(deserialize_f32 deserialize_f64);
+
     serde::forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf unit unit_struct newtype_struct seq tuple
+        bool char bytes byte_buf unit unit_struct newtype_struct seq tuple
         tuple_struct map struct identifier ignored_any
     }
 }

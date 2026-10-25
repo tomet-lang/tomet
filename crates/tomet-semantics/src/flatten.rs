@@ -137,6 +137,7 @@ pub fn scalar_string(v: &Value) -> Option<String> {
         Value::Bool(b) => Some(b.to_string()),
         Value::Int(i) => Some(i.to_string()),
         Value::Float(f) => Some(cotomet_syntax::float_text(*f)),
+        Value::Number(text) => Some(text.clone()),
         Value::String(s) => Some(s.clone()),
         Value::Seq(items) => {
             let parts: Option<Vec<String>> = items.iter().map(scalar_string).collect();
@@ -169,6 +170,12 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
             // JSON has no NaN or infinity; a string keeps the value
             // visible rather than turning it into null.
             .unwrap_or_else(|| serde_json::Value::String(f.to_string())),
+        // JSON here has no arbitrary-precision number, so a kept-as-written number
+        // is the `f64` it spells; one beyond an `f64` is its text.
+        Value::Number(text) => match v.as_number().and_then(serde_json::Number::from_f64) {
+            Some(n) => serde_json::Value::Number(n),
+            None => serde_json::Value::String(text.clone()),
+        },
         Value::String(s) => serde_json::Value::String(s.clone()),
         Value::Seq(items) => serde_json::Value::Array(items.iter().map(value_to_json).collect()),
         Value::Map(entries) => serde_json::Value::Object(

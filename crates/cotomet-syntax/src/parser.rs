@@ -340,7 +340,8 @@ fn construct_string(args: Vec<Value>) -> std::result::Result<Value, String> {
         Some(Value::Int(i)) => i.to_string(),
         Some(Value::Bool(b)) => b.to_string(),
         Some(Value::Null) => "null".to_string(),
-        Some(Value::Float(f)) if f.is_finite() => format!("{f:?}"),
+        Some(Value::Number(text)) => text,
+        Some(Value::Float(f)) if f.is_finite() => Value::float_text(f),
         Some(Value::Float(f)) if f.is_nan() => "nan".to_string(),
         Some(Value::Float(f)) => (if f > 0.0 { "inf" } else { "-inf" }).to_string(),
         Some(other) => return Err(format!("string() takes a scalar, got {other:?}")),
@@ -362,6 +363,14 @@ fn construct_int(args: Vec<Value>) -> std::result::Result<Value, String> {
                 Err(format!("float `{f}` is out of range for a 64-bit integer"))
             }
         }
+        Some(Value::Number(text)) => match text.parse::<f64>() {
+            Ok(f) if f.is_finite() && f >= i64::MIN as f64 && f < i64::MAX as f64 => {
+                Ok(Value::Int(f.trunc() as i64))
+            }
+            _ => Err(format!(
+                "number `{text}` is out of range for a 64-bit integer"
+            )),
+        },
         Some(Value::String(s)) => s
             .trim()
             .parse::<i64>()
@@ -383,6 +392,10 @@ fn construct_float(args: Vec<Value>) -> std::result::Result<Value, String> {
         None => Ok(Value::Float(0.0)),
         Some(Value::Int(i)) => Ok(Value::Float(i as f64)),
         Some(Value::Float(f)) => Ok(Value::Float(f)),
+        Some(Value::Number(text)) => match text.parse::<f64>() {
+            Ok(f) if f.is_finite() => Ok(Value::Float(f)),
+            _ => Err(format!("float `{text}` is out of range")),
+        },
         Some(Value::String(s)) => {
             let text = s.trim();
             let spells_non_finite = text
@@ -399,7 +412,7 @@ fn construct_float(args: Vec<Value>) -> std::result::Result<Value, String> {
 }
 
 /// What a bare scalar's text is, by the JSON number grammar.
-enum Number {
+enum NumberShape {
     Int,
     Float,
 }
@@ -408,7 +421,7 @@ enum Number {
 /// fraction (`.digits`) and/or an exponent (`e[+-]digits`) (float), or
 /// neither. A leading zero (`007`), a leading `+`, and a bare `.5` or `5.`
 /// are none of these, so they stay strings.
-fn classify_number(s: &str) -> Option<Number> {
+fn classify_number(s: &str) -> Option<NumberShape> {
     let b = s.as_bytes();
     let digits = |mut i: usize| {
         let start = i;
@@ -436,15 +449,23 @@ fn classify_number(s: &str) -> Option<Number> {
         i = digits(i)?;
         float = true;
     }
-    (i == b.len()).then_some(if float { Number::Float } else { Number::Int })
+    (i == b.len()).then_some(if float {
+        NumberShape::Float
+    } else {
+        NumberShape::Int
+    })
 }
 
 /// Types the text of a bare scalar (see the crate-level "Scalars" section).
 ///
-/// `null`, `true` and `false` are the only keywords. A number is an `i64` or
-/// an `f64` by the JSON grammar; a number that does not fit is an error
-/// rather than a lossy value. Everything else is a string, so no text is ever
-/// changed by reading it.
+/// `null`, `true` and `false` are the only keywords. A number by the JSON
+/// grammar is an `i64` or an `f64` when that is exactly what it says, and
+/// otherwise a [`Value::Number`] holding the text as written (`1.10`, `1e3`,
+/// `-0`, an integer too large for an `i64`, a float too large for an `f64`).
+/// Everything else is a string, so no text is ever changed by reading it.
+///
+/// The `Result` is kept for the callers that match on one; reading a bare scalar
+/// has no error left in it.
 pub fn scalar_from_text(s: &str) -> std::result::Result<Value, String> {
     match s {
         "null" => return Ok(Value::Null),
@@ -453,14 +474,16 @@ pub fn scalar_from_text(s: &str) -> std::result::Result<Value, String> {
         _ => {}
     }
     match classify_number(s) {
-        Some(Number::Int) => s
-            .parse::<i64>()
-            .map(Value::Int)
-            .map_err(|_| format!("integer `{s}` is out of range for a 64-bit integer")),
-        Some(Number::Float) => match s.parse::<f64>() {
-            Ok(f) if f.is_finite() => Ok(Value::Float(f)),
-            _ => Err(format!("float `{s}` is out of range")),
-        },
+        Some(NumberShape::Int) => Ok(match s.parse::<i64>() {
+            Ok(i) if i.to_string() == s => Value::Int(i),
+            // `-0`, or too large for an `i64`: kept as written.
+            _ => Value::Number(s.to_string()),
+        }),
+        Some(NumberShape::Float) => Ok(match s.parse::<f64>() {
+            Ok(f) if f.is_finite() && Value::float_text(f) == s => Value::Float(f),
+            // `1.10`, `1e3`, `0.50`, or beyond an `f64`: kept as written.
+            _ => Value::Number(s.to_string()),
+        }),
         None => Ok(Value::String(s.to_string())),
     }
 }

@@ -4,44 +4,48 @@
 
 =[tomet-type]
 
-=[ tomet-type ]
+==[tomet-type]
 
 The types a value can be declared as, and how data and text are held to
 them.
 
-=[ Architecture & Responsibilities ]
+==[Architecture & Responsibilities]
 
-- (One vocabulary)
-  | A `type:` is written in the settings' `meta` fields, in `::vars`, and in
-  | a vocabulary's arguments. They all name a [`Type`] here, so a name that
-  | one place accepts is a name every place accepts.
-- (Knows nothing about elements)
-  | This crate depends on [`tomet_ast::Value`] and nothing else. A type does
-  | not know what an element is, which vocabulary declared it, or what
-  | `::meta` is; the dependency is what keeps it so.
-- (What is held to a type)
-  | [`Type::admits`] asks whether a [`Value`] in a document is of the type.
-  | [`Type::read_text`] turns a text that arrives as text -- `--var key=value` --
-  | into the value of the type. [`Type::holds_text`] asks whether a string
-  | is in the form the type gives text, for the types that have one.
+- ("One vocabulary") A `type:` is written in the settings' `meta` fields, in `::vars`, and in
+a vocabulary's arguments. They all name a [`Type`] here, so a name that
+one place accepts is a name every place accepts.
+- ("Knows nothing about elements") This crate depends on [`tomet_ast::Value`] and nothing else. A type does
+not know what an element is, which vocabulary declared it, or what
+`::meta` is; the dependency is what keeps it so.
+- ("What is held to a type") [`Type::admits`] asks whether a [`Value`] in a document is of the type.
+[`Type::read_text`] turns a text that arrives as text -- `--var key=value` --
+into the value of the type. [`Type::holds_text`] asks whether a string
+is in the form the type gives text, for the types that have one.
 
-=[ What a type is not ]
+==[What a type is not]
 
 - It is not how a field is written or made. `format`, `offset`, `length`,
-  `prefix` and `always_newline` are properties of a field's declaration, and
-  belong to the formatter. In particular what makes a `nanoid` well formed
-  depends on the field's `prefix` and `length`, so [`Type::Nanoid`] admits a
-  string and judges no more; `tomet-format-field-utils` judges the rest.
-- It is not a value in the evaluator. A datetime read here stays text
-  ([`datetime`] gives the parts); `tomet-expr` turns it into its own value.
 
-=[ Not yet ]
+`prefix` and `always_newline` are properties of a field's declaration, and
+belong to the formatter. In particular what makes a `nanoid` well formed
+depends on the field's `prefix` and `length`, so [`Type::Nanoid`] admits a
+string and judges no more; `tomet-format-field-utils` judges the rest.
 
+- It is not a value in the evaluator. A datetime read here stays text, and
+
+[`datetime`] gives its parts; `tomet-expr` turns it into its own value.
+
+==[Not yet]
+
+- A version with a pre-release or build part (`1.0.0-beta`, `+5`).
 - A type with a parameter. `list` has no element type yet; the author expects
-  it to be written `<list<string>>` when it comes, so [`Type::parse`] reads
-  a name and nothing else, and says so for any other spelling.
+
+it to be written `<list<string>>` when it comes, so [`Type::parse`] reads
+a name and nothing else, and says so for any other spelling.
+
 - `enum`. Nothing gives it a meaning yet (`:rule`'s `allow:` takes the same
-  spelling and means a list of names).
+
+spelling and means a list of names).
 
 ==[Module datetime]
 

@@ -417,6 +417,7 @@ fn value_to_string(v: &Value) -> String {
         Value::String(s) => s.clone(),
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
+        Value::Number(text) => text.clone(),
         Value::Bool(b) => b.to_string(),
         Value::Null => String::new(),
         Value::Seq(items) => {

@@ -194,6 +194,12 @@ impl EvalValue {
             Value::Bool(b) => EvalValue::Bool(*b),
             Value::Int(i) => EvalValue::Int(*i),
             Value::Float(f) => EvalValue::Float(*f),
+            // An expression computes with a number, so a kept-as-written one is the
+            // `f64` it spells; one beyond an `f64` stays the text it is.
+            Value::Number(text) => match value.as_number() {
+                Some(f) => EvalValue::Float(f),
+                None => EvalValue::String(text.clone()),
+            },
             Value::String(s) => EvalValue::String(s.clone()),
             Value::Seq(items) => {
                 EvalValue::Seq(items.iter().map(|v| Self::from_ast(v, doc)).collect())

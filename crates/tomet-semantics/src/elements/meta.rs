@@ -118,6 +118,8 @@ fn value_to_version_string(v: &Value) -> String {
         Value::String(s) => s.clone(),
         Value::Int(i) => i.to_string(),
         Value::Float(f) => cotomet_syntax::float_text(*f),
+        // `::version(1.10)` is the version `1.10`, not `1.1`.
+        Value::Number(text) => text.clone(),
         _ => format!("{v:?}"),
     }
 }

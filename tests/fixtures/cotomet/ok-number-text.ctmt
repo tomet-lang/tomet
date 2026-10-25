@@ -1,0 +1,11 @@
+// A number that reading would change keeps the text it was written as.
+revision: 1.10
+padded: 0.50
+exponent: 1e3
+negative-zero: -0
+large-int: 12345678901234567890
+large-float: 1e999
+
+// What the JSON grammar does not call a number is a string.
+version: 1.10.0
+date: 2026-10-25

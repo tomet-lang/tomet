@@ -172,10 +172,35 @@ mod tests {
     }
 
     #[test]
-    fn an_unsigned_integer_beyond_i64_is_an_error_not_a_wrapped_value() {
+    fn an_unsigned_integer_beyond_i64_is_kept_as_its_digits_not_wrapped() {
         assert_eq!(to_string(&(i64::MAX as u64)).unwrap(), i64::MAX.to_string());
-        let err = to_string(&u64::MAX).unwrap_err().to_string();
-        assert!(err.contains("out of range"), "{err}");
+        assert_eq!(to_string(&u64::MAX).unwrap(), u64::MAX.to_string());
+        assert_eq!(from_str::<u64>(&u64::MAX.to_string()).unwrap(), u64::MAX);
+        assert_eq!(to_string(&u128::MAX).unwrap(), u128::MAX.to_string());
+        assert_eq!(from_str::<u128>(&u128::MAX.to_string()).unwrap(), u128::MAX);
+    }
+
+    #[test]
+    fn a_string_target_takes_a_bare_scalar_as_the_text_it_was_written_as() {
+        // the revision that used to need quotes: `rev: 1.10` was read as 1.1
+        #[derive(Debug, PartialEq, serde::Deserialize)]
+        struct Rev {
+            rev: String,
+        }
+        for (src, want) in [
+            ("rev: 1.10", "1.10"),
+            ("rev: 1.0", "1.0"),
+            ("rev: 1e3", "1e3"),
+            ("rev: 2024", "2024"),
+            ("rev: true", "true"),
+            ("rev: 1.10.0", "1.10.0"),
+            ("rev: \"1.10\"", "1.10"),
+        ] {
+            assert_eq!(from_str::<Rev>(src).unwrap().rev, want, "{src}");
+        }
+        // a float target still reads the number
+        assert_eq!(from_str::<f64>("1.10").unwrap(), 1.1);
+        assert_eq!(from_str::<i64>("-0").unwrap(), 0);
     }
 
     #[test]
@@ -203,7 +228,7 @@ mod tests {
 
     #[test]
     fn a_data_error_names_the_key_path_to_the_value() {
-        let err = failure::<Settings>("bookmarks: list({label: a, path: 1})");
+        let err = failure::<Settings>("bookmarks: list({label: a, path: list(1)})");
         assert!(err.starts_with("bookmarks[0].path: "), "{err}");
         assert!(err.contains("invalid type"), "{err}");
 
@@ -237,11 +262,11 @@ mod tests {
         assert!(err.starts_with("\"a.tmt\": "), "{err}");
         assert!(err.contains("missing field `path`"), "{err}");
 
-        let err = failure::<BTreeMap<String, Bookmark>>("a.tmt: { label: x, path: 1 }");
+        let err = failure::<BTreeMap<String, Bookmark>>("a.tmt: { label: x, path: list(1) }");
         assert!(err.starts_with("\"a.tmt\".path: "), "{err}");
 
         // a key without a dot stays bare
-        let err = failure::<BTreeMap<String, Bookmark>>("a-b: { label: x, path: 1 }");
+        let err = failure::<BTreeMap<String, Bookmark>>("a-b: { label: x, path: list(1) }");
         assert!(err.starts_with("a-b.path: "), "{err}");
     }
 
@@ -264,7 +289,7 @@ mod tests {
     #[test]
     fn the_path_is_data_not_just_text() {
         let Error::Data { path, .. } =
-            from_str::<Settings>("bookmarks: list({label: a, path: 1})").unwrap_err()
+            from_str::<Settings>("bookmarks: list({label: a, path: list(1)})").unwrap_err()
         else {
             panic!("expected a data error");
         };

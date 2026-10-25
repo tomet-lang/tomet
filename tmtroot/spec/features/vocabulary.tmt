@@ -21,6 +21,9 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 }
 ```
 
+`version:` は版で、`1.0.0` や `1.10` のように、ピリオドで区切った整数
+（@file(tmtroot/spec/elements/std.version.element.tmt)）。形が違えば `tomet check` が報告する。
+
 #[ 名前はキー ]
 
 `::elements` の中身は、要素の名前をキーにしたマップ。`args` の中身は、引数の名前を

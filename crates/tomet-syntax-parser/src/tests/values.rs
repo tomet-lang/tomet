@@ -280,3 +280,25 @@ fn a_pipe_value_inside_nested_maps() {
     );
     assert!(matches!(id[1].1, Value::Blocks(_)));
 }
+
+/// A number that reading would change keeps the text it was written as, in
+/// an element's arguments as anywhere else a value stands: `1.10` is not `1.1`.
+/// What the JSON grammar does not call a number is a string, as it always was.
+#[test]
+fn a_number_reading_would_change_keeps_its_text_in_an_argument() {
+    for (src, want) in [
+        ("1.10", Value::Number("1.10".into())),
+        ("1e3", Value::Number("1e3".into())),
+        ("-0", Value::Number("-0".into())),
+        ("1.5", Value::Float(1.5)),
+        ("2024", Value::Int(2024)),
+        ("1.10.0", Value::String("1.10.0".into())),
+        ("2026-10-25", Value::String("2026-10-25".into())),
+    ] {
+        let doc = parse_document(&format!("@x({src})\n")).unwrap();
+        let Some(Block::Element(el)) = doc.blocks.first() else {
+            panic!("{src}: expected an element, got {:?}", doc.blocks);
+        };
+        assert_eq!(el.args, Some(want), "{src}");
+    }
+}

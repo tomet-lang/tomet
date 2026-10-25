@@ -27,10 +27,6 @@ const GRAMMAR_ACCEPTS: &[(&str, &str)] = &[
         "a repeated key is a meaning, not a shape",
     ),
     (
-        "err-integer-overflow.ctmt",
-        "a number is typed by the highlight query, which does not know i64",
-    ),
-    (
         "err-lone-scalar.ctmt",
         "a file is `key: value` entries; the grammar reads a stray value as a value",
     ),

@@ -1102,3 +1102,72 @@ fn the_version_messages_say_what_to_write() {
         "`kind` takes at most 2 arguments: the name, then an optional version"
     );
 }
+
+fn version_problems(src: &str) -> Vec<String> {
+    validate_document(&parse(src))
+        .iter()
+        .filter(|e| matches!(e, Diagnostic::InvalidDefinition { name, .. } if name == "version"))
+        .map(|e| e.to_string())
+        .collect()
+}
+
+/// A document's declared version is a version: `1.10` is the version `1.10`, bare or
+/// quoted, and `abc` or `1.0-beta` is not one.
+#[test]
+fn a_declared_version_is_held_to_the_version_type() {
+    for ok in [
+        "::vocabulary(deck){ version: \"1.0.0\" }\n",
+        "::vocabulary(deck){ version: 1.10 }\n",
+        "::vocabulary(deck){ version: 2 }\n",
+        "::blueprint(note){ version: \"1.0\", description: \"x\" }\n",
+        "::version(1.0)\n",
+        "::version(1.10)\n",
+        "::version(1.10.0)\n",
+    ] {
+        assert!(
+            version_problems(ok).is_empty(),
+            "{ok}: {:?}",
+            version_problems(ok)
+        );
+    }
+    for (bad, needle) in [
+        (
+            "::vocabulary(deck){ version: \"abc\" }\n",
+            "`abc` is not a version",
+        ),
+        (
+            "::vocabulary(deck){ version: \"1.0-beta\" }\n",
+            "`1.0-beta`",
+        ),
+        (
+            "::blueprint(note){ version: true }\n",
+            "`true` is not a version",
+        ),
+        ("::version(v1)\n", "`v1` is not a version"),
+    ] {
+        let found = version_problems(bad);
+        assert_eq!(found.len(), 1, "{bad}: {found:?}");
+        assert!(found[0].contains(needle), "{bad}: {found:?}");
+    }
+}
+
+/// A `::meta` field declared `type: version` holds a bare `1.10` as the text it was
+/// written as; the other forms it checks are as before.
+#[test]
+fn a_version_field_in_meta_reads_a_bare_number_as_text() {
+    use std::collections::BTreeMap;
+    let types: BTreeMap<String, String> = [("rev".to_string(), "version".to_string())]
+        .into_iter()
+        .collect();
+    let problems = |src: &str| {
+        let mut errors = Vec::new();
+        check_field_types(&parse(src), &types, &mut errors);
+        errors.len()
+    };
+    for ok in ["1.10", "\"1.10.0\"", "2", "1.0"] {
+        assert_eq!(problems(&format!("::meta{{ rev: {ok} }}\n")), 0, "{ok}");
+    }
+    for bad in ["\"abc\"", "true", "\"1.0-beta\""] {
+        assert_eq!(problems(&format!("::meta{{ rev: {bad} }}\n")), 1, "{bad}");
+    }
+}

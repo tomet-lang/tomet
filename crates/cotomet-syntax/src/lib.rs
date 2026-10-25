@@ -90,14 +90,20 @@
 //! strings:
 //!
 //! - `null`, `true`, `false`: the only keywords (`NULL`, `~`, `yes` are strings).
-//! - An int, `-?(0|[1-9][0-9]*)`, that fits an `i64`.
+//! - An int, `-?(0|[1-9][0-9]*)`.
 //! - A float: an int followed by a fraction (`.5` after digits) and/or an
-//!   exponent (`e3`, `E-3`), that is finite.
+//!   exponent (`e3`, `E-3`).
+//!
+//! An int that fits an `i64`, and a float that is exactly what an `f64`
+//! prints (`1.5`, `2.0`), are a [`Value::Int`] and a [`Value::Float`]. A number
+//! that reading would change -- `1.10` (an `f64` prints `1.1`), `0.50`, `1e3`,
+//! `-0`, an integer past an `i64`, a float past an `f64` (`1e999`) -- is a
+//! [`Value::Number`] holding the text as written. Whether `1.10` is a number, a
+//! version or a string is for the type that reads it to say.
 //!
 //! Everything else is a string, so reading a bare scalar never changes its
-//! text: `007`, `+1`, `.5`, `5.`, `1_000`, `0x10`, `nan` and `inf` are strings.
-//! A number that has the shape of an int or float but does not fit (`i64`
-//! overflow, `1e999`) is an error, never a silently lossy value.
+//! text: `007`, `+1`, `.5`, `5.`, `1_000`, `0x10`, `1.10.0`, `2026-10-25`, `nan`
+//! and `inf` are strings.
 //!
 //! The printer writes a float with a `.` or exponent (`1.0`, never `1`), so a
 //! float reads back as a float. A non-finite float has no bare spelling and is
@@ -352,16 +358,60 @@ mod tests {
     #[test]
     fn numbers_follow_the_json_grammar() {
         assert_eq!(scalar("0"), Value::Int(0));
-        assert_eq!(scalar("-0"), Value::Int(0));
         assert_eq!(scalar("42"), Value::Int(42));
         assert_eq!(scalar("-17"), Value::Int(-17));
         assert_eq!(scalar("9223372036854775807"), Value::Int(i64::MAX));
         assert_eq!(scalar("-9223372036854775808"), Value::Int(i64::MIN));
-        assert_eq!(scalar("1.50"), Value::Float(1.5));
+        assert_eq!(scalar("1.5"), Value::Float(1.5));
         assert_eq!(scalar("-0.5"), Value::Float(-0.5));
-        assert_eq!(scalar("1e3"), Value::Float(1000.0));
-        assert_eq!(scalar("1E+3"), Value::Float(1000.0));
-        assert_eq!(scalar("25e-1"), Value::Float(2.5));
+        assert_eq!(scalar("2.0"), Value::Float(2.0));
+    }
+
+    #[test]
+    fn a_number_that_reading_would_change_keeps_the_text_it_was_written_as() {
+        for src in [
+            "-0",
+            "1.10",
+            "1.50",
+            "0.50",
+            "1e3",
+            "1E+3",
+            "25e-1",
+            // too large for the type it would be read as
+            "9223372036854775808",
+            "-9223372036854775809",
+            "12345678901234567890",
+            "1e999",
+            "-1e999",
+        ] {
+            assert_eq!(scalar(src), Value::Number(src.to_string()), "{src}");
+        }
+    }
+
+    #[test]
+    fn a_kept_number_is_what_the_printer_writes_and_the_reader_reads_back() {
+        for src in ["1.10", "-0", "1e3", "12345678901234567890"] {
+            let value = parse_value(&format!("k: {src}")).unwrap();
+            assert_eq!(print_value(&value), format!("k: {src}"), "{src}");
+            assert_eq!(parse_value(&print_value(&value)).unwrap(), value, "{src}");
+        }
+        // a string that looks like one is quoted, so it is not read back as a number
+        let quoted = map(&[("k", text("1.10"))]);
+        assert_eq!(print_value(&quoted), "k: \"1.10\"");
+        assert_eq!(parse_value(&print_value(&quoted)).unwrap(), quoted);
+    }
+
+    #[test]
+    fn a_number_is_the_text_it_was_written_as_for_a_target_that_wants_text() {
+        assert_eq!(scalar("1.10").scalar_text().as_deref(), Some("1.10"));
+        assert_eq!(scalar("1.5").scalar_text().as_deref(), Some("1.5"));
+        assert_eq!(scalar("2.0").scalar_text().as_deref(), Some("2.0"));
+        assert_eq!(scalar("2024").scalar_text().as_deref(), Some("2024"));
+        assert_eq!(scalar("true").scalar_text().as_deref(), Some("true"));
+        assert_eq!(scalar("1.10.0").scalar_text().as_deref(), Some("1.10.0"));
+        assert_eq!(scalar("null").scalar_text(), None);
+        assert_eq!(scalar("1.10").as_number(), Some(1.1));
+        assert_eq!(scalar("1e999").as_number(), None);
     }
 
     #[test]
@@ -378,6 +428,7 @@ mod tests {
             "1e",
             "1e+",
             "1.2.3",
+            "1.10.0",
             "nan",
             "NaN",
             "inf",
@@ -397,15 +448,9 @@ mod tests {
     }
 
     #[test]
-    fn a_number_that_does_not_fit_is_an_error_not_a_lossy_value() {
-        for src in [
-            "9223372036854775808",
-            "-9223372036854775809",
-            "1e999",
-            "-1e999",
-        ] {
-            let err = parse_value(src).unwrap_err().to_string();
-            assert!(err.contains("out of range"), "{src}: {err}");
+    fn a_number_that_does_not_fit_is_not_an_error_and_not_lossy() {
+        for src in ["9223372036854775808", "-9223372036854775809", "1e999"] {
+            assert_eq!(scalar(src), Value::Number(src.to_string()), "{src}");
         }
     }
 

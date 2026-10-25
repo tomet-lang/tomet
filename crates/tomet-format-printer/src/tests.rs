@@ -620,3 +620,26 @@ fn test_headingless_section_printing() {
     let printed = document_to_tm(&doc);
     assert_eq!(printed, "=\nContent\n");
 }
+
+/// Formatting must not change what a document says: `1.10` stays `1.10`, it
+/// does not become the `1.1` an `f64` prints.
+#[test]
+fn a_number_reading_would_change_is_printed_as_written() {
+    let src = "::meta{ rev: 1.10, ratio: 2.5, big: 12345678901234567890, zero: -0 }\n\n@x(1.10)\n";
+    let doc = tomet_parser::parse_document(src).unwrap();
+    let printed = document_to_tm_with_config(&doc, &PrinterConfig::default());
+    for kept in [
+        "rev: 1.10",
+        "ratio: 2.5",
+        "big: 12345678901234567890",
+        "zero: -0",
+        "@x(1.10)",
+    ] {
+        assert!(printed.contains(kept), "{kept} in {printed}");
+    }
+    let again = tomet_parser::parse_document(&printed).unwrap();
+    assert_eq!(
+        document_to_tm_with_config(&again, &PrinterConfig::default()),
+        printed
+    );
+}

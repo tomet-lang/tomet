@@ -209,6 +209,7 @@ pub(crate) fn value_to_text(val: &Value) -> String {
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
+        Value::Number(text) => text.clone(),
         Value::Null => "null".to_string(),
         _ => format!("{val:?}"),
     }

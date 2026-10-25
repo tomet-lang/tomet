@@ -85,6 +85,14 @@ float, and a document names only the major version.
 
 ===[fn check_content_shape]
 
+===[fn check_declared_versions]
+
+Checks the versions a document declares: `::version(1.0)` and the `version:` of
+`::vocabulary` and `::blueprint` are each a [`Type::Version`](tomet_type::Type).
+
+`::kind(name, 2)` and `::use(ns, 3)` name only a major version, an integer,
+and are held to that by `check_version_slot`.
+
 ===[fn check_name_definitions]
 
 Checks what `::macros` and `::vars` define: a macro is a string template, a

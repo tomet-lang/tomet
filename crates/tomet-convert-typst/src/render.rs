@@ -722,10 +722,11 @@ fn escape_typst_string(s: &str) -> String {
 fn value_to_plain(v: &Value) -> String {
     match v {
         Value::Null => String::new(),
-        Value::Bool(b) => b.to_string(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => f.to_string(),
-        Value::String(s) => s.clone(),
+        // The text a scalar was written as: `1.0` stays `1.0`, `1.10` stays `1.10`.
+        Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::Number(_) | Value::String(_) => v
+            .scalar_text()
+            .map(|text| text.into_owned())
+            .unwrap_or_default(),
         Value::Seq(items) => items
             .iter()
             .map(value_to_plain)

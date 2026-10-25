@@ -46,9 +46,14 @@ impl ser::Serializer for ValueSerializer {
         Ok(Value::Int(v as i64))
     }
     fn serialize_u64(self, v: u64) -> Result<Value> {
-        i64::try_from(v)
-            .map(Value::Int)
-            .map_err(|_| Error::msg(format!("{v} is out of range for a 64-bit signed integer")))
+        // One that does not fit an `i64` is kept as the digits it is, not wrapped.
+        Ok(i64::try_from(v).map_or_else(|_| Value::Number(v.to_string()), Value::Int))
+    }
+    fn serialize_i128(self, v: i128) -> Result<Value> {
+        Ok(i64::try_from(v).map_or_else(|_| Value::Number(v.to_string()), Value::Int))
+    }
+    fn serialize_u128(self, v: u128) -> Result<Value> {
+        Ok(i64::try_from(v).map_or_else(|_| Value::Number(v.to_string()), Value::Int))
     }
     fn serialize_f32(self, v: f32) -> Result<Value> {
         Ok(Value::Float(v as f64))
@@ -246,6 +251,7 @@ fn value_to_key_string(v: Value) -> Result<String> {
         Value::Int(i) => Ok(i.to_string()),
         Value::Bool(b) => Ok(b.to_string()),
         Value::Float(f) => Ok(f.to_string()),
+        Value::Number(text) => Ok(text),
         other => Err(Error::msg(format!(
             "map keys must be strings or simple scalars, got {other:?}"
         ))),

@@ -23,6 +23,21 @@ cotomet-syntax provides:
 
 Serde integration lives in `serde_cotomet`.
 
+==[Relation to tmt]
+
+The extension `.ctmt` says "a tmt-family file", and this is what that
+promises. cotomet is the value language of tmt standing alone: the
+`{ key: value }` data groups and `(args)` of a `.tmt` document are read by
+this same parser (`tomet-syntax-parser` hands it a [`ValueHook`] for what only
+a document has), so a scalar, a quoted string, a map, a sequence and a
+constructor such as `list(a, b)` mean the same in both. A `::name(args){data}`
+declaration is spelled the same too.
+
+What a `.ctmt` does not have is what the hook adds: elements (`@name`) and
+`|` prose as a value. Comments are `//` only (`/* */` belongs to documents).
+A `.ctmt` is data, not a vault document: it has no vocabulary, no index and
+no links.
+
 ==[Key Functions]
 
 - (write_key) Write a map key, quoted only when it is not an identifier. Every printer that emits `key: value` calls it.
@@ -82,15 +97,21 @@ A bare (unquoted) scalar is typed by its text, and only these are not
 strings:
 
 - `null`, `true`, `false`: the only keywords (`NULL`, `~`, `yes` are strings).
-- An int, `-?(0|[1-9][0-9]*)`, that fits an `i64`.
+- An int, `-?(0|[1-9][0-9]*)`.
 - A float: an int followed by a fraction (`.5` after digits) and/or an
 
-exponent (`e3`, `E-3`), that is finite.
+exponent (`e3`, `E-3`).
+
+An int that fits an `i64`, and a float that is exactly what an `f64`
+prints (`1.5`, `2.0`), are a [`Value::Int`] and a [`Value::Float`]. A number
+that reading would change -- `1.10` (an `f64` prints `1.1`), `0.50`, `1e3`,
+`-0`, an integer past an `i64`, a float past an `f64` (`1e999`) -- is a
+[`Value::Number`] holding the text as written. Whether `1.10` is a number, a
+version or a string is for the type that reads it to say.
 
 Everything else is a string, so reading a bare scalar never changes its
-text: `007`, `+1`, `.5`, `5.`, `1_000`, `0x10`, `nan` and `inf` are strings.
-A number that has the shape of an int or float but does not fit (`i64`
-overflow, `1e999`) is an error, never a silently lossy value.
+text: `007`, `+1`, `.5`, `5.`, `1_000`, `0x10`, `1.10.0`, `2026-10-25`, `nan`
+and `inf` are strings.
 
 The printer writes a float with a `.` or exponent (`1.0`, never `1`), so a
 float reads back as a float. A non-finite float has no bare spelling and is
@@ -244,10 +265,14 @@ entry/sequence item.
 
 Types the text of a bare scalar (see the crate-level "Scalars" section).
 
-`null`, `true` and `false` are the only keywords. A number is an `i64` or
-an `f64` by the JSON grammar; a number that does not fit is an error
-rather than a lossy value. Everything else is a string, so no text is ever
-changed by reading it.
+`null`, `true` and `false` are the only keywords. A number by the JSON
+grammar is an `i64` or an `f64` when that is exactly what it says, and
+otherwise a [`Value::Number`] holding the text as written (`1.10`, `1e3`,
+`-0`, an integer too large for an `i64`, a float too large for an `f64`).
+Everything else is a string, so no text is ever changed by reading it.
+
+The `Result` is kept for the callers that match on one; reading a bare scalar
+has no error left in it.
 
 ====[fn parse_quoted]
 

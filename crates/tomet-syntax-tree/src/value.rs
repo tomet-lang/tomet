@@ -13,10 +13,13 @@ pub trait ValueExt {
     /// Returns the `bool` value if this value is a `Value::Bool`.
     fn as_bool(&self) -> Option<bool>;
 
-    /// Returns the `i64` value if this value is a `Value::Int`.
+    /// Returns the `i64` value if this value is a `Value::Int`, or a `Value::Number`
+    /// that spells an integer an `i64` holds.
     fn as_i64(&self) -> Option<i64>;
 
-    /// Returns the `f64` value if this value is a `Value::Float`.
+    /// Returns the `f64` value if this value is a `Value::Float`, or a `Value::Number`
+    /// that spells one (`1.10` is `1.1` here; the text it was written as is
+    /// [`Value::scalar_text`]).
     fn as_f64(&self) -> Option<f64>;
 
     /// Returns a slice of elements if this value is a `Value::Seq`.
@@ -57,15 +60,14 @@ impl ValueExt for Value {
     fn as_i64(&self) -> Option<i64> {
         match self {
             Value::Int(i) => Some(*i),
+            // `-0`: kept as written, and the integer it spells.
+            Value::Number(text) => text.parse().ok(),
             _ => None,
         }
     }
 
     fn as_f64(&self) -> Option<f64> {
-        match self {
-            Value::Float(f) => Some(*f),
-            _ => None,
-        }
+        self.as_number()
     }
 
     fn as_seq(&self) -> Option<&[Value]> {
@@ -108,5 +110,27 @@ impl ValueExt for Value {
             Value::Map(map) => map.is_empty(),
             _ => false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_kept_number_is_read_as_the_number_it_spells() {
+        let one_ten = Value::Number("1.10".to_string());
+        assert_eq!(one_ten.as_f64(), Some(1.1));
+        assert_eq!(one_ten.as_i64(), None);
+        assert_eq!(Value::Number("-0".to_string()).as_i64(), Some(0));
+        let big = Value::Number("12345678901234567890".to_string());
+        assert_eq!(big.as_i64(), None);
+        assert_eq!(big.as_f64(), Some(1.2345678901234567e19));
+        // too large for an f64: there is no number to read, only the text
+        let huge = Value::Number("1e999".to_string());
+        assert_eq!(huge.as_f64(), None);
+        assert_eq!(huge.scalar_text().as_deref(), Some("1e999"));
+        // and it is not a string
+        assert_eq!(one_ten.as_str(), None);
     }
 }

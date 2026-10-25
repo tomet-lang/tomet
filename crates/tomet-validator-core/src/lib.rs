@@ -70,6 +70,7 @@ pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagn
     check_singletons_and_regions(doc, bindings, errors);
     check_retired_settings_keys(doc, errors);
     check_name_definitions(doc, errors);
+    check_declared_versions(doc, errors);
     check_arguments(doc, bindings, errors);
     check_version_slot(doc, bindings, errors);
     check_unfinished(doc, errors);
@@ -413,6 +414,7 @@ fn version_as_written(value: &tomet_ast::Value) -> String {
     match value {
         Value::String(s) => format!("{s:?}"),
         Value::Float(f) => format!("{f:?}"),
+        Value::Number(text) => text.clone(),
         Value::Int(n) => n.to_string(),
         Value::Bool(b) => b.to_string(),
         Value::Null => "null".to_string(),
@@ -492,6 +494,70 @@ fn for_each_direct_content_element<'a>(
             Block::List(_) => {}
         }
     }
+}
+
+/// Checks the versions a document declares: `::version(1.0)` and the `version:` of
+/// `::vocabulary` and `::blueprint` are each a [`Type::Version`](tomet_type::Type).
+///
+/// `::kind(name, 2)` and `::use(ns, 3)` name only a major version, an integer,
+/// and are held to that by `check_version_slot`.
+pub fn check_declared_versions(doc: &Document, errors: &mut Vec<Diagnostic>) {
+    use tomet_ast::Value;
+    use tomet_semantics::{ElementKind, classify_std_lenient};
+    use tomet_type::Type;
+
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        let (declaration, written) = match classify_std_lenient(el) {
+            ElementKind::Version => (
+                "version",
+                tomet_semantics::normalized_element_args(el)
+                    .and_then(|args| match args {
+                        Value::Map(entries) => entries
+                            .into_iter()
+                            .find(|(key, _)| key == "version")
+                            .map(|(_, v)| v),
+                        other => Some(other),
+                    })
+                    .or_else(|| {
+                        tomet_semantics::data::element_data(el).and_then(|data| match data {
+                            Value::Map(entries) => entries
+                                .into_iter()
+                                .find(|(key, _)| key == "version")
+                                .map(|(_, v)| v),
+                            _ => None,
+                        })
+                    }),
+            ),
+            kind @ (ElementKind::Vocabulary | ElementKind::Blueprint) => (
+                if kind == ElementKind::Vocabulary {
+                    "vocabulary"
+                } else {
+                    "blueprint"
+                },
+                match tomet_semantics::data::element_data(el) {
+                    Some(Value::Map(entries)) => entries
+                        .into_iter()
+                        .find(|(key, _)| key == "version")
+                        .map(|(_, v)| v),
+                    _ => None,
+                },
+            ),
+            _ => return,
+        };
+        let Some(written) = written else { return };
+        // `${...}` is not known until it is evaluated.
+        if matches!(&written, Value::Element(el) if matches!(el.sigil, tomet_ast::Sigil::Dollar)) {
+            return;
+        }
+        if let Err(mismatch) = Type::Version.admits(&written) {
+            errors.push(Diagnostic::InvalidDefinition {
+                declaration,
+                name: "version".to_string(),
+                reason: mismatch.to_string(),
+                span: el.span,
+            });
+        }
+    });
 }
 
 /// Checks what `::macros` and `::vars` define: a macro is a string template, a
@@ -616,12 +682,15 @@ pub fn check_field_types(
                 continue;
             };
             let well_formed = match value {
-                Value::String(text) => text.is_empty() || ty.holds_text(text) == Some(true),
                 Value::Null => true,
                 // `${...}` keeps its place in the tree until it is evaluated,
                 // and what it comes to is not known here.
                 Value::Element(el) if matches!(el.sigil, tomet_ast::Sigil::Dollar) => true,
-                _ => false,
+                // A scalar is the text it was written as: a bare `1.10` is the
+                // version `1.10`, and `2026` is not a datetime.
+                scalar => scalar
+                    .scalar_text()
+                    .is_some_and(|text| text.is_empty() || ty.holds_text(&text) == Some(true)),
             };
             if !well_formed {
                 errors.push(Diagnostic::InvalidFieldValue {
@@ -643,6 +712,7 @@ fn describe_value(value: &tomet_ast::Value) -> String {
         Value::Bool(b) => b.to_string(),
         Value::Int(n) => n.to_string(),
         Value::Float(n) => n.to_string(),
+        Value::Number(text) => text.clone(),
         Value::Seq(_) => "a list".to_string(),
         Value::Map(_) => "a map".to_string(),
         _ => "something else".to_string(),

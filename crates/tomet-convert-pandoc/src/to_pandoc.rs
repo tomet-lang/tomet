@@ -53,8 +53,10 @@ fn meta_value(v: &Value) -> MetaValue {
     match v {
         Value::Null => MetaValue::MetaString(String::new()),
         Value::Bool(b) => MetaValue::MetaBool(*b),
-        Value::Int(i) => MetaValue::MetaString(i.to_string()),
-        Value::Float(f) => MetaValue::MetaString(f.to_string()),
+        // The text it was written as: `1.10` is not `1.1` to a reader.
+        Value::Int(_) | Value::Float(_) | Value::Number(_) => {
+            MetaValue::MetaString(v.scalar_text().map(|t| t.into_owned()).unwrap_or_default())
+        }
         Value::String(s) => MetaValue::MetaInlines(text_to_inlines(s)),
         Value::Seq(items) => MetaValue::MetaList(items.iter().map(meta_value).collect()),
         Value::Map(entries) => MetaValue::MetaMap(

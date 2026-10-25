@@ -26,11 +26,12 @@
 //!   belong to the formatter. In particular what makes a `nanoid` well formed
 //!   depends on the field's `prefix` and `length`, so [`Type::Nanoid`] admits a
 //!   string and judges no more; `tomet-format-field-utils` judges the rest.
-//! - It is not a value in the evaluator. A datetime read here stays text
-//!   ([`datetime`] gives the parts); `tomet-expr` turns it into its own value.
+//! - It is not a value in the evaluator. A datetime read here stays text, and
+//!   [`datetime`] gives its parts; `tomet-expr` turns it into its own value.
 //!
 //! =[ Not yet ]
 //!
+//! - A version with a pre-release or build part (`1.0.0-beta`, `+5`).
 //! - A type with a parameter. `list` has no element type yet; the author expects
 //!   it to be written `<list<string>>` when it comes, so [`Type::parse`] reads
 //!   a name and nothing else, and says so for any other spelling.
@@ -40,6 +41,9 @@
 use tomet_ast::Value;
 
 pub mod datetime;
+mod version;
+
+pub use version::Version;
 
 /// A type a value can be declared as.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -56,6 +60,10 @@ pub enum Type {
     Bool,
     /// A date, or a date and a time ([`datetime::parse_datetime_parts`]).
     Datetime,
+    /// A version: dotted non-negative integers, `1`, `1.0`, `1.10.0`
+    /// ([`Version`]). It is text. A bare `1.10` is read as the text it was
+    /// written as, not as the number it would be.
+    Version,
     /// An identifier in the 8-4-4-4-12 hexadecimal form.
     Uuid,
     /// A short generated identifier. Its form depends on the field's `prefix`
@@ -67,13 +75,14 @@ pub enum Type {
 
 impl Type {
     /// Every type, in the order they are listed to people.
-    pub const ALL: [Type; 9] = [
+    pub const ALL: [Type; 10] = [
         Type::String,
         Type::Int,
         Type::Uint,
         Type::Float,
         Type::Bool,
         Type::Datetime,
+        Type::Version,
         Type::Uuid,
         Type::Nanoid,
         Type::List,
@@ -88,6 +97,7 @@ impl Type {
             Type::Float => "float",
             Type::Bool => "bool",
             Type::Datetime => "datetime",
+            Type::Version => "version",
             Type::Uuid => "uuid",
             Type::Nanoid => "nanoid",
             Type::List => "list",
@@ -122,26 +132,30 @@ impl Type {
             Type::Float => "a number",
             Type::Bool => "`true` or `false`",
             Type::Datetime => "a date or a datetime (RFC 3339)",
+            Type::Version => "a version such as `1.10.0`",
             Type::Uuid => "a UUID",
             Type::Nanoid => "an identifier",
             Type::List => "a list",
         }
     }
 
-    /// Whether this type gives text a form of its own to be held to: `datetime`
-    /// and `uuid`. [`holds_text`](Type::holds_text) is `Some` for exactly these.
+    /// Whether this type gives text a form of its own to be held to: `datetime`,
+    /// `version` and `uuid`. [`holds_text`](Type::holds_text) is `Some` for
+    /// exactly these.
     pub fn has_text_form(self) -> bool {
-        matches!(self, Type::Datetime | Type::Uuid)
+        matches!(self, Type::Datetime | Type::Version | Type::Uuid)
     }
 
     /// Whether `text` is in the form this type gives text, or `None` when the
     /// type gives text no form of its own.
     ///
-    /// Only `datetime` and `uuid` have one. A `string` is any text, and what
-    /// makes a `nanoid` well formed is the field's `prefix` and `length`.
+    /// Only `datetime`, `version` and `uuid` have one. A `string` is any text,
+    /// and what makes a `nanoid` well formed is the field's `prefix` and
+    /// `length`. Surrounding whitespace is not looked at, as for a datetime.
     pub fn holds_text(self, text: &str) -> Option<bool> {
         match self {
             Type::Datetime => Some(datetime::parse_datetime_parts(text).is_some()),
+            Type::Version => Some(Version::parse(text.trim()).is_some()),
             Type::Uuid => Some(is_uuid(text)),
             _ => None,
         }
@@ -159,6 +173,11 @@ impl Type {
                 self.holds_text(text) == Some(true)
             }
             (Type::List, Value::Seq(_)) => true,
+            // A version is text, and a bare `1`, `1.0` or `1.10` is the text it was
+            // written as: what is written decides, not what it would be as a number.
+            (Type::Version, scalar) => scalar
+                .scalar_text()
+                .is_some_and(|text| self.holds_text(&text) == Some(true)),
             _ => false,
         };
         if fits {
@@ -174,8 +193,8 @@ impl Type {
     /// The value of this type that `text` stands for, when the text arrives as
     /// text and nothing else: `tomet new --var n=3`.
     ///
-    /// A datetime or a UUID stays the text it was, trimmed, once it is known
-    /// to be well formed. A `list` has no single-text form.
+    /// A datetime, a version or a UUID stays the text it was, trimmed, once it is
+    /// known to be well formed. A `list` has no single-text form.
     pub fn read_text(self, text: &str) -> Result<Value, TextError> {
         let found = || format!("`{text}`");
         let mismatch = |ty: Type| TextError::Mismatch(Mismatch { ty, found: found() });
@@ -199,7 +218,7 @@ impl Type {
                 "false" => Ok(Value::Bool(false)),
                 _ => Err(mismatch(self)),
             },
-            Type::Datetime | Type::Uuid => {
+            Type::Datetime | Type::Version | Type::Uuid => {
                 let text = text.trim();
                 if self.holds_text(text) == Some(true) {
                     Ok(Value::String(text.to_string()))
@@ -326,7 +345,7 @@ mod tests {
             assert_eq!(Type::from_name(ty.name()), Some(ty), "{ty}");
             assert_eq!(Type::parse(&text(ty.name())), Ok(ty), "{ty}");
         }
-        assert_eq!(Type::ALL.len(), 9);
+        assert_eq!(Type::ALL.len(), 10);
     }
 
     #[test]
@@ -347,7 +366,7 @@ mod tests {
 
     #[test]
     fn a_value_is_held_to_its_type() {
-        let ok: [(Type, Value); 12] = [
+        let ok: [(Type, Value); 17] = [
             (Type::String, text("x")),
             (Type::Int, Value::Int(-3)),
             (Type::Uint, Value::Int(0)),
@@ -356,6 +375,12 @@ mod tests {
             (Type::Bool, Value::Bool(false)),
             (Type::Datetime, text("2026-10-25")),
             (Type::Datetime, text("2026-10-25T09:00:00+09:00")),
+            (Type::Version, text("1.10.0")),
+            (Type::Version, text("1.0")),
+            // bare, a version is the text it was written as
+            (Type::Version, Value::Int(1)),
+            (Type::Version, Value::Float(1.5)),
+            (Type::Version, Value::Number("1.10".to_string())),
             (Type::Uuid, text("123e4567-e89b-12d3-a456-426614174000")),
             (Type::Nanoid, text("kWBcIUUz")),
             (Type::List, Value::Seq(vec![])),
@@ -364,13 +389,18 @@ mod tests {
         for (ty, value) in ok {
             assert_eq!(ty.admits(&value), Ok(()), "{ty}: {value:?}");
         }
-        let bad: [(Type, Value); 9] = [
+        let bad: [(Type, Value); 14] = [
             (Type::String, Value::Int(1)),
             (Type::Int, Value::Float(1.0)),
             (Type::Uint, Value::Int(-1)),
             (Type::Bool, text("true")),
             (Type::Datetime, text("tomorrow")),
             (Type::Datetime, Value::Int(2026)),
+            (Type::Version, text("1.0-beta")),
+            (Type::Version, text("v1")),
+            (Type::Version, Value::Bool(true)),
+            (Type::Version, Value::Null),
+            (Type::Version, Value::Float(1e21)),
             (Type::Uuid, text("not-a-uuid")),
             (Type::List, text("a")),
             (Type::Nanoid, Value::Int(1)),
@@ -399,6 +429,7 @@ mod tests {
             Type::Datetime.read_text(" 2026-10-25 "),
             Ok(text("2026-10-25"))
         );
+        assert_eq!(Type::Version.read_text(" 1.10.0 "), Ok(text("1.10.0")));
         assert_eq!(
             Type::Uuid.read_text("123E4567-E89B-12D3-A456-426614174000"),
             Ok(text("123E4567-E89B-12D3-A456-426614174000"))
@@ -414,6 +445,7 @@ mod tests {
             (Type::Float, "inf"),
             (Type::Bool, "yes"),
             (Type::Datetime, "tomorrow"),
+            (Type::Version, "1.0-beta"),
             (Type::Uuid, "123"),
         ] {
             let err = ty.read_text(bad).unwrap_err();
@@ -433,7 +465,10 @@ mod tests {
     }
 
     #[test]
-    fn only_datetime_and_uuid_have_a_form_for_text() {
+    fn only_datetime_version_and_uuid_have_a_form_for_text() {
+        assert_eq!(Type::Version.holds_text("1.10.0"), Some(true));
+        assert_eq!(Type::Version.holds_text(" 1.10 "), Some(true));
+        assert_eq!(Type::Version.holds_text("1.10-rc"), Some(false));
         assert_eq!(Type::Datetime.holds_text("2026-10-25"), Some(true));
         assert_eq!(Type::Datetime.holds_text("soon"), Some(false));
         assert_eq!(

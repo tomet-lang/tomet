@@ -848,6 +848,8 @@ fn value_str(v: &Value) -> String {
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
+        // Kept as written; named, so a report shows it was not read as a float.
+        Value::Number(text) => format!("number({text})"),
         Value::String(s) => format!("{s:?}"),
         // Written as the source spells it: `[...]` is block content here
         // (`Value::Blocks` below), not a list.

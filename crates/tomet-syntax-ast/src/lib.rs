@@ -99,6 +99,22 @@ pub enum Value {
     Bool(bool),
     Int(i64),
     Float(f64),
+    /// A number kept as it was written, because reading it as an `i64` or an
+    /// `f64` would change it: `1.10` (an `f64` prints `1.1`), `1e3`, `-0`, or an
+    /// integer too large for an `i64`.
+    ///
+    /// Only these. A number that survives being read keeps being an
+    /// [`Int`](Value::Int) or a [`Float`](Value::Float), so a value has one
+    /// representation; whether `1.5` is a number is not in doubt, and whether
+    /// `1.10` is a number, a version or a string is for the type that reads it
+    /// to say. `1.10.0`, `007` and `2026-10-25` are not numbers by the JSON
+    /// grammar and never come here: they are [`String`](Value::String)s.
+    ///
+    /// The text is a valid JSON number, so it parses as an `f64` (or fails only
+    /// for a magnitude beyond one). Read it with
+    /// [`as_number`](Value::as_number); the text it was written as, whatever the
+    /// scalar, is [`scalar_text`](Value::scalar_text).
+    Number(String),
     String(String),
     Seq(Vec<Value>),
     /// Insertion-ordered key/value pairs (a `.tmt` map has no inherent
@@ -155,6 +171,47 @@ pub enum Value {
     Blocks(Vec<Block>),
 }
 
+impl Value {
+    /// How an `f64` is written when it is a [`Value::Float`]: the shortest text
+    /// that reads back as the same number, always with a `.` or an exponent.
+    ///
+    /// This is the one definition. The reader keeps a number as a `Float` only
+    /// when the text it was written as is this text, and the printer writes a
+    /// `Float` with it, so a `Float` is always what its text says.
+    pub fn float_text(f: f64) -> String {
+        format!("{f:?}")
+    }
+
+    /// The text a bare scalar was written as, for a target that wants text: a
+    /// `string` argument given `2024`, `true` or `1.10`.
+    ///
+    /// `None` for what is not a scalar (`null`, a list, a map, an element) --
+    /// those have no single text. A [`String`](Value::String) is itself,
+    /// whether it was quoted or not: the reader does not keep the difference.
+    pub fn scalar_text(&self) -> Option<std::borrow::Cow<'_, str>> {
+        use std::borrow::Cow;
+        Some(match self {
+            Value::String(s) | Value::Number(s) => Cow::Borrowed(s.as_str()),
+            Value::Int(i) => Cow::Owned(i.to_string()),
+            Value::Float(f) => Cow::Owned(Value::float_text(*f)),
+            Value::Bool(b) => Cow::Borrowed(if *b { "true" } else { "false" }),
+            _ => return None,
+        })
+    }
+
+    /// The number a [`Float`](Value::Float) or [`Number`](Value::Number) is, as
+    /// an `f64`. A `Number` too large for one is `None`. (An [`Int`](Value::Int)
+    /// is not read as a float here: the caller asked for the kept-as-written
+    /// kinds, and has `as_i64` for the rest.)
+    pub fn as_number(&self) -> Option<f64> {
+        match self {
+            Value::Float(f) => Some(*f),
+            Value::Number(text) => text.parse::<f64>().ok().filter(|f| f.is_finite()),
+            _ => None,
+        }
+    }
+}
+
 impl Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -165,6 +222,13 @@ impl Serialize for Value {
             Value::Bool(b) => serializer.serialize_bool(*b),
             Value::Int(i) => serializer.serialize_i64(*i),
             Value::Float(f) => serializer.serialize_f64(*f),
+            // A number on the wire is an f64: that is the most a serializer
+            // that has no arbitrary-precision number can say. One that cannot
+            // be one (too large) is sent as the text it was written as.
+            Value::Number(text) => match text.parse::<f64>() {
+                Ok(f) if f.is_finite() => serializer.serialize_f64(f),
+                _ => serializer.serialize_str(text),
+            },
             Value::String(s) => serializer.serialize_str(s),
             Value::Seq(seq) => {
                 use serde::ser::SerializeSeq;
