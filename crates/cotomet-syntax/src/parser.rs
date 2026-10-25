@@ -80,6 +80,93 @@ pub fn is_name_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_' || c == '-'
 }
 
+/// Whether an expression begins at `cur`: `$` immediately followed by `{`,
+/// or an identifier and `(`.
+pub fn is_interp_start(cur: &Cursor) -> bool {
+    let mut look = *cur;
+    if look.bump() != Some('$') {
+        return false;
+    }
+    if look.peek() == Some('{') {
+        return true;
+    }
+    if look.peek().is_some_and(is_interp_ident_start) {
+        let _ = look.eat_while(is_interp_ident_char);
+        while look.peek() == Some('.') {
+            look.bump();
+            if !look.peek().is_some_and(is_interp_ident_start) {
+                return false;
+            }
+            let _ = look.eat_while(is_interp_ident_char);
+        }
+        if look.peek() == Some('(') {
+            return true;
+        }
+    }
+    false
+}
+
+/// First character of an interpolation expression identifier.
+pub fn is_interp_ident_start(c: char) -> bool {
+    c.is_alphabetic() || c == '_'
+}
+
+/// Subsequent characters of an interpolation expression identifier.
+pub fn is_interp_ident_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_' || c == '-'
+}
+
+fn skip_balanced(look: &mut Cursor, open: char, close: char) -> bool {
+    if look.peek() != Some(open) {
+        return false;
+    }
+    look.bump();
+    let mut depth = 1usize;
+    while let Some(c) = look.peek() {
+        if c == open {
+            depth += 1;
+            look.bump();
+        } else if c == close {
+            depth -= 1;
+            look.bump();
+            if depth == 0 {
+                return true;
+            }
+        } else if c == '"' {
+            if parse_quoted(look).is_err() {
+                return false;
+            }
+        } else {
+            look.bump();
+        }
+    }
+    false
+}
+
+fn is_interp_key(cur: &Cursor) -> bool {
+    if !is_interp_start(cur) {
+        return false;
+    }
+    let mut look = *cur;
+    look.bump(); // skip '$'
+    if look.peek() == Some('{') {
+        if !skip_balanced(&mut look, '{', '}') {
+            return false;
+        }
+    } else {
+        let _ = look.eat_while(is_interp_ident_char);
+        while look.peek() == Some('.') {
+            look.bump();
+            let _ = look.eat_while(is_interp_ident_char);
+        }
+        if !skip_balanced(&mut look, '(', ')') {
+            return false;
+        }
+    }
+    skip_inline_ws(&mut look);
+    look.peek() == Some(':') && !look.starts_with("::") && !is_scheme_uri_colon(&look)
+}
+
 pub fn is_inline_ws(c: char) -> bool {
     c == ' ' || c == '\t'
 }
@@ -533,6 +620,9 @@ pub fn parse_one_entry_with<H: ValueHook>(
     hook: &mut H,
 ) -> Result<(String, Value)> {
     let checkpoint = cur.pos();
+    if is_interp_key(cur) {
+        return Err(err(checkpoint, "an expression cannot be a key"));
+    }
     if let Some(key) = eat_key(cur) {
         skip_inline_ws(cur);
         if !is_scheme_uri_colon(cur) && cur.peek() == Some(':') {
@@ -621,6 +711,20 @@ pub struct File {
     pub body: Value,
 }
 
+/// A hook used when parsing declarations that rejects any expression with
+/// "a declaration takes no expression".
+struct DeclHook;
+
+impl ValueHook for DeclHook {
+    fn try_parse_value(&mut self, cur: &mut Cursor) -> Option<Result<Value>> {
+        if is_interp_start(cur) {
+            Some(Err(err(cur.pos(), "a declaration takes no expression")))
+        } else {
+            None
+        }
+    }
+}
+
 /// Parse a standalone cotomet file (`.ctmt`): declarations, then a map of
 /// `key: value` entries.
 ///
@@ -631,7 +735,20 @@ pub struct File {
 /// second as a positional entry. A declaration below the first entry is an
 /// error too: they go at the top. An empty file, or one with only comments, has
 /// no declarations and the empty map.
+///
+/// Declarations at the top take no expressions. The body uses [`NoHook`], which
+/// rejects unquoted expressions (this reader reads data only; write them in
+/// quotes or use [`parse_file_with`] with an expression-aware hook).
 pub fn parse_file(src: &str) -> Result<File> {
+    parse_file_with(src, &mut NoHook)
+}
+
+/// Parse a standalone cotomet file (`.ctmt`) with a custom [`ValueHook`].
+///
+/// Like [`parse_file`], but passes values through `hook`. Declarations at the
+/// top take no expressions: an expression there is an error saying "a declaration
+/// takes no expression".
+pub fn parse_file_with<H: ValueHook>(src: &str, hook: &mut H) -> Result<File> {
     let mut cur = Cursor::new(src);
     let mut header = Vec::new();
     loop {
@@ -641,7 +758,7 @@ pub fn parse_file(src: &str) -> Result<File> {
         }
         header.push(parse_declaration(&mut cur).map_err(|e| e.located_in(src))?);
     }
-    let body = parse_map_body_impl(&mut cur, &mut NoHook, true).map_err(|e| e.located_in(src))?;
+    let body = parse_map_body_impl(&mut cur, hook, true).map_err(|e| e.located_in(src))?;
     skip_ws_newlines_and_comments(&mut cur);
     if !cur.is_eof() {
         return Err(err(cur.pos(), "unexpected trailing content").located_in(src));
@@ -667,7 +784,7 @@ fn parse_declaration(cur: &mut Cursor) -> Result<Declaration> {
                 let v = if cur.peek() == Some(')') {
                     Value::Map(Vec::new())
                 } else {
-                    parse_value_at_with(cur, &mut NoHook)?
+                    parse_value_at_with(cur, &mut DeclHook)?
                 };
                 skip_ws_newlines_and_comments(cur);
                 if !cur.eat_str(")") {
@@ -678,7 +795,7 @@ fn parse_declaration(cur: &mut Cursor) -> Result<Declaration> {
             }
             Some('{') if data.is_none() => {
                 cur.bump();
-                let map = parse_map_body_impl(cur, &mut NoHook, false)?;
+                let map = parse_map_body_impl(cur, &mut DeclHook, false)?;
                 skip_ws_newlines_and_comments(cur);
                 if !cur.eat_str("}") {
                     return Err(err(cur.pos(), "expected '}'"));
@@ -780,6 +897,12 @@ fn parse_entry_value_impl<H: ValueHook>(
     skip_ws_newlines_and_comments(cur);
     if let Some(result) = hook.try_parse_value(cur) {
         return result;
+    }
+    if is_interp_start(cur) {
+        return Err(err(
+            cur.pos(),
+            "an expression `${...}` is not read: this reader reads data only; write it in quotes to keep the text, or use `cotomet::eval` / a hook",
+        ));
     }
     if let Some(result) = try_parse_call_with(cur, hook) {
         return result;

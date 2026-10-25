@@ -145,8 +145,9 @@ pub use error::{Error, Result};
 pub use parser::{
     Declaration, File, LITERAL_CONSTRUCTORS, NoHook, POSITIONAL_ENTRY_KEY, ValueHook,
     duplicate_key_error, eat_ident, eat_name, eat_name_segment, eat_scalar_raw, err, is_ident_char,
-    is_inline_ws, is_name_char, is_name_start, is_name_start_at, is_scheme_uri_colon,
-    parse_entry_value, parse_entry_value_with, parse_file, parse_map_body, parse_map_body_with,
+    is_inline_ws, is_interp_ident_char, is_interp_ident_start, is_interp_start, is_name_char,
+    is_name_start, is_name_start_at, is_scheme_uri_colon, parse_entry_value,
+    parse_entry_value_with, parse_file, parse_file_with, parse_map_body, parse_map_body_with,
     parse_one_entry, parse_one_entry_with, parse_quoted, parse_value, parse_value_at,
     parse_value_at_with, parse_value_with, scalar_from_text, skip_block_comment, skip_inline_ws,
     skip_line_comment, skip_ws_and_newlines, skip_ws_newlines_and_comments, starts_absolute_path,
@@ -890,5 +891,80 @@ mod tests {
         for src in ["k:", "k: // nothing\n", "k: list(,)"] {
             assert!(parse_value(src).is_err(), "{src:?}");
         }
+    }
+
+    #[test]
+    fn unquoted_expression_in_data_only_is_an_error_with_line_and_col() {
+        let err = parse_file("a: ${foo}\n").unwrap_err();
+        assert!(
+            err.message.contains(
+                "an expression `${...}` is not read: this reader reads data only; write it in quotes to keep the text, or use `cotomet::eval` / a hook"
+            ),
+            "{}",
+            err.message
+        );
+        assert_eq!((err.line, err.column), (1, 4));
+
+        let err2 = parse_value("a: $call(1)\n").unwrap_err();
+        assert!(
+            err2.message.contains(
+                "an expression `${...}` is not read: this reader reads data only; write it in quotes to keep the text, or use `cotomet::eval` / a hook"
+            ),
+            "{}",
+            err2.message
+        );
+        assert_eq!((err2.line, err2.column), (1, 4));
+    }
+
+    #[test]
+    fn expression_in_declaration_is_an_error() {
+        let err = parse_file("::kind(${x})\nk: 1\n").unwrap_err();
+        assert!(
+            err.message.contains("a declaration takes no expression"),
+            "{}",
+            err.message
+        );
+        assert_eq!((err.line, err.column), (1, 8));
+
+        let err2 = parse_file("::meta{ author: ${x} }\nk: 1\n").unwrap_err();
+        assert!(
+            err2.message.contains("a declaration takes no expression"),
+            "{}",
+            err2.message
+        );
+        assert_eq!((err2.line, err2.column), (1, 17));
+    }
+
+    #[test]
+    fn expression_as_a_key_is_an_error() {
+        let err = parse_file("${x}: 1\n").unwrap_err();
+        assert!(
+            err.message.contains("an expression cannot be a key"),
+            "{}",
+            err.message
+        );
+        assert_eq!((err.line, err.column), (1, 1));
+
+        let err2 = parse_value("m: { ${x}: 1 }\n").unwrap_err();
+        assert!(
+            err2.message.contains("an expression cannot be a key"),
+            "{}",
+            err2.message
+        );
+        assert_eq!((err2.line, err2.column), (1, 6));
+
+        let err3 = parse_file("${concat(\")\", \"}\")}: 1\n").unwrap_err();
+        assert!(
+            err3.message.contains("an expression cannot be a key"),
+            "{}",
+            err3.message
+        );
+        assert_eq!((err3.line, err3.column), (1, 1));
+    }
+
+    #[test]
+    fn quoted_expression_and_bare_dollar_remain_strings() {
+        let f = parse_file("a: \"${foo}\"\nb: $bar\n").unwrap();
+        assert_eq!(f.body, map(&[("a", text("${foo}")), ("b", text("$bar")),]));
     }
 }
