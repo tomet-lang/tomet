@@ -9,7 +9,7 @@
 
 =[ 今できること ]
 
-利用者が足せるのは、マクロだけ。設定の `macros:` に、引数を差し込む文字列のテンプレートを書く（@file(tmtroot/spec/expressions/macro.expr.tmt)）。
+利用者が足せるのは、マクロだけ。`::macros` に、引数を差し込む文字列のテンプレートを書く（@file(tmtroot/spec/expressions/macro.expr.tmt)）。
 
 次のものは、今はできない。
 
@@ -21,7 +21,7 @@
 `emoji` の名前表は組み込みで、変えられない。自分の絵文字を足したいときは、引数なしのマクロで足す。
 
 ```tm
-macros: { done: "✅" }
+::macros{ done: "✅" }
 ```
 
 ```tm

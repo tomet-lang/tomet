@@ -76,11 +76,11 @@ fn insert_or_merge_prop(map: &mut Vec<(String, Value)>, key: &str, value: &Value
 }
 
 /// Recursively merges `key` and `value` into `target`, normalizing dotted keys
-/// into hierarchical `Value::Map` entries while preserving flat keys for `meta` and `macros`.
+/// into hierarchical `Value::Map` entries while preserving flat keys for `meta`.
 pub fn merge_entry(target: &mut Vec<(String, Value)>, key: &str, value: &Value) {
     if let Some((head, tail)) = key.split_once('.') {
-        if head == "meta" || head == "macros" || head == "macro" {
-            // For meta and macros, `tail` is a flat key (e.g. field name or macro name)
+        if head == "meta" {
+            // For meta, `tail` is a flat key (a field name)
             // that should not be split further.
             let sub_map = get_or_insert_map(target, head);
             insert_or_merge_prop(sub_map, tail, value);
@@ -92,7 +92,7 @@ pub fn merge_entry(target: &mut Vec<(String, Value)>, key: &str, value: &Value) 
         merge_entry(sub_map, tail, value);
     } else if let Value::Map(incoming_map) = value {
         let existing_map = get_or_insert_map(target, key);
-        if key == "meta" || key == "macros" || key == "macro" {
+        if key == "meta" {
             for (sub_k, sub_v) in incoming_map {
                 insert_or_merge_prop(existing_map, sub_k, sub_v);
             }

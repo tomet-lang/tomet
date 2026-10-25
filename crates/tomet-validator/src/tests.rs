@@ -631,14 +631,82 @@ fn the_types_map_is_retired_too_and_says_it_has_no_replacement() {
     );
 }
 
-/// The live surface is untouched. `format`, `macros` and the path
-/// lists are what `tomet-config` actually reads.
+/// A macro is a definition of a name, not a setting: `macros:` in
+/// `::settings` or `::config` is reported, and says where it goes.
+#[test]
+fn macros_in_the_settings_are_retired_and_say_where_they_go() {
+    for head in ["settings", "config"] {
+        let doc = parse(&format!(
+            "::kind({head})\n::{head}{{\nmacros: {{ gh: \"https://example.com/${{1}}\" }}\n}}\n"
+        ));
+        let errors = validate_document(&doc);
+        let reported = errors
+            .iter()
+            .find(|e| matches!(e, Diagnostic::RetiredSettingsKey { key, .. } if key == "macros"))
+            .unwrap_or_else(|| panic!("{head}: {errors:?}"));
+        assert!(reported.to_string().contains("::macros"), "{reported}");
+    }
+}
+
+fn definition_problems(src: &str) -> Vec<String> {
+    validate_document(&parse(src))
+        .iter()
+        .filter(|e| matches!(e, Diagnostic::InvalidDefinition { .. }))
+        .map(|e| e.to_string())
+        .collect()
+}
+
+/// A macro is a string template: a map or a number has nothing to substitute into.
+#[test]
+fn a_macro_that_is_not_a_string_is_reported() {
+    assert!(definition_problems("::macros{\n  gh: \"https://x/${1}\"\n}\n").is_empty());
+    let found = definition_problems("::macros{\n  gh: 3\n  ok: \"x\"\n}\n");
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].contains("`gh` in `::macros`"), "{found:?}");
+}
+
+#[test]
+fn a_variable_is_a_declaration_with_a_type_it_can_have_and_a_default_that_fits() {
+    let good = "::vars{\n  title: {\n    type: string\n    about: | 題。\n  }\n  n: { type: int, default: 3 }\n  at: { type: datetime, default: \"2026-10-25T09:00:00+09:00\" }\n  tags: { type: list, default: list(a, b) }\n}\n";
+    assert!(
+        definition_problems(good).is_empty(),
+        "{:?}",
+        definition_problems(good)
+    );
+
+    for (src, needle) in [
+        ("::vars{\n  title: \"x\"\n}\n", "declared as a map"),
+        (
+            "::vars{\n  title: { kind: string }\n}\n",
+            "unknown key `kind`",
+        ),
+        (
+            "::vars{\n  title: { type: date }\n}\n",
+            "not a type a variable can have",
+        ),
+        (
+            "::vars{\n  n: { type: int, default: \"3\" }\n}\n",
+            "`default` is not a value of `type: int`",
+        ),
+        (
+            "::vars{\n  at: { type: datetime, default: \"tomorrow\" }\n}\n",
+            "`default` is not a value of `type: datetime`",
+        ),
+    ] {
+        let found = definition_problems(src);
+        assert_eq!(found.len(), 1, "{src}: {found:?}");
+        assert!(found[0].contains(needle), "{src}: {found:?}");
+    }
+}
+
+/// The live surface is untouched. `format` and the path lists are what
+/// `tomet-config` actually reads.
 #[test]
 fn a_settings_document_using_only_live_keys_is_clean() {
     let doc = parse(
         "::kind(config)\n::config{\n\
          format: { callout: { style: { content: block } } }\n\
-         macros: { gh: \"https://example.com/${1}\" }\n}\n",
+         blueprints: list(\"a.blueprint.tmt\")\n}\n",
     );
     let errors = validate_document(&doc);
     assert!(

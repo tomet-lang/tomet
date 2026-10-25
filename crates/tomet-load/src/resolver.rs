@@ -205,14 +205,15 @@ mod tests {
         let vault = Vault::discover(&root);
         let resolver = vault.resolver();
         let macros = HashMap::new();
-        let vars = EvalValue::Null;
+        let var = EvalValue::Null;
         let cx = EvalContext {
             phase: Phase::Output,
             resolver: &resolver,
             generate: &SystemGenerate,
             self_doc: DocRef("index.tmt".into()),
             macros: &macros,
-            vars: &vars,
+            var: &var,
+            var_unset: &[],
             includes: &[],
             heading_level: 0,
             notes: Default::default(),

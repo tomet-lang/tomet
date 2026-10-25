@@ -113,7 +113,8 @@ struct Scope<'a> {
     macros: std::collections::HashMap<String, String>,
     chain: Vec<DocRef>,
     self_doc: DocRef,
-    vars: EvalValue,
+    var: EvalValue,
+    var_unset: Vec<String>,
 }
 
 impl Scope<'_> {
@@ -124,7 +125,8 @@ impl Scope<'_> {
             generate: &SystemGenerate,
             self_doc: self.self_doc.clone(),
             macros: &self.macros,
-            vars: &self.vars,
+            var: &self.var,
+            var_unset: &self.var_unset,
             includes: &self.chain,
             heading_level: 0,
             notes: Default::default(),
@@ -279,6 +281,8 @@ impl Vault {
     fn scope<'a>(&self, doc: &Document, path: &Path, resolver: &'a dyn Resolver) -> Scope<'a> {
         let self_doc = self.doc_ref(path);
         let snapshot = Arc::new(doc.clone());
+        let config = self.evaluation_config(doc);
+        let vars = self.vars_in_scope(&config, &self_doc);
         Scope {
             overlay: Overlay {
                 meta: typed_meta(&self.config, &snapshot, &self_doc),
@@ -286,13 +290,14 @@ impl Vault {
                 snapshot,
                 inner: resolver,
             },
-            macros: self.evaluation_config(doc).macros,
+            macros: config.macros,
             // The document is the first of the chain of files being included,
             // so a file that includes it back is a cycle at once, not one lap
             // later.
             chain: vec![self_doc.clone()],
             self_doc,
-            vars: EvalValue::Null,
+            var: vars.values,
+            var_unset: vars.unset,
         }
     }
 
@@ -318,14 +323,17 @@ impl Vault {
             snapshot: source.clone(),
             inner: resolver,
         };
-        let macros = self.evaluation_config(&source).macros;
+        let config = self.evaluation_config(&source);
+        let vars = self.vars_in_scope(&config, doc);
+        let macros = config.macros;
         let cx = EvalContext {
             phase: Phase::Output,
             resolver: &overlay,
             generate: &SystemGenerate,
             self_doc: doc.clone(),
             macros: &macros,
-            vars: &EvalValue::Null,
+            var: &vars.values,
+            var_unset: &vars.unset,
             includes,
             heading_level: 0,
             notes: Default::default(),
@@ -349,8 +357,8 @@ impl Vault {
         DocRef(rel.strip_prefix("./").unwrap_or(&rel).to_string())
     }
 
-    /// The macros in scope for `doc`: its own `::config`, then the vault's
-    /// for every name it did not claim.
+    /// The macros and variables in scope for `doc`: its own `::macros` and
+    /// `::vars`, then the vault's for every name it did not claim.
     ///
     /// The document wins a collision, which is the direction every other
     /// scope in this format runs. Before this lived here it lived in the
@@ -363,7 +371,23 @@ impl Vault {
                 .entry(name.clone())
                 .or_insert_with(|| template.clone());
         }
+        for (name, decl) in &self.config.vars {
+            if !config.vars.iter().any(|(declared, _)| declared == name) {
+                config.vars.push((name.clone(), decl.clone()));
+            }
+        }
         config
+    }
+
+    /// `var` when rendering `doc_ref`: each declared variable at its `default`.
+    /// Nothing is passed while rendering, so nothing here can be refused.
+    fn vars_in_scope(
+        &self,
+        config: &tomet_semantics::DocumentConfig,
+        doc_ref: &DocRef,
+    ) -> tomet_expr::VarScope {
+        tomet_expr::var_scope(&config.vars, doc_ref, &[])
+            .expect("nothing is passed when rendering, so nothing is undeclared or mistyped")
     }
 }
 
@@ -556,14 +580,14 @@ mod tests {
     #[test]
     fn macros_from_the_vault_and_the_document_are_both_in_scope() {
         let config = tomet_config::load_config_from_str(
-            "::settings{ macros: { gh: \"https://gh/${1}\", site: \"vault\" } }\n",
+            "::macros{ gh: \"https://gh/${1}\", site: \"vault\" }\n",
         )
         .unwrap();
         let vault = Vault::from_sources(config, "/v", &[]);
         let (doc, prepared) = prepared(
             &vault,
             "/v/a.tmt",
-            "::config{ macros: { site: \"doc\" } }\n\n${macro.gh(1)} ${macro.site()}\n",
+            "::macros{ site: \"doc\" }\n\n${macro.gh(1)} ${macro.site()}\n",
         );
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
         // The document wins a collision.

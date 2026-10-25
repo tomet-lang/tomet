@@ -14,7 +14,7 @@ Configuration parsing and styling rule definitions ([`Config`], [`FormatConfig`]
 ([`load_config_from_str`]). Finding and reading a config file off
 disk is `tomet-load-config`'s job, one layer up.
 - ("Root Group Modules")
-  - (groups) Root configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`MacrosConfig`], [`RegistryConfig`], [`ApiConfig`]).
+  - (groups) Root configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`RegistryConfig`], [`ApiConfig`]).
   - (discovery) Configuration parsing and error handling.
   - (tree) AST tree normalization and path lookup utilities.
 
@@ -40,11 +40,10 @@ Root configuration groups corresponding to `::settings{ ... }` / `::config{ ... 
 
 Each submodule defines a dedicated strongly-typed configuration struct for a specific domain:
 
-- `format`, link, element, callout, list, and table formatting rules ([`FormatConfig`], [`GroupOrder`]).:Heading
-- `meta` metadata formatting and schema rules ([`MetaConfig`], [`FieldConfig`]).:Document
-- `workspace` file indexing exclusions and unswept rules ([`WorkspaceConfig`]).:Vault
-- `macros` template expansions ([`MacrosConfig`]).:Macro
-- `registry` and vocabularies declarations ([`RegistryConfig`]).:Blueprints
+- ("`format`") Heading, link, element, callout, list, and table formatting rules ([`FormatConfig`], [`GroupOrder`]).
+- ("`meta`") Document metadata formatting and schema rules ([`MetaConfig`], [`FieldConfig`]).
+- ("`workspace`") Vault file indexing exclusions and unswept rules ([`WorkspaceConfig`]).
+- ("`registry`") Blueprints and vocabularies declarations ([`RegistryConfig`]).
 
 ===[Module format]
 
@@ -59,16 +58,6 @@ Formatting and printer rule configuration.
 ====[Enums]
 
 =====[enum GroupOrder]
-
-===[Module macros]
-
-Macro template definitions ([`MacrosConfig`]).
-
-====[Structs]
-
-=====[struct MacrosConfig]
-
-Macro template expansions and URL prefix templates.
 
 ===[Module meta]
 
@@ -149,7 +138,7 @@ one-element list shorthand.
 ====[fn merge_entry]
 
 Recursively merges `key` and `value` into `target`, normalizing dotted keys
-into hierarchical `Value::Map` entries while preserving flat keys for `meta` and `macros`.
+into hierarchical `Value::Map` entries while preserving flat keys for `meta`.
 
 ==[Structs]
 

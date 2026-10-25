@@ -69,6 +69,7 @@ pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagn
 
     check_singletons_and_regions(doc, bindings, errors);
     check_retired_settings_keys(doc, errors);
+    check_name_definitions(doc, errors);
     check_arguments(doc, bindings, errors);
     check_version_slot(doc, bindings, errors);
     check_unfinished(doc, errors);
@@ -493,10 +494,83 @@ fn for_each_direct_content_element<'a>(
     }
 }
 
+/// Checks what `::macros` and `::vars` define: a macro is a string template, a
+/// variable is a declaration (`type`, `default`, `about`) whose `type` is one a
+/// variable can have and whose `default` is a value of it.
+pub fn check_name_definitions(doc: &Document, errors: &mut Vec<Diagnostic>) {
+    use tomet_ast::Value;
+    use tomet_semantics::{ElementKind, VAR_TYPES, VarDecl, classify_std_lenient};
+
+    tomet_tree::for_each_top_level_element(doc, |el| match classify_std_lenient(el) {
+        ElementKind::Macros => {
+            let entries = [
+                tomet_semantics::normalized_element_args(el),
+                tomet_semantics::data::element_data(el),
+            ];
+            for entries in entries.into_iter().flatten() {
+                let Value::Map(entries) = entries else {
+                    continue;
+                };
+                for (name, template) in entries {
+                    if !matches!(template, Value::String(_)) {
+                        errors.push(Diagnostic::InvalidDefinition {
+                            declaration: "macros",
+                            name,
+                            reason: "a macro is a string template, such as `\"https://x/${1}\"`"
+                                .to_string(),
+                            span: el.span,
+                        });
+                    }
+                }
+            }
+        }
+        ElementKind::Vars => {
+            for (name, decl) in tomet_semantics::read_var_decls(el) {
+                let reason = match decl {
+                    Err(reason) => Some(reason),
+                    Ok(decl) => var_problem(&decl, VAR_TYPES),
+                };
+                if let Some(reason) = reason {
+                    errors.push(Diagnostic::InvalidDefinition {
+                        declaration: "vars",
+                        name,
+                        reason,
+                        span: el.span,
+                    });
+                }
+            }
+        }
+        _ => {}
+    });
+
+    fn var_problem(decl: &VarDecl, types: [&str; 6]) -> Option<String> {
+        let ty = decl.type_name();
+        if !types.contains(&ty) {
+            return Some(format!(
+                "`type: {ty}` is not a type a variable can have; use {}",
+                types.map(|t| format!("`{t}`")).join(", ")
+            ));
+        }
+        let default = decl.default.as_ref()?;
+        let fits = match (ty, default) {
+            ("string", Value::String(_)) => true,
+            ("int", Value::Int(_)) => true,
+            ("float", Value::Float(_) | Value::Int(_)) => true,
+            ("bool", Value::Bool(_)) => true,
+            ("list", Value::Seq(_)) => true,
+            ("datetime", Value::String(text)) => {
+                tomet_semantics::datetime::parse_datetime_parts(text).is_some()
+            }
+            _ => false,
+        };
+        (!fits).then(|| format!("`default` is not a value of `type: {ty}`"))
+    }
+}
+
 pub fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>) {
     use tomet_ast::Value;
 
-    const RETIRED: [&str; 2] = ["elements", "types"];
+    const RETIRED: [&str; 4] = ["elements", "types", "macros", "macro"];
 
     tomet_tree::for_each_top_level_element(doc, |el| {
         if !el.sigil.is_bare_named("settings") && !el.sigil.is_bare_named("config") {

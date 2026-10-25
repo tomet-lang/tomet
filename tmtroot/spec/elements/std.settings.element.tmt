@@ -5,8 +5,10 @@
 
 =[ 全容 ]
 
-`::settings` は **Tomet がどう振る舞うか**を書く。整形、マクロ、vault が持つ
-ファイルの一覧。
+`::settings` は **Tomet がどう振る舞うか**を書く。整形、vault が持つファイルの
+一覧。名前の定義（マクロ、変数）は設定ではないので、ここには書かない
+（@file(tmtroot/spec/elements/std.macros.element.tmt)、
+@file(tmtroot/spec/elements/std.vars.element.tmt)）。
 
 ```tm
 ::config(import:@target)
@@ -19,9 +21,6 @@
   }
   meta: {
     created: { type: datetime, format: rfc3339, offset: "+09:00" }
-  }
-  macros: {
-    gh: "https://github.com/tomet/tomet/issues/${1}"
   }
   blueprints: list(".tomet/blueprints/daily-note.blueprint.tmt")
   vocabularies: list(".tomet/vocabularies/deck.vocabulary.tmt")

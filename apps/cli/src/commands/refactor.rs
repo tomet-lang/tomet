@@ -137,10 +137,8 @@ mod tests {
   type: note
   title: "My Title"
 }
-::config{
-  macros: {
-    gh: "https://github.com/${1}"
-  }
+::macros{
+  gh: "https://github.com/${1}"
 }
 
 - @link("https://github.com/tomet/tomet")[Repo]

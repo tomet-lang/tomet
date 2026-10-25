@@ -85,6 +85,12 @@ float, and a document names only the major version.
 
 ===[fn check_content_shape]
 
+===[fn check_name_definitions]
+
+Checks what `::macros` and `::vars` define: a macro is a string template, a
+variable is a declaration (`type`, `default`, `about`) whose `type` is one a
+variable can have and whose `default` is a value of it.
+
 ===[fn check_retired_settings_keys]
 
 ===[fn check_field_types]

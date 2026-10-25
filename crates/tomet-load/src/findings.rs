@@ -70,7 +70,13 @@ impl Vault {
         // Run on a copy: this reports on the document as written, and
         // `prepare` rewrites the tree.
         let mut prepared = doc.clone();
-        let unresolved = self.prepare(&mut prepared, path).unresolved;
+        let mut unresolved = self.prepare(&mut prepared, path).unresolved;
+        // A blueprint is written to be filled in: what only has a value when a
+        // document is being created from it (`generate.*`, a variable with no
+        // default) is not a mistake there.
+        if tomet_semantics::document_kind(doc).as_deref() == Some("blueprint") {
+            unresolved.retain(|u| !u.creation_only);
+        }
 
         Findings {
             diagnostics,

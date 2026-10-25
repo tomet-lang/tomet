@@ -464,7 +464,7 @@ fn is_web_url(s: &str) -> bool {
 ///
 /// The editor has the document and its settings and nothing else, so what
 /// reaches for another file fails and says so; `generate.*` fails too,
-/// because rendering never runs it.
+/// because rendering never runs it. A variable is at its `default`.
 fn evaluate_for_hover(
     doc: &Document,
     expr: &tomet_ast::InterpExpr,
@@ -472,14 +472,17 @@ fn evaluate_for_hover(
 ) -> Result<EvalValue, tomet_expr::EvalError> {
     let here = "document.tmt";
     let resolver = MemoryResolver::new().with_document(here, std::sync::Arc::new(doc.clone()));
-    let vars = EvalValue::Null;
+    // Nothing is passed while hovering, so the variables are at their defaults.
+    let vars = tomet_expr::var_scope(&config.vars, &DocRef(here.to_string()), &[])
+        .expect("nothing is passed, so nothing is undeclared or mistyped");
     let cx = EvalContext {
         phase: Phase::Output,
         resolver: &resolver,
         generate: &SystemGenerate,
         self_doc: DocRef(here.to_string()),
         macros: &config.macros,
-        vars: &vars,
+        var: &vars.values,
+        var_unset: &vars.unset,
         includes: &[],
         heading_level: 0,
         notes: Default::default(),

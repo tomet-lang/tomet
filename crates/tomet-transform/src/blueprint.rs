@@ -1,7 +1,5 @@
 //! Blueprint schema extraction, transformation, and instantiation.
 
-use std::collections::HashMap;
-
 use tomet_ast::{Document, Sigil, Value};
 use tomet_expr::EvalContext;
 use tomet_semantics::{ElementKind, classify_std_lenient, normalized_element_args};
@@ -11,12 +9,12 @@ use tomet_tree::{
 
 use crate::expressions::{Unresolved, resolve_expressions};
 
-/// Metadata and variable definitions extracted from a `::blueprint` directive.
+/// What a `::blueprint` directive says about the blueprint. Its variables are
+/// not here: the blueprint declares them with `::vars`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlueprintInfo {
     pub target_kind: String,
     pub description: Option<String>,
-    pub vars_schema: HashMap<String, Value>,
 }
 
 /// Extracts [`BlueprintInfo`] from `doc` if it declares a top-level `::blueprint` directive.
@@ -38,18 +36,11 @@ pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
         };
 
         let mut description = None;
-        let mut vars_schema = HashMap::new();
 
         if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
             for (k, v) in entries {
                 if k == "description" {
                     description = v.as_str().map(String::from);
-                } else if k == "vars"
-                    && let Value::Map(var_entries) = v
-                {
-                    for (vk, vv) in var_entries {
-                        vars_schema.insert(vk.clone(), vv.clone());
-                    }
                 }
             }
         }
@@ -57,7 +48,6 @@ pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
         result = Some(BlueprintInfo {
             target_kind,
             description,
-            vars_schema,
         });
     });
     result
@@ -76,7 +66,7 @@ pub struct Instantiated {
 /// Instantiates a blueprint `doc` in-place by:
 /// 1. Promoting/converting `::blueprint(target)` to `::kind(target)` and stripping schema blocks.
 /// 2. Resolving every `${...}` in it, with `cx` -- which is a creating context
-///    (`Phase::Create`), the only place `generate.*` and `vars` exist.
+///    (`Phase::Create`), the only place `generate.*` exists.
 pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiated {
     let mut changed = false;
 
@@ -103,6 +93,16 @@ pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiat
         !is_blueprint_kind
     });
     changed |= dropped_own_kind;
+
+    // The blueprint's `::vars` are its inputs. They have been given their values
+    // by now (see `tomet-workspace`), and a document made from it has none to ask for.
+    let mut dropped_vars = false;
+    retain_top_level_elements(doc, |el| {
+        let is_vars = classify_std_lenient(el) == ElementKind::Vars;
+        dropped_vars |= is_vars;
+        !is_vars
+    });
+    changed |= dropped_vars;
 
     // Step 1: Transform ::blueprint -> ::kind
     for_each_top_level_element_mut(doc, |el| {
@@ -141,6 +141,7 @@ pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiat
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use time::OffsetDateTime;
     use tomet_expr::{DocRef, EvalValue, Generate, NoResolver, Phase};
 
@@ -166,7 +167,8 @@ mod tests {
             generate: &Fixed,
             self_doc: DocRef("notes/plan.tmt".into()),
             macros: &macros,
-            vars: &vars,
+            var: &vars,
+            var_unset: &[],
             includes: &[],
             heading_level: 0,
             notes: Default::default(),
@@ -206,20 +208,17 @@ mod tests {
 
     #[test]
     fn extracts_blueprint_info() {
-        let src = "::blueprint(daily-note){\n  description: \"Daily note\"\n  vars: {\n    author: \"Alice\"\n  }\n}\n\n=[ Plan ]#(plan)\n";
+        let src =
+            "::blueprint(daily-note){\n  description: \"Daily note\"\n}\n\n=[ Plan ]#(plan)\n";
         let doc = tomet_parser::parse_document(src).unwrap();
         let info = extract_blueprint_info(&doc).unwrap();
         assert_eq!(info.target_kind, "daily-note");
         assert_eq!(info.description.as_deref(), Some("Daily note"));
-        assert_eq!(
-            info.vars_schema.get("author"),
-            Some(&Value::String("Alice".into()))
-        );
     }
 
     #[test]
     fn instantiates_blueprint_to_kind_and_resolves_expressions() {
-        let src = "::blueprint(daily-note)\n::meta{\n  id: ${generate.uuid()}\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  title: ${vars.title}\n}\n\n=[ Plan for ${vars.title} ]#(plan)\n";
+        let src = "::blueprint(daily-note)\n::meta{\n  id: ${generate.uuid()}\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  title: ${var.title}\n}\n\n=[ Plan for ${var.title} ]#(plan)\n";
         let vars = EvalValue::Map(vec![(
             "title".to_string(),
             EvalValue::String("Sprint 42".into()),
@@ -260,7 +259,7 @@ mod tests {
     #[test]
     fn an_expression_with_no_value_is_left_and_reported() {
         let (doc, report) = instantiate(
-            "::blueprint(note)\n::meta{ title: ${vars.title} }\n",
+            "::blueprint(note)\n::meta{ title: ${var.title} }\n",
             EvalValue::Map(vec![]),
         );
         assert_eq!(report.unresolved.len(), 1);

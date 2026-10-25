@@ -9,7 +9,7 @@
 //!   | ([`load_config_from_str`]). Finding and reading a config file off
 //!   | disk is `tomet-load-config`'s job, one layer up.
 //! - (Root Group Modules)
-//!   - (groups) Root configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`MacrosConfig`], [`RegistryConfig`], [`ApiConfig`]).
+//!   - (groups) Root configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`RegistryConfig`], [`ApiConfig`]).
 //!   - (discovery) Configuration parsing and error handling.
 //!   - (tree) AST tree normalization and path lookup utilities.
 
@@ -30,8 +30,8 @@ pub mod tree;
 
 pub use discovery::{ConfigError, load_config_from_str};
 pub use groups::{
-    FieldConfig, FormatConfig, GroupOrder, MacrosConfig, MetaConfig, RegistryConfig,
-    WorkspaceConfig, format, macros, meta, registry, workspace,
+    FieldConfig, FormatConfig, GroupOrder, MetaConfig, RegistryConfig, WorkspaceConfig, format,
+    meta, registry, workspace,
 };
 pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
 pub use tomet_spec_derive::Config;
@@ -45,7 +45,11 @@ pub struct Config {
     pub format: FormatConfig,
     pub meta: MetaConfig,
     pub workspace: WorkspaceConfig,
-    pub macros: MacrosConfig,
+    /// The macros a vault defines with `::macros`: name to template. Not a
+    /// setting, so it is not read from the `::settings`/`::config` tree.
+    pub macros: std::collections::HashMap<String, String>,
+    /// The variables a vault declares with `::vars`, in the order written.
+    pub vars: Vec<(String, tomet_semantics::VarDecl)>,
     pub registry: RegistryConfig,
 }
 
@@ -86,7 +90,8 @@ impl Config {
             format: FormatConfig::from_root(&root),
             meta: MetaConfig::from_root(&root),
             workspace: WorkspaceConfig::from_root(&root),
-            macros: MacrosConfig::from_root(&root),
+            macros: config.macros.clone(),
+            vars: config.vars.clone(),
             registry: RegistryConfig::from_root(&root),
         }
     }

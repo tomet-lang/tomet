@@ -200,6 +200,8 @@ fn is_declaration(element: &Element) -> bool {
             | ElementKind::Meta
             | ElementKind::Config
             | ElementKind::Settings
+            | ElementKind::Macros
+            | ElementKind::Vars
             | ElementKind::Use
             | ElementKind::Blueprint
     )

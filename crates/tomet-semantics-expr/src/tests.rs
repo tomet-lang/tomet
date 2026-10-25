@@ -50,7 +50,7 @@ fn parse(src: &str) -> tomet_ast::InterpExpr {
 fn run_with(
     src: &str,
     phase: Phase,
-    vars: &EvalValue,
+    var: &EvalValue,
     macros: &HashMap<String, String>,
 ) -> Result<EvalValue, EvalError> {
     let cx = EvalContext {
@@ -59,7 +59,8 @@ fn run_with(
         generate: &Fixed,
         self_doc: DocRef("here.tmt".to_string()),
         macros,
-        vars,
+        var,
+        var_unset: &[],
         includes: &[],
         heading_level: 0,
         notes: Default::default(),
@@ -67,12 +68,12 @@ fn run_with(
     evaluate(&parse(src), &cx)
 }
 
-/// Evaluates when rendering, with nothing in `vars`.
+/// Evaluates when rendering, with nothing in `var`.
 fn out(src: &str) -> Result<EvalValue, EvalError> {
     run_with(src, Phase::Output, &EvalValue::Null, &HashMap::new())
 }
 
-/// Evaluates when creating a document, with `vars` set.
+/// Evaluates when creating a document, with `var` set.
 fn create(src: &str, vars: EvalValue) -> Result<EvalValue, EvalError> {
     run_with(src, Phase::Create, &vars, &HashMap::new())
 }
@@ -110,14 +111,47 @@ fn reserved_values_resolve() {
 }
 
 #[test]
-fn vars_and_generate_exist_only_when_creating() {
-    assert_eq!(out("vars"), Err(EvalError::PhaseOnly("vars".to_string())));
+fn generate_exists_only_when_creating_and_var_in_both() {
     assert_eq!(
         out("generate"),
         Err(EvalError::PhaseOnly("generate".to_string()))
     );
-    let vars = map(vec![("title", text("T"))]);
-    assert_eq!(create("vars.title", vars).unwrap(), text("T"));
+    // `var` is a value of the document, so it reads when rendering too.
+    let var = map(vec![("title", text("T"))]);
+    assert_eq!(
+        run_with("var.title", Phase::Output, &var, &HashMap::new()).unwrap(),
+        text("T")
+    );
+    assert_eq!(create("var.title", var).unwrap(), text("T"));
+}
+
+#[test]
+fn a_declared_variable_with_no_value_says_how_to_give_it_one() {
+    let cx = EvalContext {
+        phase: Phase::Output,
+        resolver: &NoResolver,
+        generate: &Fixed,
+        self_doc: DocRef("here.tmt".to_string()),
+        macros: &HashMap::new(),
+        var: &map(vec![("other", text("O"))]),
+        var_unset: &["title".to_string()],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+    assert_eq!(
+        evaluate(&parse("var.title"), &cx),
+        Err(EvalError::NoValue("title".to_string()))
+    );
+    // a name that is not declared at all is still an unknown member
+    assert_eq!(
+        evaluate(&parse("var.nope"), &cx),
+        Err(EvalError::UnknownMember {
+            on: "map",
+            member: "nope".to_string()
+        })
+    );
+    assert_eq!(evaluate(&parse("var.other"), &cx).unwrap(), text("O"));
 }
 
 #[test]
@@ -144,7 +178,7 @@ fn generate_called_when_rendering_names_the_function() {
 fn a_member_that_does_not_exist_is_named() {
     let vars = map(vec![("title", text("T"))]);
     assert_eq!(
-        create("vars.nope", vars),
+        create("var.nope", vars),
         Err(EvalError::UnknownMember {
             on: "map",
             member: "nope".to_string()
@@ -300,7 +334,7 @@ fn xs() -> EvalValue {
 #[test]
 fn a_lambda_is_a_value_and_can_be_applied_by_a_method() {
     assert_eq!(
-        create("vars.xs.map(x => add(x, 1))", xs()).unwrap(),
+        create("var.xs.map(x => add(x, 1))", xs()).unwrap(),
         seq(vec![int(4), int(2), int(3)])
     );
 }
@@ -308,7 +342,7 @@ fn a_lambda_is_a_value_and_can_be_applied_by_a_method() {
 #[test]
 fn filter_keeps_what_the_function_says_yes_to() {
     assert_eq!(
-        create("vars.xs.filter(x => x > 1)", xs()).unwrap(),
+        create("var.xs.filter(x => x > 1)", xs()).unwrap(),
         seq(vec![int(3), int(2)])
     );
 }
@@ -316,7 +350,7 @@ fn filter_keeps_what_the_function_says_yes_to() {
 #[test]
 fn filter_needs_a_bool_from_its_function() {
     assert!(matches!(
-        create("vars.xs.filter(x => x)", xs()),
+        create("var.xs.filter(x => x)", xs()),
         Err(EvalError::TypeMismatch { got: "int", .. })
     ));
 }
@@ -324,11 +358,11 @@ fn filter_needs_a_bool_from_its_function() {
 #[test]
 fn sort_orders_by_a_key_and_is_stable() {
     assert_eq!(
-        create("vars.xs.sort(x => x)", xs()).unwrap(),
+        create("var.xs.sort(x => x)", xs()).unwrap(),
         seq(vec![int(1), int(2), int(3)])
     );
     assert_eq!(
-        create("vars.xs.sort(x => x, \"desc\")", xs()).unwrap(),
+        create("var.xs.sort(x => x, \"desc\")", xs()).unwrap(),
         seq(vec![int(3), int(2), int(1)])
     );
     // Equal keys keep their original order.
@@ -341,7 +375,7 @@ fn sort_orders_by_a_key_and_is_stable() {
         ]),
     )]);
     assert_eq!(
-        create("vars.xs.sort(p => p.k).map(p => p.n)", pairs).unwrap(),
+        create("var.xs.sort(p => p.k).map(p => p.n)", pairs).unwrap(),
         seq(vec![text("b"), text("a"), text("c")])
     );
 }
@@ -350,13 +384,13 @@ fn sort_orders_by_a_key_and_is_stable() {
 fn sort_refuses_keys_that_have_no_common_order() {
     let mixed = map(vec![("xs", seq(vec![int(1), text("a")]))]);
     assert_eq!(
-        create("vars.xs.sort(x => x)", mixed),
+        create("var.xs.sort(x => x)", mixed),
         Err(EvalError::NotComparable {
             left: "int",
             right: "string"
         })
     );
-    assert!(create("vars.xs.sort(x => x, \"sideways\")", xs()).is_err());
+    assert!(create("var.xs.sort(x => x, \"sideways\")", xs()).is_err());
 }
 
 #[test]
@@ -371,47 +405,47 @@ fn an_item_with_no_key_goes_last_whichever_way_the_rest_are_ordered() {
         ]),
     )]);
     assert_eq!(
-        create("vars.xs.sort(p => p.k).map(p => p.n)", xs.clone()).unwrap(),
+        create("var.xs.sort(p => p.k).map(p => p.n)", xs.clone()).unwrap(),
         seq(vec![text("b"), text("a"), text("none1"), text("none2")])
     );
     assert_eq!(
-        create("vars.xs.sort(p => p.k, \"desc\").map(p => p.n)", xs).unwrap(),
+        create("var.xs.sort(p => p.k, \"desc\").map(p => p.n)", xs).unwrap(),
         seq(vec![text("a"), text("b"), text("none1"), text("none2")])
     );
     // Only keys that exist have to agree: a number and a string still clash.
     let clash = map(vec![("xs", seq(vec![int(1), EvalValue::Null, text("a")]))]);
-    assert!(create("vars.xs.sort(x => x)", clash).is_err());
+    assert!(create("var.xs.sort(x => x)", clash).is_err());
 }
 
 #[test]
 fn join_len_contains_and_item_on_a_list() {
     assert_eq!(
-        create("vars.xs.join(\", \")", xs()).unwrap(),
+        create("var.xs.join(\", \")", xs()).unwrap(),
         text("3, 1, 2")
     );
-    assert_eq!(create("vars.xs.len()", xs()).unwrap(), int(3));
+    assert_eq!(create("var.xs.len()", xs()).unwrap(), int(3));
     assert_eq!(
-        create("vars.xs.contains(2)", xs()).unwrap(),
+        create("var.xs.contains(2)", xs()).unwrap(),
         EvalValue::Bool(true)
     );
     assert_eq!(
-        create("vars.xs.contains(9)", xs()).unwrap(),
+        create("var.xs.contains(9)", xs()).unwrap(),
         EvalValue::Bool(false)
     );
-    assert_eq!(create("vars.xs.item(1)", xs()).unwrap(), int(1));
-    assert!(create("vars.xs.item(7)", xs()).is_err());
-    assert!(create("vars.xs.item(-1)", xs()).is_err());
+    assert_eq!(create("var.xs.item(1)", xs()).unwrap(), int(1));
+    assert!(create("var.xs.item(7)", xs()).is_err());
+    assert!(create("var.xs.item(-1)", xs()).is_err());
 }
 
 #[test]
 fn join_takes_scalars_only() {
     let nested = map(vec![("xs", seq(vec![seq(vec![int(1)])]))]);
     assert!(matches!(
-        create("vars.xs.join(\",\")", nested),
+        create("var.xs.join(\",\")", nested),
         Err(EvalError::TypeMismatch { got: "list", .. })
     ));
     let nulls = map(vec![("xs", seq(vec![EvalValue::Null]))]);
-    assert!(create("vars.xs.join(\",\")", nulls).is_err());
+    assert!(create("var.xs.join(\",\")", nulls).is_err());
 }
 
 #[test]
@@ -419,7 +453,7 @@ fn an_empty_list_answers_contains_with_no_instead_of_failing() {
     // What a document with no tags gives for a `list` field.
     let empty = map(vec![("tags", seq(vec![]))]);
     assert_eq!(
-        create("vars.tags.contains(\"rust\")", empty).unwrap(),
+        create("var.tags.contains(\"rust\")", empty).unwrap(),
         EvalValue::Bool(false)
     );
 }
@@ -428,11 +462,11 @@ fn an_empty_list_answers_contains_with_no_instead_of_failing() {
 fn maps_and_strings_have_their_own_contains_and_get() {
     let m = map(vec![("m", map(vec![("a", int(1))]))]);
     assert_eq!(
-        create("vars.m.contains(\"a\")", m.clone()).unwrap(),
+        create("var.m.contains(\"a\")", m.clone()).unwrap(),
         EvalValue::Bool(true)
     );
-    assert_eq!(create("vars.m.get(\"a\", 0)", m.clone()).unwrap(), int(1));
-    assert_eq!(create("vars.m.get(\"z\", 0)", m).unwrap(), int(0));
+    assert_eq!(create("var.m.get(\"a\", 0)", m.clone()).unwrap(), int(1));
+    assert_eq!(create("var.m.get(\"z\", 0)", m).unwrap(), int(0));
     assert_eq!(
         out("\"hello\".contains(\"ell\")").unwrap(),
         EvalValue::Bool(true)
@@ -464,7 +498,7 @@ fn a_method_on_the_wrong_type_or_on_null_is_an_error() {
 #[test]
 fn a_lambda_sees_the_names_around_it() {
     assert_eq!(
-        create("vars.xs.map(x => vars.xs.filter(y => y > x).len())", xs()).unwrap(),
+        create("var.xs.map(x => var.xs.filter(y => y > x).len())", xs()).unwrap(),
         seq(vec![int(0), int(2), int(1)])
     );
 }
@@ -480,7 +514,7 @@ fn a_lambda_cannot_take_a_reserved_name_as_a_parameter() {
 #[test]
 fn a_lambda_called_with_the_wrong_number_of_arguments_is_reported() {
     assert!(matches!(
-        create("vars.xs.sort((a, b) => a)", xs()),
+        create("var.xs.sort((a, b) => a)", xs()),
         Err(EvalError::WrongArgCount { .. })
     ));
 }
@@ -571,7 +605,8 @@ fn in_vault(src: &str) -> Result<EvalValue, EvalError> {
         generate: &Fixed,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
-        vars: &vars,
+        var: &vars,
+        var_unset: &[],
         includes: &[],
         heading_level: 0,
         notes: Default::default(),
@@ -828,11 +863,11 @@ fn with_dates() -> EvalValue {
 #[test]
 fn a_datetime_formats_with_the_shared_symbols() {
     assert_eq!(
-        create("vars.late.format(\"YYYY-MM-DD HH:mm\")", with_dates()).unwrap(),
+        create("var.late.format(\"YYYY-MM-DD HH:mm\")", with_dates()).unwrap(),
         text("2026-06-01 12:30")
     );
     assert_eq!(
-        create("vars.late.format(\"YYYY年MM月DD日\")", with_dates()).unwrap(),
+        create("var.late.format(\"YYYY年MM月DD日\")", with_dates()).unwrap(),
         text("2026年06月01日")
     );
 }
@@ -841,7 +876,7 @@ fn a_datetime_formats_with_the_shared_symbols() {
 fn format_keeps_the_values_own_offset() {
     // 12:30 at +09:00 is 03:30 UTC; the value is written as it is, not converted.
     assert_eq!(
-        create("vars.late.format(\"HH\")", with_dates()).unwrap(),
+        create("var.late.format(\"HH\")", with_dates()).unwrap(),
         text("12")
     );
 }
@@ -849,15 +884,15 @@ fn format_keeps_the_values_own_offset() {
 #[test]
 fn datetimes_order_and_compare() {
     assert_eq!(
-        create("vars.early < vars.late", with_dates()).unwrap(),
+        create("var.early < var.late", with_dates()).unwrap(),
         EvalValue::Bool(true)
     );
     assert_eq!(
-        create("vars.late >= vars.early", with_dates()).unwrap(),
+        create("var.late >= var.early", with_dates()).unwrap(),
         EvalValue::Bool(true)
     );
     assert_eq!(
-        create("vars.early == vars.early", with_dates()).unwrap(),
+        create("var.early == var.early", with_dates()).unwrap(),
         EvalValue::Bool(true)
     );
     // The same instant at two offsets is the same datetime.
@@ -866,7 +901,7 @@ fn datetimes_order_and_compare() {
         ("b", when("2026-01-01T00:00:00Z")),
     ]);
     assert_eq!(
-        create("vars.a == vars.b", same).unwrap(),
+        create("var.a == var.b", same).unwrap(),
         EvalValue::Bool(true)
     );
 }
@@ -875,7 +910,7 @@ fn datetimes_order_and_compare() {
 fn a_datetime_does_not_order_against_a_string() {
     let mixed = map(vec![("d", when("2026-01-01T00:00:00Z"))]);
     assert_eq!(
-        create("vars.d < \"2026-02-01\"", mixed),
+        create("var.d < \"2026-02-01\"", mixed),
         Err(EvalError::NotComparable {
             left: "datetime",
             right: "string"
@@ -895,7 +930,7 @@ fn datetimes_sort() {
     )]);
     assert_eq!(
         create(
-            "vars.xs.sort(d => d, \"desc\").map(d => d.format(\"MM\"))",
+            "var.xs.sort(d => d, \"desc\").map(d => d.format(\"MM\"))",
             list
         )
         .unwrap(),
@@ -906,11 +941,11 @@ fn datetimes_sort() {
 #[test]
 fn format_wants_a_string_and_a_datetime_has_no_other_members() {
     assert!(matches!(
-        create("vars.late.format(1)", with_dates()),
+        create("var.late.format(1)", with_dates()),
         Err(EvalError::TypeMismatch { got: "int", .. })
     ));
     assert_eq!(
-        create("vars.late.century", with_dates()),
+        create("var.late.century", with_dates()),
         Err(EvalError::UnknownMember {
             on: "datetime",
             member: "century".to_string()
@@ -930,21 +965,21 @@ fn a_datetime_has_its_parts_in_its_own_offset() {
         ("second", 0),
     ] {
         assert_eq!(
-            create(&format!("vars.late.{expr}"), with_dates()).unwrap(),
+            create(&format!("var.late.{expr}"), with_dates()).unwrap(),
             int(want),
             "{expr}"
         );
     }
     assert_eq!(
-        create("vars.late.offset", with_dates()).unwrap(),
+        create("var.late.offset", with_dates()).unwrap(),
         text("+09:00")
     );
     assert_eq!(
-        create("vars.early.offset", with_dates()).unwrap(),
+        create("var.early.offset", with_dates()).unwrap(),
         text("+00:00")
     );
     assert_eq!(
-        create("vars.late.year == 2026", with_dates()).unwrap(),
+        create("var.late.year == 2026", with_dates()).unwrap(),
         EvalValue::Bool(true)
     );
 }
@@ -953,24 +988,24 @@ fn a_datetime_has_its_parts_in_its_own_offset() {
 fn at_gives_the_same_instant_in_another_offset() {
     // 12:30 at +09:00 is 03:30 UTC.
     assert_eq!(
-        create("vars.late.at(\"Z\").format(\"HH:mm\")", with_dates()).unwrap(),
+        create("var.late.at(\"Z\").format(\"HH:mm\")", with_dates()).unwrap(),
         text("03:30")
     );
     assert_eq!(
         create(
-            "vars.early.at(\"-05:30\").format(\"YYYY-MM-DD HH:mm\")",
+            "var.early.at(\"-05:30\").format(\"YYYY-MM-DD HH:mm\")",
             with_dates()
         )
         .unwrap(),
         text("2025-12-31 18:30")
     );
     assert_eq!(
-        create("vars.late.at(\"-05:00\").offset", with_dates()).unwrap(),
+        create("var.late.at(\"-05:00\").offset", with_dates()).unwrap(),
         text("-05:00")
     );
     // The instant is the same, so it compares equal.
     assert_eq!(
-        create("vars.late.at(\"Z\") == vars.late", with_dates()).unwrap(),
+        create("var.late.at(\"Z\") == var.late", with_dates()).unwrap(),
         EvalValue::Bool(true)
     );
 }
@@ -978,10 +1013,10 @@ fn at_gives_the_same_instant_in_another_offset() {
 #[test]
 fn at_wants_an_offset() {
     assert!(matches!(
-        create("vars.late.at(1)", with_dates()),
+        create("var.late.at(1)", with_dates()),
         Err(EvalError::TypeMismatch { got: "int", .. })
     ));
-    assert!(create("vars.late.at(\"Tokyo\")", with_dates()).is_err());
+    assert!(create("var.late.at(\"Tokyo\")", with_dates()).is_err());
 }
 
 #[test]
@@ -1149,7 +1184,8 @@ fn include_in(
         generate: &Fixed,
         self_doc: DocRef(host.to_string()),
         macros: &macros,
-        vars: &vars,
+        var: &vars,
+        var_unset: &[],
         includes,
         heading_level: level,
         notes: Default::default(),
@@ -1443,7 +1479,8 @@ fn in_list_vault(src: &str) -> Result<EvalValue, EvalError> {
         generate: &Fixed,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
-        vars: &vars,
+        var: &vars,
+        var_unset: &[],
         includes: &[],
         heading_level: 0,
         notes: Default::default(),

@@ -49,7 +49,8 @@ fn run_in(
         generate: &SystemGenerate,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
-        vars,
+        var: vars,
+        var_unset: &[],
         includes: &[],
         heading_level: 0,
         notes: Default::default(),
@@ -328,10 +329,10 @@ fn a_reference_is_answered_from_the_document_the_resolver_holds() {
 }
 
 #[test]
-fn creating_a_document_reads_vars_and_generates() {
+fn creating_a_document_reads_var_and_generates() {
     let vars = EvalValue::Map(vec![("title".into(), EvalValue::String("Plan".into()))]);
     let (doc, unresolved) = run_with(
-        "::meta{ id: ${generate.uuid()}, title: ${vars.title} }\n\nPlan for ${vars.title}\n",
+        "::meta{ id: ${generate.uuid()}, title: ${var.title} }\n\nPlan for ${var.title}\n",
         Phase::Create,
         &vars,
     );
@@ -387,7 +388,8 @@ fn with_no_vault_a_reference_to_another_document_fails_and_stays() {
         generate: &SystemGenerate,
         self_doc: DocRef("here.tmt".into()),
         macros: &macros,
-        vars: &vars,
+        var: &vars,
+        var_unset: &[],
         includes: &[],
         heading_level: 0,
         notes: Default::default(),

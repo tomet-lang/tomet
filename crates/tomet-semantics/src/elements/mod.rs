@@ -11,6 +11,7 @@
 //! - (footnote) Footnote collection and indexing (`@ftn(id)[...]`, and `@ftn(id)` to refer to one).
 //! - (heading) Heading level calculation and bounds clamping (`heading`).
 //! - (meta) Document metadata and frontmatter extraction (`::meta`, `::kind`, `::version`).
+//! - (vars) Variable declarations (`::vars`).
 //! - (table) Table rows and cell structures (`@table`).
 //! - (tag) Tag collection (`#tag`).
 //! - (target) Target URI and scheme resolution (`@link`, `@embed`, `@file`, `@dir`).
@@ -22,3 +23,4 @@ pub mod meta;
 pub mod table;
 pub mod tag;
 pub mod target;
+pub mod vars;

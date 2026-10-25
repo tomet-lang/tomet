@@ -89,8 +89,9 @@ Instantiates a blueprint file into formatted Tomet source text for the new
 document `target`, a path relative to the vault.
 
 `vars` are the values passed to `tomet new --var key=value`, read in the
-blueprint as `${vars.key}`; `title` defaults to the file's name. The
-document being created is `self`, so `${self.filename}` is the new file's
+blueprint as `${var.key}`. A name nothing declares is refused, and so is a
+variable that has neither a value nor a `default`: the blueprint's `::vars`
+(over the vault's) says which there are. The document being created is `self`, so `${self.filename}` is the new file's
 name. `${generate.now()}` is written in the offset the settings give
 `created` (or `modified`), UTC if neither has one.
 

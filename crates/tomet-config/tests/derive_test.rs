@@ -106,10 +106,7 @@ fn test_flatten_and_custom_parser() {
 fn test_all_config_specs_coverage() {
     let specs = all_config_specs();
     let group_names: Vec<&str> = specs.iter().map(|g| g.name).collect();
-    assert_eq!(
-        group_names,
-        vec!["format", "meta", "workspace", "macros", "registry"]
-    );
+    assert_eq!(group_names, vec!["format", "meta", "workspace", "registry"]);
 
     let format_group = specs.iter().find(|g| g.name == "format").unwrap();
     assert!(

@@ -25,12 +25,14 @@
 @table
 |[ 名前       ][ 型           ][ 中身 ]
 |[ `self`     ][ 文書         ][ 式を書いたファイル（@file(tmtroot/spec/expressions/self.expr.tmt)） ]
-|[ `macro`    ][ 名前空間     ][ 設定で定義したマクロ（@file(tmtroot/spec/expressions/macro.expr.tmt)） ]
+|[ `macro`    ][ 名前空間     ][ vault と文書の `::macros` で定義したマクロ（@file(tmtroot/spec/expressions/macro.expr.tmt)） ]
+|[ `var`      ][ Map          ][ vault と文書の `::vars` で宣言した変数。値は `default`、作成時は `--var` が上書きする（@file(tmtroot/spec/elements/std.vars.element.tmt)） ]
 |[ `vault`    ][ ディレクトリ ][ vault のルート ]
-|[ `vars`     ][ Map          ][ 作成時だけ。`--var` で渡された変数 ]
 |[ `generate` ][ 名前空間     ][ 作成時だけ。生成関数（@file(tmtroot/spec/expressions/func.expr.tmt)） ]
 
-作成時だけの名前を出力時に書くと、未知の名前ではなく「作成時専用」という専用のエラーになる。
+作成時だけの名前を出力時に書くと、未知の名前ではなく「作成時専用」という専用のエラーになる。`var` は作成時専用ではない。文書の値なので、出力時にも使える。
+
+`var` の名前は、宣言したものに限る。宣言にない名前（`var.titel`）は未知の名前のエラーで、`tomet check` が出力の前に報告する。値のない変数（`default` が無く、`--var` でも渡されない）を読むと、エラー。
 
 この一覧は、ここに置いた1か所を正とする。名前を足すときは、ここを直す。
 

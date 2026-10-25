@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use tomet_ast::{Document, Element, Value};
 use tomet_tree::ValueExt;
 
-use crate::{ElementKind, classify_std_lenient, normalized_element_args};
+use crate::{ElementKind, VarDecl, classify_std_lenient, normalized_element_args};
 
 /// Supported target format for document exports.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -61,8 +61,11 @@ pub struct DocumentConfig {
     pub table_max_col_width: Option<usize>,
     /// Table default alignment ("left", "center", "right").
     pub table_align: Option<String>,
-    /// User-defined macro templates specified by `macros` map in `::config`.
+    /// User-defined macro templates, from the `::macros` declaration.
     pub macros: HashMap<String, String>,
+    /// The variables declared with `::vars`, in the order written. A later
+    /// declaration of a name replaces an earlier one.
+    pub vars: Vec<(String, VarDecl)>,
     /// Imported configuration file paths specified by `import` or `imports` in `::config`.
     pub imports: Vec<String>,
     /// Raw key-value entries collected from `::config` element args and value groups.
@@ -79,8 +82,8 @@ impl DocumentConfig {
     }
 }
 
-/// Returns this document's `::config` and `::settings` settings merged from
-/// all configuration elements in the document -- top-level per
+/// Returns this document's `::config` and `::settings` settings, and its
+/// `::macros`, merged from all those declarations in the document -- top-level per
 /// [`tomet_tree::for_each_top_level_element`], which still counts a
 /// `::config`/`::settings` that joined an adjacent paragraph
 /// (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), not just a raw `doc.blocks`
@@ -88,11 +91,13 @@ impl DocumentConfig {
 pub fn document_config(doc: &Document) -> DocumentConfig {
     let mut config = DocumentConfig::default();
 
-    tomet_tree::for_each_top_level_element(doc, |el| {
-        let kind = classify_std_lenient(el);
-        if kind == ElementKind::Config || kind.as_str() == "settings" {
+    tomet_tree::for_each_top_level_element(doc, |el| match classify_std_lenient(el) {
+        ElementKind::Config | ElementKind::Settings => {
             extract_config_from_element(el, &mut config);
         }
+        ElementKind::Macros => extract_macros(el, &mut config),
+        ElementKind::Vars => extract_vars(el, &mut config),
+        _ => {}
     });
 
     // Deduplicate export_type list while preserving order
@@ -118,6 +123,37 @@ fn extract_config_from_element(el: &Element, config: &mut DocumentConfig) {
     }
 }
 
+/// Reads a `::macros` declaration: each entry is a macro name and its
+/// template. An entry whose value is not a string is not a macro and is
+/// skipped, as `tomet check` reports a definition it cannot use.
+fn extract_macros(el: &Element, config: &mut DocumentConfig) {
+    let args = match normalized_element_args(el) {
+        Some(Value::Map(entries)) => entries,
+        _ => Vec::new(),
+    };
+    let data = match crate::data::element_data(el) {
+        Some(Value::Map(entries)) => entries,
+        _ => Vec::new(),
+    };
+    for (name, template) in args.iter().chain(data.iter()) {
+        if let Some(template) = template.as_str() {
+            config.macros.insert(name.clone(), template.to_string());
+        }
+    }
+}
+
+/// Reads a `::vars` declaration. An entry that is not a declaration is skipped;
+/// `tomet check` says why.
+fn extract_vars(el: &Element, config: &mut DocumentConfig) {
+    for (name, decl) in crate::read_var_decls(el) {
+        let Ok(decl) = decl else { continue };
+        match config.vars.iter_mut().find(|(n, _)| *n == name) {
+            Some((_, held)) => *held = decl,
+            None => config.vars.push((name, decl)),
+        }
+    }
+}
+
 fn is_truthy(v: &Value) -> bool {
     match v {
         Value::Bool(b) => *b,
@@ -131,6 +167,11 @@ fn is_truthy(v: &Value) -> bool {
 }
 
 fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
+    // A macro is defined by `::macros`, not by a setting. `tomet check` reports
+    // the retired key; nothing reads it.
+    if k == "macros" || k == "macro" || k.starts_with("macros.") || k.starts_with("macro.") {
+        return;
+    }
     config.entries.push((k.to_string(), v.clone()));
 
     match k {
@@ -196,29 +237,9 @@ fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
                 }
             }
         }
-        "macros" | "macro" => {
-            if let Value::Map(macro_entries) = v {
-                for (mk, mv) in macro_entries {
-                    if let Some(template) = mv.as_str() {
-                        config.macros.insert(mk.clone(), template.to_string());
-                    }
-                }
-            }
-        }
         // Fallback for flat keys
         "export_type" => process_export_type(v, config),
         "export_path" => process_export_path(v, config),
-        _ if k.starts_with("macros.") || k.starts_with("macro.") => {
-            let mname = k
-                .strip_prefix("macros.")
-                .or_else(|| k.strip_prefix("macro."))
-                .unwrap_or(k);
-            if let Some(template) = v.as_str() {
-                config
-                    .macros
-                    .insert(mname.to_string(), template.to_string());
-            }
-        }
         _ if k.starts_with("export_path.") => {
             let format_sub = &k["export_path.".len()..];
             if let Some(path_str) = clean_path_value(v) {
@@ -345,8 +366,8 @@ mod tests {
     }
 
     #[test]
-    fn parses_macros_config() {
-        let doc = parse_document("::config{\n  macros: {\n    gh: \"https://github.com/org/repo/issues/$1\"\n    jira: \"https://jira.org/browse/$1\"\n  }\n}\n").unwrap();
+    fn parses_the_macros_declaration() {
+        let doc = parse_document("::macros{\n  gh: \"https://github.com/org/repo/issues/$1\"\n  jira: \"https://jira.org/browse/$1\"\n}\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(
             config.macros.get("gh").map(|s| s.as_str()),
@@ -356,5 +377,25 @@ mod tests {
             config.macros.get("jira").map(|s| s.as_str()),
             Some("https://jira.org/browse/$1")
         );
+    }
+
+    #[test]
+    fn a_macro_is_not_a_setting() {
+        // The old spelling is retired: `tomet check` reports it, and nothing reads it.
+        for src in [
+            "::config{\n  macros: {\n    gh: \"x\"\n  }\n}\n",
+            "::settings{\n  macros: {\n    gh: \"x\"\n  }\n}\n",
+        ] {
+            let config = document_config(&parse_document(src).unwrap());
+            assert!(config.macros.is_empty(), "{src}");
+            assert!(config.entries.is_empty(), "{src}");
+        }
+    }
+
+    #[test]
+    fn the_macros_declaration_reads_every_entry() {
+        let doc = parse_document("::macros{\n  a: \"1\"\n  b: \"2\"\n}\n").unwrap();
+        let config = document_config(&doc);
+        assert_eq!(config.macros.len(), 2);
     }
 }

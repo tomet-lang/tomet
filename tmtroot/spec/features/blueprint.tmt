@@ -14,10 +14,16 @@
 ```tm
 ::kind(blueprint)
 ::blueprint(daily-note)
+::vars{
+  title: {
+    type: string
+    about: | 日記の題。
+  }
+}
 ::meta{
   id: ${generate.uuid()}
   date: ${generate.now().format("YYYY-MM-DD")}
-  title: ${vars.title}
+  title: ${var.title}
 }
 
 #[ TODO ] {id: todo}
@@ -58,8 +64,9 @@ tomet new --list
 - `${generate.now()}`: 今の日時（RFC 3339）を生成。
 - `${generate.now().format("YYYY-MM-DD")}`: 日時を整形する。`.format` は渡された日時を整形するだけの純粋なメソッド（書式の記号は @file(tmtroot/spec/expressions/types.expr.tmt)）。
 - `${self.filename}`: 作成先ファイル名。
-- `${vars.title}`: CLIの `--var title=...` で渡されたタイトル。省略時はファイル名から推定される。
-- `${vars.name}`: CLIの `--var name=value` で渡されたカスタム変数。
+- `${var.title}`: `::vars` が宣言した変数。値は CLI の `--var title=...` か、宣言の `default`。`default` が無ければ必須。
+
+ブループリントが受け取る入力は、`::vars` が宣言したものだけ（@file(tmtroot/spec/elements/std.vars.element.tmt)）。宣言にない名前を `--var` で渡すとエラーになり、宣言にない `${var.x}` は `tomet check` が報告する。
 
 UUID の形式の検査は式ではなく、フィールドの型（`type: uuid`）で行います。
 

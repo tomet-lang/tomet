@@ -23,6 +23,16 @@ pub enum ElementKind {
     /// `BUILTIN_KINDS` despite three places matching it by raw string; a
     /// bare name has to be built-in now, so it is listed properly.
     Settings,
+    /// `::macros{ name: "template" }` -- the macros a document or a vault
+    /// defines, one map entry each, keyed by the macro's name. Called as
+    /// `${macro.name(...)}`. A definition, not a setting, so it is not in
+    /// [`Settings`](ElementKind::Settings). See `tmtroot/spec/elements/std.macros.element.tmt`.
+    Macros,
+    /// `::vars{ name: { type, default, about } }` -- the variables a document
+    /// or a vault declares, one declaration each, keyed by the variable's
+    /// name. Read as `${var.name}`; `tomet new --var` fills them in. See
+    /// `tmtroot/spec/elements/std.vars.element.tmt`.
+    Vars,
     /// `::use(ns)` -- brings a vocabulary into scope, by the name it gives
     /// itself. `{ as: other }` renames it, and is only for a collision.
     ///
@@ -212,6 +222,8 @@ impl ElementKind {
             ElementKind::Meta => "meta",
             ElementKind::Config => "config",
             ElementKind::Settings => "settings",
+            ElementKind::Macros => "macros",
+            ElementKind::Vars => "vars",
             ElementKind::Use => "use",
             ElementKind::Blueprint => "blueprint",
             ElementKind::Vocabulary => "vocabulary",
@@ -275,12 +287,14 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 32] = [
+pub const BUILTIN_KINDS: [(&str, ElementKind); 34] = [
     ("kind", ElementKind::Kind),
     ("version", ElementKind::Version),
     ("meta", ElementKind::Meta),
     ("config", ElementKind::Config),
     ("settings", ElementKind::Settings),
+    ("macros", ElementKind::Macros),
+    ("vars", ElementKind::Vars),
     ("use", ElementKind::Use),
     ("blueprint", ElementKind::Blueprint),
     // The vocabulary document's own three. They are here rather than in a
@@ -492,7 +506,17 @@ pub fn is_directive(kind: &ElementKind) -> bool {
     use ElementKind::*;
     matches!(
         kind,
-        Version | Kind | Meta | Config | Settings | Use | Blueprint | Vocabulary | Elements
+        Version
+            | Kind
+            | Meta
+            | Config
+            | Settings
+            | Macros
+            | Vars
+            | Use
+            | Blueprint
+            | Vocabulary
+            | Elements
     )
 }
 
@@ -506,8 +530,8 @@ pub fn is_directive(kind: &ElementKind) -> bool {
 pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
-        Meta | Config | Settings | Use | Blueprint | Hr | Callout | Card | Table | Heading
-        | Kind | Version | Vocabulary | Elements | Data => Shape::Block,
+        Meta | Config | Settings | Macros | Vars | Use | Blueprint | Hr | Callout | Card
+        | Table | Heading | Kind | Version | Vocabulary | Elements | Data => Shape::Block,
         Em | Strong | Mark | Strikeout | Ruby => Shape::Inline,
         // Either shape. A link or an embed alone on a line is not a
         // structural error -- it is how you show one file or one image.
@@ -585,8 +609,8 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
     match kind {
         // Directives and vocabulary-document bookkeeping: `{data}`/
         // `(args)` only, no `[content]`.
-        Kind | Version | Meta | Config | Settings | Use | Blueprint | Vocabulary | Elements
-        | Data => None,
+        Kind | Version | Meta | Config | Settings | Macros | Vars | Use | Blueprint
+        | Vocabulary | Elements | Data => None,
         // Self-closing; a fenced/backtick code body's `[content]` is
         // synthesized by the parser itself (`raw.rs`), not shaped
         // by an author, so there is nothing here for a shape check to
@@ -615,9 +639,11 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
 
 /// Whether at most one of `kind` may appear in a document.
 ///
-/// The six the spec has always declared, and nothing else.
-/// `docs/spec/builtin-settings.tmt` listed them as `singleton: true`
-/// while no code read the word; this is that list, in code.
+/// The declarations about the document that are written once: `kind`,
+/// `version`, `meta`, `config`, `settings`, `macros`, `vars`, `blueprint`,
+/// `vocabulary` and `elements`. `docs/spec/builtin-settings.tmt` listed the first
+/// six as `singleton: true` while no code read the word; this is that list, in
+/// code.
 ///
 /// `::use` is deliberately absent, and is the proof the two axes are
 /// separate: it may only sit in the preamble, and you write several,
@@ -626,13 +652,21 @@ pub fn builtin_singleton(kind: &ElementKind) -> bool {
     use ElementKind::*;
     matches!(
         kind,
-        Kind | Version | Meta | Config | Settings | Blueprint | Vocabulary | Elements
+        Kind | Version
+            | Meta
+            | Config
+            | Settings
+            | Macros
+            | Vars
+            | Blueprint
+            | Vocabulary
+            | Elements
     )
 }
 
 /// Where in a document `kind` may appear.
 ///
-/// The same six, plus the elements that bring something into scope. What
+/// The same declarations, plus the elements that bring something into scope. What
 /// the spec spelled `placement: head` -- a name that also carried the
 /// block/inline rule, which is why the key is being retired in favour of
 /// these two plus `display`.
@@ -640,9 +674,8 @@ pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
     use crate::vocabulary::Region;
     use ElementKind::*;
     match kind {
-        Kind | Version | Meta | Config | Settings | Blueprint | Vocabulary | Elements | Use => {
-            Region::Preamble
-        }
+        Kind | Version | Meta | Config | Settings | Macros | Vars | Blueprint | Vocabulary
+        | Elements | Use => Region::Preamble,
         _ => Region::Body,
     }
 }
@@ -719,6 +752,8 @@ mod tests {
             "meta",
             "config",
             "settings",
+            "macros",
+            "vars",
             "use",
             "blueprint",
             "version",

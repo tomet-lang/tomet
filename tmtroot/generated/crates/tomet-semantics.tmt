@@ -110,6 +110,7 @@ built-in element families:
 - (footnote) Footnote collection and indexing (`@ftn(id)[...]`, and `@ftn(id)` to refer to one).
 - (heading) Heading level calculation and bounds clamping (`heading`).
 - (meta) Document metadata and frontmatter extraction (`::meta`, `::kind`, `::version`).
+- (vars) Variable declarations (`::vars`).
 - (table) Table rows and cell structures (`@table`).
 - (tag) Tag collection (`#tag`).
 - (target) Target URI and scheme resolution (`@link`, `@embed`, `@file`, `@dir`).
@@ -132,8 +133,8 @@ Supported target format for document exports.
 
 =====[fn document_config]
 
-Returns this document's `::config` and `::settings` settings merged from
-all configuration elements in the document -- top-level per
+Returns this document's `::config` and `::settings` settings, and its
+`::macros`, merged from all those declarations in the document -- top-level per
 [`tomet_tree::for_each_top_level_element`], which still counts a
 `::config`/`::settings` that joined an adjacent paragraph
 (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), not just a raw `doc.blocks`
@@ -291,6 +292,45 @@ a document without one in hand.
 
 Classifies a `target` string's scheme and strips a recognized explicit prefix.
 
+===[Module vars]
+
+`::vars{ name: { type, default, about } }` -- the variables a document or
+a vault declares. See `tmtroot/spec/elements/std.vars.element.tmt`.
+
+Every entry is a declaration, a map of fields; there is no spelling that
+writes a value directly, so a map-valued default is never mistaken for a
+declaration (it goes in `default:`).
+
+====[Structs]
+
+=====[struct VarDecl]
+
+One variable, as declared.
+
+====[Functions]
+
+=====[fn read_var_decls]
+
+The entries of one `::vars` element, each read, or the reason it cannot be.
+
+The args form (`::vars(a: {...})`) and the data form (`::vars{ a: {...} }`)
+are both read, as for `::macros`.
+
+====[Constants]
+
+=====[const VAR_TYPES]
+
+The types a variable can be declared with: the vocabulary of `type:` in the
+settings' `meta` fields, less the ones a variable has no use for.
+
+=====[const DEFAULT_VAR_TYPE]
+
+The type of a variable that does not say: what the command line passes.
+
+=====[const VAR_KEYS]
+
+The keys a declaration may have.
+
 ==[Module flatten]
 
 Projecting an element's data onto a flat, string-valued attribute map.
@@ -408,7 +448,7 @@ never an `::use(doc)` in front of it.
 
 ====[struct ParamDecl]
 
-One parameter, as `@param(name){ ... }` declares it.
+One parameter, as an entry of an element's `args:` map declares it.
 
 `param` and not `arg`: parameter is the declaration side, argument is
 the call side, so `(args)` needs no rename.
@@ -417,7 +457,7 @@ the call side, so `(args)` needs no rename.
 produces it -- `uint` arrives as a string, `list(string)` as a
 sequence -- because
 checking a value against it needs a type language this project has not
-settled: `@param(name)`'s own type is an identifier rather than a
+settled: a parameter's own `type:` is an identifier rather than a
 string, `default:`'s type depends on `type:`, and `type:`'s type is a
 type. Interpreting it here would mean deciding all three by accident.
 
@@ -425,7 +465,8 @@ type. Interpreting it here would mean deciding all three by accident.
 
 One element, as a vocabulary declares it.
 
-`@args` and `@content` are read; `@data` is not yet.
+`args:` and `content:` are read; `@data` is not yet. `about:`, the
+element's prose, is not read either.
 
 ====[struct Vocabulary]
 
@@ -458,7 +499,7 @@ proof the two axes are independent.
 
 ====[enum ContentAllow]
 
-`@content{allow:}`'s value -- what a vocabulary's own element may hold
+`content: { allow: }`'s value -- what a vocabulary's own element may hold
 in `[content]`/`|content` (`Vec<Block>`, see `tmtroot/docs/spec/
 feature/content-shape.tmt`).
 

@@ -473,7 +473,7 @@ mod tests {
     fn hover_evaluates_an_expression_in_the_vault() {
         let root = vault(
             "hover",
-            "::kind(config)\n::config{ macros: { gh: \"https://github.com/o/r/issues/${1}\" } }\n",
+            "::kind(config)\n::macros{ gh: \"https://github.com/o/r/issues/${1}\" }\n",
             &[("b.tmt", "::meta{ title: Saved }\n")],
         );
         let (a, b) = (root.join("a.tmt"), root.join("b.tmt"));

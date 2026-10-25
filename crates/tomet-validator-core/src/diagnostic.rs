@@ -205,6 +205,18 @@ pub enum Diagnostic {
     /// `SettingsSchema` no caller ever built, so a document could declare
     /// `singleton: true` and be obeyed by nothing at all.
     RetiredSettingsKey { key: String, span: Span },
+    /// An entry of `::macros` or `::vars` that cannot be used as written: a macro
+    /// whose template is not a string, or a variable whose declaration is not a
+    /// map, has an unknown key or type, or has a `default` its `type` does not hold.
+    ///
+    /// `span` is the whole declaration: an entry of a `{...}` group has no span
+    /// of its own, so the entry is named instead of pointed at.
+    InvalidDefinition {
+        declaration: &'static str,
+        name: String,
+        reason: String,
+        span: Span,
+    },
     /// A `::meta` field the settings declare with a `type:` that has a form,
     /// holding something that does not have it -- a `type: uuid` field that
     /// is not a UUID.
@@ -235,6 +247,7 @@ impl Diagnostic {
             Diagnostic::OutsidePreamble { span, .. } => *span,
             Diagnostic::WrongSigil { span, .. } => *span,
             Diagnostic::RetiredSettingsKey { span, .. } => *span,
+            Diagnostic::InvalidDefinition { span, .. } => *span,
             Diagnostic::InvalidFieldValue { span, .. } => *span,
             Diagnostic::UnknownArgument { span, .. } => *span,
             Diagnostic::MissingRequiredArgument { span, .. } => *span,
@@ -491,6 +504,10 @@ impl Diagnostic {
                          each entry of `::elements` carries `display`, `region` and \
                          `singleton`, and its `args` carry the arguments"
                     }
+                    "macros" | "macro" => {
+                        "write `::macros{ ... }` instead -- a macro is a definition \
+                         of a name, not a setting"
+                    }
                     "types" => {
                         "it has no replacement: nothing read it, and per-element \
                          rendering style has no home in settings yet -- \
@@ -501,6 +518,12 @@ impl Diagnostic {
                 };
                 write!(f, "`{key}` in `::settings` is retired; {advice}")
             }
+            Diagnostic::InvalidDefinition {
+                declaration,
+                name,
+                reason,
+                ..
+            } => write!(f, "`{name}` in `::{declaration}`: {reason}"),
             Diagnostic::InvalidFieldValue {
                 field,
                 field_type,

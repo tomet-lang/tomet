@@ -50,6 +50,10 @@ pub struct Unresolved {
     /// Why: what the evaluator said, what the value could not be placed as,
     /// or what was done with the id.
     pub reason: String,
+    /// Whether the expression only has a value when a document is being created
+    /// from a blueprint: `generate.*`, or a variable that has no `default`. In a
+    /// blueprint that is as it should be, so `tomet check` leaves it out there.
+    pub creation_only: bool,
 }
 
 /// What an [`Unresolved`] is about.
@@ -138,6 +142,7 @@ impl Pass<'_> {
                         if unresolved == 1 { "item" } else { "items" },
                         from.0
                     ),
+                    creation_only: false,
                 }),
             }
         }
@@ -145,6 +150,12 @@ impl Pass<'_> {
             Ok(value) => Some(value),
             Err(reason) => {
                 self.fail(expr, span, reason.to_string());
+                if let Some(last) = self.unresolved.last_mut() {
+                    last.creation_only = matches!(
+                        reason,
+                        tomet_expr::EvalError::PhaseOnly(_) | tomet_expr::EvalError::NoValue(_)
+                    );
+                }
                 None
             }
         }
@@ -156,6 +167,7 @@ impl Pass<'_> {
             source: expr.to_string(),
             span,
             reason,
+            creation_only: false,
         });
     }
 
@@ -483,6 +495,7 @@ impl Ids {
             reason: format!(
                 "the id `{taken}` is already used earlier in the document; this one was dropped"
             ),
+            creation_only: false,
         });
     }
 

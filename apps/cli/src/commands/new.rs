@@ -109,7 +109,7 @@ mod tests {
         let tmpl_file = tmpl_dir.join("rfc.blueprint.tmt");
         fs::write(
             &tmpl_file,
-            "::kind(blueprint)\n::blueprint(rfc)\n::meta{\n  id: ${generate.uuid()}\n  title: ${vars.title}\n  author: ${vars.author}\n}\n\n=[ Motivation for ${vars.title} ]#(motivation)\n",
+            "::kind(blueprint)\n::blueprint(rfc)\n::vars{\n  title: { type: string }\n  author: { type: string }\n}\n::meta{\n  id: ${generate.uuid()}\n  title: ${var.title}\n  author: ${var.author}\n}\n\n=[ Motivation for ${var.title} ]#(motivation)\n",
         )
         .unwrap();
 

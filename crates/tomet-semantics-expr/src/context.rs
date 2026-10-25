@@ -20,7 +20,7 @@ pub enum Phase {
     /// so only functions whose result depends on their arguments alone run.
     Output,
     /// A document is being created from a blueprint, and the result is
-    /// written into its source. `generate.*` and `vars` exist only here.
+    /// written into its source. `generate.*` exists only here.
     Create,
 }
 
@@ -158,8 +158,12 @@ pub struct EvalContext<'a> {
     pub self_doc: DocRef,
     /// Macro name to template, already merged (the document's own win).
     pub macros: &'a HashMap<String, String>,
-    /// `vars`, the values passed to `tomet new`. Only read in [`Phase::Create`].
-    pub vars: &'a EvalValue,
+    /// `var`: the variables in scope, a map from name to value. The value is the
+    /// one passed to `tomet new --var`, else the declaration's `default`.
+    pub var: &'a EvalValue,
+    /// The variables declared and given no value (no `default`, and none passed).
+    /// They are not in [`var`](Self::var); reading one says how to give it one.
+    pub var_unset: &'a [String],
     /// The documents being included right now, outermost first, when this
     /// expression sits in an included file. Empty for a document that is
     /// being prepared on its own.
@@ -181,7 +185,8 @@ impl<'a> EvalContext<'a> {
             generate: self.generate,
             self_doc: self.self_doc.clone(),
             macros: self.macros,
-            vars: self.vars,
+            var: self.var,
+            var_unset: self.var_unset,
             includes: self.includes,
             heading_level: level,
             notes: self.notes.clone(),

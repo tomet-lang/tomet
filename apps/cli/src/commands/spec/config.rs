@@ -90,10 +90,10 @@ mod tests {
         assert!(all_keys.contains("meta.<field>.format"));
         assert!(all_keys.contains("meta.<field>.offset"));
 
-        // Check registry and macros keys
+        // Check registry keys. `macros` is not among them: it is a declaration.
         assert!(all_keys.contains("blueprints"));
         assert!(all_keys.contains("vocabularies"));
-        assert!(all_keys.contains("macros"));
+        assert!(!all_keys.contains("macros"));
 
         let _ = doc;
     }

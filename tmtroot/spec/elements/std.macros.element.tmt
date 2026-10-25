@@ -1,0 +1,26 @@
+::kind(element)
+::meta{
+  id: std.macros
+}
+
+=[ 全容 ]
+
+`::macros` は、この文書で使うマクロの定義を、名前をキーにした表で書く。
+
+```tm
+::macros{
+  gh: "https://github.com/tomet/tomet/issues/${1}"
+  done: "✅"
+}
+```
+
+- キーが名前、値が本体のテンプレート。呼び方とテンプレートの規則は @file(tmtroot/spec/expressions/macro.expr.tmt)。
+- 設定（`::settings`）には書かない。マクロは Tomet の振る舞いを決めるものではなく、名前の定義だから。
+- vault の設定（`default.config.tmt`）にも、文書にも書ける。2つは同じ名前のキーごとに合わさり、文書が勝つ。
+- 先頭の並びに書く（`Region::Preamble`）。1文書に1つ。複数の定義は1つの表にまとめる。
+- 本体が文字列でない定義は、エラー（`tomet check`）。
+
+#[ 未実装 ]
+
+- 本体が文字列以外の値（マップなど）であるマクロ。cotomet で先に入れる。
+- 単数形の `::macro(name)`。「`::macros` に1つずつ書いたもの」と同じ意味で足す予定。

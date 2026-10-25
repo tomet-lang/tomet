@@ -293,7 +293,7 @@ fn macro_hover_over_stdio() {
                 "uri": "file:///tmp/macro_test.tmt",
                 "languageId": "tomet",
                 "version": 1,
-                "text": "::config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  }\n}\n\n$macro.gh(101)\n",
+                "text": "::macros{\n  gh: \"https://github.com/tomet/tomet/issues/${1}\"\n}\n\n$macro.gh(101)\n",
             }
         }),
     );
@@ -303,7 +303,7 @@ fn macro_hover_over_stdio() {
         "textDocument/hover",
         json!({
             "textDocument": {"uri": "file:///tmp/macro_test.tmt"},
-            "position": {"line": 6, "character": 2},
+            "position": {"line": 4, "character": 2},
         }),
     );
     let hover_val = hover_resp["result"]["contents"]["value"]
@@ -330,7 +330,7 @@ fn macro_hover_does_not_take_macros_from_an_imported_config_over_stdio() {
     let config_path = dir.join("custom.config.tmt");
     std::fs::write(
         &config_path,
-        "::config{\n  macros: {\n    youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n",
+        "::macros{\n  youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n}\n",
     )
     .unwrap();
 
@@ -398,7 +398,7 @@ fn macro_hover_with_workspace_auto_config_over_stdio() {
     let config_path = dir.join("default.config.tmt");
     std::fs::write(
         &config_path,
-        "::config{\n  macros: {\n    twitter_post: \"https://x.com/${1}/status/${2}\"\n  }\n}\n",
+        "::macros{\n  twitter_post: \"https://x.com/${1}/status/${2}\"\n}\n",
     )
     .unwrap();
 

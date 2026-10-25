@@ -25,7 +25,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result, bail};
 use tomet_ast::Value;
 use tomet_config::PrinterConfig;
-use tomet_expr::{DocRef, EvalContext, EvalValue, Generate, MemoryResolver, OffsetGenerate, Phase};
+use tomet_expr::{DocRef, EvalContext, Generate, MemoryResolver, OffsetGenerate, Phase};
 use tomet_transform::instantiate_blueprint;
 
 /// Every blueprint `config` declares, as `(name, path)`, sorted by name.
@@ -134,8 +134,9 @@ pub struct Created {
 /// document `target`, a path relative to the vault.
 ///
 /// `vars` are the values passed to `tomet new --var key=value`, read in the
-/// blueprint as `${vars.key}`; `title` defaults to the file's name. The
-/// document being created is `self`, so `${self.filename}` is the new file's
+/// blueprint as `${var.key}`. A name nothing declares is refused, and so is a
+/// variable that has neither a value nor a `default`: the blueprint's `::vars`
+/// (over the vault's) says which there are. The document being created is `self`, so `${self.filename}` is the new file's
 /// name. `${generate.now()}` is written in the offset the settings give
 /// `created` (or `modified`), UTC if neither has one.
 ///
@@ -166,26 +167,33 @@ fn instantiate_blueprint_file_with(
 
     let self_doc = DocRef(target.to_string_lossy().replace('\\', "/"));
 
-    let mut passed: Vec<(String, EvalValue)> = vars
+    // The blueprint's own declarations win over the vault's.
+    let blueprint_config = tomet_semantics::document_config(&doc);
+    let mut declared = blueprint_config.vars.clone();
+    for (name, decl) in &config.vars {
+        if !declared.iter().any(|(held, _)| held == name) {
+            declared.push((name.clone(), decl.clone()));
+        }
+    }
+    let mut passed: Vec<(String, Value)> = vars
         .iter()
-        .map(|(key, value)| (key.clone(), EvalValue::from_ast(value, &self_doc)))
+        .map(|(key, value)| (key.clone(), value.clone()))
         .collect();
     passed.sort_by(|a, b| a.0.cmp(&b.0));
-    if !passed.iter().any(|(key, _)| key == "title") {
-        let default_title = target
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("Document")
-            .to_string();
-        passed.push(("title".to_string(), EvalValue::String(default_title)));
+    let scope = tomet_expr::var_scope(&declared, &self_doc, &passed)?;
+    if !scope.unset.is_empty() {
+        let names = scope.unset.join(", ");
+        bail!(
+            "no value for {names}: pass `--var {}=...`, or give it a `default` in the blueprint's `::vars`",
+            scope.unset[0]
+        );
     }
-    let vars = EvalValue::Map(passed);
 
     // The new document stands in for itself: a reference to one of its own
     // ids is answered from the blueprint it is being made from.
     let resolver = MemoryResolver::new().with_document(&self_doc.0, Arc::new(doc.clone()));
 
-    let mut macros = tomet_semantics::document_config(&doc).macros;
+    let mut macros = blueprint_config.macros;
     for (name, template) in &config.macros {
         macros
             .entry(name.clone())
@@ -198,7 +206,8 @@ fn instantiate_blueprint_file_with(
         generate,
         self_doc,
         macros: &macros,
-        vars: &vars,
+        var: &scope.values,
+        var_unset: &scope.unset,
         includes: &[],
         heading_level: 0,
         notes: Default::default(),
@@ -299,7 +308,7 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/blueprints")).unwrap();
         fs::write(
             dir.join(".tomet/blueprints/daily-note.blueprint.tmt"),
-            "::kind(blueprint)\n::blueprint(daily-note)\n::meta{\n  id: ${generate.uuid()}\n  title: ${vars.title}\n}\n\n=[ Tasks for ${vars.title} ]#(tasks)\n",
+            "::kind(blueprint)\n::blueprint(daily-note)\n::vars{\n  title: { type: string }\n}\n::meta{\n  id: ${generate.uuid()}\n  title: ${var.title}\n}\n\n=[ Tasks for ${var.title} ]#(tasks)\n",
         )
         .unwrap();
         dir
@@ -418,7 +427,7 @@ mod tests {
     fn generated_values_come_from_the_injected_clock_and_random_source() {
         let file = blueprint_file(
             "fixed",
-            "::blueprint(note)\n::meta{\n  id: ${generate.uuid()}\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  by: ${vars.author}\n}\n",
+            "::blueprint(note)\n::vars{\n  author: { type: string }\n}\n::meta{\n  id: ${generate.uuid()}\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  by: ${var.author}\n}\n",
         );
         let mut vars = HashMap::new();
         vars.insert("author".to_string(), Value::String("Ann".into()));
@@ -444,8 +453,11 @@ mod tests {
     }
 
     #[test]
-    fn the_title_defaults_to_the_files_name_and_can_be_passed() {
-        let file = blueprint_file("title", "::blueprint(note)\n\n=[ ${vars.title} ]\n");
+    fn a_variable_takes_its_default_and_a_passed_value_wins() {
+        let file = blueprint_file(
+            "title",
+            "::blueprint(note)\n::vars{\n  title: { default: \"Untitled\" }\n}\n\n=[ ${var.title} ]\n",
+        );
         let config = PrinterConfig::default();
         let made = |vars: &HashMap<String, Value>| {
             instantiate_blueprint_file_with(
@@ -458,7 +470,7 @@ mod tests {
             .unwrap()
             .content
         };
-        assert!(made(&HashMap::new()).contains("my-note"));
+        assert!(made(&HashMap::new()).contains("Untitled"));
         let mut vars = HashMap::new();
         vars.insert("title".to_string(), Value::String("Given".into()));
         assert!(made(&vars).contains("Given"));
@@ -467,7 +479,7 @@ mod tests {
 
     #[test]
     fn an_expression_with_no_value_is_left_in_the_new_document() {
-        let file = blueprint_file("left", "::blueprint(note)\n::meta{ by: ${vars.author} }\n");
+        let file = blueprint_file("left", "::blueprint(note)\n::meta{ by: ${var.author} }\n");
         let made = instantiate_blueprint_file_with(
             &file,
             Path::new("n.tmt"),
@@ -476,7 +488,7 @@ mod tests {
             &Fixed,
         )
         .unwrap();
-        assert!(made.content.contains("${vars.author}"), "{}", made.content);
+        assert!(made.content.contains("${var.author}"), "{}", made.content);
         let _ = fs::remove_dir_all(file.parent().unwrap());
     }
 
@@ -487,7 +499,7 @@ mod tests {
     fn an_expression_with_no_value_is_reported_with_its_line_in_the_blueprint() {
         let file = blueprint_file(
             "reported",
-            "::blueprint(note)\n\n::meta{\n  by: ${vars.author}\n  on: ${generate.uuid()}\n}\n",
+            "::blueprint(note)\n\n::meta{\n  by: ${var.author}\n  on: ${generate.uuid()}\n}\n",
         );
         let made = instantiate_blueprint_file_with(
             &file,
@@ -498,7 +510,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(made.unfilled.len(), 1, "{:?}", made.unfilled);
-        assert_eq!(made.unfilled[0].source, "vars.author");
+        assert_eq!(made.unfilled[0].source, "var.author");
         assert_eq!(made.unfilled[0].line, 4);
         assert!(
             made.unfilled[0].reason.contains("author"),
@@ -508,12 +520,79 @@ mod tests {
         let _ = fs::remove_dir_all(file.parent().unwrap());
     }
 
+    fn made_with(name: &str, src: &str, vars: &[(&str, &str)]) -> anyhow::Result<String> {
+        let file = blueprint_file(name, src);
+        let vars: HashMap<String, Value> = vars
+            .iter()
+            .map(|(k, v)| (k.to_string(), Value::String(v.to_string())))
+            .collect();
+        let made = instantiate_blueprint_file_with(
+            &file,
+            Path::new("n.tmt"),
+            &vars,
+            &PrinterConfig::default(),
+            &Fixed,
+        );
+        let _ = fs::remove_dir_all(file.parent().unwrap());
+        made.map(|m| m.content)
+    }
+
+    #[test]
+    fn a_required_variable_that_is_not_passed_stops_the_creation() {
+        let src = "::blueprint(note)\n::vars{\n  title: { type: string }\n}\n\n=[ ${var.title} ]\n";
+        let err = made_with("required", src, &[]).unwrap_err().to_string();
+        assert!(
+            err.contains("title") && err.contains("--var title"),
+            "{err}"
+        );
+        assert!(
+            made_with("required-given", src, &[("title", "Hi")])
+                .unwrap()
+                .contains("Hi")
+        );
+    }
+
+    #[test]
+    fn a_name_nothing_declares_is_refused() {
+        let src = "::blueprint(note)\n::vars{\n  title: { default: \"x\" }\n}\n";
+        let err = made_with("undeclared", src, &[("titel", "Hi")])
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("titel") && err.contains("declared: title"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_passed_value_is_converted_to_the_declared_type() {
+        let src = "::blueprint(note)\n::vars{\n  n: { type: int }\n}\n::meta{ count: ${add(var.n, 1)} }\n";
+        assert!(
+            made_with("typed", src, &[("n", "41")])
+                .unwrap()
+                .contains("count: 42")
+        );
+        let err = made_with("typed-bad", src, &[("n", "many")])
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("not an integer"), "{err}");
+    }
+
+    #[test]
+    fn the_blueprints_vars_do_not_go_into_the_new_document() {
+        let src =
+            "::blueprint(note)\n::vars{\n  title: { default: \"x\" }\n}\n\n=[ ${var.title} ]\n";
+        let content = made_with("dropped", src, &[]).unwrap();
+        assert!(!content.contains("::vars"), "{content}");
+        assert!(content.contains("::kind(note)"), "{content}");
+    }
+
     #[test]
     fn creating_a_file_reports_what_it_was_left_to_fill_in() {
         let root = vault("unfilled");
         fs::write(
             root.join(".tomet/blueprints/daily-note.blueprint.tmt"),
-            "::blueprint(daily-note)\n::meta{ by: ${vars.author} }\n",
+            "::blueprint(daily-note)\n::meta{ by: ${var.author} }\n",
         )
         .unwrap();
         let config = declaring(&[".tomet/blueprints/daily-note.blueprint.tmt"]);

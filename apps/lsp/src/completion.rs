@@ -346,6 +346,8 @@ fn describe_kind(name: &str) -> &'static str {
         "meta" => "Metadata key-value declaration",
         "config" => "Document-wide configuration",
         "settings" => "Schema and settings block",
+        "macros" => "Macro definitions: name to template",
+        "vars" => "Variable declarations: type, default, about",
         "use" => "Bind a vocabulary as a namespace",
         "references" => "Remote connection container",
         "id" => "Attach attributes to a remote element by id",

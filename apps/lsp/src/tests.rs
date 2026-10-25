@@ -325,10 +325,10 @@ fn completions_with_multibyte_characters() {
 
 #[test]
 fn hover_on_macro_evaluation() {
-    let text = "::config{\n  macros: {\n    gh: \"https://github.com/tomet/tomet/issues/${1}\"\n    greet: \"Hello, ${1} ${2}!\"\n    copyright: \"(C) 2026 Tomet Projects\"\n  }\n}\n\n$macro.gh(42)\n\n$macro.greet(\"Alice\", \"Bob\")\n\n${macro.copyright()}\n\n$emoji(\"sparkles\")\n";
+    let text = "::macros{\n  gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  greet: \"Hello, ${1} ${2}!\"\n  copyright: \"(C) 2026 Tomet Projects\"\n}\n\n$macro.gh(42)\n\n$macro.greet(\"Alice\", \"Bob\")\n\n${macro.copyright()}\n\n$emoji(\"sparkles\")\n";
 
-    // Hover on $macro.gh(42) (line 8, char 2)
-    let hover = hover_for(text, Position::new(8, 2), None).expect("hover found for $gh");
+    // Hover on $macro.gh(42) (line 6, char 2)
+    let hover = hover_for(text, Position::new(6, 2), None).expect("hover found for $gh");
     if let HoverContents::Markup(m) = hover.contents {
         assert!(m.value.contains("Macro Result"));
         assert!(m.value.contains(
@@ -338,8 +338,8 @@ fn hover_on_macro_evaluation() {
         panic!("expected markup contents");
     }
 
-    // Hover on $macro.greet("Alice", "Bob") (line 10, char 3)
-    let hover2 = hover_for(text, Position::new(10, 3), None).expect("hover found for $greet");
+    // Hover on $macro.greet("Alice", "Bob") (line 8, char 3)
+    let hover2 = hover_for(text, Position::new(8, 3), None).expect("hover found for $greet");
     if let HoverContents::Markup(m) = hover2.contents {
         assert!(m.value.contains("Macro Result"));
         assert!(m.value.contains("```text\nHello, Alice Bob!\n```"));
@@ -347,9 +347,9 @@ fn hover_on_macro_evaluation() {
         panic!("expected markup contents");
     }
 
-    // Hover on ${macro.copyright()} (line 12, char 3)
+    // Hover on ${macro.copyright()} (line 10, char 3)
     let hover3 =
-        hover_for(text, Position::new(12, 3), None).expect("hover found for ${macro.copyright()}");
+        hover_for(text, Position::new(10, 3), None).expect("hover found for ${macro.copyright()}");
     if let HoverContents::Markup(m) = hover3.contents {
         assert!(m.value.contains("Macro Result"));
         assert!(m.value.contains("(C) 2026 Tomet Projects"));
@@ -357,8 +357,8 @@ fn hover_on_macro_evaluation() {
         panic!("expected markup contents");
     }
 
-    // Hover on $emoji("sparkles") (line 14, char 2)
-    let hover4 = hover_for(text, Position::new(14, 2), None).expect("hover found for $emoji");
+    // Hover on $emoji("sparkles") (line 12, char 2)
+    let hover4 = hover_for(text, Position::new(12, 2), None).expect("hover found for $emoji");
     if let HoverContents::Markup(m) = hover4.contents {
         assert!(m.value.contains("Macro Result"));
         assert!(m.value.contains("✨"));
@@ -396,7 +396,7 @@ fn hover_on_macro_defined_in_settings_file_ref() {
     let config_path = dir.join("default.config.tmt");
     std::fs::write(
         &config_path,
-        "::config{\n  macros: {\n    youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  }\n}\n",
+        "::macros{\n  youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n}\n",
     )
     .unwrap();
 
@@ -450,7 +450,7 @@ fn hover_on_macro_auto_discovered_from_workspace_config() {
     let config_path = dir.join("default.config.tmt");
     std::fs::write(
         &config_path,
-        "::config{\n  macros: {\n    youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n    twitter_post: \"https://x.com/${1}/status/${2}\"\n  }\n}\n",
+        "::macros{\n  youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  twitter_post: \"https://x.com/${1}/status/${2}\"\n}\n",
     )
     .unwrap();
 
@@ -504,7 +504,7 @@ fn hover_on_macro_defined_in_config_import() {
     let config_path = dir.join("custom.config.tmt");
     std::fs::write(
         &config_path,
-        "::config{\n  macros: {\n    wiki: \"https://ja.wikipedia.org/wiki/${1}\"\n  }\n}\n",
+        "::macros{\n  wiki: \"https://ja.wikipedia.org/wiki/${1}\"\n}\n",
     )
     .unwrap();
 
@@ -566,6 +566,8 @@ fn double_colon_at_the_start_of_a_line_offers_the_declarations() {
             "use",
             "version",
             "settings",
+            "macros",
+            "vars",
             "blueprint",
             "vocabulary",
         ] {

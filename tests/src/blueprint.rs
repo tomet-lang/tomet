@@ -22,15 +22,17 @@ fn test_blueprint_end_to_end_lifecycle() {
     let blueprint_src = r#"::kind(blueprint)
 ::blueprint(daily-note){
   description: "Daily Standup & Plan"
-  vars: {
-    author: { type: string, default: "Anonymous" }
-  }
+}
+::vars{
+  author: { type: string, default: "Anonymous" }
+  title: { type: string, default: "Daily" }
 }
 ::meta{
   id: ${generate.uuid()}
   date: ${generate.now().format("YYYY-MM-DD")}
-  author: ${vars.author}
-  title: ${vars.title}
+  author: ${var.author}
+  title: ${var.title}
+  file: ${self.filename}
 }
 
 =[ Goals for ${generate.now().format("YYYY-MM-DD")} ]#(goals)

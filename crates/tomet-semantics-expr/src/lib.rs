@@ -27,7 +27,9 @@
 //! - (When it runs)
 //!   | [`Phase::Output`] is rendering; the same expression gives the same
 //!   | result every time. [`Phase::Create`] is making a document from a
-//!   | blueprint, and is the only place `generate.*` and `vars` exist.
+//!   | blueprint, and is the only place `generate.*` exists. `var` exists in both:
+//!   | the variables a document or a vault declares, filled in by `tomet new --var`
+//!   | when creating.
 //!
 //! The pass that puts the values back into a document is
 //! `tomet_transform::resolve_expressions`.
@@ -45,6 +47,7 @@ mod methods;
 mod nodes;
 mod ops;
 mod value;
+mod vars;
 
 #[cfg(test)]
 mod tests;
@@ -58,6 +61,7 @@ pub use error::EvalError;
 pub use include::MAX_INCLUDE_DEPTH;
 pub use memory::MemoryResolver;
 pub use value::{Closure, DirRef, DocRef, Env, EvalValue, Namespace, Node};
+pub use vars::{VarError, VarScope, var_scope};
 
 use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Literal};
 
@@ -65,8 +69,8 @@ use args::Args;
 use ops::{arithmetic, compare, values_equal};
 
 /// The names that stand for a value and that no lambda parameter may take.
-/// `vars` and `generate` exist only while a document is being created.
-pub const RESERVED_VALUES: [&str; 5] = ["self", "macro", "vault", "vars", "generate"];
+/// `generate` exists only while a document is being created.
+pub const RESERVED_VALUES: [&str; 5] = ["self", "macro", "var", "vault", "generate"];
 
 /// Evaluates `expr` in `cx`.
 pub fn evaluate(expr: &InterpExpr, cx: &EvalContext) -> Result<EvalValue, EvalError> {
@@ -121,6 +125,14 @@ fn eval(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eva
         }
         InterpExprKind::Binary { op, lhs, rhs } => binary(*op, lhs, rhs, cx, env),
         InterpExprKind::Member { object, member } => {
+            // A variable that is declared and has no value is not in the map, so
+            // it would read as an unknown member. It is a different mistake: say so.
+            if matches!(&object.kind, InterpExprKind::Identifier(name) if name == "var")
+                && env.get("var").is_none()
+                && cx.var_unset.iter().any(|unset| unset == member)
+            {
+                return Err(EvalError::NoValue(member.clone()));
+            }
             let value = eval(object, cx, env)?;
             member_value(value, member, cx)
         }
@@ -146,10 +158,8 @@ fn name_value(name: &str, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eval
         "self" => Ok(EvalValue::Document(cx.self_doc.clone())),
         "macro" => Ok(EvalValue::Namespace(Namespace::Macro)),
         "vault" => Ok(EvalValue::Directory(DirRef(String::new()))),
-        "vars" | "generate" if cx.phase == Phase::Output => {
-            Err(EvalError::PhaseOnly(name.to_string()))
-        }
-        "vars" => Ok(cx.vars.clone()),
+        "var" => Ok(cx.var.clone()),
+        "generate" if cx.phase == Phase::Output => Err(EvalError::PhaseOnly(name.to_string())),
         "generate" => Ok(EvalValue::Namespace(Namespace::Generate)),
         _ => Err(EvalError::UnknownName(name.to_string())),
     }
@@ -302,12 +312,15 @@ pub const FUNCTIONS: &[(&str, &str)] = &[
 /// each with a line saying what it is.
 pub const RESERVED_NAMES: &[(&str, &str)] = &[
     ("self", "The document this expression is written in"),
-    ("macro", "The macros defined in settings: `macro.name(...)`"),
-    ("vault", "The vault's root directory: `vault.docs`"),
     (
-        "vars",
-        "Values passed to `tomet new --var` (only when creating a document)",
+        "macro",
+        "The macros defined by `::macros`: `macro.name(...)`",
     ),
+    (
+        "var",
+        "The variables declared by `::vars`: `var.name` (`tomet new --var` fills them in)",
+    ),
+    ("vault", "The vault's root directory: `vault.docs`"),
     (
         "generate",
         "`generate.uuid()` and `generate.now()` (only when creating a document)",

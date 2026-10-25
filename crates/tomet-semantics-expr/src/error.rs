@@ -33,6 +33,8 @@ pub enum EvalError {
     /// A name that exists only while a document is being created, used
     /// while rendering one.
     PhaseOnly(String),
+    /// A variable that is declared, has no `default`, and was given no value.
+    NoValue(String),
     /// A document, a note, a directory or an id that could not be found.
     Unresolved(String),
     /// Text that is not an address.
@@ -86,6 +88,11 @@ impl fmt::Display for EvalError {
             EvalError::PhaseOnly(name) => write!(
                 f,
                 "`{name}` can only be used when a document is being created, not when it is rendered"
+            ),
+            EvalError::NoValue(name) => write!(
+                f,
+                "`var.{name}` is declared but has no value: give it a `default` in `::vars`, \
+                 or pass `--var {name}=...` when creating the document"
             ),
             EvalError::Unresolved(what) => write!(f, "{what}"),
             EvalError::BadAddress(text) => write!(f, "`{text}` is not an address"),

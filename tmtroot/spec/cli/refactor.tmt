@@ -12,7 +12,7 @@
 
 @table
 |[ 直し                              ][ 選ぶオプション ][ していること ]
-|[ URL をマクロに                    ][ `--url-macros` ][ リンクの行き先の URL が、設定のマクロ（`macros`）の型に合うとき、そのマクロを呼ぶ形に書き換える。`https://github.com/tomet/tomet/issues/42` が、マクロ `gh` に合えば、`$macro.gh(42)` になる。 ]
+|[ URL をマクロに                    ][ `--url-macros` ][ リンクの行き先の URL が、`::macros` のマクロの型に合うとき、そのマクロを呼ぶ形に書き換える。`https://github.com/tomet/tomet/issues/42` が、マクロ `gh` に合えば、`$macro.gh(42)` になる。 ]
 |[ `::meta` の `type` を `::kind` に ][ `--meta-kind`  ][ `::meta` の `type:` を、文書の先頭の `::kind(...)` に昇格させる。 ]
 
 どちらも選ばなければ、**両方**をする。片方を選べば、その1つだけ。

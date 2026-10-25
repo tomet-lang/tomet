@@ -28,7 +28,9 @@ of them. `&&` and `||` skip their right side once the left decides,
 and take booleans only.
 - ("When it runs") [`Phase::Output`] is rendering; the same expression gives the same
 result every time. [`Phase::Create`] is making a document from a
-blueprint, and is the only place `generate.*` and `vars` exist.
+blueprint, and is the only place `generate.*` exists. `var` exists in both:
+the variables a document or a vault declares, filled in by `tomet new --var`
+when creating.
 
 The pass that puts the values back into a document is
 `tomet_transform::resolve_expressions`.
@@ -44,7 +46,7 @@ Evaluates `expr` in `cx`.
 ===[const RESERVED_VALUES]
 
 The names that stand for a value and that no lambda parameter may take.
-`vars` and `generate` exist only while a document is being created.
+`generate` exists only while a document is being created.
 
 ===[const FUNCTIONS]
 

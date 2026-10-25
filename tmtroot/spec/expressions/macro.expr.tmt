@@ -24,13 +24,11 @@ ${macro.gh("tomet/tomet")}
 
 =[ 定義 ]
 
-設定の `macros` に、名前とテンプレートを書く。
+文書の先頭の `::macros` に、名前とテンプレートを書く（@file(tmtroot/spec/elements/std.macros.element.tmt)）。
 
 ```tm
-::settings{
-  macros: {
-    gh: "https://github.com/tomet/tomet/issues/${1}"
-  }
+::macros{
+  gh: "https://github.com/tomet/tomet/issues/${1}"
 }
 ```
 

@@ -11,6 +11,8 @@
 -@root(std.kind)|
 -@root(std.related)|
 -@root(std.settings)|
+-@root(std.macros)|
+-@root(std.vars)|
 -@root(std.config)|
 -@root(std.version)|
 

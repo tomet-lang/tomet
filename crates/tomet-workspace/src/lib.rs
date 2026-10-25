@@ -31,10 +31,8 @@ mod tests {
   type: task
   created: 2026-04-12T18:00:00+09:00
 }
-::config{
-  macros: {
-    youtube_ch: "https://www.youtube.com/${1}"
-  }
+::macros{
+  youtube_ch: "https://www.youtube.com/${1}"
 }
 
 - @link("https://www.youtube.com/@realakibaboyz")[REAL AKIBA BOYZ]

@@ -629,7 +629,7 @@ mod tests {
             ("@x(${a.b})\n", 1),
             ("@x(tags: list(${a}, b, ${c(1)}))\n", 2),
             (
-                "::meta{\n  id: ${generate.uuid()}\n  by: ${vars.author}\n}\n",
+                "::meta{\n  id: ${generate.uuid()}\n  by: ${var.author}\n}\n",
                 2,
             ),
         ] {

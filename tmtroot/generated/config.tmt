@@ -43,12 +43,6 @@ Workspace-level configuration for vault indexing and file discovery.
 - `workspace.ignore` (list(string)): Paths that are not part of this vault (neither swept nor resolvable). Aliases: `ignore.files`.
 - `workspace.unswept` (list(string)): Paths that are in the vault and left alone (e.g. `tests/fixtures` frozen test corpus).
 
-==[ macros ]
-
-Macro template expansions and URL prefix templates.
-
-- `macros` (map(string, string)): User-defined macro templates (e.g. `${1}` positional parameters). Aliases: `macro`.
-
 ==[ registry ]
 
 Blueprint and vocabulary file registry declarations.

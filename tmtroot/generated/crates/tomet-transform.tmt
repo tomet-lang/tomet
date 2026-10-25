@@ -23,7 +23,8 @@ Blueprint schema extraction, transformation, and instantiation.
 
 ====[struct BlueprintInfo]
 
-Metadata and variable definitions extracted from a `::blueprint` directive.
+What a `::blueprint` directive says about the blueprint. Its variables are
+not here: the blueprint declares them with `::vars`.
 
 ====[struct Instantiated]
 
@@ -40,7 +41,7 @@ Extracts [`BlueprintInfo`] from `doc` if it declares a top-level `::blueprint` d
 Instantiates a blueprint `doc` in-place by:
 1. Promoting/converting `::blueprint(target)` to `::kind(target)` and stripping schema blocks.
 2. Resolving every `${...}` in it, with `cx` -- which is a creating context
-(`Phase::Create`), the only place `generate.*` and `vars` exist.
+(`Phase::Create`), the only place `generate.*` exists.
 
 ==[Module directive]
 

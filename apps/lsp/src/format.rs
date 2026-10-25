@@ -35,7 +35,7 @@ pub fn resolve_effective_config(
     let mut config = tomet_semantics::document_config(doc);
     let file_path_opt = uri.and_then(uri_to_file_path);
 
-    // 1. Merge macros from workspace config file (e.g. default.config.tmt / tomet.config.tmt)
+    // 1. Merge macros and variables from workspace config file (e.g. default.config.tmt / tomet.config.tmt)
     if let Some(fp) = &file_path_opt
         && let Some((_, cfg_path, _)) = tomet_load_config::find_config_file(fp)
         && let Ok(src) = std::fs::read_to_string(&cfg_path)
@@ -44,6 +44,11 @@ pub fn resolve_effective_config(
         let ext_cfg = tomet_semantics::document_config(&cfg_doc);
         for (k, v) in ext_cfg.macros {
             config.macros.entry(k).or_insert(v);
+        }
+        for (name, decl) in ext_cfg.vars {
+            if !config.vars.iter().any(|(held, _)| *held == name) {
+                config.vars.push((name, decl));
+            }
         }
     }
 
