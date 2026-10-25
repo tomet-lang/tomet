@@ -26,6 +26,7 @@ tomet-load = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-declaration = { workspace = true }
 tomet-semantics = { workspace = true }
+tomet-transform = { workspace = true }
 tomet-validator = { workspace = true }
 tomet-vault = { workspace = true }
 

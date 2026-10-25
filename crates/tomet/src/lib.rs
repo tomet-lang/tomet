@@ -40,7 +40,7 @@
 //!
 //! =[ Features ]
 //!
-//! [`declaration`], [`semantics`] and [`validator`] are always present: they are pure, and
+//! [`declaration`], [`semantics`], [`transform`] and [`validator`] are always present: they are pure, and
 //! reading a document already depends on the first. Everything that leaves
 //! the AST is opt-in, so a reader-only consumer
 //! compiles nothing it does not use. Each feature adds one module:
@@ -77,6 +77,8 @@ pub use tomet_config as config;
 /// What an element means: vocabularies, bindings, built-in classification.
 pub use tomet_declaration as declaration;
 pub use tomet_semantics as semantics;
+/// Pure in-memory AST refactoring and structural transformations.
+pub use tomet_transform as transform;
 /// Diagnostics for a parsed document.
 pub use tomet_validator as validator;
 
