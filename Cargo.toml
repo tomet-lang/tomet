@@ -37,6 +37,7 @@ members = [
   "crates/tomet-semantics-address",
   "crates/tomet-semantics-type",
   "crates/tomet-semantics-declaration",
+  "crates/tomet-semantics-eval",
 
   #= Validator -- core, rule, blueprint, facade
   "crates/tomet-validator-core",
@@ -124,6 +125,7 @@ tomet-expr = { path = "crates/tomet-semantics-expr", version = "0.5.0" }
 tomet-type = { path = "crates/tomet-semantics-type", version = "0.5.0" }
 tomet-declaration = { path = "crates/tomet-semantics-declaration", version = "0.5.0" }
 tomet-semantics = { path = "crates/tomet-semantics", version = "0.5.0" }
+cotomet-eval = { path = "crates/tomet-semantics-eval", version = "0.5.0" }
 #= Validator
 tomet-validator = { path = "crates/tomet-validator", version = "0.5.0" }
 tomet-validator-blueprint = { path = "crates/tomet-validator-blueprint", version = "0.5.0" }

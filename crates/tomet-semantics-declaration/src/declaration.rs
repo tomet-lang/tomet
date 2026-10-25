@@ -90,6 +90,12 @@ pub fn declarations(doc: &Document) -> Vec<Found> {
     found
 }
 
+impl From<&cotomet_syntax::Declaration> for Declaration {
+    fn from(d: &cotomet_syntax::Declaration) -> Self {
+        Declaration::new(d.name.clone(), d.args.clone(), d.data.clone())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

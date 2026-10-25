@@ -6,6 +6,11 @@ license.workspace = true
 repository.workspace = true
 description = "The crate to depend on when using cotomet, the data language dual to tomet, from Rust."
 
+[features]
+default = []
+eval = ["dep:cotomet-eval"]
+
 [dependencies]
+cotomet-eval = { workspace = true, optional = true }
 cotomet-syntax = { workspace = true }
 serde_cotomet = { workspace = true }
