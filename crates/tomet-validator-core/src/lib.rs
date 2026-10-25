@@ -70,11 +70,9 @@ pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagn
 
     check_singletons_and_regions(doc, bindings, errors);
     check_retired_settings_keys(doc, errors);
-    check_name_definitions(doc, errors);
-    check_declared_versions(doc, errors);
+    check_document_declarations(doc, errors);
     check_vocabulary_params(doc, errors);
     check_arguments(doc, bindings, errors);
-    check_version_slot(doc, bindings, errors);
     check_unfinished(doc, errors);
     check_content_shape(doc, bindings, errors);
     check_dangling_anchors(doc, errors);
@@ -385,62 +383,46 @@ pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Dia
     });
 }
 
-/// `::kind(name, version)` and `::use(ns, version)`: a version, when written, is an
-/// integer of 1 or more, and the name and the version are all they take.
-///
-/// `1.0` is the case this exists for: a semver habit that would read as a
-/// float, and a document names only the major version.
-pub fn check_version_slot(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
-    use tomet_ast::Value;
-    use tomet_semantics::ElementKind;
+/// Runs checks on the standard declarations in `doc`, mapping each [`Problem`]
+/// back to a [`Diagnostic`] with the declaration element's span.
+pub fn check_document_declarations(doc: &Document, errors: &mut Vec<Diagnostic>) {
+    use tomet_declaration::{Host, Problem, check_declarations, declarations};
 
-    const TAKES: usize = 2;
-
-    tomet_tree::for_each_element(doc, |el| {
-        if !matches!(
-            classify_in(el, bindings),
-            Ok(ElementKind::Declaration(DeclKind::Kind) | ElementKind::Declaration(DeclKind::Use))
-        ) {
-            return;
+    let found = declarations(doc);
+    let decls: Vec<_> = found.iter().map(|f| f.declaration.clone()).collect();
+    for (idx, problem) in check_declarations(&decls, Host::Tmt) {
+        let span = found[idx].span;
+        match problem {
+            Problem::InvalidVersion { declaration, found } => {
+                errors.push(Diagnostic::InvalidVersion {
+                    element: declaration.to_string(),
+                    found,
+                    span,
+                });
+            }
+            Problem::TooManyArguments { declaration, takes } => {
+                errors.push(Diagnostic::TooManyArguments {
+                    element: declaration.to_string(),
+                    takes,
+                    span,
+                });
+            }
+            Problem::InvalidDefinition {
+                declaration,
+                name,
+                reason,
+            } => {
+                errors.push(Diagnostic::InvalidDefinition {
+                    declaration,
+                    name,
+                    reason,
+                    span,
+                });
+            }
+            // Host::Tmt permits all declarations that can appear in a .tmt document,
+            // so NotForThisHost is not triggered here. It will be mapped when .ctmt joins.
+            Problem::NotForThisHost { .. } => {}
         }
-        let Some(name) = el.sigil.name() else { return };
-        let Some(Value::Map(entries)) = tomet_semantics::normalized_element_args(el) else {
-            return;
-        };
-
-        // The slots take the first positional entries in order; one left over
-        // after that is an argument the element has no slot for.
-        if entries.iter().any(|(key, _)| key.is_empty()) {
-            errors.push(Diagnostic::TooManyArguments {
-                element: name.to_string(),
-                takes: TAKES,
-                span: el.span,
-            });
-        }
-        if let Some((_, version)) = entries.iter().find(|(key, _)| key == "version")
-            && !matches!(version, Value::Int(n) if *n >= 1)
-        {
-            errors.push(Diagnostic::InvalidVersion {
-                element: name.to_string(),
-                found: version_as_written(version),
-                span: el.span,
-            });
-        }
-    });
-}
-
-/// A version value the way a reader wrote it: strings quoted, floats with their
-/// point (`1.0`, not `1`).
-fn version_as_written(value: &tomet_ast::Value) -> String {
-    use tomet_ast::Value;
-    match value {
-        Value::String(s) => format!("{s:?}"),
-        Value::Float(f) => format!("{f:?}"),
-        Value::Number(text) => text.clone(),
-        Value::Int(n) => n.to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Null => "null".to_string(),
-        _ => "a value that is not a number".to_string(),
     }
 }
 
@@ -544,135 +526,6 @@ pub fn check_vocabulary_params(doc: &Document, errors: &mut Vec<Diagnostic>) {
             reason: problem.reason,
             span,
         });
-    }
-}
-
-/// Checks the versions a document declares: `::version(1.0)` and the `version:` of
-/// `::vocabulary` and `::blueprint` are each a [`Type::Version`](tomet_type::Type).
-///
-/// `::kind(name, 2)` and `::use(ns, 3)` name only a major version, an integer,
-/// and are held to that by `check_version_slot`.
-pub fn check_declared_versions(doc: &Document, errors: &mut Vec<Diagnostic>) {
-    use tomet_ast::Value;
-    use tomet_semantics::{ElementKind, classify_std_lenient};
-    use tomet_type::Type;
-
-    tomet_tree::for_each_top_level_element(doc, |el| {
-        let (declaration, written) = match classify_std_lenient(el) {
-            ElementKind::Declaration(DeclKind::Version) => (
-                "version",
-                tomet_semantics::normalized_element_args(el)
-                    .and_then(|args| match args {
-                        Value::Map(entries) => entries
-                            .into_iter()
-                            .find(|(key, _)| key == "version")
-                            .map(|(_, v)| v),
-                        other => Some(other),
-                    })
-                    .or_else(|| {
-                        tomet_semantics::data::element_data(el).and_then(|data| match data {
-                            Value::Map(entries) => entries
-                                .into_iter()
-                                .find(|(key, _)| key == "version")
-                                .map(|(_, v)| v),
-                            _ => None,
-                        })
-                    }),
-            ),
-            kind @ (ElementKind::Declaration(DeclKind::Vocabulary)
-            | ElementKind::Declaration(DeclKind::Blueprint)) => (
-                if kind == ElementKind::Declaration(DeclKind::Vocabulary) {
-                    "vocabulary"
-                } else {
-                    "blueprint"
-                },
-                match tomet_semantics::data::element_data(el) {
-                    Some(Value::Map(entries)) => entries
-                        .into_iter()
-                        .find(|(key, _)| key == "version")
-                        .map(|(_, v)| v),
-                    _ => None,
-                },
-            ),
-            _ => return,
-        };
-        let Some(written) = written else { return };
-        // `${...}` is not known until it is evaluated.
-        if matches!(&written, Value::Element(el) if matches!(el.sigil, tomet_ast::Sigil::Dollar)) {
-            return;
-        }
-        if let Err(mismatch) = Type::Version.admits(&written) {
-            errors.push(Diagnostic::InvalidDefinition {
-                declaration,
-                name: "version".to_string(),
-                reason: mismatch.to_string(),
-                span: el.span,
-            });
-        }
-    });
-}
-
-/// Checks what `::macros` and `::vars` define: a macro is a string template, a
-/// variable is a declaration (`type`, `default`, `about`) whose `type` is one a
-/// variable can have and whose `default` is a value of it.
-pub fn check_name_definitions(doc: &Document, errors: &mut Vec<Diagnostic>) {
-    use tomet_ast::Value;
-    use tomet_declaration::{Declaration, VarDecl};
-    use tomet_semantics::{ElementKind, classify_std_lenient};
-
-    tomet_tree::for_each_top_level_element(doc, |el| match classify_std_lenient(el) {
-        ElementKind::Declaration(DeclKind::Macros) => {
-            let entries = [
-                tomet_semantics::normalized_element_args(el),
-                tomet_semantics::data::element_data(el),
-            ];
-            for entries in entries.into_iter().flatten() {
-                let Value::Map(entries) = entries else {
-                    continue;
-                };
-                for (name, template) in entries {
-                    if !matches!(template, Value::String(_)) {
-                        errors.push(Diagnostic::InvalidDefinition {
-                            declaration: "macros",
-                            name,
-                            reason: "a macro is a string template, such as `\"https://x/${1}\"`"
-                                .to_string(),
-                            span: el.span,
-                        });
-                    }
-                }
-            }
-        }
-        ElementKind::Declaration(DeclKind::Vars) => {
-            let Some(declaration) = Declaration::from_element(el) else {
-                return;
-            };
-            for (name, decl) in tomet_declaration::read_var_decls(&declaration) {
-                let reason = match decl {
-                    Err(reason) => Some(reason),
-                    Ok(decl) => var_problem(&decl),
-                };
-                if let Some(reason) = reason {
-                    errors.push(Diagnostic::InvalidDefinition {
-                        declaration: "vars",
-                        name,
-                        reason,
-                        span: el.span,
-                    });
-                }
-            }
-        }
-        _ => {}
-    });
-
-    /// A `default` that is not of the declared `type`. A `type` that is not one is
-    /// refused when the declaration is read ([`tomet_declaration::VarDecl::from_value`]).
-    fn var_problem(decl: &VarDecl) -> Option<String> {
-        let default = decl.default.as_ref()?;
-        decl.ty
-            .admits(default)
-            .err()
-            .map(|err| format!("`default` is not a value of `type: {}`: {err}", decl.ty))
     }
 }
 

@@ -34,6 +34,6 @@ name, `(args)` and `{data}`. The readers see only that.
 the connect on an element, is another concept.
 
 - A user vocabulary's preamble elements (`::character`): the vocabulary declares them.
-- The checks (`check_version_slot` and the like) still live in `tomet-validator-core`; they move
+- AST-anchored diagnostics with source spans: they live in `tomet-validator-core`, which
 
-here as a host-neutral problem when `.ctmt` is checked.
+maps [`Problem`] back to an element's span.

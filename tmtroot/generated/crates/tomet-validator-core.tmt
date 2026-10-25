@@ -75,13 +75,10 @@ Enforces the `singleton` and `region` axes.
 
 ===[fn check_arguments]
 
-===[fn check_version_slot]
+===[fn check_document_declarations]
 
-`::kind(name, version)` and `::use(ns, version)`: a version, when written, is an
-integer of 1 or more, and the name and the version are all they take.
-
-`1.0` is the case this exists for: a semver habit that would read as a
-float, and a document names only the major version.
+Runs checks on the standard declarations in `doc`, mapping each [`Problem`]
+back to a [`Diagnostic`] with the declaration element's span.
 
 ===[fn check_content_shape]
 
@@ -91,20 +88,6 @@ Checks how a vocabulary document declares its parameters: a `type:` that names
 no type, a `default:` that is not of its `type:`. The same findings are reported
 where a vault reads the vocabulary ([`tomet_semantics::LoadedVocabularies`]);
 this is for checking the vocabulary file itself.
-
-===[fn check_declared_versions]
-
-Checks the versions a document declares: `::version(1.0)` and the `version:` of
-`::vocabulary` and `::blueprint` are each a [`Type::Version`](tomet_type::Type).
-
-`::kind(name, 2)` and `::use(ns, 3)` name only a major version, an integer,
-and are held to that by `check_version_slot`.
-
-===[fn check_name_definitions]
-
-Checks what `::macros` and `::vars` define: a macro is a string template, a
-variable is a declaration (`type`, `default`, `about`) whose `type` is one a
-variable can have and whose `default` is a value of it.
 
 ===[fn check_retired_settings_keys]
 

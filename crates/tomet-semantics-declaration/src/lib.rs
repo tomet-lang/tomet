@@ -30,16 +30,18 @@
 //! - `::rule(...)`, a document-level rule: it exists as a name in a design memo only. `:rule`,
 //!   the connect on an element, is another concept.
 //! - A user vocabulary's preamble elements (`::character`): the vocabulary declares them.
-//! - The checks (`check_version_slot` and the like) still live in `tomet-validator-core`; they move
-//!   here as a host-neutral problem when `.ctmt` is checked.
+//! - AST-anchored diagnostics with source spans: they live in `tomet-validator-core`, which
+//!   maps [`Problem`] back to an element's span.
 
 pub use tomet_ast::{Document, Element, Value};
 
+mod check;
 mod declaration;
 mod kind;
 mod read;
 mod vars;
 
+pub use check::{Problem, check_declarations};
 pub use declaration::{Declaration, Found, declarations};
 pub use kind::{Cardinality, DeclKind, Host, Scope, Spec};
 pub use read::{
