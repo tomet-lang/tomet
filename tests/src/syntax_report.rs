@@ -839,6 +839,17 @@ fn element_head(el: &Element) -> String {
         }
         Sigil::Bare => "Bare".to_string(),
         Sigil::Dollar => "Interp $".to_string(),
+        Sigil::Question(matcher) => {
+            let placement = match el.placement {
+                Placement::Block => "Block ",
+                Placement::Inline => "Inline",
+            };
+            let matcher = matcher
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_default();
+            format!("{placement} ?{matcher}")
+        }
     }
 }
 

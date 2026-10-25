@@ -1,5 +1,6 @@
 //! Parsing for sections (`=[...]`, `=...`) and thematic breaks (`---`).
 
+use crate::dialect::Dialect;
 use crate::element::{parse_groups, parse_sugar_body};
 use crate::error::Result;
 use crate::inline::{Stop, parse_inline_seq};
@@ -68,7 +69,7 @@ pub(crate) fn is_section_start(cur: &Cursor) -> bool {
     had_ws
 }
 
-pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
+pub(crate) fn parse_section(dialect: Dialect, cur: &mut Cursor) -> Result<Section> {
     let start_pos = cur.pos();
     let level = cur.eat_while(|c| c == '=').len();
 
@@ -84,14 +85,14 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
             // `@name`'s, so `=` takes `(args)`, `[content]` and `{value}`
             // in any order, and its content -- bracketed or `|`-marked --
             // may span lines.
-            parse_groups(cur, &mut el, true)?;
+            parse_groups(dialect, cur, &mut el, true)?;
             skip_inline_ws(cur);
             if cur.peek() == Some('=') {
                 cur.eat_while(|c| c == '=');
                 skip_inline_ws(cur);
                 // Allow groups (e.g. `{ attrs }`) to follow decorative '='
                 if crate::element::opens_group(cur) {
-                    parse_groups(cur, &mut el, true)?;
+                    parse_groups(dialect, cur, &mut el, true)?;
                     skip_inline_ws(cur);
                     if cur.peek() == Some('=') {
                         cur.eat_while(|c| c == '=');
@@ -115,7 +116,7 @@ pub(crate) fn parse_section(cur: &mut Cursor) -> Result<Section> {
         _ if had_ws && !matches!(cur.peek(), None | Some('\n') | Some('\r')) => {
             // A sugar heading supports a named connect too, matching its
             // full, bracketed form just above.
-            let body = parse_sugar_body(cur)?;
+            let body = parse_sugar_body(dialect, cur)?;
             let mut content = body.content;
             trim_trailing_equals(&mut content);
             title = content;
@@ -183,14 +184,14 @@ pub(crate) fn is_titled_thematic_break_start(cur: &Cursor) -> bool {
     look.peek() == Some('[')
 }
 
-pub(crate) fn parse_titled_thematic_break(cur: &mut Cursor) -> Result<Element> {
+pub(crate) fn parse_titled_thematic_break(dialect: Dialect, cur: &mut Cursor) -> Result<Element> {
     let start_pos = cur.pos();
     cur.eat_while(|c| c == '-');
     skip_inline_ws(cur);
     if !cur.eat_str("[") {
         return Err(err(cur.pos(), "expected '['"));
     }
-    let title = parse_inline_seq(cur, Stop::Bracket(']'), true)?;
+    let title = parse_inline_seq(dialect, cur, Stop::Bracket(']'), true)?;
     if !cur.eat_str("]") {
         return Err(err(cur.pos(), "expected ']'"));
     }

@@ -719,7 +719,8 @@ pub struct Id(pub String);
 
 /// Which sigil introduced an element, and its name.
 ///
-/// There is one element sigil, `@`. It says "an element starts here" and
+/// There is one element sigil in a document, `@`, and a second, `?`, in a
+/// pattern (see [`Sigil::Question`]). A sigil says "an element starts here" and
 /// nothing else: whether the element stands as a block or belongs to a
 /// paragraph is [`Placement`], which the parser derives from position, and
 /// origin is carried by [`Name`]'s namespace.
@@ -764,6 +765,19 @@ pub enum Sigil {
     /// preamble can be found without loading any vocabulary. Which names may
     /// be written this way is the `Region` a vocabulary declares for them;
     Document(Name),
+    /// `?matcher(name, args){options}[content]` -- a hole in a pattern.
+    ///
+    /// Structurally the same as [`Sigil::Named`]: the same groups, read by
+    /// the same code. Two differences. The head is a *matcher*, not an
+    /// element name, and it is optional: `?()` and `?(n)[...]` have none. And
+    /// it only exists in what `parse_pattern` reads; `parse_document` leaves
+    /// `?` as text, so ordinary prose such as `本当に?(はい)` is never a hole.
+    ///
+    /// The matcher is deliberately not [`Sigil::name`]: that is "which
+    /// element is this", and `?meta()` is not the `meta` element. What a
+    /// matcher means, and what a hole matches, is the host's (tandr's), not
+    /// tomet's. See `tmtroot/spec/syntax/hole.tmt`.
+    Question(Option<Name>),
 }
 
 impl Sigil {
@@ -772,11 +786,44 @@ impl Sigil {
     /// A `::name` has one just as an `@name` does, so consumers that look an
     /// element up by name read both spellings the same way; the ones that
     /// care which was written ask [`Sigil::is_document`].
+    ///
+    /// A hole has none: its head is a matcher, see [`Sigil::matcher`].
     pub fn name(&self) -> Option<&Name> {
         match self {
             Sigil::Named(name) | Sigil::Document(name) => Some(name),
-            Sigil::Bare | Sigil::Dollar => None,
+            Sigil::Bare | Sigil::Dollar | Sigil::Question(_) => None,
         }
+    }
+
+    /// The text that opens an element: `@name`, `::name`, `$`, `?matcher`.
+    /// Empty for [`Sigil::Bare`], which is written with no sigil at all.
+    ///
+    /// Everything that prints an element asks here, so a sigil is spelled in
+    /// one place.
+    pub fn head(&self) -> String {
+        match self {
+            Sigil::Named(name) => format!("@{name}"),
+            Sigil::Document(name) => format!("::{name}"),
+            Sigil::Bare => String::new(),
+            Sigil::Dollar => "$".to_string(),
+            Sigil::Question(matcher) => match matcher {
+                Some(matcher) => format!("?{matcher}"),
+                None => "?".to_string(),
+            },
+        }
+    }
+
+    /// The matcher a hole names, if it is a hole and names one.
+    pub fn matcher(&self) -> Option<&Name> {
+        match self {
+            Sigil::Question(matcher) => matcher.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// Whether this sigil is `?` -- a hole in a pattern.
+    pub fn is_question(&self) -> bool {
+        matches!(self, Sigil::Question(_))
     }
 
     /// A document declaration with a bare (un-namespaced) name.

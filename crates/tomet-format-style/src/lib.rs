@@ -235,14 +235,11 @@ pub fn render_value_inner_with_blocks(
         Value::Element(el) => {
             let mut s = match &el.args {
                 Some(args) => format!(
-                    "@{}({})",
-                    el.sigil.name().map(ToString::to_string).unwrap_or_default(),
+                    "{}({})",
+                    el.sigil.head(),
                     render_args_with_blocks(args, config, render_blocks)
                 ),
-                None => format!(
-                    "@{}",
-                    el.sigil.name().map(ToString::to_string).unwrap_or_default()
-                ),
+                None => el.sigil.head(),
             };
             if let Some(content) = &el.content {
                 s.push('[');

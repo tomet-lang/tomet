@@ -43,8 +43,7 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
             out.push(')');
         }
         Value::Element(el) => {
-            out.push('@');
-            out.push_str(&el.sigil.name().map(|n| n.to_string()).unwrap_or_default());
+            out.push_str(&el.sigil.head());
             if let Some(args) = &el.args {
                 out.push('(');
                 write_args(args, out);

@@ -12,6 +12,7 @@
 //! happens to sit in `List.items` instead of `Document.blocks`. There is no
 //! second grammar and no naming constraint.
 
+use crate::dialect::Dialect;
 use crate::element::{parse_element_with_pipe_stack, parse_paren_value, parse_sugar_body};
 use crate::error::Result;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_text};
@@ -54,7 +55,7 @@ pub(crate) struct ListMarker {
     pub combine: bool,
 }
 
-pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
+pub(crate) fn eat_list_marker(dialect: Dialect, cur: &mut Cursor) -> Result<Option<ListMarker>> {
     let mut look = *cur;
     let mut indent = 0;
     while matches!(look.peek(), Some(' ') | Some('\t')) {
@@ -100,7 +101,7 @@ pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
 
     if look.peek() == Some('(') {
         let mut probe = look;
-        let value = parse_paren_value(&mut probe)?;
+        let value = parse_paren_value(dialect, &mut probe)?;
         // `- (x) content` and `- (x)[ content ]` are the same element with
         // the same args; only the sugar needs a space to separate the
         // marker from the text that follows it. `|` joins the group
@@ -152,20 +153,22 @@ pub(crate) fn eat_list_marker(cur: &mut Cursor) -> Result<Option<ListMarker>> {
     }))
 }
 
-pub(crate) fn peek_list_marker(cur: &Cursor) -> Result<Option<ListMarker>> {
+pub(crate) fn peek_list_marker(dialect: Dialect, cur: &Cursor) -> Result<Option<ListMarker>> {
     let mut look = *cur;
-    eat_list_marker(&mut look)
+    eat_list_marker(dialect, &mut look)
 }
 
 pub(crate) fn parse_list(
+    dialect: Dialect,
     cur: &mut Cursor,
     ordered: bool,
     pipe_stack: &[usize],
 ) -> Result<Vec<ListItem>> {
-    parse_list_internal(cur, ordered, 0, pipe_stack)
+    parse_list_internal(dialect, cur, ordered, 0, pipe_stack)
 }
 
 fn parse_list_internal(
+    dialect: Dialect,
     cur: &mut Cursor,
     ordered: bool,
     min_indent: usize,
@@ -174,13 +177,13 @@ fn parse_list_internal(
     let mut items = Vec::new();
     loop {
         let head = if pipe_stack.is_empty() {
-            match peek_list_marker(cur)? {
+            match peek_list_marker(dialect, cur)? {
                 Some(head) if head.indent >= min_indent && head.ordered == ordered => head,
                 _ => break,
             }
         } else {
             if items.is_empty() {
-                match peek_list_marker(cur)? {
+                match peek_list_marker(dialect, cur)? {
                     Some(head) if head.indent >= min_indent && head.ordered == ordered => head,
                     _ => break,
                 }
@@ -195,7 +198,7 @@ fn parse_list_internal(
                             probe.bump();
                         }
                         skip_inline_ws(&mut probe);
-                        match peek_list_marker(&probe)? {
+                        match peek_list_marker(dialect, &probe)? {
                             Some(head) if head.indent >= min_indent && head.ordered == ordered => {
                                 *cur = probe;
                                 head
@@ -208,7 +211,7 @@ fn parse_list_internal(
             }
         };
 
-        let item = parse_single_list_item(cur, head, pipe_stack)?;
+        let item = parse_single_list_item(dialect, cur, head, pipe_stack)?;
         items.push(item);
     }
     Ok(items)
@@ -220,7 +223,11 @@ fn parse_list_internal(
 /// groups through `parse_groups`/`parse_element_with_pipe_stack` and then
 /// may still have trailing text before the line ends, the same way
 /// `@x[T] content` keeps both halves in one paragraph.
-fn append_trailing_line_content(cur: &mut Cursor, content: &mut Vec<Block>) -> Result<()> {
+fn append_trailing_line_content(
+    dialect: Dialect,
+    cur: &mut Cursor,
+    content: &mut Vec<Block>,
+) -> Result<()> {
     let after_groups = cur.pos();
     skip_inline_ws(cur);
     if matches!(cur.peek(), None | Some('\n')) {
@@ -237,7 +244,7 @@ fn append_trailing_line_content(cur: &mut Cursor, content: &mut Vec<Block>) -> R
         push_text(&mut p.content, " ".to_string(), cur.span_from(after_groups));
     }
     let rest_start = cur.pos();
-    let rest = parse_inline_seq(cur, Stop::Line, false)?;
+    let rest = parse_inline_seq(dialect, cur, Stop::Line, false)?;
     if !rest.is_empty() {
         match content.last_mut() {
             Some(Block::Paragraph(p)) => extend_merging(&mut p.content, rest),
@@ -251,21 +258,22 @@ fn append_trailing_line_content(cur: &mut Cursor, content: &mut Vec<Block>) -> R
 }
 
 pub(crate) fn parse_list_item_body(
+    dialect: Dialect,
     cur: &mut Cursor,
     head: &ListMarker,
     pipe_stack: &[usize],
 ) -> Result<ListItem> {
     let item_start = cur.pos();
-    eat_list_marker(cur)?;
+    eat_list_marker(dialect, cur)?;
 
     if head.combine {
         // Reuses the exact same element-parsing path a standalone
         // `@name(...)` takes -- no second grammar, no naming constraint.
         // Cursor sits right on `@`, left there by `eat_list_marker` above.
-        let mut el = parse_element_with_pipe_stack(cur, true, pipe_stack)?;
+        let mut el = parse_element_with_pipe_stack(dialect, cur, true, pipe_stack)?;
         el.placement = Placement::Block;
         let mut content = el.content.take().unwrap_or_default();
-        append_trailing_line_content(cur, &mut content)?;
+        append_trailing_line_content(dialect, cur, &mut content)?;
         el.content = Some(content);
         el.span = cur.span_from(item_start);
         return Ok(ListItem {
@@ -289,7 +297,7 @@ pub(crate) fn parse_list_item_body(
         // the item's own slots, the same arms/branch `@name`'s groups
         // already use.
         let mut item = element_new(Sigil::Bare);
-        crate::element::parse_groups_with_pipe_stack(cur, &mut item, true, pipe_stack)?;
+        crate::element::parse_groups_with_pipe_stack(dialect, cur, &mut item, true, pipe_stack)?;
         // An `(args)` group read here is the item's own -- the same
         // slot the probe's `(marker)` fills, reached from the other
         // side. `- (x)[ y ]` takes that path and `-(x)` this one, and
@@ -302,7 +310,7 @@ pub(crate) fn parse_list_item_body(
         let connects = item.connects;
         let attrs = item.value.and_then(|v| v.as_data());
         let mut content = item.content.unwrap_or_default();
-        append_trailing_line_content(cur, &mut content)?;
+        append_trailing_line_content(dialect, cur, &mut content)?;
         (content, attrs, id, connects)
     } else {
         // The bracket-less sugar, shared with `=`: one line, plus this
@@ -312,7 +320,7 @@ pub(crate) fn parse_list_item_body(
         // (`=`'s title stays that shape too); a list item's own
         // `content` is `Vec<Block>` now, so wrap it in one `Paragraph`.
         let item_start = cur.pos();
-        let body = parse_sugar_body(cur)?;
+        let body = parse_sugar_body(dialect, cur)?;
         let content = if body.content.is_empty() {
             Vec::new()
         } else {
@@ -344,12 +352,13 @@ pub(crate) fn parse_list_item_body(
 }
 
 pub(crate) fn parse_single_list_item(
+    dialect: Dialect,
     cur: &mut Cursor,
     head: ListMarker,
     pipe_stack: &[usize],
 ) -> Result<ListItem> {
     let item_start = cur.pos();
-    let mut item = parse_list_item_body(cur, &head, pipe_stack)?;
+    let mut item = parse_list_item_body(dialect, cur, &head, pipe_stack)?;
 
     if pipe_stack.is_empty() {
         if cur.peek() == Some('\n') {
@@ -357,10 +366,11 @@ pub(crate) fn parse_single_list_item(
         }
 
         let mut sublist = None;
-        if let Some(next) = peek_list_marker(cur)?
+        if let Some(next) = peek_list_marker(dialect, cur)?
             && next.indent > head.indent
         {
-            let sub_items = parse_list_internal(cur, next.ordered, next.indent, pipe_stack)?;
+            let sub_items =
+                parse_list_internal(dialect, cur, next.ordered, next.indent, pipe_stack)?;
             if !sub_items.is_empty() {
                 let list_span = sub_items
                     .first()
@@ -386,11 +396,12 @@ pub(crate) fn parse_single_list_item(
                 probe.bump();
             }
             skip_inline_ws(&mut probe);
-            if let Ok(Some(next)) = peek_list_marker(&probe)
+            if let Ok(Some(next)) = peek_list_marker(dialect, &probe)
                 && next.indent > head.indent
             {
                 *cur = probe;
-                let sub_items = parse_list_internal(cur, next.ordered, next.indent, pipe_stack)?;
+                let sub_items =
+                    parse_list_internal(dialect, cur, next.ordered, next.indent, pipe_stack)?;
                 if !sub_items.is_empty() {
                     let list_span = sub_items
                         .first()

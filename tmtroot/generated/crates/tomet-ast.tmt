@@ -183,7 +183,8 @@ equivalent (no headings, prose, or links).
 
 Which sigil introduced an element, and its name.
 
-There is one element sigil, `@`. It says "an element starts here" and
+There is one element sigil in a document, `@`, and a second, `?`, in a
+pattern (see [`Sigil::Question`]). A sigil says "an element starts here" and
 nothing else: whether the element stands as a block or belongs to a
 paragraph is [`Placement`], which the parser derives from position, and
 origin is carried by [`Name`]'s namespace.

@@ -3,6 +3,7 @@
 //! Orchestrates block-level constructs (sections, paragraphs, lists,
 //! elements, thematic breaks) into a [`Document`].
 
+use crate::dialect::Dialect;
 use crate::element::{
     LineEnd, consume_trailing_continuation, element_ends_line, is_document_element_start,
     is_element_start, leading_continuation, parse_element_with_pipe_stack,
@@ -23,9 +24,23 @@ use tomet_tree::{ElementExt, element_new, list};
 
 /// Parse an entire source string as a markup [`Document`].
 pub fn parse_document(src: &str) -> Result<Document> {
+    parse_in(Dialect::Document, src)
+}
+
+/// Parse an entire source string as a pattern: a [`Document`] in which `?name(args){options}[content]`
+/// is a hole ([`tomet_ast::Sigil::Question`]).
+///
+/// It is [`parse_document`] with one more sigil. Everything else is read by the same code, so a
+/// pattern is written in, and printed as, ordinary tomet.
+pub fn parse_pattern(src: &str) -> Result<Document> {
+    parse_in(Dialect::Pattern, src)
+}
+
+fn parse_in(dialect: Dialect, src: &str) -> Result<Document> {
     let mut cur = Cursor::new(src);
     let start_pos = cur.pos();
-    let blocks = parse_block_seq(&mut cur, BlockStop::Eof, &[]).map_err(|e| e.located_in(src))?;
+    let blocks =
+        parse_block_seq(dialect, &mut cur, BlockStop::Eof, &[]).map_err(|e| e.located_in(src))?;
     let span = cur.span_from(start_pos);
     Ok(Document::new(blocks, span))
 }
@@ -52,6 +67,7 @@ pub(crate) enum BlockStop {
 /// `|content` is fully closed by the time this returns, independent of
 /// whatever section the *enclosing* document is in the middle of.
 pub(crate) fn parse_block_seq(
+    dialect: Dialect,
     cur_ref: &mut Cursor,
     stop: BlockStop,
     pipe_stack: &[usize],
@@ -154,7 +170,7 @@ pub(crate) fn parse_block_seq(
                     };
                     el
                 };
-                let cont = continue_into_paragraph(&mut cur, prev, boundary)?;
+                let cont = continue_into_paragraph(dialect, &mut cur, prev, boundary)?;
                 if let Some(top) = stack.last_mut() {
                     top.blocks.push(cont);
                 } else {
@@ -165,12 +181,12 @@ pub(crate) fn parse_block_seq(
         }
 
         if cur.peek() == Some('=') && is_section_start(&cur) {
-            let sec = parse_section(&mut cur)?;
+            let sec = parse_section(dialect, &mut cur)?;
             push_section(&mut doc_blocks, &mut stack, sec);
             continue;
         }
         if is_titled_thematic_break_start(&cur) {
-            let el = parse_titled_thematic_break(&mut cur)?;
+            let el = parse_titled_thematic_break(dialect, &mut cur)?;
             push_block(&mut doc_blocks, &mut stack, Block::Element(el));
             continue;
         }
@@ -188,8 +204,8 @@ pub(crate) fn parse_block_seq(
             push_block(&mut doc_blocks, &mut stack, Block::Element(el));
             continue;
         }
-        if let Some(head) = peek_list_marker(&cur)? {
-            let items = parse_list(&mut cur, head.ordered, pipe_stack)?;
+        if let Some(head) = peek_list_marker(dialect, &cur)? {
+            let items = parse_list(dialect, &mut cur, head.ordered, pipe_stack)?;
             if !items.is_empty() {
                 let list_span = items
                     .first()
@@ -207,7 +223,7 @@ pub(crate) fn parse_block_seq(
         // running text either: `::kind(a, ` is a broken declaration, not a
         // paragraph that happens to start with two colons.
         if is_document_element_start(&cur) {
-            let el = parse_element_with_pipe_stack(&mut cur, true, pipe_stack)?
+            let el = parse_element_with_pipe_stack(dialect, &mut cur, true, pipe_stack)?
                 .with_placement(Placement::Block);
             let mut rest = cur;
             skip_inline_ws(&mut rest);
@@ -229,23 +245,23 @@ pub(crate) fn parse_block_seq(
         // default -- `docs/examples/dirs.tmt`'s file listing depends on
         // this -- and joins whatever follows only when its line ends with
         // an explicit trailing `\`.
-        if cur.peek() == Some('@') && is_element_start(&cur, true) {
-            match element_ends_line(&cur) {
+        if dialect.opens_element(cur.peek()) && is_element_start(dialect, &cur, true) {
+            match element_ends_line(dialect, &cur) {
                 LineEnd::Bare => {
-                    let el = parse_element_with_pipe_stack(&mut cur, true, pipe_stack)?
+                    let el = parse_element_with_pipe_stack(dialect, &mut cur, true, pipe_stack)?
                         .with_placement(Placement::Block);
                     consume_bare_line_end(&mut cur);
                     push_block(&mut doc_blocks, &mut stack, Block::Element(el));
                     continue;
                 }
                 LineEnd::Continuation => {
-                    let el = parse_element_with_pipe_stack(&mut cur, true, pipe_stack)?;
+                    let el = parse_element_with_pipe_stack(dialect, &mut cur, true, pipe_stack)?;
                     consume_trailing_continuation(&mut cur);
                     consume_bare_line_end(&mut cur);
                     if matches!(cur.peek(), Some('\n') | Some('\r')) {
                         cur.bump();
                     }
-                    let cont = continue_into_paragraph(&mut cur, el, boundary)?;
+                    let cont = continue_into_paragraph(dialect, &mut cur, el, boundary)?;
                     push_block(&mut doc_blocks, &mut stack, cont);
                     continue;
                 }
@@ -258,7 +274,7 @@ pub(crate) fn parse_block_seq(
             continue;
         }
 
-        if let Some(p) = parse_paragraph(&mut cur, boundary, pipe_stack)? {
+        if let Some(p) = parse_paragraph(dialect, &mut cur, boundary, pipe_stack)? {
             push_block(&mut doc_blocks, &mut stack, p);
         }
     }
@@ -320,6 +336,7 @@ fn consume_bare_line_end(cur: &mut Cursor) {
 }
 
 fn continue_into_paragraph(
+    dialect: Dialect,
     cur: &mut Cursor,
     first: Element,
     boundary: Option<char>,
@@ -332,7 +349,7 @@ fn continue_into_paragraph(
     let join_span = cur.span_from(break_start);
     let mut content = vec![Inline::Element(first.with_placement(Placement::Inline))];
     push_soft_break(&mut content, join_span);
-    let rest = parse_inline_seq(cur, Stop::Paragraph { boundary }, true)?;
+    let rest = parse_inline_seq(dialect, cur, Stop::Paragraph { boundary }, true)?;
     extend_merging(&mut content, rest);
     if matches!(content.last(), Some(Inline::SoftBreak(_))) {
         content.pop();
@@ -360,15 +377,16 @@ pub(crate) fn skip_line_comment(cur: &mut Cursor) {
 }
 
 fn parse_paragraph(
+    dialect: Dialect,
     cur: &mut Cursor,
     boundary: Option<char>,
     pipe_stack: &[usize],
 ) -> Result<Option<Block>> {
     let start_pos = cur.pos();
     let content = if pipe_stack.is_empty() {
-        parse_inline_seq(cur, Stop::Paragraph { boundary }, true)?
+        parse_inline_seq(dialect, cur, Stop::Paragraph { boundary }, true)?
     } else {
-        parse_inline_seq(cur, Stop::PipeRun { cols: pipe_stack }, true)?
+        parse_inline_seq(dialect, cur, Stop::PipeRun { cols: pipe_stack }, true)?
     };
     if content.is_empty() {
         return Ok(None);

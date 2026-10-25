@@ -6,6 +6,7 @@ mod document_declarations;
 mod elements;
 mod fences;
 mod groups;
+mod holes;
 mod id;
 mod inline;
 mod interpolation;

@@ -203,5 +203,9 @@ pub(crate) fn sigil_display_name(sigil: &Sigil) -> String {
         Sigil::Document(name) => format!("::{name}"),
         Sigil::Bare => "(bare)".to_string(),
         Sigil::Dollar => "${...}".to_string(),
+        Sigil::Question(matcher) => match matcher {
+            Some(matcher) => format!("?{matcher}()"),
+            None => "?()".to_string(),
+        },
     }
 }

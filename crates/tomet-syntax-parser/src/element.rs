@@ -1,5 +1,6 @@
 //! Parsing for elements (`@name`, bare elements, colon connect syntax).
 
+use crate::dialect::Dialect;
 use crate::error::Result;
 use crate::inline::{Stop, at_line_start, parse_inline_seq};
 use crate::section::merge_values;
@@ -12,7 +13,9 @@ use tomet_ast::{Block, Element, ElementValue, Entry, Id, Inline, Placement, Sigi
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
-/// Whether `cur` starts an element (`@name`).
+/// Whether `cur` starts an element: `@name`, or in a pattern `?matcher(`.
+///
+/// A hole (`?`) is only an element in [`Dialect::Pattern`]; see [`is_hole_tail`].
 ///
 /// `block_context` is whether the cursor sits where a block may begin --
 /// the document's top level, or a line start inside another element's
@@ -30,12 +33,21 @@ use tomet_tree::{ElementExt, element_new};
 /// The old `#name` spelling had the end-of-line allowance bound to the
 /// sigil rather than to the position. There is one element sigil now, so
 /// the allowance belongs to the position.
-pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
+pub(crate) fn is_element_start(dialect: Dialect, cur: &Cursor, block_context: bool) -> bool {
     let mut look = *cur;
-    if look.bump() != Some('@') {
-        return false;
+    match look.bump() {
+        Some('@') => name_and_tail_start(look, block_context),
+        Some('?') => dialect == Dialect::Pattern && is_hole_tail(look),
+        _ => false,
     }
-    name_and_tail_start(look, block_context)
+}
+
+/// What has to follow a `?` for it to be a hole and not a question mark: an
+/// optional matcher name, then `(` with nothing between. Parens are always
+/// written, so `?name` alone, or `?name {...}`, is text, and so is `really? (yes)`.
+fn is_hole_tail(mut look: Cursor) -> bool {
+    let _ = eat_name(&mut look);
+    look.peek() == Some('(')
 }
 
 /// Whether a declaration about the document, `::name`, starts at `cur`.
@@ -104,9 +116,9 @@ pub(crate) enum LineEnd {
 /// The element is parsed speculatively on a copy of the cursor and the
 /// copy is thrown away -- the same probe `eat_list_marker_with_indent`
 /// uses for a list marker's `(...)` form.
-pub(crate) fn element_ends_line(cur: &Cursor) -> LineEnd {
+pub(crate) fn element_ends_line(dialect: Dialect, cur: &Cursor) -> LineEnd {
     let mut probe = *cur;
-    if parse_element(&mut probe, true).is_err() {
+    if parse_element(dialect, &mut probe, true).is_err() {
         return LineEnd::No;
     }
     skip_inline_ws(&mut probe);
@@ -215,36 +227,55 @@ fn skip_lookahead_gap(cur: &mut Cursor) {
 /// pass `false` (no `connects` field to put a named one in), but
 /// `element_list_item` now takes `connects` too, so there is no longer a
 /// context that needs the connect branch half-enabled.
-pub(crate) fn parse_element(cur: &mut Cursor, allow_colon_connect: bool) -> Result<Element> {
-    parse_element_with_pipe_stack(cur, allow_colon_connect, &[])
+pub(crate) fn parse_element(
+    dialect: Dialect,
+    cur: &mut Cursor,
+    allow_colon_connect: bool,
+) -> Result<Element> {
+    parse_element_with_pipe_stack(dialect, cur, allow_colon_connect, &[])
 }
 
 pub(crate) fn parse_element_with_pipe_stack(
+    dialect: Dialect,
     cur: &mut Cursor,
     allow_colon_connect: bool,
     parent_pipe_stack: &[usize],
 ) -> Result<Element> {
     let start_pos = cur.pos();
-    let document = cur.eat_str("::");
-    if !document && !cur.eat_str("@") {
-        return Err(err(cur.pos(), "expected '@' or '::'"));
-    }
-    let sigil = match eat_name(cur) {
-        Some(name) if document => Sigil::Document(name),
-        Some(name) => Sigil::Named(name),
-        None => {
-            return Err(err(
-                cur.pos(),
-                format!(
-                    "expected an element name after '{}'",
-                    if document { "::" } else { "@" }
-                ),
-            ));
+    let sigil = if dialect == Dialect::Pattern && cur.eat_str("?") {
+        // A hole: the matcher is optional (`?()`, `?(n)[...]`), and the groups
+        // are the ones every other sigil reads.
+        Sigil::Question(eat_name(cur))
+    } else {
+        let document = cur.eat_str("::");
+        if !document && !cur.eat_str("@") {
+            return Err(err(cur.pos(), "expected '@' or '::'"));
+        }
+        match eat_name(cur) {
+            Some(name) if document => Sigil::Document(name),
+            Some(name) => Sigil::Named(name),
+            None => {
+                return Err(err(
+                    cur.pos(),
+                    format!(
+                        "expected an element name after '{}'",
+                        if document { "::" } else { "@" }
+                    ),
+                ));
+            }
         }
     };
+    // A hole has no connect form.
+    let allow_colon_connect = allow_colon_connect && !sigil.is_question();
 
     let mut el = element_new(sigil);
-    parse_groups_with_pipe_stack(cur, &mut el, allow_colon_connect, parent_pipe_stack)?;
+    parse_groups_with_pipe_stack(
+        dialect,
+        cur,
+        &mut el,
+        allow_colon_connect,
+        parent_pipe_stack,
+    )?;
     el.span = cur.span_from(start_pos);
     Ok(el)
 }
@@ -298,14 +329,16 @@ pub(crate) fn opens_group(cur: &Cursor) -> bool {
 /// spelling may span lines. Only the bracket-less *sugar* body
 /// (`parse_sugar_body`, the `- x` and `= x` forms) is still one line.
 pub(crate) fn parse_groups(
+    dialect: Dialect,
     cur: &mut Cursor,
     el: &mut Element,
     allow_colon_connect: bool,
 ) -> Result<()> {
-    parse_groups_with_pipe_stack(cur, el, allow_colon_connect, &[])
+    parse_groups_with_pipe_stack(dialect, cur, el, allow_colon_connect, &[])
 }
 
 pub(crate) fn parse_groups_with_pipe_stack(
+    dialect: Dialect,
     cur: &mut Cursor,
     el: &mut Element,
     allow_colon_connect: bool,
@@ -334,19 +367,25 @@ pub(crate) fn parse_groups_with_pipe_stack(
                 if is_name_start_at(cur) {
                     let name = eat_name(cur).expect("is_name_start_at just confirmed a name");
                     let mut connect_el = element_new(Sigil::Named(name));
-                    parse_groups_with_pipe_stack(cur, &mut connect_el, false, parent_pipe_stack)?;
+                    parse_groups_with_pipe_stack(
+                        dialect,
+                        cur,
+                        &mut connect_el,
+                        false,
+                        parent_pipe_stack,
+                    )?;
                     connect_el.span = cur.span_from(colon_pos);
                     el.connects.push(connect_el);
                     continue;
                 }
                 match cur.peek() {
                     Some('(') => {
-                        let conn_args = parse_paren_value(cur)?;
+                        let conn_args = parse_paren_value(dialect, cur)?;
                         el.args = merge_values(el.args.as_ref(), Some(&conn_args));
                         continue;
                     }
                     Some('{') => {
-                        let conn_val = parse_value_group(cur)?;
+                        let conn_val = parse_value_group(dialect, cur)?;
                         // Connect merges pairs into an existing group; a
                         // group holding elements is replaced wholesale,
                         // as there is nothing to merge key-wise.
@@ -370,11 +409,11 @@ pub(crate) fn parse_groups_with_pipe_stack(
             }
             match cur.peek() {
                 Some('(') if el.args.is_none() => {
-                    el.args = Some(parse_paren_value(cur)?);
+                    el.args = Some(parse_paren_value(dialect, cur)?);
                     continue;
                 }
                 Some('[') if el.content.is_none() => {
-                    el.content = Some(parse_content(cur)?);
+                    el.content = Some(parse_content(dialect, cur)?);
                     continue;
                 }
                 // `|` is `[` without the brackets -- same slot, closed by
@@ -400,7 +439,7 @@ pub(crate) fn parse_groups_with_pipe_stack(
                     }
                     if parent_ok && probe.peek() == Some('|') {
                         *cur = probe;
-                        el.content = Some(parse_pipe_content(cur, parent_pipe_stack)?);
+                        el.content = Some(parse_pipe_content(dialect, cur, parent_pipe_stack)?);
                         continue;
                     } else {
                         cur.set_pos(checkpoint);
@@ -408,7 +447,7 @@ pub(crate) fn parse_groups_with_pipe_stack(
                     }
                 }
                 Some('{') if el.value.is_none() => {
-                    el.value = Some(parse_value_group(cur)?);
+                    el.value = Some(parse_value_group(dialect, cur)?);
                     continue;
                 }
                 // `#(id)` -- a single slot, read after the three groups
@@ -481,9 +520,9 @@ pub(crate) fn parse_groups_with_pipe_stack(
 /// exactly there rather than overshooting it -- see
 /// [`find_trailing_connect`]'s doc comment for why this can't just be
 /// trusted.
-fn content_lands_at(cur: &Cursor, stop: usize) -> bool {
+fn content_lands_at(dialect: Dialect, cur: &Cursor, stop: usize) -> bool {
     let mut probe = *cur;
-    parse_inline_seq(&mut probe, Stop::Offset(stop), false).is_ok() && probe.pos() == stop
+    parse_inline_seq(dialect, &mut probe, Stop::Offset(stop), false).is_ok() && probe.pos() == stop
 }
 
 /// Whether `el`'s own groups-read actually claimed anything -- used to
@@ -540,7 +579,7 @@ fn claimed_something(el: &Element) -> bool {
 ///   lets it claim a colon connect for itself (`parse_sugar_body` always
 ///   parses its own content with `allow_colon_connect: false`), so this
 ///   check is cheap insurance there rather than load-bearing.
-fn find_trailing_connect(cur: &Cursor) -> Option<usize> {
+fn find_trailing_connect(dialect: Dialect, cur: &Cursor) -> Option<usize> {
     let src = cur.src();
     let preceded_by_colon = |pos: usize| {
         let bytes = src.as_bytes();
@@ -612,13 +651,14 @@ fn find_trailing_connect(cur: &Cursor) -> Option<usize> {
         let mut probe = *cur;
         probe.set_pos(pos);
         let mut scratch = element_new(Sigil::Bare);
-        if parse_groups_with_pipe_stack(&mut probe, &mut scratch, true, &[]).is_err()
+        if parse_groups_with_pipe_stack(dialect, &mut probe, &mut scratch, true, &[]).is_err()
             || !claimed_something(&scratch)
         {
             return false;
         }
         skip_inline_ws(&mut probe);
-        matches!(probe.peek(), None | Some('\n') | Some('\r')) && content_lands_at(cur, pos)
+        matches!(probe.peek(), None | Some('\n') | Some('\r'))
+            && content_lands_at(dialect, cur, pos)
     })
 }
 
@@ -659,12 +699,12 @@ impl SugarBody {
 /// what lets it tolerate the same single-blank-line gap every other
 /// sigil's groups do -- `- content` followed by `  :{}` on the next line
 /// connects exactly as `- content :{}` does on one.
-pub(crate) fn parse_sugar_body(cur: &mut Cursor) -> Result<SugarBody> {
-    if let Some(connect_pos) = find_trailing_connect(cur) {
-        let content = parse_inline_seq(cur, Stop::Offset(connect_pos), false)?;
+pub(crate) fn parse_sugar_body(dialect: Dialect, cur: &mut Cursor) -> Result<SugarBody> {
+    if let Some(connect_pos) = find_trailing_connect(dialect, cur) {
+        let content = parse_inline_seq(dialect, cur, Stop::Offset(connect_pos), false)?;
         cur.set_pos(connect_pos);
         let mut scratch = element_new(Sigil::Bare);
-        parse_groups_with_pipe_stack(cur, &mut scratch, true, &[])?;
+        parse_groups_with_pipe_stack(dialect, cur, &mut scratch, true, &[])?;
         // `find_trailing_connect` only ever starts a candidate at `:`,
         // `(`, `{` or `#(`, never at `[`/`|` -- but a *second*, colon-less
         // group read further along the same candidate's run still could
@@ -673,7 +713,7 @@ pub(crate) fn parse_sugar_body(cur: &mut Cursor) -> Result<SugarBody> {
         // not finding a connect at all rather than silently losing it.
         if scratch.content.is_some() {
             cur.set_pos(connect_pos);
-            let content = parse_inline_seq(cur, Stop::Line, false)?;
+            let content = parse_inline_seq(dialect, cur, Stop::Line, false)?;
             return Ok(SugarBody::from_scratch(content, element_new(Sigil::Bare)));
         }
         return Ok(SugarBody::from_scratch(content, scratch));
@@ -684,7 +724,7 @@ pub(crate) fn parse_sugar_body(cur: &mut Cursor) -> Result<SugarBody> {
     // `parse_groups` grants every other sigil) -- `- content` followed
     // by `  :{}` on the next line connects exactly as `- content :{}`
     // does on one.
-    let content = parse_inline_seq(cur, Stop::Line, false)?;
+    let content = parse_inline_seq(dialect, cur, Stop::Line, false)?;
     let after_content = cur.pos();
     let mut scratch = element_new(Sigil::Bare);
     // Confirm what follows the gap is actually a connect opener before
@@ -703,7 +743,7 @@ pub(crate) fn parse_sugar_body(cur: &mut Cursor) -> Result<SugarBody> {
         && (matches!(probe.peek(), Some('(') | Some('{') | Some(':'))
             || (probe.peek() == Some('#') && probe.peek_at(1) == Some('(')));
     if is_connect_opener {
-        parse_groups_with_pipe_stack(cur, &mut scratch, true, &[])?;
+        parse_groups_with_pipe_stack(dialect, cur, &mut scratch, true, &[])?;
         // Same guard as above, for the same reason: a second, colon-less
         // group within this gap-tolerant read could still reach `[`/`|`.
         if scratch.content.is_some() {
@@ -714,7 +754,7 @@ pub(crate) fn parse_sugar_body(cur: &mut Cursor) -> Result<SugarBody> {
     Ok(SugarBody::from_scratch(content, scratch))
 }
 
-pub(crate) fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
+pub(crate) fn parse_paren_value(dialect: Dialect, cur: &mut Cursor) -> Result<Value> {
     if !cur.eat_str("(") {
         return Err(err(cur.pos(), "expected '('"));
     }
@@ -722,7 +762,7 @@ pub(crate) fn parse_paren_value(cur: &mut Cursor) -> Result<Value> {
     let v = if cur.peek() == Some(')') {
         Value::Map(Vec::new())
     } else {
-        parse_value_at(cur)?
+        parse_value_at(dialect, cur)?
     };
     skip_ws_newlines_and_comments(cur);
     if !cur.eat_str(")") {
@@ -772,7 +812,11 @@ fn parse_id_scalar(cur: &mut Cursor) -> Result<String> {
 ///
 /// Also what a `key: | prose` value is (`crate::value::TometValueHook`), so
 /// an element's trailing prose and a map entry's prose are one grammar.
-pub(crate) fn parse_pipe_content(cur: &mut Cursor, parent_stack: &[usize]) -> Result<Vec<Block>> {
+pub(crate) fn parse_pipe_content(
+    dialect: Dialect,
+    cur: &mut Cursor,
+    parent_stack: &[usize],
+) -> Result<Vec<Block>> {
     let col = cur.column();
     if !cur.eat_str("|") {
         return Err(err(cur.pos(), "expected '|'"));
@@ -780,7 +824,12 @@ pub(crate) fn parse_pipe_content(cur: &mut Cursor, parent_stack: &[usize]) -> Re
     let mut current_stack = parent_stack.to_vec();
     current_stack.push(col);
     skip_inline_ws(cur);
-    crate::document::parse_block_seq(cur, crate::document::BlockStop::Eof, &current_stack)
+    crate::document::parse_block_seq(
+        dialect,
+        cur,
+        crate::document::BlockStop::Eof,
+        &current_stack,
+    )
 }
 
 /// Parses a `[content]` group as a block sequence -- the same recursive
@@ -789,12 +838,16 @@ pub(crate) fn parse_pipe_content(cur: &mut Cursor, parent_stack: &[usize]) -> Re
 /// run with no block markers inside comes out as a single `Paragraph`, so
 /// ordinary inline usage (`@link(...)[Tomet]`) is unaffected; see
 /// `tmtroot/docs/spec/feature/content-shape.tmt`.
-fn parse_content(cur: &mut Cursor) -> Result<Vec<Block>> {
+fn parse_content(dialect: Dialect, cur: &mut Cursor) -> Result<Vec<Block>> {
     if !cur.eat_str("[") {
         return Err(err(cur.pos(), "expected '['"));
     }
-    let content =
-        crate::document::parse_block_seq(cur, crate::document::BlockStop::Bracket(']'), &[])?;
+    let content = crate::document::parse_block_seq(
+        dialect,
+        cur,
+        crate::document::BlockStop::Bracket(']'),
+        &[],
+    )?;
     if !cur.eat_str("]") {
         return Err(err(cur.pos(), "expected ']'"));
     }
@@ -822,7 +875,7 @@ fn parse_content(cur: &mut Cursor) -> Result<Vec<Block>> {
 /// slot instead (`@tags(1, 2, 3)`, already a `Seq` there) -- there is no
 /// live spelling anywhere in the corpus that needs `{...}` itself to hold
 /// one.
-pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
+pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<ElementValue> {
     let group_start = cur.pos();
     if !cur.eat_str("{") {
         return Err(err(cur.pos(), "expected '{'"));
@@ -833,7 +886,7 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
         match cur.peek() {
             None => return Err(err(group_start, "unterminated '{', expected '}'")),
             Some('}') => break,
-            Some('(') => entries.push(Entry::Element(parse_bare_element(cur)?)),
+            Some('(') => entries.push(Entry::Element(parse_bare_element(dialect, cur)?)),
             // A named entry, `@args{ ... }`. Unambiguous: `is_ident_char`
             // excludes `@`, so a map key cannot begin with one, and this
             // position errors today -- `eat_ident` returns empty and the
@@ -857,9 +910,9 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
             // of scope for this position on purpose. `Separated` collapses
             // into "not a block" the same as `No`, unchanged from
             // `element_ends_line`'s old boolean behavior.
-            _ if is_element_start(cur, at_line_start(cur)) => {
-                let block = at_line_start(cur) && element_ends_line(cur) == LineEnd::Bare;
-                let el = parse_element(cur, false)?;
+            _ if is_element_start(dialect, cur, at_line_start(cur)) => {
+                let block = at_line_start(cur) && element_ends_line(dialect, cur) == LineEnd::Bare;
+                let el = parse_element(dialect, cur, false)?;
                 entries.push(Entry::Element(if block {
                     el.with_placement(Placement::Block)
                 } else {
@@ -868,7 +921,7 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
             }
             _ => {
                 let entry_start = cur.pos();
-                let (key, value) = parse_one_entry(cur)?;
+                let (key, value) = parse_one_entry(dialect, cur)?;
                 if key == POSITIONAL_ENTRY_KEY {
                     return Err(err(
                         entry_start,
@@ -910,10 +963,10 @@ pub(crate) fn parse_value_group(cur: &mut Cursor) -> Result<ElementValue> {
 ///
 /// `allow_colon_connect: false`, matching the named entry above -- there
 /// is no enclosing construct inside a group for a connect to reach.
-fn parse_bare_element(cur: &mut Cursor) -> Result<Element> {
+fn parse_bare_element(dialect: Dialect, cur: &mut Cursor) -> Result<Element> {
     let start_pos = cur.pos();
     let mut el = element_new(Sigil::Bare);
-    parse_groups(cur, &mut el, false)?;
+    parse_groups(dialect, cur, &mut el, false)?;
     el.span = cur.span_from(start_pos);
     Ok(el)
 }

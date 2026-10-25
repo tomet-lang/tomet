@@ -2,6 +2,7 @@
 //! while providing custom hooks for embedded elements (`@element`) and
 //! dollar expressions (`$interp`) within Tomet documents.
 
+use crate::dialect::Dialect;
 use crate::error::{Error, Result};
 use tomet_ast::Value;
 use tomet_lexer::Cursor;
@@ -14,7 +15,13 @@ pub(crate) use cotomet_syntax::{
 /// Parse an entire source string as one `Value` (a data-only `.tmt`
 /// document -- no headings, prose, or top-level elements).
 pub fn parse_value(src: &str) -> Result<Value> {
-    cotomet_syntax::parse_value_with(src, &mut TometValueHook).map_err(Into::into)
+    cotomet_syntax::parse_value_with(
+        src,
+        &mut TometValueHook {
+            dialect: Dialect::Document,
+        },
+    )
+    .map_err(Into::into)
 }
 
 pub(crate) fn err(pos: usize, message: impl Into<String>) -> Error {
@@ -63,13 +70,17 @@ impl cotomet_syntax::ValueHook for CotometValueHook {
 
 /// A [`cotomet_syntax::ValueHook`] allowing embedded elements (`@...`) and dollar expressions (`$...`)
 /// to be parsed inside value positions within Tomet.
-pub(crate) struct TometValueHook;
+pub(crate) struct TometValueHook {
+    pub(crate) dialect: Dialect,
+}
 
 impl cotomet_syntax::ValueHook for TometValueHook {
     fn try_parse_value(&mut self, cur: &mut Cursor) -> Option<cotomet_syntax::Result<Value>> {
         // A real, `@`-sigiled element sitting in a value slot
-        if cur.peek() == Some('@') && crate::element::is_element_start(cur, false) {
-            let el = match crate::element::parse_element(cur, false) {
+        if self.dialect.opens_element(cur.peek())
+            && crate::element::is_element_start(self.dialect, cur, false)
+        {
+            let el = match crate::element::parse_element(self.dialect, cur, false) {
                 Ok(el) => el,
                 Err(e) => {
                     return Some(Err(cotomet_syntax::Error::at(
@@ -93,6 +104,7 @@ impl cotomet_syntax::ValueHook for TometValueHook {
         if cur.peek() == Some('[') {
             cur.bump();
             let blocks = match crate::document::parse_block_seq(
+                self.dialect,
                 cur,
                 crate::document::BlockStop::Bracket(']'),
                 &[],
@@ -119,7 +131,7 @@ impl cotomet_syntax::ValueHook for TometValueHook {
         // keeps a `,` or `}` inside the prose from closing the entry.
         if cur.peek() == Some('|') {
             return Some(
-                crate::element::parse_pipe_content(cur, &[])
+                crate::element::parse_pipe_content(self.dialect, cur, &[])
                     .map(Value::Blocks)
                     .map_err(|e| cotomet_syntax::Error::at(e.message, e.line, e.column, e.offset)),
             );
@@ -129,10 +141,10 @@ impl cotomet_syntax::ValueHook for TometValueHook {
     }
 }
 
-pub(crate) fn parse_value_at(cur: &mut Cursor) -> Result<Value> {
-    cotomet_syntax::parse_value_at_with(cur, &mut TometValueHook).map_err(Into::into)
+pub(crate) fn parse_value_at(dialect: Dialect, cur: &mut Cursor) -> Result<Value> {
+    cotomet_syntax::parse_value_at_with(cur, &mut TometValueHook { dialect }).map_err(Into::into)
 }
 
-pub(crate) fn parse_one_entry(cur: &mut Cursor) -> Result<(String, Value)> {
-    cotomet_syntax::parse_one_entry_with(cur, &mut TometValueHook).map_err(Into::into)
+pub(crate) fn parse_one_entry(dialect: Dialect, cur: &mut Cursor) -> Result<(String, Value)> {
+    cotomet_syntax::parse_one_entry_with(cur, &mut TometValueHook { dialect }).map_err(Into::into)
 }

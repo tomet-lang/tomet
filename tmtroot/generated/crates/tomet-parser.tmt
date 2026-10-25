@@ -16,12 +16,21 @@ source of truth for the Tomet grammar.
 It performs zero I/O, external file resolution, or dynamic code execution.
 Given identical input text, it produces identical AST output with guaranteed
 linear/predictable time complexity.
+- ("Documents And Patterns")
+  - `parse_document` reads an ordinary document, where `?` is text.
+`parse_pattern` reads the same grammar with one more sigil, `?`, which makes a
+hole (`Sigil::Question`). The parser only builds the hole; what a matcher is and
+what a hole matches belongs to the caller (tandr), never to this crate.
 - ("Tree-sitter Synchronization")
   - `tomet-parser` is the single source of truth for grammar definitions.
 `tree-sitter-tomet` is a separate hand-maintained grammar approximation used for
 editor syntax highlighting.
 
 ==[Module Layout]
+
+- (dialect) Which sigils may open an element: `@` always, `?` (a hole) only in a pattern.
+
+`parse_document` and `parse_pattern` share every other function; each takes the dialect.
 
 - (document) Block-level dispatch loop, paragraphs, and document-level parsing.
 - (element) Typed elements (`<T>`, `@name`, bare `@`), group ordering, and connect syntax.

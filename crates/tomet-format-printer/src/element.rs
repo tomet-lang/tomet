@@ -1,6 +1,6 @@
 //! Rendering elements, values, args, and connects.
 
-use tomet_ast::{Element, ElementValue, Entry, Placement, Sigil, Value};
+use tomet_ast::{Element, ElementValue, Entry, Placement, Value};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_style::render_nested;
 
@@ -214,23 +214,10 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
 
     let mut out = String::new();
 
-    match &el.sigil {
-        // One sigil, whatever the placement. A block-placed element is
-        // told apart by standing alone on its line, which is the same
-        // condition the parser reads it back with.
-        Sigil::Named(name) => {
-            out.push('@');
-            out.push_str(&name.to_string());
-        }
-        Sigil::Document(name) => {
-            out.push_str("::");
-            out.push_str(&name.to_string());
-        }
-        Sigil::Bare => {}
-        Sigil::Dollar => {
-            out.push('$');
-        }
-    }
+    // One sigil, whatever the placement. A block-placed element is told apart
+    // by standing alone on its line, which is the same condition the parser
+    // reads it back with.
+    out.push_str(&el.sigil.head());
 
     let render_args_cb = |out: &mut String| {
         if let Some(args) = &el.args {

@@ -145,6 +145,9 @@ pub fn measure(doc: &Document) -> Stats {
             }
             Sigil::Dollar => stats.dollar += 1,
             Sigil::Bare => stats.bare += 1,
+            // A hole exists only in what `parse_pattern` reads, never in a
+            // document that is being measured, so there is no count for it.
+            Sigil::Question(_) => {}
         }
 
         if let Some((kind, target)) = link_target_of(el).or_else(|| path_target_of(el))

@@ -1,5 +1,6 @@
 //! Parsing for inline sequences, text normalization, and inline delimiters (`*em*`, `**strong**`, `==mark==`).
 
+use crate::dialect::Dialect;
 use crate::element::{LineEnd, element_ends_line, is_element_start, parse_element};
 use crate::error::Result;
 use crate::interp::{is_interp_start, parse_dollar_element};
@@ -44,6 +45,7 @@ pub(crate) enum Stop<'a> {
 /// every other caller passes `true`, unchanged from before this
 /// parameter existed.
 pub(crate) fn parse_inline_seq<'a>(
+    dialect: Dialect,
     cur: &mut Cursor,
     stop: Stop<'a>,
     allow_colon_connect: bool,
@@ -132,7 +134,7 @@ pub(crate) fn parse_inline_seq<'a>(
                         look.bump();
                         skip_inline_ws(&mut look);
                     }
-                    if paragraph_breaks_here(&look) {
+                    if paragraph_breaks_here(dialect, &look) {
                         break;
                     }
                     if redundant_leading {
@@ -189,10 +191,10 @@ pub(crate) fn parse_inline_seq<'a>(
                                 look.bump();
                             }
                             skip_inline_ws(&mut look);
-                            if paragraph_breaks_here(&look)
-                                || (look.peek() == Some('@')
-                                    && is_element_start(&look, true)
-                                    && element_ends_line(&look) == LineEnd::Bare)
+                            if paragraph_breaks_here(dialect, &look)
+                                || (dialect.opens_element(look.peek())
+                                    && is_element_start(dialect, &look, true)
+                                    && element_ends_line(dialect, &look) == LineEnd::Bare)
                                 || (look.peek() == Some('$') && is_interp_start(&look))
                             {
                                 break;
@@ -293,15 +295,15 @@ pub(crate) fn parse_inline_seq<'a>(
             text_start = cur.pos();
             continue;
         }
-        if cur.peek() == Some('@') {
+        if dialect.opens_element(cur.peek()) {
             let block_context = match stop {
                 Stop::Bracket(_) => at_line_start(cur),
                 Stop::PipeRun { .. } => at_marked_line_start(cur),
                 _ => false,
             };
-            if is_element_start(cur, block_context) {
+            if is_element_start(dialect, cur, block_context) {
                 let line_end = if block_context {
-                    element_ends_line(cur)
+                    element_ends_line(dialect, cur)
                 } else {
                     LineEnd::No
                 };
@@ -311,7 +313,7 @@ pub(crate) fn parse_inline_seq<'a>(
                 // it does at the top level; only an explicit trailing
                 // `\` joins it to what follows.
                 flush_text(&mut items, cur, &mut text_start, pipe_cols);
-                let el = parse_element(cur, allow_colon_connect)?;
+                let el = parse_element(dialect, cur, allow_colon_connect)?;
                 if line_end == LineEnd::Continuation {
                     crate::element::consume_trailing_continuation(cur);
                 }
@@ -333,7 +335,7 @@ pub(crate) fn parse_inline_seq<'a>(
         }
         if matches!(cur.peek(), Some('*') | Some('_') | Some('~')) {
             let before = cur.pos();
-            if let Some(el) = try_delimited(cur, allow_colon_connect)? {
+            if let Some(el) = try_delimited(dialect, cur, allow_colon_connect)? {
                 flush_text_upto(&mut items, cur, &mut text_start, before, pipe_cols);
                 items.push(Inline::Element(el));
                 text_start = cur.pos();
@@ -359,11 +361,11 @@ pub(crate) fn parse_inline_seq<'a>(
 /// consulted to decide whether a fresh bare element joins what precedes
 /// it -- that is opt-in now, via the trigger, not a default this
 /// look-ahead governs.
-pub(crate) fn paragraph_breaks_here(look: &Cursor) -> bool {
+pub(crate) fn paragraph_breaks_here(dialect: Dialect, look: &Cursor) -> bool {
     look.is_eof()
         || look.peek() == Some('\n')
         || (look.peek() == Some('=') && crate::section::is_section_start(look))
-        || matches!(peek_list_marker(look), Ok(Some(_)))
+        || matches!(peek_list_marker(dialect, look), Ok(Some(_)))
         || look.starts_with("//")
         || look.starts_with("/*")
         || is_titled_thematic_break_start(look)
@@ -444,9 +446,13 @@ fn is_boundary(c: Option<char>) -> bool {
     matches!(c, None | Some(' ') | Some('\t') | Some('\n') | Some('\r'))
 }
 
-fn try_delimited(cur: &mut Cursor, allow_colon_connect: bool) -> Result<Option<Element>> {
+fn try_delimited(
+    dialect: Dialect,
+    cur: &mut Cursor,
+    allow_colon_connect: bool,
+) -> Result<Option<Element>> {
     for (delim, kind) in DELIMITERS {
-        if let Some(el) = try_one_delimited(cur, delim, kind, allow_colon_connect)? {
+        if let Some(el) = try_one_delimited(dialect, cur, delim, kind, allow_colon_connect)? {
             return Ok(Some(el));
         }
     }
@@ -454,6 +460,7 @@ fn try_delimited(cur: &mut Cursor, allow_colon_connect: bool) -> Result<Option<E
 }
 
 fn try_one_delimited(
+    dialect: Dialect,
     cur: &mut Cursor,
     delim: &'static str,
     kind: &str,
@@ -491,7 +498,7 @@ fn try_one_delimited(
     }
 
     cur.set_pos(open.pos());
-    let inner = parse_inline_seq(cur, Stop::Delim(delim), allow_colon_connect)?;
+    let inner = parse_inline_seq(dialect, cur, Stop::Delim(delim), allow_colon_connect)?;
     if !cur.eat_str(delim) {
         return Err(err(cur.pos(), format!("expected '{delim}'")));
     }
