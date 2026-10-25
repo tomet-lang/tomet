@@ -9,7 +9,7 @@ pub mod id;
 pub use diagnostic::{CstValidationError, Diagnostic, Severity};
 pub use id::{collect_ids, collect_ids_cst};
 
-use tomet_ast::{Block, Document, Element, Inline, List};
+use tomet_ast::{Block, Document, Element, Inline, List, Span};
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, Shape};
@@ -121,7 +121,7 @@ pub fn check_singletons_and_regions(
             Ok(kind) => match bindings.declaration(name) {
                 Some(decl) => (decl.singleton, Some(decl.region)),
                 None => (
-                    tomet_semantics::builtin_singleton(&kind),
+                    false, // Standard declarations are counted in one place by `check_declarations`
                     Some(tomet_semantics::builtin_region(&kind)),
                 ),
             },
@@ -419,9 +419,82 @@ pub fn check_document_declarations(doc: &Document, errors: &mut Vec<Diagnostic>)
                     span,
                 });
             }
-            // Host::Tmt permits all declarations that can appear in a .tmt document,
-            // so NotForThisHost is not triggered here. It will be mapped when .ctmt joins.
-            Problem::NotForThisHost { .. } => {}
+            Problem::NotForThisHost { declaration } => {
+                errors.push(Diagnostic::NotForThisHost { declaration, span });
+            }
+            Problem::Repeated { declaration, first } => {
+                errors.push(Diagnostic::DuplicateSingleton {
+                    name: declaration.to_string(),
+                    first: found[first].span,
+                    duplicate: span,
+                });
+            }
+        }
+    }
+}
+
+/// A declaration paired with its source span.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Declared {
+    pub declaration: tomet_declaration::Declaration,
+    pub span: Span,
+}
+
+impl Declared {
+    pub fn new(declaration: tomet_declaration::Declaration, span: Span) -> Self {
+        Declared { declaration, span }
+    }
+}
+
+/// Validates declarations from a `.ctmt` file header against [`Host::Ctmt`].
+///
+/// Reports host restrictions, duplicate singletons, version format errors,
+/// too many arguments, and invalid macro/var definitions. Declarations whose
+/// names are not standard are ignored (their meaning belongs to the tool that
+/// reads the file).
+pub fn check_ctmt_declarations(declarations: &[Declared], errors: &mut Vec<Diagnostic>) {
+    use tomet_declaration::{Host, Problem, check_declarations};
+
+    let decls: Vec<_> = declarations.iter().map(|d| d.declaration.clone()).collect();
+    for (idx, problem) in check_declarations(&decls, Host::Ctmt) {
+        let span = declarations[idx].span;
+        match problem {
+            Problem::NotForThisHost { declaration } => {
+                errors.push(Diagnostic::NotForThisHost { declaration, span });
+            }
+            Problem::Repeated { declaration, first } => {
+                errors.push(Diagnostic::DuplicateSingleton {
+                    name: declaration.to_string(),
+                    first: declarations[first].span,
+                    duplicate: span,
+                });
+            }
+            Problem::InvalidVersion { declaration, found } => {
+                errors.push(Diagnostic::InvalidVersion {
+                    element: declaration.to_string(),
+                    found,
+                    span,
+                });
+            }
+            Problem::TooManyArguments { declaration, takes } => {
+                errors.push(Diagnostic::TooManyArguments {
+                    element: declaration.to_string(),
+                    takes,
+                    span,
+                });
+            }
+            Problem::InvalidDefinition {
+                declaration,
+                name,
+                reason,
+            } => {
+                errors.push(Diagnostic::InvalidDefinition {
+                    declaration,
+                    name,
+                    reason,
+                    span,
+                });
+            }
         }
     }
 }

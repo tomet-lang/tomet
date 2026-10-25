@@ -2288,6 +2288,7 @@ dependencies = [
  "serde",
  "tomet-ast",
  "tomet-cst",
+ "tomet-declaration",
  "tomet-lexer",
  "tomet-parser",
  "tomet-semantics",

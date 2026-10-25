@@ -566,15 +566,6 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
     }
 }
 
-/// Whether at most one of `kind` may appear in a document.
-///
-/// A standard declaration says so itself (`tomet-declaration`'s `Spec`): all but `::use`, which
-/// brings in one vocabulary each and is the proof that where a declaration may sit and how often are
-/// two axes. No body element is a singleton.
-pub fn builtin_singleton(kind: &ElementKind) -> bool {
-    matches!(kind, ElementKind::Declaration(declaration) if declaration.is_singleton())
-}
-
 /// Where in a document `kind` may appear.
 ///
 /// Every standard declaration is in the preamble, and nothing else the language names is: a body

@@ -7,7 +7,7 @@ use tomet_ast::Value;
 use tomet_type::Type;
 
 use crate::declaration::Declaration;
-use crate::kind::{DeclKind, Host};
+use crate::kind::{Cardinality, DeclKind, Host};
 use crate::vars::{VarDecl, read_var_decls};
 
 /// A problem found with a document's declarations.
@@ -34,6 +34,15 @@ pub enum Problem {
     },
     /// A declaration written in a host that does not permit it.
     NotForThisHost { declaration: &'static str },
+    /// A declaration that may appear at most once was written more than once.
+    ///
+    /// The shared check is the one place standard declarations are counted for both
+    /// `.tmt` and `.ctmt` hosts; `check_singletons_and_regions` in the validator counts
+    /// only user-vocabulary declarations. `first` is the index of the first occurrence.
+    Repeated {
+        declaration: &'static str,
+        first: usize,
+    },
 }
 
 impl std::fmt::Display for Problem {
@@ -59,6 +68,9 @@ impl std::fmt::Display for Problem {
             Problem::NotForThisHost { declaration } => {
                 write!(f, "`::{declaration}` is not permitted in this host")
             }
+            Problem::Repeated { declaration, .. } => {
+                write!(f, "`{declaration}` may appear once in a document")
+            }
         }
     }
 }
@@ -83,6 +95,7 @@ fn version_as_written(value: &Value) -> String {
 /// Non-standard declarations are ignored.
 pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usize, Problem)> {
     let mut problems = Vec::new();
+    let mut seen_once = std::collections::HashMap::new();
 
     for (idx, decl) in declarations.iter().enumerate() {
         let Some(kind) = decl.kind() else { continue };
@@ -96,6 +109,20 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
                 },
             ));
             continue;
+        }
+
+        if spec.cardinality == Cardinality::Once {
+            if let Some(&first_idx) = seen_once.get(&kind) {
+                problems.push((
+                    idx,
+                    Problem::Repeated {
+                        declaration: spec.name,
+                        first: first_idx,
+                    },
+                ));
+            } else {
+                seen_once.insert(kind, idx);
+            }
         }
 
         match kind {
@@ -492,5 +519,55 @@ mod tests {
             problems[0].1,
             Problem::NotForThisHost { declaration: "use" }
         );
+    }
+
+    #[test]
+    fn repeated_singletons_are_reported() {
+        let meta1 = Declaration::new(
+            "meta",
+            None,
+            Some(Value::Map(vec![("a".into(), Value::Int(1))])),
+        );
+        let meta2 = Declaration::new(
+            "meta",
+            None,
+            Some(Value::Map(vec![("b".into(), Value::Int(2))])),
+        );
+        let problems = check_declarations(&[meta1, meta2], Host::Ctmt);
+        assert_eq!(problems.len(), 1);
+        assert_eq!(
+            problems[0],
+            (
+                1,
+                Problem::Repeated {
+                    declaration: "meta",
+                    first: 0,
+                }
+            )
+        );
+        assert_eq!(
+            problems[0].1.to_string(),
+            "`meta` may appear once in a document"
+        );
+
+        // Many cardinality is allowed to repeat
+        let use1 = Declaration::new(
+            "use",
+            Some(Value::Map(vec![(
+                "target".into(),
+                Value::String("a".into()),
+            )])),
+            None,
+        );
+        let use2 = Declaration::new(
+            "use",
+            Some(Value::Map(vec![(
+                "target".into(),
+                Value::String("b".into()),
+            )])),
+            None,
+        );
+        let problems = check_declarations(&[use1, use2], Host::Tmt);
+        assert!(problems.is_empty());
     }
 }

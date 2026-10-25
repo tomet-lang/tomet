@@ -242,6 +242,11 @@ pub enum Diagnostic {
         value: String,
         span: Span,
     },
+    /// A declaration written in a host where it is not permitted.
+    NotForThisHost {
+        declaration: &'static str,
+        span: Span,
+    },
 }
 
 impl Diagnostic {
@@ -272,6 +277,7 @@ impl Diagnostic {
             Diagnostic::Conflict { span, .. } => *span,
             Diagnostic::ContentNotInline { span, .. } => *span,
             Diagnostic::DisallowedInContent { span, .. } => *span,
+            Diagnostic::NotForThisHost { span, .. } => *span,
         }
     }
 
@@ -561,6 +567,9 @@ impl Diagnostic {
                     "`{field}` in `::meta` is declared `type: {field_type}`, \
                      but `{value}` is not a valid {field_type}"
                 )
+            }
+            Diagnostic::NotForThisHost { declaration, .. } => {
+                write!(f, "`::{declaration}` is not permitted in this host")
             }
         }
     }

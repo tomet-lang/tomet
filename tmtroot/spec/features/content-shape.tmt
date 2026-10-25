@@ -32,7 +32,7 @@ content: { allow: any }
 `Value::Call`そのもので、新しい値構文は要らない。
 
 組み込み36(+1)要素については、vocabulary宣言が無いので、`required_shape`/
-`builtin_region`/`builtin_singleton`と並ぶ新しい表を`tomet-semantics`に
+`builtin_region`と並ぶ新しい表を`tomet-semantics`に
 持つ。`em`/`strong`/`mark`/`strikeout`/`ruby`/`link`/`embed`/`file`/`dir`/
 `draft`/`fixme`/`heading`/`quote`は、たとえ`display: block`でも
 contentはinline限定（短い単一ラベル止まり）。`callout`/`card`/`table`/

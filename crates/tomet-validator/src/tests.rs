@@ -41,6 +41,19 @@ fn a_second_singleton_is_reported() {
     ));
 }
 
+#[test]
+fn a_repeated_standard_declaration_says_where_the_first_is() {
+    let src = "::kind(note)\n::meta{a: 1}\n::meta{b: 2}\n\n#[ T ]\n";
+    let doc = parse(src);
+    let errors = validate_document(&doc);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    let index = tomet_lexer::LineIndex::new(src);
+    assert_eq!(
+        errors[0].message_in(&index),
+        "`meta` may appear once in a document; the first is at 2:1"
+    );
+}
+
 /// A vocabulary's own `singleton: true` is enforced the same way. The
 /// builtin table and a declaration are two sources for one rule, not
 /// two rules.
@@ -1263,4 +1276,98 @@ fn checking_a_vocabulary_reports_a_type_that_names_no_type() {
             .any(|p| p.contains("`item.tags`") && p.contains("no spelling yet")),
         "{problems:?}"
     );
+}
+
+#[test]
+fn check_ctmt_declarations_reports_expected_diagnostics() {
+    use tomet_ast::{Span, Value};
+    use tomet_declaration::Declaration;
+
+    // 1. Valid declarations produce no errors
+    let declared = vec![
+        Declared::new(
+            Declaration::new(
+                "kind",
+                Some(Value::Map(vec![
+                    ("".into(), Value::String("catalog".into())),
+                    ("".into(), Value::Int(1)),
+                ])),
+                None,
+            ),
+            Span::new(0, 10),
+        ),
+        Declared::new(
+            Declaration::new("version", Some(Value::String("1.0.0".into())), None),
+            Span::new(11, 25),
+        ),
+        Declared::new(
+            Declaration::new(
+                "meta",
+                None,
+                Some(Value::Map(vec![(
+                    "author".into(),
+                    Value::String("me".into()),
+                )])),
+            ),
+            Span::new(26, 40),
+        ),
+    ];
+    let mut errors = Vec::new();
+    check_ctmt_declarations(&declared, &mut errors);
+    assert_eq!(errors, vec![]);
+
+    // 2. Non-standard declarations are passed over; NotForThisHost, Repeated, InvalidVersion, and InvalidDefinition are reported
+    let decls = vec![
+        Declaration::new("upstreams", None, None),
+        Declaration::new("foo.bar", None, None),
+        Declaration::new("use", Some(Value::String("deck".into())), None),
+        Declaration::new("meta", None, None),
+        Declaration::new("meta", None, None),
+        Declaration::new(
+            "kind",
+            Some(Value::Map(vec![
+                ("".into(), Value::String("catalog".into())),
+                ("".into(), Value::String("abc".into())),
+            ])),
+            None,
+        ),
+        Declaration::new(
+            "macros",
+            None,
+            Some(Value::Map(vec![("bad".into(), Value::Int(123))])),
+        ),
+    ];
+    let spans: Vec<Span> = (0..decls.len())
+        .map(|i| Span::new(i * 10, i * 10 + 9))
+        .collect();
+    let declared: Vec<_> = decls
+        .into_iter()
+        .zip(spans.iter().copied())
+        .map(|(d, s)| Declared::new(d, s))
+        .collect();
+    let mut errors = Vec::new();
+    check_ctmt_declarations(&declared, &mut errors);
+
+    assert!(
+        !errors
+            .iter()
+            .any(|e| matches!(e, Diagnostic::UnknownElement { .. }))
+    );
+    assert_eq!(errors.len(), 4);
+    assert!(errors.iter().any(|e| matches!(
+        e,
+        Diagnostic::NotForThisHost {
+            declaration: "use",
+            ..
+        }
+    )));
+    assert!(errors.iter().any(
+        |e| matches!(e, Diagnostic::DuplicateSingleton { name, first, duplicate } if name == "meta" && *first == spans[3] && *duplicate == spans[4])
+    ));
+    assert!(errors.iter().any(
+        |e| matches!(e, Diagnostic::InvalidVersion { element, found, .. } if element == "kind" && found == "\"abc\"")
+    ));
+    assert!(errors.iter().any(
+        |e| matches!(e, Diagnostic::InvalidDefinition { declaration: "macros", name, .. } if name == "bad")
+    ));
 }

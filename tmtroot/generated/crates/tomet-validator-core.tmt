@@ -55,6 +55,12 @@ an `ID_GROUP` node can only ever appear where `parse_groups`/
 for, and no attribute-key collision with `@link`'s own `id` argument
 to guard against (that argument is not this slot).
 
+==[Structs]
+
+===[struct Declared]
+
+A declaration paired with its source span.
+
 ==[Functions]
 
 ===[fn classify_in]
@@ -79,6 +85,15 @@ Enforces the `singleton` and `region` axes.
 
 Runs checks on the standard declarations in `doc`, mapping each [`Problem`]
 back to a [`Diagnostic`] with the declaration element's span.
+
+===[fn check_ctmt_declarations]
+
+Validates declarations from a `.ctmt` file header against [`Host::Ctmt`].
+
+Reports host restrictions, duplicate singletons, version format errors,
+too many arguments, and invalid macro/var definitions. Declarations whose
+names are not standard are ignored (their meaning belongs to the tool that
+reads the file).
 
 ===[fn check_content_shape]
 

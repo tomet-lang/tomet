@@ -13,9 +13,11 @@
 //!   | [`DeclKind`] is the closed list of the standard declarations. Each has a [`Spec`]: its
 //!   | positional slots, whether it may be written once or many times, and where it may be written
 //!   | ([`Scope`]). Reading and checking the ones both hosts have (`kind version meta macros
-//!   | vars`) is here. What the `.tmt`-only ones *do* -- `use` binds a vocabulary, `blueprint`
-//!   | is instantiated, `config` fills the settings -- stays with the host, which matches on
-//!   | [`DeclKind`]. This crate never calls the host back.
+//!   | vars`) is here. Standard declarations are counted here, in one place for both hosts; the
+//!   | validator's singleton check covers only user-vocabulary elements. What the `.tmt`-only
+//!   | ones *do* -- `use` binds a vocabulary, `blueprint` is instantiated, `config` fills the
+//!   | settings -- stays with the host, which matches on [`DeclKind`]. This crate never calls the
+//!   | host back.
 //! - (A leaf)
 //!   | It depends on [`tomet_ast`] for [`Value`], [`Element`] and [`Document`], on
 //!   | [`tomet_tree`] to walk a document's top level, and on [`tomet_type`] for the types a
