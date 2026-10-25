@@ -34,6 +34,33 @@ pub(crate) fn parse_quoted(cur: &mut Cursor) -> Result<String> {
     cotomet_syntax::parse_quoted(cur).map_err(Into::into)
 }
 
+/// A [`cotomet_syntax::ValueHook`] allowing only dollar expressions (`${...}`, `$name(...)`)
+/// to be parsed inside value positions.
+///
+/// Embedded elements (`@element`), block sequences (`[...]`), and prose pipes (`| prose`)
+/// are declined so they are rejected by cotomet grammar.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CotometValueHook;
+
+impl cotomet_syntax::ValueHook for CotometValueHook {
+    fn try_parse_value(&mut self, cur: &mut Cursor) -> Option<cotomet_syntax::Result<Value>> {
+        // `$name(args)`/`${...}` sitting where a value goes -- evaluated later.
+        if cur.peek() == Some('$') && cotomet_syntax::is_interp_start(cur) {
+            let el = match crate::interp::parse_dollar_element(cur) {
+                Ok(el) => el,
+                Err(e) => {
+                    return Some(Err(cotomet_syntax::Error::at(
+                        e.message, e.line, e.column, e.offset,
+                    )));
+                }
+            };
+            return Some(Ok(Value::Element(Box::new(el))));
+        }
+
+        None
+    }
+}
+
 /// A [`cotomet_syntax::ValueHook`] allowing embedded elements (`@...`) and dollar expressions (`$...`)
 /// to be parsed inside value positions within Tomet.
 pub(crate) struct TometValueHook;
@@ -53,17 +80,9 @@ impl cotomet_syntax::ValueHook for TometValueHook {
             return Some(Ok(Value::Element(Box::new(el))));
         }
 
-        // `$name(args)`/`${...}` sitting where a value goes -- evaluated later by `tomet-transform::interp`.
-        if cur.peek() == Some('$') && crate::interp::is_interp_start(cur) {
-            let el = match crate::interp::parse_dollar_element(cur) {
-                Ok(el) => el,
-                Err(e) => {
-                    return Some(Err(cotomet_syntax::Error::at(
-                        e.message, e.line, e.column, e.offset,
-                    )));
-                }
-            };
-            return Some(Ok(Value::Element(Box::new(el))));
+        // Delegate dollar expressions (`$name(args)`/`${...}`) to CotometValueHook.
+        if let Some(res) = CotometValueHook.try_parse_value(cur) {
+            return Some(res);
         }
 
         // `key: [ ... ]` -- block content as a value (`Value::Blocks`),

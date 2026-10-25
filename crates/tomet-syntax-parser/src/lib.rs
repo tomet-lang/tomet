@@ -44,7 +44,7 @@ mod value;
 pub use cst::parse_cst;
 pub use document::parse_document;
 pub use error::{Error, Result};
-pub use value::parse_value;
+pub use value::{CotometValueHook, parse_value};
 
 /// Parse a `$func(args)` or `${expr}` dollar element directly from a string slice.
 pub fn parse_dollar_element_str(source: &str) -> Result<tomet_ast::Element> {

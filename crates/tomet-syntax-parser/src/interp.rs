@@ -6,30 +6,7 @@ use tomet_ast::{BinaryOp, Element, InterpExpr, InterpExprKind, Literal, Sigil};
 use tomet_lexer::Cursor;
 use tomet_tree::element_new;
 
-/// `$` immediately followed by `{` or an identifier and `(`
-pub(crate) fn is_interp_start(cur: &Cursor) -> bool {
-    let mut look = *cur;
-    if look.bump() != Some('$') {
-        return false;
-    }
-    if look.peek() == Some('{') {
-        return true;
-    }
-    if look.peek().is_some_and(is_interp_ident_start) {
-        let _ = look.eat_while(is_interp_ident_char);
-        while look.peek() == Some('.') {
-            look.bump();
-            if !look.peek().is_some_and(is_interp_ident_start) {
-                return false;
-            }
-            let _ = look.eat_while(is_interp_ident_char);
-        }
-        if look.peek() == Some('(') {
-            return true;
-        }
-    }
-    false
-}
+pub use cotomet_syntax::{is_interp_ident_char, is_interp_ident_start, is_interp_start};
 
 /// `${ Expr }` or `$func(args)` or `$macro.func(args)` -- structurally `Sigil::Dollar` with an `Interp` element value
 pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
@@ -529,22 +506,6 @@ fn parse_interp_number(cur: &mut Cursor, start: usize) -> Result<InterpExpr> {
         kind: InterpExprKind::Literal(literal),
         span: cur.span_from(start),
     })
-}
-
-fn is_interp_ident_start(c: char) -> bool {
-    c.is_alphabetic() || c == '_'
-}
-
-/// Matches [`crate::value::is_ident_char`] except for `.`, which is member
-/// access here rather than part of a name. Notably includes `-`: an
-/// identifier has one shape everywhere in the language, so a kind like
-/// `node-graph` stays addressable as `${ref(id(node-graph))}`.
-///
-/// The cost, taken deliberately: if `+ - * /` are ever added as operators,
-/// they will require surrounding whitespace, since `a-b` is one identifier
-/// and `a - b` is the subtraction.
-fn is_interp_ident_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '-'
 }
 
 fn eat_interp_ident<'a>(cur: &mut Cursor<'a>) -> Result<&'a str> {
