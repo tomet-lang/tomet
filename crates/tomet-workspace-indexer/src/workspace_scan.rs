@@ -31,6 +31,7 @@ enum EntryKind {
     Dir,
     Markdown,
     Tomet,
+    Ctmt,
 }
 
 #[derive(Debug, Clone)]
@@ -188,6 +189,8 @@ fn classify_file(p: &Path) -> Option<EntryKind> {
         Some(EntryKind::Markdown)
     } else if crate::is_tm_file(p) {
         Some(EntryKind::Tomet)
+    } else if crate::is_ctmt_file(p) {
+        Some(EntryKind::Ctmt)
     } else {
         None
     }
@@ -384,6 +387,37 @@ mod tests {
         assert!(index.tree_nodes().is_empty());
         assert_eq!(index.migration_candidates().len(), 1);
         assert_eq!(index.migration_candidates()[0].source_path, md_path);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn build_indexes_ctmt_files_in_tree_without_polluting_meta_or_migration() {
+        let dir = temp_dir("ctmt_test");
+        fs::write(dir.join("catasto.ctmt"), "::upstreams{}\n").unwrap();
+        fs::write(dir.join("doc.tmt"), "@kind(note)\n").unwrap();
+        fs::write(dir.join("guide.md"), "# Guide\n").unwrap();
+
+        let index = WorkspaceIndex::build(&dir, &PrinterConfig::default(), &dir);
+        let nodes = index.tree_nodes();
+
+        let file_names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
+        assert!(
+            file_names.contains(&"catasto.ctmt"),
+            "catasto.ctmt must be in tree nodes, but got {file_names:?}"
+        );
+        assert!(file_names.contains(&"doc.tmt"));
+        assert!(file_names.contains(&"guide.md"));
+
+        // meta_paths only includes Tomet (.tmt/.tm), not .ctmt
+        let meta_paths = index.meta_paths();
+        assert_eq!(meta_paths.len(), 1);
+        assert_eq!(meta_paths[0].file_name().unwrap(), "doc.tmt");
+
+        // migration_candidates only includes Markdown (.md)
+        let migration_candidates = index.migration_candidates();
+        assert_eq!(migration_candidates.len(), 1);
+        assert_eq!(migration_candidates[0].source_path.file_name().unwrap(), "guide.md");
 
         let _ = fs::remove_dir_all(&dir);
     }
