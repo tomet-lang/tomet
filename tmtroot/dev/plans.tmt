@@ -1,6 +1,32 @@
 ::kind(todo)
 
+- 属性付与->(`@crate`とか`deps`に登録などの挙動に大きく携わりそう。)
+- `;`はやはり改行コードである。
+- ``を`//`と同じ扱いにすれば結構完璧。
+- 現在どうやら`elements`で複数ネームスペースを入れられないみたい。
+- depslock -> `https`なども含めることができ、それをインポートして検証可能にする。
+- 1ファイルエクスポート -> pure tometフォーマットと言う概念を入れる。
+  - 外部ファイルに依存しない一ファイル
+- コメントの中の言及まで書き換える仕組み
+- `--`, `->`で、`--`を説明にする？or `-/`
+- イベント型パーサーに肉薄する 90 MB/s を出している Tomet
+- `::macro.xxx()`
+- Onelineを見据えた構文追加``, `*`
+  - `(){}`の`|`みたいに、一行単位で宣言可能にするなにか。`*`, `:prop()`
+- websiteにtmtrootをコピーする
+- `todo`, `task`語彙
+- `root.config.tmt`, `global.config.tmt`
+- `@legacy` タグ要素
+- `@comment`, `:target(html, ...)`
+- `| aaaaa |`が`[ aaaaa ]`の代替になるのではないか？
+- クレートの責務を把握せずにクレートに手をつけようとするな
+- アプリが対応している語彙を出力
+- 会話形式の語彙
+- `@type(oneline)`の輸入
 - `tellme`, `show`
+- `@ui`, `@input`, `@html.xxx`
+- 語彙マネージャー？
+  - `@owner`と`fss`？
 - `@type(list)`
 - rust用の追加要素
 - `:rule()`にnamespace
@@ -127,4 +153,17 @@
   - ( ) サジェスト
   - ( ) 自動補完
 - ( ) 多言語バインディング
+  - ( ) Go: コア構文安定化後に着手。CGO（C-ABI）を避け、Go の言語思想（ポータビリティ、単一静的バイナリ、`CGO_ENABLED=0`）を尊重するため、Wasm (wazero) による Pure Go 実装とイディオマティックな API（`func Parse(...) (*Document, error)` 等）を採用する。
 - ( ) その他
+---[ ベンチマーク・性能測定 ]---
+- (x) criterion / divan ハーネス整備 (`benches/` パッケージ, parse, format, divan)
+- ( ) 追加ベンチマークの拡充
+  - ( ) `validate/semantics`: バリデーション・意味論検査
+  - ( ) `search`: 検索処理
+  - ( ) `merge`: ドキュメント結合
+  - ( ) `convert`: Markdown / HTML 変換
+  // 留意事項 (Facts to keep):
+  // - `tomet format` は `@link(ref:"X")[t]` を `@link[t](ref:"X")` へ書き換える。
+  //   tomet-corpus と tomet-synth は非正規順序を出力するため、ベンチマークで no-op を
+  //   測定したい場合はあらかじめフォーマットを一度通しておく。
+  // - パース処理は 89e104a8 以降線形。古い非線形カーブの測定値とは直接比較せず再計測すること。

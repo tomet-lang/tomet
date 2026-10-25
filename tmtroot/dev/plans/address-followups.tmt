@@ -1,0 +1,26 @@
+::kind(todo)
+
+// アドレス機構の本体 (構文、パス辿り、同一文書内の `dangling anchor` 検査) は実装済みで
+// `tmtroot/spec/syntax/addressable.tmt` にある。ここには残りだけを置く。
+// 2026-11-01 に `main` `0fe9c3bb` で確認: どちらもまだ実装されていない。
+
+- ( ) vault 全体の `::id` 一意性検査
+  - 前提が変わっている: 文書の同一性は `::meta` の `id:` ではなく宣言 `::id(x)`
+    (`DeclKind::Id`、「vault の文書をまたいで一意」)。`::meta` に `id` を書くのはもうエラー。
+  - 今あるのは同一文書内の二重 `::id` (`DuplicateSingleton`) だけ。文書をまたぐ検査は無い。
+    `tomet check <dir>` (`apps/cli/src/commands/check.rs`) は各ファイルを独立に並列で見ていて、
+    複数ファイルを一緒に見る段階が無い。
+  - 仕様書 `addressable.tmt` は今も「`::meta` の id: ドキュメント間で一意」「重複は `tomet check` のエラー」と
+    書いていて、`::id` に直す必要があり、書いてあるエラーはまだ出ない。
+  - 案: sweep で集めたファイルの `document_id` を Phase 2 (直列) で突き合わせ、後から現れた方を
+    「最初の宣言はどこか」付きのエラーにする。単一ファイルの `check` は見ない。
+    `id-generation-settings` が同じ問い (一意性を強制するか、`ref:` を id で解決するか) を未決として持っている。
+- ( ) `#(id)` のリネームと参照の追従
+  - `@link(#x)`、`@link(id:x)`、`${#x.prop...}`、`@link(tmt:p#x)`、`@link(ref:N#x)`、`${tmt("p")#x}` を
+    すべて書き換える。
+  - 材料: 定義側は `tomet_address::find_anchor`、参照の解釈は LSP の `reference_at`
+    (`apps/lsp/src/definition.rs`、`vault_definition.rs`)。「ある id への参照を span 付きで全部返す」関数は無い。
+    LSP に `rename_provider` も無い。
+  - 書き換えは span 単位の文字列置換にする。`refactor_source` は AST を再出力してコメントを落とすので使わない。
+  - `tomet refactor` は書式の移行用で、引数を取るリネームは別コマンド (`tomet rename`) にする案。
+  - 範囲外: 文書 (`::id`) の改名、ファイル移動に伴うリンク更新、引用符付き id (`address-name-step`)。

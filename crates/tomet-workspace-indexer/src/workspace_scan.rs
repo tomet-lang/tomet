@@ -417,7 +417,10 @@ mod tests {
         // migration_candidates only includes Markdown (.md)
         let migration_candidates = index.migration_candidates();
         assert_eq!(migration_candidates.len(), 1);
-        assert_eq!(migration_candidates[0].source_path.file_name().unwrap(), "guide.md");
+        assert_eq!(
+            migration_candidates[0].source_path.file_name().unwrap(),
+            "guide.md"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }

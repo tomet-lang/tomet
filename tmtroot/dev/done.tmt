@@ -4,7 +4,7 @@
 - (x) Table記法
 - (x) コネクト構文 (`:(){}`)
 - (x) `args`推論 (基本要素対応)         // `@embed(target)`。カスタム要素対応と
-      // `positional: [ ... ]` は後で撤去。語彙の `@param` が置き換え
+  // `positional: [ ... ]` は後で撤去。語彙の `@param` が置き換え
 - (x) `@`推論                          // 後で撤去。`@(url:)` は要素にならない
 - (x) マクロ構文 (`$macro(var, var, ...)`)
 - (x) 代入、関数構文 (`${var}` `compute`,`resolve`)

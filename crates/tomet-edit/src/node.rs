@@ -139,13 +139,14 @@ impl AttrSlot {
         }
         // Single-entry multi-line block: check `leading_trivia`
         if self.leading_trivia.contains('\n')
-            && let Some(nl_pos) = self.leading_trivia.rfind('\n') {
-                let indent: String = self.leading_trivia[nl_pos + 1..]
-                    .chars()
-                    .take_while(|c| *c == ' ' || *c == '\t')
-                    .collect();
-                return format!("\n{indent}");
-            }
+            && let Some(nl_pos) = self.leading_trivia.rfind('\n')
+        {
+            let indent: String = self.leading_trivia[nl_pos + 1..]
+                .chars()
+                .take_while(|c| *c == ' ' || *c == '\t')
+                .collect();
+            return format!("\n{indent}");
+        }
         ", ".to_string()
     }
 
@@ -166,7 +167,8 @@ impl AttrSlot {
                         if !first_sep.contains("//") && !first_sep.contains("/*") {
                             self.entries[0].leading_sep.clear();
                         } else if let Some(stripped) = first_sep.strip_prefix(',') {
-                            self.entries[0].leading_sep = stripped.trim_start_matches(' ').to_string();
+                            self.entries[0].leading_sep =
+                                stripped.trim_start_matches(' ').to_string();
                         }
                     }
                 }
@@ -343,7 +345,9 @@ pub enum EditValueKind {
 pub enum ElementPiece {
     Sigil(String),
     Trivia(String),
-    Id { raw: String },
+    Id {
+        raw: String,
+    },
     Args,
     Data,
     Content {
@@ -383,12 +387,8 @@ impl ElementSlots {
                 .iter()
                 .position(|p| matches!(p, ElementPiece::Sigil(_)))
                 .map_or(0, |i| i + 1);
-            self.pieces.insert(
-                pos,
-                ElementPiece::Id {
-                    raw: String::new(),
-                },
-            );
+            self.pieces
+                .insert(pos, ElementPiece::Id { raw: String::new() });
         }
     }
 

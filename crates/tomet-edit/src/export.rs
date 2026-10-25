@@ -83,9 +83,7 @@ pub(crate) fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
                         }
                         ElementPiece::Args => {
                             if let Some(slot) = &node.slots.args_slot {
-                                if !slot.edited
-                                    && !slot.entries.iter().any(|e| e.is_edited())
-                                {
+                                if !slot.edited && !slot.entries.iter().any(|e| e.is_edited()) {
                                     out.push_str(&slot.raw);
                                 } else if !slot.entries.is_empty() {
                                     slot.export_into(out);
@@ -94,9 +92,7 @@ pub(crate) fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
                         }
                         ElementPiece::Data => {
                             if let Some(slot) = &node.slots.data_slot {
-                                if !slot.edited
-                                    && !slot.entries.iter().any(|e| e.is_edited())
-                                {
+                                if !slot.edited && !slot.entries.iter().any(|e| e.is_edited()) {
                                     out.push_str(&slot.raw);
                                 } else if !slot.entries.is_empty() {
                                     slot.export_into(out);
@@ -108,18 +104,20 @@ pub(crate) fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
                             close_raw,
                             raw,
                         } => {
-                            let children_edited = node
-                                .slots
-                                .content_children
-                                .as_ref()
-                                .is_some_and(|children| {
-                                    children.iter().any(|c| match c {
-                                        ChildItem::Node(cid) => doc.get(*cid).is_some_and(|cn| {
-                                            cn.edited || doc.has_edited_descendants(*cid)
-                                        }),
-                                        ChildItem::Trivia(_) => false,
-                                    })
-                                });
+                            let children_edited =
+                                node.slots
+                                    .content_children
+                                    .as_ref()
+                                    .is_some_and(|children| {
+                                        children.iter().any(|c| match c {
+                                            ChildItem::Node(cid) => {
+                                                doc.get(*cid).is_some_and(|cn| {
+                                                    cn.edited || doc.has_edited_descendants(*cid)
+                                                })
+                                            }
+                                            ChildItem::Trivia(_) => false,
+                                        })
+                                    });
                             if !node.slots.content_edited && !children_edited && !raw.is_empty() {
                                 out.push_str(raw);
                             } else if let Some(children) = &node.slots.content_children {

@@ -1,0 +1,20 @@
+::kind(element)
+::id(std.migration)
+
+=[ 全容 ]
+
+```tm
+::migration{
+  meta: {
+    created: { type: datetime, format: iso8601 }
+  }
+}
+```
+
+移行の道具の設定を置く場所。tomet 自身は、ここから何も読まない。vault の設定が移行の道具の設定を持てるように、標準の宣言として登録してあるだけ。
+
+移行の道具が自分の語彙を宣言するようになれば、この宣言は要らなくなる。
+
+=[ 書く場所 ]
+
+`.tmt` の文書の先頭に一つ。ふつうは @term(tomet#vault-config)。

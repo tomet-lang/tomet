@@ -246,8 +246,12 @@ fn line_raw_text(src: &str) -> String {
     assert_eq!(el.name, Name::bare("raw"));
     assert_eq!(el.placement, Placement::Block);
     assert_eq!(el.data.args, None);
-    let Some([Block::Paragraph(p)]) = el.content.as_deref() else { panic!() };
-    let [Inline::Raw(raw)] = p.content.as_slice() else { panic!() };
+    let Some([Block::Paragraph(p)]) = el.content.as_deref() else {
+        panic!()
+    };
+    let [Inline::Raw(raw)] = p.content.as_slice() else {
+        panic!()
+    };
     raw.value.clone()
 }
 
@@ -263,7 +267,10 @@ fn two_backticks_at_the_start_of_a_line_make_the_whole_line_raw() {
 
 #[test]
 fn consecutive_line_raw_lines_are_one_raw_block() {
-    assert_eq!(line_raw_text("`` one\n`` two\n``\n``three\n"), "one\ntwo\n\nthree");
+    assert_eq!(
+        line_raw_text("`` one\n`` two\n``\n``three\n"),
+        "one\ntwo\n\nthree"
+    );
     // A blank line ends it.
     let doc = parse_document("`` one\n\n`` two\n").unwrap();
     assert_eq!(doc.blocks.len(), 2);
@@ -279,22 +286,36 @@ fn a_line_raw_breaks_the_paragraph_before_it_and_not_a_fence_after_it() {
 #[test]
 fn two_backticks_inside_a_line_are_still_an_inline_raw() {
     let doc = parse_document("a ``b`c`` d\n").unwrap();
-    let [Block::Paragraph(p)] = doc.blocks.as_slice() else { panic!() };
-    assert!(p.content.iter().any(|i| matches!(i, Inline::Element(el) if el.name == Name::bare("raw"))));
+    let [Block::Paragraph(p)] = doc.blocks.as_slice() else {
+        panic!()
+    };
+    assert!(
+        p.content
+            .iter()
+            .any(|i| matches!(i, Inline::Element(el) if el.name == Name::bare("raw")))
+    );
     // And in a `[content]`, where it is the first thing after the bracket.
     let doc = parse_document("@x[ ``b`c`` ]\n").unwrap();
-    let Block::Element(el) = &doc.blocks[0] else { panic!() };
+    let Block::Element(el) = &doc.blocks[0] else {
+        panic!()
+    };
     assert!(matches!(el.content.as_deref(), Some([Block::Paragraph(_)])));
 }
 
 #[test]
 fn a_line_raw_in_a_pipe_run_loses_the_markers() {
     let doc = parse_document("@quote\n| `` one\n| `` two\n").unwrap();
-    let Block::Element(q) = &doc.blocks[0] else { panic!() };
+    let Block::Element(q) = &doc.blocks[0] else {
+        panic!()
+    };
     let Some([Block::Element(raw)]) = q.content.as_deref() else {
         panic!("{:?}", q.content)
     };
-    let Some([Block::Paragraph(p)]) = raw.content.as_deref() else { panic!() };
-    let [Inline::Raw(t)] = p.content.as_slice() else { panic!() };
+    let Some([Block::Paragraph(p)]) = raw.content.as_deref() else {
+        panic!()
+    };
+    let [Inline::Raw(t)] = p.content.as_slice() else {
+        panic!()
+    };
     assert_eq!(t.value, "one\ntwo");
 }

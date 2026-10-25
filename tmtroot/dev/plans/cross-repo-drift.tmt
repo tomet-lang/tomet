@@ -1,0 +1,26 @@
+::kind(todo)
+
+// cotomet への改名 (2026-10-24) のあとに見つかった、リポジトリをまたぐ取り残しのうち、
+// 2026-11-01 の時点でまだ残っているもの。tomet `main` は `0fe9c3bb`。
+
+- ( ) 各リポジトリが tomet を別々のコミットに固定している
+  - sisho は `Cargo.lock` が `52980203`、`flake.lock` が `0c19b444` で、1 つのリポジトリの中で食い違っている。
+    twrit は両方 `52980203`、sisho-desk は `35e1ba52`、fs-catasto と tandr は `Cargo.lock` が古く
+    `flake.lock` は `1d7923be`。tomet-shelf は `a0a9d916` (0.5.0)。どれも `main` の祖先ではある。
+  - 食い違い自体は、1 つが他のリポジトリの変更を必要とするまで困らない。
+    足りないのは、sisho の 2 つの固定 (Cargo と flake) と、それを使う側の固定を突き合わせる検査
+    (sisho の設計メモでも未決のまま)。
+- ( ) `examples` が今の tomet で `tomet check` を通らない
+  - `examples` で `tomet check .` を実行すると 15 ファイル中 11 が失敗する (2026-11-01、PATH の `tomet 0.5.0`)。
+    `::meta` の `id:` (今は `::id(...)`)、`vault` 名前空間が未宣言、`config` の裸書き、など。
+    `examples` の最新コミットは「`::elements` と `::name` に書き直した」で、`::id` への移行より前。
+  - 元の項目 (青写真の `${uuid()}` などが `unresolved` と警告される) も残っている。
+    青写真が使われるときに埋まる値なので害は無い。青写真に書いて黙らせるか、警告を許すか。
+  - 先に `tomet refactor --meta-id` で移行できるものがあるかを見る。
+
+// 取り残しのうち他へ移ったもの (ここでは追わない):
+//   tomet-shelf の `tomet-compute` 追従は完了している (`tomet-compute` への参照は無く、`Cargo.lock` は 0.5.0)。
+//     `tomet-shelf/.agents/tasks/follow-tomet-main.md` は古いまま残っている。
+//   tandr は `tandr/.agents/tasks/follow-tomet.md`、twrit の `writ` 語彙の出どころと
+//     `tmtroot/agents.tmt` の `[patch]` / Forgejo の記述 (今も残っている) は
+//     `twrit/.agents/tasks/writ-vocabulary-source.md`。

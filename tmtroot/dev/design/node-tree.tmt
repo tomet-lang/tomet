@@ -1,0 +1,88 @@
+=[ ノードの木: Section・File・Folder・Vault は同じもの ]
+
+Status: 議論中。方向は著者が気に入っている段階で、どれも実装していない。決まっていないことは「未決」に分けた。2026-10 の議論。
+
+Section と File は実は同じではないか、という問いから始まった。Section は見出しとコネクトと子を持ち、File は先頭の `::` の並びと本文を持つ。どちらも「見出し部と、子の列」である。この見方を Folder と Vault まで広げ、全体を一つのノードの木として扱う。
+
+==[ 仮説 ]
+
+@table
+|[ ノード  ][ 見出し部                                    ][ 子                  ]
+|[ Vault   ][ 根の見出し部                                ][ Folder と File      ]
+|[ Folder  ][ そのフォルダ自身の見出し部                  ][ Folder と File      ]
+|[ File    ][ 先頭の `::` の並び                          ][ Section と ブロック ]
+|[ Section ][ 見出し行と、後ろに付くコネクト `:name(...)` ][ Section と ブロック ]
+
+- File は、見出し行を持たない level 0 の Section である。先頭の `::name` は、その Section の後置コネクトを、見出し行がないので行頭に並べて書いたものと読む。
+- Folder と Vault も同じ形である。違うのは、見出し部と本文を書く場所が、まだ無いことだけである。
+
+```tm
+::meta{ id: doc-x, title: "Daily" }
+::kind(config)
+
+=[ 概要 ]:rule(...)
+==:meta{ id: sec-1 }:kind(note)
+```
+
+==[ 今の実装との距離 ]
+
+- `Section` は `args` `value` `id` `connects` `blocks` を持つ。`Document` が持つのは `blocks` と `span` だけである。文書宣言は、先頭に並ぶ `Block::Element` である。
+- cotomet の `File { header, body }` は、この見出し部と本文の分け方をすでにしている。
+- Folder には、重なって継承される `.config.tmt` がある。下の階層が上の宣言を継ぐのは、Section のスコープそのものである。ただし書けるのは設定だけで、フォルダ自身の本文も、他の宣言も置けない。
+
+==[ 得られるもの ]
+
+- 宣言にスコープがつく。`::kind` `::rule` `::vars` `::macros` `::vocabulary` が、Section やフォルダの単位で効く。
+- File と Section の相互変換が機械的になる。節をファイルに切り出すには、節のコネクトを先頭の並びに上げる。逆も同じ。
+- `<doc>#<addr>` のアドレスが、Folder・File・Section を通した一本の道筋になる。
+- `OutsidePreamble` が一般化される。「文書の先頭の並び」が「各ノードの見出し部」になる。
+- `.config.tmt` が Folder の見出し部に吸収され、種類の違うファイルが一つ減る。
+
+==[ Folder 自身のノード ]
+
+Folder と Vault の見出し部と本文を書く、固定名のファイルを置く。これがこの木に足りない最後の一片である。候補を比べた。
+
+@table
+|[ 名前                   ][ 評価 ]
+|[ `.tmt`                 ][ 拡張子だけで、隠れる。フォルダの顔になるファイルが見えないのは筋が悪い ]
+|[ `_.tmt`                ][ `_` は `@fixme` の記号と重なる。名前から意味が読めない ]
+|[ `root.tmt`             ][ 「root」は vault の根を指す語。サブフォルダで誤読される ]
+|[ `フォルダ名.tmt`（中） ][ タブと名前の由来は最良。だが vault の根が、clone や `jj workspace add` で別名になると、根の設定が黙って消える。`mv` だけでも降格する ]
+|[ `フォルダ名.tmt`（隣） ][ フォルダだけ動かすと、見出し部が取り残される ]
+|[ `index.tmt`            ][ 慣習は最も広い（`index.html` `index.md`）。「目次」を連想させる点と、タブが並んだとき区別できない点が弱い ]
+|[ `self.tmt`             ][ 「このノード自身」を最も正確に指す。Rust の `self::` と同じ意味で、相対アドレスの `self` `super` と対応する。慣習としては定着していない ]
+
+条件は三つ。固定名で、vault の根でもディレクトリ名に依存しないこと。ファイルとして見えること。意味が「このノード自身」であること。この三つを満たすのは `index.tmt` と `self.tmt` で、assistant の推しは `self.tmt`、次点が `index.tmt`。**著者はまだ選んでいない。**
+
+```
+notes/
+├ self.tmt      ← notes 自身
+├ daily.tmt
+└ weekly.tmt
+```
+
+```tm
+::kind(notebook)
+::vars{ author: { type: string } }
+::macros{ gh: "https://.../${1}" }
+
+=[ notes について ]
+このフォルダは日々のメモを置く。
+```
+
+- `.config.tmt` と `vault.config.tmt` の中身は、そのフォルダの `self.tmt` の先頭の `::` の並びになる。
+- このファイルが無いフォルダは、空の見出し部を持つものとして扱う。必須にはしない。
+- どのフォルダでも、タブに同じファイル名が並ぶ。エディタと LSP が、フォルダ名を併記して補う。
+
+==[ 未決 ]
+
+- Folder 自身のノードの名前（`self.tmt` か `index.tmt`）。
+- 節の途中に `::x` を書けるか。推しは、各ノードの本文の先頭の並びだけに限り、後置形（`==:meta()`）は見出し行を持つ節の一行形として残す。
+- Section が持てる宣言と、持てない宣言の線引き。
+- cotomet の `File { header, body }` との整合。
+- 移行の順序。`vault.config.tmt` と `.config.tmt` を読むコードは、移行の間は両方を受け付けるか、一度に切り替えるか。移行そのものは `tandr` に任せる。
+
+==[ 関連 ]
+
+- `::name` の宣言そのものは `document-declarations`（同じ `design/`）。
+- `.config.tmt` と `vault.config.tmt` の扱いは、タスク `docs-config-rework`（`.agents/tasks/`）と重なる。

@@ -1,0 +1,47 @@
+::kind(todo)
+
+// man ページの取り込み (pandoc 経由) と、それで見えたプリンタ / エスケープの穴。
+// 2026-09-26 時点の状態: `tomet cli-docs` は完了してコミット済み (9b4a905。`apps/cli/src/commands/cli_docs.rs` の `//!` を参照)。
+// ここにあるのは残りだけ。どれも始めていない。作者待ちの項目には手を付けない。
+// 全部片付いたら、決まったことを doc comment や writ に畳んで、この文書を消す。
+
+=[ 方針 (決まっている) ]
+
+- man ページの取り込みは `pandoc -f man -t json page.1 | tomet from-pandoc -`。
+  pandoc が使えなくなる、mdoc のページが要る、品質が低すぎる、のどれかにならない限り、roff を直接読むクレート
+  (`convert-roff`) は作らない。改善する場所は `from-pandoc` で、そうすれば pandoc を通るどの入力も得をする。
+- 動作確認: `pandoc -f man -t json "$(man -w ls)" ...` (ページが `.gz` なら先に `zcat`)。その結果に `tomet check` をかける。
+
+=[ 見つかったこと (`ls.1` から。出力に `tomet check` をかけると、これで失敗する) ]
+
+- ( ) 1. `tomet-printer` が、節の中のブロックを隣り合う行に出力する。空行が入るのは最上位のブロックの間だけ
+  (`crates/tomet-format-printer/src/lib.rs` の `document_to_tm_with_config`、`render_section`)。
+  1 つの節の中の段落 2 つが 1 つに読み戻され (確認: 段落 4 つが 2 つになった)、次の `@links{` や `@strong[..]` の行が
+  インラインになる。`test_section_blocks_blank_lines` が隣り合う出力を固定しているので、意図的かもしれない。要確認。
+  - 実験 (戻してある): 節の子の間に `\n` を出すと、この単体テストと
+    `cheatsheet.printed` / `cheatsheet.pandoc.roundtrip` のスナップショットが壊れる (ref の再生成が要る)。
+  - 今の回避策: `cli_docs.rs` は節を平らに並べている。
+- ( ) 2. インラインの `Text` には `@name(..)`、`${..}`、`^n(..)` のエスケープが無く、プリンタは `Text` をそのまま書く。
+  そのため、取り込んだ文章の `@meta(x)` は要素として読み戻され、`-lt: sort` のような文は未知のコネクト `:sort` と読まれる。
+  言語の穴。`cli_docs.rs::guard_triggers` が、そのような語をコードスパンで包む回避策を持っている。
+- ( ) 3. `from-pandoc` は `DefinitionList` を `@links{ ("term")[def] }` に写す (`from_pandoc.rs` の `Block::DefinitionList` の腕)。
+  `links` は標準の要素ではなく「リンク」の意味 (HTML ではアンカーの一覧になる) なので、意味が違い、`tomet check` も通らない。
+
+=[ 作者待ち (勝手に決めたり実装したりしない) ]
+
+- ( ) 定義リストの要素: 作者が、それを包含するかもしれないもっと一般的なモデルを設計中。`dl` は作らない。
+  言われるまで `DefinitionList` の写し方には触れない。
+- ( ) 1 をプリンタで直すか (私は直すのを勧めた。スナップショットの ref と単体テスト 1 つが変わる)。
+- ( ) 2 (エスケープ): 言語の決定。
+- ( ) ルートの `.writ.tmt` の `tmtroot-mirrors-the-root` は、tmtroot は `/` を写し「それ以外は置かない」と言う。
+  `cli.tmt` を置いている `tmtroot/generated/` に 1 文が要る。writ は作者のもの。提案して止まる。
+- ( ) `docs/README.tmt` の地図に `docs/reference/` (生成した英語の CLI リファレンス) を載せる。提案だけ。
+
+=[ 作者待ちが解けたら ]
+
+- ( ) プリンタの節の区切りを直す (1)。`TOMET_UPDATE_REF=1 cargo test -p tomet-tests` で ref を再生成し、
+  そのあと `cli_docs.rs` の平らな配置の回避策を外す。
+- ( ) `ls.1` のパイプラインをもう一度流し、`tomet check` を通す。pandoc が無くても動く、小さな pandoc JSON を
+  `from_pandoc` に食わせるフィクスチャ風のテストを足す。
+- ( ) `tomet from-man` という入口を作るか、2 段のパイプのままにするか決める (薄いラッパーは割に合わないかもしれない)。
+- ( ) 後で: `tomet` 自身から `clap_mangen` を同じ経路に通せば、`cli-docs` は要らなくなる。pandoc 経由をしばらく使ってから決める。

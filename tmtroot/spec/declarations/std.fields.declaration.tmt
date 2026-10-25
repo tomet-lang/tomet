@@ -1,0 +1,26 @@
+::kind(element)
+::id(std.fields)
+
+=[ 全容 ]
+
+```tm
+::fields{
+  aliases: { type: list, always_newline: true }
+  created: { type: datetime, format: rfc3339, offset: "+09:00" }
+  url.wiki: { type: list, always_newline: true }
+}
+```
+
+`::meta` の項目の型と形を宣言する。キーは項目の名前で、`.` を含んでもよい（`url.wiki`）。値は、その項目の宣言。
+
+- `type`: 項目の型（`string` `list` `datetime` `uuid` など）。
+- `format` `offset`: 日時の書き方。
+- `always_newline`: この項目を、必ず改行して書く。
+
+キーの一覧は @file(tmtroot/generated/config.tmt)。
+
+型の宣言は検査にも使われる。`uuid` と宣言された項目が UUID でなければ、`tomet check` が報告する。`::id` の型も、ここの `id` の宣言に照らして検査される（@file(tmtroot/spec/declarations/std.id.declaration.tmt)）。
+
+=[ 書く場所 ]
+
+`.tmt` の文書の先頭に一つ。@term(tomet#vault-config)、フォルダの @term(tomet#folder-config)、文書自身のどれにも書ける。項目の名前ごとに重なり、同じ項目は、内側の層で書かれたキーだけが上書きされる。

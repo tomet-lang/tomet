@@ -1,0 +1,22 @@
+::kind(element)
+::id(std.workspace)
+
+=[ 全容 ]
+
+```tm
+::workspace{
+  ignore: list( "00-09 System/01 Apps/obsidian" )
+  unswept: list( "tests/fixtures", "tests/ref" )
+}
+```
+
+どのパスが vault の一部かを決める。パスは vault のルートからの相対で書く。
+
+- `ignore`: vault の一部ではない。走査されず、リンクの解決にも現れない。
+- `unswept`: vault の中にあるが、手を入れない。整形や書き換えの対象外で、凍結したテストの入力などに使う。
+
+=[ 書く場所 ]
+
+@term(tomet#vault-config) の中に、一つだけ。vault の境目を決めるのは vault 自身なので、これは vault の設定にしか書けない。
+
+フォルダの @term(tomet#folder-config) や、文書の先頭に書いても効かず、`tomet check` が報告する。設定の層ではない `::kind(config)` の文書（見本や雛形）は、読まれないので報告しない。層の仕組みは @file(tmtroot/spec/features/config.tmt)。

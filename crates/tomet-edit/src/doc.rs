@@ -182,9 +182,10 @@ impl EditDoc {
         for child in children {
             if let ChildItem::Node(child_id) = child
                 && let Some(child_node) = self.get(*child_id)
-                    && (child_node.edited || self.has_edited_descendants(*child_id)) {
-                        return true;
-                    }
+                && (child_node.edited || self.has_edited_descendants(*child_id))
+            {
+                return true;
+            }
         }
 
         false
@@ -313,9 +314,9 @@ impl EditDoc {
                 && let Some(pos) = children
                     .iter()
                     .position(|item| item.as_node_id() == Some(id))
-                {
-                    return Some((Some(node.id), pos));
-                }
+            {
+                return Some((Some(node.id), pos));
+            }
         }
 
         None
@@ -508,9 +509,10 @@ impl EditDoc {
                 }
                 for child in children {
                     if let Some(cid) = child.as_node_id()
-                        && let Some(state) = self.task_state(cid) {
-                            return Some(state);
-                        }
+                        && let Some(state) = self.task_state(cid)
+                    {
+                        return Some(state);
+                    }
                 }
                 None
             }
@@ -537,10 +539,11 @@ impl EditDoc {
                         let mut trivia_updated = false;
                         for item in children.iter_mut() {
                             if let ChildItem::Trivia(t) = item
-                                && let Some(upd) = update_task_text(t, checked) {
-                                    *t = upd;
-                                    trivia_updated = true;
-                                }
+                                && let Some(upd) = update_task_text(t, checked)
+                            {
+                                *t = upd;
+                                trivia_updated = true;
+                            }
                         }
                         if !trivia_updated
                             && children.iter().all(|c| matches!(c, ChildItem::Trivia(_)))
@@ -561,10 +564,11 @@ impl EditDoc {
 
                     for cid in child_ids {
                         if let Some(child_node) = self.get_mut(cid)
-                            && let Some(upd) = update_task_text(&child_node.raw, checked) {
-                                child_node.raw = upd;
-                                child_node.mark_edited();
-                            }
+                            && let Some(upd) = update_task_text(&child_node.raw, checked)
+                        {
+                            child_node.raw = upd;
+                            child_node.mark_edited();
+                        }
                     }
 
                     if let Some(node) = self.get_mut(id) {
@@ -654,9 +658,10 @@ impl EditDoc {
                 if spaces > 0 {
                     *text = text[spaces..].to_string();
                     if let Some(ChildItem::Trivia(t)) = children.first_mut()
-                        && t.starts_with(&"  "[..spaces]) {
-                            *t = t[spaces..].to_string();
-                        }
+                        && t.starts_with(&"  "[..spaces])
+                    {
+                        *t = t[spaces..].to_string();
+                    }
                     node.mark_edited();
                 }
                 Ok(())

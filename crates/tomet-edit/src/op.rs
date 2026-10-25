@@ -125,9 +125,10 @@ impl EditDoc {
                     node.mark_edited();
                 }
                 if let Some(parent_id) = new_parent
-                    && let Some(parent) = self.get_mut(parent_id) {
-                        parent.mark_edited();
-                    }
+                    && let Some(parent) = self.get_mut(parent_id)
+                {
+                    parent.mark_edited();
+                }
             }
             EditOp::EditText { id, new_text } => {
                 let node = self.get_mut(id).ok_or(EditError::NodeNotFound(id))?;
@@ -236,9 +237,9 @@ impl EditDoc {
                                 if value.is_none()
                                     && let Some(pos) =
                                         children.iter().position(|c| c.as_node_id() == Some(cid))
-                                    {
-                                        children.remove(pos);
-                                    }
+                                {
+                                    children.remove(pos);
+                                }
                             } else if let Some(new_id) = value.as_deref() {
                                 let insert_pos = if children.last().is_some_and(|c| match c {
                                     ChildItem::Trivia(t) => t.ends_with('\n'),
@@ -263,10 +264,11 @@ impl EditDoc {
 
                 if let Some(cid) = existing_id_child
                     && let Some(new_id) = value.as_deref()
-                        && let Some(child_node) = self.get_mut(cid) {
-                            child_node.raw = format!("#({new_id})");
-                            child_node.mark_edited();
-                        }
+                    && let Some(child_node) = self.get_mut(cid)
+                {
+                    child_node.raw = format!("#({new_id})");
+                    child_node.mark_edited();
+                }
             }
         }
         Ok(())
@@ -414,10 +416,14 @@ fn remove_child_at(children: &mut Vec<ChildItem>, pos: usize) {
         if pos == 0 || (pos > 0 && matches!(children[pos - 1], ChildItem::Trivia(_))) {
             children.remove(pos);
         }
-    } else if pos == children.len() && pos > 0 && matches!(children[pos - 1], ChildItem::Trivia(_))
-        && pos - 1 > 0 && matches!(children[pos - 2], ChildItem::Trivia(_)) {
-            children.remove(pos - 1);
-        }
+    } else if pos == children.len()
+        && pos > 0
+        && matches!(children[pos - 1], ChildItem::Trivia(_))
+        && pos - 1 > 0
+        && matches!(children[pos - 2], ChildItem::Trivia(_))
+    {
+        children.remove(pos - 1);
+    }
 }
 
 pub(crate) fn update_heading_id(heading_raw: &str, new_id: Option<&str>) -> String {

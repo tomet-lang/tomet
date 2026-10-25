@@ -48,7 +48,11 @@ pub fn merge(base: &str, local: &str, remote: &str) -> MergeResult {
             clean,
         };
     }
-    merge_doc(&import_source(base), &import_source(local), &import_source(remote))
+    merge_doc(
+        &import_source(base),
+        &import_source(local),
+        &import_source(remote),
+    )
 }
 
 /// Performs a format-preserving three-way merge of three [`EditDoc`] instances.
@@ -595,9 +599,17 @@ impl<'a> Merger<'a> {
                 let lc_raw = export_children_str(self.local, lc);
                 let rc_raw = export_children_str(self.remote, rc);
                 if lc_raw == rc_raw || bc_raw == rc_raw {
-                    (Some(self.out.clone_children_from(self.local, lc)), false, true)
+                    (
+                        Some(self.out.clone_children_from(self.local, lc)),
+                        false,
+                        true,
+                    )
                 } else if bc_raw == lc_raw {
-                    (Some(self.out.clone_children_from(self.remote, rc)), true, true)
+                    (
+                        Some(self.out.clone_children_from(self.remote, rc)),
+                        true,
+                        true,
+                    )
                 } else {
                     let (merged, clean) = self.merge_child_seq(bc, lc, rc, true, true)?;
                     (Some(merged), true, clean)

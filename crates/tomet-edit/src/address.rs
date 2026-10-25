@@ -106,9 +106,7 @@ pub fn parse_address_path(raw: &str) -> Option<AddressPath> {
             cur = cur.strip_prefix("prop").unwrap().trim();
         } else {
             // General field name up to next '.' or '('
-            let end = cur
-                .find(['.', '('])
-                .unwrap_or(cur.len());
+            let end = cur.find(['.', '(']).unwrap_or(cur.len());
             let field = cur[..end].trim();
             if !field.is_empty() {
                 steps.push(Step::Field(field.to_string()));
@@ -268,30 +266,31 @@ impl EditDoc {
 
         // Check if addr targets `.content` specifically on a BlockElement
         if let [.., Step::Field(f)] = path.steps.as_slice()
-            && f == "content" {
-                let owner_id = self
-                    .node_for(addr)
-                    .ok_or_else(|| EditError::AddressNotFound(addr.to_string()))?;
-                let old_children = self
-                    .get(owner_id)
-                    .and_then(|n| n.slots.content_children.clone())
-                    .unwrap_or_default();
-                for item in old_children {
-                    if let ChildItem::Node(cid) = item {
-                        self.remove_node(cid);
-                    }
-                }
-                let node = self
-                    .get_mut(owner_id)
-                    .ok_or(EditError::NodeNotFound(owner_id))?;
-                if matches!(node.kind, NodeKind::BlockElement { .. }) {
-                    node.slots.ensure_piece_content();
-                    node.slots.content_children = Some(vec![ChildItem::Trivia(text)]);
-                    node.slots.content_edited = true;
-                    node.mark_edited();
-                    return Ok(());
+            && f == "content"
+        {
+            let owner_id = self
+                .node_for(addr)
+                .ok_or_else(|| EditError::AddressNotFound(addr.to_string()))?;
+            let old_children = self
+                .get(owner_id)
+                .and_then(|n| n.slots.content_children.clone())
+                .unwrap_or_default();
+            for item in old_children {
+                if let ChildItem::Node(cid) = item {
+                    self.remove_node(cid);
                 }
             }
+            let node = self
+                .get_mut(owner_id)
+                .ok_or(EditError::NodeNotFound(owner_id))?;
+            if matches!(node.kind, NodeKind::BlockElement { .. }) {
+                node.slots.ensure_piece_content();
+                node.slots.content_children = Some(vec![ChildItem::Trivia(text)]);
+                node.slots.content_edited = true;
+                node.mark_edited();
+                return Ok(());
+            }
+        }
 
         let node_id = self
             .node_at(addr)

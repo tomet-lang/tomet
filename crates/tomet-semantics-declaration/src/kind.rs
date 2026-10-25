@@ -28,8 +28,15 @@ pub enum DeclKind {
     /// `::export{ type, path }`: where and in which formats this document is exported.
     Export,
     /// `::blueprints{ name: @file(path) }`: the blueprints this vault or folder registers.
+    ///
+    /// The key is the name it is registered under and must be the name the file gives itself
+    /// (`::blueprint(name)`); `tomet check` reports a key that is not. The value is `@file`, not a
+    /// new element: it is a link `tomet` already tracks and can rewrite when the file moves.
     Blueprints,
     /// `::vocabularies{ name: @file(path) }`: the vocabularies this vault or folder registers.
+    ///
+    /// Like [`Blueprints`](DeclKind::Blueprints): the key is the namespace the file gives itself
+    /// (`::vocabulary(name)`).
     Vocabularies,
     /// `::dictionaries{ name: @file(path) }`: the dictionaries of terms this vault or folder registers. Like
     /// [`DeclKind::Vocabularies`], the key is the binding and must be the name the file gives itself

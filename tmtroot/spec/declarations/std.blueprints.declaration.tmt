@@ -1,0 +1,32 @@
+::kind(element)
+::id(std.blueprints)
+
+=[ 全容 ]
+
+```tm
+::blueprints{
+  writ: @file(tmtroot/schema/blueprints/writ.blueprint.tmt)
+  crate: @file(tmtroot/schema/blueprints/crate.blueprint.tmt)
+}
+```
+
+この vault が使うブループリントのファイルを、名前をつけて登録する。ブループリントとは何かは @file(tmtroot/spec/features/blueprint.tmt)。
+
+=[ 登録の決まり ]
+
+`::blueprints`、`::vocabularies`、`::dictionaries` は同じ形で、同じ決まりに従う。
+
+- キーは、登録する名前。ファイルが自分で名乗る名前（`::blueprint(writ)` の `writ`）と同じでなければならない。食い違えば `tomet check` が報告する。
+- 値は `@file(パス)`。パスは vault のルートからの相対。`@file` でない値は、何も登録しない。
+- 層ごとに重なり、同じ名前は内側の層のものに置き換わる。違う名前は、足し合わさる。
+- 語彙と辞書は、読めない、または名乗らないファイルを `tomet check` が警告する。そのほかの文書の検査は止まらない。
+
+`@file` を使うのは、tomet がもう追跡しているリンクだから。ファイルが動けば、tomet が書き換えられる。登録のためだけの新しい要素は作らなかった。
+
+=[ 書く場所 ]
+
+`.tmt` の文書の先頭に一つ。ふつうは @term(tomet#vault-config) か、フォルダの @term(tomet#folder-config) に書く。
+
+=[ 未実装 ]
+
+- ブループリントの、存在しないファイルの報告。語彙と辞書とは違い、いまは何も言わない。

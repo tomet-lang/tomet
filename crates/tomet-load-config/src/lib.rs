@@ -29,6 +29,13 @@
 //!
 //! These two names are the only ones. Every user of them, in code and in
 //! tests, refers to the constants here rather than spelling them.
+//!
+//! Why these names. `vault`, and not `repo`, `root`, `global` or `default`: a vault can be a
+//! subdirectory of a repository (`repo` would lie), `root` collides with `root:` keys, `global`
+//! reads as a per-user layer, and `default` claims the bottom of the stack although it sits above
+//! the built-in defaults. The file is the marker, so no `root: true` key is needed. `.config.tmt`
+//! mirrors `.writ.tmt`: the same name at every level, a dotfile because it is scattered. Any other
+//! `xxx.config.tmt` is left free for other applications.
 
 use std::path::{Path, PathBuf};
 

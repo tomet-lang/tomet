@@ -255,7 +255,10 @@ mod tests {
         assert_eq!(kinds, ["paragraph", "line_raw", "paragraph"]);
         // Three backticks are a fence.
         let tree = parse("```\nx\n```\n");
-        assert_eq!(tree.root_node().named_child(0).unwrap().kind(), "fenced_code_block");
+        assert_eq!(
+            tree.root_node().named_child(0).unwrap().kind(),
+            "fenced_code_block"
+        );
     }
 
     #[test]

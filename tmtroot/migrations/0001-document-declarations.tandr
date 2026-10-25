@@ -1,12 +1,14 @@
-// Migration 0001: the document-level declarations are written `::name`, and
-// footnotes are `@ftn`.
-//
-//   tandr run -r tmtroot/migrations/0001-document-declarations.tandr -i .
-//
-// Only the head of each element changes (`@kind` becomes `::kind`); the
-// arguments, data, content, id and connects stay byte for byte as they were.
-// Run it while the old spellings still parse: once `^` and `@footnote` are
-// refused, `tandr` no longer sees them. See tmtroot/dev/design/document-declarations.tmt.
+::meta(
+  description:| Migration 0001: the document-level declarations are written `::name`, and
+              | footnotes are `@ftn`.
+              |
+              |   tandr run -r tmtroot/migrations/0001-document-declarations.tandr -i .
+              |
+              | Only the head of each element changes (`@kind` becomes `::kind`); the
+              | arguments, data, content, id and connects stay byte for byte as they were.
+              | Run it while the old spellings still parse: once `^` and `@footnote` are
+              | refused, `tandr` no longer sees them. See tmtroot/dev/design/document-declarations.tmt.
+)
 
 doc_kind:       { match: "@kind",       replace: { head: "::kind" } }
 doc_version:    { match: "@version",    replace: { head: "::version" } }

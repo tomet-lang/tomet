@@ -110,7 +110,7 @@ vault が決めるのは、設定、語彙、`workspace.ignore` などの除外�
 
 =[ 設定のファイル名 ]
 
-設定は `default.config.tmt` か `tomet.config.tmt`。設定のファイルを直接渡すオプションは、`tomet` にはない（`sisho tui` が `--config` を受ける）。
+設定は `default.config.tmt` か `tomet.config.tmt`。設定のファイルを直接渡すオプションは、`tomet` にはない（`sisho desk` が `--config` を受ける）。
 
 =[ 現状の実装との差 ]
 

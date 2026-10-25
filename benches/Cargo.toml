@@ -39,4 +39,3 @@ tomet-tests = { path = "../tests" }
 #= Crates.io
 criterion = { workspace = true }
 divan = { workspace = true }
-

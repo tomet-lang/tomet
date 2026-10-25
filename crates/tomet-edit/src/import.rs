@@ -141,17 +141,18 @@ fn split_section_heading(
         let c_end = usize::from(content_node.text_range().end()) - base_offset;
         let content_slice = &heading_raw[c_start..c_end];
         if let Some(after_open) = content_slice.strip_prefix('[')
-            && let Some(inner) = after_open.strip_suffix(']') {
-                let lead_ws_len = inner.len() - inner.trim_start().len();
-                let trimmed = inner.trim();
-                let trail_ws_start = lead_ws_len + trimmed.len();
-                let prefix_end = c_start + 1 + lead_ws_len;
-                let suffix_start = c_start + 1 + trail_ws_start;
-                let prefix = heading_raw[..prefix_end].to_string();
-                let title_str = &heading_raw[prefix_end..suffix_start];
-                let suffix = heading_raw[suffix_start..].to_string();
-                return (prefix, parse_inline_items(title_str), suffix);
-            }
+            && let Some(inner) = after_open.strip_suffix(']')
+        {
+            let lead_ws_len = inner.len() - inner.trim_start().len();
+            let trimmed = inner.trim();
+            let trail_ws_start = lead_ws_len + trimmed.len();
+            let prefix_end = c_start + 1 + lead_ws_len;
+            let suffix_start = c_start + 1 + trail_ws_start;
+            let prefix = heading_raw[..prefix_end].to_string();
+            let title_str = &heading_raw[prefix_end..suffix_start];
+            let suffix = heading_raw[suffix_start..].to_string();
+            return (prefix, parse_inline_items(title_str), suffix);
+        }
     }
 
     // Sugar form (`= Title\n` or `== Title ==\n`)
@@ -279,9 +280,9 @@ fn content_opener(content_node: &SyntaxNode) -> K {
 fn import_content_children(doc: &mut EditDoc, content_node: &SyntaxNode) -> Vec<ChildItem> {
     let elems: Vec<SyntaxElement> = content_node.children_with_tokens().collect();
     let opener = content_opener(content_node);
-    let start = if elems.first().is_some_and(|e| {
-        matches!(e, NodeOrToken::Token(t) if t.kind() == K::L_BRACKET || t.kind() == K::PIPE)
-    }) {
+    let start = if elems.first().is_some_and(
+        |e| matches!(e, NodeOrToken::Token(t) if t.kind() == K::L_BRACKET || t.kind() == K::PIPE),
+    ) {
         1
     } else {
         0
@@ -470,7 +471,12 @@ fn import_attr_entry(entry_node: &SyntaxNode) -> (String, AttrEntry, String) {
         }
         (key, key_raw, sep, &inner[idx..])
     } else {
-        (String::new(), String::new(), String::new(), inner.as_slice())
+        (
+            String::new(),
+            String::new(),
+            String::new(),
+            inner.as_slice(),
+        )
     };
 
     let value = import_edit_value(val_elems);
@@ -494,7 +500,9 @@ fn import_attr_entry(entry_node: &SyntaxNode) -> (String, AttrEntry, String) {
 
 fn unquote_key(s: &str) -> String {
     if s.len() >= 2 && s.starts_with('"') && s.ends_with('"') {
-        s[1..s.len() - 1].replace("\\\"", "\"").replace("\\\\", "\\")
+        s[1..s.len() - 1]
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\")
     } else {
         s.to_string()
     }
@@ -510,49 +518,50 @@ fn import_edit_value(elems: &[SyntaxElement]) -> EditValue {
     }
 
     if elems.len() == 1
-        && let NodeOrToken::Node(node) = &elems[0] {
-            match node.kind() {
-                K::MAP_LITERAL => {
-                    return EditValue {
-                        raw,
-                        edited: false,
-                        kind: EditValueKind::Map(import_attr_slot(node)),
-                    };
-                }
-                K::INLINE_ELEMENT => {
-                    let sigil_raw = node
-                        .children()
-                        .find(|c| c.kind() == K::SIGIL)
-                        .map(|c| c.text().to_string())
-                        .unwrap_or_default();
-                    let name = sigil_raw.trim_start_matches(['@', ':', '$']).to_string();
-                    let args = node
-                        .children()
-                        .find(|c| c.kind() == K::ARGS)
-                        .map(|c| import_attr_slot(&c));
-                    let data = node
-                        .children()
-                        .find(|c| c.kind() == K::VALUE_DATA)
-                        .map(|c| import_attr_slot(&c));
-                    let content_raw = node
-                        .children()
-                        .find(|c| c.kind() == K::CONTENT)
-                        .map(|c| c.text().to_string());
-                    return EditValue {
-                        raw,
-                        edited: false,
-                        kind: EditValueKind::Element {
-                            sigil_raw,
-                            name,
-                            args,
-                            data,
-                            content_raw,
-                        },
-                    };
-                }
-                _ => {}
+        && let NodeOrToken::Node(node) = &elems[0]
+    {
+        match node.kind() {
+            K::MAP_LITERAL => {
+                return EditValue {
+                    raw,
+                    edited: false,
+                    kind: EditValueKind::Map(import_attr_slot(node)),
+                };
             }
+            K::INLINE_ELEMENT => {
+                let sigil_raw = node
+                    .children()
+                    .find(|c| c.kind() == K::SIGIL)
+                    .map(|c| c.text().to_string())
+                    .unwrap_or_default();
+                let name = sigil_raw.trim_start_matches(['@', ':', '$']).to_string();
+                let args = node
+                    .children()
+                    .find(|c| c.kind() == K::ARGS)
+                    .map(|c| import_attr_slot(&c));
+                let data = node
+                    .children()
+                    .find(|c| c.kind() == K::VALUE_DATA)
+                    .map(|c| import_attr_slot(&c));
+                let content_raw = node
+                    .children()
+                    .find(|c| c.kind() == K::CONTENT)
+                    .map(|c| c.text().to_string());
+                return EditValue {
+                    raw,
+                    edited: false,
+                    kind: EditValueKind::Element {
+                        sigil_raw,
+                        name,
+                        args,
+                        data,
+                        content_raw,
+                    },
+                };
+            }
+            _ => {}
         }
+    }
 
     EditValue {
         raw: raw.clone(),
@@ -645,9 +654,7 @@ pub fn parse_inline_items(src: &str) -> Vec<InlineItem> {
         // 2. Block comment `/* ... */`
         if rest.starts_with("/*") {
             flush_text(&mut items, &mut text_start, pos);
-            let end = rest
-                .find("*/")
-                .map_or(body.len(), |idx| pos + idx + 2);
+            let end = rest.find("*/").map_or(body.len(), |idx| pos + idx + 2);
             items.push(InlineItem::Trivia(body[pos..end].to_string()));
             pos = end;
             text_start = pos;
@@ -768,7 +775,10 @@ fn try_scan_delimited_sugar(
             {
                 let close_end = cursor + delim.len();
                 if delim.starts_with('_')
-                    && body[close_end..].chars().next().is_some_and(char::is_alphanumeric)
+                    && body[close_end..]
+                        .chars()
+                        .next()
+                        .is_some_and(char::is_alphanumeric)
                 {
                     cursor += delim.len();
                     continue;

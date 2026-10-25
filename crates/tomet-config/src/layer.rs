@@ -3,7 +3,12 @@
 //! A vault's configuration is a stack of files -- the vault config, then each folder config on the
 //! way down to a document, then the document's own declarations -- and the nearer layer wins, key
 //! by key. Each concern is a declaration of its own (`::format`, `::fields`, `::workspace`,
-//! `::blueprints`, `::vocabularies`, `::dictionaries`, `::macros`, `::vars`), and a layer keeps what each one said.
+//! `::blueprints`, `::vocabularies`, `::dictionaries`, `::macros`, `::vars`), and a layer keeps what
+//! each one said.
+//! They are of three kinds, and the kind decides how they are read: tables from a name to a
+//! definition (`::macros`, `::vars`, `::fields`, `::blueprints`, `::vocabularies`,
+//! `::dictionaries`: merged by name), knobs of a tool (`::format`, `::workspace`, `::export`:
+//! merged key by key), and pointers to other files (`::import`, not implemented yet).
 //! Merging happens on those values, before they become a [`Config`](crate::Config): a typed group
 //! cannot tell a key that was never written from one written with its default, so two typed groups
 //! cannot be merged without guessing.

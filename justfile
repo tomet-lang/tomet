@@ -105,4 +105,3 @@ setup-helix:
 clean-helix:
     @rm -rf ~/.config/helix/runtime/queries/tomet ~/.config/helix/runtime/queries/cotomet
     @echo "🧹 Removed ~/.config/helix/runtime/queries/{tomet,cotomet}"
-

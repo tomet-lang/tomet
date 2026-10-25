@@ -1,0 +1,26 @@
+::kind(todo)
+
+// 型の語彙の残り。型の語彙の家は `tomet-semantics-type` (パッケージ `tomet-type`) で、
+// 数は書かれたテキストを保つ (`Value::Number`)。`6502d746`、`6da9f33d`、`61c6f818` で入った。
+// まず `tomet-type` の `//!` を読むこと。ここは残った分だけ。2026-11-01 に確認: どれも未着手。
+// 修飾子 (`format` `offset` `length` `prefix`) は意図して `Type` の外にある。
+// `nanoid` が整っているかは `tomet-format-field-utils` が、`prefix` と `length` から決める。
+
+- ( ) 式の中のバージョン
+  - `tomet_type::Version` は `1.10` を `1.9` の後ろに並べるが、式は両者を文字列として比べる (`"1.10" < "1.9"`)。
+    `version(...)` か `EvalValue::Version` を足す。
+- ( ) 型を名指ししない設定
+  - `FieldConfig.field_type` はまだ文字列で、設定の `meta` の欄の `type: person` は黙って無視される。
+    設定を読むところで報告する (語彙の側はすでに報告している)。
+- ( ) `list(string)` と `<list<string>>`
+  - 作者は、要素の型を `<list<string>>` と書くつもりでいる。綴りが決まるまで `Type::parse` は名前だけを読み、
+    語彙の `type: list(string)` は「まだ綴りがない」と報告されて検査されない。
+  - `enum(...)` も同じ: まだ意味を持たない (`:rule` の `allow:` は、リストとして取る)。
+- ( ) 式の中に残した数
+  - `EvalValue::from_ast(Number)` は、その数が表す `f64` になるので、型のない `rev: 1.10` の `${meta.rev}` は
+    `1.1` と出る。文字列の型があれば大丈夫 (`tomet_expr::typed_value`)。型のない場合は決まっていない。
+- ( ) 「値を平文にする関数」が 6 つある
+  - html、markdown、typst、`flatten::scalar_string`、`positional::scalar_to_plain`、インデクサ。
+    どれも `Value::scalar_text` と連結でできる。(2026-11-01 時点で `scalar_text_or_debug` (declaration) や
+    transform / expr の `scalar_text` も別にある)
+- ( ) バージョンの pre-release とビルドの部分 (`1.0.0-beta`、`+5`) を読む。

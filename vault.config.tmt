@@ -58,6 +58,9 @@
   idea: @file(tmtroot/schema/vocabularies/idea.vocabulary.tmt)
   roots: @file(tmtroot/schema/vocabularies/roots.vocabulary.tmt)
 }
+::dictionaries{
+  tomet: @file(tmtroot/spec/dictionaries/tomet.tmt)
+}
 ::workspace{
   ignore: list( "00-09 System/01 Apps/obsidian" )
   unswept: list( "tests/fixtures", "tests/ref", "tests/store" )

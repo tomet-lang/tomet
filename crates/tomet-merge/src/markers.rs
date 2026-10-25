@@ -191,7 +191,9 @@ pub(crate) fn extract_conflict_inline_side(inner_raw: &str) -> String {
 
 pub(crate) fn unquote_scalar_display(s: &str) -> String {
     if s.len() >= 2 && s.starts_with('"') && s.ends_with('"') {
-        s[1..s.len() - 1].replace("\\\"", "\"").replace("\\\\", "\\")
+        s[1..s.len() - 1]
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\")
     } else {
         s.to_string()
     }
