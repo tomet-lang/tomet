@@ -12,7 +12,11 @@ tomet-expr = { workspace = true }
 tomet-config = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-search = { workspace = true }
+tomet-declaration = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-transform = { workspace = true }
 tomet-type = { workspace = true }
 tomet-validator = { workspace = true }
+
+[dev-dependencies]
+tomet-tree = { workspace = true }

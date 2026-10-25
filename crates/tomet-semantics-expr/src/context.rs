@@ -54,6 +54,16 @@ pub trait Resolver {
         blocks: Vec<Block>,
         includes: &[DocRef],
     ) -> Result<PreparedBlocks, String>;
+    /// Makes `blocks`, which were written in `from`, reach the same things from `to`: a relative link
+    /// `./img/a.png` written in one directory has to be spelled differently in another.
+    ///
+    /// The evaluator moves a document's content into another (`include`) and does not know what a
+    /// link is; the host that knows tomet documents does. A host that has nothing to rewrite -- an
+    /// in-memory resolver over documents with no links -- leaves the blocks as they are, which is what
+    /// this does.
+    fn rebase_links(&self, blocks: Vec<Block>, _from: &DocRef, _to: &DocRef) -> Vec<Block> {
+        blocks
+    }
 }
 
 /// Blocks prepared in their own file's context.

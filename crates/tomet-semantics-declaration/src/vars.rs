@@ -5,10 +5,10 @@
 //! writes a value directly, so a map-valued default is never mistaken for a
 //! declaration (it goes in `default:`).
 
-use tomet_ast::{Block, Element, Inline, Value};
+use tomet_ast::{Block, Inline, Value};
 use tomet_type::Type;
 
-use crate::normalized_element_args;
+use crate::declaration::Declaration;
 
 /// The keys a declaration may have.
 pub const VAR_KEYS: [&str; 3] = ["type", "default", "about"];
@@ -93,22 +93,17 @@ fn plain_text(value: &Value) -> Option<String> {
     }
 }
 
-/// The entries of one `::vars` element, each read, or the reason it cannot be.
+/// The entries of one `::vars` declaration, each read, or the reason it cannot be.
 ///
 /// The args form (`::vars(a: {...})`) and the data form (`::vars{ a: {...} }`)
 /// are both read, as for `::macros`.
-pub fn read_var_decls(el: &Element) -> Vec<(String, Result<VarDecl, String>)> {
-    let args = match normalized_element_args(el) {
-        Some(Value::Map(entries)) => entries,
-        _ => Vec::new(),
-    };
-    let data = match crate::data::element_data(el) {
-        Some(Value::Map(entries)) => entries,
-        _ => Vec::new(),
-    };
-    args.iter()
-        .chain(data.iter())
-        .map(|(name, value)| (name.clone(), VarDecl::from_value(value)))
+pub fn read_var_decls(declaration: &Declaration) -> Vec<(String, Result<VarDecl, String>)> {
+    crate::read::entries(declaration)
+        .into_iter()
+        .map(|(name, value)| {
+            let decl = VarDecl::from_value(&value);
+            (name, decl)
+        })
         .collect()
 }
 
@@ -119,13 +114,11 @@ mod tests {
 
     fn decls(src: &str) -> Vec<(String, Result<VarDecl, String>)> {
         let doc = parse_document(src).unwrap();
-        let mut found = Vec::new();
-        tomet_tree::for_each_top_level_element(&doc, |el| {
-            if crate::classify_std_lenient(el) == crate::ElementKind::Vars {
-                found.extend(read_var_decls(el));
-            }
-        });
-        found
+        crate::declarations(&doc)
+            .iter()
+            .filter(|found| found.kind == crate::DeclKind::Vars)
+            .flat_map(|found| read_var_decls(&found.declaration))
+            .collect()
     }
 
     #[test]

@@ -1,6 +1,7 @@
 //! Directive promotion and Value DSL normalization transformations.
 
 use tomet_ast::{Block, Document, Element, Sigil, Value};
+use tomet_semantics::DeclKind;
 use tomet_semantics::{ElementKind, classify_std_lenient};
 use tomet_tree::{DocumentExt, ElementExt, element_new, for_each_top_level_element_mut};
 
@@ -72,7 +73,7 @@ where
 pub fn promote_meta_type_to_kind(doc: &mut Document) -> bool {
     promote_prop_to_directive(
         doc,
-        |el| classify_std_lenient(el) == ElementKind::Meta,
+        |el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta),
         "type",
         "kind",
         None,

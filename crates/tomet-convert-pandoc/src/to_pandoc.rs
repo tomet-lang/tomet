@@ -5,9 +5,8 @@ use tomet_ast::{
     Sigil, Value,
 };
 use tomet_semantics::{
-    ElementKind, TableRow, classify_std_lenient, document_meta, flatten_data, flatten_element_data,
-    heading_level, is_directive, link_target, normalized_element_args, parse_table_rows,
-    path_target,
+    ElementKind, TableRow, classify_std_lenient, flatten_data, flatten_element_data, heading_level,
+    is_directive, link_target, normalized_element_args, parse_table_rows, path_target,
 };
 
 use crate::ast::{
@@ -29,7 +28,7 @@ pub fn to_pandoc(doc: &Document) -> PandocDoc {
         blocks.extend(block_to_pandoc(block));
     }
     let mut out = PandocDoc::new(blocks);
-    if let Some(Value::Map(entries)) = document_meta(doc) {
+    if let Some(Value::Map(entries)) = tomet_declaration::document_meta(doc) {
         out.meta = entries
             .iter()
             .map(|(k, v)| (k.clone(), meta_value(v)))

@@ -19,27 +19,19 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
     if !name.is_bare() {
         return &[];
     }
+    // A declaration's slots are the declaration's own (`tomet-declaration`): the same ones for every
+    // host that reads it. The table below is the body elements'.
+    if let Some(declaration) = tomet_declaration::DeclKind::from_name(&name.name) {
+        return declaration.positional_keys();
+    }
     match name.name.as_str() {
         "ftn" => &["id"],
-        // The second slot is the version of that kind, an integer of 1 or more,
-        // and may be left out. The validator checks the value; nothing reads it yet.
-        "kind" => &["kind", "version"],
-        "version" => &["version"],
         "raw" => &["lang"],
         "embed" | "link" => &["target"],
         // A path mention names one thing, so its single positional slot
         // is the path. The element name says file or directory; unlike
         // `@link`, there is no scheme prefix to carry it.
         "file" | "dir" => &["target"],
-        // The namespace to bring into scope. The vault says where it
-        // lives, so this names it, not its file. The second slot is the
-        // version wanted, an integer of 1 or more, and may be left out. The
-        // validator checks the value; nothing reads it yet.
-        "use" => &["target", "version"],
-        // The kind the blueprint produces. `target` and not `kind`:
-        // `::kind(blueprint)` sits directly above it, and `kind` there would
-        // mean the output's kind while `::kind` means this file's.
-        "blueprint" => &["target"],
         "callout" => &["variant"],
         "heading" => &["level"],
         "task" => &["status"],
@@ -88,15 +80,6 @@ fn is_recoverable_target_scheme(key: &str) -> bool {
     tomet_address::is_explicit_scheme(key)
 }
 
-/// Sentinel key `tomet_parser` tags a bare, unkeyed positional entry
-/// with (`(a, b)`'s two entries, or `@link(tm:foo, depends_on)`'s second
-/// one) -- must match `tomet_syntax_parser::value::POSITIONAL_ENTRY_KEY`
-/// exactly. Duplicated here rather than imported since `tomet-semantics`
-/// deliberately doesn't depend on `tomet-parser` (see this crate's own
-/// module doc) --
-/// `eat_ident` never produces an empty *real* key, so `""` can't collide.
-const POSITIONAL_ENTRY_KEY: &str = "";
-
 /// Scoped to elements whose *first* positional slot is `"target"`
 /// (`@link`/`@embed`'s builtin default; a custom element could once be
 /// given that slot through `::settings`, which is a `::vocabulary` question
@@ -131,26 +114,6 @@ fn recover_target_scheme_entry(
         "target".to_string(),
         Value::String(format!("{key}:{}", scalar_to_plain(value))),
     );
-    Value::Map(entries)
-}
-
-/// Assigns each remaining bare positional entry (tagged with
-/// [`POSITIONAL_ENTRY_KEY`] by the parser, or recovered as `target` by
-/// [`recover_target_scheme_entry`] just before this runs) to the next slot
-/// in `positional_keys` that isn't already present as a real key, in
-/// left-to-right order on both sides. Slots with no positional entry left
-/// to fill them, and positional entries beyond the number of slots, are
-/// both left as-is -- nothing is silently dropped either way; an
-/// unassigned positional entry just keeps its `""` key.
-fn fill_positional_slots(positional_keys: &[String], mut entries: Vec<(String, Value)>) -> Value {
-    for key in positional_keys {
-        if entries.iter().any(|(k, _)| k == key) {
-            continue;
-        }
-        if let Some(pos) = entries.iter().position(|(k, _)| k == POSITIONAL_ENTRY_KEY) {
-            entries[pos].0 = key.clone();
-        }
-    }
     Value::Map(entries)
 }
 
@@ -204,7 +167,7 @@ fn scalar_to_plain(v: &Value) -> String {
 ///   element's first slot is `"target"` (see
 ///   [`recover_target_scheme_entry`]), then fill any still-unfilled slots
 ///   from bare positional entries the parser tagged with
-///   [`POSITIONAL_ENTRY_KEY`] (`@link(tm:foo, depends_on)`'s `depends_on`,
+///   [`cotomet_syntax::POSITIONAL_ENTRY_KEY`] (`@link(tm:foo, depends_on)`'s `depends_on`,
 ///   or a custom element's `(a, b)`).
 /// - `Value::Seq`: an explicit `[...]`-bracketed positional list
 ///   (`@task([a, b])`) -- independent of the parser's bare-comma-list
@@ -233,46 +196,22 @@ pub fn normalized_element_args(el: &Element) -> Option<Value> {
 /// scope declares with `@param(name){ positional: true }`.
 pub fn normalized_element_args_in(el: &Element, bindings: &Bindings) -> Option<Value> {
     let args = el.args.as_ref()?;
-    let positional_keys = positional_keys(&el.sigil, bindings);
-
-    match args {
-        Value::Map(entries) => {
-            if positional_keys.is_empty() {
-                Some(Value::Map(entries.clone()))
-            } else {
-                let recovered = recover_target_scheme_entry(
-                    positional_keys.first().map(String::as_str),
-                    entries.clone(),
-                );
-                let Value::Map(recovered_entries) = recovered else {
-                    unreachable!("recover_target_scheme_entry always returns Value::Map")
-                };
-                Some(fill_positional_slots(&positional_keys, recovered_entries))
-            }
+    let keys = positional_keys(&el.sigil, bindings);
+    // `@link(tmt:foo)`: the reader split a `scheme:value` into a key and a value; put it back.
+    let args = match args {
+        Value::Map(entries) if !keys.is_empty() => {
+            recover_target_scheme_entry(keys.first().map(String::as_str), entries.clone())
         }
-        Value::Seq(seq) => {
-            if positional_keys.is_empty() {
-                Some(args.clone())
-            } else {
-                let mut entries = Vec::new();
-                for (idx, val) in seq.iter().enumerate() {
-                    if idx < positional_keys.len() {
-                        entries.push((positional_keys[idx].clone(), val.clone()));
-                    }
-                }
-                Some(Value::Map(entries))
-            }
-        }
-        scalar => match positional_keys.first() {
-            Some(first) => Some(Value::Map(vec![(first.clone(), scalar.clone())])),
-            None => Some(scalar.clone()),
-        },
-    }
+        other => other.clone(),
+    };
+    let slots: Vec<&str> = keys.iter().map(String::as_str).collect();
+    Some(cotomet_syntax::bind_positional(&args, &slots))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cotomet_syntax::POSITIONAL_ENTRY_KEY;
     use tomet_ast::Name;
     use tomet_tree::element_new;
 
@@ -294,7 +233,7 @@ mod tests {
         // `@conflict(1, 2)` -- two bare entries, no keys -- parses as a
         // `Value::Map` with two `POSITIONAL_ENTRY_KEY`-tagged entries
         // (the single-entry collapse in `parse_map_body_or_scalar` only
-        // applies when there is exactly one). `fill_positional_slots`
+        // applies when there is exactly one). `bind_positional`
         // assigns them to `a`/`b` in the order they were written, not by
         // any other ordering -- see `ElementKind::Conflict`'s own doc
         // comment for why that distinction is deliberate here.
@@ -477,7 +416,7 @@ mod tests {
     /// the only source, and it has no entry for a custom name.
     ///
     /// A consequence worth stating: every builtin has at most one
-    /// positional slot, so `fill_positional_slots`' multi-slot loop is
+    /// positional slot, so `bind_positional`'s multi-slot loop is
     /// written for `@param` and exercised with one slot today.
     #[test]
     fn a_custom_element_gets_no_positional_inference() {

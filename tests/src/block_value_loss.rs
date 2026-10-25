@@ -96,9 +96,7 @@ fn all_block_bearing_kinds_are_in_builtin_kinds() {
     // Sanity check that every element tracked here is actually recognized as a builtin kind.
     for kind in BLOCK_BEARING_KINDS {
         assert!(
-            tomet_semantics::BUILTIN_KINDS
-                .iter()
-                .any(|(name, _)| name == kind),
+            tomet_semantics::builtin_kinds().any(|(name, _)| name == *kind),
             "'{kind}' should be in BUILTIN_KINDS"
         );
     }

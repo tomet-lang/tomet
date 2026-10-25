@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use tomet_ast::{Document, Element, Value};
 use tomet_tree::ValueExt;
 
-use crate::{ElementKind, VarDecl, classify_std_lenient, normalized_element_args};
+use tomet_declaration::{DeclKind, VarDecl};
+
+use crate::{ElementKind, classify_std_lenient, normalized_element_args};
 
 /// Supported target format for document exports.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -91,14 +93,19 @@ impl DocumentConfig {
 pub fn document_config(doc: &Document) -> DocumentConfig {
     let mut config = DocumentConfig::default();
 
-    tomet_tree::for_each_top_level_element(doc, |el| match classify_std_lenient(el) {
-        ElementKind::Config | ElementKind::Settings => {
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        if matches!(
+            classify_std_lenient(el),
+            ElementKind::Declaration(DeclKind::Config | DeclKind::Settings)
+        ) {
             extract_config_from_element(el, &mut config);
         }
-        ElementKind::Macros => extract_macros(el, &mut config),
-        ElementKind::Vars => extract_vars(el, &mut config),
-        _ => {}
     });
+    // The macros and the variables are declarations of their own, read by `tomet-declaration`.
+    config.macros = tomet_declaration::document_macros(doc)
+        .into_iter()
+        .collect();
+    config.vars = tomet_declaration::document_vars(doc);
 
     // Deduplicate export_type list while preserving order
     let mut seen = std::collections::HashSet::new();
@@ -119,37 +126,6 @@ fn extract_config_from_element(el: &Element, config: &mut DocumentConfig) {
     if let Some(Value::Map(entries)) = crate::data::element_data(el) {
         for (k, v) in &entries {
             process_config_entry(k, v, config);
-        }
-    }
-}
-
-/// Reads a `::macros` declaration: each entry is a macro name and its
-/// template. An entry whose value is not a string is not a macro and is
-/// skipped, as `tomet check` reports a definition it cannot use.
-fn extract_macros(el: &Element, config: &mut DocumentConfig) {
-    let args = match normalized_element_args(el) {
-        Some(Value::Map(entries)) => entries,
-        _ => Vec::new(),
-    };
-    let data = match crate::data::element_data(el) {
-        Some(Value::Map(entries)) => entries,
-        _ => Vec::new(),
-    };
-    for (name, template) in args.iter().chain(data.iter()) {
-        if let Some(template) = template.as_str() {
-            config.macros.insert(name.clone(), template.to_string());
-        }
-    }
-}
-
-/// Reads a `::vars` declaration. An entry that is not a declaration is skipped;
-/// `tomet check` says why.
-fn extract_vars(el: &Element, config: &mut DocumentConfig) {
-    for (name, decl) in crate::read_var_decls(el) {
-        let Ok(decl) = decl else { continue };
-        match config.vars.iter_mut().find(|(n, _)| *n == name) {
-            Some((_, held)) => *held = decl,
-            None => config.vars.push((name, decl)),
         }
     }
 }

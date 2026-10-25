@@ -362,10 +362,10 @@ pub fn document_fields(
     if let Some(name) = file.file_name().and_then(|n| n.to_str()) {
         fields.insert("filename".to_string(), Value::String(name.to_string()));
     }
-    if let Some(kind) = tomet_semantics::document_kind(doc) {
+    if let Some(kind) = tomet_declaration::document_kind(doc) {
         fields.insert("kind".to_string(), Value::String(kind));
     }
-    if let Some(meta) = tomet_semantics::document_meta(doc) {
+    if let Some(meta) = tomet_declaration::document_meta(doc) {
         flatten_into("meta", &meta, &mut fields);
     }
 

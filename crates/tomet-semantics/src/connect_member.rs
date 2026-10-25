@@ -2,7 +2,7 @@ use tomet_ast::Name;
 
 /// The closed vocabulary of `:name(...)` connect identifiers
 /// (`@x(...):as(y):rule(...)`), parallel to but distinct from
-/// [`crate::kind::ElementKind`]/[`crate::kind::BUILTIN_KINDS`] -- a
+/// [`crate::kind::ElementKind`]/[`crate::kind::builtin_kinds`] -- a
 /// connect name lives in its own namespace, not the element-name one, so
 /// `:rule` and a hypothetical `@rule` element do not collide.
 ///
@@ -37,7 +37,7 @@ impl ConnectMember {
 }
 
 /// The one registration point for connect names -- add a member here and
-/// to the enum above, nowhere else, the same discipline `BUILTIN_KINDS`
+/// to the enum above, nowhere else, the same discipline the built-in names
 /// keeps for element names.
 pub const CONNECT_MEMBERS: [(&str, ConnectMember); 1] = [("rule", ConnectMember::Rule)];
 

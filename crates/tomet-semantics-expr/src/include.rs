@@ -11,13 +11,13 @@
 //!    there;
 //! 3. its headings are moved to the level they have where they land;
 //! 4. its relative links (`./`, `../`) are rewritten to still reach the same
-//!    file from the including one.
+//!    file from the including one -- by the host, through
+//!    [`Resolver::rebase_links`](super::Resolver::rebase_links): which elements are
+//!    links is not the evaluator's to know.
 //!
 //! A cycle, or a chain deeper than [`MAX_INCLUDE_DEPTH`], is an error.
 
-use tomet_ast::{Block, Document, Element, Inline, Placement, Span, Value};
-use tomet_semantics::{ElementKind, classify_std_lenient, link_target_of};
-use tomet_tree::for_each_element_mut;
+use tomet_ast::{Block, Element, Inline, Placement, Sigil};
 
 use super::args::Args;
 use super::context::{EvalContext, Note};
@@ -74,7 +74,7 @@ pub(crate) fn include(args: Args, cx: &EvalContext) -> Result<EvalValue, EvalErr
     if let Some(top) = top_section_level(&blocks) {
         shift_levels(&mut blocks, wanted as isize - top as isize);
     }
-    rebase_links(&mut blocks, &doc, &cx.self_doc);
+    let blocks = cx.resolver.rebase_links(blocks, &doc, &cx.self_doc);
     Ok(EvalValue::Fragment(blocks))
 }
 
@@ -191,20 +191,12 @@ fn element_block(element: &Element) -> Block {
 }
 
 /// Whether an element is something a document says about itself, which does
-/// not go along when its body is included.
+/// not go along when its body is included: a declaration, written `::name`.
+///
+/// The sigil says so; no name is looked up. That also covers a vocabulary's own preamble
+/// elements (`::character`), which no list of standard names could.
 fn is_declaration(element: &Element) -> bool {
-    matches!(
-        classify_std_lenient(element),
-        ElementKind::Kind
-            | ElementKind::Version
-            | ElementKind::Meta
-            | ElementKind::Config
-            | ElementKind::Settings
-            | ElementKind::Macros
-            | ElementKind::Vars
-            | ElementKind::Use
-            | ElementKind::Blueprint
-    )
+    matches!(element.sigil, Sigil::Document(_))
 }
 
 /// The blocks without the document's own declarations. Declarations on
@@ -270,92 +262,5 @@ fn shift_levels(blocks: &mut [Block], delta: isize) {
             }
             Block::Paragraph(_) => {}
         }
-    }
-}
-
-// ---- relative links ---------------------------------------------------------
-
-/// The directory part of a vault-relative path, as components.
-fn directory(doc: &DocRef) -> Vec<&str> {
-    let mut parts: Vec<&str> = doc.0.split('/').filter(|p| !p.is_empty()).collect();
-    parts.pop();
-    parts
-}
-
-/// Joins `relative` onto `base` and resolves `.` and `..`. `None` when it
-/// climbs out of the vault.
-fn resolve(base: &[&str], relative: &str) -> Option<Vec<String>> {
-    let mut out: Vec<String> = base.iter().map(|p| p.to_string()).collect();
-    for part in relative.split('/') {
-        match part {
-            "" | "." => {}
-            ".." => {
-                out.pop()?;
-            }
-            other => out.push(other.to_string()),
-        }
-    }
-    Some(out)
-}
-
-/// `target` spelled relative to `from`, both as components from the vault root.
-fn relative_to(from: &[&str], target: &[String]) -> String {
-    let common = from
-        .iter()
-        .zip(target)
-        .take_while(|(a, b)| **a == b.as_str())
-        .count();
-    let ups = from.len() - common;
-    let rest = target[common..].join("/");
-    if ups == 0 {
-        format!("./{rest}")
-    } else {
-        format!("{}{rest}", "../".repeat(ups))
-    }
-}
-
-/// Rewrites the `./` and `../` targets of links and embeds in `blocks`, which
-/// were written in `from`, so that they reach the same files from `to`.
-/// `tmt:`, `ref:`, `https:` and the rest name a file the same way anywhere
-/// and are left alone.
-fn rebase_links(blocks: &mut Vec<Block>, from: &DocRef, to: &DocRef) {
-    let (from_dir, to_dir) = (directory(from), directory(to));
-    if from_dir == to_dir {
-        return;
-    }
-    let mut holder = Document::new(std::mem::take(blocks), Span::default());
-    for_each_element_mut(&mut holder, |element| {
-        let Some((_, target)) = link_target_of(element) else {
-            return;
-        };
-        if !(target.starts_with("./") || target.starts_with("../")) {
-            return;
-        }
-        let (path, anchor) = match target.find('#') {
-            Some(at) => target.split_at(at),
-            None => (target.as_str(), ""),
-        };
-        let Some(resolved) = resolve(&from_dir, path) else {
-            return;
-        };
-        set_target(
-            element,
-            format!("{}{anchor}", relative_to(&to_dir, &resolved)),
-        );
-    });
-    *blocks = holder.blocks;
-}
-
-/// Writes a link's target back, whether it was given as the one argument or
-/// as `target:`.
-fn set_target(element: &mut Element, target: String) {
-    match &mut element.args {
-        Some(Value::String(existing)) => *existing = target,
-        Some(Value::Map(entries)) => {
-            if let Some((_, value)) = entries.iter_mut().find(|(key, _)| key == "target") {
-                *value = Value::String(target);
-            }
-        }
-        _ => {}
     }
 }

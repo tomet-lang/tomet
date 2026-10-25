@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-semantics, dependencies: list(cotomet-syntax, tomet-address, tomet-ast, tomet-parser, tomet-tree, tomet-type), dependents: list(tomet, tomet-cli, tomet-config, tomet-expr, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-semantics, dependencies: list(cotomet-syntax, tomet-address, tomet-ast, tomet-declaration, tomet-parser, tomet-tree, tomet-type), dependents: list(tomet, tomet-cli, tomet-config, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-semantics]
 
@@ -11,15 +11,22 @@ I/O-free semantic classification and normalization layer for Tomet AST elements.
 ==[Architecture & Responsibilities]
 
 - ("Pure I/O-Free Semantic Layer") `tomet-semantics` is strictly a pure classification and semantic extraction layer.
-It performs zero I/O and depends exclusively on `tomet-ast` (not `tomet-parser`),
-allowing downstream consumers (`tomet-html`, `tomet-markdown`, `tomet-links`,
-`tomet-tui`, `tomet-lsp`) to classify elements without pulling in the parser.
+It performs zero I/O and does not depend on `tomet-parser`, allowing downstream
+consumers (`tomet-html`, `tomet-markdown`, `tomet-links`, `tomet-tui`, `tomet-lsp`) to
+classify elements without pulling in the parser.
+- ("Declarations are not here") What `::kind`, `::meta`, `::macros`, `::vars` and the other standard declarations @em[mean] --
+their slots, how often each may be written, what reading one gives -- is
+`tomet-declaration`'s, so a `.ctmt` file reads them the same way. This crate keeps
+what only a tomet document does with them: [`ElementKind::Declaration`] classifies one,
+[`DocumentConfig`] fills the settings from `::config` and `::settings`, and a vocabulary
+binds through `::use`. Which elements carry an address (`@link`, `@embed`, `@file`,
+`@dir`) is `tomet-address`'s.
 
 ==[Core Capabilities]
 
 - ("Element Classification (`kind`)") Canonical recognition of Tomet's built-in vocabulary
-(`::meta`, `::config`, `@links`, `@link`, `<embed>`, `hr`, `em`, `strong`, `mark`,
-`raw`, `quote`, `table`, `heading`, `ol`, `ul`, `bare`, `interp`) via [`ElementKind`].
+(`::meta` and the other declarations, `@link`, `@embed`, `hr`, `em`, `strong`, `mark`,
+`raw`, `quote`, `table`, `heading`, `bare`, `interp`) via [`ElementKind`].
 - ("Link Target Extraction (`target`)") Canonical extraction of link targets and scheme
 prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
 - @em[]Positional Argument Normalization (`positional`))
@@ -28,14 +35,14 @@ prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
 | (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and `::settings` custom schemas.
 
 - ("Document Configuration (`config`)") Merges `::config` and `::settings` blocks across
-a document into a structured [`DocumentConfig`].
-- ("Metadata Extraction (`meta`)") Extracts top-level `::meta` values via [`document_meta`].
+a document into a structured [`DocumentConfig`], with the `::macros` and `::vars` it
+declares.
 - ("Structural Helpers") Heading level clamping (`heading`) and
 table parsing (`table`).
 - ("Element Data Extraction (`data`)") Extracts and normalizes an element's `{...}` data group via [`data::element_data`].
 - ("Element-Specific Semantics (`elements`)") Dedicated normalization and extraction
 logic for concrete built-in element families (`config`, `footnote`,
-`heading`, `meta`, `table`, `tag`, `target`).
+`heading`, `table`, `tag`, `target`).
 
 ==[Module data]
 
@@ -67,8 +74,6 @@ built-in element families:
 - (config) Document configuration (`::config`, `::settings`).
 - (footnote) Footnote collection and indexing (`@ftn(id)[...]`, and `@ftn(id)` to refer to one).
 - (heading) Heading level calculation and bounds clamping (`heading`).
-- (meta) Document metadata and frontmatter extraction (`::meta`, `::kind`, `::version`).
-- (vars) Variable declarations (`::vars`).
 - (table) Table rows and cell structures (`@table`).
 - (tag) Tag collection (`#tag`).
 - (target) Target URI and scheme resolution (`@link`, `@embed`, `@file`, `@dir`).
@@ -127,44 +132,6 @@ has one. `None` for any non-heading element, or for a heading whose
 `level` argument is missing or not an integer (e.g. hand-authored
 `@heading(level: "two")`) -- callers fall back to a default level
 themselves, this function never guesses one.
-
-===[Module meta]
-
-====[Functions]
-
-=====[fn document_meta]
-
-Returns this document's `::meta` element's parsed data, if it has one --
-the `{...}` value group read via [`crate::data::element_data`].
-Callers pull whatever key they care about (`title`, `date`, `tags`, ...) out
-of the returned map themselves.
-
-`None` if the document has no `::meta` element, or that element has no
-`{value}` group at all. Only the first top-level `::meta` is considered
--- `::meta` is documented as `singleton: true` (see
-`docs/spec/builtin-settings.tmt`), so a well-formed document
-never has more than one anyway.
-
-"Top-level" is [`tomet_tree::for_each_top_level_element`], not a raw
-`doc.blocks` walk: `::meta` still counts as top-level after joining an
-adjacent paragraph (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), a
-tree-shape choice unrelated to whether it opened its own line.
-
-=====[fn document_kind]
-
-Returns this document's declared kind string (e.g. `"j.daily"`, `"config"`, `"image_note"`),
-resolved strictly from top-level `::kind(...)` / `<kind>(...)` elements.
-
-=====[fn document_blueprint]
-
-The kind of document a blueprint is for: what its `::blueprint(X)` names,
-as `::blueprint(X)` or `::blueprint(target: X)`. `None` for a document that
-is not a blueprint.
-
-=====[fn document_version]
-
-Returns this document's declared language/syntax version (e.g. `"1.0"`),
-resolved strictly from top-level `::version(...)` / `<version>(...)` elements.
 
 ===[Module table]
 
@@ -249,36 +216,6 @@ a document without one in hand.
 =====[fn target_scheme]
 
 Classifies a `target` string's scheme and strips a recognized explicit prefix.
-
-===[Module vars]
-
-`::vars{ name: { type, default, about } }` -- the variables a document or
-a vault declares. See `tmtroot/spec/elements/std.vars.element.tmt`.
-
-Every entry is a declaration, a map of fields; there is no spelling that
-writes a value directly, so a map-valued default is never mistaken for a
-declaration (it goes in `default:`).
-
-====[Structs]
-
-=====[struct VarDecl]
-
-One variable, as declared.
-
-====[Functions]
-
-=====[fn read_var_decls]
-
-The entries of one `::vars` element, each read, or the reason it cannot be.
-
-The args form (`::vars(a: {...})`) and the data form (`::vars{ a: {...} }`)
-are both read, as for `::macros`.
-
-====[Constants]
-
-=====[const VAR_KEYS]
-
-The keys a declaration may have.
 
 ==[Module flatten]
 
@@ -382,7 +319,7 @@ always written out.
 
 - `std` wins every collision, and cannot be shadowed: a vocabulary
 
-that declares a name already in [`BUILTIN_KINDS`] is rejected at the
+that declares a name already in [`builtin_kinds`] is rejected at the
 declaration rather than at each use site, which is one error instead
 of many.
 
@@ -460,7 +397,7 @@ feature/content-shape.tmt`).
 
 The vocabularies tomet ships hardcoded in Rust rather than as a vault's
 `::vocabulary(ns)` document -- the same reason `std`'s elements are a
-Rust table (`BUILTIN_KINDS`) rather than a `::vocabulary(std)` document:
+Rust table (`builtin_kinds`) rather than a `::vocabulary(std)` document:
 see `kind.rs`'s doc comment on why that is a limit of the vocabulary
 format, not a permanent design.
 

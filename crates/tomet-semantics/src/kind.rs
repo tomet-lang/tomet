@@ -1,4 +1,5 @@
 use tomet_ast::{Element, Name, Placement, Sigil};
+use tomet_declaration::DeclKind;
 
 /// What a parsed `Element` officially means, replacing the ad-hoc
 /// stringly-typed `kind: String` that `tomet-html` and
@@ -12,57 +13,15 @@ use tomet_ast::{Element, Name, Placement, Sigil};
 /// specific to each format).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ElementKind {
-    /// `::kind(name)` or `::kind(name, version)` -- the kind of this document.
-    /// The version is an integer of 1 or more and may be left out. `tomet check`
-    /// rejects any other value; nothing reads it yet.
-    Kind,
-    Version,
-    Meta,
-    Config,
-    /// `::settings{...}` -- the schema/config block. Not previously in
-    /// `BUILTIN_KINDS` despite three places matching it by raw string; a
-    /// bare name has to be built-in now, so it is listed properly.
-    Settings,
-    /// `::macros{ name: "template" }` -- the macros a document or a vault
-    /// defines, one map entry each, keyed by the macro's name. Called as
-    /// `${macro.name(...)}`. A definition, not a setting, so it is not in
-    /// [`Settings`](ElementKind::Settings). See `tmtroot/spec/elements/std.macros.element.tmt`.
-    Macros,
-    /// `::vars{ name: { type, default, about } }` -- the variables a document
-    /// or a vault declares, one declaration each, keyed by the variable's
-    /// name. Read as `${var.name}`; `tomet new --var` fills them in. See
-    /// `tmtroot/spec/elements/std.vars.element.tmt`.
-    Vars,
-    /// `::use(ns)` -- brings a vocabulary into scope, by the name it gives
-    /// itself. `{ as: other }` renames it, and is only for a collision.
+    /// A standard declaration about the document: `::kind`, `::meta`, `::macros`, `::use` and the
+    /// rest (`DeclKind`).
     ///
-    /// `::use(ns, version)` also says which version of it is wanted: an
-    /// integer of 1 or more, which may be left out. `tomet check` rejects any
-    /// other value; nothing reads it yet, so the namespace binds the same either
-    /// way.
-    ///
-    /// The namespace, not a path: the vault declares where each
-    /// vocabulary lives, so a path here would say it twice.
-    ///
-    /// Was `@import`, which carried two jobs at once: binding a namespace
-    /// and splicing a document in. Binding stayed here; splicing a document
-    /// in is the expression `${include(...)}`, not an element, so that there
-    /// is one way to say it.
-    Use,
-    Blueprint,
-    /// `::vocabulary(ns){...}` -- the header of a vocabulary document,
-    /// naming the namespace it declares. See `docs/spec/vocabulary.tmt`.
-    Vocabulary,
-    /// `::elements{ name: { ... } }` -- the elements a vocabulary declares,
-    /// one map entry each, keyed by the element's name.
-    ///
-    /// Every level is the same shape, a map of fields: an element holds
-    /// `display`, `region`, `singleton`, `args`, `content` and `about`, and
-    /// `args` holds one such map per parameter, keyed by the parameter's
-    /// name and ordered as written, which is what orders the positional
-    /// slots. Nothing below this element is itself an element, so a name
-    /// is only ever a key.
-    Elements,
+    /// What each one *is* -- its positional slots, how often it may be written, whether a `.ctmt`
+    /// may have it, what reading it gives -- is `tomet-declaration`'s. What `use`, `blueprint`,
+    /// `config` and the vocabulary pair *do* is this crate's and `tomet-config`'s, which match on
+    /// the `DeclKind`. Eleven variants used to stand here, one per declaration; they were a second
+    /// table of the same names.
+    Declaration(DeclKind),
     /// `@data{...}` -- the description of an element's `{...}` slot.
     /// Declared by no vocabulary yet.
     Data,
@@ -217,17 +176,7 @@ impl ElementKind {
     /// }`. `Custom(name)` returns `name` itself.
     pub fn as_str(&self) -> &str {
         match self {
-            ElementKind::Kind => "kind",
-            ElementKind::Version => "version",
-            ElementKind::Meta => "meta",
-            ElementKind::Config => "config",
-            ElementKind::Settings => "settings",
-            ElementKind::Macros => "macros",
-            ElementKind::Vars => "vars",
-            ElementKind::Use => "use",
-            ElementKind::Blueprint => "blueprint",
-            ElementKind::Vocabulary => "vocabulary",
-            ElementKind::Elements => "elements",
+            ElementKind::Declaration(declaration) => declaration.name(),
             ElementKind::Data => "data",
             ElementKind::Draft => "draft",
             ElementKind::Fixme => "fixme",
@@ -258,11 +207,12 @@ impl ElementKind {
     }
 }
 
-/// Recognized **bare** names with fixed meaning -- kept as one list so
+/// Recognized **bare** names of the body elements with fixed meaning -- kept as one list so
 /// `classify_std`'s name -> variant match and `ElementKind::as_str`'s variant
 /// -> name match can't silently drift apart (see
 /// `builtin_kind_round_trips_through_as_str` below, which checks every
-/// entry here).
+/// entry here). The declarations are not here: `tomet-declaration`'s `DeclKind` is their
+/// one list, and [`builtin_kinds`] puts the two together.
 ///
 /// This is the `std` namespace. `@link` is shorthand for `@std.link`, and
 /// bare names resolve here and nowhere else -- a user-defined element must
@@ -287,24 +237,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-pub const BUILTIN_KINDS: [(&str, ElementKind); 34] = [
-    ("kind", ElementKind::Kind),
-    ("version", ElementKind::Version),
-    ("meta", ElementKind::Meta),
-    ("config", ElementKind::Config),
-    ("settings", ElementKind::Settings),
-    ("macros", ElementKind::Macros),
-    ("vars", ElementKind::Vars),
-    ("use", ElementKind::Use),
-    ("blueprint", ElementKind::Blueprint),
-    // The vocabulary document's own three. They are here rather than in a
-    // `::vocabulary(vocabulary)` document because reading that document
-    // would need the machinery it defines. The cost is that a kind's
-    // vocabulary can no longer declare any of these three names -- a
-    // namespace brought in with `::use` still can, since it is never
-    // written bare.
-    ("vocabulary", ElementKind::Vocabulary),
-    ("elements", ElementKind::Elements),
+const BODY_KINDS: [(&str, ElementKind); 23] = [
     ("data", ElementKind::Data),
     // Marks on the document about the document. `//(TODO)` was the first
     // spelling tried and cannot work: `tomet_ast` has no comment node, so
@@ -334,11 +267,23 @@ pub const BUILTIN_KINDS: [(&str, ElementKind); 34] = [
     ("task", ElementKind::Task),
 ];
 
+/// Every recognized bare name and what it is: the standard declarations, then the body elements.
+pub fn builtin_kinds() -> impl Iterator<Item = (&'static str, ElementKind)> + Clone {
+    DeclKind::ALL
+        .into_iter()
+        .map(|kind| (kind.name(), ElementKind::Declaration(kind)))
+        .chain(BODY_KINDS.iter().cloned())
+}
+
 fn builtin_kind(name: &str) -> Option<ElementKind> {
-    BUILTIN_KINDS
-        .iter()
-        .find(|(builtin, _)| *builtin == name)
-        .map(|(_, kind)| kind.clone())
+    DeclKind::from_name(name)
+        .map(ElementKind::Declaration)
+        .or_else(|| {
+            BODY_KINDS
+                .iter()
+                .find(|(builtin, _)| *builtin == name)
+                .map(|(_, kind)| kind.clone())
+        })
 }
 
 /// Classifies a [`Name`] against the `std` vocabulary alone.
@@ -351,7 +296,7 @@ fn builtin_kind(name: &str) -> Option<ElementKind> {
 ///
 /// A namespaced name is always `Custom` -- namespaces are exactly how a
 /// user-defined element declares it is not part of the built-in
-/// vocabulary. A bare name must be in [`BUILTIN_KINDS`]; anything else is
+/// vocabulary. A bare name must be in [`builtin_kinds`]; anything else is
 /// [`UnknownName`], not a silent `Custom`.
 ///
 /// That silent fallback -- `builtin_kind(name).unwrap_or_else(|| Custom(name))`
@@ -500,24 +445,10 @@ pub fn classify_std_lenient(el: &Element) -> ElementKind {
 ///
 /// Every writer needs this and each used to keep its own copy of the
 /// list, which is how `settings` and `import` came to be missing from all
-/// three of them: they joined [`BUILTIN_KINDS`] after those lists were
+/// three of them: they joined [`builtin_kinds`] after those lists were
 /// written, so `::settings(file:...)` exported as a stray `<div>`.
 pub fn is_directive(kind: &ElementKind) -> bool {
-    use ElementKind::*;
-    matches!(
-        kind,
-        Version
-            | Kind
-            | Meta
-            | Config
-            | Settings
-            | Macros
-            | Vars
-            | Use
-            | Blueprint
-            | Vocabulary
-            | Elements
-    )
+    matches!(kind, ElementKind::Declaration(_))
 }
 
 /// The shape a built-in element must take.
@@ -530,8 +461,7 @@ pub fn is_directive(kind: &ElementKind) -> bool {
 pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
     use ElementKind::*;
     Some(match kind {
-        Meta | Config | Settings | Macros | Vars | Use | Blueprint | Hr | Callout | Card
-        | Table | Heading | Kind | Version | Vocabulary | Elements | Data => Shape::Block,
+        Declaration(_) | Hr | Callout | Card | Table | Heading | Data => Shape::Block,
         Em | Strong | Mark | Strikeout | Ruby => Shape::Inline,
         // Either shape. A link or an embed alone on a line is not a
         // structural error -- it is how you show one file or one image.
@@ -609,8 +539,7 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
     match kind {
         // Directives and vocabulary-document bookkeeping: `{data}`/
         // `(args)` only, no `[content]`.
-        Kind | Version | Meta | Config | Settings | Macros | Vars | Use | Blueprint
-        | Vocabulary | Elements | Data => None,
+        Declaration(_) | Data => None,
         // Self-closing; a fenced/backtick code body's `[content]` is
         // synthesized by the parser itself (`raw.rs`), not shaped
         // by an author, so there is nothing here for a shape check to
@@ -639,43 +568,22 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
 
 /// Whether at most one of `kind` may appear in a document.
 ///
-/// The declarations about the document that are written once: `kind`,
-/// `version`, `meta`, `config`, `settings`, `macros`, `vars`, `blueprint`,
-/// `vocabulary` and `elements`. `docs/spec/builtin-settings.tmt` listed the first
-/// six as `singleton: true` while no code read the word; this is that list, in
-/// code.
-///
-/// `::use` is deliberately absent, and is the proof the two axes are
-/// separate: it may only sit in the preamble, and you write several,
-/// because you bring in several vocabularies.
+/// A standard declaration says so itself (`tomet-declaration`'s `Spec`): all but `::use`, which
+/// brings in one vocabulary each and is the proof that where a declaration may sit and how often are
+/// two axes. No body element is a singleton.
 pub fn builtin_singleton(kind: &ElementKind) -> bool {
-    use ElementKind::*;
-    matches!(
-        kind,
-        Kind | Version
-            | Meta
-            | Config
-            | Settings
-            | Macros
-            | Vars
-            | Blueprint
-            | Vocabulary
-            | Elements
-    )
+    matches!(kind, ElementKind::Declaration(declaration) if declaration.is_singleton())
 }
 
 /// Where in a document `kind` may appear.
 ///
-/// The same declarations, plus the elements that bring something into scope. What
-/// the spec spelled `placement: head` -- a name that also carried the
-/// block/inline rule, which is why the key is being retired in favour of
-/// these two plus `display`.
+/// Every standard declaration is in the preamble, and nothing else the language names is: a body
+/// element goes anywhere. What the spec spelled `placement: head` -- a name that also carried the
+/// block/inline rule, which is why the key is being retired in favour of these two plus `display`.
 pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
     use crate::vocabulary::Region;
-    use ElementKind::*;
     match kind {
-        Kind | Version | Meta | Config | Settings | Macros | Vars | Blueprint | Vocabulary
-        | Elements | Use => Region::Preamble,
+        ElementKind::Declaration(_) => Region::Preamble,
         _ => Region::Body,
     }
 }
@@ -720,10 +628,10 @@ mod tests {
 
     #[test]
     fn builtin_kind_round_trips_through_as_str() {
-        for (name, kind) in &BUILTIN_KINDS {
-            assert_eq!(kind.as_str(), *name, "as_str() mismatch for {name:?}");
+        for (name, kind) in builtin_kinds() {
+            assert_eq!(kind.as_str(), name, "as_str() mismatch for {name:?}");
             assert_eq!(
-                classify_std_name(&Name::bare(*name)),
+                classify_std_name(&Name::bare(name)),
                 Ok(kind.clone()),
                 "classify_std_name() mismatch for {name:?}"
             );
@@ -817,7 +725,10 @@ mod tests {
     #[test]
     fn double_colon_sigil_is_recognized() {
         let el = element_new(Sigil::document("meta"));
-        assert_eq!(classify_std_lenient(&el), ElementKind::Meta);
+        assert_eq!(
+            classify_std_lenient(&el),
+            ElementKind::Declaration(DeclKind::Meta)
+        );
     }
 
     #[test]

@@ -52,7 +52,7 @@ impl Vault {
     pub fn findings(&self, path: &Path, doc: &Document) -> Findings {
         // The blueprint for the document's kind, if the vault declares one:
         // the one part of the check that needs the disk.
-        let blueprint = tomet_semantics::document_kind(doc)
+        let blueprint = tomet_declaration::document_kind(doc)
             .filter(|kind| kind != "blueprint")
             .and_then(|kind| {
                 tomet_workspace::blueprint::find_blueprint(&self.root, &kind, &self.config)
@@ -74,7 +74,7 @@ impl Vault {
         // A blueprint is written to be filled in: what only has a value when a
         // document is being created from it (`generate.*`, a variable with no
         // default) is not a mistake there.
-        if tomet_semantics::document_kind(doc).as_deref() == Some("blueprint") {
+        if tomet_declaration::document_kind(doc).as_deref() == Some("blueprint") {
             unresolved.retain(|u| !u.creation_only);
         }
 

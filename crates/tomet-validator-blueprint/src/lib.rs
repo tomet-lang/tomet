@@ -5,6 +5,7 @@
 //! target documents for conformance.
 
 use tomet_ast::{Block, Document, Element, Inline, Section, Span, Value};
+use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, ElementKind, classify_std_lenient};
 use tomet_tree::{ValueExt, for_each_top_level_element};
 use tomet_validator_core::Diagnostic;
@@ -36,7 +37,7 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
 
     for_each_top_level_element(blueprint, |el| {
         let kind = classify_std_lenient(el);
-        if kind == ElementKind::Blueprint {
+        if kind == ElementKind::Declaration(DeclKind::Blueprint) {
             found_blueprint = true;
             if let Some(Value::String(k)) = &el.args {
                 target_kind = k.clone();
@@ -46,7 +47,7 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
             {
                 target_kind = s.to_string();
             }
-        } else if kind == ElementKind::Meta {
+        } else if kind == ElementKind::Declaration(DeclKind::Meta) {
             if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
                 for (k, _) in entries {
                     required_meta_keys.push((k.clone(), el.span));
@@ -118,7 +119,7 @@ pub fn validate_against_schema(
     let mut doc_meta_span = doc_span;
 
     for_each_top_level_element(doc, |el| {
-        if classify_std_lenient(el) == ElementKind::Meta {
+        if classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta) {
             doc_meta_span = el.span;
             if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
                 for (k, _) in entries {

@@ -64,7 +64,7 @@ pub(crate) fn vault_for(file: &Path) -> tomet_load::Vault {
 /// one -- `<title>`/`html`/`serve` prefer this over the filename when
 /// present (see `.agents/tasks/ssg-readiness.md` step 1).
 pub(crate) fn meta_title(doc: &tomet_ast::Document) -> Option<String> {
-    let meta = tomet_semantics::document_meta(doc)?;
+    let meta = tomet_declaration::document_meta(doc)?;
     let tomet_ast::Value::Map(map) = meta else {
         return None;
     };

@@ -16,6 +16,7 @@ tomet-load-config = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-printer = { workspace = true }
 tomet-search = { workspace = true }
+tomet-declaration = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-transform = { workspace = true }
 tomet-tree = { workspace = true }

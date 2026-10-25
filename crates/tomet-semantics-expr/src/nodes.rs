@@ -330,7 +330,7 @@ pub(crate) fn document_member(
             .resolver
             .meta(doc)
             .map_err(|why| EvalError::Unresolved(format!("metadata of `{}`: {why}", doc.0))),
-        "kind" => Ok(tomet_semantics::document_kind(&*load(doc, cx)?)
+        "kind" => Ok(tomet_declaration::document_kind(&*load(doc, cx)?)
             .map(EvalValue::String)
             .unwrap_or(EvalValue::Null)),
         _ => Err(EvalError::UnknownMember {

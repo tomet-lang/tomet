@@ -11,6 +11,7 @@ pub use id::{collect_ids, collect_ids_cst};
 
 use tomet_ast::{Block, Document, Element, Inline, List};
 use tomet_cst::{SyntaxNode, TextRange};
+use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, Shape};
 
 /// Classifies `el` against `std` and the namespaces in scope.
@@ -398,7 +399,7 @@ pub fn check_version_slot(doc: &Document, bindings: &Bindings, errors: &mut Vec<
     tomet_tree::for_each_element(doc, |el| {
         if !matches!(
             classify_in(el, bindings),
-            Ok(ElementKind::Kind | ElementKind::Use)
+            Ok(ElementKind::Declaration(DeclKind::Kind) | ElementKind::Declaration(DeclKind::Use))
         ) {
             return;
         }
@@ -529,7 +530,9 @@ pub fn check_vocabulary_params(doc: &Document, errors: &mut Vec<Diagnostic>) {
     };
     let mut elements_span = None;
     tomet_tree::for_each_top_level_element(doc, |el| {
-        if elements_span.is_none() && classify_std_lenient(el) == ElementKind::Elements {
+        if elements_span.is_none()
+            && classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Elements)
+        {
             elements_span = Some(el.span);
         }
     });
@@ -556,7 +559,7 @@ pub fn check_declared_versions(doc: &Document, errors: &mut Vec<Diagnostic>) {
 
     tomet_tree::for_each_top_level_element(doc, |el| {
         let (declaration, written) = match classify_std_lenient(el) {
-            ElementKind::Version => (
+            ElementKind::Declaration(DeclKind::Version) => (
                 "version",
                 tomet_semantics::normalized_element_args(el)
                     .and_then(|args| match args {
@@ -576,8 +579,9 @@ pub fn check_declared_versions(doc: &Document, errors: &mut Vec<Diagnostic>) {
                         })
                     }),
             ),
-            kind @ (ElementKind::Vocabulary | ElementKind::Blueprint) => (
-                if kind == ElementKind::Vocabulary {
+            kind @ (ElementKind::Declaration(DeclKind::Vocabulary)
+            | ElementKind::Declaration(DeclKind::Blueprint)) => (
+                if kind == ElementKind::Declaration(DeclKind::Vocabulary) {
                     "vocabulary"
                 } else {
                     "blueprint"
@@ -613,10 +617,11 @@ pub fn check_declared_versions(doc: &Document, errors: &mut Vec<Diagnostic>) {
 /// variable can have and whose `default` is a value of it.
 pub fn check_name_definitions(doc: &Document, errors: &mut Vec<Diagnostic>) {
     use tomet_ast::Value;
-    use tomet_semantics::{ElementKind, VarDecl, classify_std_lenient};
+    use tomet_declaration::{Declaration, VarDecl};
+    use tomet_semantics::{ElementKind, classify_std_lenient};
 
     tomet_tree::for_each_top_level_element(doc, |el| match classify_std_lenient(el) {
-        ElementKind::Macros => {
+        ElementKind::Declaration(DeclKind::Macros) => {
             let entries = [
                 tomet_semantics::normalized_element_args(el),
                 tomet_semantics::data::element_data(el),
@@ -638,8 +643,11 @@ pub fn check_name_definitions(doc: &Document, errors: &mut Vec<Diagnostic>) {
                 }
             }
         }
-        ElementKind::Vars => {
-            for (name, decl) in tomet_semantics::read_var_decls(el) {
+        ElementKind::Declaration(DeclKind::Vars) => {
+            let Some(declaration) = Declaration::from_element(el) else {
+                return;
+            };
+            for (name, decl) in tomet_declaration::read_var_decls(&declaration) {
                 let reason = match decl {
                     Err(reason) => Some(reason),
                     Ok(decl) => var_problem(&decl),
@@ -658,7 +666,7 @@ pub fn check_name_definitions(doc: &Document, errors: &mut Vec<Diagnostic>) {
     });
 
     /// A `default` that is not of the declared `type`. A `type` that is not one is
-    /// refused when the declaration is read ([`tomet_semantics::VarDecl::from_value`]).
+    /// refused when the declaration is read ([`tomet_declaration::VarDecl::from_value`]).
     fn var_problem(decl: &VarDecl) -> Option<String> {
         let default = decl.default.as_ref()?;
         decl.ty
@@ -714,7 +722,8 @@ pub fn check_field_types(
     let mut checked = false;
     tomet_tree::for_each_top_level_element(doc, |el| {
         if checked
-            || tomet_semantics::classify_std_lenient(el) != tomet_semantics::ElementKind::Meta
+            || tomet_semantics::classify_std_lenient(el)
+                != tomet_semantics::ElementKind::Declaration(DeclKind::Meta)
         {
             return;
         }

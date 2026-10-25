@@ -1,4 +1,5 @@
 use std::ops::ControlFlow;
+use tomet_semantics::DeclKind;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
 use tomet_ast::{Document, Element, ElementValue, Value};
@@ -73,7 +74,7 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                         }),
                         range: Some(self.positions.range(&span)),
                     })
-                } else if kind == ElementKind::Kind {
+                } else if kind == ElementKind::Declaration(DeclKind::Kind) {
                     let declared_kind = normalized_element_args(el)
                         .and_then(|v| {
                             v.get("kind")
@@ -96,7 +97,7 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                         }),
                         range: Some(self.positions.range(&span)),
                     })
-                } else if kind == ElementKind::Blueprint {
+                } else if kind == ElementKind::Declaration(DeclKind::Blueprint) {
                     let target_kind = normalized_element_args(el)
                         .and_then(|v| {
                             v.get("target")
@@ -120,7 +121,7 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                         }),
                         range: Some(self.positions.range(&span)),
                     })
-                } else if kind == ElementKind::Version {
+                } else if kind == ElementKind::Declaration(DeclKind::Version) {
                     let declared_ver = normalized_element_args(el)
                         .and_then(|v| {
                             v.get("version").map(|v| match v {

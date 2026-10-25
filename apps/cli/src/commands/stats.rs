@@ -138,7 +138,7 @@ fn collect_report(path: &Path) -> anyhow::Result<(Report, usize)> {
             let findings = vault.findings(file, &doc);
             let warnings = findings.warnings();
             let has_errors = findings.has_errors();
-            let kind = tomet_semantics::document_kind(&doc);
+            let kind = tomet_declaration::document_kind(&doc);
             let stats = measure(&doc);
 
             StatsFileResult::Measured {
@@ -656,11 +656,11 @@ mod tests {
         for (name, src) in docs {
             let doc = tomet_parser::parse_document(src).expect("test source parses");
             assert_eq!(
-                tomet_semantics::document_kind(&doc).is_some(),
+                tomet_declaration::document_kind(&doc).is_some(),
                 !name.is_empty()
             );
             by_kind
-                .entry(tomet_semantics::document_kind(&doc))
+                .entry(tomet_declaration::document_kind(&doc))
                 .or_default()
                 .merge(measure(&doc));
         }

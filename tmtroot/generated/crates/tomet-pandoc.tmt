@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-pandoc, dependencies: list(tomet-ast, tomet-parser, tomet-printer, tomet-semantics, tomet-tree), dependents: list(tomet, tomet-cli, tomet-tests)}
+::meta{crate: tomet-pandoc, dependencies: list(tomet-ast, tomet-declaration, tomet-parser, tomet-printer, tomet-semantics, tomet-tree), dependents: list(tomet, tomet-cli, tomet-tests)}
 
 =[tomet-pandoc]
 

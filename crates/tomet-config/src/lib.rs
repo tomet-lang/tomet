@@ -49,7 +49,7 @@ pub struct Config {
     /// setting, so it is not read from the `::settings`/`::config` tree.
     pub macros: std::collections::HashMap<String, String>,
     /// The variables a vault declares with `::vars`, in the order written.
-    pub vars: Vec<(String, tomet_semantics::VarDecl)>,
+    pub vars: Vec<(String, tomet_declaration::VarDecl)>,
     pub registry: RegistryConfig,
 }
 

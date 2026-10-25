@@ -1748,6 +1748,7 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-config",
+ "tomet-declaration",
  "tomet-edit",
  "tomet-formatter",
  "tomet-html",
@@ -1813,6 +1814,7 @@ dependencies = [
  "serde_json",
  "tomet-ast",
  "tomet-config",
+ "tomet-declaration",
  "tomet-expr",
  "tomet-formatter",
  "tomet-html",
@@ -1842,6 +1844,7 @@ name = "tomet-config"
 version = "0.5.0"
 dependencies = [
  "tomet-ast",
+ "tomet-declaration",
  "tomet-parser",
  "tomet-semantics",
  "tomet-spec-derive",
@@ -1853,6 +1856,17 @@ name = "tomet-cst"
 version = "0.5.0"
 dependencies = [
  "rowan",
+]
+
+[[package]]
+name = "tomet-declaration"
+version = "0.5.0"
+dependencies = [
+ "cotomet-syntax",
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-tree",
+ "tomet-type",
 ]
 
 [[package]]
@@ -1876,8 +1890,8 @@ version = "0.5.0"
 dependencies = [
  "time",
  "tomet-ast",
+ "tomet-declaration",
  "tomet-parser",
- "tomet-semantics",
  "tomet-tree",
  "tomet-type",
  "uuid",
@@ -1934,6 +1948,7 @@ dependencies = [
  "ignore",
  "tomet-ast",
  "tomet-config",
+ "tomet-declaration",
  "tomet-load-config",
  "tomet-parser",
  "tomet-semantics",
@@ -1997,6 +2012,7 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-config",
+ "tomet-declaration",
  "tomet-expr",
  "tomet-indexer",
  "tomet-links",
@@ -2073,6 +2089,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tomet-ast",
+ "tomet-declaration",
  "tomet-parser",
  "tomet-printer",
  "tomet-semantics",
@@ -2136,6 +2153,7 @@ dependencies = [
  "serde_json",
  "tomet-address",
  "tomet-ast",
+ "tomet-declaration",
  "tomet-parser",
  "tomet-tree",
  "tomet-type",
@@ -2298,6 +2316,7 @@ dependencies = [
  "tomet-address",
  "tomet-ast",
  "tomet-cst",
+ "tomet-declaration",
  "tomet-lexer",
  "tomet-semantics",
  "tomet-tree",
@@ -2321,11 +2340,13 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-config",
+ "tomet-declaration",
  "tomet-expr",
  "tomet-parser",
  "tomet-search",
  "tomet-semantics",
  "tomet-transform",
+ "tomet-tree",
  "tomet-type",
  "tomet-validator",
 ]
@@ -2338,6 +2359,7 @@ dependencies = [
  "time",
  "tomet-ast",
  "tomet-config",
+ "tomet-declaration",
  "tomet-expr",
  "tomet-formatter",
  "tomet-indexer",

@@ -1,5 +1,5 @@
 use lsp_types::{CompletionItem, CompletionItemKind, Position, Uri};
-use tomet_semantics::{BUILTIN_KINDS, ElementKind, Shape};
+use tomet_semantics::{ElementKind, Shape, builtin_kinds};
 
 use crate::position::{get_line_prefix, uri_to_file_path};
 
@@ -47,15 +47,15 @@ pub fn completions_for_with_uri(
             .chars()
             .all(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | '.'))
     {
-        for (name, kind) in BUILTIN_KINDS.iter() {
-            if !is_declaration(kind) {
+        for (name, kind) in builtin_kinds() {
+            if !is_declaration(&kind) {
                 continue;
             }
             items.push(CompletionItem {
                 label: name.to_string(),
                 insert_text: Some(name.to_string()),
                 kind: Some(CompletionItemKind::KEYWORD),
-                detail: Some(detail_for(name, kind)),
+                detail: Some(detail_for(name, &kind)),
                 ..CompletionItem::default()
             });
         }
@@ -63,15 +63,15 @@ pub fn completions_for_with_uri(
     }
 
     if prefix.ends_with('@') {
-        for (name, kind) in BUILTIN_KINDS.iter() {
-            if is_declaration(kind) {
+        for (name, kind) in builtin_kinds() {
+            if is_declaration(&kind) {
                 continue;
             }
             items.push(CompletionItem {
                 label: name.to_string(),
                 insert_text: Some(name.to_string()),
                 kind: Some(CompletionItemKind::KEYWORD),
-                detail: Some(detail_for(name, kind)),
+                detail: Some(detail_for(name, &kind)),
                 ..CompletionItem::default()
             });
         }
@@ -104,13 +104,13 @@ pub fn completions_for_with_uri(
     }
 
     // Unprefixed: offer every built-in under the sigil its region requires.
-    for (name, kind) in BUILTIN_KINDS.iter() {
-        let sigil = if is_declaration(kind) { "::" } else { "@" };
+    for (name, kind) in builtin_kinds() {
+        let sigil = if is_declaration(&kind) { "::" } else { "@" };
         items.push(CompletionItem {
             label: format!("{sigil}{name}"),
             insert_text: Some(format!("{sigil}{name}")),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some(detail_for(name, kind)),
+            detail: Some(detail_for(name, &kind)),
             ..CompletionItem::default()
         });
     }

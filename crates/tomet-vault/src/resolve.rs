@@ -24,7 +24,7 @@ use tomet_type::Type;
 ///
 /// Keys the document writes without declaring them are kept as written.
 pub fn typed_meta(config: &PrinterConfig, doc: &Document, doc_ref: &DocRef) -> EvalValue {
-    let written = match tomet_semantics::document_meta(doc) {
+    let written = match tomet_declaration::document_meta(doc) {
         Some(Value::Map(entries)) => entries,
         _ => Vec::new(),
     };
@@ -101,6 +101,10 @@ impl Resolver for Overlay<'_> {
         includes: &[DocRef],
     ) -> Result<PreparedBlocks, String> {
         self.inner.prepare_blocks(doc, blocks, includes)
+    }
+
+    fn rebase_links(&self, blocks: Vec<Block>, from: &DocRef, to: &DocRef) -> Vec<Block> {
+        tomet_semantics::rebase_relative_links(blocks, &from.0, &to.0)
     }
 }
 

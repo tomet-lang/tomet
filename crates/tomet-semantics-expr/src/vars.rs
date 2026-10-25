@@ -10,7 +10,7 @@
 //! that crate's to say.
 
 use tomet_ast::Value;
-use tomet_semantics::VarDecl;
+use tomet_declaration::VarDecl;
 use tomet_type::Type;
 
 use crate::datetime::parse_datetime;

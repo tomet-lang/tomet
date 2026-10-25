@@ -80,6 +80,10 @@ impl Resolver for DiskResolver<'_> {
     ) -> Result<PreparedBlocks, String> {
         self.vault.prepare_blocks(doc, blocks, includes, self)
     }
+
+    fn rebase_links(&self, blocks: Vec<Block>, from: &DocRef, to: &DocRef) -> Vec<Block> {
+        tomet_semantics::rebase_relative_links(blocks, &from.0, &to.0)
+    }
 }
 
 #[cfg(test)]

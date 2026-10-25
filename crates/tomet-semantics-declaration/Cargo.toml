@@ -1,0 +1,16 @@
+[package]
+name = "tomet-declaration"
+version.workspace = true
+edition.workspace = true
+description = "What a document's declarations -- ::kind, ::meta, ::macros, ::vars and the rest -- mean, apart from what the body elements and vocabularies mean."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+cotomet-syntax = { workspace = true }
+tomet-ast = { workspace = true }
+tomet-tree = { workspace = true }
+tomet-type = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

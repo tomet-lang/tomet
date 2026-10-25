@@ -1235,18 +1235,6 @@ fn outline(blocks: &[tomet_ast::Block]) -> Vec<String> {
     out
 }
 
-/// The target of every `@link` in the blocks, in order.
-fn link_targets(blocks: &[tomet_ast::Block]) -> Vec<String> {
-    let mut doc = tomet_ast::Document::new(blocks.to_vec(), tomet_ast::Span::default());
-    let mut out = Vec::new();
-    tomet_tree::for_each_element_mut(&mut doc, |el| {
-        if let Some((_, target)) = tomet_semantics::link_target_of(el) {
-            out.push(target);
-        }
-    });
-    out
-}
-
 #[test]
 fn a_document_is_included_without_its_own_declarations() {
     let blocks =
@@ -1385,38 +1373,6 @@ fn include_checks_what_it_is_given() {
     );
     assert!(include_in("here.tmt", 0, &[], "include()").is_err());
     assert!(include_in("here.tmt", 0, &[], "include(tmt(\"nope.tmt\"))").is_err());
-}
-
-#[test]
-fn relative_links_are_rewritten_to_still_reach_the_same_file() {
-    // Host at the vault root: `docs/guide.tmt`'s `./img/a.png` is `docs/img/a.png`.
-    let from_root =
-        fragment(include_in("here.tmt", 0, &[], "include(tmt(\"docs/guide.tmt\"))").unwrap());
-    assert_eq!(
-        link_targets(&from_root),
-        ["./docs/img/a.png", "./shared/s.tmt#top", "tmt:abs.tmt"]
-    );
-    // Host one level down from the guide.
-    let from_sub = fragment(
-        include_in(
-            "docs/sub/host.tmt",
-            0,
-            &[],
-            "include(tmt(\"docs/guide.tmt\"))",
-        )
-        .unwrap(),
-    );
-    assert_eq!(
-        link_targets(&from_sub),
-        ["../img/a.png", "../../shared/s.tmt#top", "tmt:abs.tmt"]
-    );
-    // Same directory: nothing to rewrite.
-    let beside =
-        fragment(include_in("docs/other.tmt", 0, &[], "include(tmt(\"docs/guide.tmt\"))").unwrap());
-    assert_eq!(
-        link_targets(&beside),
-        ["./img/a.png", "../shared/s.tmt#top", "tmt:abs.tmt"]
-    );
 }
 
 #[test]

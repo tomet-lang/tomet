@@ -207,11 +207,11 @@ impl Vault {
             .collect();
         tomet_validator::check_field_types(doc, &field_types, &mut diagnostics);
 
-        if let Some(kind) = tomet_semantics::document_kind(doc)
+        if let Some(kind) = tomet_declaration::document_kind(doc)
             && kind != "blueprint"
-            && let Some(blueprint) = blueprints
-                .iter()
-                .find(|b| tomet_semantics::document_blueprint(b).as_deref() == Some(kind.as_str()))
+            && let Some(blueprint) = blueprints.iter().find(|b| {
+                tomet_declaration::document_blueprint(b).as_deref() == Some(kind.as_str())
+            })
         {
             diagnostics.extend(tomet_validator::validate_against_blueprint_with(
                 doc, blueprint, &bindings,
@@ -519,6 +519,47 @@ mod tests {
         let (mut doc, _) = vault.parse(src).expect("parses");
         let prepared = vault.prepare(&mut doc, Path::new(path), &NoResolver);
         (doc, prepared)
+    }
+
+    /// An included document's relative links are rewritten to still reach the same files: the
+    /// evaluator asks the vault's resolver, which knows what a link is.
+    #[test]
+    fn an_include_rewrites_the_relative_links_of_what_it_brings() {
+        let resolver = tomet_expr::MemoryResolver::new()
+            .with_source(
+                "docs/guide.tmt",
+                "See @link(./img/a.png) and @link(../shared/s.tmt#top) and @link(tmt:abs.tmt).\n",
+            )
+            .unwrap();
+        let vault = Vault::from_sources(PrinterConfig::default(), "/v", &[]);
+        let targets = |host: &str| {
+            let (mut doc, _) = vault
+                .parse("${include(tmt(\"docs/guide.tmt\"))}\n")
+                .expect("parses");
+            vault.prepare(&mut doc, Path::new(host), &resolver);
+            let mut found = Vec::new();
+            tomet_tree::for_each_element_mut(&mut doc, |el| {
+                if let Some((_, target)) = tomet_semantics::link_target_of(el) {
+                    found.push(target);
+                }
+            });
+            found
+        };
+        // from the vault root: `docs/guide.tmt`'s `./img/a.png` is `docs/img/a.png`
+        assert_eq!(
+            targets("/v/here.tmt"),
+            ["./docs/img/a.png", "./shared/s.tmt#top", "tmt:abs.tmt"]
+        );
+        // one level below the guide
+        assert_eq!(
+            targets("/v/docs/sub/host.tmt"),
+            ["../img/a.png", "../../shared/s.tmt#top", "tmt:abs.tmt"]
+        );
+        // beside it: nothing to rewrite
+        assert_eq!(
+            targets("/v/docs/other.tmt"),
+            ["./img/a.png", "../shared/s.tmt#top", "tmt:abs.tmt"]
+        );
     }
 
     /// The text of every paragraph, joined by a space. Two expressions on

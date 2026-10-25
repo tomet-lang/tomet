@@ -93,7 +93,7 @@ pub fn find_blueprint(root: &Path, name: &str, config: &PrinterConfig) -> Option
 fn blueprint_name(path: &Path) -> Option<String> {
     let src = fs::read_to_string(path).ok()?;
     let doc = tomet_parser::parse_document(&src).ok()?;
-    tomet_semantics::document_blueprint(&doc)
+    tomet_declaration::document_blueprint(&doc)
 }
 
 /// An expression in a blueprint that had no value, and so stands in the new

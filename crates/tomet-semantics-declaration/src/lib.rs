@@ -1,0 +1,49 @@
+//! =[ tomet-declaration ]
+//!
+//! What a document's declarations mean: `::kind`, `::version`, `::meta`, `::macros`, `::vars` and
+//! the rest of the standard ones, apart from what body elements and vocabularies mean.
+//!
+//! =[ Architecture & Responsibilities ]
+//!
+//! - (Declaration means `::declaration`)
+//!   | A declaration is a `::name(args){data}` at the top of a document, about the document
+//!   | rather than in it. This crate is that and only that: a datetime, a type or an
+//!   | expression is another concept and lives elsewhere.
+//! - (Shape here, meaning injected)
+//!   | [`DeclKind`] is the closed list of the standard declarations. Each has a [`Spec`]: its
+//!   | positional slots, whether it may be written once or many times, and where it may be written
+//!   | ([`Scope`]). Reading and checking the ones both hosts have (`kind version meta macros
+//!   | vars`) is here. What the `.tmt`-only ones *do* -- `use` binds a vocabulary, `blueprint`
+//!   | is instantiated, `config` fills the settings -- stays with the host, which matches on
+//!   | [`DeclKind`]. This crate never calls the host back.
+//! - (A leaf)
+//!   | It depends on [`tomet_ast`] for [`Value`], [`Element`] and [`Document`], on
+//!   | [`tomet_tree`] to walk a document's top level, and on [`tomet_type`] for the types a
+//!   | `::vars` entry names. It does not know a body element, a vocabulary or a vault.
+//! - (Two hosts, one input)
+//!   | A `.tmt` document gives its declarations as [`Declaration`]s through
+//!   | [`Declaration::from_element`]; a `.ctmt` file's header gives the same three things, a
+//!   | name, `(args)` and `{data}`. The readers see only that.
+//!
+//! =[ Not here ]
+//!
+//! - `::rule(...)`, a document-level rule: it exists as a name in a design memo only. `:rule`,
+//!   the connect on an element, is another concept.
+//! - A user vocabulary's preamble elements (`::character`): the vocabulary declares them.
+//! - The checks (`check_version_slot` and the like) still live in `tomet-validator-core`; they move
+//!   here as a host-neutral problem when `.ctmt` is checked.
+
+pub use tomet_ast::{Document, Element, Value};
+
+mod declaration;
+mod kind;
+mod read;
+mod vars;
+
+pub use declaration::{Declaration, Found, declarations};
+pub use kind::{Cardinality, DeclKind, Host, Scope, Spec};
+pub use read::{
+    blueprint_target, document_blueprint, document_kind, document_macros, document_meta,
+    document_vars, document_version, kind_name, macros, meta, version_string,
+};
+pub use vars::{VAR_KEYS, VarDecl, read_var_decls};

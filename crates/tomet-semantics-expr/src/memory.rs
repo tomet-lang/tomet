@@ -76,7 +76,7 @@ impl Resolver for MemoryResolver {
 
     fn meta(&self, doc: &DocRef) -> Result<EvalValue, String> {
         let document = self.document(doc)?;
-        Ok(match tomet_semantics::document_meta(&document) {
+        Ok(match tomet_declaration::document_meta(&document) {
             Some(meta) => EvalValue::from_ast(&meta, doc),
             None => EvalValue::from_ast(&Value::Map(Vec::new()), doc),
         })

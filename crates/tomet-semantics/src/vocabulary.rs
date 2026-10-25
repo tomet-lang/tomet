@@ -14,7 +14,7 @@
 //!   declared on the first line. Anything brought in with `::use` is
 //!   always written out.
 //! - `std` wins every collision, and cannot be shadowed: a vocabulary
-//!   that declares a name already in [`BUILTIN_KINDS`] is rejected at the
+//!   that declares a name already in [`builtin_kinds`] is rejected at the
 //!   declaration rather than at each use site, which is one error instead
 //!   of many.
 //! - `doc` (`RESERVED_NAMESPACES`) is a second namespace tomet carries
@@ -30,7 +30,9 @@ use tomet_ast::{Document, Name, Value};
 use tomet_tree::ValueExt;
 use tomet_type::{Type, TypeError};
 
-use crate::kind::{BUILTIN_KINDS, ElementKind, Shape, UnknownName, classify_std_lenient};
+use tomet_declaration::DeclKind;
+
+use crate::kind::{ElementKind, Shape, UnknownName, builtin_kinds, classify_std_lenient};
 use crate::positional::normalized_element_args;
 
 /// Where an element is allowed to sit in a document.
@@ -170,7 +172,7 @@ pub const RESERVED_NAMESPACES: [&str; 1] = ["doc"];
 
 /// The vocabularies tomet ships hardcoded in Rust rather than as a vault's
 /// `::vocabulary(ns)` document -- the same reason `std`'s elements are a
-/// Rust table (`BUILTIN_KINDS`) rather than a `::vocabulary(std)` document:
+/// Rust table (`builtin_kinds`) rather than a `::vocabulary(std)` document:
 /// see `kind.rs`'s doc comment on why that is a limit of the vocabulary
 /// format, not a permanent design.
 ///
@@ -237,7 +239,7 @@ pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
 /// unconditionally, so it can't wait for `Bindings::for_document`'s
 /// `available` (a caller using `Bindings::default()`, which most of this
 /// crate's own tests do, never populates that at all). `std` gets this for
-/// free from `BUILTIN_KINDS` being a `const`; `doc` needs a static instead
+/// free from the table being a `const`; `doc` needs a static instead
 /// because it is real [`Vocabulary`] data, built once by
 /// [`builtin_doc_vocabularies`] and reused rather than reallocated on every
 /// lookup.
@@ -264,7 +266,7 @@ impl Vocabulary {
         };
 
         tomet_tree::for_each_top_level_element(doc, |el| {
-            if classify_std_lenient(el) != ElementKind::Elements {
+            if classify_std_lenient(el) != ElementKind::Declaration(DeclKind::Elements) {
                 return;
             }
             let Some(data) = crate::data::element_data(el) else {
@@ -293,7 +295,7 @@ impl Vocabulary {
     pub fn shadowed_builtins(&self) -> Vec<&str> {
         self.elements
             .keys()
-            .filter(|name| BUILTIN_KINDS.iter().any(|(builtin, _)| builtin == *name))
+            .filter(|name| builtin_kinds().any(|(builtin, _)| builtin == *name))
             .map(String::as_str)
             .collect()
     }
@@ -463,7 +465,7 @@ impl Bindings {
             .map(|v| (v.namespace.clone(), v))
             .collect();
 
-        let kind = crate::elements::meta::document_kind(doc)
+        let kind = tomet_declaration::document_kind(doc)
             .and_then(|kind| by_namespace.get(&kind))
             .cloned();
 
@@ -569,7 +571,7 @@ impl Bindings {
 fn used_namespaces(doc: &Document) -> Vec<String> {
     let mut names = Vec::new();
     tomet_tree::for_each_top_level_element(doc, |el| {
-        if classify_std_lenient(el) != ElementKind::Use {
+        if classify_std_lenient(el) != ElementKind::Declaration(DeclKind::Use) {
             return;
         }
         let Some(args) = normalized_element_args(el) else {
@@ -588,17 +590,18 @@ fn used_namespaces(doc: &Document) -> Vec<String> {
 }
 
 fn builtin(name: &str) -> Option<ElementKind> {
-    BUILTIN_KINDS
-        .iter()
+    builtin_kinds()
         .find(|(builtin, _)| *builtin == name)
-        .map(|(_, kind)| kind.clone())
+        .map(|(_, kind)| kind)
 }
 
 /// The namespace a `::vocabulary(ns)` header names, and whether it is open.
 fn header(doc: &Document) -> Option<(String, bool)> {
     let mut found = None;
     tomet_tree::for_each_top_level_element(doc, |el| {
-        if found.is_some() || classify_std_lenient(el) != ElementKind::Vocabulary {
+        if found.is_some()
+            || classify_std_lenient(el) != ElementKind::Declaration(DeclKind::Vocabulary)
+        {
             return;
         }
         let Some(name) = positional_name(el) else {
@@ -1086,7 +1089,10 @@ mod tests {
     #[test]
     fn empty_bindings_resolve_std_and_nothing_else() {
         let b = Bindings::default();
-        assert_eq!(b.classify(&name("meta")), Ok(ElementKind::Meta));
+        assert_eq!(
+            b.classify(&name("meta")),
+            Ok(ElementKind::Declaration(DeclKind::Meta))
+        );
         assert!(b.classify(&name("layers")).is_err());
         assert!(b.classify(&name("writ.layers")).is_err());
     }

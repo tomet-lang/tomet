@@ -90,7 +90,13 @@ fn prepare_document(mut doc: tomet::ast::Document, opts: &ProcessOptions) -> tom
         for block in cfg_doc.blocks {
             if let tomet::ast::Block::Element(el) = &block {
                 let kind = tomet::semantics::classify_std_lenient(el);
-                if kind == tomet::semantics::ElementKind::Config || kind.as_str() == "settings" {
+                if matches!(
+                    kind,
+                    tomet::semantics::ElementKind::Declaration(
+                        tomet::declaration::DeclKind::Config
+                            | tomet::declaration::DeclKind::Settings
+                    )
+                ) {
                     prefix_blocks.push(block);
                 }
             }
@@ -168,7 +174,7 @@ pub fn process_document_internal(
     let is_data_only = html.trim().is_empty();
 
     // 1. Meta & Title from @meta{title}
-    let meta = tomet::semantics::document_meta(&doc);
+    let meta = tomet::declaration::document_meta(&doc);
     let meta_title = meta.as_ref().and_then(|v| match v {
         tomet::ast::Value::Map(m) => m.iter().find_map(|(k, val)| {
             if k == "title" {

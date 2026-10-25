@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: cotomet-syntax, dependencies: list(tomet-ast, tomet-lexer), dependents: list(cotomet, serde_cotomet, tomet-edit, tomet-formatter, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style, tomet-tests)}
+::meta{crate: cotomet-syntax, dependencies: list(tomet-ast, tomet-lexer), dependents: list(cotomet, serde_cotomet, tomet-declaration, tomet-edit, tomet-formatter, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style, tomet-tests)}
 
 =[cotomet-syntax]
 
