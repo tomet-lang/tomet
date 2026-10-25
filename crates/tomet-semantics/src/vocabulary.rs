@@ -28,6 +28,7 @@ use std::sync::LazyLock;
 
 use tomet_ast::{Document, Name, Value};
 use tomet_tree::ValueExt;
+use tomet_type::{Type, TypeError};
 
 use crate::kind::{BUILTIN_KINDS, ElementKind, Shape, UnknownName, classify_std_lenient};
 use crate::positional::normalized_element_args;
@@ -52,18 +53,17 @@ pub enum Region {
 /// `param` and not `arg`: parameter is the declaration side, argument is
 /// the call side, so `(args)` needs no rename.
 ///
-/// **`ty` is read but never checked.** It is kept as `element_data`
-/// produces it -- `uint` arrives as a string, `list(string)` as a
-/// sequence -- because
-/// checking a value against it needs a type language this project has not
-/// settled: a parameter's own `type:` is an identifier rather than a
-/// string, `default:`'s type depends on `type:`, and `type:`'s type is a
-/// type. Interpreting it here would mean deciding all three by accident.
+/// `type:` is a [`Type`] (`tomet-type`), and an argument written for the
+/// parameter is held to it (`tomet check`). A `type:` that names no type is
+/// kept as the reason, not dropped: the parameter is then not checked, and
+/// [`Vocabulary::param_problems`] says so once, where the vocabulary is read.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ParamDecl {
     pub name: String,
-    /// The declared type, verbatim. See the note above.
-    pub ty: Option<Value>,
+    /// The declared type: `None` when `type:` is not written, `Some(Err(_))`
+    /// when it is written and is not a type (an unknown name, or a spelling
+    /// such as `list(string)` that has no meaning yet).
+    pub ty: Option<Result<Type, TypeError>>,
     pub required: bool,
     /// Whether this parameter may be filled by position rather than by
     /// name. The *order* comes from where the entry sits in `args:`, which is why
@@ -103,6 +103,22 @@ pub enum ContentAllow {
     Inline,
     /// `allow: any` -- any blocks, any names.
     Any,
+}
+
+/// Something wrong with how a parameter is declared, found where the
+/// vocabulary is read rather than at every use.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParamProblem {
+    pub element: String,
+    pub param: String,
+    pub reason: String,
+}
+
+impl ParamDecl {
+    /// The declared type, when `type:` names one.
+    pub fn declared_type(&self) -> Option<Type> {
+        self.ty.as_ref().and_then(|ty| ty.as_ref().ok().copied())
+    }
 }
 
 impl ElementDecl {
@@ -281,6 +297,37 @@ impl Vocabulary {
             .map(String::as_str)
             .collect()
     }
+
+    /// Parameters declared in a way that cannot be held to: a `type:` that
+    /// names no type, and a `default:` that is not of its `type:`. In
+    /// declaration order.
+    ///
+    /// Not an invalid vocabulary: such a parameter is accepted and simply not
+    /// checked. Reported once, where the vocabulary is read.
+    pub fn param_problems(&self) -> Vec<ParamProblem> {
+        let mut problems = Vec::new();
+        for (element, decl) in &self.elements {
+            for param in &decl.params {
+                let reason = match &param.ty {
+                    Some(Err(err)) => Some(err.to_string()),
+                    Some(Ok(ty)) => param
+                        .default
+                        .as_ref()
+                        .and_then(|default| ty.admits(default).err())
+                        .map(|mismatch| format!("`default` is not of `type: {ty}`: {mismatch}")),
+                    None => None,
+                };
+                if let Some(reason) = reason {
+                    problems.push(ParamProblem {
+                        element: element.clone(),
+                        param: param.name.clone(),
+                        reason,
+                    });
+                }
+            }
+        }
+        problems
+    }
 }
 
 /// Every vocabulary a vault declares, with whatever went wrong.
@@ -356,6 +403,12 @@ impl LoadedVocabularies {
             self.errors.push(format!(
                 "{label} declares `{shadowed}`, which is already a built-in name; \
                  std wins, so a vocabulary may not take one"
+            ));
+        }
+        for problem in vocab.param_problems() {
+            self.errors.push(format!(
+                "{label}: `{}`'s parameter `{}`: {}",
+                problem.element, problem.param, problem.reason
             ));
         }
 
@@ -638,7 +691,7 @@ fn params_from_value(args: &Value) -> Vec<ParamDecl> {
         .iter()
         .map(|(name, spec)| ParamDecl {
             name: name.clone(),
-            ty: spec.get("type").cloned(),
+            ty: spec.get("type").map(Type::parse),
             required: spec
                 .get("required")
                 .and_then(|v| v.as_bool())
@@ -739,16 +792,15 @@ mod tests {
         let id = card.param("id").expect("declared");
         assert!(id.required);
         assert!(id.positional);
-        // Read verbatim, never interpreted -- see `ParamDecl::ty`.
-        assert_eq!(id.ty, Some(Value::String("uint".to_string())));
+        assert_eq!(id.ty, Some(Ok(Type::Uint)));
+        assert_eq!(id.declared_type(), Some(Type::Uint));
 
         let tags = card.param("tags").expect("declared");
         assert!(!tags.required);
         assert!(!tags.positional);
-        assert_eq!(
-            tags.ty,
-            Some(Value::Seq(vec![Value::String("string".to_string())]))
-        );
+        // `list(string)` has no spelling as a type yet: kept as the reason.
+        assert_eq!(tags.ty, Some(Err(TypeError::NotAName)));
+        assert_eq!(tags.declared_type(), None);
     }
 
     #[test]
@@ -841,6 +893,68 @@ mod tests {
         let v = vocab("::vocabulary(deck)\n\n::elements{ link: {}, ref: {} }\n");
         assert_eq!(v.shadowed_builtins(), ["link"]);
         assert!(vocab(WRIT).shadowed_builtins().is_empty());
+    }
+
+    const DECK: &str = "::vocabulary(deck)
+
+::elements{
+  item: {
+    args: {
+      id: { type: uint, positional: true }
+      tags: { type: list(string) }
+      owner: { type: person }
+      stars: { type: uint, default: \"many\" }
+      note: {}
+    }
+  }
+}
+";
+
+    #[test]
+    fn a_type_that_names_no_type_or_a_default_that_does_not_fit_is_a_problem() {
+        let problems = vocab(DECK).param_problems();
+        let by_param = |p: &str| {
+            problems
+                .iter()
+                .find(|x| x.param == p)
+                .map(|x| x.reason.as_str())
+        };
+        // `list(string)` has no spelling yet, `person` is no type
+        assert!(
+            by_param("tags").unwrap().contains("no spelling yet"),
+            "{problems:?}"
+        );
+        assert!(
+            by_param("owner")
+                .unwrap()
+                .contains("`person` is not a type"),
+            "{problems:?}"
+        );
+        assert!(
+            by_param("stars")
+                .unwrap()
+                .contains("`default` is not of `type: uint`"),
+            "{problems:?}"
+        );
+        // a good type, and no type at all, are not problems
+        assert_eq!(by_param("id"), None);
+        assert_eq!(by_param("note"), None);
+        assert_eq!(problems.len(), 3);
+    }
+
+    #[test]
+    fn the_problem_is_reported_once_where_the_vocabulary_is_read() {
+        let doc = tomet_parser::parse_document(DECK).unwrap();
+        let mut loaded = LoadedVocabularies::default();
+        loaded.add("deck.vocabulary.tmt", &doc);
+        assert_eq!(loaded.errors.len(), 3, "{:?}", loaded.errors);
+        assert!(
+            loaded.errors[0].starts_with("deck.vocabulary.tmt: `item`'s parameter `"),
+            "{:?}",
+            loaded.errors
+        );
+        // the vocabulary is still accepted: a parameter that cannot be checked is not checked
+        assert!(loaded.by_namespace.contains_key("deck"));
     }
 
     #[test]

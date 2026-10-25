@@ -149,7 +149,8 @@ mod tests {
     fn they_are_ordered_as_versions_not_as_numbers_or_text() {
         assert!(v("1.10") > v("1.9"));
         assert!("1.10" < "1.9", "as text the order is the other way");
-        assert!(1.10_f64 < 1.9_f64, "and as numbers too");
+        let number = |text: &str| text.parse::<f64>().unwrap();
+        assert!(number("1.10") < number("1.9"), "and as numbers too");
         assert!(v("1.10.0") > v("1.9.9"));
         assert!(v("2") > v("1.99.99"));
         assert!(v("0.5.0") < v("0.10"));

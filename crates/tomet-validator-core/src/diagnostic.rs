@@ -112,6 +112,19 @@ pub enum Diagnostic {
         argument: String,
         span: Span,
     },
+    /// An argument that is not of the `type:` its parameter declares:
+    /// `@card(id: abc)` where `id` is `type: uint`.
+    ///
+    /// A parameter whose `type:` is not a type is not checked, and the
+    /// vocabulary says so where it is read.
+    InvalidArgument {
+        element: String,
+        argument: String,
+        ty: String,
+        /// What is wrong, as `tomet-type` says it: `` `abc` is not a non-negative integer ``.
+        reason: String,
+        span: Span,
+    },
     /// A parameter marked `required: true` with no argument to fill it.
     MissingRequiredArgument {
         element: String,
@@ -250,6 +263,7 @@ impl Diagnostic {
             Diagnostic::InvalidDefinition { span, .. } => *span,
             Diagnostic::InvalidFieldValue { span, .. } => *span,
             Diagnostic::UnknownArgument { span, .. } => *span,
+            Diagnostic::InvalidArgument { span, .. } => *span,
             Diagnostic::MissingRequiredArgument { span, .. } => *span,
             Diagnostic::InvalidVersion { span, .. } => *span,
             Diagnostic::TooManyArguments { span, .. } => *span,
@@ -434,6 +448,18 @@ impl Diagnostic {
                     f,
                     "`{element}` has no argument `{argument}`; its vocabulary \
                      declares the ones it takes under `args:`"
+                )
+            }
+            Diagnostic::InvalidArgument {
+                element,
+                argument,
+                ty,
+                reason,
+                ..
+            } => {
+                write!(
+                    f,
+                    "`{element}`'s argument `{argument}` is declared `type: {ty}`, but {reason}"
                 )
             }
             Diagnostic::MissingRequiredArgument {

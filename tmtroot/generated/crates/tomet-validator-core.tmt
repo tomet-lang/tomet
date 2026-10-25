@@ -85,6 +85,13 @@ float, and a document names only the major version.
 
 ===[fn check_content_shape]
 
+===[fn check_vocabulary_params]
+
+Checks how a vocabulary document declares its parameters: a `type:` that names
+no type, a `default:` that is not of its `type:`. The same findings are reported
+where a vault reads the vocabulary ([`tomet_semantics::LoadedVocabularies`]);
+this is for checking the vocabulary file itself.
+
 ===[fn check_declared_versions]
 
 Checks the versions a document declares: `::version(1.0)` and the `version:` of

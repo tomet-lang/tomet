@@ -71,6 +71,7 @@ pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagn
     check_retired_settings_keys(doc, errors);
     check_name_definitions(doc, errors);
     check_declared_versions(doc, errors);
+    check_vocabulary_params(doc, errors);
     check_arguments(doc, bindings, errors);
     check_version_slot(doc, bindings, errors);
     check_unfinished(doc, errors);
@@ -351,6 +352,26 @@ pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Dia
                 });
             }
         }
+        // An argument is held to the `type:` its parameter declares. A parameter
+        // whose `type:` names no type is not checked (the vocabulary says so
+        // where it is read), and a `${...}` is not known until it is evaluated.
+        for (key, value) in entries {
+            let Some(ty) = decl.param(key).and_then(|p| p.declared_type()) else {
+                continue;
+            };
+            if matches!(value, Value::Element(el) if matches!(el.sigil, tomet_ast::Sigil::Dollar)) {
+                continue;
+            }
+            if let Err(mismatch) = ty.admits(value) {
+                errors.push(Diagnostic::InvalidArgument {
+                    element: name.to_string(),
+                    argument: key.clone(),
+                    ty: ty.to_string(),
+                    reason: mismatch.to_string(),
+                    span: el.span,
+                });
+            }
+        }
         for param in decl.params.iter().filter(|p| p.required) {
             if !entries.iter().any(|(k, _)| *k == param.name) {
                 errors.push(Diagnostic::MissingRequiredArgument {
@@ -493,6 +514,33 @@ fn for_each_direct_content_element<'a>(
             Block::Section(_) => {}
             Block::List(_) => {}
         }
+    }
+}
+
+/// Checks how a vocabulary document declares its parameters: a `type:` that names
+/// no type, a `default:` that is not of its `type:`. The same findings are reported
+/// where a vault reads the vocabulary ([`tomet_semantics::LoadedVocabularies`]);
+/// this is for checking the vocabulary file itself.
+pub fn check_vocabulary_params(doc: &Document, errors: &mut Vec<Diagnostic>) {
+    use tomet_semantics::{ElementKind, Vocabulary, classify_std_lenient};
+
+    let Some(vocab) = Vocabulary::from_document(doc) else {
+        return;
+    };
+    let mut elements_span = None;
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        if elements_span.is_none() && classify_std_lenient(el) == ElementKind::Elements {
+            elements_span = Some(el.span);
+        }
+    });
+    let Some(span) = elements_span else { return };
+    for problem in vocab.param_problems() {
+        errors.push(Diagnostic::InvalidDefinition {
+            declaration: "elements",
+            name: format!("{}.{}", problem.element, problem.param),
+            reason: problem.reason,
+            span,
+        });
     }
 }
 

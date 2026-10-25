@@ -402,13 +402,10 @@ One parameter, as an entry of an element's `args:` map declares it.
 `param` and not `arg`: parameter is the declaration side, argument is
 the call side, so `(args)` needs no rename.
 
-@strong[`ty` is read but never checked.] It is kept as `element_data`
-produces it -- `uint` arrives as a string, `list(string)` as a
-sequence -- because
-checking a value against it needs a type language this project has not
-settled: a parameter's own `type:` is an identifier rather than a
-string, `default:`'s type depends on `type:`, and `type:`'s type is a
-type. Interpreting it here would mean deciding all three by accident.
+`type:` is a [`Type`] (`tomet-type`), and an argument written for the
+parameter is held to it (`tomet check`). A `type:` that names no type is
+kept as the reason, not dropped: the parameter is then not checked, and
+[`Vocabulary::param_problems`] says so once, where the vocabulary is read.
 
 ====[struct ElementDecl]
 
@@ -416,6 +413,11 @@ One element, as a vocabulary declares it.
 
 `args:` and `content:` are read; `@data` is not yet. `about:`, the
 element's prose, is not read either.
+
+====[struct ParamProblem]
+
+Something wrong with how a parameter is declared, found where the
+vocabulary is read rather than at every use.
 
 ====[struct Vocabulary]
 

@@ -1171,3 +1171,96 @@ fn a_version_field_in_meta_reads_a_bare_number_as_text() {
         assert_eq!(problems(&format!("::meta{{ rev: {bad} }}\n")), 1, "{bad}");
     }
 }
+
+const TYPED_DECK: &str = r#"::kind(vocabulary)
+::vocabulary(deck){}
+
+::elements{
+  item: {
+    args: {
+      id: { type: uint, positional: true }
+      label: { type: string }
+      rev: { type: version }
+      done: { type: bool }
+      owner: { type: person }
+      tags: { type: list(string) }
+    }
+  }
+}
+"#;
+
+fn typed_deck() -> Bindings {
+    let vocab =
+        tomet_semantics::Vocabulary::from_document(&parse(TYPED_DECK)).expect("a vocabulary");
+    Bindings::for_document(&parse("::kind(deck)\n"), [vocab])
+}
+
+fn argument_problems(src: &str) -> Vec<String> {
+    validate_document_with(&parse(&format!("::kind(deck)\n\n{src}\n")), &typed_deck())
+        .iter()
+        .filter(|e| matches!(e, Diagnostic::InvalidArgument { .. }))
+        .map(|e| e.to_string())
+        .collect()
+}
+
+/// An argument is held to the type its parameter declares. A bare scalar of a text
+/// type is the text it was written as, so `2024` is a `string` and `1.10` a `version`.
+#[test]
+fn an_argument_is_held_to_the_type_its_parameter_declares() {
+    for ok in [
+        "@item(3)",
+        "@item(id: 0, label: 2024, rev: 1.10, done: true)",
+        "@item(label: hello, rev: \"1.10.0\")",
+        "@item(rev: 2)",
+        "@item(label: true)",
+        // not known until evaluated
+        "@item(id: ${vars.n})",
+        // `type: person` names no type and `list(string)` has no spelling yet: not checked
+        "@item(owner: anyone, tags: list(a, b))",
+        "@item(tags: 5)",
+    ] {
+        assert!(
+            argument_problems(ok).is_empty(),
+            "{ok}: {:?}",
+            argument_problems(ok)
+        );
+    }
+    for (bad, needle) in [
+        ("@item(id: abc)", "`abc` is not a non-negative integer"),
+        ("@item(id: -1)", "`-1` is not a non-negative integer"),
+        ("@item(id: \"3\")", "`3` is not a non-negative integer"),
+        ("@item(rev: 1.0-beta)", "`1.0-beta` is not a version"),
+        ("@item(done: yes)", "`yes` is not `true` or `false`"),
+        ("@item(label: list(a))", "a list is not a string"),
+    ] {
+        let found = argument_problems(bad);
+        assert_eq!(found.len(), 1, "{bad}: {found:?}");
+        assert!(found[0].contains(needle), "{bad}: {found:?}");
+        assert!(found[0].contains("is declared `type:"), "{bad}: {found:?}");
+    }
+}
+
+/// Checking the vocabulary document itself reports the parameters it declares in a
+/// way that cannot be held to.
+#[test]
+fn checking_a_vocabulary_reports_a_type_that_names_no_type() {
+    let errors = validate_document(&parse(TYPED_DECK));
+    let problems: Vec<String> = errors
+        .iter()
+        .filter(|e| matches!(e, Diagnostic::InvalidDefinition { declaration, .. } if *declaration == "elements"))
+        .map(|e| e.to_string())
+        .collect();
+    assert_eq!(problems.len(), 2, "{problems:?}");
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("`item.owner`") && p.contains("`person` is not a type")),
+        "{problems:?}"
+    );
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("`item.tags`") && p.contains("no spelling yet")),
+        "{problems:?}"
+    );
+}

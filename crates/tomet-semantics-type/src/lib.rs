@@ -162,23 +162,28 @@ impl Type {
     }
 
     /// Whether `value`, as a document holds it, is of this type.
+    ///
+    /// A type that is text -- `string`, `version`, `uuid`, `nanoid`, and `datetime`
+    /// -- takes any scalar as the text it was written as, so a bare `2024` is a
+    /// `string` and a bare `1.10` is a `version`: what is written decides, not
+    /// what the reader would have made of it. A number type takes the numbers
+    /// the reader keeps as written too (`1.10` is a `float`, `-0` an `int`).
     pub fn admits(self, value: &Value) -> Result<(), Mismatch> {
-        let fits = match (self, value) {
-            (Type::String | Type::Nanoid, Value::String(_)) => true,
-            (Type::Int, Value::Int(_)) => true,
-            (Type::Uint, Value::Int(n)) => *n >= 0,
-            (Type::Float, Value::Float(_) | Value::Int(_)) => true,
-            (Type::Bool, Value::Bool(_)) => true,
-            (Type::Datetime | Type::Uuid, Value::String(text)) => {
-                self.holds_text(text) == Some(true)
-            }
-            (Type::List, Value::Seq(_)) => true,
-            // A version is text, and a bare `1`, `1.0` or `1.10` is the text it was
-            // written as: what is written decides, not what it would be as a number.
-            (Type::Version, scalar) => scalar
+        let integer = || match value {
+            Value::Int(n) => Some(*n),
+            Value::Number(text) => text.parse::<i64>().ok(),
+            _ => None,
+        };
+        let fits = match self {
+            Type::Int => integer().is_some(),
+            Type::Uint => integer().is_some_and(|n| n >= 0),
+            Type::Float => matches!(value, Value::Int(_)) || value.as_number().is_some(),
+            Type::Bool => matches!(value, Value::Bool(_)),
+            Type::List => matches!(value, Value::Seq(_)),
+            Type::String | Type::Nanoid => value.scalar_text().is_some(),
+            Type::Datetime | Type::Version | Type::Uuid => value
                 .scalar_text()
                 .is_some_and(|text| self.holds_text(&text) == Some(true)),
-            _ => false,
         };
         if fits {
             Ok(())
@@ -366,9 +371,16 @@ mod tests {
 
     #[test]
     fn a_value_is_held_to_its_type() {
-        let ok: [(Type, Value); 17] = [
+        let ok = vec![
             (Type::String, text("x")),
+            // a bare scalar is the text it was written as
+            (Type::String, Value::Int(2024)),
+            (Type::String, Value::Bool(true)),
+            (Type::String, Value::Number("1.10".to_string())),
+            (Type::Nanoid, Value::Int(12345678)),
             (Type::Int, Value::Int(-3)),
+            (Type::Int, Value::Number("-0".to_string())),
+            (Type::Float, Value::Number("1.10".to_string())),
             (Type::Uint, Value::Int(0)),
             (Type::Float, Value::Float(1.5)),
             (Type::Float, Value::Int(2)),
@@ -389,8 +401,9 @@ mod tests {
         for (ty, value) in ok {
             assert_eq!(ty.admits(&value), Ok(()), "{ty}: {value:?}");
         }
-        let bad: [(Type, Value); 14] = [
-            (Type::String, Value::Int(1)),
+        let bad = vec![
+            (Type::String, Value::Null),
+            (Type::String, Value::Seq(vec![])),
             (Type::Int, Value::Float(1.0)),
             (Type::Uint, Value::Int(-1)),
             (Type::Bool, text("true")),
@@ -403,7 +416,7 @@ mod tests {
             (Type::Version, Value::Float(1e21)),
             (Type::Uuid, text("not-a-uuid")),
             (Type::List, text("a")),
-            (Type::Nanoid, Value::Int(1)),
+            (Type::Nanoid, Value::Map(vec![])),
         ];
         for (ty, value) in bad {
             assert!(ty.admits(&value).is_err(), "{ty}: {value:?}");
