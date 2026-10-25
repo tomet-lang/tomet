@@ -6,7 +6,7 @@
 // Only the head of each element changes (`@kind` becomes `::kind`); the
 // arguments, data, content, id and connects stay byte for byte as they were.
 // Run it while the old spellings still parse: once `^` and `@footnote` are
-// refused, `tandr` no longer sees them. See tmtroot/dev/design/document-connects.tmt.
+// refused, `tandr` no longer sees them. See tmtroot/dev/design/document-declarations.tmt.
 
 doc_kind:       { match: "@kind",       replace: { head: "::kind" } }
 doc_version:    { match: "@version",    replace: { head: "::version" } }

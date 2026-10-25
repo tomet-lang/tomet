@@ -699,7 +699,6 @@ pub enum Sigil {
     /// document's preamble, the run of `::` blocks at the top -- so the
     /// preamble can be found without loading any vocabulary. Which names may
     /// be written this way is the `Region` a vocabulary declares for them;
-    /// see `tmtroot/dev/design/document-connects.tmt`.
     Document(Name),
 }
 
