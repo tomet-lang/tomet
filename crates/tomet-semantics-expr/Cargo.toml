@@ -10,6 +10,7 @@ repository.workspace = true
 tomet-ast = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-semantics = { workspace = true }
+tomet-type = { workspace = true }
 tomet-tree = { workspace = true }
 
 #= Crates.io

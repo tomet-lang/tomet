@@ -322,7 +322,11 @@ fn render_meta_field_value(
     }
     if let Some(cfg) = field_cfg {
         if (cfg.format.as_deref() == Some("rfc3339")
-            || cfg.field_type.as_deref() == Some("datetime"))
+            || cfg
+                .field_type
+                .as_deref()
+                .and_then(tomet_type::Type::from_name)
+                == Some(tomet_type::Type::Datetime))
             && let Value::String(s) = v
         {
             return tomet_field_utils::format_rfc3339(s, cfg.offset.as_deref());

@@ -1,0 +1,10 @@
+[package]
+name = "tomet-type"
+version.workspace = true
+edition.workspace = true
+description = "The types a value can be declared as -- string, int, datetime, uuid, list and the rest -- and how data and text are held to them."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }

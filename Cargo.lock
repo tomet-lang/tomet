@@ -1879,6 +1879,7 @@ dependencies = [
  "tomet-parser",
  "tomet-semantics",
  "tomet-tree",
+ "tomet-type",
  "uuid",
 ]
 
@@ -1899,7 +1900,7 @@ version = "0.5.0"
 dependencies = [
  "nanoid",
  "tomet-config",
- "tomet-semantics",
+ "tomet-type",
  "uuid",
 ]
 
@@ -2137,6 +2138,7 @@ dependencies = [
  "tomet-ast",
  "tomet-parser",
  "tomet-tree",
+ "tomet-type",
 ]
 
 [[package]]
@@ -2185,6 +2187,7 @@ dependencies = [
  "tomet-field-utils",
  "tomet-semantics",
  "tomet-tree",
+ "tomet-type",
 ]
 
 [[package]]
@@ -2244,6 +2247,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomet-type"
+version = "0.5.0"
+dependencies = [
+ "tomet-ast",
+]
+
+[[package]]
 name = "tomet-typst"
 version = "0.5.0"
 dependencies = [
@@ -2291,6 +2301,7 @@ dependencies = [
  "tomet-lexer",
  "tomet-semantics",
  "tomet-tree",
+ "tomet-type",
 ]
 
 [[package]]
@@ -2315,6 +2326,7 @@ dependencies = [
  "tomet-search",
  "tomet-semantics",
  "tomet-transform",
+ "tomet-type",
  "tomet-validator",
 ]
 

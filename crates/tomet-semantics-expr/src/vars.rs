@@ -5,10 +5,13 @@
 //! was passed comes from `tomet new --var key=value`, and is text. A default
 //! is read as written: a default that does not fit its `type` is left as it
 //! is, and `tomet check` reports it, as for `typed_meta`. A value passed on
-//! the command line is held to its type, because nothing else will.
+//! the command line is held to its type, because nothing else will -- by
+//! [`tomet_type::Type::read_text`]; what a type is, and what text it takes, is
+//! that crate's to say.
 
 use tomet_ast::Value;
 use tomet_semantics::VarDecl;
+use tomet_type::Type;
 
 use crate::datetime::parse_datetime;
 use crate::value::{DocRef, EvalValue};
@@ -41,8 +44,9 @@ pub enum VarError {
     /// A text that is not a value of the declared type.
     BadValue {
         name: String,
-        ty: String,
+        ty: Type,
         text: String,
+        /// What is wrong, as [`tomet_type::TextError`] says it: `` `many` is not an integer ``.
         why: String,
     },
 }
@@ -98,9 +102,12 @@ pub fn var_scope(
     for (name, decl) in decls {
         let given = passed.iter().rev().find(|(n, _)| n == name);
         let value = match (given, &decl.default) {
-            (Some((_, Value::String(text))), _) => Some(from_text(name, decl, text)?),
+            (Some((_, Value::String(text))), _) => Some(shaped(
+                decl.ty,
+                EvalValue::from_ast(&read_text(name, decl.ty, text)?, doc),
+            )),
             (Some((_, other)), _) => Some(EvalValue::from_ast(other, doc)),
-            (None, Some(default)) => Some(typed_default(decl, EvalValue::from_ast(default, doc))),
+            (None, Some(default)) => Some(shaped(decl.ty, EvalValue::from_ast(default, doc))),
             (None, None) => None,
         };
         match value {
@@ -115,50 +122,31 @@ pub fn var_scope(
 }
 
 /// A text passed on the command line, as the value of the declared type.
-fn from_text(name: &str, decl: &VarDecl, text: &str) -> Result<EvalValue, VarError> {
-    let ty = decl.type_name();
-    let bad = |why: &str| VarError::BadValue {
+fn read_text(name: &str, ty: Type, text: &str) -> Result<Value, VarError> {
+    ty.read_text(text).map_err(|err| VarError::BadValue {
         name: name.to_string(),
-        ty: ty.to_string(),
+        ty,
         text: text.to_string(),
-        why: why.to_string(),
-    };
-    match ty {
-        "string" => Ok(EvalValue::String(text.to_string())),
-        "int" => text
-            .trim()
-            .parse::<i64>()
-            .map(EvalValue::Int)
-            .map_err(|_| bad("it is not an integer")),
-        "float" => text
-            .trim()
-            .parse::<f64>()
-            .map(EvalValue::Float)
-            .map_err(|_| bad("it is not a number")),
-        "bool" => match text.trim() {
-            "true" => Ok(EvalValue::Bool(true)),
-            "false" => Ok(EvalValue::Bool(false)),
-            _ => Err(bad("it is neither `true` nor `false`")),
-        },
-        "datetime" => parse_datetime(text.trim())
-            .map(EvalValue::DateTime)
-            .ok_or_else(|| bad("it is not a datetime (RFC 3339)")),
-        "list" => Err(bad("a list cannot be passed with `--var` yet")),
-        _ => Err(bad("that is not a type a variable can have")),
-    }
+        why: err.to_string(),
+    })
 }
 
-/// A default, shaped by the declared type where it plainly can be. One that
-/// does not fit stays as written.
-fn typed_default(decl: &VarDecl, value: EvalValue) -> EvalValue {
-    match (decl.type_name(), value) {
-        ("datetime", EvalValue::String(text)) => match parse_datetime(&text) {
+/// A value, shaped by the declared type where it plainly can be: a datetime
+/// that is text becomes a datetime, a whole number given for a `float` is a
+/// number, a lone value for a `list` is a list of one. One that does not fit
+/// stays as written -- `tomet check` is what reports it.
+///
+/// This is the one place a declared type shapes a value that was written for
+/// it: a variable's default or `--var`, and a `::meta` field alike.
+pub fn shaped(ty: Type, value: EvalValue) -> EvalValue {
+    match (ty, value) {
+        (Type::Datetime, EvalValue::String(text)) => match parse_datetime(&text) {
             Some(parsed) => EvalValue::DateTime(parsed),
             None => EvalValue::String(text),
         },
-        ("float", EvalValue::Int(i)) => EvalValue::Float(i as f64),
-        ("list", list @ EvalValue::Seq(_)) => list,
-        ("list", single) => EvalValue::Seq(vec![single]),
+        (Type::Float, EvalValue::Int(i)) => EvalValue::Float(i as f64),
+        (Type::List, list @ EvalValue::Seq(_)) => list,
+        (Type::List, single) => EvalValue::Seq(vec![single]),
         (_, value) => value,
     }
 }
@@ -167,9 +155,9 @@ fn typed_default(decl: &VarDecl, value: EvalValue) -> EvalValue {
 mod tests {
     use super::*;
 
-    fn decl(ty: Option<&str>, default: Option<Value>) -> VarDecl {
+    fn decl(ty: Option<Type>, default: Option<Value>) -> VarDecl {
         VarDecl {
-            ty: ty.map(str::to_string),
+            ty: ty.unwrap_or(Type::String),
             default,
             about: None,
         }
@@ -226,9 +214,9 @@ mod tests {
     #[test]
     fn a_passed_text_is_held_to_the_declared_type() {
         let decls = vec![
-            ("n".to_string(), decl(Some("int"), None)),
-            ("on".to_string(), decl(Some("bool"), None)),
-            ("at".to_string(), decl(Some("datetime"), None)),
+            ("n".to_string(), decl(Some(Type::Int), None)),
+            ("on".to_string(), decl(Some(Type::Bool), None)),
+            ("at".to_string(), decl(Some(Type::Datetime), None)),
         ];
         let scope = var_scope(&decls, &doc(), &passed("n", "3")).unwrap();
         assert_eq!(
@@ -247,7 +235,7 @@ mod tests {
         // `tomet check` reports it; rendering does not stop for it.
         let decls = vec![(
             "n".to_string(),
-            decl(Some("int"), Some(Value::String("many".to_string()))),
+            decl(Some(Type::Int), Some(Value::String("many".to_string()))),
         )];
         let scope = var_scope(&decls, &doc(), &[]).unwrap();
         assert_eq!(

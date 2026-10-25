@@ -19,7 +19,7 @@
 
 @table
 |[ キー      ][ 意味 ]
-|[ `type`    ][ 型。`string` `int` `float` `bool` `datetime` `list` のどれか。省くと `string`。`--var` の文字列はこの型に変換する（`list` はまだ渡せない） ]
+|[ `type`    ][ 型の名前。`string` `int` `bool` `datetime` など（一覧は `tomet_type::Type`）。省くと `string`。`--var` の文字列はこの型に変換する（`list` はまだ渡せない） ]
 |[ `default` ][ 値が渡されなかったときの値。無ければ必須 ]
 |[ `about`   ][ 説明。ホバーと補完に出る ]
 

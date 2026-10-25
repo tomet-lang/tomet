@@ -680,10 +680,7 @@ fn a_variable_is_a_declaration_with_a_type_it_can_have_and_a_default_that_fits()
             "::vars{\n  title: { kind: string }\n}\n",
             "unknown key `kind`",
         ),
-        (
-            "::vars{\n  title: { type: date }\n}\n",
-            "not a type a variable can have",
-        ),
+        ("::vars{\n  title: { type: date }\n}\n", "is not a type"),
         (
             "::vars{\n  n: { type: int, default: \"3\" }\n}\n",
             "`default` is not a value of `type: int`",

@@ -1,14 +1,14 @@
 //! Datetimes: reading them from text and writing them with a format string.
 
 use time::{Date, Month, OffsetDateTime, PrimitiveDateTime, Time, UtcOffset};
-use tomet_semantics::datetime::{parse_datetime_parts, parse_offset_seconds};
+use tomet_type::datetime::{parse_datetime_parts, parse_offset_seconds};
 
 use super::error::EvalError;
 use super::value::EvalValue;
 
 /// Reads a date, or a date and a time, as a datetime.
 ///
-/// What text reads as one is `tomet_semantics::datetime`'s to say -- the same
+/// What text reads as one is `tomet_type::datetime`'s to say -- the same
 /// reading `tomet check` and `tomet format` use. This only gives the parts a
 /// clock type; a value with no offset is UTC.
 ///
@@ -102,7 +102,7 @@ mod tests {
     }
 
     // What text reads as a datetime is tested where it is defined
-    // (`tomet_semantics::datetime`); these are the conversion into a clock.
+    // (`tomet_type::datetime`); these are the conversion into a clock.
 
     #[test]
     fn rfc_3339_keeps_its_offset() {

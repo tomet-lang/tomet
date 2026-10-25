@@ -61,7 +61,7 @@ pub use error::EvalError;
 pub use include::MAX_INCLUDE_DEPTH;
 pub use memory::MemoryResolver;
 pub use value::{Closure, DirRef, DocRef, Env, EvalValue, Namespace, Node};
-pub use vars::{VarError, VarScope, var_scope};
+pub use vars::{VarError, VarScope, shaped, var_scope};
 
 use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Literal};
 

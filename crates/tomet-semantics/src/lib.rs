@@ -27,10 +27,6 @@
 //!   | a document into a structured [`DocumentConfig`].
 //! - (Metadata Extraction (`meta`))
 //!   | Extracts top-level `::meta` values via [`document_meta`].
-//! - (Datetimes (`datetime`))
-//!   | The one definition of what text reads as a date or a date and a time,
-//!   | as plain parts (`datetime::parse_datetime_parts`). The evaluator, `tomet check`
-//!   | and `tomet format` all read a `datetime` field by it.
 //! - (Structural Helpers)
 //!   | Heading level clamping (`heading`) and
 //!   | table parsing (`table`).
@@ -44,7 +40,6 @@
 
 mod connect_member;
 pub mod data;
-pub mod datetime;
 pub mod elements;
 pub mod flatten;
 mod kind;
@@ -65,7 +60,7 @@ pub use elements::target::{
     EXPLICIT_SCHEMES, TargetScheme, link_target, link_target_of, path_target, path_target_of,
     target_scheme,
 };
-pub use elements::vars::{DEFAULT_VAR_TYPE, VAR_KEYS, VAR_TYPES, VarDecl, read_var_decls};
+pub use elements::vars::{VAR_KEYS, VarDecl, read_var_decls};
 pub use flatten::{
     EXACT_DATA_KEY, FlatData, POSITIONAL_KEY, flatten_data, flatten_element_data, is_attribute_key,
     scalar_string, value_to_json,

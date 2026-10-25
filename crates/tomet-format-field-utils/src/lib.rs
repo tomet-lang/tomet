@@ -12,16 +12,17 @@
 //! whole-document-rebuild model.
 
 use tomet_config::FieldConfig;
+use tomet_type::Type;
 
 pub fn generate_id_for_field(cfg: &FieldConfig) -> String {
     let prefix = cfg.prefix.as_deref().unwrap_or("");
-    match cfg.field_type.as_deref() {
-        Some("nanoid") => {
+    match cfg.field_type.as_deref().and_then(Type::from_name) {
+        Some(Type::Nanoid) => {
             let len = cfg.length.unwrap_or(8);
             let id = nanoid::nanoid!(len);
             format!("{prefix}{id}")
         }
-        Some("uuid") => {
+        Some(Type::Uuid) => {
             let id = uuid::Uuid::new_v4().to_string();
             format!("{prefix}{id}")
         }
@@ -49,10 +50,10 @@ pub fn is_valid_id_format(existing: &str, cfg: &FieldConfig) -> bool {
 
 /// Whether `s` reads as a date, or a date and a time -- the reading
 /// `tomet check` and the evaluator use for a `datetime` field
-/// (`tomet_semantics::datetime`), so what `tomet format` rewrites is what
+/// ([`Type::Datetime`]), so what `tomet format` rewrites is what
 /// `check` accepts.
 pub fn is_iso8601(s: &str) -> bool {
-    tomet_semantics::datetime::parse_datetime_parts(s).is_some()
+    Type::Datetime.holds_text(s) == Some(true)
 }
 
 pub fn format_rfc3339(s: &str, offset: Option<&str>) -> String {

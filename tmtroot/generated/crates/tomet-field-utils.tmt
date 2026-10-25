@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-field-utils, dependencies: list(tomet-config, tomet-semantics), dependents: list(tomet-printer, tomet-style)}
+::meta{crate: tomet-field-utils, dependencies: list(tomet-config, tomet-type), dependents: list(tomet-printer, tomet-style)}
 
 =[tomet-field-utils]
 
@@ -27,7 +27,7 @@ whole-document-rebuild model.
 
 Whether `s` reads as a date, or a date and a time -- the reading
 `tomet check` and the evaluator use for a `datetime` field
-(`tomet_semantics::datetime`), so what `tomet format` rewrites is what
+([`Type::Datetime`]), so what `tomet format` rewrites is what
 `check` accepts.
 
 ===[fn format_rfc3339]

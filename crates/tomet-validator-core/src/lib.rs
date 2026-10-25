@@ -499,7 +499,7 @@ fn for_each_direct_content_element<'a>(
 /// variable can have and whose `default` is a value of it.
 pub fn check_name_definitions(doc: &Document, errors: &mut Vec<Diagnostic>) {
     use tomet_ast::Value;
-    use tomet_semantics::{ElementKind, VAR_TYPES, VarDecl, classify_std_lenient};
+    use tomet_semantics::{ElementKind, VarDecl, classify_std_lenient};
 
     tomet_tree::for_each_top_level_element(doc, |el| match classify_std_lenient(el) {
         ElementKind::Macros => {
@@ -528,7 +528,7 @@ pub fn check_name_definitions(doc: &Document, errors: &mut Vec<Diagnostic>) {
             for (name, decl) in tomet_semantics::read_var_decls(el) {
                 let reason = match decl {
                     Err(reason) => Some(reason),
-                    Ok(decl) => var_problem(&decl, VAR_TYPES),
+                    Ok(decl) => var_problem(&decl),
                 };
                 if let Some(reason) = reason {
                     errors.push(Diagnostic::InvalidDefinition {
@@ -543,27 +543,14 @@ pub fn check_name_definitions(doc: &Document, errors: &mut Vec<Diagnostic>) {
         _ => {}
     });
 
-    fn var_problem(decl: &VarDecl, types: [&str; 6]) -> Option<String> {
-        let ty = decl.type_name();
-        if !types.contains(&ty) {
-            return Some(format!(
-                "`type: {ty}` is not a type a variable can have; use {}",
-                types.map(|t| format!("`{t}`")).join(", ")
-            ));
-        }
+    /// A `default` that is not of the declared `type`. A `type` that is not one is
+    /// refused when the declaration is read ([`tomet_semantics::VarDecl::from_value`]).
+    fn var_problem(decl: &VarDecl) -> Option<String> {
         let default = decl.default.as_ref()?;
-        let fits = match (ty, default) {
-            ("string", Value::String(_)) => true,
-            ("int", Value::Int(_)) => true,
-            ("float", Value::Float(_) | Value::Int(_)) => true,
-            ("bool", Value::Bool(_)) => true,
-            ("list", Value::Seq(_)) => true,
-            ("datetime", Value::String(text)) => {
-                tomet_semantics::datetime::parse_datetime_parts(text).is_some()
-            }
-            _ => false,
-        };
-        (!fits).then(|| format!("`default` is not a value of `type: {ty}`"))
+        decl.ty
+            .admits(default)
+            .err()
+            .map(|err| format!("`default` is not a value of `type: {}`: {err}", decl.ty))
     }
 }
 
@@ -605,6 +592,7 @@ pub fn check_field_types(
     errors: &mut Vec<Diagnostic>,
 ) {
     use tomet_ast::Value;
+    use tomet_type::Type;
 
     if field_types.is_empty() {
         return;
@@ -624,11 +612,11 @@ pub fn check_field_types(
             let Some(field_type) = field_types.get(field) else {
                 continue;
             };
-            let Some(has_form) = form_of(field_type) else {
+            let Some(ty) = Type::from_name(field_type).filter(|ty| ty.has_text_form()) else {
                 continue;
             };
             let well_formed = match value {
-                Value::String(text) => text.is_empty() || has_form(text),
+                Value::String(text) => text.is_empty() || ty.holds_text(text) == Some(true),
                 Value::Null => true,
                 // `${...}` keeps its place in the tree until it is evaluated,
                 // and what it comes to is not known here.
@@ -645,29 +633,6 @@ pub fn check_field_types(
             }
         }
     });
-}
-
-/// What a `type:` with a form checks its text against, or `None` for a type
-/// that is only a label.
-fn form_of(field_type: &str) -> Option<fn(&str) -> bool> {
-    match field_type {
-        "uuid" => Some(is_uuid),
-        // The one definition of what a datetime field holds, which the
-        // evaluator reads a field by and `tomet format` rewrites by.
-        "datetime" => Some(|text| tomet_semantics::datetime::parse_datetime_parts(text).is_some()),
-        _ => None,
-    }
-}
-
-/// The 8-4-4-4-12 hexadecimal form, in either case. The version and variant
-/// are not looked at: what the settings ask for is an identifier of this
-/// shape, not a particular way of drawing one.
-fn is_uuid(text: &str) -> bool {
-    text.len() == 36
-        && text.char_indices().all(|(i, c)| match i {
-            8 | 13 | 18 | 23 => c == '-',
-            _ => c.is_ascii_hexdigit(),
-        })
 }
 
 /// A value as a reader would have written it, for a message.

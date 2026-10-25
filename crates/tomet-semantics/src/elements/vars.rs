@@ -6,16 +6,9 @@
 //! declaration (it goes in `default:`).
 
 use tomet_ast::{Block, Element, Inline, Value};
-use tomet_tree::ValueExt;
+use tomet_type::Type;
 
 use crate::normalized_element_args;
-
-/// The types a variable can be declared with: the vocabulary of `type:` in the
-/// settings' `meta` fields, less the ones a variable has no use for.
-pub const VAR_TYPES: [&str; 6] = ["string", "int", "float", "bool", "datetime", "list"];
-
-/// The type of a variable that does not say: what the command line passes.
-pub const DEFAULT_VAR_TYPE: &str = "string";
 
 /// The keys a declaration may have.
 pub const VAR_KEYS: [&str; 3] = ["type", "default", "about"];
@@ -23,8 +16,9 @@ pub const VAR_KEYS: [&str; 3] = ["type", "default", "about"];
 /// One variable, as declared.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VarDecl {
-    /// `type:` as written; `None` is a string ([`DEFAULT_VAR_TYPE`]).
-    pub ty: Option<String>,
+    /// `type:`. A declaration that does not say is a string, which is what the
+    /// command line passes.
+    pub ty: Type,
     /// `default:`. A variable without one is required.
     pub default: Option<Value>,
     /// `about:`, for hover and completion.
@@ -32,11 +26,6 @@ pub struct VarDecl {
 }
 
 impl VarDecl {
-    /// The declared type, a string when the declaration does not say.
-    pub fn type_name(&self) -> &str {
-        self.ty.as_deref().unwrap_or(DEFAULT_VAR_TYPE)
-    }
-
     /// Whether a value has to be given: there is no `default`.
     pub fn is_required(&self) -> bool {
         self.default.is_none()
@@ -51,16 +40,13 @@ impl VarDecl {
             );
         };
         let mut decl = VarDecl {
-            ty: None,
+            ty: Type::String,
             default: None,
             about: None,
         };
         for (key, field) in fields {
             match key.as_str() {
-                "type" => match field.as_str() {
-                    Some(ty) => decl.ty = Some(ty.to_string()),
-                    None => return Err("`type` is a name, such as `string`".to_string()),
-                },
+                "type" => decl.ty = Type::parse(field).map_err(|e| e.to_string())?,
                 "default" => decl.default = Some(field.clone()),
                 "about" => match plain_text(field) {
                     Some(about) => decl.about = Some(about),
@@ -148,11 +134,11 @@ mod tests {
             "::vars{\n  title: {\n    type: string\n    about: | 題。\n  }\n  n: { type: int, default: 3 }\n}\n",
         );
         let title = found[0].1.as_ref().unwrap();
-        assert_eq!(title.type_name(), "string");
+        assert_eq!(title.ty, Type::String);
         assert!(title.is_required());
         assert_eq!(title.about.as_deref(), Some("題。"));
         let n = found[1].1.as_ref().unwrap();
-        assert_eq!(n.type_name(), "int");
+        assert_eq!(n.ty, Type::Int);
         assert_eq!(n.default, Some(Value::Int(3)));
         assert!(!n.is_required());
     }
@@ -160,7 +146,17 @@ mod tests {
     #[test]
     fn the_type_is_a_string_when_it_is_left_out() {
         let found = decls("::vars{\n  who: { default: \"me\" }\n}\n");
-        assert_eq!(found[0].1.as_ref().unwrap().type_name(), "string");
+        assert_eq!(found[0].1.as_ref().unwrap().ty, Type::String);
+    }
+
+    #[test]
+    fn a_type_that_is_not_one_is_refused_with_the_types_there_are() {
+        let found = decls("::vars{\n  title: { type: date }\n}\n");
+        let reason = found[0].1.as_ref().unwrap_err();
+        assert!(
+            reason.contains("`date`") && reason.contains("`datetime`"),
+            "{reason}"
+        );
     }
 
     #[test]

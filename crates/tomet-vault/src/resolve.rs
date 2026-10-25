@@ -6,7 +6,8 @@ use std::sync::Arc;
 
 use tomet_ast::{Block, Document, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
-use tomet_expr::{DirRef, DocRef, EvalValue, PreparedBlocks, Resolver, parse_datetime};
+use tomet_expr::{DirRef, DocRef, EvalValue, PreparedBlocks, Resolver, shaped};
+use tomet_type::Type;
 
 /// The document's `::meta`, typed by the settings' `meta` declarations.
 ///
@@ -45,15 +46,11 @@ pub fn typed_meta(config: &PrinterConfig, doc: &Document, doc_ref: &DocRef) -> E
 }
 
 fn typed(field: &FieldConfig, value: Option<EvalValue>) -> EvalValue {
-    match (field.field_type.as_deref(), value) {
-        (Some("list"), None) => EvalValue::Seq(Vec::new()),
-        (Some("list"), Some(list @ EvalValue::Seq(_))) => list,
-        (Some("list"), Some(single)) => EvalValue::Seq(vec![single]),
-        (Some("datetime"), Some(EvalValue::String(text))) => match parse_datetime(&text) {
-            Some(parsed) => EvalValue::DateTime(parsed),
-            None => EvalValue::String(text),
-        },
-        (_, Some(value)) => value,
+    let ty = field.field_type.as_deref().and_then(Type::from_name);
+    match (ty, value) {
+        (Some(Type::List), None) => EvalValue::Seq(Vec::new()),
+        (Some(ty), Some(value)) => shaped(ty, value),
+        (None, Some(value)) => value,
         (_, None) => EvalValue::Null,
     }
 }

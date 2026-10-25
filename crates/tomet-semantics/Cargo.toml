@@ -11,6 +11,7 @@ cotomet-syntax = { workspace = true }
 tomet-address = { workspace = true }
 tomet-ast = { workspace = true }
 tomet-tree = { workspace = true }
+tomet-type = { workspace = true }
 
 #= Crates.io
 serde_json = { workspace = true }

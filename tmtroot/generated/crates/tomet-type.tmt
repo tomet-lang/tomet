@@ -1,0 +1,103 @@
+::kind(api)
+
+::meta{crate: tomet-type, dependencies: list(tomet-ast), dependents: list(tomet-expr, tomet-field-utils, tomet-semantics, tomet-style, tomet-validator-core, tomet-vault)}
+
+=[tomet-type]
+
+=[ tomet-type ]
+
+The types a value can be declared as, and how data and text are held to
+them.
+
+=[ Architecture & Responsibilities ]
+
+- (One vocabulary)
+  | A `type:` is written in the settings' `meta` fields, in `::vars`, and in
+  | a vocabulary's arguments. They all name a [`Type`] here, so a name that
+  | one place accepts is a name every place accepts.
+- (Knows nothing about elements)
+  | This crate depends on [`tomet_ast::Value`] and nothing else. A type does
+  | not know what an element is, which vocabulary declared it, or what
+  | `::meta` is; the dependency is what keeps it so.
+- (What is held to a type)
+  | [`Type::admits`] asks whether a [`Value`] in a document is of the type.
+  | [`Type::read_text`] turns a text that arrives as text -- `--var key=value` --
+  | into the value of the type. [`Type::holds_text`] asks whether a string
+  | is in the form the type gives text, for the types that have one.
+
+=[ What a type is not ]
+
+- It is not how a field is written or made. `format`, `offset`, `length`,
+  `prefix` and `always_newline` are properties of a field's declaration, and
+  belong to the formatter. In particular what makes a `nanoid` well formed
+  depends on the field's `prefix` and `length`, so [`Type::Nanoid`] admits a
+  string and judges no more; `tomet-format-field-utils` judges the rest.
+- It is not a value in the evaluator. A datetime read here stays text
+  ([`datetime`] gives the parts); `tomet-expr` turns it into its own value.
+
+=[ Not yet ]
+
+- A type with a parameter. `list` has no element type yet; the author expects
+  it to be written `<list<string>>` when it comes, so [`Type::parse`] reads
+  a name and nothing else, and says so for any other spelling.
+- `enum`. Nothing gives it a meaning yet (`:rule`'s `allow:` takes the same
+  spelling and means a list of names).
+
+==[Module datetime]
+
+What text reads as a date, or a date and a time.
+
+The one definition of what a `datetime` field holds. The evaluator reads a
+field with it, `tomet check` checks a field with it, and `tomet format`
+decides with it what to rewrite as RFC 3339. It gives the parts and
+nothing else -- no clock type -- so a crate that only needs to know
+whether text reads as a datetime does not carry one.
+
+===[Structs]
+
+====[struct DateTimeParts]
+
+A date, or a date and a time, as written.
+
+===[Functions]
+
+====[fn parse_datetime_parts]
+
+Reads a date, or a date and a time: `2026-10-17`, `2026-10-17T09:00`,
+`2026-10-17 09:00:00`, `2026-10-17T09:00:00.5+09:00`.
+
+- The date is `YYYY-MM-DD`; with nothing after it the time is midnight.
+- The time follows after a `T` or a space, as `HH:MM`, or `HH:MM:SS`
+
+with an optional fraction.
+
+- An offset (`Z`, `+09:00`) may close it. Without one the value is read
+
+as UTC, which is what a bare date has always been.
+
+`None` for anything else, including a day the month does not have.
+
+====[fn parse_offset_seconds]
+
+Reads a UTC offset written `+09:00`, `-05:30` or `Z`, as seconds east of
+UTC. `None` for anything else.
+
+==[Structs]
+
+===[struct Mismatch]
+
+A value that is not of the type it was held to.
+
+==[Enums]
+
+===[enum Type]
+
+A type a value can be declared as.
+
+===[enum TypeError]
+
+A `type:` that does not name a type.
+
+===[enum TextError]
+
+Why a text is not a value of a type.

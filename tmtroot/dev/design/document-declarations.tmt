@@ -77,7 +77,7 @@ Status: 実装済み。`::name` を足し、`tandr` で全部移行し、旧い�
 |[ `::macros{}`     ][ 名前から本体への値の表。呼び出しは `$macro.gh(12)`。`::settings{ macros }` からは出す（マクロは振る舞いの設定ではなく名前の定義で、cotomet 自身のものだから）。文書の定義は vault の同名を上書きする ]
 |[ `::vars{}`       ][ `elements` に近い、宣言のマップ。`名前: { type, default, about }`。参照は `${var.xxx}`。`::macros` と同じく、vault の `default.config.tmt` にも書け、文書が同じ名前を宣言ごとに上書きする ]
 |[ 必須と省略可     ][ `default` が無ければ必須、あれば省略可。値を直接書く形は無い（マップの値は `default:` の中に書く） ]
-|[ `type`           ][ `string` `int` `float` `bool` `datetime` `list`。省くと string（コマンドラインから渡るのは文字列だから）。`meta` のフィールドの `type:` と語彙は重なるが、同じではない ]
+|[ `type`           ][ 型の名前（一覧は `tomet_type::Type`。`meta` のフィールドの `type:` と同じ語彙）。省くと string（コマンドラインから渡るのは文字列だから） ]
 |[ `--var` との関係 ][ 場当たりだった作成時専用の `vars` を昇格する。旧 `vars.` の名前空間は `var.` に吸収し、並存させない。`--var` は `::vars` で宣言した名前に絞る（宣言にない名前はエラー）。blueprint の入力と `${var.x}` の参照を `tomet check` で検証できる。「作成時専用」の制限はなくなり、作成時専用に残るのは `generate` だけ ]
 |[ 単数形           ][ `::macro(name)` `::var(name)` `::element(name)` は後で足す。「単数形を並べたもの」と同じ意味にする。今は足さない ]
 
