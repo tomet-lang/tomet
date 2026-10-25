@@ -30,6 +30,10 @@
 //!   | blueprint, and is the only place `generate.*` exists. `var` exists in both:
 //!   | the variables a document or a vault declares, filled in by `tomet new --var`
 //!   | when creating.
+//! - (Macros)
+//!   | Macros defined by `::macros` are called as `macro.name(...)`. Macro
+//!   | arguments are ordinary expressions. Calls check argument counts and
+//!   | required named arguments, reporting `unknown macro` when missing.
 //!
 //! The pass that puts the values back into a document is
 //! `tomet_transform::resolve_expressions`.
@@ -75,6 +79,30 @@ pub const RESERVED_VALUES: [&str; 5] = ["self", "macro", "var", "vault", "genera
 /// Evaluates `expr` in `cx`.
 pub fn evaluate(expr: &InterpExpr, cx: &EvalContext) -> Result<EvalValue, EvalError> {
     eval(expr, cx, &Env::new())
+}
+
+/// Whether `value` is, or holds, a document, a directory or an element: something that
+/// is found through a vault and has no data form of its own.
+fn refers_to_vault(value: &EvalValue) -> bool {
+    match value {
+        EvalValue::Document(_) | EvalValue::Directory(_) | EvalValue::Node { .. } => true,
+        EvalValue::Seq(items) => items.iter().any(refers_to_vault),
+        EvalValue::Map(entries) => entries.iter().any(|(_, v)| refers_to_vault(v)),
+        EvalValue::Call(_, args) => args.iter().any(refers_to_vault),
+        _ => false,
+    }
+}
+
+/// Evaluates `expr` in `cx`, requiring the result to have a data representation.
+///
+/// If evaluation succeeds but the value cannot be stored as data, an [`EvalError::NotData`]
+/// is returned.
+pub fn evaluate_data(expr: &InterpExpr, cx: &EvalContext) -> Result<tomet_ast::Value, EvalError> {
+    let value = evaluate(expr, cx)?;
+    value.to_ast().ok_or_else(|| EvalError::NotData {
+        type_name: value.type_name(),
+        is_vault_ref: refers_to_vault(&value),
+    })
 }
 
 /// Calls a function value.
@@ -261,16 +289,77 @@ fn generate_call(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, 
     }
 }
 
+fn is_ident_placeholder(s: &str) -> bool {
+    let mut chars = s.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first.is_alphabetic() || first == '_')
+        && chars.all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+}
+
 /// `macro.name(args)`: the template with its placeholders filled in.
-/// `${1}`, `${2}` take the positional arguments and `${key}` the named ones.
+/// Positional placeholders `${1}`, `${2}`, ... take positional arguments, and
+/// named placeholders `${ident}` take named arguments. Any other `${...}` in
+/// the template is treated as plain text.
+///
+/// Arguments are ordinary expressions. Missing or excess arguments report arity
+/// errors, missing named arguments report the missing name, and an unknown
+/// macro reports `unknown macro`.
 fn macro_call(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalError> {
     let template = cx
         .macros
         .get(name)
         .ok_or_else(|| EvalError::UnknownFunction(format!("macro.{name}")))?;
+
+    let mut max_pos = 0;
+    let mut named_keys = Vec::new();
+    let mut rest = template.as_str();
+    while let Some(start) = rest.find("${") {
+        rest = &rest[start + 2..];
+        if let Some(end) = rest.find('}') {
+            let key = &rest[..end];
+            if !key.is_empty() && key.chars().all(|c| c.is_ascii_digit()) {
+                if let Ok(idx) = key.parse::<usize>() {
+                    max_pos = max_pos.max(idx);
+                }
+            } else if is_ident_placeholder(key) && !named_keys.contains(&key.to_string()) {
+                named_keys.push(key.to_string());
+            }
+            rest = &rest[end + 1..];
+        }
+    }
+
+    if max_pos > 0 && args.positional.len() != max_pos {
+        return Err(EvalError::WrongArgCount {
+            function: format!("macro.{name}"),
+            expected: max_pos.to_string(),
+            got: args.positional.len(),
+        });
+    }
+    if max_pos == 0
+        && named_keys.is_empty()
+        && (!args.positional.is_empty() || !args.named.is_empty())
+    {
+        return Err(EvalError::WrongArgCount {
+            function: format!("macro.{name}"),
+            expected: "0".to_string(),
+            got: args.positional.len() + args.named.len(),
+        });
+    }
+    for expected_key in &named_keys {
+        if !args.named.iter().any(|(k, _)| k == expected_key) {
+            return Err(EvalError::message(format!(
+                "macro.{name} expects named argument `{expected_key}`"
+            )));
+        }
+    }
+
     let mut text = template.clone();
     for (key, value) in &args.named {
-        text = text.replace(&format!("${{{key}}}"), &methods::scalar_text(value)?);
+        if is_ident_placeholder(key) {
+            text = text.replace(&format!("${{{key}}}"), &methods::scalar_text(value)?);
+        }
     }
     for (i, value) in args.positional.iter().enumerate() {
         text = text.replace(&format!("${{{}}}", i + 1), &methods::scalar_text(value)?);

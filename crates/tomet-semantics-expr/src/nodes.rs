@@ -49,7 +49,14 @@ fn directory_docs(
                     .collect(),
             )
         })
-        .map_err(|why| EvalError::Unresolved(format!("directory `{}`: {why}", dir.0)))
+        .map_err(|why| {
+            // the vault root is the empty path: nothing to quote
+            if dir.0.is_empty() {
+                EvalError::Unresolved(why)
+            } else {
+                EvalError::Unresolved(format!("directory `{}`: {why}", dir.0))
+            }
+        })
 }
 
 // ---- finding a node by id ----------------------------------------------------

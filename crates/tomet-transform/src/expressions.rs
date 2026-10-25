@@ -35,7 +35,7 @@ use tomet_ast::{
     Block, Document, Element, ElementValue, Entry, Id, Inline, InterpExpr, List, ListItem,
     Paragraph, Sigil, Span, Text, Value,
 };
-use tomet_expr::{EvalContext, EvalValue, Note, evaluate};
+use tomet_expr::{EvalContext, EvalValue, Note, evaluate, evaluate_data};
 use tomet_tree::list_item;
 
 /// Something the pass left as it found it, and says so.
@@ -124,8 +124,17 @@ fn dollar_expr(el: &Element) -> Option<&InterpExpr> {
 impl Pass<'_> {
     /// Evaluates, or records why it could not and returns `None`.
     fn evaluate(&mut self, expr: &InterpExpr, span: Span) -> Option<EvalValue> {
+        self.eval_with(expr, span, |cx| evaluate(expr, cx))
+    }
+
+    fn eval_with<T>(
+        &mut self,
+        expr: &InterpExpr,
+        span: Span,
+        f: impl FnOnce(&EvalContext) -> Result<T, tomet_expr::EvalError>,
+    ) -> Option<T> {
         let here = self.cx.at_heading_level(self.level);
-        let evaluated = evaluate(expr, &here);
+        let evaluated = f(&here);
         // What the evaluation noticed on the way. The expression has a value
         // all the same -- the content is in the document -- so this is a
         // warning beside it and not a failure of it.
@@ -312,18 +321,7 @@ impl Pass<'_> {
     }
 
     fn data_expression(&mut self, expr: &InterpExpr, span: Span) -> Option<Value> {
-        let value = self.evaluate(expr, span)?;
-        match value.to_ast() {
-            Some(data) => Some(data),
-            None => {
-                self.fail(
-                    expr,
-                    span,
-                    format!("a {} cannot be stored as data", value.type_name()),
-                );
-                None
-            }
-        }
+        self.eval_with(expr, span, |cx| evaluate_data(expr, cx))
     }
 
     // ---- lists --------------------------------------------------------------

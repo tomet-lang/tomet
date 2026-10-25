@@ -248,6 +248,73 @@ fn a_macro_is_called_through_its_namespace() {
 }
 
 #[test]
+fn macro_table_cases() {
+    let mut macros = HashMap::new();
+    macros.insert("gh".to_string(), "https://x/${1}".to_string());
+    macros.insert("two".to_string(), "${1}-${2}".to_string());
+    macros.insert("named".to_string(), "hi ${who}".to_string());
+    macros.insert("none".to_string(), "const".to_string());
+    let resolver = vault();
+    let cx = EvalContext {
+        phase: Phase::Output,
+        resolver: &resolver,
+        generate: &SystemGenerate,
+        self_doc: DocRef("here.tmt".to_string()),
+        macros: &macros,
+        var: &EvalValue::Null,
+        var_unset: &[],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+    let test_run = |expr: &str| {
+        let src = format!("Test {}.\n", expr);
+        let mut doc = tomet_parser::parse_document(&src).unwrap();
+        let unresolved = resolve_expressions(&mut doc, &cx);
+        (text_of(&doc), unresolved)
+    };
+
+    assert!(test_run("${macro.gh(12)}").1.is_empty());
+    assert!(test_run("${macro.gh(\"a/b\")}").1.is_empty());
+    assert!(test_run("${macro.named(who: \"w\")}").1.is_empty());
+
+    let unres = test_run("${macro.gh(tomet)}").1;
+    assert_eq!(unres.len(), 1);
+    assert!(unres[0].reason.contains("unknown name `tomet`"));
+
+    let unres = test_run("${macro.gh(1, 2)}").1;
+    assert_eq!(unres.len(), 1);
+    assert_eq!(unres[0].reason, "`macro.gh` expects 1 argument(s), got 2");
+
+    let unres = test_run("${macro.gh()}").1;
+    assert_eq!(unres.len(), 1);
+    assert_eq!(unres[0].reason, "`macro.gh` expects 1 argument(s), got 0");
+
+    let unres = test_run("${macro.two(1)}").1;
+    assert_eq!(unres.len(), 1);
+    assert_eq!(unres[0].reason, "`macro.two` expects 2 argument(s), got 1");
+
+    let unres = test_run("${macro.none(1)}").1;
+    assert_eq!(unres.len(), 1);
+    assert_eq!(unres[0].reason, "`macro.none` expects 0 argument(s), got 1");
+
+    let unres = test_run("${macro.named()}").1;
+    assert_eq!(unres.len(), 1);
+    assert_eq!(unres[0].reason, "macro.named expects named argument `who`");
+
+    let unres = test_run("${macro.nosuch(1)}").1;
+    assert_eq!(unres.len(), 1);
+    assert_eq!(unres[0].reason, "unknown macro `macro.nosuch`");
+
+    let unres = test_run("${macro.gh}").1;
+    assert_eq!(unres.len(), 1);
+    assert_eq!(
+        unres[0].reason,
+        "the macro `gh` has to be called: `macro.gh(...)`"
+    );
+}
+
+#[test]
 fn a_value_in_an_element_argument_keeps_its_type() {
     let (doc, unresolved) = run("@card(n: ${add(1, 2)}, label: ${\"x\"})\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");

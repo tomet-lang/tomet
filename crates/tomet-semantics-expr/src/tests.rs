@@ -539,6 +539,31 @@ fn a_macro_fills_positional_and_named_placeholders() {
 }
 
 #[test]
+fn macro_bare_word_argument_is_unknown_name() {
+    let mut macros = HashMap::new();
+    macros.insert("gh".to_string(), "https://x/issues/${1}".to_string());
+    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    assert_eq!(
+        run("macro.gh(tomet)"),
+        Err(EvalError::UnknownName("tomet".to_string()))
+    );
+}
+
+#[test]
+fn macro_non_placeholder_in_template_treated_as_plain_text() {
+    let mut macros = HashMap::new();
+    macros.insert(
+        "env".to_string(),
+        "${HOME}/bin:${PATH:-/bin}:${}".to_string(),
+    );
+    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    assert_eq!(
+        run("macro.env(HOME: \"/root\")").unwrap(),
+        text("/root/bin:${PATH:-/bin}:${}")
+    );
+}
+
+#[test]
 fn a_macro_cannot_be_named_without_being_called_and_has_no_bare_form() {
     let mut macros = HashMap::new();
     macros.insert("gh".to_string(), "x".to_string());
@@ -1530,4 +1555,69 @@ fn no_function_is_listed_twice() {
     let before = names.len();
     names.dedup();
     assert_eq!(before, names.len());
+}
+
+#[test]
+fn evaluate_data_returns_ast_value_or_fails_when_not_storable() {
+    let empty_map = HashMap::new();
+    let cx = EvalContext {
+        phase: Phase::Output,
+        resolver: &NoResolver,
+        generate: &Fixed,
+        self_doc: DocRef("here.tmt".to_string()),
+        macros: &empty_map,
+        var: &EvalValue::Null,
+        var_unset: &[],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+
+    let expr = parse("add(1, 2)");
+    let data = evaluate_data(&expr, &cx).unwrap();
+    assert_eq!(data, tomet_ast::Value::Int(3));
+
+    let fn_expr = parse("x => x");
+    let err = evaluate_data(&fn_expr, &cx).unwrap_err();
+    assert_eq!(
+        err,
+        EvalError::NotData {
+            type_name: "function",
+            is_vault_ref: false,
+        }
+    );
+    assert_eq!(err.to_string(), "a function cannot be stored as data");
+}
+
+#[test]
+fn a_list_of_documents_is_a_list_that_cannot_be_stored_as_data() {
+    let resolver = vault();
+    let macros = HashMap::new();
+    let vars = EvalValue::Null;
+    let cx = EvalContext {
+        phase: Phase::Output,
+        resolver: &resolver,
+        generate: &Fixed,
+        self_doc: DocRef("here.tmt".to_string()),
+        macros: &macros,
+        var: &vars,
+        var_unset: &[],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+
+    // The message names the value's own type, as it did before `NotData` knew about vaults...
+    let err = evaluate_data(&parse("vault.docs"), &cx).unwrap_err();
+    assert_eq!(err.to_string(), "a list cannot be stored as data");
+    // ...and a caller that has no vault can still tell that a vault is what the list is of.
+    assert_eq!(
+        err,
+        EvalError::NotData {
+            type_name: "list",
+            is_vault_ref: true,
+        }
+    );
+    let err = evaluate_data(&parse("self"), &cx).unwrap_err();
+    assert_eq!(err.to_string(), "a document cannot be stored as data");
 }

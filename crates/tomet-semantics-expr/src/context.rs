@@ -123,6 +123,9 @@ impl Resolver for NoResolver {
         Err(format!("no vault to find the note `{name}` in"))
     }
     fn dir_docs(&self, dir: &DirRef) -> Result<Vec<DocRef>, String> {
+        if dir.0.is_empty() {
+            return Err("no vault to list the vault root's documents in".to_string());
+        }
         Err(format!("no vault to list the directory `{}` in", dir.0))
     }
     fn meta(&self, doc: &DocRef) -> Result<EvalValue, String> {

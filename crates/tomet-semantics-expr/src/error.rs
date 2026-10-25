@@ -39,6 +39,13 @@ pub enum EvalError {
     Unresolved(String),
     /// Text that is not an address.
     BadAddress(String),
+    /// A value that has no data representation where data was required.
+    /// `type_name` is the value's own type; `is_vault_ref` says whether it is, or
+    /// holds, a document, a directory or an element found through a vault.
+    NotData {
+        type_name: &'static str,
+        is_vault_ref: bool,
+    },
     /// Anything that needs its own sentence.
     Message(String),
     /// Syntax the parser reads and the evaluator does not run yet.
@@ -67,7 +74,13 @@ impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             EvalError::UnknownName(name) => write!(f, "unknown name `{name}`"),
-            EvalError::UnknownFunction(name) => write!(f, "unknown function `{name}`"),
+            EvalError::UnknownFunction(name) => {
+                if let Some(macro_name) = name.strip_prefix("macro.") {
+                    write!(f, "unknown macro `macro.{macro_name}`")
+                } else {
+                    write!(f, "unknown function `{name}`")
+                }
+            }
             EvalError::UnknownMember { on, member } => {
                 write!(f, "a {on} has no member `{member}`")
             }
@@ -96,6 +109,9 @@ impl fmt::Display for EvalError {
             ),
             EvalError::Unresolved(what) => write!(f, "{what}"),
             EvalError::BadAddress(text) => write!(f, "`{text}` is not an address"),
+            EvalError::NotData { type_name, .. } => {
+                write!(f, "a {type_name} cannot be stored as data")
+            }
             EvalError::Message(text) => f.write_str(text),
             EvalError::NotYetSupported(what) => {
                 write!(f, "{what} is not supported by the evaluator yet")
