@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: cotomet-syntax, dependencies: list(tomet-ast, tomet-lexer), dependents: list(cotomet, serde_cotomet, tomet-declaration, tomet-edit, tomet-formatter, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style, tomet-tests)}
+::meta{crate: cotomet-syntax, dependencies: list(tomet-ast, tomet-lexer), dependents: list(cotomet, cotomet-eval, serde_cotomet, tomet-declaration, tomet-edit, tomet-formatter, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style, tomet-tests)}
 
 =[cotomet-syntax]
 
@@ -223,6 +223,19 @@ First character of one segment of an element/identifier name.
 
 Subsequent characters of one segment of an element/identifier name.
 
+====[fn is_interp_start]
+
+Whether an expression begins at `cur`: `$` immediately followed by `{`,
+or an identifier and `(`.
+
+====[fn is_interp_ident_start]
+
+First character of an interpolation expression identifier.
+
+====[fn is_interp_ident_char]
+
+Subsequent characters of an interpolation expression identifier.
+
 ====[fn is_inline_ws]
 
 ====[fn skip_inline_ws]
@@ -321,6 +334,18 @@ entry, where `parse_value` would read the first as a scalar and keep the
 second as a positional entry. A declaration below the first entry is an
 error too: they go at the top. An empty file, or one with only comments, has
 no declarations and the empty map.
+
+Declarations at the top take no expressions. The body uses [`NoHook`], which
+rejects unquoted expressions (this reader reads data only; write them in
+quotes or use [`parse_file_with`] with an expression-aware hook).
+
+====[fn parse_file_with]
+
+Parse a standalone cotomet file (`.ctmt`) with a custom [`ValueHook`].
+
+Like [`parse_file`], but passes values through `hook`. Declarations at the
+top take no expressions: an expression there is an error saying "a declaration
+takes no expression".
 
 ====[fn parse_entry_value]
 

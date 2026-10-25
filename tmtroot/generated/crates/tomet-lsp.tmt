@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-lsp, dependencies: list(cotomet, tomet-address, tomet-ast, tomet-cst, tomet-expr, tomet-formatter, tomet-lexer, tomet-load, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator), dependents: list()}
+::meta{crate: tomet-lsp, dependencies: list(cotomet, cotomet-eval, tomet-address, tomet-ast, tomet-cst, tomet-declaration, tomet-expr, tomet-formatter, tomet-lexer, tomet-load, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator), dependents: list()}
 
 =[tomet-lsp]
 
@@ -45,8 +45,10 @@ names is at `textDocument.uri` in all of them.
 
 ====[fn data_diagnostics_for]
 
-What the cotomet parser says of `text` as a standalone file: at most one
-error, underlined from where it is to the end of its line.
+What the cotomet parser and evaluator say of `text` as a standalone file.
+
+Returns parse errors, declaration errors, and expression evaluation errors,
+underlined at their locations in the source text.
 
 ==[Module definition]
 
