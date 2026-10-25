@@ -13,8 +13,10 @@ path = "src/main.rs"
 
 [dependencies]
 cotomet = { workspace = true }
+cotomet-eval = { workspace = true }
 tomet-address = { workspace = true }
 tomet-ast = { workspace = true }
+tomet-declaration = { workspace = true }
 tomet-expr = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-formatter = { workspace = true }

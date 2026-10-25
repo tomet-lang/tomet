@@ -12,11 +12,13 @@
 /// starts in text the parser does not accept; so is any result that would
 /// read back as a different value.
 pub fn format_data_source(src: &str) -> String {
-    let Ok(before) = cotomet_syntax::parse_file(src) else {
+    let mut hook = tomet_parser::CotometValueHook;
+    let Ok(before) = cotomet_syntax::parse_file_with(src, &mut hook) else {
         return src.to_string();
     };
     let formatted = scan(src);
-    match cotomet_syntax::parse_file(&formatted) {
+    let mut hook = tomet_parser::CotometValueHook;
+    match cotomet_syntax::parse_file_with(&formatted, &mut hook) {
         Ok(after) if after == before => formatted,
         _ => src.to_string(),
     }
@@ -189,5 +191,19 @@ mod tests {
         assert_eq!(format_data_source(""), "");
         assert_eq!(format_data_source("  \n\n \t\n"), "");
         assert_eq!(format_data_source("// c"), "// c\n");
+    }
+
+    #[test]
+    fn file_with_expressions_is_formatted() {
+        let src = "::macros{ vocab: \"x\" }   \r\n\r\n\r\nkey: ${macro.vocab}   \r\n";
+        assert_eq!(
+            format_data_source(src),
+            "::macros{ vocab: \"x\" }\n\nkey: ${macro.vocab}\n"
+        );
+        let mut hook = tomet_parser::CotometValueHook;
+        let before = cotomet_syntax::parse_file_with(src, &mut hook).unwrap();
+        let mut hook = tomet_parser::CotometValueHook;
+        let after = cotomet_syntax::parse_file_with(&format_data_source(src), &mut hook).unwrap();
+        assert_eq!(before, after);
     }
 }

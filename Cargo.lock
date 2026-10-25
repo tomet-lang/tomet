@@ -274,8 +274,22 @@ checksum = "baf0a07a401f374238ab8e2f11a104d2851bf9ce711ec69804834de8af45c7af"
 name = "cotomet"
 version = "0.5.0"
 dependencies = [
+ "cotomet-eval",
  "cotomet-syntax",
  "serde_cotomet",
+]
+
+[[package]]
+name = "cotomet-eval"
+version = "0.5.0"
+dependencies = [
+ "cotomet-syntax",
+ "time",
+ "tomet-ast",
+ "tomet-declaration",
+ "tomet-expr",
+ "tomet-lexer",
+ "tomet-parser",
 ]
 
 [[package]]
@@ -1805,6 +1819,7 @@ dependencies = [
  "anyhow",
  "clap",
  "cotomet",
+ "cotomet-eval",
  "jobserver",
  "jobserver-gate",
  "mimalloc",
@@ -2040,12 +2055,14 @@ version = "0.5.0"
 dependencies = [
  "anyhow",
  "cotomet",
+ "cotomet-eval",
  "lsp-server",
  "lsp-types",
  "serde_json",
  "tomet-address",
  "tomet-ast",
  "tomet-cst",
+ "tomet-declaration",
  "tomet-expr",
  "tomet-formatter",
  "tomet-lexer",

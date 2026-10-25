@@ -143,6 +143,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
             format_diagnostics(
                 file,
                 &diagnostics,
+                &[],
                 &index,
                 json,
                 &mut stderr_lines,
@@ -231,16 +232,17 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
 fn format_diagnostics(
     file: &Path,
     diagnostics: &[Diagnostic],
+    eval_errors: &[cotomet_eval::Error],
     index: &LineIndex,
     json: bool,
     stderr_lines: &mut Vec<String>,
     json_entries: &mut Vec<serde_json::Value>,
 ) {
-    if diagnostics.is_empty() {
+    if diagnostics.is_empty() && eval_errors.is_empty() {
         return;
     }
     if json {
-        let error_list: Vec<serde_json::Value> = diagnostics
+        let mut error_list: Vec<serde_json::Value> = diagnostics
             .iter()
             .map(|d| {
                 serde_json::json!({
@@ -249,6 +251,14 @@ fn format_diagnostics(
                 })
             })
             .collect();
+        for e in eval_errors {
+            error_list.push(serde_json::json!({
+                "message": e.message,
+                "line": e.line,
+                "column": e.column,
+                "severity": "error",
+            }));
+        }
         json_entries.push(serde_json::json!({
             "file": file.display().to_string(),
             "errors": error_list,
@@ -262,37 +272,60 @@ fn format_diagnostics(
                 d.message_in(index)
             ));
         }
+        for err in eval_errors {
+            stderr_lines.push(format!(
+                "{}:{}:{}: {}",
+                file.display(),
+                err.line,
+                err.column,
+                err.message
+            ));
+        }
     }
 }
 
+/// Check a standalone cotomet file (`.ctmt`).
+///
+/// Declarations at the top are validated by `check_ctmt_declarations`. If the
+/// evaluator also reports errors within header declarations (such as a malformed
+/// `::vars` or `::macros` entry), those duplicates are dropped in favor of the
+/// declaration check's diagnostic so each problem is reported once.
 fn check_ctmt(file: &Path, src: &str, json: bool) -> CheckFileResult {
-    let parsed = match cotomet::syntax::parse_file(src) {
+    let mut hook = tomet_parser::CotometValueHook;
+    let parsed = match cotomet::syntax::parse_file_with(src, &mut hook) {
         Ok(parsed) => parsed,
         Err(err) => return parse_failure(file, src, &err.into(), json),
     };
 
+    let header_spans: Vec<_> = parsed.header.iter().map(|d| d.span).collect();
+
     let declared: Vec<_> = parsed
         .header
         .iter()
-        .map(|d| {
-            tomet_validator::Declared::new(
-                tomet_declaration::Declaration::new(d.name.clone(), d.args.clone(), d.data.clone()),
-                d.span,
-            )
-        })
+        .map(|d| tomet_validator::Declared::new(tomet_declaration::Declaration::from(d), d.span))
         .collect();
     let mut diagnostics = Vec::new();
     tomet_validator::check_ctmt_declarations(&declared, &mut diagnostics);
 
+    let eval_res = cotomet_eval::eval_file(parsed, src, &[]);
+    let eval_errors: Vec<_> = match eval_res {
+        Ok(_) => Vec::new(),
+        Err(errors) => errors
+            .into_iter()
+            .filter(|e| !header_spans.iter().any(|s| s.contains_offset(e.span.start)))
+            .collect(),
+    };
+
     let index = tomet_lexer::LineIndex::new(src);
     let warnings = diagnostics.iter().filter(|d| !is_error(d)).count();
-    let has_errors = diagnostics.iter().any(is_error);
+    let has_errors = diagnostics.iter().any(is_error) || !eval_errors.is_empty();
 
     let mut stderr_lines = Vec::new();
     let mut json_entries = Vec::new();
     format_diagnostics(
         file,
         &diagnostics,
+        &eval_errors,
         &index,
         json,
         &mut stderr_lines,
@@ -674,6 +707,79 @@ mod tests {
             vec!["`meta` may appear once in a document; the first is at 1:1"]
         );
         let err = check(&dup_file, false, true, false).expect_err("duplicate ::meta fails");
+        assert!(err.to_string().contains("1 of 1 file(s) failed"));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Expressions in a .ctmt file are evaluated and reported with line and column.
+    #[test]
+    fn cotomet_eval_expressions_are_checked() {
+        let root = vault("ctmt_eval_expressions");
+
+        fn ctmt_errors(file: &Path, src: &str) -> Vec<String> {
+            match check_ctmt(file, src, false) {
+                CheckFileResult::Checked { stderr_lines, .. } => stderr_lines,
+                _ => panic!("expected CheckFileResult::Checked"),
+            }
+        }
+
+        // 1. .ctmt with ${macro.vocab("writ", "1.0.0")} passes check
+        let good_src = "::macros{ vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\" }\npath: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
+        let good_file = root.join("good.ctmt");
+        fs::write(&good_file, good_src).unwrap();
+        assert_eq!(ctmt_errors(&good_file, good_src), Vec::<String>::new());
+        check(&good_file, false, true, false).expect("valid expression passes");
+
+        // 2. .ctmt with ${macro.nosuch(1)} fails check, message contains line, col, and "unknown macro `macro.nosuch`"
+        let bad_macro_src = "path: ${macro.nosuch(1)}\n";
+        let bad_macro_file = root.join("bad_macro.ctmt");
+        fs::write(&bad_macro_file, bad_macro_src).unwrap();
+        let errs = ctmt_errors(&bad_macro_file, bad_macro_src);
+        assert_eq!(errs.len(), 1);
+        assert!(
+            errs[0].contains("1:7: unknown macro `macro.nosuch`"),
+            "got {}",
+            errs[0]
+        );
+        let err = check(&bad_macro_file, false, true, false).expect_err("unknown macro fails");
+        assert!(err.to_string().contains("1 of 1 file(s) failed"));
+
+        // 3. .ctmt with ${macro.vocab("writ")} fails check, message contains arity error
+        let bad_arity_src = "::macros{ vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\" }\npath: ${macro.vocab(\"writ\")}\n";
+        let bad_arity_file = root.join("bad_arity.ctmt");
+        fs::write(&bad_arity_file, bad_arity_src).unwrap();
+        let errs = ctmt_errors(&bad_arity_file, bad_arity_src);
+        assert_eq!(errs.len(), 1);
+        assert!(
+            errs[0].contains("2:7: `macro.vocab` expects 2 argument(s), got 1"),
+            "got {}",
+            errs[0]
+        );
+        let err = check(&bad_arity_file, false, true, false).expect_err("wrong arity fails");
+        assert!(err.to_string().contains("1 of 1 file(s) failed"));
+
+        // 4. .ctmt with ${tmt("a.tmt")} fails check with clear error (address checking out of scope)
+        let addr_src = "path: ${tmt(\"a.tmt\")}\n";
+        let addr_file = root.join("addr.ctmt");
+        fs::write(&addr_file, addr_src).unwrap();
+        let errs = ctmt_errors(&addr_file, addr_src);
+        assert_eq!(errs.len(), 1);
+        assert!(
+            errs[0].contains("1:7: a .ctmt has no vault, so it cannot refer to a document, a directory or an element"),
+            "got {}",
+            errs[0]
+        );
+        let err = check(&addr_file, false, true, false).expect_err("address expr fails");
+        assert!(err.to_string().contains("1 of 1 file(s) failed"));
+
+        // 5. .ctmt with bad ::vars entry reports exactly 1 message
+        let bad_var_src = "::vars{ bad: 123 }\npath: \"ok\"\n";
+        let bad_var_file = root.join("bad_var.ctmt");
+        fs::write(&bad_var_file, bad_var_src).unwrap();
+        let errs = ctmt_errors(&bad_var_file, bad_var_src);
+        assert_eq!(errs.len(), 1, "expected 1 error, got {:?}", errs);
+        let err = check(&bad_var_file, false, true, false).expect_err("bad vars fails");
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
         let _ = fs::remove_dir_all(&root);

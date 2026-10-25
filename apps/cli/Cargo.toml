@@ -35,6 +35,7 @@ tomet-typst = { workspace = true }
 tomet-validator = { workspace = true }
 tomet-workspace = { workspace = true }
 cotomet = { workspace = true }
+cotomet-eval = { workspace = true }
 
 #= Crates.io
 anyhow = { workspace = true }
