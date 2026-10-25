@@ -70,16 +70,18 @@ declarations about the file:
 ```
 
 [`parse_file`] reads one into a [`File`]. A declaration is `::name`, then
-positional arguments in `(...)` and a map in `{...}`, either or both, and
+arguments in `(...)` (mixed positional and named, like `.tmt`'s:
+`::kind(note, version: 2)`) and a map in `{...}`, either or both, and
 ends its line; they go before the first entry. What a name means is not
 decided here. The body is [`parse_value`] that also insists every entry has
 a key, so a lone scalar or a bare value among the entries is an error at
 that entry.
 
 The tools know a `.ctmt` as data, not as a document: `tomet check` and
-`tomet format` take one next to a `.tmt`; `tomet-lsp` gives it this
-parser's diagnostics and a whitespace formatter and nothing a document gets;
-`tree-sitter-cotomet` highlights it in Helix, Neovim and Zed, and VS Code has a
+`tomet format` take one next to a `.tmt`; `tomet check` validates a `.ctmt`
+header's standard declarations (and passes over the rest); `tomet-lsp` gives
+it this parser's diagnostics and a whitespace formatter and nothing a document
+gets; `tree-sitter-cotomet` highlights it in Helix, Neovim and Zed, and VS Code has a
 TextMate grammar. None of them loads it into a vault.
 
 A document with nothing in it, or only whitespace and comments, is the
@@ -178,7 +180,7 @@ A declaration about a file, written `::name(args){data}` at its top: what
 the file is (`::kind(catalog, 2)`), what it brings in (`::use(deck)`), the
 information about it (`::meta{ id: x }`).
 
-The arguments are values, positional, as in any cotomet call; the data is a
+The arguments are read like `.tmt`'s (mixed positional and named); the data is a
 map. What a name means is not for this crate to say: it reads the shape.
 
 ====[struct File]

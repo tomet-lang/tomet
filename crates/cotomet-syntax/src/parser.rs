@@ -8,7 +8,7 @@
 use std::collections::HashSet;
 
 use crate::error::{Error, Result};
-use tomet_ast::{Name, Value};
+use tomet_ast::{Name, Span, Value};
 use tomet_lexer::Cursor;
 
 /// A hook allowing callers (such as `tomet-syntax-parser`) to parse custom
@@ -593,18 +593,19 @@ pub fn parse_map_body_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Resu
 /// the file is (`::kind(catalog, 2)`), what it brings in (`::use(deck)`), the
 /// information about it (`::meta{ id: x }`).
 ///
-/// The arguments are values, positional, as in any cotomet call; the data is a
+/// The arguments are read like `.tmt`'s (mixed positional and named); the data is a
 /// map. What a name means is not for this crate to say: it reads the shape.
 #[derive(Debug, Clone)]
 pub struct Declaration {
     pub name: String,
-    pub args: Vec<Value>,
+    pub args: Option<Value>,
     pub data: Option<Value>,
-    /// Where the `::` is, in bytes. Not part of what the declaration says, so
-    /// two files that say the same thing are equal wherever they say it.
-    pub offset: usize,
+    /// Where the declaration is, from `::` to the end of its groups.
+    pub span: Span,
 }
 
+/// Two declarations that say the same thing are equal wherever they say it;
+/// `span` is ignored so structural equality reflects content, not layout.
 impl PartialEq for Declaration {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.args == other.args && self.data == other.data
@@ -650,18 +651,30 @@ pub fn parse_file(src: &str) -> Result<File> {
 
 /// One `::name(args){data}` declaration, ending its line. The `::` is next.
 fn parse_declaration(cur: &mut Cursor) -> Result<Declaration> {
-    let offset = cur.pos();
+    let start = cur.pos();
     cur.eat_str("::");
     let Some(name) = eat_name(cur) else {
-        return Err(err(offset, "expected a name after '::'"));
+        return Err(err(start, "expected a name after '::'"));
     };
+    let mut end = cur.pos();
     let (mut args, mut data) = (None, None);
     loop {
         skip_inline_ws(cur);
         match cur.peek() {
             Some('(') if args.is_none() => {
                 cur.bump();
-                args = Some(parse_call_args(cur, &mut NoHook, false)?);
+                skip_ws_newlines_and_comments(cur);
+                let v = if cur.peek() == Some(')') {
+                    Value::Map(Vec::new())
+                } else {
+                    parse_value_at_with(cur, &mut NoHook)?
+                };
+                skip_ws_newlines_and_comments(cur);
+                if !cur.eat_str(")") {
+                    return Err(err(cur.pos(), "expected ')'"));
+                }
+                end = cur.pos();
+                args = Some(v);
             }
             Some('{') if data.is_none() => {
                 cur.bump();
@@ -670,6 +683,7 @@ fn parse_declaration(cur: &mut Cursor) -> Result<Declaration> {
                 if !cur.eat_str("}") {
                     return Err(err(cur.pos(), "expected '}'"));
                 }
+                end = cur.pos();
                 data = Some(map);
             }
             _ => break,
@@ -684,9 +698,9 @@ fn parse_declaration(cur: &mut Cursor) -> Result<Declaration> {
     }
     Ok(Declaration {
         name: name.to_string(),
-        args: args.unwrap_or_default(),
+        args,
         data,
-        offset,
+        span: Span::new(start, end),
     })
 }
 

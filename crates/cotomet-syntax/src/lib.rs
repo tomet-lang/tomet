@@ -63,16 +63,18 @@
 //! ```
 //!
 //! [`parse_file`] reads one into a [`File`]. A declaration is `::name`, then
-//! positional arguments in `(...)` and a map in `{...}`, either or both, and
+//! arguments in `(...)` (mixed positional and named, like `.tmt`'s:
+//! `::kind(note, version: 2)`) and a map in `{...}`, either or both, and
 //! ends its line; they go before the first entry. What a name means is not
 //! decided here. The body is [`parse_value`] that also insists every entry has
 //! a key, so a lone scalar or a bare value among the entries is an error at
 //! that entry.
 //!
 //! The tools know a `.ctmt` as data, not as a document: `tomet check` and
-//! `tomet format` take one next to a `.tmt`; `tomet-lsp` gives it this
-//! parser's diagnostics and a whitespace formatter and nothing a document gets;
-//! `tree-sitter-cotomet` highlights it in Helix, Neovim and Zed, and VS Code has a
+//! `tomet format` take one next to a `.tmt`; `tomet check` validates a `.ctmt`
+//! header's standard declarations (and passes over the rest); `tomet-lsp` gives
+//! it this parser's diagnostics and a whitespace formatter and nothing a document
+//! gets; `tree-sitter-cotomet` highlights it in Helix, Neovim and Zed, and VS Code has a
 //! TextMate grammar. None of them loads it into a vault.
 //!
 //! A document with nothing in it, or only whitespace and comments, is the
@@ -154,7 +156,7 @@ pub use positional::bind_positional;
 pub use print::{
     float_text, key_text, print_value, quoted_text, write_float, write_key, write_scalar_string,
 };
-pub use tomet_ast::Value;
+pub use tomet_ast::{Span, Value};
 
 #[cfg(test)]
 mod tests {
@@ -697,7 +699,7 @@ mod tests {
         }
     }
 
-    fn declared(f: &File) -> Vec<(String, Vec<Value>, Option<Value>)> {
+    fn declared(f: &File) -> Vec<(String, Option<Value>, Option<Value>)> {
         f.header
             .iter()
             .map(|d| (d.name.clone(), d.args.clone(), d.data.clone()))
@@ -715,13 +717,16 @@ mod tests {
             [
                 (
                     "kind".to_string(),
-                    vec![text("catalog"), Value::Int(2)],
+                    Some(Value::Map(vec![
+                        ("".to_string(), text("catalog")),
+                        ("".to_string(), Value::Int(2)),
+                    ])),
                     None
                 ),
-                ("use".to_string(), vec![text("deck")], None),
+                ("use".to_string(), Some(text("deck")), None),
                 (
                     "meta".to_string(),
-                    vec![],
+                    None,
                     Some(map(&[("id", text("x")), ("n", Value::Int(1))]))
                 ),
             ]
@@ -739,15 +744,30 @@ mod tests {
             declared(&f),
             [(
                 "x".to_string(),
-                vec![text("a"), text("b")],
+                Some(Value::Map(vec![
+                    ("".to_string(), text("a")),
+                    ("".to_string(), text("b")),
+                ])),
                 Some(map(&[("c", Value::Int(1))]))
             )]
         );
         let f = parse_file("::x{ c: 1 }(a)\n").unwrap();
-        assert_eq!(f.header[0].args, [text("a")]);
+        assert_eq!(f.header[0].args, Some(text("a")));
         // a bare name is a declaration with nothing in it
         let f = parse_file("::draft\n").unwrap();
-        assert_eq!(declared(&f), [("draft".to_string(), vec![], None)]);
+        assert_eq!(declared(&f), [("draft".to_string(), None, None)]);
+    }
+
+    #[test]
+    fn a_declaration_reads_mixed_args_like_tmt() {
+        let f = parse_file("::kind(note, version: 2)\n").unwrap();
+        assert_eq!(
+            f.header[0].args,
+            Some(Value::Map(vec![
+                ("".to_string(), text("note")),
+                ("version".to_string(), Value::Int(2)),
+            ]))
+        );
     }
 
     #[test]
@@ -760,8 +780,19 @@ mod tests {
     #[test]
     fn a_declaration_records_where_it_starts() {
         let f = parse_file("// c\n::kind(a)\n  ::use(b)\n").unwrap();
-        assert_eq!(f.header[0].offset, 5);
-        assert_eq!(f.header[1].offset, 17);
+        assert_eq!(f.header[0].span, Span::new(5, 14));
+        assert_eq!(f.header[1].span, Span::new(17, 25));
+    }
+
+    #[test]
+    fn a_declaration_span_ends_at_the_last_group_delimiter() {
+        let src = "::kind(a)   // comment\nkey: 1\n";
+        let f = parse_file(src).unwrap();
+        assert_eq!(f.header[0].span, Span::new(0, 9));
+        assert_eq!(
+            &src[f.header[0].span.start..f.header[0].span.end],
+            "::kind(a)"
+        );
     }
 
     #[test]
