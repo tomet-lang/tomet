@@ -2,7 +2,9 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use rayon::prelude::*;
+use tomet_lexer::LineIndex;
 use tomet_load::{Findings, is_error};
+use tomet_validator::Diagnostic;
 
 use crate::util::{format_parse_error, read};
 
@@ -23,8 +25,8 @@ enum CheckFileResult {
 /// Checks one file, or every `.tmt` and `.ctmt` under a directory.
 ///
 /// A `.ctmt` is a standalone cotomet file, not a document: it is parsed as
-/// cotomet and must be a map of `key: value` entries, and has no vocabulary
-/// to check against.
+/// cotomet and must be a map of `key: value` entries, with its header
+/// declarations validated against [`tomet_declaration::Host::Ctmt`].
 ///
 /// Checking is not parsing. This used to return OK the moment a document
 /// parsed, so two `::meta`, or an element name that exists nowhere, passed
@@ -97,15 +99,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
             };
 
             if tomet_indexer::is_ctmt_file(file) {
-                return match cotomet::syntax::parse_file(&src) {
-                    Ok(_) => CheckFileResult::Checked {
-                        warnings: 0,
-                        has_errors: false,
-                        stderr_lines: Vec::new(),
-                        json_entries: Vec::new(),
-                    },
-                    Err(err) => parse_failure(file, &src, &err.into(), json),
-                };
+                return check_ctmt(file, &src, json);
             }
 
             let doc = match tomet_parser::parse_document(&src) {
@@ -146,39 +140,18 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
                 }
             }
 
-            let failed = if diagnostics.is_empty() {
-                false
-            } else {
-                if json {
-                    let error_list: Vec<serde_json::Value> = diagnostics
-                        .iter()
-                        .map(|d| {
-                            serde_json::json!({
-                                "message": d.message_in(&index),
-                                "severity": if is_error(d) { "error" } else { "warning" },
-                            })
-                        })
-                        .collect();
-                    json_entries.push(serde_json::json!({
-                        "file": file.display().to_string(),
-                        "errors": error_list,
-                    }));
-                } else {
-                    for d in &diagnostics {
-                        let label = if is_error(d) { "" } else { "warning: " };
-                        stderr_lines.push(format!(
-                            "{}: {label}{}",
-                            file.display(),
-                            d.message_in(&index)
-                        ));
-                    }
-                }
-                has_errors
-            };
+            format_diagnostics(
+                file,
+                &diagnostics,
+                &index,
+                json,
+                &mut stderr_lines,
+                &mut json_entries,
+            );
 
             CheckFileResult::Checked {
                 warnings,
-                has_errors: failed,
+                has_errors,
                 stderr_lines,
                 json_entries,
             }
@@ -253,6 +226,85 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
         }
     }
     Ok(())
+}
+
+fn format_diagnostics(
+    file: &Path,
+    diagnostics: &[Diagnostic],
+    index: &LineIndex,
+    json: bool,
+    stderr_lines: &mut Vec<String>,
+    json_entries: &mut Vec<serde_json::Value>,
+) {
+    if diagnostics.is_empty() {
+        return;
+    }
+    if json {
+        let error_list: Vec<serde_json::Value> = diagnostics
+            .iter()
+            .map(|d| {
+                serde_json::json!({
+                    "message": d.message_in(index),
+                    "severity": if is_error(d) { "error" } else { "warning" },
+                })
+            })
+            .collect();
+        json_entries.push(serde_json::json!({
+            "file": file.display().to_string(),
+            "errors": error_list,
+        }));
+    } else {
+        for d in diagnostics {
+            let label = if is_error(d) { "" } else { "warning: " };
+            stderr_lines.push(format!(
+                "{}: {label}{}",
+                file.display(),
+                d.message_in(index)
+            ));
+        }
+    }
+}
+
+fn check_ctmt(file: &Path, src: &str, json: bool) -> CheckFileResult {
+    let parsed = match cotomet::syntax::parse_file(src) {
+        Ok(parsed) => parsed,
+        Err(err) => return parse_failure(file, src, &err.into(), json),
+    };
+
+    let declared: Vec<_> = parsed
+        .header
+        .iter()
+        .map(|d| {
+            tomet_validator::Declared::new(
+                tomet_declaration::Declaration::new(d.name.clone(), d.args.clone(), d.data.clone()),
+                d.span,
+            )
+        })
+        .collect();
+    let mut diagnostics = Vec::new();
+    tomet_validator::check_ctmt_declarations(&declared, &mut diagnostics);
+
+    let index = tomet_lexer::LineIndex::new(src);
+    let warnings = diagnostics.iter().filter(|d| !is_error(d)).count();
+    let has_errors = diagnostics.iter().any(is_error);
+
+    let mut stderr_lines = Vec::new();
+    let mut json_entries = Vec::new();
+    format_diagnostics(
+        file,
+        &diagnostics,
+        &index,
+        json,
+        &mut stderr_lines,
+        &mut json_entries,
+    );
+
+    CheckFileResult::Checked {
+        warnings,
+        has_errors,
+        stderr_lines,
+        json_entries,
+    }
 }
 
 /// One file that did not parse, as the sweep reports it: JSON when asked for,
@@ -550,6 +602,79 @@ mod tests {
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
         check(&root.join("good.tmt"), false, true, false).expect("good file passes");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Declarations at the top of a .ctmt file are validated against Host::Ctmt.
+    #[test]
+    fn cotomet_header_declarations_are_checked() {
+        let root = vault("ctmt_declarations");
+
+        fn ctmt_messages(file: &Path, src: &str) -> Vec<String> {
+            match check_ctmt(file, src, false) {
+                CheckFileResult::Checked { stderr_lines, .. } => stderr_lines
+                    .into_iter()
+                    .map(|l| {
+                        let prefix = format!("{}: ", file.display());
+                        l.strip_prefix(&prefix).unwrap_or(&l).to_string()
+                    })
+                    .collect(),
+                _ => panic!("expected CheckFileResult::Checked"),
+            }
+        }
+
+        // 1. Valid standard declarations pass
+        let good_src = "::kind(catalog, 1)\n::version(1.0.0)\n::meta{\n  author: \"me\"\n}\n::macros{\n  name: \"val\"\n}\n::vars{\n  n: { type: int, default: 1 }\n}\nkey: 42\n";
+        let good_file = root.join("good.ctmt");
+        fs::write(&good_file, good_src).unwrap();
+        assert_eq!(ctmt_messages(&good_file, good_src), Vec::<String>::new());
+        check(&good_file, false, true, false).expect("valid ctmt passes");
+
+        // 2. A file that opens with non-standard ::upstreams{ ... } checks clean
+        let upstreams_src = "::upstreams{\n  vocabularies: { git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies }\n  commonfiles: { git: \"https://github.com/tomet-lang/commonfiles.git\", rev: main, root: base }\n}\n\"tmtroot/schema/vocabularies/rust@1.0.0.vocabulary.tmt\": { source: { upstream: vocabularies, path: \"...\" } }\n";
+        let upstreams_file = root.join("upstreams.ctmt");
+        fs::write(&upstreams_file, upstreams_src).unwrap();
+        assert_eq!(
+            ctmt_messages(&upstreams_file, upstreams_src),
+            Vec::<String>::new()
+        );
+        check(&upstreams_file, false, true, false).expect("::upstreams checks clean");
+
+        // 3. The same file with ::kind(catalog, 1.0) added reports version problem only
+        let bad_kind_src = "::kind(catalog, 1.0)\n::upstreams{\n  vocabularies: { git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies }\n}\nkey: 1\n";
+        let bad_kind_file = root.join("upstreams_bad_kind.ctmt");
+        fs::write(&bad_kind_file, bad_kind_src).unwrap();
+        let msgs = ctmt_messages(&bad_kind_file, bad_kind_src);
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(
+            msgs[0],
+            "the version in `::kind(...)` must be an integer of 1 or more, found 1.0"
+        );
+        assert!(!msgs[0].contains("upstreams"));
+        let err = check(&bad_kind_file, false, true, false).expect_err("bad ::kind version fails");
+        assert!(err.to_string().contains("1 of 1 file(s) failed"));
+
+        // 4. NotForThisHost (::use in .ctmt) fails
+        let not_for_host_src = "::use(deck)\nkey: 1\n";
+        let not_for_host_file = root.join("not_for_host.ctmt");
+        fs::write(&not_for_host_file, not_for_host_src).unwrap();
+        let msgs = ctmt_messages(&not_for_host_file, not_for_host_src);
+        assert_eq!(msgs, vec!["`::use` is not permitted in this host"]);
+        let err = check(&not_for_host_file, false, true, false).expect_err("::use in .ctmt fails");
+        assert!(err.to_string().contains("1 of 1 file(s) failed"));
+
+        // 5. Duplicate singleton (two ::meta) fails
+        let dup_src = "::meta{ a: 1 }\n::meta{ b: 2 }\nkey: 1\n";
+        let dup_file = root.join("duplicate.ctmt");
+        fs::write(&dup_file, dup_src).unwrap();
+        let msgs = ctmt_messages(&dup_file, dup_src);
+        assert_eq!(
+            msgs,
+            vec!["`meta` may appear once in a document; the first is at 1:1"]
+        );
+        let err = check(&dup_file, false, true, false).expect_err("duplicate ::meta fails");
+        assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
         let _ = fs::remove_dir_all(&root);
     }
