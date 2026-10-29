@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-address, dependencies: list(tomet-ast, tomet-parser, tomet-tree), dependents: list(tomet-edit, tomet-links, tomet-lsp, tomet-semantics, tomet-stats, tomet-validator-core)}
+::meta{crate: tomet-address, dependencies: list(tomet-ast, tomet-parser, tomet-tree), dependents: list(tomet-deps, tomet-edit, tomet-links, tomet-lsp, tomet-semantics, tomet-stats, tomet-validator-core)}
 
 =[tomet-address]
 

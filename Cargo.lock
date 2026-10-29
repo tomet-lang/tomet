@@ -1763,6 +1763,7 @@ dependencies = [
  "tomet-ast",
  "tomet-config",
  "tomet-declaration",
+ "tomet-deps",
  "tomet-edit",
  "tomet-formatter",
  "tomet-html",
@@ -1883,6 +1884,18 @@ dependencies = [
  "tomet-parser",
  "tomet-tree",
  "tomet-type",
+]
+
+[[package]]
+name = "tomet-deps"
+version = "0.5.0"
+dependencies = [
+ "serde",
+ "tomet-address",
+ "tomet-ast",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-tree",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet, dependencies: list(tomet-ast, tomet-config, tomet-declaration, tomet-edit, tomet-formatter, tomet-html, tomet-links, tomet-load, tomet-markdown, tomet-merge, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-typst, tomet-validator, tomet-vault), dependents: list(tomet-java, tomet-js, tomet-python)}
+::meta{crate: tomet, dependencies: list(tomet-ast, tomet-config, tomet-declaration, tomet-deps, tomet-edit, tomet-formatter, tomet-html, tomet-links, tomet-load, tomet-markdown, tomet-merge, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-transform, tomet-typst, tomet-validator, tomet-vault), dependents: list(tomet-java, tomet-js, tomet-python)}
 
 =[tomet]
 
@@ -46,12 +46,13 @@ top-level elements -- so there is no vocabulary for it to skip.
 
 ==[Features]
 
-[`declaration`], [`semantics`] and [`validator`] are always present: they are pure, and
+[`declaration`], [`semantics`], [`transform`] and [`validator`] are always present: they are pure, and
 reading a document already depends on the first. Everything that leaves
 the AST is opt-in, so a reader-only consumer
 compiles nothing it does not use. Each feature adds one module:
 
 @table[[ feature    ][ module       ][ from              ]
+[ `deps`     ][ `deps`       ][ `tomet-deps`      ]
 [ `edit`     ][ `edit`       ][ `tomet-edit`      ]
 [ `merge`    ][ `merge`      ][ `tomet-merge`     ]
 [ `parser`   ][ `parser`     ][ `tomet-parser`    ]

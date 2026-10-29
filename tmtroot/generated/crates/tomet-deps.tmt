@@ -1,0 +1,99 @@
+::kind(api)
+
+::meta{crate: tomet-deps, dependencies: list(tomet-address, tomet-ast, tomet-parser, tomet-semantics, tomet-tree), dependents: list(tomet)}
+
+=[tomet-deps]
+
+==[tomet-deps]
+
+Document-level dependency tracking, impact analysis, and incremental invalidation
+for Tomet workspaces and static site generators.
+
+==[Architecture & Responsibilities]
+
+- ("Vault-Wide Dependency Graph & Invalidation Engine") `tomet-deps` models document interactions across a vault as a bidirectional directed graph.
+It tracks outgoing hypertext links, transclusions/embeds, and metadata dependencies.
+- ("Fine-Grained Invalidation") Rather than treating all file modifications equally, `tomet-deps` tracks signature differences:
+- Text-only modification: re-renders only the edited document.
+- Link addition/removal: re-renders the document and updates the incoming backlinks of the target.
+- Title/export changes: propagates re-render requirements to all documents referencing the target.
+- Transclusion / Embed: propagates content changes recursively to all embedding documents.
+
+- ("Pure In-Memory & Platform Agnostic") Zero filesystem I/O. All models and graph algorithms are pure in-memory computations,
+making `tomet-deps` fully compatible with native CLI, background watch runners, and Wasm targets.
+
+==[Module extract]
+
+Pure in-memory dependency and export extraction from parsed Tomet ASTs.
+
+===[Functions]
+
+====[fn extract_raw_dependencies]
+
+Extracts raw outgoing targets alongside their dependency kind from an AST Document.
+
+====[fn extract_exports_hash]
+
+Computes a hash of document declarations (such as `::meta`, `::title`, `::kind`, `::slug`, etc.).
+
+====[fn extract_document_node]
+
+Builds a [`DocumentNode`] from a parsed document given a target resolution function.
+
+==[Module graph]
+
+In-memory bidirectional dependency graph and impact propagation engine.
+
+===[Structs]
+
+====[struct RemovedRecord]
+
+Record of a document removed from the graph.
+
+====[struct DependencyGraph]
+
+Bidirectional in-memory dependency graph for document nodes.
+
+===[Functions]
+
+====[fn compute_affected_paths]
+
+Pure function: computes affected documents given all document nodes and a slice of changes.
+
+==[Module model]
+
+Pure in-memory data models for document dependencies, backlinks, and invalidation.
+
+===[Structs]
+
+====[struct Dependency]
+
+A directed reference from one document to another.
+
+====[struct Backlink]
+
+An incoming backlink representation.
+
+====[struct DocumentNode]
+
+A document node containing its dependency signature and outgoing references.
+
+====[struct AffectedPaths]
+
+Impact and invalidation report produced by dependency analysis.
+
+===[Enums]
+
+====[enum DependencyKind]
+
+The nature of a directed dependency between two documents.
+
+====[enum Change]
+
+An observed change to a document within a set.
+
+===[Functions]
+
+====[fn fnv1a_hash]
+
+Standard 64-bit FNV-1a hash for content and metadata fingerprinting.

@@ -64,6 +64,9 @@ members = [
   #= Merge -- pure in-memory 3-way AST merge & conflict resolution
   "crates/tomet-merge",
 
+  #= Deps -- pure in-memory document dependency tracking & invalidation
+  "crates/tomet-deps",
+
   #= Stats -- pure in-memory document statistics & metrics
   "crates/tomet-stats",
 
@@ -160,6 +163,7 @@ tomet-printer = { path = "crates/tomet-format-printer", version = "0.5.0" }
 tomet-style = { path = "crates/tomet-format-style", version = "0.5.0" }
 #= Workspace
 tomet-config = { path = "crates/tomet-config", version = "0.5.0" }
+tomet-deps = { path = "crates/tomet-deps", version = "0.5.0" }
 tomet-indexer = { path = "crates/tomet-workspace-indexer", version = "0.5.0" }
 tomet-links = { path = "crates/tomet-workspace-links", version = "0.5.0", default-features = false }
 tomet-load = { path = "crates/tomet-load", version = "0.5.0" }

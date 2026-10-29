@@ -47,6 +47,7 @@
 //!
 //! @table
 //! |[ feature    ][ module       ][ from              ]
+//! |[ `deps`     ][ `deps`       ][ `tomet-deps`      ]
 //! |[ `edit`     ][ `edit`       ][ `tomet-edit`      ]
 //! |[ `merge`    ][ `merge`      ][ `tomet-merge`     ]
 //! |[ `parser`   ][ `parser`     ][ `tomet-parser`    ]
@@ -104,6 +105,10 @@ pub use tomet_merge as merge;
 /// The disk-free `Vault`: build one from text with `from_sources`. The
 /// top-level [`Vault`] is this plus finding and reading files.
 pub use tomet_vault as vault;
+
+/// Vault-wide dependency tracking, backlinks, and incremental invalidation (opt-in feature `deps`).
+#[cfg(feature = "deps")]
+pub use tomet_deps as deps;
 
 #[cfg(feature = "format")]
 pub use tomet_formatter as format;

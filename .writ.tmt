@@ -28,6 +28,7 @@ does not relax the rule to fit the change it wanted to make.
       "crates/tomet-search",
       "crates/tomet-edit",
       "crates/tomet-merge",
+      "crates/tomet-deps",
       "crates/tomet-stats",
       "crates/tomet-spec",
       "crates/tomet-vault"
@@ -63,6 +64,8 @@ engines rather than internal syntax or semantics producers, and their names carr
 editing runtimes, and it shares no prefix with the producer groups.
 
 @dir(crates/tomet-merge) is likewise listed by name: it is pure in-memory three-way AST merge and conflict resolution over parsed documents, and it shares no prefix with the producer groups.
+
+@dir(crates/tomet-deps) is likewise listed by name: it is pure in-memory document dependency tracking, backlinks, and invalidation calculation over parsed documents, and it shares no prefix with the producer groups.
 
 @dir(crates/tomet-stats) is likewise listed by name: it is pure in-memory document statistics and metrics calculation over a parsed AST, and it shares no prefix with the producer groups.
 

@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [features]
+deps = ["dep:tomet-deps"]
 edit = ["dep:tomet-edit"]
 format = ["dep:tomet-formatter"]
 html = ["dep:tomet-html"]
@@ -31,6 +32,7 @@ tomet-validator = { workspace = true }
 tomet-vault = { workspace = true }
 
 #= Optional
+tomet-deps = { workspace = true, optional = true }
 tomet-edit = { workspace = true, optional = true }
 tomet-formatter = { workspace = true, optional = true }
 tomet-html = { workspace = true, optional = true }
