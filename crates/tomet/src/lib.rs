@@ -162,13 +162,11 @@ mod tests {
             );
         }
 
-        #[cfg(all(feature = "parser", feature = "merge"))]
+        #[cfg(feature = "merge")]
         {
-            let base = parse_document("Hello world.\n").unwrap();
-            let local = parse_document("Hello my world.\n").unwrap();
-            let remote = parse_document("Hello world!\n").unwrap();
-            let res = merge::merge(&base, &local, &remote);
+            let res = merge::merge("Hello world.\n", "Hello my world.\n", "Hello world!\n");
             assert!(res.clean);
+            assert_eq!(res.text, "Hello my world!\n");
         }
     }
 }

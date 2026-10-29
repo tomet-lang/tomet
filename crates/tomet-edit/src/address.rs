@@ -107,7 +107,7 @@ pub fn parse_address_path(raw: &str) -> Option<AddressPath> {
         } else {
             // General field name up to next '.' or '('
             let end = cur
-                .find(|c: char| c == '.' || c == '(')
+                .find(['.', '('])
                 .unwrap_or(cur.len());
             let field = cur[..end].trim();
             if !field.is_empty() {
@@ -183,11 +183,14 @@ impl EditDoc {
         let children = match &node.kind {
             NodeKind::Section { children, .. }
             | NodeKind::List { children }
-            | NodeKind::ListItem { children, .. } => children,
-            _ => return Vec::new(),
+            | NodeKind::ListItem { children, .. } => Some(children.as_slice()),
+            NodeKind::BlockElement { .. } => node.slots.content_children.as_deref(),
+            _ => None,
         };
 
-        children.iter().filter_map(ChildItem::as_node_id).collect()
+        children
+            .map(|c| c.iter().filter_map(ChildItem::as_node_id).collect())
+            .unwrap_or_default()
     }
 
     /// Returns the `idx`-th non-trivia child node of `parent_id`.
@@ -221,8 +224,8 @@ impl EditDoc {
                 NodeKind::Paragraph { text } => Some(text.clone()),
                 NodeKind::CodeBlock { code, .. } => Some(code.clone()),
                 NodeKind::Section { heading_raw, .. } => Some(heading_raw.clone()),
-                NodeKind::BlockElement { content, .. } => {
-                    content.clone().or_else(|| Some(node.raw.clone()))
+                NodeKind::BlockElement { .. } => {
+                    self.content_text(cur_id).or_else(|| Some(node.raw.clone()))
                 }
                 NodeKind::ListItem { text, .. } => Some(text.clone()),
                 _ => Some(node.raw.clone()),
@@ -235,16 +238,17 @@ impl EditDoc {
                     _ => None,
                 },
                 [Step::Field(f)] if f == "content" => match &node.kind {
-                    NodeKind::BlockElement { content, .. } => content.clone(),
+                    NodeKind::BlockElement { .. } => self.content_text(cur_id),
                     NodeKind::Paragraph { text } => Some(text.clone()),
                     _ => None,
                 },
                 [Step::Prop, Step::Field(key)] | [Step::Field(key)] => match &node.kind {
-                    NodeKind::BlockElement { data, args, .. } => data
-                        .iter()
-                        .find(|(k, _)| k == key)
-                        .or_else(|| args.iter().find(|(k, _)| k == key))
-                        .map(|(_, v)| v.clone()),
+                    NodeKind::BlockElement { .. } => node
+                        .slots
+                        .data_slot
+                        .as_ref()
+                        .and_then(|s| s.get(key))
+                        .or_else(|| node.slots.args_slot.as_ref().and_then(|s| s.get(key))),
                     _ => None,
                 },
                 _ => None,
@@ -263,21 +267,31 @@ impl EditDoc {
             parse_address_path(addr).ok_or_else(|| EditError::AddressNotFound(addr.to_string()))?;
 
         // Check if addr targets `.content` specifically on a BlockElement
-        if let [.., Step::Field(f)] = path.steps.as_slice() {
-            if f == "content" {
+        if let [.., Step::Field(f)] = path.steps.as_slice()
+            && f == "content" {
                 let owner_id = self
                     .node_for(addr)
                     .ok_or_else(|| EditError::AddressNotFound(addr.to_string()))?;
+                let old_children = self
+                    .get(owner_id)
+                    .and_then(|n| n.slots.content_children.clone())
+                    .unwrap_or_default();
+                for item in old_children {
+                    if let ChildItem::Node(cid) = item {
+                        self.remove_node(cid);
+                    }
+                }
                 let node = self
                     .get_mut(owner_id)
                     .ok_or(EditError::NodeNotFound(owner_id))?;
-                if let NodeKind::BlockElement { content, .. } = &mut node.kind {
-                    *content = Some(text);
+                if matches!(node.kind, NodeKind::BlockElement { .. }) {
+                    node.slots.ensure_piece_content();
+                    node.slots.content_children = Some(vec![ChildItem::Trivia(text)]);
+                    node.slots.content_edited = true;
                     node.mark_edited();
                     return Ok(());
                 }
             }
-        }
 
         let node_id = self
             .node_at(addr)
@@ -329,14 +343,23 @@ impl EditDoc {
         let node = self.get(node_id).ok_or(EditError::NodeNotFound(node_id))?;
 
         let group = match &node.kind {
-            NodeKind::BlockElement { args, data, .. } => {
-                if args.iter().any(|(k, _)| k == &key) {
-                    AttrGroup::Args
-                } else if data.iter().any(|(k, _)| k == &key) {
-                    AttrGroup::Data
-                } else if args.is_empty() && !data.is_empty() {
-                    AttrGroup::Data
-                } else if !args.is_empty() && data.is_empty() {
+            NodeKind::BlockElement { .. } => {
+                let in_args = node
+                    .slots
+                    .args_slot
+                    .as_ref()
+                    .is_some_and(|s| s.contains_key(&key));
+                let has_args = node
+                    .slots
+                    .args_slot
+                    .as_ref()
+                    .is_some_and(|s| !s.entries.is_empty());
+                let has_data = node
+                    .slots
+                    .data_slot
+                    .as_ref()
+                    .is_some_and(|s| !s.entries.is_empty());
+                if in_args || (has_args && !has_data) {
                     AttrGroup::Args
                 } else {
                     AttrGroup::Data

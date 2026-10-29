@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-edit, dependencies: list(cotomet-syntax, tomet-address, tomet-ast, tomet-config, tomet-cst, tomet-parser, tomet-tree, tomet-validator, tomet-vault), dependents: list(tomet, tomet-tests)}
+::meta{crate: tomet-edit, dependencies: list(cotomet-syntax, tomet-address, tomet-ast, tomet-config, tomet-cst, tomet-parser, tomet-tree, tomet-validator, tomet-vault), dependents: list(tomet, tomet-merge, tomet-tests)}
 
 =[tomet-edit]
 
@@ -17,13 +17,15 @@ It depends on zero CRDT libraries, networking, or session transport code.
 newlines, comments) is preserved alongside nodes.
 Guaranteed Invariant: Importing and immediately exporting without edits is 100% byte-identical
 to the original input source across the entire corpus (`export_doc(&import_source(src)) == src`).
-- ("Text as Raw String (Paragraphs & Headings)") Prose within paragraphs, headings, and element content is held as raw text rather than
-inline marks. Structure in the model is retained where identity, moving, and keys matter
-(sections, blocks, attributes), allowing CRDTs to merge text via character-level sequences
-without fragile structured-mark nesting.
-- ("First-Class Move & Closed Edit Operations") [`EditOp`] provides a minimal, closed set of operations (`Insert`, `Delete`, `Move`, `EditText`, `SetAttribute`).
+- ("Full-Depth Format-Preserving Structure") Block element `[content]` slots are represented as child block sequences (`Vec<ChildItem>`)
+with interspersed trivia, `(args)` and `{data}` slots retain per-entry raw slices, leading/trailing
+trivia, and recursive [`EditValue`] trees, and paragraphs and section headings expose both
+flat text (for character-level CRDTs via [`EditOp::EditText`]) and structured [`InlineItem`]
+runs (preserving `*italic*`, `**bold**`, `` `code` ``, and inline `@el` elements).
+- ("First-Class Move & Closed Edit Operations") [`EditOp`] provides a minimal, closed set of operations (`Insert`, `Delete`, `Move`, `Replace`, `EditText`, `SetAttribute`).
 `Move` is a first-class operation, directly supported by tree-based CRDTs (e.g. Loro's MovableTree).
-[`EditOp::SetAttribute`] allows key-level manipulation of an element's `{}` data, `()` args, and `#()` id slot.
+[`EditOp::SetAttribute`] allows key-level manipulation of an element's `{}` data, `()` args, and `#()` id slot
+while preserving untouched slots, entries, and brace padding byte-for-byte.
 - ("Post-Edit Diagnostics") Collaborative engines merge writes without rejecting them. [`diagnose_doc`] exports the edited
 document to source text and re-parses it with the full validator to report duplicate IDs,
 schema errors, or broken syntax after concurrent merges. [`diagnose_doc_in`] does it as a
@@ -115,6 +117,14 @@ Guaranteed Invariant: An import followed by export with no edits is byte-identic
 to the input source:
 `export(&import_source(src)) == src`
 
+====[fn export_node_str]
+
+Exports a single node in `doc` to a Tomet source string.
+
+====[fn export_children_str]
+
+Exports a slice of [`ChildItem`]s in `doc` to a Tomet source string.
+
 ==[Module import]
 
 Imports a concrete syntax tree (CST) into an [`EditDoc`].
@@ -129,6 +139,19 @@ Parses `src` into a CST and imports it into an [`EditDoc`].
 
 Imports an existing Rowan CST [`SyntaxNode`] into an [`EditDoc`].
 
+====[fn import_attr_slot]
+
+Imports an `ARGS`, `VALUE_DATA`, `MAP_LITERAL`, or `SEQ_LITERAL` CST node into an [`AttrSlot`].
+
+====[fn parse_edit_value_str]
+
+Parses a raw value string into an [`EditValue`].
+
+====[fn parse_inline_items]
+
+Segments a paragraph or heading string into structured [`InlineItem`]s while
+guaranteeing that concatenating each item's `raw_str()` reproduces `src` byte-for-byte.
+
 ==[Module node]
 
 Node and child definitions for `tomet-edit`.
@@ -138,6 +161,23 @@ Node and child definitions for `tomet-edit`.
 ====[struct NodeId]
 
 An opaque, unique identifier for a node in an [`EditDoc`].
+
+====[struct AttrSlot]
+
+A structured attribute group (`(args)`, `{data}`, or nested `{map}` / `[seq]`)
+preserving exact CST trivia, brace padding, comments, and per-entry slices.
+
+====[struct AttrEntry]
+
+A single `key: value` map entry or positional sequence item inside an [`AttrSlot`].
+
+====[struct EditValue]
+
+A structured value inside an [`AttrEntry`], preserving its raw CST slice and nested structure.
+
+====[struct ElementSlots]
+
+Fine-grained slot and child-block representation for a [`NodeKind::BlockElement`].
 
 ====[struct Node]
 
@@ -152,6 +192,18 @@ An entry in a child list: either layout trivia (whitespace/comment) or a child n
 ====[enum AttrGroup]
 
 Target attribute slot or group on an element.
+
+====[enum EditValueKind]
+
+Specific variant of an [`EditValue`].
+
+====[enum ElementPiece]
+
+A piece of an element's CST layout in source order.
+
+====[enum InlineItem]
+
+A structured inline item within a paragraph or section heading.
 
 ====[enum NodeKind]
 

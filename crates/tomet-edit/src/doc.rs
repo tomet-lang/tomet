@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use crate::export::export_item;
 use crate::node::{AttrGroup, ChildItem, Node, NodeId, NodeKind};
 use crate::op::{EditError, EditOp};
 
@@ -85,6 +86,81 @@ impl EditDoc {
         self.nodes.remove(&id)
     }
 
+    /// Deep-clones a node and all of its descendant nodes from `src` into `self`,
+    /// returning the newly allocated [`NodeId`].
+    pub fn clone_node_from(&mut self, src: &EditDoc, id: NodeId) -> NodeId {
+        let node = src.get(id).expect("source node must exist").clone();
+        let new_id = self.alloc_id();
+
+        let new_kind = match node.kind {
+            NodeKind::Section {
+                level,
+                heading_raw,
+                id_attr,
+                children,
+            } => NodeKind::Section {
+                level,
+                heading_raw,
+                id_attr,
+                children: self.clone_children_from(src, &children),
+            },
+            NodeKind::List { children } => NodeKind::List {
+                children: self.clone_children_from(src, &children),
+            },
+            NodeKind::ListItem {
+                marker,
+                text,
+                id_attr,
+                children,
+            } => NodeKind::ListItem {
+                marker,
+                text,
+                id_attr,
+                children: self.clone_children_from(src, &children),
+            },
+            other => other,
+        };
+
+        let mut new_slots = node.slots.clone();
+        if let Some(cc) = &node.slots.content_children {
+            new_slots.content_children = Some(self.clone_children_from(src, cc));
+        }
+
+        self.insert_node(Node {
+            id: new_id,
+            kind: new_kind,
+            raw: node.raw,
+            edited: node.edited,
+            slots: new_slots,
+            inlines: node.inlines,
+            heading_prefix: node.heading_prefix,
+            heading_suffix: node.heading_suffix,
+        });
+        new_id
+    }
+
+    /// Deep-clones a slice of [`ChildItem`]s from `src` into `self`.
+    pub fn clone_children_from(&mut self, src: &EditDoc, items: &[ChildItem]) -> Vec<ChildItem> {
+        items
+            .iter()
+            .map(|item| match item {
+                ChildItem::Trivia(t) => ChildItem::Trivia(t.clone()),
+                ChildItem::Node(id) => ChildItem::Node(self.clone_node_from(src, *id)),
+            })
+            .collect()
+    }
+
+    /// Returns the exported inner text of an element's `[content]` slot, if present.
+    pub fn content_text(&self, id: NodeId) -> Option<String> {
+        let node = self.get(id)?;
+        let children = node.slots.content_children.as_ref()?;
+        let mut out = String::new();
+        for item in children {
+            export_item(self, item, &mut out);
+        }
+        Some(out)
+    }
+
     /// Checks if any descendant of `id` has been marked as edited.
     pub fn has_edited_descendants(&self, id: NodeId) -> bool {
         let Some(node) = self.get(id) else {
@@ -92,20 +168,23 @@ impl EditDoc {
         };
 
         let children = match &node.kind {
-            crate::node::NodeKind::Section { children, .. }
-            | crate::node::NodeKind::List { children }
-            | crate::node::NodeKind::ListItem { children, .. } => children,
-            _ => return false,
+            NodeKind::Section { children, .. }
+            | NodeKind::List { children }
+            | NodeKind::ListItem { children, .. } => Some(children.as_slice()),
+            NodeKind::BlockElement { .. } => node.slots.content_children.as_deref(),
+            _ => None,
+        };
+
+        let Some(children) = children else {
+            return false;
         };
 
         for child in children {
-            if let ChildItem::Node(child_id) = child {
-                if let Some(child_node) = self.get(*child_id) {
-                    if child_node.edited || self.has_edited_descendants(*child_id) {
+            if let ChildItem::Node(child_id) = child
+                && let Some(child_node) = self.get(*child_id)
+                    && (child_node.edited || self.has_edited_descendants(*child_id)) {
                         return true;
                     }
-                }
-            }
         }
 
         false
@@ -157,19 +236,15 @@ impl EditDoc {
         }
 
         let meta_id = self.alloc_id();
-        let mut meta_node = Node::new(
+        let meta_node = Node::block_element(
             meta_id,
-            NodeKind::BlockElement {
-                name: "meta".to_string(),
-                declaration: true,
-                id_attr: None,
-                args: Vec::new(),
-                data: Vec::new(),
-                content: None,
-            },
-            String::new(),
+            "meta",
+            true,
+            None::<String>,
+            Vec::new(),
+            Vec::new(),
+            None::<String>,
         );
-        meta_node.mark_edited();
 
         self.insert_node(meta_node);
         self.root_children_mut().insert(0, ChildItem::Node(meta_id));
@@ -190,12 +265,7 @@ impl EditDoc {
     pub fn meta_data(&self, key: &str) -> Option<String> {
         let meta_id = self.meta_node()?;
         let node = self.get(meta_id)?;
-        match &node.kind {
-            NodeKind::BlockElement { data, .. } => {
-                data.iter().find(|(k, _)| k == key).map(|(_, v)| v.clone())
-            }
-            _ => None,
-        }
+        node.slots.data_slot.as_ref()?.get(key)
     }
 
     /// Sets, updates, or deletes a key in the top-level `::meta` block's data map.
@@ -235,15 +305,17 @@ impl EditDoc {
             let children = match &node.kind {
                 NodeKind::Section { children, .. }
                 | NodeKind::List { children }
-                | NodeKind::ListItem { children, .. } => children,
-                _ => continue,
+                | NodeKind::ListItem { children, .. } => Some(children.as_slice()),
+                NodeKind::BlockElement { .. } => node.slots.content_children.as_deref(),
+                _ => None,
             };
-            if let Some(pos) = children
-                .iter()
-                .position(|item| item.as_node_id() == Some(id))
-            {
-                return Some((Some(node.id), pos));
-            }
+            if let Some(children) = children
+                && let Some(pos) = children
+                    .iter()
+                    .position(|item| item.as_node_id() == Some(id))
+                {
+                    return Some((Some(node.id), pos));
+                }
         }
 
         None
@@ -347,6 +419,9 @@ impl EditDoc {
                     NodeKind::Section { children, .. }
                     | NodeKind::List { children }
                     | NodeKind::ListItem { children, .. } => children.len(),
+                    NodeKind::BlockElement { .. } => {
+                        p.slots.content_children.as_ref().map_or(0, Vec::len)
+                    }
                     _ => return Err(EditError::NotAContainer(pid)),
                 }
             }
@@ -432,15 +507,16 @@ impl EditDoc {
                     return Some(state);
                 }
                 for child in children {
-                    if let Some(cid) = child.as_node_id() {
-                        if let Some(state) = self.task_state(cid) {
+                    if let Some(cid) = child.as_node_id()
+                        && let Some(state) = self.task_state(cid) {
                             return Some(state);
                         }
-                    }
                 }
                 None
             }
-            NodeKind::BlockElement { name, args, .. } if name == "task" => inspect_task_args(args),
+            NodeKind::BlockElement { name, .. } if name == "task" => {
+                inspect_task_slot(node.slots.args_slot.as_ref())
+            }
             _ => None,
         }
     }
@@ -460,12 +536,11 @@ impl EditDoc {
                         *text = text_updated.clone();
                         let mut trivia_updated = false;
                         for item in children.iter_mut() {
-                            if let ChildItem::Trivia(t) = item {
-                                if let Some(upd) = update_task_text(t, checked) {
+                            if let ChildItem::Trivia(t) = item
+                                && let Some(upd) = update_task_text(t, checked) {
                                     *t = upd;
                                     trivia_updated = true;
                                 }
-                            }
                         }
                         if !trivia_updated
                             && children.iter().all(|c| matches!(c, ChildItem::Trivia(_)))
@@ -485,12 +560,11 @@ impl EditDoc {
                         .unwrap_or_default();
 
                     for cid in child_ids {
-                        if let Some(child_node) = self.get_mut(cid) {
-                            if let Some(upd) = update_task_text(&child_node.raw, checked) {
+                        if let Some(child_node) = self.get_mut(cid)
+                            && let Some(upd) = update_task_text(&child_node.raw, checked) {
                                 child_node.raw = upd;
                                 child_node.mark_edited();
                             }
-                        }
                     }
 
                     if let Some(node) = self.get_mut(id) {
@@ -510,44 +584,31 @@ impl EditDoc {
                 Err(EditError::NotAnElement(id))
             }
             NodeKind::BlockElement { name, .. } if name == "task" => {
-                let mut updated = false;
                 let node_mut = self.get_mut(id).unwrap();
-                if let NodeKind::BlockElement { args, .. } = &mut node_mut.kind {
-                    for (k, v) in args.iter_mut() {
-                        if k.is_empty() || k == "status" {
-                            let old = v.trim().trim_matches('"');
-                            *v = if checked {
-                                if old == "todo" {
-                                    "done".to_string()
-                                } else {
-                                    "x".to_string()
-                                }
-                            } else if old == "done" {
-                                "todo".to_string()
-                            } else {
-                                "todo".to_string()
-                            };
-                            updated = true;
-                            break;
+                node_mut.slots.ensure_piece_args();
+                let slot = node_mut
+                    .slots
+                    .args_slot
+                    .get_or_insert_with(|| crate::node::AttrSlot::new_empty("(", ")"));
+                let mut target_key = String::new();
+                let mut new_val = if checked {
+                    "x".to_string()
+                } else {
+                    "todo".to_string()
+                };
+                for entry in &slot.entries {
+                    if entry.key.is_empty() || entry.key == "status" {
+                        target_key = entry.key.clone();
+                        let old = entry.value.export();
+                        let old_trimmed = old.trim().trim_matches('"');
+                        if checked && old_trimmed == "todo" {
+                            new_val = "done".to_string();
                         }
-                    }
-                    if !updated {
-                        args.insert(
-                            0,
-                            (
-                                String::new(),
-                                if checked {
-                                    "x".to_string()
-                                } else {
-                                    "todo".to_string()
-                                },
-                            ),
-                        );
+                        break;
                     }
                 }
-                if let Some(node) = self.get_mut(id) {
-                    node.mark_edited();
-                }
+                slot.set_key(&target_key, Some(new_val));
+                node_mut.mark_edited();
                 Ok(())
             }
             _ => Err(EditError::NotAnElement(id)),
@@ -592,11 +653,10 @@ impl EditDoc {
                 };
                 if spaces > 0 {
                     *text = text[spaces..].to_string();
-                    if let Some(ChildItem::Trivia(t)) = children.first_mut() {
-                        if t.starts_with(&"  "[..spaces]) {
+                    if let Some(ChildItem::Trivia(t)) = children.first_mut()
+                        && t.starts_with(&"  "[..spaces]) {
                             *t = t[spaces..].to_string();
                         }
-                    }
                     node.mark_edited();
                 }
                 Ok(())
@@ -641,14 +701,17 @@ fn inspect_task_text(text: &str) -> Option<bool> {
     }
 }
 
-fn inspect_task_args(args: &[(String, String)]) -> Option<bool> {
-    for (k, v) in args {
-        if k.is_empty() || k == "status" {
-            let val = v.trim().trim_matches('"');
-            if val == "done" || val == "x" || val == "X" {
-                return Some(true);
-            } else if val == "todo" || val == " " || val.is_empty() {
-                return Some(false);
+fn inspect_task_slot(slot: Option<&crate::node::AttrSlot>) -> Option<bool> {
+    if let Some(slot) = slot {
+        for entry in &slot.entries {
+            if entry.key.is_empty() || entry.key == "status" {
+                let exported = entry.value.export();
+                let val = exported.trim().trim_matches('"');
+                if val == "done" || val == "x" || val == "X" {
+                    return Some(true);
+                } else if val == "todo" || val == " " || val.is_empty() {
+                    return Some(false);
+                }
             }
         }
     }

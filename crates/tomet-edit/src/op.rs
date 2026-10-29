@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::doc::EditDoc;
-use crate::node::{AttrGroup, ChildItem, Node, NodeId, NodeKind};
+use crate::node::{AttrGroup, AttrSlot, ChildItem, ElementPiece, Node, NodeId, NodeKind};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum EditError {
@@ -92,6 +92,14 @@ impl EditDoc {
                             | NodeKind::ListItem { children, .. } => {
                                 children[pos] = ChildItem::Node(new_id);
                             }
+                            NodeKind::BlockElement { .. } => {
+                                let children = parent
+                                    .slots
+                                    .content_children
+                                    .as_mut()
+                                    .ok_or(EditError::NotAContainer(parent_id))?;
+                                children[pos] = ChildItem::Node(new_id);
+                            }
                             _ => return Err(EditError::NotAContainer(parent_id)),
                         }
                     }
@@ -116,16 +124,16 @@ impl EditDoc {
                 if let Some(node) = self.get_mut(id) {
                     node.mark_edited();
                 }
-                if let Some(parent_id) = new_parent {
-                    if let Some(parent) = self.get_mut(parent_id) {
+                if let Some(parent_id) = new_parent
+                    && let Some(parent) = self.get_mut(parent_id) {
                         parent.mark_edited();
                     }
-                }
             }
             EditOp::EditText { id, new_text } => {
                 let node = self.get_mut(id).ok_or(EditError::NodeNotFound(id))?;
                 match &mut node.kind {
                     NodeKind::Paragraph { text } => {
+                        node.inlines = crate::import::parse_inline_items(&new_text);
                         *text = new_text;
                     }
                     NodeKind::CodeBlock { code, .. } => {
@@ -167,21 +175,42 @@ impl EditDoc {
 
                 match &mut node.kind {
                     NodeKind::BlockElement {
+                        name,
+                        declaration,
                         id_attr,
-                        args,
-                        data,
-                        ..
-                    } => match group {
-                        AttrGroup::Id => {
-                            *id_attr = value.clone();
+                    } => {
+                        if node.slots.pieces.is_empty() {
+                            let prefix = if *declaration { "::" } else { "@" };
+                            node.slots
+                                .pieces
+                                .push(ElementPiece::Sigil(format!("{prefix}{name}")));
                         }
-                        AttrGroup::Data => {
-                            update_entry_list(data, &key, value.clone());
+                        match group {
+                            AttrGroup::Id => {
+                                *id_attr = value.clone();
+                                node.slots.id_edited = true;
+                                if value.is_some() {
+                                    node.slots.ensure_piece_id();
+                                }
+                            }
+                            AttrGroup::Data => {
+                                node.slots.ensure_piece_data();
+                                let slot = node
+                                    .slots
+                                    .data_slot
+                                    .get_or_insert_with(|| AttrSlot::new_empty("{", "}"));
+                                slot.set_key(&key, value.clone());
+                            }
+                            AttrGroup::Args => {
+                                node.slots.ensure_piece_args();
+                                let slot = node
+                                    .slots
+                                    .args_slot
+                                    .get_or_insert_with(|| AttrSlot::new_empty("(", ")"));
+                                slot.set_key(&key, value.clone());
+                            }
                         }
-                        AttrGroup::Args => {
-                            update_entry_list(args, &key, value.clone());
-                        }
-                    },
+                    }
                     NodeKind::Section {
                         id_attr,
                         heading_raw,
@@ -204,13 +233,12 @@ impl EditDoc {
                             *text = update_item_text_id(text, value.as_deref());
 
                             if let Some(cid) = existing_id_child {
-                                if value.is_none() {
-                                    if let Some(pos) =
+                                if value.is_none()
+                                    && let Some(pos) =
                                         children.iter().position(|c| c.as_node_id() == Some(cid))
                                     {
                                         children.remove(pos);
                                     }
-                                }
                             } else if let Some(new_id) = value.as_deref() {
                                 let insert_pos = if children.last().is_some_and(|c| match c {
                                     ChildItem::Trivia(t) => t.ends_with('\n'),
@@ -233,14 +261,12 @@ impl EditDoc {
                     node.mark_edited();
                 }
 
-                if let Some(cid) = existing_id_child {
-                    if let Some(new_id) = value.as_deref() {
-                        if let Some(child_node) = self.get_mut(cid) {
+                if let Some(cid) = existing_id_child
+                    && let Some(new_id) = value.as_deref()
+                        && let Some(child_node) = self.get_mut(cid) {
                             child_node.raw = format!("#({new_id})");
                             child_node.mark_edited();
                         }
-                    }
-                }
             }
         }
         Ok(())
@@ -308,6 +334,16 @@ impl EditDoc {
                         children.insert(index, item);
                         Ok(())
                     }
+                    NodeKind::BlockElement { .. } => {
+                        parent.slots.ensure_piece_content();
+                        let children = parent.slots.content_children.get_or_insert_with(Vec::new);
+                        if index > children.len() {
+                            return Err(EditError::IndexOutOfBounds(index));
+                        }
+                        children.insert(index, item);
+                        parent.slots.content_edited = true;
+                        Ok(())
+                    }
                     _ => Err(EditError::NotAContainer(parent_id)),
                 }
             }
@@ -336,6 +372,16 @@ impl EditDoc {
                         remove_child_at(children, pos);
                         Ok(())
                     }
+                    NodeKind::BlockElement { .. } => {
+                        let children = parent
+                            .slots
+                            .content_children
+                            .as_mut()
+                            .ok_or(EditError::NotAContainer(parent_id))?;
+                        remove_child_at(children, pos);
+                        parent.slots.content_edited = true;
+                        Ok(())
+                    }
                     _ => Err(EditError::NotAContainer(parent_id)),
                 }
             }
@@ -344,17 +390,19 @@ impl EditDoc {
 
     fn remove_node_recursive(&mut self, id: NodeId) {
         if let Some(node) = self.remove_node(id) {
-            match node.kind {
+            let children_opt = match node.kind {
                 NodeKind::Section { children, .. }
                 | NodeKind::List { children }
-                | NodeKind::ListItem { children, .. } => {
-                    for child in children {
-                        if let ChildItem::Node(child_id) = child {
-                            self.remove_node_recursive(child_id);
-                        }
+                | NodeKind::ListItem { children, .. } => Some(children),
+                NodeKind::BlockElement { .. } => node.slots.content_children,
+                _ => None,
+            };
+            if let Some(children) = children_opt {
+                for child in children {
+                    if let ChildItem::Node(child_id) = child {
+                        self.remove_node_recursive(child_id);
                     }
                 }
-                _ => {}
             }
         }
     }
@@ -367,24 +415,9 @@ fn remove_child_at(children: &mut Vec<ChildItem>, pos: usize) {
             children.remove(pos);
         }
     } else if pos == children.len() && pos > 0 && matches!(children[pos - 1], ChildItem::Trivia(_))
-    {
-        if pos - 1 > 0 && matches!(children[pos - 2], ChildItem::Trivia(_)) {
+        && pos - 1 > 0 && matches!(children[pos - 2], ChildItem::Trivia(_)) {
             children.remove(pos - 1);
         }
-    }
-}
-
-fn update_entry_list(entries: &mut Vec<(String, String)>, key: &str, value: Option<String>) {
-    if let Some(pos) = entries.iter().position(|(k, _)| k == key) {
-        match value {
-            Some(v) => entries[pos].1 = v,
-            None => {
-                entries.remove(pos);
-            }
-        }
-    } else if let Some(v) = value {
-        entries.push((key.to_string(), v));
-    }
 }
 
 pub(crate) fn update_heading_id(heading_raw: &str, new_id: Option<&str>) -> String {

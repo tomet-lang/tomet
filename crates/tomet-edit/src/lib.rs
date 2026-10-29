@@ -13,15 +13,17 @@
 //!   | newlines, comments) is preserved alongside nodes.
 //!   | Guaranteed Invariant: Importing and immediately exporting without edits is 100% byte-identical
 //!   | to the original input source across the entire corpus (`export_doc(&import_source(src)) == src`).
-//! - (Text as Raw String (Paragraphs & Headings))
-//!   | Prose within paragraphs, headings, and element content is held as raw text rather than
-//!   | inline marks. Structure in the model is retained where identity, moving, and keys matter
-//!   | (sections, blocks, attributes), allowing CRDTs to merge text via character-level sequences
-//!   | without fragile structured-mark nesting.
+//! - (Full-Depth Format-Preserving Structure)
+//!   | Block element `[content]` slots are represented as child block sequences (`Vec<ChildItem>`)
+//!   | with interspersed trivia, `(args)` and `{data}` slots retain per-entry raw slices, leading/trailing
+//!   | trivia, and recursive [`EditValue`] trees, and paragraphs and section headings expose both
+//!   | flat text (for character-level CRDTs via [`EditOp::EditText`]) and structured [`InlineItem`]
+//!   | runs (preserving `*italic*`, `**bold**`, `` `code` ``, and inline `@el` elements).
 //! - (First-Class Move & Closed Edit Operations)
-//!   | [`EditOp`] provides a minimal, closed set of operations (`Insert`, `Delete`, `Move`, `EditText`, `SetAttribute`).
+//!   | [`EditOp`] provides a minimal, closed set of operations (`Insert`, `Delete`, `Move`, `Replace`, `EditText`, `SetAttribute`).
 //!   | `Move` is a first-class operation, directly supported by tree-based CRDTs (e.g. Loro's MovableTree).
-//!   | [`EditOp::SetAttribute`] allows key-level manipulation of an element's `{}` data, `()` args, and `#()` id slot.
+//!   | [`EditOp::SetAttribute`] allows key-level manipulation of an element's `{}` data, `()` args, and `#()` id slot
+//!   | while preserving untouched slots, entries, and brace padding byte-for-byte.
 //! - (Post-Edit Diagnostics)
 //!   | Collaborative engines merge writes without rejecting them. [`diagnose_doc`] exports the edited
 //!   | document to source text and re-parses it with the full validator to report duplicate IDs,
@@ -39,9 +41,14 @@ pub mod op;
 pub use address::{AddressPath, BaseTarget, Step, parse_address_path};
 pub use diagnostics::{PostEditReport, diagnose_doc, diagnose_doc_in};
 pub use doc::EditDoc;
-pub use export::export_doc;
-pub use import::{import_cst, import_source};
-pub use node::{AttrGroup, ChildItem, Node, NodeId, NodeKind};
+pub use export::{export_children_str, export_doc, export_node_str};
+pub use import::{
+    import_attr_slot, import_cst, import_source, parse_edit_value_str, parse_inline_items,
+};
+pub use node::{
+    AttrEntry, AttrGroup, AttrSlot, ChildItem, EditValue, EditValueKind, ElementPiece,
+    ElementSlots, InlineItem, Node, NodeId, NodeKind,
+};
 pub use op::{EditError, EditOp};
 
 #[cfg(test)]
@@ -208,7 +215,7 @@ mod tests {
         let exported = export_doc(&doc);
         assert_eq!(
             exported,
-            "::meta{x: 1, icon: @doc.icon(star, pkg: tabler)}\n\nBody text.\n"
+            "::meta{ x: 1, icon: @doc.icon(star, pkg: tabler) }\n\nBody text.\n"
         );
     }
 
@@ -228,7 +235,7 @@ mod tests {
             .unwrap();
 
         let exported = export_doc(&doc);
-        assert_eq!(exported, "::meta{icon: @doc.icon(new)}\n\nBody.\n");
+        assert_eq!(exported, "::meta{ icon: @doc.icon(new) }\n\nBody.\n");
     }
 
     #[test]
@@ -247,7 +254,7 @@ mod tests {
             .unwrap();
 
         let exported = export_doc(&doc);
-        assert_eq!(exported, "::meta{y: 2}\n\nBody.\n");
+        assert_eq!(exported, "::meta{ y: 2 }\n\nBody.\n");
     }
 
     #[test]
@@ -304,9 +311,6 @@ mod tests {
                 name: "meta".to_string(),
                 declaration: true,
                 id_attr: None,
-                args: Vec::new(),
-                data: Vec::new(),
-                content: None,
             },
             String::new(),
         );
@@ -428,7 +432,7 @@ mod tests {
         let exported_meta = export_doc(&doc_meta);
         assert_eq!(
             exported_meta,
-            "::meta#(cfg){version: 2, author: \"Tomet\"}\n\nText.\n"
+            "::meta#(cfg){ version: 2, author: \"Tomet\" }\n\nText.\n"
         );
     }
 
@@ -523,12 +527,12 @@ mod tests {
         assert_eq!(doc.meta_node(), Some(orig_meta_id));
 
         let exported = export_doc(&doc);
-        assert_eq!(exported, "::meta{a: 10, b: 2}\n\nBody text.\n");
+        assert_eq!(exported, "::meta{ a: 10, b: 2 }\n\nBody text.\n");
 
         // Delete a key
         doc.set_meta_data("b", None::<String>).unwrap();
         let exported_del = export_doc(&doc);
-        assert_eq!(exported_del, "::meta{a: 10}\n\nBody text.\n");
+        assert_eq!(exported_del, "::meta{ a: 10 }\n\nBody text.\n");
 
         // 2. Missing ::meta: automatically creates ::meta at top with spacing trivia
         let src_none = "Just a note.\n";
@@ -803,5 +807,116 @@ Second paragraph.
         // Outdent back to 0 spaces
         doc.outdent_list_item(item2_id).unwrap();
         assert_eq!(export_doc(&doc), "- item 1\n- item 2\n");
+    }
+
+    #[test]
+    fn set_attribute_preserves_brace_padding_and_untouched_keys() {
+        let src = "::meta{ title: \"A\", count: 42 }\n\nBody.\n";
+        let mut doc = import_source(src);
+        let meta_id = doc.meta_node().unwrap();
+
+        doc.set_attribute(meta_id, AttrGroup::Data, "count", Some("99"))
+            .unwrap();
+
+        assert_eq!(
+            export_doc(&doc),
+            "::meta{ title: \"A\", count: 99 }\n\nBody.\n"
+        );
+
+        // Multi-line data block with comments and indentation
+        let multiline_src =
+            "::meta{\n  // Primary title\n  title: \"A\",\n  count: 42,\n}\n\nBody.\n";
+        let mut doc_ml = import_source(multiline_src);
+        let ml_id = doc_ml.meta_node().unwrap();
+        doc_ml
+            .set_attribute(ml_id, AttrGroup::Data, "count", Some("100"))
+            .unwrap();
+        assert_eq!(
+            export_doc(&doc_ml),
+            "::meta{\n  // Primary title\n  title: \"A\",\n  count: 100,\n}\n\nBody.\n"
+        );
+    }
+
+    #[test]
+    fn edit_child_inside_multiline_block_element_preserves_args_and_brackets() {
+        let src = "@callout(type: \"info\")[\n  First line.\n\n  Second line.\n]\n";
+        let mut doc = import_source(src);
+
+        let callout_id = doc.root_nodes().next().unwrap();
+        let children = doc.child_nodes(callout_id);
+        assert_eq!(children.len(), 2);
+
+        doc.apply_op(EditOp::EditText {
+            id: children[0],
+            new_text: "Updated first line.\n".to_string(),
+        })
+        .unwrap();
+
+        assert_eq!(
+            export_doc(&doc),
+            "@callout(type: \"info\")[\n  Updated first line.\n\n  Second line.\n]\n"
+        );
+    }
+
+    #[test]
+    fn nested_edit_value_and_inline_items_import_and_roundtrip() {
+        let src = "::meta{ nested: { a: [1, 2], icon: @doc.icon(star) } }\n\n=[ *Styled* Heading ]\n\nHello *italic*, **bold**, `code`, and @badge(ok)[green].\n";
+        let doc = import_source(src);
+        assert_eq!(export_doc(&doc), src);
+
+        let meta_id = doc.meta_node().unwrap();
+        let meta_node = doc.get(meta_id).unwrap();
+        let data_slot = meta_node.slots.data_slot.as_ref().unwrap();
+        assert_eq!(data_slot.entries.len(), 1);
+        match &data_slot.entries[0].value.kind {
+            EditValueKind::Map(inner_slot) => {
+                assert_eq!(inner_slot.entries.len(), 2);
+                assert!(matches!(
+                    inner_slot.entries[0].value.kind,
+                    EditValueKind::Seq(_)
+                ));
+                assert!(matches!(
+                    inner_slot.entries[1].value.kind,
+                    EditValueKind::Element { .. }
+                ));
+            }
+            other => panic!("expected nested Map value, got {other:?}"),
+        }
+
+        let sec_id = doc.root_nodes().nth(1).unwrap();
+        let sec_node = doc.get(sec_id).unwrap();
+        assert_eq!(sec_node.heading_prefix, "=[ ");
+        assert_eq!(sec_node.heading_suffix, " ]\n");
+        assert!(
+            sec_node
+                .inlines
+                .iter()
+                .any(|item| matches!(item, InlineItem::Sugar { raw, .. } if raw == "*Styled*"))
+        );
+
+        let para_id = doc.child_node_at(sec_id, 0).unwrap();
+        let para_node = doc.get(para_id).unwrap();
+        assert!(
+            para_node
+                .inlines
+                .iter()
+                .any(|item| matches!(item, InlineItem::Sugar { raw, .. } if raw == "*italic*"))
+        );
+        assert!(
+            para_node
+                .inlines
+                .iter()
+                .any(|item| matches!(item, InlineItem::Sugar { raw, .. } if raw == "**bold**"))
+        );
+        assert!(
+            para_node
+                .inlines
+                .iter()
+                .any(|item| matches!(item, InlineItem::Sugar { raw, .. } if raw == "`code`"))
+        );
+        assert!(para_node.inlines.iter().any(|item| matches!(
+            item,
+            InlineItem::Element { name, .. } if name == "badge"
+        )));
     }
 }

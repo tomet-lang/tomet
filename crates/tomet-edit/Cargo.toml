@@ -7,14 +7,17 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-tomet-address = { workspace = true }
 cotomet-syntax = { workspace = true }
 tomet-ast = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-parser = { workspace = true }
 tomet-tree = { workspace = true }
+tomet-address = { workspace = true }
 tomet-validator = { workspace = true }
 tomet-vault = { workspace = true }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
 tomet-config = { workspace = true }

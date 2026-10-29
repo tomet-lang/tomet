@@ -1890,6 +1890,7 @@ name = "tomet-edit"
 version = "0.5.0"
 dependencies = [
  "cotomet-syntax",
+ "getrandom 0.2.17",
  "tomet-address",
  "tomet-ast",
  "tomet-config",
@@ -2095,9 +2096,7 @@ dependencies = [
 name = "tomet-merge"
 version = "0.5.0"
 dependencies = [
- "tomet-ast",
- "tomet-parser",
- "tomet-printer",
+ "tomet-edit",
 ]
 
 [[package]]

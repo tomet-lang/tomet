@@ -285,12 +285,11 @@ fn lcs_matches<T: PartialEq>(base: &[T], derived: &[T]) -> Vec<MatchBlock> {
 
     let mut blocks: Vec<MatchBlock> = Vec::new();
     for (bi, di) in pairs {
-        if let Some(last) = blocks.last_mut() {
-            if last.base_start + last.len == bi && last.derived_start + last.len == di {
+        if let Some(last) = blocks.last_mut()
+            && last.base_start + last.len == bi && last.derived_start + last.len == di {
                 last.len += 1;
                 continue;
             }
-        }
         blocks.push(MatchBlock {
             base_start: bi,
             derived_start: di,

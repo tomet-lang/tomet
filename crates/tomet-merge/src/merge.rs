@@ -1,95 +1,829 @@
-//! The merge half of this crate's algorithm: walks `base`/`local`/`remote`
-//! together and narrows a conflict as deep into the tree as it can before
-//! giving up and embedding a marker (see the crate's module doc for the
-//! full algorithm).
+//! Format-preserving three-way merge over [`tomet_edit::EditDoc`] and `.tmt` source text.
 
-use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, List, ListItem, Paragraph, Section,
-    Value,
+use std::collections::BTreeSet;
+
+use tomet_edit::{
+    AttrEntry, AttrSlot, ChildItem, EditDoc, EditValue, EditValueKind, InlineItem, Node, NodeId,
+    NodeKind, export_children_str, export_doc, export_node_str, import_source,
+    parse_edit_value_str, parse_inline_items,
 };
 
 use crate::diff3;
-use crate::markers::{coalesce_text, conflict_block, conflict_inline, push_text, value_conflict};
+use crate::find_conflicts::has_conflicts_doc;
+use crate::markers::{BlockUnit, UnitKind, build_conflict_block_unit, format_inline_conflict_span};
 
-/// The outcome of merging one note across two divergent versions of a
-/// vault.
-#[derive(Debug, Clone, PartialEq)]
+/// The outcome of a format-preserving three-way merge.
+#[derive(Debug, Clone)]
 pub struct MergeResult {
-    /// The merged document. Always a structurally valid Tomet document --
-    /// conflicts are represented as `@conflict` markers, never as
-    /// malformed or partial output.
-    pub document: Document,
-    /// Where merging succeeded without leaving a conflict marker behind.
+    /// The merged `.tmt` source text, preserving untouched formatting, comments,
+    /// inline sugar, and whitespace byte-for-byte.
+    pub text: String,
+    /// The merged [`EditDoc`] tree.
+    pub doc: EditDoc,
+    /// `true` if merging succeeded without leaving any `@conflict` markers.
     pub clean: bool,
 }
 
-/// Merges `local` and `remote`, both descendants of `base`, into one
-/// document.
-///
-/// Never fails: a merge that cannot be resolved automatically produces a
-/// document containing `@conflict` markers rather than an error. The
-/// caller always has something to commit or save. `@conflict`
-/// is `tomet`'s own bare `std` element, so nothing needs adding to the preamble for it.
-pub fn merge(base: &Document, local: &Document, remote: &Document) -> MergeResult {
-    let (blocks, clean) = merge_block_seq(&base.blocks, &local.blocks, &remote.blocks);
-
-    MergeResult {
-        document: Document {
-            blocks,
-            span: base.span,
-        },
-        clean,
+/// Performs a format-preserving three-way merge of `base`, `local`, and `remote`
+/// `.tmt` source texts.
+pub fn merge(base: &str, local: &str, remote: &str) -> MergeResult {
+    if local == remote || base == remote {
+        let doc = import_source(local);
+        let clean = !has_conflicts_doc(&doc);
+        return MergeResult {
+            text: local.to_string(),
+            doc,
+            clean,
+        };
     }
+    if base == local {
+        let doc = import_source(remote);
+        let clean = !has_conflicts_doc(&doc);
+        return MergeResult {
+            text: remote.to_string(),
+            doc,
+            clean,
+        };
+    }
+    merge_doc(&import_source(base), &import_source(local), &import_source(remote))
 }
 
-/// Diffs one `Vec<Block>` three ways, narrowing each conflict via
-/// [`merge_one`] before falling back to one `@conflict` marker holding
-/// both sides' blocks directly. Used for `Document.blocks` (top level),
-/// an `Element`'s `children`, and now its `content` too (recursively,
-/// from inside `merge_one` itself) -- all three are `Vec<Block>`.
-fn merge_block_seq(base: &[Block], local: &[Block], remote: &[Block]) -> (Vec<Block>, bool) {
-    let mut blocks = Vec::new();
-    let mut clean = true;
-    for region in diff3::merge3(base, local, remote) {
-        match region {
-            diff3::Region::Same(items) => blocks.extend(items),
-            diff3::Region::Conflict { base, mine, theirs } => {
-                let narrowed = match (base.as_slice(), mine.as_slice(), theirs.as_slice()) {
-                    ([b], [m], [t]) => merge_one(b, m, t),
-                    _ => None,
+/// Performs a format-preserving three-way merge of three [`EditDoc`] instances.
+pub fn merge_doc(base: &EditDoc, local: &EditDoc, remote: &EditDoc) -> MergeResult {
+    let base_src = export_doc(base);
+    let local_src = export_doc(local);
+    let remote_src = export_doc(remote);
+
+    if local_src == remote_src || base_src == remote_src {
+        let clean = !has_conflicts_doc(local);
+        return MergeResult {
+            text: local_src,
+            doc: local.clone(),
+            clean,
+        };
+    }
+    if base_src == local_src {
+        let clean = !has_conflicts_doc(remote);
+        return MergeResult {
+            text: remote_src,
+            doc: remote.clone(),
+            clean,
+        };
+    }
+
+    let mut merger = Merger {
+        base,
+        local,
+        remote,
+        out: EditDoc::new(),
+    };
+    let (root_children, clean) = merger
+        .merge_child_seq(
+            base.root_children(),
+            local.root_children(),
+            remote.root_children(),
+            true,
+            true,
+        )
+        .expect("top-level merge_child_seq with allow_conflict_blocks=true never returns None");
+
+    *merger.out.root_children_mut() = root_children;
+    let text = export_doc(&merger.out);
+    let doc = import_source(&text);
+    MergeResult { text, doc, clean }
+}
+
+#[derive(Clone)]
+struct Merger<'a> {
+    base: &'a EditDoc,
+    local: &'a EditDoc,
+    remote: &'a EditDoc,
+    out: EditDoc,
+}
+
+impl<'a> Merger<'a> {
+    fn clone_unit(&mut self, unit: &BlockUnit) -> BlockUnit {
+        match &unit.kind {
+            UnitKind::Comment(c) => BlockUnit {
+                leading_ws: unit.leading_ws.clone(),
+                kind: UnitKind::Comment(c.clone()),
+            },
+            UnitKind::Node {
+                id,
+                raw,
+                trailing_nl,
+            } => {
+                let src = if self.local.get(*id).is_some_and(|n| &n.raw == raw) {
+                    self.local
+                } else if self.remote.get(*id).is_some_and(|n| &n.raw == raw) {
+                    self.remote
+                } else if self.base.get(*id).is_some_and(|n| &n.raw == raw) {
+                    self.base
+                } else if self.local.get(*id).is_some() {
+                    self.local
+                } else if self.remote.get(*id).is_some() {
+                    self.remote
+                } else {
+                    self.base
                 };
-                if let Some((block, sub_clean)) = narrowed {
-                    blocks.push(block);
-                    clean &= sub_clean;
-                    continue;
+                let new_id = self.out.clone_node_from(src, *id);
+                BlockUnit {
+                    leading_ws: unit.leading_ws.clone(),
+                    kind: UnitKind::Node {
+                        id: new_id,
+                        raw: raw.clone(),
+                        trailing_nl: trailing_nl.clone(),
+                    },
                 }
-                clean = false;
-                blocks.push(conflict_block(mine, theirs));
             }
         }
     }
-    (blocks, clean)
+
+    fn merge_child_seq(
+        &mut self,
+        b_items: &[ChildItem],
+        l_items: &[ChildItem],
+        r_items: &[ChildItem],
+        allow_conflict_blocks: bool,
+        is_root_or_content: bool,
+    ) -> Option<(Vec<ChildItem>, bool)> {
+        let (mut b_units, b_trail) = decompose_children(self.base, b_items);
+        let (mut l_units, l_trail) = decompose_children(self.local, l_items);
+        let (mut r_units, r_trail) = decompose_children(self.remote, r_items);
+
+        let b_starts_empty_ws = b_units.first().is_none_or(|u| u.leading_ws.is_empty());
+        let l_starts_empty_ws = l_units.first().is_none_or(|u| u.leading_ws.is_empty());
+        let r_starts_empty_ws = r_units.first().is_none_or(|u| u.leading_ws.is_empty());
+        let default_sep = l_units
+            .iter()
+            .skip(1)
+            .chain(r_units.iter().skip(1))
+            .chain(b_units.iter().skip(1))
+            .find_map(|u| (!u.leading_ws.is_empty()).then(|| u.leading_ws.clone()))
+            .unwrap_or_else(|| "\n".to_string());
+
+        propagate_matched_leading_ws(&mut b_units, &mut l_units, &mut r_units);
+
+        let mut merged_units: Vec<BlockUnit> = Vec::new();
+        let mut clean = true;
+
+        for region in diff3::merge3(&b_units, &l_units, &r_units) {
+            match region {
+                diff3::Region::Same(units) => {
+                    for u in &units {
+                        merged_units.push(self.clone_unit(u));
+                    }
+                }
+                diff3::Region::Conflict { base, mine, theirs } => {
+                    if !base.is_empty() && base.len() == mine.len() && mine.len() == theirs.len() {
+                        let mut sub = self.clone();
+                        let mut narrowed_all = Vec::with_capacity(base.len());
+                        let mut all_ok = true;
+                        let mut sub_clean_all = true;
+
+                        for ((bu, lu), ru) in base.iter().zip(mine.iter()).zip(theirs.iter()) {
+                            if let Some((nu, sc)) = sub.merge_one_unit(bu, lu, ru) {
+                                narrowed_all.push(nu);
+                                sub_clean_all &= sc;
+                            } else if allow_conflict_blocks {
+                                let leading_ws =
+                                    merge_ws(&bu.leading_ws, &lu.leading_ws, &ru.leading_ws);
+                                narrowed_all.push(build_conflict_block_unit(
+                                    std::slice::from_ref(lu),
+                                    std::slice::from_ref(ru),
+                                    leading_ws,
+                                    &mut sub.out,
+                                ));
+                                sub_clean_all = false;
+                            } else {
+                                all_ok = false;
+                                break;
+                            }
+                        }
+
+                        if all_ok {
+                            self.out = sub.out;
+                            merged_units.extend(narrowed_all);
+                            clean &= sub_clean_all;
+                            continue;
+                        }
+                    }
+
+                    if !allow_conflict_blocks {
+                        return None;
+                    }
+
+                    clean = false;
+                    let leading_ws = match (base.first(), mine.first(), theirs.first()) {
+                        (Some(b), Some(l), Some(r)) => {
+                            merge_ws(&b.leading_ws, &l.leading_ws, &r.leading_ws)
+                        }
+                        (_, Some(l), _) => l.leading_ws.clone(),
+                        (_, _, Some(r)) => r.leading_ws.clone(),
+                        _ => String::new(),
+                    };
+                    merged_units.push(build_conflict_block_unit(
+                        &mine,
+                        &theirs,
+                        leading_ws,
+                        &mut self.out,
+                    ));
+                }
+            }
+        }
+
+        if is_root_or_content
+            && b_starts_empty_ws
+            && l_starts_empty_ws
+            && r_starts_empty_ws
+            && let Some(first) = merged_units.first_mut()
+            && first.leading_ws == "\n"
+        {
+            first.leading_ws.clear();
+        }
+        for idx in 1..merged_units.len() {
+            let prev_ends_with_nl = match &merged_units[idx - 1].kind {
+                UnitKind::Comment(c) => c.ends_with('\n'),
+                UnitKind::Node {
+                    raw, trailing_nl, ..
+                } => raw.ends_with('\n') || trailing_nl.ends_with('\n'),
+            };
+            if merged_units[idx].leading_ws.is_empty() && prev_ends_with_nl {
+                let was_at_zero = l_units
+                    .first()
+                    .is_some_and(|u| u == &merged_units[idx] && u.leading_ws.is_empty())
+                    || r_units
+                        .first()
+                        .is_some_and(|u| u == &merged_units[idx] && u.leading_ws.is_empty());
+                if was_at_zero {
+                    merged_units[idx].leading_ws = default_sep.clone();
+                }
+            }
+        }
+
+        let merged_trail = merge_ws(&b_trail, &l_trail, &r_trail);
+        let mut out_items = Vec::new();
+        for u in merged_units {
+            if !u.leading_ws.is_empty() {
+                out_items.push(ChildItem::Trivia(u.leading_ws));
+            }
+            match u.kind {
+                UnitKind::Comment(c) => out_items.push(ChildItem::Trivia(c)),
+                UnitKind::Node {
+                    id, trailing_nl, ..
+                } => {
+                    out_items.push(ChildItem::Node(id));
+                    if !trailing_nl.is_empty() {
+                        out_items.push(ChildItem::Trivia(trailing_nl));
+                    }
+                }
+            }
+        }
+        if !merged_trail.is_empty() {
+            out_items.push(ChildItem::Trivia(merged_trail));
+        }
+
+        Some((out_items, clean))
+    }
+
+    fn merge_one_unit(
+        &mut self,
+        b_unit: &BlockUnit,
+        l_unit: &BlockUnit,
+        r_unit: &BlockUnit,
+    ) -> Option<(BlockUnit, bool)> {
+        let leading_ws = merge_ws(&b_unit.leading_ws, &l_unit.leading_ws, &r_unit.leading_ws);
+        let (
+            UnitKind::Node {
+                id: bid,
+                raw: b_raw,
+                trailing_nl: b_nl,
+            },
+            UnitKind::Node {
+                id: lid,
+                raw: l_raw,
+                trailing_nl: l_nl,
+            },
+            UnitKind::Node {
+                id: rid,
+                raw: r_raw,
+                trailing_nl: r_nl,
+            },
+        ) = (&b_unit.kind, &l_unit.kind, &r_unit.kind)
+        else {
+            return None;
+        };
+
+        if l_raw == r_raw || b_raw == r_raw {
+            let new_id = self.out.clone_node_from(self.local, *lid);
+            return Some((
+                BlockUnit {
+                    leading_ws,
+                    kind: UnitKind::Node {
+                        id: new_id,
+                        raw: l_raw.clone(),
+                        trailing_nl: l_nl.clone(),
+                    },
+                },
+                true,
+            ));
+        }
+        if b_raw == l_raw {
+            let new_id = self.out.clone_node_from(self.remote, *rid);
+            return Some((
+                BlockUnit {
+                    leading_ws,
+                    kind: UnitKind::Node {
+                        id: new_id,
+                        raw: r_raw.clone(),
+                        trailing_nl: r_nl.clone(),
+                    },
+                },
+                true,
+            ));
+        }
+
+        let (merged_id, clean) = self.merge_one_node(*bid, *lid, *rid)?;
+        let merged_raw = export_node_str(&self.out, merged_id);
+        let trailing_nl = if merged_raw.ends_with('\n') {
+            String::new()
+        } else {
+            merge_ws(b_nl, l_nl, r_nl)
+        };
+        Some((
+            BlockUnit {
+                leading_ws,
+                kind: UnitKind::Node {
+                    id: merged_id,
+                    raw: merged_raw,
+                    trailing_nl,
+                },
+            },
+            clean,
+        ))
+    }
+
+    fn merge_one_node(&mut self, bid: NodeId, lid: NodeId, rid: NodeId) -> Option<(NodeId, bool)> {
+        let b_node = self.base.get(bid)?;
+        let l_node = self.local.get(lid)?;
+        let r_node = self.remote.get(rid)?;
+
+        match (&b_node.kind, &l_node.kind, &r_node.kind) {
+            (
+                NodeKind::Paragraph { .. },
+                NodeKind::Paragraph { .. },
+                NodeKind::Paragraph { .. },
+            ) => {
+                let (merged_text, merged_inlines, clean) =
+                    merge_inline_items(&b_node.inlines, &l_node.inlines, &r_node.inlines);
+                let new_id = self.out.alloc_id();
+                let mut node = Node::new(
+                    new_id,
+                    NodeKind::Paragraph {
+                        text: merged_text.clone(),
+                    },
+                    merged_text,
+                );
+                node.inlines = merged_inlines;
+                node.edited = true;
+                self.out.insert_node(node);
+                Some((new_id, clean))
+            }
+            (
+                NodeKind::Section {
+                    level: bl,
+                    heading_raw: bh,
+                    id_attr: bid_attr,
+                    children: bc,
+                },
+                NodeKind::Section {
+                    level: ll,
+                    heading_raw: lh,
+                    id_attr: lid_attr,
+                    children: lc,
+                },
+                NodeKind::Section {
+                    level: rl,
+                    heading_raw: rh,
+                    id_attr: rid_attr,
+                    children: rc,
+                },
+            ) if bl == ll && ll == rl && lid_attr == rid_attr && bid_attr == lid_attr => {
+                let (heading_raw, inlines, heading_prefix, heading_suffix, title_clean) =
+                    if lh == rh || bh == rh {
+                        (
+                            lh.clone(),
+                            l_node.inlines.clone(),
+                            l_node.heading_prefix.clone(),
+                            l_node.heading_suffix.clone(),
+                            true,
+                        )
+                    } else if bh == lh {
+                        (
+                            rh.clone(),
+                            r_node.inlines.clone(),
+                            r_node.heading_prefix.clone(),
+                            r_node.heading_suffix.clone(),
+                            true,
+                        )
+                    } else {
+                        let (merged_title, merged_inlines, clean) =
+                            merge_inline_items(&b_node.inlines, &l_node.inlines, &r_node.inlines);
+                        (
+                            format!(
+                                "{}{merged_title}{}",
+                                l_node.heading_prefix, l_node.heading_suffix
+                            ),
+                            merged_inlines,
+                            l_node.heading_prefix.clone(),
+                            l_node.heading_suffix.clone(),
+                            clean,
+                        )
+                    };
+
+                let (merged_children, children_clean) =
+                    self.merge_child_seq(bc, lc, rc, true, false)?;
+                let new_id = self.out.alloc_id();
+                let mut node = Node::new(
+                    new_id,
+                    NodeKind::Section {
+                        level: *ll,
+                        heading_raw,
+                        id_attr: lid_attr.clone(),
+                        children: merged_children,
+                    },
+                    String::new(),
+                );
+                node.inlines = inlines;
+                node.heading_prefix = heading_prefix;
+                node.heading_suffix = heading_suffix;
+                node.edited = true;
+                self.out.insert_node(node);
+                Some((new_id, title_clean && children_clean))
+            }
+            (
+                NodeKind::BlockElement {
+                    name: bn,
+                    declaration: bd,
+                    id_attr: bid_attr,
+                    ..
+                },
+                NodeKind::BlockElement {
+                    name: ln,
+                    declaration: ld,
+                    id_attr: lid_attr,
+                    ..
+                },
+                NodeKind::BlockElement {
+                    name: rn,
+                    declaration: rd,
+                    id_attr: rid_attr,
+                    ..
+                },
+            ) if bn == ln && ln == rn && bd == ld && ld == rd && lid_attr == rid_attr => {
+                self.merge_block_element(b_node, l_node, r_node)
+            }
+            (
+                NodeKind::List { children: bc },
+                NodeKind::List { children: lc },
+                NodeKind::List { children: rc },
+            ) => {
+                let (merged_children, clean) = self.merge_child_seq(bc, lc, rc, false, false)?;
+                let new_id = self.out.alloc_id();
+                let mut node = Node::new(
+                    new_id,
+                    NodeKind::List {
+                        children: merged_children,
+                    },
+                    String::new(),
+                );
+                node.edited = true;
+                self.out.insert_node(node);
+                Some((new_id, clean))
+            }
+            (
+                NodeKind::ListItem {
+                    marker: bm,
+                    text: bt,
+                    id_attr: bid_attr,
+                    children: bc,
+                },
+                NodeKind::ListItem {
+                    marker: lm,
+                    text: lt,
+                    id_attr: lid_attr,
+                    children: lc,
+                },
+                NodeKind::ListItem {
+                    marker: rm,
+                    text: rt,
+                    id_attr: rid_attr,
+                    children: rc,
+                },
+            ) if bm == lm && lm == rm && lid_attr == rid_attr && bid_attr == lid_attr => {
+                if bc
+                    .iter()
+                    .chain(lc)
+                    .chain(rc)
+                    .any(|c| c.as_node_id().is_some())
+                {
+                    return None;
+                }
+                let (b_prefix, b_body) = split_list_item_prefix(bt, bm)?;
+                let (l_prefix, l_body) = split_list_item_prefix(lt, lm)?;
+                let (r_prefix, r_body) = split_list_item_prefix(rt, rm)?;
+                if b_prefix != l_prefix || l_prefix != r_prefix {
+                    return None;
+                }
+                let (merged_body, _, clean) = merge_inline_items(
+                    &parse_inline_items(b_body),
+                    &parse_inline_items(l_body),
+                    &parse_inline_items(r_body),
+                );
+                let merged_text = format!("{l_prefix}{merged_body}");
+                let new_id = self.out.alloc_id();
+                let mut node = Node::new(
+                    new_id,
+                    NodeKind::ListItem {
+                        marker: lm.clone(),
+                        text: merged_text.clone(),
+                        id_attr: lid_attr.clone(),
+                        children: vec![ChildItem::Trivia(merged_text.clone())],
+                    },
+                    merged_text,
+                );
+                node.edited = true;
+                self.out.insert_node(node);
+                Some((new_id, clean))
+            }
+            _ => None,
+        }
+    }
+
+    fn merge_block_element(
+        &mut self,
+        b_node: &Node,
+        l_node: &Node,
+        r_node: &Node,
+    ) -> Option<(NodeId, bool)> {
+        let NodeKind::BlockElement {
+            name,
+            declaration,
+            id_attr,
+            ..
+        } = &l_node.kind
+        else {
+            return None;
+        };
+
+        let (args_slot, args_clean) = merge_optional_attr_slot(
+            &b_node.slots.args_slot,
+            &l_node.slots.args_slot,
+            &r_node.slots.args_slot,
+        )?;
+
+        let (content_children, content_edited, content_clean) = match (
+            &b_node.slots.content_children,
+            &l_node.slots.content_children,
+            &r_node.slots.content_children,
+        ) {
+            (Some(bc), Some(lc), Some(rc)) => {
+                let bc_raw = export_children_str(self.base, bc);
+                let lc_raw = export_children_str(self.local, lc);
+                let rc_raw = export_children_str(self.remote, rc);
+                if lc_raw == rc_raw || bc_raw == rc_raw {
+                    (Some(self.out.clone_children_from(self.local, lc)), false, true)
+                } else if bc_raw == lc_raw {
+                    (Some(self.out.clone_children_from(self.remote, rc)), true, true)
+                } else {
+                    let (merged, clean) = self.merge_child_seq(bc, lc, rc, true, true)?;
+                    (Some(merged), true, clean)
+                }
+            }
+            (None, None, None) => (None, false, true),
+            _ => return None,
+        };
+
+        let (data_slot, data_clean) = merge_optional_attr_slot(
+            &b_node.slots.data_slot,
+            &l_node.slots.data_slot,
+            &r_node.slots.data_slot,
+        )?;
+
+        let mut slots = l_node.slots.clone();
+        slots.args_slot = args_slot;
+        slots.data_slot = data_slot;
+        slots.content_children = content_children;
+        slots.content_edited = content_edited;
+        if slots.args_slot.is_some() {
+            slots.ensure_piece_args();
+        }
+        if slots.data_slot.is_some() {
+            slots.ensure_piece_data();
+        }
+
+        let new_id = self.out.alloc_id();
+        let mut new_node = Node::new(
+            new_id,
+            NodeKind::BlockElement {
+                name: name.clone(),
+                declaration: *declaration,
+                id_attr: id_attr.clone(),
+            },
+            String::new(),
+        );
+        new_node.slots = slots;
+        new_node.edited = true;
+        self.out.insert_node(new_node);
+
+        Some((new_id, args_clean && content_clean && data_clean))
+    }
 }
 
-/// Lifts a three-way merge function over `Option`, returning `None` if the
-/// three options don't all agree on presence/absence (a shape mismatch the
-/// merge algorithm can't narrow).
-///
-/// - All three `Some`: calls `f(b, l, r)` and wraps the result in `Some`.
-/// - All three `None`: clean no-op, returns `Some((None, true))`.
-/// - Any mix: returns `None` so the caller can bail out early.
-fn merge_optional<T, F>(
-    base: &Option<T>,
-    local: &Option<T>,
-    remote: &Option<T>,
-    f: F,
-) -> Option<(Option<T>, bool)>
-where
-    F: FnOnce(&T, &T, &T) -> Option<(T, bool)>,
-{
+enum TriviaPiece {
+    Ws(String),
+    Comment(String),
+}
+
+fn split_trivia_tokens(s: &str) -> Vec<TriviaPiece> {
+    let mut out = Vec::new();
+    let mut pos = 0;
+    let mut ws_start = 0;
+
+    while pos < s.len() {
+        let rest = &s[pos..];
+        if rest.starts_with("//") {
+            if pos > ws_start {
+                out.push(TriviaPiece::Ws(s[ws_start..pos].to_string()));
+            }
+            let line_end = rest.find('\n').map_or(s.len(), |i| pos + i + 1);
+            out.push(TriviaPiece::Comment(s[pos..line_end].to_string()));
+            pos = line_end;
+            ws_start = pos;
+        } else if rest.starts_with("/*") {
+            if pos > ws_start {
+                out.push(TriviaPiece::Ws(s[ws_start..pos].to_string()));
+            }
+            let comment_end = rest.find("*/").map_or(s.len(), |i| pos + i + 2);
+            out.push(TriviaPiece::Comment(s[pos..comment_end].to_string()));
+            pos = comment_end;
+            ws_start = pos;
+        } else {
+            pos += rest.chars().next().map_or(1, char::len_utf8);
+        }
+    }
+
+    if ws_start < s.len() {
+        out.push(TriviaPiece::Ws(s[ws_start..].to_string()));
+    }
+    out
+}
+
+fn decompose_children(doc: &EditDoc, items: &[ChildItem]) -> (Vec<BlockUnit>, String) {
+    let mut units: Vec<BlockUnit> = Vec::new();
+    let mut pending_ws = String::new();
+
+    for item in items {
+        match item {
+            ChildItem::Trivia(t) => {
+                let mut slice = t.as_str();
+                if pending_ws.is_empty()
+                    && let Some(BlockUnit {
+                        kind:
+                            UnitKind::Node {
+                                raw, trailing_nl, ..
+                            },
+                        ..
+                    }) = units.last_mut()
+                    && !raw.ends_with('\n')
+                    && trailing_nl.is_empty()
+                {
+                    if let Some(rest) = slice.strip_prefix("\r\n") {
+                        *trailing_nl = "\r\n".to_string();
+                        slice = rest;
+                    } else if let Some(rest) = slice.strip_prefix('\n') {
+                        *trailing_nl = "\n".to_string();
+                        slice = rest;
+                    }
+                }
+                for piece in split_trivia_tokens(slice) {
+                    match piece {
+                        TriviaPiece::Ws(ws) => pending_ws.push_str(&ws),
+                        TriviaPiece::Comment(c) => {
+                            units.push(BlockUnit {
+                                leading_ws: std::mem::take(&mut pending_ws),
+                                kind: UnitKind::Comment(c),
+                            });
+                        }
+                    }
+                }
+            }
+            ChildItem::Node(id) => {
+                let raw = export_node_str(doc, *id);
+                units.push(BlockUnit {
+                    leading_ws: std::mem::take(&mut pending_ws),
+                    kind: UnitKind::Node {
+                        id: *id,
+                        raw,
+                        trailing_nl: String::new(),
+                    },
+                });
+            }
+        }
+    }
+
+    (units, pending_ws)
+}
+
+fn merge_ws(base: &str, local: &str, remote: &str) -> String {
+    if local == remote || base == remote {
+        local.to_string()
+    } else if base == local {
+        remote.to_string()
+    } else {
+        local.to_string()
+    }
+}
+
+fn lcs_index_pairs<T: PartialEq>(base: &[T], derived: &[T]) -> Vec<(usize, usize)> {
+    let (n, m) = (base.len(), derived.len());
+    let stride = m + 1;
+    let mut dp = vec![0u32; (n + 1) * stride];
+    for i in 1..=n {
+        for j in 1..=m {
+            dp[i * stride + j] = if base[i - 1] == derived[j - 1] {
+                dp[(i - 1) * stride + (j - 1)] + 1
+            } else {
+                dp[(i - 1) * stride + j].max(dp[i * stride + (j - 1)])
+            };
+        }
+    }
+    let mut pairs = Vec::new();
+    let (mut i, mut j) = (n, m);
+    while i > 0 && j > 0 {
+        if base[i - 1] == derived[j - 1] {
+            pairs.push((i - 1, j - 1));
+            i -= 1;
+            j -= 1;
+        } else if dp[(i - 1) * stride + j] >= dp[i * stride + (j - 1)] {
+            i -= 1;
+        } else {
+            j -= 1;
+        }
+    }
+    pairs.reverse();
+    pairs
+}
+
+fn propagate_matched_leading_ws(
+    base: &mut [BlockUnit],
+    local: &mut [BlockUnit],
+    remote: &mut [BlockUnit],
+) {
+    let mut local_map = vec![None; base.len()];
+    for (bi, li) in lcs_index_pairs(base, local) {
+        local_map[bi] = Some(li);
+    }
+    let mut remote_map = vec![None; base.len()];
+    for (bi, ri) in lcs_index_pairs(base, remote) {
+        remote_map[bi] = Some(ri);
+    }
+
+    for bi in 0..base.len() {
+        match (local_map[bi], remote_map[bi]) {
+            (Some(li), Some(ri)) => {
+                let merged = merge_ws(
+                    &base[bi].leading_ws,
+                    &local[li].leading_ws,
+                    &remote[ri].leading_ws,
+                );
+                base[bi].leading_ws = merged.clone();
+                local[li].leading_ws = merged.clone();
+                remote[ri].leading_ws = merged;
+            }
+            (Some(li), None) => base[bi].leading_ws = local[li].leading_ws.clone(),
+            (None, Some(ri)) => base[bi].leading_ws = remote[ri].leading_ws.clone(),
+            (None, None) => {}
+        }
+    }
+}
+
+fn split_list_item_prefix<'a>(text: &'a str, marker: &str) -> Option<(&'a str, &'a str)> {
+    let ws_len = text.len() - text.trim_start_matches([' ', '\t']).len();
+    let after_marker = text[ws_len..].strip_prefix(marker)?;
+    let post_ws_len = after_marker.len() - after_marker.trim_start_matches([' ', '\t']).len();
+    let total_prefix = ws_len + marker.len() + post_ws_len;
+    Some((&text[..total_prefix], &text[total_prefix..]))
+}
+
+fn merge_optional_attr_slot(
+    base: &Option<AttrSlot>,
+    local: &Option<AttrSlot>,
+    remote: &Option<AttrSlot>,
+) -> Option<(Option<AttrSlot>, bool)> {
     match (base, local, remote) {
         (Some(b), Some(l), Some(r)) => {
-            let (merged, clean) = f(b, l, r)?;
+            let (merged, clean) = merge_attr_slot(b, l, r)?;
             Some((Some(merged), clean))
         }
         (None, None, None) => Some((None, true)),
@@ -97,370 +831,331 @@ where
     }
 }
 
-/// Attempts to narrow a conflict between one base block and the single
-/// block each side made of it, instead of giving up on the whole block.
-///
-/// `None` means recursion can't help here -- the caller falls back to
-/// wrapping the whole block in marker nodes. `Some((block, clean))`
-/// means it produced a merged block; `clean` says whether that block
-/// still had to embed its own (narrower) conflict markers.
-fn merge_one(base: &Block, local: &Block, remote: &Block) -> Option<(Block, bool)> {
-    match (base, local, remote) {
-        (Block::Paragraph(b), Block::Paragraph(l), Block::Paragraph(r)) => {
-            let (content, clean) = merge_inline_seq(&b.content, &l.content, &r.content);
-            Some((Block::Paragraph(Paragraph::new(content, b.span)), clean))
-        }
-        (Block::Element(b), Block::Element(l), Block::Element(r)) => {
-            let (element, clean) = merge_element(b, l, r)?;
-            Some((Block::Element(element), clean))
-        }
-        (Block::List(b), Block::List(l), Block::List(r)) => {
-            let (list, clean) = merge_list(b, l, r)?;
-            Some((Block::List(list), clean))
-        }
-        (Block::Section(b), Block::Section(l), Block::Section(r))
-            if b.level == l.level && l.level == r.level =>
-        {
-            // Neither `connects` nor `id` is diffed -- bail rather than
-            // silently keep `local`'s and drop a real difference on the
-            // floor.
-            if l.connects != r.connects || l.id != r.id {
-                return None;
-            }
-
-            let (title, title_clean) = merge_inline_seq(&b.title, &l.title, &r.title);
-            let (args, args_clean) = merge_optional(&b.args, &l.args, &r.args, |ba, la, ra| {
-                let (merged, clean) = merge_value(Some(ba), la, ra);
-                Some((merged, clean))
-            })?;
-            let (blocks, blocks_clean) = merge_block_seq(&b.blocks, &l.blocks, &r.blocks);
-            let (value, value_clean) =
-                merge_optional(&b.value, &l.value, &r.value, |bv, lv, rv| {
-                    merge_element_value(bv, lv, rv)
-                })?;
-
-            Some((
-                Block::Section(Section {
-                    level: l.level,
-                    title,
-                    args,
-                    value,
-                    id: l.id.clone(),
-                    connects: l.connects.clone(),
-                    blocks,
-                    span: l.span,
-                }),
-                title_clean && args_clean && blocks_clean && value_clean,
-            ))
-        }
-        _ => None,
+fn merge_attr_slot(b: &AttrSlot, l: &AttrSlot, r: &AttrSlot) -> Option<(AttrSlot, bool)> {
+    if l.raw == r.raw || b.raw == r.raw {
+        return Some((l.clone(), true));
     }
-}
-
-fn merge_element(b: &Element, l: &Element, r: &Element) -> Option<(Element, bool)> {
-    if b.sigil != l.sigil || l.sigil != r.sigil {
-        return None;
-    }
-    // `connects` isn't diffed -- bail rather than silently keep
-    // `local`'s and drop a real difference on the floor.
-    if l.connects != r.connects {
-        return None;
+    if b.raw == l.raw {
+        return Some((r.clone(), true));
     }
 
-    let (args, args_clean) = merge_optional(&b.args, &l.args, &r.args, |ba, la, ra| {
-        let (merged, clean) = merge_value(Some(ba), la, ra);
-        Some((merged, clean))
-    })?;
-    let (content, content_clean) =
-        merge_optional(&b.content, &l.content, &r.content, |bc, lc, rc| {
-            let (merged, clean) = merge_block_seq(bc, lc, rc);
-            Some((merged, clean))
-        })?;
-    let (value, value_clean) = merge_optional(&b.value, &l.value, &r.value, |bv, lv, rv| {
-        merge_element_value(bv, lv, rv)
-    })?;
-
-    Some((
-        Element {
-            args,
-            content,
-            value,
-            ..l.clone()
-        },
-        args_clean && content_clean && value_clean,
-    ))
-}
-
-fn merge_list(b: &List, l: &List, r: &List) -> Option<(List, bool)> {
-    if b.ordered != l.ordered || l.ordered != r.ordered {
-        return None;
-    }
-    if l.connects != r.connects || l.id != r.id {
-        return None;
-    }
-    let (items, clean) = merge_list_item_seq(&b.items, &l.items, &r.items)?;
-    Some((
-        List {
-            ordered: l.ordered,
-            items,
-            id: l.id.clone(),
-            connects: l.connects.clone(),
-            span: b.span,
-        },
-        clean,
-    ))
-}
-
-fn merge_list_item(b: &ListItem, l: &ListItem, r: &ListItem) -> Option<(ListItem, bool)> {
-    let (element, el_clean) = merge_element(&b.element, &l.element, &r.element)?;
-    let (sublist, sub_clean) = merge_optional(&b.sublist, &l.sublist, &r.sublist, |sb, sl, sr| {
-        merge_list(sb, sl, sr)
-    })?;
-    Some((ListItem { element, sublist }, el_clean && sub_clean))
-}
-
-fn merge_list_item_seq(
-    base: &[ListItem],
-    local: &[ListItem],
-    remote: &[ListItem],
-) -> Option<(Vec<ListItem>, bool)> {
-    let mut items = Vec::new();
-    let mut clean = true;
-    for region in diff3::merge3(base, local, remote) {
-        match region {
-            diff3::Region::Same(same_items) => items.extend(same_items),
-            diff3::Region::Conflict { base, mine, theirs } => {
-                let narrowed = match (base.as_slice(), mine.as_slice(), theirs.as_slice()) {
-                    ([b], [m], [t]) => merge_list_item(b, m, t),
-                    _ => None,
-                }?;
-                items.push(narrowed.0);
-                clean &= narrowed.1;
-            }
-        }
-    }
-    Some((items, clean))
-}
-
-/// Narrows a conflict inside an element's `{data}` group, by key rather
-/// than by position (so reordered-but-otherwise-untouched keys never
-/// register as a conflict). `None` when either side's group holds a
-/// nested element rather than only `key: value` pairs -- narrowing a
-/// conflict *between* interleaved pairs and nested elements would need
-/// its own representation for "a conflict sitting where an element
-/// could be", which is a fourth placement context for `@mobile.conflict`
-/// and hasn't been designed.
-fn merge_element_value(
-    base: &ElementValue,
-    local: &ElementValue,
-    remote: &ElementValue,
-) -> Option<(ElementValue, bool)> {
-    let (ElementValue::Group(b), ElementValue::Group(l), ElementValue::Group(r)) =
-        (base, local, remote)
-    else {
-        return None;
-    };
-
-    let only_pairs = |entries: &[Entry]| -> Option<Vec<(String, Value)>> {
-        entries
+    if l.open_delim == "{"
+        && b.entries
             .iter()
-            .map(|e| match e {
-                Entry::Pair(k, v) => Some((k.clone(), v.clone())),
-                Entry::Element(_) => None,
-            })
-            .collect()
-    };
-    let (base_pairs, local_pairs, remote_pairs) = (only_pairs(b)?, only_pairs(l)?, only_pairs(r)?);
+            .chain(&l.entries)
+            .chain(&r.entries)
+            .any(|e| e.key.is_empty())
+    {
+        return None;
+    }
 
-    let (merged, clean) = merge_value_map(&base_pairs, &local_pairs, &remote_pairs);
-    let Value::Map(entries) = merged else {
-        unreachable!("merge_value_map always returns a Value::Map")
+    let style_donor = if !l.entries.is_empty() {
+        l
+    } else if !r.entries.is_empty() {
+        r
+    } else {
+        b
     };
+    let leading_trivia = style_donor.leading_trivia.clone();
+    let sep_lead = style_donor.infer_new_entry_sep();
+    let trailing_trivia = style_donor.trailing_trivia.clone();
+
+    let mut order: Vec<String> = Vec::new();
+    let mut seen = BTreeSet::new();
+    for entry in l.entries.iter().chain(&r.entries) {
+        if seen.insert(entry.key.clone()) {
+            order.push(entry.key.clone());
+        }
+    }
+
+    fn lookup<'a>(entries: &'a [AttrEntry], key: &str) -> Option<&'a AttrEntry> {
+        entries.iter().find(|e| e.key == key)
+    }
+    let mut out_entries: Vec<AttrEntry> = Vec::new();
+    let mut clean = true;
+
+    for key in &order {
+        let (be, le, re) = (
+            lookup(&b.entries, key),
+            lookup(&l.entries, key),
+            lookup(&r.entries, key),
+        );
+        match (le, re) {
+            (Some(l_ent), None) => {
+                if be.is_none_or(|b_ent| b_ent.value.raw.trim() != l_ent.value.raw.trim()) {
+                    out_entries.push(l_ent.clone());
+                }
+            }
+            (None, Some(r_ent)) => {
+                if be.is_none_or(|b_ent| b_ent.value.raw.trim() != r_ent.value.raw.trim()) {
+                    out_entries.push(r_ent.clone());
+                }
+            }
+            (None, None) => unreachable!(),
+            (Some(l_ent), Some(r_ent)) => {
+                let l_val = l_ent.value.raw.trim();
+                let r_val = r_ent.value.raw.trim();
+                let b_val = be.map(|e| e.value.raw.trim());
+
+                if l_val == r_val || b_val == Some(r_val) {
+                    out_entries.push(l_ent.clone());
+                } else if b_val == Some(l_val) {
+                    let mut updated = l_ent.clone();
+                    updated.value = r_ent.value.clone();
+                    updated.edited = true;
+                    out_entries.push(updated);
+                } else {
+                    let (merged_val, sub_clean) =
+                        merge_edit_value(be.map(|e| &e.value), &l_ent.value, &r_ent.value);
+                    clean &= sub_clean;
+                    let mut updated = l_ent.clone();
+                    updated.value = merged_val;
+                    updated.edited = true;
+                    out_entries.push(updated);
+                }
+            }
+        }
+    }
+
+    for (idx, entry) in out_entries.iter_mut().enumerate() {
+        if idx == 0 {
+            if !entry.leading_sep.is_empty()
+                && !entry.leading_sep.contains("//")
+                && !entry.leading_sep.contains("/*")
+            {
+                entry.leading_sep.clear();
+            }
+        } else if entry.leading_sep.is_empty() {
+            entry.leading_sep = sep_lead.clone();
+        }
+    }
+
     Some((
-        ElementValue::Group(
-            entries
-                .into_iter()
-                .map(|(k, v)| Entry::Pair(k, v))
-                .collect(),
-        ),
+        AttrSlot {
+            raw: String::new(),
+            open_delim: l.open_delim.clone(),
+            close_delim: l.close_delim.clone(),
+            edited: true,
+            leading_trivia,
+            trailing_trivia,
+            entries: out_entries,
+        },
         clean,
     ))
 }
 
-/// Three-way merge of one value, recursing into `Value::Map` (by key) and
-/// `Value::Seq` (positionally); a leaf-level (or shape-mismatched)
-/// disagreement embeds `@mobile.conflict(mine: ..., theirs: ...)` as
-/// the value itself, using `Value::Element` -- a value slot can hold an
-/// arbitrary element, so the same element name used as a block/inline
-/// marker elsewhere does double duty here as data instead.
-///
-/// `base: None` means there is nothing to compare against (the key, or
-/// this whole value, was added independently by both sides) -- treated
-/// as an empty `Map`/`Seq` rather than failing, so two sides adding the
-/// same key with compatible sub-structure can still merge below this
-/// level instead of conflicting outright.
-fn merge_value(base: Option<&Value>, local: &Value, remote: &Value) -> (Value, bool) {
-    if local == remote {
+fn merge_edit_value(
+    base: Option<&EditValue>,
+    local: &EditValue,
+    remote: &EditValue,
+) -> (EditValue, bool) {
+    let l_trim = local.raw.trim();
+    let r_trim = remote.raw.trim();
+    let b_trim = base.map(|b| b.raw.trim());
+
+    if l_trim == r_trim || b_trim == Some(r_trim) {
         return (local.clone(), true);
     }
-    if base == Some(local) {
+    if b_trim == Some(l_trim) {
         return (remote.clone(), true);
     }
-    if base == Some(remote) {
-        return (local.clone(), true);
-    }
 
-    match (local, remote) {
-        (Value::Map(l), Value::Map(r)) => {
-            let b = match base {
-                Some(Value::Map(b)) => b.as_slice(),
-                _ => &[],
+    match (&local.kind, &remote.kind) {
+        (EditValueKind::Map(l_slot), EditValueKind::Map(r_slot)) => {
+            let empty_slot = AttrSlot::new_empty("{", "}");
+            let b_slot = match base.map(|b| &b.kind) {
+                Some(EditValueKind::Map(s)) => s,
+                _ => &empty_slot,
             };
-            merge_value_map(b, l, r)
+            if let Some((merged_slot, clean)) = merge_attr_slot(b_slot, l_slot, r_slot) {
+                return (
+                    EditValue {
+                        raw: merged_slot.export(),
+                        edited: true,
+                        kind: EditValueKind::Map(merged_slot),
+                    },
+                    clean,
+                );
+            }
         }
-        (Value::Seq(l), Value::Seq(r)) => {
-            let b = match base {
-                Some(Value::Seq(b)) => b.as_slice(),
-                _ => &[],
+        (EditValueKind::Seq(l_slot), EditValueKind::Seq(r_slot)) => {
+            let b_vals: Vec<String> = match base.map(|b| &b.kind) {
+                Some(EditValueKind::Seq(s)) => s
+                    .entries
+                    .iter()
+                    .map(|e| e.value.raw.trim().to_string())
+                    .collect(),
+                _ => Vec::new(),
             };
-            merge_value_seq(b, l, r)
-        }
-        _ => (value_conflict(local.clone(), remote.clone()), false),
-    }
-}
+            let l_vals: Vec<String> = l_slot
+                .entries
+                .iter()
+                .map(|e| e.value.raw.trim().to_string())
+                .collect();
+            let r_vals: Vec<String> = r_slot
+                .entries
+                .iter()
+                .map(|e| e.value.raw.trim().to_string())
+                .collect();
 
-fn merge_value_map(
-    base: &[(String, Value)],
-    local: &[(String, Value)],
-    remote: &[(String, Value)],
-) -> (Value, bool) {
-    fn lookup<'a>(entries: &'a [(String, Value)], key: &str) -> Option<&'a Value> {
-        entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
-    }
-
-    // Local's key order first, then any key remote alone introduced --
-    // an arbitrary but deterministic choice; `{data}` order isn't
-    // semantically load-bearing the way block order is.
-    let mut order: Vec<&str> = Vec::new();
-    let mut seen = std::collections::BTreeSet::new();
-    for (k, _) in local.iter().chain(remote.iter()) {
-        if seen.insert(k.as_str()) {
-            order.push(k.as_str());
-        }
-    }
-
-    let mut out = Vec::new();
-    let mut clean = true;
-    for key in order {
-        let (b, l, r) = (lookup(base, key), lookup(local, key), lookup(remote, key));
-        match (l, r) {
-            (Some(lv), None) => {
-                // remote deleted `key`; keep it only if local actually
-                // changed it -- an unmodified key gives way to the
-                // other side's deletion instead of resurrecting it.
-                if b != Some(lv) {
-                    out.push((key.to_string(), lv.clone()));
-                }
-            }
-            (None, Some(rv)) => {
-                if b != Some(rv) {
-                    out.push((key.to_string(), rv.clone()));
-                }
-            }
-            (None, None) => unreachable!("key came from local or remote"),
-            (Some(lv), Some(rv)) => {
-                let (merged, sub_clean) = merge_value(b, lv, rv);
-                clean &= sub_clean;
-                out.push((key.to_string(), merged));
-            }
-        }
-    }
-    (Value::Map(out), clean)
-}
-
-fn merge_value_seq(base: &[Value], local: &[Value], remote: &[Value]) -> (Value, bool) {
-    let mut out = Vec::new();
-    let mut clean = true;
-    for region in diff3::merge3(base, local, remote) {
-        match region {
-            diff3::Region::Same(items) => out.extend(items),
-            diff3::Region::Conflict { base, mine, theirs } => {
-                if let ([b], [l], [r]) = (base.as_slice(), mine.as_slice(), theirs.as_slice()) {
-                    let (merged, sub_clean) = merge_value(Some(b), l, r);
-                    out.push(merged);
-                    clean &= sub_clean;
-                    continue;
-                }
-                clean = false;
-                out.push(value_conflict(Value::Seq(mine), Value::Seq(theirs)));
-            }
-        }
-    }
-    (Value::Seq(out), clean)
-}
-
-/// The inline-level counterpart of `merge`'s main loop: diffs one
-/// `Vec<Inline>` three ways and always succeeds, embedding
-/// `@mobile.conflict` markers (as inline nodes) around anything it can't
-/// resolve rather than failing outward to a whole-block conflict.
-///
-/// A run of plain prose parses to one `Inline::Text` covering the whole
-/// run, so without a further step, editing any word anywhere in a
-/// sentence would make the entire sentence one non-matching item and
-/// conflict outright. When a conflict region narrows to exactly one
-/// `Inline::Text` per side, [`merge_text`] recurses once more, character
-/// by character, which is what actually lets two edits to different
-/// words in the same sentence merge silently.
-fn merge_inline_seq(base: &[Inline], local: &[Inline], remote: &[Inline]) -> (Vec<Inline>, bool) {
-    let mut out = Vec::new();
-    let mut clean = true;
-    for region in diff3::merge3(base, local, remote) {
-        match region {
-            diff3::Region::Same(items) => out.extend(items),
-            diff3::Region::Conflict { base, mine, theirs } => {
-                let narrowed = match (base.as_slice(), mine.as_slice(), theirs.as_slice()) {
-                    ([Inline::Text(b)], [Inline::Text(l)], [Inline::Text(r)]) => {
-                        Some(merge_text(&b.value, &l.value, &r.value))
+            let mut merged_items = Vec::new();
+            let mut clean = true;
+            for region in diff3::merge3(&b_vals, &l_vals, &r_vals) {
+                match region {
+                    diff3::Region::Same(items) => merged_items.extend(items),
+                    diff3::Region::Conflict { base, mine, theirs } => {
+                        if let ([b_item], [l_item], [r_item]) =
+                            (base.as_slice(), mine.as_slice(), theirs.as_slice())
+                        {
+                            let (merged_ev, sub_clean) = merge_edit_value(
+                                Some(&parse_edit_value_str(b_item)),
+                                &parse_edit_value_str(l_item),
+                                &parse_edit_value_str(r_item),
+                            );
+                            merged_items.push(merged_ev.export());
+                            clean &= sub_clean;
+                        } else {
+                            clean = false;
+                            merged_items.push(format!(
+                                "@conflict(a: list({}), b: list({}))",
+                                mine.join(", "),
+                                theirs.join(", ")
+                            ));
+                        }
                     }
-                    _ => None,
-                };
-                if let Some((items, sub_clean)) = narrowed {
-                    out.extend(items);
+                }
+            }
+            let (open_prefix, close_suffix) = if l_slot.open_delim.starts_with("list") {
+                ("list(", ")")
+            } else {
+                ("[", "]")
+            };
+            let raw = format!("{open_prefix}{}{close_suffix}", merged_items.join(", "));
+            return (parse_edit_value_str(&raw), clean);
+        }
+        _ => {}
+    }
+
+    (
+        parse_edit_value_str(&format!("@conflict(a: {l_trim}, b: {r_trim})")),
+        false,
+    )
+}
+
+fn split_trailing_newline(items: &[InlineItem]) -> (&[InlineItem], &str) {
+    if let Some(InlineItem::Trivia(nl)) = items.last()
+        && (nl == "\n" || nl == "\r\n")
+    {
+        (&items[..items.len() - 1], nl.as_str())
+    } else {
+        (items, "")
+    }
+}
+
+fn merge_inline_items(
+    b_inlines: &[InlineItem],
+    l_inlines: &[InlineItem],
+    r_inlines: &[InlineItem],
+) -> (String, Vec<InlineItem>, bool) {
+    let (b_body, b_nl) = split_trailing_newline(b_inlines);
+    let (l_body, l_nl) = split_trailing_newline(l_inlines);
+    let (r_body, r_nl) = split_trailing_newline(r_inlines);
+    let merged_nl = merge_ws(b_nl, l_nl, r_nl);
+
+    let mut out_str = String::new();
+    let mut clean = true;
+
+    for region in diff3::merge3(b_body, l_body, r_body) {
+        match region {
+            diff3::Region::Same(items) => {
+                for item in items {
+                    out_str.push_str(item.raw_str());
+                }
+            }
+            diff3::Region::Conflict { base, mine, theirs } => {
+                if let ([InlineItem::Text(bt)], [InlineItem::Text(lt)], [InlineItem::Text(rt)]) =
+                    (base.as_slice(), mine.as_slice(), theirs.as_slice())
+                {
+                    let (merged_t, sub_clean) = merge_text_tokens(bt, lt, rt);
+                    out_str.push_str(&merged_t);
                     clean &= sub_clean;
                     continue;
                 }
+
                 clean = false;
-                out.push(conflict_inline(mine, theirs));
+                let mine_raw: String = mine.iter().map(InlineItem::raw_str).collect();
+                let theirs_raw: String = theirs.iter().map(InlineItem::raw_str).collect();
+                out_str.push_str(&format_inline_conflict_span(&mine_raw, &theirs_raw));
             }
         }
     }
-    (coalesce_text(out), clean)
+
+    out_str.push_str(&merged_nl);
+    let parsed_inlines = parse_inline_items(&out_str);
+    (out_str, parsed_inlines, clean)
 }
 
-/// Character-level three-way merge of one `Inline::Text` run, the bottom
-/// of the recursion: nothing below a character can narrow a conflict any
-/// further.
-fn merge_text(base: &str, local: &str, remote: &str) -> (Vec<Inline>, bool) {
-    let (b, l, r): (Vec<char>, Vec<char>, Vec<char>) = (
-        base.chars().collect(),
-        local.chars().collect(),
-        remote.chars().collect(),
-    );
+fn tokenize_prose(s: &str) -> Vec<&str> {
+    #[derive(Clone, Copy, PartialEq)]
+    enum Class {
+        Ws,
+        Word,
+        Punct,
+    }
 
-    let mut out = Vec::new();
+    let classify = |c: char| {
+        if c.is_whitespace() {
+            Class::Ws
+        } else if c.is_alphanumeric() || c == '_' || c == '-' || c == '\'' {
+            Class::Word
+        } else {
+            Class::Punct
+        }
+    };
+
+    let mut tokens = Vec::new();
+    let mut start = 0;
+    let mut prev_class: Option<Class> = None;
+    for (idx, ch) in s.char_indices() {
+        let cls = classify(ch);
+        if let Some(prev) = prev_class
+            && (prev != cls || cls == Class::Punct)
+        {
+            tokens.push(&s[start..idx]);
+            start = idx;
+        }
+        prev_class = Some(cls);
+    }
+    if start < s.len() {
+        tokens.push(&s[start..]);
+    }
+    tokens
+}
+
+fn merge_text_tokens(base: &str, local: &str, remote: &str) -> (String, bool) {
+    let b_toks = tokenize_prose(base);
+    let l_toks = tokenize_prose(local);
+    let r_toks = tokenize_prose(remote);
+
+    let mut out = String::new();
     let mut clean = true;
-    for region in diff3::merge3(&b, &l, &r) {
+
+    for region in diff3::merge3(&b_toks, &l_toks, &r_toks) {
         match region {
-            diff3::Region::Same(chars) => push_text(&mut out, chars),
+            diff3::Region::Same(toks) => {
+                for t in toks {
+                    out.push_str(t);
+                }
+            }
             diff3::Region::Conflict { mine, theirs, .. } => {
                 clean = false;
-                let mut mine_run = Vec::new();
-                push_text(&mut mine_run, mine);
-                let mut theirs_run = Vec::new();
-                push_text(&mut theirs_run, theirs);
-                out.push(conflict_inline(mine_run, theirs_run));
+                out.push_str(&format_inline_conflict_span(
+                    &mine.concat(),
+                    &theirs.concat(),
+                ));
             }
         }
     }
-    (coalesce_text(out), clean)
+
+    (out, clean)
 }
