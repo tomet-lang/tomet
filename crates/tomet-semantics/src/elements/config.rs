@@ -1,10 +1,8 @@
 use std::collections::HashMap;
-use tomet_ast::{Document, Element, Value};
+use tomet_ast::{Document, Value};
 use tomet_tree::ValueExt;
 
 use tomet_declaration::{DeclKind, VarDecl};
-
-use crate::{ElementKind, classify_std_lenient, normalized_element_args};
 
 /// Supported target format for document exports.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -44,34 +42,21 @@ impl ExportType {
     }
 }
 
-/// Extracted document configuration settings from top-level `::config` elements.
+/// What a document declares about itself that is not formatting or a registry: where it is exported
+/// (`::export`), and the macros and variables it defines (`::macros`, `::vars`).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DocumentConfig {
-    /// Target export types specified by `export.type` (or `export_type`).
+    /// Target export types specified by `::export`'s `type`.
     pub export_type: Vec<ExportType>,
-    /// Default output path specified by `export.path` (or `export_path`) scalar string.
+    /// Default output path specified by `::export`'s `path` as a plain string.
     pub export_path: Option<String>,
-    /// Per-export-type output paths specified by `export.path` map or format keys.
+    /// Per-export-type output paths specified by `::export`'s `path` as a map of format to path.
     pub export_paths: HashMap<ExportType, String>,
-    /// Formatting/export style specified by `style`.
-    pub style: Option<String>,
-    /// Table column width alignment setting (`table.adjust_width`).
-    pub table_adjust_width: bool,
-    /// Table column width adjustment mode string ("true", "false", "auto").
-    pub table_adjust_width_mode: Option<String>,
-    /// Table max column width threshold for alignment when auto mode is enabled.
-    pub table_max_col_width: Option<usize>,
-    /// Table default alignment ("left", "center", "right").
-    pub table_align: Option<String>,
     /// User-defined macro templates, from the `::macros` declaration.
     pub macros: HashMap<String, String>,
     /// The variables declared with `::vars`, in the order written. A later
     /// declaration of a name replaces an earlier one.
     pub vars: Vec<(String, VarDecl)>,
-    /// Imported configuration file paths specified by `import` or `imports` in `::config`.
-    pub imports: Vec<String>,
-    /// Raw key-value entries collected from `::config` element args and value groups.
-    pub entries: Vec<(String, Value)>,
 }
 
 impl DocumentConfig {
@@ -84,24 +69,20 @@ impl DocumentConfig {
     }
 }
 
-/// Returns this document's `::config` and `::settings` settings, and its
-/// `::macros`, merged from all those declarations in the document -- top-level per
-/// [`tomet_tree::for_each_top_level_element`], which still counts a
-/// `::config`/`::settings` that joined an adjacent paragraph
-/// (`docs/spec/syntax.tmt`'s `##[ 区切り ]`), not just a raw `doc.blocks`
-/// walk.
+/// Returns this document's `::export`, `::macros` and `::vars`.
+///
+/// `::export` is read in either form, `(type: commonmark, path: "README.md")` or the same keys in
+/// `{...}`; a `path` is one path for every type, or a map of format to path.
 pub fn document_config(doc: &Document) -> DocumentConfig {
     let mut config = DocumentConfig::default();
 
-    tomet_tree::for_each_top_level_element(doc, |el| {
-        if matches!(
-            classify_std_lenient(el),
-            ElementKind::Declaration(DeclKind::Config | DeclKind::Settings)
-        ) {
-            extract_config_from_element(el, &mut config);
+    for (key, value) in tomet_declaration::document_entries(doc, DeclKind::Export) {
+        match key.as_str() {
+            "type" => process_export_type(&value, &mut config),
+            "path" => process_export_path(&value, &mut config),
+            _ => {}
         }
-    });
-    // The macros and the variables are declarations of their own, read by `tomet-declaration`.
+    }
     config.macros = tomet_declaration::document_macros(doc)
         .into_iter()
         .collect();
@@ -112,131 +93,6 @@ pub fn document_config(doc: &Document) -> DocumentConfig {
     config.export_type.retain(|item| seen.insert(item.clone()));
 
     config
-}
-
-fn extract_config_from_element(el: &Element, config: &mut DocumentConfig) {
-    // 1. Process `(args)` if present
-    if let Some(Value::Map(args_entries)) = normalized_element_args(el) {
-        for (k, v) in args_entries {
-            process_config_entry(&k, &v, config);
-        }
-    }
-
-    // 2. Process the element's value as data -- `{key: value}` pairs.
-    if let Some(Value::Map(entries)) = crate::data::element_data(el) {
-        for (k, v) in &entries {
-            process_config_entry(k, v, config);
-        }
-    }
-}
-
-fn is_truthy(v: &Value) -> bool {
-    match v {
-        Value::Bool(b) => *b,
-        Value::String(s) => matches!(
-            s.trim().to_lowercase().as_str(),
-            "true" | "1" | "yes" | "auto"
-        ),
-        Value::Int(i) => *i != 0,
-        _ => false,
-    }
-}
-
-fn process_config_entry(k: &str, v: &Value, config: &mut DocumentConfig) {
-    // A macro is defined by `::macros`, not by a setting. `tomet check` reports
-    // the retired key; nothing reads it.
-    if k == "macros" || k == "macro" || k.starts_with("macros.") || k.starts_with("macro.") {
-        return;
-    }
-    config.entries.push((k.to_string(), v.clone()));
-
-    match k {
-        "format" => {
-            if let Some(table) = v.get("table") {
-                if let Some(adjust_width) = table.get("adjust_width") {
-                    config.table_adjust_width = is_truthy(adjust_width);
-                    if let Some(s) = adjust_width.as_str() {
-                        config.table_adjust_width_mode = Some(s.to_string());
-                    }
-                }
-                if let Some(n) = table.get("max_col_width").and_then(|m| m.as_i64()) {
-                    config.table_max_col_width = Some(n as usize);
-                }
-                if let Some(s) = table.get("align").and_then(|a| a.as_str()) {
-                    config.table_align = Some(s.to_string());
-                }
-            }
-        }
-        "style" => {
-            if let Some(s) = v.as_str() {
-                config.style = Some(s.to_string());
-            }
-        }
-        "table" => {
-            if let Some(adjust_width) = v.get("adjust_width") {
-                config.table_adjust_width = is_truthy(adjust_width);
-                if let Some(s) = adjust_width.as_str() {
-                    config.table_adjust_width_mode = Some(s.to_string());
-                }
-            }
-            if let Some(n) = v.get("max_col_width").and_then(|m| m.as_i64()) {
-                config.table_max_col_width = Some(n as usize);
-            }
-            if let Some(s) = v.get("align").and_then(|a| a.as_str()) {
-                config.table_align = Some(s.to_string());
-            }
-        }
-        "table.adjust_width" | "table_adjust_width" => {
-            config.table_adjust_width = is_truthy(v);
-            if let Some(s) = v.as_str() {
-                config.table_adjust_width_mode = Some(s.to_string());
-            }
-        }
-        "table.max_col_width" | "table_max_col_width" => {
-            if let Some(n) = v.as_i64() {
-                config.table_max_col_width = Some(n as usize);
-            }
-        }
-        "table.align" | "table_align" => {
-            if let Some(s) = v.as_str() {
-                config.table_align = Some(s.to_string());
-            }
-        }
-        "export" => {
-            if let Value::Map(export_map) = v {
-                for (ek, ev) in export_map {
-                    match ek.as_str() {
-                        "type" => process_export_type(ev, config),
-                        "path" => process_export_path(ev, config),
-                        _ => {}
-                    }
-                }
-            }
-        }
-        // Fallback for flat keys
-        "export_type" => process_export_type(v, config),
-        "export_path" => process_export_path(v, config),
-        _ if k.starts_with("export_path.") => {
-            let format_sub = &k["export_path.".len()..];
-            if let Some(path_str) = clean_path_value(v) {
-                config
-                    .export_paths
-                    .insert(ExportType::parse(format_sub), path_str);
-            }
-        }
-        "import" | "imports" | "file" => {
-            if let Some(s) = v.as_str() {
-                config.imports.push(s.to_string());
-            } else if let Some(items) = v.as_seq() {
-                for item in items {
-                    if let Some(s) = item.as_str() {
-                        config.imports.push(s.to_string());
-                    }
-                }
-            }
-        }
-        _ => {}
-    }
 }
 
 fn process_export_type(v: &Value, config: &mut DocumentConfig) {
@@ -289,11 +145,9 @@ mod tests {
     use tomet_parser::parse_document;
 
     #[test]
-    fn parses_grouped_export_config_args() {
-        let doc = parse_document(
-            "::config(\n  export: {\n    type: commonmark\n    path: \"README.md\"\n  }\n)\n",
-        )
-        .unwrap();
+    fn parses_the_export_declaration_args() {
+        let doc =
+            parse_document("::export(\n  type: commonmark\n  path: \"README.md\"\n)\n").unwrap();
 
         let config = document_config(&doc);
         assert_eq!(config.export_type, vec![ExportType::CommonMark]);
@@ -305,9 +159,9 @@ mod tests {
     }
 
     #[test]
-    fn parses_grouped_export_config_with_sequence_and_map_paths() {
+    fn parses_the_export_declaration_data_with_sequence_and_map_paths() {
         let doc = parse_document(
-            "::config(\n  export: {\n    type: list(commonmark, html)\n    path: {\n      commonmark: \"README.md\"\n      html: \"index.html\"\n    }\n  }\n)\n",
+            "::export{\n  type: list(commonmark, html)\n  path: {\n    commonmark: \"README.md\"\n    html: \"index.html\"\n  }\n}\n",
         )
         .unwrap();
 
@@ -327,18 +181,10 @@ mod tests {
     }
 
     #[test]
-    fn handles_no_config_element() {
+    fn handles_no_declarations() {
         let doc = parse_document("#[ Hello ]\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(config, DocumentConfig::default());
-    }
-
-    #[test]
-    fn parses_table_adjust_width_config() {
-        let doc =
-            parse_document("::settings{\n  table: {\n    adjust_width: true\n  }\n}\n").unwrap();
-        let config = document_config(&doc);
-        assert!(config.table_adjust_width);
     }
 
     #[test]
@@ -353,19 +199,6 @@ mod tests {
             config.macros.get("jira").map(|s| s.as_str()),
             Some("https://jira.org/browse/$1")
         );
-    }
-
-    #[test]
-    fn a_macro_is_not_a_setting() {
-        // The old spelling is retired: `tomet check` reports it, and nothing reads it.
-        for src in [
-            "::config{\n  macros: {\n    gh: \"x\"\n  }\n}\n",
-            "::settings{\n  macros: {\n    gh: \"x\"\n  }\n}\n",
-        ] {
-            let config = document_config(&parse_document(src).unwrap());
-            assert!(config.macros.is_empty(), "{src}");
-            assert!(config.entries.is_empty(), "{src}");
-        }
     }
 
     #[test]

@@ -1,8 +1,6 @@
-::config(
-  export: {
-    type: commonmark,
-    path: "CONTRIBUTING.md"
-  }
+::export(
+  type: commonmark,
+  path: "CONTRIBUTING.md"
 )
 
 ${macro.generated_by(self.path)}

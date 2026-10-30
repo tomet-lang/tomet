@@ -1,8 +1,6 @@
-::config(
-  export: {
-    type: commonmark,
-    path: "README.md"
-  }
+::export(
+  type: commonmark,
+  path: "README.md"
 )
 ::id(doc-readme)
 ::meta{

@@ -648,9 +648,14 @@ mod tests {
     fn a_declaration_is_classified_by_its_double_colon_and_refused_as_an_element() {
         for name in [
             "kind",
+            "id",
             "meta",
-            "config",
-            "settings",
+            "format",
+            "fields",
+            "workspace",
+            "export",
+            "blueprints",
+            "vocabularies",
             "macros",
             "vars",
             "use",

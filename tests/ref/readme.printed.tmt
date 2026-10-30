@@ -1,6 +1,4 @@
-::settings(file: docs/docs.settings.tmt)
-
-::config(export: {type: commonmark, path: README.ja.md})
+::export(type: commonmark, path: README.ja.md)
 
 =[Tomet]
 私のための言語!

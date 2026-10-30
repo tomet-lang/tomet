@@ -410,7 +410,7 @@ mod tests {
         let src = sub.join("doc.tmt");
         fs::write(
             &src,
-            "::config(export: { type: commonmark, path: \"out.md\" })\n\n#[ Title ]\n",
+            "::export(type: commonmark, path: \"out.md\")\n\n#[ Title ]\n",
         )
         .expect("write source");
 
@@ -445,7 +445,7 @@ mod tests {
         fs::write(
             &src,
             format!(
-                "::config(export: {{ type: commonmark, path: \"{}\" }})\n\n#[ Title ]\n",
+                "::export(type: commonmark, path: \"{}\")\n\n#[ Title ]\n",
                 out.display()
             ),
         )
@@ -475,7 +475,7 @@ mod tests {
         .expect("config");
         fs::write(
             dir.join("good.tmt"),
-            "::config(export: { type: commonmark, path: \"good.md\" })\n\n#[ Good ]\n",
+            "::export(type: commonmark, path: \"good.md\")\n\n#[ Good ]\n",
         )
         .expect("good");
         fs::write(dir.join("broken.tmt"), "=[ unterminated\n").expect("broken");
@@ -526,7 +526,7 @@ mod tests {
         let out_file = temp_dir.join("test_out.md");
 
         let src_content = format!(
-            "::config(\n  export: {{\n    type: commonmark\n    path: \"{}\"\n  }}\n)\n=[ Hello Export ]\n",
+            "::export(\n  type: commonmark\n  path: \"{}\"\n)\n=[ Hello Export ]\n",
             out_file.display()
         );
         fs::write(&src_file, src_content).unwrap();

@@ -1,4 +1,4 @@
-::config(
+::format(
   format:json
   /// [ (意図)[formatterが見る。視覚に長けたフォーマットであるために、
   ///   @link(file:tmt/examples/bookmark.tmt)[一行ずつ]]や、@link(file:tmt/examples/scenario.tmt)[エリアだけ改行]などをフォーマッタや出力が合わせるために記入したい。

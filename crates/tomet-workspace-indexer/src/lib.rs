@@ -395,7 +395,7 @@ pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
         tomet_tree::for_each_element(&doc, |el| {
             let kind = classify_std_lenient(el);
             let kind = kind.as_str();
-            if kind == "meta" || kind == "config" {
+            if kind == "meta" {
                 if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
                     for (k, v) in entries {
                         map.insert(format!("{kind}.{k}"), value_to_string(v));
@@ -463,10 +463,8 @@ mod tests {
 
     #[test]
     fn test_is_path_ignored_with_config_from_settings() {
-        let settings_src = r#"::settings{
-  ignore: {
-    files: list("00-09 System/01 Apps/obsidian")
-  }
+        let settings_src = r#"::workspace{
+  ignore: list("00-09 System/01 Apps/obsidian")
 }
 "#;
         let cfg =
@@ -481,11 +479,10 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_metadata_collects_meta_and_config_fields() {
-        let src = "::meta{author: Alice}\n\n::config{lang: en}\n\n#[Doc]\n";
+    fn test_extract_metadata_collects_meta_fields() {
+        let src = "::meta{author: Alice}\n\n#[Doc]\n";
         let map = extract_metadata(src);
         assert_eq!(map.get("meta.author"), Some(&"Alice".to_string()));
-        assert_eq!(map.get("config.lang"), Some(&"en".to_string()));
     }
 
     #[test]

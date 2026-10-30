@@ -316,74 +316,6 @@ fn macro_hover_over_stdio() {
 }
 
 #[test]
-fn macro_hover_does_not_take_macros_from_an_imported_config_over_stdio() {
-    let unique = format!(
-        "tomet_smoke_import_{}_{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    );
-    let dir = std::env::temp_dir().join(unique);
-    std::fs::create_dir_all(&dir).unwrap();
-    let config_path = dir.join("custom.config.tmt");
-    std::fs::write(
-        &config_path,
-        "::macros{\n  youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n}\n",
-    )
-    .unwrap();
-
-    let doc_path = dir.join("journal.tmt");
-    let doc_uri = format!("file://{}", doc_path.display());
-
-    let mut server = Server::start();
-
-    let init = server.send_request(
-        "initialize",
-        json!({"processId": Value::Null, "rootUri": Value::Null, "capabilities": {}}),
-    );
-    assert!(init.get("error").is_none());
-    server.send_notification("initialized", json!({}));
-
-    server.send_notification(
-        "textDocument/didOpen",
-        json!({
-            "textDocument": {
-                "uri": doc_uri,
-                "languageId": "tomet",
-                "version": 1,
-                "text": "::config(import:\"custom.config.tmt\")\n\n@embed($macro.youtube_video(\"Pm_h6FnF8HU\"))[Video]\n",
-            }
-        }),
-    );
-    let _diags = server.read_message();
-
-    let hover_resp = server.send_request(
-        "textDocument/hover",
-        json!({
-            "textDocument": {"uri": doc_uri},
-            "position": {"line": 2, "character": 12},
-        }),
-    );
-    let hover_val = hover_resp["result"]["contents"]["value"]
-        .as_str()
-        .unwrap_or_else(|| panic!("expected hover value string, got {hover_resp:?}"));
-    // Hover shows what rendering shows, and rendering takes its macros from
-    // the document's own `::config` and the vault's settings -- not from a
-    // file the document imports. So the imported macro is not there, and the
-    // hover says so rather than showing a value the output would not have.
-    assert!(
-        hover_val.contains("Error"),
-        "an imported macro is not one rendering knows: {hover_val}"
-    );
-    assert!(!hover_val.contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU"));
-
-    server.shutdown();
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
 fn macro_hover_with_workspace_auto_config_over_stdio() {
     let unique = format!(
         "tomet_smoke_auto_{}_{}",
@@ -456,7 +388,7 @@ fn uuid_vault(name: &str) -> std::path::PathBuf {
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(
         root.join(tomet_load_config::VAULT_CONFIG_FILE),
-        "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n",
+        "::kind(config)\n::fields{ id: { type: uuid } }\n",
     )
     .unwrap();
     root
@@ -584,7 +516,7 @@ fn a_vault_with_a_missing_vocabulary_says_so_in_the_log() {
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(
         root.join(tomet_load_config::VAULT_CONFIG_FILE),
-        "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/missing.vocabulary.tmt\") }\n",
+        "::kind(config)\n::vocabularies{ missing: @file(.tomet/vocabularies/missing.vocabulary.tmt) }\n",
     )
     .unwrap();
     let path = root.join("a.tmt");

@@ -66,12 +66,10 @@ impl Vault {
         // is the one check that needs the path: the validator cannot tell a
         // vault config from any other document by what is in it.
         if !may_set_vault_only(path, doc) {
-            tomet_validator::check_vault_only_settings(
-                doc,
-                tomet_config::is_vault_only_key,
-                &mut diagnostics,
-            );
+            tomet_validator::check_vault_only_declarations(doc, &mut diagnostics);
         }
+
+        diagnostics.extend(self.registry_name_mismatches(doc));
 
         // A `${...}` with no value is not an error: a document showing one
         // as an example is a legitimate document, and `export` leaves it
@@ -111,4 +109,44 @@ fn may_set_vault_only(path: &Path, doc: &Document) -> bool {
     }
     name != Some(tomet_load_config::FOLDER_CONFIG_FILE)
         && tomet_declaration::document_kind(doc).as_deref() == Some("config")
+}
+
+impl Vault {
+    /// The entries of `doc`'s `::blueprints` and `::vocabularies` whose key is not the name the
+    /// registered file gives itself. A file that cannot be read or parsed is not reported here: the
+    /// vault reports that once, where it loads it.
+    fn registry_name_mismatches(&self, doc: &Document) -> Vec<tomet_validator::Diagnostic> {
+        use tomet_declaration::DeclKind;
+
+        let mut out = Vec::new();
+        for found in tomet_declaration::declarations(doc) {
+            let declaration = match found.kind {
+                DeclKind::Blueprints => "blueprints",
+                DeclKind::Vocabularies => "vocabularies",
+                _ => continue,
+            };
+            for (name, path) in tomet_config::registry_entries(doc, found.kind) {
+                let Some(registered) = std::fs::read_to_string(self.root.join(&path))
+                    .ok()
+                    .and_then(|src| tomet_parser::parse_document(&src).ok())
+                else {
+                    continue;
+                };
+                let declared = match found.kind {
+                    DeclKind::Blueprints => tomet_declaration::document_blueprint(&registered),
+                    _ => tomet_semantics::Vocabulary::from_document(&registered)
+                        .map(|vocabulary| vocabulary.namespace),
+                };
+                if declared.as_deref() != Some(name.as_str()) {
+                    out.push(tomet_validator::Diagnostic::RegistryNameMismatch {
+                        declaration,
+                        name,
+                        declared,
+                        span: found.span,
+                    });
+                }
+            }
+        }
+        out
+    }
 }

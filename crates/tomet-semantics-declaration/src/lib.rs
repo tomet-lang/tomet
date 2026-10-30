@@ -47,8 +47,8 @@ pub use check::{Problem, check_declarations};
 pub use declaration::{Declaration, Found, declarations};
 pub use kind::{Cardinality, DeclKind, Host, Scope, Spec};
 pub use read::{
-    blueprint_target, document_blueprint, document_id, document_kind, document_macros,
-    document_meta, document_vars, document_version, id_name, kind_name, macros, meta,
-    version_string,
+    blueprint_target, document_blueprint, document_entries, document_id, document_kind,
+    document_macros, document_meta, document_vars, document_version, id_name, kind_name, macros,
+    meta, version_string,
 };
 pub use vars::{VAR_KEYS, VarDecl, read_var_decls};

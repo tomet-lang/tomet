@@ -18,12 +18,13 @@
 //!   directory holding it -- and the vault-only settings.
 //! - (folder) [`FOLDER_CONFIG_FILE`]: applies to its folder and below, stacked
 //!   from the vault root down to the document.
-//! - (document) the document's own `::config`, applied by [`config_for`].
+//! - (document) the document's own declarations (`::format`, `::fields`, `::macros`, ...), applied
+//!   by [`config_for`].
 //!
 //! The nearer layer wins, key by key; see [`Config::from_layers`] for the
 //! merge. The nearest [`VAULT_CONFIG_FILE`] ends the walk, so an outer vault
-//! never leaks into an inner one. A setting that only the vault may make
-//! (`tomet_config::VAULT_ONLY_GROUPS`) has no effect in a folder or a document
+//! never leaks into an inner one. A declaration that only the vault config may
+//! write (`DeclKind::is_vault_only`: `::workspace`) has no effect in a folder or a document
 //! layer; `tomet check` reports it.
 //!
 //! These two names are the only ones. Every user of them, in code and in
@@ -110,7 +111,7 @@ fn find_stack(start: &Path) -> Option<Stack> {
 ///
 /// Returns `(Config, vault_config_path, vault_directory_path)`. The `Config` is
 /// the vault config with every [`FOLDER_CONFIG_FILE`] between the vault root and
-/// `start` laid over it; the document's own `::config` is not part of it (that
+/// `start` laid over it; the document's own declarations are not part of it (that
 /// is [`config_for`]'s).
 pub fn find_config_file(start: &Path) -> Option<(Config, PathBuf, PathBuf)> {
     let stack = find_stack(start)?;
@@ -134,9 +135,9 @@ pub fn load_config_from_file(path: &Path) -> Result<Config, ConfigError> {
 /// The config that governs `path`, for a tool about to act on `src`.
 ///
 /// The vault config, then each folder config down to `path`, then the
-/// document's own `::config` on top, each layer winning over the ones before
+/// document's own declarations on top, each layer winning over the ones before
 /// it. With no vault to find there are no file layers: the document's own
-/// `::config` is used, and failing that the defaults.
+/// declarations are used, and failing that the defaults.
 pub fn config_for(path: Option<&Path>, src: &str) -> Config {
     let mut layers = path
         .and_then(find_stack)
@@ -199,12 +200,9 @@ mod tests {
         let dir = Dir::new("old");
         dir.write(
             "default.config.tmt",
-            "::config{ format: { link: { no_space: true } } }\n",
+            "::format{ link: { no_space: true } }\n",
         );
-        dir.write(
-            "tomet.config.tmt",
-            "::config{ format: { link: { no_space: true } } }\n",
-        );
+        dir.write("tomet.config.tmt", "::format{ link: { no_space: true } }\n");
         let note = dir.write("note.tmt", "");
         assert!(find_config_file(&note).is_none());
     }
@@ -224,15 +222,15 @@ mod tests {
         let dir = Dir::new("stack");
         dir.write(
             VAULT_CONFIG_FILE,
-            "::config{ format: { table: { max_col_width: 50 }, link: { no_space: true } } }\n::macros{ m: \"vault\", v: \"vault\" }\n",
+            "::format{ table: { max_col_width: 50 }, link: { no_space: true } }\n::macros{ m: \"vault\", v: \"vault\" }\n",
         );
         dir.write(
             "a/.config.tmt",
-            "::config{ format: { table: { max_col_width: 60 } } }\n::macros{ m: \"outer\" }\n",
+            "::format{ table: { max_col_width: 60 } }\n::macros{ m: \"outer\" }\n",
         );
         dir.write(
             "a/b/.config.tmt",
-            "::config{ format: { table: { max_col_width: 70 } } }\n::macros{ m: \"inner\" }\n",
+            "::format{ table: { max_col_width: 70 } }\n::macros{ m: \"inner\" }\n",
         );
         let deep = dir.write("a/b/note.tmt", "");
         let shallow = dir.write("a/note.tmt", "");
@@ -256,11 +254,11 @@ mod tests {
         let dir = Dir::new("rootfolder");
         dir.write(
             VAULT_CONFIG_FILE,
-            "::config{ format: { table: { max_col_width: 50 } } }\n",
+            "::format{ table: { max_col_width: 50 } }\n",
         );
         dir.write(
             FOLDER_CONFIG_FILE,
-            "::config{ format: { table: { max_col_width: 90 } } }\n",
+            "::format{ table: { max_col_width: 90 } }\n",
         );
         let note = dir.write("note.tmt", "");
         let (cfg, _, _) = find_config_file(&note).unwrap();
@@ -270,10 +268,7 @@ mod tests {
     #[test]
     fn the_nearest_vault_config_ends_the_walk() {
         let dir = Dir::new("nested");
-        dir.write(
-            VAULT_CONFIG_FILE,
-            "::config{ format: { link: { no_space: true } } }\n",
-        );
+        dir.write(VAULT_CONFIG_FILE, "::format{ link: { no_space: true } }\n");
         dir.write("inner/vault.config.tmt", "::kind(config)\n");
         let note = dir.write("inner/note.tmt", "");
         let (cfg, file, root) = find_config_file(&note).unwrap();
@@ -290,11 +285,11 @@ mod tests {
         let dir = Dir::new("vaultonly");
         dir.write(
             VAULT_CONFIG_FILE,
-            "::config{ workspace: { ignore: list(\"target\") } }\n",
+            "::workspace{ ignore: list(\"target\") }\n",
         );
         dir.write(
             "a/.config.tmt",
-            "::config{ workspace: { ignore: list(\"elsewhere\") }, format: { link: { no_space: true } } }\n",
+            "::workspace{ ignore: list(\"elsewhere\") }\n::format{ link: { no_space: true } }\n",
         );
         let note = dir.write("a/note.tmt", "");
         let (cfg, _, _) = find_config_file(&note).unwrap();
@@ -310,10 +305,10 @@ mod tests {
         let dir = Dir::new("document");
         dir.write(
             VAULT_CONFIG_FILE,
-            "::config{ format: { table: { max_col_width: 50 }, link: { no_space: true } } }\n",
+            "::format{ table: { max_col_width: 50 }, link: { no_space: true } }\n",
         );
         let note = dir.write("note.tmt", "");
-        let src = "::config{ format: { table: { max_col_width: 99 } } }\n";
+        let src = "::format{ table: { max_col_width: 99 } }\n";
         let cfg = config_for(Some(&note), src);
         assert_eq!(cfg.format.table_max_col_width, Some(99));
         assert!(cfg.format.link_no_space);
@@ -323,10 +318,7 @@ mod tests {
     fn without_a_vault_the_document_config_alone_applies() {
         let dir = Dir::new("lone");
         let note = dir.write("note.tmt", "");
-        let cfg = config_for(
-            Some(&note),
-            "::config{ format: { link: { no_space: true } } }\n",
-        );
+        let cfg = config_for(Some(&note), "::format{ link: { no_space: true } }\n");
         assert!(cfg.format.link_no_space);
     }
 }

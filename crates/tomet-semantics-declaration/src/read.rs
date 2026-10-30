@@ -127,6 +127,15 @@ pub fn document_meta(doc: &Document) -> Option<Value> {
     meta(&first(doc, DeclKind::Meta)?)
 }
 
+/// The `(name, value)` entries of the document's first declaration of `kind` whose body is a map
+/// (`::format{ ... }`, `::fields{ ... }`, `::blueprints{ ... }`): `(args)` first, then `{data}`.
+/// Empty when the document does not write it.
+pub fn document_entries(doc: &Document, kind: DeclKind) -> Vec<(String, Value)> {
+    first(doc, kind)
+        .map(|found| entries(&found))
+        .unwrap_or_default()
+}
+
 /// Every macro the document defines, in the order written; a name defined twice appears twice,
 /// and the later one is the one that stands.
 pub fn document_macros(doc: &Document) -> Vec<(String, String)> {

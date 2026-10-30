@@ -34,7 +34,7 @@ pub use groups::{
     FieldConfig, FormatConfig, GroupOrder, MetaConfig, RegistryConfig, WorkspaceConfig, format,
     meta, registry, workspace,
 };
-pub use layer::{ConfigLayer, VAULT_ONLY_GROUPS, is_vault_only_key};
+pub use layer::{ConfigLayer, registry_entries};
 pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
 pub use tomet_spec_derive::Config;
 
@@ -59,21 +59,21 @@ pub struct Config {
 pub type PrinterConfig = Config;
 
 impl Config {
+    /// The config one file declares, with nothing under or over it.
     pub fn from_doc(doc: &Document) -> Self {
-        let config = tomet_semantics::document_config(doc);
-        Self::from_document_config(&config)
+        Self::from_layers([&ConfigLayer::from_doc(doc)])
     }
 
     /// The config a stack of layers comes to, outermost first: the inner layer
     /// wins, key by key (a map merges; a list or a scalar is replaced), and a
-    /// macro or variable is replaced by name. Built once from the merged value
-    /// tree, see [`ConfigLayer`].
+    /// macro, a variable or a registered name is replaced by name. Built once
+    /// from the merged value trees, see [`ConfigLayer`].
     pub fn from_layers<'a>(layers: impl IntoIterator<Item = &'a ConfigLayer>) -> Self {
         let mut merged = ConfigLayer::default();
         for layer in layers {
             merged.push_inner(layer);
         }
-        Self::from_document_config(&merged.config)
+        Self::from_merged(&merged)
     }
 
     /// Returns the configured group order for a specific element name (e.g. "link"),
@@ -82,30 +82,33 @@ impl Config {
         self.format.element_group_order(element_name)
     }
 
-    pub fn from_document_config(config: &tomet_semantics::DocumentConfig) -> Self {
-        let mut normalized_entries = Vec::new();
-        for (k, v) in &config.entries {
-            if k == "format" {
-                if let Value::Map(map) = v {
-                    for (sub_k, sub_v) in map {
-                        merge_entry(&mut normalized_entries, sub_k, sub_v);
-                    }
-                }
-            } else if let Some(sub_k) = k.strip_prefix("format.") {
-                merge_entry(&mut normalized_entries, sub_k, v);
-            } else {
-                merge_entry(&mut normalized_entries, k, v);
-            }
+    /// Reads the typed groups off one value tree assembled from the declarations: `::format` is
+    /// the root, the `::fields` are its `meta` map (beside the `meta` formatting hints), the
+    /// `::workspace` its `workspace` map, and the registries lists of paths.
+    fn from_merged(layer: &ConfigLayer) -> Self {
+        let mut root = Vec::new();
+        for (key, value) in layer.format() {
+            merge_entry(&mut root, key, value);
         }
-
-        let root = Value::Map(normalized_entries);
+        for (name, definition) in layer.fields() {
+            let field = Value::Map(vec![(name.clone(), definition.clone())]);
+            merge_entry(&mut root, "meta", &field);
+        }
+        for (key, value) in layer.workspace() {
+            let entry = Value::Map(vec![(key.clone(), value.clone())]);
+            merge_entry(&mut root, "workspace", &entry);
+        }
+        let paths = |paths: Vec<String>| Value::Seq(paths.into_iter().map(Value::String).collect());
+        root.push(("blueprints".to_string(), paths(layer.blueprint_paths())));
+        root.push(("vocabularies".to_string(), paths(layer.vocabulary_paths())));
+        let root = Value::Map(root);
 
         Self {
             format: FormatConfig::from_root(&root),
             meta: MetaConfig::from_root(&root),
             workspace: WorkspaceConfig::from_root(&root),
-            macros: config.macros.clone(),
-            vars: config.vars.clone(),
+            macros: layer.macros().clone(),
+            vars: layer.vars().to_vec(),
             registry: RegistryConfig::from_root(&root),
         }
     }
@@ -116,25 +119,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_settings_field_config_parsing() {
-        let settings_src = r#"::settings{
-  meta: {
-    aliases: {
-      type: list
-      always_newline: true
-    }
-    created: {
-      type: datetime
-      format: rfc3339
-    }
-    modified: {
-      type: datetime
-      format: rfc3339
-    }
+    fn test_fields_declaration_parsing() {
+        let src = r#"::fields{
+  aliases: {
+    type: list
+    always_newline: true
+  }
+  created: {
+    type: datetime
+    format: rfc3339
+  }
+  modified: {
+    type: datetime
+    format: rfc3339
   }
 }
 "#;
-        let cfg = load_config_from_str(settings_src).unwrap();
+        let cfg = load_config_from_str(src).unwrap();
         assert!(cfg.meta.fields.get("aliases").unwrap().always_newline);
         assert_eq!(
             cfg.meta.fields.get("created").unwrap().format.as_deref(),
@@ -148,7 +149,7 @@ mod tests {
 
     #[test]
     fn callout_style_is_read_from_format_and_no_longer_from_elements() {
-        let live = r#"::config{ format: { callout: { style: { content: block } } } }
+        let live = r#"::format{ callout: { style: { content: block } } }
 "#;
         assert_eq!(
             load_config_from_str(live)
@@ -158,7 +159,7 @@ mod tests {
             Some("block".to_string())
         );
 
-        let retired = r#"::config{ elements: { callout: { style: { content: block } } } }
+        let retired = r#"::format{ elements: { callout: { style: { content: block } } } }
 "#;
         assert_eq!(
             load_config_from_str(retired)
@@ -170,14 +171,12 @@ mod tests {
     }
 
     #[test]
-    fn test_ignore_files_config_parsing() {
-        let settings_src = r#"::settings{
-  ignore: {
-    files: list("00-09 System/01 Apps/obsidian")
-  }
+    fn test_workspace_ignore_parsing() {
+        let src = r#"::workspace{
+  ignore: list("00-09 System/01 Apps/obsidian")
 }
 "#;
-        let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
+        let cfg = load_config_from_str(src).expect("failed to parse the workspace");
         assert_eq!(
             cfg.workspace.ignore,
             vec!["00-09 System/01 Apps/obsidian".to_string()]
@@ -186,54 +185,44 @@ mod tests {
 
     #[test]
     fn test_heading_and_link_spacing_config() {
-        let src = r#"::config(
-  format: {
-    heading: { space_inside_brackets: true }
-    link: { no_space: true }
-  }
+        let src = r#"::format(
+  heading: { space_inside_brackets: true }
+  link: { no_space: true }
 )
 "#;
-        let cfg = load_config_from_str(src).expect("failed to parse config");
+        let cfg = load_config_from_str(src).expect("failed to parse format");
         assert!(cfg.format.heading_space_inside_brackets);
         assert!(cfg.format.link_no_space);
     }
 
     #[test]
     fn test_group_order_config() {
-        let src1 = r#"::config(
-  format: {
-    element: { group_order: "content_first" }
-  }
+        let src1 = r#"::format(
+  element: { group_order: "content_first" }
 )
 "#;
-        let cfg1 = load_config_from_str(src1).expect("failed to parse config");
+        let cfg1 = load_config_from_str(src1).expect("failed to parse format");
         assert_eq!(cfg1.format.group_order, Some(GroupOrder::ContentFirst));
 
-        let src2 = r#"::config(
-  format: {
-    group_order: "[]()"
-  }
+        let src2 = r#"::format(
+  group_order: "[]()"
 )
 "#;
-        let cfg2 = load_config_from_str(src2).expect("failed to parse config");
+        let cfg2 = load_config_from_str(src2).expect("failed to parse format");
         assert_eq!(cfg2.format.group_order, Some(GroupOrder::ContentFirst));
 
-        let src3 = r#"::config(
-  format: {
-    group_order: "args_first"
-  }
+        let src3 = r#"::format(
+  group_order: "args_first"
 )
 "#;
-        let cfg3 = load_config_from_str(src3).expect("failed to parse config");
+        let cfg3 = load_config_from_str(src3).expect("failed to parse format");
         assert_eq!(cfg3.format.group_order, Some(GroupOrder::ArgsFirst));
 
-        let src4 = r#"::config(
-  format: {
-    link: { group_order: "content_first" }
-  }
+        let src4 = r#"::format(
+  link: { group_order: "content_first" }
 )
 "#;
-        let cfg4 = load_config_from_str(src4).expect("failed to parse config");
+        let cfg4 = load_config_from_str(src4).expect("failed to parse format");
         assert_eq!(cfg4.format.link_group_order, Some(GroupOrder::ContentFirst));
         assert_eq!(cfg4.format.group_order, None);
         assert_eq!(
@@ -242,14 +231,12 @@ mod tests {
         );
         assert_eq!(cfg4.element_group_order("other"), None);
 
-        let src5 = r#"::config(
-  format: {
-    element: { group_order: "args_first" }
-    link: { group_order: "[]()" }
-  }
+        let src5 = r#"::format(
+  element: { group_order: "args_first" }
+  link: { group_order: "[]()" }
 )
 "#;
-        let cfg5 = load_config_from_str(src5).expect("failed to parse config");
+        let cfg5 = load_config_from_str(src5).expect("failed to parse format");
         assert_eq!(cfg5.format.group_order, Some(GroupOrder::ArgsFirst));
         assert_eq!(cfg5.format.link_group_order, Some(GroupOrder::ContentFirst));
         assert_eq!(
@@ -264,7 +251,7 @@ mod tests {
 
     #[test]
     fn test_dot_notation_variants() {
-        let src_deep_dot = r#"::config{
+        let src_deep_dot = r#"::format{
   callout.style.content: "quote"
   list.multiline.style.content: "box"
   table.adjust_width: true
@@ -272,7 +259,7 @@ mod tests {
   table.align: "center"
 }
 "#;
-        let cfg = load_config_from_str(src_deep_dot).expect("failed to parse deep dot config");
+        let cfg = load_config_from_str(src_deep_dot).expect("failed to parse deep dot format");
         assert_eq!(cfg.format.callout_content_style.as_deref(), Some("quote"));
         assert_eq!(
             cfg.format.list_multiline_style_content.as_deref(),
@@ -282,7 +269,7 @@ mod tests {
         assert_eq!(cfg.format.table_max_col_width, Some(80));
         assert_eq!(cfg.format.table_align.as_deref(), Some("center"));
 
-        let src_mixed = r#"::config{
+        let src_mixed = r#"::format{
   callout: {
     style.content: "custom"
   }
@@ -291,7 +278,7 @@ mod tests {
   }
 }
 "#;
-        let cfg_mixed = load_config_from_str(src_mixed).expect("failed to parse mixed config");
+        let cfg_mixed = load_config_from_str(src_mixed).expect("failed to parse mixed format");
         assert_eq!(
             cfg_mixed.format.callout_content_style.as_deref(),
             Some("custom")
@@ -300,33 +287,23 @@ mod tests {
             cfg_mixed.format.list_multiline_style_content.as_deref(),
             Some("bullet")
         );
-
-        let src_format = r#"::config{
-  format.callout.style.content: "formatted"
-  format.table.max_col_width: 100
-}
-"#;
-        let cfg_fmt = load_config_from_str(src_format).expect("failed to parse format config");
-        assert_eq!(
-            cfg_fmt.format.callout_content_style.as_deref(),
-            Some("formatted")
-        );
-        assert_eq!(cfg_fmt.format.table_max_col_width, Some(100));
     }
 
     #[test]
     fn test_dot_notation_meta_and_merge() {
-        let src = r#"::config{
+        let src = r#"::format{
   meta.always_newline: true
-  meta: {
-    url.wiki: { type: list, always_newline: true }
-    title: { length: 70 }
-  }
-  workspace.ignore: list("target", "build")
-  workspace.unswept: list("tests/fixtures")
+}
+::fields{
+  url.wiki: { type: list, always_newline: true }
+  title: { length: 70 }
+}
+::workspace{
+  ignore: list("target", "build")
+  unswept: list("tests/fixtures")
 }
 "#;
-        let cfg = load_config_from_str(src).expect("failed to parse meta and workspace config");
+        let cfg = load_config_from_str(src).expect("failed to parse meta and workspace");
         assert!(cfg.meta.always_newline);
         assert!(cfg.meta.fields.contains_key("url.wiki"));
         assert!(cfg.meta.fields.get("url.wiki").unwrap().always_newline);

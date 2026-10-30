@@ -82,7 +82,7 @@ pub fn clear_vault_files() {
 }
 
 fn prepare_document(mut doc: tomet::ast::Document, opts: &ProcessOptions) -> tomet::ast::Document {
-    // 1. Inject external workspace config (e.g. default.config.tmt) if provided
+    // 1. Inject the macros and variables of an external workspace config, if provided
     if let Some(cfg_src) = &opts.config
         && let Ok(cfg_doc) = parse_plain(cfg_src)
     {
@@ -93,8 +93,7 @@ fn prepare_document(mut doc: tomet::ast::Document, opts: &ProcessOptions) -> tom
                 if matches!(
                     kind,
                     tomet::semantics::ElementKind::Declaration(
-                        tomet::declaration::DeclKind::Config
-                            | tomet::declaration::DeclKind::Settings
+                        tomet::declaration::DeclKind::Macros | tomet::declaration::DeclKind::Vars
                     )
                 ) {
                     prefix_blocks.push(block);

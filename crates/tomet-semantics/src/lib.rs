@@ -14,7 +14,7 @@
 //!   | their slots, how often each may be written, what reading one gives -- is
 //!   | `tomet-declaration`'s, so a `.ctmt` file reads them the same way. This crate keeps
 //!   | what only a tomet document does with them: [`ElementKind::Declaration`] classifies one,
-//!   | [`DocumentConfig`] fills the settings from `::config` and `::settings`, and a vocabulary
+//!   | [`DocumentConfig`] fills the export settings from `::export`, and a vocabulary
 //!   | binds through `::use`. Which elements carry an address (`@link`, `@embed`, `@file`,
 //!   | `@dir`) is `tomet-address`'s.
 //!
@@ -29,11 +29,10 @@
 //!   | prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
 //! - **Positional Argument Normalization (`positional`))
 //!   | Unifies positional argument mapping
-//!   | (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and `::settings` custom schemas.
+//!   | (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and vocabulary-declared schemas.
 //! - (Document Configuration (`config`))
-//!   | Merges `::config` and `::settings` blocks across
-//!   | a document into a structured [`DocumentConfig`], with the `::macros` and `::vars` it
-//!   | declares.
+//!   | Reads a document's `::export` into a structured [`DocumentConfig`], with the `::macros` and
+//!   | `::vars` it declares.
 //! - (Structural Helpers)
 //!   | Heading level clamping (`heading`) and
 //!   | table parsing (`table`).

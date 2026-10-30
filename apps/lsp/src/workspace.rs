@@ -279,7 +279,7 @@ mod tests {
     fn a_field_type_the_settings_declare_is_checked() {
         let root = vault(
             "types",
-            "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n",
+            "::kind(config)\n::fields{ id: { type: uuid } }\n",
             &[],
         );
         let path = root.join("a.tmt");
@@ -305,7 +305,7 @@ mod tests {
     fn the_vaults_vocabulary_is_in_scope() {
         let root = vault(
             "vocab",
-            "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
+            "::kind(config)\n::vocabularies{ deck: @file(.tomet/vocabularies/deck.vocabulary.tmt) }\n",
             &[(
                 ".tomet/vocabularies/deck.vocabulary.tmt",
                 "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ card: {} }\n",
@@ -395,7 +395,7 @@ mod tests {
 
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n",
+            "::kind(config)\n::fields{ id: { type: uuid } }\n",
         )
         .unwrap();
         ws.files_changed();
@@ -421,7 +421,7 @@ mod tests {
     fn a_vault_complaint_is_made_once_until_it_is_fixed_and_broken_again() {
         let root = vault(
             "notices",
-            "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/missing.vocabulary.tmt\") }\n",
+            "::kind(config)\n::vocabularies{ missing: @file(.tomet/vocabularies/missing.vocabulary.tmt) }\n",
             &[],
         );
         let path = root.join("a.tmt");
@@ -541,7 +541,7 @@ mod tests {
     fn at_offers_the_elements_of_the_vocabulary_in_scope() {
         let root = vault(
             "at",
-            "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
+            "::kind(config)\n::vocabularies{ deck: @file(.tomet/vocabularies/deck.vocabulary.tmt) }\n",
             &[(".tomet/vocabularies/deck.vocabulary.tmt", DECK)],
         );
         let in_deck = completions_at_the_end(&root, "::kind(deck)\n\n@");

@@ -1,6 +1,4 @@
-::settings(file: docs/docs.settings.tmt)
-
-::config(style: structural)
+::format(style: structural)
 
 ::meta{key: value, type: person}
 

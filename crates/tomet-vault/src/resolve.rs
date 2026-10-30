@@ -11,16 +11,16 @@ use tomet_type::Type;
 
 /// The document's `::meta`, typed by the settings' `meta` declarations.
 ///
-/// - a `list` field is a list: a lone value is wrapped, and the list is
-///   empty when the document lacks the field;
-/// - a `datetime` field is a datetime when its text reads as one, and stays
-///   text when it does not (`tomet check` is what reports the bad one, by
-///   the same `parse_datetime`);
-/// - a field whose type is text (`string`, `version`, `uuid`, `nanoid`) is the
-///   text it was written as, so `rev: 1.10` is `"1.10"` and not `1.1`;
-/// - every other declared field is `Null` when the document lacks it;
-/// - a key that is neither declared nor written is absent from the map, so
-///   reading it is an error and a typo cannot turn into an answer of "no".
+/// -| a `list` field is a list: a lone value is wrapped, and the list is
+///  | empty when the document lacks the field;
+/// -| a `datetime` field is a datetime when its text reads as one, and stays
+///  | text when it does not (`tomet check` is what reports the bad one, by
+///  | the same `parse_datetime`);
+/// -| a field whose type is text (`string`, `version`, `uuid`, `nanoid`) is the
+///  | text it was written as, so `rev: 1.10` is `"1.10"` and not `1.1`;
+/// -| every other declared field is `Null` when the document lacks it;
+/// -| a key that is neither declared nor written is absent from the map, so
+///  | reading it is an error and a typo cannot turn into an answer of "no".
 ///
 /// Keys the document writes without declaring them are kept as written.
 pub fn typed_meta(config: &PrinterConfig, doc: &Document, doc_ref: &DocRef) -> EvalValue {
@@ -117,14 +117,12 @@ mod tests {
         tomet_config::load_config_from_str(settings).expect("valid settings")
     }
 
-    const SETTINGS: &str = "::settings{
-  meta: {
-    tags: { type: list }
-    created: { type: datetime, format: rfc3339 }
-    title: { type: string }
-    rev: { type: version }
-    note: { always_newline: true }
-  }
+    const SETTINGS: &str = "::fields{
+  tags: { type: list }
+  created: { type: datetime, format: rfc3339 }
+  title: { type: string }
+  rev: { type: version }
+  note: { always_newline: true }
 }
 ";
 

@@ -394,7 +394,7 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/vocabularies")).unwrap();
         fs::write(
             dir.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
+            "::kind(config)\n::vocabularies{ deck: @file(.tomet/vocabularies/deck.vocabulary.tmt) }\n",
         )
         .unwrap();
         fs::write(
@@ -473,7 +473,7 @@ mod tests {
         let root = vault("ctmt_unswept");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::config{ workspace: { unswept: list(\"frozen\") } }\n",
+            "::kind(config)\n::workspace{ unswept: list(\"frozen\") }\n",
         )
         .unwrap();
         fs::create_dir_all(root.join("frozen")).unwrap();
@@ -491,7 +491,7 @@ mod tests {
         let root = vault("uuid");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n",
+            "::kind(config)\n::fields{ id: { type: uuid } }\n",
         )
         .unwrap();
         fs::write(
@@ -508,7 +508,7 @@ mod tests {
         // The same document is fine where the settings declare nothing.
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::config{}\n",
+            "::kind(config)\n::format{}\n",
         )
         .unwrap();
         check(&root.join("bad.tmt"), false, true, false).expect("nothing declares `id`");
@@ -608,7 +608,7 @@ mod tests {
         let root = vault("blueprint_check");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(settings)\n::settings{\n  blueprints: list(\"bp.tmt\")\n}\n",
+            "::kind(config)\n::blueprints{ bp: @file(bp.tmt) }\n",
         )
         .unwrap();
         fs::write(

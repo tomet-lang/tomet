@@ -17,62 +17,58 @@
   copyright: "(C) 2026 Tomet Projects"
   generated_by: "<!-- Generated from ${1}. Edit that, then `tomet export .`. -->"
 }
-::config{
-  format: {
-    meta: { always_newline: true }
-    heading: { space_inside_brackets: true }
-    table: { adjust_width: auto, max_col_width: 50 }
-    link: {
-      no_space: true
-      group_order: "[]()"
-    }
-    quote: { always_newline: true }
-    callout: {
-      style: { content: block }
-    }
-    list: {
-      multiline: {
-        style: { content: box }
-      }
+::format{
+  meta: { always_newline: true }
+  heading: { space_inside_brackets: true }
+  table: { adjust_width: auto, max_col_width: 50 }
+  link: {
+    no_space: true
+    group_order: "[]()"
+  }
+  quote: { always_newline: true }
+  callout: {
+    style: { content: block }
+  }
+  list: {
+    multiline: {
+      style: { content: box }
     }
   }
+}
+::fields{
+  aliases: { type: list, always_newline: true }
+  created: { type: datetime, format: rfc3339, offset: "+09:00" }
+  modified: { type: datetime, format: rfc3339, offset: "+09:00" }
+  topics: { type: list, list_type: "@link", always_newline: false }
+  url.wiki: { type: list, always_newline: true }
+  url.source: { type: list, always_newline: true }
+  url.main: { type: list, always_newline: true }
+}
+::blueprints{
+  writ: @file(tmtroot/schema/blueprints/writ.blueprint.tmt)
+  element: @file(tmtroot/schema/blueprints/element.blueprint.tmt)
+  crate: @file(tmtroot/schema/blueprints/crate.blueprint.tmt)
+}
+::vocabularies{
+  writ: @file(tmtroot/schema/vocabularies/writ.vocabulary.tmt)
+  bookmark: @file(tmtroot/schema/vocabularies/bookmark.vocabulary.tmt)
+  node-graph: @file(tmtroot/schema/vocabularies/node-graph.vocabulary.tmt)
+  scenario: @file(tmtroot/schema/vocabularies/scenario.vocabulary.tmt)
+  video: @file(tmtroot/schema/vocabularies/video.vocabulary.tmt)
+  idea: @file(tmtroot/schema/vocabularies/idea.vocabulary.tmt)
+  roots: @file(tmtroot/schema/vocabularies/roots.vocabulary.tmt)
+}
+::workspace{
+  ignore: list( "00-09 System/01 Apps/obsidian" )
+  unswept: list( "tests/fixtures", "tests/ref", "tests/store" )
+}
+::migration{
   meta: {
-    aliases: { type: list, always_newline: true }
-    created: { type: datetime, format: rfc3339, offset: "+09:00" }
-    modified: { type: datetime, format: rfc3339, offset: "+09:00" }
-    topics: { type: list, list_type: "@link", always_newline: false }
-    url.wiki: { type: list, always_newline: true }
-    url.source: { type: list, always_newline: true }
-    url.main: { type: list, always_newline: true }
+    created: { type: datetime, format: iso8601 }
+    updated: { type: datetime, format: iso8601, merge: modified }
   }
-  blueprints: list(
-    "tmtroot/schema/blueprints/writ.blueprint.tmt",
-    "tmtroot/schema/blueprints/element.blueprint.tmt",
-    "tmtroot/schema/blueprints/crate.blueprint.tmt",
-    "docs/examples/blueprints/daily-note.blueprint.tmt",
-    "docs/examples/blueprints/rfc.blueprint.tmt",
-  )
-  vocabularies: list(
-    "tmtroot/schema/vocabularies/writ.vocabulary.tmt",
-    "tmtroot/schema/vocabularies/bookmark.vocabulary.tmt",
-    "tmtroot/schema/vocabularies/node-graph.vocabulary.tmt",
-    "tmtroot/schema/vocabularies/scenario.vocabulary.tmt",
-    "tmtroot/schema/vocabularies/video.vocabulary.tmt",
-    "tmtroot/schema/vocabularies/idea.vocabulary.tmt",
-    "tmtroot/schema/vocabularies/roots.vocabulary.tmt",
-  )
-  workspace: {
-    ignore: list( "00-09 System/01 Apps/obsidian" )
-    unswept: list( "tests/fixtures", "tests/ref", "tests/store" )
-  }
-  migration: {
-    meta: {
-      created: { type: datetime, format: iso8601 }
-      updated: { type: datetime, format: iso8601, merge: modified }
-    }
-    url: {
-      args: { label: force }
-      style: link
-    }
+  url: {
+    args: { label: force }
+    style: link
   }
 }

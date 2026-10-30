@@ -4,7 +4,7 @@
 /// A standard declaration: what `::name` can be, for a name the language gives a meaning.
 ///
 /// Closed on purpose. The standard declarations are the language's own, and a host matches on
-/// this to do what only it knows (a `.tmt` binds a vocabulary for `Use`, a vault reads `Config`);
+/// this to do what only it knows (a `.tmt` binds a vocabulary for `Use`, a vault reads `Workspace`);
 /// a user's own preamble element is a vocabulary's, and is not here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DeclKind {
@@ -16,10 +16,21 @@ pub enum DeclKind {
     Version,
     /// `::meta{ ... }`: information about the document.
     Meta,
-    /// `::config{ ... }`: settings for the document or the vault it sits in.
-    Config,
-    /// `::settings{ ... }`: the same, in the file that holds a vault's.
-    Settings,
+    /// `::format{ ... }`: how documents are formatted: the rules `tomet format` and the printers follow.
+    Format,
+    /// `::fields{ name: { type, ... } }`: the `::meta` fields this vault or folder declares: their types and shapes.
+    Fields,
+    /// `::workspace{ ignore, unswept }`: which paths are part of the vault. Only the vault config may write it.
+    Workspace,
+    /// `::export{ type, path }`: where and in which formats this document is exported.
+    Export,
+    /// `::blueprints{ name: @file(path) }`: the blueprints this vault or folder registers.
+    Blueprints,
+    /// `::vocabularies{ name: @file(path) }`: the vocabularies this vault or folder registers.
+    Vocabularies,
+    /// `::migration{ ... }`: the settings of the migration tool. `tomet` reads nothing from it; it is
+    /// registered so that the vault config may carry it until the tool declares its own vocabulary.
+    Migration,
     /// `::macros{ name: "template" }`: the macros this document or vault defines.
     Macros,
     /// `::vars{ name: { type, default, about } }`: the variables this document or vault declares.
@@ -85,10 +96,13 @@ pub struct Spec {
     pub positional: &'static [&'static str],
     pub cardinality: Cardinality,
     pub scope: Scope,
+    /// Whether only the vault config may write it. A folder config or a document that writes it is
+    /// reported by `tomet check`, and the loader ignores it.
+    pub vault_only: bool,
 }
 
 /// Every standard declaration, in the order they are listed to people.
-const SPECS: [Spec; 12] = [
+const SPECS: [Spec; 17] = [
     Spec {
         kind: DeclKind::Kind,
         name: "kind",
@@ -97,6 +111,7 @@ const SPECS: [Spec; 12] = [
         positional: &["kind", "version"],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        vault_only: false,
     },
     Spec {
         kind: DeclKind::Id,
@@ -106,6 +121,7 @@ const SPECS: [Spec; 12] = [
         positional: &["id"],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        vault_only: false,
     },
     Spec {
         kind: DeclKind::Version,
@@ -113,6 +129,7 @@ const SPECS: [Spec; 12] = [
         positional: &["version"],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        vault_only: false,
     },
     Spec {
         kind: DeclKind::Meta,
@@ -120,20 +137,63 @@ const SPECS: [Spec; 12] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        vault_only: false,
     },
     Spec {
-        kind: DeclKind::Config,
-        name: "config",
+        kind: DeclKind::Format,
+        name: "format",
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        vault_only: false,
     },
     Spec {
-        kind: DeclKind::Settings,
-        name: "settings",
+        kind: DeclKind::Fields,
+        name: "fields",
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        vault_only: false,
+    },
+    Spec {
+        kind: DeclKind::Workspace,
+        name: "workspace",
+        positional: &[],
+        cardinality: Cardinality::Once,
+        scope: Scope::Tmt,
+        vault_only: true,
+    },
+    Spec {
+        kind: DeclKind::Export,
+        name: "export",
+        positional: &[],
+        cardinality: Cardinality::Once,
+        scope: Scope::Tmt,
+        vault_only: false,
+    },
+    Spec {
+        kind: DeclKind::Blueprints,
+        name: "blueprints",
+        positional: &[],
+        cardinality: Cardinality::Once,
+        scope: Scope::Tmt,
+        vault_only: false,
+    },
+    Spec {
+        kind: DeclKind::Vocabularies,
+        name: "vocabularies",
+        positional: &[],
+        cardinality: Cardinality::Once,
+        scope: Scope::Tmt,
+        vault_only: false,
+    },
+    Spec {
+        kind: DeclKind::Migration,
+        name: "migration",
+        positional: &[],
+        cardinality: Cardinality::Once,
+        scope: Scope::Tmt,
+        vault_only: false,
     },
     Spec {
         kind: DeclKind::Macros,
@@ -141,6 +201,7 @@ const SPECS: [Spec; 12] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        vault_only: false,
     },
     Spec {
         kind: DeclKind::Vars,
@@ -148,6 +209,7 @@ const SPECS: [Spec; 12] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        vault_only: false,
     },
     Spec {
         kind: DeclKind::Use,
@@ -160,6 +222,7 @@ const SPECS: [Spec; 12] = [
         // independent, and this is the proof.
         cardinality: Cardinality::Many,
         scope: Scope::Tmt,
+        vault_only: false,
     },
     Spec {
         kind: DeclKind::Blueprint,
@@ -170,6 +233,7 @@ const SPECS: [Spec; 12] = [
         positional: &["target"],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        vault_only: false,
     },
     Spec {
         kind: DeclKind::Vocabulary,
@@ -177,6 +241,7 @@ const SPECS: [Spec; 12] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        vault_only: false,
     },
     Spec {
         kind: DeclKind::Elements,
@@ -184,18 +249,24 @@ const SPECS: [Spec; 12] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        vault_only: false,
     },
 ];
 
 impl DeclKind {
     /// Every standard declaration.
-    pub const ALL: [DeclKind; 12] = [
+    pub const ALL: [DeclKind; 17] = [
         DeclKind::Kind,
         DeclKind::Id,
         DeclKind::Version,
         DeclKind::Meta,
-        DeclKind::Config,
-        DeclKind::Settings,
+        DeclKind::Format,
+        DeclKind::Fields,
+        DeclKind::Workspace,
+        DeclKind::Export,
+        DeclKind::Blueprints,
+        DeclKind::Vocabularies,
+        DeclKind::Migration,
         DeclKind::Macros,
         DeclKind::Vars,
         DeclKind::Use,
@@ -235,6 +306,11 @@ impl DeclKind {
         self.spec().cardinality == Cardinality::Once
     }
 
+    /// Whether only the vault config may write it.
+    pub fn is_vault_only(self) -> bool {
+        self.spec().vault_only
+    }
+
     /// Whether it may be written in `host`.
     pub fn allowed_in(self, host: Host) -> bool {
         self.spec().scope.allows(host)
@@ -272,6 +348,15 @@ mod tests {
         assert_eq!(DeclKind::Use.positional_keys(), ["target", "version"]);
         assert_eq!(DeclKind::Blueprint.positional_keys(), ["target"]);
         assert!(DeclKind::Meta.positional_keys().is_empty());
+    }
+
+    #[test]
+    fn only_the_workspace_is_the_vaults_alone() {
+        let vault_only: Vec<DeclKind> = DeclKind::ALL
+            .into_iter()
+            .filter(|k| k.is_vault_only())
+            .collect();
+        assert_eq!(vault_only, [DeclKind::Workspace]);
     }
 
     #[test]

@@ -59,7 +59,7 @@ fn directives_have_no_markdown_output() {
     // `import` from `BUILTIN_KINDS` made it a `Custom` kind again, and the
     // div came straight back.
     for src in [
-        "::settings(file:project.settings.tmt)\n",
+        "::export(path:out.md)\n",
         "::use(deck)\n",
         "::meta{type: note}\n",
     ] {
@@ -370,11 +370,11 @@ fn thematic_break() {
 }
 
 #[test]
-fn config_element_exports_as_nothing() {
-    let mut el = tomet_tree::element_new(Sigil::document("config"));
+fn a_declaration_exports_as_nothing() {
+    let mut el = tomet_tree::element_new(Sigil::document("export"));
     el.args = Some(Value::Map(vec![(
-        "format".to_string(),
-        Value::String("json".to_string()),
+        "type".to_string(),
+        Value::String("commonmark".to_string()),
     )]));
     let doc = Document {
         blocks: vec![Block::Element(el)],

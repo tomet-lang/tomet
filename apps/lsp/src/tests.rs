@@ -164,10 +164,10 @@ fn completions_trigger_prefix() {
     // document are `::`'s, so they are not offered here.
     let at_items = completions_for("@", Position::new(0, 1));
     assert!(at_items.iter().any(|i| i.label == "link"));
-    assert!(at_items.iter().all(|i| i.label != "config"));
+    assert!(at_items.iter().all(|i| i.label != "format"));
     let decl_items = completions_for("::", Position::new(0, 2));
-    let config = decl_items.iter().find(|i| i.label == "config").unwrap();
-    assert!(config.detail.as_deref().unwrap().ends_with("(block)"));
+    let format = decl_items.iter().find(|i| i.label == "format").unwrap();
+    assert!(format.detail.as_deref().unwrap().ends_with("(block)"));
     assert!(decl_items.iter().all(|i| i.label != "link"));
     // `link` takes either shape -- a link alone on a line is how you
     // show one file -- so its detail carries no placement note.
@@ -181,7 +181,7 @@ fn completions_trigger_prefix() {
     assert!(
         completions_for("#", Position::new(0, 1))
             .iter()
-            .all(|i| { i.label != "config" && i.label != "link" })
+            .all(|i| { i.label != "format" && i.label != "link" })
     );
 
     let interp_items = completions_for("${", Position::new(0, 2));
@@ -382,65 +382,6 @@ fn hover_on_undefined_macro_shows_error() {
 }
 
 #[test]
-fn hover_on_macro_defined_in_settings_file_ref() {
-    let unique = format!(
-        "tomet_test_{}_{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    );
-    let dir = std::env::temp_dir().join(unique);
-    std::fs::create_dir_all(&dir).unwrap();
-    let config_path = dir.join(tomet_load_config::VAULT_CONFIG_FILE);
-    std::fs::write(
-        &config_path,
-        "::macros{\n  youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n}\n",
-    )
-    .unwrap();
-
-    let doc_path = dir.join("sub/note.tmt");
-    std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
-    let doc_text = format!(
-        "::settings(file:\"file:{}\")\n\n$macro.youtube_video(\"Pm_h6FnF8HU\")\n",
-        tomet_load_config::VAULT_CONFIG_FILE
-    );
-    let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
-
-    let hover = hover_for(&doc_text, Position::new(2, 5), Some(&uri))
-        .expect("hover found for external config macro");
-    if let HoverContents::Markup(m) = hover.contents {
-        assert!(m.value.contains("Macro Result"));
-        assert!(
-            m.value
-                .contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU")
-        );
-    } else {
-        panic!("expected markup contents");
-    }
-
-    // Test embed with macro
-    let embed_doc = format!(
-        "::settings(file:\"file:{}\")\n\n@embed($macro.youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n",
-        tomet_load_config::VAULT_CONFIG_FILE
-    );
-    let hover2 = hover_for(&embed_doc, Position::new(2, 10), Some(&uri))
-        .expect("hover found for embed macro");
-    if let HoverContents::Markup(m) = hover2.contents {
-        assert!(m.value.contains("Macro Result"));
-        assert!(
-            m.value
-                .contains("https://www.youtube.com/watch?v=Pm_h6FnF8HU")
-        );
-    } else {
-        panic!("expected markup contents");
-    }
-
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
 fn hover_on_macro_auto_discovered_from_workspace_config() {
     let unique = format!(
         "tomet_auto_cfg_{}_{}",
@@ -495,41 +436,6 @@ fn hover_on_macro_auto_discovered_from_workspace_config() {
 }
 
 #[test]
-fn hover_on_macro_defined_in_config_import() {
-    let unique = format!(
-        "tomet_import_cfg_{}_{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    );
-    let dir = std::env::temp_dir().join(unique);
-    std::fs::create_dir_all(&dir).unwrap();
-    let config_path = dir.join("custom.config.tmt");
-    std::fs::write(
-        &config_path,
-        "::macros{\n  wiki: \"https://ja.wikipedia.org/wiki/${1}\"\n}\n",
-    )
-    .unwrap();
-
-    let doc_path = dir.join("note.tmt");
-    let doc_text = "::config(import: \"custom.config.tmt\")\n\n$macro.wiki(\"Rust\")\n";
-    let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
-
-    let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
-        .expect("hover found for ::config(import:...) macro");
-    if let HoverContents::Markup(m) = hover.contents {
-        assert!(m.value.contains("Macro Result"));
-        assert!(m.value.contains("https://ja.wikipedia.org/wiki/Rust"));
-    } else {
-        panic!("expected markup contents");
-    }
-
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
 fn hover_on_kind_and_version() {
     let doc_text = "::version(1.0)\n::kind(j.daily)\n\n#[ Title ]\n";
     let hover_ver =
@@ -566,11 +472,16 @@ fn double_colon_at_the_start_of_a_line_offers_the_declarations() {
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
         for want in [
             "kind",
+            "id",
             "meta",
-            "config",
+            "format",
+            "fields",
+            "workspace",
+            "export",
+            "blueprints",
+            "vocabularies",
             "use",
             "version",
-            "settings",
             "macros",
             "vars",
             "blueprint",

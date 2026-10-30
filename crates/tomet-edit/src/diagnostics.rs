@@ -52,7 +52,7 @@ mod tests {
     use super::*;
     use crate::import::import_source;
 
-    const SETTINGS: &str = "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n";
+    const SETTINGS: &str = "::kind(config)\n::fields{ id: { type: uuid } }\n";
 
     #[test]
     fn a_document_in_a_vault_is_held_to_the_types_its_settings_declare() {

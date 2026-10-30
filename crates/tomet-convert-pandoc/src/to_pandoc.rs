@@ -965,7 +965,7 @@ mod tests {
     #[test]
     fn directives_produce_nothing() {
         assert!(convert("::meta{type: note}\n").is_empty());
-        assert!(convert("::settings(file:project.settings.tmt)\n").is_empty());
+        assert!(convert("::export(path:out.md)\n").is_empty());
         // ...and neither do several in a row.
         assert!(convert("::meta{a: 1}\n::meta{b: 2}\n").is_empty());
     }

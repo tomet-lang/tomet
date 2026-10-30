@@ -258,13 +258,11 @@ fn test_wikilink_no_space_setting() {
 
 #[test]
 fn test_nanoid_generation_and_ensure_document_id() {
-    let settings_src = r#"::settings{
-  meta: {
-    id: {
-      type: nanoid
-      length: 8
-      prefix: "doc-"
-    }
+    let settings_src = r#"::fields{
+  id: {
+    type: nanoid
+    length: 8
+    prefix: "doc-"
   }
 }
 "#;
@@ -288,15 +286,13 @@ fn test_nanoid_generation_and_ensure_document_id() {
 
 #[test]
 fn test_nanoid_force_and_overwrite_behavior() {
-    let settings_src = r#"::settings{
-  meta: {
-    id: {
-      type: nanoid
-      length: 8
-      prefix: "doc-"
-      force: true
-      overwrite: true
-    }
+    let settings_src = r#"::fields{
+  id: {
+    type: nanoid
+    length: 8
+    prefix: "doc-"
+    force: true
+    overwrite: true
   }
 }
 "#;

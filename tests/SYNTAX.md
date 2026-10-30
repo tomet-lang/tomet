@@ -378,6 +378,12 @@ Block  ::config
           Raw "{\"gh\": \"x/${1}\"}"
 ```
 
+検証:
+
+```
+unknown element `config`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.config`), or declare the vocabulary that has it and bind it with `::use`
+```
+
 ## `{...}` グループ
 
 ### `key: value` の並び

@@ -9,7 +9,7 @@ fn meta_element_has_no_visible_output() {
 
 #[test]
 fn config_element_has_no_visible_output() {
-    let doc = parse_document("::config(format:json)\n").unwrap();
+    let doc = parse_document("::export(type:commonmark)\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "");
 }

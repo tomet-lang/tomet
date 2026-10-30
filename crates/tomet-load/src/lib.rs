@@ -335,7 +335,7 @@ mod tests {
         fs::create_dir_all(root.join("notes")).expect("temp dirs");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::settings{ meta: { tags: { type: list }, created: { type: datetime } } }\n",
+            "::kind(config)\n::fields{ tags: { type: list }, created: { type: datetime } }\n",
         )
         .expect("config");
         for (file, tags, created) in [
@@ -492,18 +492,55 @@ mod tests {
     }
 
     #[test]
-    fn a_setting_only_the_vault_makes_is_reported_anywhere_else() {
+    fn a_registry_key_must_be_the_name_the_file_gives_itself() {
+        let root = include_vault(
+            "tomet_test_load_registry_names",
+            &[
+                ("bp.blueprint.tmt", "::kind(blueprint)\n::blueprint(note)\n"),
+                (
+                    "deck.vocabulary.tmt",
+                    "::kind(vocabulary)\n::vocabulary(deck){ version: \"1.0.0\" }\n\n::elements{ card: {} }\n",
+                ),
+            ],
+        );
+        let path = root.join(tomet_load_config::VAULT_CONFIG_FILE);
+        fs::write(
+            &path,
+            "::kind(config)\n::blueprints{ note: @file(bp.blueprint.tmt), wrong: @file(bp.blueprint.tmt) }\n::vocabularies{ deck: @file(deck.vocabulary.tmt), other: @file(deck.vocabulary.tmt) }\n",
+        )
+        .unwrap();
+        let vault = Vault::discover(&root);
+        let doc = tomet_parser::parse_document(&fs::read_to_string(&path).unwrap()).unwrap();
+        let mismatches: Vec<(String, String)> = vault
+            .findings(&path, &doc)
+            .diagnostics
+            .into_iter()
+            .filter_map(|d| match d {
+                tomet_validator::Diagnostic::RegistryNameMismatch {
+                    declaration, name, ..
+                } => Some((declaration.to_string(), name)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            mismatches,
+            [
+                ("blueprints".to_string(), "wrong".to_string()),
+                ("vocabularies".to_string(), "other".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_declaration_only_the_vault_writes_is_reported_anywhere_else() {
         let root = include_vault(
             "tomet_test_load_vault_only",
             &[
                 (
                     "a/.config.tmt",
-                    "::kind(config)\n::config{ workspace: { ignore: list(\"x\") } }\n",
+                    "::kind(config)\n::workspace{ ignore: list(\"x\") }\n",
                 ),
-                (
-                    "note.tmt",
-                    "::config{ workspace: { unswept: list(\"y\") } }\n\nbody\n",
-                ),
+                ("note.tmt", "::workspace{ unswept: list(\"y\") }\n\nbody\n"),
             ],
         );
         let vault = Vault::discover(&root);
@@ -513,7 +550,7 @@ mod tests {
         };
         let reported = |findings: &Findings| {
             findings.diagnostics.iter().any(|d| {
-                matches!(d, tomet_validator::Diagnostic::VaultOnlySetting { key, .. } if key == "workspace")
+                matches!(d, tomet_validator::Diagnostic::VaultOnlyDeclaration { name, .. } if name == "workspace")
             })
         };
 
@@ -527,18 +564,14 @@ mod tests {
         let sample = root.join("sample.tmt");
         fs::write(
             &sample,
-            "::kind(config)\n::config{ workspace: { ignore: list(\"x\") } }\n",
+            "::kind(config)\n::workspace{ ignore: list(\"x\") }\n",
         )
         .unwrap();
         assert!(!reported(&findings_of(&sample)));
 
         // The vault config is the one place it belongs.
         let vault_file = root.join(tomet_load_config::VAULT_CONFIG_FILE);
-        fs::write(
-            &vault_file,
-            "::config{ workspace: { ignore: list(\"x\") } }\n",
-        )
-        .unwrap();
+        fs::write(&vault_file, "::workspace{ ignore: list(\"x\") }\n").unwrap();
         assert!(!reported(&findings_of(&vault_file)));
     }
 

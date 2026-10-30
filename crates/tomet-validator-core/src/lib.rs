@@ -69,7 +69,6 @@ pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagn
     });
 
     check_singletons_and_regions(doc, bindings, errors);
-    check_retired_settings_keys(doc, errors);
     check_document_declarations(doc, errors);
     check_vocabulary_params(doc, errors);
     check_arguments(doc, bindings, errors);
@@ -608,52 +607,18 @@ pub fn check_vocabulary_params(doc: &Document, errors: &mut Vec<Diagnostic>) {
     }
 }
 
-pub fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>) {
-    use tomet_ast::Value;
-
-    const RETIRED: [&str; 4] = ["elements", "types", "macros", "macro"];
-
-    tomet_tree::for_each_top_level_element(doc, |el| {
-        if !el.sigil.is_bare_named("settings") && !el.sigil.is_bare_named("config") {
-            return;
-        }
-        let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el) else {
-            return;
-        };
-        for key in RETIRED {
-            if entries.iter().any(|(k, _)| k == key) {
-                errors.push(Diagnostic::RetiredSettingsKey {
-                    key: key.to_string(),
-                    span: el.span,
-                });
-            }
-        }
-    });
-}
-
-/// Reports each top-level `::config` / `::settings` key `is_vault_only` names.
+/// Reports each top-level declaration only the vault config may write (`DeclKind::is_vault_only`).
 ///
-/// The caller decides whether the document is allowed to set them (the vault
-/// config is; a folder config and an ordinary document are not) and which keys
-/// are vault-only, because that list belongs to the crate that reads settings,
-/// which this one sits below.
-pub fn check_vault_only_settings(
-    doc: &Document,
-    is_vault_only: impl Fn(&str) -> bool,
-    errors: &mut Vec<Diagnostic>,
-) {
-    use tomet_ast::Value;
-
+/// The caller decides whether the document is allowed to write them (the vault config is; a folder
+/// config and an ordinary document are not), because that takes the path, which this crate never has.
+pub fn check_vault_only_declarations(doc: &Document, errors: &mut Vec<Diagnostic>) {
     tomet_tree::for_each_top_level_element(doc, |el| {
-        if !el.sigil.is_bare_named("settings") && !el.sigil.is_bare_named("config") {
-            return;
-        }
-        let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el) else {
-            return;
-        };
-        for (key, _) in entries.iter().filter(|(key, _)| is_vault_only(key)) {
-            errors.push(Diagnostic::VaultOnlySetting {
-                key: key.clone(),
+        if let tomet_semantics::ElementKind::Declaration(kind) =
+            tomet_semantics::classify_std_lenient(el)
+            && kind.is_vault_only()
+        {
+            errors.push(Diagnostic::VaultOnlyDeclaration {
+                name: kind.name().to_string(),
                 span: el.span,
             });
         }

@@ -93,11 +93,9 @@ mod tests {
     use std::path::PathBuf;
 
     const SETTINGS: &str = "::kind(config)
-::settings{
-  meta: {
-    tags: { type: list }
-    created: { type: datetime }
-  }
+::fields{
+  tags: { type: list }
+  created: { type: datetime }
 }
 ";
 

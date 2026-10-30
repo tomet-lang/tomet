@@ -205,27 +205,21 @@ pub enum Diagnostic {
         element_span: Span,
         span: Span,
     },
-    /// A top-level `::settings`/`::config` key that has been retired.
+    /// A declaration only the vault config may write, written in a folder config or in an ordinary
+    /// document -- where it has no effect.
     ///
-    /// `elements:` described what a custom element takes -- its `args`,
-    /// `required`, `positional`, `content`, `placement` and `singleton`.
-    /// A `::vocabulary` document says all of that now, at the declaration
-    /// rather than in a settings map beside it, so the settings copy was
-    /// the second place one fact lived.
-    ///
-    /// It is reported rather than ignored because ignoring is how it got
-    /// here: of the six keys only `positional` was ever read, by a
-    /// `SettingsSchema` no caller ever built, so a document could declare
-    /// `singleton: true` and be obeyed by nothing at all.
-    RetiredSettingsKey { key: String, span: Span },
-    /// A setting only the vault config may make, written in a folder config or
-    /// in a document's own `::config` -- where it has no effect.
-    ///
-    /// Reported rather than ignored quietly, for the reason
-    /// [`Diagnostic::RetiredSettingsKey`] is: a setting that does nothing and says
-    /// nothing is how a reader comes to believe it is obeyed. `span` is the
-    /// `::config` element; an entry of a `{...}` group has no span of its own.
-    VaultOnlySetting { key: String, span: Span },
+    /// Reported rather than ignored quietly: a setting that does nothing and says nothing is how a
+    /// reader comes to believe it is obeyed. `span` is the declaration.
+    VaultOnlyDeclaration { name: String, span: Span },
+    /// A `::blueprints` / `::vocabularies` entry whose key is not the name the file it registers
+    /// gives itself (`::blueprint(x)`, `::vocabulary(x)`). The key is the name it is registered under;
+    /// the file must agree. `declared` is `None` when the file names nothing. `span` is the declaration.
+    RegistryNameMismatch {
+        declaration: &'static str,
+        name: String,
+        declared: Option<String>,
+        span: Span,
+    },
     /// `id` written in `::meta{ ... }`: a document's identity is the declaration `::id(...)`.
     ///
     /// `::meta` keeps the free attributes of a document; what tomet itself reads about it does
@@ -277,9 +271,9 @@ impl Diagnostic {
             Diagnostic::DuplicateSingleton { duplicate, .. } => *duplicate,
             Diagnostic::OutsidePreamble { span, .. } => *span,
             Diagnostic::WrongSigil { span, .. } => *span,
-            Diagnostic::RetiredSettingsKey { span, .. } => *span,
-            Diagnostic::VaultOnlySetting { span, .. } => *span,
+            Diagnostic::VaultOnlyDeclaration { span, .. } => *span,
             Diagnostic::MetaIdMoved { span } => *span,
+            Diagnostic::RegistryNameMismatch { span, .. } => *span,
             Diagnostic::InvalidDefinition { span, .. } => *span,
             Diagnostic::InvalidFieldValue { span, .. } => *span,
             Diagnostic::UnknownArgument { span, .. } => *span,
@@ -540,38 +534,29 @@ impl Diagnostic {
                     allowed.join(", ")
                 )
             }
-            Diagnostic::RetiredSettingsKey { key, .. } => {
-                // Named per key rather than one generic sentence: `elements`
-                // has somewhere to go and `types` does not, and telling a
-                // reader to move something that has no destination is worse
-                // than telling them it is gone.
-                let advice = match key.as_str() {
-                    "elements" => {
-                        "declare elements in a `::vocabulary` document instead -- \
-                         each entry of `::elements` carries `display`, `region` and \
-                         `singleton`, and its `args` carry the arguments"
-                    }
-                    "macros" | "macro" => {
-                        "write `::macros{ ... }` instead -- a macro is a definition \
-                         of a name, not a setting"
-                    }
-                    "types" => {
-                        "it has no replacement: nothing read it, and per-element \
-                         rendering style has no home in settings yet -- \
-                         `format.callout.style` and `format.list.multiline.style` \
-                         are the only two that are read"
-                    }
-                    _ => "remove it",
-                };
-                write!(f, "`{key}` in `::settings` is retired; {advice}")
-            }
+            Diagnostic::RegistryNameMismatch {
+                declaration,
+                name,
+                declared,
+                ..
+            } => match declared {
+                Some(declared) => write!(
+                    f,
+                    "`{name}` in `::{declaration}` registers a file that calls itself `{declared}`; \
+                     the key is the name it is registered under, and the file must agree"
+                ),
+                None => write!(
+                    f,
+                    "`{name}` in `::{declaration}` registers a file that gives itself no name"
+                ),
+            },
             Diagnostic::MetaIdMoved { .. } => write!(
                 f,
                 "`id` is not written in `::meta`; the identity of a document is `::id(...)`"
             ),
-            Diagnostic::VaultOnlySetting { key, .. } => write!(
+            Diagnostic::VaultOnlyDeclaration { name, .. } => write!(
                 f,
-                "`{key}` can only be set in the vault config; here it has no effect"
+                "`::{name}` can only be written in the vault config; here it has no effect"
             ),
             Diagnostic::InvalidDefinition {
                 declaration,

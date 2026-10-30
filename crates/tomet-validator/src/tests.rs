@@ -627,61 +627,6 @@ fn an_id_in_meta_is_reported_and_an_id_declaration_is_not() {
     );
 }
 
-/// `elements:` described a custom element in `::settings`; a
-/// `::vocabulary` document says all of it now, so the settings copy is
-/// reported rather than skipped -- skipping is how it survived being
-/// read by nothing.
-#[test]
-fn a_retired_settings_key_is_reported() {
-    let doc = parse(
-        "::kind(settings)\n::settings{\n\
-         elements: { bookmark: { singleton: false } }\n}\n",
-    );
-    let errors = validate_document(&doc);
-    assert!(
-        errors
-            .iter()
-            .any(|e| matches!(e, Diagnostic::RetiredSettingsKey { key, .. } if key == "elements")),
-        "{errors:?}"
-    );
-}
-
-/// `types:` goes with it, and its message has to say there is nowhere
-/// to move it to rather than inventing a destination.
-#[test]
-fn the_types_map_is_retired_too_and_says_it_has_no_replacement() {
-    let doc = parse(
-        "::kind(settings)\n::settings{\n\
-         types: { bookmark: { style: one_line } }\n}\n",
-    );
-    let errors = validate_document(&doc);
-    let reported = errors
-        .iter()
-        .find(|e| matches!(e, Diagnostic::RetiredSettingsKey { key, .. } if key == "types"))
-        .unwrap_or_else(|| panic!("{errors:?}"));
-    assert!(
-        reported.to_string().contains("no replacement"),
-        "{reported}"
-    );
-}
-
-/// A macro is a definition of a name, not a setting: `macros:` in
-/// `::settings` or `::config` is reported, and says where it goes.
-#[test]
-fn macros_in_the_settings_are_retired_and_say_where_they_go() {
-    for head in ["settings", "config"] {
-        let doc = parse(&format!(
-            "::kind({head})\n::{head}{{\nmacros: {{ gh: \"https://example.com/${{1}}\" }}\n}}\n"
-        ));
-        let errors = validate_document(&doc);
-        let reported = errors
-            .iter()
-            .find(|e| matches!(e, Diagnostic::RetiredSettingsKey { key, .. } if key == "macros"))
-            .unwrap_or_else(|| panic!("{head}: {errors:?}"));
-        assert!(reported.to_string().contains("::macros"), "{reported}");
-    }
-}
-
 fn definition_problems(src: &str) -> Vec<String> {
     validate_document(&parse(src))
         .iter()
@@ -730,22 +675,37 @@ fn a_variable_is_a_declaration_with_a_type_it_can_have_and_a_default_that_fits()
     }
 }
 
-/// The live surface is untouched. `format` and the path lists are what
-/// `tomet-config` actually reads.
+/// Each concern of the vault config is a declaration of its own, and they are clean.
 #[test]
-fn a_settings_document_using_only_live_keys_is_clean() {
+fn the_config_declarations_are_clean() {
     let doc = parse(
-        "::kind(config)\n::config{\n\
-         format: { callout: { style: { content: block } } }\n\
-         blueprints: list(\"a.blueprint.tmt\")\n}\n",
+        "::kind(config)\n::format{ callout: { style: { content: block } } }\n\
+         ::fields{ created: { type: datetime } }\n\
+         ::blueprints{ a: @file(a.blueprint.tmt) }\n\
+         ::vocabularies{ deck: @file(deck.vocabulary.tmt) }\n\
+         ::workspace{ ignore: list(\"x\") }\n\
+         ::export(type: commonmark)\n",
     );
     let errors = validate_document(&doc);
-    assert!(
-        !errors
-            .iter()
-            .any(|e| matches!(e, Diagnostic::RetiredSettingsKey { .. })),
-        "{errors:?}"
-    );
+    assert!(errors.is_empty(), "{errors:?}");
+}
+
+/// `::config` and `::settings` are gone: what they held is split into the declarations above.
+#[test]
+fn the_dissolved_config_and_settings_are_unknown_declarations() {
+    for name in ["config", "settings"] {
+        let doc = parse(&format!(
+            "::{name}{{ format: {{ link: {{ no_space: true }} }} }}\n"
+        ));
+        let errors = validate_document(&doc);
+        assert!(
+            errors.iter().any(|e| matches!(
+                e,
+                Diagnostic::UnknownElement { name: found, .. } if found == name
+            )),
+            "{name}: {errors:?}"
+        );
+    }
 }
 
 /// A document with `deck` in scope.

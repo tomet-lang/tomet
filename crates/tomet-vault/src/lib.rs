@@ -396,7 +396,7 @@ mod tests {
     use super::*;
 
     const BLUEPRINT: &str = "::kind(blueprint)\n::blueprint(note)\n::meta{\n  date: \"2026\"\n}\n\n=[ Items ]#(items):rule(allow: list(task))\n";
-    const UUID_SETTINGS: &str = "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n";
+    const UUID_SETTINGS: &str = "::kind(config)\n::fields{ id: { type: uuid } }\n";
 
     fn texts(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
@@ -605,8 +605,7 @@ mod tests {
     #[test]
     fn a_document_reads_its_own_meta_typed_by_the_settings() {
         let config =
-            tomet_config::load_config_from_str("::settings{ meta: { tags: { type: list } } }\n")
-                .unwrap();
+            tomet_config::load_config_from_str("::fields{ tags: { type: list } }\n").unwrap();
         let vault = Vault::from_sources(config, "/v", &[]);
         // No `tags` written: still a list, so `.contains` answers instead of failing.
         let (doc, prepared) = prepared(
