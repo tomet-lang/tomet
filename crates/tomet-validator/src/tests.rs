@@ -606,6 +606,27 @@ fn an_unknown_element_is_still_an_error() {
     assert!(diagnostics.iter().all(|d| d.severity() == Severity::Error));
 }
 
+/// The identity of a document is `::id(...)`; `id` in `::meta` is reported, not read.
+#[test]
+fn an_id_in_meta_is_reported_and_an_id_declaration_is_not() {
+    let moved = validate_document(&parse("::meta{ id: a, title: T }\n"));
+    assert!(
+        moved
+            .iter()
+            .any(|e| matches!(e, Diagnostic::MetaIdMoved { .. }))
+    );
+
+    let declared = validate_document(&parse("::id(a)\n::meta{ title: T }\n"));
+    assert!(declared.is_empty(), "{declared:?}");
+
+    let twice = validate_document(&parse("::id(a)\n::id(b)\n"));
+    assert!(
+        twice
+            .iter()
+            .any(|e| matches!(e, Diagnostic::DuplicateSingleton { name, .. } if name == "id"))
+    );
+}
+
 /// `elements:` described a custom element in `::settings`; a
 /// `::vocabulary` document says all of it now, so the settings copy is
 /// reported rather than skipped -- skipping is how it survived being
@@ -947,9 +968,9 @@ const UUID: &str = "123e4567-e89b-42d3-a456-426614174000";
 
 #[test]
 fn a_uuid_field_holding_a_uuid_is_clean() {
-    let source = format!("::meta{{\n  id: {UUID}\n}}\n");
+    let source = format!("::id({UUID})\n");
     assert_eq!(field_diagnostics(&source, &[("id", "uuid")]), vec![]);
-    let upper = format!("::meta{{ id: {} }}\n", UUID.to_uppercase());
+    let upper = format!("::id({})\n", UUID.to_uppercase());
     assert_eq!(field_diagnostics(&upper, &[("id", "uuid")]), vec![]);
 }
 
@@ -961,7 +982,7 @@ fn a_uuid_field_holding_anything_else_is_reported() {
         "123e4567-e89b-42d3-a456-42661417400",
         "123e4567-e89b-42d3-a456-42661417400g",
     ] {
-        let source = format!("::meta{{ id: \"{bad}\" }}\n");
+        let source = format!("::id(\"{bad}\")\n");
         let errors = field_diagnostics(&source, &[("id", "uuid")]);
         assert_eq!(errors.len(), 1, "{bad}: {errors:?}");
         assert!(
@@ -971,7 +992,7 @@ fn a_uuid_field_holding_anything_else_is_reported() {
         );
         assert_eq!(errors[0].severity(), Severity::Error);
     }
-    let number = field_diagnostics("::meta{ id: 42 }\n", &[("id", "uuid")]);
+    let number = field_diagnostics("::id(42)\n", &[("id", "uuid")]);
     assert_eq!(number.len(), 1, "{number:?}");
 }
 
@@ -983,9 +1004,9 @@ fn a_uuid_field_holding_anything_else_is_reported() {
 fn an_absent_empty_or_unevaluated_uuid_is_not_reported() {
     let declared = [("id", "uuid")];
     assert_eq!(field_diagnostics("::meta{ title: x }\n", &declared), vec![]);
-    assert_eq!(field_diagnostics("::meta{ id: \"\" }\n", &declared), vec![]);
+    assert_eq!(field_diagnostics("::id(\"\")\n", &declared), vec![]);
     assert_eq!(
-        field_diagnostics("::meta{ id: ${generate.uuid()} }\n", &declared),
+        field_diagnostics("::id(${generate.uuid()})\n", &declared),
         vec![]
     );
     assert_eq!(field_diagnostics("plain\n", &declared), vec![]);
@@ -995,7 +1016,7 @@ fn an_absent_empty_or_unevaluated_uuid_is_not_reported() {
 /// that have a form.
 #[test]
 fn an_undeclared_field_or_a_type_with_no_form_is_left_alone() {
-    let source = "::meta{ id: nonsense, title: nonsense }\n";
+    let source = "::id(nonsense)\n::meta{ title: nonsense }\n";
     assert_eq!(field_diagnostics(source, &[]), vec![]);
     assert_eq!(field_diagnostics(source, &[("title", "string")]), vec![]);
     assert_eq!(field_diagnostics(source, &[("id", "uuid")]).len(), 1);

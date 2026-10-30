@@ -1,7 +1,5 @@
 ::kind(element)
-::meta{
-  id: std.macros
-}
+::id(std.macros)
 
 =[ 全容 ]
 

@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn a_document_in_a_vault_is_held_to_the_types_its_settings_declare() {
-        let doc = import_source("::meta{ id: not-a-uuid }\n");
+        let doc = import_source("::id(not-a-uuid)\n");
         let plain = Vault::from_sources(Default::default(), ".", &[]);
         let typed = Vault::from_sources(
             tomet_config::load_config_from_str(SETTINGS).unwrap(),

@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.lambda
-}
+::id(expr.lambda)
 
 無名関数。
 

@@ -1,7 +1,5 @@
 ::kind(fixture)
-::meta{
-  id: doc-continuation
-}
+::id(doc-continuation)
 
 =[ `\` は段落の継続トリガー ]
 

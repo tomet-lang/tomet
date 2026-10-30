@@ -1,6 +1,4 @@
-::meta{
-  id: cli.format
-}
+::id(cli.format)
 
 `tomet format <PATH>...`: 文書の書き方を整える。文書の意味は変えない。
 

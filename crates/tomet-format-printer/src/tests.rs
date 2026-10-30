@@ -282,7 +282,8 @@ fn test_nanoid_generation_and_ensure_document_id() {
     ensure_document_id_with_config(&mut doc, &cfg);
 
     let printed = document_to_tm_with_config(&doc, &cfg);
-    assert!(printed.contains("id: doc-"));
+    assert!(printed.contains("::id(doc-"), "{printed}");
+    assert!(!printed.contains("::meta"), "{printed}");
 }
 
 #[test]
@@ -309,7 +310,7 @@ fn test_nanoid_force_and_overwrite_behavior() {
     let mut doc1 = tomet_markdown::from_markdown(md1);
     ensure_document_id_with_config(&mut doc1, &cfg);
     let printed1 = document_to_tm_with_config(&doc1, &cfg);
-    assert!(printed1.contains("id: doc-12345678"));
+    assert!(printed1.contains("::id(doc-12345678)"), "{printed1}");
 
     // Case 2: Invalid format existing ID is overwritten when overwrite: true
     let md2 = "---\nid: invalid-slug\n---\n# Note 2\n";
@@ -317,7 +318,7 @@ fn test_nanoid_force_and_overwrite_behavior() {
     ensure_document_id_with_config(&mut doc2, &cfg);
     let printed2 = document_to_tm_with_config(&doc2, &cfg);
     assert!(!printed2.contains("invalid-slug"));
-    assert!(printed2.contains("id: doc-"));
+    assert!(printed2.contains("::id(doc-"), "{printed2}");
 
     // Case 3: When force: true and overwrite: false, invalid existing ID is preserved
     let cfg_no_overwrite = PrinterConfig {
@@ -340,7 +341,7 @@ fn test_nanoid_force_and_overwrite_behavior() {
     let mut doc3 = tomet_markdown::from_markdown(md2);
     ensure_document_id_with_config(&mut doc3, &cfg_no_overwrite);
     let printed3 = document_to_tm_with_config(&doc3, &cfg_no_overwrite);
-    assert!(printed3.contains("id: invalid-slug"));
+    assert!(printed3.contains("::id(invalid-slug)"), "{printed3}");
 }
 
 #[test]

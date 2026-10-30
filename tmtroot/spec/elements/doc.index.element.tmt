@@ -1,4 +1,2 @@
 ::kind(element)
-::meta{
-  id: doc.index
-}
+::id(doc.index)

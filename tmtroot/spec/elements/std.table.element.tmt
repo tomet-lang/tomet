@@ -1,7 +1,5 @@
 ::kind(element)
-::meta{
-  id: std.table
-}
+::id(std.table)
 
 ```tm
 | 糖衣         | 要素      |

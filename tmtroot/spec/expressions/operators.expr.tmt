@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.operators
-}
+::id(expr.operators)
 
 式の演算子、リテラル、グルーピング。
 

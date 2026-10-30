@@ -28,6 +28,22 @@ pub fn kind_name(declaration: &Declaration) -> Option<String> {
     data.get("kind").and_then(text).or_else(|| text(data))
 }
 
+/// The identity a `::id(...)` declares: `::id(std.config)` or `::id(id: std.config)`.
+///
+/// `None` when it is not written as text, such as `::id(${uuid()})` before it is evaluated.
+pub fn id_name(declaration: &Declaration) -> Option<String> {
+    if let Some(args) = declaration.bound_args() {
+        if let Some(name) = args.get("id").and_then(text) {
+            return Some(name);
+        }
+        if let Some(name) = text(&args) {
+            return Some(name);
+        }
+    }
+    let data = declaration.data.as_ref()?;
+    data.get("id").and_then(text).or_else(|| text(data))
+}
+
 /// The kind of document a `::blueprint(X)` or `::blueprint(target: X)` is for.
 pub fn blueprint_target(declaration: &Declaration) -> Option<String> {
     let args = declaration.bound_args()?;
@@ -89,6 +105,11 @@ fn first(doc: &Document, kind: DeclKind) -> Option<Declaration> {
 /// The kind this document declares with its first `::kind(...)`.
 pub fn document_kind(doc: &Document) -> Option<String> {
     kind_name(&first(doc, DeclKind::Kind)?)
+}
+
+/// The identity this document declares with its first `::id(...)`.
+pub fn document_id(doc: &Document) -> Option<String> {
+    id_name(&first(doc, DeclKind::Id)?)
 }
 
 /// The kind a blueprint document is for; `None` for a document that is not a blueprint.
@@ -162,6 +183,21 @@ mod tests {
 
     fn parse(src: &str) -> Document {
         tomet_parser::parse_document(src).expect("parses")
+    }
+
+    #[test]
+    fn an_id_is_what_the_id_declaration_names_dots_and_all() {
+        assert_eq!(
+            document_id(&parse("::id(std.config)\n\n=[ T ]\n")).as_deref(),
+            Some("std.config")
+        );
+        assert_eq!(
+            document_id(&parse("::id(doc-kWBcIUUz)\n")).as_deref(),
+            Some("doc-kWBcIUUz")
+        );
+        assert_eq!(document_id(&parse("::kind(x)\n")), None);
+        // `::meta{ id: ... }` is not an identity any more.
+        assert_eq!(document_id(&parse("::meta{ id: a }\n")), None);
     }
 
     #[test]

@@ -1,6 +1,4 @@
-::meta{
-  id: cli.from-pandoc
-}
+::id(cli.from-pandoc)
 
 `tomet from-pandoc <PATH>`: Pandoc の構文木（JSON）を、`.tmt` にする。Pandoc が読めるすべての形式（docx、LaTeX、EPUB、org、…）からの橋になる。
 

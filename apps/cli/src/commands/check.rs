@@ -496,10 +496,10 @@ mod tests {
         .unwrap();
         fs::write(
             root.join("good.tmt"),
-            "::meta{ id: 123e4567-e89b-42d3-a456-426614174000 }\n",
+            "::id(123e4567-e89b-42d3-a456-426614174000)\n",
         )
         .unwrap();
-        fs::write(root.join("bad.tmt"), "::meta{ id: not-a-uuid }\n").unwrap();
+        fs::write(root.join("bad.tmt"), "::id(not-a-uuid)\n").unwrap();
 
         check(&root.join("good.tmt"), false, true, false).expect("a UUID passes");
         let err = check(&root.join("bad.tmt"), false, true, false).expect_err("not a UUID");

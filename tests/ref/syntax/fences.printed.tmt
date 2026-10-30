@@ -1,6 +1,6 @@
 ::kind(fixture)
 
-::meta{id: doc-fences}
+::id(doc-fences)
 
 =[逐語本文]
 `[content]` に入れ子になったbacktickフェンスは、本文をそのまま運ぶ。`]` や

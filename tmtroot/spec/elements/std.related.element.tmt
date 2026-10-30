@@ -1,6 +1,4 @@
 ::kind(element)
-::meta{
-  id: std.related
-}
+::id(std.related)
 
 読者に対して「この文書を読んだあとは、こちらも読んでね」と解説付きで提示したい場合。

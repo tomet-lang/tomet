@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.types
-}
+::id(expr.types)
 
 設定の型が式の値の型になる。値の型ごとに、呼べるメソッドが決まる。
 

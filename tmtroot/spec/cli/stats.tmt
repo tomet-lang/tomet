@@ -1,6 +1,4 @@
-::meta{
-  id: cli.stats
-}
+::id(cli.stats)
 
 `tomet stats [PATH]`: 文書の大きさと中身を数える。文字、要素、リンク、見出し。
 

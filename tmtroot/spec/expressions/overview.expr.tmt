@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.overview
-}
+::id(expr.overview)
 
 `$` で始まり、評価されて結果に置き換わる構文を、**式**と呼ぶ。
 

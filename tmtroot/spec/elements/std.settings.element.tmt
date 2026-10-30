@@ -1,7 +1,5 @@
 ::kind(element)
-::meta{
-  id: std.settings
-}
+::id(std.settings)
 
 =[ 全容 ]
 

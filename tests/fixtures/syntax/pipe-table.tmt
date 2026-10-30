@@ -1,7 +1,5 @@
 ::kind(fixture)
-::meta{
-  id: doc-pipe-table
-}
+::id(doc-pipe-table)
 
 =[ `|` はセルの区切りではなく内容の左端 ]
 

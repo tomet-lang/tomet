@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.address
-}
+::id(expr.address)
 
 アドレスを式の中でどう書くか。アドレスそのものの定義は @file(tmtroot/spec/syntax/addressable.tmt) にある。ここでは繰り返さない。
 

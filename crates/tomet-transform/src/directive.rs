@@ -69,6 +69,23 @@ where
     true
 }
 
+/// Promotes `::meta`'s `id:` field to a top-level `::id(...)` element, after the `::version` and
+/// `::kind` that lead the document.
+pub fn promote_meta_id_to_id(doc: &mut Document) -> bool {
+    let after_preamble = ["kind", "version"]
+        .iter()
+        .filter_map(|name| doc.find_element_block_index(|el| el.sigil.is_bare_named(name)))
+        .max()
+        .map_or(0, |index| index + 1);
+    promote_prop_to_directive(
+        doc,
+        |el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta),
+        "id",
+        "id",
+        Some(after_preamble),
+    )
+}
+
 /// Promotes `::meta`'s `type:` field to a top-level `::kind(...)` element.
 pub fn promote_meta_type_to_kind(doc: &mut Document) -> bool {
     promote_prop_to_directive(

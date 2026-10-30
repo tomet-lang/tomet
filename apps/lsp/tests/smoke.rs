@@ -494,7 +494,7 @@ fn the_vaults_diagnostics_follow_the_text_after_a_pause() {
     let mut server = Server::start();
     initialize(&mut server, json!({}));
 
-    open(&mut server, &path, "::meta{ id: not-a-uuid }\n");
+    open(&mut server, &path, "::id(not-a-uuid)\n");
     let at_once = server.read_message();
     assert!(
         diagnostics_array(&at_once).is_empty(),
@@ -547,7 +547,7 @@ fn a_changed_config_changes_the_diagnostics() {
     let mut server = Server::start();
     initialize(&mut server, json!({}));
 
-    open(&mut server, &path, "::meta{ id: not-a-uuid }\n");
+    open(&mut server, &path, "::id(not-a-uuid)\n");
     let _at_once = server.read_message();
     let first = server.read_message();
     assert_eq!(diagnostics_array(&first).len(), 1, "{first:?}");

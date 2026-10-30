@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn instantiates_blueprint_to_kind_and_resolves_expressions() {
-        let src = "::blueprint(daily-note)\n::meta{\n  id: ${generate.uuid()}\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  title: ${var.title}\n}\n\n=[ Plan for ${var.title} ]#(plan)\n";
+        let src = "::blueprint(daily-note)\n::id(${generate.uuid()})\n::meta{\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  title: ${var.title}\n}\n\n=[ Plan for ${var.title} ]#(plan)\n";
         let vars = EvalValue::Map(vec![(
             "title".to_string(),
             EvalValue::String("Sprint 42".into()),
@@ -242,6 +242,15 @@ mod tests {
             .expect("expected a ::kind element");
         assert_eq!(kind.args, Some(Value::String("daily-note".into())));
 
+        let id = top_level
+            .iter()
+            .find(|el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Id))
+            .expect("expected an ::id element");
+        assert_eq!(
+            id.args,
+            Some(Value::String("00000000-0000-0000-0000-000000000000".into()))
+        );
+
         let meta = top_level
             .iter()
             .find(|el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta))
@@ -250,10 +259,6 @@ mod tests {
             panic!("expected meta map");
         };
         let get = |key: &str| entries.iter().find(|(k, _)| k == key).unwrap().1.clone();
-        assert_eq!(
-            get("id"),
-            Value::String("00000000-0000-0000-0000-000000000000".into())
-        );
         assert_eq!(get("date"), Value::String("1970-01-01".into()));
         assert_eq!(get("file"), Value::String("plan.tmt".into()));
         assert_eq!(get("title"), Value::String("Sprint 42".into()));

@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.filter
-}
+::id(expr.filter)
 
 文書の集まりを、絞り込み、並べ、リンクにする。
 

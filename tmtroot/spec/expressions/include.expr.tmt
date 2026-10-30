@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.include
-}
+::id(expr.include)
 
 `include(...)`: 文書の中身を、書いた場所に取り込む。
 

@@ -1,5 +1,5 @@
 ::kind(config)
-::meta{id: doc-kWBcIUUz}
+::id(config-vault)
 ::macros{
   gh: "https://github.com/tomet/tomet/issues/${1}"
   gh_pr: "https://github.com/tomet/tomet/pull/${1}"

@@ -1672,6 +1672,12 @@ Block  ::meta
     id: "x"
 ```
 
+検証:
+
+```
+`id` is not written in `::meta`; the identity of a document is `::id(...)`
+```
+
 ### groups の全部と、後置のコネクトも取れる
 
 ```tmt
@@ -1848,7 +1854,7 @@ Block  @id
 検証:
 
 ```
-unknown element `id`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.id`), or declare the vocabulary that has it and bind it with `::use`
+`id` is written `@id`, but it is content, not a declaration about the document: write `::id`
 ```
 
 > **パースは通る。** 上が実際の結果。

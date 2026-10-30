@@ -1,4 +1,2 @@
 ::kind(element)
-::meta{
-  id: std.strikeout
-}
+::id(std.strikeout)

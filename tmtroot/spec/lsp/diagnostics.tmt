@@ -1,6 +1,4 @@
-::meta{
-  id: lsp.diagnostics
-}
+::id(lsp.diagnostics)
 
 診断: エディタに開いている文書について、`tomet check` と同じことを、書いている途中に知らせる。
 

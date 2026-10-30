@@ -284,7 +284,7 @@ mod tests {
         );
         let path = root.join("a.tmt");
         let mut ws = Workspace::new();
-        ws.set_buffer(path.clone(), "::meta{ id: not-a-uuid }\n".to_string());
+        ws.set_buffer(path.clone(), "::id(not-a-uuid)\n".to_string());
 
         let diags = ws.findings_diagnostics(&path);
         assert_eq!(diags.len(), 1, "{:?}", messages(&diags));
@@ -293,7 +293,7 @@ mod tests {
 
         ws.set_buffer(
             path.clone(),
-            "::meta{ id: 123e4567-e89b-42d3-a456-426614174000 }\n".to_string(),
+            "::id(123e4567-e89b-42d3-a456-426614174000)\n".to_string(),
         );
         assert!(ws.findings_diagnostics(&path).is_empty());
         let _ = fs::remove_dir_all(&root);
@@ -390,7 +390,7 @@ mod tests {
         let root = vault("config", "::kind(config)\n", &[]);
         let path = root.join("a.tmt");
         let mut ws = Workspace::new();
-        ws.set_buffer(path.clone(), "::meta{ id: not-a-uuid }\n".to_string());
+        ws.set_buffer(path.clone(), "::id(not-a-uuid)\n".to_string());
         assert!(ws.findings_diagnostics(&path).is_empty());
 
         fs::write(

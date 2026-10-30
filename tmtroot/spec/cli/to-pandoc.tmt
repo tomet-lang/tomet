@@ -1,6 +1,4 @@
-::meta{
-  id: cli.to-pandoc
-}
+::id(cli.to-pandoc)
 
 `tomet to-pandoc <PATH>`: 文書を、Pandoc の構文木（JSON）にする。Pandoc が書けるすべての形式（docx、LaTeX、EPUB、org、…）への橋になる。
 

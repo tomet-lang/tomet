@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.func
-}
+::id(expr.func)
 
 組み込み関数と、純粋性。
 

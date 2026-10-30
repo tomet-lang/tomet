@@ -1,6 +1,4 @@
-::meta{
-  id: bindings.validate
-}
+::id(bindings.validate)
 
 JS・Java・Python の `validate`: vault をディスクではなくソース文字列で受け取り、`tomet check` と同じ検査をする。
 

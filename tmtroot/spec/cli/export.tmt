@@ -1,6 +1,4 @@
-::meta{
-  id: cli.export
-}
+::id(cli.export)
 
 `tomet export [PATH]`: 文書が宣言した設定に従って、書き出す。何をどこへ書くかは、文書の側が決める。
 

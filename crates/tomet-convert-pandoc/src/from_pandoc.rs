@@ -51,8 +51,21 @@ const CLASS_PREFIX: &str = "tomet-";
 /// Converts a Pandoc document to a Tomet document.
 pub fn from_pandoc(doc: &PandocDoc) -> Document {
     let mut blocks = Vec::new();
-    if !doc.meta.is_empty() {
-        blocks.push(TmBlock::Element(meta_element(&doc.meta)));
+    // Pandoc's `id` is the identity of the document: the declaration `::id(...)`, not a field of `::meta`.
+    let mut meta = doc.meta.clone();
+    let id = meta
+        .remove("id")
+        .and_then(|value| match meta_value_to_value(&value) {
+            Value::String(text) => Some(text),
+            other => other.scalar_text().map(|text| text.into_owned()),
+        });
+    if let Some(id) = id {
+        let mut id_el = element_new(Sigil::document("id")).with_placement(Placement::Block);
+        id_el.args = Some(Value::String(id));
+        blocks.push(TmBlock::Element(id_el));
+    }
+    if !meta.is_empty() {
+        blocks.push(TmBlock::Element(meta_element(&meta)));
     }
     for block in &doc.blocks {
         if let Some(b) = block_from_pandoc(block) {
@@ -824,6 +837,24 @@ mod tests {
                 ("draft".to_string(), Value::Bool(true)),
                 ("title".to_string(), Value::String("Hello".to_string())),
             ]))
+        );
+    }
+
+    #[test]
+    fn the_id_declaration_survives_a_round_trip() {
+        let doc = parse_document("::id(doc-1)\n::meta{title: Hello}\n\n本文\n").unwrap();
+        let back = from_pandoc(&to_pandoc(&doc));
+        assert_eq!(
+            tomet_declaration::document_id(&back).as_deref(),
+            Some("doc-1")
+        );
+        assert!(
+            tomet_declaration::document_meta(&back)
+                .and_then(|meta| match meta {
+                    Value::Map(entries) => Some(entries.iter().all(|(key, _)| key != "id")),
+                    _ => None,
+                })
+                .unwrap_or(false)
         );
     }
 

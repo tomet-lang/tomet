@@ -1,7 +1,5 @@
 ::kind(element)
-::meta{
-  id: std.card
-}
+::id(std.card)
 
 @card(title:試し)
 | あああああああああ

@@ -1,7 +1,5 @@
 ::kind(fixture)
-::meta{
-  id: doc-pipe
-}
+::id(doc-pipe)
 
 =[ `|` は括弧のない `[` ]
 

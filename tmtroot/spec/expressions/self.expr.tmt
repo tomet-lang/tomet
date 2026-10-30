@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.self
-}
+::id(expr.self)
 
 文書の値と、ディレクトリの値。
 

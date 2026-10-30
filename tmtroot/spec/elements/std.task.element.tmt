@@ -1,7 +1,5 @@
 ::kind(element)
-::meta{
-  id: std.task
-}
+::id(std.task)
 
 =[ @task ]
 

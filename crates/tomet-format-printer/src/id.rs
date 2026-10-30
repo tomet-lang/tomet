@@ -1,12 +1,16 @@
 //! ID generation and rendering helpers.
 
-use tomet_ast::{Block, Document, ElementValue, Entry, Id, Sigil, Value};
+use tomet_ast::{Block, Document, Element, Id, Sigil, Value};
 use tomet_config::PrinterConfig;
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
 use tomet_style::quote_scalar_string;
-use tomet_tree::element_new;
+use tomet_tree::{DocumentExt, ValueExt, element_new, for_each_top_level_element_mut};
 
-/// Ensures that a document has an `id` field in its `::meta` block if configured to do so.
+/// Ensures that a document has an `::id(...)` declaration if configured to do so.
+///
+/// The generation is configured by the vault's `id` meta field (`type`, `force`, `overwrite`, ...).
+/// A new declaration goes after the leading `::version` / `::kind`, so the preamble reads
+/// `::kind`, `::id`, `::meta`.
 pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig) {
     let Some(id_cfg) = config.meta.fields.get("id") else {
         return;
@@ -18,51 +22,36 @@ pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig
     let force = id_cfg.force.unwrap_or(true);
     let overwrite = id_cfg.overwrite.unwrap_or(false);
 
-    let mut meta_found = false;
-    for block in &mut doc.blocks {
-        if let Block::Element(el) = block
-            && el.sigil.is_bare_named("meta")
-        {
-            meta_found = true;
-            if let Some(ElementValue::Group(entries)) = &mut el.value {
-                let existing_idx =
-                    entries
-                        .iter()
-                        .enumerate()
-                        .find_map(|(idx, entry)| match entry {
-                            Entry::Pair(k, v) if k == "id" => Some((idx, v.clone())),
-                            _ => None,
-                        });
-
-                if let Some((idx, val)) = existing_idx {
-                    if overwrite {
-                        let existing_str = match &val {
-                            Value::String(s) => s.as_str(),
-                            _ => "",
-                        };
-                        if !is_valid_id_format(existing_str, id_cfg) {
-                            let new_id = generate_id_for_field(id_cfg);
-                            entries[idx] = Entry::Pair("id".to_string(), Value::String(new_id));
-                        }
-                    }
-                } else if force || overwrite {
-                    let new_id = generate_id_for_field(id_cfg);
-                    entries.insert(0, Entry::Pair("id".to_string(), Value::String(new_id)));
-                }
-            }
-            break;
+    // Top-level, not a walk of `doc.blocks`: `::kind` and `::id` on adjacent lines join into one
+    // paragraph, and an `::id` there is still the document's.
+    let mut found = false;
+    for_each_top_level_element_mut(doc, |el| {
+        if found || !el.sigil.is_bare_named("id") {
+            return;
         }
-    }
+        found = true;
+        if overwrite && !declared_id(el).is_some_and(|id| is_valid_id_format(id, id_cfg)) {
+            el.args = Some(Value::String(generate_id_for_field(id_cfg)));
+        }
+    });
 
-    if !meta_found && (force || overwrite) {
-        let new_id = generate_id_for_field(id_cfg);
-        let mut meta_el = element_new(Sigil::document("meta"));
-        meta_el.value = Some(ElementValue::Group(vec![Entry::Pair(
-            "id".to_string(),
-            Value::String(new_id),
-        )]));
-        doc.blocks.insert(0, Block::Element(meta_el));
+    if !found && (force || overwrite) {
+        let at = ["kind", "version"]
+            .iter()
+            .filter_map(|name| doc.find_element_block_index(|el| el.sigil.is_bare_named(name)))
+            .max()
+            .map_or(0, |index| index + 1);
+        let mut el = element_new(Sigil::document("id"));
+        el.args = Some(Value::String(generate_id_for_field(id_cfg)));
+        doc.insert_block(at, Block::Element(el));
     }
+}
+
+/// The identity an `::id(...)` element holds: `::id(x)` or `::id(id: x)`.
+fn declared_id(el: &Element) -> Option<&str> {
+    let args = el.args.as_ref()?;
+    args.as_str()
+        .or_else(|| args.get("id").and_then(|id| id.as_str()))
 }
 
 /// Prints `#(foobar)` if `id` is `Some`, else nothing. Shared by every

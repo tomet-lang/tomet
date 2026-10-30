@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.macro
-}
+::id(expr.macro)
 
 マクロ。設定で定義した、引数を差し込む文字列のテンプレート。
 

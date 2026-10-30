@@ -1,6 +1,4 @@
-::meta{
-  id: cli.new
-}
+::id(cli.new)
 
 `tomet new [PATH]`: ブループリントから、新しい文書を作る。
 

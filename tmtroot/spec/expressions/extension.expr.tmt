@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.extension
-}
+::id(expr.extension)
 
 式を、利用者がどこまで拡張できるか。
 

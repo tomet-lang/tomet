@@ -1,6 +1,4 @@
-::meta{
-  id: cli.to-md
-}
+::id(cli.to-md)
 
 `tomet to-md <PATH>`: 文書を CommonMark にする。
 

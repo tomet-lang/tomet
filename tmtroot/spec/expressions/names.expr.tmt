@@ -1,7 +1,5 @@
 ::kind(expr)
-::meta{
-  id: expr.names
-}
+::id(expr.names)
 
 式の中に書いた名前を、どこから探すか。
 

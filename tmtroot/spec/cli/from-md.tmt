@@ -1,6 +1,4 @@
-::meta{
-  id: cli.from-md
-}
+::id(cli.from-md)
 
 `tomet from-md <PATH>`: CommonMark の Markdown を、`.tmt` にする。
 

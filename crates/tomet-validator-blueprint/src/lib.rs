@@ -15,6 +15,8 @@ use tomet_validator_rule::{RuleArgs, check_descendants_against_rule, decode_rule
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlueprintSchema {
     pub target_kind: String,
+    /// The `::meta` keys the blueprint declares, and `id` when it declares `::id(...)`: the
+    /// document's identity is required, though it is not written in `::meta`.
     pub required_meta_keys: Vec<(String, Span)>,
     pub required_sections: Vec<RequiredSection>,
 }
@@ -47,6 +49,8 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
             {
                 target_kind = s.to_string();
             }
+        } else if kind == ElementKind::Declaration(DeclKind::Id) {
+            required_meta_keys.push(("id".to_string(), el.span));
         } else if kind == ElementKind::Declaration(DeclKind::Meta) {
             if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
                 for (k, _) in entries {
@@ -119,7 +123,9 @@ pub fn validate_against_schema(
     let mut doc_meta_span = doc_span;
 
     for_each_top_level_element(doc, |el| {
-        if classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta) {
+        if classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Id) {
+            doc_meta_keys.push("id".to_string());
+        } else if classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta) {
             doc_meta_span = el.span;
             if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
                 for (k, _) in entries {
@@ -273,7 +279,7 @@ mod tests {
     #[test]
     fn a_plain_kind_document_is_not_a_blueprint() {
         let doc = tomet_parser::parse_document(
-            "::kind(daily-note)\n::meta{\n  id: doc-1\n}\n\n=[ Plan ] {id: plan}\n",
+            "::kind(daily-note)\n::id(doc-1)\n\n=[ Plan ] {id: plan}\n",
         )
         .unwrap();
         assert!(
@@ -297,10 +303,10 @@ mod tests {
     #[test]
     fn validates_matching_document_successfully() {
         let blueprint = parse(
-            "::blueprint(daily-note)\n::meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n=[ Plan ] {id: plan}\n\n=[ Review ] {id: review}\n",
+            "::blueprint(daily-note)\n::id(${uuid()})\n::meta{\n  date: ${date()}\n}\n\n=[ Plan ] {id: plan}\n\n=[ Review ] {id: review}\n",
         );
         let doc = parse(
-            "::kind(daily-note)\n::meta{\n  id: doc-123\n  date: 2026-09-01\n}\n\n=[ Plan ] {id: plan}\n- ( ) My task\n\n=[ Review ] {id: review}\nGood day.\n",
+            "::kind(daily-note)\n::id(doc-123)\n::meta{\n  date: 2026-09-01\n}\n\n=[ Plan ] {id: plan}\n- ( ) My task\n\n=[ Review ] {id: review}\nGood day.\n",
         );
 
         let errors = validate_against_blueprint(&doc, &blueprint);
@@ -308,13 +314,28 @@ mod tests {
     }
 
     #[test]
+    fn a_blueprint_with_an_id_requires_the_document_to_declare_one() {
+        let blueprint = parse("::blueprint(daily-note)\n::id(${uuid()})\n\n=[ Plan ]#(plan)\n");
+        let without = parse("::kind(daily-note)\n\n=[ Plan ]#(plan)\n");
+        let errors = validate_against_blueprint(&without, &blueprint);
+        assert!(
+            matches!(
+                errors.as_slice(),
+                [Diagnostic::MissingRequiredMetaKey { key, .. }] if key == "id"
+            ),
+            "{errors:?}"
+        );
+
+        let with = parse("::kind(daily-note)\n::id(doc-1)\n\n=[ Plan ]#(plan)\n");
+        assert!(validate_against_blueprint(&with, &blueprint).is_empty());
+    }
+
+    #[test]
     fn reports_missing_meta_key_and_missing_section() {
         let blueprint = parse(
-            "::blueprint(daily-note)\n::meta{\n  id: ${uuid()}\n  date: ${date()}\n}\n\n=[ Plan ]#(plan)\n\n=[ Review ]#(review)\n",
+            "::blueprint(daily-note)\n::id(${uuid()})\n::meta{\n  date: ${date()}\n}\n\n=[ Plan ]#(plan)\n\n=[ Review ]#(review)\n",
         );
-        let doc = parse(
-            "::kind(daily-note)\n::meta{\n  id: doc-123\n}\n\n=[ Plan ]#(plan)\n- ( ) My task\n",
-        );
+        let doc = parse("::kind(daily-note)\n::id(doc-123)\n\n=[ Plan ]#(plan)\n- ( ) My task\n");
 
         let errors = validate_against_blueprint(&doc, &blueprint);
         assert_eq!(errors.len(), 2);

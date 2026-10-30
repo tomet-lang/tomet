@@ -148,10 +148,29 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
     let parser = Parser::new_ext(&preprocessed_body, options_flags);
     let mut stack: Vec<Frame> = vec![Frame::Blocks(Vec::new())];
 
-    if let Some(entries) = frontmatter {
-        let mut meta_el = element_new(Sigil::document("meta"));
-        meta_el.value = Some(tomet_ast::ElementValue::from_map(Value::Map(entries)));
-        push_block(&mut stack, Block::Element(meta_el));
+    if let Some(mut entries) = frontmatter {
+        // The identity of a document is the declaration `::id`, not a field of `::meta`.
+        let id = entries
+            .iter()
+            .position(|(key, _)| key == "id")
+            .and_then(|pos| {
+                entries[pos]
+                    .1
+                    .scalar_text()
+                    .map(|text| (pos, text.into_owned()))
+            });
+        let had_id = id.is_some();
+        if let Some((pos, text)) = id {
+            entries.remove(pos);
+            let mut id_el = element_new(Sigil::document("id"));
+            id_el.args = Some(Value::String(text));
+            push_block(&mut stack, Block::Element(id_el));
+        }
+        if !had_id || !entries.is_empty() {
+            let mut meta_el = element_new(Sigil::document("meta"));
+            meta_el.value = Some(tomet_ast::ElementValue::from_map(Value::Map(entries)));
+            push_block(&mut stack, Block::Element(meta_el));
+        }
     }
 
     for event in parser {

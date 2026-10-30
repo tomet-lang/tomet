@@ -1,6 +1,6 @@
 ::kind(fixture)
 
-::meta{id: doc-pipe-table}
+::id(doc-pipe-table)
 
 =[`|` はセルの区切りではなく内容の左端]
 外側の `[` と閉じ `]` が消え、行の頭に縦の列が立つ。セルは `[cell][cell]`

@@ -406,7 +406,7 @@ mod tests {
     /// a `type:`, with them a field that has the wrong form is reported.
     #[test]
     fn settings_given_as_text_declare_the_types_of_fields() {
-        let source = "::meta{ id: not-a-uuid }\n";
+        let source = "::id(not-a-uuid)\n";
         assert!(validate_sources(source, &[], None, &[]).unwrap().is_empty());
 
         let found = validate_sources(source, &[], Some(UUID_SETTINGS), &[]).unwrap();

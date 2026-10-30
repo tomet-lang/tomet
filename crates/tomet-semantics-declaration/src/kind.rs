@@ -10,6 +10,8 @@
 pub enum DeclKind {
     /// `::kind(name, 2)`: what kind of document this is, and the major version of that kind.
     Kind,
+    /// `::id(std.config)`: the identity of this document, unique across the documents of a vault.
+    Id,
     /// `::version(1.0)`: the language version the document is written in.
     Version,
     /// `::meta{ ... }`: information about the document.
@@ -86,13 +88,22 @@ pub struct Spec {
 }
 
 /// Every standard declaration, in the order they are listed to people.
-const SPECS: [Spec; 11] = [
+const SPECS: [Spec; 12] = [
     Spec {
         kind: DeclKind::Kind,
         name: "kind",
         // The second slot is the major version of that kind, an integer of 1 or more, and may be
         // left out. The validator checks the value; nothing reads it yet.
         positional: &["kind", "version"],
+        cardinality: Cardinality::Once,
+        scope: Scope::Both,
+    },
+    Spec {
+        kind: DeclKind::Id,
+        name: "id",
+        // The identity itself. Dots are part of it (`std.config`, `doc-kWBcIUUz`): it is one bare
+        // argument.
+        positional: &["id"],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
     },
@@ -178,8 +189,9 @@ const SPECS: [Spec; 11] = [
 
 impl DeclKind {
     /// Every standard declaration.
-    pub const ALL: [DeclKind; 11] = [
+    pub const ALL: [DeclKind; 12] = [
         DeclKind::Kind,
+        DeclKind::Id,
         DeclKind::Version,
         DeclKind::Meta,
         DeclKind::Config,
@@ -255,6 +267,7 @@ mod tests {
     #[test]
     fn the_signatures_are_the_ones_the_language_has_always_had() {
         assert_eq!(DeclKind::Kind.positional_keys(), ["kind", "version"]);
+        assert_eq!(DeclKind::Id.positional_keys(), ["id"]);
         assert_eq!(DeclKind::Version.positional_keys(), ["version"]);
         assert_eq!(DeclKind::Use.positional_keys(), ["target", "version"]);
         assert_eq!(DeclKind::Blueprint.positional_keys(), ["target"]);
@@ -278,6 +291,7 @@ mod tests {
             in_ctmt,
             [
                 DeclKind::Kind,
+                DeclKind::Id,
                 DeclKind::Version,
                 DeclKind::Meta,
                 DeclKind::Macros,

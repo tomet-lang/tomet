@@ -226,6 +226,11 @@ pub enum Diagnostic {
     /// nothing is how a reader comes to believe it is obeyed. `span` is the
     /// `::config` element; an entry of a `{...}` group has no span of its own.
     VaultOnlySetting { key: String, span: Span },
+    /// `id` written in `::meta{ ... }`: a document's identity is the declaration `::id(...)`.
+    ///
+    /// `::meta` keeps the free attributes of a document; what tomet itself reads about it does
+    /// not live there. `span` is the `::meta` element.
+    MetaIdMoved { span: Span },
     /// An entry of `::macros` or `::vars` that cannot be used as written: a macro
     /// whose template is not a string, or a variable whose declaration is not a
     /// map, has an unknown key or type, or has a `default` its `type` does not hold.
@@ -274,6 +279,7 @@ impl Diagnostic {
             Diagnostic::WrongSigil { span, .. } => *span,
             Diagnostic::RetiredSettingsKey { span, .. } => *span,
             Diagnostic::VaultOnlySetting { span, .. } => *span,
+            Diagnostic::MetaIdMoved { span } => *span,
             Diagnostic::InvalidDefinition { span, .. } => *span,
             Diagnostic::InvalidFieldValue { span, .. } => *span,
             Diagnostic::UnknownArgument { span, .. } => *span,
@@ -559,6 +565,10 @@ impl Diagnostic {
                 };
                 write!(f, "`{key}` in `::settings` is retired; {advice}")
             }
+            Diagnostic::MetaIdMoved { .. } => write!(
+                f,
+                "`id` is not written in `::meta`; the identity of a document is `::id(...)`"
+            ),
             Diagnostic::VaultOnlySetting { key, .. } => write!(
                 f,
                 "`{key}` can only be set in the vault config; here it has no effect"

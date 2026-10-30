@@ -6,8 +6,8 @@
     author: { type: string, default: "Anonymous" }
   }
 }
+::id(${uuid()})
 ::meta{
-  id: ${uuid()}
   title: ${vars.title}
   author: ${vars.author}
   status: draft

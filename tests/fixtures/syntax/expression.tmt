@@ -1,5 +1,5 @@
 ::kind(fixture)
-::meta{ id: doc-expression }
+::id(doc-expression)
 
 =[ リテラル ]
 

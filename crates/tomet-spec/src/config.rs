@@ -1,6 +1,6 @@
 //! Configuration reference generator from [`ConfigGroupSpec`] schemas.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Placement, Section, Sigil, Value};
+use tomet_ast::{Block, Document, Element, Placement, Section, Sigil, Value};
 use tomet_config::{ConfigEntrySpec, ConfigGroupSpec, PrinterConfig};
 use tomet_tree::{ElementExt, element_new};
 
@@ -26,14 +26,11 @@ pub fn document(
     title: &str,
     intro_paragraphs: &[&str],
 ) -> Document {
-    let mut meta = element_new(Sigil::document("meta")).with_placement(Placement::Block);
-    meta.value = Some(ElementValue::from_map(Value::Map(vec![(
-        "id".to_string(),
-        Value::String(doc_id.to_string()),
-    )])));
+    let mut id = element_new(Sigil::document("id")).with_placement(Placement::Block);
+    id.args = Some(Value::String(doc_id.to_string()));
 
     let mut blocks = vec![
-        Block::Element(meta),
+        Block::Element(id),
         Block::Section(Section::new(1, vec![text(title)], dummy())),
     ];
 

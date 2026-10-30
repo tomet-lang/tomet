@@ -1,6 +1,4 @@
-::meta{
-  id: cli.refactor
-}
+::id(cli.refactor)
 
 `tomet refactor [PATH]`: 古い書き方の文書を、新しい書き方に直す。言語を変えるときに、既存の文書を機械的に移すためのコマンド。
 

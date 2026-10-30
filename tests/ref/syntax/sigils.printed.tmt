@@ -1,6 +1,6 @@
 ::kind(fixture)
 
-::meta{id: doc-sigils}
+::id(doc-sigils)
 
 =[シジルは形を表す]
 シジルは `@` ひとつだけ。`#` はもう何の意味も持たない、ただの文字。

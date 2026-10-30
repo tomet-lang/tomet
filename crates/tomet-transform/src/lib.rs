@@ -28,6 +28,7 @@ pub use structural::*;
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use tomet_ast::Value;
 
     fn parse_doc(src: &str) -> tomet_ast::Document {
         tomet_parser::parse_document(src).expect("valid source")
@@ -70,6 +71,32 @@ mod tests {
         assert!(sigils.iter().any(|s| s.is_bare_named("kind")));
         assert!(sigils.iter().any(|s| s.is_bare_named("version")));
         assert!(sigils.iter().any(|s| s.is_bare_named("meta")));
+    }
+
+    #[test]
+    fn test_promote_meta_id_to_id() {
+        let mut doc = parse_doc("::meta{\n  id: doc-1\n  title: T\n}\n");
+        assert!(promote_meta_id_to_id(&mut doc));
+
+        let mut id = None;
+        let mut meta_keys = Vec::new();
+        tomet_tree::for_each_top_level_element(&doc, |el| {
+            if el.sigil.is_bare_named("id") {
+                id = el.args.clone();
+            }
+            if el.sigil.is_bare_named("meta")
+                && let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el)
+            {
+                meta_keys = entries.into_iter().map(|(key, _)| key).collect();
+            }
+        });
+        assert_eq!(id, Some(Value::String("doc-1".into())));
+        assert_eq!(meta_keys, vec!["title".to_string()]);
+
+        // Nothing to promote: no change.
+        assert!(!promote_meta_id_to_id(&mut parse_doc(
+            "::meta{ title: T }\n"
+        )));
     }
 
     #[test]

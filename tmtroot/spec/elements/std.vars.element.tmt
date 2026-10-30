@@ -1,7 +1,5 @@
 ::kind(element)
-::meta{
-  id: std.vars
-}
+::id(std.vars)
 
 =[ 全容 ]
 

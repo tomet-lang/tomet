@@ -1,6 +1,6 @@
 ::kind(fixture)
 
-::meta{id: doc-pipe}
+::id(doc-pipe)
 
 =[`|` は括弧のない `[`]
 `[content]` と同じスロットに置け、`]` の代わりに `|` 行の連なりの終わりで

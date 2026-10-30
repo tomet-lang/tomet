@@ -1,6 +1,4 @@
-::meta{
-  id: cli.html
-}
+::id(cli.html)
 
 `tomet html <PATH>`: 文書を HTML にする。独立したページか、本文だけ。
 

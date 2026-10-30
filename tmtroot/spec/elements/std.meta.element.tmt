@@ -1,6 +1,4 @@
 ::kind(element)
-::meta{
-  id: std.meta
-}
+::id(std.meta)
 
 基本的に、レンダリングされない、ドキュメントの属性を宣言する場所である。

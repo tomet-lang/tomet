@@ -1,6 +1,4 @@
-::meta{
-  id: cli.roundtrip
-}
+::id(cli.roundtrip)
 
 `tomet roundtrip <FILE>`: データファイルを読み、書き戻し、読み直して、元と同じになるか確かめる。データの保存と読み込み（`cotomet`）が、値を損なわないことを確かめるためのコマンド。
 

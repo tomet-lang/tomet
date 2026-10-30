@@ -1,6 +1,4 @@
-::meta{
-  id: cli.spec
-}
+::id(cli.spec)
 
 `tomet spec`: コマンド体系（CLI）や設定スキーマ（Config）の仕様・リファレンスを、`.tmt` として自動生成する。
 

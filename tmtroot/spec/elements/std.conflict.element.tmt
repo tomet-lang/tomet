@@ -1,7 +1,5 @@
 ::kind(element)
-::meta{
-  id: std.conflict
-}
+::id(std.conflict)
 
 3-wayマージが同じ箇所を両側から変更したと判定し、自動統合を諦めたときに
 置かれる要素。`a`/`b`は2つの候補、どちらが「自分」でどちらが「相手」かと

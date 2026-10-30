@@ -34,6 +34,14 @@ pub fn to_pandoc(doc: &Document) -> PandocDoc {
             .map(|(k, v)| (k.clone(), meta_value(v)))
             .collect();
     }
+    // The identity of a document is the declaration `::id(...)`; Pandoc's metadata map is where
+    // it goes, as `id`.
+    if let Some(id) = tomet_declaration::document_id(doc) {
+        out.meta.insert(
+            "id".to_string(),
+            MetaValue::MetaInlines(text_to_inlines(&id)),
+        );
+    }
     out
 }
 
@@ -896,6 +904,17 @@ mod tests {
                 Target("https://example.com".into(), String::new()),
             )])]
         );
+    }
+
+    #[test]
+    fn the_id_declaration_feeds_the_metadata_id() {
+        let doc = parse_document("::id(doc-1)\n::meta{title: Hello}\n\n本文\n").unwrap();
+        let pandoc = to_pandoc(&doc);
+        assert_eq!(
+            pandoc.meta.get("id"),
+            Some(&MetaValue::MetaInlines(vec![Inline::Str("doc-1".into())]))
+        );
+        assert!(pandoc.meta.contains_key("title"));
     }
 
     #[test]

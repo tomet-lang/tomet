@@ -5,15 +5,17 @@ pub(crate) fn refactor_cmd(
     in_place: bool,
     url_macros: bool,
     meta_kind: bool,
+    meta_id: bool,
     check: bool,
     force: bool,
 ) -> anyhow::Result<()> {
-    let options = if !url_macros && !meta_kind {
+    let options = if !url_macros && !meta_kind && !meta_id {
         tomet_workspace::RefactorOptions::default()
     } else {
         tomet_workspace::RefactorOptions {
             url_to_macros: url_macros,
             meta_type_to_kind: meta_kind,
+            meta_id_to_id: meta_id,
             ..tomet_workspace::RefactorOptions::default()
         }
     };
@@ -117,7 +119,7 @@ mod tests {
         fs::write(temp_dir.join("fine.tmt"), "::kind(note)\n\n=[ Title ]\n").unwrap();
         fs::write(temp_dir.join("broken.tmt"), "=[ unterminated\n").unwrap();
 
-        let res = refactor_cmd(&temp_dir, false, false, false, true, false);
+        let res = refactor_cmd(&temp_dir, false, false, false, false, true, false);
         assert!(
             res.is_err(),
             "--check must not pass while a file could not be parsed"
@@ -145,7 +147,7 @@ mod tests {
 "#;
         fs::write(&src_file, src_content).unwrap();
 
-        let res = refactor_cmd(&src_file, true, false, false, false, false);
+        let res = refactor_cmd(&src_file, true, false, false, false, false, false);
         assert!(res.is_ok());
 
         let refactored = fs::read_to_string(&src_file).unwrap();
@@ -172,10 +174,10 @@ mod tests {
         let old = "::meta{\n  type: note\n}\n";
         fs::write(&frozen, old).unwrap();
 
-        refactor_cmd(&frozen, true, false, false, false, false).unwrap();
+        refactor_cmd(&frozen, true, false, false, false, false, false).unwrap();
         assert_eq!(fs::read_to_string(&frozen).unwrap(), old, "left alone");
 
-        refactor_cmd(&frozen, true, false, false, false, true).unwrap();
+        refactor_cmd(&frozen, true, false, false, false, false, true).unwrap();
         assert_ne!(
             fs::read_to_string(&frozen).unwrap(),
             old,

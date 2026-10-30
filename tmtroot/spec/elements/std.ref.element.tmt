@@ -1,7 +1,5 @@
 ::kind(element)
-::meta{
-  id: std.ref
-}
+::id(std.ref)
 
 @callout(warning)
 | 現在は、`@link(ref:)`の簡易版としての立ち位置になっている。

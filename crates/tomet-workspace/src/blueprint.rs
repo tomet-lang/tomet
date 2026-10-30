@@ -308,7 +308,7 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/blueprints")).unwrap();
         fs::write(
             dir.join(".tomet/blueprints/daily-note.blueprint.tmt"),
-            "::kind(blueprint)\n::blueprint(daily-note)\n::vars{\n  title: { type: string }\n}\n::meta{\n  id: ${generate.uuid()}\n  title: ${var.title}\n}\n\n=[ Tasks for ${var.title} ]#(tasks)\n",
+            "::kind(blueprint)\n::blueprint(daily-note)\n::vars{\n  title: { type: string }\n}\n::id(${generate.uuid()})\n::meta{\n  title: ${var.title}\n}\n\n=[ Tasks for ${var.title} ]#(tasks)\n",
         )
         .unwrap();
         dir
@@ -427,7 +427,7 @@ mod tests {
     fn generated_values_come_from_the_injected_clock_and_random_source() {
         let file = blueprint_file(
             "fixed",
-            "::blueprint(note)\n::vars{\n  author: { type: string }\n}\n::meta{\n  id: ${generate.uuid()}\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  by: ${var.author}\n}\n",
+            "::blueprint(note)\n::vars{\n  author: { type: string }\n}\n::id(${generate.uuid()})\n::meta{\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  by: ${var.author}\n}\n",
         );
         let mut vars = HashMap::new();
         vars.insert("author".to_string(), Value::String("Ann".into()));
@@ -443,7 +443,7 @@ mod tests {
         .content;
 
         assert!(
-            content.contains("id: 00000000-0000-0000-0000-000000000000"),
+            content.contains("::id(00000000-0000-0000-0000-000000000000)"),
             "{content}"
         );
         assert!(content.contains("day: 1970-01-01"), "{content}");

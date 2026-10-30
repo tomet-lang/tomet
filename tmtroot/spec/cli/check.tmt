@@ -1,6 +1,4 @@
-::meta{
-  id: cli.check
-}
+::id(cli.check)
 
 `tomet check [PATH]`: 文書が正しいかを調べ、直すべきものがあれば非ゼロで終わる。
 

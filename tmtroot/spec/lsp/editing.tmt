@@ -1,6 +1,4 @@
-::meta{
-  id: lsp.editing
-}
+::id(lsp.editing)
 
 書くのを助ける機能: 整形、ホバー、補完、定義ジャンプ、アウトライン、折りたたみ。診断は @file(tmtroot/spec/lsp/diagnostics.tmt)。
 

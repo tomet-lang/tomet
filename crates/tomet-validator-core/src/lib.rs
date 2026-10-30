@@ -429,6 +429,9 @@ pub fn check_document_declarations(doc: &Document, errors: &mut Vec<Diagnostic>)
                     duplicate: span,
                 });
             }
+            Problem::MetaIdMoved => {
+                errors.push(Diagnostic::MetaIdMoved { span });
+            }
         }
     }
 }
@@ -468,6 +471,9 @@ pub fn check_ctmt_declarations(declarations: &[Declared], errors: &mut Vec<Diagn
                     first: declarations[first].span,
                     duplicate: span,
                 });
+            }
+            Problem::MetaIdMoved => {
+                errors.push(Diagnostic::MetaIdMoved { span });
             }
             Problem::InvalidVersion { declaration, found } => {
                 errors.push(Diagnostic::InvalidVersion {
@@ -669,51 +675,70 @@ pub fn check_field_types(
     errors: &mut Vec<Diagnostic>,
 ) {
     use tomet_ast::Value;
-    use tomet_type::Type;
+    use tomet_tree::ValueExt;
 
     if field_types.is_empty() {
         return;
     }
-    let mut checked = false;
+    let mut checked_meta = false;
+    let mut checked_id = false;
     tomet_tree::for_each_top_level_element(doc, |el| {
-        if checked
-            || tomet_semantics::classify_std_lenient(el)
-                != tomet_semantics::ElementKind::Declaration(DeclKind::Meta)
-        {
-            return;
-        }
-        checked = true;
-        let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el) else {
-            return;
-        };
-        for (field, value) in &entries {
-            let Some(field_type) = field_types.get(field) else {
-                continue;
-            };
-            let Some(ty) = Type::from_name(field_type).filter(|ty| ty.has_text_form()) else {
-                continue;
-            };
-            let well_formed = match value {
-                Value::Null => true,
-                // `${...}` keeps its place in the tree until it is evaluated,
-                // and what it comes to is not known here.
-                Value::Element(el) if matches!(el.sigil, tomet_ast::Sigil::Dollar) => true,
-                // A scalar is the text it was written as: a bare `1.10` is the
-                // version `1.10`, and `2026` is not a datetime.
-                scalar => scalar
-                    .scalar_text()
-                    .is_some_and(|text| text.is_empty() || ty.holds_text(&text) == Some(true)),
-            };
-            if !well_formed {
-                errors.push(Diagnostic::InvalidFieldValue {
-                    field: field.clone(),
-                    field_type: field_type.clone(),
-                    value: describe_value(value),
-                    span: el.span,
-                });
+        match tomet_semantics::classify_std_lenient(el) {
+            tomet_semantics::ElementKind::Declaration(DeclKind::Meta) if !checked_meta => {
+                checked_meta = true;
+                let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el) else {
+                    return;
+                };
+                for (field, value) in &entries {
+                    errors.extend(field_value_error(field, value, field_types, el.span));
+                }
             }
+            // The identity of a document is the field `id` of its vault's settings, wherever
+            // it is written: `meta: { id: { type: uuid } }` holds `::id(...)` to a UUID.
+            tomet_semantics::ElementKind::Declaration(DeclKind::Id) if !checked_id => {
+                checked_id = true;
+                let Some(value) = tomet_semantics::normalized_element_args(el)
+                    .and_then(|args| args.get("id").cloned())
+                else {
+                    return;
+                };
+                errors.extend(field_value_error("id", &value, field_types, el.span));
+            }
+            _ => {}
         }
     });
+}
+
+/// The diagnostic for `value` as the field `field`, if the settings declare a `type:` for the
+/// field that has a form and `value` does not have it.
+fn field_value_error(
+    field: &str,
+    value: &tomet_ast::Value,
+    field_types: &std::collections::BTreeMap<String, String>,
+    span: Span,
+) -> Option<Diagnostic> {
+    use tomet_ast::Value;
+    use tomet_type::Type;
+
+    let field_type = field_types.get(field)?;
+    let ty = Type::from_name(field_type).filter(|ty| ty.has_text_form())?;
+    let well_formed = match value {
+        Value::Null => true,
+        // `${...}` keeps its place in the tree until it is evaluated,
+        // and what it comes to is not known here.
+        Value::Element(el) if matches!(el.sigil, tomet_ast::Sigil::Dollar) => true,
+        // A scalar is the text it was written as: a bare `1.10` is the
+        // version `1.10`, and `2026` is not a datetime.
+        scalar => scalar
+            .scalar_text()
+            .is_some_and(|text| text.is_empty() || ty.holds_text(&text) == Some(true)),
+    };
+    (!well_formed).then(|| Diagnostic::InvalidFieldValue {
+        field: field.to_string(),
+        field_type: field_type.clone(),
+        value: describe_value(value),
+        span,
+    })
 }
 
 /// A value as a reader would have written it, for a message.

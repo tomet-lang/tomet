@@ -1,7 +1,5 @@
 ::kind(element)
-::meta{
-  id: std.link
-}
+::id(std.link)
 
 #[ 対応形式 ]
 

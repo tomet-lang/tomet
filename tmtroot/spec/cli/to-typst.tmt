@@ -1,6 +1,4 @@
-::meta{
-  id: cli.to-typst
-}
+::id(cli.to-typst)
 
 `tomet to-typst <PATH>`: 文書を Typst の記法にする。
 

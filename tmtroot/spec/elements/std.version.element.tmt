@@ -1,7 +1,5 @@
 ::kind(element)
-::meta{
-  id: std.version
-}
+::id(std.version)
 
 tometのバージョンを宣言する要素である。
 

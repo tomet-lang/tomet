@@ -43,6 +43,9 @@ pub enum Problem {
         declaration: &'static str,
         first: usize,
     },
+    /// `id` written in `::meta{ ... }`. `::meta` holds free attributes; what the language itself
+    /// reads about a document, its identity, is the declaration `::id(...)`.
+    MetaIdMoved,
 }
 
 impl std::fmt::Display for Problem {
@@ -70,6 +73,12 @@ impl std::fmt::Display for Problem {
             }
             Problem::Repeated { declaration, .. } => {
                 write!(f, "`{declaration}` may appear once in a document")
+            }
+            Problem::MetaIdMoved => {
+                write!(
+                    f,
+                    "`id` is not written in `::meta`; the identity of a document is `::id(...)`"
+                )
             }
         }
     }
@@ -137,6 +146,13 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
             }
             DeclKind::Vars => {
                 check_vars(idx, decl, spec.name, &mut problems);
+            }
+            DeclKind::Meta => {
+                if let Some(Value::Map(entries)) = &decl.data
+                    && entries.iter().any(|(key, _)| key == "id")
+                {
+                    problems.push((idx, Problem::MetaIdMoved));
+                }
             }
             _ => {}
         }

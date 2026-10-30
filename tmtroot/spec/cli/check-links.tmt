@@ -1,6 +1,4 @@
-::meta{
-  id: cli.check-links
-}
+::id(cli.check-links)
 
 `tomet check-links [PATH]`: 文書の、他のファイルや文書へのリンクが切れていないか調べる。
 

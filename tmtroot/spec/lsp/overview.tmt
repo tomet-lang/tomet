@@ -1,6 +1,4 @@
-::meta{
-  id: lsp.overview
-}
+::id(lsp.overview)
 
 Tomet の言語サーバー `tomet-lsp`。エディタに、診断、整形、ホバー、補完、定義ジャンプ、アウトライン、折りたたみを与える。
 

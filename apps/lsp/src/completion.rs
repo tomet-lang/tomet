@@ -347,7 +347,7 @@ fn describe_kind(name: &str) -> &'static str {
         "vars" => "Variable declarations: type, default, about",
         "use" => "Bind a vocabulary as a namespace",
         "references" => "Remote connection container",
-        "id" => "Attach attributes to a remote element by id",
+        "id" => "Identity of this document, unique in the vault",
         "link" => "Link to a url, file, or document",
         "embed" => "Embed another document or asset",
         "table" => "Table",

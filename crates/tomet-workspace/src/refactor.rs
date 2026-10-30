@@ -10,7 +10,9 @@ use tomet_indexer::{collect_tm_files_with_config, is_excluded_by_config};
 use tomet_load_config::find_config_file;
 use tomet_parser::parse_document;
 use tomet_printer::document_to_tm_with_config;
-use tomet_transform::{MacroSet, promote_meta_type_to_kind, transform_link_targets_with_macros};
+use tomet_transform::{
+    MacroSet, promote_meta_id_to_id, promote_meta_type_to_kind, transform_link_targets_with_macros,
+};
 
 use crate::diff::FileDiff;
 
@@ -21,6 +23,8 @@ pub struct RefactorOptions {
     pub url_to_macros: bool,
     /// Promote `::meta` `type:` field to top-level `::kind(...)` element.
     pub meta_type_to_kind: bool,
+    /// Promote `::meta` `id:` field to top-level `::id(...)` declaration.
+    pub meta_id_to_id: bool,
     /// Also refactor files and directories the project config excludes
     /// (`workspace.ignore`, `workspace.unswept`). Off by default: a file
     /// named explicitly is held to the same exclusions as one a sweep finds.
@@ -32,6 +36,7 @@ impl Default for RefactorOptions {
         Self {
             url_to_macros: true,
             meta_type_to_kind: true,
+            meta_id_to_id: true,
             force: false,
         }
     }
@@ -56,6 +61,10 @@ pub fn refactor_document(
     }
 
     if options.meta_type_to_kind && promote_meta_type_to_kind(doc) {
+        total_changes += 1;
+    }
+
+    if options.meta_id_to_id && promote_meta_id_to_id(doc) {
         total_changes += 1;
     }
 

@@ -1,4 +1,2 @@
 ::kind(element)
-::meta{
-  id: std.list
-}
+::id(std.list)
