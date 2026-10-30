@@ -32,6 +32,9 @@ pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
         // is the path. The element name says file or directory; unlike
         // `@link`, there is no scheme prefix to carry it.
         "file" | "dir" => &["target"],
+        // A mention names one term: `tomet#id`, `tomet#name("...")` or the term itself. In a
+        // `::dictionary` the same element is the definition and takes no argument.
+        "term" => &["target"],
         "callout" => &["variant"],
         "heading" => &["level"],
         "task" => &["status"],
@@ -213,7 +216,7 @@ mod tests {
     use super::*;
     use cotomet_syntax::POSITIONAL_ENTRY_KEY;
     use tomet_ast::Name;
-    use tomet_tree::element_new;
+    use tomet_tree::{ValueExt, element_new};
 
     #[test]
     fn normalizes_raw_positional_arg() {
@@ -306,6 +309,32 @@ mod tests {
                 Value::String("https://example.com".to_string())
             )]))
         );
+    }
+
+    #[test]
+    fn a_term_mention_has_one_positional_target_in_each_of_its_three_spellings() {
+        // The dictionary is on the left of `#`, as `<document>#<place>`; the term alone has none.
+        for written in [
+            "tomet#vault-config",
+            "tomet#name(\"vault.config.tmt\")",
+            "\"vault.config.tmt\"",
+        ] {
+            let doc = tomet_parser::parse_document(&format!("a @term({written}) b\n"))
+                .expect("a mention parses");
+            let mut found = None;
+            tomet_tree::for_each_element(&doc, |el| {
+                if el.sigil.name().is_some_and(|name| name.name == "term") {
+                    found = normalized_element_args(el);
+                }
+            });
+            let target = found
+                .as_ref()
+                .and_then(|args| args.get("target"))
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            let expected = written.trim_matches('"').to_string();
+            assert_eq!(target, Some(expected), "{written}");
+        }
     }
 
     #[test]

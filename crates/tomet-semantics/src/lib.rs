@@ -33,6 +33,9 @@
 //! - (Document Configuration (`config`))
 //!   | Reads a document's `::export` into a structured [`DocumentConfig`], with the `::macros` and
 //!   | `::vars` it declares.
+//! - (Dictionaries (`dictionary`))
+//!   | Reads a `::dictionary(name)` document into a [`Dictionary`] of [`Term`]s, collects the ones a
+//!   | vault registers in [`LoadedDictionaries`], and resolves what a `@term` names ([`TermRef`]).
 //! - (Structural Helpers)
 //!   | Heading level clamping (`heading`) and
 //!   | table parsing (`table`).
@@ -46,6 +49,7 @@
 
 mod connect_member;
 pub mod data;
+pub mod dictionary;
 pub mod elements;
 pub mod flatten;
 mod kind;
@@ -57,6 +61,7 @@ pub use connect_member::{
     CONNECT_MEMBERS, ConnectMember, UnknownConnectMember, classify_connect_member,
 };
 pub use data::element_data;
+pub use dictionary::{Dictionary, LoadedDictionaries, Term, TermProblem, TermRef};
 pub use elements::config::{DocumentConfig, ExportType, document_config};
 pub use elements::footnote::{self, FootnoteItem, FootnoteRegistry};
 pub use elements::heading::heading_level;

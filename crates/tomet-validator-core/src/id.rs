@@ -1,4 +1,4 @@
-use tomet_ast::{Block, Document, Element, Inline, List, Span};
+use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline, List, Span, Value};
 
 /// Walks every node in `doc` and returns `(id, span)` for each
 /// [`Element::id`]/[`Section::id`] found, in document order.
@@ -55,6 +55,17 @@ fn collect_element_ids(el: &Element, ids: &mut Vec<(String, Span)>) {
     if let Some(id) = &el.id {
         ids.push((id.0.clone(), el.span));
     }
+    if let Some(args) = &el.args {
+        collect_value_ids(args, ids);
+    }
+    if let Some(ElementValue::Group(entries)) = &el.value {
+        for entry in entries {
+            match entry {
+                Entry::Pair(_, value) => collect_value_ids(value, ids),
+                Entry::Element(child) => collect_element_ids(child, ids),
+            }
+        }
+    }
     if let Some(content) = &el.content {
         for block in content {
             collect_block_ids(block, ids);
@@ -62,6 +73,30 @@ fn collect_element_ids(el: &Element, ids: &mut Vec<(String, Span)>) {
     }
     for conn in &el.connects {
         collect_element_ids(conn, ids);
+    }
+}
+
+/// The ids of the elements that sit in a value slot (`key: @file(a)#(entry)`), at any depth. They are
+/// anchors like any other (`@link(#entry)` resolves), so they count for uniqueness too.
+fn collect_value_ids(value: &Value, ids: &mut Vec<(String, Span)>) {
+    match value {
+        Value::Element(el) => collect_element_ids(el, ids),
+        Value::Map(entries) => {
+            for (_, value) in entries {
+                collect_value_ids(value, ids);
+            }
+        }
+        Value::Seq(values) | Value::Call(_, values) => {
+            for value in values {
+                collect_value_ids(value, ids);
+            }
+        }
+        Value::Blocks(blocks) => {
+            for block in blocks {
+                collect_block_ids(block, ids);
+            }
+        }
+        _ => {}
     }
 }
 

@@ -3,7 +3,7 @@
 //! A vault's configuration is a stack of files -- the vault config, then each folder config on the
 //! way down to a document, then the document's own declarations -- and the nearer layer wins, key
 //! by key. Each concern is a declaration of its own (`::format`, `::fields`, `::workspace`,
-//! `::blueprints`, `::vocabularies`, `::macros`, `::vars`), and a layer keeps what each one said.
+//! `::blueprints`, `::vocabularies`, `::dictionaries`, `::macros`, `::vars`), and a layer keeps what each one said.
 //! Merging happens on those values, before they become a [`Config`](crate::Config): a typed group
 //! cannot tell a key that was never written from one written with its default, so two typed groups
 //! cannot be merged without guessing.
@@ -22,6 +22,7 @@ pub struct ConfigLayer {
     workspace: Vec<(String, Value)>,
     blueprints: Vec<(String, Value)>,
     vocabularies: Vec<(String, Value)>,
+    dictionaries: Vec<(String, Value)>,
     macros: HashMap<String, String>,
     vars: Vec<(String, VarDecl)>,
 }
@@ -35,6 +36,7 @@ impl ConfigLayer {
             workspace: document_entries(doc, DeclKind::Workspace),
             blueprints: document_entries(doc, DeclKind::Blueprints),
             vocabularies: document_entries(doc, DeclKind::Vocabularies),
+            dictionaries: document_entries(doc, DeclKind::Dictionaries),
             macros: tomet_declaration::document_macros(doc)
                 .into_iter()
                 .collect(),
@@ -51,6 +53,7 @@ impl ConfigLayer {
             DeclKind::Workspace => Some(&mut self.workspace),
             DeclKind::Blueprints => Some(&mut self.blueprints),
             DeclKind::Vocabularies => Some(&mut self.vocabularies),
+            DeclKind::Dictionaries => Some(&mut self.dictionaries),
             _ => None,
         }
     }
@@ -80,6 +83,7 @@ impl ConfigLayer {
         self.workspace.extend(inner.workspace.iter().cloned());
         self.blueprints.extend(inner.blueprints.iter().cloned());
         self.vocabularies.extend(inner.vocabularies.iter().cloned());
+        self.dictionaries.extend(inner.dictionaries.iter().cloned());
         self.macros.extend(inner.macros.clone());
         for (name, decl) in &inner.vars {
             match self.vars.iter_mut().find(|(held, _)| held == name) {
@@ -120,10 +124,16 @@ impl ConfigLayer {
     pub(crate) fn vocabulary_paths(&self) -> Vec<String> {
         registered_paths(&self.vocabularies)
     }
+
+    /// The registered dictionary files, in the order registered; a name registered twice is the
+    /// later one.
+    pub(crate) fn dictionary_paths(&self) -> Vec<String> {
+        registered_paths(&self.dictionaries)
+    }
 }
 
-/// The `(name, path)` pairs a document registers in its `::blueprints` or `::vocabularies`
-/// (`kind`), in the order written. An entry that is not a reference to a file is left out.
+/// The `(name, path)` pairs a document registers in its `::blueprints`, `::vocabularies` or
+/// `::dictionaries` (`kind`), in the order written. An entry that is not a reference to a file is left out.
 pub fn registry_entries(doc: &Document, kind: DeclKind) -> Vec<(String, String)> {
     document_entries(doc, kind)
         .into_iter()
@@ -217,6 +227,18 @@ mod tests {
             "::vocabularies{ deck: @file(deck.tmt), odd: 3, link: @link(x) }\n",
         )]);
         assert_eq!(cfg.registry.vocabularies, vec!["deck.tmt".to_string()]);
+    }
+
+    #[test]
+    fn dictionaries_are_registered_like_vocabularies_and_stacked_by_name() {
+        let outer = layer("::dictionaries{ tomet: @file(a.tmt), user: @file(u.tmt) }\n");
+        let inner = layer("::dictionaries{ tomet: @file(b.tmt) }\n");
+        let cfg = Config::from_layers([&outer, &inner]);
+        assert_eq!(
+            cfg.registry.dictionaries,
+            vec!["b.tmt".to_string(), "u.tmt".to_string()]
+        );
+        assert!(cfg.registry.vocabularies.is_empty());
     }
 
     #[test]

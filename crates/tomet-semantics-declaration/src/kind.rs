@@ -28,6 +28,10 @@ pub enum DeclKind {
     Blueprints,
     /// `::vocabularies{ name: @file(path) }`: the vocabularies this vault or folder registers.
     Vocabularies,
+    /// `::dictionaries{ name: @file(path) }`: the dictionaries of terms this vault or folder registers. Like
+    /// [`DeclKind::Vocabularies`], the key is the binding and must be the name the file gives itself
+    /// (`::dictionary(name)`), and the path is relative to the vault root.
+    Dictionaries,
     /// `::migration{ ... }`: the settings of the migration tool. `tomet` reads nothing from it; it is
     /// registered so that the vault config may carry it until the tool declares its own vocabulary.
     Migration,
@@ -41,6 +45,10 @@ pub enum DeclKind {
     Blueprint,
     /// `::vocabulary(ns){ ... }`: the header of a vocabulary document.
     Vocabulary,
+    /// `::dictionary(name){ "term": @term[description]#(id) }`: a dictionary of terms. Each entry is a term
+    /// (its name is the key, quoted, so a word in any language fits) with a description and, optionally, a
+    /// stable identifier; a document mentions one with `@term`.
+    Dictionary,
     /// `::elements{ ... }`: the elements a vocabulary declares.
     Elements,
 }
@@ -102,7 +110,7 @@ pub struct Spec {
 }
 
 /// Every standard declaration, in the order they are listed to people.
-const SPECS: [Spec; 17] = [
+const SPECS: [Spec; 19] = [
     Spec {
         kind: DeclKind::Kind,
         name: "kind",
@@ -188,6 +196,14 @@ const SPECS: [Spec; 17] = [
         vault_only: false,
     },
     Spec {
+        kind: DeclKind::Dictionaries,
+        name: "dictionaries",
+        positional: &[],
+        cardinality: Cardinality::Once,
+        scope: Scope::Tmt,
+        vault_only: false,
+    },
+    Spec {
         kind: DeclKind::Migration,
         name: "migration",
         positional: &[],
@@ -244,6 +260,15 @@ const SPECS: [Spec; 17] = [
         vault_only: false,
     },
     Spec {
+        kind: DeclKind::Dictionary,
+        name: "dictionary",
+        // The name the dictionary is mentioned by: `@term(tomet#id)` names it `tomet`.
+        positional: &["name"],
+        cardinality: Cardinality::Once,
+        scope: Scope::Tmt,
+        vault_only: false,
+    },
+    Spec {
         kind: DeclKind::Elements,
         name: "elements",
         positional: &[],
@@ -255,7 +280,7 @@ const SPECS: [Spec; 17] = [
 
 impl DeclKind {
     /// Every standard declaration.
-    pub const ALL: [DeclKind; 17] = [
+    pub const ALL: [DeclKind; 19] = [
         DeclKind::Kind,
         DeclKind::Id,
         DeclKind::Version,
@@ -266,12 +291,14 @@ impl DeclKind {
         DeclKind::Export,
         DeclKind::Blueprints,
         DeclKind::Vocabularies,
+        DeclKind::Dictionaries,
         DeclKind::Migration,
         DeclKind::Macros,
         DeclKind::Vars,
         DeclKind::Use,
         DeclKind::Blueprint,
         DeclKind::Vocabulary,
+        DeclKind::Dictionary,
         DeclKind::Elements,
     ];
 
@@ -347,6 +374,7 @@ mod tests {
         assert_eq!(DeclKind::Version.positional_keys(), ["version"]);
         assert_eq!(DeclKind::Use.positional_keys(), ["target", "version"]);
         assert_eq!(DeclKind::Blueprint.positional_keys(), ["target"]);
+        assert_eq!(DeclKind::Dictionary.positional_keys(), ["name"]);
         assert!(DeclKind::Meta.positional_keys().is_empty());
     }
 

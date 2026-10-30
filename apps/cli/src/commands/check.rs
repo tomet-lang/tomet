@@ -68,12 +68,11 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
     // seven files times eighty-five documents -- which is why the front
     // door has a vault and a per-document call rather than one function.
     let vault = tomet_load::Vault::discover(path);
-    if !vault.vocabulary_errors.is_empty() {
-        let mut err_out = io::stderr().lock();
-        for problem in &vault.vocabulary_errors {
-            let _ = writeln!(err_out, "warning: {problem}");
-        }
+    let mut err_out = io::stderr().lock();
+    for problem in vault.setup_problems() {
+        let _ = writeln!(err_out, "warning: {problem}");
     }
+    drop(err_out);
 
     let files = if path.is_file() {
         vec![path.to_path_buf()]

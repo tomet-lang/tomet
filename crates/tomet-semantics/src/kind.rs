@@ -167,6 +167,10 @@ pub enum ElementKind {
     Tag,
     /// `@task(status)[ ... ]` -- an actionable task item.
     Task,
+    /// `@term(tomet#vault-config)`, `@term(tomet#name("vault.config.tmt"))`, `@term("vault.config.tmt")` -- a
+    /// mention of a term a dictionary defines. In a `::dictionary` the same element is the definition:
+    /// `"vault.config.tmt": @term[description]#(vault-config)`.
+    Term,
 }
 
 impl ElementKind {
@@ -203,6 +207,7 @@ impl ElementKind {
             ElementKind::Footnote => "ftn",
             ElementKind::Tag => "tag",
             ElementKind::Task => "task",
+            ElementKind::Term => "term",
         }
     }
 }
@@ -237,7 +242,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-const BODY_KINDS: [(&str, ElementKind); 23] = [
+const BODY_KINDS: [(&str, ElementKind); 24] = [
     ("data", ElementKind::Data),
     // Marks on the document about the document. `//(TODO)` was the first
     // spelling tried and cannot work: `tomet_ast` has no comment node, so
@@ -265,6 +270,7 @@ const BODY_KINDS: [(&str, ElementKind); 23] = [
     ("ftn", ElementKind::Footnote),
     ("tag", ElementKind::Tag),
     ("task", ElementKind::Task),
+    ("term", ElementKind::Term),
 ];
 
 /// Every recognized bare name and what it is: the standard declarations, then the body elements.
@@ -491,6 +497,9 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         Footnote => return None,
         Tag => return None,
         Task => return None,
+        // Either shape: a mention sits inside a sentence, and the definition in a `::dictionary` stands as
+        // an entry of its value group.
+        Term => return None,
         Custom(_) | Bare | Interp => return None,
     })
 }
@@ -560,7 +569,8 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         // May hold multiple paragraphs, headings, lists: a blockquote
         // commonly spans several paragraphs; an admonition/card/footnote
         // can too; a table's rows/cells; a task's details.
-        Quote | Callout | Card | Table | Footnote | Task => Some(ContentShape::Block),
+        // A term's description is the content of its definition; a mention has none.
+        Quote | Callout | Card | Table | Footnote | Task | Term => Some(ContentShape::Block),
         // Not a built-in bare name at all.
         Custom(_) | Bare | Interp => None,
     }

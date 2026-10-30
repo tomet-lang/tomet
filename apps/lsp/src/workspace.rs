@@ -146,9 +146,9 @@ impl Workspace {
                     vault.set_buffer(open, text);
                 }
             }
-            let now: HashSet<String> = vault.vocabulary_errors.iter().cloned().collect();
+            let now: HashSet<String> = vault.setup_problems().cloned().collect();
             let before = self.reported.remove(&root).unwrap_or_default();
-            for problem in &vault.vocabulary_errors {
+            for problem in vault.setup_problems() {
                 if !before.contains(problem) {
                     self.notices
                         .push(format!("{problem} (vault: {})", vault.root.display()));
@@ -161,8 +161,8 @@ impl Workspace {
     }
 
     /// What the vaults found wrong with their own setup since this was last
-    /// asked, once each: a vocabulary the config declares that does not exist,
-    /// or that does not name itself. Not about any document, so there is no
+    /// asked, once each: a vocabulary or a dictionary the config declares that does not
+    /// exist, or that does not name itself. Not about any document, so there is no
     /// place in one to put it; the caller says it where the client keeps its
     /// log.
     pub fn take_notices(&mut self) -> Vec<String> {

@@ -50,6 +50,13 @@ pub fn blueprint_target(declaration: &Declaration) -> Option<String> {
     text(&args).or_else(|| args.get("target").and_then(text))
 }
 
+/// The name a `::dictionary(tomet)` or `::dictionary(name: tomet)` gives its dictionary; a term is mentioned
+/// through it (`@term(tomet#vault-config)`).
+pub fn dictionary_name(declaration: &Declaration) -> Option<String> {
+    let args = declaration.bound_args()?;
+    text(&args).or_else(|| args.get("name").and_then(text))
+}
+
 /// The version a `::version(...)` declares, as written: `::version(1.10)` is `"1.10"`, not `"1.1"`.
 pub fn version_string(declaration: &Declaration) -> Option<String> {
     let from = |value: &Value| match value.get("version") {
@@ -115,6 +122,11 @@ pub fn document_id(doc: &Document) -> Option<String> {
 /// The kind a blueprint document is for; `None` for a document that is not a blueprint.
 pub fn document_blueprint(doc: &Document) -> Option<String> {
     blueprint_target(&first(doc, DeclKind::Blueprint)?)
+}
+
+/// The name of the dictionary a document is; `None` for a document that is not one.
+pub fn document_dictionary(doc: &Document) -> Option<String> {
+    dictionary_name(&first(doc, DeclKind::Dictionary)?)
 }
 
 /// The language version this document declares, as written.
@@ -192,6 +204,19 @@ mod tests {
 
     fn parse(src: &str) -> Document {
         tomet_parser::parse_document(src).expect("parses")
+    }
+
+    #[test]
+    fn a_dictionary_is_named_by_its_declaration() {
+        assert_eq!(
+            document_dictionary(&parse("::dictionary(tomet){ \"a\": @term[x] }\n")).as_deref(),
+            Some("tomet")
+        );
+        assert_eq!(
+            document_dictionary(&parse("::dictionary(name: tomet)\n")).as_deref(),
+            Some("tomet")
+        );
+        assert_eq!(document_dictionary(&parse("::kind(note)\n")), None);
     }
 
     #[test]

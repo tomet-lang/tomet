@@ -2,7 +2,9 @@
 //! without touching the disk.
 //!
 //! A [`Vault`] is the state a document is read against: the config that
-//! governs it and the vocabularies that config declares. Given that state,
+//! governs it, the vocabularies that config declares, and the dictionaries
+//! of terms it registers (`@term` is checked against them in
+//! [`Vault::diagnostics`] and given the term's text in [`Vault::prepare`]). Given that state,
 //! parsing a source and binding its names ([`Vault::parse`],
 //! [`Vault::bindings`]) and rewriting a document into the shape a converter
 //! should see ([`Vault::prepare`]) are plain computation.
@@ -42,7 +44,7 @@ use tomet_config::PrinterConfig;
 use tomet_expr::{
     DocRef, EvalContext, EvalError, EvalValue, Phase, PreparedBlocks, SystemGenerate,
 };
-use tomet_semantics::{Bindings, LoadedVocabularies};
+use tomet_semantics::{Bindings, LoadedDictionaries, LoadedVocabularies};
 
 mod resolve;
 
@@ -149,7 +151,11 @@ pub struct Vault {
     /// fatal: a caller reports them and carries on, because one bad
     /// vocabulary should not hide the state of every document.
     pub vocabulary_errors: Vec<String>,
+    /// Dictionaries that were declared but could not be accepted, and the terms of one that were
+    /// left out. Not fatal either.
+    pub dictionary_errors: Vec<String>,
     loaded: LoadedVocabularies,
+    dictionaries: LoadedDictionaries,
 }
 
 impl Vault {
@@ -159,8 +165,30 @@ impl Vault {
             config,
             root,
             vocabulary_errors: loaded.errors.clone(),
+            dictionary_errors: Vec::new(),
             loaded,
+            dictionaries: LoadedDictionaries::default(),
         }
+    }
+
+    /// This vault with the dictionaries it registered, already loaded.
+    pub fn with_dictionaries(mut self, dictionaries: LoadedDictionaries) -> Self {
+        self.dictionary_errors = dictionaries.errors.clone();
+        self.dictionaries = dictionaries;
+        self
+    }
+
+    /// The dictionaries of terms this vault registered.
+    pub fn dictionaries(&self) -> &LoadedDictionaries {
+        &self.dictionaries
+    }
+
+    /// Everything wrong with the vault's own setup that no document is to blame for: the
+    /// vocabularies and the dictionaries it declared that were not accepted.
+    pub fn setup_problems(&self) -> impl Iterator<Item = &String> {
+        self.vocabulary_errors
+            .iter()
+            .chain(self.dictionary_errors.iter())
     }
 
     /// A vault whose vocabularies are given as `(label, source text)`
@@ -217,7 +245,40 @@ impl Vault {
                 doc, blueprint, &bindings,
             ));
         }
+        diagnostics.extend(self.unresolved_terms(doc));
         diagnostics
+    }
+
+    /// The `@term` mentions in `doc` that name no term of this vault's dictionaries. An `@term`
+    /// with no argument is a definition (in a `::dictionary`), not a mention.
+    fn unresolved_terms(&self, doc: &Document) -> Vec<Diagnostic> {
+        use tomet_semantics::{ElementKind, TermRef, ValueExt};
+
+        let own = tomet_declaration::document_dictionary(doc);
+        let mut unresolved = Vec::new();
+        tomet_tree::for_each_element(doc, |el| {
+            if tomet_semantics::classify_std_lenient(el) != ElementKind::Term {
+                return;
+            }
+            let Some(target) = tomet_semantics::normalized_element_args(el).and_then(|args| {
+                args.get("target")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+            }) else {
+                return;
+            };
+            if let Err(problem) = self
+                .dictionaries
+                .resolve(&TermRef::parse(&target), own.as_deref())
+            {
+                unresolved.push(Diagnostic::UnresolvedTerm {
+                    target,
+                    reason: problem.to_string(),
+                    span: el.span,
+                });
+            }
+        });
+        unresolved
     }
 
     /// The names in scope for `doc`: `std`, the document's own `::kind`,
@@ -251,9 +312,50 @@ impl Vault {
     /// interpolation was in before this existed.
     pub fn prepare(&self, doc: &mut Document, path: &Path, resolver: &dyn Resolver) -> Prepared {
         let scope = self.scope(doc, path, resolver);
-        Prepared {
+        let prepared = Prepared {
             unresolved: tomet_transform::resolve_expressions(doc, &scope.context()),
+        };
+        self.fill_terms(doc);
+        prepared
+    }
+
+    /// Gives every `@term` mention that names a term the term's own text, unless the author wrote
+    /// something between the brackets, so that a converter renders a word and need not know what a
+    /// dictionary is. A mention that names no term is left as it is; `tomet check` reports it.
+    fn fill_terms(&self, doc: &mut Document) {
+        use tomet_ast::{Block, Inline, Paragraph, Span, Text};
+        use tomet_semantics::{ElementKind, TermRef, ValueExt};
+
+        if self.dictionaries.is_empty() {
+            return;
         }
+        let own = tomet_declaration::document_dictionary(doc);
+        tomet_tree::for_each_element_mut(doc, |el| {
+            if el
+                .content
+                .as_ref()
+                .is_some_and(|content| !content.is_empty())
+                || tomet_semantics::classify_std_lenient(el) != ElementKind::Term
+            {
+                return;
+            }
+            let Some(target) = tomet_semantics::normalized_element_args(el).and_then(|args| {
+                args.get("target")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+            }) else {
+                return;
+            };
+            if let Ok((_, term)) = self
+                .dictionaries
+                .resolve(&TermRef::parse(&target), own.as_deref())
+            {
+                el.content = Some(vec![Block::Paragraph(Paragraph::new(
+                    vec![Inline::Text(Text::from(term.name.as_str()))],
+                    Span::dummy(),
+                ))]);
+            }
+        });
     }
 
     /// What `expr`, written in `doc` (which sits at `path`), comes to when the
@@ -513,6 +615,74 @@ mod tests {
         let vault = Vault::from_sources(PrinterConfig::default(), ".", &[]);
         let (_, bindings) = vault.parse("::kind(acme)\n").expect("parses");
         assert!(bindings.kind.is_none());
+    }
+
+    fn vault_with_dictionary() -> Vault {
+        let mut dictionaries = tomet_semantics::LoadedDictionaries::default();
+        dictionaries.add(
+            "tomet.tmt",
+            &tomet_parser::parse_document(
+                "::dictionary(tomet){ \"vault.config.tmt\": @term[ The file that marks a vault. ]#(vault-config) }\n",
+            )
+            .expect("parses"),
+        );
+        Vault::from_sources(PrinterConfig::default(), ".", &[]).with_dictionaries(dictionaries)
+    }
+
+    /// A mention that names no term is an error that says how to fix it; one that does is not.
+    #[test]
+    fn a_term_mention_is_checked_against_the_registered_dictionaries() {
+        let vault = vault_with_dictionary();
+        let reasons = |src: &str| -> Vec<String> {
+            let (doc, _) = vault.parse(src).expect("parses");
+            vault
+                .diagnostics(&doc, &[])
+                .into_iter()
+                .filter_map(|d| match d {
+                    Diagnostic::UnresolvedTerm { reason, .. } => Some(reason),
+                    _ => None,
+                })
+                .collect()
+        };
+        assert!(
+            reasons("a @term(tomet#vault-config) b @term(\"vault.config.tmt\") c\n").is_empty()
+        );
+        assert_eq!(reasons("a @term(#vault-config) b\n").len(), 1);
+        assert_eq!(reasons("a @term(tomet#gone) b\n").len(), 1);
+        // The definition has no argument: it is not a mention.
+        assert!(reasons("::dictionary(d){ \"w\": @term[ W ] }\n").is_empty());
+    }
+
+    /// A resolved mention comes out as the term's own text, so a converter renders a word; what the
+    /// author wrote between the brackets stays, and one that names nothing is left alone.
+    #[test]
+    fn a_resolved_term_mention_is_given_the_terms_text() {
+        let vault = vault_with_dictionary();
+        let text_of = |src: &str| -> Vec<Option<String>> {
+            let (doc, _) = prepared(&vault, "a.tmt", src);
+            let mut found = Vec::new();
+            tomet_tree::for_each_element(&doc, |el| {
+                if tomet_semantics::classify_std_lenient(el) == tomet_semantics::ElementKind::Term {
+                    found.push(el.content.as_ref().and_then(|blocks| match blocks.first() {
+                        Some(Block::Paragraph(p)) => match p.content.first() {
+                            Some(tomet_ast::Inline::Text(t)) => Some(t.value.clone()),
+                            _ => None,
+                        },
+                        _ => None,
+                    }));
+                }
+            });
+            found
+        };
+        assert_eq!(
+            text_of("a @term(tomet#vault-config) b\n"),
+            [Some("vault.config.tmt".to_string())]
+        );
+        assert_eq!(
+            text_of("a @term(tomet#vault-config)[ the config ] b\n"),
+            [Some("the config".to_string())]
+        );
+        assert_eq!(text_of("a @term(tomet#gone) b\n"), [None]);
     }
 
     fn prepared(vault: &Vault, path: &str, src: &str) -> (Document, Prepared) {

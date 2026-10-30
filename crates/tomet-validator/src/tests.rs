@@ -759,6 +759,20 @@ fn duplicate_id_nested_inline_is_reported() {
 }
 
 #[test]
+fn duplicate_id_on_an_element_in_a_value_slot_is_reported() {
+    // `@file(a)#(dup)` sits in a declaration's `{...}` as the value of a key. It is an anchor like
+    // any other (`@link(#dup)` resolves), so a second `#(dup)` is a duplicate.
+    let doc = parse("::dictionary(d){ \"a\": @term[ A ]#(dup) }\n\n=[ H ]#(dup)\n");
+    let errors = validate_document(&doc);
+    assert!(
+        errors
+            .iter()
+            .any(|e| matches!(e, Diagnostic::DuplicateId { id, .. } if id == "dup")),
+        "{errors:?}"
+    );
+}
+
+#[test]
 fn duplicate_id_with_integer_values_is_reported() {
     let src = "=[ one ]#(42)\n=[ two ]#(42)\n";
     let doc = parse(src);

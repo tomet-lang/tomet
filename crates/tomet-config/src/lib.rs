@@ -101,6 +101,7 @@ impl Config {
         let paths = |paths: Vec<String>| Value::Seq(paths.into_iter().map(Value::String).collect());
         root.push(("blueprints".to_string(), paths(layer.blueprint_paths())));
         root.push(("vocabularies".to_string(), paths(layer.vocabulary_paths())));
+        root.push(("dictionaries".to_string(), paths(layer.dictionary_paths())));
         let root = Value::Map(root);
 
         Self {

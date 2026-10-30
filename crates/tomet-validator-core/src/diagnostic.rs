@@ -220,6 +220,14 @@ pub enum Diagnostic {
         declared: Option<String>,
         span: Span,
     },
+    /// A `@term` mention that names no term of the dictionaries the vault registers. `target` is
+    /// what was written between the parentheses; `reason` says why it names none and how to fix it.
+    /// `span` is the mention.
+    UnresolvedTerm {
+        target: String,
+        reason: String,
+        span: Span,
+    },
     /// `id` written in `::meta{ ... }`: a document's identity is the declaration `::id(...)`.
     ///
     /// `::meta` keeps the free attributes of a document; what tomet itself reads about it does
@@ -274,6 +282,7 @@ impl Diagnostic {
             Diagnostic::VaultOnlyDeclaration { span, .. } => *span,
             Diagnostic::MetaIdMoved { span } => *span,
             Diagnostic::RegistryNameMismatch { span, .. } => *span,
+            Diagnostic::UnresolvedTerm { span, .. } => *span,
             Diagnostic::InvalidDefinition { span, .. } => *span,
             Diagnostic::InvalidFieldValue { span, .. } => *span,
             Diagnostic::UnknownArgument { span, .. } => *span,
@@ -550,6 +559,9 @@ impl Diagnostic {
                     "`{name}` in `::{declaration}` registers a file that gives itself no name"
                 ),
             },
+            Diagnostic::UnresolvedTerm { target, reason, .. } => {
+                write!(f, "`@term({target})` names no term: {reason}")
+            }
             Diagnostic::MetaIdMoved { .. } => write!(
                 f,
                 "`id` is not written in `::meta`; the identity of a document is `::id(...)`"

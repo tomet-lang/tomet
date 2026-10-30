@@ -15,8 +15,6 @@ tomet-search = { workspace = true }
 tomet-declaration = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-transform = { workspace = true }
+tomet-tree = { workspace = true }
 tomet-type = { workspace = true }
 tomet-validator = { workspace = true }
-
-[dev-dependencies]
-tomet-tree = { workspace = true }

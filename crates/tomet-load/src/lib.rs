@@ -1,8 +1,8 @@
 //! The one way to read a `.tmt` document correctly.
 //!
 //! Reading a document is four steps: find the config that governs it
-//! (`tomet-load-config`), load the vocabularies that config declares
-//! (this crate's own `vocabulary` module), parse the source, and bind
+//! (`tomet-load-config`), load the vocabularies and dictionaries that config declares
+//! (this crate's own `vocabulary` and `dictionary` modules), parse the source, and bind
 //! the names. A caller that skips the middle two gets a
 //! `Document` whose element names resolve against `std` alone, which
 //! silently drops every user-vocabulary element. `twrit` shipped exactly
@@ -76,11 +76,13 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
+use dictionary::load_dictionaries;
 use tomet_ast::Document;
 use tomet_config::PrinterConfig;
 use tomet_semantics::Bindings;
 use vocabulary::load_vocabularies;
 
+mod dictionary;
 mod findings;
 mod resolver;
 mod vocabulary;
@@ -120,7 +122,8 @@ impl Deref for Vault {
 }
 
 impl Vault {
-    /// Finds the vault governing `path` and loads its vocabularies.
+    /// Finds the vault governing `path` and loads its vocabularies and dictionaries (this crate's
+    /// own `vocabulary` and `dictionary` modules).
     ///
     /// Never fails. With no config file to find, the defaults are used and
     /// `root` is `path`'s directory -- a lone `.tmt` outside any vault is
@@ -138,8 +141,9 @@ impl Vault {
             });
 
         let loaded = load_vocabularies(&root, &config.registry.vocabularies);
+        let dictionaries = load_dictionaries(&root, &config.registry.dictionaries);
         Self {
-            core: tomet_vault::Vault::new(config, root, loaded),
+            core: tomet_vault::Vault::new(config, root, loaded).with_dictionaries(dictionaries),
             docs: Mutex::new(HashMap::new()),
             links: OnceLock::new(),
         }
@@ -501,12 +505,16 @@ mod tests {
                     "deck.vocabulary.tmt",
                     "::kind(vocabulary)\n::vocabulary(deck){ version: \"1.0.0\" }\n\n::elements{ card: {} }\n",
                 ),
+                (
+                    "tomet.dictionary.tmt",
+                    "::kind(dictionary)\n::dictionary(tomet){ \"a\": @term[x] }\n",
+                ),
             ],
         );
         let path = root.join(tomet_load_config::VAULT_CONFIG_FILE);
         fs::write(
             &path,
-            "::kind(config)\n::blueprints{ note: @file(bp.blueprint.tmt), wrong: @file(bp.blueprint.tmt) }\n::vocabularies{ deck: @file(deck.vocabulary.tmt), other: @file(deck.vocabulary.tmt) }\n",
+            "::kind(config)\n::blueprints{ note: @file(bp.blueprint.tmt), wrong: @file(bp.blueprint.tmt) }\n::vocabularies{ deck: @file(deck.vocabulary.tmt), other: @file(deck.vocabulary.tmt) }\n::dictionaries{ tomet: @file(tomet.dictionary.tmt), words: @file(tomet.dictionary.tmt) }\n",
         )
         .unwrap();
         let vault = Vault::discover(&root);
@@ -527,6 +535,7 @@ mod tests {
             [
                 ("blueprints".to_string(), "wrong".to_string()),
                 ("vocabularies".to_string(), "other".to_string()),
+                ("dictionaries".to_string(), "words".to_string()),
             ]
         );
     }

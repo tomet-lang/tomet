@@ -4,7 +4,7 @@
 //! - (`format`) Heading, link, element, callout, list, and table formatting rules ([`FormatConfig`], [`GroupOrder`]).
 //! - (`meta`) Document metadata formatting and schema rules ([`MetaConfig`], [`FieldConfig`]).
 //! - (`workspace`) Vault file indexing exclusions and unswept rules ([`WorkspaceConfig`]).
-//! - (`registry`) Blueprints and vocabularies declarations ([`RegistryConfig`]).
+//! - (`registry`) Blueprints, vocabularies and dictionaries declarations ([`RegistryConfig`]).
 
 pub mod format;
 pub mod meta;
