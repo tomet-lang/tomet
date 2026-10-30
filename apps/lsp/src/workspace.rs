@@ -264,7 +264,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("tomet_lsp_ws_{name}_{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join(".tomet/vocabularies")).unwrap();
-        fs::write(root.join("default.config.tmt"), config).unwrap();
+        fs::write(root.join(tomet_load_config::VAULT_CONFIG_FILE), config).unwrap();
         for (path, source) in files {
             fs::write(root.join(path), source).unwrap();
         }
@@ -394,7 +394,7 @@ mod tests {
         assert!(ws.findings_diagnostics(&path).is_empty());
 
         fs::write(
-            root.join("default.config.tmt"),
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
             "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n",
         )
         .unwrap();

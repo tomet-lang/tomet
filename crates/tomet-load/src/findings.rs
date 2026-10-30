@@ -45,7 +45,8 @@ impl Vault {
     ///
     /// The document is validated as written, against the vocabularies it has
     /// in scope, the blueprint its `::kind` names (if the vault declares one),
-    /// and the `type:` the settings declare for its `::meta` fields. Then a
+    /// and the `type:` the settings declare for its `::meta` fields, and no
+    /// setting that only the vault config may make is written anywhere but there. Then a
     /// copy of it is prepared, to report what could not be resolved; `doc`
     /// itself is not changed, so the spans in the findings are the ones in the
     /// text the caller has.
@@ -59,7 +60,18 @@ impl Vault {
             })
             .and_then(|path| std::fs::read_to_string(path).ok())
             .and_then(|src| tomet_parser::parse_document(&src).ok());
-        let diagnostics = self.diagnostics(doc, blueprint.as_slice());
+        let mut diagnostics = self.diagnostics(doc, blueprint.as_slice());
+
+        // What only the vault config may set has no effect anywhere else. This
+        // is the one check that needs the path: the validator cannot tell a
+        // vault config from any other document by what is in it.
+        if !may_set_vault_only(path, doc) {
+            tomet_validator::check_vault_only_settings(
+                doc,
+                tomet_config::is_vault_only_key,
+                &mut diagnostics,
+            );
+        }
 
         // A `${...}` with no value is not an error: a document showing one
         // as an example is a legitimate document, and `export` leaves it
@@ -83,4 +95,20 @@ impl Vault {
             unresolved,
         }
     }
+}
+
+/// Whether `doc`, read from `path`, may write what only the vault config sets.
+///
+/// The vault config may. So may a config document that is not a layer of any
+/// stack -- a sample or a template under another name -- because nothing reads it,
+/// so there is nothing for the setting to fail to affect. A folder config
+/// ([`tomet_load_config::FOLDER_CONFIG_FILE`]) and an ordinary document are the
+/// layers it would be wrongly written in.
+fn may_set_vault_only(path: &Path, doc: &Document) -> bool {
+    let name = path.file_name().and_then(|name| name.to_str());
+    if name == Some(tomet_load_config::VAULT_CONFIG_FILE) {
+        return true;
+    }
+    name != Some(tomet_load_config::FOLDER_CONFIG_FILE)
+        && tomet_declaration::document_kind(doc).as_deref() == Some("config")
 }

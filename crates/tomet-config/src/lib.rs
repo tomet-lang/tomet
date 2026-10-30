@@ -25,6 +25,7 @@ pub mod __private {
 
 pub mod discovery;
 pub mod groups;
+pub mod layer;
 pub mod schema;
 pub mod tree;
 
@@ -33,6 +34,7 @@ pub use groups::{
     FieldConfig, FormatConfig, GroupOrder, MetaConfig, RegistryConfig, WorkspaceConfig, format,
     meta, registry, workspace,
 };
+pub use layer::{ConfigLayer, VAULT_ONLY_GROUPS, is_vault_only_key};
 pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
 pub use tomet_spec_derive::Config;
 
@@ -60,6 +62,18 @@ impl Config {
     pub fn from_doc(doc: &Document) -> Self {
         let config = tomet_semantics::document_config(doc);
         Self::from_document_config(&config)
+    }
+
+    /// The config a stack of layers comes to, outermost first: the inner layer
+    /// wins, key by key (a map merges; a list or a scalar is replaced), and a
+    /// macro or variable is replaced by name. Built once from the merged value
+    /// tree, see [`ConfigLayer`].
+    pub fn from_layers<'a>(layers: impl IntoIterator<Item = &'a ConfigLayer>) -> Self {
+        let mut merged = ConfigLayer::default();
+        for layer in layers {
+            merged.push_inner(layer);
+        }
+        Self::from_document_config(&merged.config)
     }
 
     /// Returns the configured group order for a specific element name (e.g. "link"),

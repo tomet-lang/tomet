@@ -393,7 +393,7 @@ fn hover_on_macro_defined_in_settings_file_ref() {
     );
     let dir = std::env::temp_dir().join(unique);
     std::fs::create_dir_all(&dir).unwrap();
-    let config_path = dir.join("default.config.tmt");
+    let config_path = dir.join(tomet_load_config::VAULT_CONFIG_FILE);
     std::fs::write(
         &config_path,
         "::macros{\n  youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n}\n",
@@ -402,11 +402,13 @@ fn hover_on_macro_defined_in_settings_file_ref() {
 
     let doc_path = dir.join("sub/note.tmt");
     std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
-    let doc_text =
-        "::settings(file:\"file:default.config.tmt\")\n\n$macro.youtube_video(\"Pm_h6FnF8HU\")\n";
+    let doc_text = format!(
+        "::settings(file:\"file:{}\")\n\n$macro.youtube_video(\"Pm_h6FnF8HU\")\n",
+        tomet_load_config::VAULT_CONFIG_FILE
+    );
     let uri = Uri::from_str(&format!("file://{}", doc_path.display())).unwrap();
 
-    let hover = hover_for(doc_text, Position::new(2, 5), Some(&uri))
+    let hover = hover_for(&doc_text, Position::new(2, 5), Some(&uri))
         .expect("hover found for external config macro");
     if let HoverContents::Markup(m) = hover.contents {
         assert!(m.value.contains("Macro Result"));
@@ -419,8 +421,11 @@ fn hover_on_macro_defined_in_settings_file_ref() {
     }
 
     // Test embed with macro
-    let embed_doc = "::settings(file:\"file:default.config.tmt\")\n\n@embed($macro.youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n";
-    let hover2 = hover_for(embed_doc, Position::new(2, 10), Some(&uri))
+    let embed_doc = format!(
+        "::settings(file:\"file:{}\")\n\n@embed($macro.youtube_video(\"Pm_h6FnF8HU\"))[Flo Rida]\n",
+        tomet_load_config::VAULT_CONFIG_FILE
+    );
+    let hover2 = hover_for(&embed_doc, Position::new(2, 10), Some(&uri))
         .expect("hover found for embed macro");
     if let HoverContents::Markup(m) = hover2.contents {
         assert!(m.value.contains("Macro Result"));
@@ -447,7 +452,7 @@ fn hover_on_macro_auto_discovered_from_workspace_config() {
     );
     let dir = std::env::temp_dir().join(unique);
     std::fs::create_dir_all(&dir).unwrap();
-    let config_path = dir.join("default.config.tmt");
+    let config_path = dir.join(tomet_load_config::VAULT_CONFIG_FILE);
     std::fs::write(
         &config_path,
         "::macros{\n  youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  twitter_post: \"https://x.com/${1}/status/${2}\"\n}\n",
@@ -750,14 +755,18 @@ fn what_an_element_holds_folds_too() {
     );
 }
 
-/// A path that starts with `/` is measured from the vault -- where its config
-/// is, under either of the two names -- and not only from `default.config.tmt`.
+/// A path that starts with `/` is measured from the vault -- the directory
+/// holding the vault config -- not from the folder of the document.
 #[test]
-fn a_rooted_path_is_measured_from_a_vault_with_either_config_name() {
+fn a_rooted_path_is_measured_from_the_vault_root() {
     let root = std::env::temp_dir().join(format!("tomet_lsp_rooted_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("notes")).unwrap();
-    std::fs::write(root.join("tomet.config.tmt"), "::kind(config)\n").unwrap();
+    std::fs::write(
+        root.join(tomet_load_config::VAULT_CONFIG_FILE),
+        "::kind(config)\n",
+    )
+    .unwrap();
     std::fs::write(root.join("top.png"), "").unwrap();
     let uri = Uri::from_str(&format!("file://{}", root.join("notes/a.tmt").display())).unwrap();
 

@@ -393,7 +393,7 @@ mod tests {
             std::env::temp_dir().join(format!("tomet_test_check_{name}_{}", nanoid::nanoid!()));
         fs::create_dir_all(dir.join(".tomet/vocabularies")).unwrap();
         fs::write(
-            dir.join("default.config.tmt"),
+            dir.join(tomet_load_config::VAULT_CONFIG_FILE),
             "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/deck.vocabulary.tmt\") }\n",
         )
         .unwrap();
@@ -472,7 +472,7 @@ mod tests {
     fn a_cotomet_file_the_config_leaves_alone_is_not_swept() {
         let root = vault("ctmt_unswept");
         fs::write(
-            root.join("default.config.tmt"),
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
             "::kind(config)\n::config{ workspace: { unswept: list(\"frozen\") } }\n",
         )
         .unwrap();
@@ -490,7 +490,7 @@ mod tests {
     fn a_uuid_field_is_checked_against_the_settings_declaration() {
         let root = vault("uuid");
         fs::write(
-            root.join("default.config.tmt"),
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
             "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n",
         )
         .unwrap();
@@ -507,7 +507,7 @@ mod tests {
 
         // The same document is fine where the settings declare nothing.
         fs::write(
-            root.join("default.config.tmt"),
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
             "::kind(config)\n::config{}\n",
         )
         .unwrap();
@@ -607,7 +607,7 @@ mod tests {
     fn blueprint_conformance_fails_check() {
         let root = vault("blueprint_check");
         fs::write(
-            root.join("default.config.tmt"),
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
             "::kind(settings)\n::settings{\n  blueprints: list(\"bp.tmt\")\n}\n",
         )
         .unwrap();

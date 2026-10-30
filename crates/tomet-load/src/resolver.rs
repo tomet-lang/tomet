@@ -105,7 +105,7 @@ mod tests {
         let root = std::env::temp_dir().join(name);
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("notes/deep")).expect("temp dirs");
-        fs::write(root.join("default.config.tmt"), SETTINGS).expect("config");
+        fs::write(root.join(tomet_load_config::VAULT_CONFIG_FILE), SETTINGS).expect("config");
         fs::write(
             root.join("notes/rust.tmt"),
             "::meta{ tags: list(rust), created: \"2026-01-01\" }\n\n=[ Rust ]#(top)\n",

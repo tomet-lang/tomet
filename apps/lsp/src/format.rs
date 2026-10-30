@@ -25,7 +25,8 @@ pub fn format_edits(text: &str, uri: Option<&Uri>) -> Vec<TextEdit> {
 }
 
 /// Resolves the merged configuration for a document by combining:
-/// 1. Workspace config discovered from ancestor directories (`default.config.tmt` / `tomet.config.tmt`)
+/// 1. The vault config and the folder configs down to the document, already stacked
+///    (see `tomet_load_config`), for the macros and variables they declare
 /// 2. Explicit `::config(import: ...)` / `::config(file: ...)` imported configs
 /// 3. Document's local `::config` definitions (highest precedence)
 pub fn resolve_effective_config(
@@ -35,17 +36,14 @@ pub fn resolve_effective_config(
     let mut config = tomet_semantics::document_config(doc);
     let file_path_opt = uri.and_then(uri_to_file_path);
 
-    // 1. Merge macros and variables from workspace config file (e.g. default.config.tmt / tomet.config.tmt)
+    // 1. Merge macros and variables from the stacked vault and folder configs
     if let Some(fp) = &file_path_opt
-        && let Some((_, cfg_path, _)) = tomet_load_config::find_config_file(fp)
-        && let Ok(src) = std::fs::read_to_string(&cfg_path)
-        && let Ok(cfg_doc) = tomet_parser::parse_document(&src)
+        && let Some((stacked, _, _)) = tomet_load_config::find_config_file(fp)
     {
-        let ext_cfg = tomet_semantics::document_config(&cfg_doc);
-        for (k, v) in ext_cfg.macros {
+        for (k, v) in stacked.macros {
             config.macros.entry(k).or_insert(v);
         }
-        for (name, decl) in ext_cfg.vars {
+        for (name, decl) in stacked.vars {
             if !config.vars.iter().any(|(held, _)| *held == name) {
                 config.vars.push((name, decl));
             }

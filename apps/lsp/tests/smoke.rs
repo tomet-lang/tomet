@@ -395,7 +395,7 @@ fn macro_hover_with_workspace_auto_config_over_stdio() {
     );
     let dir = std::env::temp_dir().join(unique);
     std::fs::create_dir_all(&dir).unwrap();
-    let config_path = dir.join("default.config.tmt");
+    let config_path = dir.join(tomet_load_config::VAULT_CONFIG_FILE);
     std::fs::write(
         &config_path,
         "::macros{\n  twitter_post: \"https://x.com/${1}/status/${2}\"\n}\n",
@@ -455,7 +455,7 @@ fn uuid_vault(name: &str) -> std::path::PathBuf {
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(
-        root.join("default.config.tmt"),
+        root.join(tomet_load_config::VAULT_CONFIG_FILE),
         "::kind(config)\n::config{ meta: { id: { type: uuid } } }\n",
     )
     .unwrap();
@@ -553,11 +553,15 @@ fn a_changed_config_changes_the_diagnostics() {
     assert_eq!(diagnostics_array(&first).len(), 1, "{first:?}");
 
     // The declaration is dropped, and the server is told a file changed.
-    std::fs::write(root.join("default.config.tmt"), "::kind(config)\n").unwrap();
+    std::fs::write(
+        root.join(tomet_load_config::VAULT_CONFIG_FILE),
+        "::kind(config)\n",
+    )
+    .unwrap();
     server.send_notification(
         "workspace/didChangeWatchedFiles",
         json!({"changes": [{
-            "uri": format!("file://{}", root.join("default.config.tmt").display()),
+            "uri": format!("file://{}", root.join(tomet_load_config::VAULT_CONFIG_FILE).display()),
             "type": 2,
         }]}),
     );
@@ -579,7 +583,7 @@ fn a_vault_with_a_missing_vocabulary_says_so_in_the_log() {
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(
-        root.join("default.config.tmt"),
+        root.join(tomet_load_config::VAULT_CONFIG_FILE),
         "::kind(config)\n::config{ vocabularies: list(\".tomet/vocabularies/missing.vocabulary.tmt\") }\n",
     )
     .unwrap();

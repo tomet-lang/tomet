@@ -63,7 +63,7 @@ export interface TometLoaderOptions {
      */
     sourcePathPrefix?: string;
     /**
-     * Optional path to the workspace configuration file (defaults to `default.config.tmt` under `base`).
+     * Optional path to the workspace configuration file (defaults to `vault.config.tmt` under `base`).
      */
     configPath?: string;
 }

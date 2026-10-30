@@ -218,6 +218,14 @@ pub enum Diagnostic {
     /// `SettingsSchema` no caller ever built, so a document could declare
     /// `singleton: true` and be obeyed by nothing at all.
     RetiredSettingsKey { key: String, span: Span },
+    /// A setting only the vault config may make, written in a folder config or
+    /// in a document's own `::config` -- where it has no effect.
+    ///
+    /// Reported rather than ignored quietly, for the reason
+    /// [`Diagnostic::RetiredSettingsKey`] is: a setting that does nothing and says
+    /// nothing is how a reader comes to believe it is obeyed. `span` is the
+    /// `::config` element; an entry of a `{...}` group has no span of its own.
+    VaultOnlySetting { key: String, span: Span },
     /// An entry of `::macros` or `::vars` that cannot be used as written: a macro
     /// whose template is not a string, or a variable whose declaration is not a
     /// map, has an unknown key or type, or has a `default` its `type` does not hold.
@@ -265,6 +273,7 @@ impl Diagnostic {
             Diagnostic::OutsidePreamble { span, .. } => *span,
             Diagnostic::WrongSigil { span, .. } => *span,
             Diagnostic::RetiredSettingsKey { span, .. } => *span,
+            Diagnostic::VaultOnlySetting { span, .. } => *span,
             Diagnostic::InvalidDefinition { span, .. } => *span,
             Diagnostic::InvalidFieldValue { span, .. } => *span,
             Diagnostic::UnknownArgument { span, .. } => *span,
@@ -550,6 +559,10 @@ impl Diagnostic {
                 };
                 write!(f, "`{key}` in `::settings` is retired; {advice}")
             }
+            Diagnostic::VaultOnlySetting { key, .. } => write!(
+                f,
+                "`{key}` can only be set in the vault config; here it has no effect"
+            ),
             Diagnostic::InvalidDefinition {
                 declaration,
                 name,

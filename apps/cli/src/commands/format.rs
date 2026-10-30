@@ -231,7 +231,7 @@ mod tests {
             std::env::temp_dir().join(format!("tomet_test_fmt_config_{}", nanoid::nanoid!()));
         let _ = fs::create_dir_all(&vault);
         fs::write(
-            vault.join("default.config.tmt"),
+            vault.join(tomet_load_config::VAULT_CONFIG_FILE),
             "::kind(config)\n::config{ format: { table: { adjust_width: auto } } }\n",
         )
         .unwrap();
@@ -341,7 +341,7 @@ mod tests {
         let frozen_dir = vault.join("tests").join("fixtures");
         let _ = fs::create_dir_all(&frozen_dir);
         fs::write(
-            vault.join("default.config.tmt"),
+            vault.join(tomet_load_config::VAULT_CONFIG_FILE),
             "::kind(config)\n::config{ workspace: { unswept: list(\"tests/fixtures\") } }\n",
         )
         .unwrap();

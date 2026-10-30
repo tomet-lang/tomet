@@ -625,6 +625,35 @@ pub fn check_retired_settings_keys(doc: &Document, errors: &mut Vec<Diagnostic>)
     });
 }
 
+/// Reports each top-level `::config` / `::settings` key `is_vault_only` names.
+///
+/// The caller decides whether the document is allowed to set them (the vault
+/// config is; a folder config and an ordinary document are not) and which keys
+/// are vault-only, because that list belongs to the crate that reads settings,
+/// which this one sits below.
+pub fn check_vault_only_settings(
+    doc: &Document,
+    is_vault_only: impl Fn(&str) -> bool,
+    errors: &mut Vec<Diagnostic>,
+) {
+    use tomet_ast::Value;
+
+    tomet_tree::for_each_top_level_element(doc, |el| {
+        if !el.sigil.is_bare_named("settings") && !el.sigil.is_bare_named("config") {
+            return;
+        }
+        let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el) else {
+            return;
+        };
+        for (key, _) in entries.iter().filter(|(key, _)| is_vault_only(key)) {
+            errors.push(Diagnostic::VaultOnlySetting {
+                key: key.clone(),
+                span: el.span,
+            });
+        }
+    });
+}
+
 /// Checks the form of the `::meta` fields the settings declare a `type:` for.
 ///
 /// `field_types` is the settings' `meta` declarations as `name -> type`,

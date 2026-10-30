@@ -61,12 +61,13 @@ mod tests {
     }
 
     #[test]
-    fn default_config_tmt_keys_are_all_covered() {
-        // Drift guard: verifies that every setting configured in root default.config.tmt
+    fn vault_config_keys_are_all_covered() {
+        // Drift guard: verifies that every setting configured in the root vault config
         // is declared in all_config_specs().
-        let root_config = std::fs::read_to_string("default.config.tmt")
-            .or_else(|_| std::fs::read_to_string("../../default.config.tmt"))
-            .expect("default.config.tmt must exist");
+        let file = tomet_load_config::VAULT_CONFIG_FILE;
+        let root_config = std::fs::read_to_string(file)
+            .or_else(|_| std::fs::read_to_string(format!("../../{file}")))
+            .unwrap_or_else(|_| panic!("{file} must exist"));
 
         let doc = tomet_parser::parse_document(&root_config).unwrap();
         let specs = all_config_specs();

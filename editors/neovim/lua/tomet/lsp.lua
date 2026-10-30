@@ -17,7 +17,7 @@ function M.setup(opts)
       end
 
       local bufname = vim.api.nvim_buf_get_name(ev.buf)
-      local root_dir = vim.fs.root(ev.buf, { "tomet.config.tmt", "default.config.tmt", ".git" })
+      local root_dir = vim.fs.root(ev.buf, { "vault.config.tmt", ".git" })
       if not root_dir and bufname ~= "" then
         root_dir = vim.fs.dirname(bufname)
       end

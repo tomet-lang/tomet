@@ -89,7 +89,7 @@ export interface TometLoaderOptions {
    */
   sourcePathPrefix?: string;
   /**
-   * Optional path to the workspace configuration file (defaults to `default.config.tmt` under `base`).
+   * Optional path to the workspace configuration file (defaults to `vault.config.tmt` under `base`).
    */
   configPath?: string;
 }
@@ -270,10 +270,10 @@ export function tometLoader(options: TometLoaderOptions): Loader {
         return;
       }
 
-      // Read optional workspace default.config.tmt
+      // Read optional workspace vault.config.tmt
       const resolvedConfigPath = configPath
         ? (isAbsolute(configPath) ? configPath : resolve(rootDir, configPath))
-        : join(baseDir, 'default.config.tmt');
+        : join(baseDir, 'vault.config.tmt');
       let workspaceConfig = existsSync(resolvedConfigPath)
         ? await fs.readFile(resolvedConfigPath, 'utf8')
         : undefined;

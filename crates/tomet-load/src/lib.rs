@@ -334,7 +334,7 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("notes")).expect("temp dirs");
         fs::write(
-            root.join("default.config.tmt"),
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
             "::kind(config)\n::settings{ meta: { tags: { type: list }, created: { type: datetime } } }\n",
         )
         .expect("config");
@@ -478,13 +478,68 @@ mod tests {
         let root = std::env::temp_dir().join(name);
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("temp dir");
-        fs::write(root.join("default.config.tmt"), "::kind(config)\n").expect("config");
+        fs::write(
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n",
+        )
+        .expect("config");
         for (path, source) in files {
             let full = root.join(path);
             fs::create_dir_all(full.parent().unwrap()).expect("dirs");
             fs::write(full, source).expect("file");
         }
         root
+    }
+
+    #[test]
+    fn a_setting_only_the_vault_makes_is_reported_anywhere_else() {
+        let root = include_vault(
+            "tomet_test_load_vault_only",
+            &[
+                (
+                    "a/.config.tmt",
+                    "::kind(config)\n::config{ workspace: { ignore: list(\"x\") } }\n",
+                ),
+                (
+                    "note.tmt",
+                    "::config{ workspace: { unswept: list(\"y\") } }\n\nbody\n",
+                ),
+            ],
+        );
+        let vault = Vault::discover(&root);
+        let findings_of = |path: &std::path::Path| {
+            let doc = tomet_parser::parse_document(&fs::read_to_string(path).unwrap()).unwrap();
+            vault.findings(path, &doc)
+        };
+        let reported = |findings: &Findings| {
+            findings.diagnostics.iter().any(|d| {
+                matches!(d, tomet_validator::Diagnostic::VaultOnlySetting { key, .. } if key == "workspace")
+            })
+        };
+
+        for rel in ["a/.config.tmt", "note.tmt"] {
+            let findings = findings_of(&root.join(rel));
+            assert!(reported(&findings), "{rel}: {:?}", findings.diagnostics);
+            assert!(findings.has_errors(), "{rel}");
+        }
+
+        // A config document that is no layer of the stack is a sample: nothing reads it.
+        let sample = root.join("sample.tmt");
+        fs::write(
+            &sample,
+            "::kind(config)\n::config{ workspace: { ignore: list(\"x\") } }\n",
+        )
+        .unwrap();
+        assert!(!reported(&findings_of(&sample)));
+
+        // The vault config is the one place it belongs.
+        let vault_file = root.join(tomet_load_config::VAULT_CONFIG_FILE);
+        fs::write(
+            &vault_file,
+            "::config{ workspace: { ignore: list(\"x\") } }\n",
+        )
+        .unwrap();
+        assert!(!reported(&findings_of(&vault_file)));
     }
 
     #[test]

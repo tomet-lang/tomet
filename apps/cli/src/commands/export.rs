@@ -401,7 +401,11 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         let sub = root.join("sub");
         fs::create_dir_all(&sub).expect("temp dirs");
-        fs::write(root.join("default.config.tmt"), "::kind(config)\n").expect("config");
+        fs::write(
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n",
+        )
+        .expect("config");
 
         let src = sub.join("doc.tmt");
         fs::write(
@@ -464,7 +468,11 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("tomet_test_export_dir_{name}"));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("temp dir");
-        fs::write(dir.join("default.config.tmt"), "::kind(config)\n").expect("config");
+        fs::write(
+            dir.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n",
+        )
+        .expect("config");
         fs::write(
             dir.join("good.tmt"),
             "::config(export: { type: commonmark, path: \"good.md\" })\n\n#[ Good ]\n",

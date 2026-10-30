@@ -6,7 +6,7 @@ name = "tomet"
 scope = "source.tmt"
 injection-regex = "tmt|tomet"
 file-types = ["tmt"]
-roots = ["tomet.config.tmt", "default.config.tmt", ".git"]
+roots = ["vault.config.tmt", ".git"]
 comment-token = "//"
 block-comment-tokens = { start = "/*", end = "*/" }
 indent = { tab-width = 2, unit = "  " }
@@ -17,7 +17,7 @@ language-servers = ["tomet-lsp"]
 name = "cotomet"
 scope = "source.cotomet"
 file-types = ["ctmt"]
-roots = ["tomet.config.tmt", "default.config.tmt", ".git"]
+roots = ["vault.config.tmt", ".git"]
 comment-token = "//"
 indent = { tab-width = 2, unit = "  " }
 language-servers = ["tomet-lsp"]

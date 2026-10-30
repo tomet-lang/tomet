@@ -164,7 +164,7 @@ mod tests {
         let frozen_dir = vault.join("tests").join("fixtures");
         let _ = fs::create_dir_all(&frozen_dir);
         fs::write(
-            vault.join("default.config.tmt"),
+            vault.join(tomet_load_config::VAULT_CONFIG_FILE),
             "::kind(config)\n::config{ workspace: { unswept: list(\"tests/fixtures\") } }\n",
         )
         .unwrap();
