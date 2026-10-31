@@ -82,10 +82,35 @@ impl Unresolved {
 
 /// Replaces every `${...}` in `doc` with what it stands for.
 pub fn resolve_expressions(doc: &mut Document, cx: &EvalContext) -> Vec<Unresolved> {
+    resolve(doc, cx, None)
+}
+
+/// [`resolve_expressions`] for the `${...}` that `selected` picks, by the span of the
+/// [`Interpolation`](tomet_ast::Interpolation) in `doc` as it is passed in. The others are left
+/// as the interpolations they are, not as text, and are not reported.
+///
+/// `selected` must compare spans with [`Span::exact_eq`]: `==` on a `Span` is always true.
+///
+/// This is what makes a file hold its own values for only some of its expressions: the ones
+/// that depend on where it sits, and none of the ones it can still evaluate for itself.
+pub fn resolve_expressions_where(
+    doc: &mut Document,
+    cx: &EvalContext,
+    selected: &dyn Fn(Span) -> bool,
+) -> Vec<Unresolved> {
+    resolve(doc, cx, Some(selected))
+}
+
+fn resolve(
+    doc: &mut Document,
+    cx: &EvalContext,
+    selected: Option<&dyn Fn(Span) -> bool>,
+) -> Vec<Unresolved> {
     let mut pass = Pass {
         cx,
         unresolved: Vec::new(),
         level: cx.heading_level,
+        selected,
     };
     doc.blocks = std::mem::take(&mut doc.blocks)
         .into_iter()
@@ -108,9 +133,15 @@ struct Pass<'a> {
     /// section's own level while its blocks are being resolved. An `include`
     /// puts its headings one below this.
     level: usize,
+    /// Which interpolations to resolve, by span; `None` is all of them.
+    selected: Option<&'a dyn Fn(Span) -> bool>,
 }
 
 impl Pass<'_> {
+    fn is_selected(&self, span: Span) -> bool {
+        self.selected.is_none_or(|selected| selected(span))
+    }
+
     /// Evaluates, or records why it could not and returns `None`.
     fn evaluate(&mut self, expr: &InterpExpr, span: Span) -> Option<EvalValue> {
         self.eval_with(expr, span, |cx| evaluate(expr, cx))
@@ -193,6 +224,7 @@ impl Pass<'_> {
             }
             // A hole exists only in a pattern, which has no expressions to resolve.
             Block::Hole(hole) => vec![Block::Hole(hole)],
+            Block::Interp(interp) if !self.is_selected(interp.span) => vec![Block::Interp(interp)],
             Block::Interp(interp) => self.block_expression(&interp.expr, interp.span),
             Block::Section(mut sec) => {
                 sec.title = self.inlines(sec.title);
@@ -233,6 +265,9 @@ impl Pass<'_> {
         inlines
             .into_iter()
             .flat_map(|inline| match inline {
+                Inline::Interp(interp) if !self.is_selected(interp.span) => {
+                    vec![Inline::Interp(interp)]
+                }
                 Inline::Interp(interp) => self.inline_expression(&interp.expr, interp.span),
                 Inline::Element(el) => vec![Inline::Element(self.element(el))],
                 other => vec![other],
@@ -304,6 +339,7 @@ impl Pass<'_> {
     /// allows to be kept as data.
     fn value(&mut self, value: Value) -> Value {
         match value {
+            Value::Interp(interp) if !self.is_selected(interp.span) => Value::Interp(interp),
             Value::Interp(interp) => self
                 .data_expression(&interp.expr, interp.span)
                 .unwrap_or(Value::Interp(interp)),
@@ -355,7 +391,10 @@ impl Pass<'_> {
 
     fn item(&mut self, mut item: ListItem) -> Vec<ListItem> {
         let sublist = item.sublist.take().map(|sub| self.list(sub));
-        let Some((expr, span)) = item_expression(&item).map(|(e, s)| (e.clone(), s)) else {
+        let Some((expr, span)) = item_expression(&item)
+            .filter(|(_, span)| self.is_selected(*span))
+            .map(|(e, s)| (e.clone(), s))
+        else {
             self.resolve_item(&mut item);
             item.sublist = sublist;
             return vec![item];

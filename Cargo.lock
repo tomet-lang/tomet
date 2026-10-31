@@ -1870,6 +1870,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomet-convert-standalone"
+version = "0.5.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-config",
+ "tomet-declaration",
+ "tomet-expr",
+ "tomet-markdown",
+ "tomet-parser",
+ "tomet-printer",
+ "tomet-tree",
+ "tomet-type",
+ "tomet-validator-profile",
+ "tomet-vault",
+]
+
+[[package]]
 name = "tomet-cst"
 version = "0.5.0"
 dependencies = [

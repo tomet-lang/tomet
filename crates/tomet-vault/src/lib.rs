@@ -319,6 +319,24 @@ impl Vault {
         prepared
     }
 
+    /// [`Vault::prepare`] for only the `${...}` that `selected` picks, by the exact position of the
+    /// [`Interpolation`](tomet_ast::Interpolation) in `doc` as it is passed in
+    /// ([`Span::exact_eq`](tomet_ast::Span::exact_eq): `==` on a span is always true). The others are
+    /// left as interpolations, and `@term` mentions are left as they are: this is for changing a
+    /// document, not for rendering it.
+    pub fn prepare_selected(
+        &self,
+        doc: &mut Document,
+        path: &Path,
+        resolver: &dyn Resolver,
+        selected: &dyn Fn(Span) -> bool,
+    ) -> Prepared {
+        let scope = self.scope(doc, path, resolver);
+        Prepared {
+            unresolved: tomet_transform::resolve_expressions_where(doc, &scope.context(), selected),
+        }
+    }
+
     /// Gives every `@term` mention that names a term the term's own text, unless the author wrote
     /// something between the brackets, so that a converter renders a word and need not know what a
     /// dictionary is. A mention that names no term is left as it is; `tomet check` reports it.

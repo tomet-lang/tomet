@@ -559,3 +559,40 @@ fn an_include_lands_one_heading_below_the_section_it_sits_in() {
     // `top` is a level-1 heading in `here.tmt`; under a level-1 host it is 2.
     assert_eq!(included, [2]);
 }
+
+/// Only the picked `${...}` are resolved; the rest stay interpolations (not text) and are not reported.
+#[test]
+fn only_the_selected_expressions_are_resolved() {
+    let src = "a ${self.path} b ${macro.gh(1)} c\n\n${self.filename}\n\n- ${self.path}\n\n@card(n: ${self.path}){ k: ${self.path} }\n";
+    let resolver = vault();
+    let macros = HashMap::new();
+    let cx = EvalContext {
+        phase: Phase::Output,
+        resolver: &resolver,
+        generate: &SystemGenerate,
+        self_doc: DocRef("here.tmt".to_string()),
+        macros: &macros,
+        var: &EvalValue::Null,
+        var_unset: &[],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+    let mut doc = tomet_parser::parse_document(src).expect("source parses");
+    // Pick every expression that mentions `path`, by the span it is written at.
+    let mut picked = Vec::new();
+    tomet_tree::for_each_interpolation(&doc, |interp| {
+        if interp.expr.to_string().contains("path") {
+            picked.push(interp.span);
+        }
+    });
+    assert_eq!(picked.len(), 4);
+    let unresolved = resolve_expressions_where(&mut doc, &cx, &|span| {
+        picked.iter().any(|p| p.exact_eq(&span))
+    });
+    assert_eq!(unresolved, vec![], "the unpicked are not reported");
+
+    let mut left = Vec::new();
+    tomet_tree::for_each_interpolation(&doc, |interp| left.push(interp.expr.to_string()));
+    assert_eq!(left, vec!["macro.gh(1)", "self.filename"]);
+}
