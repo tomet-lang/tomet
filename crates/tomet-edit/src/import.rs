@@ -223,15 +223,18 @@ fn import_block_element(doc: &mut EditDoc, node: &SyntaxNode) -> (NodeKind, Elem
                 }
                 K::CONTENT => {
                     let raw_content = child.text().to_string();
+                    // `|content` is `[content]` without the brackets: it opens
+                    // with the `|` and has nothing to close it.
+                    let opener = content_opener(&child);
                     let inner = raw_content.strip_prefix('[').unwrap_or(&raw_content);
-                    let close_raw = if inner.ends_with(']') {
+                    let close_raw = if opener == K::L_BRACKET && inner.ends_with(']') {
                         "]".to_string()
                     } else {
                         String::new()
                     };
                     content_children = Some(import_content_children(doc, &child));
                     pieces.push(ElementPiece::Content {
-                        open_raw: "[".to_string(),
+                        open_raw: if opener == K::PIPE { "|" } else { "[" }.to_string(),
                         close_raw,
                         raw: raw_content,
                     });
@@ -265,17 +268,27 @@ fn import_block_element(doc: &mut EditDoc, node: &SyntaxNode) -> (NodeKind, Elem
     )
 }
 
+/// How a `CONTENT` group opens: `[` for `[content]`, `|` for `|content`.
+fn content_opener(content_node: &SyntaxNode) -> K {
+    match content_node.first_token().map(|t| t.kind()) {
+        Some(K::PIPE) => K::PIPE,
+        _ => K::L_BRACKET,
+    }
+}
+
 fn import_content_children(doc: &mut EditDoc, content_node: &SyntaxNode) -> Vec<ChildItem> {
     let elems: Vec<SyntaxElement> = content_node.children_with_tokens().collect();
-    let start = if elems
-        .first()
-        .is_some_and(|e| matches!(e, NodeOrToken::Token(t) if t.kind() == K::L_BRACKET))
-    {
+    let opener = content_opener(content_node);
+    let start = if elems.first().is_some_and(|e| {
+        matches!(e, NodeOrToken::Token(t) if t.kind() == K::L_BRACKET || t.kind() == K::PIPE)
+    }) {
         1
     } else {
         0
     };
-    let end = if elems.len() > start
+    // Only a bracketed group has a closing token of its own to leave off.
+    let end = if opener == K::L_BRACKET
+        && elems.len() > start
         && elems
             .last()
             .is_some_and(|e| matches!(e, NodeOrToken::Token(t) if t.kind() == K::R_BRACKET))
@@ -300,7 +313,7 @@ fn import_content_children(doc: &mut EditDoc, content_node: &SyntaxNode) -> Vec<
     children
 }
 
-/// Imports an `ARGS`, `VALUE_DATA`, `MAP_LITERAL`, or `SEQ_LITERAL` CST node into an [`AttrSlot`].
+/// Imports an `ARGS`, `VALUE_DATA`, or `MAP_LITERAL` CST node into an [`AttrSlot`].
 pub fn import_attr_slot(group_node: &SyntaxNode) -> AttrSlot {
     let raw = group_node.text().to_string();
     let elems: Vec<SyntaxElement> = group_node.children_with_tokens().collect();
@@ -504,13 +517,6 @@ fn import_edit_value(elems: &[SyntaxElement]) -> EditValue {
                         raw,
                         edited: false,
                         kind: EditValueKind::Map(import_attr_slot(node)),
-                    };
-                }
-                K::SEQ_LITERAL => {
-                    return EditValue {
-                        raw,
-                        edited: false,
-                        kind: EditValueKind::Seq(import_attr_slot(node)),
                     };
                 }
                 K::INLINE_ELEMENT => {

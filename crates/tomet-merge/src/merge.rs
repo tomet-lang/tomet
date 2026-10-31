@@ -978,61 +978,6 @@ fn merge_edit_value(
                 );
             }
         }
-        (EditValueKind::Seq(l_slot), EditValueKind::Seq(r_slot)) => {
-            let b_vals: Vec<String> = match base.map(|b| &b.kind) {
-                Some(EditValueKind::Seq(s)) => s
-                    .entries
-                    .iter()
-                    .map(|e| e.value.raw.trim().to_string())
-                    .collect(),
-                _ => Vec::new(),
-            };
-            let l_vals: Vec<String> = l_slot
-                .entries
-                .iter()
-                .map(|e| e.value.raw.trim().to_string())
-                .collect();
-            let r_vals: Vec<String> = r_slot
-                .entries
-                .iter()
-                .map(|e| e.value.raw.trim().to_string())
-                .collect();
-
-            let mut merged_items = Vec::new();
-            let mut clean = true;
-            for region in diff3::merge3(&b_vals, &l_vals, &r_vals) {
-                match region {
-                    diff3::Region::Same(items) => merged_items.extend(items),
-                    diff3::Region::Conflict { base, mine, theirs } => {
-                        if let ([b_item], [l_item], [r_item]) =
-                            (base.as_slice(), mine.as_slice(), theirs.as_slice())
-                        {
-                            let (merged_ev, sub_clean) = merge_edit_value(
-                                Some(&parse_edit_value_str(b_item)),
-                                &parse_edit_value_str(l_item),
-                                &parse_edit_value_str(r_item),
-                            );
-                            merged_items.push(merged_ev.export());
-                            clean &= sub_clean;
-                        } else {
-                            clean = false;
-                            merged_items.push(format!(
-                                "@conflict(a: list({}), b: list({}))",
-                                mine.join(", "),
-                                theirs.join(", ")
-                            ));
-                        }
-                    }
-                }
-            }
-            let (open_prefix, close_suffix) = if l_slot.open_delim.starts_with("list") {
-                ("list(", ")")
-            } else {
-                ("[", "]")
-            };
-            let raw = format!("{open_prefix}{}{close_suffix}", merged_items.join(", "));
-            return (parse_edit_value_str(&raw), clean);
-        }
         _ => {}
     }
 

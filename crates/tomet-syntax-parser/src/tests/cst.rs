@@ -18,6 +18,14 @@ fn kinds(src: &str, kind: K) -> usize {
     texts(src, kind).len()
 }
 
+/// How many tokens of `kind` the tree has.
+fn tokens_of(src: &str, kind: K) -> usize {
+    crate::parse_cst(src)
+        .descendants_with_tokens()
+        .filter(|e| e.kind() == kind)
+        .count()
+}
+
 // --- list markers ---------------------------------------------------------
 
 #[test]
@@ -313,4 +321,44 @@ fn a_pipe_run_is_a_value() {
     assert_eq!(texts(src, K::CONTENT), ["| one, {two}\n         | three"]);
     assert_eq!(kinds(src, K::MAP_ENTRY), 2);
     assert_eq!(kinds(src, K::SEQ_ITEM), 0);
+}
+
+// --- `[ ... ]` as a value ---------------------------------------------------
+
+#[test]
+fn a_bracket_in_a_value_is_content_and_a_code_span_cannot_close_it() {
+    // The AST parser reads `[ ... ]` in a value as blocks (`Value::Blocks`).
+    // Read as a list it closed at the `]` inside the code span.
+    let src = "a @conflict(a: [ use `]` here ], b: [ x ]) b\n";
+    assert!(crate::parse_document(src).is_ok());
+    assert_eq!(texts(src, K::CONTENT), ["[ use `]` here ]", "[ x ]"]);
+    assert_eq!(texts(src, K::CODE_SPAN), ["`]`"]);
+    assert_eq!(kinds(src, K::INLINE_ELEMENT), 1);
+}
+
+#[test]
+fn a_value_content_may_hold_blocks() {
+    let src = "@conflict(\n  a: [\n    - one\n    - two\n  ]\n  b: [ x ]\n)\n";
+    assert_eq!(kinds(src, K::LIST_ITEM), 2);
+    assert_eq!(kinds(src, K::CONTENT), 2);
+}
+
+// --- quotes in running text ---------------------------------------------------
+
+#[test]
+fn a_quote_in_a_sentence_swallows_nothing() {
+    // `'s` after a code span looked like the start of a string and took the
+    // rest of the line, and with it the element at the end.
+    let src = "`a`'s own merge, after @conflict(a: [ L ], b: [ R ])\nnext.\n";
+    assert_eq!(kinds(src, K::INLINE_ELEMENT), 1);
+    assert_eq!(tokens_of(src, K::STRING_LITERAL), 0);
+    let src = "He said \"see *this* and `that`\" twice.\n";
+    assert_eq!(texts(src, K::EMPHASIS), ["*this*"]);
+    assert_eq!(texts(src, K::CODE_SPAN), ["`that`"]);
+}
+
+#[test]
+fn a_string_is_still_a_string_in_a_value() {
+    let src = "@x(k: \"v w\", n: 'a')\n";
+    assert_eq!(tokens_of(src, K::STRING_LITERAL), 2);
 }

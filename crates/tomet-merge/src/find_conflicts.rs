@@ -142,7 +142,7 @@ fn find_conflicts_in_edit_value(val: &EditValue, out: &mut Vec<ConflictItem>) {
         return;
     }
     match &val.kind {
-        EditValueKind::Map(slot) | EditValueKind::Seq(slot) => {
+        EditValueKind::Map(slot) => {
             find_conflicts_in_attr_slot(slot, out);
         }
         _ => {}

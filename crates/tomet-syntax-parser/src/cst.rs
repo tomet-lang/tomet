@@ -18,7 +18,8 @@
 //! one of each -- then any `CONNECT` (`:name(...)`).
 //! `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
 //! `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
-//! `MAP_LITERAL`, `SEQ_LITERAL` or (a call such as `list(...)`) `ARGS`.
+//! `MAP_LITERAL`, `CONTENT` (a value written `[ ... ]` is blocks, as in the AST
+//! parser; the list literal is gone) or (a call such as `list(...)`) `ARGS`.
 //! `CONTENT` recurses into the same block grammar `ROOT`/`SECTION` use
 //! (`SECTION`, `LIST`, `BLOCK_ELEMENT`, `CODE_BLOCK`, `THEMATIC_BREAK`,
 //! `PARAGRAPH`), bounded by the group's own closing `]` instead of EOF or
@@ -788,6 +789,22 @@ impl<'a> CstParser<'a> {
             if self.at_run_end() {
                 break;
             }
+            // In running text a quote is a character, not the start of a
+            // string: the tokenizer, which cannot tell, read everything up to
+            // the closing quote or the end of the line as one token, and what
+            // stood in it -- an element, a `*span*`, a `@conflict` -- was lost.
+            // Split the quote off and read the rest again.
+            if k == K::STRING_LITERAL {
+                let at = self.start_of(self.pos);
+                let quote = self
+                    .text_at(self.pos)
+                    .chars()
+                    .next()
+                    .map_or(1, char::len_utf8);
+                self.split_at(at + quote);
+                self.bump_as(K::TEXT_CHUNK);
+                continue;
+            }
             match stop {
                 InlineStop::Line if k == K::NEWLINE => {
                     self.bump();
@@ -1314,12 +1331,11 @@ impl<'a> CstParser<'a> {
                     self.parse_entries(K::R_BRACE);
                     self.builder.finish_node();
                 }
-                K::L_BRACKET => {
-                    self.builder.start_node(K::SEQ_LITERAL.into());
-                    self.bump();
-                    self.parse_entries(K::R_BRACKET);
-                    self.builder.finish_node();
-                }
+                // `[ ... ]` as a value is blocks, the same `[content]` an
+                // element takes -- the AST parser's `TometValueHook` reads it
+                // so; the list literal it once was is gone. Read as a list it
+                // closed at the first `]`, even one inside `` `code` ``.
+                K::L_BRACKET => self.parse_content_group(),
                 K::L_PAREN => self.parse_args_group(),
                 _ => {
                     if !self.try_parse_inline_element() {
@@ -1556,9 +1572,10 @@ mod tests {
         assert_eq!(item.text().to_string(), "list(p, q)");
         assert_eq!(count(&item, K::ARGS), 1);
         assert_eq!(count(&root, K::MAP_LITERAL), 1);
-        assert_eq!(count(&root, K::SEQ_LITERAL), 1);
-        // `list(p, q)`, its `p` and `q`, and the two numbers.
-        assert_eq!(count(&root, K::SEQ_ITEM), 5);
+        // `[1, 2]` as a value is blocks, as in the AST parser: a content, not a list.
+        assert_eq!(count(&root, K::CONTENT), 1);
+        // `list(p, q)` and its `p` and `q`.
+        assert_eq!(count(&root, K::SEQ_ITEM), 3);
     }
 
     #[test]

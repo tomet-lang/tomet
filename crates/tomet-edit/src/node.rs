@@ -268,7 +268,7 @@ impl EditValue {
         }
         match &self.kind {
             EditValueKind::Scalar(_) => false,
-            EditValueKind::Map(slot) | EditValueKind::Seq(slot) => {
+            EditValueKind::Map(slot) => {
                 slot.edited || slot.entries.iter().any(AttrEntry::is_edited)
             }
             EditValueKind::Element { args, data, .. } => {
@@ -297,7 +297,7 @@ impl EditValue {
         }
         match &self.kind {
             EditValueKind::Scalar(s) => out.push_str(s),
-            EditValueKind::Map(slot) | EditValueKind::Seq(slot) => slot.export_into(out),
+            EditValueKind::Map(slot) => slot.export_into(out),
             EditValueKind::Element {
                 sigil_raw,
                 args,
@@ -328,8 +328,6 @@ pub enum EditValueKind {
     Scalar(String),
     /// Nested map literal `{ ... }`.
     Map(AttrSlot),
-    /// Nested sequence literal `[ ... ]`.
-    Seq(AttrSlot),
     /// Inline element in value position (e.g. `@doc.icon(star)` or `@conflict(a: 1, b: 2)`).
     Element {
         sigil_raw: String,

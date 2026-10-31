@@ -229,7 +229,6 @@ fn is_group_punctuation(kind: K) -> bool {
             | K::VALUE_DATA
             | K::CONTENT
             | K::MAP_LITERAL
-            | K::SEQ_LITERAL
             | K::ID_GROUP
             | K::CONNECT
             | K::MAP_ENTRY
@@ -297,7 +296,6 @@ fn in_value(token: &SyntaxToken) -> bool {
             | K::VALUE_DATA
             | K::ID_GROUP
             | K::MAP_LITERAL
-            | K::SEQ_LITERAL
             | K::MAP_ENTRY
             | K::SEQ_ITEM
             | K::INTERP_EXPR => return true,

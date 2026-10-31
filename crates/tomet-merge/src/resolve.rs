@@ -421,7 +421,7 @@ fn resolve_edit_value<'a>(
     }
 
     match &mut val.kind {
-        EditValueKind::Map(slot) | EditValueKind::Seq(slot) => {
+        EditValueKind::Map(slot) => {
             if resolve_attr_slot(slot, resolutions) {
                 val.edited = true;
                 true

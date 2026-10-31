@@ -84,7 +84,6 @@ pub enum SyntaxKind {
     VALUE_CHILDREN,
     MAP_ENTRY,
     MAP_LITERAL,
-    SEQ_LITERAL,
     SEQ_ITEM,
     INTERP_EXPR,
     /// `*em*` or `_em_`: the delimiters are the first and last tokens, the
