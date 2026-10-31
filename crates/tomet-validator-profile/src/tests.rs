@@ -125,3 +125,15 @@ fn findings_come_in_the_order_they_are_written() {
         ]
     );
 }
+
+#[test]
+fn a_term_in_a_list_item_is_found_too() {
+    assert_eq!(
+        findings("-@term(\"word\") in a list item\n"),
+        vec![Dirt::Term {
+            target: "word".into()
+        }]
+    );
+    let own = "::dictionary(d){ \"word\": @term[ W ]#(w) }\n\n-@term(d#w) mentioned\n";
+    assert_eq!(findings(own), vec![]);
+}
