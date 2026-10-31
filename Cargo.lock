@@ -2334,6 +2334,7 @@ dependencies = [
  "tomet-semantics",
  "tomet-validator-blueprint",
  "tomet-validator-core",
+ "tomet-validator-profile",
  "tomet-validator-rule",
 ]
 
@@ -2362,6 +2363,19 @@ dependencies = [
  "tomet-semantics",
  "tomet-tree",
  "tomet-type",
+]
+
+[[package]]
+name = "tomet-validator-profile"
+version = "0.5.0"
+dependencies = [
+ "tomet-ast",
+ "tomet-declaration",
+ "tomet-expr",
+ "tomet-parser",
+ "tomet-semantics",
+ "tomet-tree",
+ "tomet-validator-core",
 ]
 
 [[package]]

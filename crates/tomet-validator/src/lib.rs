@@ -13,10 +13,13 @@
 //!   | - `tomet-validator-core`: Base semantic element, ID duplicate, and argument checks.
 //!   | - `tomet-validator-rule`: Node constraint and `:rule` connect validation engine.
 //!   | - `tomet-validator-blueprint`: Document structural blueprint extraction and conformance.
+//!   | - `tomet-validator-profile`: Whether a document keeps the promise of its `::profile(...)`.
 
 pub use tomet_validator_blueprint as blueprint;
 pub use tomet_validator_blueprint::*;
 pub use tomet_validator_core::*;
+pub use tomet_validator_profile as profile;
+pub use tomet_validator_profile::{Dirt, Finding, standalone_findings, validate_profile};
 pub use tomet_validator_rule as rule;
 pub use tomet_validator_rule::*;
 
@@ -38,6 +41,9 @@ pub fn validate_document_with(doc: &Document, bindings: &Bindings) -> Vec<Diagno
 
     // 2. Local :rule connect constraint checks
     check_rule_connects(doc, bindings, &mut errors);
+
+    // 3. The promise of a declared ::profile
+    errors.extend(validate_profile(doc));
 
     errors
 }

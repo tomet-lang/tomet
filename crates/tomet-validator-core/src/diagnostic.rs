@@ -228,6 +228,9 @@ pub enum Diagnostic {
         reason: String,
         span: Span,
     },
+    /// A document that declares `::profile(standalone)` takes something from outside itself.
+    /// `what` says what, in words; `span` is the expression, element or mention that takes it.
+    NotStandalone { what: String, span: Span },
     /// `id` written in `::meta{ ... }`: a document's identity is the declaration `::id(...)`.
     ///
     /// `::meta` keeps the free attributes of a document; what tomet itself reads about it does
@@ -283,6 +286,7 @@ impl Diagnostic {
             Diagnostic::MetaIdMoved { span } => *span,
             Diagnostic::RegistryNameMismatch { span, .. } => *span,
             Diagnostic::UnresolvedTerm { span, .. } => *span,
+            Diagnostic::NotStandalone { span, .. } => *span,
             Diagnostic::InvalidDefinition { span, .. } => *span,
             Diagnostic::InvalidFieldValue { span, .. } => *span,
             Diagnostic::UnknownArgument { span, .. } => *span,
@@ -562,6 +566,10 @@ impl Diagnostic {
             Diagnostic::UnresolvedTerm { target, reason, .. } => {
                 write!(f, "`@term({target})` names no term: {reason}")
             }
+            Diagnostic::NotStandalone { what, .. } => write!(
+                f,
+                "`::profile(standalone)` is declared, but the file needs {what}"
+            ),
             Diagnostic::MetaIdMoved { .. } => write!(
                 f,
                 "`id` is not written in `::meta`; the identity of a document is `::id(...)`"

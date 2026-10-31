@@ -44,6 +44,7 @@ members = [
   "crates/tomet-validator-core",
   "crates/tomet-validator-rule",
   "crates/tomet-validator-blueprint",
+  "crates/tomet-validator-profile",
   "crates/tomet-validator",
 
   #= Config -- PrinterConfig discovery & loading; the producers sit on this
@@ -135,6 +136,7 @@ cotomet-eval = { path = "crates/tomet-semantics-eval", version = "0.5.0" }
 tomet-validator = { path = "crates/tomet-validator", version = "0.5.0" }
 tomet-validator-blueprint = { path = "crates/tomet-validator-blueprint", version = "0.5.0" }
 tomet-validator-core = { path = "crates/tomet-validator-core", version = "0.5.0" }
+tomet-validator-profile = { path = "crates/tomet-validator-profile", version = "0.5.0" }
 tomet-validator-rule = { path = "crates/tomet-validator-rule", version = "0.5.0" }
 #= Transform
 tomet-transform = { path = "crates/tomet-transform", version = "0.5.0" }

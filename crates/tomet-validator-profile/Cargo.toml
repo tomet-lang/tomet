@@ -1,0 +1,18 @@
+[package]
+name = "tomet-validator-profile"
+version.workspace = true
+edition.workspace = true
+description = "Checks that a Tomet document keeps the promise of its ::profile(...)."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }
+tomet-declaration = { workspace = true }
+tomet-expr = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-tree = { workspace = true }
+tomet-validator-core = { workspace = true }
+
+[dev-dependencies]
+tomet-parser = { workspace = true }

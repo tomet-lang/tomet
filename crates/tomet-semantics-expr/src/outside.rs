@@ -49,6 +49,37 @@ pub enum Reach {
     UnknownAddress,
 }
 
+impl std::fmt::Display for Reach {
+    /// What it is that the file does not hold, as a noun phrase a report can build a sentence on.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Reach::Vault => write!(f, "the vault (`vault`)"),
+            Reach::Macro(name) => {
+                write!(f, "the macro `{name}`, which `::macros` does not define")
+            }
+            Reach::Var(name) => {
+                write!(f, "the variable `{name}`, which `::vars` does not declare")
+            }
+            Reach::OtherDocument(function) => write!(f, "another document (`{function}(...)`)"),
+            Reach::Placement("link") => write!(f, "a link, which writes where the file sits"),
+            Reach::Placement(what) => write!(f, "where the file sits (`self.{what}`)"),
+            Reach::FieldType => {
+                write!(f, "the type the vault gives a metadata field (`self.meta`)")
+            }
+            Reach::Address(scheme) => {
+                write!(
+                    f,
+                    "a document outside the file (an address with `{scheme}:`)"
+                )
+            }
+            Reach::UnknownAddress => write!(
+                f,
+                "an address built at run time, which cannot be shown to stay inside the file"
+            ),
+        }
+    }
+}
+
 /// One place an expression reaches outside, with where in the expression it is.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Reaching {

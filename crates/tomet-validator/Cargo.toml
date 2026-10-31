@@ -12,6 +12,7 @@ tomet-cst = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-validator-blueprint = { workspace = true }
 tomet-validator-core = { workspace = true }
+tomet-validator-profile = { workspace = true }
 tomet-validator-rule = { workspace = true }
 
 #= Crates.io
