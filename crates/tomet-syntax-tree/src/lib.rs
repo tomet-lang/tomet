@@ -101,7 +101,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Block, Inline, Sigil, Span, Text, Value};
+    use tomet_ast::{Block, Inline, Name, Span, Text, Value};
 
     fn parse(src: &str) -> tomet_ast::Document {
         tomet_parser::parse_document(src).expect("valid Tomet source")
@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_element_extension_traits() {
-        let mut el = element_new(Sigil::named("card"));
+        let mut el = element_new(Name::bare("card"));
         el.data.set_prop("tag", Value::String("urgent".into()));
         assert_eq!(
             el.data.get_attr("tag").and_then(|v| v.as_str()),

@@ -21,7 +21,7 @@ mod values;
 use super::*;
 use tomet_ast::{
     Block, Declaration, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name,
-    Paragraph, Placement, Sigil, SoftBreak, Span, Value,
+    Paragraph, Placement, SoftBreak, Span, Value,
 };
 
 /// A `SoftBreak` for test expectations -- span never matters, `Span`'s

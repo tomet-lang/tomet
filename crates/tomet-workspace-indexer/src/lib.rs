@@ -445,7 +445,7 @@ fn value_to_string(v: &Value) -> String {
             format!("{name}({})", s.join(", "))
         }
         Value::Element(el) => {
-            let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
+            let name = el.name.to_string();
             match &el.data.args {
                 Some(args) => format!("@{name}({})", value_to_string(args)),
                 None => format!("@{name}"),

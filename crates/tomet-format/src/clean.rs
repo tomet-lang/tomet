@@ -69,7 +69,7 @@ pub fn clean_whitespace(normalized: &str) -> String {
 }
 
 pub(crate) fn is_raw_element(el: &Element) -> bool {
-    if el.sigil.is_bare_named("raw") {
+    if el.name.is_bare_named("raw") {
         return true;
     }
     if let Some(Value::Map(entries)) = &el.data.args

@@ -10,11 +10,11 @@ use crate::value::{
     skip_ws_newlines_and_comments,
 };
 use tomet_ast::{
-    Bare, Block, Connect, Declaration, Element, Entry, Group, Hole, Id, Inline, Name, Placement,
-    Sigil, Span, Value,
+    Bare, Block, Connect, Data, Declaration, Element, Entry, Group, Hole, Id, Inline, Name,
+    Placement, Span, Value,
 };
 use tomet_lexer::Cursor;
-use tomet_tree::{ElementExt, element_new};
+use tomet_tree::ElementExt;
 
 /// Whether `cur` starts an element: `@name`, or in a pattern `?matcher(`.
 ///
@@ -244,16 +244,38 @@ pub(crate) fn parse_element_with_pipe_stack(
         return Err(err(cur.pos(), "expected an element name after '@'"));
     };
 
-    let mut el = element_new(Sigil::Named(name));
+    let mut read = Groups::default();
     parse_groups_with_pipe_stack(
         dialect,
         cur,
-        &mut el,
+        &mut read,
         allow_colon_connect,
         parent_pipe_stack,
     )?;
-    el.span = cur.span_from(start_pos);
-    Ok(el)
+    Ok(Element {
+        name,
+        placement: Placement::Inline,
+        data: read.data,
+        content: read.content,
+        id: read.id,
+        connects: read.connects,
+        span: cur.span_from(start_pos),
+    })
+}
+
+/// What [`parse_groups`] reads: the groups every node takes, before the node
+/// that owns them claims the ones it accepts.
+///
+/// It is not a node. Which of an element, a hole, a declaration, a bare
+/// entry, a list item or a section it becomes is decided by the caller, and
+/// what that role does not take (a declaration's `:connect`, a connect's
+/// `#(id)`) is refused there, so the reading of a group is written once.
+#[derive(Default)]
+pub(crate) struct Groups {
+    pub data: Data,
+    pub content: Option<Vec<Block>>,
+    pub id: Option<Id>,
+    pub connects: Vec<Connect>,
 }
 
 /// What `@name...` -- or, in a pattern, `?matcher...` -- reads into.
@@ -330,7 +352,7 @@ fn parse_hole(dialect: Dialect, cur: &mut Cursor, parent_pipe_stack: &[usize]) -
     let start_pos = cur.pos();
     cur.eat_str("?");
     let matcher = eat_name(cur);
-    let mut read = element_new(Sigil::Bare);
+    let mut read = Groups::default();
     parse_groups_with_pipe_stack(dialect, cur, &mut read, false, parent_pipe_stack)?;
     Ok(Hole {
         matcher,
@@ -357,7 +379,7 @@ pub(crate) fn parse_declaration(
     let Some(name) = eat_name(cur) else {
         return Err(err(cur.pos(), "expected a declaration name after '::'"));
     };
-    let mut read = element_new(Sigil::Named(name.clone()));
+    let mut read = Groups::default();
     parse_groups_with_pipe_stack(dialect, cur, &mut read, true, parent_pipe_stack)?;
     let span = cur.span_from(start_pos);
     if !read.connects.is_empty() {
@@ -426,16 +448,16 @@ pub(crate) fn opens_group(cur: &Cursor) -> bool {
 pub(crate) fn parse_groups(
     dialect: Dialect,
     cur: &mut Cursor,
-    el: &mut Element,
+    read: &mut Groups,
     allow_colon_connect: bool,
 ) -> Result<()> {
-    parse_groups_with_pipe_stack(dialect, cur, el, allow_colon_connect, &[])
+    parse_groups_with_pipe_stack(dialect, cur, read, allow_colon_connect, &[])
 }
 
 pub(crate) fn parse_groups_with_pipe_stack(
     dialect: Dialect,
     cur: &mut Cursor,
-    el: &mut Element,
+    read: &mut Groups,
     allow_colon_connect: bool,
     parent_pipe_stack: &[usize],
 ) -> Result<()> {
@@ -461,22 +483,22 @@ pub(crate) fn parse_groups_with_pipe_stack(
                 // nested inside the other.
                 if is_name_start_at(cur) {
                     let name = eat_name(cur).expect("is_name_start_at just confirmed a name");
-                    let mut connect_el = element_new(Sigil::Named(name.clone()));
+                    let mut connect_read = Groups::default();
                     parse_groups_with_pipe_stack(
                         dialect,
                         cur,
-                        &mut connect_el,
+                        &mut connect_read,
                         false,
                         parent_pipe_stack,
                     )?;
-                    connect_el.span = cur.span_from(colon_pos);
-                    el.connects.push(into_connect(name, connect_el)?);
+                    let span = cur.span_from(colon_pos);
+                    read.connects.push(into_connect(name, connect_read, span)?);
                     continue;
                 }
                 match cur.peek() {
                     Some('(') => {
                         let conn_args = parse_paren_value(dialect, cur)?;
-                        el.data.args = merge_values(el.data.args.as_ref(), Some(&conn_args));
+                        read.data.args = merge_values(read.data.args.as_ref(), Some(&conn_args));
                         continue;
                     }
                     Some('{') => {
@@ -484,7 +506,7 @@ pub(crate) fn parse_groups_with_pipe_stack(
                         // Connect merges pairs into an existing group; a
                         // group holding elements is replaced wholesale,
                         // as there is nothing to merge key-wise.
-                        let merged = match (&el.data.value, &conn_val) {
+                        let merged = match (&read.data.value, &conn_val) {
                             (Some(existing), Group(_))
                                 if !existing.has_children() && !conn_val.has_children() =>
                             {
@@ -493,24 +515,24 @@ pub(crate) fn parse_groups_with_pipe_stack(
                             }
                             _ => None,
                         };
-                        el.data.value = Some(merged.unwrap_or(conn_val));
+                        read.data.value = Some(merged.unwrap_or(conn_val));
                         continue;
                     }
                     _ => {}
                 }
             }
             match cur.peek() {
-                Some('(') if el.data.args.is_none() => {
-                    el.data.args = Some(parse_paren_value(dialect, cur)?);
+                Some('(') if read.data.args.is_none() => {
+                    read.data.args = Some(parse_paren_value(dialect, cur)?);
                     continue;
                 }
-                Some('[') if el.content.is_none() => {
-                    el.content = Some(parse_content(dialect, cur)?);
+                Some('[') if read.content.is_none() => {
+                    read.content = Some(parse_content(dialect, cur)?);
                     continue;
                 }
                 // `|` is `[` without the brackets -- same slot, closed by
                 // the end of the marked run instead of by `]`.
-                Some('|') if el.content.is_none() => {
+                Some('|') if read.content.is_none() => {
                     let mut probe = *cur;
                     let mut parent_ok = true;
                     if newlines > 0 && !parent_pipe_stack.is_empty() {
@@ -531,15 +553,15 @@ pub(crate) fn parse_groups_with_pipe_stack(
                     }
                     if parent_ok && probe.peek() == Some('|') {
                         *cur = probe;
-                        el.content = Some(parse_pipe_content(dialect, cur, parent_pipe_stack)?);
+                        read.content = Some(parse_pipe_content(dialect, cur, parent_pipe_stack)?);
                         continue;
                     } else {
                         cur.set_pos(checkpoint);
                         break;
                     }
                 }
-                Some('{') if el.data.value.is_none() => {
-                    el.data.value = Some(parse_value_group(dialect, cur)?);
+                Some('{') if read.data.value.is_none() => {
+                    read.data.value = Some(parse_value_group(dialect, cur)?);
                     continue;
                 }
                 // `#(id)` -- a single slot, read after the three groups
@@ -551,8 +573,8 @@ pub(crate) fn parse_groups_with_pipe_stack(
                 // this element. A connect takes no id, though, so
                 // [`into_connect`] then refuses it: the owner's id is
                 // written before the first connect.
-                Some('#') if el.id.is_none() && cur.peek_at(1) == Some('(') => {
-                    el.id = Some(parse_hash_id(cur)?);
+                Some('#') if read.id.is_none() && cur.peek_at(1) == Some('(') => {
+                    read.id = Some(parse_hash_id(cur)?);
                     continue;
                 }
                 // A group whose slot is already filled. Every arm above
@@ -627,12 +649,12 @@ fn content_lands_at(dialect: Dialect, cur: &Cursor, stop: usize) -> bool {
 /// `word:word` (`...see note:more`) would read as a zero-argument
 /// `:more` connect merely because there happened to be nothing left
 /// after it to disagree.
-fn claimed_something(el: &Element) -> bool {
-    el.data.args.is_some()
-        || el.content.is_some()
-        || el.data.value.is_some()
-        || el.id.is_some()
-        || el
+fn claimed_something(read: &Groups) -> bool {
+    read.data.args.is_some()
+        || read.content.is_some()
+        || read.data.value.is_some()
+        || read.id.is_some()
+        || read
             .connects
             .iter()
             .any(|c| c.data.args.is_some() || c.content.is_some() || c.data.value.is_some())
@@ -642,10 +664,10 @@ fn claimed_something(el: &Element) -> bool {
 /// three groups an element does and nothing more, so the `#(id)` slot, which
 /// the shared reader fills like any other, is refused here: an id written
 /// after a connect is not the owner's, and is not the connect's either.
-fn into_connect(name: Name, read: Element) -> Result<Connect> {
+fn into_connect(name: Name, read: Groups, span: Span) -> Result<Connect> {
     if read.id.is_some() {
         return Err(err(
-            read.span.start,
+            span.start,
             "a `:connect` takes no `#(id)`: write the id of its owner before the first `:connect`",
         ));
     }
@@ -653,7 +675,7 @@ fn into_connect(name: Name, read: Element) -> Result<Connect> {
         name,
         data: read.data,
         content: read.content,
-        span: read.span,
+        span,
     })
 }
 
@@ -762,7 +784,7 @@ fn find_trailing_connect(dialect: Dialect, cur: &Cursor) -> Option<usize> {
     candidates.into_iter().find(|&pos| {
         let mut probe = *cur;
         probe.set_pos(pos);
-        let mut scratch = element_new(Sigil::Bare);
+        let mut scratch = Groups::default();
         if parse_groups_with_pipe_stack(dialect, &mut probe, &mut scratch, true, &[]).is_err()
             || !claimed_something(&scratch)
         {
@@ -787,7 +809,7 @@ pub(crate) struct SugarBody {
 }
 
 impl SugarBody {
-    fn from_scratch(content: Vec<Inline>, scratch: Element) -> Self {
+    fn from_scratch(content: Vec<Inline>, scratch: Groups) -> Self {
         SugarBody {
             content,
             args: scratch.data.args,
@@ -815,7 +837,7 @@ pub(crate) fn parse_sugar_body(dialect: Dialect, cur: &mut Cursor) -> Result<Sug
     if let Some(connect_pos) = find_trailing_connect(dialect, cur) {
         let content = parse_inline_seq(dialect, cur, Stop::Offset(connect_pos), false)?;
         cur.set_pos(connect_pos);
-        let mut scratch = element_new(Sigil::Bare);
+        let mut scratch = Groups::default();
         parse_groups_with_pipe_stack(dialect, cur, &mut scratch, true, &[])?;
         // `find_trailing_connect` only ever starts a candidate at `:`,
         // `(`, `{` or `#(`, never at `[`/`|` -- but a *second*, colon-less
@@ -826,7 +848,7 @@ pub(crate) fn parse_sugar_body(dialect: Dialect, cur: &mut Cursor) -> Result<Sug
         if scratch.content.is_some() {
             cur.set_pos(connect_pos);
             let content = parse_inline_seq(dialect, cur, Stop::Line, false)?;
-            return Ok(SugarBody::from_scratch(content, element_new(Sigil::Bare)));
+            return Ok(SugarBody::from_scratch(content, Groups::default()));
         }
         return Ok(SugarBody::from_scratch(content, scratch));
     }
@@ -838,7 +860,7 @@ pub(crate) fn parse_sugar_body(dialect: Dialect, cur: &mut Cursor) -> Result<Sug
     // does on one.
     let content = parse_inline_seq(dialect, cur, Stop::Line, false)?;
     let after_content = cur.pos();
-    let mut scratch = element_new(Sigil::Bare);
+    let mut scratch = Groups::default();
     // Confirm what follows the gap is actually a connect opener before
     // calling into the real reader: a bracket-less sugar body has no
     // `content`/`children` field of its own to hold a `[...]`/`|...`
@@ -860,7 +882,7 @@ pub(crate) fn parse_sugar_body(dialect: Dialect, cur: &mut Cursor) -> Result<Sug
         // group within this gap-tolerant read could still reach `[`/`|`.
         if scratch.content.is_some() {
             cur.set_pos(after_content);
-            return Ok(SugarBody::from_scratch(content, element_new(Sigil::Bare)));
+            return Ok(SugarBody::from_scratch(content, Groups::default()));
         }
     }
     Ok(SugarBody::from_scratch(content, scratch))
@@ -1080,7 +1102,7 @@ pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<Gr
 /// is no enclosing construct inside a group for a connect to reach.
 fn parse_bare_entry(dialect: Dialect, cur: &mut Cursor) -> Result<Bare> {
     let start_pos = cur.pos();
-    let mut read = element_new(Sigil::Bare);
+    let mut read = Groups::default();
     parse_groups(dialect, cur, &mut read, false)?;
     Ok(Bare {
         data: read.data,

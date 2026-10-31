@@ -72,10 +72,7 @@ fn text_of(doc: &Document) -> String {
                 Inline::Text(t) => out.push_str(&t.value),
                 Inline::Raw(t) => out.push_str(&t.value),
                 Inline::Element(el) => {
-                    out.push_str(&format!(
-                        "<{}>",
-                        el.sigil.name().map(|n| n.to_string()).unwrap_or_default()
-                    ));
+                    out.push_str(&format!("<{}>", el.name.to_string()));
                     if let Some(content) = &el.content {
                         blocks(out, content);
                     }
@@ -108,10 +105,7 @@ fn text_of(doc: &Document) -> String {
                     out.push(']');
                 }
                 Block::Element(el) => {
-                    out.push_str(&format!(
-                        "<{}>",
-                        el.sigil.name().map(|n| n.to_string()).unwrap_or_default()
-                    ));
+                    out.push_str(&format!("<{}>", el.name.to_string()));
                 }
                 Block::Interp(interp) => out.push_str(&format!("${{{}}}", interp.expr)),
                 Block::Declaration(d) => out.push_str(&format!("::{}", d.name)),

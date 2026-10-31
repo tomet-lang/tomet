@@ -28,7 +28,7 @@ pub fn parse_document(src: &str) -> Result<Document> {
 }
 
 /// Parse an entire source string as a pattern: a [`Document`] in which `?name(args){options}[content]`
-/// is a hole ([`tomet_ast::Sigil::Question`]).
+/// is a hole ([`tomet_ast::Hole`]).
 ///
 /// It is [`parse_document`] with one more sigil. Everything else is read by the same code, so a
 /// pattern is written in, and printed as, ordinary tomet.
@@ -192,7 +192,7 @@ pub(crate) fn parse_block_seq(
         if is_thematic_break(&cur) {
             let item_start = cur.pos();
             consume_thematic_break(&mut cur);
-            let el = element_new(tomet_ast::Sigil::named("hr"))
+            let el = element_new(tomet_ast::Name::bare("hr"))
                 .with_placement(Placement::Block)
                 .with_span(cur.span_from(item_start));
             push_block(&mut doc_blocks, &mut stack, Block::Element(el));

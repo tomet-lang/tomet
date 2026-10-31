@@ -398,8 +398,8 @@ mod tests {
 
         // Query element metadata
         assert_eq!(doc.text_at("#main-meta.id").as_deref(), Some("main-meta"));
-        assert_eq!(doc.text_at("#main-meta.sigil").as_deref(), Some("meta"));
-        assert_eq!(doc.text_at("#warn.sigil").as_deref(), Some("callout"));
+        assert_eq!(doc.text_at("#main-meta.name").as_deref(), Some("meta"));
+        assert_eq!(doc.text_at("#warn.name").as_deref(), Some("callout"));
 
         // Query content
         assert_eq!(

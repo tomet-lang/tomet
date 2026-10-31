@@ -1,6 +1,6 @@
 //! Element group order formatting according to `GroupOrder` settings.
 
-use tomet_ast::{Block, Connect, Data, Declaration, Element, Entry, Group, Inline, List, Sigil};
+use tomet_ast::{Block, Connect, Data, Declaration, Element, Entry, Group, Inline, List};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_parser::parse_document;
 
@@ -195,9 +195,8 @@ fn collect_swaps_in_element(
         return;
     }
     // 1. Check if this element itself needs swapping
-    let elem_name = el.sigil.name().map(|n| n.name.as_str()).unwrap_or("");
+    let elem_name = el.name.name.as_str();
     if let Some(order) = config.element_group_order(elem_name)
-        && matches!(el.sigil, Sigil::Named(_))
         && el.data.args.is_some()
         && el.content.is_some()
         && !el.span.is_dummy()

@@ -25,7 +25,7 @@ enum Written<'a> {
 impl Written<'_> {
     fn name(&self) -> Option<&tomet_ast::Name> {
         match self {
-            Written::Element(el) => el.sigil.name(),
+            Written::Element(el) => Some(&el.name),
             Written::Declaration(d) => Some(&d.name),
         }
     }
@@ -61,28 +61,28 @@ pub fn classify_in(
     el: &tomet_ast::Element,
     bindings: &Bindings,
 ) -> Result<tomet_semantics::ElementKind, tomet_semantics::UnknownName> {
-    match &el.sigil {
-        tomet_ast::Sigil::Named(name) => {
-            tomet_semantics::refuse_declaration_as_element(name, bindings.classify(name)?)
-        }
-        _ => tomet_semantics::classify_std(el),
-    }
+    tomet_semantics::refuse_declaration_as_element(&el.name, bindings.classify(&el.name)?)
 }
 
-/// [`classify_in`] for a child of a node: an element as itself, a list item as
-/// the element it is when it has a name, and a plain list item as
-/// [`ElementKind::Bare`](tomet_semantics::ElementKind::Bare).
-pub fn classify_child(
+/// What a `:rule(allow: list(...))` calls a plain `- item`, which has no name
+/// to be called by.
+pub const PLAIN_ITEM_KIND_NAME: &str = "bare";
+
+/// The name a rule's `allow:` list knows a child of a node by: an element by
+/// its kind, a list item by the element it is when it has a name, and a plain
+/// list item by [`PLAIN_ITEM_KIND_NAME`].
+pub fn child_kind_name(
     child: tomet_tree::Child<'_>,
     bindings: &Bindings,
-) -> Result<tomet_semantics::ElementKind, tomet_semantics::UnknownName> {
-    match child {
-        tomet_tree::Child::Element(el) => classify_in(el, bindings),
+) -> Result<String, tomet_semantics::UnknownName> {
+    let kind = match child {
+        tomet_tree::Child::Element(el) => classify_in(el, bindings)?,
         tomet_tree::Child::Item(item) => match item.named_element() {
-            Some(element) => classify_in(&element, bindings),
-            None => Ok(tomet_semantics::ElementKind::Bare),
+            Some(element) => classify_in(&element, bindings)?,
+            None => return Ok(PLAIN_ITEM_KIND_NAME.to_string()),
         },
-    }
+    };
+    Ok(kind.as_str().to_string())
 }
 
 pub fn shape_str(shape: Shape) -> &'static str {
@@ -118,7 +118,7 @@ pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagn
         }
         if let Some((found, expected)) = tomet_semantics::shape_mismatch(el) {
             errors.push(Diagnostic::ShapeMismatch {
-                name: el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
+                name: el.name.to_string(),
                 found: shape_str(found),
                 expected: shape_str(expected),
                 span: el.span,
@@ -434,9 +434,8 @@ fn note_text(el: &tomet_ast::Element) -> String {
 
 pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     for_each_element_and_item(doc, |el| {
-        let Some(name) = el.sigil.name() else { return };
         check_arguments_of(
-            name,
+            &el.name,
             tomet_semantics::normalized_element_args_in(el, bindings),
             el.span,
             bindings,
@@ -645,13 +644,11 @@ pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec
         let Ok(kind) = classify_in(el, bindings) else {
             return;
         };
-        let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
+        let name = el.name.to_string();
 
         let allow = match &kind {
-            tomet_semantics::ElementKind::Custom(_) => el
-                .sigil
-                .name()
-                .and_then(|n| bindings.declaration(n))
+            tomet_semantics::ElementKind::Custom(_) => bindings
+                .declaration(&el.name)
                 .and_then(|decl| decl.content_allow.clone()),
             _ => match tomet_semantics::builtin_content_shape(&kind) {
                 Some(tomet_semantics::ContentShape::Inline) => {

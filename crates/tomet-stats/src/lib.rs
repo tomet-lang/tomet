@@ -23,7 +23,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use tomet_ast::{Block, Document, Inline, Sigil};
+use tomet_ast::{Block, Document, Inline};
 use tomet_semantics::{ElementKind, TargetScheme, link_target_of, path_target_of, target_scheme};
 
 pub use tomet_address::LinkKind;
@@ -144,10 +144,8 @@ pub fn measure(doc: &Document) -> Stats {
     }
 
     tomet_tree::for_each_element(doc, |el| {
-        if let Sigil::Named(name) = &el.sigil {
-            stats.named += 1;
-            *stats.by_name.entry(name.to_string()).or_default() += 1;
-        }
+        stats.named += 1;
+        *stats.by_name.entry(el.name.to_string()).or_default() += 1;
         count_link(&mut stats, el);
     });
 

@@ -1,7 +1,7 @@
 //! =[ tomet-ast ]
 //!
 //! Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
-//! `Inline`, `Element`, `Declaration`, `Interpolation`, `Value`, `Span`).
+//! `Inline`, `Element`, `Declaration`, `Interpolation`, `Hole`, `ListItem`, `Value`, `Span`).
 //!
 //! =[ Design Policy ]
 //!
@@ -17,7 +17,11 @@
 //!   | A `::name(...)` is a [`Declaration`]: always a [`Block`], about the document and attached to
 //!   | nothing, so it has no placement and takes no connect.
 //!   | A `:name(...)` is a [`Connect`]: metadata about its owner, with no id, no connects of its own
-//!   | and no placement. What nodes share is [`Data`] (`(args)` and the `{...}` [`Group`]), so what
+//!   | and no placement. A `?matcher(...)` is a [`Hole`] (a matcher, optional, in place of a name).
+//!   | A list item is a [`ListItem`] and a nameless `(marker)[content]` entry of a `{...}` group is a
+//!   | [`Bare`]: neither has a name, so neither is an [`Element`], whose name is mandatory.
+//!   | `ListItem::named_element` gives the element a `-@name(...)` item is, as a copy.
+//!   | What nodes share is [`Data`] (`(args)` and the `{...}` [`Group`]), so what
 //!   | reads them is written once; `[content]` and `#(id)` stay on the roles that take them.
 //! - (Clear Crate Boundaries)
 //!   | Semantics: Classification of element meanings (links, `::meta`, `::config`) lives in `tomet-semantics`.
@@ -157,7 +161,7 @@ pub enum Value {
     /// A real, `@`-sigiled element sitting where a value goes --
     /// `::meta(icon: @doc.icon("triangle"))`. Unlike [`Value::Call`], this
     /// is the same [`Element`] any other position produces: it has a
-    /// `sigil`, classifies and validates through `Bindings` like any other
+    /// `name`, classifies and validates through `Bindings` like any other
     /// element (an unregistered name is still an error here), and can
     /// itself carry `args`/`content`/`value`. What distinguishes it from a
     /// call is exactly the `@` -- a call is inert, uninterpreted data
@@ -506,7 +510,7 @@ impl ListItem {
     pub fn named_element(&self) -> Option<Element> {
         let name = self.name.clone()?;
         Some(Element {
-            sigil: Sigil::Named(name),
+            name,
             placement: Placement::Block,
             data: self.data.clone(),
             content: Some(self.content.clone()),
@@ -784,83 +788,6 @@ impl fmt::Display for Name {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Id(pub String);
 
-/// Which sigil introduced an element, and its name.
-///
-/// There is one element sigil in a document, `@`. A sigil says "an element starts here" and
-/// nothing else: whether the element stands as a block or belongs to a
-/// paragraph is [`Placement`], which the parser derives from position, and
-/// origin is carried by [`Name`]'s namespace.
-///
-/// Two earlier axes were tried here and both carried no information. `<T>`
-/// vs `@name` was meant to separate official from user-defined elements,
-/// but both classified through the same arm. `#name` vs `@name` was meant
-/// to encode shape, but the parser never consulted it (position already
-/// decided placement) and `tomet-semantics`' `required_shape` already knew
-/// each builtin's shape, so the sigil only restated it. `#` is not a
-/// second sigil today either: `#(id)` is [`Element::id`], a slot in the
-/// element's own groups, not a different way to introduce an element.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum Sigil {
-    /// `@name` -- an element. The name is mandatory.
-    ///
-    /// A nameless `@(url:...)` used to infer its kind from a key in its
-    /// args. That inference was retired and `@link(target:...)` is the
-    /// one link element, but the *syntax* was left behind, so a bare `@`
-    /// still parsed and classified as the meaningless `Custom("at")`.
-    /// It is gone: an element has a name.
-    Named(Name),
-    /// No sigil at all. Legal as an entry inside another element's value
-    /// group (e.g. the `(1)[...]` entries inside `@links{ ... }`), where
-    /// the container already supplies the type, and as a [`crate::ListItem`]
-    /// written without the combine notation (a plain `- content`), where
-    /// the list itself is the container.
-    #[default]
-    Bare,
-}
-
-impl Sigil {
-    /// This element's name, if it has one.
-    ///
-    pub fn name(&self) -> Option<&Name> {
-        match self {
-            Sigil::Named(name) => Some(name),
-            Sigil::Bare => None,
-        }
-    }
-
-    /// The text that opens an element: `@name`.
-    /// Empty for [`Sigil::Bare`], which is written with no sigil at all.
-    ///
-    /// Everything that prints an element asks here, so a sigil is spelled in
-    /// one place.
-    pub fn head(&self) -> String {
-        match self {
-            Sigil::Named(name) => format!("@{name}"),
-            Sigil::Bare => String::new(),
-        }
-    }
-
-    /// An element with a bare (un-namespaced) name.
-    pub fn named(name: impl Into<String>) -> Self {
-        Sigil::Named(Name::bare(name))
-    }
-
-    /// Whether this element carries the bare (un-namespaced) name `name`.
-    ///
-    /// This is the check almost every consumer wants: a bare name resolves
-    /// in `std` or in the document's own `::kind` namespace, never in one
-    /// brought in with `::use`, so `is_bare_named("meta")` asks "is this
-    /// *the* `meta` element" and cannot be satisfied by a user-defined
-    /// `deck.meta`.
-    ///
-    /// It is a spelling test, not a resolution. A `::kind(writ)` document
-    /// writes its own `@layers` bare as well; telling that apart from a
-    /// `std` name is `Bindings::classify`'s job.
-    pub fn is_bare_named(&self, name: &str) -> bool {
-        self.name().is_some_and(|n| n.is_bare_named(name))
-    }
-}
-
 /// Where an element sits: on its own as a block, or inside running text.
 ///
 /// The parser derives this from position alone -- never from the element's
@@ -969,6 +896,20 @@ pub struct Data {
     pub value: Option<Group>,
 }
 
+/// An `@name(args)[content]{value}` element.
+///
+/// The one element sigil is `@`; it says "an element starts here" and nothing
+/// else. Whether the element stands as a block or belongs to a paragraph is
+/// [`Placement`], which the parser derives from position, and origin is
+/// carried by [`Name`]'s namespace. Two earlier axes were tried and carried no
+/// information: `<T>` vs `@name` (official vs user-defined, but both
+/// classified through the same arm) and `#name` vs `@name` (shape, which
+/// `tomet-semantics`' `required_shape` already knew). `#(id)` is not a second
+/// sigil either: it is [`Element::id`], a slot in the element's own groups.
+///
+/// A node that has no name of its own, a [`Bare`] entry or a plain list item,
+/// is not an element at all.
+///
 /// `(args)` / `[content]` / `{value}`, each optional and at most one of each,
 /// in any order in the source.
 ///
@@ -978,9 +919,12 @@ pub struct Data {
 /// `connects` is unrelated to those three: it is the `:name(...)` family
 /// stacked after them (`@x(...):as(y):rule(...)`), zero or more, each a
 /// [`Connect`]. Order-preserving, empty when nothing follows.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Element {
-    pub sigil: Sigil,
+    /// The name after `@`. It is mandatory: a nameless `@(url:...)` used to
+    /// infer its kind from a key in its args, that inference was retired,
+    /// and the syntax is gone with it.
+    pub name: Name,
     pub placement: Placement,
     pub data: Data,
     /// `[content]` / `|content`, parsed with the exact same recursive block

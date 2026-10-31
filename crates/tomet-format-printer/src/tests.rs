@@ -1,5 +1,7 @@
 use super::*;
-use tomet_ast::{Block, Data, Document, Group, Inline, Paragraph, Section, Sigil, Value};
+use tomet_ast::{
+    Bare, Block, Data, Document, Entry, Group, Inline, Name, Paragraph, Section, Value,
+};
 use tomet_config::{FieldConfig, FormatConfig, GroupOrder, MetaConfig, load_config_from_str};
 use tomet_field_utils::generate_id_for_field;
 use tomet_style::render_value_inner;
@@ -476,22 +478,23 @@ fn test_codeblock_formatting() {
 
 #[test]
 fn test_container_children_indentation() {
-    let mut child1 = element_new(Sigil::Bare);
-    child1.data.args = Some(Value::Int(1));
-    child1.content = Some(vec![Block::Paragraph(Paragraph::new(
-        vec![Inline::Text("note 1".into())],
-        tomet_ast::Span::dummy(),
-    ))]);
+    let note = |marker: i64, text: &str| {
+        Entry::Bare(Bare {
+            data: Data {
+                args: Some(Value::Int(marker)),
+                value: None,
+            },
+            content: Some(vec![Block::Paragraph(Paragraph::new(
+                vec![Inline::Text(text.into())],
+                tomet_ast::Span::dummy(),
+            ))]),
+            id: None,
+            span: tomet_ast::Span::dummy(),
+        })
+    };
 
-    let mut child2 = element_new(Sigil::Bare);
-    child2.data.args = Some(Value::Int(2));
-    child2.content = Some(vec![Block::Paragraph(Paragraph::new(
-        vec![Inline::Text("note 2".into())],
-        tomet_ast::Span::dummy(),
-    ))]);
-
-    let mut links = element_new(Sigil::named("links"));
-    links.data.value = Some(Group::from_children(vec![child1, child2]));
+    let mut links = element_new(Name::bare("links"));
+    links.data.value = Some(Group(vec![note(1, "note 1"), note(2, "note 2")]));
 
     let doc = Document::new(vec![Block::Element(links)], tomet_ast::Span::dummy());
     let printed = document_to_tm(&doc);
@@ -504,7 +507,7 @@ fn test_container_children_indentation() {
 
 #[test]
 fn test_group_order_content_first() {
-    let mut el = element_new(Sigil::named("link"));
+    let mut el = element_new(Name::bare("link"));
     el.data.args = Some(Value::String("https://example.com".to_string()));
     el.content = Some(vec![Block::Paragraph(Paragraph::new(
         vec![Inline::Text("Example".into())],

@@ -165,7 +165,7 @@ fn registered_path(value: &Value) -> Option<String> {
 }
 
 fn file_target(el: &Element) -> Option<String> {
-    if !el.sigil.is_bare_named("file") {
+    if !el.name.is_bare_named("file") {
         return None;
     }
     let args = tomet_semantics::normalized_element_args(el)?;

@@ -25,7 +25,7 @@ use std::path::PathBuf;
 
 use tomet_ast::{
     Bare, Block, Connect, Data, Document, Element, Entry, Group, Hole, Inline, InterpExpr,
-    Interpolation, List, ListItem, Placement, Sigil, Value,
+    Interpolation, List, ListItem, Placement, Value,
 };
 use tomet_parser::parse_document;
 
@@ -912,20 +912,14 @@ fn dump_groups(out: &mut String, data: &Data, content: Option<&[Block]>, depth: 
 
 /// The element's head line in the dump: its placement, then its name.
 ///
-/// Placement is shown because the sigil no longer carries it -- every
-/// element is `@name`, and whether it stands as a block is decided by
-/// position.
+/// Placement is shown because the name does not carry it -- every element is
+/// `@name`, and whether it stands as a block is decided by position.
 fn element_head(el: &Element) -> String {
-    match &el.sigil {
-        Sigil::Named(name) => {
-            let placement = match el.placement {
-                Placement::Block => "Block ",
-                Placement::Inline => "Inline",
-            };
-            format!("{placement} @{name}")
-        }
-        Sigil::Bare => "Bare".to_string(),
-    }
+    let placement = match el.placement {
+        Placement::Block => "Block ",
+        Placement::Inline => "Inline",
+    };
+    format!("{placement} @{}", el.name)
 }
 
 fn value_str(v: &Value) -> String {
@@ -974,7 +968,7 @@ fn value_str(v: &Value) -> String {
             }
         }
         Value::Element(el) => {
-            let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
+            let name = el.name.to_string();
             match &el.data.args {
                 Some(args) => format!("@{name}({})", value_str(args)),
                 None => format!("@{name}"),

@@ -24,7 +24,7 @@ pub enum Step {
     Item(usize),
     /// Property namespace (`.prop`).
     Prop,
-    /// Property key or field name (`.key`, `.id`, `.sigil`, `.content`).
+    /// Property key or field name (`.key`, `.id`, `.name`, `.content`).
     Field(String),
 }
 
@@ -233,7 +233,7 @@ impl EditDoc {
         } else {
             match remaining_steps {
                 [Step::Field(f)] if f == "id" => node.id_attr().map(|s| s.to_string()),
-                [Step::Field(f)] if f == "sigil" => match &node.kind {
+                [Step::Field(f)] if f == "name" => match &node.kind {
                     NodeKind::BlockElement { name, .. } => Some(name.clone()),
                     _ => None,
                 },

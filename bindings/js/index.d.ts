@@ -8,7 +8,26 @@ export interface Span {
 }
 
 /**
- * Pure data values supported in Tomet.
+ * A name as written after `@` or `::`: `rule`, or `deck.card` with the
+ * namespace split off.
+ */
+export interface Name {
+  namespace: string | null;
+  name: string;
+}
+
+/** The `#(id)` an element, section, list or item carries. */
+export type Id = string;
+
+/**
+ * A value of `(args)` or a `{...}` pair.
+ *
+ * A map is an object; the key of a positional entry is `""`. Beyond plain data a
+ * value may be what the source wrote there: a call (`{ call, args }`), a
+ * `${...}` (`Interpolation`), a `?` hole, an `@element`, or `[content]`
+ * (`Block[]`). A reader tells them apart by their own keys.
+ *
+ * Only plain data and `Block[]` are read back when a `Document` is passed in.
  */
 export type Value =
   | null
@@ -18,47 +37,138 @@ export type Value =
   | Value[]
   | { [key: string]: Value };
 
-export type Sigil =
-  | 'Bare'
-  | 'Angle'
-  | 'At'
-  | 'Dollar'
-  | 'Ampersand'
-  | 'Colon'
-  | 'Pipe'
-  | 'Tilde'
-  | 'Hash';
+/** The two groups every node that takes them holds: `(args)` and `{value}`. */
+export interface Data {
+  args: Value | null;
+  value: Group | null;
+}
 
-export interface InlineText {
-  content: string;
+/** The entries of a `{...}` group, in source order. */
+export type Group = Entry[];
+
+export type Entry =
+  | { Pair: [string, Value] }
+  | { Element: Element }
+  /** A nameless `(marker)[content]` entry, as in `@links{ (1)[...] }`. */
+  | { Bare: Bare }
+  | { Hole: Hole };
+
+/** Whether an element stands on its own or inside running text. */
+export type Placement = 'Block' | 'Inline';
+
+/** An `@name(args)[content]{value}#(id)` element and its `:connect`s. */
+export interface Element {
+  name: Name;
+  placement: Placement;
+  data: Data;
+  content: Block[] | null;
+  id: Id | null;
+  connects: Connect[];
+  span: Span;
+}
+
+/** A `:name(args)[content]{value}` stacked after an owner. */
+export interface Connect {
+  name: Name;
+  data: Data;
+  content: Block[] | null;
+  span: Span;
+}
+
+/** A `::name(args)[content]{value}#(id)` declaration about the document itself. */
+export interface Declaration {
+  name: Name;
+  data: Data;
+  content: Block[] | null;
+  id: Id | null;
+  span: Span;
+}
+
+export interface Bare {
+  data: Data;
+  content: Block[] | null;
+  id: Id | null;
+  span: Span;
+}
+
+/** A `?matcher(...)` hole; only `parse_pattern` produces one. */
+export interface Hole {
+  matcher: Name | null;
+  placement: Placement;
+  data: Data;
+  content: Block[] | null;
+  id: Id | null;
+  span: Span;
+}
+
+/** An expression of `${...}`, left to the evaluator. */
+export interface InterpExpr {
+  kind: unknown;
+  span: Span;
+}
+
+export interface Interpolation {
+  expr: InterpExpr;
+  span: Span;
+}
+
+export interface Text {
+  value: string;
   span: Span;
 }
 
 export type Inline =
-  | { type: 'Text'; data: InlineText }
-  | { type: 'Element'; data: Element }
-  | { type: 'Code'; content: string; span: Span };
+  | { Text: Text }
+  | { Element: Element }
+  | { Interp: Interpolation }
+  | { Hole: Hole }
+  | { SoftBreak: { span: Span } }
+  | { LineBreak: { span: Span } }
+  /** Verbatim text, which may hold newlines (a code block's body). */
+  | { Raw: Text };
 
-export type ElementValue =
-  | { type: 'Data'; data: Value }
-  | { type: 'Children'; data: Element[] };
+export interface Paragraph {
+  content: Inline[];
+  span: Span;
+}
 
-export interface Element {
-  sigil: Sigil;
-  name: string | null;
-  args: Value | null;
-  content: Inline[] | string | null;
-  value: ElementValue | null;
+export interface Section {
+  level: number;
+  title: Inline[];
+  data: Data;
+  id: Id | null;
+  connects: Connect[];
+  blocks: Block[];
+  span: Span;
+}
+
+export interface ListItem {
+  /** `null` for a plain `- content`; the element's name for `-@name(...)`. */
+  name: Name | null;
+  data: Data;
+  content: Block[];
+  id: Id | null;
+  connects: Connect[];
+  sublist: List | null;
+  span: Span;
+}
+
+export interface List {
+  ordered: boolean;
+  items: ListItem[];
+  id: Id | null;
+  connects: Connect[];
   span: Span;
 }
 
 export type Block =
-  | { type: 'Heading'; level: number; content: Inline[]; span: Span }
-  | { type: 'Paragraph'; inlines: Inline[]; span: Span }
-  | { type: 'ThematicBreak'; title: Inline[] | null; span: Span }
-  | { type: 'Element'; data: Element }
-  | { type: 'LineComment'; content: string; span: Span }
-  | { type: 'BlockComment'; content: string; span: Span };
+  | { Paragraph: Paragraph }
+  | { Element: Element }
+  | { Section: Section }
+  | { List: List }
+  | { Declaration: Declaration }
+  | { Hole: Hole }
+  | { Interp: Interpolation };
 
 export interface Document {
   blocks: Block[];

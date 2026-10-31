@@ -223,7 +223,7 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
         }
         Value::Element(el) => {
             let mut obj = serde_json::Map::new();
-            let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
+            let name = el.name.to_string();
             obj.insert("element".to_string(), serde_json::Value::String(name));
             if let Some(args) = &el.data.args {
                 obj.insert("args".to_string(), value_to_json(args));
@@ -243,11 +243,11 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Group, Sigil};
+    use tomet_ast::{Group, Name};
     use tomet_tree::element_new;
 
     fn el_with(args: Option<Value>, value: Option<Value>) -> Element {
-        let mut el = element_new(Sigil::named("x"));
+        let mut el = element_new(Name::bare("x"));
         el.data.args = args;
         el.data.value = value.map(Group::from_map);
         el

@@ -35,7 +35,7 @@ fn every_sigil_takes_every_group_opener() {
     fn produced(src: &str) -> Option<String> {
         let doc = parse_document(src).ok()?;
         match doc.blocks.first()? {
-            Block::Element(el) => el.sigil.name().map(|n| n.name.clone()),
+            Block::Element(el) => Some(el.name.name.clone()),
             Block::Section(_) => Some("section".into()),
             Block::Paragraph(_) => None,
             Block::List(list) => Some(if list.ordered { "ol" } else { "ul" }.into()),

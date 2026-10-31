@@ -29,8 +29,8 @@
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use tomet_ast::{
-    Block, Data, Document, Element, Inline, LineBreak, List, ListItem, Paragraph, Placement,
-    RawText, Section, Sigil, SoftBreak, Span, Text, Value,
+    Block, Data, Document, Element, Inline, LineBreak, List, ListItem, Name, Paragraph, Placement,
+    RawText, Section, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::{ElementKind, classify_std_lenient};
 use tomet_tree::{declaration_new, element_new, list, list_item};
@@ -227,7 +227,7 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
                     span: Span::dummy(),
                 }),
             ),
-            Event::Rule => push_block(&mut stack, Block::Element(element_new(Sigil::named("hr")))),
+            Event::Rule => push_block(&mut stack, Block::Element(element_new(Name::bare("hr")))),
             _ => {}
         }
     }
@@ -406,7 +406,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 };
 
                 let el = Element {
-                    sigil: Sigil::named("callout"),
+                    name: Name::bare("callout"),
 
                     placement: Placement::Block,
 
@@ -426,7 +426,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 push_block(stack, Block::Element(el));
             } else {
                 let el = Element {
-                    sigil: Sigil::named("quote"),
+                    name: Name::bare("quote"),
 
                     placement: Placement::Block,
 
@@ -456,7 +456,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
             };
             let el = Element {
-                sigil: Sigil::named("raw"),
+                name: Name::bare("raw"),
 
                 placement: Placement::Block,
 
@@ -573,7 +573,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             // otherwise -> file) once this is rendered/queried -- no key
             // choice needed here, unlike the old per-kind key scheme.
             let el = Element {
-                sigil: Sigil::named("link"),
+                name: Name::bare("link"),
 
                 placement: Placement::Inline,
 
@@ -602,7 +602,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 Some(wrap_inline_content(alt))
             };
             let el = Element {
-                sigil: Sigil::named("embed"),
+                name: Name::bare("embed"),
 
                 placement: Placement::Inline,
 
@@ -658,7 +658,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
 
 pub(super) fn wrap_inline(tag: &str, content: Vec<Inline>) -> Inline {
     Inline::Element(Element {
-        sigil: Sigil::named(tag),
+        name: Name::bare(tag),
 
         placement: Placement::Inline,
 

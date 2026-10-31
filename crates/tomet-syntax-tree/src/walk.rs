@@ -544,7 +544,7 @@ fn walk_value_mut<B>(value: &mut Value, visitor: &mut impl VisitorMut<B>) -> Con
 /// embedded in `el`'s own `(args)` -- `@thing(icon: @doc.icon("x"))` --
 /// describes `thing`, the same way `el.connects` does, so it is exempt
 /// for the same reason. `el.connects` itself is skipped for a related but
-/// distinct reason: a connect (`Sigil::Named` carrying `:name(...)`'s own
+/// distinct reason: a connect (a [`Connect`] carrying `:name(...)`'s own
 /// args/content/value, e.g. `:rule(...)`) is not a descendant of the
 /// document `el` sits in at all -- it is metadata about `el` itself,
 /// consumed only by the dedicated check that understands the closed set
@@ -681,7 +681,7 @@ impl<'a> Child<'a> {
     /// Its name, if it has one: a plain list item has none.
     pub fn name(&self) -> Option<&'a tomet_ast::Name> {
         match self {
-            Child::Element(el) => el.sigil.name(),
+            Child::Element(el) => Some(&el.name),
             Child::Item(item) => item.name.as_ref(),
         }
     }

@@ -48,10 +48,7 @@ fn at_sigiled_call_in_a_value_position_is_an_element() {
     let Value::Element(el) = &entries[0].1 else {
         panic!("expected an embedded element, got {:?}", entries[0].1);
     };
-    assert_eq!(
-        el.sigil,
-        Sigil::Named(tomet_ast::Name::namespaced("doc", "icon"))
-    );
+    assert_eq!(el.name, tomet_ast::Name::namespaced("doc", "icon"));
     assert_eq!(
         el.data.args,
         Some(Value::Map(vec![
@@ -71,7 +68,7 @@ fn an_embedded_element_with_content_is_accepted() {
     let Value::Element(el) = &entries[0].1 else {
         panic!("expected element");
     };
-    assert_eq!(el.sigil, Sigil::named("link"));
+    assert_eq!(el.name, Name::bare("link"));
     assert!(el.data.args.is_some());
     assert!(el.content.is_some());
 }

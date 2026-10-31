@@ -2,7 +2,7 @@
 
 use tomet_ast::{
     Bare, Block as TmBlock, Data, Document, Element, Entry, Group, Id, Inline as TmInline,
-    Interpolation, List, Placement, Sigil, Value,
+    Interpolation, List, Placement, Value,
 };
 use tomet_semantics::{
     ElementKind, TableRow, classify_std_lenient, flatten_data, flatten_element_data, heading_level,
@@ -752,12 +752,12 @@ fn table_alignment(el: &Element) -> Alignment {
 
 // ---- attributes ----------------------------------------------------
 
-/// The attribute key that records a sigil with no name of its own.
+/// The attribute key that records a bare `(marker)[content]` entry, which has
+/// no name of its own.
 ///
-/// A `Sigil::Bare` entry has no name. Putting one in the `tomet-<name>`
-/// class anyway -- `ElementKind::Bare::as_str()` is `"bare"` -- made
-/// `from_pandoc` rebuild it as an element *named* `bare`, and `@bare` is
-/// not a builtin, so a round-tripped document stopped validating.
+/// Putting one in the `tomet-<name>` class anyway would make `from_pandoc`
+/// rebuild it as an element *named* `bare`, and `@bare` is not a builtin, so
+/// a round-tripped document stopped validating.
 ///
 /// A key rather than another class, because a class collides: a document
 /// whose `::kind` names a vocabulary declaring `bare` writes `@bare`
@@ -765,17 +765,12 @@ fn table_alignment(el: &Element) -> Alignment {
 /// established the reserved-key convention this follows.
 pub(crate) const SIGIL_KEY: &str = "tomet-sigil";
 
-/// [`SIGIL_KEY`]'s value for `Sigil::Bare`.
+/// [`SIGIL_KEY`]'s value for a bare entry.
 pub(crate) const BARE_SIGIL: &str = "bare";
 
-/// The `Attr` for an element Pandoc has no equivalent for: its data, plus
-/// either the class carrying its name or the key saying it has none.
+/// The `Attr` for an element Pandoc has no equivalent for: its data, plus the
+/// class carrying its name.
 fn generic_attr(el: &Element, kind: &ElementKind) -> Attr {
-    if matches!(el.sigil, Sigil::Bare) {
-        let mut attr = attr_of(el, &[]);
-        attr.2.push((SIGIL_KEY.to_string(), BARE_SIGIL.to_string()));
-        return attr;
-    }
     attr_of(el, &[&format!("tomet-{}", kind.as_str())])
 }
 

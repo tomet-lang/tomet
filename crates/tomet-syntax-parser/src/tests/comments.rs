@@ -138,7 +138,7 @@ fn double_slash_inside_a_url_is_not_treated_as_a_comment() {
             assert_eq!(p.content.len(), 3);
             assert_eq!(p.content[0], Inline::Text("see ".into()));
             if let Inline::Element(el) = &p.content[1] {
-                assert_eq!(el.sigil, Sigil::named("link"));
+                assert_eq!(el.name, Name::bare("link"));
                 assert_eq!(
                     el.data.args,
                     Some(Value::Map(vec![(

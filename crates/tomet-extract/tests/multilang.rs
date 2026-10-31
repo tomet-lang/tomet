@@ -25,12 +25,12 @@ def run():
     assert_eq!(elements.len(), 2);
 
     let (el0, span0, kind0) = &elements[0];
-    assert_eq!(el0.sigil.name().map(|n| n.name.as_str()), Some("file"));
+    assert_eq!(el0.name.name, "file");
     assert_eq!(kind0, &CommentKind::Line);
     assert_eq!(line_col(py_src, span0.start).line, 3);
 
     let (el1, span1, kind1) = &elements[1];
-    assert_eq!(el1.sigil.name().map(|n| n.name.as_str()), Some("rule"));
+    assert_eq!(el1.name.name, "rule");
     assert_eq!(kind1, &CommentKind::OuterDoc);
     assert_eq!(line_col(py_src, span1.start).line, 8);
 }
@@ -52,12 +52,12 @@ export function parseInput() {}
     assert_eq!(elements.len(), 2);
 
     let (el0, span0, kind0) = &elements[0];
-    assert_eq!(el0.sigil.name().map(|n| n.name.as_str()), Some("link"));
+    assert_eq!(el0.name.name, "link");
     assert_eq!(kind0, &CommentKind::Line);
     assert_eq!(line_col(ts_src, span0.start).line, 3);
 
     let (el1, span1, kind1) = &elements[1];
-    assert_eq!(el1.sigil.name().map(|n| n.name.as_str()), Some("rule"));
+    assert_eq!(el1.name.name, "rule");
     assert_eq!(kind1, &CommentKind::OuterDoc);
     assert_eq!(line_col(ts_src, span1.start).line, 7);
 }
@@ -79,7 +79,7 @@ public class Controller {
     assert_eq!(elements.len(), 1);
 
     let (el0, span0, kind0) = &elements[0];
-    assert_eq!(el0.sigil.name().map(|n| n.name.as_str()), Some("file"));
+    assert_eq!(el0.name.name, "file");
     assert_eq!(kind0, &CommentKind::OuterDoc);
     assert_eq!(line_col(java_src, span0.start).line, 6);
 }
@@ -97,7 +97,7 @@ echo "starting"
     assert_eq!(elements.len(), 1);
 
     let (el0, span0, kind0) = &elements[0];
-    assert_eq!(el0.sigil.name().map(|n| n.name.as_str()), Some("rule"));
+    assert_eq!(el0.name.name, "rule");
     assert_eq!(kind0, &CommentKind::Line);
     assert_eq!(line_col(sh_src, span0.start).line, 4);
 }

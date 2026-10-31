@@ -14,11 +14,12 @@
 //!   intact.
 //! - **A number in `::meta` returns as a string.** Pandoc metadata has no
 //!   numeric type.
-//! - **An element inside a `{...}` group returns as body content.**
+//! - **A named element inside a `{...}` group returns as body content.**
 //!   Pandoc cannot say "this `Div` was a group entry rather than part of
-//!   the body", so `@deck.card{ title: x, (a)[y] }` comes back with the
-//!   entry in `[content]`. The printer has no spelling for a bare sigil
-//!   there, so it writes `[y]{ value: a }` and that re-parses as text.
+//!   the body", so `@deck.card{ title: x, @note[y] }` comes back with the
+//!   entry in `[content]`. A bare `(a)[y]` entry does not share the loss:
+//!   it has no name to carry, so [`crate::to_pandoc`] marks it under
+//!   [`SIGIL_KEY`] and it returns to the group.
 //!
 //!   Accepted rather than fixed, and the reason is what this bridge is
 //!   for. It exists to reach the formats Pandoc reads and writes --
@@ -34,8 +35,9 @@
 //!   `Attr` is where data goes. Only the elements move.
 
 use tomet_ast::{
-    Block as TmBlock, Declaration, Document, Element, Group, Id, Inline as TmInline, LineBreak,
-    List, Name, Paragraph, Placement, RawText, Section, Sigil, SoftBreak, Span, Text, Value,
+    Bare, Block as TmBlock, Data, Declaration, Document, Element, Entry, Group, Id,
+    Inline as TmInline, LineBreak, List, Name, Paragraph, Placement, RawText, Section, SoftBreak,
+    Span, Text, Value,
 };
 use tomet_semantics::EXACT_DATA_KEY;
 
@@ -195,7 +197,7 @@ fn block_element(block: &Block) -> Element {
             el.content = Some(wrap_inline_content(inlines_from_pandoc(inlines)));
             el
         }
-        Block::HorizontalRule => element_new(Sigil::named("hr")),
+        Block::HorizontalRule => element_new(Name::bare("hr")),
         Block::CodeBlock(attr, code) => {
             let mut el = named_element("raw", attr);
             // The language travelled as the first class; put it back in
@@ -216,7 +218,7 @@ fn block_element(block: &Block) -> Element {
             // No Tomet spelling for "raw output in some other format", so
             // it lands as a code block tagged with the format rather than
             // being dropped.
-            let mut el = element_new(Sigil::named("raw"));
+            let mut el = element_new(Name::bare("raw"));
             el.data.args = Some(Value::Map(vec![(
                 "lang".to_string(),
                 Value::String(format.clone()),
@@ -228,7 +230,7 @@ fn block_element(block: &Block) -> Element {
             el
         }
         Block::BlockQuote(blocks) => {
-            let mut el = element_new(Sigil::named("quote"));
+            let mut el = element_new(Name::bare("quote"));
             el.content = Some(pandoc_blocks_to_content(blocks));
             el
         }
@@ -244,7 +246,9 @@ fn block_element(block: &Block) -> Element {
         Block::Table(parts) => table_element(parts),
         Block::Div(attr, blocks) => {
             let mut el = element_from_attr(attr, || "div".to_string());
-            el.content = Some(pandoc_blocks_to_content(blocks));
+            let (content, entries) = body_from_pandoc(blocks);
+            el.content = Some(content);
+            push_bare_entries(&mut el.data, entries);
             el
         }
         Block::Figure(attr, _, blocks) => {
@@ -253,7 +257,7 @@ fn block_element(block: &Block) -> Element {
             el
         }
         Block::LineBlock(lines) => {
-            let mut el = element_new(Sigil::named("quote"));
+            let mut el = element_new(Name::bare("quote"));
             let mut content = Vec::new();
             for line in lines {
                 content.extend(inlines_from_pandoc(line));
@@ -264,7 +268,7 @@ fn block_element(block: &Block) -> Element {
         // Handled by `block_from_pandoc`; reached only if this is called
         // directly with one.
         Block::Para(inlines) | Block::Plain(inlines) => {
-            let mut el = element_new(Sigil::named("paragraph"));
+            let mut el = element_new(Name::bare("paragraph"));
             el.content = Some(wrap_inline_content(inlines_from_pandoc(inlines)));
             el
         }
@@ -495,7 +499,7 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
             TmInline::Element(el)
         }
         Inline::Note(blocks) => {
-            let mut el = element_new(Sigil::named("quote"));
+            let mut el = element_new(Name::bare("quote"));
             el.content = Some(pandoc_blocks_to_content(blocks));
             TmInline::Element(el)
         }
@@ -573,22 +577,58 @@ fn blocks_to_text_tm(blocks: &[TmBlock]) -> String {
 // ---- attributes ----------------------------------------------------
 
 /// Rebuilds the element an `Attr` describes.
-///
-/// A `Sigil::Bare` entry has no name to carry in a class, so
-/// [`crate::to_pandoc`] records the sigil under [`SIGIL_KEY`] instead.
-/// Reading it back here is what keeps `@deck.card{ (a)[ x ] }` from
-/// returning as an element named `bare` -- a name no vocabulary declares,
-/// which made the round-tripped document fail validation.
 fn element_from_attr(attr: &Attr, fallback: impl FnOnce() -> String) -> Element {
-    let mut el = named_element(&class_name(attr).unwrap_or_else(fallback), attr);
-    if attr
-        .2
+    named_element(&class_name(attr).unwrap_or_else(fallback), attr)
+}
+
+/// Whether `attr` marks a `Div` as a bare `(marker)[content]` entry of the
+/// `{...}` group around it.
+///
+/// A bare entry has no name to carry in a class, so [`crate::to_pandoc`]
+/// records it under [`SIGIL_KEY`] instead. Reading it back is what keeps
+/// `@deck.card{ (a)[ x ] }` from returning as an element named `bare` -- a
+/// name no vocabulary declares, which made the round-tripped document fail
+/// validation.
+fn is_bare_entry(attr: &Attr) -> bool {
+    attr.2
         .iter()
         .any(|(k, v)| k == SIGIL_KEY && v == BARE_SIGIL)
-    {
-        el.sigil = Sigil::Bare;
+}
+
+/// The body of a `Div` as the content and the bare entries it came from:
+/// each block through [`block_from_pandoc`], except a `Div` marked as a bare
+/// entry, which goes back into the `{...}` group it was written in.
+fn body_from_pandoc(blocks: &[Block]) -> (Vec<TmBlock>, Vec<Bare>) {
+    let mut content = Vec::new();
+    let mut entries = Vec::new();
+    for block in blocks {
+        match block {
+            Block::Div(attr, inner) if is_bare_entry(attr) => {
+                let (inner_content, inner_entries) = body_from_pandoc(inner);
+                let (args, value) = extract_data_from_attr(attr);
+                let mut data = Data { args, value };
+                push_bare_entries(&mut data, inner_entries);
+                entries.push(Bare {
+                    data,
+                    content: (!inner_content.is_empty()).then_some(inner_content),
+                    id: id_from_attr(attr),
+                    span: Span::dummy(),
+                });
+            }
+            other => content.extend(block_from_pandoc(other)),
+        }
     }
-    el
+    (content, entries)
+}
+
+/// Appends `entries` to the `{...}` group of `data`, opening one if there is
+/// none yet.
+fn push_bare_entries(data: &mut Data, entries: Vec<Bare>) {
+    if entries.is_empty() {
+        return;
+    }
+    let Group(group) = data.value.get_or_insert_with(|| Group(Vec::new()));
+    group.extend(entries.into_iter().map(Entry::Bare));
 }
 
 /// The element name a `tomet-` class carries, if there is one.
@@ -633,7 +673,7 @@ fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<Group>) {
 /// in `{value}` -- `{}` is always data, and there is nothing left in the
 /// attribute map to say which pair came from which group.
 fn named_element(name: &str, attr: &Attr) -> Element {
-    let mut el = element_new(Sigil::Named(parse_name(name)));
+    let mut el = element_new(parse_name(name));
     let (args, value) = extract_data_from_attr(attr);
     el.data.args = args;
     el.data.value = value;
@@ -739,7 +779,7 @@ mod tests {
             .content
             .iter()
             .filter_map(|i| match i {
-                TmInline::Element(el) => Some(el.sigil.name()?.to_string()),
+                TmInline::Element(el) => Some(el.name.to_string()),
                 _ => None,
             })
             .collect();

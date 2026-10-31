@@ -88,7 +88,7 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
             )),
             Value::Element(el) => Err(Error::msg(format!(
                 "an embedded element (`@{}(...)`) has no serde equivalent",
-                el.sigil.name().map(|n| n.to_string()).unwrap_or_default()
+                el.name.to_string()
             ))),
             Value::Blocks(blocks) => Err(Error::msg(format!(
                 "block content (`[...]`, {} block(s)) has no serde equivalent",

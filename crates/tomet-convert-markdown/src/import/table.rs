@@ -1,7 +1,7 @@
 //! Table conversion, width calculation, and Markdown table preprocessing.
 
 use pulldown_cmark::Alignment;
-use tomet_ast::{Block, Element, Inline, Placement, Sigil, Span, Text};
+use tomet_ast::{Block, Element, Inline, Name, Placement, Span, Text};
 use tomet_tree::{ElementExt, element_new};
 
 use super::{ImportOptions, wrap_inline_content};
@@ -71,7 +71,7 @@ pub(super) fn build_table_element(
 ) -> Element {
     let mut content_inlines = Vec::new();
     if rows.is_empty() {
-        let mut el = element_new(Sigil::named("table")).with_placement(Placement::Block);
+        let mut el = element_new(Name::bare("table")).with_placement(Placement::Block);
         el.content = Some(wrap_inline_content(content_inlines));
         return el;
     }
@@ -187,7 +187,7 @@ pub(super) fn build_table_element(
         content_inlines.push(Inline::Text(Text::new("\n", Span::dummy())));
     }
 
-    let mut el = element_new(Sigil::named("table")).with_placement(Placement::Block);
+    let mut el = element_new(Name::bare("table")).with_placement(Placement::Block);
     el.content = Some(wrap_inline_content(content_inlines));
     el
 }

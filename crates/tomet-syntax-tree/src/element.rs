@@ -1,8 +1,8 @@
 //! Extension traits, property helpers, and constructors for [`tomet_ast::Element`], [`tomet_ast::Declaration`] and [`tomet_ast::Data`].
 
 use tomet_ast::{
-    Block, Connect, Data, Declaration, Element, Group, Id, List, ListItem, Name, Placement, Sigil,
-    Span, Value,
+    Block, Connect, Data, Declaration, Element, Group, Id, List, ListItem, Name, Placement, Span,
+    Value,
 };
 
 /// Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
@@ -25,16 +25,10 @@ pub trait ElementExt {
     /// Consumes `self` and sets its `id`.
     fn with_id(self, id: Id) -> Self;
 
-    /// Returns the element's name, namespace included, if it has one.
-    fn name(&self) -> Option<&Name>;
-
     /// Returns just the local half of the element's name, without its
-    /// namespace. Prefer [`ElementExt::name`] or
-    /// [`tomet_ast::Sigil::is_bare_named`] when the namespace matters.
-    fn local_name(&self) -> Option<&str>;
-
-    /// Returns `true` if this element has `Sigil::Bare`.
-    fn is_bare(&self) -> bool;
+    /// namespace. Prefer [`Element::name`] or [`Name::is_bare_named`] when
+    /// the namespace matters.
+    fn local_name(&self) -> &str;
 }
 
 impl ElementExt for Element {
@@ -68,16 +62,8 @@ impl ElementExt for Element {
         self
     }
 
-    fn name(&self) -> Option<&Name> {
-        self.sigil.name()
-    }
-
-    fn local_name(&self) -> Option<&str> {
-        self.sigil.name().map(|n| n.name.as_str())
-    }
-
-    fn is_bare(&self) -> bool {
-        matches!(self.sigil, Sigil::Bare)
+    fn local_name(&self) -> &str {
+        &self.name.name
     }
 }
 
@@ -288,13 +274,13 @@ impl DataExt for Data {
     }
 }
 
-/// Creates a new [`Element`] with given `sigil` and default empty fields.
+/// Creates a new [`Element`] with given `name` and default empty fields.
 ///
 /// The placement is [`Placement::Inline`]; a caller building a block uses
 /// [`ElementExt::with_placement`], and the parser sets it from position.
-pub fn element_new(sigil: Sigil) -> Element {
+pub fn element_new(name: Name) -> Element {
     Element {
-        sigil,
+        name,
         placement: Placement::Inline,
         data: Data::default(),
         content: None,
@@ -327,9 +313,9 @@ pub fn list(ordered: bool, items: Vec<ListItem>, span: Span) -> List {
     }
 }
 
-/// A list item constructor. `sigil` is `Sigil::Bare` for a plain `- content`
-/// item, or `Sigil::Named(name)` for the `-@name(...)` combine form -- the
-/// exact same `Element` shape a standalone `@name(...)` would produce.
+/// A list item constructor. `name` is `None` for a plain `- content` item, or
+/// the element's name for the `-@name(...)` combine form -- which takes the
+/// same groups a standalone `@name(...)` would.
 ///
 /// `id` is a real parameter, not hardcoded to `None` -- list items are a
 /// first-class consumer of `#(id)` like everything else `parse_groups`

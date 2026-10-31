@@ -1,4 +1,4 @@
-use tomet_ast::{Data, Declaration, Element, Name, Sigil, Value};
+use tomet_ast::{Data, Declaration, Element, Name, Value};
 
 use crate::vocabulary::{Bindings, ElementDecl};
 
@@ -12,13 +12,9 @@ use crate::vocabulary::{Bindings, ElementDecl};
 /// the name would have preserved that bug as a feature. `callout` is kept even though it is not in `BUILTIN_KINDS`;
 /// it is a widely used custom element in the docs and dropping its
 /// positional key would silently change how `(warning)` reads.
-pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
-    sigil.name().map_or(&[], builtin_positional_arg_keys_of)
-}
-
-/// [`builtin_positional_arg_keys`] for a name alone: what an element or a
-/// declaration of that name takes positionally.
-pub fn builtin_positional_arg_keys_of(name: &Name) -> &'static [&'static str] {
+///
+/// Asked of an element or a declaration alike: the name is all it reads.
+pub fn builtin_positional_arg_keys(name: &Name) -> &'static [&'static str] {
     if !name.is_bare() {
         return &[];
     }
@@ -51,10 +47,10 @@ pub fn builtin_positional_arg_keys_of(name: &Name) -> &'static [&'static str] {
 }
 
 /// The builtin positional key for a list item's `(...)` marker (a list
-/// item is `Element{ sigil: Sigil::Bare, args: <marker>, .. }`, see
-/// `tomet_ast::Element::list_item`). `Sigil::Bare` has no name to
-/// look a per-kind key up by (unlike `builtin_positional_arg_key`), so
-/// this is a single fixed key rather than a lookup table.
+/// item is a [`tomet_ast::ListItem`] whose `data.args` is the marker). A
+/// plain item has no name to look a per-kind key up by (unlike
+/// [`builtin_positional_arg_keys`]), so this is a single fixed key rather
+/// than a lookup table.
 pub const LIST_MARKER_POSITIONAL_KEY: &str = "marker";
 
 /// Normalizes a list item's `(...)` marker `Value` the same way
@@ -123,7 +119,7 @@ fn recover_target_scheme_entry(
     Value::Map(entries)
 }
 
-/// The ordered positional-key list for `sigil`, owned.
+/// The ordered positional-key list for `name`, owned.
 ///
 /// Two sources, and `std` is asked first: its table is hard-coded and a
 /// vocabulary may not shadow a builtin name, so the order cannot matter --
@@ -138,7 +134,7 @@ fn positional_keys(name: Option<&Name>, bindings: &Bindings) -> Vec<String> {
     let Some(name) = name else {
         return Vec::new();
     };
-    let builtin = builtin_positional_arg_keys_of(name);
+    let builtin = builtin_positional_arg_keys(name);
     if !builtin.is_empty() {
         return builtin.iter().map(|s| s.to_string()).collect();
     }
@@ -207,7 +203,7 @@ pub fn normalized_element_args(el: &Element) -> Option<Value> {
 /// [`normalized_element_args`], plus the positional slots a vocabulary in
 /// scope declares with `@param(name){ positional: true }`.
 pub fn normalized_element_args_in(el: &Element, bindings: &Bindings) -> Option<Value> {
-    normalized_args_in(el.sigil.name(), &el.data, bindings)
+    normalized_args_in(Some(&el.name), &el.data, bindings)
 }
 
 /// [`normalized_element_args`] for a declaration: `::kind(config, 2)` is
@@ -250,7 +246,7 @@ mod tests {
 
     #[test]
     fn normalizes_raw_positional_arg() {
-        let mut el = element_new(Sigil::named("raw"));
+        let mut el = element_new(Name::bare("raw"));
         el.data.args = Some(Value::String("rust".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -270,7 +266,7 @@ mod tests {
         // assigns them to `a`/`b` in the order they were written, not by
         // any other ordering -- see `ElementKind::Conflict`'s own doc
         // comment for why that distinction is deliberate here.
-        let mut el = element_new(Sigil::named("conflict"));
+        let mut el = element_new(Name::bare("conflict"));
         el.data.args = Some(Value::Map(vec![
             (String::new(), Value::Int(1)),
             (String::new(), Value::Int(2)),
@@ -288,7 +284,7 @@ mod tests {
     fn kind_and_use_take_an_optional_version_after_the_name() {
         // `::kind(name, 2)` is two bare entries; `::kind(name)` is one scalar.
         for (sigil, name_key) in [("kind", "kind"), ("use", "target")] {
-            let mut el = element_new(Sigil::named(sigil));
+            let mut el = element_new(Name::bare(sigil));
             el.data.args = Some(Value::Map(vec![
                 (String::new(), Value::String("deck".to_string())),
                 (String::new(), Value::Int(2)),
@@ -317,7 +313,7 @@ mod tests {
 
     #[test]
     fn normalizes_embed_positional_arg() {
-        let mut el = element_new(Sigil::named("embed"));
+        let mut el = element_new(Name::bare("embed"));
         el.data.args = Some(Value::String("foo.png".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -330,7 +326,7 @@ mod tests {
 
     #[test]
     fn normalizes_link_positional_arg() {
-        let mut el = element_new(Sigil::named("link"));
+        let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Value::String("https://example.com".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -353,7 +349,7 @@ mod tests {
                 .expect("a mention parses");
             let mut found = None;
             tomet_tree::for_each_element(&doc, |el| {
-                if el.sigil.name().is_some_and(|name| name.name == "term") {
+                if el.name.name == "term" {
                     found = normalized_element_args(el);
                 }
             });
@@ -373,7 +369,7 @@ mod tests {
         // parser's `identifier:` rule has no notion of `target` being the
         // only real key `@link` has) -- this recovers it back into one
         // `target` string.
-        let mut el = element_new(Sigil::named("link"));
+        let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Value::Map(vec![(
             "tmt".to_string(),
             Value::String("foo/bar".to_string()),
@@ -392,7 +388,7 @@ mod tests {
         // `@link(tmt:foo, predicate: depends_on)` -- only the `tmt` entry is
         // a parser-split scheme prefix; `predicate` is real extra data and
         // stays untouched.
-        let mut el = element_new(Sigil::named("link"));
+        let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Value::Map(vec![
             ("tmt".to_string(), Value::String("foo".to_string())),
             (
@@ -414,7 +410,7 @@ mod tests {
 
     #[test]
     fn does_not_recover_when_target_key_already_present() {
-        let mut el = element_new(Sigil::named("link"));
+        let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Value::Map(vec![
             ("target".to_string(), Value::String("tmt:foo".to_string())),
             ("tmt".to_string(), Value::String("bar".to_string())),
@@ -430,7 +426,7 @@ mod tests {
 
     #[test]
     fn does_not_recover_when_multiple_scheme_candidates_are_ambiguous() {
-        let mut el = element_new(Sigil::named("link"));
+        let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Value::Map(vec![
             ("tmt".to_string(), Value::String("foo".to_string())),
             ("id".to_string(), Value::String("bar".to_string())),
@@ -449,7 +445,7 @@ mod tests {
         // An arbitrary custom element's own `tmt`-named field is left
         // alone -- recovery is scoped to elements whose positional key
         // is `target` (`@link`/`@embed`), not a general mechanism.
-        let mut el = element_new(Sigil::named("caution"));
+        let mut el = element_new(Name::bare("caution"));
         el.data.args = Some(Value::Map(vec![(
             "tmt".to_string(),
             Value::String("foo".to_string()),
@@ -479,7 +475,7 @@ mod tests {
     /// written for `@param` and exercised with one slot today.
     #[test]
     fn a_custom_element_gets_no_positional_inference() {
-        let mut el = element_new(Sigil::Named(Name::namespaced("deck", "job")));
+        let mut el = element_new(Name::namespaced("deck", "job"));
         el.data.args = Some(Value::Map(vec![
             (
                 POSITIONAL_ENTRY_KEY.to_string(),
@@ -508,7 +504,7 @@ mod tests {
 
     #[test]
     fn leaves_map_args_unchanged() {
-        let mut el = element_new(Sigil::named("raw"));
+        let mut el = element_new(Name::bare("raw"));
         let map_val = Value::Map(vec![(
             "lang".to_string(),
             Value::String("rust".to_string()),
@@ -541,7 +537,7 @@ mod tests {
     fn an_element_with_no_positional_key_leaves_a_bare_scalar_alone() {
         // `deck.card` is namespaced, so it has no builtin positional key
         // and nothing to normalize the scalar into.
-        let mut el = element_new(Sigil::Named(Name::namespaced("deck", "card")));
+        let mut el = element_new(Name::namespaced("deck", "card"));
         el.data.args = Some(Value::String("https://example.com".to_string()));
         assert_eq!(
             normalized_element_args(&el),
@@ -554,7 +550,7 @@ mod tests {
     /// [`a_custom_element_gets_no_positional_inference`].
     #[test]
     fn a_custom_elements_bracketed_positional_list_is_left_alone() {
-        let mut el = element_new(Sigil::Named(Name::namespaced("deck", "job")));
+        let mut el = element_new(Name::namespaced("deck", "job"));
         el.data.args = Some(Value::Seq(vec![
             Value::String("Clean room".to_string()),
             Value::String("high".to_string()),
@@ -571,7 +567,7 @@ mod tests {
 
     #[test]
     fn normalizes_task_status_positional_arg() {
-        let mut el = element_new(Sigil::named("task"));
+        let mut el = element_new(Name::bare("task"));
         el.data.args = Some(Value::String("x".to_string()));
         assert_eq!(
             normalized_element_args(&el),

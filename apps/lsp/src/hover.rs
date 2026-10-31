@@ -15,7 +15,7 @@ use tomet_tree::{
 
 use crate::format::resolve_effective_config;
 use crate::position::{TextPositions, span_contains};
-use crate::symbol::{list_item_marker_text, sigil_display_name};
+use crate::symbol::list_item_marker_text;
 
 /// What an expression comes to, for a hover: given the document it is written
 /// in, and the expression.
@@ -84,7 +84,7 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                         range: Some(self.positions.range(&span)),
                     })
                 } else {
-                    let mut desc = format!("**Element**: `{}`\n", sigil_display_name(&el.sigil));
+                    let mut desc = format!("**Element**: `{}`\n", format!("@{}", el.name));
                     desc.push_str(&format!("- **Classification**: `{}`\n", kind.as_str()));
                     if let Some(norm_args) = normalized_element_args(el) {
                         desc.push_str(&format!("- **Normalized Args**: `{norm_args:?}`\n"));
@@ -399,7 +399,7 @@ fn table_hover(
         }
     }
 
-    let mut summary = format!("**Table** (`{}`)\n\n", sigil_display_name(&el.sigil));
+    let mut summary = format!("**Table** (`{}`)\n\n", format!("@{}", el.name));
     summary.push_str(&format!("- **Rows**: {}\n", table_rows.len()));
     summary.push_str(&format!("- **Columns**: {}\n", header_cells.len()));
     if !aligns.is_empty() {

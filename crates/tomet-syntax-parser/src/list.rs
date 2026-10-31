@@ -8,8 +8,8 @@
 //! A list item written `-@name(...)` (no space between the marker and `@`)
 //! is the **combine** notation: it parses `@name(...)` through the exact
 //! same element-parsing path a standalone, top-level `@name(...)` would,
-//! producing an identical `Element` (`Sigil::Named(name)`) that just
-//! happens to sit in `List.items` instead of `Document.blocks`. There is no
+//! and the [`tomet_ast::ListItem`] it makes carries that element's name and
+//! groups (`ListItem::named_element` gives the element back). There is no
 //! second grammar and no naming constraint.
 
 use crate::dialect::Dialect;
@@ -18,9 +18,9 @@ use crate::error::Result;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_text};
 use crate::section::merge_values;
 use crate::value::skip_inline_ws;
-use tomet_ast::{Block, ListItem, Paragraph, Sigil, Value};
+use tomet_ast::{Block, ListItem, Paragraph, Value};
 use tomet_lexer::Cursor;
-use tomet_tree::{element_new, list, list_item};
+use tomet_tree::{list, list_item};
 
 /// The group openers left once an item's `(marker)` has been taken.
 ///
@@ -274,7 +274,7 @@ pub(crate) fn parse_list_item_body(
         let mut content = el.content.unwrap_or_default();
         append_trailing_line_content(dialect, cur, &mut content)?;
         return Ok(ListItem {
-            name: el.sigil.name().cloned(),
+            name: Some(el.name),
             data: el.data,
             content,
             id: el.id,
@@ -298,7 +298,7 @@ pub(crate) fn parse_list_item_body(
         // `:(){}` merge and a named `:rule(...)` connect now attach to
         // the item's own slots, the same arms/branch `@name`'s groups
         // already use.
-        let mut item = element_new(Sigil::Bare);
+        let mut item = crate::element::Groups::default();
         crate::element::parse_groups_with_pipe_stack(dialect, cur, &mut item, true, pipe_stack)?;
         // An `(args)` group read here is the item's own -- the same
         // slot the probe's `(marker)` fills, reached from the other

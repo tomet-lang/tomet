@@ -180,9 +180,7 @@ fn the_cst_and_the_ast_agree_on_inline_structure() {
     fn names(inlines: &[Inline], out: &mut Vec<String>) {
         for i in inlines {
             if let Inline::Element(e) = i {
-                if let Some(n) = e.sigil.name() {
-                    out.push(n.name.clone());
-                }
+                out.push(e.name.name.clone());
                 for b in e.content.iter().flatten() {
                     if let Block::Paragraph(p) = b {
                         names(&p.content, out);

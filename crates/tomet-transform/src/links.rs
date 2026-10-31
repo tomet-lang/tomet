@@ -364,7 +364,7 @@ mod tests {
 
         let mut labels = Vec::new();
         for_each_element_mut(&mut doc, |el| {
-            if el.sigil.is_bare_named("link") {
+            if el.name.is_bare_named("link") {
                 let content_str = el.content.as_ref().map(|c| {
                     c.iter()
                         .filter_map(|block| match block {

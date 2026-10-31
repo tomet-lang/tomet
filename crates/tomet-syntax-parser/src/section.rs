@@ -1,11 +1,11 @@
 //! Parsing for sections (`=[...]`, `=...`) and thematic breaks (`---`).
 
 use crate::dialect::Dialect;
-use crate::element::{parse_groups, parse_sugar_body};
+use crate::element::{Groups, parse_groups, parse_sugar_body};
 use crate::error::Result;
 use crate::inline::{Stop, parse_inline_seq};
 use crate::value::{err, skip_inline_ws};
-use tomet_ast::{Block, Element, Inline, Paragraph, Placement, Section, Sigil, Span, Value};
+use tomet_ast::{Block, Element, Inline, Name, Paragraph, Placement, Section, Span, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -85,7 +85,7 @@ pub(crate) fn parse_section(dialect: Dialect, cur: &mut Cursor) -> Result<Sectio
     let had_ws = matches!(cur.peek(), Some(' ') | Some('\t'));
     skip_inline_ws(cur);
 
-    let mut el = element_new(Sigil::named("section")).with_placement(Placement::Block);
+    let mut read = Groups::default();
     let mut title: Vec<Inline> = Vec::new();
 
     match cur.peek() {
@@ -94,14 +94,14 @@ pub(crate) fn parse_section(dialect: Dialect, cur: &mut Cursor) -> Result<Sectio
             // `@name`'s, so `=` takes `(args)`, `[content]` and `{value}`
             // in any order, and its content -- bracketed or `|`-marked --
             // may span lines.
-            parse_groups(dialect, cur, &mut el, true)?;
+            parse_groups(dialect, cur, &mut read, true)?;
             skip_inline_ws(cur);
             if cur.peek() == Some('=') {
                 cur.eat_while(|c| c == '=');
                 skip_inline_ws(cur);
                 // Allow groups (e.g. `{ attrs }`) to follow decorative '='
                 if crate::element::opens_group(cur) {
-                    parse_groups(dialect, cur, &mut el, true)?;
+                    parse_groups(dialect, cur, &mut read, true)?;
                     skip_inline_ws(cur);
                     if cur.peek() == Some('=') {
                         cur.eat_while(|c| c == '=');
@@ -117,7 +117,7 @@ pub(crate) fn parse_section(dialect: Dialect, cur: &mut Cursor) -> Result<Sectio
             // `tmtroot/docs/spec/feature/content-shape.tmt`); this is that
             // rule enforced where the AST itself can't represent a
             // violation, rather than deferred to `tomet-semantics`.
-            title = title_from_content_blocks(cur, el.content.take())?;
+            title = title_from_content_blocks(cur, read.content.take())?;
         }
         _ if cur.starts_with("//") || cur.starts_with("/*") => {
             // A heading-less section with a trailing comment.
@@ -129,10 +129,10 @@ pub(crate) fn parse_section(dialect: Dialect, cur: &mut Cursor) -> Result<Sectio
             let mut content = body.content;
             trim_trailing_equals(&mut content);
             title = content;
-            el.data.args = body.args;
-            el.data.value = body.value;
-            el.id = body.id;
-            el.connects = body.connects;
+            read.data.args = body.args;
+            read.data.value = body.value;
+            read.id = body.id;
+            read.connects = body.connects;
         }
         None | Some('\n') | Some('\r') => {
             // A heading-less section (`=` or `==` alone on its line).
@@ -162,9 +162,9 @@ pub(crate) fn parse_section(dialect: Dialect, cur: &mut Cursor) -> Result<Sectio
     Ok(Section {
         level,
         title,
-        data: el.data,
-        id: el.id,
-        connects: el.connects,
+        data: read.data,
+        id: read.id,
+        connects: read.connects,
         blocks: Vec::new(),
         span,
     })
@@ -230,7 +230,7 @@ pub(crate) fn parse_titled_thematic_break(dialect: Dialect, cur: &mut Cursor) ->
         cur.pos()
     };
     let title_span = Span::new(start_pos, end_pos);
-    let mut el = element_new(Sigil::named("hr"))
+    let mut el = element_new(Name::bare("hr"))
         .with_placement(Placement::Block)
         .with_span(title_span);
     el.content = Some(vec![Block::Paragraph(Paragraph::new(title, title_span))]);

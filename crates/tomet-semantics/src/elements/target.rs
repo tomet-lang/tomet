@@ -53,7 +53,7 @@ fn target_arg(el: &Element) -> Option<String> {
     // in `builtin_positional_arg_key` (`-> "target"`), so a bare
     // positional scalar should already have arrived here as a map via
     // `normalized_element_args` -- this fallback only matters for a
-    // `Sigil` this function is never called with a `Link`/`Embed`
+    // element this function is never called with a `Link`/`Embed`
     // `kind` for (guarded above), so it's effectively unreachable in
     // practice but kept for symmetry/safety rather than relying on
     // that invariant silently.
@@ -89,11 +89,11 @@ pub fn target_scheme(target: &str) -> (AddressKind, &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Sigil, Value};
+    use tomet_ast::{Name, Value};
     use tomet_tree::element_new;
 
-    fn map_el(sigil: Sigil, entries: Vec<(&str, Value)>) -> Element {
-        let mut el = element_new(sigil);
+    fn map_el(name: Name, entries: Vec<(&str, Value)>) -> Element {
+        let mut el = element_new(name);
         el.data.args = Some(Value::Map(
             entries
                 .into_iter()
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn named_target_key_on_typed_link_element() {
-        let el = map_el(Sigil::named("link"), vec![("target", s("x.md"))]);
+        let el = map_el(Name::bare("link"), vec![("target", s("x.md"))]);
         assert_eq!(crate::classify_std_lenient(&el), ElementKind::Link);
         assert_eq!(
             link_target_of(&el),
@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn named_at_link_element() {
-        let el = map_el(Sigil::named("link"), vec![("target", s("x.md"))]);
+        let el = map_el(Name::bare("link"), vec![("target", s("x.md"))]);
         assert_eq!(crate::classify_std_lenient(&el), ElementKind::Link);
         assert_eq!(
             link_target_of(&el),
@@ -133,7 +133,7 @@ mod tests {
         // "link" IS in `builtin_positional_arg_key` (-> "target"), so
         // `normalized_element_args` turns this into a map before
         // `link_target` ever sees it.
-        let mut el = element_new(Sigil::named("link"));
+        let mut el = element_new(Name::bare("link"));
         el.data.args = Some(s("x.md"));
         assert_eq!(crate::classify_std_lenient(&el), ElementKind::Link);
         assert_eq!(
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn embed_target_named_key() {
-        let el = map_el(Sigil::named("embed"), vec![("target", s("a.png"))]);
+        let el = map_el(Name::bare("embed"), vec![("target", s("a.png"))]);
         assert_eq!(crate::classify_std_lenient(&el), ElementKind::Embed);
         assert_eq!(
             link_target_of(&el),
@@ -157,7 +157,7 @@ mod tests {
         // `@embed(a.png)`: "embed" IS in builtin_positional_arg_key
         // (-> "target"), so normalized_element_args already turns this
         // into a map before link_target ever sees it.
-        let mut el = element_new(Sigil::named("embed"));
+        let mut el = element_new(Name::bare("embed"));
         el.data.args = Some(s("a.png"));
         assert_eq!(
             link_target_of(&el),
@@ -234,13 +234,13 @@ mod tests {
 
     #[test]
     fn non_string_value_under_target_key_is_rejected() {
-        let el = map_el(Sigil::named("link"), vec![("target", Value::Int(42))]);
+        let el = map_el(Name::bare("link"), vec![("target", Value::Int(42))]);
         assert_eq!(link_target_of(&el), None);
     }
 
     #[test]
     fn non_link_kind_has_no_target() {
-        let el = map_el(Sigil::named("em"), vec![("key", s("val"))]);
+        let el = map_el(Name::bare("em"), vec![("key", s("val"))]);
         assert_eq!(crate::classify_std_lenient(&el), ElementKind::Em);
         assert_eq!(link_target_of(&el), None);
     }
@@ -249,11 +249,11 @@ mod tests {
 #[cfg(test)]
 mod path_tests {
     use super::*;
-    use tomet_ast::{Sigil, Value};
+    use tomet_ast::{Name, Value};
     use tomet_tree::element_new;
 
     fn path_el(name: &str, value: &str) -> Element {
-        let mut el = element_new(Sigil::named(name));
+        let mut el = element_new(Name::bare(name));
         el.data.args = Some(Value::String(value.to_string()));
         el
     }

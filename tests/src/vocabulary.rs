@@ -23,7 +23,7 @@
 //! down -- a branch the parser used to have, and would fail again the
 //! moment one was reintroduced.
 
-use tomet_ast::{Data, Document, Name, Sigil, Value};
+use tomet_ast::{Data, Document, Name, Value};
 use tomet_parser::parse_document;
 use tomet_tree::{for_each_element_mut, for_each_top_level_declaration_mut};
 
@@ -204,8 +204,8 @@ fn the_guard_reports_a_difference_it_is_given() {
 /// two trees built from differently-named sources can be compared directly.
 fn normalize(doc: &mut Document, ident: &str, kind: Ident) {
     for_each_element_mut(doc, |el| match kind {
-        Ident::ElementName => rename_name(sigil_name_mut(&mut el.sigil), ident),
-        Ident::Namespace => rename_namespace(sigil_name_mut(&mut el.sigil), ident),
+        Ident::ElementName => rename_name(Some(&mut el.name), ident),
+        Ident::Namespace => rename_namespace(Some(&mut el.name), ident),
         Ident::ArgKey => rename_arg_key(&mut el.data, ident),
     });
     for_each_top_level_declaration_mut(doc, |declaration| match kind {
@@ -228,13 +228,6 @@ fn rename_namespace(name: Option<&mut Name>, ident: &str) {
         && name.namespace.as_deref() == Some(ident)
     {
         name.namespace = Some(PLACEHOLDER.to_string());
-    }
-}
-
-fn sigil_name_mut(sigil: &mut Sigil) -> Option<&mut Name> {
-    match sigil {
-        Sigil::Named(name) => Some(name),
-        Sigil::Bare => None,
     }
 }
 

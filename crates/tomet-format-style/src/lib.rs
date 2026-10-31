@@ -215,7 +215,7 @@ pub fn render_value_inner_with_blocks(
         // unresolved in prose.
         Value::Interp(interp) => format!("${{{}}}", interp.expr),
         Value::Element(el) => render_embedded(
-            el.sigil.head(),
+            format!("@{}", el.name),
             &el.data,
             el.content.as_deref(),
             config,

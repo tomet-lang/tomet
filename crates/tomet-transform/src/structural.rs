@@ -4,7 +4,7 @@ pub use tomet_search::structural::{
     StructuralMatch, StructuralQuery, count_structural_matches, matches_query,
 };
 
-use tomet_ast::{Data, Document, Name, Sigil, Value};
+use tomet_ast::{Data, Document, Name, Value};
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 use tomet_tree::{DataExt, for_each_element_mut, for_each_top_level_declaration_mut};
 
@@ -21,11 +21,7 @@ pub fn apply_structural_action(doc: &mut Document, action: &StructuralAction) ->
     let mut count = 0;
     for_each_element_mut(doc, |el| {
         let kind = classify_std_lenient(el);
-        let name = match &mut el.sigil {
-            Sigil::Named(name) => Some(name),
-            _ => None,
-        };
-        count += apply_to(action, kind.as_str(), name, &mut el.data);
+        count += apply_to(action, kind.as_str(), Some(&mut el.name), &mut el.data);
     });
     for_each_top_level_declaration_mut(doc, |declaration| {
         let kind = classify_declaration_lenient(declaration);

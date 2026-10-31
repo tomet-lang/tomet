@@ -104,19 +104,19 @@ fn list_to_plain(list: &List) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Paragraph, Sigil, Span, Text};
+    use tomet_ast::{Name, Paragraph, Span, Text};
     use tomet_tree::element_new;
 
     #[test]
     fn extracts_tags_from_args_string() {
-        let mut el = element_new(Sigil::named("tag"));
+        let mut el = element_new(Name::bare("tag"));
         el.data.args = Some(Value::String("rust".to_string()));
         assert_eq!(extract_tags(&el), vec!["rust"]);
     }
 
     #[test]
     fn extracts_tags_from_args_seq() {
-        let mut el = element_new(Sigil::named("tag"));
+        let mut el = element_new(Name::bare("tag"));
         el.data.args = Some(Value::Seq(vec![
             Value::String("rust".to_string()),
             Value::String("tomet".to_string()),
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn extracts_tags_from_content() {
-        let mut el = element_new(Sigil::named("tag"));
+        let mut el = element_new(Name::bare("tag"));
         el.content = Some(vec![Block::Paragraph(Paragraph::new(
             vec![Inline::Text(Text::new("docs", Span::dummy()))],
             Span::dummy(),

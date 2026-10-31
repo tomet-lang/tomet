@@ -27,7 +27,7 @@ fn parses_link_with_order_free_groups() {
     assert_eq!(a, b);
     match &a.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("link"));
+            assert_eq!(el.name, Name::bare("link"));
             assert_eq!(
                 el.data.args,
                 Some(Value::Map(vec![(
@@ -46,7 +46,7 @@ fn parses_links_container_with_bare_children() {
     let doc = parse_document("@links {\n  (1)[ note ]\n  (anotation1)[ note ]\n}\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("links"));
+            assert_eq!(el.name, Name::bare("links"));
             match &el.data.value {
                 Some(Group(entries)) => {
                     let [Entry::Bare(first), Entry::Bare(second)] = entries.as_slice() else {
@@ -68,7 +68,7 @@ fn parses_caution_as_typed_element_not_bare_bracket() {
     let doc = parse_document("@caution[ be careful ]\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("caution"));
+            assert_eq!(el.name, Name::bare("caution"));
             assert_eq!(el.content, wrap(vec![Inline::Text("be careful".into())]));
         }
         other => panic!("expected element, got {other:?}"),

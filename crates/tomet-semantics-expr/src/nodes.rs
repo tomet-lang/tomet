@@ -282,8 +282,8 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
             .id()
             .map(|id| EvalValue::String(id.to_string()))
             .unwrap_or(EvalValue::Null)),
-        "sigil" => Ok(EvalValue::String(match node {
-            Node::Element(el) => el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
+        "name" => Ok(EvalValue::String(match node {
+            Node::Element(el) => el.name.to_string(),
             Node::Connect(conn) => conn.name.to_string(),
             Node::Declaration(d) => d.name.to_string(),
             Node::Item(item) => item

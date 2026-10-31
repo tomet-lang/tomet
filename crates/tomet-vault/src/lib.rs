@@ -285,7 +285,7 @@ impl Vault {
     /// and anything it brings in with `::use`.
     ///
     /// This is what makes an element name mean something. Matching on a
-    /// bare `Sigil::Named` instead is the shortcut that drops the
+    /// bare `Element::name` instead is the shortcut that drops the
     /// namespaced spelling of the same element.
     pub fn bindings(&self, doc: &Document) -> Bindings {
         self.loaded.bindings_for(doc)

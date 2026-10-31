@@ -639,7 +639,7 @@ fn in_vault(src: &str) -> Result<EvalValue, EvalError> {
 fn a_leading_hash_picks_an_element_of_the_current_document() {
     assert_eq!(in_vault("#c1.prop.n").unwrap(), int(1));
     assert_eq!(in_vault("#c1.id").unwrap(), text("c1"));
-    assert_eq!(in_vault("#c1.sigil").unwrap(), text("card"));
+    assert_eq!(in_vault("#c1.name").unwrap(), text("card"));
 }
 
 #[test]
@@ -663,7 +663,7 @@ fn prop_merges_args_and_value_and_item_walks_a_list() {
 #[test]
 fn a_heading_is_found_by_its_id_and_is_a_section() {
     assert_eq!(in_vault("#intro.id").unwrap(), text("intro"));
-    assert_eq!(in_vault("#intro.sigil").unwrap(), text("section"));
+    assert_eq!(in_vault("#intro.name").unwrap(), text("section"));
     // The element that follows the heading is under it.
     assert!(matches!(in_vault("#intro.content").unwrap(), EvalValue::Fragment(b) if b.len() == 2));
 }
@@ -744,9 +744,9 @@ fn the_meta_a_resolver_gives_is_what_is_read() {
 
 #[test]
 fn root_items_are_numbered_from_zero_and_a_section_is_a_node() {
-    assert_eq!(in_vault("#item(0).sigil").unwrap(), text("kind"));
+    assert_eq!(in_vault("#item(0).name").unwrap(), text("kind"));
     assert_eq!(in_vault("self#item(2).id").unwrap(), text("intro"));
-    assert_eq!(in_vault("self.item(1).sigil").unwrap(), text("meta"));
+    assert_eq!(in_vault("self.item(1).name").unwrap(), text("meta"));
     assert!(in_vault("#item(99)").is_err());
 }
 
@@ -1061,7 +1061,7 @@ fn link_target(value: &EvalValue) -> String {
     let [tomet_ast::Inline::Element(el)] = p.content.as_slice() else {
         panic!("expected one inline element, got {:?}", p.content);
     };
-    assert_eq!(el.sigil, tomet_ast::Sigil::named("link"));
+    assert_eq!(el.name, tomet_ast::Name::bare("link"));
     match &el.data.args {
         Some(tomet_ast::Value::String(target)) => target.clone(),
         other => panic!("expected a string target, got {other:?}"),
@@ -1246,10 +1246,7 @@ fn outline(blocks: &[tomet_ast::Block]) -> Vec<String> {
                     out.push(format!("p:{}", t.trim()));
                 }
             }
-            tomet_ast::Block::Element(el) => out.push(format!(
-                "e:{}",
-                el.sigil.name().map(|n| n.to_string()).unwrap_or_default()
-            )),
+            tomet_ast::Block::Element(el) => out.push(format!("e:{}", el.name.to_string())),
             _ => {}
         }
     }
@@ -1468,7 +1465,7 @@ fn in_list_vault(src: &str) -> Result<EvalValue, EvalError> {
 #[test]
 fn a_list_is_found_by_its_id_like_an_element() {
     assert_eq!(in_list_vault("#shopping.id").unwrap(), text("shopping"));
-    assert_eq!(in_list_vault("#shopping.sigil").unwrap(), text("list"));
+    assert_eq!(in_list_vault("#shopping.name").unwrap(), text("list"));
     assert_eq!(in_list_vault("#shopping.connects").unwrap(), seq(vec![]));
     assert_eq!(in_list_vault("#shopping.prop").unwrap(), EvalValue::Null);
     // An item still has its own id, and the list's does not shadow it.

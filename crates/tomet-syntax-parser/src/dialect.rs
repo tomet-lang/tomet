@@ -4,7 +4,7 @@
 ///
 /// Both read the same grammar and share every function. They differ in one
 /// thing, which characters may open an element: `@` in both, and `?` (a hole,
-/// [`tomet_ast::Sigil::Question`]) only in a [`Dialect::Pattern`].
+/// [`tomet_ast::Hole`]) only in a [`Dialect::Pattern`].
 ///
 /// A dialect is a property of the text being read, not of a position in it,
 /// so it is passed along as its own argument and not kept in the cursor.

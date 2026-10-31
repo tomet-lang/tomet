@@ -5,7 +5,7 @@ fn parses_thematic_break() {
     let doc = parse_document("---\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("hr"));
+            assert_eq!(el.name, Name::bare("hr"));
             assert_eq!(el.content, None);
         }
         other => panic!("expected hr element, got {other:?}"),
@@ -16,7 +16,7 @@ fn parses_thematic_break() {
 fn parses_thematic_break_with_more_than_three_dashes() {
     let doc = parse_document("-----\n").unwrap();
     match &doc.blocks[0] {
-        Block::Element(el) => assert_eq!(el.sigil, Sigil::named("hr")),
+        Block::Element(el) => assert_eq!(el.name, Name::bare("hr")),
         other => panic!("expected hr element, got {other:?}"),
     }
 }
@@ -26,7 +26,7 @@ fn parses_titled_thematic_break() {
     let doc = parse_document("---[ Title ]---\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("hr"));
+            assert_eq!(el.name, Name::bare("hr"));
             assert_eq!(el.content, wrap(vec![Inline::Text("Title".into())]));
         }
         other => panic!("expected hr element, got {other:?}"),

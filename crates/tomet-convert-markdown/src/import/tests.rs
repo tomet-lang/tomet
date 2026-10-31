@@ -52,11 +52,11 @@ fn emphasis_and_strong() {
                 .content
                 .iter()
                 .filter_map(|i| match i {
-                    Inline::Element(el) => Some(el.sigil.clone()),
+                    Inline::Element(el) => Some(el.name.clone()),
                     _ => None,
                 })
                 .collect();
-            assert_eq!(kinds, vec![Sigil::named("em"), Sigil::named("strong")]);
+            assert_eq!(kinds, vec![Name::bare("em"), Name::bare("strong")]);
         }
         other => panic!("expected paragraph, got {other:?}"),
     }
@@ -122,7 +122,7 @@ fn link() {
     match &doc.blocks[0] {
         Block::Paragraph(p) => match &p.content[0] {
             Inline::Element(el) => {
-                assert_eq!(el.sigil, Sigil::named("link"));
+                assert_eq!(el.name, Name::bare("link"));
                 assert_eq!(
                     el.data.args,
                     Some(Value::Map(vec![(
@@ -146,7 +146,7 @@ fn autolink_is_a_plain_link_element() {
     let doc = from_markdown("<https://example.com>\n");
     match &doc.blocks[0] {
         Block::Paragraph(p) => match &p.content[0] {
-            Inline::Element(el) => assert_eq!(el.sigil, Sigil::named("link")),
+            Inline::Element(el) => assert_eq!(el.name, Name::bare("link")),
             other => panic!("expected element, got {other:?}"),
         },
         other => panic!("expected paragraph, got {other:?}"),
@@ -159,7 +159,7 @@ fn image_becomes_embed_element() {
     match &doc.blocks[0] {
         Block::Paragraph(p) => match &p.content[0] {
             Inline::Element(el) => {
-                assert_eq!(el.sigil, Sigil::named("embed"));
+                assert_eq!(el.name, Name::bare("embed"));
                 assert_eq!(
                     el.data.args,
                     Some(Value::Map(vec![(
@@ -182,7 +182,7 @@ fn image_becomes_embed_element() {
 fn thematic_break() {
     let doc = from_markdown("---\n");
     match &doc.blocks[0] {
-        Block::Element(el) => assert_eq!(el.sigil, Sigil::named("hr")),
+        Block::Element(el) => assert_eq!(el.name, Name::bare("hr")),
         other => panic!("expected hr element, got {other:?}"),
     }
 }
@@ -192,7 +192,7 @@ fn fenced_code_block() {
     let doc = from_markdown("```rust\nfn main() {}\n```\n");
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("raw"));
+            assert_eq!(el.name, Name::bare("raw"));
             assert_eq!(
                 el.data.args,
                 Some(Value::Map(vec![(
@@ -217,7 +217,7 @@ fn simple_block_quote() {
     let doc = from_markdown("> quoted text\n");
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("quote"));
+            assert_eq!(el.name, Name::bare("quote"));
             assert_eq!(el.data.args, None);
             assert_eq!(
                 el.content,
@@ -239,7 +239,7 @@ fn heading_nested_inside_a_block_quote_splices_its_title_text_in() {
     let doc = from_markdown("> # Quoted Title\n>\n> more text\n");
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("quote"));
+            assert_eq!(el.name, Name::bare("quote"));
             let content = para_inlines(el.content.as_ref().expect("content"));
             assert!(
                 !content
@@ -292,13 +292,14 @@ fn a_code_span_keeps_the_sigils_inside_it() {
             panic!("expected a paragraph for {src:?}")
         };
         let has_raw = p.content.iter().any(|inl| match inl {
-            Inline::Element(el) if el.sigil.is_bare_named("raw") => el
-                .content
-                .as_ref()
-                .is_some_and(|c| match para_inlines(c).first() {
-                    Some(Inline::Raw(r)) => r.value == expected_code,
-                    _ => false,
-                }),
+            Inline::Element(el) if el.name.is_bare_named("raw") => {
+                el.content
+                    .as_ref()
+                    .is_some_and(|c| match para_inlines(c).first() {
+                        Some(Inline::Raw(r)) => r.value == expected_code,
+                        _ => false,
+                    })
+            }
             _ => false,
         });
         assert!(
@@ -365,7 +366,7 @@ fn wikilink_converts_to_tomet_element() {
     let Inline::Element(el1) = &p.content[1] else {
         panic!("expected element 1");
     };
-    assert_eq!(el1.sigil, Sigil::named("link"));
+    assert_eq!(el1.name, Name::bare("link"));
     assert_eq!(
         el1.data.args,
         Some(Value::Map(vec![(
@@ -384,7 +385,7 @@ fn wikilink_converts_to_tomet_element() {
     let Inline::Element(el2) = &p.content[3] else {
         panic!("expected element 2");
     };
-    assert_eq!(el2.sigil, Sigil::named("link"));
+    assert_eq!(el2.name, Name::bare("link"));
     assert_eq!(
         el2.data.args,
         Some(Value::Map(vec![(
@@ -410,7 +411,7 @@ fn table_converts_to_tomet_element() {
     assert_eq!(doc.blocks.len(), 1);
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("table"));
+            assert_eq!(el.name, Name::bare("table"));
             assert!(el.content.is_some());
         }
         other => panic!("expected table element, got {other:?}"),
@@ -593,7 +594,7 @@ fn embed_wikilinks_and_images_import_as_embed_elements() {
     let Inline::Element(embed1) = &p.content[0] else {
         panic!("expected embed element 1");
     };
-    assert_eq!(embed1.sigil, Sigil::named("embed"));
+    assert_eq!(embed1.name, Name::bare("embed"));
     assert_eq!(
         embed1.data.args,
         Some(Value::Map(vec![(
@@ -609,7 +610,7 @@ fn embed_wikilinks_and_images_import_as_embed_elements() {
     let Inline::Element(embed2) = &p.content[2] else {
         panic!("expected embed element 2");
     };
-    assert_eq!(embed2.sigil, Sigil::named("embed"));
+    assert_eq!(embed2.name, Name::bare("embed"));
     assert_eq!(
         embed2.data.args,
         Some(Value::Map(vec![(
@@ -635,7 +636,7 @@ fn test_wikilink_with_at_prefix_not_enclosed_in_backticks() {
     let Inline::Element(el1) = &p.content[1] else {
         panic!("expected element 1");
     };
-    assert_eq!(el1.sigil, Sigil::named("link"));
+    assert_eq!(el1.name, Name::bare("link"));
     assert_eq!(
         el1.data.args,
         Some(Value::Map(vec![(
@@ -647,7 +648,7 @@ fn test_wikilink_with_at_prefix_not_enclosed_in_backticks() {
     let Inline::Element(el2) = &p.content[3] else {
         panic!("expected element 2");
     };
-    assert_eq!(el2.sigil, Sigil::named("link"));
+    assert_eq!(el2.name, Name::bare("link"));
     assert_eq!(
         el2.data.args,
         Some(Value::Map(vec![(
@@ -696,7 +697,7 @@ fn test_obsidian_callout_blockquote_import() {
     let Block::Element(el) = &doc.blocks[0] else {
         panic!("expected element");
     };
-    assert_eq!(el.sigil, Sigil::named("callout"));
+    assert_eq!(el.name, Name::bare("callout"));
     assert_eq!(
         el.data.args,
         Some(Value::Map(vec![
@@ -713,7 +714,7 @@ fn test_obsidian_callout_blockquote_import() {
     let Block::Element(el_plain) = &doc_plain.blocks[0] else {
         panic!("expected plain quote element");
     };
-    assert_eq!(el_plain.sigil, Sigil::named("quote"));
+    assert_eq!(el_plain.name, Name::bare("quote"));
     assert_eq!(el_plain.data.args, None);
 }
 

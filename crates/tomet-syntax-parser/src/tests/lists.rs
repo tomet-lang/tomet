@@ -94,7 +94,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
             assert_eq!(item_attrs(&items[0]), None, "{bare:?}");
             match Some(first_para(&items[0].content)) {
                 Some([Inline::Element(link)]) => {
-                    assert_eq!(link.sigil, Sigil::named("link"), "{bare:?}");
+                    assert_eq!(link.name, Name::bare("link"), "{bare:?}");
                     assert_eq!(
                         link.data.value,
                         Some(Group::from_map(Value::Map(vec![(
@@ -132,7 +132,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
                 // else.
                 match Some(first_para(&items[0].content)) {
                     Some([Inline::Element(link)]) => {
-                        assert_eq!(link.sigil, Sigil::named("link"), "{src:?}");
+                        assert_eq!(link.name, Name::bare("link"), "{src:?}");
                         assert_eq!(link.data.value, None, "{src:?}");
                     }
                     other => panic!("{src:?}: expected a single @link element, got {other:?}"),
@@ -411,7 +411,7 @@ fn combine_notation_has_no_naming_constraint() {
         panic!("expected element");
     };
 
-    assert_eq!(combine_el.sigil, standalone_el.sigil);
+    assert_eq!(combine_el.name, standalone_el.name);
     assert_eq!(
         classify_std_lenient(&combine_el),
         classify_std_lenient(standalone_el)

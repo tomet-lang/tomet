@@ -1,5 +1,5 @@
 use super::*;
-use tomet_ast::{Data, Declaration, Group, Paragraph, Placement, RawText, Sigil, Span, Text};
+use tomet_ast::{Data, Declaration, Group, Name, Paragraph, Placement, RawText, Span, Text};
 
 /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`
 /// now) -- every fixture below is still just one paragraph's worth.
@@ -101,7 +101,7 @@ fn adjacent_meta_blocks_have_no_visible_output() {
 
 fn heading_element(level: i64, content: Vec<Inline>) -> Element {
     Element {
-        sigil: Sigil::named("heading"),
+        name: Name::bare("heading"),
 
         placement: Placement::Block,
 
@@ -204,7 +204,7 @@ fn emphasis_and_strong() {
         blocks: vec![Block::Paragraph(Paragraph::new(
             vec![
                 Inline::Element(Element {
-                    sigil: Sigil::named("em"),
+                    name: Name::bare("em"),
 
                     placement: Placement::Inline,
 
@@ -226,7 +226,7 @@ fn emphasis_and_strong() {
                 }),
                 Inline::Text(Text::new(" ", Span::dummy())),
                 Inline::Element(Element {
-                    sigil: Sigil::named("strong"),
+                    name: Name::bare("strong"),
 
                     placement: Placement::Inline,
 
@@ -257,7 +257,7 @@ fn emphasis_and_strong() {
 #[test]
 fn link_round_trips() {
     let el = Element {
-        sigil: Sigil::named("link"),
+        name: Name::bare("link"),
 
         placement: Placement::Inline,
 
@@ -293,7 +293,7 @@ fn link_round_trips() {
 #[test]
 fn embed_becomes_image() {
     let el = Element {
-        sigil: Sigil::named("embed"),
+        name: Name::bare("embed"),
 
         placement: Placement::Inline,
 
@@ -329,7 +329,7 @@ fn embed_becomes_image() {
 #[test]
 fn raw_block_uses_fence_and_lang() {
     let el = Element {
-        sigil: Sigil::named("raw"),
+        name: Name::bare("raw"),
 
         placement: Placement::Block,
 
@@ -362,7 +362,7 @@ fn raw_block_uses_fence_and_lang() {
 #[test]
 fn raw_inline_uses_backticks() {
     let el = Element {
-        sigil: Sigil::named("raw"),
+        name: Name::bare("raw"),
 
         placement: Placement::Inline,
 
@@ -399,7 +399,7 @@ fn raw_inline_uses_backticks() {
 #[test]
 fn thematic_break() {
     let doc = Document {
-        blocks: vec![Block::Element(tomet_tree::element_new(Sigil::named("hr")))],
+        blocks: vec![Block::Element(tomet_tree::element_new(Name::bare("hr")))],
         span: Span::dummy(),
     };
     assert_eq!(to_markdown(&doc), "---\n\n");
@@ -425,7 +425,7 @@ fn a_declaration_exports_as_nothing() {
 /// as an `<h2>`.
 #[test]
 fn titled_thematic_break_is_not_a_setext_heading() {
-    let mut el = tomet_tree::element_new(Sigil::named("hr"));
+    let mut el = tomet_tree::element_new(Name::bare("hr"));
     el.content = Some(wrap_content(vec![Inline::Text(Text::new(
         "Title",
         Span::dummy(),
@@ -439,13 +439,13 @@ fn titled_thematic_break_is_not_a_setext_heading() {
 
 #[test]
 fn wikilink_exports_to_markdown() {
-    let mut el1 = tomet_tree::element_new(Sigil::named("link"));
+    let mut el1 = tomet_tree::element_new(Name::bare("link"));
     el1.data.args = Some(Value::Map(vec![(
         "target".to_string(),
         Value::String("ref:name".to_string()),
     )]));
 
-    let mut el2 = tomet_tree::element_new(Sigil::named("link"));
+    let mut el2 = tomet_tree::element_new(Name::bare("link"));
     el2.data.args = Some(Value::Map(vec![(
         "target".to_string(),
         Value::String("ref:name".to_string()),
@@ -472,7 +472,7 @@ fn wikilink_exports_to_markdown() {
 /// A paragraph holding one `@link(target)`, with `label` as its content when
 /// there is one.
 fn link_doc(target: &str, label: Option<&str>) -> Document {
-    let mut el = tomet_tree::element_new(Sigil::named("link"));
+    let mut el = tomet_tree::element_new(Name::bare("link"));
     el.data.args = Some(Value::Map(vec![(
         "target".to_string(),
         Value::String(target.to_string()),
@@ -527,7 +527,7 @@ fn an_unlabeled_url_stays_bare() {
 
 #[test]
 fn table_exports_to_markdown() {
-    let mut el = tomet_tree::element_new(Sigil::named("table"));
+    let mut el = tomet_tree::element_new(Name::bare("table"));
     el.content = Some(wrap_content(vec![Inline::Text(Text::new(
         "[ col1 ][ col2 ]\n[ val1 ][ val2 ]",
         Span::dummy(),

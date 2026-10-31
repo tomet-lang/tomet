@@ -26,7 +26,7 @@ pub struct Service {
     assert_eq!(elements.len(), 2);
 
     let (el0, span0, kind0) = &elements[0];
-    assert_eq!(el0.sigil.name().map(|n| n.name.as_str()), Some("rule"));
+    assert_eq!(el0.name.name, "rule");
     assert_eq!(kind0, &CommentKind::OuterDoc);
     // Line 5 is where `@rule` appears in source
     assert_eq!(line_col(source, span0.start).line, 5);
@@ -34,7 +34,7 @@ pub struct Service {
     assert_eq!(line_col(source, span0.start).column, 9);
 
     let (el1, span1, kind1) = &elements[1];
-    assert_eq!(el1.sigil.name().map(|n| n.name.as_str()), Some("file"));
+    assert_eq!(el1.name.name, "file");
     assert_eq!(kind1, &CommentKind::OuterDoc);
     // Line 9 is where `@file` appears
     assert_eq!(line_col(source, span1.start).line, 9);

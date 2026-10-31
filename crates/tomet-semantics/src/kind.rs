@@ -1,4 +1,4 @@
-use tomet_ast::{Element, Name, Placement, Sigil};
+use tomet_ast::{Element, Name, Placement};
 use tomet_declaration::DeclKind;
 
 /// What a parsed `Element` officially means, replacing the ad-hoc
@@ -117,7 +117,7 @@ pub enum ElementKind {
     /// `positional::builtin_positional_arg_key` (`variant` is its
     /// positional), the Markdown and Typst writers' `render_callout`,
     /// the Markdown *reader*, which turns `> [!note]` into
-    /// `Sigil::named("callout")`, `tomet-format-printer`'s style branch,
+    /// `Name::bare("callout")`, `tomet-format-printer`'s style branch,
     /// two arms in `tomet-config`, and the LSP.
     ///
     /// The reader is what settles it: a Markdown round-trip produced an
@@ -131,7 +131,7 @@ pub enum ElementKind {
     /// still undecided -- `docs/spec/builtin-elements.tmt` used to say it
     /// was not built in at all, which was the part that was false.
     Callout,
-    /// `Sigil::named("card")` -- a plain title + content box, with no
+    /// `Name::bare("card")` -- a plain title + content box, with no
     /// admonition semantics (no `variant`, no color/icon). Exists
     /// alongside [`ElementKind::Callout`] rather than as a `variant` of
     /// it: callout's whole value is signaling a category to the reader
@@ -148,13 +148,6 @@ pub enum ElementKind {
     /// [`UnknownName`] rather than this, which is the whole point of
     /// namespaces.
     Custom(String),
-    /// `Sigil::Bare` -- the untyped `(key)[content]` entries inside a
-    /// container like `@links{}`. Its string form ("bare") can collide
-    /// with a user writing a literal `@bare` element (which
-    /// would classify as `Custom("bare")` instead), but that's the same
-    /// ambiguity the old stringly-typed `element_kind()` already had --
-    /// not a regression.
-    Bare,
     /// `@ftn` -- a footnote: a definition when it has content, a
     /// reference to the one with the same id when it has none.
     Footnote,
@@ -197,7 +190,6 @@ impl ElementKind {
             ElementKind::Table => "table",
             ElementKind::Heading => "heading",
             ElementKind::Custom(name) => name,
-            ElementKind::Bare => "bare",
             ElementKind::Footnote => "ftn",
             ElementKind::Tag => "tag",
             ElementKind::Task => "task",
@@ -395,7 +387,7 @@ impl std::fmt::Display for UnknownName {
 
 impl std::error::Error for UnknownName {}
 
-/// Classifies `el` by its `Sigil`, against the `std` vocabulary alone.
+/// Classifies `el` by its name, against the `std` vocabulary alone.
 ///
 /// The `_std` is the whole caveat. For a document carrying a `::kind`,
 /// this returns [`UnknownName`] for every element that document's own
@@ -403,14 +395,9 @@ impl std::error::Error for UnknownName {}
 /// what a caller usually wants. `Bindings::classify` is the one that
 /// answers "what does this name mean *in this document*".
 ///
-/// Reach for this when there is no document to resolve against -- the
-/// validator uses it for the non-`Named` sigils, which carry no name to
-/// resolve.
+/// Reach for this when there is no document to resolve against.
 ///
-/// `Sigil::Bare` is `ElementKind::Bare`. Everything else goes through
-/// [`classify_std_name`].
-///
-/// The name is all the sigil carries. Where the element sits is
+/// The name goes through [`classify_std_name`] and nothing else is read. Where the element sits is
 /// `Element::placement`, and a placement that disagrees with the kind's
 /// definition is reported separately by [`shape_mismatch`].
 ///
@@ -418,12 +405,9 @@ impl std::error::Error for UnknownName {}
 /// guessing was retired; the only way to get `ElementKind::Link` is to
 /// write `@link` explicitly.
 pub fn classify_std(el: &Element) -> Result<ElementKind, UnknownName> {
-    match &el.sigil {
-        // A name that is a declaration's is refused when written `@name`:
-        // see [`refuse_declaration_as_element`].
-        Sigil::Named(name) => refuse_declaration_as_element(name, classify_std_name(name)?),
-        Sigil::Bare => Ok(ElementKind::Bare),
-    }
+    // A name that is a declaration's is refused when written `@name`:
+    // see [`refuse_declaration_as_element`].
+    refuse_declaration_as_element(&el.name, classify_std_name(&el.name)?)
 }
 
 /// [`classify_std`], falling back to `Custom` for an unknown bare name.
@@ -511,7 +495,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         // Either shape: a mention sits inside a sentence, and the definition in a `::dictionary` stands as
         // an entry of its value group.
         Term => return None,
-        Custom(_) | Bare => return None,
+        Custom(_) => return None,
     })
 }
 
@@ -583,7 +567,7 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         // A term's description is the content of its definition; a mention has none.
         Quote | Callout | Card | Table | Footnote | Task | Term => Some(ContentShape::Block),
         // Not a built-in bare name at all.
-        Custom(_) | Bare => None,
+        Custom(_) => None,
     }
 }
 
@@ -623,9 +607,6 @@ pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
 ///
 /// Returns `Some((found, expected))` when they disagree.
 pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {
-    if matches!(el.sigil, Sigil::Bare) {
-        return None;
-    }
     let found = Shape::from(el.placement);
     let kind = classify_std(el).ok()?;
     let expected = required_shape(&kind)?;
@@ -654,7 +635,7 @@ mod tests {
     fn unknown_bare_name_is_an_error() {
         // Bare names are reserved for the built-in vocabulary, so this is
         // the diagnostic that replaces the old silent `Custom` fallback.
-        let el = element_new(Sigil::named("caution"));
+        let el = element_new(Name::bare("caution"));
         assert_eq!(
             classify_std(&el),
             Err(UnknownName {
@@ -688,7 +669,7 @@ mod tests {
                 classify_declaration(&declaration_new(name)).is_ok(),
                 "::{name}"
             );
-            let err = classify_std(&element_new(Sigil::named(name))).unwrap_err();
+            let err = classify_std(&element_new(Name::bare(name))).unwrap_err();
             assert!(err.declaration, "@{name}");
             assert!(
                 err.to_string().contains(&format!("write `::{name}`")),
@@ -696,17 +677,17 @@ mod tests {
             );
             // and it is not read as the declaration, however leniently
             assert_eq!(
-                classify_std_lenient(&element_new(Sigil::named(name))),
+                classify_std_lenient(&element_new(Name::bare(name))),
                 ElementKind::Custom(name.to_string())
             );
         }
         // content keeps its sigil
-        assert!(classify_std(&element_new(Sigil::named("callout"))).is_ok());
+        assert!(classify_std(&element_new(Name::bare("callout"))).is_ok());
     }
 
     #[test]
     fn namespaced_name_is_custom() {
-        let el = element_new(Sigil::Named(Name::namespaced("deck", "caution")));
+        let el = element_new(Name::namespaced("deck", "caution"));
         assert_eq!(
             classify_std(&el),
             Ok(ElementKind::Custom("deck.caution".to_string()))
@@ -716,7 +697,7 @@ mod tests {
     #[test]
     fn namespacing_never_shadows_a_builtin() {
         // `deck.meta` is the user's element, not Tomet's `#meta`.
-        let el = element_new(Sigil::Named(Name::namespaced("deck", "meta")));
+        let el = element_new(Name::namespaced("deck", "meta"));
         assert_eq!(
             classify_std(&el),
             Ok(ElementKind::Custom("deck.meta".to_string()))
@@ -725,7 +706,7 @@ mod tests {
 
     #[test]
     fn classify_std_lenient_falls_back_for_an_unknown_bare_name() {
-        let el = element_new(Sigil::named("caution"));
+        let el = element_new(Name::bare("caution"));
         assert_eq!(
             classify_std_lenient(&el),
             ElementKind::Custom("caution".to_string())
@@ -734,7 +715,7 @@ mod tests {
 
     #[test]
     fn type_sigil_with_builtin_name_is_recognized() {
-        let el = element_new(Sigil::named("raw"));
+        let el = element_new(Name::bare("raw"));
         assert_eq!(classify_std_lenient(&el), ElementKind::Raw);
     }
 
@@ -749,7 +730,7 @@ mod tests {
 
     #[test]
     fn named_at_sigil_with_link_name_is_recognized() {
-        let mut el = element_new(Sigil::named("link"));
+        let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("https://example.com".to_string()),
@@ -759,7 +740,7 @@ mod tests {
 
     #[test]
     fn named_at_sigil_with_conflict_name_is_recognized() {
-        let el = element_new(Sigil::named("conflict"));
+        let el = element_new(Name::bare("conflict"));
         assert_eq!(classify_std_lenient(&el), ElementKind::Conflict);
         // Either shape, and no `[content]`/`|content` concept of its own
         // -- `a`/`b` live in `(args)` instead.
@@ -769,7 +750,7 @@ mod tests {
 
     #[test]
     fn named_at_sigil_with_task_name_is_recognized() {
-        let el = element_new(Sigil::named("task"));
+        let el = element_new(Name::bare("task"));
         assert_eq!(classify_std_lenient(&el), ElementKind::Task);
         assert_eq!(required_shape(&ElementKind::Task), None);
         assert_eq!(
@@ -780,7 +761,7 @@ mod tests {
 
     #[test]
     fn named_at_sigil_with_ruby_name_is_recognized() {
-        let mut el = element_new(Sigil::named("ruby"));
+        let mut el = element_new(Name::bare("ruby"));
         el.data.args = Some(Value::Map(vec![(
             "rt".to_string(),
             Value::String("かんじ".to_string()),
@@ -791,20 +772,20 @@ mod tests {
 
     #[test]
     fn shape_mismatch_reports_a_block_element_put_in_running_text() {
-        let el = element_new(Sigil::named("hr")).with_placement(Placement::Inline);
+        let el = element_new(Name::bare("hr")).with_placement(Placement::Inline);
         assert_eq!(shape_mismatch(&el), Some((Shape::Inline, Shape::Block)));
     }
 
     #[test]
     fn shape_mismatch_reports_an_inline_element_standing_as_a_block() {
-        let el = element_new(Sigil::named("em")).with_placement(Placement::Block);
+        let el = element_new(Name::bare("em")).with_placement(Placement::Block);
         assert_eq!(shape_mismatch(&el), Some((Shape::Block, Shape::Inline)));
     }
 
     #[test]
     fn a_correctly_placed_element_has_no_mismatch() {
-        let hr = element_new(Sigil::named("hr")).with_placement(Placement::Block);
-        let em = element_new(Sigil::named("em")).with_placement(Placement::Inline);
+        let hr = element_new(Name::bare("hr")).with_placement(Placement::Block);
+        let em = element_new(Name::bare("em")).with_placement(Placement::Inline);
         assert_eq!(shape_mismatch(&hr), None);
         assert_eq!(shape_mismatch(&em), None);
     }
@@ -812,15 +793,9 @@ mod tests {
     #[test]
     fn a_custom_element_may_take_either_shape() {
         let name = Name::namespaced("deck", "card");
-        let block = element_new(Sigil::Named(name.clone())).with_placement(Placement::Block);
-        let inline = element_new(Sigil::Named(name)).with_placement(Placement::Inline);
+        let block = element_new(name.clone()).with_placement(Placement::Block);
+        let inline = element_new(name).with_placement(Placement::Inline);
         assert_eq!(shape_mismatch(&block), None);
         assert_eq!(shape_mismatch(&inline), None);
-    }
-
-    #[test]
-    fn bare_sigil_is_always_bare() {
-        let el = element_new(Sigil::Bare);
-        assert_eq!(classify_std_lenient(&el), ElementKind::Bare);
     }
 }

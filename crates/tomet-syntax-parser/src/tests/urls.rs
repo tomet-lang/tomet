@@ -120,7 +120,7 @@ fn code_span_does_not_autolink_bare_url() {
             assert_eq!(p.content.len(), 1);
             match &p.content[0] {
                 Inline::Element(el) => {
-                    assert_eq!(el.sigil, Sigil::named("raw"));
+                    assert_eq!(el.name, Name::bare("raw"));
                     assert_eq!(el.placement, tomet_ast::Placement::Inline);
                     assert_eq!(
                         el.content,

@@ -14,7 +14,7 @@ use crate::inline::render_content_blocks;
 /// `<sigil><name>(args)[content]{value}`.
 pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     {
-        if el.sigil.is_bare_named("hr") && el.data.args.is_none() && el.data.value.is_none() {
+        if el.name.is_bare_named("hr") && el.data.args.is_none() && el.data.value.is_none() {
             if let Some(content) = &el.content {
                 return format!(
                     "---[{}]---{}{}",
@@ -32,7 +32,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         }
     }
 
-    if el.sigil.is_bare_named("raw") {
+    if el.name.is_bare_named("raw") {
         if el.placement == Placement::Inline
             && el.data.args.is_none()
             && el.data.value.is_none()
@@ -101,7 +101,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         }
     }
 
-    if el.sigil.is_bare_named("callout")
+    if el.name.is_bare_named("callout")
         && let Some(style) = config.format.callout_content_style.as_deref()
     {
         if style == "expanded" {
@@ -212,8 +212,8 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     // One sigil, whatever the placement. A block-placed element is told apart
     // by standing alone on its line, which is the same condition the parser
     // reads it back with.
-    let mut out = el.sigil.head();
-    let name = el.sigil.name().map(|n| n.name.as_str()).unwrap_or("");
+    let mut out = format!("@{}", el.name);
+    let name = el.name.name.as_str();
     out.push_str(&render_groups(
         name,
         &el.data,

@@ -105,8 +105,8 @@ fn a_declaration_inside_a_code_fence_is_code() {
 #[test]
 fn the_parser_does_not_refuse_a_declaration_name_after_an_at_sign() {
     let doc = parse_document("@kind(config)\n@meta{ id: x }\n").unwrap();
-    assert_eq!(element(&doc.blocks[0]).sigil, Sigil::named("kind"));
-    assert_eq!(element(&doc.blocks[1]).sigil, Sigil::named("meta"));
+    assert_eq!(element(&doc.blocks[0]).name, Name::bare("kind"));
+    assert_eq!(element(&doc.blocks[1]).name, Name::bare("meta"));
 }
 
 #[test]

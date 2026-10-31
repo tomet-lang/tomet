@@ -122,9 +122,9 @@ mod tests {
         fn stray(inlines: &[tomet_ast::Inline], found: &mut Vec<String>) {
             for inline in inlines {
                 if let tomet_ast::Inline::Element(el) = inline
-                    && !el.sigil.is_bare_named("raw")
+                    && !el.name.is_bare_named("raw")
                 {
-                    found.push(format!("{:?}", el.sigil));
+                    found.push(format!("{:?}", el.name));
                 }
             }
         }

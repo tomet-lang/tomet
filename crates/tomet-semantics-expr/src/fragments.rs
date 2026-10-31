@@ -1,6 +1,6 @@
 //! Values that are trees: what `link` builds.
 
-use tomet_ast::{Block, Inline, Paragraph, Sigil, Span, Value};
+use tomet_ast::{Block, Inline, Name, Paragraph, Span, Value};
 use tomet_tree::element_new;
 
 use super::error::EvalError;
@@ -29,7 +29,7 @@ pub(crate) fn link_fragment(target: &EvalValue) -> Result<EvalValue, EvalError> 
             ));
         }
     };
-    let mut link = element_new(Sigil::named("link"));
+    let mut link = element_new(Name::bare("link"));
     link.data.args = Some(Value::String(address));
     let span = Span::default();
     Ok(EvalValue::Fragment(vec![Block::Paragraph(Paragraph::new(

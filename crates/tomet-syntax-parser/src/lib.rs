@@ -13,7 +13,7 @@
 //! - (Documents And Patterns)
 //!   -| `parse_document` reads an ordinary document, where `?` is text.
 //!    | `parse_pattern` reads the same grammar with one more sigil, `?`, which makes a
-//!    | hole (`Sigil::Question`). The parser only builds the hole; what a matcher is and
+//!    | hole (see [`tomet_ast::Hole`]). The parser only builds the hole; what a matcher is and
 //!    | what a hole matches belongs to the caller (tandr), never to this crate.
 //! - (Tree-sitter Synchronization)
 //!   -| `tomet-parser` is the single source of truth for grammar definitions.

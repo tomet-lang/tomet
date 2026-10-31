@@ -5,7 +5,7 @@
 //! round-trip as literal text rather than being misread as `.tmt`
 //! syntax on export.
 
-use tomet_ast::{Block, Document, Element, Inline, List, Sigil, Span, Text, Value};
+use tomet_ast::{Block, Document, Element, Inline, List, Name, Span, Text, Value};
 use tomet_tree::element_new;
 
 pub(super) fn post_process_document_wikilinks(doc: &mut Document) {
@@ -46,7 +46,7 @@ fn post_process_list_wikilinks(list: &mut List) {
 }
 
 fn post_process_element_wikilinks(el: &mut Element) {
-    if el.sigil.is_bare_named("raw") {
+    if el.name.is_bare_named("raw") {
         return;
     }
     if let Some(content) = &mut el.content {
@@ -134,7 +134,7 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                     }
                 }
                 let url_str = &remaining[u_start..u_end];
-                let mut el = element_new(Sigil::named("link"));
+                let mut el = element_new(Name::bare("link"));
                 el.data.args = Some(Value::Map(vec![(
                     "target".to_string(),
                     Value::String(url_str.to_string()),
@@ -154,7 +154,7 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                         }
                     }
                     let url_str = &remaining[u_start..u_end];
-                    let mut el = element_new(Sigil::named("link"));
+                    let mut el = element_new(Name::bare("link"));
                     el.data.args = Some(Value::Map(vec![(
                         "target".to_string(),
                         Value::String(url_str.to_string()),
@@ -200,9 +200,9 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
         // wikilink-style, search-by-name reference rather than a plain
         // relative file path.
         let sigil = if is_embed {
-            Sigil::named("embed")
+            Name::bare("embed")
         } else {
-            Sigil::named("link")
+            Name::bare("link")
         };
         let target_key_value = |raw: &str| -> String {
             if is_embed {

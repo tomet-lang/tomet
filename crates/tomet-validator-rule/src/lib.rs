@@ -10,7 +10,7 @@ pub use decode::{RuleArgs, decode_rule_args};
 use tomet_ast::{Connect, Document, Span};
 use tomet_semantics::Bindings;
 use tomet_tree::Child;
-use tomet_validator_core::{Diagnostic, classify_child};
+use tomet_validator_core::{Diagnostic, child_kind_name};
 
 /// Enforces every `:rule(allow:list(...))` connect found anywhere in the
 /// document -- on an ordinary element's own `connects`, on a heading's
@@ -91,9 +91,8 @@ pub fn check_descendants_against_rule(
     let allowed_display: Vec<String> = rule_args.allow.iter().map(|n| n.to_string()).collect();
 
     walk_descendants(rule_args.direct, &mut |descendant| {
-        let kind_name = match classify_child(descendant, bindings) {
-            Ok(kind) => kind.as_str().to_string(),
-            Err(_) => return,
+        let Ok(kind_name) = child_kind_name(descendant, bindings) else {
+            return;
         };
         let is_allowed = rule_args
             .allow

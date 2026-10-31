@@ -9,21 +9,21 @@ fn parses_emphasis_and_strong() {
                 .content
                 .iter()
                 .filter_map(|i| match i {
-                    Inline::Element(el) => Some((el.sigil.clone(), el.content.clone())),
+                    Inline::Element(el) => Some((el.name.clone(), el.content.clone())),
                     _ => None,
                 })
                 .collect();
             assert_eq!(
                 kinds,
                 vec![
-                    (Sigil::named("em"), wrap(vec![Inline::Text("em".into())])),
+                    (Name::bare("em"), wrap(vec![Inline::Text("em".into())])),
                     (
-                        Sigil::named("strong"),
+                        Name::bare("strong"),
                         wrap(vec![Inline::Text("strong".into())])
                     ),
-                    (Sigil::named("em"), wrap(vec![Inline::Text("em2".into())])),
+                    (Name::bare("em"), wrap(vec![Inline::Text("em2".into())])),
                     (
-                        Sigil::named("strong"),
+                        Name::bare("strong"),
                         wrap(vec![Inline::Text("strong2".into())])
                     ),
                 ]

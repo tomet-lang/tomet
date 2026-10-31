@@ -86,7 +86,7 @@ fn parses_a_fenced_code_block_with_lang() {
     let doc = parse_document("```rust\nfn main() {}\n```\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("raw"));
+            assert_eq!(el.name, Name::bare("raw"));
             assert_eq!(
                 el.data.args,
                 Some(Value::Map(vec![(
@@ -105,7 +105,7 @@ fn parses_a_fenced_code_block_without_lang() {
     let doc = parse_document("```\nplain\n```\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("raw"));
+            assert_eq!(el.name, Name::bare("raw"));
             assert_eq!(el.data.args, None);
             assert_eq!(el.content, wrap(vec![Inline::Raw("plain".into())]));
         }
@@ -131,7 +131,7 @@ fn fenced_code_block_and_bracket_raw_produce_the_same_ast() {
     let bracket = parse_document("@raw(lang:rust)[fn main() {}]\n").unwrap();
     match (&fenced.blocks[0], &bracket.blocks[0]) {
         (Block::Element(a), Block::Element(b)) => {
-            assert_eq!(a.sigil, b.sigil);
+            assert_eq!(a.name, b.name);
             assert_eq!(a.data.args, b.data.args);
             assert_eq!(a.data.value, b.data.value);
             assert_eq!(a.content, wrap(vec![Inline::Raw("fn main() {}".into())]));
@@ -227,7 +227,7 @@ fn backtick_span_still_closes_normally_on_the_same_line() {
             assert_eq!(p.content[0], Inline::Text("call ".into()));
             match &p.content[1] {
                 Inline::Element(el) => {
-                    assert_eq!(el.sigil, Sigil::named("raw"));
+                    assert_eq!(el.name, Name::bare("raw"));
                     assert_eq!(el.placement, tomet_ast::Placement::Inline);
                     assert_eq!(el.content, wrap(vec![Inline::Raw("foo()".into())]));
                 }

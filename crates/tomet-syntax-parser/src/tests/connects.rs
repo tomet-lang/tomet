@@ -22,7 +22,7 @@ fn element_supports_inline_colon_connection() {
     let doc = parse_document("@task[ Task A ]:{ id: taskA, priority: high }\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("task"));
+            assert_eq!(el.name, Name::bare("task"));
             assert_eq!(
                 el.data.value,
                 Some(Group::from_map(Value::Map(vec![
@@ -40,7 +40,7 @@ fn remote_id_target_element_supports_colon_connection() {
     let doc = parse_document("@id(taskA):{ priority: high, tag: dev }\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("id"));
+            assert_eq!(el.name, Name::bare("id"));
             assert_eq!(el.data.args, Some(Value::String("taskA".into())));
             assert_eq!(
                 el.data.value,
@@ -59,7 +59,7 @@ fn named_connect_reads_into_connects() {
     let doc = parse_document("@section[ x ]:rule(allow: list(card))\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("section"));
+            assert_eq!(el.name, Name::bare("section"));
             assert_eq!(el.connects.len(), 1);
             let rule = &el.connects[0];
             assert_eq!(rule.name, Name::bare("rule"));

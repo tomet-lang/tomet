@@ -18,7 +18,7 @@ fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
             assert_eq!(&p.content[1], &sb());
             match &p.content[2] {
                 Inline::Element(el) => {
-                    assert_eq!(el.sigil, Sigil::named("note"));
+                    assert_eq!(el.name, Name::bare("note"));
                     assert_eq!(el.placement, tomet_ast::Placement::Inline);
                 }
                 other => panic!("expected an element, got {other:?}"),
@@ -32,7 +32,7 @@ fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
     assert_eq!(doc.blocks.len(), 2);
     match &doc.blocks[1] {
         Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::named("note"));
+            assert_eq!(el.name, Name::bare("note"));
             assert_eq!(el.placement, tomet_ast::Placement::Block);
         }
         other => panic!("expected an element, got {other:?}"),
@@ -51,8 +51,8 @@ fn adjacent_elements_with_no_blank_line_isolate_by_default() {
     assert_eq!(doc.blocks.len(), 2);
     match (&doc.blocks[0], &doc.blocks[1]) {
         (Block::Element(a), Block::Element(b)) => {
-            assert_eq!(a.sigil, Sigil::named("note"));
-            assert_eq!(b.sigil, Sigil::named("memo"));
+            assert_eq!(a.name, Name::bare("note"));
+            assert_eq!(b.name, Name::bare("memo"));
         }
         other => panic!("expected two elements, got {other:?}"),
     }
@@ -71,11 +71,11 @@ fn a_leading_continuation_joins_adjacent_elements() {
                 .content
                 .iter()
                 .filter_map(|inline| match inline {
-                    Inline::Element(el) => Some(el.sigil.clone()),
+                    Inline::Element(el) => Some(el.name.clone()),
                     _ => None,
                 })
                 .collect();
-            assert_eq!(elements, vec![Sigil::named("note"), Sigil::named("memo")]);
+            assert_eq!(elements, vec![Name::bare("note"), Name::bare("memo")]);
         }
         other => panic!("expected one paragraph, got {other:?}"),
     }
@@ -92,7 +92,7 @@ fn a_paragraph_does_not_swallow_a_following_fenced_code_block() {
     match (&doc.blocks[0], &doc.blocks[1]) {
         (Block::Paragraph(p), Block::Element(el)) => {
             assert_eq!(&p.content, &vec![Inline::Text("text".into())]);
-            assert_eq!(el.sigil, Sigil::named("raw"));
+            assert_eq!(el.name, Name::bare("raw"));
         }
         other => panic!("expected paragraph then raw, got {other:?}"),
     }
@@ -110,7 +110,7 @@ fn a_paragraph_does_not_swallow_a_following_thematic_break() {
     match (&doc.blocks[0], &doc.blocks[1], &doc.blocks[2]) {
         (Block::Paragraph(a), Block::Element(hr), Block::Paragraph(b)) => {
             assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
-            assert_eq!(hr.sigil, Sigil::named("hr"));
+            assert_eq!(hr.name, Name::bare("hr"));
             assert_eq!(&b.content, &vec![Inline::Text("more".into())]);
         }
         other => panic!("expected paragraph, hr, paragraph, got {other:?}"),
@@ -131,7 +131,7 @@ fn a_leading_continuation_joins_a_thematic_break_into_the_previous_paragraph() {
         (Block::Paragraph(a), Block::Paragraph(b)) => {
             assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
             match b.content.first() {
-                Some(Inline::Element(hr)) => assert_eq!(hr.sigil, Sigil::named("hr")),
+                Some(Inline::Element(hr)) => assert_eq!(hr.name, Name::bare("hr")),
                 other => panic!("expected hr as the paragraph's first item, got {other:?}"),
             }
             match b.content.last() {

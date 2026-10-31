@@ -294,13 +294,13 @@ pub fn parse() {}
         assert_eq!(elements.len(), 2);
 
         let (el0, span0, kind0) = &elements[0];
-        assert_eq!(el0.sigil.name().map(|n| n.name.as_str()), Some("file"));
+        assert_eq!(el0.name.name, "file");
         assert_eq!(kind0, &CommentKind::OuterDoc);
         assert!(src[span0.start..].starts_with("@file(docs/spec/syntax.tmt)"));
         assert_eq!(line_of(src, span0.start), 3);
 
         let (el1, span1, kind1) = &elements[1];
-        assert_eq!(el1.sigil.name().map(|n| n.name.as_str()), Some("rule"));
+        assert_eq!(el1.name.name, "rule");
         assert_eq!(kind1, &CommentKind::OuterDoc);
         assert!(src[span1.start..].starts_with("@rule(crate-layering)"));
         assert_eq!(line_of(src, span1.start), 4);

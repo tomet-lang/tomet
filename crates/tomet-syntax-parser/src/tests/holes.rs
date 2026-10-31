@@ -155,7 +155,7 @@ fn a_matcher_may_be_namespaced() {
 #[test]
 fn a_hole_sits_inside_an_element_pattern() {
     let link = element("@link(url: ?(u))[ ?(text) ]");
-    assert_eq!(link.sigil, Sigil::named("link"));
+    assert_eq!(link.name, Name::bare("link"));
     let Some(Value::Map(args)) = &link.data.args else {
         panic!("expected args, got {:?}", link.data.args);
     };

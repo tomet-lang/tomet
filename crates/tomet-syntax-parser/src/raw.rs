@@ -2,7 +2,7 @@
 
 use crate::error::Result;
 use crate::value::skip_inline_ws;
-use tomet_ast::{Block, Element, Inline, Paragraph, Placement, RawText, Sigil, Span, Value};
+use tomet_ast::{Block, Element, Inline, Name, Paragraph, Placement, RawText, Span, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -41,7 +41,7 @@ pub(crate) fn parse_fenced_code_block(cur: &mut Cursor, pipe_stack: &[usize]) ->
     // single `Paragraph` -- a fenced code block never holds more than one
     // verbatim blob, so this is not a case the new block-permitting
     // content model needs to generalize, just a type to satisfy.
-    let mut el = element_new(Sigil::named("raw"))
+    let mut el = element_new(Name::bare("raw"))
         .with_placement(Placement::Block)
         .with_span(cur.span_from(start_pos))
         .with_content(vec![Block::Paragraph(Paragraph::new(

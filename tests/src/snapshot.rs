@@ -95,15 +95,14 @@ fn pandoc_output_matches_reference() {
     }
 }
 
-/// A sigil is a shape, not a name, and the Pandoc bridge must not turn
-/// one into the other.
+/// A bare `(marker)[content]` entry has no name, and the Pandoc bridge must
+/// not give it one.
 ///
-/// `Sigil::Bare` used to travel in the `tomet-<name>` class like every
-/// named element, because `ElementKind::Bare::as_str()` is `"bare"`, and
-/// came back as an element *named* `bare`. No vocabulary declares that
-/// name, so the round-tripped document failed validation -- a conversion
-/// producing something the language rejects. It travels under a reserved
-/// key now.
+/// Written in the `tomet-<name>` class like a named element it would come back
+/// as an element *named* `bare`. No vocabulary declares that name, so the
+/// round-tripped document would fail validation -- a conversion producing
+/// something the language rejects. It travels under a reserved key, and
+/// returns to the `{...}` group it was written in.
 #[test]
 fn a_bare_entry_does_not_come_back_as_an_element_named_bare() {
     let src = "@deck.card{ title: t, (a)[ x ] }\n";
@@ -112,9 +111,7 @@ fn a_bare_entry_does_not_come_back_as_an_element_named_bare() {
 
     let mut names = Vec::new();
     tomet_tree::for_each_element(&back, |el| {
-        if let Some(name) = el.sigil.name() {
-            names.push(name.name.clone());
-        }
+        names.push(el.name.name.clone());
     });
     assert!(
         !names.iter().any(|n| n == "bare"),

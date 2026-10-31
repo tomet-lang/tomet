@@ -8,7 +8,7 @@ use crate::list::peek_list_marker;
 use crate::raw::is_fenced_code_block_start;
 use crate::section::{is_thematic_break, is_titled_thematic_break_start};
 use crate::value::{err, skip_block_comment, skip_inline_ws, skip_line_comment};
-use tomet_ast::{Data, Element, Inline, Placement, RawText, Sigil, SoftBreak, Span, Text, Value};
+use tomet_ast::{Data, Element, Inline, Name, Placement, RawText, SoftBreak, Span, Text, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -232,7 +232,7 @@ pub(crate) fn parse_inline_seq<'a>(
                 let inner_text = cur.src()[inner_start..inner_end].to_string();
                 let span = cur.span_from(before);
                 let content_span = Span::new(inner_start, inner_end);
-                let el = element_new(Sigil::named("raw"))
+                let el = element_new(Name::bare("raw"))
                     .with_placement(Placement::Inline)
                     .with_span(span)
                     .with_content(vec![tomet_ast::Block::Paragraph(
@@ -518,7 +518,7 @@ fn try_one_delimited(
         return Err(err(cur.pos(), format!("expected '{delim}'")));
     }
     let span = cur.span_from(start_pos);
-    let mut el = element_new(Sigil::named(kind)).with_span(span);
+    let mut el = element_new(Name::bare(kind)).with_span(span);
     // `em`/`strong`/`mark`/`strikeout` are inline-only content (see
     // `tmtroot/docs/spec/feature/content-shape.tmt`): always exactly one
     // `Paragraph` wrapping the inline run, never multiple blocks.
@@ -898,7 +898,7 @@ fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
     let span = cur.span_from(start_pos);
 
     let el = Element {
-        sigil: Sigil::named("link"),
+        name: Name::bare("link"),
         // An autolink is found while scanning running text, so it is
         // always part of it.
         placement: Placement::Inline,

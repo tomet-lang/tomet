@@ -1,7 +1,5 @@
 use lsp_types::{DocumentSymbol, SymbolKind};
-use tomet_ast::{
-    Block, Connect, Declaration, Element, Inline, Interpolation, List, ListItem, Sigil,
-};
+use tomet_ast::{Block, Connect, Declaration, Element, Inline, Interpolation, List, ListItem};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 use crate::position::TextPositions;
@@ -141,7 +139,7 @@ fn collect_element_symbol(
             children: None,
         }
     } else {
-        let name = sigil_display_name(&el.sigil);
+        let name = format!("@{}", el.name);
         #[allow(deprecated)]
         DocumentSymbol {
             name,
@@ -284,17 +282,10 @@ pub(crate) fn extract_inlines_text(inlines: &[Inline]) -> String {
                 out.push_str(tomet_ast::softbreak_join(before, after));
             }
             Inline::LineBreak(_) => out.push(' '),
-            Inline::Element(el) => out.push_str(&sigil_display_name(&el.sigil)),
+            Inline::Element(el) => out.push_str(&format!("@{}", el.name)),
             Inline::Interp(_) => out.push_str("${...}"),
             Inline::Hole(_) => {}
         }
     }
     out
-}
-
-pub(crate) fn sigil_display_name(sigil: &Sigil) -> String {
-    match sigil {
-        Sigil::Named(name) => format!("@{name}"),
-        Sigil::Bare => "(bare)".to_string(),
-    }
 }
