@@ -17,6 +17,16 @@
 //! [`Vault::from_sources`] and gets the same verdicts, because both go
 //! through the same rules (`LoadedVocabularies::add` in `tomet-semantics`).
 //!
+//! =[ A document that reads alone ]
+//!
+//! A document that declares `::profile(standalone)` is read as if the vault held nothing: the
+//! macros and variables, the `type:` of a metadata field, the vocabularies, the dictionaries and
+//! the other files an expression could reach are all taken away, so that what it means is what its
+//! own bytes say. [`Vault::bindings`], [`Vault::prepare`], [`Vault::evaluate`] and the `@term`
+//! check of [`Vault::diagnostics`] read this way. What a vault only checks and does not change the
+//! meaning of (a blueprint, the form a metadata field must have) still applies.
+//! [`Vault::prepare_selected`] does not: it is what makes a document keep that promise.
+//!
 //! =[ wasm ]
 //!
 //! This crate, and `tomet` and `tomet-load` above it, compile for
@@ -52,6 +62,11 @@ pub use resolve::{Overlay, typed_meta};
 pub use tomet_expr::{DirRef, MemoryResolver, NoResolver, Resolver};
 pub use tomet_transform::{Unresolved, UnresolvedKind};
 pub use tomet_validator::Diagnostic;
+
+/// Whether `doc` promises `::profile(standalone)`, which is a promise to be read without a vault.
+fn reads_alone(doc: &Document) -> bool {
+    tomet_declaration::document_profiles(doc).contains(&tomet_declaration::Profile::Standalone)
+}
 
 /// What [`Vault::prepare`] could not do.
 ///
@@ -156,6 +171,9 @@ pub struct Vault {
     pub dictionary_errors: Vec<String>,
     loaded: LoadedVocabularies,
     dictionaries: LoadedDictionaries,
+    /// This vault as a document that promises `::profile(standalone)` sees it: nothing in it.
+    /// Built when first asked for. See [`Vault::seen_by`].
+    alone: std::sync::OnceLock<Box<Vault>>,
 }
 
 impl Vault {
@@ -168,6 +186,57 @@ impl Vault {
             dictionary_errors: Vec::new(),
             loaded,
             dictionaries: LoadedDictionaries::default(),
+            alone: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// The vault and the resolver `doc` is read with: these, or, for a document that declares
+    /// `::profile(standalone)`, the empty vault of [`Vault::seen_by`] and a resolver that finds no
+    /// other file, so nothing but the document's own bytes answers an expression.
+    fn reading<'a>(
+        &'a self,
+        doc: &Document,
+        resolver: &'a dyn Resolver,
+    ) -> (&'a Vault, &'a dyn Resolver) {
+        if reads_alone(doc) {
+            (self.seen_by(doc), &NoResolver)
+        } else {
+            (self, resolver)
+        }
+    }
+
+    /// The dictionaries `doc` looks its `@term` mentions up in: the vault's, or, for a document
+    /// that reads alone, only itself, when it is a dictionary.
+    fn dictionaries_for(&self, doc: &Document) -> std::borrow::Cow<'_, LoadedDictionaries> {
+        use std::borrow::Cow;
+        if !reads_alone(doc) {
+            return Cow::Borrowed(&self.dictionaries);
+        }
+        let mut own = LoadedDictionaries::default();
+        if tomet_declaration::document_dictionary(doc).is_some() {
+            own.add("", doc);
+        }
+        Cow::Owned(own)
+    }
+
+    /// The vault as `doc` reads it: this one, or, for a document that declares
+    /// `::profile(standalone)`, an empty one -- no macros, variables, field types, vocabularies
+    /// or dictionaries -- so that what the document means is what its own bytes say.
+    ///
+    /// Only what changes the meaning is taken away. A constraint the vault puts on a document
+    /// (a blueprint, the `type:` a metadata field must have) leaves what it means as it is, so it
+    /// is still checked.
+    fn seen_by(&self, doc: &Document) -> &Vault {
+        if reads_alone(doc) {
+            self.alone.get_or_init(|| {
+                Box::new(Vault::new(
+                    PrinterConfig::default(),
+                    self.root.clone(),
+                    LoadedVocabularies::default(),
+                ))
+            })
+        } else {
+            self
         }
     }
 
@@ -255,6 +324,7 @@ impl Vault {
         use tomet_semantics::{ElementKind, TermRef, ValueExt};
 
         let own = tomet_declaration::document_dictionary(doc);
+        let dictionaries = self.dictionaries_for(doc);
         let mut unresolved = Vec::new();
         tomet_tree::for_each_element(doc, |el| {
             if tomet_semantics::classify_std_lenient(el) != ElementKind::Term {
@@ -267,10 +337,7 @@ impl Vault {
             }) else {
                 return;
             };
-            if let Err(problem) = self
-                .dictionaries
-                .resolve(&TermRef::parse(&target), own.as_deref())
-            {
+            if let Err(problem) = dictionaries.resolve(&TermRef::parse(&target), own.as_deref()) {
                 unresolved.push(Diagnostic::UnresolvedTerm {
                     target,
                     reason: problem.to_string(),
@@ -288,7 +355,7 @@ impl Vault {
     /// bare `Element::name` instead is the shortcut that drops the
     /// namespaced spelling of the same element.
     pub fn bindings(&self, doc: &Document) -> Bindings {
-        self.loaded.bindings_for(doc)
+        self.seen_by(doc).loaded.bindings_for(doc)
     }
 
     /// Parses `src` and binds its names against this vault.
@@ -311,7 +378,8 @@ impl Vault {
     /// commands and missing from the fourth -- which is the state
     /// interpolation was in before this existed.
     pub fn prepare(&self, doc: &mut Document, path: &Path, resolver: &dyn Resolver) -> Prepared {
-        let scope = self.scope(doc, path, resolver);
+        let (vault, resolver) = self.reading(doc, resolver);
+        let scope = vault.scope(doc, path, resolver);
         let prepared = Prepared {
             unresolved: tomet_transform::resolve_expressions(doc, &scope.context()),
         };
@@ -323,7 +391,8 @@ impl Vault {
     /// [`Interpolation`](tomet_ast::Interpolation) in `doc` as it is passed in
     /// ([`Span::exact_eq`](tomet_ast::Span::exact_eq): `==` on a span is always true). The others are
     /// left as interpolations, and `@term` mentions are left as they are: this is for changing a
-    /// document, not for rendering it.
+    /// document, not for rendering it. So it reads the document with the whole vault even if the
+    /// document promises `::profile(standalone)`: making that promise true is what it is for.
     pub fn prepare_selected(
         &self,
         doc: &mut Document,
@@ -344,7 +413,8 @@ impl Vault {
         use tomet_ast::{Block, Inline, Paragraph, Span, Text};
         use tomet_semantics::{ElementKind, TermRef, ValueExt};
 
-        if self.dictionaries.is_empty() {
+        let dictionaries = self.dictionaries_for(doc);
+        if dictionaries.is_empty() {
             return;
         }
         let own = tomet_declaration::document_dictionary(doc);
@@ -364,10 +434,7 @@ impl Vault {
             }) else {
                 return;
             };
-            if let Ok((_, term)) = self
-                .dictionaries
-                .resolve(&TermRef::parse(&target), own.as_deref())
-            {
+            if let Ok((_, term)) = dictionaries.resolve(&TermRef::parse(&target), own.as_deref()) {
                 el.content = Some(vec![Block::Paragraph(Paragraph::new(
                     vec![Inline::Text(Text::from(term.name.as_str()))],
                     Span::dummy(),
@@ -391,7 +458,8 @@ impl Vault {
         expr: &tomet_ast::InterpExpr,
         resolver: &dyn Resolver,
     ) -> Result<EvalValue, EvalError> {
-        let scope = self.scope(doc, path, resolver);
+        let (vault, resolver) = self.reading(doc, resolver);
+        let scope = vault.scope(doc, path, resolver);
         tomet_expr::evaluate(expr, &scope.context())
     }
 
@@ -437,14 +505,15 @@ impl Vault {
         resolver: &dyn Resolver,
     ) -> Result<PreparedBlocks, String> {
         let source = resolver.document(doc)?;
+        let (vault, resolver) = self.reading(&source, resolver);
         let overlay = Overlay {
-            meta: typed_meta(&self.config, &source, doc),
+            meta: typed_meta(&vault.config, &source, doc),
             path: doc.clone(),
             snapshot: source.clone(),
             inner: resolver,
         };
-        let config = self.evaluation_config(&source);
-        let vars = self.vars_in_scope(&config, doc);
+        let config = vault.evaluation_config(&source);
+        let vars = vault.vars_in_scope(&config, doc);
         let macros = config.macros;
         let cx = EvalContext {
             phase: Phase::Output,
@@ -834,5 +903,103 @@ mod tests {
         );
         assert_eq!(prepared.unresolved.len(), 1, "{:?}", prepared.unresolved);
         assert_eq!(text_of(&doc), "n is ${#c1.prop.n}");
+    }
+    // ---- a document that declares `::profile(standalone)` is read without the vault ---------
+
+    const PROMISE: &str = "::profile(standalone)\n";
+
+    fn vault_with_a_macro() -> Vault {
+        let config = tomet_config::load_config_from_str(
+            "::macros{ gh: \"https://gh/${1}\" }\n::fields{ n: { type: uuid } }\n",
+        )
+        .unwrap();
+        Vault::from_sources(config, "/v", &[("acme.tmt", ACME)])
+    }
+
+    #[test]
+    fn a_standalone_document_does_not_get_the_vaults_macros() {
+        let vault = vault_with_a_macro();
+        let (_, with) = prepared(&vault, "/v/a.tmt", "${macro.gh(1)}\n");
+        assert!(with.unresolved.is_empty());
+
+        let (doc, alone) = prepared(
+            &vault,
+            "/v/a.tmt",
+            &format!("{PROMISE}\n${{macro.gh(1)}}\n"),
+        );
+        assert_eq!(alone.unresolved.len(), 1, "{:?}", alone.unresolved);
+        assert!(text_of(&doc).contains("${macro.gh(1)}"));
+        // Its own definition is its own.
+        let (doc, own) = prepared(
+            &vault,
+            "/v/a.tmt",
+            &format!("{PROMISE}::macros{{ gh: \"mine/${{1}}\" }}\n\n${{macro.gh(1)}}\n"),
+        );
+        assert!(own.unresolved.is_empty(), "{:?}", own.unresolved);
+        assert_eq!(text_of(&doc), "mine/1");
+    }
+
+    #[test]
+    fn a_standalone_document_is_not_bound_to_the_vaults_vocabulary() {
+        let vault = vault_with_a_macro();
+        let (_, bound) = vault.parse("::kind(acme)\n").unwrap();
+        assert!(bound.kind.is_some());
+        let (_, alone) = vault.parse(&format!("{PROMISE}::kind(acme)\n")).unwrap();
+        assert!(alone.kind.is_none());
+    }
+
+    #[test]
+    fn a_standalone_document_does_not_find_other_files() {
+        let resolver = tomet_expr::MemoryResolver::new()
+            .with_source("docs/b.tmt", "Body of B.\n")
+            .unwrap();
+        let vault = Vault::from_sources(PrinterConfig::default(), "/v", &[]);
+        let run = |src: &str| {
+            let (mut doc, _) = vault.parse(src).unwrap();
+            let prepared = vault.prepare(&mut doc, Path::new("/v/a.tmt"), &resolver);
+            (text_of(&doc), prepared.unresolved.len())
+        };
+        let (text, unresolved) = run("${include(tmt(\"docs/b.tmt\"))}\n");
+        assert_eq!((text.as_str(), unresolved), ("Body of B.", 0));
+        let (_, unresolved) = run(&format!("{PROMISE}\n${{include(tmt(\"docs/b.tmt\"))}}\n"));
+        assert_eq!(unresolved, 1);
+    }
+
+    #[test]
+    fn a_standalone_document_does_not_get_the_vaults_dictionaries_but_may_be_one() {
+        let vault = vault_with_dictionary();
+        let mention = "a @term(tomet#vault-config) b\n";
+        let (_, with) = prepared(&vault, "/v/a.tmt", mention);
+        assert!(with.unresolved.is_empty());
+        assert!(
+            vault
+                .diagnostics(&vault.parse(&format!("{PROMISE}{mention}")).unwrap().0, &[])
+                .iter()
+                .any(|d| matches!(d, Diagnostic::UnresolvedTerm { .. }))
+        );
+        // A document that is the dictionary it mentions from is its own.
+        let own = format!("{PROMISE}::dictionary(d){{ \"w\": @term[ W ]#(w) }}\n\n@term(d#w)\n");
+        assert!(
+            !vault
+                .diagnostics(&vault.parse(&own).unwrap().0, &[])
+                .iter()
+                .any(|d| matches!(d, Diagnostic::UnresolvedTerm { .. }))
+        );
+    }
+
+    /// What a vault puts on a document without changing what it means is still checked.
+    #[test]
+    fn a_standalone_document_is_still_held_to_a_blueprint() {
+        let vault = vault_with_a_macro();
+        let blueprint = tomet_parser::parse_document(BLUEPRINT).unwrap();
+        let src = format!("{PROMISE}::kind(note)\n\n=[ Other ]\n");
+        let doc = vault.parse(&src).unwrap().0;
+        let found = vault.diagnostics(&doc, &[blueprint]);
+        assert!(
+            found
+                .iter()
+                .any(|d| matches!(d, Diagnostic::MissingRequiredSection { .. })),
+            "{found:?}"
+        );
     }
 }
