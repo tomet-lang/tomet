@@ -30,6 +30,7 @@ use tomet_cst::{NodeOrToken, SyntaxElement, SyntaxKind as K, SyntaxNode, WalkEve
 
 use crate::markers::{
     extract_conflict_block_side, extract_conflict_inline_side, unquote_scalar_display,
+    value_side_for_marker,
 };
 
 /// Where a marker stands, which says how its sides are laid out.
@@ -288,6 +289,16 @@ fn read_side(
         [] => Err(bad("a side is empty")),
         [NodeOrToken::Node(group)] if group.kind() == K::CONTENT => {
             let whole = group.text().to_string();
+            // `|content` is `[content]` without the brackets: nothing closes it.
+            // Read it as the bracketed form it stands for.
+            if group.first_token().map(|t| t.kind()) == Some(K::PIPE) {
+                let bracketed = value_side_for_marker(&whole);
+                return Ok(if value_position {
+                    Side::Value(bracketed)
+                } else {
+                    Side::Blocks(bracketed_inner(&bracketed).unwrap_or_default().to_string())
+                });
+            }
             let closed = group.last_token().map(|t| t.kind()) == Some(K::R_BRACKET);
             match (bracketed_inner(&whole), closed) {
                 (Some(_), true) if value_position => Ok(Side::Value(whole)),
@@ -418,6 +429,40 @@ mod tests {
     fn a_side_with_a_bracket_inside_code() {
         let src = "see @conflict(a: [ use `]` here ], b: [ x ]) end\n";
         assert_eq!(one(src).a, "use `]` here");
+    }
+
+    // `|content` is `[content]` without the brackets: it has nothing to close,
+    // and a hand-written marker may use it for a side.
+
+    #[test]
+    fn a_side_written_as_a_pipe_run() {
+        let src = "=[ Title ]\n\n@conflict(\n  a: | Section A\n  b: | Section B\n)\n\nEnd.\n";
+        let c = one(src);
+        assert_eq!(
+            (c.kind, c.a.as_str(), c.b.as_str()),
+            (ConflictKind::Block, "Section A", "Section B")
+        );
+        assert_eq!(
+            crate::resolve_single(src, 0, crate::ConflictResolution::B).unwrap(),
+            "=[ Title ]\n\nSection B\n\nEnd.\n"
+        );
+    }
+
+    #[test]
+    fn a_side_written_as_a_multi_line_pipe_run() {
+        let src = "@conflict(\n  a: | one\n     | two\n  b: [ x ]\n)\n";
+        let c = one(src);
+        assert_eq!((c.a.as_str(), c.b.as_str()), ("one\ntwo", "x"));
+    }
+
+    #[test]
+    fn a_pipe_run_side_in_a_value() {
+        let src = "@x{\n  about: @conflict(\n    a: | mine\n    b: | yours\n  )\n}\n";
+        let c = one(src);
+        assert_eq!(c.kind, ConflictKind::Value);
+        let kept = crate::resolve_single(src, 0, crate::ConflictResolution::A).unwrap();
+        assert!(!has_conflicts(&kept), "{kept:?}");
+        assert!(kept.contains("mine") && !kept.contains("yours"), "{kept:?}");
     }
 
     #[test]
