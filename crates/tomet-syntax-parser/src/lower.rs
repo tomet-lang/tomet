@@ -20,8 +20,9 @@
 
 use crate::error::{Error, Result};
 use crate::inline::{split_softbreaks, trim_edges};
-use tomet_ast::{Block, Document, Paragraph, Span};
+use tomet_ast::{Block, Document, Inline, Name, Paragraph, Placement, RawText, Span, Value};
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode};
+use tomet_tree::{ElementExt, element_new};
 
 /// The message of the error [`lower_document`] returns for a construct it does
 /// not lower yet. The differential test counts these instead of failing on them.
@@ -76,6 +77,8 @@ fn lower_blocks(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
 fn lower_block(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
     match node.kind() {
         K::PARAGRAPH => lower_paragraph(src, node),
+        K::THEMATIC_BREAK => lower_thematic_break(src, node).map(Some),
+        K::CODE_BLOCK => lower_code_block(src, node).map(Some),
         other => Err(unsupported(format!("node {other:?}"))),
     }
 }
@@ -132,4 +135,72 @@ fn escaped_semicolons(src: &str, start: usize, end: usize) -> Vec<usize> {
             line[from..].chars().all(char::is_whitespace)
         })
         .collect()
+}
+
+/// The source text of `node` and where it starts.
+fn text_of<'a>(src: &'a str, node: &SyntaxNode) -> (usize, &'a str) {
+    let range = node.text_range();
+    let (start, end) = (usize::from(range.start()), usize::from(range.end()));
+    (start, &src[start..end])
+}
+
+/// `---`: a run of dashes on a line of its own. A title (`---[ T ]---`) is not
+/// lowered yet.
+fn lower_thematic_break(src: &str, node: &SyntaxNode) -> Result<Block> {
+    if node.children().next().is_some() {
+        return Err(unsupported("a titled thematic break"));
+    }
+    if node.children_with_tokens().any(|e| e.kind() == K::COMMENT) {
+        return Err(unsupported("a comment after a thematic break"));
+    }
+    let (start, text) = text_of(src, node);
+    let end = start + text.trim_end_matches(['\n', '\r']).len();
+    Ok(Block::Element(
+        element_new(Name::bare("hr"))
+            .with_placement(Placement::Block)
+            .with_span(Span::new(start, end)),
+    ))
+}
+
+/// A fenced code block: a `raw` element whose content is the body, verbatim,
+/// and whose `lang` is the first word of the line the fence opens on.
+fn lower_code_block(src: &str, node: &SyntaxNode) -> Result<Block> {
+    if node.descendants_with_tokens().any(|e| e.kind() == K::PIPE) {
+        return Err(unsupported("a fenced code block in a `|` run"));
+    }
+    let (start, text) = text_of(src, node);
+    let fence_len = text.chars().take_while(|&c| c == '`').count();
+    let (opening, rest) = match text.find('\n') {
+        Some(n) => (&text[fence_len..n], &text[n + 1..]),
+        None => (&text[fence_len..], ""),
+    };
+    let lang = opening.split_whitespace().next().unwrap_or("").to_string();
+    let body_start = start + (text.len() - rest.len());
+
+    // The body ends where a closing line starts: a run of at least as many
+    // backticks, and nothing else but white space.
+    let last_line_at = rest.rfind('\n').map_or(0, |n| n + 1);
+    let last_line = &rest[last_line_at..];
+    let closes = {
+        let ticks = last_line.chars().take_while(|&c| c == '`').count();
+        ticks >= fence_len && last_line[ticks..].trim().is_empty() && ticks > 0
+    };
+    let body = if closes { &rest[..last_line_at] } else { rest };
+    let mut code = body.to_string();
+    if code.ends_with('\n') {
+        code.pop();
+    }
+    let content_span = Span::new(body_start, body_start + body.len());
+
+    let mut element = element_new(Name::bare("raw"))
+        .with_placement(Placement::Block)
+        .with_span(Span::new(start, start + text.len()))
+        .with_content(vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Raw(RawText::new(code, content_span))],
+            content_span,
+        ))]);
+    if !lang.is_empty() {
+        element.data.args = Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]));
+    }
+    Ok(Block::Element(element))
 }

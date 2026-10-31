@@ -31,6 +31,14 @@ const SMALL: &[&str] = &[
     "a\n\\;b\n",
     "\\;a\n",
     "a;b\nc\n",
+    "---\n",
+    "a\n\n----\n\nb\n",
+    "```\ncode\n```\n",
+    "```rust\nfn main() {}\n```\n",
+    "```rust extra words\nx\n\ny\n```\n",
+    "````\n```\n````\n",
+    "```\nunterminated\n",
+    "```\n```\n",
 ];
 
 #[test]
