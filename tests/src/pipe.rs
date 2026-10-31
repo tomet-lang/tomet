@@ -229,3 +229,35 @@ fn a_blank_line_closes_a_run() {
     assert!(matches!(doc.blocks[0], Block::Element(_)));
     assert!(matches!(doc.blocks[1], Block::Paragraph(_)));
 }
+
+/// The node shape of a CST: the kinds of its nodes, nested, with every token
+/// -- markers, brackets, white space -- left out.
+fn shape(node: &tomet_cst::SyntaxNode) -> String {
+    let children: Vec<String> = node.children().map(|c| shape(&c)).collect();
+    if children.is_empty() {
+        format!("{:?}", node.kind())
+    } else {
+        format!("{:?}({})", node.kind(), children.join(" "))
+    }
+}
+
+/// The CST keeps the same promise as the AST: `|content` is `[content]`
+/// spelled without brackets. The two spellings of every construct above give
+/// the same tree of nodes; only the tokens that draw the edge differ.
+#[test]
+fn the_cst_has_one_shape_for_both_spellings() {
+    for (label, marked, bracketed) in SAME {
+        let from_marked = tomet_parser::parse_cst(marked);
+        let from_brackets = tomet_parser::parse_cst(bracketed);
+        assert_eq!(
+            from_marked.text().to_string(),
+            *marked,
+            "{label}: the CST of the `|` form lost text"
+        );
+        assert_eq!(
+            shape(&from_marked),
+            shape(&from_brackets),
+            "{label}: `|` and `[ ]` gave different CSTs"
+        );
+    }
+}

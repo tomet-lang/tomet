@@ -33,8 +33,17 @@
 //! inside backticks starts a comment), so a token is split where such a span
 //! starts or ends: the tree is the same text, cut at other places.
 //!
-//! `|`-marked content runs are not modelled yet: they stay flat tokens in
-//! their paragraph or list item.
+//! A `|` run is `[content]` spelled without brackets, and so it is the same
+//! node: a `CONTENT` that opens with a `PIPE` and has no closing `]`. It is an
+//! element's content (`@quote| text`, or `|` on the line after the element), a
+//! list item's (`-| text`), a heading's (`=| text`) or a `key: | prose` value.
+//! It ends at the first line that does not repeat its marker in the same column
+//! -- a blank line, or a `|` somewhere else, ends it too -- and the AST parser's
+//! error for that last case is not one here. The `|` that begins each later
+//! line is a `PIPE` token among the content's own, but the grammar reads it as
+//! white space, so the blocks of a run are the blocks the bracketed form has.
+
+use std::collections::HashSet;
 
 use tomet_cst::{GreenNodeBuilder, SyntaxKind, SyntaxNode};
 use tomet_lexer::{Cursor, tokenize};
@@ -72,7 +81,7 @@ struct CstParser<'a> {
     src: &'a str,
     /// The tokens of `src`, in order, each a slice of it. A token is split in
     /// two (see [`CstParser::split_at`]) where a span starts or ends inside it.
-    tokens: Vec<(SyntaxKind, &'a str)>,
+    tokens: Tokens<'a>,
     pos: usize,
     builder: GreenNodeBuilder<'static>,
     /// Whether an element may claim a `:name(...)` group that follows it.
@@ -86,17 +95,93 @@ struct CstParser<'a> {
     /// restores it around its own body, so nesting depth is tracked by
     /// the call stack, not a counter here.
     in_bracket: bool,
+    /// The columns of the `|` markers of the runs being read, outermost
+    /// first: the `|` that opened each, which the run's later lines repeat.
+    pipe_cols: Vec<usize>,
+    /// Where each of those runs ends, as a byte offset into `src` (the
+    /// `NEWLINE` after its last line). Only the innermost matters, and it is
+    /// never past the one outside it.
+    run_ends: Vec<usize>,
+    /// The start of every `|` that is a run's marker on a later line rather
+    /// than its opener. The parser does not see them: [`CstParser::kind_at`]
+    /// answers `WHITESPACE` for them, which is what the AST parser does when
+    /// it folds a marker away with the newline before it. The tree still
+    /// gets them as `PIPE` tokens, because [`CstParser::bump`] emits what the
+    /// tokenizer read.
+    markers: HashSet<usize>,
+}
+
+/// The tokens of the text, kept as two stacks around the cursor.
+///
+/// A token is cut in two where a span starts or ends inside it, and the cut is
+/// always at or just after the cursor. In one vector that insertion moves every
+/// token after it, which made a text with many `_em_` quadratic; here the
+/// tokens ahead are stored last first, so a cut near the cursor moves only the
+/// few tokens between it and the cursor. Positions are still plain indices into
+/// the whole sequence.
+struct Tokens<'a> {
+    /// The tokens before the cursor, in order.
+    behind: Vec<(SyntaxKind, &'a str)>,
+    /// The tokens from the cursor on, the last one first: the next is at the end.
+    ahead: Vec<(SyntaxKind, &'a str)>,
+}
+
+impl<'a> Tokens<'a> {
+    fn new(mut all: Vec<(SyntaxKind, &'a str)>) -> Self {
+        all.reverse();
+        Self {
+            behind: Vec::new(),
+            ahead: all,
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.behind.len() + self.ahead.len()
+    }
+
+    fn get(&self, i: usize) -> Option<(SyntaxKind, &'a str)> {
+        match i.checked_sub(self.behind.len()) {
+            None => self.behind.get(i).copied(),
+            Some(k) => self.ahead.len().checked_sub(k + 1).map(|j| self.ahead[j]),
+        }
+    }
+
+    /// Moves the cursor past the next token.
+    fn advance(&mut self) {
+        if let Some(token) = self.ahead.pop() {
+            self.behind.push(token);
+        }
+    }
+
+    /// Replaces token `i`, which must not be behind the cursor, by `pieces`.
+    fn replace(&mut self, i: usize, pieces: Vec<(SyntaxKind, &'a str)>) {
+        let j = self.ahead.len() - 1 - (i - self.behind.len());
+        self.ahead.splice(j..=j, pieces.into_iter().rev());
+    }
+}
+
+/// What the line after a run's last read line does to it.
+enum Continuation {
+    /// No marker in the right column, or a blank line: the run is over.
+    End,
+    /// Markers and nothing else: the run goes on, with a new paragraph.
+    Empty,
+    /// Markers and content: the run goes on.
+    Content,
 }
 
 impl<'a> CstParser<'a> {
     fn new(src: &'a str, tokens: Vec<(SyntaxKind, &'a str)>) -> Self {
         Self {
             src,
-            tokens,
+            tokens: Tokens::new(tokens),
             pos: 0,
             builder: GreenNodeBuilder::new(),
             allow_connect: true,
             in_bracket: false,
+            pipe_cols: Vec::new(),
+            run_ends: Vec::new(),
+            markers: HashSet::new(),
         }
     }
 
@@ -106,12 +191,24 @@ impl<'a> CstParser<'a> {
         self.pos >= self.tokens.len()
     }
 
+    /// The kind of token `i` as the grammar sees it: a run's marker on a later
+    /// line is white space.
     fn kind_at(&self, i: usize) -> Option<SyntaxKind> {
-        self.tokens.get(i).map(|(k, _)| *k)
+        match self.raw_kind_at(i)? {
+            K::PIPE if !self.markers.is_empty() && self.markers.contains(&self.start_of(i)) => {
+                Some(K::WHITESPACE)
+            }
+            k => Some(k),
+        }
+    }
+
+    /// The kind of token `i` as the tokenizer read it, markers included.
+    fn raw_kind_at(&self, i: usize) -> Option<SyntaxKind> {
+        self.tokens.get(i).map(|(k, _)| k)
     }
 
     fn text_at(&self, i: usize) -> &'a str {
-        self.tokens.get(i).map_or("", |(_, t)| *t)
+        self.tokens.get(i).map_or("", |(_, t)| t)
     }
 
     fn current_kind(&self) -> Option<SyntaxKind> {
@@ -119,16 +216,18 @@ impl<'a> CstParser<'a> {
     }
 
     fn bump(&mut self) {
-        if let Some((kind, text)) = self.tokens.get(self.pos).copied() {
+        if let Some((kind, text)) = self.tokens.get(self.pos) {
             self.builder.token(kind.into(), text);
+            self.tokens.advance();
             self.pos += 1;
         }
     }
 
     /// Emits the current token as `kind`, whatever the tokenizer called it.
     fn bump_as(&mut self, kind: SyntaxKind) {
-        if let Some((_, text)) = self.tokens.get(self.pos).copied() {
+        if let Some((_, text)) = self.tokens.get(self.pos) {
             self.builder.token(kind.into(), text);
+            self.tokens.advance();
             self.pos += 1;
         }
     }
@@ -147,23 +246,31 @@ impl<'a> CstParser<'a> {
     /// spans it and tokenizing each half again: the halves are what the
     /// tokenizer would have read had the text been split there to begin with.
     ///
-    /// Only ever called at or after the current token, so `pos` stays valid.
+    /// Only ever called at or after the current token, so `pos` stays valid;
+    /// a byte behind the cursor is left alone.
     fn split_at(&mut self, byte: usize) {
-        let idx = self
-            .tokens
-            .partition_point(|(_, text)| self.token_end(text) <= byte);
-        let Some(&(_, text)) = self.tokens.get(idx) else {
+        // The first token at or after the cursor that ends past `byte`.
+        let (mut lo, mut hi) = (self.pos, self.tokens.len());
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            if self.token_end(self.text_at(mid)) <= byte {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        let Some((_, text)) = self.tokens.get(lo) else {
             return;
         };
-        let start = text.as_ptr() as usize - self.src.as_ptr() as usize;
-        if start == byte {
+        let start = self.start_of(lo);
+        debug_assert!(start <= byte, "split behind the cursor");
+        if start >= byte {
             return;
         }
-        debug_assert!(idx >= self.pos, "split behind the cursor");
         let (head, tail) = text.split_at(byte - start);
         let mut pieces = tokenize(head);
         pieces.extend(tokenize(tail));
-        self.tokens.splice(idx..=idx, pieces);
+        self.tokens.replace(lo, pieces);
     }
 
     fn token_end(&self, text: &str) -> usize {
@@ -191,16 +298,100 @@ impl<'a> CstParser<'a> {
         n
     }
 
+    /// Is the cursor the first thing on its line? Inside a `|` run the
+    /// opener's `|` is part of the line's left edge, as the markers of the
+    /// lines after it are: an element written after it stands as a block.
     fn at_line_start(&self) -> bool {
+        let in_run = !self.pipe_cols.is_empty();
         let mut i = self.pos;
-        while i > 0 && self.kind_at(i - 1) == Some(K::WHITESPACE) {
+        while i > 0
+            && (self.kind_at(i - 1) == Some(K::WHITESPACE)
+                || (in_run && self.kind_at(i - 1) == Some(K::PIPE)))
+        {
             i -= 1;
         }
         i == 0 || self.kind_at(i - 1) == Some(K::NEWLINE)
     }
 
     fn is_opener(kind: Option<SyntaxKind>) -> bool {
-        matches!(kind, Some(K::L_PAREN | K::L_BRACKET | K::L_BRACE))
+        matches!(kind, Some(K::L_PAREN | K::L_BRACKET | K::L_BRACE | K::PIPE))
+    }
+
+    // --- `|` runs -----------------------------------------------------------
+
+    /// The 1-based column, in characters, at which byte `at` stands in its
+    /// line -- what `Cursor::column` says for the AST parser.
+    fn column_at(&self, at: usize) -> usize {
+        let line_start = self.src[..at].rfind('\n').map_or(0, |i| i + 1);
+        self.src[line_start..at].chars().count() + 1
+    }
+
+    /// Index of the first token from `i` that is not white space. Markers
+    /// are not skipped: this reads the tokens as the tokenizer made them.
+    fn skip_raw_ws(&self, mut i: usize) -> usize {
+        while self.raw_kind_at(i) == Some(K::WHITESPACE) {
+            i += 1;
+        }
+        i
+    }
+
+    /// Does the line after the `NEWLINE` at `newline` carry the markers of a
+    /// run whose columns are `cols`, one for each run it is inside of?
+    /// Returns the verdict and the index of the innermost marker.
+    ///
+    /// The same rule as the AST parser's `pipe_run_state`, except that a
+    /// marker in the wrong column ends the run here instead of being an
+    /// error: the CST never fails.
+    fn continuation(&self, newline: usize, cols: &[usize]) -> (Continuation, Option<usize>) {
+        let mut i = self.skip_raw_ws(newline + 1);
+        if matches!(self.raw_kind_at(i), None | Some(K::NEWLINE)) {
+            return (Continuation::End, None);
+        }
+        let mut innermost = None;
+        for &col in cols {
+            if self.raw_kind_at(i) != Some(K::PIPE) || self.column_at(self.start_of(i)) != col {
+                return (Continuation::End, None);
+            }
+            innermost = Some(i);
+            i = self.skip_raw_ws(i + 1);
+        }
+        if matches!(self.raw_kind_at(i), None | Some(K::NEWLINE)) {
+            (Continuation::Empty, innermost)
+        } else {
+            (Continuation::Content, innermost)
+        }
+    }
+
+    /// The run opened by the `|` at token `opener`: the index of the `NEWLINE`
+    /// after its last line (the number of tokens, if it runs to the end of the
+    /// text), and the index of the marker on each line after the first.
+    fn scan_pipe_run(&self, opener: usize) -> (usize, Vec<usize>) {
+        let mut cols = self.pipe_cols.clone();
+        cols.push(self.column_at(self.start_of(opener)));
+        let mut markers = Vec::new();
+        let mut i = opener;
+        loop {
+            while !matches!(self.raw_kind_at(i), None | Some(K::NEWLINE)) {
+                i += 1;
+            }
+            if self.raw_kind_at(i).is_none() {
+                return (self.tokens.len(), markers);
+            }
+            match self.continuation(i, &cols) {
+                (Continuation::End, _) | (_, None) => return (i, markers),
+                (_, Some(marker)) => {
+                    markers.push(marker);
+                    i = marker + 1;
+                }
+            }
+        }
+    }
+
+    /// Has the run being read ended before the cursor?
+    fn at_run_end(&self) -> bool {
+        self.run_ends
+            .last()
+            .is_some_and(|&end| self.start_of(self.pos) >= end)
     }
 
     // --- lookahead ------------------------------------------------------
@@ -211,6 +402,7 @@ impl<'a> CstParser<'a> {
             K::L_PAREN => (K::L_PAREN, K::R_PAREN),
             K::L_BRACKET => (K::L_BRACKET, K::R_BRACKET),
             K::L_BRACE => (K::L_BRACE, K::R_BRACE),
+            K::PIPE => return Some(self.scan_pipe_run(i).0),
             _ => return None,
         };
         let mut depth = 0usize;
@@ -234,7 +426,7 @@ impl<'a> CstParser<'a> {
     fn groups_follow(&self, i: usize) -> bool {
         let i = self.skip_ws_from(i);
         match self.kind_at(i) {
-            Some(K::L_PAREN | K::L_BRACKET | K::L_BRACE) => true,
+            Some(K::L_PAREN | K::L_BRACKET | K::L_BRACE | K::PIPE) => true,
             Some(K::HASH) => self.id_follows(i),
             Some(K::COLON) => {
                 Self::is_opener(self.kind_at(i + 1)) || self.kind_at(i + 1) == Some(K::IDENT)
@@ -252,9 +444,11 @@ impl<'a> CstParser<'a> {
         loop {
             let j = self.skip_ws_from(i);
             match self.kind_at(j) {
-                Some(k @ (K::L_PAREN | K::L_BRACKET | K::L_BRACE)) => {
-                    let slot =
-                        &mut seen[(k == K::L_BRACKET) as usize + 2 * (k == K::L_BRACE) as usize];
+                // `|` is `[` without the brackets: the same slot, closed by the
+                // end of its marked run.
+                Some(k @ (K::L_PAREN | K::L_BRACKET | K::L_BRACE | K::PIPE)) => {
+                    let slot = &mut seen[(k == K::L_BRACKET || k == K::PIPE) as usize
+                        + 2 * (k == K::L_BRACE) as usize];
                     if std::mem::replace(slot, true) {
                         return i;
                     }
@@ -420,10 +614,14 @@ impl<'a> CstParser<'a> {
     }
 
     /// Blocks until EOF, until a section of level `<= section_level`
-    /// starts, or -- when [`CstParser::in_bracket`] -- until the
-    /// enclosing `[content]` group's own closing `]`.
+    /// starts, until the `|` run being read ends, or -- when
+    /// [`CstParser::in_bracket`] -- until the enclosing `[content]` group's
+    /// own closing `]`.
     fn parse_body(&mut self, section_level: usize) {
         while !self.is_eof() {
+            if self.at_run_end() {
+                break;
+            }
             if self.current_kind().is_some_and(|k| k.is_trivia()) {
                 self.bump();
                 continue;
@@ -465,7 +663,7 @@ impl<'a> CstParser<'a> {
         self.bump_while(K::EQUAL);
         self.bump_while(K::WHITESPACE);
         if Self::is_opener(self.current_kind()) {
-            self.parse_groups();
+            self.parse_groups(false);
             // Decorative trailing `=`, which may itself be followed by groups.
             loop {
                 let j = self.skip_ws_from(self.pos);
@@ -474,7 +672,7 @@ impl<'a> CstParser<'a> {
                 }
                 self.bump_while(K::WHITESPACE);
                 self.bump_while(K::EQUAL);
-                self.parse_groups();
+                self.parse_groups(false);
             }
         }
         self.parse_inline(InlineStop::Line);
@@ -497,7 +695,7 @@ impl<'a> CstParser<'a> {
     fn parse_block_element(&mut self) {
         self.builder.start_node(K::BLOCK_ELEMENT.into());
         self.parse_sigil();
-        self.parse_groups();
+        self.parse_groups(true);
         while matches!(self.current_kind(), Some(K::WHITESPACE | K::COMMENT)) {
             self.bump();
         }
@@ -508,6 +706,16 @@ impl<'a> CstParser<'a> {
         self.builder.start_node(K::LIST.into());
         while self.is_list_start_at(self.pos) {
             self.parse_list_item();
+            // In a `|` run the next item stands after the run's marker.
+            let j = self.skip_ws_from(self.pos);
+            if j > self.pos
+                && self.is_list_start_at(j)
+                && (self.pos..j).any(|i| self.raw_kind_at(i) == Some(K::PIPE))
+            {
+                while self.pos < j {
+                    self.bump();
+                }
+            }
         }
         self.builder.finish_node();
     }
@@ -526,7 +734,7 @@ impl<'a> CstParser<'a> {
         // trailing `:name(...)`/`:(...)`/`:{...}` -- immediately after
         // its closing bracket, nothing else there to claim it -- attaches
         // to the item itself, the same as any other sigil's groups do.
-        self.parse_groups();
+        self.parse_groups(false);
         // The rest of the line -- plain trailing text for a full-form
         // item, or the whole bracket-less sugar body -- must not let an
         // inner element (`@link` in `- @link(ref:x) :{ id: b }`) steal a
@@ -576,6 +784,10 @@ impl<'a> CstParser<'a> {
     fn parse_inline(&mut self, stop: InlineStop) {
         let mut depth = 0usize;
         while let Some(k) = self.current_kind() {
+            // The text of a `|` run stops where the run does.
+            if self.at_run_end() {
+                break;
+            }
             match stop {
                 InlineStop::Line if k == K::NEWLINE => {
                     self.bump();
@@ -809,7 +1021,7 @@ impl<'a> CstParser<'a> {
                 _ => {}
             }
         } else {
-            self.parse_groups();
+            self.parse_groups(false);
         }
         self.builder.finish_node();
         true
@@ -858,11 +1070,28 @@ impl<'a> CstParser<'a> {
     /// connect's own id check (in [`parse_connect`]) claims an adjacent
     /// `#(...)` for itself first, so a `#(id)` written after a connect
     /// never reaches this loop's own `id` slot at all.
-    fn parse_groups(&mut self) {
+    ///
+    /// `|` is `[` without the brackets: the same slot, closed by the end of its
+    /// run. A block element (`cross_newline`) may open it on the line after
+    /// its own, `@quote(A)` and then `| text`; any other construct opens it
+    /// on its own line or not at all.
+    fn parse_groups(&mut self, cross_newline: bool) {
         let (mut args, mut value, mut content, mut id) = (false, false, false, false);
         loop {
             let j = self.skip_ws_from(self.pos);
             match self.kind_at(j) {
+                Some(K::PIPE) if !content => {
+                    content = true;
+                    self.bump_while(K::WHITESPACE);
+                    self.parse_pipe_content();
+                }
+                Some(K::NEWLINE) if cross_newline && !content && self.pipe_follows_line(j) => {
+                    content = true;
+                    self.bump_while(K::WHITESPACE);
+                    self.bump(); // the newline
+                    self.bump_while(K::WHITESPACE); // an outer run's markers
+                    self.parse_pipe_content();
+                }
                 Some(K::L_PAREN) if !args => {
                     args = true;
                     self.bump_while(K::WHITESPACE);
@@ -890,6 +1119,42 @@ impl<'a> CstParser<'a> {
                 _ => break,
             }
         }
+    }
+
+    /// After the `NEWLINE` at `newline`: does the next line open a `|` run
+    /// of its own (once the markers of the run it stands in are passed)?
+    fn pipe_follows_line(&self, newline: usize) -> bool {
+        let inside = self
+            .run_ends
+            .last()
+            .is_none_or(|&end| self.start_of(newline) < end);
+        inside && self.kind_at(self.skip_ws_from(newline + 1)) == Some(K::PIPE)
+    }
+
+    /// A `|` run, read as the `[content]` of whatever owns it: the `|` that
+    /// opens it, then blocks until the run ends. The `|` that begins each
+    /// later line is the run's margin, not content; the grammar does not see
+    /// it (see [`CstParser::markers`]) and the tree keeps it as a `PIPE`.
+    fn parse_pipe_content(&mut self) {
+        let (end, markers) = self.scan_pipe_run(self.pos);
+        let column = self.column_at(self.start_of(self.pos));
+        let marker_starts: Vec<usize> = markers.iter().map(|&m| self.start_of(m)).collect();
+        let end_byte = self.start_of(end);
+
+        self.builder.start_node(K::CONTENT.into());
+        self.bump(); // the opening '|'
+        self.markers.extend(marker_starts);
+        self.pipe_cols.push(column);
+        self.run_ends.push(end_byte);
+        let outer_connect = std::mem::replace(&mut self.allow_connect, true);
+        let outer_bracket = std::mem::replace(&mut self.in_bracket, false);
+        self.bump_while(K::WHITESPACE);
+        self.parse_body(0);
+        self.in_bracket = outer_bracket;
+        self.allow_connect = outer_connect;
+        self.run_ends.pop();
+        self.pipe_cols.pop();
+        self.builder.finish_node();
     }
 
     /// Is `i` a `#` immediately followed by `(`, so that it opens the one
@@ -1031,6 +1296,13 @@ impl<'a> CstParser<'a> {
 
     /// One value, ending before a `,`, a newline or the enclosing `close`.
     fn parse_value(&mut self, close: SyntaxKind) {
+        // `key: | prose`: a `|` run as the value. It ends where its markers
+        // stop, which is what keeps a `,` or a `}` in the prose from closing
+        // the entry.
+        self.bump_while(K::WHITESPACE);
+        if self.current_kind() == Some(K::PIPE) {
+            self.parse_pipe_content();
+        }
         while let Some(k) = self.current_kind() {
             if k == close || matches!(k, K::COMMA | K::NEWLINE) {
                 break;
