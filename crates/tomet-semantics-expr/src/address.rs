@@ -16,6 +16,15 @@ use super::value::{DirRef, DocRef, Env, EvalValue};
 /// parameter can collide with it.
 pub(crate) const ROOT: &str = "#doc";
 
+/// The scheme of `text` when it points at something outside the document it is written in, which is
+/// every address with a document on the left of `#`. The schemes `address_value` reads, and no more.
+pub(crate) fn outside_scheme(text: &str) -> Option<&'static str> {
+    let text = text.trim();
+    let left = text.split_once('#').map_or(text, |(left, _)| left);
+    let (scheme, _) = left.split_once(':')?;
+    ["tmt", "ref", "dir"].into_iter().find(|s| *s == scheme)
+}
+
 /// Reads `text` as an address and returns what it points at.
 pub(crate) fn address_value(text: &str, cx: &EvalContext) -> Result<EvalValue, EvalError> {
     let text = text.trim();

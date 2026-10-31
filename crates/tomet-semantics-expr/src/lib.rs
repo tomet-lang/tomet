@@ -50,6 +50,7 @@ mod memory;
 mod methods;
 mod nodes;
 mod ops;
+mod outside;
 mod value;
 mod vars;
 
@@ -64,6 +65,7 @@ pub use datetime::{format_datetime, parse_datetime, parse_offset};
 pub use error::EvalError;
 pub use include::MAX_INCLUDE_DEPTH;
 pub use memory::MemoryResolver;
+pub use outside::{OwnNames, Reach, Reaching, reaches_outside};
 pub use value::{Closure, DirRef, DocRef, Env, EvalValue, Namespace, Node};
 pub use vars::{VarError, VarScope, shaped, typed_value, var_scope};
 
