@@ -206,3 +206,21 @@ fn a_semicolon_breaks_a_pipe_run_paragraph_too() {
     };
     assert_eq!(el.content.as_ref().map(Vec::len), Some(2));
 }
+
+#[test]
+fn a_bare_name_alone_on_its_line_is_an_element_whatever_follows() {
+    // `@memo` with no group is an element when it is the whole of its line
+    // (`is_element_start`). The check used to run after the gap before the next
+    // group was skipped, so it held only at the end of the file.
+    for src in ["@memo\n", "@memo\n\ntext\n", "@memo\n\n@other\n", "@memo // note\n\ntext\n"] {
+        let doc = parse_document(src).unwrap();
+        assert!(
+            matches!(&doc.blocks[0], Block::Element(el) if el.name == Name::bare("memo")),
+            "{src:?}: {:?}",
+            doc.blocks[0]
+        );
+    }
+    // On a line with something else it is text, as before.
+    let doc = parse_document("@memo and more\n").unwrap();
+    assert!(matches!(&doc.blocks[0], Block::Paragraph(_)));
+}

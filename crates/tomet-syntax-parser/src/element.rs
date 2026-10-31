@@ -76,6 +76,23 @@ fn name_and_tail_start(mut look: Cursor, block_context: bool) -> bool {
     if !is_name_start_at(&look) || eat_name(&mut look).is_none() {
         return false;
     }
+    // `@memo` alone on its line: asked before the gap is skipped, which reads
+    // past the line end and would take whatever follows for what follows the name.
+    if block_context {
+        let mut rest = look;
+        skip_inline_ws(&mut rest);
+        while rest.starts_with("//") || rest.starts_with("/*") {
+            if rest.starts_with("//") {
+                skip_line_comment(&mut rest);
+            } else if skip_block_comment(&mut rest).is_err() {
+                break;
+            }
+            skip_inline_ws(&mut rest);
+        }
+        if matches!(rest.peek(), None | Some('\n') | Some('\r')) {
+            return true;
+        }
+    }
     skip_lookahead_gap(&mut look);
     if opens_group(&look) {
         return true;
@@ -92,7 +109,7 @@ fn name_and_tail_start(mut look: Cursor, block_context: bool) -> bool {
         after_colon.bump();
         return is_name_start_at(&after_colon);
     }
-    block_context && matches!(look.peek(), None | Some('\n') | Some('\r'))
+    false
 }
 
 /// Whether the element starting at `cur` is the whole of its line: nothing but

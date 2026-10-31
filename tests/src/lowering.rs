@@ -16,7 +16,7 @@ use tomet_parser::{UNSUPPORTED, lower_top_level_blocks, parse_cst, parse_documen
 use tomet_tests::{corpus, read_fixture};
 
 /// How many top-level blocks of the fixtures lowering produces today.
-const MIN_LOWERED: usize = 5;
+const MIN_LOWERED: usize = 67;
 
 /// Small documents, each of which lowering must give exactly as `parse_document` does.
 const SMALL: &[&str] = &[
@@ -39,6 +39,22 @@ const SMALL: &[&str] = &[
     "````\n```\n````\n",
     "```\nunterminated\n",
     "```\n```\n",
+    "@note\n",
+    "@note(type: warn)\n",
+    "@note{ k: v }\n",
+    "@note[ hello ]\n",
+    "@note(a: 1)[ hello\nworld ]{ k: v }#(x)\n",
+    "@a\n\n@b(1, 2)\n",
+    "@a(x: 1)\n[ on the next line ]\n",
+    "@a:b(c: 1)\n",
+    "@a#(id)\n",
+    "=\n",
+    "= T\n",
+    "== sub heading\n",
+    "=[ T ]\n\nbody\n",
+    "= a\n\ntext\n\n== b\n\nmore\n\n= c\n",
+    "=[ T ]{ k: v }\n",
+    "---\n=[ T ]\n---\n",
 ];
 
 #[test]

@@ -18,11 +18,21 @@
 //! ([`crate::inline::split_softbreaks`]), and the grammars of the leaves that are
 //! not shape (`${...}` expressions, a group's values).
 
+use crate::dialect::Dialect;
+use crate::element::{Groups, parse_hash_id, parse_paren_value, parse_value_group};
 use crate::error::{Error, Result};
 use crate::inline::{split_softbreaks, trim_edges};
-use tomet_ast::{Block, Document, Inline, Name, Paragraph, Placement, RawText, Span, Value};
+use crate::value::eat_name;
+use tomet_ast::{
+    Block, Connect, Document, Element, Inline, Name, Paragraph, Placement, RawText, Section, Span,
+    Value,
+};
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode};
+use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
+
+/// The dialect lowering reads in. Patterns come with holes.
+const DIALECT: Dialect = Dialect::Document;
 
 /// The message of the error [`lower_document`] returns for a construct it does
 /// not lower yet. The differential test counts these instead of failing on them.
@@ -66,6 +76,8 @@ fn lower_blocks(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
         match child {
             // Trivia, and the `;` that only breaks a block, leave nothing behind.
             SyntaxElement::Token(t) if t.kind().is_trivia() || t.kind() == K::SEMI => {}
+            // The brackets of a `[content]` group are not content.
+            SyntaxElement::Token(t) if node.kind() == K::CONTENT && is_bracket(t.kind()) => {}
             SyntaxElement::Token(t) => return Err(unsupported(format!("token {:?}", t.kind()))),
             SyntaxElement::Node(n) => blocks.extend(lower_block(src, &n)?),
         }
@@ -77,6 +89,8 @@ fn lower_blocks(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
 fn lower_block(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
     match node.kind() {
         K::PARAGRAPH => lower_paragraph(src, node),
+        K::BLOCK_ELEMENT => lower_block_element(src, node).map(Some),
+        K::SECTION => lower_section(src, node).map(Some),
         K::THEMATIC_BREAK => lower_thematic_break(src, node).map(Some),
         K::CODE_BLOCK => lower_code_block(src, node).map(Some),
         other => Err(unsupported(format!("node {other:?}"))),
@@ -203,4 +217,201 @@ fn lower_code_block(src: &str, node: &SyntaxNode) -> Result<Block> {
         element.data.args = Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]));
     }
     Ok(Block::Element(element))
+}
+
+fn is_bracket(kind: K) -> bool {
+    matches!(kind, K::L_BRACKET | K::R_BRACKET)
+}
+
+fn cursor_at(src: &str, at: usize) -> Cursor<'_> {
+    let mut cur = Cursor::new(src);
+    cur.set_pos(at);
+    cur
+}
+
+/// Where `node` starts and ends, white space and all.
+fn range_of(node: &SyntaxNode) -> (usize, usize) {
+    let range = node.text_range();
+    (usize::from(range.start()), usize::from(range.end()))
+}
+
+/// The `@name` or `:name` a sigil-like node starts with: the name, read as the
+/// AST parser reads one at `at`.
+fn name_at(src: &str, at: usize) -> Result<Name> {
+    let mut cur = cursor_at(src, at);
+    eat_name(&mut cur).ok_or_else(|| unsupported("a name that does not read"))
+}
+
+/// An element: `@name` and the groups that follow it.
+fn lower_block_element(src: &str, node: &SyntaxNode) -> Result<Block> {
+    let element = lower_element(src, node)?.with_placement(Placement::Block);
+    Ok(Block::Element(element))
+}
+
+fn lower_element(src: &str, node: &SyntaxNode) -> Result<Element> {
+    let sigil = node
+        .children()
+        .find(|n| n.kind() == K::SIGIL)
+        .ok_or_else(|| unsupported("an element without a sigil"))?;
+    let (sigil_start, _) = range_of(&sigil);
+    if sigil.children_with_tokens().next().map(|e| e.kind()) != Some(K::AT) {
+        return Err(unsupported("a sigil that is not `@`"));
+    }
+    let name = name_at(src, sigil_start + 1)?;
+    let read = lower_groups(src, node)?;
+    // The element ends with its last group; the white space and comments the
+    // node also holds are not part of it.
+    let end = node.children().map(|n| range_of(&n).1).max().unwrap_or(sigil_start);
+    Ok(Element {
+        name,
+        placement: Placement::Inline,
+        data: read.data,
+        content: read.content,
+        id: read.id,
+        connects: read.connects,
+        span: Span::new(sigil_start, end),
+    })
+}
+
+/// The groups of `node`: `(args)`, `{value}`, `[content]`, `#(id)` and the
+/// `:connect`s, whatever order they were written in. `(args)` and `{value}`
+/// are read by the AST parser's own value grammar, at the group's offset.
+fn lower_groups(src: &str, node: &SyntaxNode) -> Result<Groups> {
+    let mut read = Groups::default();
+    for child in node.children() {
+        let (start, end) = range_of(&child);
+        let mut cur = cursor_at(src, start);
+        match child.kind() {
+            K::SIGIL | K::SECTION_HEADING => {}
+            K::ARGS => {
+                read.data.args = Some(parse_paren_value(DIALECT, &mut cur)?);
+                expect_end(&cur, end, "an args group")?;
+            }
+            K::VALUE_DATA => {
+                read.data.value = Some(parse_value_group(DIALECT, &mut cur)?);
+                expect_end(&cur, end, "a value group")?;
+            }
+            K::CONTENT => read.content = Some(lower_content(src, &child)?),
+            K::ID_GROUP => {
+                read.id = Some(parse_hash_id(&mut cur)?);
+                expect_end(&cur, end, "an id")?;
+            }
+            K::CONNECT => read.connects.push(lower_connect(src, &child)?),
+            other => return Err(unsupported(format!("{other:?} in an element's groups"))),
+        }
+    }
+    Ok(read)
+}
+
+/// The AST parser's reading of a group has to end where the CST's group does;
+/// if it does not, the two parsers disagree about the group and lowering says so.
+fn expect_end(cur: &Cursor, end: usize, what: &str) -> Result<()> {
+    if cur.pos() == end {
+        Ok(())
+    } else {
+        Err(unsupported(format!("{what} that the two parsers end differently")))
+    }
+}
+
+/// `[content]`: the blocks between the brackets. A `|` run is not lowered yet.
+fn lower_content(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
+    if node.children_with_tokens().any(|e| e.kind() == K::PIPE) {
+        return Err(unsupported("a `|` run"));
+    }
+    lower_blocks(src, node)
+}
+
+/// `:name(args){value}[content]`. The nameless merge form (`:(x: 1)`) is not lowered yet.
+fn lower_connect(src: &str, node: &SyntaxNode) -> Result<Connect> {
+    let (start, _) = range_of(node);
+    let Some(ident) = node
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .find(|t| t.kind() == K::IDENT)
+    else {
+        return Err(unsupported("a connect without a name"));
+    };
+    let name = name_at(src, usize::from(ident.text_range().start()))?;
+    if node.children().any(|n| n.kind() == K::ID_GROUP) {
+        return Err(unsupported("an id in a connect"));
+    }
+    let read = lower_groups(src, node)?;
+    let end = node.children().map(|n| range_of(&n).1).max().unwrap_or(start + 1);
+    Ok(Connect {
+        name,
+        data: read.data,
+        content: read.content,
+        span: Span::new(start, end),
+    })
+}
+
+/// A section: its heading (level, title, groups) and the blocks under it.
+///
+/// Only the headings with no title, with a title of plain text, or with a
+/// `[title]` of one plain paragraph are lowered; a title with an element in it
+/// is not yet.
+fn lower_section(src: &str, node: &SyntaxNode) -> Result<Block> {
+    let heading = node
+        .children()
+        .find(|n| n.kind() == K::SECTION_HEADING)
+        .ok_or_else(|| unsupported("a section without a heading"))?;
+    let (start, end) = range_of(&heading);
+    let level = heading
+        .children_with_tokens()
+        .take_while(|e| e.kind() == K::EQUAL)
+        .count();
+    let read = lower_groups(src, &heading)?;
+
+    let title = if let Some(content) = read.content.clone() {
+        title_from_content(content)?
+    } else {
+        sugar_title(src, &heading, level)?
+    };
+    let mut section = Section::new(level, title, Span::new(start, end));
+    section.data = read.data;
+    section.id = read.id;
+    section.connects = read.connects;
+    for child in node.children().filter(|n| n.kind() != K::SECTION_HEADING) {
+        section.blocks.extend(lower_block(src, &child)?);
+    }
+    Ok(Block::Section(section))
+}
+
+/// The inline content of a `[title]`: it has to be one paragraph.
+fn title_from_content(mut blocks: Vec<Block>) -> Result<Vec<Inline>> {
+    match blocks.len() {
+        0 => Ok(Vec::new()),
+        1 => match blocks.pop() {
+            Some(Block::Paragraph(p)) => Ok(p.content),
+            _ => Err(unsupported("a title that is not a paragraph")),
+        },
+        _ => Err(unsupported("a title of several blocks")),
+    }
+}
+
+/// `== text`: the heading's text, when it is plain.
+fn sugar_title(src: &str, heading: &SyntaxNode, level: usize) -> Result<Vec<Inline>> {
+    if heading.children().next().is_some() {
+        return Err(unsupported("a sugar title with groups"));
+    }
+    if heading.children_with_tokens().any(|e| e.kind() == K::COMMENT) {
+        return Err(unsupported("a comment in a heading"));
+    }
+    let (start, end) = range_of(heading);
+    let text = &src[start..end];
+    let text = text.trim_end_matches(['\n', '\r']);
+    let after = text[level..].trim_start();
+    if after.is_empty() {
+        return Ok(Vec::new());
+    }
+    // The AST parser takes a trailing `(args)`, `{value}`, `#(id)` or `:connect`
+    // off the end of a sugar title, and the CST does not know them there yet.
+    // Until it does, a title that could end in one is not lowered.
+    if after.contains(['(', '{', '#', ':']) {
+        return Err(unsupported("a sugar title that may end in groups"));
+    }
+    let from = start + (text.len() - after.len());
+    let mut items = Vec::new();
+    split_softbreaks(&mut items, &src[from..start + text.len()], from, &[]);
+    Ok(trim_edges(items))
 }
