@@ -27,7 +27,7 @@ pub fn document(
     intro_paragraphs: &[&str],
 ) -> Document {
     let mut id = element_new(Sigil::document("id")).with_placement(Placement::Block);
-    id.args = Some(Value::String(doc_id.to_string()));
+    id.data.args = Some(Value::String(doc_id.to_string()));
 
     let mut blocks = vec![
         Block::Element(id),

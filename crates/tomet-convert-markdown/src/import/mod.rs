@@ -29,8 +29,8 @@
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use tomet_ast::{
-    Block, Document, Element, Inline, LineBreak, List, ListItem, Paragraph, Placement, RawText,
-    Section, Sigil, SoftBreak, Span, Text, Value,
+    Block, Data, Document, Element, Inline, LineBreak, List, ListItem, Paragraph, Placement,
+    RawText, Section, Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::{ElementKind, classify_std_lenient};
 use tomet_tree::{element_new, list, list_item};
@@ -163,12 +163,12 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
         if let Some((pos, text)) = id {
             entries.remove(pos);
             let mut id_el = element_new(Sigil::document("id"));
-            id_el.args = Some(Value::String(text));
+            id_el.data.args = Some(Value::String(text));
             push_block(&mut stack, Block::Element(id_el));
         }
         if !had_id || !entries.is_empty() {
             let mut meta_el = element_new(Sigil::document("meta"));
-            meta_el.value = Some(tomet_ast::Group::from_map(Value::Map(entries)));
+            meta_el.data.value = Some(tomet_ast::Group::from_map(Value::Map(entries)));
             push_block(&mut stack, Block::Element(meta_el));
         }
     }
@@ -407,24 +407,40 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
 
                 let el = Element {
                     sigil: Sigil::named("callout"),
+
                     placement: Placement::Block,
-                    args: Some(args),
+
+                    data: Data {
+                        args: Some(args),
+                        value: None,
+                    },
+
                     content: Some(wrap_inline_content(content)),
-                    value: None,
+
                     id: None,
+
                     connects: Vec::new(),
+
                     span: Span::dummy(),
                 };
                 push_block(stack, Block::Element(el));
             } else {
                 let el = Element {
                     sigil: Sigil::named("quote"),
+
                     placement: Placement::Block,
-                    args: None,
+
+                    data: Data {
+                        args: None,
+                        value: None,
+                    },
+
                     content: Some(wrap_inline_content(content)),
-                    value: None,
+
                     id: None,
+
                     connects: Vec::new(),
+
                     span: Span::dummy(),
                 };
                 push_block(stack, Block::Element(el));
@@ -441,15 +457,23 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             };
             let el = Element {
                 sigil: Sigil::named("raw"),
+
                 placement: Placement::Block,
-                args,
+
+                data: Data {
+                    args: args,
+                    value: None,
+                },
+
                 content: Some(vec![Block::Paragraph(Paragraph::new(
                     vec![Inline::Raw(RawText::new(text, Span::dummy()))],
                     Span::dummy(),
                 ))]),
-                value: None,
+
                 id: None,
+
                 connects: Vec::new(),
+
                 span: Span::dummy(),
             };
             push_block(stack, Block::Element(el));
@@ -550,15 +574,23 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             // choice needed here, unlike the old per-kind key scheme.
             let el = Element {
                 sigil: Sigil::named("link"),
+
                 placement: Placement::Inline,
-                args: Some(Value::Map(vec![(
-                    "target".to_string(),
-                    Value::String(dest),
-                )])),
+
+                data: Data {
+                    args: Some(Value::Map(vec![(
+                        "target".to_string(),
+                        Value::String(dest),
+                    )])),
+                    value: None,
+                },
+
                 content: Some(wrap_inline_content(inlines)),
-                value: None,
+
                 id: None,
+
                 connects: Vec::new(),
+
                 span: Span::dummy(),
             };
             push_inline(stack, Inline::Element(el));
@@ -571,15 +603,23 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             };
             let el = Element {
                 sigil: Sigil::named("embed"),
+
                 placement: Placement::Inline,
-                args: Some(Value::Map(vec![(
-                    "target".to_string(),
-                    Value::String(dest),
-                )])),
+
+                data: Data {
+                    args: Some(Value::Map(vec![(
+                        "target".to_string(),
+                        Value::String(dest),
+                    )])),
+                    value: None,
+                },
+
                 content,
-                value: None,
+
                 id: None,
+
                 connects: Vec::new(),
+
                 span: Span::dummy(),
             };
             push_inline(stack, Inline::Element(el));
@@ -619,12 +659,20 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
 pub(super) fn wrap_inline(tag: &str, content: Vec<Inline>) -> Inline {
     Inline::Element(Element {
         sigil: Sigil::named(tag),
+
         placement: Placement::Inline,
-        args: None,
+
+        data: Data {
+            args: None,
+            value: None,
+        },
+
         content: Some(wrap_inline_content(content)),
-        value: None,
+
         id: None,
+
         connects: Vec::new(),
+
         span: Span::dummy(),
     })
 }

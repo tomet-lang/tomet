@@ -1062,7 +1062,7 @@ fn link_target(value: &EvalValue) -> String {
         panic!("expected one inline element, got {:?}", p.content);
     };
     assert_eq!(el.sigil, tomet_ast::Sigil::named("link"));
-    match &el.args {
+    match &el.data.args {
         Some(tomet_ast::Value::String(target)) => target.clone(),
         other => panic!("expected a string target, got {other:?}"),
     }

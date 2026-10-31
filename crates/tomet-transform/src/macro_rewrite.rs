@@ -154,10 +154,10 @@ pub fn transform_link_targets_with_macros(doc: &mut Document, macro_set: &MacroS
                     el.transform_prop("target", |_| Value::String(macro_call));
                     changed = true;
                 }
-            } else if let Some(Value::String(url)) = &el.args
+            } else if let Some(Value::String(url)) = &el.data.args
                 && let Some(macro_call) = macro_set.rewrite_url(url)
             {
-                el.args = Some(Value::String(macro_call));
+                el.data.args = Some(Value::String(macro_call));
                 changed = true;
             }
 

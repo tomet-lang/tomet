@@ -63,7 +63,7 @@ where
     };
 
     let mut new_directive = element_new(Sigil::document(target_directive_name));
-    new_directive.args = Some(prop_val);
+    new_directive.data.args = Some(prop_val);
 
     doc.insert_block(insert_pos, Block::Element(new_directive));
     true

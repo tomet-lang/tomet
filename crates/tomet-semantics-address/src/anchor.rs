@@ -110,12 +110,12 @@ fn find_in_element(el: &Element, anchor: &str) -> Option<Span> {
             return Some(span);
         }
     }
-    if let Some(args) = &el.args
+    if let Some(args) = &el.data.args
         && let Some(span) = find_in_value(args, anchor)
     {
         return Some(span);
     }
-    if let Some(Group(entries)) = &el.value {
+    if let Some(Group(entries)) = &el.data.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => {
@@ -226,10 +226,10 @@ fn collect_in_element(el: &Element, anchors: &mut Vec<(String, Span)>) {
     for conn in &el.connects {
         collect_in_element(conn, anchors);
     }
-    if let Some(args) = &el.args {
+    if let Some(args) = &el.data.args {
         collect_in_value(args, anchors);
     }
-    if let Some(Group(entries)) = &el.value {
+    if let Some(Group(entries)) = &el.data.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => collect_in_element(child, anchors),

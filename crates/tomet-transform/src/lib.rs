@@ -82,7 +82,7 @@ mod tests {
         let mut meta_keys = Vec::new();
         tomet_tree::for_each_top_level_element(&doc, |el| {
             if el.sigil.is_bare_named("id") {
-                id = el.args.clone();
+                id = el.data.args.clone();
             }
             if el.sigil.is_bare_named("meta")
                 && let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el)

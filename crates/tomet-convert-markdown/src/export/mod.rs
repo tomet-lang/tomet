@@ -348,6 +348,7 @@ fn render_raw(el: &Element, inline: bool) -> String {
         render_inline_raw(&code)
     } else {
         let lang = el
+            .data
             .args
             .as_ref()
             .and_then(as_map)
@@ -399,7 +400,7 @@ fn render_callout(cx: &MarkdownCtx, el: &Element) -> String {
     let mut variant = None;
     let mut title = None;
 
-    if let Some(args) = &el.args {
+    if let Some(args) = &el.data.args {
         match args {
             Value::String(s) => variant = Some(s.clone()),
             Value::Map(entries) => {
@@ -661,7 +662,7 @@ fn render_footnotes(cx: &MarkdownCtx, out: &mut String) {
 fn render_generic(cx: &MarkdownCtx, el: &Element, kind: &str, inline: bool) -> String {
     let tag = if inline { "span" } else { "div" };
     let mut out = format!("<{tag} data-tm-kind=\"{}\"", escape_attr(kind));
-    if let Some(args) = &el.args {
+    if let Some(args) = &el.data.args {
         push_data_attrs(&mut out, args);
     }
     out.push('>');

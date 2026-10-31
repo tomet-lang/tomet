@@ -207,7 +207,7 @@ pub fn resolve_document_links<F>(
 }
 
 fn update_element_target(el: &mut Element, new_target: String) {
-    match &mut el.args {
+    match &mut el.data.args {
         Some(Value::String(s)) => {
             *s = new_target;
         }
@@ -226,7 +226,7 @@ fn update_element_target(el: &mut Element, new_target: String) {
             }
         }
         _ => {
-            el.args = Some(Value::String(new_target));
+            el.data.args = Some(Value::String(new_target));
         }
     }
 }

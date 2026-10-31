@@ -59,14 +59,14 @@ fn a_single_argument_is_the_value_itself() {
         panic!("expected a hole");
     };
     assert_eq!(hole.sigil, matcher("int"));
-    assert_eq!(hole.args, Some(string("n")));
+    assert_eq!(hole.data.args, Some(string("n")));
 }
 
 #[test]
 fn an_empty_group_is_an_empty_map() {
     let hole = element("?()");
     assert_eq!(hole.sigil, Sigil::Question(None));
-    assert_eq!(hole.args, Some(Value::Map(Vec::new())));
+    assert_eq!(hole.data.args, Some(Value::Map(Vec::new())));
     assert_eq!(hole.placement, Placement::Block);
 }
 
@@ -74,14 +74,14 @@ fn an_empty_group_is_an_empty_map() {
 fn the_matcher_may_be_left_out() {
     let hole = element("?(n)");
     assert_eq!(hole.sigil, Sigil::Question(None));
-    assert_eq!(hole.args, Some(string("n")));
+    assert_eq!(hole.data.args, Some(string("n")));
 }
 
 #[test]
 fn content_is_a_sub_pattern() {
     let hole = element("?(id)[adr-?int(n)-?(slug)]");
     assert_eq!(hole.sigil, Sigil::Question(None));
-    assert_eq!(hole.args, Some(string("id")));
+    assert_eq!(hole.data.args, Some(string("id")));
     let content = hole.content.expect("content");
     assert_eq!(shape(first_para(&content)), r#""adr-" ?int "-" ?"#);
 }
@@ -91,7 +91,7 @@ fn several_arguments_are_unkeyed_entries() {
     let hole = element(r#"?int(n, "x")"#);
     assert_eq!(hole.sigil, matcher("int"));
     assert_eq!(
-        hole.args,
+        hole.data.args,
         Some(Value::Map(vec![
             (String::new(), string("n")),
             (String::new(), string("x")),
@@ -102,8 +102,8 @@ fn several_arguments_are_unkeyed_entries() {
 #[test]
 fn options_are_the_value_group() {
     let hole = element("?int(n){min: 1}");
-    let Some(Group(entries)) = &hole.value else {
-        panic!("expected a value group, got {:?}", hole.value);
+    let Some(Group(entries)) = &hole.data.value else {
+        panic!("expected a value group, got {:?}", hole.data.value);
     };
     assert_eq!(entries.len(), 1);
 }
@@ -111,8 +111,8 @@ fn options_are_the_value_group() {
 #[test]
 fn a_content_literal_is_a_value() {
     let hole = element("?alt(doc, list([adr-?int(n)], [rfc-?int(n)]))");
-    let Some(Value::Map(entries)) = &hole.args else {
-        panic!("expected a map, got {:?}", hole.args);
+    let Some(Value::Map(entries)) = &hole.data.args else {
+        panic!("expected a map, got {:?}", hole.data.args);
     };
     assert_eq!(entries[0].1, string("doc"));
     let Value::Seq(branches) = &entries[1].1 else {
@@ -125,8 +125,8 @@ fn a_content_literal_is_a_value() {
 #[test]
 fn a_content_literal_is_a_value_in_positional_position_too() {
     let hole = element("?many(items, [ab])");
-    let Some(Value::Map(entries)) = &hole.args else {
-        panic!("expected a map, got {:?}", hole.args);
+    let Some(Value::Map(entries)) = &hole.data.args else {
+        panic!("expected a map, got {:?}", hole.data.args);
     };
     assert_eq!(entries[0].1, string("items"));
     assert!(matches!(entries[1].1, Value::Blocks(_)));
@@ -148,8 +148,8 @@ fn a_matcher_may_be_namespaced() {
 fn a_hole_sits_inside_an_element_pattern() {
     let link = element("@link(url: ?(u))[ ?(text) ]");
     assert_eq!(link.sigil, Sigil::named("link"));
-    let Some(Value::Map(args)) = &link.args else {
-        panic!("expected args, got {:?}", link.args);
+    let Some(Value::Map(args)) = &link.data.args else {
+        panic!("expected args, got {:?}", link.data.args);
     };
     assert_eq!(args[0].0, "url");
     let Value::Element(url) = &args[0].1 else {
@@ -256,8 +256,8 @@ fn a_quoted_argument_is_never_formatting() {
     // `strong(init)` + `.py`) is written as a quoted argument instead.
     let hole = element(r#"?string("__init__.py")"#);
     assert_eq!(hole.sigil, matcher("string"));
-    assert_eq!(hole.args, Some(string("__init__.py")));
+    assert_eq!(hole.data.args, Some(string("__init__.py")));
 
     let hole = element(r#"?string("_private_.rs")"#);
-    assert_eq!(hole.args, Some(string("_private_.rs")));
+    assert_eq!(hole.data.args, Some(string("_private_.rs")));
 }

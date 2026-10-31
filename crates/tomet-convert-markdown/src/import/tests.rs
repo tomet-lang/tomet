@@ -124,7 +124,7 @@ fn link() {
             Inline::Element(el) => {
                 assert_eq!(el.sigil, Sigil::named("link"));
                 assert_eq!(
-                    el.args,
+                    el.data.args,
                     Some(Value::Map(vec![(
                         "target".to_string(),
                         Value::String("https://example.com".to_string())
@@ -161,7 +161,7 @@ fn image_becomes_embed_element() {
             Inline::Element(el) => {
                 assert_eq!(el.sigil, Sigil::named("embed"));
                 assert_eq!(
-                    el.args,
+                    el.data.args,
                     Some(Value::Map(vec![(
                         "target".to_string(),
                         Value::String("assets/pic.png".to_string())
@@ -194,7 +194,7 @@ fn fenced_code_block() {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("raw"));
             assert_eq!(
-                el.args,
+                el.data.args,
                 Some(Value::Map(vec![(
                     "lang".to_string(),
                     Value::String("rust".to_string())
@@ -218,7 +218,7 @@ fn simple_block_quote() {
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("quote"));
-            assert_eq!(el.args, None);
+            assert_eq!(el.data.args, None);
             assert_eq!(
                 el.content,
                 wrap(vec![Inline::Text(Text::new("quoted text", Span::dummy()))])
@@ -367,7 +367,7 @@ fn wikilink_converts_to_tomet_element() {
     };
     assert_eq!(el1.sigil, Sigil::named("link"));
     assert_eq!(
-        el1.args,
+        el1.data.args,
         Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("ref:name".to_string())
@@ -386,7 +386,7 @@ fn wikilink_converts_to_tomet_element() {
     };
     assert_eq!(el2.sigil, Sigil::named("link"));
     assert_eq!(
-        el2.args,
+        el2.data.args,
         Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("ref:name".to_string())
@@ -555,27 +555,42 @@ fn checkbox_task_list_markers_and_custom_markers_import_as_typed_markers() {
     };
     let items = &list.items;
     assert_eq!(items.len(), 5);
-    assert_eq!(items[0].element.args, Some(Value::String("x".to_string())));
+    assert_eq!(
+        items[0].element.data.args,
+        Some(Value::String("x".to_string()))
+    );
     assert_eq!(
         items[0].element.content,
         wrap(vec![Inline::Text(Text::new("task1", Span::dummy()))])
     );
-    assert_eq!(items[1].element.args, Some(Value::String(" ".to_string())));
+    assert_eq!(
+        items[1].element.data.args,
+        Some(Value::String(" ".to_string()))
+    );
     assert_eq!(
         items[1].element.content,
         wrap(vec![Inline::Text(Text::new("task2", Span::dummy()))])
     );
-    assert_eq!(items[2].element.args, Some(Value::String("c".to_string())));
+    assert_eq!(
+        items[2].element.data.args,
+        Some(Value::String("c".to_string()))
+    );
     assert_eq!(
         items[2].element.content,
         wrap(vec![Inline::Text(Text::new("con item", Span::dummy()))])
     );
-    assert_eq!(items[3].element.args, Some(Value::String("p".to_string())));
+    assert_eq!(
+        items[3].element.data.args,
+        Some(Value::String("p".to_string()))
+    );
     assert_eq!(
         items[3].element.content,
         wrap(vec![Inline::Text(Text::new("pro item", Span::dummy()))])
     );
-    assert_eq!(items[4].element.args, Some(Value::String("x".to_string())));
+    assert_eq!(
+        items[4].element.data.args,
+        Some(Value::String("x".to_string()))
+    );
     assert_eq!(
         items[4].element.content,
         wrap(vec![Inline::Text(Text::new("task3", Span::dummy()))])
@@ -595,7 +610,7 @@ fn embed_wikilinks_and_images_import_as_embed_elements() {
     };
     assert_eq!(embed1.sigil, Sigil::named("embed"));
     assert_eq!(
-        embed1.args,
+        embed1.data.args,
         Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("name".to_string())
@@ -611,7 +626,7 @@ fn embed_wikilinks_and_images_import_as_embed_elements() {
     };
     assert_eq!(embed2.sigil, Sigil::named("embed"));
     assert_eq!(
-        embed2.args,
+        embed2.data.args,
         Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("_path".to_string())
@@ -637,7 +652,7 @@ fn test_wikilink_with_at_prefix_not_enclosed_in_backticks() {
     };
     assert_eq!(el1.sigil, Sigil::named("link"));
     assert_eq!(
-        el1.args,
+        el1.data.args,
         Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("ref:@file_name".to_string())
@@ -649,7 +664,7 @@ fn test_wikilink_with_at_prefix_not_enclosed_in_backticks() {
     };
     assert_eq!(el2.sigil, Sigil::named("link"));
     assert_eq!(
-        el2.args,
+        el2.data.args,
         Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("ref:@Templater".to_string())
@@ -698,7 +713,7 @@ fn test_obsidian_callout_blockquote_import() {
     };
     assert_eq!(el.sigil, Sigil::named("callout"));
     assert_eq!(
-        el.args,
+        el.data.args,
         Some(Value::Map(vec![
             ("variant".to_string(), Value::String("info".to_string())),
             (
@@ -714,7 +729,7 @@ fn test_obsidian_callout_blockquote_import() {
         panic!("expected plain quote element");
     };
     assert_eq!(el_plain.sigil, Sigil::named("quote"));
-    assert_eq!(el_plain.args, None);
+    assert_eq!(el_plain.data.args, None);
 }
 
 #[test]

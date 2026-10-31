@@ -234,10 +234,10 @@ fn sigil_name_mut(sigil: &mut Sigil) -> Option<&mut Name> {
 }
 
 fn rename_arg_key(el: &mut Element, ident: &str) {
-    if let Some(args) = &mut el.args {
+    if let Some(args) = &mut el.data.args {
         rename_keys(args, ident);
     }
-    if let Some(value) = &mut el.value {
+    if let Some(value) = &mut el.data.value {
         for (key, val) in value.pairs_mut() {
             if key == ident {
                 *key = PLACEHOLDER.to_string();

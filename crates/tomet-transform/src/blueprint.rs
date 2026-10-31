@@ -27,7 +27,7 @@ pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
         {
             return;
         }
-        let target_kind = match &el.args {
+        let target_kind = match &el.data.args {
             Some(Value::String(s)) => s.clone(),
             Some(Value::Map(entries)) => entries
                 .iter()
@@ -40,7 +40,12 @@ pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
 
         let mut description = None;
 
-        if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
+        if let Some(entries) = el
+            .data
+            .value
+            .as_ref()
+            .map(|v| v.pairs().collect::<Vec<_>>())
+        {
             for (k, v) in entries {
                 if k == "description" {
                     description = v.as_str().map(String::from);
@@ -123,10 +128,10 @@ pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiat
                 .to_string();
 
             el.sigil = Sigil::document("kind");
-            el.args = Some(Value::String(target_kind));
+            el.data.args = Some(Value::String(target_kind));
             // `{version, description}` describes the blueprint, not the
             // document it produces, so it does not survive promotion.
-            el.value = None;
+            el.data.value = None;
             changed = true;
         }
     });
@@ -201,7 +206,7 @@ mod tests {
         let mut kinds = Vec::new();
         tomet_tree::for_each_top_level_element(&doc, |el| {
             if classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Kind)
-                && let Some(s) = el.args.as_ref().and_then(|v| v.as_str())
+                && let Some(s) = el.data.args.as_ref().and_then(|v| v.as_str())
             {
                 kinds.push(s.to_string());
             }
@@ -240,14 +245,14 @@ mod tests {
             .iter()
             .find(|el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Kind))
             .expect("expected a ::kind element");
-        assert_eq!(kind.args, Some(Value::String("daily-note".into())));
+        assert_eq!(kind.data.args, Some(Value::String("daily-note".into())));
 
         let id = top_level
             .iter()
             .find(|el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Id))
             .expect("expected an ::id element");
         assert_eq!(
-            id.args,
+            id.data.args,
             Some(Value::String("00000000-0000-0000-0000-000000000000".into()))
         );
 
@@ -255,7 +260,7 @@ mod tests {
             .iter()
             .find(|el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta))
             .expect("expected a ::meta element");
-        let Some(Value::Map(entries)) = meta.value.as_ref().map(|v| v.as_data()) else {
+        let Some(Value::Map(entries)) = meta.data.value.as_ref().map(|v| v.as_data()) else {
             panic!("expected meta map");
         };
         let get = |key: &str| entries.iter().find(|(k, _)| k == key).unwrap().1.clone();

@@ -76,7 +76,7 @@ pub(crate) fn render_raw_element(el: &Element, out: &mut String, inline: bool) {
         .as_ref()
         .map(|a| blocks_to_plain(a))
         .unwrap_or_default();
-    let attrs = el.value.as_ref().map(|v| v.as_data());
+    let attrs = el.data.value.as_ref().map(|v| v.as_data());
     let (class, data) = split_attrs(attrs.as_ref());
     let id = id_attr(el.id.as_ref());
 

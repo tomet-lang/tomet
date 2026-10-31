@@ -1,6 +1,6 @@
 //! Metadata element manipulation in documents.
 
-use tomet_ast::{Block, Document, Element, Group, Placement, Sigil, Value};
+use tomet_ast::{Block, Data, Document, Element, Group, Placement, Sigil, Value};
 use tomet_semantics::classify_std_lenient;
 use tomet_tree::{ElementExt, for_each_element_mut};
 
@@ -20,16 +20,24 @@ pub fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_
     if !found {
         let new_el = Element {
             sigil: Sigil::named(target_element),
+
             // A directive inserted at the top of the document stands alone.
             placement: Placement::Block,
-            args: None,
+
+            data: Data {
+                args: None,
+                value: Some(Group::from_map(Value::Map(vec![(
+                    key.to_string(),
+                    Value::String(new_val.to_string()),
+                )]))),
+            },
+
             content: None,
-            value: Some(Group::from_map(Value::Map(vec![(
-                key.to_string(),
-                Value::String(new_val.to_string()),
-            )]))),
+
             id: None,
+
             connects: Vec::new(),
+
             span: Default::default(),
         };
         doc.blocks.insert(0, Block::Element(new_el));

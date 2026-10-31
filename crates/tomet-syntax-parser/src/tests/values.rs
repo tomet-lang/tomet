@@ -53,7 +53,7 @@ fn at_sigiled_call_in_a_value_position_is_an_element() {
         Sigil::Named(tomet_ast::Name::namespaced("doc", "icon"))
     );
     assert_eq!(
-        el.args,
+        el.data.args,
         Some(Value::Map(vec![
             ("".to_string(), Value::String("triangle".to_string())),
             ("pkg".to_string(), Value::String("lucide".to_string())),
@@ -72,7 +72,7 @@ fn an_embedded_element_with_content_is_accepted() {
         panic!("expected element");
     };
     assert_eq!(el.sigil, Sigil::named("link"));
-    assert!(el.args.is_some());
+    assert!(el.data.args.is_some());
     assert!(el.content.is_some());
 }
 
@@ -299,7 +299,7 @@ fn a_number_reading_would_change_keeps_its_text_in_an_argument() {
         let Some(Block::Element(el)) = doc.blocks.first() else {
             panic!("{src}: expected an element, got {:?}", doc.blocks);
         };
-        assert_eq!(el.args, Some(want), "{src}");
+        assert_eq!(el.data.args, Some(want), "{src}");
     }
 }
 

@@ -56,10 +56,10 @@ fn collect_element_ids(el: &Element, ids: &mut Vec<(String, Span)>) {
     if let Some(id) = &el.id {
         ids.push((id.0.clone(), el.span));
     }
-    if let Some(args) = &el.args {
+    if let Some(args) = &el.data.args {
         collect_value_ids(args, ids);
     }
-    if let Some(Group(entries)) = &el.value {
+    if let Some(Group(entries)) = &el.data.value {
         for entry in entries {
             match entry {
                 Entry::Pair(_, value) => collect_value_ids(value, ids),

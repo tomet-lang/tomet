@@ -201,7 +201,7 @@ pub fn normalized_element_args(el: &Element) -> Option<Value> {
 /// [`normalized_element_args`], plus the positional slots a vocabulary in
 /// scope declares with `@param(name){ positional: true }`.
 pub fn normalized_element_args_in(el: &Element, bindings: &Bindings) -> Option<Value> {
-    let args = el.args.as_ref()?;
+    let args = el.data.args.as_ref()?;
     let keys = positional_keys(&el.sigil, bindings);
     // `@link(tmt:foo)`: the reader split a `scheme:value` into a key and a value; put it back.
     let args = match args {
@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn normalizes_raw_positional_arg() {
         let mut el = element_new(Sigil::named("raw"));
-        el.args = Some(Value::String("rust".to_string()));
+        el.data.args = Some(Value::String("rust".to_string()));
         assert_eq!(
             normalized_element_args(&el),
             Some(Value::Map(vec![(
@@ -244,7 +244,7 @@ mod tests {
         // any other ordering -- see `ElementKind::Conflict`'s own doc
         // comment for why that distinction is deliberate here.
         let mut el = element_new(Sigil::named("conflict"));
-        el.args = Some(Value::Map(vec![
+        el.data.args = Some(Value::Map(vec![
             (String::new(), Value::Int(1)),
             (String::new(), Value::Int(2)),
         ]));
@@ -262,7 +262,7 @@ mod tests {
         // `::kind(name, 2)` is two bare entries; `::kind(name)` is one scalar.
         for (sigil, name_key) in [("kind", "kind"), ("use", "target")] {
             let mut el = element_new(Sigil::named(sigil));
-            el.args = Some(Value::Map(vec![
+            el.data.args = Some(Value::Map(vec![
                 (String::new(), Value::String("deck".to_string())),
                 (String::new(), Value::Int(2)),
             ]));
@@ -276,7 +276,7 @@ mod tests {
             );
 
             // the version may be left out
-            el.args = Some(Value::String("deck".to_string()));
+            el.data.args = Some(Value::String("deck".to_string()));
             assert_eq!(
                 normalized_element_args(&el),
                 Some(Value::Map(vec![(
@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn normalizes_embed_positional_arg() {
         let mut el = element_new(Sigil::named("embed"));
-        el.args = Some(Value::String("foo.png".to_string()));
+        el.data.args = Some(Value::String("foo.png".to_string()));
         assert_eq!(
             normalized_element_args(&el),
             Some(Value::Map(vec![(
@@ -304,7 +304,7 @@ mod tests {
     #[test]
     fn normalizes_link_positional_arg() {
         let mut el = element_new(Sigil::named("link"));
-        el.args = Some(Value::String("https://example.com".to_string()));
+        el.data.args = Some(Value::String("https://example.com".to_string()));
         assert_eq!(
             normalized_element_args(&el),
             Some(Value::Map(vec![(
@@ -347,7 +347,7 @@ mod tests {
         // only real key `@link` has) -- this recovers it back into one
         // `target` string.
         let mut el = element_new(Sigil::named("link"));
-        el.args = Some(Value::Map(vec![(
+        el.data.args = Some(Value::Map(vec![(
             "tmt".to_string(),
             Value::String("foo/bar".to_string()),
         )]));
@@ -366,7 +366,7 @@ mod tests {
         // a parser-split scheme prefix; `predicate` is real extra data and
         // stays untouched.
         let mut el = element_new(Sigil::named("link"));
-        el.args = Some(Value::Map(vec![
+        el.data.args = Some(Value::Map(vec![
             ("tmt".to_string(), Value::String("foo".to_string())),
             (
                 "predicate".to_string(),
@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn does_not_recover_when_target_key_already_present() {
         let mut el = element_new(Sigil::named("link"));
-        el.args = Some(Value::Map(vec![
+        el.data.args = Some(Value::Map(vec![
             ("target".to_string(), Value::String("tmt:foo".to_string())),
             ("tmt".to_string(), Value::String("bar".to_string())),
         ]));
@@ -404,7 +404,7 @@ mod tests {
     #[test]
     fn does_not_recover_when_multiple_scheme_candidates_are_ambiguous() {
         let mut el = element_new(Sigil::named("link"));
-        el.args = Some(Value::Map(vec![
+        el.data.args = Some(Value::Map(vec![
             ("tmt".to_string(), Value::String("foo".to_string())),
             ("id".to_string(), Value::String("bar".to_string())),
         ]));
@@ -423,7 +423,7 @@ mod tests {
         // alone -- recovery is scoped to elements whose positional key
         // is `target` (`@link`/`@embed`), not a general mechanism.
         let mut el = element_new(Sigil::named("caution"));
-        el.args = Some(Value::Map(vec![(
+        el.data.args = Some(Value::Map(vec![(
             "tmt".to_string(),
             Value::String("foo".to_string()),
         )]));
@@ -453,7 +453,7 @@ mod tests {
     #[test]
     fn a_custom_element_gets_no_positional_inference() {
         let mut el = element_new(Sigil::Named(Name::namespaced("deck", "job")));
-        el.args = Some(Value::Map(vec![
+        el.data.args = Some(Value::Map(vec![
             (
                 POSITIONAL_ENTRY_KEY.to_string(),
                 Value::String("Clean room".to_string()),
@@ -486,7 +486,7 @@ mod tests {
             "lang".to_string(),
             Value::String("rust".to_string()),
         )]);
-        el.args = Some(map_val.clone());
+        el.data.args = Some(map_val.clone());
         assert_eq!(normalized_element_args(&el), Some(map_val));
     }
 
@@ -515,7 +515,7 @@ mod tests {
         // `deck.card` is namespaced, so it has no builtin positional key
         // and nothing to normalize the scalar into.
         let mut el = element_new(Sigil::Named(Name::namespaced("deck", "card")));
-        el.args = Some(Value::String("https://example.com".to_string()));
+        el.data.args = Some(Value::String("https://example.com".to_string()));
         assert_eq!(
             normalized_element_args(&el),
             Some(Value::String("https://example.com".to_string()))
@@ -528,7 +528,7 @@ mod tests {
     #[test]
     fn a_custom_elements_bracketed_positional_list_is_left_alone() {
         let mut el = element_new(Sigil::Named(Name::namespaced("deck", "job")));
-        el.args = Some(Value::Seq(vec![
+        el.data.args = Some(Value::Seq(vec![
             Value::String("Clean room".to_string()),
             Value::String("high".to_string()),
         ]));
@@ -545,7 +545,7 @@ mod tests {
     #[test]
     fn normalizes_task_status_positional_arg() {
         let mut el = element_new(Sigil::named("task"));
-        el.args = Some(Value::String("x".to_string()));
+        el.data.args = Some(Value::String("x".to_string()));
         assert_eq!(
             normalized_element_args(&el),
             Some(Value::Map(vec![(

@@ -18,7 +18,7 @@ pub fn render(root: &mut Command, doc_id: &str, notice: &str, config: &PrinterCo
 /// Builds a Tomet [`Document`] AST representing the CLI command hierarchy and options.
 pub fn document(root: &mut Command, doc_id: &str, notice: &str) -> Document {
     let mut id = element_new(Sigil::document("id")).with_placement(Placement::Block);
-    id.args = Some(Value::String(doc_id.to_string()));
+    id.data.args = Some(Value::String(doc_id.to_string()));
 
     let mut blocks = vec![Block::Element(id)];
     push_command(root, 1, &mut blocks);

@@ -741,7 +741,7 @@ mod tests {
     #[test]
     fn named_at_sigil_with_link_name_is_recognized() {
         let mut el = element_new(Sigil::named("link"));
-        el.args = Some(Value::Map(vec![(
+        el.data.args = Some(Value::Map(vec![(
             "target".to_string(),
             Value::String("https://example.com".to_string()),
         )]));
@@ -772,7 +772,7 @@ mod tests {
     #[test]
     fn named_at_sigil_with_ruby_name_is_recognized() {
         let mut el = element_new(Sigil::named("ruby"));
-        el.args = Some(Value::Map(vec![(
+        el.data.args = Some(Value::Map(vec![(
             "rt".to_string(),
             Value::String("かんじ".to_string()),
         )]));

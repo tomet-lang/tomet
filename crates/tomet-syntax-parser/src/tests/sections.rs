@@ -96,7 +96,7 @@ fn parses_section_with_decorative_trailing_equals() {
         panic!()
     };
     assert_eq!(s3.title, vec![Inline::Text("Title".into())]);
-    assert!(s3.value.is_some());
+    assert!(s3.data.value.is_some());
     assert_eq!(s3.blocks.len(), 1);
 
     let doc4 = parse_document("==[ Title ]=={ id: intro }\nParagraph\n").unwrap();
@@ -104,7 +104,7 @@ fn parses_section_with_decorative_trailing_equals() {
         panic!()
     };
     assert_eq!(s4.title, vec![Inline::Text("Title".into())]);
-    assert!(s4.value.is_some());
+    assert!(s4.data.value.is_some());
     assert_eq!(s4.blocks.len(), 1);
 
     // Sugar form with trailing equals
@@ -269,7 +269,7 @@ fn parses_headingless_section_with_comment_and_attrs() {
     };
     assert_eq!(s2.level, 1);
     assert!(s2.title.is_empty());
-    assert!(s2.value.is_some());
+    assert!(s2.data.value.is_some());
 }
 
 #[test]

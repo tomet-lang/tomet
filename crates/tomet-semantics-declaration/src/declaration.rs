@@ -41,8 +41,8 @@ impl Declaration {
         }
         Some(Declaration {
             name: name.name.clone(),
-            args: el.args.clone(),
-            data: el.value.as_ref().map(|value| value.as_data()),
+            args: el.data.args.clone(),
+            data: el.data.value.as_ref().map(|value| value.as_data()),
         })
     }
 

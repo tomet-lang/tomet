@@ -83,12 +83,12 @@ pub(crate) fn render_section(sec: &Section, config: &PrinterConfig, out: &mut St
             out.push(']');
         }
     }
-    if let Some(args) = &sec.args {
+    if let Some(args) = &sec.data.args {
         out.push('(');
         out.push_str(&render_args(args, config));
         out.push(')');
     }
-    if let Some(v) = sec.value.as_ref().map(|v| v.as_data()) {
+    if let Some(v) = sec.data.value.as_ref().map(|v| v.as_data()) {
         out.push(' ');
         out.push_str(&render_value(&v));
     }
@@ -126,7 +126,7 @@ pub(crate) fn render_heading_element(el: &Element, config: &PrinterConfig, out: 
         out.push_str(&render_content_blocks(content, config));
         out.push(']');
     }
-    if let Some(v) = el.value.as_ref().map(|v| v.as_data()) {
+    if let Some(v) = el.data.value.as_ref().map(|v| v.as_data()) {
         out.push(' ');
         out.push_str(&render_value(&v));
     }
@@ -178,7 +178,7 @@ pub(crate) fn render_list_with_indent(
         let mut head_prefix = String::new();
         head_prefix.push_str(&indent_str);
         head_prefix.push_str(&prefix);
-        if let Some(marker) = &item.args {
+        if let Some(marker) = &item.data.args {
             head_prefix.push('(');
             head_prefix.push_str(&render_args(marker, config));
             head_prefix.push_str(") ");
@@ -186,7 +186,7 @@ pub(crate) fn render_list_with_indent(
 
         let content_str = render_content_blocks(item.content.as_deref().unwrap_or(&[]), config);
         let lines: Vec<&str> = content_str.lines().collect();
-        let item_attrs = item.value.as_ref().map(|v| v.as_data());
+        let item_attrs = item.data.value.as_ref().map(|v| v.as_data());
 
         if lines.len() > 1 && config.format.list_multiline_style_content.is_some() {
             let style = config

@@ -70,7 +70,7 @@ pub(crate) fn is_raw_element(el: &Element) -> bool {
     if el.sigil.is_bare_named("raw") {
         return true;
     }
-    if let Some(Value::Map(entries)) = &el.args
+    if let Some(Value::Map(entries)) = &el.data.args
         && entries
             .iter()
             .any(|(k, v)| k == "content" && matches!(v, Value::String(s) if s == "raw"))
@@ -100,7 +100,7 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                 walk_block(block, out);
             }
         }
-        if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
+        if let Some(children) = el.data.value.as_ref().map(|v| v.as_children()) {
             for child in children {
                 walk_element(child, out);
             }

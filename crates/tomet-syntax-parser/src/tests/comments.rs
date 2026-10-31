@@ -140,7 +140,7 @@ fn double_slash_inside_a_url_is_not_treated_as_a_comment() {
             if let Inline::Element(el) = &p.content[1] {
                 assert_eq!(el.sigil, Sigil::named("link"));
                 assert_eq!(
-                    el.args,
+                    el.data.args,
                     Some(Value::Map(vec![(
                         "target".to_string(),
                         Value::String("https://example.com".to_string())
@@ -226,7 +226,7 @@ fn own_line_comment_works_inside_a_paren_group() {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::document("config"));
             assert_eq!(
-                el.args,
+                el.data.args,
                 Some(Value::Map(vec![(
                     "format".into(),
                     Value::String("json".into())
@@ -243,7 +243,7 @@ fn own_line_comment_works_inside_a_lightweight_value_group() {
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(
-                el.value,
+                el.data.value,
                 Some(Group::from_map(Value::Map(vec![(
                     "key".into(),
                     Value::String("value".into())

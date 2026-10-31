@@ -396,12 +396,17 @@ pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
             let kind = classify_std_lenient(el);
             let kind = kind.as_str();
             if kind == "meta" {
-                if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
+                if let Some(entries) = el
+                    .data
+                    .value
+                    .as_ref()
+                    .map(|v| v.pairs().collect::<Vec<_>>())
+                {
                     for (k, v) in entries {
                         map.insert(format!("{kind}.{k}"), value_to_string(v));
                     }
                 }
-                if let Some(Value::Map(entries)) = &el.args {
+                if let Some(Value::Map(entries)) = &el.data.args {
                     for (k, v) in entries {
                         map.insert(format!("{kind}.(args).{k}"), value_to_string(v));
                     }
@@ -437,7 +442,7 @@ fn value_to_string(v: &Value) -> String {
         }
         Value::Element(el) => {
             let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
-            match &el.args {
+            match &el.data.args {
                 Some(args) => format!("@{name}({})", value_to_string(args)),
                 None => format!("@{name}"),
             }

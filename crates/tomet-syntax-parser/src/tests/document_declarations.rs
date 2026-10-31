@@ -15,11 +15,11 @@ fn a_double_colon_line_is_a_document_declaration() {
     let kind = element(&doc.blocks[0]);
     assert_eq!(kind.sigil, Sigil::document("kind"));
     assert_eq!(kind.placement, Placement::Block);
-    assert!(kind.args.is_some());
+    assert!(kind.data.args.is_some());
     let meta = element(&doc.blocks[1]);
     assert_eq!(meta.sigil, Sigil::document("meta"));
     assert_eq!(meta.placement, Placement::Block);
-    assert!(meta.value.is_some());
+    assert!(meta.data.value.is_some());
     assert!(matches!(doc.blocks[2], Block::Section(_)));
 }
 
@@ -28,9 +28,9 @@ fn a_declaration_takes_the_same_groups_as_an_element() {
     let doc = parse_document("::x(a)[ b ]{ c: 1 }#(i):rule(allow:list(k))\n").unwrap();
     let el = element(&doc.blocks[0]);
     assert_eq!(el.sigil, Sigil::document("x"));
-    assert!(el.args.is_some());
+    assert!(el.data.args.is_some());
     assert!(el.content.is_some());
-    assert!(el.value.is_some());
+    assert!(el.data.value.is_some());
     assert!(el.id.is_some());
     assert_eq!(el.connects.len(), 1);
     assert_eq!(el.connects[0].sigil, Sigil::named("rule"));

@@ -66,7 +66,7 @@ fn collect_block_folding_ranges(
                 });
             }
 
-            if let Some(val) = &el.value {
+            if let Some(val) = &el.data.value {
                 collect_element_value_folding_ranges(index, val, ranges);
             }
             // What the element holds folds on its own too: a section or a
@@ -111,7 +111,7 @@ fn collect_list_folding_ranges(index: &LineIndex<'_>, list: &List, ranges: &mut 
     }
 
     for item in &list.items {
-        if let Some(val) = &item.element.value {
+        if let Some(val) = &item.element.data.value {
             collect_element_value_folding_ranges(index, val, ranges);
         }
         for child in item.element.content.iter().flatten() {
@@ -143,7 +143,7 @@ fn collect_element_value_folding_ranges(
                     collapsed_text: None,
                 });
             }
-            if let Some(child_val) = &child.value {
+            if let Some(child_val) = &child.data.value {
                 collect_element_value_folding_ranges(index, child_val, ranges);
             }
         }

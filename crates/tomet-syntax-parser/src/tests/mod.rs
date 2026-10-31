@@ -56,5 +56,5 @@ fn first_para(blocks: &[Block]) -> &[Inline] {
 /// A list item's trailing `{value}` attrs, if any -- mirrors how
 /// `Element::list_item` stores them under `value` as `Group::Data`.
 fn item_attrs(item: &Element) -> Option<Value> {
-    item.value.as_ref().map(|v| v.as_data())
+    item.data.value.as_ref().map(|v| v.as_data())
 }

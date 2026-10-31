@@ -30,7 +30,7 @@ pub(crate) fn link_fragment(target: &EvalValue) -> Result<EvalValue, EvalError> 
         }
     };
     let mut link = element_new(Sigil::named("link"));
-    link.args = Some(Value::String(address));
+    link.data.args = Some(Value::String(address));
     let span = Span::default();
     Ok(EvalValue::Fragment(vec![Block::Paragraph(Paragraph::new(
         vec![Inline::Element(link)],

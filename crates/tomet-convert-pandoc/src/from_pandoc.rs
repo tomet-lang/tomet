@@ -61,7 +61,7 @@ pub fn from_pandoc(doc: &PandocDoc) -> Document {
         });
     if let Some(id) = id {
         let mut id_el = element_new(Sigil::document("id")).with_placement(Placement::Block);
-        id_el.args = Some(Value::String(id));
+        id_el.data.args = Some(Value::String(id));
         blocks.push(TmBlock::Element(id_el));
     }
     if !meta.is_empty() {
@@ -124,7 +124,7 @@ fn meta_element(meta: &crate::ast::Meta) -> Element {
         .map(|(k, v)| (k.clone(), meta_value_to_value(v)))
         .collect();
     let mut el = element_new(Sigil::document("meta")).with_placement(Placement::Block);
-    el.value = Some(Group::from_map(Value::Map(entries)));
+    el.data.value = Some(Group::from_map(Value::Map(entries)));
     el
 }
 
@@ -164,8 +164,8 @@ fn block_from_pandoc(block: &Block) -> Option<TmBlock> {
             let title = inlines_from_pandoc(inlines);
             let mut sec = Section::new(*level as usize, title, Span::dummy());
             let (args, value) = extract_data_from_attr(attr);
-            sec.args = args;
-            sec.value = value;
+            sec.data.args = args;
+            sec.data.value = value;
             sec.id = id_from_attr(attr);
             Some(TmBlock::Section(sec))
         }
@@ -191,7 +191,7 @@ fn block_element(block: &Block) -> Element {
     let el = match block {
         Block::Header(level, attr, inlines) => {
             let mut el = named_element("heading", attr);
-            el.args = Some(Value::Int(*level));
+            el.data.args = Some(Value::Int(*level));
             el.content = Some(wrap_inline_content(inlines_from_pandoc(inlines)));
             el
         }
@@ -201,7 +201,7 @@ fn block_element(block: &Block) -> Element {
             // The language travelled as the first class; put it back in
             // `lang:` where `to_pandoc` looks for it.
             if let Some(lang) = attr.1.iter().find(|c| !c.starts_with(CLASS_PREFIX)) {
-                el.args = Some(Value::Map(vec![(
+                el.data.args = Some(Value::Map(vec![(
                     "lang".to_string(),
                     Value::String(lang.clone()),
                 )]));
@@ -217,7 +217,7 @@ fn block_element(block: &Block) -> Element {
             // it lands as a code block tagged with the format rather than
             // being dropped.
             let mut el = element_new(Sigil::named("raw"));
-            el.args = Some(Value::Map(vec![(
+            el.data.args = Some(Value::Map(vec![(
                 "lang".to_string(),
                 Value::String(format.clone()),
             )]));
@@ -342,7 +342,7 @@ fn table_element(parts: &TableParts) -> Element {
         args.push(("align".to_string(), Value::String(align.to_string())));
     }
     if !args.is_empty() {
-        el.args = Some(Value::Map(args));
+        el.data.args = Some(Value::Map(args));
     }
     el
 }
@@ -637,8 +637,8 @@ fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<Group>) {
 fn named_element(name: &str, attr: &Attr) -> Element {
     let mut el = element_new(Sigil::Named(parse_name(name)));
     let (args, value) = extract_data_from_attr(attr);
-    el.args = args;
-    el.value = value;
+    el.data.args = args;
+    el.data.value = value;
     el.id = id_from_attr(attr);
     el
 }
@@ -655,13 +655,13 @@ fn id_from_attr(attr: &Attr) -> Option<Id> {
 
 /// Adds a key to an element's `(args)`, keeping whatever is already there.
 fn merge_arg(el: &mut Element, key: &str, value: Value) {
-    match el.args.take() {
+    match el.data.args.take() {
         Some(Value::Map(mut entries)) => {
             entries.retain(|(k, _)| k != key);
             entries.insert(0, (key.to_string(), value));
-            el.args = Some(Value::Map(entries));
+            el.data.args = Some(Value::Map(entries));
         }
-        _ => el.args = Some(Value::Map(vec![(key.to_string(), value)])),
+        _ => el.data.args = Some(Value::Map(vec![(key.to_string(), value)])),
     }
 }
 
@@ -785,13 +785,13 @@ mod tests {
             panic!("expected an element, got {:?}", back.blocks[0]);
         };
         assert_eq!(
-            el.args,
+            el.data.args,
             Some(Value::Map(vec![(
                 "url".to_string(),
                 Value::String("x".to_string())
             )]))
         );
-        let value = el.value.as_ref().map(|v| v.as_data()).unwrap();
+        let value = el.data.value.as_ref().map(|v| v.as_data()).unwrap();
         assert_eq!(
             value,
             Value::Map(vec![
@@ -813,9 +813,9 @@ mod tests {
         let TmBlock::Element(el) = &back.blocks[0] else {
             panic!("expected an element");
         };
-        assert_eq!(el.args, None);
+        assert_eq!(el.data.args, None);
         assert_eq!(
-            el.value.as_ref().map(|v| v.as_data()),
+            el.data.value.as_ref().map(|v| v.as_data()),
             Some(Value::Map(vec![(
                 "a".to_string(),
                 Value::String("1".to_string())
@@ -832,7 +832,7 @@ mod tests {
         };
         assert!(el.sigil.is_bare_named("meta"));
         assert_eq!(
-            el.value.as_ref().map(|v| v.as_data()),
+            el.data.value.as_ref().map(|v| v.as_data()),
             Some(Value::Map(vec![
                 ("draft".to_string(), Value::Bool(true)),
                 ("title".to_string(), Value::String("Hello".to_string())),

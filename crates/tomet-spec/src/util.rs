@@ -30,7 +30,7 @@ pub fn paragraph(content: Vec<Inline>) -> Block {
 /// Builds a block-level `@raw(lang: "text")` code block element.
 pub fn code_block(body: &str) -> Element {
     let mut el = element_new(Sigil::named("raw")).with_placement(Placement::Block);
-    el.args = Some(Value::Map(vec![(
+    el.data.args = Some(Value::Map(vec![(
         "lang".to_string(),
         Value::String("text".to_string()),
     )]));

@@ -94,7 +94,7 @@ mod tests {
 
     fn map_el(sigil: Sigil, entries: Vec<(&str, Value)>) -> Element {
         let mut el = element_new(sigil);
-        el.args = Some(Value::Map(
+        el.data.args = Some(Value::Map(
             entries
                 .into_iter()
                 .map(|(k, v)| (k.to_string(), v))
@@ -134,7 +134,7 @@ mod tests {
         // `normalized_element_args` turns this into a map before
         // `link_target` ever sees it.
         let mut el = element_new(Sigil::named("link"));
-        el.args = Some(s("x.md"));
+        el.data.args = Some(s("x.md"));
         assert_eq!(crate::classify_std_lenient(&el), ElementKind::Link);
         assert_eq!(
             link_target_of(&el),
@@ -158,7 +158,7 @@ mod tests {
         // (-> "target"), so normalized_element_args already turns this
         // into a map before link_target ever sees it.
         let mut el = element_new(Sigil::named("embed"));
-        el.args = Some(s("a.png"));
+        el.data.args = Some(s("a.png"));
         assert_eq!(
             link_target_of(&el),
             Some((ElementKind::Embed, "a.png".to_string()))
@@ -257,7 +257,7 @@ mod path_tests {
 
     fn path_el(name: &str, value: &str) -> Element {
         let mut el = element_new(Sigil::named(name));
-        el.args = Some(Value::String(value.to_string()));
+        el.data.args = Some(Value::String(value.to_string()));
         el
     }
 

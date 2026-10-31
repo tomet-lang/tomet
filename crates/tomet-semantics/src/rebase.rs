@@ -86,7 +86,7 @@ fn relative_to(from: &[&str], target: &[String]) -> String {
 
 /// Writes a link's target back, whether it was given as the one argument or as `target:`.
 fn set_target(element: &mut Element, target: String) {
-    match &mut element.args {
+    match &mut element.data.args {
         Some(Value::String(existing)) => *existing = target,
         Some(Value::Map(entries)) => {
             if let Some((_, value)) = entries.iter_mut().find(|(key, _)| key == "target") {

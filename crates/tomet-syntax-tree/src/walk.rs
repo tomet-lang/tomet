@@ -80,7 +80,7 @@ fn inlines_in(inlines: &[Inline], f: &mut dyn FnMut(&Inline)) {
 }
 
 fn inlines_in_element(element: &Element, f: &mut dyn FnMut(&Inline)) {
-    if let Some(args) = &element.args {
+    if let Some(args) = &element.data.args {
         inlines_in_value(args, f);
     }
     if let Some(content) = &element.content {
@@ -88,7 +88,7 @@ fn inlines_in_element(element: &Element, f: &mut dyn FnMut(&Inline)) {
             inlines_in_block(block, f);
         }
     }
-    if let Some(Group(entries)) = &element.value {
+    if let Some(Group(entries)) = &element.data.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => inlines_in_element(child, f),
@@ -292,7 +292,7 @@ fn walk_inlines<B>(inlines: &[Inline], visitor: &mut impl Visitor<B>) -> Control
 
 fn walk_element<B>(element: &Element, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
     propagate!(visitor.visit(element));
-    if let Some(args) = &element.args {
+    if let Some(args) = &element.data.args {
         propagate!(walk_value(args, visitor));
     }
     if let Some(content) = &element.content {
@@ -300,7 +300,7 @@ fn walk_element<B>(element: &Element, visitor: &mut impl Visitor<B>) -> ControlF
             propagate!(walk_block(block, visitor));
         }
     }
-    if let Some(Group(entries)) = &element.value {
+    if let Some(Group(entries)) = &element.data.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => propagate!(walk_element(child, visitor)),
@@ -429,7 +429,7 @@ fn walk_inlines_mut<B>(inlines: &mut [Inline], visitor: &mut impl VisitorMut<B>)
 
 fn walk_element_mut<B>(element: &mut Element, visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
     propagate!(visitor.visit_mut(element));
-    if let Some(args) = &mut element.args {
+    if let Some(args) = &mut element.data.args {
         propagate!(walk_value_mut(args, visitor));
     }
     if let Some(content) = &mut element.content {
@@ -437,7 +437,7 @@ fn walk_element_mut<B>(element: &mut Element, visitor: &mut impl VisitorMut<B>) 
             propagate!(walk_block_mut(block, visitor));
         }
     }
-    if let Some(Group(entries)) = &mut element.value {
+    if let Some(Group(entries)) = &mut element.data.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => propagate!(walk_element_mut(child, visitor)),
@@ -516,7 +516,7 @@ pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&E
         for_each_descendant_in_blocks(content, direct_only, &mut f);
     }
     if direct_only {
-        if let Some(Group(entries)) = &el.value {
+        if let Some(Group(entries)) = &el.data.value {
             for entry in entries {
                 if let Entry::Element(child) = entry {
                     f(child);
@@ -529,7 +529,7 @@ pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&E
         f(child);
         ControlFlow::Continue(())
     };
-    if let Some(Group(entries)) = &el.value {
+    if let Some(Group(entries)) = &el.data.value {
         for entry in entries {
             if let Entry::Element(child) = entry {
                 let _ = walk_element(child, &mut visitor);
@@ -657,7 +657,7 @@ fn lists_in_element(el: &Element, f: &mut dyn FnMut(&List)) {
             lists_in_block(b, f);
         }
     }
-    if let Some(Group(entries)) = &el.value {
+    if let Some(Group(entries)) = &el.data.value {
         for entry in entries {
             if let Entry::Element(child) = entry {
                 lists_in_element(child, f);
@@ -724,10 +724,10 @@ fn interpolations_in_block(block: &Block, f: &mut dyn FnMut(&Interpolation)) {
         Block::Element(element) => interpolations_in_element(element, f),
         Block::Section(section) => {
             interpolations_in_inlines(&section.title, f);
-            if let Some(args) = &section.args {
+            if let Some(args) = &section.data.args {
                 interpolations_in_value(args, f);
             }
-            if let Some(value) = &section.value {
+            if let Some(value) = &section.data.value {
                 interpolations_in_element_value(value, f);
             }
             for connect in &section.connects {
@@ -765,7 +765,7 @@ fn interpolations_in_inlines(inlines: &[Inline], f: &mut dyn FnMut(&Interpolatio
 }
 
 fn interpolations_in_element(element: &Element, f: &mut dyn FnMut(&Interpolation)) {
-    if let Some(args) = &element.args {
+    if let Some(args) = &element.data.args {
         interpolations_in_value(args, f);
     }
     if let Some(content) = &element.content {
@@ -773,7 +773,7 @@ fn interpolations_in_element(element: &Element, f: &mut dyn FnMut(&Interpolation
             interpolations_in_block(block, f);
         }
     }
-    if let Some(value) = &element.value {
+    if let Some(value) = &element.data.value {
         interpolations_in_element_value(value, f);
     }
     for connect in &element.connects {

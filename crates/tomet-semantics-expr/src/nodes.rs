@@ -111,7 +111,7 @@ fn in_element(el: &Element, id: &str) -> Option<Node> {
         .flatten()
         .find_map(|block| in_block(block, id))
         .or_else(|| el.connects.iter().find_map(|conn| in_element(conn, id)))
-        .or_else(|| match &el.value {
+        .or_else(|| match &el.data.value {
             Some(Group(entries)) => entries.iter().find_map(|entry| match entry {
                 Entry::Element(child) => in_element(child, id),
                 _ => None,
@@ -230,8 +230,8 @@ fn children(doc: &DocRef, node: &Node) -> Vec<EvalValue> {
 pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<EvalValue, EvalError> {
     match member {
         "prop" => Ok(match node {
-            Node::Element(el) => prop(doc, &el.args, &el.value),
-            Node::Section(sec) => prop(doc, &sec.args, &sec.value),
+            Node::Element(el) => prop(doc, &el.data.args, &el.data.value),
+            Node::Section(sec) => prop(doc, &sec.data.args, &sec.data.value),
             // A list has neither arguments nor a value group.
             Node::List(_) => prop(doc, &None, &None),
         }),

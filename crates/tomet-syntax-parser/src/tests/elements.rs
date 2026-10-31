@@ -8,7 +8,7 @@ fn parses_section_with_attrs() {
             assert_eq!(s.level, 1);
             assert_eq!(s.title, vec![Inline::Text("Hello".into())]);
             assert_eq!(
-                s.value,
+                s.data.value,
                 Some(Group::from_map(Value::Map(vec![(
                     "id".into(),
                     Value::String("header1".into())
@@ -28,7 +28,7 @@ fn parses_link_with_order_free_groups() {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("link"));
             assert_eq!(
-                el.args,
+                el.data.args,
                 Some(Value::Map(vec![(
                     "target".into(),
                     Value::String("https://example.com".into())
@@ -46,14 +46,17 @@ fn parses_links_container_with_bare_children() {
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("links"));
-            match &el.value {
+            match &el.data.value {
                 Some(value) => {
                     let children = value.as_children();
                     assert_eq!(children.len(), 2);
                     assert_eq!(children[0].sigil, Sigil::Bare);
-                    assert_eq!(children[0].args, Some(Value::Int(1)));
+                    assert_eq!(children[0].data.args, Some(Value::Int(1)));
                     assert_eq!(children[0].content, wrap(vec![Inline::Text("note".into())]));
-                    assert_eq!(children[1].args, Some(Value::String("anotation1".into())));
+                    assert_eq!(
+                        children[1].data.args,
+                        Some(Value::String("anotation1".into()))
+                    );
                 }
                 other => panic!("expected children, got {other:?}"),
             }

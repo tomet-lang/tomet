@@ -112,7 +112,7 @@ fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
     let doc = parse_document("@T()\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.args, Some(Value::Map(vec![])));
+            assert_eq!(el.data.args, Some(Value::Map(vec![])));
             assert_eq!(el.content, None);
         }
         other => panic!("expected an element, got {other:?}"),
@@ -121,7 +121,7 @@ fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
     let doc = parse_document("::meta{}\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.value, Some(Group::from_map(Value::Map(vec![]))));
+            assert_eq!(el.data.value, Some(Group::from_map(Value::Map(vec![]))));
         }
         other => panic!("expected an element, got {other:?}"),
     }
@@ -156,7 +156,10 @@ fn a_parenthesis_after_an_element_is_prose() {
     assert_eq!(&p.content[1], &Inline::Text(" (b:2)".into()));
     match &p.content[0] {
         Inline::Element(el) => {
-            assert_eq!(el.args, Some(Value::Map(vec![("a".into(), Value::Int(1))])));
+            assert_eq!(
+                el.data.args,
+                Some(Value::Map(vec![("a".into(), Value::Int(1))]))
+            );
         }
         other => panic!("expected an element, got {other:?}"),
     }
@@ -172,7 +175,10 @@ fn a_comment_between_groups_does_not_detach_the_next_group() {
     assert_eq!(doc.blocks.len(), 1);
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.args, Some(Value::Map(vec![("a".into(), Value::Int(1))])));
+            assert_eq!(
+                el.data.args,
+                Some(Value::Map(vec![("a".into(), Value::Int(1))]))
+            );
             assert_eq!(el.content, wrap(vec![Inline::Text("content".into())]));
         }
         other => panic!("expected an element with both groups, got {other:?}"),

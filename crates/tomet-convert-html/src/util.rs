@@ -130,10 +130,11 @@ pub(crate) fn push_data_attr(out: &mut String, key: &str, value: &str) {
 /// which would be invalid HTML. `(args)` wins because it is the group the
 /// reader wrote closer to the name.
 pub(crate) fn push_value_data_attrs(out: &mut String, el: &Element) {
-    let Some(data) = el.value.as_ref().map(|v| v.as_data()) else {
+    let Some(data) = el.data.value.as_ref().map(|v| v.as_data()) else {
         return;
     };
     let taken: Vec<String> = el
+        .data
         .args
         .as_ref()
         .map(|a| {

@@ -31,7 +31,7 @@ pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig
         }
         found = true;
         if overwrite && !declared_id(el).is_some_and(|id| is_valid_id_format(id, id_cfg)) {
-            el.args = Some(Value::String(generate_id_for_field(id_cfg)));
+            el.data.args = Some(Value::String(generate_id_for_field(id_cfg)));
         }
     });
 
@@ -42,14 +42,14 @@ pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig
             .max()
             .map_or(0, |index| index + 1);
         let mut el = element_new(Sigil::document("id"));
-        el.args = Some(Value::String(generate_id_for_field(id_cfg)));
+        el.data.args = Some(Value::String(generate_id_for_field(id_cfg)));
         doc.insert_block(at, Block::Element(el));
     }
 }
 
 /// The identity an `::id(...)` element holds: `::id(x)` or `::id(id: x)`.
 fn declared_id(el: &Element) -> Option<&str> {
-    let args = el.args.as_ref()?;
+    let args = el.data.args.as_ref()?;
     args.as_str()
         .or_else(|| args.get("id").and_then(|id| id.as_str()))
 }

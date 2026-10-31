@@ -7,5 +7,5 @@
 /// An element's value as data: a `{...}` group's `key: value` pairs, or
 /// `None` if the element has no value group at all.
 pub fn element_data(el: &tomet_ast::Element) -> Option<tomet_ast::Value> {
-    el.value.as_ref().map(|value| value.as_data())
+    el.data.value.as_ref().map(|value| value.as_data())
 }

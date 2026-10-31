@@ -6,7 +6,7 @@ use tomet_ast::{Block, Element, Inline, List, Value};
 /// Inspects `args` (as string, seq, or map) and `content` (as plain text).
 pub fn extract_tags(el: &Element) -> Vec<String> {
     let mut tags = Vec::new();
-    if let Some(args) = &el.args {
+    if let Some(args) = &el.data.args {
         extract_tags_from_value(args, &mut tags);
     }
     if tags.is_empty()
@@ -107,14 +107,14 @@ mod tests {
     #[test]
     fn extracts_tags_from_args_string() {
         let mut el = element_new(Sigil::named("tag"));
-        el.args = Some(Value::String("rust".to_string()));
+        el.data.args = Some(Value::String("rust".to_string()));
         assert_eq!(extract_tags(&el), vec!["rust"]);
     }
 
     #[test]
     fn extracts_tags_from_args_seq() {
         let mut el = element_new(Sigil::named("tag"));
-        el.args = Some(Value::Seq(vec![
+        el.data.args = Some(Value::Seq(vec![
             Value::String("rust".to_string()),
             Value::String("tomet".to_string()),
         ]));

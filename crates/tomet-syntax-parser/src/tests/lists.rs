@@ -35,7 +35,7 @@ fn parses_list_value_markers_and_trailing_attrs() {
                 items[0].element.content,
                 wrap(vec![Inline::Text("todo".into())])
             );
-            assert_eq!(items[0].element.args, Some(Value::String("T".into())));
+            assert_eq!(items[0].element.data.args, Some(Value::String("T".into())));
             assert_eq!(
                 item_attrs(&items[0].element),
                 Some(Value::Map(vec![(
@@ -48,7 +48,7 @@ fn parses_list_value_markers_and_trailing_attrs() {
                 items[1].element.content,
                 wrap(vec![Inline::Text("question".into())])
             );
-            assert_eq!(items[1].element.args, Some(Value::String("?".into())));
+            assert_eq!(items[1].element.data.args, Some(Value::String("?".into())));
             assert_eq!(
                 item_attrs(&items[1].element),
                 Some(Value::Map(vec![(
@@ -96,7 +96,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
                 Some([Inline::Element(link)]) => {
                     assert_eq!(link.sigil, Sigil::named("link"), "{bare:?}");
                     assert_eq!(
-                        link.value,
+                        link.data.value,
                         Some(Group::from_map(Value::Map(vec![(
                             "id".into(),
                             Value::String("breakfast".into())
@@ -133,7 +133,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
                 match items[0].element.content.as_deref().map(first_para) {
                     Some([Inline::Element(link)]) => {
                         assert_eq!(link.sigil, Sigil::named("link"), "{src:?}");
-                        assert_eq!(link.value, None, "{src:?}");
+                        assert_eq!(link.data.value, None, "{src:?}");
                     }
                     other => panic!("{src:?}: expected a single @link element, got {other:?}"),
                 }
@@ -173,7 +173,7 @@ fn list_marker_supports_explicit_key_value() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
-                items[0].element.args,
+                items[0].element.data.args,
                 Some(Value::Map(vec![
                     ("color".into(), Value::String("red".into())),
                     ("priority".into(), Value::String("high".into())),
@@ -190,7 +190,10 @@ fn list_marker_quoted_scalar_avoids_colon_misparse() {
     match &doc.blocks[0] {
         Block::List(list) => {
             let items = &list.items;
-            assert_eq!(items[0].element.args, Some(Value::String("12:01".into())));
+            assert_eq!(
+                items[0].element.data.args,
+                Some(Value::String("12:01".into()))
+            );
         }
         other => panic!("expected list, got {other:?}"),
     }
@@ -207,7 +210,7 @@ fn bracket_after_a_list_marker_is_the_content_group() {
     match &doc.blocks[0] {
         Block::List(list) => {
             let items = &list.items;
-            assert_eq!(items[0].element.args, None);
+            assert_eq!(items[0].element.data.args, None);
             let content = first_para(items[0].element.content.as_ref().expect("content"));
             let text: String = content
                 .iter()
@@ -270,7 +273,7 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
-                items[0].element.args,
+                items[0].element.data.args,
                 Some(Value::Map(vec![("x".into(), Value::Int(1))]))
             );
         }
@@ -298,7 +301,7 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
-                items[0].element.args,
+                items[0].element.data.args,
                 Some(Value::Map(vec![("x".into(), Value::Int(1))]))
             );
             assert_eq!(
@@ -378,7 +381,7 @@ fn combine_notation_supports_a_bare_trailing_connect() {
         Block::List(list) => {
             let item = &list.items[0].element;
             assert_eq!(
-                item.args,
+                item.data.args,
                 Some(Value::Map(vec![("x".into(), Value::Int(1))]))
             );
             assert_eq!(

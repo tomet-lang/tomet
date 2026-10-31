@@ -214,13 +214,13 @@ fn render_generic_element(
     if let Some(id) = id_attr(el.id.as_ref()) {
         out.push_str(&format!(" id=\"{}\"", escape_attr(&id)));
     }
-    push_data_attrs(out, el.args.as_ref(), &[]);
+    push_data_attrs(out, el.data.args.as_ref(), &[]);
     push_value_data_attrs(out, el);
     out.push('>');
     if let Some(content) = &el.content {
         crate::block::render_content_blocks(cx, content, out);
     }
-    if let Some(value) = &el.value {
+    if let Some(value) = &el.data.value {
         render_element_value(cx, value, out);
     }
     out.push_str(&format!("</{tag}>"));

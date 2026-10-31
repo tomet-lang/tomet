@@ -82,7 +82,8 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                                 .map(|s| s.to_string())
                         })
                         .or_else(|| {
-                            el.args
+                            el.data
+                                .args
                                 .as_ref()
                                 .and_then(|v| v.as_str())
                                 .map(|s| s.to_string())
@@ -106,7 +107,8 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                                 .map(|s| s.to_string())
                         })
                         .or_else(|| {
-                            el.args
+                            el.data
+                                .args
                                 .as_ref()
                                 .and_then(|v| v.as_str())
                                 .map(|s| s.to_string())
@@ -431,7 +433,7 @@ fn macro_hover(
     evaluate: Evaluate<'_>,
     el: &Element,
 ) -> Option<Hover> {
-    let expr = find_interp_in_value(el.args.as_ref()?)?;
+    let expr = find_interp_in_value(el.data.args.as_ref()?)?;
     Some(macro_result_hover(positions, doc, evaluate, &expr, el.span))
 }
 

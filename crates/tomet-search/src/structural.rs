@@ -45,8 +45,13 @@ pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
     if let Some(sub) = &query.value_contains
         && !sub.is_empty()
     {
-        let in_args = el.args.as_ref().is_some_and(|v| value_contains_str(v, sub));
+        let in_args = el
+            .data
+            .args
+            .as_ref()
+            .is_some_and(|v| value_contains_str(v, sub));
         let in_val = el
+            .data
             .value
             .as_ref()
             .is_some_and(|v| value_contains_str(&v.as_data(), sub));

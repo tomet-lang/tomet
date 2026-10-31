@@ -18,7 +18,7 @@ pub struct RuleArgs {
 /// Reads `connect_el.args` for a `:rule(...)` connect, or `None` if the
 /// shape isn't recognized.
 pub fn decode_rule_args(connect_el: &Element) -> Option<RuleArgs> {
-    let Some(Value::Map(entries)) = &connect_el.args else {
+    let Some(Value::Map(entries)) = &connect_el.data.args else {
         return None;
     };
 
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn no_args_at_all_is_none() {
         let mut connect = element_new(Sigil::named("rule"));
-        connect.args = None;
+        connect.data.args = None;
         assert_eq!(decode_rule_args(&connect), None);
     }
 

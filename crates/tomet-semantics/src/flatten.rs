@@ -71,8 +71,8 @@ pub fn is_attribute_key(key: &str) -> bool {
 /// The element children a `{...}` group may hold are skipped: they belong
 /// in the output's body rather than its attributes.
 pub fn flatten_element_data(el: &Element) -> FlatData {
-    let value = el.value.as_ref().map(|v| v.as_data());
-    flatten_data(el.args.as_ref(), value.as_ref())
+    let value = el.data.value.as_ref().map(|v| v.as_data());
+    flatten_data(el.data.args.as_ref(), value.as_ref())
 }
 
 /// Flattens the two groups directly.
@@ -211,7 +211,7 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
             let mut obj = serde_json::Map::new();
             let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
             obj.insert("element".to_string(), serde_json::Value::String(name));
-            if let Some(args) = &el.args {
+            if let Some(args) = &el.data.args {
                 obj.insert("args".to_string(), value_to_json(args));
             }
             serde_json::Value::Object(obj)
@@ -234,8 +234,8 @@ mod tests {
 
     fn el_with(args: Option<Value>, value: Option<Value>) -> Element {
         let mut el = element_new(Sigil::named("x"));
-        el.args = args;
-        el.value = value.map(Group::from_map);
+        el.data.args = args;
+        el.data.value = value.map(Group::from_map);
         el
     }
 

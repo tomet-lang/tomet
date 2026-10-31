@@ -35,7 +35,10 @@ fn id_may_come_before_its_groups_too() {
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(el.id, Some(Id("myid".into())));
-            assert_eq!(el.args, Some(Value::Map(vec![("a".into(), Value::Int(1))])));
+            assert_eq!(
+                el.data.args,
+                Some(Value::Map(vec![("a".into(), Value::Int(1))]))
+            );
         }
         other => panic!("expected element, got {other:?}"),
     }
@@ -97,7 +100,7 @@ fn section_sugar_reads_a_trailing_id_and_attrs_together() {
         Block::Section(s) => {
             assert_eq!(s.id, Some(Id("intro".into())));
             assert_eq!(
-                s.value,
+                s.data.value,
                 Some(Group::from_map(Value::Map(vec![(
                     "tag".into(),
                     Value::String("x".into())
@@ -145,7 +148,7 @@ fn list_item_sugar_reads_a_trailing_id_and_attrs_together() {
     let items = &list.items;
     assert_eq!(items[0].element.id, Some(Id("item1".into())));
     assert_eq!(
-        items[0].element.value,
+        items[0].element.data.value,
         Some(Group::from_map(Value::Map(vec![(
             "tag".into(),
             Value::String("x".into())

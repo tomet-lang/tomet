@@ -121,8 +121,8 @@ pub(crate) fn parse_section(dialect: Dialect, cur: &mut Cursor) -> Result<Sectio
             let mut content = body.content;
             trim_trailing_equals(&mut content);
             title = content;
-            el.args = body.args;
-            el.value = body.value;
+            el.data.args = body.args;
+            el.data.value = body.value;
             el.id = body.id;
             el.connects = body.connects;
         }
@@ -154,8 +154,7 @@ pub(crate) fn parse_section(dialect: Dialect, cur: &mut Cursor) -> Result<Sectio
     Ok(Section {
         level,
         title,
-        args: el.args,
-        value: el.value,
+        data: el.data,
         id: el.id,
         connects: el.connects,
         blocks: Vec::new(),

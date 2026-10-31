@@ -73,7 +73,7 @@ pub(crate) fn render_block(
 
 fn render_section(cx: &RenderCtx, sec: &Section, out: &mut String, state: &mut HeadingState) {
     let level = (sec.level as u8).clamp(1, 6);
-    let value_data = sec.value.as_ref().map(|v| v.as_data());
+    let value_data = sec.data.value.as_ref().map(|v| v.as_data());
     let (class, data) = split_attrs(value_data.as_ref());
     let mut id = id_attr(sec.id.as_ref());
     let text = inlines_to_plain(&sec.title);
@@ -161,7 +161,7 @@ fn render_heading_element(
 ) {
     let level = heading_level(el).unwrap_or(1);
     let content = el.content.as_deref().unwrap_or(&[]);
-    let value_data = el.value.as_ref().map(|v| v.as_data());
+    let value_data = el.data.value.as_ref().map(|v| v.as_data());
     let (class, data) = split_attrs(value_data.as_ref());
     let mut id = id_attr(el.id.as_ref());
     let text = crate::util::blocks_to_plain(content);
@@ -219,14 +219,14 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
             continue;
         }
 
-        let attrs = item.value.as_ref().map(|v| v.as_data());
+        let attrs = item.data.value.as_ref().map(|v| v.as_data());
         let (class, data) = split_attrs(attrs.as_ref());
         let id = id_attr(item.id.as_ref());
         out.push_str("<li");
         push_named_attrs(out, &id, &class, &data);
         push_span_attrs(cx, out, item.span);
         out.push('>');
-        if let Some(marker) = &item.args {
+        if let Some(marker) = &item.data.args {
             out.push_str("<span class=\"tm-list-marker\"");
             match marker {
                 Value::Map(map) => {

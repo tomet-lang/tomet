@@ -323,7 +323,7 @@ fn a_value_in_an_element_argument_keeps_its_type() {
         panic!("an element block");
     };
     assert_eq!(
-        el.args,
+        el.data.args,
         Some(Value::Map(vec![
             ("n".into(), Value::Int(3)),
             ("label".into(), Value::String("x".into()))
@@ -339,7 +339,7 @@ fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
     let Block::Element(el) = &doc.blocks[0] else {
         panic!("an element block");
     };
-    let Some(Group(entries)) = &el.value else {
+    let Some(Group(entries)) = &el.data.value else {
         panic!("a group");
     };
     assert_eq!(
@@ -365,7 +365,7 @@ fn a_document_cannot_be_stored_as_data_and_the_expression_stays() {
         panic!("an element block");
     };
     // Still the expression, so the author sees what did not resolve.
-    let Some(Value::Map(entries)) = &el.args else {
+    let Some(Value::Map(entries)) = &el.data.args else {
         panic!("args");
     };
     assert!(matches!(&entries[0].1, Value::Interp(_)));
@@ -408,7 +408,7 @@ fn creating_a_document_reads_var_and_generates() {
     let Block::Element(el) = &doc.blocks[0] else {
         panic!("meta");
     };
-    let Some(Group(entries)) = &el.value else {
+    let Some(Group(entries)) = &el.data.value else {
         panic!("a group");
     };
     let tomet_ast::Entry::Pair(_, Value::String(id)) = &entries[0] else {
@@ -436,7 +436,7 @@ fn creation_only_names_are_refused_when_rendering() {
         panic!("meta");
     };
     // The expression is still there.
-    let Some(Group(entries)) = &el.value else {
+    let Some(Group(entries)) = &el.data.value else {
         panic!("a group");
     };
     assert!(matches!(
@@ -482,7 +482,10 @@ fn a_macro_in_an_element_argument_is_expanded_and_stays_text() {
     let Inline::Element(link) = &p.content[0] else {
         panic!("a link");
     };
-    assert_eq!(link.args, Some(Value::String("https://x/issues/7".into())));
+    assert_eq!(
+        link.data.args,
+        Some(Value::String("https://x/issues/7".into()))
+    );
 }
 
 // ---- unique ids after splicing ----------------------------------------------

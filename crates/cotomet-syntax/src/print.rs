@@ -47,7 +47,7 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
         }
         Value::Element(el) => {
             out.push_str(&el.sigil.head());
-            if let Some(args) = &el.args {
+            if let Some(args) = &el.data.args {
                 out.push('(');
                 write_args(args, out);
                 out.push(')');

@@ -11,7 +11,7 @@ use crate::inline::render_content_blocks;
 /// `<sigil><name>(args)[content]{value}`.
 pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     {
-        if el.sigil.is_bare_named("hr") && el.args.is_none() && el.value.is_none() {
+        if el.sigil.is_bare_named("hr") && el.data.args.is_none() && el.data.value.is_none() {
             if let Some(content) = &el.content {
                 return format!(
                     "---[{}]---{}{}",
@@ -38,8 +38,8 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
 
     if el.sigil.is_bare_named("raw") {
         if el.placement == Placement::Inline
-            && el.args.is_none()
-            && el.value.is_none()
+            && el.data.args.is_none()
+            && el.data.value.is_none()
             && el.connects.is_empty()
         {
             let from_content = el
@@ -63,6 +63,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
 
         if el.placement == Placement::Block {
             let lang = el
+                .data
                 .args
                 .as_ref()
                 .and_then(|args| match args {
@@ -109,7 +110,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     {
         if style == "expanded" {
             let mut out = String::from("@callout");
-            if let Some(args) = &el.args {
+            if let Some(args) = &el.data.args {
                 out.push('(');
                 out.push_str(&render_args(args, config));
                 out.push(')');
@@ -124,7 +125,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 }
                 out.push(']');
             }
-            if let Some(value) = &el.value {
+            if let Some(value) = &el.data.value {
                 out.push_str(&render_element_value(value, config));
             }
             out.push_str(&render_id(el.id.as_ref()));
@@ -132,7 +133,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             return out;
         } else if style == "block" {
             let mut out = String::from("@callout");
-            if let Some(args) = &el.args {
+            if let Some(args) = &el.data.args {
                 out.push('(');
                 out.push_str(&render_args(args, config));
                 out.push(')');
@@ -162,7 +163,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                     out.push(']');
                 }
             }
-            if let Some(value) = &el.value {
+            if let Some(value) = &el.data.value {
                 out.push_str(&render_element_value(value, config));
             }
             out.push_str(&render_id(el.id.as_ref()));
@@ -170,7 +171,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             return out;
         } else if style == "box" {
             let mut out = String::from("@callout");
-            if let Some(args) = &el.args {
+            if let Some(args) = &el.data.args {
                 out.push('(');
                 out.push_str(&render_args(args, config));
                 out.push(')');
@@ -203,7 +204,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                     }
                 }
             }
-            if let Some(value) = &el.value {
+            if let Some(value) = &el.data.value {
                 out.push_str(&render_element_value(value, config));
             }
             out.push_str(&render_id(el.id.as_ref()));
@@ -220,7 +221,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     out.push_str(&el.sigil.head());
 
     let render_args_cb = |out: &mut String| {
-        if let Some(args) = &el.args {
+        if let Some(args) = &el.data.args {
             out.push('(');
             out.push_str(&render_args(args, config));
             out.push(')');
@@ -250,7 +251,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         }
     }
 
-    if let Some(value) = &el.value {
+    if let Some(value) = &el.data.value {
         out.push_str(&render_element_value(value, config));
     }
 
@@ -332,7 +333,7 @@ pub(crate) fn render_connects(connects: &[Element], config: &PrinterConfig) -> S
         if let Some(name) = connect.sigil.name() {
             out.push_str(&name.to_string());
         }
-        if let Some(args) = &connect.args {
+        if let Some(args) = &connect.data.args {
             out.push('(');
             out.push_str(&render_args(args, config));
             out.push(')');
@@ -342,7 +343,7 @@ pub(crate) fn render_connects(connects: &[Element], config: &PrinterConfig) -> S
             out.push_str(&render_content_blocks(content, config));
             out.push(']');
         }
-        if let Some(value) = &connect.value {
+        if let Some(value) = &connect.data.value {
             out.push_str(&render_element_value(value, config));
         }
         out.push_str(&render_id(connect.id.as_ref()));

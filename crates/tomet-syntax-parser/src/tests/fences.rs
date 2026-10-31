@@ -86,7 +86,7 @@ fn parses_a_fenced_code_block_with_lang() {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("raw"));
             assert_eq!(
-                el.args,
+                el.data.args,
                 Some(Value::Map(vec![(
                     "lang".to_string(),
                     Value::String("rust".to_string())
@@ -104,7 +104,7 @@ fn parses_a_fenced_code_block_without_lang() {
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("raw"));
-            assert_eq!(el.args, None);
+            assert_eq!(el.data.args, None);
             assert_eq!(el.content, wrap(vec![Inline::Raw("plain".into())]));
         }
         other => panic!("expected a raw element, got {other:?}"),
@@ -130,8 +130,8 @@ fn fenced_code_block_and_bracket_raw_produce_the_same_ast() {
     match (&fenced.blocks[0], &bracket.blocks[0]) {
         (Block::Element(a), Block::Element(b)) => {
             assert_eq!(a.sigil, b.sigil);
-            assert_eq!(a.args, b.args);
-            assert_eq!(a.value, b.value);
+            assert_eq!(a.data.args, b.data.args);
+            assert_eq!(a.data.value, b.data.value);
             assert_eq!(a.content, wrap(vec![Inline::Raw("fn main() {}".into())]));
             assert_eq!(b.content, wrap(vec![Inline::Text("fn main() {}".into())]));
         }

@@ -120,7 +120,7 @@ fn reference_in(el: &Element) -> Option<Reference> {
             _ => {}
         }
     }
-    if let Some(Value::Map(entries)) = &el.args {
+    if let Some(Value::Map(entries)) = &el.data.args {
         for (k, v) in entries {
             if k == "id"
                 && let Value::String(s) = v

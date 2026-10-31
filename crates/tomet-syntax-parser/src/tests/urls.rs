@@ -10,7 +10,7 @@ fn bare_url_autolink_strips_trailing_punctuation() {
             assert_eq!(p.content[0], Inline::Text("Check ".into()));
             if let Inline::Element(el) = &p.content[1] {
                 assert_eq!(
-                    el.args,
+                    el.data.args,
                     Some(Value::Map(vec![(
                         "target".into(),
                         Value::String("https://example.com/foo".into())
@@ -22,7 +22,7 @@ fn bare_url_autolink_strips_trailing_punctuation() {
             assert_eq!(p.content[2], Inline::Text("! and ".into()));
             if let Inline::Element(el) = &p.content[3] {
                 assert_eq!(
-                    el.args,
+                    el.data.args,
                     Some(Value::Map(vec![(
                         "target".into(),
                         Value::String("https://example.com/bar".into())
@@ -46,7 +46,7 @@ fn bare_url_autolink_handles_parentheses() {
             assert_eq!(p.content[0], Inline::Text("Visit (".into()));
             if let Inline::Element(el) = &p.content[1] {
                 assert_eq!(
-                    el.args,
+                    el.data.args,
                     Some(Value::Map(vec![(
                         "target".into(),
                         Value::String("https://example.com/foo".into())
@@ -58,7 +58,7 @@ fn bare_url_autolink_handles_parentheses() {
             assert_eq!(p.content[2], Inline::Text(") or ".into()));
             if let Inline::Element(el) = &p.content[3] {
                 assert_eq!(
-                    el.args,
+                    el.data.args,
                     Some(Value::Map(vec![(
                         "target".into(),
                         Value::String("https://example.com/path(bar)".into())
@@ -80,7 +80,7 @@ fn bare_url_autolink_supports_http_https_mailto() {
             assert_eq!(p.content.len(), 5);
             if let Inline::Element(el) = &p.content[0] {
                 assert_eq!(
-                    el.args,
+                    el.data.args,
                     Some(Value::Map(vec![(
                         "target".into(),
                         Value::String("http://a.com".into())
@@ -90,7 +90,7 @@ fn bare_url_autolink_supports_http_https_mailto() {
             assert_eq!(p.content[1], Inline::Text(" ".into()));
             if let Inline::Element(el) = &p.content[2] {
                 assert_eq!(
-                    el.args,
+                    el.data.args,
                     Some(Value::Map(vec![(
                         "target".into(),
                         Value::String("https://b.com".into())
@@ -100,7 +100,7 @@ fn bare_url_autolink_supports_http_https_mailto() {
             assert_eq!(p.content[3], Inline::Text(" ".into()));
             if let Inline::Element(el) = &p.content[4] {
                 assert_eq!(
-                    el.args,
+                    el.data.args,
                     Some(Value::Map(vec![(
                         "target".into(),
                         Value::String("mailto:user@example.com".into())
@@ -145,7 +145,7 @@ fn bare_absolute_path_parses_as_a_plain_scalar() {
     let doc = parse_document("@link(/etc/hosts)[Hosts]\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.args, Some(Value::String("/etc/hosts".into())));
+            assert_eq!(el.data.args, Some(Value::String("/etc/hosts".into())));
         }
         other => panic!("expected element, got {other:?}"),
     }
@@ -168,7 +168,10 @@ fn bare_scheme_uri_parses_as_one_scalar_not_a_map() {
     let doc = parse_document("@link(https://example.com)[Site]\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.args, Some(Value::String("https://example.com".into())));
+            assert_eq!(
+                el.data.args,
+                Some(Value::String("https://example.com".into()))
+            );
         }
         other => panic!("expected element, got {other:?}"),
     }
@@ -202,7 +205,7 @@ fn bare_url_autolink_preserves_query_param_placeholder() {
     match &p.content[0] {
         Inline::Element(el) => {
             assert_eq!(
-                el.args,
+                el.data.args,
                 Some(Value::Map(vec![(
                     "target".into(),
                     Value::String("http://127.0.0.1:8888/search?lang=ja&q=@query".into())

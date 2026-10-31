@@ -303,12 +303,12 @@ pub(crate) fn parse_list_item_body(
         // side. `- (x)[ y ]` takes that path and `-(x)` this one, and
         // dropping it here is what made `-(x)` an empty item once `(`
         // could reach this branch at all.
-        if item.args.is_some() {
-            marker = merge_values(marker.as_ref(), item.args.as_ref());
+        if item.data.args.is_some() {
+            marker = merge_values(marker.as_ref(), item.data.args.as_ref());
         }
         let id = item.id;
         let connects = item.connects;
-        let attrs = item.value.map(|v| v.as_data());
+        let attrs = item.data.value.map(|v| v.as_data());
         let mut content = item.content.unwrap_or_default();
         append_trailing_line_content(dialect, cur, &mut content)?;
         (content, attrs, id, connects)

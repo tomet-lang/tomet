@@ -47,12 +47,12 @@ pub fn extract_exports_hash(doc: &Document) -> u64 {
             if let Some(name) = el.sigil.name() {
                 hash_bytes.extend_from_slice(name.name.as_bytes());
             }
-            if let Some(args) = &el.args
+            if let Some(args) = &el.data.args
                 && let Some(text) = args.scalar_text()
             {
                 hash_bytes.extend_from_slice(text.as_bytes());
             }
-            if let Some(val) = &el.value {
+            if let Some(val) = &el.data.value {
                 for (k, v) in val.pairs() {
                     hash_bytes.extend_from_slice(k.as_bytes());
                     if let Some(text) = v.scalar_text() {

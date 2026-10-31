@@ -521,7 +521,7 @@ fn push_word(word: &mut String, out: &mut Vec<Inline>) {
 /// its `{...}` group holds as children.
 fn element_body_blocks(el: &Element) -> Vec<Block> {
     let mut blocks = element_content_to_blocks(content_of(el));
-    if let Some(value) = el.value.as_ref() {
+    if let Some(value) = el.data.value.as_ref() {
         for child in value.as_children() {
             blocks.extend(element_to_blocks(child));
         }
@@ -763,8 +763,8 @@ fn attr_of(el: &Element, classes: &[&str]) -> Attr {
 }
 
 fn section_attr(sec: &tomet_ast::Section) -> Attr {
-    let args = sec.args.as_ref();
-    let value = sec.value.as_ref().map(|v| v.as_data());
+    let args = sec.data.args.as_ref();
+    let value = sec.data.value.as_ref().map(|v| v.as_data());
     attr_from(
         sec.id.as_ref(),
         flatten_data(args, value.as_ref()).into_pairs(),
@@ -777,7 +777,7 @@ fn section_attr(sec: &tomet_ast::Section) -> Attr {
 /// For the builtins whose args the mapping already consumed into a
 /// dedicated field: a heading's level, a link's or image's target.
 fn attr_from_value(el: &Element, classes: &[&str]) -> Attr {
-    let value = el.value.as_ref().map(|v| v.as_data());
+    let value = el.data.value.as_ref().map(|v| v.as_data());
     attr_from(
         el.id.as_ref(),
         flatten_data(None, value.as_ref()).into_pairs(),

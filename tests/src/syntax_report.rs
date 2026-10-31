@@ -672,11 +672,11 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
             for inline in &sec.title {
                 dump_inline(out, inline, depth + 2);
             }
-            if let Some(args) = &sec.args {
+            if let Some(args) = &sec.data.args {
                 indent(out, depth + 1);
                 let _ = writeln!(out, "args    {}", value_str(args));
             }
-            match &sec.value {
+            match &sec.data.value {
                 Some(Group(entries)) => {
                     indent(out, depth + 1);
                     if entries.is_empty() {
@@ -775,7 +775,7 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
     indent(out, depth);
     let _ = writeln!(out, "{}", element_head(el));
 
-    if let Some(args) = &el.args {
+    if let Some(args) = &el.data.args {
         indent(out, depth + 1);
         let _ = writeln!(out, "args    {}", value_str(args));
     }
@@ -786,7 +786,7 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
             dump_block(out, block, depth + 2);
         }
     }
-    match &el.value {
+    match &el.data.value {
         Some(Group(entries)) => {
             indent(out, depth + 1);
             if entries.is_empty() {
@@ -889,7 +889,7 @@ fn value_str(v: &Value) -> String {
         Value::Interp(interp) => format!("${{{}}}", interp_str(&interp.expr)),
         Value::Element(el) => {
             let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
-            match &el.args {
+            match &el.data.args {
                 Some(args) => format!("@{name}({})", value_str(args)),
                 None => format!("@{name}"),
             }

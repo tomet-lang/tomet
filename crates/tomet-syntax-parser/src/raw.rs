@@ -48,6 +48,6 @@ pub(crate) fn parse_fenced_code_block(cur: &mut Cursor, pipe_stack: &[usize]) ->
             vec![Inline::Raw(RawText::new(code, content_span))],
             content_span,
         ))]);
-    el.args = args;
+    el.data.args = args;
     Ok(el)
 }

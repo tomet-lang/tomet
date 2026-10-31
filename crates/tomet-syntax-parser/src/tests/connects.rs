@@ -6,7 +6,7 @@ fn section_supports_inline_colon_connection() {
     match &doc.blocks[0] {
         Block::Section(s) => {
             assert_eq!(
-                s.value,
+                s.data.value,
                 Some(Group::from_map(Value::Map(vec![
                     ("id".into(), Value::String("intro".into())),
                     ("tag".into(), Value::String("main".into())),
@@ -24,7 +24,7 @@ fn element_supports_inline_colon_connection() {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("task"));
             assert_eq!(
-                el.value,
+                el.data.value,
                 Some(Group::from_map(Value::Map(vec![
                     ("id".into(), Value::String("taskA".into())),
                     ("priority".into(), Value::String("high".into())),
@@ -41,9 +41,9 @@ fn remote_id_target_element_supports_colon_connection() {
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("id"));
-            assert_eq!(el.args, Some(Value::String("taskA".into())));
+            assert_eq!(el.data.args, Some(Value::String("taskA".into())));
             assert_eq!(
-                el.value,
+                el.data.value,
                 Some(Group::from_map(Value::Map(vec![
                     ("priority".into(), Value::String("high".into())),
                     ("tag".into(), Value::String("dev".into())),
@@ -64,7 +64,7 @@ fn named_connect_reads_into_connects() {
             let rule = &el.connects[0];
             assert_eq!(rule.sigil, Sigil::named("rule"));
             assert_eq!(
-                rule.args,
+                rule.data.args,
                 Some(Value::Map(vec![(
                     "allow".into(),
                     Value::Seq(vec![Value::String("card".into())])
@@ -99,7 +99,7 @@ fn bare_colon_merge_is_unaffected_by_named_connect_support() {
         Block::Element(el) => {
             assert!(el.connects.is_empty());
             assert_eq!(
-                el.value,
+                el.data.value,
                 Some(Group::from_map(Value::Map(vec![(
                     "b".into(),
                     Value::Int(2)
@@ -141,7 +141,7 @@ fn sugar_list_item_and_heading_support_a_bare_connect() {
             Block::List(list) => {
                 let items = &list.items;
                 assert_eq!(
-                    items[0].element.args,
+                    items[0].element.data.args,
                     expect_args.map(|v| Value::Map(vec![("x".into(), v)])),
                     "{src:?}"
                 );
@@ -166,9 +166,12 @@ fn sugar_list_item_and_heading_support_a_bare_connect() {
     let doc = parse_document("= title :(x: 1){y: 2}\n").unwrap();
     match &doc.blocks[0] {
         Block::Section(s) => {
-            assert_eq!(s.args, Some(Value::Map(vec![("x".into(), Value::Int(1))])));
             assert_eq!(
-                s.value,
+                s.data.args,
+                Some(Value::Map(vec![("x".into(), Value::Int(1))]))
+            );
+            assert_eq!(
+                s.data.value,
                 Some(Group::from_map(Value::Map(vec![(
                     "y".into(),
                     Value::Int(2)
@@ -250,7 +253,7 @@ fn sugar_connect_tolerates_one_blank_line_but_not_two() {
     match &doc.blocks[0] {
         Block::Section(s) => {
             assert_eq!(
-                s.value,
+                s.data.value,
                 Some(Group::from_map(Value::Map(vec![(
                     "y".into(),
                     Value::Int(2)

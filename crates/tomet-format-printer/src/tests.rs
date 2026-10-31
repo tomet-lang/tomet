@@ -1,5 +1,5 @@
 use super::*;
-use tomet_ast::{Block, Document, Group, Inline, Paragraph, Section, Sigil, Value};
+use tomet_ast::{Block, Data, Document, Group, Inline, Paragraph, Section, Sigil, Value};
 use tomet_config::{FieldConfig, FormatConfig, GroupOrder, MetaConfig, load_config_from_str};
 use tomet_field_utils::generate_id_for_field;
 use tomet_style::render_value_inner;
@@ -477,21 +477,21 @@ fn test_codeblock_formatting() {
 #[test]
 fn test_container_children_indentation() {
     let mut child1 = element_new(Sigil::Bare);
-    child1.args = Some(Value::Int(1));
+    child1.data.args = Some(Value::Int(1));
     child1.content = Some(vec![Block::Paragraph(Paragraph::new(
         vec![Inline::Text("note 1".into())],
         tomet_ast::Span::dummy(),
     ))]);
 
     let mut child2 = element_new(Sigil::Bare);
-    child2.args = Some(Value::Int(2));
+    child2.data.args = Some(Value::Int(2));
     child2.content = Some(vec![Block::Paragraph(Paragraph::new(
         vec![Inline::Text("note 2".into())],
         tomet_ast::Span::dummy(),
     ))]);
 
     let mut links = element_new(Sigil::named("links"));
-    links.value = Some(Group::from_children(vec![child1, child2]));
+    links.data.value = Some(Group::from_children(vec![child1, child2]));
 
     let doc = Document::new(vec![Block::Element(links)], tomet_ast::Span::dummy());
     let printed = document_to_tm(&doc);
@@ -505,7 +505,7 @@ fn test_container_children_indentation() {
 #[test]
 fn test_group_order_content_first() {
     let mut el = element_new(Sigil::named("link"));
-    el.args = Some(Value::String("https://example.com".to_string()));
+    el.data.args = Some(Value::String("https://example.com".to_string()));
     el.content = Some(vec![Block::Paragraph(Paragraph::new(
         vec![Inline::Text("Example".into())],
         tomet_ast::Span::dummy(),
@@ -576,11 +576,18 @@ fn test_old_hash_tag_sugar_prints_as_plain_text() {
 fn test_section_blocks_blank_lines() {
     let sec = Section {
         level: 1,
+
         title: vec![Inline::Text("Title".into())],
-        args: None,
-        value: None,
+
+        data: Data {
+            args: None,
+            value: None,
+        },
+
         id: None,
+
         connects: Vec::new(),
+
         blocks: vec![
             Block::Paragraph(tomet_ast::Paragraph::new(
                 vec![Inline::Text("Paragraph 1".into())],
@@ -591,6 +598,7 @@ fn test_section_blocks_blank_lines() {
                 tomet_ast::Span::dummy(),
             )),
         ],
+
         span: tomet_ast::Span::dummy(),
     };
     let doc = Document::new(vec![Block::Section(sec)], tomet_ast::Span::dummy());
@@ -602,15 +610,23 @@ fn test_section_blocks_blank_lines() {
 fn test_headingless_section_printing() {
     let sec = Section {
         level: 1,
+
         title: Vec::new(),
-        args: None,
-        value: None,
+
+        data: Data {
+            args: None,
+            value: None,
+        },
+
         id: None,
+
         connects: Vec::new(),
+
         blocks: vec![Block::Paragraph(tomet_ast::Paragraph::new(
             vec![Inline::Text("Content".into())],
             tomet_ast::Span::dummy(),
         ))],
+
         span: tomet_ast::Span::dummy(),
     };
     let doc = Document::new(vec![Block::Section(sec)], tomet_ast::Span::dummy());

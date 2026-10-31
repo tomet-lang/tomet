@@ -1,6 +1,8 @@
 //! Extension trait, attribute helpers, and constructors for [`tomet_ast::Element`].
 
-use tomet_ast::{Block, Element, Group, Id, List, ListItem, Name, Placement, Sigil, Span, Value};
+use tomet_ast::{
+    Block, Data, Element, Group, Id, List, ListItem, Name, Placement, Sigil, Span, Value,
+};
 
 /// Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
 pub trait ElementExt {
@@ -87,7 +89,7 @@ impl ElementExt for Element {
     }
 
     fn with_args(mut self, args: Value) -> Self {
-        self.args = Some(args);
+        self.data.args = Some(args);
         self
     }
 
@@ -97,7 +99,7 @@ impl ElementExt for Element {
     }
 
     fn with_value(mut self, value: Group) -> Self {
-        self.value = Some(value);
+        self.data.value = Some(value);
         self
     }
 
@@ -119,11 +121,11 @@ impl ElementExt for Element {
     }
 
     fn attrs_view(&self) -> Option<Value> {
-        let args_map = match &self.args {
+        let args_map = match &self.data.args {
             Some(Value::Map(entries)) => Some(entries.clone()),
             _ => None,
         };
-        let value_map = self.value.as_ref().and_then(|v| match v.as_data() {
+        let value_map = self.data.value.as_ref().and_then(|v| match v.as_data() {
             Value::Map(entries) => Some(entries),
             _ => None,
         });
@@ -139,21 +141,21 @@ impl ElementExt for Element {
             }
             (Some(args), None) => Some(Value::Map(args)),
             (None, Some(value)) => Some(Value::Map(value)),
-            (None, None) => self.args.clone(),
+            (None, None) => self.data.args.clone(),
         }
     }
 
     fn attrs_mut(&mut self) -> Option<&mut Value> {
-        self.args.as_mut()
+        self.data.args.as_mut()
     }
 
     fn get_attr<'a>(&'a self, key: &str) -> Option<&'a Value> {
-        if let Some(value) = &self.value
+        if let Some(value) = &self.data.value
             && let Some(found) = value.get(key)
         {
             return Some(found);
         }
-        if let Some(Value::Map(entries)) = &self.args
+        if let Some(Value::Map(entries)) = &self.data.args
             && let Some((_, val)) = entries.iter().find(|(k, _)| k == key)
         {
             return Some(val);
@@ -164,10 +166,15 @@ impl ElementExt for Element {
     fn get_attr_mut<'a>(&'a mut self, key: &str) -> Option<&'a mut Value> {
         // Checked separately from the mutable borrow below so `value` and
         // `args` are never borrowed mutably at the same time.
-        if self.value.as_ref().is_some_and(|v| v.get(key).is_some()) {
-            return self.value.as_mut().and_then(|v| v.get_mut(key));
+        if self
+            .data
+            .value
+            .as_ref()
+            .is_some_and(|v| v.get(key).is_some())
+        {
+            return self.data.value.as_mut().and_then(|v| v.get_mut(key));
         }
-        if let Some(Value::Map(entries)) = &mut self.args
+        if let Some(Value::Map(entries)) = &mut self.data.args
             && let Some((_, val)) = entries.iter_mut().find(|(k, _)| k == key)
         {
             return Some(val);
@@ -180,37 +187,37 @@ impl ElementExt for Element {
     }
 
     fn set_prop(&mut self, key: &str, new_val: Value) {
-        if let Some(value) = &mut self.value
+        if let Some(value) = &mut self.data.value
             && let Some(slot) = value.get_mut(key)
         {
             *slot = new_val;
             return;
         }
-        if let Some(Value::Map(entries)) = &mut self.args
+        if let Some(Value::Map(entries)) = &mut self.data.args
             && let Some((_, val)) = entries.iter_mut().find(|(k, _)| k == key)
         {
             *val = new_val;
             return;
         }
-        if let Some(value @ Group(_)) = &mut self.value {
+        if let Some(value @ Group(_)) = &mut self.data.value {
             value.push_pair(key, new_val);
-        } else if let Some(Value::Map(entries)) = &mut self.args {
+        } else if let Some(Value::Map(entries)) = &mut self.data.args {
             entries.push((key.to_string(), new_val));
-        } else if self.value.is_none() && self.args.is_none() {
-            self.args = Some(Value::Map(vec![(key.to_string(), new_val)]));
-        } else if self.args.is_some() {
-            self.value = Some(Group(vec![tomet_ast::Entry::Pair(
+        } else if self.data.value.is_none() && self.data.args.is_none() {
+            self.data.args = Some(Value::Map(vec![(key.to_string(), new_val)]));
+        } else if self.data.args.is_some() {
+            self.data.value = Some(Group(vec![tomet_ast::Entry::Pair(
                 key.to_string(),
                 new_val,
             )]));
         } else {
-            self.args = Some(Value::Map(vec![(key.to_string(), new_val)]));
+            self.data.args = Some(Value::Map(vec![(key.to_string(), new_val)]));
         }
     }
 
     fn rename_prop_key(&mut self, old_key: &str, new_key: &str) -> bool {
         let mut changed = false;
-        if let Some(Value::Map(entries)) = &mut self.args {
+        if let Some(Value::Map(entries)) = &mut self.data.args {
             for (k, _) in entries.iter_mut() {
                 if k == old_key {
                     *k = new_key.to_string();
@@ -218,7 +225,7 @@ impl ElementExt for Element {
                 }
             }
         }
-        if let Some(value) = &mut self.value {
+        if let Some(value) = &mut self.data.value {
             for (k, _) in value.pairs_mut() {
                 if k == old_key {
                     *k = new_key.to_string();
@@ -231,7 +238,7 @@ impl ElementExt for Element {
 
     fn replace_prop_value(&mut self, target_key: &str, new_val: Value) -> bool {
         let mut changed = false;
-        if let Some(Value::Map(entries)) = &mut self.args {
+        if let Some(Value::Map(entries)) = &mut self.data.args {
             for (k, val) in entries.iter_mut() {
                 if k == target_key {
                     *val = new_val.clone();
@@ -239,7 +246,7 @@ impl ElementExt for Element {
                 }
             }
         }
-        if let Some(value) = &mut self.value {
+        if let Some(value) = &mut self.data.value {
             for (k, val) in value.pairs_mut() {
                 if k == target_key {
                     *val = new_val.clone();
@@ -251,12 +258,12 @@ impl ElementExt for Element {
     }
 
     fn remove_prop(&mut self, key: &str) -> Option<Value> {
-        if let Some(value) = &mut self.value
+        if let Some(value) = &mut self.data.value
             && let Some(removed) = value.remove(key)
         {
             return Some(removed);
         }
-        if let Some(Value::Map(entries)) = &mut self.args
+        if let Some(Value::Map(entries)) = &mut self.data.args
             && let Some(idx) = entries.iter().position(|(k, _)| k == key)
         {
             return Some(entries.remove(idx).1);
@@ -286,9 +293,8 @@ pub fn element_new(sigil: Sigil) -> Element {
     Element {
         sigil,
         placement: Placement::Inline,
-        args: None,
+        data: Data::default(),
         content: None,
-        value: None,
         id: None,
         connects: Vec::new(),
         span: Span::default(),
@@ -329,9 +335,11 @@ pub fn list_item(
         element: Element {
             sigil,
             placement: Placement::Block,
-            args,
+            data: Data {
+                args,
+                value: attrs.map(Group::from_map),
+            },
             content: Some(content),
-            value: attrs.map(Group::from_map),
             id,
             connects,
             span,

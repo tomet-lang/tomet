@@ -381,7 +381,7 @@ pub(crate) fn parse_groups_with_pipe_stack(
                 match cur.peek() {
                     Some('(') => {
                         let conn_args = parse_paren_value(dialect, cur)?;
-                        el.args = merge_values(el.args.as_ref(), Some(&conn_args));
+                        el.data.args = merge_values(el.data.args.as_ref(), Some(&conn_args));
                         continue;
                     }
                     Some('{') => {
@@ -389,7 +389,7 @@ pub(crate) fn parse_groups_with_pipe_stack(
                         // Connect merges pairs into an existing group; a
                         // group holding elements is replaced wholesale,
                         // as there is nothing to merge key-wise.
-                        let merged = match (&el.value, &conn_val) {
+                        let merged = match (&el.data.value, &conn_val) {
                             (Some(existing), Group(_))
                                 if !existing.has_children() && !conn_val.has_children() =>
                             {
@@ -398,15 +398,15 @@ pub(crate) fn parse_groups_with_pipe_stack(
                             }
                             _ => None,
                         };
-                        el.value = Some(merged.unwrap_or(conn_val));
+                        el.data.value = Some(merged.unwrap_or(conn_val));
                         continue;
                     }
                     _ => {}
                 }
             }
             match cur.peek() {
-                Some('(') if el.args.is_none() => {
-                    el.args = Some(parse_paren_value(dialect, cur)?);
+                Some('(') if el.data.args.is_none() => {
+                    el.data.args = Some(parse_paren_value(dialect, cur)?);
                     continue;
                 }
                 Some('[') if el.content.is_none() => {
@@ -443,8 +443,8 @@ pub(crate) fn parse_groups_with_pipe_stack(
                         break;
                     }
                 }
-                Some('{') if el.value.is_none() => {
-                    el.value = Some(parse_value_group(dialect, cur)?);
+                Some('{') if el.data.value.is_none() => {
+                    el.data.value = Some(parse_value_group(dialect, cur)?);
                     continue;
                 }
                 // `#(id)` -- a single slot, read after the three groups
@@ -532,14 +532,13 @@ fn content_lands_at(dialect: Dialect, cur: &Cursor, stop: usize) -> bool {
 /// `:more` connect merely because there happened to be nothing left
 /// after it to disagree.
 fn claimed_something(el: &Element) -> bool {
-    el.args.is_some()
+    el.data.args.is_some()
         || el.content.is_some()
-        || el.value.is_some()
+        || el.data.value.is_some()
         || el.id.is_some()
-        || el
-            .connects
-            .iter()
-            .any(|c| c.args.is_some() || c.content.is_some() || c.value.is_some() || c.id.is_some())
+        || el.connects.iter().any(|c| {
+            c.data.args.is_some() || c.content.is_some() || c.data.value.is_some() || c.id.is_some()
+        })
 }
 
 /// Leftmost position on the current line where the rest of the line,
@@ -675,8 +674,8 @@ impl SugarBody {
     fn from_scratch(content: Vec<Inline>, scratch: Element) -> Self {
         SugarBody {
             content,
-            args: scratch.args,
-            value: scratch.value,
+            args: scratch.data.args,
+            value: scratch.data.value,
             id: scratch.id,
             connects: scratch.connects,
         }

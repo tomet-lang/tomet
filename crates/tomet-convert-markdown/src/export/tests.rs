@@ -1,5 +1,5 @@
 use super::*;
-use tomet_ast::{Group, Paragraph, Placement, RawText, Sigil, Span, Text};
+use tomet_ast::{Data, Group, Paragraph, Placement, RawText, Sigil, Span, Text};
 
 /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`
 /// now) -- every fixture below is still just one paragraph's worth.
@@ -85,15 +85,23 @@ fn adjacent_meta_blocks_have_no_visible_output() {
     fn meta_element(tag: &str) -> Element {
         Element {
             sigil: Sigil::document("meta"),
+
             placement: Placement::Inline,
-            args: Some(Value::String(tag.to_string())),
+
+            data: Data {
+                args: Some(Value::String(tag.to_string())),
+                value: Some(Group::from_map(Value::Map(vec![(
+                    "key".to_string(),
+                    Value::String("value".to_string()),
+                )]))),
+            },
+
             content: None,
-            value: Some(Group::from_map(Value::Map(vec![(
-                "key".to_string(),
-                Value::String("value".to_string()),
-            )]))),
+
             id: None,
+
             connects: Vec::new(),
+
             span: Span::dummy(),
         }
     }
@@ -122,12 +130,20 @@ fn adjacent_meta_blocks_have_no_visible_output() {
 fn heading_element(level: i64, content: Vec<Inline>) -> Element {
     Element {
         sigil: Sigil::named("heading"),
+
         placement: Placement::Block,
-        args: Some(Value::Int(level)),
+
+        data: Data {
+            args: Some(Value::Int(level)),
+            value: None,
+        },
+
         content: Some(wrap_content(content)),
-        value: None,
+
         id: None,
+
         connects: Vec::new(),
+
         span: Span::dummy(),
     }
 }
@@ -217,29 +233,45 @@ fn emphasis_and_strong() {
             vec![
                 Inline::Element(Element {
                     sigil: Sigil::named("em"),
+
                     placement: Placement::Inline,
-                    args: None,
+
+                    data: Data {
+                        args: None,
+                        value: None,
+                    },
+
                     content: Some(wrap_content(vec![Inline::Text(Text::new(
                         "a",
                         Span::dummy(),
                     ))])),
-                    value: None,
+
                     id: None,
+
                     connects: Vec::new(),
+
                     span: Span::dummy(),
                 }),
                 Inline::Text(Text::new(" ", Span::dummy())),
                 Inline::Element(Element {
                     sigil: Sigil::named("strong"),
+
                     placement: Placement::Inline,
-                    args: None,
+
+                    data: Data {
+                        args: None,
+                        value: None,
+                    },
+
                     content: Some(wrap_content(vec![Inline::Text(Text::new(
                         "b",
                         Span::dummy(),
                     ))])),
-                    value: None,
+
                     id: None,
+
                     connects: Vec::new(),
+
                     span: Span::dummy(),
                 }),
             ],
@@ -254,18 +286,26 @@ fn emphasis_and_strong() {
 fn link_round_trips() {
     let el = Element {
         sigil: Sigil::named("link"),
+
         placement: Placement::Inline,
-        args: Some(Value::Map(vec![(
-            "target".to_string(),
-            Value::String("https://example.com".to_string()),
-        )])),
+
+        data: Data {
+            args: Some(Value::Map(vec![(
+                "target".to_string(),
+                Value::String("https://example.com".to_string()),
+            )])),
+            value: None,
+        },
+
         content: Some(wrap_content(vec![Inline::Text(Text::new(
             "Wiki",
             Span::dummy(),
         ))])),
-        value: None,
+
         id: None,
+
         connects: Vec::new(),
+
         span: Span::dummy(),
     };
     let doc = Document {
@@ -282,18 +322,26 @@ fn link_round_trips() {
 fn embed_becomes_image() {
     let el = Element {
         sigil: Sigil::named("embed"),
+
         placement: Placement::Inline,
-        args: Some(Value::Map(vec![(
-            "target".to_string(),
-            Value::String("pic.png".to_string()),
-        )])),
+
+        data: Data {
+            args: Some(Value::Map(vec![(
+                "target".to_string(),
+                Value::String("pic.png".to_string()),
+            )])),
+            value: None,
+        },
+
         content: Some(wrap_content(vec![Inline::Text(Text::new(
             "a cat",
             Span::dummy(),
         ))])),
-        value: None,
+
         id: None,
+
         connects: Vec::new(),
+
         span: Span::dummy(),
     };
     let doc = Document {
@@ -310,18 +358,26 @@ fn embed_becomes_image() {
 fn raw_block_uses_fence_and_lang() {
     let el = Element {
         sigil: Sigil::named("raw"),
+
         placement: Placement::Block,
-        args: Some(Value::Map(vec![(
-            "lang".to_string(),
-            Value::String("rust".to_string()),
-        )])),
+
+        data: Data {
+            args: Some(Value::Map(vec![(
+                "lang".to_string(),
+                Value::String("rust".to_string()),
+            )])),
+            value: None,
+        },
+
         content: Some(wrap_content(vec![Inline::Text(Text::new(
             "fn main() {}",
             Span::dummy(),
         ))])),
-        value: None,
+
         id: None,
+
         connects: Vec::new(),
+
         span: Span::dummy(),
     };
     let doc = Document {
@@ -335,15 +391,23 @@ fn raw_block_uses_fence_and_lang() {
 fn raw_inline_uses_backticks() {
     let el = Element {
         sigil: Sigil::named("raw"),
+
         placement: Placement::Inline,
-        args: None,
+
+        data: Data {
+            args: None,
+            value: None,
+        },
+
         content: Some(wrap_content(vec![Inline::Raw(RawText::new(
             "foo()",
             Span::dummy(),
         ))])),
-        value: None,
+
         id: None,
+
         connects: Vec::new(),
+
         span: Span::dummy(),
     };
     let doc = Document {
@@ -372,7 +436,7 @@ fn thematic_break() {
 #[test]
 fn a_declaration_exports_as_nothing() {
     let mut el = tomet_tree::element_new(Sigil::document("export"));
-    el.args = Some(Value::Map(vec![(
+    el.data.args = Some(Value::Map(vec![(
         "type".to_string(),
         Value::String("commonmark".to_string()),
     )]));
@@ -404,13 +468,13 @@ fn titled_thematic_break_is_not_a_setext_heading() {
 #[test]
 fn wikilink_exports_to_markdown() {
     let mut el1 = tomet_tree::element_new(Sigil::named("link"));
-    el1.args = Some(Value::Map(vec![(
+    el1.data.args = Some(Value::Map(vec![(
         "target".to_string(),
         Value::String("ref:name".to_string()),
     )]));
 
     let mut el2 = tomet_tree::element_new(Sigil::named("link"));
-    el2.args = Some(Value::Map(vec![(
+    el2.data.args = Some(Value::Map(vec![(
         "target".to_string(),
         Value::String("ref:name".to_string()),
     )]));
@@ -437,7 +501,7 @@ fn wikilink_exports_to_markdown() {
 /// there is one.
 fn link_doc(target: &str, label: Option<&str>) -> Document {
     let mut el = tomet_tree::element_new(Sigil::named("link"));
-    el.args = Some(Value::Map(vec![(
+    el.data.args = Some(Value::Map(vec![(
         "target".to_string(),
         Value::String(target.to_string()),
     )]));

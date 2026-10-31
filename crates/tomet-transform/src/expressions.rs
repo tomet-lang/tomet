@@ -189,8 +189,8 @@ impl Pass<'_> {
             Block::Interp(interp) => self.block_expression(&interp.expr, interp.span),
             Block::Section(mut sec) => {
                 sec.title = self.inlines(sec.title);
-                sec.args = sec.args.map(|v| self.value(v));
-                sec.value = sec.value.map(|v| self.element_value(v));
+                sec.data.args = sec.data.args.map(|v| self.value(v));
+                sec.data.value = sec.data.value.map(|v| self.element_value(v));
                 sec.connects = sec.connects.into_iter().map(|c| self.element(c)).collect();
                 let outer = std::mem::replace(&mut self.level, sec.level);
                 sec.blocks = sec.blocks.into_iter().flat_map(|b| self.block(b)).collect();
@@ -251,8 +251,8 @@ impl Pass<'_> {
     // ---- elements and data --------------------------------------------------
 
     fn element(&mut self, mut el: Element) -> Element {
-        el.args = el.args.map(|v| self.value(v));
-        el.value = el.value.map(|v| self.element_value(v));
+        el.data.args = el.data.args.map(|v| self.value(v));
+        el.data.value = el.data.value.map(|v| self.element_value(v));
         el.content = el
             .content
             .map(|blocks| blocks.into_iter().flat_map(|b| self.block(b)).collect());
@@ -520,7 +520,7 @@ impl Ids {
         for conn in &mut el.connects {
             self.element(conn);
         }
-        if let Some(Group(entries)) = &mut el.value {
+        if let Some(Group(entries)) = &mut el.data.value {
             for entry in entries {
                 if let Entry::Element(child) = entry {
                     self.element(child);

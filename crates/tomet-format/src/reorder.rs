@@ -190,7 +190,7 @@ fn collect_swaps_in_element(
     let elem_name = el.sigil.name().map(|n| n.name.as_str()).unwrap_or("");
     if let Some(order) = config.element_group_order(elem_name)
         && matches!(el.sigil, Sigil::Named(_))
-        && el.args.is_some()
+        && el.data.args.is_some()
         && el.content.is_some()
         && !el.span.is_dummy()
     {
@@ -216,7 +216,7 @@ fn collect_swaps_in_element(
             }
         }
     }
-    if let Some(children) = el.value.as_ref().map(|v| v.as_children()) {
+    if let Some(children) = el.data.value.as_ref().map(|v| v.as_children()) {
         for child in children {
             collect_swaps_in_element(child, src, config, swaps, limit);
             if swaps.len() >= limit {

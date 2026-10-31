@@ -376,7 +376,7 @@ fn callout_variant_and_title(el: &Element) -> (String, Option<String>) {
     let mut variant = None;
     let mut title = None;
 
-    if let Some(args) = &el.args {
+    if let Some(args) = &el.data.args {
         match args {
             Value::String(s) => variant = Some(s.clone()),
             Value::Map(entries) => {

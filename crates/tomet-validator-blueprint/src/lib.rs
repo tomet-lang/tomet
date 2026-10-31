@@ -41,9 +41,9 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
         let kind = classify_std_lenient(el);
         if kind == ElementKind::Declaration(DeclKind::Blueprint) {
             found_blueprint = true;
-            if let Some(Value::String(k)) = &el.args {
+            if let Some(Value::String(k)) = &el.data.args {
                 target_kind = k.clone();
-            } else if let Some(Value::Map(entries)) = &el.args
+            } else if let Some(Value::Map(entries)) = &el.data.args
                 && let Some((_, v)) = entries.iter().find(|(k, _)| k == "target" || k == "kind")
                 && let Some(s) = v.as_str()
             {
@@ -52,12 +52,17 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
         } else if kind == ElementKind::Declaration(DeclKind::Id) {
             required_meta_keys.push(("id".to_string(), el.span));
         } else if kind == ElementKind::Declaration(DeclKind::Meta) {
-            if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
+            if let Some(entries) = el
+                .data
+                .value
+                .as_ref()
+                .map(|v| v.pairs().collect::<Vec<_>>())
+            {
                 for (k, _) in entries {
                     required_meta_keys.push((k.clone(), el.span));
                 }
             }
-            if let Some(Value::Map(entries)) = &el.args {
+            if let Some(Value::Map(entries)) = &el.data.args {
                 for (k, _) in entries {
                     if k != "format" {
                         required_meta_keys.push((k.clone(), el.span));
@@ -127,12 +132,17 @@ pub fn validate_against_schema(
             doc_meta_keys.push("id".to_string());
         } else if classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta) {
             doc_meta_span = el.span;
-            if let Some(entries) = el.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
+            if let Some(entries) = el
+                .data
+                .value
+                .as_ref()
+                .map(|v| v.pairs().collect::<Vec<_>>())
+            {
                 for (k, _) in entries {
                     doc_meta_keys.push(k.clone());
                 }
             }
-            if let Some(Value::Map(entries)) = &el.args {
+            if let Some(Value::Map(entries)) = &el.data.args {
                 for (k, _) in entries {
                     if k != "format" {
                         doc_meta_keys.push(k.clone());

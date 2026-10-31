@@ -119,7 +119,7 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::document("meta"));
                 assert_eq!(
-                    el.value,
+                    el.data.value,
                     Some(tomet_ast::Group::from_map(Value::Map(vec![
                         ("title".to_string(), Value::String("Hello".to_string())),
                         ("author".to_string(), Value::String("Alice".to_string())),
@@ -140,7 +140,7 @@ mod tests {
             Block::Element(el) => {
                 assert_eq!(el.sigil, Sigil::document("meta"));
                 assert_eq!(
-                    el.value,
+                    el.data.value,
                     Some(tomet_ast::Group::from_map(Value::Map(vec![
                         ("title".to_string(), Value::String("Doc".to_string())),
                         (
@@ -166,7 +166,7 @@ mod tests {
             panic!("expected meta element");
         };
         assert_eq!(
-            el.value,
+            el.data.value,
             Some(tomet_ast::Group::from_map(Value::Map(vec![(
                 "topics".to_string(),
                 Value::Seq(vec![

@@ -32,7 +32,7 @@ mod tests {
     #[test]
     fn type_sigil_heading_classifies_and_extracts_level() {
         let mut el = element_new(Sigil::named("heading"));
-        el.args = Some(Value::Int(2));
+        el.data.args = Some(Value::Int(2));
         assert_eq!(crate::classify_std_lenient(&el), ElementKind::Heading);
         assert_eq!(heading_level(&el), Some(2));
     }
@@ -40,7 +40,7 @@ mod tests {
     #[test]
     fn at_sigil_heading_classifies_and_extracts_level() {
         let mut el = element_new(Sigil::named("heading"));
-        el.args = Some(Value::Int(3));
+        el.data.args = Some(Value::Int(3));
         assert_eq!(crate::classify_std_lenient(&el), ElementKind::Heading);
         assert_eq!(heading_level(&el), Some(3));
     }
@@ -63,28 +63,28 @@ mod tests {
         // already wrapped in a map -- `normalized_element_args` wraps it
         // under the single "level" positional slot before this reads it.
         let mut el = element_new(Sigil::named("heading"));
-        el.args = Some(Value::Int(1));
+        el.data.args = Some(Value::Int(1));
         assert_eq!(heading_level(&el), Some(1));
     }
 
     #[test]
     fn clamps_level_above_six_down_to_six() {
         let mut el = element_new(Sigil::named("heading"));
-        el.args = Some(Value::Int(9));
+        el.data.args = Some(Value::Int(9));
         assert_eq!(heading_level(&el), Some(6));
     }
 
     #[test]
     fn clamps_level_below_one_up_to_one() {
         let mut el = element_new(Sigil::named("heading"));
-        el.args = Some(Value::Int(0));
+        el.data.args = Some(Value::Int(0));
         assert_eq!(heading_level(&el), Some(1));
     }
 
     #[test]
     fn non_heading_element_is_always_none() {
         let mut el = element_new(Sigil::named("raw"));
-        el.args = Some(Value::Int(2));
+        el.data.args = Some(Value::Int(2));
         assert_eq!(heading_level(&el), None);
     }
 
@@ -97,7 +97,7 @@ mod tests {
     #[test]
     fn heading_with_non_int_level_is_none() {
         let mut el = element_new(Sigil::named("heading"));
-        el.args = Some(Value::Map(vec![(
+        el.data.args = Some(Value::Map(vec![(
             "level".to_string(),
             Value::String("two".to_string()),
         )]));

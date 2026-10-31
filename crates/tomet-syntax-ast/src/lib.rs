@@ -403,8 +403,7 @@ impl Block {
 pub struct Section {
     pub level: usize,
     pub title: Vec<Inline>,
-    pub args: Option<Value>,
-    pub value: Option<Group>,
+    pub data: Data,
     pub id: Option<Id>,
     pub connects: Vec<Element>,
     pub blocks: Vec<Block>,
@@ -416,8 +415,7 @@ impl Section {
         Self {
             level,
             title,
-            args: None,
-            value: None,
+            data: Data::default(),
             id: None,
             connects: Vec::new(),
             blocks: Vec::new(),
@@ -893,6 +891,19 @@ pub enum Placement {
     Inline,
 }
 
+/// The data a node carries: its `(args)` and its `{value}` group, each
+/// optional and at most one of each.
+///
+/// Every node that takes either holds them as a `Data`, so what reads them
+/// (the walkers, the printer, `merge_values`) is written once for all of
+/// them. `[content]` and `#(id)` are not in here on purpose: they differ in
+/// kind (child blocks, an address) and not every node takes them.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct Data {
+    pub args: Option<Value>,
+    pub value: Option<Group>,
+}
+
 /// `(args)` / `[content]` / `{value}`, each optional and at most one of each,
 /// in any order in the source.
 ///
@@ -908,7 +919,7 @@ pub enum Placement {
 pub struct Element {
     pub sigil: Sigil,
     pub placement: Placement,
-    pub args: Option<Value>,
+    pub data: Data,
     /// `[content]` / `|content`, parsed with the exact same recursive block
     /// grammar as `Document.blocks`/`Section.blocks`: a bare run with no
     /// block markers becomes `[Paragraph(...)]`, and blank lines, `=[...]`
@@ -922,7 +933,6 @@ pub struct Element {
     /// vocabulary's own elements). See `tmtroot/docs/spec/feature/
     /// content-shape.tmt`.
     pub content: Option<Vec<Block>>,
-    pub value: Option<Group>,
     pub id: Option<Id>,
     pub connects: Vec<Element>,
     pub span: Span,

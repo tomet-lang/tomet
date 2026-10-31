@@ -8,7 +8,7 @@ use crate::list::peek_list_marker;
 use crate::raw::is_fenced_code_block_start;
 use crate::section::{is_thematic_break, is_titled_thematic_break_start};
 use crate::value::{err, skip_block_comment, skip_inline_ws, skip_line_comment};
-use tomet_ast::{Element, Inline, Placement, RawText, Sigil, SoftBreak, Span, Text, Value};
+use tomet_ast::{Data, Element, Inline, Placement, RawText, Sigil, SoftBreak, Span, Text, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -902,12 +902,14 @@ fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
         // An autolink is found while scanning running text, so it is
         // always part of it.
         placement: Placement::Inline,
-        args: Some(Value::Map(vec![(
-            "target".to_string(),
-            Value::String(url_str),
-        )])),
+        data: Data {
+            args: Some(Value::Map(vec![(
+                "target".to_string(),
+                Value::String(url_str),
+            )])),
+            value: None,
+        },
         content: None,
-        value: None,
         id: None,
         connects: Vec::new(),
         span,

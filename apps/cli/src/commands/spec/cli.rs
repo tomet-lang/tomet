@@ -134,7 +134,7 @@ mod tests {
                     Block::Section(s) => walk(&s.blocks, found),
                     Block::Element(el) => {
                         walk(el.content.as_deref().unwrap_or(&[]), found);
-                        if let Some(tomet_ast::Group(entries)) = &el.value {
+                        if let Some(tomet_ast::Group(entries)) = &el.data.value {
                             for entry in entries {
                                 if let Entry::Element(item) = entry {
                                     walk(item.content.as_deref().unwrap_or(&[]), found);

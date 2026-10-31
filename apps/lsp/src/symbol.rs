@@ -118,7 +118,7 @@ fn collect_element_symbol(
         #[allow(deprecated)]
         DocumentSymbol {
             name,
-            detail: el.args.as_ref().map(|a| format!("{a:?}")),
+            detail: el.data.args.as_ref().map(|a| format!("{a:?}")),
             kind: SymbolKind::OBJECT,
             tags: None,
             deprecated: None,
@@ -171,7 +171,7 @@ fn collect_inline_symbols(
 }
 
 pub(crate) fn list_item_marker_text(item: &Element) -> String {
-    if let Some(marker) = &item.args {
+    if let Some(marker) = &item.data.args {
         return format!("({marker:?})");
     }
     "-".to_string()

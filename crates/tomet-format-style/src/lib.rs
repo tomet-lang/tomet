@@ -211,7 +211,7 @@ pub fn render_value_inner_with_blocks(
         // unresolved in prose.
         Value::Interp(interp) => format!("${{{}}}", interp.expr),
         Value::Element(el) => {
-            let mut s = match &el.args {
+            let mut s = match &el.data.args {
                 Some(args) => format!(
                     "{}({})",
                     el.sigil.head(),
@@ -224,7 +224,7 @@ pub fn render_value_inner_with_blocks(
                 s.push_str(&render_blocks(content, config));
                 s.push(']');
             }
-            if let Some(val) = &el.value {
+            if let Some(val) = &el.data.value {
                 match val {
                     Group(entries) => {
                         s.push('{');
@@ -361,7 +361,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
     }
 
     let mut out = String::from(head);
-    if let Some(args) = &el.args {
+    if let Some(args) = &el.data.args {
         out.push('(');
         out.push_str(&render_args_with_config(args, config));
         out.push(')');
@@ -470,7 +470,7 @@ mod tests {
     #[test]
     fn render_meta_element_single_line_by_default() {
         let mut el = tomet_tree::element_new(Sigil::document("meta"));
-        el.value = Some(Group::from_map(Value::Map(vec![(
+        el.data.value = Some(Group::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )])));
@@ -481,7 +481,7 @@ mod tests {
     #[test]
     fn render_meta_element_keeps_the_double_colon_it_was_written_with() {
         let mut el = tomet_tree::element_new(Sigil::document("meta"));
-        el.value = Some(Group::from_map(Value::Map(vec![(
+        el.data.value = Some(Group::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )])));
@@ -500,7 +500,7 @@ mod tests {
     #[test]
     fn render_meta_element_multiline_when_always_newline_configured() {
         let mut el = tomet_tree::element_new(Sigil::document("meta"));
-        el.value = Some(Group::from_map(Value::Map(vec![(
+        el.data.value = Some(Group::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )])));
@@ -520,7 +520,7 @@ mod tests {
     #[test]
     fn render_meta_element_quotes_keys_that_are_not_identifiers() {
         let mut el = tomet_tree::element_new(Sigil::document("meta"));
-        el.value = Some(Group::from_map(Value::Map(vec![
+        el.data.value = Some(Group::from_map(Value::Map(vec![
             ("plain.key".to_string(), Value::Int(1)),
             ("tmtroot/a b.tmt".to_string(), Value::Int(2)),
         ])));
