@@ -262,6 +262,18 @@ pub fn tokenize(src: &str) -> Vec<(SyntaxKind, &str)> {
                 cursor.eat_while(|ch| ch != '\n');
                 tokens.push((SyntaxKind::COMMENT, cursor.slice_from(start)));
             }
+            // `/* ... */`, anywhere the inline parser skips one, up to the
+            // first `*/` after the opening (they do not nest). The parser
+            // refuses one that is never closed; a lossless tokenizer cannot,
+            // so it runs to the end, which is what an editor shows while the
+            // closing `*/` is not typed yet.
+            '/' if cursor.starts_with("/*") => {
+                let len = src[start + 2..]
+                    .find("*/")
+                    .map_or(src.len() - start, |i| i + 4);
+                cursor.set_pos(start + len);
+                tokens.push((SyntaxKind::COMMENT, cursor.slice_from(start)));
+            }
             '@' => {
                 cursor.bump();
                 tokens.push((SyntaxKind::AT, cursor.slice_from(start)));
@@ -450,6 +462,40 @@ mod tests {
         assert!(kinds("a // c").contains(&SyntaxKind::COMMENT));
         assert!(kinds("// c").contains(&SyntaxKind::COMMENT));
         assert!(!kinds("https://x").contains(&SyntaxKind::COMMENT));
+    }
+
+    #[test]
+    fn a_block_comment_runs_to_the_first_closer_and_does_not_nest() {
+        let comments = |src| -> Vec<String> {
+            tokenize(src)
+                .into_iter()
+                .filter(|(k, _)| *k == SyntaxKind::COMMENT)
+                .map(|(_, t)| t.to_string())
+                .collect()
+        };
+        assert_eq!(comments("a /* b */ c"), ["/* b */"]);
+        assert_eq!(comments("a/* b */c"), ["/* b */"]);
+        assert_eq!(comments("/* a\nb */ c"), ["/* a\nb */"]);
+        assert_eq!(comments("/* a /* b */ c */"), ["/* a /* b */"]);
+        // `/*/` does not close itself.
+        assert_eq!(comments("/*/ x */"), ["/*/ x */"]);
+        // Never closed: to the end, and the text stays whole.
+        assert_eq!(comments("a /* b\nc"), ["/* b\nc"]);
+        assert_eq!(
+            tokenize("a /* b\nc")
+                .iter()
+                .map(|(_, t)| *t)
+                .collect::<String>(),
+            "a /* b\nc"
+        );
+    }
+
+    #[test]
+    fn a_slash_that_opens_nothing_is_a_slash() {
+        let kinds =
+            |src| -> Vec<SyntaxKind> { tokenize(src).into_iter().map(|(k, _)| k).collect() };
+        assert!(!kinds("a / b").contains(&SyntaxKind::COMMENT));
+        assert!(!kinds("a */ b").contains(&SyntaxKind::COMMENT));
     }
 
     #[test]
