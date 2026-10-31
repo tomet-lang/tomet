@@ -25,11 +25,21 @@
 //! a shallower section -- a block nested inside `[content]` (and its own
 //! `#(id)`) is represented, not flattened into inline text.
 //!
-//! Emphasis (`*em*`) and `|`-marked content runs are not modelled: they stay
-//! flat tokens in their paragraph.
+//! Running text carries `EMPHASIS`, `STRONG`, `STRIKEOUT`, `CODE_SPAN` and
+//! `AUTOLINK` nodes where the AST parser reads an `em`, `strong`, `strikeout`,
+//! `raw` or `link` element. What opens a span, and where an address ends, is
+//! decided by the same functions in `inline.rs`, so the two cannot drift.
+//! The tokenizer reads text without context (`_em_` is one identifier, a `//`
+//! inside backticks starts a comment), so a token is split where such a span
+//! starts or ends: the tree is the same text, cut at other places.
+//!
+//! `|`-marked content runs are not modelled yet: they stay flat tokens in
+//! their paragraph or list item.
 
 use tomet_cst::{GreenNodeBuilder, SyntaxKind, SyntaxNode};
-use tomet_lexer::tokenize;
+use tomet_lexer::{Cursor, tokenize};
+
+use crate::inline::{DELIMITERS, autolink_end, autolink_scheme_at, delimited_probe, is_boundary};
 
 use SyntaxKind as K;
 
@@ -38,7 +48,7 @@ use SyntaxKind as K;
 /// Guaranteed Invariant: `parse_cst(src).text().to_string() == src`.
 pub fn parse_cst(src: &str) -> SyntaxNode {
     let raw_tokens = tokenize(src);
-    let mut parser = CstParser::new(&raw_tokens);
+    let mut parser = CstParser::new(src, raw_tokens);
     parser.parse_root();
     SyntaxNode::new_root(parser.builder.finish())
 }
@@ -52,10 +62,17 @@ enum InlineStop {
     /// `]`, depth-counted so a literal `[`/`]` typed as plain prose
     /// (`array[0]`) doesn't end it early.
     Paragraph,
+    /// Up to, not including, the closing delimiter of an `EMPHASIS`,
+    /// `STRONG` or `STRIKEOUT`; or the end of the paragraph, or the `]` that
+    /// closes the group the span stands in, if that comes first.
+    Delim(&'static str),
 }
 
 struct CstParser<'a> {
-    tokens: &'a [(SyntaxKind, &'a str)],
+    src: &'a str,
+    /// The tokens of `src`, in order, each a slice of it. A token is split in
+    /// two (see [`CstParser::split_at`]) where a span starts or ends inside it.
+    tokens: Vec<(SyntaxKind, &'a str)>,
     pos: usize,
     builder: GreenNodeBuilder<'static>,
     /// Whether an element may claim a `:name(...)` group that follows it.
@@ -72,8 +89,9 @@ struct CstParser<'a> {
 }
 
 impl<'a> CstParser<'a> {
-    fn new(tokens: &'a [(SyntaxKind, &'a str)]) -> Self {
+    fn new(src: &'a str, tokens: Vec<(SyntaxKind, &'a str)>) -> Self {
         Self {
+            src,
             tokens,
             pos: 0,
             builder: GreenNodeBuilder::new(),
@@ -105,6 +123,51 @@ impl<'a> CstParser<'a> {
             self.builder.token(kind.into(), text);
             self.pos += 1;
         }
+    }
+
+    /// Emits the current token as `kind`, whatever the tokenizer called it.
+    fn bump_as(&mut self, kind: SyntaxKind) {
+        if let Some((_, text)) = self.tokens.get(self.pos).copied() {
+            self.builder.token(kind.into(), text);
+            self.pos += 1;
+        }
+    }
+
+    /// The byte offset in `src` at which token `i` starts (`src.len()` past
+    /// the last one). Tokens are slices of `src`, so this is pointer
+    /// arithmetic, not a running sum that a split would have to keep right.
+    fn start_of(&self, i: usize) -> usize {
+        match self.tokens.get(i) {
+            Some((_, text)) => text.as_ptr() as usize - self.src.as_ptr() as usize,
+            None => self.src.len(),
+        }
+    }
+
+    /// Makes `byte` the boundary between two tokens, cutting the token that
+    /// spans it and tokenizing each half again: the halves are what the
+    /// tokenizer would have read had the text been split there to begin with.
+    ///
+    /// Only ever called at or after the current token, so `pos` stays valid.
+    fn split_at(&mut self, byte: usize) {
+        let idx = self
+            .tokens
+            .partition_point(|(_, text)| self.token_end(text) <= byte);
+        let Some(&(_, text)) = self.tokens.get(idx) else {
+            return;
+        };
+        let start = text.as_ptr() as usize - self.src.as_ptr() as usize;
+        if start == byte {
+            return;
+        }
+        debug_assert!(idx >= self.pos, "split behind the cursor");
+        let (head, tail) = text.split_at(byte - start);
+        let mut pieces = tokenize(head);
+        pieces.extend(tokenize(tail));
+        self.tokens.splice(idx..=idx, pieces);
+    }
+
+    fn token_end(&self, text: &str) -> usize {
+        text.as_ptr() as usize - self.src.as_ptr() as usize + text.len()
     }
 
     fn bump_while(&mut self, kind: SyntaxKind) {
@@ -300,13 +363,22 @@ impl<'a> CstParser<'a> {
         )
     }
 
+    /// Does a list item start at `i`: a `-` (`-.` for an ordered one), then
+    /// white space, an element's `@`, or a group opener -- the forms
+    /// `list::eat_list_marker` reads. A `-` followed by anything else is prose.
     fn is_list_start_at(&self, i: usize) -> bool {
         if self.kind_at(i) != Some(K::MINUS) {
             return false;
         }
-        let next = self.kind_at(i + 1);
-        next == Some(K::WHITESPACE)
-            || (next == Some(K::DOT) && self.kind_at(i + 2) == Some(K::WHITESPACE))
+        let mut next = i + 1;
+        if self.kind_at(next) == Some(K::DOT) {
+            next += 1;
+        }
+        match self.kind_at(next) {
+            Some(K::WHITESPACE | K::AT | K::L_PAREN | K::L_BRACKET | K::L_BRACE | K::PIPE) => true,
+            Some(K::HASH) => self.id_follows(next),
+            _ => false,
+        }
     }
 
     fn is_code_block_start_at(&self, i: usize) -> bool {
@@ -523,12 +595,193 @@ impl<'a> CstParser<'a> {
                         break;
                     }
                 }
+                InlineStop::Delim(d) => {
+                    // A blank line ends the span unclosed, as it does in the
+                    // AST parser; so does the `]` of the group it stands in.
+                    if k == K::NEWLINE && self.blank_line_follows(self.pos) {
+                        break;
+                    }
+                    if self.in_bracket {
+                        match k {
+                            K::R_BRACKET if depth == 0 => break,
+                            K::R_BRACKET => depth -= 1,
+                            K::L_BRACKET => depth += 1,
+                            _ => {}
+                        }
+                    }
+                    if self.closer_here(d) {
+                        break;
+                    }
+                }
                 _ => {}
             }
-            if !self.try_parse_inline_element() {
+            if !(self.try_parse_code_span()
+                || self.try_parse_autolink(stop)
+                || self.try_parse_inline_element()
+                || self.try_parse_delimited())
+            {
                 self.bump();
             }
         }
+    }
+
+    /// After the `NEWLINE` at `i`: is the next line empty (or the text over)?
+    fn blank_line_follows(&self, i: usize) -> bool {
+        let j = self.skip_ws_from(i + 1);
+        matches!(self.kind_at(j), None | Some(K::NEWLINE))
+    }
+
+    /// Does the closing `delim` of the span being read start at the current
+    /// token? If it starts later inside it (`_em_s` is one identifier), the
+    /// token is cut there and the answer is no, for now: the next token is
+    /// the closer.
+    fn closer_here(&mut self, delim: &str) -> bool {
+        let start = self.start_of(self.pos);
+        let text = self.text_at(self.pos);
+        for (off, _) in text.char_indices() {
+            let at = start + off;
+            if self.closes_at(at, delim) {
+                if off == 0 {
+                    return true;
+                }
+                self.split_at(at);
+                return false;
+            }
+        }
+        false
+    }
+
+    /// A closing delimiter stands at `at`: `delim` there, and not right after
+    /// a space. Same rule as the AST parser's `Stop::Delim`.
+    fn closes_at(&self, at: usize, delim: &str) -> bool {
+        self.src[at..].starts_with(delim) && !is_boundary(self.src[..at].chars().next_back())
+    }
+
+    /// `*em*`, `_em_`, `**strong**`, `__strong__` or `~~struck~~` at the cursor.
+    fn try_parse_delimited(&mut self) -> bool {
+        let start = self.start_of(self.pos);
+        if !matches!(self.src.as_bytes().get(start), Some(b'*' | b'_' | b'~')) {
+            return false;
+        }
+        let mut cur = Cursor::new(self.src);
+        cur.set_pos(start);
+        for (delim, name) in DELIMITERS {
+            if !delimited_probe(&cur, delim) {
+                continue;
+            }
+            let kind = match name {
+                "strong" => K::STRONG,
+                "strikeout" => K::STRIKEOUT,
+                _ => K::EMPHASIS,
+            };
+            self.builder.start_node(kind.into());
+            self.bump_delimiter(delim);
+            self.parse_inline(InlineStop::Delim(delim));
+            if self.closes_at(self.start_of(self.pos), delim) {
+                self.bump_delimiter(delim);
+            }
+            self.builder.finish_node();
+            return true;
+        }
+        false
+    }
+
+    /// Emits the delimiter at the cursor one character per token, each as the
+    /// token it is, however the tokenizer read it (`__` is part of an `IDENT`).
+    fn bump_delimiter(&mut self, delim: &str) {
+        for c in delim.chars() {
+            let at = self.start_of(self.pos);
+            self.split_at(at + c.len_utf8());
+            self.bump_as(match c {
+                '*' => K::STAR,
+                '_' => K::UNDERSCORE,
+                '~' => K::TILDE,
+                _ => K::TEXT_CHUNK,
+            });
+        }
+    }
+
+    /// `` `code` `` at the cursor: a run of backticks, then the first run of
+    /// the same length on the same line. What stands between is code, read as
+    /// nothing else -- the tokenizer's idea of a comment or a string included.
+    fn try_parse_code_span(&mut self) -> bool {
+        if self.current_kind() != Some(K::BACKTICK) {
+            return false;
+        }
+        let bytes = self.src.as_bytes();
+        let start = self.start_of(self.pos);
+        let fence = bytes[start..].iter().take_while(|&&b| b == b'`').count();
+        let inner_start = start + fence;
+        let mut i = inner_start;
+        let mut inner_end = None;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'\n' | b'\r' => break,
+                b'`' => {
+                    let run = bytes[i..].iter().take_while(|&&b| b == b'`').count();
+                    if run == fence {
+                        inner_end = Some(i);
+                        break;
+                    }
+                    i += run;
+                }
+                _ => i += 1,
+            }
+        }
+        let Some(inner_end) = inner_end else {
+            return false;
+        };
+        self.split_at(inner_end);
+        self.split_at(inner_end + fence);
+        self.builder.start_node(K::CODE_SPAN.into());
+        while self.start_of(self.pos) < inner_start {
+            self.bump_as(K::BACKTICK);
+        }
+        while self.start_of(self.pos) < inner_end {
+            self.bump_as(K::TEXT_CHUNK);
+        }
+        while self.start_of(self.pos) < inner_end + fence && !self.is_eof() {
+            self.bump_as(K::BACKTICK);
+        }
+        self.builder.finish_node();
+        true
+    }
+
+    /// A bare `https://`, `http://` or `mailto:` address at the cursor.
+    fn try_parse_autolink(&mut self, stop: InlineStop) -> bool {
+        let start = self.start_of(self.pos);
+        let mut cur = Cursor::new(self.src);
+        cur.set_pos(start);
+        let Some(scheme_len) = autolink_scheme_at(&cur) else {
+            return false;
+        };
+        let mut scanned = start;
+        for (off, ch) in self.src[start..].char_indices() {
+            let at = start + off;
+            if matches!(ch, ' ' | '\t' | '\n' | '\r') || ch < ' ' {
+                break;
+            }
+            if let InlineStop::Delim(d) = stop
+                && self.closes_at(at, d)
+            {
+                break;
+            }
+            scanned = at + ch.len_utf8();
+        }
+        let Some(end) = autolink_end(self.src, start, scheme_len, scanned) else {
+            return false;
+        };
+        self.split_at(end);
+        self.builder.start_node(K::AUTOLINK.into());
+        while self.start_of(self.pos) < end && !self.is_eof() {
+            match self.current_kind() {
+                // `//` inside an address is part of it, not a comment.
+                Some(K::COMMENT) => self.bump_as(K::TEXT_CHUNK),
+                _ => self.bump(),
+            }
+        }
+        self.builder.finish_node();
+        true
     }
 
     /// Parses an element at the cursor if the tokens form one.

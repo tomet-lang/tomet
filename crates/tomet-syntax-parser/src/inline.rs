@@ -1,4 +1,4 @@
-//! Parsing for inline sequences, text normalization, and inline delimiters (`*em*`, `**strong**`, `==mark==`).
+//! Parsing for inline sequences, text normalization, and inline delimiters (`*em*`, `_em_`, `**strong**`, `__strong__`, `~~strikeout~~`).
 
 use crate::dialect::Dialect;
 use crate::element::{LineEnd, element_ends_line, is_element_start, parse_element};
@@ -430,7 +430,9 @@ fn trim_edges(mut items: Vec<Inline>) -> Vec<Inline> {
     items
 }
 
-const DELIMITERS: [(&str, &str); 5] = [
+/// The inline delimiters and the element each one makes, longest first so
+/// `**` is tried before `*`.
+pub(crate) const DELIMITERS: [(&str, &str); 5] = [
     ("**", "strong"),
     ("__", "strong"),
     ("~~", "strikeout"),
@@ -438,12 +440,49 @@ const DELIMITERS: [(&str, &str); 5] = [
     ("_", "em"),
 ];
 
-fn char_before(cur: &Cursor) -> Option<char> {
+pub(crate) fn char_before(cur: &Cursor) -> Option<char> {
     cur.src()[..cur.pos()].chars().next_back()
 }
 
-fn is_boundary(c: Option<char>) -> bool {
+pub(crate) fn is_boundary(c: Option<char>) -> bool {
     matches!(c, None | Some(' ') | Some('\t') | Some('\n') | Some('\r'))
+}
+
+/// Whether `delim` opens a span at `cur`: it stands there, is not the middle
+/// of a word (for `_`), has text right after it, and a closing `delim` follows
+/// before the paragraph ends.
+///
+/// Shared with the CST parser, so the two cannot disagree on what opens.
+pub(crate) fn delimited_probe(cur: &Cursor, delim: &str) -> bool {
+    if !cur.starts_with(delim) {
+        return false;
+    }
+    if delim.starts_with('_') && char_before(cur).is_some_and(|c| c.is_alphanumeric()) {
+        return false;
+    }
+    let mut open = *cur;
+    open.eat_str(delim);
+    if is_boundary(open.peek()) {
+        return false;
+    }
+    let mut probe = open;
+    loop {
+        if probe.starts_with(delim) && (delim == "~~" || !is_boundary(char_before(&probe))) {
+            return true;
+        }
+        if probe.is_eof() {
+            return false;
+        }
+        if probe.peek() == Some('\n') {
+            let mut look = probe;
+            look.bump();
+            skip_inline_ws(&mut look);
+            if look.is_eof() || look.peek() == Some('\n') {
+                return false;
+            }
+        }
+        probe.bump();
+    }
 }
 
 fn try_delimited(
@@ -467,35 +506,11 @@ fn try_one_delimited(
     allow_colon_connect: bool,
 ) -> Result<Option<Element>> {
     let start_pos = cur.pos();
-    if !cur.starts_with(delim) {
-        return Ok(None);
-    }
-    if delim.starts_with('_') && char_before(cur).is_some_and(|c| c.is_alphanumeric()) {
+    if !delimited_probe(cur, delim) {
         return Ok(None);
     }
     let mut open = *cur;
     open.eat_str(delim);
-    if is_boundary(open.peek()) {
-        return Ok(None);
-    }
-    let mut probe = open;
-    loop {
-        if probe.starts_with(delim) && (delim == "~~" || !is_boundary(char_before(&probe))) {
-            break;
-        }
-        if probe.is_eof() {
-            return Ok(None);
-        }
-        if probe.peek() == Some('\n') {
-            let mut look = probe;
-            look.bump();
-            skip_inline_ws(&mut look);
-            if look.is_eof() || look.peek() == Some('\n') {
-                return Ok(None);
-            }
-        }
-        probe.bump();
-    }
 
     cur.set_pos(open.pos());
     let inner = parse_inline_seq(dialect, cur, Stop::Delim(delim), allow_colon_connect)?;
@@ -747,19 +762,81 @@ fn split_softbreaks(items: &mut Vec<Inline>, raw: &str, base: usize, pipe_cols: 
 }
 
 fn is_autolink_start(cur: &Cursor) -> bool {
+    autolink_scheme_at(cur).is_some()
+}
+
+/// The length of the scheme (`https://`, `http://`, `mailto:`) an autolink
+/// starts with at `cur`, if one starts there and not in the middle of a word.
+pub(crate) fn autolink_scheme_at(cur: &Cursor) -> Option<usize> {
     if char_before(cur).is_some_and(|c| c.is_alphanumeric()) {
-        return false;
+        return None;
     }
-    cur.starts_with("https://") || cur.starts_with("http://") || cur.starts_with("mailto:")
+    if cur.starts_with("https://") {
+        Some(8)
+    } else if cur.starts_with("http://") || cur.starts_with("mailto:") {
+        Some(7)
+    } else {
+        None
+    }
+}
+
+/// Where the autolink that starts at `start` ends, given that the address
+/// ran up to `scanned_end` (the first whitespace or the end of its group):
+/// without the punctuation and the unmatched closers that belong to the
+/// sentence around it. `None` if nothing is left after the scheme.
+///
+/// Shared with the CST parser, so the two cannot disagree on where it ends.
+pub(crate) fn autolink_end(
+    src: &str,
+    start: usize,
+    scheme_len: usize,
+    scanned_end: usize,
+) -> Option<usize> {
+    if scanned_end - start <= scheme_len {
+        return None;
+    }
+    let mut end_pos = scanned_end;
+
+    while end_pos > start + scheme_len {
+        let slice = &src[start..end_pos];
+        let last_char = slice.chars().next_back().unwrap();
+        if matches!(last_char, '.' | ',' | ';' | ':' | '!' | '?' | '"' | '\'') {
+            end_pos -= last_char.len_utf8();
+        } else if last_char == '>' {
+            let open_count = slice.chars().filter(|&c| c == '<').count();
+            let close_count = slice.chars().filter(|&c| c == '>').count();
+            if close_count > open_count {
+                end_pos -= 1;
+            } else {
+                break;
+            }
+        } else if last_char == ')' {
+            let open_count = slice.chars().filter(|&c| c == '(').count();
+            let close_count = slice.chars().filter(|&c| c == ')').count();
+            if close_count > open_count {
+                end_pos -= 1;
+            } else {
+                break;
+            }
+        } else if last_char == ']' {
+            let open_count = slice.chars().filter(|&c| c == '[').count();
+            let close_count = slice.chars().filter(|&c| c == ']').count();
+            if close_count > open_count {
+                end_pos -= 1;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    (end_pos > start + scheme_len).then_some(end_pos)
 }
 
 fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
     let start_pos = cur.pos();
-    let scheme_len = if cur.starts_with("https://") {
-        8
-    } else if cur.starts_with("http://") || cur.starts_with("mailto:") {
-        7
-    } else {
+    let Some(scheme_len) = autolink_scheme_at(cur) else {
         return Ok(None);
     };
 
@@ -811,52 +888,10 @@ fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
         probe.bump();
     }
 
-    let scanned_end = probe.pos();
-    let raw_len = scanned_end - start_pos;
-    if raw_len <= scheme_len {
-        return Ok(None);
-    }
-
     let src = cur.src();
-    let mut end_pos = scanned_end;
-
-    while end_pos > start_pos + scheme_len {
-        let slice = &src[start_pos..end_pos];
-        let last_char = slice.chars().next_back().unwrap();
-        if matches!(last_char, '.' | ',' | ';' | ':' | '!' | '?' | '"' | '\'') {
-            end_pos -= last_char.len_utf8();
-        } else if last_char == '>' {
-            let open_count = slice.chars().filter(|&c| c == '<').count();
-            let close_count = slice.chars().filter(|&c| c == '>').count();
-            if close_count > open_count {
-                end_pos -= 1;
-            } else {
-                break;
-            }
-        } else if last_char == ')' {
-            let open_count = slice.chars().filter(|&c| c == '(').count();
-            let close_count = slice.chars().filter(|&c| c == ')').count();
-            if close_count > open_count {
-                end_pos -= 1;
-            } else {
-                break;
-            }
-        } else if last_char == ']' {
-            let open_count = slice.chars().filter(|&c| c == '[').count();
-            let close_count = slice.chars().filter(|&c| c == ']').count();
-            if close_count > open_count {
-                end_pos -= 1;
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-
-    if end_pos <= start_pos + scheme_len {
+    let Some(end_pos) = autolink_end(src, start_pos, scheme_len, probe.pos()) else {
         return Ok(None);
-    }
+    };
 
     let url_str = src[start_pos..end_pos].to_string();
     cur.set_pos(end_pos);

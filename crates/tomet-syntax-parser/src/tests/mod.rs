@@ -2,6 +2,7 @@
 
 mod comments;
 mod connects;
+mod cst;
 mod document_declarations;
 mod elements;
 mod fences;

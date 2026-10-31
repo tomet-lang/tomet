@@ -87,6 +87,20 @@ pub enum SyntaxKind {
     SEQ_LITERAL,
     SEQ_ITEM,
     INTERP_EXPR,
+    /// `*em*` or `_em_`: the delimiters are the first and last tokens, the
+    /// running text between them is read as in any paragraph.
+    EMPHASIS,
+    /// `**strong**` or `__strong__`.
+    STRONG,
+    /// `~~struck~~`.
+    STRIKEOUT,
+    /// `` `code` `` (or a longer fence, ``` ``a`b`` ```): the fences are
+    /// `BACKTICK` tokens, everything between them is `TEXT_CHUNK` and is
+    /// never read as syntax.
+    CODE_SPAN,
+    /// A bare `https://`, `http://` or `mailto:` address in running text,
+    /// without the punctuation that closes the sentence around it.
+    AUTOLINK,
     ERROR,
 
     // Must be the last variant
