@@ -1,8 +1,8 @@
 //! Construction and detection of `@conflict` marker elements, and the
 //! text/block unit helpers shared by [`crate::merge`], [`crate::resolve`],
-//! and [`crate::find_conflicts`].
+//! and [`crate::conflict`].
 
-use tomet_edit::{AttrSlot, EditDoc, EditValue, EditValueKind, NodeId, import_source};
+use tomet_edit::{EditDoc, NodeId, import_source};
 
 /// The raw-text substring other crates can look for without parsing a
 /// document -- a cheap "does this note have a conflict in it at all"
@@ -189,41 +189,51 @@ pub(crate) fn extract_conflict_inline_side(inner_raw: &str) -> String {
     s.to_string()
 }
 
-pub(crate) fn block_conflict_sides_from_slot(slot: &AttrSlot) -> Option<(String, String)> {
-    let a_entry = slot.entries.iter().find(|e| e.key == "a")?;
-    let b_entry = slot.entries.iter().find(|e| e.key == "b")?;
-    let a_raw = a_entry.value.raw.trim();
-    let b_raw = b_entry.value.raw.trim();
-    let a_inner = a_raw.strip_prefix('[')?.strip_suffix(']')?;
-    let b_inner = b_raw.strip_prefix('[')?.strip_suffix(']')?;
-    Some((a_inner.to_string(), b_inner.to_string()))
-}
-
-pub(crate) fn value_conflict_sides_from_value(val: &EditValue) -> Option<(&EditValue, &EditValue)> {
-    let EditValueKind::Element {
-        name,
-        args: Some(slot),
-        ..
-    } = &val.kind
-    else {
-        return None;
-    };
-    if name != "conflict" {
-        return None;
-    }
-    let a_entry = slot.entries.iter().find(|e| e.key == "a")?;
-    let b_entry = slot.entries.iter().find(|e| e.key == "b")?;
-    let a_trim = a_entry.value.raw.trim();
-    if a_trim.starts_with('[') && a_trim.ends_with(']') {
-        return None;
-    }
-    Some((&a_entry.value, &b_entry.value))
-}
-
 pub(crate) fn unquote_scalar_display(s: &str) -> String {
     if s.len() >= 2 && s.starts_with('"') && s.ends_with('"') {
         s[1..s.len() - 1].replace("\\\"", "\"").replace("\\\\", "\\")
     } else {
         s.to_string()
+    }
+}
+
+/// A value written for one side of a value-position `@conflict(a: ..., b: ...)`.
+///
+/// A `|` run cannot stand there: it ends where its markers stop, so it would
+/// swallow the `, b: ...` after it and the marker could not be read back. It
+/// means `[ ... ]` (a `|content` is that, spelled without brackets), so it is
+/// written as that. Any other value is written as it is.
+pub(crate) fn value_side_for_marker(raw: &str) -> String {
+    let raw = raw.trim();
+    let Some(rest) = raw.strip_prefix('|') else {
+        return raw.to_string();
+    };
+    let lines: Vec<&str> = rest
+        .split('\n')
+        .enumerate()
+        .map(|(i, line)| {
+            let line = if i == 0 {
+                line
+            } else {
+                let line = line.trim_start();
+                line.strip_prefix('|').unwrap_or(line)
+            };
+            line.strip_prefix(' ').unwrap_or(line).trim_end()
+        })
+        .collect();
+    match lines.as_slice() {
+        [one] => format!("[ {one} ]"),
+        many => {
+            let mut out = String::from("[\n");
+            for line in many {
+                if !line.is_empty() {
+                    out.push_str("    ");
+                    out.push_str(line);
+                }
+                out.push('\n');
+            }
+            out.push_str("  ]");
+            out
+        }
     }
 }

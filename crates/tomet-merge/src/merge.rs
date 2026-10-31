@@ -8,9 +8,12 @@ use tomet_edit::{
     parse_edit_value_str, parse_inline_items,
 };
 
+use crate::conflict::has_conflicts;
 use crate::diff3;
-use crate::find_conflicts::has_conflicts_doc;
-use crate::markers::{BlockUnit, UnitKind, build_conflict_block_unit, format_inline_conflict_span};
+use crate::markers::{
+    BlockUnit, UnitKind, build_conflict_block_unit, format_inline_conflict_span,
+    value_side_for_marker,
+};
 
 /// The outcome of a format-preserving three-way merge.
 #[derive(Debug, Clone)]
@@ -29,7 +32,7 @@ pub struct MergeResult {
 pub fn merge(base: &str, local: &str, remote: &str) -> MergeResult {
     if local == remote || base == remote {
         let doc = import_source(local);
-        let clean = !has_conflicts_doc(&doc);
+        let clean = !has_conflicts(local);
         return MergeResult {
             text: local.to_string(),
             doc,
@@ -38,7 +41,7 @@ pub fn merge(base: &str, local: &str, remote: &str) -> MergeResult {
     }
     if base == local {
         let doc = import_source(remote);
-        let clean = !has_conflicts_doc(&doc);
+        let clean = !has_conflicts(remote);
         return MergeResult {
             text: remote.to_string(),
             doc,
@@ -55,7 +58,7 @@ pub fn merge_doc(base: &EditDoc, local: &EditDoc, remote: &EditDoc) -> MergeResu
     let remote_src = export_doc(remote);
 
     if local_src == remote_src || base_src == remote_src {
-        let clean = !has_conflicts_doc(local);
+        let clean = !has_conflicts(&local_src);
         return MergeResult {
             text: local_src,
             doc: local.clone(),
@@ -63,7 +66,7 @@ pub fn merge_doc(base: &EditDoc, local: &EditDoc, remote: &EditDoc) -> MergeResu
         };
     }
     if base_src == local_src {
-        let clean = !has_conflicts_doc(remote);
+        let clean = !has_conflicts(&remote_src);
         return MergeResult {
             text: remote_src,
             doc: remote.clone(),
@@ -960,29 +963,30 @@ fn merge_edit_value(
         return (remote.clone(), true);
     }
 
-    match (&local.kind, &remote.kind) {
-        (EditValueKind::Map(l_slot), EditValueKind::Map(r_slot)) => {
-            let empty_slot = AttrSlot::new_empty("{", "}");
-            let b_slot = match base.map(|b| &b.kind) {
-                Some(EditValueKind::Map(s)) => s,
-                _ => &empty_slot,
-            };
-            if let Some((merged_slot, clean)) = merge_attr_slot(b_slot, l_slot, r_slot) {
-                return (
-                    EditValue {
-                        raw: merged_slot.export(),
-                        edited: true,
-                        kind: EditValueKind::Map(merged_slot),
-                    },
-                    clean,
-                );
-            }
+    if let (EditValueKind::Map(l_slot), EditValueKind::Map(r_slot)) = (&local.kind, &remote.kind) {
+        let empty_slot = AttrSlot::new_empty("{", "}");
+        let b_slot = match base.map(|b| &b.kind) {
+            Some(EditValueKind::Map(s)) => s,
+            _ => &empty_slot,
+        };
+        if let Some((merged_slot, clean)) = merge_attr_slot(b_slot, l_slot, r_slot) {
+            return (
+                EditValue {
+                    raw: merged_slot.export(),
+                    edited: true,
+                    kind: EditValueKind::Map(merged_slot),
+                },
+                clean,
+            );
         }
-        _ => {}
     }
 
     (
-        parse_edit_value_str(&format!("@conflict(a: {l_trim}, b: {r_trim})")),
+        parse_edit_value_str(&format!(
+            "@conflict(a: {}, b: {})",
+            value_side_for_marker(l_trim),
+            value_side_for_marker(r_trim)
+        )),
         false,
     )
 }

@@ -33,20 +33,33 @@
 //!      values to `@conflict(a: <local>, b: <remote>)`.
 //! 3. **Block-level fallback** — when block kinds or counts disagree,
 //!    emit a block-level `@conflict(a: [ ... ], b: [ ... ])` element.
+//!
+//! A value that is written as a `|` run (`about: | text`) cannot stand
+//! inside `@conflict(a: ..., b: ...)`, where it would swallow the `, b: ...`;
+//! it is written there as the `[ ... ]` it means.
+//!
+//! # Conflicts
+//!
+//! [`find_conflicts`] lists the markers of a document and [`resolve`],
+//! [`resolve_all`] and [`resolve_single`] take them out by choosing a side. They read the
+//! CST, so a marker is found wherever the text has one -- a paragraph, a list
+//! item, a heading, an element's content, a value -- and each comes with its
+//! byte span and its sides as written, never printed again.
+//!
+//! A marker that cannot be read (unclosed, a side missing, a third key) is a
+//! [`ConflictError`], not a marker to step over: [`has_conflicts`] says `true`
+//! for it, and nothing resolves past it.
 
+mod conflict;
 mod diff3;
-mod find_conflicts;
 mod markers;
 mod merge;
 mod resolve;
 
-pub use find_conflicts::{ConflictItem, find_conflicts, find_conflicts_doc, has_conflicts, has_conflicts_doc};
+pub use conflict::{ConflictError, ConflictItem, ConflictKind, find_conflicts, has_conflicts};
 pub use markers::CONFLICT_MARKER;
 pub use merge::{MergeResult, merge, merge_doc};
-pub use resolve::{
-    ConflictResolution, resolve, resolve_all, resolve_all_doc, resolve_doc, resolve_single,
-    resolve_single_doc,
-};
+pub use resolve::{ConflictResolution, resolve, resolve_all, resolve_single};
 
 #[cfg(test)]
 mod tests {
@@ -101,18 +114,19 @@ mod tests {
         let remote = "The fast brown fox.\n";
         let merged = merge(base, local, remote);
 
-        let a = resolve(&merged.text, &[ConflictResolution::A]);
+        let a = resolve(&merged.text, &[ConflictResolution::A]).unwrap();
         assert!(!has_conflicts(&a));
         assert_eq!(a, "The slow brown fox.\n");
 
-        let b = resolve(&merged.text, &[ConflictResolution::B]);
+        let b = resolve(&merged.text, &[ConflictResolution::B]).unwrap();
         assert!(!has_conflicts(&b));
         assert_eq!(b, "The fast brown fox.\n");
 
         let custom = resolve(
             &merged.text,
             &[ConflictResolution::Rewritten("agile".into())],
-        );
+        )
+        .unwrap();
         assert!(!has_conflicts(&custom));
         assert_eq!(custom, "The agile brown fox.\n");
     }
@@ -121,7 +135,8 @@ mod tests {
     fn edits_to_different_data_keys_merge_cleanly() {
         let base = "::meta{\n  title: \"Old\"\n  status: \"draft\"\n}\n\nBody.\n";
         let local = "::meta{\n  title: \"New\"\n  status: \"draft\"\n}\n\nBody.\n";
-        let remote = "::meta{\n  title: \"Old\"\n  status: \"published\"\n  tag: \"v1\"\n}\n\nBody.\n";
+        let remote =
+            "::meta{\n  title: \"Old\"\n  status: \"published\"\n  tag: \"v1\"\n}\n\nBody.\n";
 
         let out = merge(base, local, remote);
         assert!(out.clean);
@@ -176,18 +191,19 @@ mod tests {
         let remote = "::meta{\n  title: \"Remote\"\n}\n";
         let merged = merge(base, local, remote);
 
-        let picked_a = resolve(&merged.text, &[ConflictResolution::A]);
+        let picked_a = resolve(&merged.text, &[ConflictResolution::A]).unwrap();
         assert!(!has_conflicts(&picked_a));
         assert_eq!(picked_a, "::meta{\n  title: \"Local\"\n}\n");
 
-        let picked_b = resolve(&merged.text, &[ConflictResolution::B]);
+        let picked_b = resolve(&merged.text, &[ConflictResolution::B]).unwrap();
         assert!(!has_conflicts(&picked_b));
         assert_eq!(picked_b, "::meta{\n  title: \"Remote\"\n}\n");
 
         let rewritten = resolve(
             &merged.text,
             &[ConflictResolution::Rewritten("Both".into())],
-        );
+        )
+        .unwrap();
         assert!(!has_conflicts(&rewritten));
         assert_eq!(rewritten, "::meta{\n  title: \"Both\"\n}\n");
     }
@@ -221,7 +237,7 @@ mod tests {
         let remote = "Remote.\n";
         let merged = merge(base, local, remote);
 
-        let resolved = resolve(&merged.text, &[ConflictResolution::A]);
+        let resolved = resolve(&merged.text, &[ConflictResolution::A]).unwrap();
         assert!(!has_conflicts(&resolved));
         assert_eq!(resolved, local);
     }
@@ -233,7 +249,7 @@ mod tests {
         let remote = "Remote.\n";
         let merged = merge(base, local, remote);
 
-        let resolved = resolve(&merged.text, &[ConflictResolution::B]);
+        let resolved = resolve(&merged.text, &[ConflictResolution::B]).unwrap();
         assert!(!has_conflicts(&resolved));
         assert_eq!(resolved, remote);
     }
@@ -245,10 +261,10 @@ mod tests {
         let remote = "B1.\n\nB2.\n";
         let merged = merge(base, local, remote);
 
-        let half = resolve(&merged.text, &[ConflictResolution::A]);
+        let half = resolve(&merged.text, &[ConflictResolution::A]).unwrap();
         assert!(has_conflicts(&half));
 
-        let done = resolve(&half, &[ConflictResolution::B]);
+        let done = resolve(&half, &[ConflictResolution::B]).unwrap();
         assert!(!has_conflicts(&done));
         assert_eq!(done, "::kind(a1)\n\nB2.\n");
     }
@@ -260,11 +276,11 @@ mod tests {
         let remote = "B1.\n\nB2.\n";
         let merged = merge(base, local, remote);
 
-        let all_a = resolve_all(&merged.text, ConflictResolution::A);
+        let all_a = resolve_all(&merged.text, ConflictResolution::A).unwrap();
         assert!(!has_conflicts(&all_a));
         assert_eq!(all_a, local);
 
-        let all_b = resolve_all(&merged.text, ConflictResolution::B);
+        let all_b = resolve_all(&merged.text, ConflictResolution::B).unwrap();
         assert!(!has_conflicts(&all_b));
         assert_eq!(all_b, remote);
     }
@@ -276,7 +292,7 @@ mod tests {
         let remote = "::meta{\n  title: \"Remote\"\n}\n\nHello friend.\n";
         let merged = merge(base, local, remote);
 
-        let items = find_conflicts(&merged.text);
+        let items = find_conflicts(&merged.text).unwrap();
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].index, 0);
         assert_eq!(items[0].a, "Local");
@@ -285,12 +301,12 @@ mod tests {
         assert_eq!(items[1].a, "there");
         assert_eq!(items[1].b, "friend");
 
-        let step1 = resolve_single(&merged.text, 1, ConflictResolution::Both);
-        let remaining = find_conflicts(&step1);
+        let step1 = resolve_single(&merged.text, 1, ConflictResolution::Both).unwrap();
+        let remaining = find_conflicts(&step1).unwrap();
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].a, "Local");
 
-        let step2 = resolve_single(&step1, 0, ConflictResolution::Both);
+        let step2 = resolve_single(&step1, 0, ConflictResolution::Both).unwrap();
         assert!(!has_conflicts(&step2));
         assert_eq!(
             step2,
@@ -343,8 +359,10 @@ mod tests {
     #[test]
     fn case_2_untouched_inline_sugar_preserved() {
         let base = "Paragraph with *italic* and **bold** and `inline_code`.\n\nOther paragraph.\n";
-        let local = "Paragraph with *italic* and **bold** and `inline_code`.\n\nOther paragraph edited.\n";
-        let remote = "Updated paragraph with *italic* and **bold** and `inline_code`.\n\nOther paragraph.\n";
+        let local =
+            "Paragraph with *italic* and **bold** and `inline_code`.\n\nOther paragraph edited.\n";
+        let remote =
+            "Updated paragraph with *italic* and **bold** and `inline_code`.\n\nOther paragraph.\n";
 
         let merged = merge(base, local, remote);
         assert!(merged.clean);
@@ -523,19 +541,96 @@ mod tests {
         let merged = merge(base, local, remote);
         assert!(!merged.clean);
         assert!(has_conflicts(&merged.text));
-        let conflicts = find_conflicts(&merged.text);
+        let conflicts = find_conflicts(&merged.text).unwrap();
         assert_eq!(conflicts.len(), 3);
 
-        let resolved_a = resolve_all(&merged.text, ConflictResolution::A);
+        let resolved_a = resolve_all(&merged.text, ConflictResolution::A).unwrap();
         assert_eq!(resolved_a, local);
         assert!(!has_conflicts(&resolved_a));
 
-        let resolved_b = resolve_all(&merged.text, ConflictResolution::B);
+        let resolved_b = resolve_all(&merged.text, ConflictResolution::B).unwrap();
         assert_eq!(resolved_b, remote);
         assert!(!has_conflicts(&resolved_b));
 
-        let step1 = resolve_single(&merged.text, 0, ConflictResolution::B);
-        assert_eq!(find_conflicts(&step1).len(), 2);
+        let step1 = resolve_single(&merged.text, 0, ConflictResolution::B).unwrap();
+        assert_eq!(find_conflicts(&step1).unwrap().len(), 2);
         assert!(step1.starts_with("::meta{ title: \"Test\", count: 3 }\n\n"));
+    }
+}
+
+#[cfg(test)]
+mod pipe_content_tests {
+    use super::*;
+
+    // `|content` is `[content]` without brackets. The edit model once wrote a
+    // `[` of its own in front of the `|` whenever it wrote such content again.
+
+    fn assert_readable(text: &str) {
+        assert!(
+            tomet_parser::parse_document(text).is_ok(),
+            "the merged text is not a document the parser reads:\n{text}"
+        );
+    }
+
+    #[test]
+    fn edits_on_different_lines_of_a_pipe_run_both_apply() {
+        let base = "@quote\n| alpha\n| beta\n";
+        let out = merge(
+            base,
+            "@quote\n| Alpha\n| beta\n",
+            "@quote\n| alpha\n| Beta\n",
+        );
+        assert!(out.clean, "{:?}", out.text);
+        assert_eq!(out.text, "@quote\n| Alpha\n| Beta\n");
+        assert_readable(&out.text);
+    }
+
+    #[test]
+    fn a_pipe_run_on_the_elements_own_line() {
+        let base = "@quote| one two\n";
+        let out = merge(base, "@quote| ONE two\n", "@quote| one TWO\n");
+        assert!(out.clean, "{:?}", out.text);
+        assert_eq!(out.text, "@quote| ONE TWO\n");
+    }
+
+    #[test]
+    fn a_table_of_pipe_rows() {
+        let base = "@table\n|[ a ][ b ]\n|[ c ][ d ]\n";
+        let out = merge(
+            base,
+            "@table\n|[ A ][ b ]\n|[ c ][ d ]\n",
+            "@table\n|[ a ][ b ]\n|[ c ][ D ]\n",
+        );
+        assert!(out.clean, "{:?}", out.text);
+        assert_eq!(out.text, "@table\n|[ A ][ b ]\n|[ c ][ D ]\n");
+        assert_readable(&out.text);
+    }
+
+    #[test]
+    fn a_nested_run() {
+        let base = "@tree\n| @tree\n| | one\n| | two\n";
+        let out = merge(
+            base,
+            "@tree\n| @tree\n| | ONE\n| | two\n",
+            "@tree\n| @tree\n| | one\n| | TWO\n",
+        );
+        assert!(out.clean, "{:?}", out.text);
+        assert_eq!(out.text, "@tree\n| @tree\n| | ONE\n| | TWO\n");
+    }
+
+    #[test]
+    fn a_conflict_in_a_pipe_run_is_found_and_can_be_resolved() {
+        let base = "@quote\n| alpha\n| beta\n";
+        let out = merge(
+            base,
+            "@quote\n| ALPHA\n| beta\n",
+            "@quote\n| Alpha\n| beta\n",
+        );
+        assert!(!out.clean);
+        assert!(has_conflicts(&out.text));
+        assert_readable(&out.text);
+        let a = resolve_all(&out.text, ConflictResolution::A).unwrap();
+        assert!(!has_conflicts(&a));
+        assert_eq!(a, "@quote\n| ALPHA\n| beta\n");
     }
 }

@@ -2117,7 +2117,9 @@ dependencies = [
 name = "tomet-merge"
 version = "0.5.0"
 dependencies = [
+ "tomet-cst",
  "tomet-edit",
+ "tomet-parser",
 ]
 
 [[package]]

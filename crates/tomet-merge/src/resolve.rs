@@ -1,14 +1,13 @@
-//! Strips `@conflict` markers back out of a merged document while preserving
-//! all untouched formatting, comments, and whitespace byte-for-byte.
+//! Taking `@conflict` markers out of a document by choosing a side.
+//!
+//! A marker is replaced where it stands, by splicing the chosen side's text
+//! into its span: everything outside the spans of the resolved markers is
+//! copied from the source byte for byte, and the side is what was written,
+//! not a rendering of it.
 
-use tomet_edit::{
-    AttrSlot, ChildItem, EditDoc, EditValue, EditValueKind, InlineItem, NodeId, NodeKind,
-    export_doc, import_source, parse_edit_value_str, parse_inline_items,
-};
-
+use crate::conflict::{ConflictError, ConflictKind, Found, Side, bracketed_inner, scan};
 use crate::markers::{
-    block_conflict_sides_from_slot, extract_conflict_block_side, extract_conflict_inline_side,
-    unquote_scalar_display, value_conflict_sides_from_value,
+    extract_conflict_block_side, extract_conflict_inline_side, unquote_scalar_display,
 };
 
 /// Which side of one `@conflict` a caller picked, or that they edited a
@@ -18,417 +17,426 @@ use crate::markers::{
 pub enum ConflictResolution {
     A,
     B,
+    /// Both sides, one after the other. In running text they are joined by a
+    /// space unless one already has white space at the seam; blocks are
+    /// separated by a blank line; two string values become one, `"a / b"`.
     Both,
     /// The user wrote something new that is neither side verbatim.
     Rewritten(String),
 }
 
-/// Resolves `@conflict` markers in `src` according to `resolutions` (in document order),
-/// leaving all source text outside resolved `@conflict` spans byte-identical.
-pub fn resolve(src: &str, resolutions: &[ConflictResolution]) -> String {
-    export_doc(&resolve_doc(&import_source(src), resolutions))
+/// Resolves the markers of `src` in document order, the first marker by the
+/// first resolution and so on. Markers past the end of `resolutions` stay.
+pub fn resolve(src: &str, resolutions: &[ConflictResolution]) -> Result<String, ConflictError> {
+    apply(src, |i| resolutions.get(i))
 }
 
-/// Resolves all `@conflict` markers in `src` to `resolution`, leaving all source
-/// text outside `@conflict` spans byte-identical.
-pub fn resolve_all(src: &str, resolution: ConflictResolution) -> String {
-    export_doc(&resolve_all_doc(&import_source(src), resolution))
+/// Resolves every marker of `src` the same way.
+pub fn resolve_all(src: &str, resolution: ConflictResolution) -> Result<String, ConflictError> {
+    apply(src, |_| Some(&resolution))
 }
 
-/// Resolves a single `@conflict` marker at `target_index` in `src` to `resolution`,
-/// leaving all other conflicts and surrounding source text byte-identical.
-pub fn resolve_single(src: &str, target_index: usize, resolution: ConflictResolution) -> String {
-    export_doc(&resolve_single_doc(
-        &import_source(src),
-        target_index,
-        resolution,
-    ))
-}
-
-/// Resolves `@conflict` markers in `doc` according to `resolutions` (in document order).
-pub fn resolve_doc(doc: &EditDoc, resolutions: &[ConflictResolution]) -> EditDoc {
-    let mut out = doc.clone();
-    apply_resolutions(&mut out, &mut resolutions.iter().map(Some));
-    out
-}
-
-/// Resolves every `@conflict` marker in `doc` to `resolution`.
-pub fn resolve_all_doc(doc: &EditDoc, resolution: ConflictResolution) -> EditDoc {
-    let mut out = doc.clone();
-    apply_resolutions(&mut out, &mut std::iter::repeat(Some(&resolution)));
-    out
-}
-
-/// Resolves a single `@conflict` marker at `target_index` in `doc` to `resolution`.
-pub fn resolve_single_doc(
-    doc: &EditDoc,
+/// Resolves marker number `target_index` of `src`; the others stay.
+pub fn resolve_single(
+    src: &str,
     target_index: usize,
     resolution: ConflictResolution,
-) -> EditDoc {
-    let mut out = doc.clone();
-    let mut idx = 0;
-    apply_resolutions(
-        &mut out,
-        &mut std::iter::from_fn(|| {
-            let res = (idx == target_index).then_some(&resolution);
-            idx += 1;
-            Some(res)
-        }),
-    );
+) -> Result<String, ConflictError> {
+    let count = scan(src)?.len();
+    if target_index >= count {
+        return Err(ConflictError::IndexOutOfBounds {
+            index: target_index,
+            count,
+        });
+    }
+    apply(src, |i| (i == target_index).then_some(&resolution))
+}
+
+fn apply<'a>(
+    src: &str,
+    pick: impl Fn(usize) -> Option<&'a ConflictResolution>,
+) -> Result<String, ConflictError> {
+    let found = scan(src)?;
+    let mut out = String::with_capacity(src.len());
+    let mut at = 0;
+    for (index, marker) in found.iter().enumerate() {
+        let Some(resolution) = pick(index) else {
+            continue;
+        };
+        let span = &marker.item.span;
+        let (text, eat_newline) = replacement(src, marker, resolution);
+        out.push_str(&src[at..span.start]);
+        out.push_str(&text);
+        at = span.end;
+        if eat_newline {
+            // A block ends in a newline of its own; the marker's was spent.
+            at += newline_len(&src[at..]);
+        }
+    }
+    out.push_str(&src[at..]);
+    Ok(out)
+}
+
+fn newline_len(s: &str) -> usize {
+    if s.starts_with("\r\n") {
+        2
+    } else {
+        usize::from(s.starts_with('\n'))
+    }
+}
+
+/// The text that takes the marker's place, and whether the newline after the
+/// marker goes with it.
+fn replacement(src: &str, marker: &Found, resolution: &ConflictResolution) -> (String, bool) {
+    match marker.item.kind {
+        ConflictKind::Inline => (inline(marker, resolution), false),
+        ConflictKind::Value => (value(marker, resolution), false),
+        ConflictKind::Block => {
+            let text = block(src, marker, resolution);
+            let eat = !text.is_empty();
+            (text, eat)
+        }
+    }
+}
+
+fn blocks_of(side: &Side) -> &str {
+    match side {
+        Side::Blocks(inner) => inner,
+        Side::Value(raw) => raw,
+    }
+}
+
+fn inline(marker: &Found, resolution: &ConflictResolution) -> String {
+    let a = extract_conflict_inline_side(blocks_of(&marker.a));
+    let b = extract_conflict_inline_side(blocks_of(&marker.b));
+    match resolution {
+        ConflictResolution::A => a,
+        ConflictResolution::B => b,
+        ConflictResolution::Both => {
+            if a.is_empty() {
+                b
+            } else if b.is_empty() {
+                a
+            } else if a.ends_with(char::is_whitespace) || b.starts_with(char::is_whitespace) {
+                format!("{a}{b}")
+            } else {
+                format!("{a} {b}")
+            }
+        }
+        ConflictResolution::Rewritten(text) => text.clone(),
+    }
+}
+
+fn block(src: &str, marker: &Found, resolution: &ConflictResolution) -> String {
+    let a = extract_conflict_block_side(blocks_of(&marker.a));
+    let b = extract_conflict_block_side(blocks_of(&marker.b));
+    let text = match resolution {
+        ConflictResolution::A => a,
+        ConflictResolution::B => b,
+        ConflictResolution::Both => {
+            if a.is_empty() {
+                b
+            } else if b.is_empty() {
+                a
+            } else {
+                format!("{a}\n{b}")
+            }
+        }
+        ConflictResolution::Rewritten(text) if text.ends_with('\n') => text.clone(),
+        ConflictResolution::Rewritten(text) => format!("{text}\n"),
+    };
+    indent_after_first_line(src, marker.item.span.start, &text)
+}
+
+/// The marker may stand indented (inside an element's `[ ]`); the lines of a
+/// block that follow its first line are indented to match.
+fn indent_after_first_line(src: &str, at: usize, text: &str) -> String {
+    let line_start = src[..at].rfind('\n').map_or(0, |i| i + 1);
+    let before = &src[line_start..at];
+    if before.is_empty() || !before.chars().all(|c| c == ' ' || c == '\t') {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    for (i, line) in text.split_inclusive('\n').enumerate() {
+        if i > 0 && !line.trim_end_matches(['\r', '\n']).is_empty() {
+            out.push_str(before);
+        }
+        out.push_str(line);
+    }
     out
 }
 
-fn apply_resolutions<'a>(
-    doc: &mut EditDoc,
-    resolutions: &mut impl Iterator<Item = Option<&'a ConflictResolution>>,
-) {
-    let root_items = doc.root_children().to_vec();
-    let (new_root, _) = resolve_child_seq(doc, &root_items, resolutions);
-    *doc.root_children_mut() = new_root;
-}
-
-fn resolve_child_seq<'a>(
-    doc: &mut EditDoc,
-    items: &[ChildItem],
-    resolutions: &mut impl Iterator<Item = Option<&'a ConflictResolution>>,
-) -> (Vec<ChildItem>, bool) {
-    let mut out = Vec::with_capacity(items.len());
-    let mut any_changed = false;
-    let mut skip_one_leading_nl = false;
-
-    for item in items {
-        let Some(id) = item.as_node_id() else {
-            if skip_one_leading_nl && let ChildItem::Trivia(t) = item {
-                skip_one_leading_nl = false;
-                let rest = t
-                    .strip_prefix("\r\n")
-                    .or_else(|| t.strip_prefix('\n'))
-                    .unwrap_or(t);
-                if !rest.is_empty() {
-                    out.push(ChildItem::Trivia(rest.to_string()));
-                }
-                continue;
-            }
-            skip_one_leading_nl = false;
-            out.push(item.clone());
-            continue;
-        };
-        skip_one_leading_nl = false;
-        let Some(node) = doc.get(id).cloned() else {
-            continue;
-        };
-
-        if let NodeKind::BlockElement {
-            name,
-            declaration: false,
-            ..
-        } = &node.kind
-            && name == "conflict"
-            && let Some(args_slot) = &node.slots.args_slot
-            && let Some((a_inner, b_inner)) = block_conflict_sides_from_slot(args_slot)
-        {
-            match resolutions.next() {
-                Some(Some(res)) => {
-                    any_changed = true;
-                    let a_text = extract_conflict_block_side(&a_inner);
-                    let b_text = extract_conflict_block_side(&b_inner);
-                    let replacement_src = match res {
-                        ConflictResolution::A => a_text,
-                        ConflictResolution::B => b_text,
-                        ConflictResolution::Both => {
-                            if a_text.is_empty() {
-                                b_text
-                            } else if b_text.is_empty() {
-                                a_text
-                            } else {
-                                format!("{a_text}\n{b_text}")
-                            }
-                        }
-                        ConflictResolution::Rewritten(text) => {
-                            if text.ends_with('\n') {
-                                text.clone()
-                            } else {
-                                format!("{text}\n")
-                            }
-                        }
-                    };
-                    let parsed = import_source(&replacement_src);
-                    let cloned_items = doc.clone_children_from(&parsed, parsed.root_children());
-                    out.extend(cloned_items);
-                    skip_one_leading_nl = !replacement_src.is_empty();
-                }
-                Some(None) | None => out.push(ChildItem::Node(id)),
-            }
-            continue;
-        }
-
-        if resolve_node_in_place(doc, id, resolutions) {
-            any_changed = true;
-        }
-        out.push(ChildItem::Node(id));
-    }
-
-    (out, any_changed)
-}
-
-fn resolve_node_in_place<'a>(
-    doc: &mut EditDoc,
-    id: NodeId,
-    resolutions: &mut impl Iterator<Item = Option<&'a ConflictResolution>>,
-) -> bool {
-    let Some(node) = doc.get(id).cloned() else {
-        return false;
+fn value(marker: &Found, resolution: &ConflictResolution) -> String {
+    let (Side::Value(a), Side::Value(b)) = (&marker.a, &marker.b) else {
+        unreachable!("a value marker has value sides")
     };
-
-    match node.kind {
-        NodeKind::Paragraph { .. } => {
-            if let Some((new_text, new_inlines)) = resolve_inlines(&node.inlines, resolutions) {
-                let n = doc.get_mut(id).unwrap();
-                n.kind = NodeKind::Paragraph {
-                    text: new_text.clone(),
-                };
-                n.raw = new_text;
-                n.inlines = new_inlines;
-                n.edited = true;
-                return true;
-            }
-            false
-        }
-        NodeKind::Section {
-            level,
-            heading_raw,
-            id_attr,
-            children,
-        } => {
-            let title_resolved = resolve_inlines(&node.inlines, resolutions);
-            let (new_children, children_changed) = resolve_child_seq(doc, &children, resolutions);
-            if title_resolved.is_none() && !children_changed {
-                return false;
-            }
-            let n = doc.get_mut(id).unwrap();
-            let (final_heading_raw, final_inlines) = if let Some((new_t, new_inl)) = title_resolved
-            {
-                (
-                    format!("{}{new_t}{}", n.heading_prefix, n.heading_suffix),
-                    new_inl,
-                )
-            } else {
-                (heading_raw, n.inlines.clone())
-            };
-            n.kind = NodeKind::Section {
-                level,
-                heading_raw: final_heading_raw,
-                id_attr,
-                children: new_children,
-            };
-            n.inlines = final_inlines;
-            n.edited = true;
-            true
-        }
-        NodeKind::BlockElement {
-            name,
-            declaration,
-            id_attr,
-            ..
-        } => {
-            let mut args_slot = node.slots.args_slot.clone();
-            let mut data_slot = node.slots.data_slot.clone();
-            let args_changed = args_slot
-                .as_mut()
-                .is_some_and(|s| resolve_attr_slot(s, resolutions));
-            let mut content_changed = false;
-            let new_content_children = node.slots.content_children.as_ref().map(|cc| {
-                let (new_cc, ch) = resolve_child_seq(doc, cc, resolutions);
-                content_changed = ch;
-                new_cc
-            });
-            let data_changed = data_slot
-                .as_mut()
-                .is_some_and(|s| resolve_attr_slot(s, resolutions));
-
-            if !args_changed && !content_changed && !data_changed {
-                return false;
-            }
-
-            let n = doc.get_mut(id).unwrap();
-            n.slots.args_slot = args_slot;
-            n.slots.data_slot = data_slot;
-            n.slots.content_children = new_content_children;
-            if content_changed {
-                n.slots.content_edited = true;
-            }
-            n.kind = NodeKind::BlockElement {
-                name,
-                declaration,
-                id_attr,
-            };
-            n.edited = true;
-            true
-        }
-        NodeKind::List { children } => {
-            let (new_children, changed) = resolve_child_seq(doc, &children, resolutions);
-            if changed {
-                let n = doc.get_mut(id).unwrap();
-                n.kind = NodeKind::List {
-                    children: new_children,
-                };
-                n.edited = true;
-            }
-            changed
-        }
-        NodeKind::ListItem {
-            marker,
-            text,
-            id_attr,
-            children,
-        } => {
-            if children.iter().any(|c| c.as_node_id().is_some()) {
-                let (new_children, changed) = resolve_child_seq(doc, &children, resolutions);
-                if changed {
-                    let n = doc.get_mut(id).unwrap();
-                    n.kind = NodeKind::ListItem {
-                        marker,
-                        text,
-                        id_attr,
-                        children: new_children,
-                    };
-                    n.edited = true;
+    // A value written `[ ... ]` stays one, whichever way it is resolved.
+    let content = bracketed_inner(a).zip(bracketed_inner(b));
+    match resolution {
+        ConflictResolution::A => a.clone(),
+        ConflictResolution::B => b.clone(),
+        ConflictResolution::Both => match content {
+            Some((a_inner, b_inner)) => {
+                let (a_inner, b_inner) = (a_inner.trim(), b_inner.trim());
+                if a_inner.contains('\n') || b_inner.contains('\n') {
+                    format!("[\n{}\n\n{}\n  ]", indented(a_inner), indented(b_inner))
+                } else {
+                    format!("[ {a_inner} {b_inner} ]")
                 }
-                changed
+            }
+            None if a.starts_with('"') && b.starts_with('"') => quoted(&format!(
+                "{} / {}",
+                unquote_scalar_display(a),
+                unquote_scalar_display(b)
+            )),
+            None => a.clone(),
+        },
+        ConflictResolution::Rewritten(text) if content.is_some() => {
+            if text.contains('\n') {
+                format!("[\n{}\n  ]", indented(text.trim_end()))
             } else {
-                let inlines = parse_inline_items(&text);
-                if let Some((new_text, _)) = resolve_inlines(&inlines, resolutions) {
-                    let n = doc.get_mut(id).unwrap();
-                    n.kind = NodeKind::ListItem {
-                        marker,
-                        text: new_text.clone(),
-                        id_attr,
-                        children: vec![ChildItem::Trivia(new_text.clone())],
-                    };
-                    n.raw = new_text;
-                    n.edited = true;
-                    return true;
-                }
-                false
+                format!("[ {text} ]")
             }
         }
-        _ => false,
+        ConflictResolution::Rewritten(text) => quoted(text),
     }
 }
 
-fn resolve_inlines<'a>(
-    inlines: &[InlineItem],
-    resolutions: &mut impl Iterator<Item = Option<&'a ConflictResolution>>,
-) -> Option<(String, Vec<InlineItem>)> {
-    let mut out = String::new();
-    let mut any_changed = false;
-
-    for item in inlines {
-        if let InlineItem::Element { name, slots, .. } = item
-            && name == "conflict"
-            && let Some(slot) = &slots.args_slot
-            && let Some((a_inner, b_inner)) = block_conflict_sides_from_slot(slot)
-        {
-            match resolutions.next() {
-                Some(Some(res)) => {
-                    any_changed = true;
-                    let a_str = extract_conflict_inline_side(&a_inner);
-                    let b_str = extract_conflict_inline_side(&b_inner);
-                    match res {
-                        ConflictResolution::A => out.push_str(&a_str),
-                        ConflictResolution::B => out.push_str(&b_str),
-                        ConflictResolution::Both => {
-                            if a_str.is_empty() {
-                                out.push_str(&b_str);
-                            } else if b_str.is_empty() {
-                                out.push_str(&a_str);
-                            } else if a_str.ends_with(char::is_whitespace)
-                                || b_str.starts_with(char::is_whitespace)
-                            {
-                                out.push_str(&a_str);
-                                out.push_str(&b_str);
-                            } else {
-                                out.push_str(&a_str);
-                                out.push(' ');
-                                out.push_str(&b_str);
-                            }
-                        }
-                        ConflictResolution::Rewritten(text) => out.push_str(text),
-                    }
-                }
-                Some(None) | None => out.push_str(item.raw_str()),
-            }
-            continue;
-        }
-        out.push_str(item.raw_str());
-    }
-
-    any_changed.then(|| {
-        let parsed = parse_inline_items(&out);
-        (out, parsed)
-    })
-}
-
-fn resolve_attr_slot<'a>(
-    slot: &mut AttrSlot,
-    resolutions: &mut impl Iterator<Item = Option<&'a ConflictResolution>>,
-) -> bool {
-    let mut any_changed = false;
-    for entry in &mut slot.entries {
-        if resolve_edit_value(&mut entry.value, resolutions) {
-            entry.edited = true;
-            any_changed = true;
-        }
-    }
-    if any_changed {
-        slot.edited = true;
-    }
-    any_changed
-}
-
-fn resolve_edit_value<'a>(
-    val: &mut EditValue,
-    resolutions: &mut impl Iterator<Item = Option<&'a ConflictResolution>>,
-) -> bool {
-    if let Some((a_val, b_val)) = value_conflict_sides_from_value(val) {
-        let a_cloned = a_val.clone();
-        let b_cloned = b_val.clone();
-        return match resolutions.next() {
-            Some(Some(res)) => {
-                *val = match res {
-                    ConflictResolution::A => a_cloned,
-                    ConflictResolution::B => b_cloned,
-                    ConflictResolution::Both => {
-                        let a_s = unquote_scalar_display(a_cloned.raw.trim());
-                        let b_s = unquote_scalar_display(b_cloned.raw.trim());
-                        if a_cloned.raw.trim().starts_with('"')
-                            && b_cloned.raw.trim().starts_with('"')
-                        {
-                            parse_edit_value_str(&format!("\"{a_s} / {b_s}\""))
-                        } else {
-                            a_cloned
-                        }
-                    }
-                    ConflictResolution::Rewritten(text) => {
-                        parse_edit_value_str(&format!("\"{}\"", text.replace('"', "\\\"")))
-                    }
-                };
-                val.edited = true;
-                true
-            }
-            Some(None) | None => false,
-        };
-    }
-
-    match &mut val.kind {
-        EditValueKind::Map(slot) => {
-            if resolve_attr_slot(slot, resolutions) {
-                val.edited = true;
-                true
+/// The lines of `text` indented as the lines of a `[ ... ]` value's content.
+fn indented(text: &str) -> String {
+    text.lines()
+        .map(|l| {
+            if l.trim().is_empty() {
+                String::new()
             } else {
-                false
+                format!("    {}", l.trim_start())
             }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn quoted(text: &str) -> String {
+    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{find_conflicts, has_conflicts, merge};
+    use ConflictResolution::{A, B, Both, Rewritten};
+
+    #[test]
+    fn inline_a_b_both_rewritten() {
+        let src = "alpha @conflict(a: [ foo ], b: [ bar ]) omega\n";
+        assert_eq!(resolve_all(src, A).unwrap(), "alpha foo omega\n");
+        assert_eq!(resolve_all(src, B).unwrap(), "alpha bar omega\n");
+        assert_eq!(resolve_all(src, Both).unwrap(), "alpha foo bar omega\n");
+        assert_eq!(
+            resolve_all(src, Rewritten("zzz".into())).unwrap(),
+            "alpha zzz omega\n"
+        );
+    }
+
+    #[test]
+    fn inline_both_does_not_double_a_space() {
+        let src = "x @conflict(a: [ foo  ], b: [ bar ]) y\n";
+        assert_eq!(resolve_all(src, Both).unwrap(), "x foo bar y\n");
+    }
+
+    #[test]
+    fn a_chosen_side_keeps_its_spelling() {
+        // The sides are spliced in as written, not printed again.
+        let src = "a @conflict(a: [ *y* ], b: [ **z** ]) b\n";
+        assert_eq!(resolve_all(src, A).unwrap(), "a *y* b\n");
+        assert_eq!(resolve_all(src, B).unwrap(), "a **z** b\n");
+        let src = "see @conflict(a: [ `x` ], b: [ @link(ref: p)[q] ]) end\n";
+        assert_eq!(resolve_all(src, B).unwrap(), "see @link(ref: p)[q] end\n");
+    }
+
+    #[test]
+    fn block_sides_replace_the_marker_and_its_newline() {
+        let src = "before\n\n@conflict(\n  a: [\n    - one\n    - two\n  ]\n  b: [\n    = Heading\n  ]\n)\n\nafter\n";
+        assert_eq!(
+            resolve_all(src, A).unwrap(),
+            "before\n\n- one\n- two\n\nafter\n"
+        );
+        assert_eq!(
+            resolve_all(src, B).unwrap(),
+            "before\n\n= Heading\n\nafter\n"
+        );
+        assert_eq!(
+            resolve_all(src, Both).unwrap(),
+            "before\n\n- one\n- two\n\n= Heading\n\nafter\n"
+        );
+        assert_eq!(
+            resolve_all(src, Rewritten("new".into())).unwrap(),
+            "before\n\nnew\n\nafter\n"
+        );
+    }
+
+    #[test]
+    fn an_indented_block_marker_keeps_its_indent() {
+        let src = "@note[\n  @conflict(a: [\n    one\n\n    two\n  ], b: [ x ])\n]\n";
+        assert_eq!(resolve_all(src, A).unwrap(), "@note[\n  one\n\n  two\n]\n");
+    }
+
+    #[test]
+    fn value_sides() {
+        let src = "@x{ k: @conflict(a: 2, b: 3), s: @conflict(a: \"one\", b: \"two\") }\n";
+        assert_eq!(resolve_all(src, A).unwrap(), "@x{ k: 2, s: \"one\" }\n");
+        assert_eq!(resolve_all(src, B).unwrap(), "@x{ k: 3, s: \"two\" }\n");
+        assert_eq!(
+            resolve_all(src, Both).unwrap(),
+            "@x{ k: 2, s: \"one / two\" }\n"
+        );
+        assert_eq!(
+            resolve_all(src, Rewritten("a \"b\"".into())).unwrap(),
+            "@x{ k: \"a \\\"b\\\"\", s: \"a \\\"b\\\"\" }\n"
+        );
+    }
+
+    #[test]
+    fn single_and_in_order() {
+        let src = "a @conflict(a: [ 1 ], b: [ 2 ]) b @conflict(a: [ 3 ], b: [ 4 ]) c\n";
+        assert_eq!(
+            resolve_single(src, 1, B).unwrap(),
+            "a @conflict(a: [ 1 ], b: [ 2 ]) b 4 c\n"
+        );
+        assert_eq!(resolve(src, &[A, B]).unwrap(), "a 1 b 4 c\n");
+        // Fewer resolutions than markers: the rest stay.
+        assert_eq!(
+            resolve(src, &[B]).unwrap(),
+            "a 2 b @conflict(a: [ 3 ], b: [ 4 ]) c\n"
+        );
+    }
+
+    #[test]
+    fn a_missing_index_is_an_error() {
+        let src = "a @conflict(a: [ 1 ], b: [ 2 ]) b\n";
+        assert_eq!(
+            resolve_single(src, 1, A),
+            Err(ConflictError::IndexOutOfBounds { index: 1, count: 1 })
+        );
+        assert_eq!(
+            resolve_single("none\n", 0, A),
+            Err(ConflictError::IndexOutOfBounds { index: 0, count: 0 })
+        );
+    }
+
+    #[test]
+    fn a_broken_marker_is_never_resolved_past() {
+        let src = "a @conflict(a: [ 1 ], b: [ 2 ]) b @conflict(a: 1\n";
+        assert!(matches!(
+            resolve_all(src, A),
+            Err(ConflictError::Malformed { .. })
+        ));
+        assert!(matches!(
+            resolve_single(src, 0, A),
+            Err(ConflictError::Malformed { .. })
+        ));
+    }
+
+    #[test]
+    fn text_outside_the_markers_is_byte_identical() {
+        let src = "=[  Title  ]   // keep me\n\n  odd   spacing *em* `c`  @conflict(a: [ x ], b: [ y ])  tail  \r\n\n```\nraw  \n```\n";
+        let out = resolve_all(src, A).unwrap();
+        assert_eq!(
+            out,
+            "=[  Title  ]   // keep me\n\n  odd   spacing *em* `c`  x  tail  \r\n\n```\nraw  \n```\n"
+        );
+    }
+
+    #[test]
+    fn resolving_every_marker_of_a_real_merge_leaves_none() {
+        let cases = [
+            (
+                "alpha beta gamma\n",
+                "alpha BETA gamma\n",
+                "alpha Beta gamma\n",
+            ),
+            ("- one\n- two\n", "- uno\n- two\n", "- ein\n- two\n"),
+            ("=[ One ]\n", "=[ Uno ]\n", "=[ Ein ]\n"),
+            ("@x{ k: 1 }\n", "@x{ k: 2 }\n", "@x{ k: 3 }\n"),
+            ("text\n", "- a list\n", "= A heading\n"),
+            ("a *x* b\n", "a *y* b\n", "a **z** b\n"),
+        ];
+        for (base, local, remote) in cases {
+            let m = merge(base, local, remote);
+            assert!(has_conflicts(&m.text), "{base:?}");
+            for side in [A, B, Both] {
+                let out = resolve_all(&m.text, side.clone()).unwrap();
+                assert!(!has_conflicts(&out), "{base:?} {side:?}: {out:?}");
+            }
+            // Choosing a side gives that side's own text back.
+            assert_eq!(
+                resolve_all(&m.text, A).unwrap().trim_end(),
+                local.trim_end(),
+                "{base:?}"
+            );
+            assert_eq!(
+                resolve_all(&m.text, B).unwrap().trim_end(),
+                remote.trim_end(),
+                "{base:?}"
+            );
+            assert_eq!(find_conflicts(&m.text).unwrap().len(), 1);
         }
-        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod pipe_value_tests {
+    use super::*;
+    use crate::{find_conflicts, has_conflicts, merge};
+    use ConflictResolution::{A, B, Both, Rewritten};
+
+    // `about: | one` / `| two` is a value written as a `|` run. A `|` run ends
+    // where its markers stop, so inside `@conflict(a: ..., b: ...)` it would
+    // swallow the `, b: ...`: the merge once wrote a document the parser
+    // refuses. The run is written as the `[ ... ]` it means.
+    const BASE: &str =
+        "::elements{\n  line: {\n    about: | one\n           | two\n    k: 1\n  }\n}\n";
+
+    fn conflicted() -> String {
+        let m = merge(
+            BASE,
+            &BASE.replace("one", "ONE"),
+            &BASE.replace("one", "Uno"),
+        );
+        assert!(!m.clean);
+        m.text
+    }
+
+    #[test]
+    fn the_marker_a_merge_writes_for_a_pipe_run_value_can_be_read_back() {
+        let text = conflicted();
+        assert!(tomet_parser::parse_document(&text).is_ok(), "{text}");
+        let found = find_conflicts(&text).unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].kind, ConflictKind::Value);
+        assert_eq!(
+            (found[0].a.as_str(), found[0].b.as_str()),
+            ("ONE\ntwo", "Uno\ntwo")
+        );
+    }
+
+    #[test]
+    fn a_resolved_pipe_run_value_is_still_a_value_the_parser_reads() {
+        let text = conflicted();
+        for side in [
+            A,
+            B,
+            Both,
+            Rewritten("new\nlines".into()),
+            Rewritten("one line".into()),
+        ] {
+            let out = resolve_all(&text, side.clone()).unwrap();
+            assert!(!has_conflicts(&out), "{side:?}: {out}");
+            assert!(
+                tomet_parser::parse_document(&out).is_ok(),
+                "{side:?}: {out}"
+            );
+            assert!(out.contains("about: ["), "{side:?}: {out}");
+        }
     }
 }
