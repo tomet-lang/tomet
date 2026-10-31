@@ -21,10 +21,11 @@
 use crate::dialect::Dialect;
 use crate::element::{Groups, parse_hash_id, parse_paren_value, parse_value_group};
 use crate::error::{Error, Result};
-use crate::inline::{split_softbreaks, trim_edges};
+use crate::inline::{DELIMITERS, split_softbreaks, trim_edges};
+use crate::interp::parse_interpolation;
 use crate::value::eat_name;
 use tomet_ast::{
-    Block, Connect, Document, Element, Inline, Name, Paragraph, Placement, RawText, Section, Span,
+    Block, Connect, Data, Declaration, Document, Element, Inline, Name, Paragraph, Placement, RawText, Section, Span,
     Value,
 };
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode};
@@ -97,21 +98,14 @@ fn lower_block(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
     }
 }
 
-/// A paragraph of plain text: no element, no interpolation, no comment in it.
+/// A paragraph: running text, with the elements, spans and interpolations in it.
 fn lower_paragraph(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
-    if node.children().next().is_some() {
-        return Err(unsupported("a paragraph with an element in it"));
-    }
-    if node
-        .children_with_tokens()
-        .any(|e| e.kind() == K::COMMENT)
-    {
-        return Err(unsupported("a comment in a paragraph"));
+    if node.descendants_with_tokens().any(|e| e.kind() == K::PIPE) {
+        return Err(unsupported("a `|` run in a paragraph"));
     }
     // From the first character that is not white space to the end of the last
     // line: the node also holds the newline that ends the paragraph.
-    let range = node.text_range();
-    let (node_start, node_end) = (usize::from(range.start()), usize::from(range.end()));
+    let (node_start, node_end) = range_of(node);
     let text = &src[node_start..node_end];
     let lead = text.len() - text.trim_start().len();
     let start = node_start + lead;
@@ -119,18 +113,17 @@ fn lower_paragraph(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
     if start >= end {
         return Ok(None);
     }
-    let mut items = Vec::new();
-    // A `\;` at the start of a line is a `;` that is text: the backslash is not
-    // part of it.
-    let mut from = start;
-    for at in escaped_semicolons(src, start, end) {
-        split_softbreaks(&mut items, &src[from..at], from, &[]);
-        from = at + 1;
-    }
-    split_softbreaks(&mut items, &src[from..end], from, &[]);
-    let content = trim_edges(items);
+    let mut content = lower_inlines(src, node, start, end)?;
     if content.is_empty() {
         return Ok(None);
+    }
+    // A `${...}` that is the whole of its line, with nothing folded into it, is
+    // a block of its own.
+    if matches!(content.as_slice(), [Inline::Interp(_)]) {
+        let Some(Inline::Interp(interp)) = content.pop() else {
+            unreachable!()
+        };
+        return Ok(Some(Block::Interp(interp)));
     }
     Ok(Some(Block::Paragraph(Paragraph::new(
         content,
@@ -138,17 +131,129 @@ fn lower_paragraph(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
     ))))
 }
 
-/// The offsets of the `\` of every `\;` in `src[start..end]` that opens a line.
-fn escaped_semicolons(src: &str, start: usize, end: usize) -> Vec<usize> {
+/// The running text in `src[from..to]`, whose elements, spans and
+/// interpolations are the children of `parent`: the text between them becomes
+/// `Text` and `SoftBreak`, a comment is left out, and the ends are trimmed.
+fn lower_inlines(src: &str, parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inline>> {
+    let mut items = Vec::new();
+    let mut text_start = from;
+    for child in parent.children_with_tokens() {
+        let range = child.text_range();
+        let (start, end) = (usize::from(range.start()), usize::from(range.end()));
+        if start < from || end > to {
+            continue;
+        }
+        match child {
+            SyntaxElement::Token(t) if t.kind() == K::COMMENT => {
+                push_text_run(src, &mut items, text_start, start);
+                text_start = end;
+            }
+            SyntaxElement::Token(_) => {}
+            SyntaxElement::Node(n) => {
+                push_text_run(src, &mut items, text_start, start);
+                text_start = end;
+                items.push(lower_inline(src, &n)?);
+            }
+        }
+    }
+    push_text_run(src, &mut items, text_start, to);
+    Ok(trim_edges(items))
+}
+
+/// `src[from..to]` as text. A `\;` that opens a line is a `;` that is text:
+/// the backslash is not part of it.
+fn push_text_run(src: &str, items: &mut Vec<Inline>, from: usize, to: usize) {
+    if from >= to {
+        return;
+    }
+    let mut at = from;
+    for backslash in escaped_semicolons(src, from, to) {
+        split_softbreaks(items, &src[at..backslash], at, &[]);
+        at = backslash + 1;
+    }
+    split_softbreaks(items, &src[at..to], at, &[]);
+}
+
+/// One inline node of running text.
+fn lower_inline(src: &str, node: &SyntaxNode) -> Result<Inline> {
+    match node.kind() {
+        K::INLINE_ELEMENT => lower_inline_element(src, node),
+        K::EMPHASIS | K::STRONG | K::STRIKEOUT => lower_delimited(src, node).map(Inline::Element),
+        K::CODE_SPAN => lower_code_span(src, node).map(Inline::Element),
+        K::AUTOLINK => Ok(Inline::Element(lower_autolink(src, node))),
+        other => Err(unsupported(format!("inline node {other:?}"))),
+    }
+}
+
+/// `@name(...)[...]` in running text, or a `${...}` interpolation.
+fn lower_inline_element(src: &str, node: &SyntaxNode) -> Result<Inline> {
+    let sigil = node
+        .children()
+        .find(|n| n.kind() == K::SIGIL)
+        .and_then(|n| n.first_token())
+        .map(|t| t.kind());
+    match sigil {
+        Some(K::AT) => lower_element(src, node).map(Inline::Element),
+        Some(K::DOLLAR) => {
+            let (start, end) = range_of(node);
+            let mut cur = cursor_at(src, start);
+            let interp = parse_interpolation(&mut cur)?;
+            expect_end(&cur, end, "an interpolation")?;
+            Ok(Inline::Interp(interp))
+        }
+        _ => Err(unsupported("an inline element with this sigil")),
+    }
+}
+
+/// `*em*`, `**strong**`, `~~strikeout~~` and the `_` spellings: an element whose
+/// content is one paragraph, the text between the delimiters.
+fn lower_delimited(src: &str, node: &SyntaxNode) -> Result<Element> {
+    let (start, end) = range_of(node);
     let text = &src[start..end];
-    text.match_indices("\\;")
-        .map(|(i, _)| start + i)
-        .filter(|&at| {
-            let line = &src[..at];
-            let from = line.rfind('\n').map_or(0, |n| n + 1);
-            line[from..].chars().all(char::is_whitespace)
-        })
-        .collect()
+    let (delimiter, name) = DELIMITERS
+        .iter()
+        .find(|(d, _)| text.starts_with(d) && text.ends_with(d) && text.len() >= 2 * d.len())
+        .ok_or_else(|| unsupported("a delimited span that does not read"))?;
+    let inner = lower_inlines(src, node, start + delimiter.len(), end - delimiter.len())?;
+    let span = Span::new(start, end);
+    Ok(element_new(Name::bare(*name))
+        .with_span(span)
+        .with_content(vec![Block::Paragraph(Paragraph::new(inner, span))]))
+}
+
+/// A code span: a `raw` element whose content is the text between the backticks.
+fn lower_code_span(src: &str, node: &SyntaxNode) -> Result<Element> {
+    let (start, end) = range_of(node);
+    let text = &src[start..end];
+    let fence = text.chars().take_while(|&c| c == '`').count();
+    if fence == 0 || text.len() < 2 * fence {
+        return Err(unsupported("a code span that does not read"));
+    }
+    let inner = &text[fence..text.len() - fence];
+    let inner_span = Span::new(start + fence, end - fence);
+    Ok(element_new(Name::bare("raw"))
+        .with_placement(Placement::Inline)
+        .with_span(Span::new(start, end))
+        .with_content(vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Raw(RawText::new(inner, inner_span))],
+            inner_span,
+        ))]))
+}
+
+/// A URL in running text: a `link` element whose `target` is the URL.
+fn lower_autolink(src: &str, node: &SyntaxNode) -> Element {
+    let (start, end) = range_of(node);
+    let mut element = element_new(Name::bare("link"))
+        .with_placement(Placement::Inline)
+        .with_span(Span::new(start, end));
+    element.data = Data {
+        args: Some(Value::Map(vec![(
+            "target".to_string(),
+            Value::String(src[start..end].to_string()),
+        )])),
+        value: None,
+    };
+    element
 }
 
 /// The source text of `node` and where it starts.
@@ -242,10 +347,41 @@ fn name_at(src: &str, at: usize) -> Result<Name> {
     eat_name(&mut cur).ok_or_else(|| unsupported("a name that does not read"))
 }
 
-/// An element: `@name` and the groups that follow it.
+/// A block element: `@name` and the groups that follow it, or `::name` and
+/// its groups, a declaration about the document.
 fn lower_block_element(src: &str, node: &SyntaxNode) -> Result<Block> {
+    let sigil = node
+        .children()
+        .find(|n| n.kind() == K::SIGIL)
+        .and_then(|n| n.first_token())
+        .map(|t| t.kind());
+    if sigil == Some(K::COLON) {
+        return lower_declaration(src, node).map(Block::Declaration);
+    }
     let element = lower_element(src, node)?.with_placement(Placement::Block);
     Ok(Block::Element(element))
+}
+
+/// `::name(args){value}[content]#(id)`.
+fn lower_declaration(src: &str, node: &SyntaxNode) -> Result<Declaration> {
+    let sigil = node
+        .children()
+        .find(|n| n.kind() == K::SIGIL)
+        .ok_or_else(|| unsupported("a declaration without a sigil"))?;
+    let (start, _) = range_of(&sigil);
+    let name = name_at(src, start + 2)?;
+    let read = lower_groups(src, node)?;
+    if !read.connects.is_empty() {
+        return Err(unsupported("a declaration with a `:connect`"));
+    }
+    let end = node.children().map(|n| range_of(&n).1).max().unwrap_or(start);
+    Ok(Declaration {
+        name,
+        data: read.data,
+        content: read.content,
+        id: read.id,
+        span: Span::new(start, end),
+    })
 }
 
 fn lower_element(src: &str, node: &SyntaxNode) -> Result<Element> {
@@ -414,4 +550,17 @@ fn sugar_title(src: &str, heading: &SyntaxNode, level: usize) -> Result<Vec<Inli
     let mut items = Vec::new();
     split_softbreaks(&mut items, &src[from..start + text.len()], from, &[]);
     Ok(trim_edges(items))
+}
+
+/// The offsets of the `\` of every `\;` in `src[start..end]` that opens a line.
+fn escaped_semicolons(src: &str, start: usize, end: usize) -> Vec<usize> {
+    let text = &src[start..end];
+    text.match_indices("\\;")
+        .map(|(i, _)| start + i)
+        .filter(|&at| {
+            let line = &src[..at];
+            let from = line.rfind('\n').map_or(0, |n| n + 1);
+            line[from..].chars().all(char::is_whitespace)
+        })
+        .collect()
 }

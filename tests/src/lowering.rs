@@ -16,7 +16,7 @@ use tomet_parser::{UNSUPPORTED, lower_top_level_blocks, parse_cst, parse_documen
 use tomet_tests::{corpus, read_fixture};
 
 /// How many top-level blocks of the fixtures lowering produces today.
-const MIN_LOWERED: usize = 67;
+const MIN_LOWERED: usize = 157;
 
 /// Small documents, each of which lowering must give exactly as `parse_document` does.
 const SMALL: &[&str] = &[
@@ -48,6 +48,22 @@ const SMALL: &[&str] = &[
     "@a(x: 1)\n[ on the next line ]\n",
     "@a:b(c: 1)\n",
     "@a#(id)\n",
+    "a *em* b\n",
+    "a **strong** and ~~gone~~ and _em_ and __strong__\n",
+    "**a *b* c**\n",
+    "a `code` b\n",
+    "a ``co`de`` b\n",
+    "see https://a.b/c, ok\n",
+    "${x} and ${a.b}\n",
+    "a @link(ref: y)[text] b\n",
+    "a @em[x]\nb @mark[y]\n",
+    "a // comment\nb\n",
+    "text /* inline */ more\n",
+    "@a()\n@b()\n",
+    "@a() text\n",
+    "::kind(config)\n",
+    "::meta{ id: x, title: T }\n\n= T\n",
+    "::kind(config, 2)\n::id(doc-a)\n",
     "=\n",
     "= T\n",
     "== sub heading\n",
@@ -72,6 +88,7 @@ fn a_small_document_lowers_to_what_the_ast_parser_reads() {
 fn what_lowering_produces_for_the_fixtures_is_what_the_ast_parser_reads() {
     let (mut lowered, mut total) = (0usize, 0usize);
     let mut wrong = Vec::new();
+    let mut why: std::collections::BTreeMap<String, usize> = Default::default();
     for rel in corpus() {
         let src = read_fixture(&rel);
         let Ok(doc) = parse_document(&src) else {
@@ -80,7 +97,9 @@ fn what_lowering_produces_for_the_fixtures_is_what_the_ast_parser_reads() {
         for (start, block) in lower_top_level_blocks(&src, &parse_cst(&src)) {
             total += 1;
             match block {
-                Err(e) if e.message.starts_with(UNSUPPORTED) => {}
+                Err(e) if e.message.starts_with(UNSUPPORTED) => {
+                    *why.entry(e.message.clone()).or_default() += 1;
+                }
                 Err(e) => wrong.push(format!("{}: {e}", rel.display())),
                 Ok(None) => lowered += 1,
                 Ok(Some(block)) => {
@@ -99,7 +118,12 @@ fn what_lowering_produces_for_the_fixtures_is_what_the_ast_parser_reads() {
         }
     }
     assert!(wrong.is_empty(), "lowering differs:\n  {}", wrong.join("\n  "));
-    eprintln!("lowered {lowered} of {total} top-level blocks");
+    eprintln!("lowered {lowered} of {total} top-level blocks; what is left:");
+    let mut left: Vec<_> = why.into_iter().collect();
+    left.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
+    for (reason, n) in left {
+        eprintln!("  {n:>3}  {reason}");
+    }
     assert!(
         lowered >= MIN_LOWERED,
         "lowering produced {lowered} blocks, fewer than the {MIN_LOWERED} it did"
