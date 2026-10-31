@@ -293,7 +293,7 @@ pub(crate) fn paragraph_breaks_here(dialect: Dialect, look: &Cursor) -> bool {
 /// so each side loops until it hits real content, matching what folding the
 /// whole edge into one string and calling `trim_start`/`trim_end` on it used
 /// to do in one step.
-fn trim_edges(mut items: Vec<Inline>) -> Vec<Inline> {
+pub(crate) fn trim_edges(mut items: Vec<Inline>) -> Vec<Inline> {
     loop {
         match items.first() {
             Some(Inline::SoftBreak(_)) => {
@@ -611,7 +611,7 @@ pub(crate) fn push_soft_break(items: &mut Vec<Inline>, span: Span) {
 /// output differs: the swallowed gap becomes a `SoftBreak` node spanning it,
 /// not a character. Deciding what that node renders as (a space, nothing,
 /// a real newline) is left to whoever consumes the tree.
-fn split_softbreaks(items: &mut Vec<Inline>, raw: &str, base: usize, pipe_cols: &[usize]) {
+pub(crate) fn split_softbreaks(items: &mut Vec<Inline>, raw: &str, base: usize, pipe_cols: &[usize]) {
     let mut text_start = 0usize;
     let mut chars = raw.char_indices().peekable();
     while let Some((i, c)) = chars.next() {

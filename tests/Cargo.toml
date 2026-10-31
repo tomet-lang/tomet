@@ -59,6 +59,10 @@ path = "src/block_value_loss.rs"
 name = "block_shape"
 path = "src/block_shape.rs"
 
+[[test]]
+name = "lowering"
+path = "src/lowering.rs"
+
 [dependencies]
 tomet-ast = { workspace = true }
 tomet-expr = { workspace = true }

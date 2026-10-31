@@ -34,6 +34,7 @@
 //! - (interp) `${...}` interpolation expressions (identifiers, member chains, calls, literals).
 //! - (value) Lightweight Tomet data grammar (maps, sequences, scalars, comments).
 //! - (cst) Lossless Concrete Syntax Tree parsing powered by `tomet-cst`.
+//! - (lower) The CST read as an AST (`lower_document`), built up construct by construct until it can replace the AST parser's grammar.
 //! - (error) Parse errors: a message plus a byte offset, with line and column resolved once at the entry points (`located_in`).
 
 pub mod cst;
@@ -45,6 +46,7 @@ mod fence;
 mod inline;
 mod interp;
 mod list;
+mod lower;
 mod raw;
 mod section;
 mod value;
@@ -52,6 +54,8 @@ mod value;
 pub use cst::parse_cst;
 pub use document::{parse_document, parse_pattern};
 pub use error::{Error, Result};
+#[doc(hidden)]
+pub use lower::{UNSUPPORTED, lower_document, lower_top_level_blocks};
 pub use value::{CotometValueHook, parse_value};
 
 /// Parse a `$func(args)` or `${expr}` interpolation directly from a string slice.
