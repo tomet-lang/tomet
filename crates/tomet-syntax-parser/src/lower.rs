@@ -19,12 +19,15 @@
 //! not shape (`${...}` expressions, a group's values).
 
 use crate::dialect::Dialect;
-use crate::element::{Groups, parse_hash_id, parse_paren_value, parse_value_group};
+use crate::element::{
+    Groups, is_document_element_start, opens_group, parse_declaration, parse_hash_id,
+    parse_paren_value, parse_value_group,
+};
 use crate::error::{Error, Result};
 use crate::section::{merge_values, trim_trailing_equals};
 use crate::inline::{DELIMITERS, extend_merging, push_text, split_softbreaks, trim_edges};
-use crate::interp::parse_interpolation;
-use crate::value::eat_name;
+use crate::interp::{is_interp_start, parse_interpolation};
+use crate::value::{eat_name, err, skip_block_comment, skip_inline_ws};
 use tomet_ast::{
     Block, Connect, Data, Declaration, Document, Element, Inline, List, Name, Paragraph, Placement, RawText, Section, Span,
     Value,
@@ -52,7 +55,7 @@ fn unsupported(what: impl std::fmt::Display) -> Error {
 /// Reads the CST of `src` as an AST [`Document`].
 #[doc(hidden)]
 pub fn lower_document(src: &str, root: &SyntaxNode) -> Result<Document> {
-    let blocks = lower_blocks(src, root)?;
+    let blocks = lower_blocks(src, root).map_err(|e| e.located_in(src))?;
     Ok(Document::new(blocks, Span::new(0, src.len())))
 }
 
@@ -77,7 +80,11 @@ fn lower_blocks(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
     for child in node.children_with_tokens() {
         match child {
             // Trivia, and the `;` that only breaks a block, leave nothing behind.
-            SyntaxElement::Token(t) if t.kind().is_trivia() || t.kind() == K::SEMI => {}
+            SyntaxElement::Token(t) if t.kind().is_trivia() || t.kind() == K::SEMI => {
+                if t.kind() == K::COMMENT {
+                    reject_unclosed_comment(src, usize::from(t.text_range().start()))?;
+                }
+            }
             // The brackets of a `[content]` group are not content.
             SyntaxElement::Token(t) if node.kind() == K::CONTENT && is_bracket(t.kind()) => {}
             // The `|` that opens a run, and the one that begins each of its lines.
@@ -127,6 +134,13 @@ fn lower_paragraph(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
             end = close;
         }
     }
+    // A `::` that opens a block is a declaration, which stands alone on its line.
+    if pipe_depth(node) == 0 && is_document_element_start(&cursor_at(src, start)) {
+        let mut cur = cursor_at(src, start);
+        parse_declaration(DIALECT, &mut cur, &[])?;
+        skip_inline_ws(&mut cur);
+        return Err(err(cur.pos(), "a `::` declaration stands alone on its line"));
+    }
     let mut content = lower_inlines(src, node, start, end)?;
     if content.is_empty() {
         return Ok(None);
@@ -160,27 +174,29 @@ fn lower_inlines(src: &str, parent: &SyntaxNode, from: usize, to: usize) -> Resu
         }
         match child {
             SyntaxElement::Token(t) if t.kind() == K::COMMENT => {
-                push_text_run(src, &mut items, text_start, start, depth);
+                reject_unclosed_comment(src, start)?;
+                push_text_run(src, &mut items, text_start, start, depth)?;
                 text_start = end;
             }
             SyntaxElement::Token(_) => {}
             SyntaxElement::Node(n) => {
-                push_text_run(src, &mut items, text_start, start, depth);
+                push_text_run(src, &mut items, text_start, start, depth)?;
                 text_start = end;
                 items.push(lower_inline(src, &n)?);
             }
         }
     }
-    push_text_run(src, &mut items, text_start, to, depth);
+    push_text_run(src, &mut items, text_start, to, depth)?;
     Ok(trim_edges(items))
 }
 
 /// `src[from..to]` as text. A `\;` that opens a line is a `;` that is text:
 /// the backslash is not part of it.
-fn push_text_run(src: &str, items: &mut Vec<Inline>, from: usize, to: usize, depth: usize) {
+fn push_text_run(src: &str, items: &mut Vec<Inline>, from: usize, to: usize, depth: usize) -> Result<()> {
     if from >= to {
-        return;
+        return Ok(());
     }
+    reject_broken_constructs(src, from, to)?;
     let cols = vec![0usize; depth];
     let mut at = from;
     for backslash in escaped_semicolons(src, from, to) {
@@ -188,6 +204,7 @@ fn push_text_run(src: &str, items: &mut Vec<Inline>, from: usize, to: usize, dep
         at = backslash + 1;
     }
     split_softbreaks(items, &src[at..to], at, &cols);
+    Ok(())
 }
 
 /// One inline node of running text.
@@ -290,6 +307,23 @@ fn lower_thematic_break(src: &str, node: &SyntaxNode) -> Result<Block> {
         // Read from just after the `[`, so the white space before the text is in
         // the span of its `Text`, as the AST parser has it.
         let (open, close) = range_of(&content);
+        reject_unterminated(src, &content)?;
+        // After the `]`: three or more dashes, and nothing else on the line.
+        let mut cur = cursor_at(src, close);
+        skip_inline_ws(&mut cur);
+        if cur.eat_while(|c| c == '-').len() < 3 {
+            return Err(err(
+                cur.pos(),
+                "expected 3 or more '-' to close the titled thematic break",
+            ));
+        }
+        skip_inline_ws(&mut cur);
+        if !matches!(cur.peek(), None | Some('\n') | Some('\r')) {
+            return Err(err(
+                cur.pos(),
+                "unexpected trailing content after titled thematic break",
+            ));
+        }
         let title = match content.children().find(|n| n.kind() == K::PARAGRAPH) {
             Some(paragraph) if content.children().count() == 1 => {
                 lower_inlines(src, &paragraph, open + 1, close - 1)?
@@ -408,9 +442,13 @@ fn lower_declaration(src: &str, node: &SyntaxNode) -> Result<Declaration> {
     let name = name_at(src, start + 2)?;
     let read = lower_groups(src, node)?;
     if !read.connects.is_empty() {
-        return Err(unsupported("a declaration with a `:connect`"));
+        return Err(err(
+            start,
+            "a `::` declaration takes no `:connect`: a connect belongs to an element",
+        ));
     }
     let end = node.children().map(|n| range_of(&n).1).max().unwrap_or(start);
+    reject_second_group(src, end)?;
     Ok(Declaration {
         name,
         data: read.data,
@@ -434,6 +472,7 @@ fn lower_element(src: &str, node: &SyntaxNode) -> Result<Element> {
     // The element ends with its last group; the white space and comments the
     // node also holds are not part of it.
     let end = node.children().map(|n| range_of(&n).1).max().unwrap_or(sigil_start);
+    reject_second_group(src, end)?;
     Ok(Element {
         name,
         placement: Placement::Inline,
@@ -497,6 +536,7 @@ fn expect_end(cur: &Cursor, end: usize, what: &str) -> Result<()> {
 
 /// `[content]`: the blocks between the brackets. A `|` run is not lowered yet.
 fn lower_content(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
+    reject_unterminated(src, node)?;
     lower_blocks(src, node)
 }
 
@@ -512,7 +552,10 @@ fn lower_connect(src: &str, node: &SyntaxNode) -> Result<Connect> {
     };
     let name = name_at(src, usize::from(ident.text_range().start()))?;
     if node.children().any(|n| n.kind() == K::ID_GROUP) {
-        return Err(unsupported("an id in a connect"));
+        return Err(err(
+            start,
+            "a `:connect` takes no `#(id)`: write the id of its owner before the first `:connect`",
+        ));
     }
     let read = lower_groups(src, node)?;
     let end = node.children().map(|n| range_of(&n).1).max().unwrap_or(start + 1);
@@ -893,4 +936,70 @@ fn lower_code_block_in_run(
         element.data.args = Some(Value::Map(vec![("lang".to_string(), Value::String(lang.to_string()))]));
     }
     Ok(Block::Element(element))
+}
+
+/// A group written against the end of an element, when the element has one of
+/// that kind already, is an error: the CST left it as text, and the AST parser
+/// refuses it. `:` in front of it merges into the one that is there.
+fn reject_second_group(src: &str, end: usize) -> Result<()> {
+    let cur = cursor_at(src, end);
+    if !opens_group(&cur) {
+        return Ok(());
+    }
+    if cur.peek() == Some('#') {
+        return Err(err(end, "a second `#(...)`: an element takes at most one id"));
+    }
+    let group = match cur.peek() {
+        Some('(') => "(args)",
+        Some('[') | Some('|') => "[content]",
+        _ => "{value}",
+    };
+    Err(err(
+        end,
+        format!(
+            "a second `{group}` group: an element takes one of each. \
+             Write `:` in front of it to merge into the one already there"
+        ),
+    ))
+}
+
+/// A `[content]` group that never closes.
+fn reject_unterminated(src: &str, content: &SyntaxNode) -> Result<()> {
+    let bracketed = content
+        .children_with_tokens()
+        .next()
+        .is_some_and(|e| e.kind() == K::L_BRACKET);
+    let closed = content
+        .children_with_tokens()
+        .last()
+        .is_some_and(|e| e.kind() == K::R_BRACKET);
+    if bracketed && !closed {
+        return Err(err(src.len(), "unterminated, expected ']'"));
+    }
+    Ok(())
+}
+
+/// What the CST left as text that the AST parser would have read as a construct
+/// and found broken: a `${` that does not close, a `/*` that does not close.
+fn reject_broken_constructs(src: &str, from: usize, to: usize) -> Result<()> {
+    let text = &src[from..to];
+    for (i, _) in text.match_indices("${") {
+        let mut cur = cursor_at(src, from + i);
+        if is_interp_start(&cur) {
+            parse_interpolation(&mut cur)?;
+        }
+    }
+    for (i, _) in text.match_indices("/*") {
+        let mut cur = cursor_at(src, from + i);
+        skip_block_comment(&mut cur)?;
+    }
+    Ok(())
+}
+
+/// A `/*` comment has to close.
+fn reject_unclosed_comment(src: &str, at: usize) -> Result<()> {
+    if src[at..].starts_with("/*") {
+        skip_block_comment(&mut cursor_at(src, at))?;
+    }
+    Ok(())
 }

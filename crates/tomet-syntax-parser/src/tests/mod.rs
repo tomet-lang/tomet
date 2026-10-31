@@ -37,6 +37,18 @@ fn parse_document(src: &str) -> crate::Result<tomet_ast::Document> {
             Err(e) => panic!("lowering failed for {src:?}: {e}"),
         }
     }
+    // A document the AST parser rejects is rejected by lowering, with the same
+    // message at the same place.
+    if let Err(expected) = &parsed {
+        match crate::lower_document(src, &crate::parse_cst(src)) {
+            Ok(_) => panic!("the AST parser rejects {src:?} ({expected}), lowering reads it"),
+            Err(e) => assert_eq!(
+                (&e.message, e.offset),
+                (&expected.message, expected.offset),
+                "the two errors for {src:?} differ"
+            ),
+        }
+    }
     parsed
 }
 
