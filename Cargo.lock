@@ -1832,6 +1832,7 @@ dependencies = [
  "serde_json",
  "tomet-ast",
  "tomet-config",
+ "tomet-convert-standalone",
  "tomet-declaration",
  "tomet-expr",
  "tomet-formatter",

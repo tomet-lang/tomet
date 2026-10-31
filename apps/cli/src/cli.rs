@@ -166,6 +166,33 @@ pub enum Command {
         #[arg(long)]
         remove_original: bool,
     },
+    /// Make a `.tmt` file standalone, so it can be taken out of its vault.
+    ///
+    /// What the file takes from its vault is dealt with: a macro or variable
+    /// the vault defines is written into the file, and what depends on where
+    /// the file sits or on other files (`${self.path}`, `${include(...)}`,
+    /// `${vault...}`) is replaced by the value it has there. The result
+    /// declares `::profile(standalone)`.
+    ///
+    /// The file is printed to standard output, or written to `--out`; what was
+    /// done is reported on standard error, and the command fails if something
+    /// is left that the file still takes from outside (a vocabulary, an
+    /// `@term`, or a metadata field unless `--freeze-fields`). There is no
+    /// `--in-place`: replacing an expression by its value in the original
+    /// would take it out of the file in the vault.
+    Standalone {
+        /// The file to take out of its vault.
+        file: PathBuf,
+        /// Write to this path instead of stdout: a file, or a directory (the
+        /// file keeps its name there).
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+        /// Also replace `${self.meta.x}` by its value. Without it the
+        /// expression is left, because a file cannot hold the vault's
+        /// `::fields` that give a metadata field its type.
+        #[arg(long)]
+        freeze_fields: bool,
+    },
     /// Normalize a `.tmt` or `.ctmt` file's whitespace (line endings, trailing
     /// whitespace, blank lines, final newline). A directory formats every
     /// `.tmt` and `.ctmt` file found under it (same file discovery as

@@ -8,4 +8,5 @@ pub mod new;
 pub mod refactor;
 pub mod roundtrip;
 pub mod spec;
+pub mod standalone;
 pub mod stats;

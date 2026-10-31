@@ -8,7 +8,7 @@
 //! =[ Subcommands ]
 //!
 //! - (Inspection & Validation) `check`, `check-links`, `ast`, `roundtrip`, and `stats`.
-//! - (Transformation & Formatting) `format` and `refactor`.
+//! - (Transformation & Formatting) `format`, `refactor` and `standalone`.
 //! - (Converters) `html`, `to-md`, `from-md`, `to-typst`, `to-pandoc`, `from-pandoc`, and `export`.
 //! - (Authoring) `new`.
 //! - (Documentation) `spec`.
@@ -135,6 +135,11 @@ fn main() -> ExitCode {
             force,
             vars,
         } => commands::new::new_cmd(path, blueprint.as_deref(), *list, *force, vars),
+        Command::Standalone {
+            file,
+            out,
+            freeze_fields,
+        } => commands::standalone::run(file, out.as_deref(), *freeze_fields),
         Command::Stats { path, json } => stats_cmd(path, *json),
     };
 
