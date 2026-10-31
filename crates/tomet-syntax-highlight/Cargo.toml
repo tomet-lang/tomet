@@ -1,0 +1,11 @@
+[package]
+name = "tomet-highlight"
+version.workspace = true
+edition.workspace = true
+description = "Syntax highlighting for Tomet: what each part of a text is, read from the CST."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tomet-cst = { workspace = true }
+tomet-parser = { workspace = true }

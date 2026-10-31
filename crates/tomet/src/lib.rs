@@ -11,7 +11,7 @@
 //! them through here would turn this crate into a mirror of the workspace.
 //! The language bindings (`bindings/python`, `java`, `js`) do use it, which
 //! is what keeps this surface honest -- what a binding still takes directly
-//! (`js`: `tomet-transform`, `tomet-lexer`) is what is missing here.
+//! (`js`: `tomet-transform`) is what is missing here.
 //!
 //! =[ Reading a document ]
 //!
@@ -51,6 +51,7 @@
 //! |[ `edit`     ][ `edit`       ][ `tomet-edit`      ]
 //! |[ `merge`    ][ `merge`      ][ `tomet-merge`     ]
 //! |[ `parser`   ][ `parser`     ][ `tomet-parser`    ]
+//! |[ `highlight` ][ `highlight`   ][ `tomet-highlight` ]
 //! |[ `html`     ][ `html`       ][ `tomet-html`      ]
 //! |[ `links`    ][ `links`      ][ `tomet-links`     ]
 //! |[ `markdown` ][ `markdown`   ][ `tomet-markdown`  ]
@@ -101,6 +102,10 @@ pub use tomet_edit as edit;
 /// Three-way AST merge and conflict resolution (opt-in feature `merge`).
 #[cfg(feature = "merge")]
 pub use tomet_merge as merge;
+
+/// What each part of a text is, for coloring it (opt-in feature `highlight`).
+#[cfg(feature = "highlight")]
+pub use tomet_highlight as highlight;
 
 /// The disk-free `Vault`: build one from text with `from_sources`. The
 /// top-level [`Vault`] is this plus finding and reading files.

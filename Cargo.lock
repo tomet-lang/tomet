@@ -1766,6 +1766,7 @@ dependencies = [
  "tomet-deps",
  "tomet-edit",
  "tomet-formatter",
+ "tomet-highlight",
  "tomet-html",
  "tomet-links",
  "tomet-load",
@@ -1960,6 +1961,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomet-highlight"
+version = "0.5.0"
+dependencies = [
+ "tomet-cst",
+ "tomet-parser",
+]
+
+[[package]]
 name = "tomet-html"
 version = "0.5.0"
 dependencies = [
@@ -2006,7 +2015,6 @@ dependencies = [
  "serde-wasm-bindgen",
  "tomet",
  "tomet-cst",
- "tomet-lexer",
  "tomet-links",
  "tomet-transform",
  "wasm-bindgen",
