@@ -69,7 +69,7 @@ pub(crate) fn render_block(
         Block::List(list) => render_list(cx, list, out),
         Block::Interp(interp) => render_interp(interp, out),
         // What a document says about itself has no rendering.
-        Block::Declaration(_) => {}
+        Block::Declaration(_) | Block::Hole(_) => {}
     }
 }
 
@@ -298,6 +298,7 @@ pub(crate) fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut Strin
             Inline::LineBreak(_) => out.push_str("<br>"),
             Inline::Element(el) => render_element(cx, el, out, true),
             Inline::Interp(interp) => render_interp(interp, out),
+            Inline::Hole(_) => {}
         }
     }
 }

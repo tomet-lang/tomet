@@ -81,7 +81,7 @@ fn meta_value(v: &Value) -> MetaValue {
         Value::Element(_) => MetaValue::MetaString(String::new()),
         // Same treatment again: an interpolation is not known until it is
         // evaluated, and Pandoc has no place to keep it unevaluated.
-        Value::Interp(_) => MetaValue::MetaString(String::new()),
+        Value::Interp(_) | Value::Hole(_) => MetaValue::MetaString(String::new()),
         // Same treatment as `Element`/`Call`: no metadata concept for
         // block content either.
         Value::Blocks(_) => MetaValue::MetaString(String::new()),
@@ -99,7 +99,7 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
         TmBlock::Interp(interp) => vec![Block::Para(vec![interp_inline(interp)])],
         // What a declaration says about the document is `to_pandoc`'s metadata,
         // not a block.
-        TmBlock::Declaration(_) => Vec::new(),
+        TmBlock::Declaration(_) | TmBlock::Hole(_) => Vec::new(),
         TmBlock::Section(sec) => {
             let mut blocks = if !sec.title.is_empty() {
                 vec![Block::Header(
@@ -300,7 +300,7 @@ fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el)),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
-            TmBlock::Declaration(_) => {}
+            TmBlock::Declaration(_) | TmBlock::Hole(_) => {}
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -341,6 +341,7 @@ fn content_to_blocks(inlines: &[TmInline]) -> Vec<Block> {
             TmInline::Raw(t) => run.extend(text_to_inlines(&t.value)),
             TmInline::SoftBreak(_) => run.push(Inline::SoftBreak),
             TmInline::LineBreak(_) => run.push(Inline::LineBreak),
+            TmInline::Hole(_) => {}
         }
     }
     flush_run(&mut run, &mut blocks);
@@ -380,7 +381,7 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
             }
             TmBlock::Element(el) => out.extend(element_to_blocks(el)),
             TmBlock::Interp(interp) => out.push(Block::Para(vec![interp_inline(interp)])),
-            TmBlock::Declaration(_) => {}
+            TmBlock::Declaration(_) | TmBlock::Hole(_) => {}
             // No direct Pandoc equivalent for a nested section; a header
             // plus its own blocks is the closest shape.
             TmBlock::Section(sec) => {
@@ -417,7 +418,7 @@ fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el)),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
-            TmBlock::Declaration(_) => {}
+            TmBlock::Declaration(_) | TmBlock::Hole(_) => {}
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -439,6 +440,7 @@ fn inlines_to_pandoc(inlines: &[TmInline]) -> Vec<Inline> {
             TmInline::LineBreak(_) => out.push(Inline::LineBreak),
             TmInline::Element(el) => out.extend(element_to_inlines(el)),
             TmInline::Interp(interp) => out.push(interp_inline(interp)),
+            TmInline::Hole(_) => {}
         }
     }
     out
@@ -548,7 +550,7 @@ fn blocks_plain_text(blocks: &[TmBlock]) -> String {
         match block {
             TmBlock::Paragraph(p) => out.push_str(&plain_text(&p.content)),
             TmBlock::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
-            TmBlock::Interp(_) | TmBlock::Declaration(_) => {}
+            TmBlock::Interp(_) | TmBlock::Declaration(_) | TmBlock::Hole(_) => {}
             TmBlock::Section(sec) => out.push_str(&plain_text(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -573,7 +575,7 @@ fn plain_text(inlines: &[TmInline]) -> String {
             }
             TmInline::LineBreak(_) => out.push('\n'),
             TmInline::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
-            TmInline::Interp(_) => {}
+            TmInline::Interp(_) | TmInline::Hole(_) => {}
         }
     }
     out

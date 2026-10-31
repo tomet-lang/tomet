@@ -5,8 +5,8 @@
 
 use crate::dialect::Dialect;
 use crate::element::{
-    LineEnd, consume_trailing_continuation, element_ends_line, is_document_element_start,
-    is_element_start, leading_continuation, parse_declaration, parse_element_with_pipe_stack,
+    LineEnd, Written, consume_trailing_continuation, element_ends_line, is_document_element_start,
+    is_element_start, leading_continuation, parse_declaration, parse_written,
 };
 use crate::error::Result;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_soft_break};
@@ -18,7 +18,7 @@ use crate::section::{
     parse_section, parse_titled_thematic_break,
 };
 use crate::value::{skip_inline_ws, skip_ws_and_newlines};
-use tomet_ast::{Block, Document, Element, Inline, Paragraph, Placement, Section};
+use tomet_ast::{Block, Document, Inline, Paragraph, Placement, Section};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new, list};
 
@@ -158,17 +158,16 @@ pub(crate) fn parse_block_seq(
             } else {
                 doc_blocks.last()
             };
-            if matches!(last_b, Some(Block::Element(_))) {
-                let prev = if let Some(top) = stack.last_mut() {
-                    let Some(Block::Element(el)) = top.blocks.pop() else {
-                        unreachable!()
-                    };
-                    el
+            if matches!(last_b, Some(Block::Element(_) | Block::Hole(_))) {
+                let popped = if let Some(top) = stack.last_mut() {
+                    top.blocks.pop()
                 } else {
-                    let Some(Block::Element(el)) = doc_blocks.pop() else {
-                        unreachable!()
-                    };
-                    el
+                    doc_blocks.pop()
+                };
+                let prev = match popped {
+                    Some(Block::Element(el)) => Written::Element(el),
+                    Some(Block::Hole(hole)) => Written::Hole(hole),
+                    _ => unreachable!(),
                 };
                 let cont = continue_into_paragraph(dialect, &mut cur, prev, boundary)?;
                 if let Some(top) = stack.last_mut() {
@@ -247,20 +246,20 @@ pub(crate) fn parse_block_seq(
         if dialect.opens_element(cur.peek()) && is_element_start(dialect, &cur, true) {
             match element_ends_line(dialect, &cur) {
                 LineEnd::Bare => {
-                    let el = parse_element_with_pipe_stack(dialect, &mut cur, true, pipe_stack)?
+                    let written = parse_written(dialect, &mut cur, true, pipe_stack)?
                         .with_placement(Placement::Block);
                     consume_bare_line_end(&mut cur);
-                    push_block(&mut doc_blocks, &mut stack, Block::Element(el));
+                    push_block(&mut doc_blocks, &mut stack, written.into_block());
                     continue;
                 }
                 LineEnd::Continuation => {
-                    let el = parse_element_with_pipe_stack(dialect, &mut cur, true, pipe_stack)?;
+                    let written = parse_written(dialect, &mut cur, true, pipe_stack)?;
                     consume_trailing_continuation(&mut cur);
                     consume_bare_line_end(&mut cur);
                     if matches!(cur.peek(), Some('\n') | Some('\r')) {
                         cur.bump();
                     }
-                    let cont = continue_into_paragraph(dialect, &mut cur, el, boundary)?;
+                    let cont = continue_into_paragraph(dialect, &mut cur, written, boundary)?;
                     push_block(&mut doc_blocks, &mut stack, cont);
                     continue;
                 }
@@ -337,16 +336,16 @@ fn consume_bare_line_end(cur: &mut Cursor) {
 fn continue_into_paragraph(
     dialect: Dialect,
     cur: &mut Cursor,
-    first: Element,
+    first: Written,
     boundary: Option<char>,
 ) -> Result<Block> {
-    let para_start = first.span.start;
-    let break_start = first.span.end;
+    let para_start = first.span().start;
+    let break_start = first.span().end;
     if let Some(after) = leading_continuation(cur) {
         *cur = after;
     }
     let join_span = cur.span_from(break_start);
-    let mut content = vec![Inline::Element(first.with_placement(Placement::Inline))];
+    let mut content = vec![first.with_placement(Placement::Inline).into_inline()];
     push_soft_break(&mut content, join_span);
     let rest = parse_inline_seq(dialect, cur, Stop::Paragraph { boundary }, true)?;
     extend_merging(&mut content, rest);

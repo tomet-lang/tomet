@@ -167,6 +167,7 @@ fn scalar_to_plain(v: &Value) -> String {
         | Value::Map(_)
         | Value::Call(..)
         | Value::Interp(_)
+        | Value::Hole(_)
         | Value::Element(_)
         | Value::Blocks(_) => String::new(),
     }

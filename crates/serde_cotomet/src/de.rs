@@ -82,6 +82,7 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
                 "call syntax `{name}(...)` has no serde equivalent (got {} arg(s))",
                 args.len()
             ))),
+            Value::Hole(_) => Err(Error::msg("a hole (`?...`) has no serde equivalent")),
             Value::Interp(_) => Err(Error::msg(
                 "an interpolation (`${...}`) has no serde equivalent",
             )),

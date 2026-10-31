@@ -251,7 +251,7 @@ fn shift_levels(blocks: &mut [Block], delta: isize) {
                     }
                 }
             }
-            Block::Paragraph(_) | Block::Interp(_) => {}
+            Block::Paragraph(_) | Block::Interp(_) | Block::Hole(_) => {}
         }
     }
 }

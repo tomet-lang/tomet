@@ -251,7 +251,7 @@ pub(crate) fn find_def_in_blocks(blocks: &[Block], target_id: &str) -> Option<Sp
                     return Some(span);
                 }
             }
-            Block::Interp(_) => {}
+            Block::Interp(_) | Block::Hole(_) => {}
         }
     }
     None

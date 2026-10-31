@@ -789,7 +789,7 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
             content.push(Inline::Interp(interp));
         }
         // What a document says about itself is not content to flatten.
-        Block::Declaration(_) => {}
+        Block::Declaration(_) | Block::Hole(_) => {}
         Block::Section(sec) => {
             extend_spaced(content, sec.title);
             for child in sec.blocks {

@@ -89,7 +89,7 @@ fn in_block(block: &Block, id: &str) -> Option<Node> {
             _ => None,
         }),
         Block::List(list) => in_list(list, id),
-        Block::Interp(_) => None,
+        Block::Interp(_) | Block::Hole(_) => None,
     }
 }
 

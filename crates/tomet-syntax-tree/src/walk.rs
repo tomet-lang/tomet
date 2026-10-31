@@ -2,8 +2,8 @@
 
 use std::ops::ControlFlow;
 use tomet_ast::{
-    Block, Connect, Data, Declaration, Document, Element, Entry, Group, Inline, Interpolation,
-    List, ListItem, Value,
+    Block, Connect, Data, Declaration, Document, Element, Entry, Group, Hole, Inline,
+    Interpolation, List, ListItem, Value,
 };
 
 /// Called at every [`Element`] `walk_document` visits, in document order.
@@ -47,6 +47,7 @@ fn inlines_in_block(block: &Block, f: &mut dyn FnMut(&Inline)) {
         Block::Paragraph(paragraph) => inlines_in(&paragraph.content, f),
         Block::Element(element) => inlines_in_element(element, f),
         Block::Declaration(d) => inlines_in_groups(&d.data, d.content.as_deref(), f),
+        Block::Hole(h) => inlines_in_groups(&h.data, h.content.as_deref(), f),
         Block::Section(section) => {
             inlines_in(&section.title, f);
             // `section.connects` is deliberately not walked here -- same
@@ -75,8 +76,10 @@ fn inlines_in_list_items(items: &[ListItem], f: &mut dyn FnMut(&Inline)) {
 fn inlines_in(inlines: &[Inline], f: &mut dyn FnMut(&Inline)) {
     for inline in inlines {
         f(inline);
-        if let Inline::Element(element) = inline {
-            inlines_in_element(element, f);
+        match inline {
+            Inline::Element(element) => inlines_in_element(element, f),
+            Inline::Hole(hole) => inlines_in_groups(&hole.data, hole.content.as_deref(), f),
+            _ => {}
         }
     }
 }
@@ -98,6 +101,7 @@ fn inlines_in_groups(data: &Data, content: Option<&[Block]>, f: &mut dyn FnMut(&
         for entry in entries {
             match entry {
                 Entry::Element(child) => inlines_in_element(child, f),
+                Entry::Hole(hole) => inlines_in_groups(&hole.data, hole.content.as_deref(), f),
                 Entry::Pair(_, v) => inlines_in_value(v, f),
             }
         }
@@ -107,6 +111,7 @@ fn inlines_in_groups(data: &Data, content: Option<&[Block]>, f: &mut dyn FnMut(&
 fn inlines_in_value(value: &Value, f: &mut dyn FnMut(&Inline)) {
     match value {
         Value::Element(el) => inlines_in_element(el, f),
+        Value::Hole(hole) => inlines_in_groups(&hole.data, hole.content.as_deref(), f),
         Value::Seq(items) => items.iter().for_each(|item| inlines_in_value(item, f)),
         Value::Map(entries) => entries.iter().for_each(|(_, v)| inlines_in_value(v, f)),
         Value::Call(_, args) => args.iter().for_each(|a| inlines_in_value(a, f)),
@@ -153,7 +158,11 @@ pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
                     }
                 }
             }
-            Block::Section(_) | Block::List(_) | Block::Declaration(_) | Block::Interp(_) => {}
+            Block::Section(_)
+            | Block::List(_)
+            | Block::Declaration(_)
+            | Block::Hole(_)
+            | Block::Interp(_) => {}
         }
     }
 }
@@ -219,6 +228,8 @@ fn walk_block<B>(block: &Block, visitor: &mut impl Visitor<B>) -> ControlFlow<B>
         // A declaration is not an element, so the visitor does not see it, but
         // the elements inside its groups are the document's like any other.
         Block::Declaration(d) => walk_groups(&d.data, d.content.as_deref(), visitor),
+        // Neither is a hole, in a pattern: not an element, but its groups hold some.
+        Block::Hole(h) => walk_groups(&h.data, h.content.as_deref(), visitor),
         Block::Section(section) => {
             propagate!(walk_inlines(&section.title, visitor));
             // `section.connects` is deliberately not walked here -- same
@@ -253,8 +264,12 @@ fn walk_list_items<B>(list: &List, visitor: &mut impl Visitor<B>) -> ControlFlow
 
 fn walk_inlines<B>(inlines: &[Inline], visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
     for inline in inlines {
-        if let Inline::Element(element) = inline {
-            propagate!(walk_element(element, visitor));
+        match inline {
+            Inline::Element(element) => propagate!(walk_element(element, visitor)),
+            Inline::Hole(hole) => {
+                propagate!(walk_groups(&hole.data, hole.content.as_deref(), visitor))
+            }
+            _ => {}
         }
     }
     ControlFlow::Continue(())
@@ -282,6 +297,9 @@ fn walk_groups<B>(
         for entry in entries {
             match entry {
                 Entry::Element(child) => propagate!(walk_element(child, visitor)),
+                Entry::Hole(hole) => {
+                    propagate!(walk_groups(&hole.data, hole.content.as_deref(), visitor))
+                }
                 Entry::Pair(_, v) => propagate!(walk_value(v, visitor)),
             }
         }
@@ -299,6 +317,7 @@ fn walk_groups<B>(
 fn walk_value<B>(value: &Value, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
     match value {
         Value::Element(el) => walk_element(el, visitor),
+        Value::Hole(hole) => walk_groups(&hole.data, hole.content.as_deref(), visitor),
         Value::Seq(items) => {
             for item in items {
                 propagate!(walk_value(item, visitor));
@@ -373,6 +392,7 @@ fn walk_block_mut<B>(block: &mut Block, visitor: &mut impl VisitorMut<B>) -> Con
         Block::Paragraph(paragraph) => walk_inlines_mut(&mut paragraph.content, visitor),
         Block::Element(element) => walk_element_mut(element, visitor),
         Block::Declaration(d) => walk_groups_mut(&mut d.data, d.content.as_deref_mut(), visitor),
+        Block::Hole(h) => walk_groups_mut(&mut h.data, h.content.as_deref_mut(), visitor),
         Block::Section(section) => {
             propagate!(walk_inlines_mut(&mut section.title, visitor));
             // See the immutable `walk_block`'s matching comment:
@@ -399,8 +419,14 @@ fn walk_list_items_mut<B>(list: &mut List, visitor: &mut impl VisitorMut<B>) -> 
 
 fn walk_inlines_mut<B>(inlines: &mut [Inline], visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
     for inline in inlines {
-        if let Inline::Element(element) = inline {
-            propagate!(walk_element_mut(element, visitor));
+        match inline {
+            Inline::Element(element) => propagate!(walk_element_mut(element, visitor)),
+            Inline::Hole(hole) => propagate!(walk_groups_mut(
+                &mut hole.data,
+                hole.content.as_deref_mut(),
+                visitor
+            )),
+            _ => {}
         }
     }
     ControlFlow::Continue(())
@@ -427,6 +453,11 @@ fn walk_groups_mut<B>(
         for entry in entries {
             match entry {
                 Entry::Element(child) => propagate!(walk_element_mut(child, visitor)),
+                Entry::Hole(hole) => propagate!(walk_groups_mut(
+                    &mut hole.data,
+                    hole.content.as_deref_mut(),
+                    visitor
+                )),
                 Entry::Pair(_, v) => propagate!(walk_value_mut(v, visitor)),
             }
         }
@@ -438,6 +469,7 @@ fn walk_groups_mut<B>(
 fn walk_value_mut<B>(value: &mut Value, visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
     match value {
         Value::Element(el) => walk_element_mut(el, visitor),
+        Value::Hole(hole) => walk_groups_mut(&mut hole.data, hole.content.as_deref_mut(), visitor),
         Value::Seq(items) => {
             for item in items {
                 propagate!(walk_value_mut(item, visitor));
@@ -551,7 +583,7 @@ pub fn for_each_descendant_in_blocks(
                 }
                 Block::Section(_) => {}
                 Block::List(_) => {}
-                Block::Declaration(_) => {}
+                Block::Declaration(_) | Block::Hole(_) => {}
                 Block::Interp(_) => {}
             }
         }
@@ -618,6 +650,7 @@ fn lists_in_block(block: &Block, f: &mut dyn FnMut(&List)) {
         Block::Paragraph(_) => {}
         Block::Element(el) => lists_in_element(el, f),
         Block::Declaration(d) => lists_in_groups(&d.data, d.content.as_deref(), f),
+        Block::Hole(h) => lists_in_groups(&h.data, h.content.as_deref(), f),
         Block::Section(sec) => {
             for b in &sec.blocks {
                 lists_in_block(b, f);
@@ -699,9 +732,11 @@ pub enum Node<'a> {
     Block(&'a Block),
     Inline(&'a Inline),
     Value(&'a Value),
+    /// An entry of a `{...}` group: a `key: value` pair, an element or a hole.
+    Entry(&'a Entry),
 }
 
-/// Visits every [`Block`], [`Inline`] and [`Value`] in `doc`, in document
+/// Visits every [`Block`], [`Inline`], [`Value`] and [`Entry`] in `doc`, in document
 /// order, wherever it sits, each before what it holds.
 ///
 /// Unlike [`walk_document`] and the walkers written beside it, this one has no
@@ -710,7 +745,7 @@ pub enum Node<'a> {
 /// item's `(args)` / `{value}` / `[content]`, every `:connect`, and inside a
 /// [`Value`] (`Seq`, `Map`, `Call`, a nested element, `[...]` blocks). It is
 /// what the walkers for things that are not elements are written on:
-/// [`for_each_interpolation`] and [`for_each_declaration`].
+/// [`for_each_interpolation`], [`for_each_declaration`] and [`for_each_hole`].
 pub fn for_each_node(doc: &Document, mut f: impl FnMut(Node<'_>)) {
     for block in &doc.blocks {
         nodes_in_block(block, &mut f);
@@ -743,6 +778,19 @@ pub fn for_each_declaration(doc: &Document, mut f: impl FnMut(&Declaration)) {
     });
 }
 
+/// Visits every [`Hole`] in `doc`, in document order, wherever it sits: as a
+/// block, in running text, as an entry of a `{...}` group or as a value. A
+/// document has none; a pattern read by `parse_pattern` has them.
+pub fn for_each_hole(doc: &Document, mut f: impl FnMut(&Hole)) {
+    for_each_node(doc, |node| match node {
+        Node::Block(Block::Hole(hole))
+        | Node::Inline(Inline::Hole(hole))
+        | Node::Entry(Entry::Hole(hole)) => f(hole),
+        Node::Value(Value::Hole(hole)) => f(hole),
+        _ => {}
+    });
+}
+
 fn nodes_in_block(block: &Block, f: &mut dyn FnMut(Node<'_>)) {
     f(Node::Block(block));
     match block {
@@ -751,6 +799,10 @@ fn nodes_in_block(block: &Block, f: &mut dyn FnMut(Node<'_>)) {
         Block::Declaration(d) => {
             nodes_in_data(&d.data, f);
             nodes_in_content(d.content.as_deref(), f);
+        }
+        Block::Hole(h) => {
+            nodes_in_data(&h.data, f);
+            nodes_in_content(h.content.as_deref(), f);
         }
         Block::Section(section) => {
             nodes_in_inlines(&section.title, f);
@@ -782,8 +834,13 @@ fn nodes_in_list(list: &List, f: &mut dyn FnMut(Node<'_>)) {
 fn nodes_in_inlines(inlines: &[Inline], f: &mut dyn FnMut(Node<'_>)) {
     for inline in inlines {
         f(Node::Inline(inline));
-        if let Inline::Element(element) = inline {
-            nodes_in_element(element, f);
+        match inline {
+            Inline::Element(element) => nodes_in_element(element, f),
+            Inline::Hole(hole) => {
+                nodes_in_data(&hole.data, f);
+                nodes_in_content(hole.content.as_deref(), f);
+            }
+            _ => {}
         }
     }
 }
@@ -814,9 +871,14 @@ fn nodes_in_data(data: &Data, f: &mut dyn FnMut(Node<'_>)) {
     }
     if let Some(Group(entries)) = &data.value {
         for entry in entries {
+            f(Node::Entry(entry));
             match entry {
                 Entry::Pair(_, value) => nodes_in_value(value, f),
                 Entry::Element(element) => nodes_in_element(element, f),
+                Entry::Hole(hole) => {
+                    nodes_in_data(&hole.data, f);
+                    nodes_in_content(hole.content.as_deref(), f);
+                }
             }
         }
     }
@@ -826,6 +888,10 @@ fn nodes_in_value(value: &Value, f: &mut dyn FnMut(Node<'_>)) {
     f(Node::Value(value));
     match value {
         Value::Element(element) => nodes_in_element(element, f),
+        Value::Hole(hole) => {
+            nodes_in_data(&hole.data, f);
+            nodes_in_content(hole.content.as_deref(), f);
+        }
         Value::Seq(items) => items.iter().for_each(|v| nodes_in_value(v, f)),
         Value::Map(entries) => entries.iter().for_each(|(_, v)| nodes_in_value(v, f)),
         Value::Call(_, args) => args.iter().for_each(|v| nodes_in_value(v, f)),

@@ -39,6 +39,10 @@ fn render_nested_block(block: &Block, config: &PrinterConfig, out: &mut String) 
                 let child_val = Value::Interp(interp.clone());
                 out.push_str(&render_nested(&child_val, config));
             }
+            Inline::Hole(hole) => {
+                let child_val = Value::Hole(Box::new(hole.clone()));
+                out.push_str(&render_nested(&child_val, config));
+            }
         }
     }
 }
@@ -210,54 +214,79 @@ pub fn render_value_inner_with_blocks(
         // normalization `tomet-transform::interp` uses for one left
         // unresolved in prose.
         Value::Interp(interp) => format!("${{{}}}", interp.expr),
-        Value::Element(el) => {
-            let mut s = match &el.data.args {
-                Some(args) => format!(
-                    "{}({})",
-                    el.sigil.head(),
-                    render_args_with_blocks(args, config, render_blocks)
-                ),
-                None => el.sigil.head(),
-            };
-            if let Some(content) = &el.content {
-                s.push('[');
-                s.push_str(&render_blocks(content, config));
-                s.push(']');
-            }
-            if let Some(val) = &el.data.value {
-                match val {
-                    Group(entries) => {
-                        s.push('{');
-                        for (i, entry) in entries.iter().enumerate() {
-                            if i > 0 {
-                                s.push_str(", ");
-                            }
-                            match entry {
-                                Entry::Pair(k, v) => {
-                                    s.push_str(&format!(
-                                        "{}: {}",
-                                        cotomet_syntax::key_text(k),
-                                        render_nested_with_blocks(v, config, render_blocks)
-                                    ));
-                                }
-                                Entry::Element(nested_el) => {
-                                    let nested_val = Value::Element(Box::new(nested_el.clone()));
-                                    s.push_str(&render_nested_with_blocks(
-                                        &nested_val,
-                                        config,
-                                        render_blocks,
-                                    ));
-                                }
-                            }
-                        }
-                        s.push('}');
-                    }
-                }
-            }
-            s
-        }
+        Value::Element(el) => render_embedded(
+            el.sigil.head(),
+            &el.data,
+            el.content.as_deref(),
+            config,
+            render_blocks,
+        ),
+        Value::Hole(hole) => render_embedded(
+            hole_head(hole),
+            &hole.data,
+            hole.content.as_deref(),
+            config,
+            render_blocks,
+        ),
         Value::Blocks(blocks) => format!("[{}]", render_blocks(blocks, config)),
     }
+}
+
+/// `?` and its matcher, if it names one.
+fn hole_head(hole: &tomet_ast::Hole) -> String {
+    match &hole.matcher {
+        Some(matcher) => format!("?{matcher}"),
+        None => "?".to_string(),
+    }
+}
+
+/// An element or a hole sitting in a value slot: its `head`, then
+/// `(args)[content]{value}`. Neither `id` nor connects are printed; the
+/// parser never puts one in a value slot.
+fn render_embedded(
+    head: String,
+    data: &tomet_ast::Data,
+    content: Option<&[Block]>,
+    config: &PrinterConfig,
+    render_blocks: &mut BlockRenderer,
+) -> String {
+    let mut s = match &data.args {
+        Some(args) => format!(
+            "{head}({})",
+            render_args_with_blocks(args, config, render_blocks)
+        ),
+        None => head,
+    };
+    if let Some(content) = content {
+        s.push('[');
+        s.push_str(&render_blocks(content, config));
+        s.push(']');
+    }
+    if let Some(Group(entries)) = &data.value {
+        s.push('{');
+        for (i, entry) in entries.iter().enumerate() {
+            if i > 0 {
+                s.push_str(", ");
+            }
+            match entry {
+                Entry::Pair(k, v) => s.push_str(&format!(
+                    "{}: {}",
+                    cotomet_syntax::key_text(k),
+                    render_nested_with_blocks(v, config, render_blocks)
+                )),
+                Entry::Element(nested) => {
+                    let nested = Value::Element(Box::new(nested.clone()));
+                    s.push_str(&render_nested_with_blocks(&nested, config, render_blocks));
+                }
+                Entry::Hole(nested) => {
+                    let nested = Value::Hole(Box::new(nested.clone()));
+                    s.push_str(&render_nested_with_blocks(&nested, config, render_blocks));
+                }
+            }
+        }
+        s.push('}');
+    }
+    s
 }
 
 pub fn render_args_with_config(v: &Value, config: &PrinterConfig) -> String {

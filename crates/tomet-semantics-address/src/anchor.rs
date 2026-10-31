@@ -55,6 +55,8 @@ fn find_in_block(block: &Block, anchor: &str) -> Option<Span> {
             None
         }
         Block::Element(el) => find_in_element(el, anchor),
+        // A hole exists only in a pattern, which has no anchors.
+        Block::Hole(_) => None,
         Block::Declaration(d) => {
             if let Some(id) = &d.id
                 && id.0 == anchor
@@ -136,6 +138,8 @@ fn find_in_data(data: &Data, anchor: &str) -> Option<Span> {
     entries.iter().find_map(|entry| match entry {
         Entry::Element(child) => find_in_element(child, anchor),
         Entry::Pair(_, v) => find_in_value(v, anchor),
+        // A hole exists only in a pattern, which has no anchors.
+        Entry::Hole(_) => None,
     })
 }
 
@@ -207,7 +211,7 @@ fn collect_in_block(block: &Block, anchors: &mut Vec<(String, Span)>) {
             }
         }
         Block::List(list) => collect_in_list(list, anchors),
-        Block::Interp(_) => {}
+        Block::Interp(_) | Block::Hole(_) => {}
     }
 }
 
@@ -257,6 +261,7 @@ fn collect_in_data(data: &Data, anchors: &mut Vec<(String, Span)>) {
             match entry {
                 Entry::Element(child) => collect_in_element(child, anchors),
                 Entry::Pair(_, v) => collect_in_value(v, anchors),
+                Entry::Hole(_) => {}
             }
         }
     }

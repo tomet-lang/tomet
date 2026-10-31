@@ -45,6 +45,17 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
         Value::Interp(interp) => {
             out.push_str(&format!("${{{}}}", interp.expr));
         }
+        Value::Hole(hole) => {
+            out.push('?');
+            if let Some(matcher) = &hole.matcher {
+                out.push_str(&matcher.to_string());
+            }
+            out.push('(');
+            if let Some(args) = &hole.data.args {
+                write_args(args, out);
+            }
+            out.push(')');
+        }
         Value::Element(el) => {
             out.push_str(&el.sigil.head());
             if let Some(args) = &el.data.args {
@@ -83,7 +94,7 @@ fn write_block_plain_text(block: &tomet_ast::Block, out: &mut String) {
             Inline::Raw(r) => out.push_str(&r.value),
             Inline::SoftBreak(_) => out.push(' '),
             Inline::LineBreak(_) => out.push('\n'),
-            Inline::Element(_) | Inline::Interp(_) => {}
+            Inline::Element(_) | Inline::Interp(_) | Inline::Hole(_) => {}
         }
     }
 }

@@ -74,7 +74,7 @@ fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
             out.push_str("\n\n");
         }
         // What a document says about itself has no rendering.
-        Block::Declaration(_) => {}
+        Block::Declaration(_) | Block::Hole(_) => {}
     }
 }
 
@@ -156,6 +156,7 @@ fn inline_to_typst(cx: &TypstCtx, inlines: &[Inline]) -> String {
             Inline::LineBreak(_) => out.push_str("\\\n"),
             Inline::Element(el) => out.push_str(&element_to_typst(cx, el, true)),
             Inline::Interp(interp) => out.push_str(&render_interp(interp)),
+            Inline::Hole(_) => {}
         }
     }
     out
@@ -663,7 +664,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
                     s.push_str(&blocks_to_plain(content));
                 }
             }
-            Inline::Interp(_) => {}
+            Inline::Interp(_) | Inline::Hole(_) => {}
         }
     }
     s
@@ -688,7 +689,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
                     }
                 }
             }
-            Block::Interp(_) | Block::Declaration(_) => {}
+            Block::Interp(_) | Block::Declaration(_) | Block::Hole(_) => {}
         }
     }
     s
@@ -750,7 +751,7 @@ fn value_to_plain(v: &Value) -> String {
         // half-rendering it out of context.
         Value::Element(_) => String::new(),
         // An interpolation is not known until it is evaluated.
-        Value::Interp(_) => String::new(),
+        Value::Interp(_) | Value::Hole(_) => String::new(),
         // Block content has no scalar form either -- same as `Map`.
         Value::Blocks(_) => String::new(),
     }

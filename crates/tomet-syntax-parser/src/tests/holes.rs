@@ -2,7 +2,7 @@
 //! reads. See `tmtroot/spec/syntax/hole.tmt`.
 
 use super::*;
-use tomet_ast::Name;
+use tomet_ast::{Hole, Name};
 
 /// The one paragraph's inline run of a pattern.
 fn inlines(src: &str) -> Vec<Inline> {
@@ -10,6 +10,15 @@ fn inlines(src: &str) -> Vec<Inline> {
     match <[Block; 1]>::try_from(doc.blocks).expect("one block") {
         [Block::Paragraph(p)] => p.content,
         [other] => panic!("expected one paragraph, got {other:?}"),
+    }
+}
+
+/// The one block-level hole of a pattern.
+fn hole(src: &str) -> Hole {
+    let doc = parse_pattern(src).unwrap();
+    match <[Block; 1]>::try_from(doc.blocks).expect("one block") {
+        [Block::Hole(hole)] => hole,
+        [other] => panic!("expected one hole, got {other:?}"),
     }
 }
 
@@ -28,10 +37,9 @@ fn shape(items: &[Inline]) -> String {
         .iter()
         .map(|item| match item {
             Inline::Text(t) => format!("{:?}", t.value),
-            Inline::Element(el) => match &el.sigil {
-                Sigil::Question(Some(m)) => format!("?{m}"),
-                Sigil::Question(None) => "?".to_string(),
-                other => panic!("not a hole: {other:?}"),
+            Inline::Hole(hole) => match &hole.matcher {
+                Some(m) => format!("?{m}"),
+                None => "?".to_string(),
             },
             other => panic!("unexpected inline {other:?}"),
         })
@@ -39,8 +47,8 @@ fn shape(items: &[Inline]) -> String {
     parts.join(" ")
 }
 
-fn matcher(name: &str) -> Sigil {
-    Sigil::Question(Some(Name::bare(name)))
+fn matcher(name: &str) -> Option<Name> {
+    Some(Name::bare(name))
 }
 
 fn string(s: &str) -> Value {
@@ -55,32 +63,32 @@ fn holes_sit_in_running_text() {
 
 #[test]
 fn a_single_argument_is_the_value_itself() {
-    let Inline::Element(hole) = &inlines("a?int(n)")[1] else {
+    let Inline::Hole(hole) = &inlines("a?int(n)")[1] else {
         panic!("expected a hole");
     };
-    assert_eq!(hole.sigil, matcher("int"));
+    assert_eq!(hole.matcher, matcher("int"));
     assert_eq!(hole.data.args, Some(string("n")));
 }
 
 #[test]
 fn an_empty_group_is_an_empty_map() {
-    let hole = element("?()");
-    assert_eq!(hole.sigil, Sigil::Question(None));
+    let hole = hole("?()");
+    assert_eq!(hole.matcher, None);
     assert_eq!(hole.data.args, Some(Value::Map(Vec::new())));
     assert_eq!(hole.placement, Placement::Block);
 }
 
 #[test]
 fn the_matcher_may_be_left_out() {
-    let hole = element("?(n)");
-    assert_eq!(hole.sigil, Sigil::Question(None));
+    let hole = hole("?(n)");
+    assert_eq!(hole.matcher, None);
     assert_eq!(hole.data.args, Some(string("n")));
 }
 
 #[test]
 fn content_is_a_sub_pattern() {
-    let hole = element("?(id)[adr-?int(n)-?(slug)]");
-    assert_eq!(hole.sigil, Sigil::Question(None));
+    let hole = hole("?(id)[adr-?int(n)-?(slug)]");
+    assert_eq!(hole.matcher, None);
     assert_eq!(hole.data.args, Some(string("id")));
     let content = hole.content.expect("content");
     assert_eq!(shape(first_para(&content)), r#""adr-" ?int "-" ?"#);
@@ -88,8 +96,8 @@ fn content_is_a_sub_pattern() {
 
 #[test]
 fn several_arguments_are_unkeyed_entries() {
-    let hole = element(r#"?int(n, "x")"#);
-    assert_eq!(hole.sigil, matcher("int"));
+    let hole = hole(r#"?int(n, "x")"#);
+    assert_eq!(hole.matcher, matcher("int"));
     assert_eq!(
         hole.data.args,
         Some(Value::Map(vec![
@@ -101,7 +109,7 @@ fn several_arguments_are_unkeyed_entries() {
 
 #[test]
 fn options_are_the_value_group() {
-    let hole = element("?int(n){min: 1}");
+    let hole = hole("?int(n){min: 1}");
     let Some(Group(entries)) = &hole.data.value else {
         panic!("expected a value group, got {:?}", hole.data.value);
     };
@@ -110,7 +118,7 @@ fn options_are_the_value_group() {
 
 #[test]
 fn a_content_literal_is_a_value() {
-    let hole = element("?alt(doc, list([adr-?int(n)], [rfc-?int(n)]))");
+    let hole = hole("?alt(doc, list([adr-?int(n)], [rfc-?int(n)]))");
     let Some(Value::Map(entries)) = &hole.data.args else {
         panic!("expected a map, got {:?}", hole.data.args);
     };
@@ -124,7 +132,7 @@ fn a_content_literal_is_a_value() {
 
 #[test]
 fn a_content_literal_is_a_value_in_positional_position_too() {
-    let hole = element("?many(items, [ab])");
+    let hole = hole("?many(items, [ab])");
     let Some(Value::Map(entries)) = &hole.data.args else {
         panic!("expected a map, got {:?}", hole.data.args);
     };
@@ -134,13 +142,13 @@ fn a_content_literal_is_a_value_in_positional_position_too() {
 
 #[test]
 fn a_matcher_may_be_namespaced() {
-    let hole = element("?tandr.heading(h)");
+    let hole = hole("?tandr.heading(h)");
     assert_eq!(
-        hole.sigil,
-        Sigil::Question(Some(Name {
+        hole.matcher,
+        Some(Name {
             namespace: Some("tandr".into()),
             name: "heading".into(),
-        }))
+        })
     );
 }
 
@@ -152,10 +160,10 @@ fn a_hole_sits_inside_an_element_pattern() {
         panic!("expected args, got {:?}", link.data.args);
     };
     assert_eq!(args[0].0, "url");
-    let Value::Element(url) = &args[0].1 else {
+    let Value::Hole(url) = &args[0].1 else {
         panic!("expected a hole, got {:?}", args[0].1);
     };
-    assert_eq!(url.sigil, Sigil::Question(None));
+    assert_eq!(url.matcher, None);
     let content = link.content.expect("content");
     assert_eq!(shape(first_para(&content)), "?");
 }
@@ -190,26 +198,21 @@ fn a_document_never_reads_a_hole() {
 }
 
 #[test]
-fn a_question_sigil_has_a_matcher_and_no_element_name() {
-    let int = matcher("int");
-    assert_eq!(int.name(), None);
-    assert_eq!(int.matcher(), Some(&Name::bare("int")));
-    assert!(int.is_question());
-    // `?meta()` is not the `meta` element.
-    assert!(!matcher("meta").is_bare_named("meta"));
-    assert_eq!(Sigil::Question(None).matcher(), None);
-    assert_eq!(Sigil::named("int").matcher(), None);
+fn a_matcher_is_not_an_element_name() {
+    // `?meta()` is a hole with the matcher `meta`; it is not the `meta` element, and
+    // is not reached by the walkers that visit elements.
+    let doc = parse_pattern("?meta()").unwrap();
+    let mut elements = 0;
+    tomet_tree::for_each_element(&doc, |_| elements += 1);
+    assert_eq!(elements, 0);
+    assert_eq!(hole("?meta()").matcher, matcher("meta"));
 }
 
 /// How many holes `parse_pattern` finds anywhere in `src`.
 fn holes_in(src: &str) -> usize {
     let doc = parse_pattern(src).unwrap();
     let mut count = 0;
-    tomet_tree::for_each_element(&doc, |el| {
-        if el.sigil.is_question() {
-            count += 1;
-        }
-    });
+    tomet_tree::for_each_hole(&doc, |_| count += 1);
     count
 }
 
@@ -241,11 +244,7 @@ fn a_document_has_no_hole_wherever_content_goes() {
     ] {
         let doc = parse_document(src).unwrap();
         let mut count = 0;
-        tomet_tree::for_each_element(&doc, |el| {
-            if el.sigil.is_question() {
-                count += 1;
-            }
-        });
+        tomet_tree::for_each_hole(&doc, |_| count += 1);
         assert_eq!(count, 0, "`{src}` read as a document has a hole");
     }
 }
@@ -254,10 +253,10 @@ fn a_document_has_no_hole_wherever_content_goes() {
 fn a_quoted_argument_is_never_formatting() {
     // A name the content grammar would read as formatting (`__init__.py` is
     // `strong(init)` + `.py`) is written as a quoted argument instead.
-    let hole = element(r#"?string("__init__.py")"#);
-    assert_eq!(hole.sigil, matcher("string"));
-    assert_eq!(hole.data.args, Some(string("__init__.py")));
+    let first = hole(r#"?string("__init__.py")"#);
+    assert_eq!(first.matcher, matcher("string"));
+    assert_eq!(first.data.args, Some(string("__init__.py")));
 
-    let hole = element(r#"?string("_private_.rs")"#);
-    assert_eq!(hole.data.args, Some(string("_private_.rs")));
+    let second = hole(r#"?string("_private_.rs")"#);
+    assert_eq!(second.data.args, Some(string("_private_.rs")));
 }

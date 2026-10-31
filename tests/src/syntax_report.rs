@@ -24,8 +24,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use tomet_ast::{
-    Block, Connect, Data, Document, Element, Entry, Group, Inline, InterpExpr, Interpolation, List,
-    Placement, Sigil, Value,
+    Block, Connect, Data, Document, Element, Entry, Group, Hole, Inline, InterpExpr, Interpolation,
+    List, Placement, Sigil, Value,
 };
 use tomet_parser::parse_document;
 
@@ -714,6 +714,7 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
                                 let _ = writeln!(out, "{k}: {}", value_str(v));
                             }
                             Entry::Element(child) => dump_element(out, child, depth + 2),
+                            Entry::Hole(child) => dump_hole(out, child, depth + 2),
                         }
                     }
                 }
@@ -737,6 +738,7 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
             }
         }
         Block::List(list) => dump_list(out, list, depth),
+        Block::Hole(hole) => dump_hole(out, hole, depth),
     }
 }
 
@@ -784,6 +786,27 @@ fn dump_inline(out: &mut String, inline: &Inline, depth: usize) {
         }
         Inline::Element(el) => dump_element(out, el, depth),
         Inline::Interp(interp) => dump_interp(out, interp, depth),
+        Inline::Hole(hole) => dump_hole(out, hole, depth),
+    }
+}
+
+/// A hole's head line reads like an element's: its placement, then `?` and its matcher.
+fn dump_hole(out: &mut String, hole: &Hole, depth: usize) {
+    let placement = match hole.placement {
+        Placement::Block => "Block ",
+        Placement::Inline => "Inline",
+    };
+    let matcher = hole
+        .matcher
+        .as_ref()
+        .map(ToString::to_string)
+        .unwrap_or_default();
+    indent(out, depth);
+    let _ = writeln!(out, "{placement} ?{matcher}");
+    dump_groups(out, &hole.data, hole.content.as_deref(), depth);
+    if let Some(id) = &hole.id {
+        indent(out, depth + 1);
+        let _ = writeln!(out, "id      {:?}", id.0);
     }
 }
 
@@ -845,6 +868,7 @@ fn dump_groups(out: &mut String, data: &Data, content: Option<&[Block]>, depth: 
                         let _ = writeln!(out, "{k}: {}", value_str(v));
                     }
                     Entry::Element(child) => dump_element(out, child, depth + 2),
+                    Entry::Hole(child) => dump_hole(out, child, depth + 2),
                 }
             }
         }
@@ -867,17 +891,6 @@ fn element_head(el: &Element) -> String {
             format!("{placement} @{name}")
         }
         Sigil::Bare => "Bare".to_string(),
-        Sigil::Question(matcher) => {
-            let placement = match el.placement {
-                Placement::Block => "Block ",
-                Placement::Inline => "Inline",
-            };
-            let matcher = matcher
-                .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_default();
-            format!("{placement} ?{matcher}")
-        }
     }
 }
 
@@ -915,6 +928,17 @@ fn value_str(v: &Value) -> String {
             format!("{name}({})", inner.join(", "))
         }
         Value::Interp(interp) => format!("${{{}}}", interp_str(&interp.expr)),
+        Value::Hole(hole) => {
+            let matcher = hole
+                .matcher
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_default();
+            match &hole.data.args {
+                Some(args) => format!("?{matcher}({})", value_str(args)),
+                None => format!("?{matcher}"),
+            }
+        }
         Value::Element(el) => {
             let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
             match &el.data.args {

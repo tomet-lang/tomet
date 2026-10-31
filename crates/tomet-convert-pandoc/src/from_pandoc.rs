@@ -541,7 +541,7 @@ fn inlines_to_text_tm(inlines: &[TmInline]) -> String {
                     out.push_str(&blocks_to_text_tm(content));
                 }
             }
-            TmInline::Interp(_) => {}
+            TmInline::Interp(_) | TmInline::Hole(_) => {}
         }
     }
     out
@@ -566,7 +566,7 @@ fn blocks_to_text_tm(blocks: &[TmBlock]) -> String {
                     }
                 }
             }
-            TmBlock::Interp(_) | TmBlock::Declaration(_) => {}
+            TmBlock::Interp(_) | TmBlock::Declaration(_) | TmBlock::Hole(_) => {}
         }
     }
     out

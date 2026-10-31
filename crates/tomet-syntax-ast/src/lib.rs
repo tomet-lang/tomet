@@ -152,6 +152,8 @@ pub enum Value {
     /// `${...}` / `$name(...)` sitting where a value goes -- evaluated later,
     /// so `tomet-semantics` never looks inside it as data. See [`Interpolation`].
     Interp(Interpolation),
+    /// A `?matcher(...)` hole sitting where a value goes, in a pattern. See [`Hole`].
+    Hole(Box<Hole>),
     /// A real, `@`-sigiled element sitting where a value goes --
     /// `::meta(icon: @doc.icon("triangle"))`. Unlike [`Value::Call`], this
     /// is the same [`Element`] any other position produces: it has a
@@ -267,6 +269,7 @@ impl Serialize for Value {
                 m.end()
             }
             Value::Interp(interp) => interp.serialize(serializer),
+            Value::Hole(hole) => hole.serialize(serializer),
             Value::Element(el) => el.serialize(serializer),
             Value::Blocks(blocks) => {
                 use serde::ser::SerializeSeq;
@@ -280,8 +283,8 @@ impl Serialize for Value {
     }
 }
 
-// Deliberately no `Value::Call`, `Value::Interp`, `Value::Element`, or
-// `Value::Blocks` arm below: all four are only ever produced by
+// Deliberately no `Value::Call`, `Value::Interp`, `Value::Hole`,
+// `Value::Element`, or `Value::Blocks` arm below: all five are only ever produced by
 // `tomet-syntax-parser` reading source text (`name(...)` / `${...}` /
 // `@name(...)` / `key: [...]`), never by
 // deserializing inbound data -- there is no `visit_call` and nothing in
@@ -382,6 +385,8 @@ pub enum Block {
     List(List),
     /// A `::name(...)` declaration about the document itself. See [`Declaration`].
     Declaration(Declaration),
+    /// A `?matcher(...)` hole standing as a block, in a pattern. See [`Hole`].
+    Hole(Hole),
     /// A `${...}` that stands alone on its line, in block context. It is a
     /// block of its own, and not a one-item paragraph, because what it
     /// evaluates to may be blocks (an include, a generated table).
@@ -396,6 +401,7 @@ impl Block {
             Block::Section(s) => s.span,
             Block::List(l) => l.span,
             Block::Declaration(d) => d.span,
+            Block::Hole(h) => h.span,
             Block::Interp(i) => i.span,
         }
     }
@@ -504,6 +510,8 @@ pub enum Inline {
     Element(Element),
     /// `${...}` / `$name(...)` inside running text. See [`Interpolation`].
     Interp(Interpolation),
+    /// A `?matcher(...)` hole inside running text, in a pattern. See [`Hole`].
+    Hole(Hole),
     /// A source line break that is semantically whitespace. Unlike the old
     /// behavior of folding it into a literal `' '` (or nothing, between two
     /// East-Asian-wide characters) at parse time, this keeps the break's
@@ -537,6 +545,7 @@ impl Inline {
             Inline::Raw(t) => t.value.chars().next(),
             Inline::Element(_)
             | Inline::Interp(_)
+            | Inline::Hole(_)
             | Inline::SoftBreak(_)
             | Inline::LineBreak(_) => None,
         }
@@ -547,6 +556,7 @@ impl Inline {
             Inline::Text(t) => t.span,
             Inline::Element(e) => e.span,
             Inline::Interp(i) => i.span,
+            Inline::Hole(h) => h.span,
             Inline::SoftBreak(b) => b.span,
             Inline::LineBreak(b) => b.span,
             Inline::Raw(t) => t.span,
@@ -751,8 +761,7 @@ pub struct Id(pub String);
 
 /// Which sigil introduced an element, and its name.
 ///
-/// There is one element sigil in a document, `@`, and a second, `?`, in a
-/// pattern (see [`Sigil::Question`]). A sigil says "an element starts here" and
+/// There is one element sigil in a document, `@`. A sigil says "an element starts here" and
 /// nothing else: whether the element stands as a block or belongs to a
 /// paragraph is [`Placement`], which the parser derives from position, and
 /// origin is carried by [`Name`]'s namespace.
@@ -782,33 +791,19 @@ pub enum Sigil {
     /// the list itself is the container.
     #[default]
     Bare,
-    /// `?matcher(name, args){options}[content]` -- a hole in a pattern.
-    ///
-    /// Structurally the same as [`Sigil::Named`]: the same groups, read by
-    /// the same code. Two differences. The head is a *matcher*, not an
-    /// element name, and it is optional: `?()` and `?(n)[...]` have none. And
-    /// it only exists in what `parse_pattern` reads; `parse_document` leaves
-    /// `?` as text, so ordinary prose such as `本当に?(はい)` is never a hole.
-    ///
-    /// The matcher is deliberately not [`Sigil::name`]: that is "which
-    /// element is this", and `?meta()` is not the `meta` element. What a
-    /// matcher means, and what a hole matches, is the host's (tandr's), not
-    /// tomet's. See `tmtroot/spec/syntax/hole.tmt`.
-    Question(Option<Name>),
 }
 
 impl Sigil {
     /// This element's name, if it has one.
     ///
-    /// A hole has none: its head is a matcher, see [`Sigil::matcher`].
     pub fn name(&self) -> Option<&Name> {
         match self {
             Sigil::Named(name) => Some(name),
-            Sigil::Bare | Sigil::Question(_) => None,
+            Sigil::Bare => None,
         }
     }
 
-    /// The text that opens an element: `@name`, `?matcher`.
+    /// The text that opens an element: `@name`.
     /// Empty for [`Sigil::Bare`], which is written with no sigil at all.
     ///
     /// Everything that prints an element asks here, so a sigil is spelled in
@@ -817,24 +812,7 @@ impl Sigil {
         match self {
             Sigil::Named(name) => format!("@{name}"),
             Sigil::Bare => String::new(),
-            Sigil::Question(matcher) => match matcher {
-                Some(matcher) => format!("?{matcher}"),
-                None => "?".to_string(),
-            },
         }
-    }
-
-    /// The matcher a hole names, if it is a hole and names one.
-    pub fn matcher(&self) -> Option<&Name> {
-        match self {
-            Sigil::Question(matcher) => matcher.as_ref(),
-            _ => None,
-        }
-    }
-
-    /// Whether this sigil is `?` -- a hole in a pattern.
-    pub fn is_question(&self) -> bool {
-        matches!(self, Sigil::Question(_))
     }
 
     /// An element with a bare (un-namespaced) name.
@@ -897,6 +875,32 @@ pub enum Placement {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Declaration {
     pub name: Name,
+    pub data: Data,
+    pub content: Option<Vec<Block>>,
+    pub id: Option<Id>,
+    pub span: Span,
+}
+
+/// A `?matcher(name, args){options}[content]` hole in a pattern.
+///
+/// It takes the groups an element does, read by the same code. Two
+/// differences: its head is a *matcher*, not an element name, and it is
+/// optional (`?()` and `?(n)[...]` have none); and it takes no `:connect`. It
+/// only exists in what `parse_pattern` reads: `parse_document` leaves `?` as
+/// text, so ordinary prose such as `本当に?(はい)` is never a hole.
+///
+/// A hole sits where an element sits, so it is a variant of [`Block`],
+/// [`Inline`], [`Entry`] and [`Value`], in the same tree a document is: a
+/// pattern is written in, and printed as, ordinary tomet. The type of every
+/// document allows one; `parse_document` never builds one.
+///
+/// The matcher is not an element name: `?meta()` is not the `meta` element.
+/// What a matcher means, and what a hole matches, is the host's (tandr's), not
+/// tomet's. See `tmtroot/spec/syntax/hole.tmt`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Hole {
+    pub matcher: Option<Name>,
+    pub placement: Placement,
     pub data: Data,
     pub content: Option<Vec<Block>>,
     pub id: Option<Id>,
@@ -971,6 +975,8 @@ pub struct Element {
 pub enum Entry {
     Pair(String, Value),
     Element(Element),
+    /// A `?matcher(...)` hole standing as an entry, in a pattern. See [`Hole`].
+    Hole(Hole),
 }
 
 /// The entries of a `{...}` group, in source order.
@@ -1014,7 +1020,7 @@ impl Group {
                 .iter()
                 .filter_map(|e| match e {
                     Entry::Pair(k, v) => Some((k.clone(), v.clone())),
-                    Entry::Element(_) => None,
+                    Entry::Element(_) | Entry::Hole(_) => None,
                 })
                 .collect(),
         )
@@ -1027,7 +1033,7 @@ impl Group {
             .iter()
             .filter_map(|e| match e {
                 Entry::Element(el) => Some(el),
-                Entry::Pair(..) => None,
+                Entry::Pair(..) | Entry::Hole(_) => None,
             })
             .collect()
     }
@@ -1035,7 +1041,9 @@ impl Group {
     /// Whether this group holds any nested elements.
     pub fn has_children(&self) -> bool {
         let Group(entries) = self;
-        entries.iter().any(|e| matches!(e, Entry::Element(_)))
+        entries
+            .iter()
+            .any(|e| matches!(e, Entry::Element(_) | Entry::Hole(_)))
     }
 
     /// This group's `key: value` pairs, in source order.
@@ -1043,7 +1051,7 @@ impl Group {
         let Group(entries) = self;
         entries.iter().filter_map(|e| match e {
             Entry::Pair(k, v) => Some((k, v)),
-            Entry::Element(_) => None,
+            Entry::Element(_) | Entry::Hole(_) => None,
         })
     }
 
@@ -1052,7 +1060,7 @@ impl Group {
         let Group(entries) = self;
         entries.iter_mut().filter_map(|e| match e {
             Entry::Pair(k, v) => Some((k, v)),
-            Entry::Element(_) => None,
+            Entry::Element(_) | Entry::Hole(_) => None,
         })
     }
 
@@ -1080,7 +1088,7 @@ impl Group {
             .position(|e| matches!(e, Entry::Pair(k, _) if k == key))?;
         match entries.remove(idx) {
             Entry::Pair(_, v) => Some(v),
-            Entry::Element(_) => unreachable!("position matched a Pair"),
+            Entry::Element(_) | Entry::Hole(_) => unreachable!("position matched a Pair"),
         }
     }
 }

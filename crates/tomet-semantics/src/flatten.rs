@@ -149,7 +149,7 @@ pub fn scalar_string(v: &Value) -> Option<String> {
         // An embedded element is a whole element, not a scalar -- same
         // bucket as `Map`/`Call`. So is an interpolation: its value is not
         // known until it is evaluated.
-        Value::Element(_) | Value::Interp(_) => None,
+        Value::Element(_) | Value::Interp(_) | Value::Hole(_) => None,
         // Block content (`key: [...]`) is a tree, not a scalar -- same
         // bucket.
         Value::Blocks(_) => None,
@@ -199,6 +199,20 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
         // rare enough in practice (`@doc.icon("x")` uses none of them)
         // that this isn't worth widening `serde_json` conversions for
         // `Inline`/`Group`, which don't have one anywhere else.
+        // A hole exists only in a pattern, which is not data: only its matcher is kept.
+        Value::Hole(hole) => {
+            let mut obj = serde_json::Map::new();
+            obj.insert(
+                "hole".to_string(),
+                serde_json::Value::String(
+                    hole.matcher
+                        .as_ref()
+                        .map(ToString::to_string)
+                        .unwrap_or_default(),
+                ),
+            );
+            serde_json::Value::Object(obj)
+        }
         Value::Interp(interp) => {
             let mut obj = serde_json::Map::new();
             obj.insert(

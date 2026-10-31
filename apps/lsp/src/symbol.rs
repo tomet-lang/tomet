@@ -64,6 +64,7 @@ fn collect_block_symbols(
         Block::Declaration(declaration) => {
             collect_declaration_symbol(positions, declaration, symbols)
         }
+        Block::Hole(_) => {}
     }
 }
 
@@ -244,7 +245,7 @@ pub(crate) fn extract_blocks_text(blocks: &[Block]) -> String {
                 }
             }
             Block::Interp(_) => out.push_str("${...}"),
-            Block::Declaration(_) => {}
+            Block::Declaration(_) | Block::Hole(_) => {}
         }
     }
     out
@@ -264,6 +265,7 @@ pub(crate) fn extract_inlines_text(inlines: &[Inline]) -> String {
             Inline::LineBreak(_) => out.push(' '),
             Inline::Element(el) => out.push_str(&sigil_display_name(&el.sigil)),
             Inline::Interp(_) => out.push_str("${...}"),
+            Inline::Hole(_) => {}
         }
     }
     out
@@ -273,9 +275,5 @@ pub(crate) fn sigil_display_name(sigil: &Sigil) -> String {
     match sigil {
         Sigil::Named(name) => format!("@{name}"),
         Sigil::Bare => "(bare)".to_string(),
-        Sigil::Question(matcher) => match matcher {
-            Some(matcher) => format!("?{matcher}()"),
-            None => "?()".to_string(),
-        },
     }
 }

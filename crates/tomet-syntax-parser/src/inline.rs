@@ -1,7 +1,7 @@
 //! Parsing for inline sequences, text normalization, and inline delimiters (`*em*`, `_em_`, `**strong**`, `__strong__`, `~~strikeout~~`).
 
 use crate::dialect::Dialect;
-use crate::element::{LineEnd, element_ends_line, is_element_start, parse_element};
+use crate::element::{LineEnd, element_ends_line, is_element_start, parse_written};
 use crate::error::Result;
 use crate::interp::{is_interp_start, parse_interpolation};
 use crate::list::peek_list_marker;
@@ -313,7 +313,7 @@ pub(crate) fn parse_inline_seq<'a>(
                 // it does at the top level; only an explicit trailing
                 // `\` joins it to what follows.
                 flush_text(&mut items, cur, &mut text_start, pipe_cols);
-                let el = parse_element(dialect, cur, allow_colon_connect)?;
+                let written = parse_written(dialect, cur, allow_colon_connect, &[])?;
                 if line_end == LineEnd::Continuation {
                     crate::element::consume_trailing_continuation(cur);
                 }
@@ -322,7 +322,7 @@ pub(crate) fn parse_inline_seq<'a>(
                 } else {
                     Placement::Inline
                 };
-                items.push(Inline::Element(el.with_placement(placement)));
+                items.push(written.with_placement(placement).into_inline());
                 text_start = cur.pos();
                 continue;
             }

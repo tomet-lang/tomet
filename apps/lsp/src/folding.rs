@@ -98,6 +98,7 @@ fn collect_block_folding_ranges(
                 });
             }
         }
+        Block::Hole(_) => {}
     }
 }
 
@@ -170,6 +171,7 @@ fn block_end_line(index: &LineIndex<'_>, block: &Block) -> u32 {
         Block::List(list) => span_end_line(index, &list.span),
         Block::Interp(interp) => span_end_line(index, &interp.span),
         Block::Declaration(declaration) => span_end_line(index, &declaration.span),
+        Block::Hole(hole) => span_end_line(index, &hole.span),
     }
 }
 

@@ -228,6 +228,8 @@ impl EvalValue {
             Value::Blocks(blocks) => EvalValue::Fragment(blocks.clone()),
             // Not evaluated yet, so it stays what it is: a block that holds it.
             Value::Interp(interp) => EvalValue::Fragment(vec![Block::Interp(interp.clone())]),
+            // A hole exists only in a pattern; kept as the block that holds it.
+            Value::Hole(hole) => EvalValue::Fragment(vec![Block::Hole((**hole).clone())]),
         }
     }
 

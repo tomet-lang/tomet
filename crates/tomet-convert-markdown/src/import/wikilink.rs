@@ -30,7 +30,7 @@ fn post_process_block_wikilinks(block: &mut Block) {
             }
         }
         Block::List(list) => post_process_list_wikilinks(list),
-        Block::Interp(_) => {}
+        Block::Interp(_) | Block::Hole(_) => {}
     }
 }
 
@@ -79,6 +79,7 @@ fn post_process_inlines_wikilinks(inlines: Vec<Inline>) -> Vec<Inline> {
             | Inline::Interp(_)) => {
                 new_inlines.push(other);
             }
+            Inline::Hole(_) => {}
         }
     }
     new_inlines

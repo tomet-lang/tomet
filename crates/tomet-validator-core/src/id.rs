@@ -40,7 +40,7 @@ fn collect_block_ids(block: &Block, ids: &mut Vec<(String, Span)>) {
             }
         }
         Block::List(list) => collect_list_ids(list, ids),
-        Block::Interp(_) => {}
+        Block::Interp(_) | Block::Hole(_) => {}
     }
 }
 
@@ -85,6 +85,7 @@ fn collect_data_ids(data: &Data, ids: &mut Vec<(String, Span)>) {
             match entry {
                 Entry::Pair(_, value) => collect_value_ids(value, ids),
                 Entry::Element(child) => collect_element_ids(child, ids),
+                Entry::Hole(_) => {}
             }
         }
     }

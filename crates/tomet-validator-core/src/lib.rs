@@ -300,6 +300,7 @@ pub fn check_singletons_and_regions(
             Block::Interp(_) => {
                 in_preamble = false;
             }
+            Block::Hole(_) => {}
         }
     }
 }
@@ -326,7 +327,7 @@ fn validate_section_block(block: &Block, visit: &mut impl FnMut(Written<'_>, boo
             }
         }
         Block::List(list) => validate_list_items(list, visit),
-        Block::Interp(_) => {}
+        Block::Interp(_) | Block::Hole(_) => {}
     }
 }
 
@@ -666,7 +667,7 @@ fn for_each_direct_content_item<'a>(content: &'a [Block], mut f: impl FnMut(Writ
                     }
                 }
             }
-            Block::Section(_) | Block::List(_) | Block::Interp(_) => {}
+            Block::Section(_) | Block::List(_) | Block::Interp(_) | Block::Hole(_) => {}
         }
     }
 }

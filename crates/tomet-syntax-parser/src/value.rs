@@ -80,15 +80,15 @@ impl cotomet_syntax::ValueHook for TometValueHook {
         if self.dialect.opens_element(cur.peek())
             && crate::element::is_element_start(self.dialect, cur, false)
         {
-            let el = match crate::element::parse_element(self.dialect, cur, false) {
-                Ok(el) => el,
+            let written = match crate::element::parse_written(self.dialect, cur, false, &[]) {
+                Ok(written) => written,
                 Err(e) => {
                     return Some(Err(cotomet_syntax::Error::at(
                         e.message, e.line, e.column, e.offset,
                     )));
                 }
             };
-            return Some(Ok(Value::Element(Box::new(el))));
+            return Some(Ok(written.into_value()));
         }
 
         // Delegate dollar expressions (`$name(args)`/`${...}`) to CotometValueHook.

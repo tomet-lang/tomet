@@ -22,7 +22,7 @@ pub(crate) fn inlines_to_plain(inlines: &[Inline]) -> String {
                     s.push_str(&blocks_to_plain(content));
                 }
             }
-            Inline::Interp(_) => {}
+            Inline::Interp(_) | Inline::Hole(_) => {}
         }
     }
     s
@@ -50,7 +50,7 @@ pub(crate) fn blocks_to_plain(blocks: &[Block]) -> String {
                     }
                 }
             }
-            Block::Interp(_) | Block::Declaration(_) => {}
+            Block::Interp(_) | Block::Declaration(_) | Block::Hole(_) => {}
         }
     }
     s
@@ -204,7 +204,7 @@ pub(crate) fn value_to_plain(v: &Value) -> String {
         // An embedded element has no scalar form either -- same as `Map`.
         Value::Element(_) => String::new(),
         // An interpolation is not known until it is evaluated.
-        Value::Interp(_) => String::new(),
+        Value::Interp(_) | Value::Hole(_) => String::new(),
         // Block content has no scalar form either -- same as `Map`.
         Value::Blocks(_) => String::new(),
     }

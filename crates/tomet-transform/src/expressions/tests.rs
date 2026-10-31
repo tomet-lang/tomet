@@ -117,6 +117,7 @@ fn text_of(doc: &Document) -> String {
                 }
                 Block::Interp(interp) => out.push_str(&format!("${{{}}}", interp.expr)),
                 Block::Declaration(d) => out.push_str(&format!("::{}", d.name)),
+                Block::Hole(_) => {}
             }
         }
     }

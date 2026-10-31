@@ -155,12 +155,6 @@ pub enum ElementKind {
     /// ambiguity the old stringly-typed `element_kind()` already had --
     /// not a regression.
     Bare,
-    /// `Sigil::Question` -- `?matcher(...)`, a hole in a pattern. It names
-    /// a kind of syntax and nothing more: what a matcher is and what a hole
-    /// matches belong to whoever reads the pattern (tandr), not to this
-    /// crate. It never appears in an ordinary
-    /// document, only in what `tomet_parser::parse_pattern` reads.
-    Hole,
     /// `@ftn` -- a footnote: a definition when it has content, a
     /// reference to the one with the same id when it has none.
     Footnote,
@@ -204,7 +198,6 @@ impl ElementKind {
             ElementKind::Heading => "heading",
             ElementKind::Custom(name) => name,
             ElementKind::Bare => "bare",
-            ElementKind::Hole => "hole",
             ElementKind::Footnote => "ftn",
             ElementKind::Tag => "tag",
             ElementKind::Task => "task",
@@ -414,8 +407,8 @@ impl std::error::Error for UnknownName {}
 /// validator uses it for the non-`Named` sigils, which carry no name to
 /// resolve.
 ///
-/// `Sigil::Bare` is `ElementKind::Bare`, `Sigil::Question` is
-/// `ElementKind::Hole`. Everything else goes through [`classify_std_name`].
+/// `Sigil::Bare` is `ElementKind::Bare`. Everything else goes through
+/// [`classify_std_name`].
 ///
 /// The name is all the sigil carries. Where the element sits is
 /// `Element::placement`, and a placement that disagrees with the kind's
@@ -430,7 +423,6 @@ pub fn classify_std(el: &Element) -> Result<ElementKind, UnknownName> {
         // see [`refuse_declaration_as_element`].
         Sigil::Named(name) => refuse_declaration_as_element(name, classify_std_name(name)?),
         Sigil::Bare => Ok(ElementKind::Bare),
-        Sigil::Question(_) => Ok(ElementKind::Hole),
     }
 }
 
@@ -519,7 +511,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         // Either shape: a mention sits inside a sentence, and the definition in a `::dictionary` stands as
         // an entry of its value group.
         Term => return None,
-        Custom(_) | Bare | Hole => return None,
+        Custom(_) | Bare => return None,
     })
 }
 
@@ -591,7 +583,7 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         // A term's description is the content of its definition; a mention has none.
         Quote | Callout | Card | Table | Footnote | Task | Term => Some(ContentShape::Block),
         // Not a built-in bare name at all.
-        Custom(_) | Bare | Hole => None,
+        Custom(_) | Bare => None,
     }
 }
 
@@ -631,7 +623,7 @@ pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
 ///
 /// Returns `Some((found, expected))` when they disagree.
 pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {
-    if matches!(el.sigil, Sigil::Bare | Sigil::Question(_)) {
+    if matches!(el.sigil, Sigil::Bare) {
         return None;
     }
     let found = Shape::from(el.placement);

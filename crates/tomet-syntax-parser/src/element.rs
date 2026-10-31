@@ -10,7 +10,8 @@ use crate::value::{
     skip_ws_newlines_and_comments,
 };
 use tomet_ast::{
-    Block, Connect, Declaration, Element, Entry, Group, Id, Inline, Name, Placement, Sigil, Value,
+    Block, Connect, Declaration, Element, Entry, Group, Hole, Id, Inline, Name, Placement, Sigil,
+    Span, Value,
 };
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
@@ -120,7 +121,7 @@ pub(crate) enum LineEnd {
 /// uses for a list marker's `(...)` form.
 pub(crate) fn element_ends_line(dialect: Dialect, cur: &Cursor) -> LineEnd {
     let mut probe = *cur;
-    if parse_element(dialect, &mut probe, true).is_err() {
+    if parse_written(dialect, &mut probe, true, &[]).is_err() {
         return LineEnd::No;
     }
     skip_inline_ws(&mut probe);
@@ -229,14 +230,6 @@ fn skip_lookahead_gap(cur: &mut Cursor) {
 /// pass `false` (no `connects` field to put a named one in), but
 /// `element_list_item` now takes `connects` too, so there is no longer a
 /// context that needs the connect branch half-enabled.
-pub(crate) fn parse_element(
-    dialect: Dialect,
-    cur: &mut Cursor,
-    allow_colon_connect: bool,
-) -> Result<Element> {
-    parse_element_with_pipe_stack(dialect, cur, allow_colon_connect, &[])
-}
-
 pub(crate) fn parse_element_with_pipe_stack(
     dialect: Dialect,
     cur: &mut Cursor,
@@ -244,25 +237,14 @@ pub(crate) fn parse_element_with_pipe_stack(
     parent_pipe_stack: &[usize],
 ) -> Result<Element> {
     let start_pos = cur.pos();
-    let sigil = if dialect == Dialect::Pattern && cur.eat_str("?") {
-        // A hole: the matcher is optional (`?()`, `?(n)[...]`), and the groups
-        // are the ones every other sigil reads.
-        Sigil::Question(eat_name(cur))
-    } else {
-        if !cur.eat_str("@") {
-            return Err(err(cur.pos(), "expected '@'"));
-        }
-        match eat_name(cur) {
-            Some(name) => Sigil::Named(name),
-            None => {
-                return Err(err(cur.pos(), "expected an element name after '@'"));
-            }
-        }
+    if !cur.eat_str("@") {
+        return Err(err(cur.pos(), "expected '@'"));
+    }
+    let Some(name) = eat_name(cur) else {
+        return Err(err(cur.pos(), "expected an element name after '@'"));
     };
-    // A hole has no connect form.
-    let allow_colon_connect = allow_colon_connect && !sigil.is_question();
 
-    let mut el = element_new(sigil);
+    let mut el = element_new(Sigil::Named(name));
     parse_groups_with_pipe_stack(
         dialect,
         cur,
@@ -272,6 +254,92 @@ pub(crate) fn parse_element_with_pipe_stack(
     )?;
     el.span = cur.span_from(start_pos);
     Ok(el)
+}
+
+/// What `@name...` -- or, in a pattern, `?matcher...` -- reads into.
+pub(crate) enum Written {
+    Element(Element),
+    Hole(Hole),
+}
+
+impl Written {
+    pub(crate) fn with_placement(self, placement: Placement) -> Self {
+        match self {
+            Written::Element(el) => Written::Element(el.with_placement(placement)),
+            Written::Hole(mut hole) => {
+                hole.placement = placement;
+                Written::Hole(hole)
+            }
+        }
+    }
+
+    pub(crate) fn span(&self) -> Span {
+        match self {
+            Written::Element(el) => el.span,
+            Written::Hole(hole) => hole.span,
+        }
+    }
+
+    pub(crate) fn into_block(self) -> Block {
+        match self {
+            Written::Element(el) => Block::Element(el),
+            Written::Hole(hole) => Block::Hole(hole),
+        }
+    }
+
+    pub(crate) fn into_inline(self) -> Inline {
+        match self {
+            Written::Element(el) => Inline::Element(el),
+            Written::Hole(hole) => Inline::Hole(hole),
+        }
+    }
+
+    pub(crate) fn into_entry(self) -> Entry {
+        match self {
+            Written::Element(el) => Entry::Element(el),
+            Written::Hole(hole) => Entry::Hole(hole),
+        }
+    }
+
+    pub(crate) fn into_value(self) -> Value {
+        match self {
+            Written::Element(el) => Value::Element(Box::new(el)),
+            Written::Hole(hole) => Value::Hole(Box::new(hole)),
+        }
+    }
+}
+
+/// An element, or a hole when `cur` is at a `?` in a pattern.
+pub(crate) fn parse_written(
+    dialect: Dialect,
+    cur: &mut Cursor,
+    allow_colon_connect: bool,
+    parent_pipe_stack: &[usize],
+) -> Result<Written> {
+    if dialect == Dialect::Pattern && cur.peek() == Some('?') {
+        return parse_hole(dialect, cur, parent_pipe_stack).map(Written::Hole);
+    }
+    parse_element_with_pipe_stack(dialect, cur, allow_colon_connect, parent_pipe_stack)
+        .map(Written::Element)
+}
+
+/// A hole, `?matcher(name, args){options}[content]#(id)`. The matcher is
+/// optional (`?()`, `?(n)[...]`) and the groups are the ones every other node
+/// reads. A hole has no connect form, so a `:name` after it is not read.
+fn parse_hole(dialect: Dialect, cur: &mut Cursor, parent_pipe_stack: &[usize]) -> Result<Hole> {
+    let start_pos = cur.pos();
+    cur.eat_str("?");
+    let matcher = eat_name(cur);
+    let mut read = element_new(Sigil::Bare);
+    parse_groups_with_pipe_stack(dialect, cur, &mut read, false, parent_pipe_stack)?;
+    Ok(Hole {
+        matcher,
+        placement: Placement::Inline,
+        data: read.data,
+        content: read.content,
+        id: read.id,
+        span: cur.span_from(start_pos),
+    })
 }
 
 /// A declaration, `::name(args){data}[content]#(id)`. The caller has seen
@@ -956,12 +1024,15 @@ pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<Gr
             // `element_ends_line`'s old boolean behavior.
             _ if is_element_start(dialect, cur, at_line_start(cur)) => {
                 let block = at_line_start(cur) && element_ends_line(dialect, cur) == LineEnd::Bare;
-                let el = parse_element(dialect, cur, false)?;
-                entries.push(Entry::Element(if block {
-                    el.with_placement(Placement::Block)
-                } else {
-                    el
-                }));
+                let written = parse_written(dialect, cur, false, &[])?;
+                entries.push(
+                    if block {
+                        written.with_placement(Placement::Block)
+                    } else {
+                        written
+                    }
+                    .into_entry(),
+                );
             }
             _ => {
                 let entry_start = cur.pos();

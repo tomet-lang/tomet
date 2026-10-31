@@ -191,6 +191,8 @@ impl Pass<'_> {
                 declaration.content = self.content(declaration.content);
                 vec![Block::Declaration(declaration)]
             }
+            // A hole exists only in a pattern, which has no expressions to resolve.
+            Block::Hole(hole) => vec![Block::Hole(hole)],
             Block::Interp(interp) => self.block_expression(&interp.expr, interp.span),
             Block::Section(mut sec) => {
                 sec.title = self.inlines(sec.title);
@@ -287,6 +289,7 @@ impl Pass<'_> {
                 .map(|entry| match entry {
                     Entry::Pair(key, value) => Entry::Pair(key, self.value(value)),
                     Entry::Element(el) => Entry::Element(self.element(el)),
+                    Entry::Hole(hole) => Entry::Hole(hole),
                 })
                 .collect(),
         )
@@ -520,7 +523,7 @@ impl Ids {
                     self.blocks(&mut section.blocks);
                 }
                 Block::List(list) => self.list(list),
-                Block::Interp(_) => {}
+                Block::Interp(_) | Block::Hole(_) => {}
             }
         }
     }
