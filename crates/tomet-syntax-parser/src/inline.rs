@@ -183,7 +183,8 @@ pub(crate) fn parse_inline_seq<'a>(
             if closed {
                 flush_text_upto(&mut items, cur, &mut text_start, before, pipe_cols);
                 let inner_text = cur.src()[inner_start..inner_end].to_string();
-                let span = cur.span_from(before);
+                // The whole span, closing fence included: `cur` is still at the opening one.
+                let span = Span::new(before, probe.pos());
                 let content_span = Span::new(inner_start, inner_end);
                 let el = element_new(Name::bare("raw"))
                     .with_placement(Placement::Inline)

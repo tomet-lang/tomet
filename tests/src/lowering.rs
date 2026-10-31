@@ -16,7 +16,7 @@ use tomet_parser::{UNSUPPORTED, lower_top_level_blocks, parse_cst, parse_documen
 use tomet_tests::{corpus, read_fixture};
 
 /// How many top-level blocks of the fixtures lowering produces today.
-const MIN_LOWERED: usize = 186;
+const MIN_LOWERED: usize = 193;
 
 /// Small documents, each of which lowering must give exactly as `parse_document` does.
 const SMALL: &[&str] = &[
@@ -82,6 +82,8 @@ const SMALL: &[&str] = &[
     "- content\n  :(x: 1){y: 2}\n",
     "-@task():(x: 1){y: 2}\n",
     "-@task()[content]:rule(allow:list(card))\n",
+    "@parent\n| ```rust\n| fn main() {}\n| ```\n| after\n",
+    "@a\n| @b\n| | ```\n| | x\n| |  y\n| | ```\n",
     "::kind(config)\n",
     "::meta{ id: x, title: T }\n\n= T\n",
     "::kind(config, 2)\n::id(doc-a)\n",
@@ -153,4 +155,122 @@ fn what_lowering_produces_for_the_fixtures_is_what_the_ast_parser_reads() {
 
 fn short(block: &Block) -> String {
     format!("{block:?}").chars().take(160).collect()
+}
+
+// --- whole documents, spans included ------------------------------------------
+
+use serde_json::Value as Json;
+
+/// The first place two trees differ, as a path: `blocks[2].content[0].span.end`.
+fn first_difference(a: &Json, b: &Json, path: String) -> Option<String> {
+    match (a, b) {
+        (Json::Object(x), Json::Object(y)) => {
+            for (key, value) in x {
+                match y.get(key) {
+                    Some(other) => {
+                        if let Some(d) = first_difference(value, other, format!("{path}.{key}")) {
+                            return Some(d);
+                        }
+                    }
+                    None => return Some(format!("{path}.{key} is only in the lowered tree")),
+                }
+            }
+            y.keys()
+                .find(|k| !x.contains_key(*k))
+                .map(|k| format!("{path}.{k} is only in the AST parser's tree"))
+        }
+        (Json::Array(x), Json::Array(y)) => {
+            for (i, (p, q)) in x.iter().zip(y).enumerate() {
+                if let Some(d) = first_difference(p, q, format!("{path}[{i}]")) {
+                    return Some(d);
+                }
+            }
+            (x.len() != y.len()).then(|| format!("{path} has {} items, the AST parser's {}", x.len(), y.len()))
+        }
+        _ => (a != b).then(|| format!("{path}: {a} against the AST parser's {b}")),
+    }
+}
+
+/// Every `.tmt` under `<repo>/tmtroot` that is not generated, deprecated or built.
+fn docs() -> Vec<(String, String)> {
+    fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if path.is_dir() {
+                if !["dist", "generated", "deprecated"].contains(&name.as_str()) {
+                    walk(&path, out);
+                }
+            } else if name.ends_with(".tmt") {
+                out.push(path);
+            }
+        }
+    }
+    let root = tomet_tests::package_dir().join("..");
+    let mut files = Vec::new();
+    walk(&root.join("tmtroot"), &mut files);
+    files.sort();
+    files
+        .into_iter()
+        .filter_map(|p| {
+            let label = p.strip_prefix(&root).ok()?.display().to_string();
+            Some((label, std::fs::read_to_string(&p).ok()?))
+        })
+        .collect()
+}
+
+/// Lowering a whole document gives the AST parser's tree, positions and all.
+fn check_whole(label: &str, src: &str, unsupported: &mut Vec<String>, wrong: &mut Vec<String>) -> bool {
+    let Ok(parsed) = parse_document(src) else {
+        return false;
+    };
+    match tomet_parser::lower_document(src, &parse_cst(src)) {
+        Err(e) if e.message.starts_with(UNSUPPORTED) => {
+            unsupported.push(format!("{label}: {}", e.message));
+            false
+        }
+        Err(e) => {
+            wrong.push(format!("{label}: {e}"));
+            false
+        }
+        Ok(lowered) => {
+            let (a, b) = (
+                serde_json::to_value(&lowered).unwrap(),
+                serde_json::to_value(&parsed).unwrap(),
+            );
+            if let Some(d) = first_difference(&a, &b, "document".into()) {
+                wrong.push(format!("{label}: {d}"));
+            }
+            true
+        }
+    }
+}
+
+#[test]
+fn every_fixture_lowers_as_a_whole_with_the_same_spans() {
+    let (mut unsupported, mut wrong) = (Vec::new(), Vec::new());
+    for rel in corpus() {
+        check_whole(&rel.display().to_string(), &read_fixture(&rel), &mut unsupported, &mut wrong);
+    }
+    assert!(unsupported.is_empty(), "not lowered yet:\n  {}", unsupported.join("\n  "));
+    assert!(wrong.is_empty(), "lowering differs:\n  {}", wrong.join("\n  "));
+}
+
+#[test]
+fn the_documents_of_the_repository_lower_as_the_ast_parser_reads_them() {
+    let (mut unsupported, mut wrong) = (Vec::new(), Vec::new());
+    let (mut lowered, mut total) = (0usize, 0usize);
+    for (label, src) in docs() {
+        total += 1;
+        if check_whole(&label, &src, &mut unsupported, &mut wrong) {
+            lowered += 1;
+        }
+    }
+    eprintln!("lowered {lowered} of {total} documents under tmtroot");
+    assert!(wrong.is_empty(), "lowering differs:\n  {}", wrong.join("\n  "));
+    assert!(
+        unsupported.is_empty(),
+        "not lowered yet:\n  {}",
+        unsupported.join("\n  ")
+    );
 }

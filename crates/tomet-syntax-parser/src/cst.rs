@@ -448,6 +448,10 @@ impl<'a> CstParser<'a> {
         let mut seen_id = false;
         loop {
             let mut j = self.skip_ws_from(i);
+            // A comment after the element does not end it either.
+            while self.kind_at(j) == Some(K::COMMENT) {
+                j = self.skip_ws_from(j + 1);
+            }
             // A group may stand on the line after the element's own, with no
             // blank line between: `@file(a)` and then `[ text ]`.
             if self.kind_at(j) == Some(K::NEWLINE) {
@@ -648,6 +652,8 @@ impl<'a> CstParser<'a> {
             Some(K::LT) => true,
             // A line-start `;` breaks the block; it is no block of its own.
             Some(K::SEMI) => true,
+            // So does a comment on a line of its own, as in the AST parser.
+            Some(K::COMMENT) => true,
             // An `@` element is not here: a line that starts with one is
             // running text and folds into the paragraph. A `::` declaration
             // is only ever a block.
@@ -755,6 +761,13 @@ impl<'a> CstParser<'a> {
         }
         if sugar {
             self.parse_sugar_tail();
+            // A `:connect` on the line after the heading is the heading's own.
+            let k = self.skip_ws_from(self.pos);
+            if self.kind_at(k) == Some(K::COLON) && self.connect_follows(k) {
+                self.bump_while(K::WHITESPACE);
+                self.parse_groups(false);
+                self.parse_inline(InlineStop::Line);
+            }
         } else {
             self.parse_inline(InlineStop::Line);
         }
@@ -1320,7 +1333,10 @@ impl<'a> CstParser<'a> {
     fn parse_groups(&mut self, cross_newline: bool) {
         let (mut args, mut value, mut content, mut id) = (false, false, false, false);
         loop {
-            let j = self.skip_ws_from(self.pos);
+            let mut j = self.skip_ws_from(self.pos);
+            while cross_newline && self.kind_at(j) == Some(K::COMMENT) {
+                j = self.skip_ws_from(j + 1);
+            }
             if cross_newline && self.kind_at(j) == Some(K::NEWLINE) {
                 let k = self.skip_ws_from(j + 1);
                 let free = match self.kind_at(k) {
@@ -1332,7 +1348,9 @@ impl<'a> CstParser<'a> {
                     _ => false,
                 };
                 if free {
-                    self.bump_while(K::WHITESPACE);
+                    while self.pos < j {
+                        self.bump(); // white space and comments
+                    }
                     self.bump(); // the newline
                     self.bump_while(K::WHITESPACE); // an outer run's markers
                     continue;

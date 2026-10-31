@@ -24,6 +24,22 @@ use tomet_ast::{
     Paragraph, Placement, SoftBreak, Span, Value,
 };
 
+/// `parse_document`, and whenever it reads a document, a check that lowering the CST
+/// of the same text gives the same tree: every string these tests parse is also a
+/// case for lowering, edge cases and odd syntax included. A construct lowering does
+/// not read yet is skipped, not failed.
+fn parse_document(src: &str) -> crate::Result<tomet_ast::Document> {
+    let parsed = crate::parse_document(src);
+    if let Ok(document) = &parsed {
+        match crate::lower_document(src, &crate::parse_cst(src)) {
+            Ok(lowered) => assert_eq!(&lowered, document, "lowering differs for {src:?}"),
+            Err(e) if e.message.starts_with(crate::UNSUPPORTED) => {}
+            Err(e) => panic!("lowering failed for {src:?}: {e}"),
+        }
+    }
+    parsed
+}
+
 /// A `SoftBreak` for test expectations -- span never matters, `Span`'s
 /// `PartialEq` always returns `true` (see its own doc comment).
 fn sb() -> Inline {

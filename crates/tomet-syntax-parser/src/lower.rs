@@ -80,6 +80,8 @@ fn lower_blocks(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
             SyntaxElement::Token(t) if t.kind().is_trivia() || t.kind() == K::SEMI => {}
             // The brackets of a `[content]` group are not content.
             SyntaxElement::Token(t) if node.kind() == K::CONTENT && is_bracket(t.kind()) => {}
+            // The `|` that opens a run, and the one that begins each of its lines.
+            SyntaxElement::Token(t) if node.kind() == K::CONTENT && t.kind() == K::PIPE => {}
             SyntaxElement::Token(t) => return Err(unsupported(format!("token {:?}", t.kind()))),
             SyntaxElement::Node(n) => blocks.extend(lower_block(src, &n)?),
         }
@@ -102,18 +104,28 @@ fn lower_block(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
 
 /// A paragraph: running text, with the elements, spans and interpolations in it.
 fn lower_paragraph(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
-    if node.descendants_with_tokens().any(|e| e.kind() == K::PIPE) {
-        return Err(unsupported("a `|` run in a paragraph"));
-    }
     // From the first character that is not white space to the end of the last
     // line: the node also holds the newline that ends the paragraph.
     let (node_start, node_end) = range_of(node);
     let text = &src[node_start..node_end];
     let lead = text.len() - text.trim_start().len();
     let start = node_start + lead;
-    let end = node_start + text.trim_end_matches(['\n', '\r']).len();
+    let mut end = node_start + text.trim_end_matches(['\n', '\r']).len();
     if start >= end {
         return Ok(None);
+    }
+    // The AST parser's paragraph runs to where it stopped reading: past the blanks
+    // before the line break or the `]` that closes the group it stands in.
+    end += src[end..].len() - src[end..].trim_start_matches([' ', '\t']).len();
+    if let Some(parent) = node.parent().filter(|p| p.kind() == K::CONTENT) {
+        let beyond = &src[end..];
+        let close = end + (beyond.len() - beyond.trim_start().len());
+        if parent
+            .children_with_tokens()
+            .any(|e| e.kind() == K::R_BRACKET && usize::from(e.text_range().start()) == close)
+        {
+            end = close;
+        }
     }
     let mut content = lower_inlines(src, node, start, end)?;
     if content.is_empty() {
@@ -137,6 +149,7 @@ fn lower_paragraph(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
 /// interpolations are the children of `parent`: the text between them becomes
 /// `Text` and `SoftBreak`, a comment is left out, and the ends are trimmed.
 fn lower_inlines(src: &str, parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inline>> {
+    let depth = pipe_depth(parent);
     let mut items = Vec::new();
     let mut text_start = from;
     for child in parent.children_with_tokens() {
@@ -147,33 +160,34 @@ fn lower_inlines(src: &str, parent: &SyntaxNode, from: usize, to: usize) -> Resu
         }
         match child {
             SyntaxElement::Token(t) if t.kind() == K::COMMENT => {
-                push_text_run(src, &mut items, text_start, start);
+                push_text_run(src, &mut items, text_start, start, depth);
                 text_start = end;
             }
             SyntaxElement::Token(_) => {}
             SyntaxElement::Node(n) => {
-                push_text_run(src, &mut items, text_start, start);
+                push_text_run(src, &mut items, text_start, start, depth);
                 text_start = end;
                 items.push(lower_inline(src, &n)?);
             }
         }
     }
-    push_text_run(src, &mut items, text_start, to);
+    push_text_run(src, &mut items, text_start, to, depth);
     Ok(trim_edges(items))
 }
 
 /// `src[from..to]` as text. A `\;` that opens a line is a `;` that is text:
 /// the backslash is not part of it.
-fn push_text_run(src: &str, items: &mut Vec<Inline>, from: usize, to: usize) {
+fn push_text_run(src: &str, items: &mut Vec<Inline>, from: usize, to: usize, depth: usize) {
     if from >= to {
         return;
     }
+    let cols = vec![0usize; depth];
     let mut at = from;
     for backslash in escaped_semicolons(src, from, to) {
-        split_softbreaks(items, &src[at..backslash], at, &[]);
+        split_softbreaks(items, &src[at..backslash], at, &cols);
         at = backslash + 1;
     }
-    split_softbreaks(items, &src[at..to], at, &[]);
+    split_softbreaks(items, &src[at..to], at, &cols);
 }
 
 /// One inline node of running text.
@@ -273,7 +287,16 @@ fn lower_thematic_break(src: &str, node: &SyntaxNode) -> Result<Block> {
     }
     let (start, end) = range_of(node);
     if let Some(content) = node.children().find(|n| n.kind() == K::CONTENT) {
-        let title = title_from_content(lower_content(src, &content)?)?;
+        // Read from just after the `[`, so the white space before the text is in
+        // the span of its `Text`, as the AST parser has it.
+        let (open, close) = range_of(&content);
+        let title = match content.children().find(|n| n.kind() == K::PARAGRAPH) {
+            Some(paragraph) if content.children().count() == 1 => {
+                lower_inlines(src, &paragraph, open + 1, close - 1)?
+            }
+            None => Vec::new(),
+            Some(_) => return Err(unsupported("a title of several blocks")),
+        };
         // The span of a titled break runs through its line end.
         let span = Span::new(start, end);
         let mut hr = element_new(Name::bare("hr"))
@@ -296,9 +319,6 @@ fn lower_thematic_break(src: &str, node: &SyntaxNode) -> Result<Block> {
 /// A fenced code block: a `raw` element whose content is the body, verbatim,
 /// and whose `lang` is the first word of the line the fence opens on.
 fn lower_code_block(src: &str, node: &SyntaxNode) -> Result<Block> {
-    if node.descendants_with_tokens().any(|e| e.kind() == K::PIPE) {
-        return Err(unsupported("a fenced code block in a `|` run"));
-    }
     let (start, text) = text_of(src, node);
     let fence_len = text.chars().take_while(|&c| c == '`').count();
     let (opening, rest) = match text.find('\n') {
@@ -307,6 +327,10 @@ fn lower_code_block(src: &str, node: &SyntaxNode) -> Result<Block> {
     };
     let lang = opening.split_whitespace().next().unwrap_or("").to_string();
     let body_start = start + (text.len() - rest.len());
+    // In a `|` run when a run holds it -- not when a `|` is part of the code.
+    if pipe_depth(node) > 0 {
+        return lower_code_block_in_run(node, start, text, fence_len, &lang, body_start);
+    }
 
     // The body ends where a closing line starts: a run of at least as many
     // backticks, and nothing else but white space.
@@ -473,9 +497,6 @@ fn expect_end(cur: &Cursor, end: usize, what: &str) -> Result<()> {
 
 /// `[content]`: the blocks between the brackets. A `|` run is not lowered yet.
 fn lower_content(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
-    if node.children_with_tokens().any(|e| e.kind() == K::PIPE) {
-        return Err(unsupported("a `|` run"));
-    }
     lower_blocks(src, node)
 }
 
@@ -653,8 +674,7 @@ fn lower_list_item(src: &str, node: &SyntaxNode) -> Result<tomet_ast::ListItem> 
     let line_end = {
         let from = node
             .children()
-            .filter(is_group)
-            .chain(combine.clone())
+            .filter(|n| n.kind() != K::LIST)
             .map(|n| range_of(&n).1)
             .max()
             .unwrap_or(marker_end)
@@ -662,7 +682,20 @@ fn lower_list_item(src: &str, node: &SyntaxNode) -> Result<tomet_ast::ListItem> 
         let within = &src[from..limit];
         from + within.find(['\n', '\r']).unwrap_or(within.len())
     };
-    let span = Span::new(start, line_end);
+    // The AST parser's item runs through the line break, and through the sublist
+    // when it has one.
+    let span_end = match &sublist {
+        Some(sub) => sub.span.end,
+        None if src[line_end..].starts_with('\n') => line_end + 1,
+        None => line_end,
+    };
+    let line_start = src[..start].rfind('\n').map_or(0, |n| n + 1);
+    let span_start = if src[line_start..start].chars().all(char::is_whitespace) {
+        line_start
+    } else {
+        start
+    };
+    let span = Span::new(span_start, span_end);
 
     let mut item = if let Some(element) = combine {
         if !leading.is_empty() || !trailing.is_empty() {
@@ -698,7 +731,7 @@ fn lower_list_item(src: &str, node: &SyntaxNode) -> Result<tomet_ast::ListItem> 
                     if inlines.is_empty() {
                         Vec::new()
                     } else {
-                        vec![Block::Paragraph(Paragraph::new(inlines, Span::new(from, to)))]
+                        vec![Block::Paragraph(Paragraph::new(inlines, Span::new(from, line_end)))]
                     }
                 }
                 _ => Vec::new(),
@@ -796,4 +829,68 @@ fn escaped_semicolons(src: &str, start: usize, end: usize) -> Vec<usize> {
             line[from..].chars().all(char::is_whitespace)
         })
         .collect()
+}
+
+/// How many `|` runs `node` stands inside: each one folds the marker at the start
+/// of a line away with the line break before it.
+fn pipe_depth(node: &SyntaxNode) -> usize {
+    node.ancestors()
+        .filter(|a| {
+            a.kind() == K::CONTENT
+                && a.children_with_tokens()
+                    .any(|e| e.kind() == K::PIPE && e.as_token().is_some())
+        })
+        .count()
+}
+
+/// A fenced code block in a `|` run: each line of it begins with the markers of the
+/// run, which are not part of the code, nor is the one space after the last.
+fn lower_code_block_in_run(
+    node: &SyntaxNode,
+    start: usize,
+    text: &str,
+    fence_len: usize,
+    lang: &str,
+    body_start: usize,
+) -> Result<Block> {
+    let depth = pipe_depth(node);
+    let rest = &text[body_start - start..];
+    let mut code = String::new();
+    for line in rest.split_inclusive('\n') {
+        let mut after_markers = line;
+        for _ in 0..depth {
+            after_markers = after_markers.trim_start_matches([' ', '\t']);
+            match after_markers.strip_prefix('|') {
+                Some(r) => after_markers = r,
+                None => return Err(unsupported("a fence line without the run's marker")),
+            }
+        }
+        // A closing line: a run of at least as many backticks, then blanks.
+        let closing = after_markers.trim_start_matches([' ', '\t']);
+        let ticks = closing.chars().take_while(|&c| c == '`').count();
+        if ticks >= fence_len && closing[ticks..].trim().is_empty() {
+            break;
+        }
+        code.push_str(after_markers.strip_prefix(' ').unwrap_or(after_markers).trim_end_matches('\n'));
+        if line.ends_with('\n') {
+            code.push('\n');
+        }
+    }
+    if code.ends_with('\n') {
+        code.pop();
+    }
+    // The AST parser's body runs through the closing line when it is in a run.
+    let end = start + text.len();
+    let content_span = Span::new(body_start, end);
+    let mut element = element_new(Name::bare("raw"))
+        .with_placement(Placement::Block)
+        .with_span(Span::new(start, end))
+        .with_content(vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Raw(RawText::new(code, content_span))],
+            content_span,
+        ))]);
+    if !lang.is_empty() {
+        element.data.args = Some(Value::Map(vec![("lang".to_string(), Value::String(lang.to_string()))]));
+    }
+    Ok(Block::Element(element))
 }
