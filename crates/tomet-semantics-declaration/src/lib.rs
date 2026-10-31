@@ -40,15 +40,17 @@ pub use tomet_ast::{Document, Element, Value};
 mod check;
 mod declaration;
 mod kind;
+mod profile;
 mod read;
 mod vars;
 
 pub use check::{Problem, check_declarations};
 pub use declaration::{Declaration, Found, declarations};
 pub use kind::{Cardinality, DeclKind, Host, Scope, Spec};
+pub use profile::Profile;
 pub use read::{
     blueprint_target, dictionary_name, document_blueprint, document_dictionary, document_entries,
-    document_id, document_kind, document_macros, document_meta, document_vars, document_version,
-    id_name, kind_name, macros, meta, version_string,
+    document_id, document_kind, document_macros, document_meta, document_profiles, document_vars,
+    document_version, id_name, kind_name, macros, meta, profile_names, version_string,
 };
 pub use vars::{VAR_KEYS, VarDecl, read_var_decls};

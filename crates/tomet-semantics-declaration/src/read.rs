@@ -10,6 +10,7 @@ use tomet_tree::ValueExt;
 
 use crate::declaration::{Declaration, declarations};
 use crate::kind::DeclKind;
+use crate::profile::Profile;
 use crate::vars::{VarDecl, read_var_decls};
 
 /// The name of the kind a `::kind(...)` declares: `::kind(j.daily)` or `::kind(kind: j.daily)`.
@@ -55,6 +56,31 @@ pub fn blueprint_target(declaration: &Declaration) -> Option<String> {
 pub fn dictionary_name(declaration: &Declaration) -> Option<String> {
     let args = declaration.bound_args()?;
     text(&args).or_else(|| args.get("name").and_then(text))
+}
+
+/// The names a `::profile(...)` is written with, as written and in order: `::profile(oneline, standalone)` is
+/// `oneline` and `standalone`. A name that is not a profile is returned too (the checker reports it); a
+/// value that is not text comes back as the text it prints as.
+///
+/// There is no slot to bind the arguments to, so they arrive as the reader left them: a map of unnamed
+/// entries (or the lone value, for one name). An entry written `key: value` is not a bare name; its key
+/// is returned, so that it is reported like any other name that is not a profile.
+pub fn profile_names(declaration: &Declaration) -> Vec<String> {
+    match declaration.bound_args() {
+        None => Vec::new(),
+        Some(Value::Map(entries)) => entries
+            .iter()
+            .map(|(key, value)| {
+                if key == cotomet_syntax::POSITIONAL_ENTRY_KEY {
+                    scalar_text_or_debug(value)
+                } else {
+                    key.clone()
+                }
+            })
+            .collect(),
+        Some(Value::Seq(items)) => items.iter().map(scalar_text_or_debug).collect(),
+        Some(one) => vec![scalar_text_or_debug(&one)],
+    }
 }
 
 /// The version a `::version(...)` declares, as written: `::version(1.10)` is `"1.10"`, not `"1.1"`.
@@ -107,6 +133,23 @@ fn first(doc: &Document, kind: DeclKind) -> Option<Declaration> {
         .into_iter()
         .find(|found| found.kind == kind)
         .map(|found| found.declaration)
+}
+
+/// The profiles this document promises with its first `::profile(...)`, each once, in the order written. A name
+/// that is not a profile is left out here and reported by [`check_declarations`](crate::check_declarations).
+pub fn document_profiles(doc: &Document) -> Vec<Profile> {
+    let Some(declaration) = first(doc, DeclKind::Profile) else {
+        return Vec::new();
+    };
+    let mut profiles = Vec::new();
+    for name in profile_names(&declaration) {
+        if let Some(profile) = Profile::from_name(&name)
+            && !profiles.contains(&profile)
+        {
+            profiles.push(profile);
+        }
+    }
+    profiles
 }
 
 /// The kind this document declares with its first `::kind(...)`.
@@ -204,6 +247,47 @@ mod tests {
 
     fn parse(src: &str) -> Document {
         tomet_parser::parse_document(src).expect("parses")
+    }
+
+    #[test]
+    fn a_profile_declaration_names_the_subsets_the_document_promises() {
+        assert_eq!(
+            document_profiles(&parse("::profile(oneline, standalone)\n")),
+            [Profile::Oneline, Profile::Standalone]
+        );
+        // One name is not a list, and the order is the order written.
+        assert_eq!(
+            document_profiles(&parse("::profile(standalone)\n")),
+            [Profile::Standalone]
+        );
+        assert_eq!(
+            document_profiles(&parse("::profile(standalone, oneline)\n")),
+            [Profile::Standalone, Profile::Oneline]
+        );
+        // Each once; a name that is not a profile is not one.
+        assert_eq!(
+            document_profiles(&parse("::profile(oneline, oneline, pure)\n")),
+            [Profile::Oneline]
+        );
+        assert_eq!(document_profiles(&parse("::kind(note)\n")), []);
+        // Only the first declaration counts, and written as an element it is not one.
+        assert_eq!(
+            document_profiles(&parse("::profile(oneline)\n::profile(standalone)\n")),
+            [Profile::Oneline]
+        );
+        assert_eq!(document_profiles(&parse("@profile(oneline)\n")), []);
+    }
+
+    #[test]
+    fn the_names_of_a_profile_declaration_come_back_as_written() {
+        let names = |src: &str| {
+            let doc = parse(src);
+            let found = declarations(&doc);
+            profile_names(&found[0].declaration)
+        };
+        assert_eq!(names("::profile(oneline, pure)\n"), ["oneline", "pure"]);
+        assert_eq!(names("::profile(7)\n"), ["7"]);
+        assert!(names("::profile\n").is_empty());
     }
 
     #[test]

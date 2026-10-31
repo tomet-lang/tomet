@@ -8,6 +8,8 @@ use tomet_type::Type;
 
 use crate::declaration::Declaration;
 use crate::kind::{Cardinality, DeclKind, Host};
+use crate::profile::Profile;
+use crate::read::profile_names;
 use crate::vars::{VarDecl, read_var_decls};
 
 /// A problem found with a document's declarations.
@@ -141,6 +143,9 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
             DeclKind::Version | DeclKind::Vocabulary | DeclKind::Blueprint => {
                 check_declared_version(idx, decl, kind, spec.name, &mut problems);
             }
+            DeclKind::Profile => {
+                check_profile(idx, decl, spec.name, &mut problems);
+            }
             DeclKind::Macros => {
                 check_macros(idx, decl, spec.name, &mut problems);
             }
@@ -247,6 +252,40 @@ fn check_declared_version(
     }
 }
 
+/// A `::profile` names at least one profile, and every name is one. A promise nobody can check is
+/// reported, not ignored.
+fn check_profile(
+    idx: usize,
+    decl: &Declaration,
+    name: &'static str,
+    problems: &mut Vec<(usize, Problem)>,
+) {
+    let names = profile_names(decl);
+    if names.is_empty() {
+        problems.push((
+            idx,
+            Problem::InvalidDefinition {
+                declaration: name,
+                name: name.to_string(),
+                reason: "names at least one profile, such as `standalone`".to_string(),
+            },
+        ));
+    }
+    for written in names {
+        if Profile::from_name(&written).is_none() {
+            let known: Vec<String> = Profile::ALL.iter().map(|p| format!("`{p}`")).collect();
+            problems.push((
+                idx,
+                Problem::InvalidDefinition {
+                    declaration: name,
+                    name: written,
+                    reason: format!("not a profile; the profiles are {}", known.join(", ")),
+                },
+            ));
+        }
+    }
+}
+
 fn check_macros(
     idx: usize,
     decl: &Declaration,
@@ -314,6 +353,68 @@ mod tests {
 
     fn parse(src: &str) -> Document {
         tomet_parser::parse_document(src).expect("parses")
+    }
+
+    fn problems_of(src: &str) -> Vec<Problem> {
+        let doc = parse(src);
+        let decls: Vec<_> = declarations(&doc)
+            .into_iter()
+            .map(|found| found.declaration)
+            .collect();
+        check_declarations(&decls, Host::Tmt)
+            .into_iter()
+            .map(|(_, problem)| problem)
+            .collect()
+    }
+
+    #[test]
+    fn a_profile_must_name_profiles_that_exist() {
+        assert!(problems_of("::profile(oneline, standalone)\n").is_empty());
+        assert!(problems_of("::profile(standalone)\n").is_empty());
+
+        let found = problems_of("::profile(oneline, pure)\n");
+        assert_eq!(
+            found,
+            [Problem::InvalidDefinition {
+                declaration: "profile",
+                name: "pure".into(),
+                reason: "not a profile; the profiles are `oneline`, `standalone`".into(),
+            }]
+        );
+        assert_eq!(
+            found[0].to_string(),
+            "`pure` in `::profile`: not a profile; the profiles are `oneline`, `standalone`"
+        );
+
+        // Naming none is not a promise either.
+        assert_eq!(problems_of("::profile\n").len(), 1);
+    }
+
+    #[test]
+    fn a_second_profile_declaration_is_reported_and_a_ctmt_file_is_not_given_one() {
+        let found = problems_of("::profile(oneline)\n::profile(standalone)\n");
+        assert_eq!(
+            found,
+            [Problem::Repeated {
+                declaration: "profile",
+                first: 0
+            }]
+        );
+
+        let doc = parse("::profile(standalone)\n");
+        let decls: Vec<_> = declarations(&doc)
+            .into_iter()
+            .map(|found| found.declaration)
+            .collect();
+        assert_eq!(
+            check_declarations(&decls, Host::Ctmt)
+                .into_iter()
+                .map(|(_, problem)| problem)
+                .collect::<Vec<_>>(),
+            [Problem::NotForThisHost {
+                declaration: "profile"
+            }]
+        );
     }
 
     #[test]

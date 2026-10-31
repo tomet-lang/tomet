@@ -14,6 +14,9 @@ pub enum DeclKind {
     Id,
     /// `::version(1.0)`: the language version the document is written in.
     Version,
+    /// `::profile(oneline, standalone)`: the subsets of tomet the document promises to stay inside. A profile
+    /// never changes what the document means; see [`Profile`](crate::Profile).
+    Profile,
     /// `::meta{ ... }`: information about the document.
     Meta,
     /// `::format{ ... }`: how documents are formatted: the rules `tomet format` and the printers follow.
@@ -110,7 +113,7 @@ pub struct Spec {
 }
 
 /// Every standard declaration, in the order they are listed to people.
-const SPECS: [Spec; 19] = [
+const SPECS: [Spec; 20] = [
     Spec {
         kind: DeclKind::Kind,
         name: "kind",
@@ -137,6 +140,18 @@ const SPECS: [Spec; 19] = [
         positional: &["version"],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        vault_only: false,
+    },
+    Spec {
+        kind: DeclKind::Profile,
+        name: "profile",
+        // Bare names, one or more, in no particular order: `::profile(oneline, standalone)`. There is
+        // no slot to name them after, so the arguments are read as they were written.
+        positional: &[],
+        cardinality: Cardinality::Once,
+        // `oneline` and `standalone` mean nothing yet for a `.ctmt` file; opening it is this value and
+        // nothing else.
+        scope: Scope::Tmt,
         vault_only: false,
     },
     Spec {
@@ -280,10 +295,11 @@ const SPECS: [Spec; 19] = [
 
 impl DeclKind {
     /// Every standard declaration.
-    pub const ALL: [DeclKind; 19] = [
+    pub const ALL: [DeclKind; 20] = [
         DeclKind::Kind,
         DeclKind::Id,
         DeclKind::Version,
+        DeclKind::Profile,
         DeclKind::Meta,
         DeclKind::Format,
         DeclKind::Fields,
@@ -376,6 +392,8 @@ mod tests {
         assert_eq!(DeclKind::Blueprint.positional_keys(), ["target"]);
         assert_eq!(DeclKind::Dictionary.positional_keys(), ["name"]);
         assert!(DeclKind::Meta.positional_keys().is_empty());
+        // Its arguments are names, not slots.
+        assert!(DeclKind::Profile.positional_keys().is_empty());
     }
 
     #[test]
