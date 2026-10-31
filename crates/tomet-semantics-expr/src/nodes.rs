@@ -78,6 +78,12 @@ fn in_block(block: &Block, id: &str) -> Option<Node> {
                 .or_else(|| sec.blocks.iter().find_map(|b| in_block(b, id)))
         }
         Block::Element(el) => in_element(el, id),
+        Block::Declaration(d) => {
+            if d.id.as_ref().is_some_and(|i| i.0 == id) {
+                return Some(Node::Declaration(Box::new(d.clone())));
+            }
+            in_content(d.content.as_deref(), id).or_else(|| in_data(&d.data, id))
+        }
         Block::Paragraph(p) => p.content.iter().find_map(|inline| match inline {
             Inline::Element(el) => in_element(el, id),
             _ => None,
@@ -165,6 +171,10 @@ fn block_value(doc: &DocRef, block: &Block) -> EvalValue {
             doc: doc.clone(),
             node: Box::new(Node::Element(Box::new(el.clone()))),
         },
+        Block::Declaration(declaration) => EvalValue::Node {
+            doc: doc.clone(),
+            node: Box::new(Node::Declaration(Box::new(declaration.clone()))),
+        },
         Block::Section(sec) => EvalValue::Node {
             doc: doc.clone(),
             node: Box::new(Node::Section(Box::new(sec.clone()))),
@@ -216,6 +226,7 @@ fn child_blocks(node: &Node) -> Vec<Block> {
     match node {
         Node::Element(el) => el.content.clone().unwrap_or_default(),
         Node::Connect(conn) => conn.content.clone().unwrap_or_default(),
+        Node::Declaration(d) => d.content.clone().unwrap_or_default(),
         Node::Section(sec) => sec.blocks.clone(),
         Node::List(list) => vec![Block::List((**list).clone())],
     }
@@ -226,10 +237,12 @@ fn child_blocks(node: &Node) -> Vec<Block> {
 /// like any other (its `#(id)` is found by `#id` as well).
 fn children(doc: &DocRef, node: &Node) -> Vec<EvalValue> {
     match node {
-        Node::Element(_) | Node::Connect(_) | Node::Section(_) => child_blocks(node)
-            .iter()
-            .map(|b| block_value(doc, b))
-            .collect(),
+        Node::Element(_) | Node::Connect(_) | Node::Declaration(_) | Node::Section(_) => {
+            child_blocks(node)
+                .iter()
+                .map(|b| block_value(doc, b))
+                .collect()
+        }
         Node::List(list) => list
             .items
             .iter()
@@ -247,6 +260,7 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
             Node::Element(el) => prop(doc, &el.data.args, &el.data.value),
             Node::Section(sec) => prop(doc, &sec.data.args, &sec.data.value),
             Node::Connect(conn) => prop(doc, &conn.data.args, &conn.data.value),
+            Node::Declaration(d) => prop(doc, &d.data.args, &d.data.value),
             // A list has neither arguments nor a value group.
             Node::List(_) => prop(doc, &None, &None),
         }),
@@ -257,6 +271,7 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
         "sigil" => Ok(EvalValue::String(match node {
             Node::Element(el) => el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
             Node::Connect(conn) => conn.name.to_string(),
+            Node::Declaration(d) => d.name.to_string(),
             Node::Section(_) => "section".to_string(),
             Node::List(_) => "list".to_string(),
         })),
@@ -266,7 +281,7 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
                 Node::Element(el) => &el.connects,
                 Node::Section(sec) => &sec.connects,
                 Node::List(list) => &list.connects,
-                Node::Connect(_) => &[],
+                Node::Connect(_) | Node::Declaration(_) => &[],
             };
             Ok(EvalValue::Seq(
                 connects

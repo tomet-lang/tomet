@@ -426,10 +426,9 @@ impl std::error::Error for UnknownName {}
 /// write `@link` explicitly.
 pub fn classify_std(el: &Element) -> Result<ElementKind, UnknownName> {
     match &el.sigil {
-        // `::name` and `@name` mean the same by name; whether the spelling
-        // fits the element's `Region` is a separate check.
+        // A name that is a declaration's is refused when written `@name`:
+        // see [`refuse_declaration_as_element`].
         Sigil::Named(name) => refuse_declaration_as_element(name, classify_std_name(name)?),
-        Sigil::Document(name) => classify_std_name(name),
         Sigil::Bare => Ok(ElementKind::Bare),
         Sigil::Question(_) => Ok(ElementKind::Hole),
     }
@@ -445,6 +444,25 @@ pub fn classify_std(el: &Element) -> Result<ElementKind, UnknownName> {
 /// belongs to [`classify_std`]; this is the lenient read of the same thing.
 pub fn classify_std_lenient(el: &Element) -> ElementKind {
     classify_std(el).unwrap_or_else(|e| ElementKind::Custom(e.name))
+}
+
+/// What a written `::name` declaration is by name, for `std` only: the
+/// counterpart of [`classify_std`], with the same caveat that a user
+/// vocabulary's elements are unknown here.
+///
+/// Unlike an `@name` element a declaration is not refused for being one: the
+/// `::` is what makes it a declaration. Whether this name may be written
+/// there is the `Region` check's business.
+pub fn classify_declaration(
+    declaration: &tomet_ast::Declaration,
+) -> Result<ElementKind, UnknownName> {
+    classify_std_name(&declaration.name)
+}
+
+/// [`classify_declaration`], falling back to `Custom` for an unknown name:
+/// the counterpart of [`classify_std_lenient`].
+pub fn classify_declaration_lenient(declaration: &tomet_ast::Declaration) -> ElementKind {
+    classify_declaration(declaration).unwrap_or_else(|e| ElementKind::Custom(e.name))
 }
 
 /// Whether a kind is a directive -- an element that configures or
@@ -626,7 +644,7 @@ pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {
 mod tests {
     use super::*;
     use tomet_ast::Value;
-    use tomet_tree::{ElementExt, element_new};
+    use tomet_tree::{ElementExt, declaration_new, element_new};
 
     #[test]
     fn builtin_kind_round_trips_through_as_str() {
@@ -675,7 +693,7 @@ mod tests {
             "vocabulary",
         ] {
             assert!(
-                classify_std(&element_new(Sigil::document(name))).is_ok(),
+                classify_declaration(&declaration_new(name)).is_ok(),
                 "::{name}"
             );
             let err = classify_std(&element_new(Sigil::named(name))).unwrap_err();
@@ -692,7 +710,6 @@ mod tests {
         }
         // content keeps its sigil
         assert!(classify_std(&element_new(Sigil::named("callout"))).is_ok());
-        assert!(classify_std(&element_new(Sigil::document("callout"))).is_ok());
     }
 
     #[test]
@@ -730,10 +747,10 @@ mod tests {
     }
 
     #[test]
-    fn double_colon_sigil_is_recognized() {
-        let el = element_new(Sigil::document("meta"));
+    fn a_declaration_is_recognized_by_its_name() {
+        let declaration = declaration_new("meta");
         assert_eq!(
-            classify_std_lenient(&el),
+            classify_declaration_lenient(&declaration),
             ElementKind::Declaration(DeclKind::Meta)
         );
     }
@@ -782,7 +799,7 @@ mod tests {
 
     #[test]
     fn shape_mismatch_reports_a_block_element_put_in_running_text() {
-        let el = element_new(Sigil::document("meta")).with_placement(Placement::Inline);
+        let el = element_new(Sigil::named("hr")).with_placement(Placement::Inline);
         assert_eq!(shape_mismatch(&el), Some((Shape::Inline, Shape::Block)));
     }
 
@@ -794,9 +811,9 @@ mod tests {
 
     #[test]
     fn a_correctly_placed_element_has_no_mismatch() {
-        let meta = element_new(Sigil::document("meta")).with_placement(Placement::Block);
+        let hr = element_new(Sigil::named("hr")).with_placement(Placement::Block);
         let em = element_new(Sigil::named("em")).with_placement(Placement::Inline);
-        assert_eq!(shape_mismatch(&meta), None);
+        assert_eq!(shape_mismatch(&hr), None);
         assert_eq!(shape_mismatch(&em), None);
     }
 

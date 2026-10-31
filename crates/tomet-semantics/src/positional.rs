@@ -1,4 +1,4 @@
-use tomet_ast::{Element, Sigil, Value};
+use tomet_ast::{Data, Declaration, Element, Name, Sigil, Value};
 
 use crate::vocabulary::{Bindings, ElementDecl};
 
@@ -13,9 +13,12 @@ use crate::vocabulary::{Bindings, ElementDecl};
 /// it is a widely used custom element in the docs and dropping its
 /// positional key would silently change how `(warning)` reads.
 pub fn builtin_positional_arg_keys(sigil: &Sigil) -> &'static [&'static str] {
-    let Some(name) = sigil.name() else {
-        return &[];
-    };
+    sigil.name().map_or(&[], builtin_positional_arg_keys_of)
+}
+
+/// [`builtin_positional_arg_keys`] for a name alone: what an element or a
+/// declaration of that name takes positionally.
+pub fn builtin_positional_arg_keys_of(name: &Name) -> &'static [&'static str] {
     if !name.is_bare() {
         return &[];
     }
@@ -131,14 +134,16 @@ fn recover_target_scheme_entry(
 /// because that would state an order the declarations already carry; an
 /// `::settings` key spelled exactly that way was deleted for being the
 /// duplicate `explicit-form-first` names outright.
-fn positional_keys(sigil: &Sigil, bindings: &Bindings) -> Vec<String> {
-    let builtin = builtin_positional_arg_keys(sigil);
+fn positional_keys(name: Option<&Name>, bindings: &Bindings) -> Vec<String> {
+    let Some(name) = name else {
+        return Vec::new();
+    };
+    let builtin = builtin_positional_arg_keys_of(name);
     if !builtin.is_empty() {
         return builtin.iter().map(|s| s.to_string()).collect();
     }
-    sigil
-        .name()
-        .and_then(|name| bindings.declaration(name))
+    bindings
+        .declaration(name)
         .map(ElementDecl::positional_keys)
         .unwrap_or_default()
 }
@@ -201,8 +206,29 @@ pub fn normalized_element_args(el: &Element) -> Option<Value> {
 /// [`normalized_element_args`], plus the positional slots a vocabulary in
 /// scope declares with `@param(name){ positional: true }`.
 pub fn normalized_element_args_in(el: &Element, bindings: &Bindings) -> Option<Value> {
-    let args = el.data.args.as_ref()?;
-    let keys = positional_keys(&el.sigil, bindings);
+    normalized_args_in(el.sigil.name(), &el.data, bindings)
+}
+
+/// [`normalized_element_args`] for a declaration: `::kind(config, 2)` is
+/// `kind: config, version: 2`.
+pub fn normalized_declaration_args(declaration: &Declaration) -> Option<Value> {
+    normalized_declaration_args_in(declaration, &Bindings::default())
+}
+
+/// [`normalized_declaration_args`], plus the positional slots a vocabulary in
+/// scope declares.
+pub fn normalized_declaration_args_in(
+    declaration: &Declaration,
+    bindings: &Bindings,
+) -> Option<Value> {
+    normalized_args_in(Some(&declaration.name), &declaration.data, bindings)
+}
+
+/// The one pipeline both read their `args` through: bind the positional
+/// ones to the slots the name has.
+fn normalized_args_in(name: Option<&Name>, data: &Data, bindings: &Bindings) -> Option<Value> {
+    let args = data.args.as_ref()?;
+    let keys = positional_keys(name, bindings);
     // `@link(tmt:foo)`: the reader split a `scheme:value` into a key and a value; put it back.
     let args = match args {
         Value::Map(entries) if !keys.is_empty() => {

@@ -1,6 +1,8 @@
 //! Rendering elements, values, args, and connects.
 
-use tomet_ast::{Connect, Element, Entry, Group, Interpolation, Placement, Value};
+use tomet_ast::{
+    Block, Connect, Data, Declaration, Element, Entry, Group, Interpolation, Placement, Value,
+};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_style::render_nested;
 
@@ -27,13 +29,6 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 );
             }
         }
-    }
-
-    if el.sigil.is_bare_named("meta") {
-        let mut out = tomet_style::render_meta_element(el, config);
-        out.push_str(&render_id(el.id.as_ref()));
-        out.push_str(&render_connects(&el.connects, config));
-        return out;
     }
 
     if el.sigil.is_bare_named("raw") {
@@ -213,15 +208,53 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         }
     }
 
-    let mut out = String::new();
-
     // One sigil, whatever the placement. A block-placed element is told apart
     // by standing alone on its line, which is the same condition the parser
     // reads it back with.
-    out.push_str(&el.sigil.head());
+    let mut out = el.sigil.head();
+    let name = el.sigil.name().map(|n| n.name.as_str()).unwrap_or("");
+    out.push_str(&render_groups(
+        name,
+        &el.data,
+        el.content.as_deref(),
+        config,
+    ));
+    out.push_str(&render_id(el.id.as_ref()));
+    out.push_str(&render_connects(&el.connects, config));
+    out
+}
+
+/// Render a [`Declaration`] AST node into Tomet syntax:
+/// `::name(args)[content]{value}#(id)`.
+pub fn render_declaration(declaration: &Declaration, config: &PrinterConfig) -> String {
+    if declaration.name.is_bare_named("meta") {
+        let mut out = tomet_style::render_meta_declaration(declaration, config);
+        out.push_str(&render_id(declaration.id.as_ref()));
+        return out;
+    }
+    let mut out = format!("::{}", declaration.name);
+    out.push_str(&render_groups(
+        &declaration.name.name,
+        &declaration.data,
+        declaration.content.as_deref(),
+        config,
+    ));
+    out.push_str(&render_id(declaration.id.as_ref()));
+    out
+}
+
+/// `(args)`, `[content]` and `{value}` as one node of that bare `name` has
+/// them: `args` and `content` in the order the configuration asks for.
+fn render_groups(
+    name: &str,
+    data: &Data,
+    content: Option<&[Block]>,
+    config: &PrinterConfig,
+) -> String {
+    let mut out = String::new();
 
     let render_args_cb = |out: &mut String| {
-        if let Some(args) = &el.data.args {
+        if let Some(args) = &data.args {
             out.push('(');
             out.push_str(&render_args(args, config));
             out.push(')');
@@ -229,16 +262,15 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     };
 
     let render_content_cb = |out: &mut String| {
-        if let Some(content) = &el.content {
+        if let Some(content) = content {
             out.push('[');
             out.push_str(&render_content_blocks(content, config));
             out.push(']');
         }
     };
 
-    let elem_name = el.sigil.name().map(|n| n.name.as_str()).unwrap_or("");
     let order = config
-        .element_group_order(elem_name)
+        .element_group_order(name)
         .unwrap_or(GroupOrder::ArgsFirst);
     match order {
         GroupOrder::ArgsFirst => {
@@ -251,13 +283,9 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         }
     }
 
-    if let Some(value) = &el.data.value {
+    if let Some(value) = &data.value {
         out.push_str(&render_element_value(value, config));
     }
-
-    out.push_str(&render_id(el.id.as_ref()));
-    out.push_str(&render_connects(&el.connects, config));
-
     out
 }
 

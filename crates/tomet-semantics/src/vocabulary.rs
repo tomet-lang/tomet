@@ -32,8 +32,8 @@ use tomet_type::{Type, TypeError};
 
 use tomet_declaration::DeclKind;
 
-use crate::kind::{ElementKind, Shape, UnknownName, builtin_kinds, classify_std_lenient};
-use crate::positional::normalized_element_args;
+use crate::kind::{ElementKind, Shape, UnknownName, builtin_kinds, classify_declaration_lenient};
+use crate::positional::normalized_declaration_args;
 
 /// Where an element is allowed to sit in a document.
 ///
@@ -265,11 +265,13 @@ impl Vocabulary {
             open,
         };
 
-        tomet_tree::for_each_top_level_element(doc, |el| {
-            if classify_std_lenient(el) != ElementKind::Declaration(DeclKind::Elements) {
+        tomet_tree::for_each_top_level_declaration(doc, |declaration| {
+            if classify_declaration_lenient(declaration)
+                != ElementKind::Declaration(DeclKind::Elements)
+            {
                 return;
             }
-            let Some(data) = crate::data::element_data(el) else {
+            let Some(data) = crate::data::declaration_data(declaration) else {
                 return;
             };
             for (name, decl) in data.as_map().unwrap_or_default() {
@@ -570,11 +572,11 @@ impl Bindings {
 /// been trimming a filename stem and hoping.
 fn used_namespaces(doc: &Document) -> Vec<String> {
     let mut names = Vec::new();
-    tomet_tree::for_each_top_level_element(doc, |el| {
-        if classify_std_lenient(el) != ElementKind::Declaration(DeclKind::Use) {
+    tomet_tree::for_each_top_level_declaration(doc, |declaration| {
+        if classify_declaration_lenient(declaration) != ElementKind::Declaration(DeclKind::Use) {
             return;
         }
-        let Some(args) = normalized_element_args(el) else {
+        let Some(args) = normalized_declaration_args(declaration) else {
             return;
         };
         let namespace = args.as_str().map(str::to_string).or_else(|| {
@@ -598,16 +600,17 @@ fn builtin(name: &str) -> Option<ElementKind> {
 /// The namespace a `::vocabulary(ns)` header names, and whether it is open.
 fn header(doc: &Document) -> Option<(String, bool)> {
     let mut found = None;
-    tomet_tree::for_each_top_level_element(doc, |el| {
+    tomet_tree::for_each_top_level_declaration(doc, |declaration| {
         if found.is_some()
-            || classify_std_lenient(el) != ElementKind::Declaration(DeclKind::Vocabulary)
+            || classify_declaration_lenient(declaration)
+                != ElementKind::Declaration(DeclKind::Vocabulary)
         {
             return;
         }
-        let Some(name) = positional_name(el) else {
+        let Some(name) = positional_name(declaration) else {
             return;
         };
-        let open = crate::data::element_data(el)
+        let open = crate::data::declaration_data(declaration)
             .and_then(|data| data.get("open").and_then(|v| v.as_bool()))
             .unwrap_or(false);
         found = Some((name, open));
@@ -616,8 +619,8 @@ fn header(doc: &Document) -> Option<(String, bool)> {
 }
 
 /// The positional argument of `::vocabulary(x)`, however it normalized.
-fn positional_name(el: &tomet_ast::Element) -> Option<String> {
-    let args = normalized_element_args(el)?;
+fn positional_name(declaration: &tomet_ast::Declaration) -> Option<String> {
+    let args = normalized_declaration_args(declaration)?;
     if let Some(s) = args.as_str() {
         return Some(s.to_string());
     }

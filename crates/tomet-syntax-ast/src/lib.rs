@@ -1,7 +1,7 @@
 //! =[ tomet-ast ]
 //!
 //! Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
-//! `Inline`, `Element`, `Interpolation`, `Value`, `Span`).
+//! `Inline`, `Element`, `Declaration`, `Interpolation`, `Value`, `Span`).
 //!
 //! =[ Design Policy ]
 //!
@@ -14,6 +14,8 @@
 //!   | it has no name, no groups and no connects, so it is a variant of [`Block`],
 //!   | [`Inline`] and [`Value`] and no walker over elements ever meets one. Reach every
 //!   | interpolation of a document through `tomet_tree::for_each_interpolation`.
+//!   | A `::name(...)` is a [`Declaration`]: always a [`Block`], about the document and attached to
+//!   | nothing, so it has no placement and takes no connect.
 //!   | A `:name(...)` is a [`Connect`]: metadata about its owner, with no id, no connects of its own
 //!   | and no placement. What nodes share is [`Data`] (`(args)` and the `{...}` [`Group`]), so what
 //!   | reads them is written once; `[content]` and `#(id)` stay on the roles that take them.
@@ -378,6 +380,8 @@ pub enum Block {
     /// A `-`/`-.` list, first-class like [`Section`] rather than encoded as
     /// a named [`Element`]. See [`List`].
     List(List),
+    /// A `::name(...)` declaration about the document itself. See [`Declaration`].
+    Declaration(Declaration),
     /// A `${...}` that stands alone on its line, in block context. It is a
     /// block of its own, and not a one-item paragraph, because what it
     /// evaluates to may be blocks (an include, a generated table).
@@ -391,6 +395,7 @@ impl Block {
             Block::Element(e) => e.span,
             Block::Section(s) => s.span,
             Block::List(l) => l.span,
+            Block::Declaration(d) => d.span,
             Block::Interp(i) => i.span,
         }
     }
@@ -777,14 +782,6 @@ pub enum Sigil {
     /// the list itself is the container.
     #[default]
     Bare,
-    /// `::name` -- a declaration about the document itself, not content in it.
-    ///
-    /// Structurally the same as [`Sigil::Named`]: an element with a mandatory
-    /// name and the same groups. The sigil says *where* it belongs -- in the
-    /// document's preamble, the run of `::` blocks at the top -- so the
-    /// preamble can be found without loading any vocabulary. Which names may
-    /// be written this way is the `Region` a vocabulary declares for them;
-    Document(Name),
     /// `?matcher(name, args){options}[content]` -- a hole in a pattern.
     ///
     /// Structurally the same as [`Sigil::Named`]: the same groups, read by
@@ -803,19 +800,15 @@ pub enum Sigil {
 impl Sigil {
     /// This element's name, if it has one.
     ///
-    /// A `::name` has one just as an `@name` does, so consumers that look an
-    /// element up by name read both spellings the same way; the ones that
-    /// care which was written ask [`Sigil::is_document`].
-    ///
     /// A hole has none: its head is a matcher, see [`Sigil::matcher`].
     pub fn name(&self) -> Option<&Name> {
         match self {
-            Sigil::Named(name) | Sigil::Document(name) => Some(name),
+            Sigil::Named(name) => Some(name),
             Sigil::Bare | Sigil::Question(_) => None,
         }
     }
 
-    /// The text that opens an element: `@name`, `::name`, `?matcher`.
+    /// The text that opens an element: `@name`, `?matcher`.
     /// Empty for [`Sigil::Bare`], which is written with no sigil at all.
     ///
     /// Everything that prints an element asks here, so a sigil is spelled in
@@ -823,7 +816,6 @@ impl Sigil {
     pub fn head(&self) -> String {
         match self {
             Sigil::Named(name) => format!("@{name}"),
-            Sigil::Document(name) => format!("::{name}"),
             Sigil::Bare => String::new(),
             Sigil::Question(matcher) => match matcher {
                 Some(matcher) => format!("?{matcher}"),
@@ -843,16 +835,6 @@ impl Sigil {
     /// Whether this sigil is `?` -- a hole in a pattern.
     pub fn is_question(&self) -> bool {
         matches!(self, Sigil::Question(_))
-    }
-
-    /// A document declaration with a bare (un-namespaced) name.
-    pub fn document(name: impl Into<String>) -> Self {
-        Sigil::Document(Name::bare(name))
-    }
-
-    /// Whether this sigil is `::` -- a declaration about the document.
-    pub fn is_document(&self) -> bool {
-        matches!(self, Sigil::Document(_))
     }
 
     /// An element with a bare (un-namespaced) name.
@@ -897,6 +879,28 @@ pub enum Placement {
     Block,
     #[default]
     Inline,
+}
+
+/// A `::name(args){data}[content]#(id)` declaration about the document itself,
+/// not content in it.
+///
+/// It takes the groups an element does and is introduced by `::` instead of
+/// `@`. The sigil says *where* it belongs -- in the document's preamble, the
+/// run of `::` blocks at the top -- so the preamble can be found without
+/// loading any vocabulary. Which names may be written this way is the
+/// `Region` a vocabulary declares for them, and whether one takes `[content]`
+/// is that vocabulary's call too, so the parser does not decide it.
+///
+/// It is always a [`Block`]: a `::` has to open its line and stand alone on it,
+/// and so has no [`Placement`]. And it is attached to nothing, so unlike an
+/// [`Element`] it takes no `:connect`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Declaration {
+    pub name: Name,
+    pub data: Data,
+    pub content: Option<Vec<Block>>,
+    pub id: Option<Id>,
+    pub span: Span,
 }
 
 /// A `:name(...)` connect stacked after an element, a section or a list

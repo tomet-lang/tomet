@@ -1,8 +1,10 @@
 //! Metadata element manipulation in documents.
 
-use tomet_ast::{Block, Data, Document, Element, Group, Placement, Sigil, Value};
-use tomet_semantics::classify_std_lenient;
-use tomet_tree::{ElementExt, for_each_element_mut};
+use tomet_ast::{Block, Document, Group, Value};
+use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
+use tomet_tree::{
+    DataExt, declaration_new, for_each_element_mut, for_each_top_level_declaration_mut,
+};
 
 /// Updates or inserts a key-value pair in a target directive/metadata block (e.g. `::meta`).
 /// If the target block is not found, prepends a new directive block at position 0.
@@ -13,34 +15,28 @@ pub fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_
         let kind = classify_std_lenient(el);
         if kind.as_str() == target_element {
             found = true;
-            el.set_prop(key, Value::String(new_val.to_string()));
+            el.data.set_prop(key, Value::String(new_val.to_string()));
+        }
+    });
+    for_each_top_level_declaration_mut(doc, |declaration| {
+        let kind = classify_declaration_lenient(declaration);
+        if kind.as_str() == target_element {
+            found = true;
+            declaration
+                .data
+                .set_prop(key, Value::String(new_val.to_string()));
         }
     });
 
     if !found {
-        let new_el = Element {
-            sigil: Sigil::named(target_element),
-
-            // A directive inserted at the top of the document stands alone.
-            placement: Placement::Block,
-
-            data: Data {
-                args: None,
-                value: Some(Group::from_map(Value::Map(vec![(
-                    key.to_string(),
-                    Value::String(new_val.to_string()),
-                )]))),
-            },
-
-            content: None,
-
-            id: None,
-
-            connects: Vec::new(),
-
-            span: Default::default(),
-        };
-        doc.blocks.insert(0, Block::Element(new_el));
+        // A directive inserted at the top of the document is a declaration,
+        // which stands alone on its line.
+        let mut declaration = declaration_new(target_element);
+        declaration.data.value = Some(Group::from_map(Value::Map(vec![(
+            key.to_string(),
+            Value::String(new_val.to_string()),
+        )])));
+        doc.blocks.insert(0, Block::Declaration(declaration));
     }
 
     true

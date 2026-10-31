@@ -227,6 +227,16 @@ pub(crate) fn find_def_in_blocks(blocks: &[Block], target_id: &str) -> Option<Sp
                     return Some(span);
                 }
             }
+            Block::Declaration(declaration) => {
+                if declaration.id.as_ref().is_some_and(|id| id.0 == target_id) {
+                    return Some(declaration.span);
+                }
+                if let Some(content) = &declaration.content
+                    && let Some(span) = find_def_in_blocks(content, target_id)
+                {
+                    return Some(span);
+                }
+            }
             Block::Paragraph(p) => {
                 for inline in &p.content {
                     if let Inline::Element(el) = inline

@@ -9,7 +9,9 @@ use crate::value::{
     parse_quoted, parse_value_at, skip_block_comment, skip_inline_ws, skip_line_comment,
     skip_ws_newlines_and_comments,
 };
-use tomet_ast::{Block, Connect, Element, Entry, Group, Id, Inline, Name, Placement, Sigil, Value};
+use tomet_ast::{
+    Block, Connect, Declaration, Element, Entry, Group, Id, Inline, Name, Placement, Sigil, Value,
+};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -247,21 +249,13 @@ pub(crate) fn parse_element_with_pipe_stack(
         // are the ones every other sigil reads.
         Sigil::Question(eat_name(cur))
     } else {
-        let document = cur.eat_str("::");
-        if !document && !cur.eat_str("@") {
-            return Err(err(cur.pos(), "expected '@' or '::'"));
+        if !cur.eat_str("@") {
+            return Err(err(cur.pos(), "expected '@'"));
         }
         match eat_name(cur) {
-            Some(name) if document => Sigil::Document(name),
             Some(name) => Sigil::Named(name),
             None => {
-                return Err(err(
-                    cur.pos(),
-                    format!(
-                        "expected an element name after '{}'",
-                        if document { "::" } else { "@" }
-                    ),
-                ));
+                return Err(err(cur.pos(), "expected an element name after '@'"));
             }
         }
     };
@@ -278,6 +272,39 @@ pub(crate) fn parse_element_with_pipe_stack(
     )?;
     el.span = cur.span_from(start_pos);
     Ok(el)
+}
+
+/// A declaration, `::name(args){data}[content]#(id)`. The caller has seen
+/// [`is_document_element_start`].
+///
+/// Its groups are read by the same [`parse_groups`] an element's are; what a
+/// declaration does not take, a `:connect`, is refused after the read.
+pub(crate) fn parse_declaration(
+    dialect: Dialect,
+    cur: &mut Cursor,
+    parent_pipe_stack: &[usize],
+) -> Result<Declaration> {
+    let start_pos = cur.pos();
+    cur.eat_str("::");
+    let Some(name) = eat_name(cur) else {
+        return Err(err(cur.pos(), "expected a declaration name after '::'"));
+    };
+    let mut read = element_new(Sigil::Named(name.clone()));
+    parse_groups_with_pipe_stack(dialect, cur, &mut read, true, parent_pipe_stack)?;
+    let span = cur.span_from(start_pos);
+    if !read.connects.is_empty() {
+        return Err(err(
+            start_pos,
+            "a `::` declaration takes no `:connect`: a connect belongs to an element",
+        ));
+    }
+    Ok(Declaration {
+        name,
+        data: read.data,
+        content: read.content,
+        id: read.id,
+        span,
+    })
 }
 
 /// The characters that open one of an element's groups.

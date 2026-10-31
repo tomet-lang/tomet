@@ -40,6 +40,10 @@ fn title_from_content_blocks(cur: &Cursor, content: Option<Vec<Block>>) -> Resul
                 cur.pos(),
                 "a heading's title can only hold plain text, not a list",
             )),
+            Some(Block::Declaration(_)) => Err(err(
+                cur.pos(),
+                "a heading's title can only hold plain text, not a `::` declaration",
+            )),
             None => unreachable!(),
         },
         Some(_) => Err(err(

@@ -7,5 +7,14 @@
 /// An element's value as data: a `{...}` group's `key: value` pairs, or
 /// `None` if the element has no value group at all.
 pub fn element_data(el: &tomet_ast::Element) -> Option<tomet_ast::Value> {
-    el.data.value.as_ref().map(|value| value.as_data())
+    data_of(&el.data)
+}
+
+/// [`element_data`] for a declaration.
+pub fn declaration_data(declaration: &tomet_ast::Declaration) -> Option<tomet_ast::Value> {
+    data_of(&declaration.data)
+}
+
+fn data_of(data: &tomet_ast::Data) -> Option<tomet_ast::Value> {
+    data.value.as_ref().map(|value| value.as_data())
 }

@@ -1,14 +1,14 @@
 //! A declaration as the readers see it, whichever document it was written in.
 
-use tomet_ast::{Document, Element, Sigil, Span, Value};
+use tomet_ast::{Document, Span, Value};
 
 use crate::kind::DeclKind;
 
 /// A declaration: a name, the `(args)` it was written with, and its `{data}`.
 ///
-/// Owned, because a tomet element's data is built from its group, not stored. A `.tmt` document
-/// gives one through [`Declaration::from_element`]; a `.ctmt` file's header is the same three
-/// things.
+/// Owned, because a tomet declaration's data is built from its group, not stored. A `.tmt`
+/// document gives one through [`Declaration::from_ast`]; a `.ctmt` file's header is the same
+/// three things.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Declaration {
     /// The name after `::`.
@@ -29,20 +29,17 @@ impl Declaration {
         }
     }
 
-    /// The declaration an element is: one written `::name` with a bare name. Written `@name`, an
-    /// element is not a declaration, whatever the name -- the validator says so, and nothing
-    /// reads it as one.
-    pub fn from_element(el: &Element) -> Option<Declaration> {
-        let Sigil::Document(name) = &el.sigil else {
-            return None;
-        };
-        if !name.is_bare() {
+    /// The declaration a written `::name` is, when its name is bare. Written `@name`, an element
+    /// is not a declaration, whatever the name -- the validator says so, and nothing reads it as
+    /// one.
+    pub fn from_ast(declaration: &tomet_ast::Declaration) -> Option<Declaration> {
+        if !declaration.name.is_bare() {
             return None;
         }
         Some(Declaration {
-            name: name.name.clone(),
-            args: el.data.args.clone(),
-            data: el.data.value.as_ref().map(|value| value.as_data()),
+            name: declaration.name.name.clone(),
+            args: declaration.data.args.clone(),
+            data: declaration.data.value.as_ref().map(|value| value.as_data()),
         })
     }
 
@@ -72,18 +69,17 @@ pub struct Found {
 
 /// The standard declarations at the top level of `doc`, in the order written.
 ///
-/// Top level is [`tomet_tree::for_each_top_level_element`]: a declaration that joined an
-/// adjacent paragraph still counts, which is a choice of tree shape and not of meaning.
+/// Top level is [`tomet_tree::for_each_top_level_declaration`].
 pub fn declarations(doc: &Document) -> Vec<Found> {
     let mut found = Vec::new();
-    tomet_tree::for_each_top_level_element(doc, |el| {
-        if let Some(declaration) = Declaration::from_element(el)
+    tomet_tree::for_each_top_level_declaration(doc, |written| {
+        if let Some(declaration) = Declaration::from_ast(written)
             && let Some(kind) = declaration.kind()
         {
             found.push(Found {
                 kind,
                 declaration,
-                span: el.span,
+                span: written.span,
             });
         }
     });

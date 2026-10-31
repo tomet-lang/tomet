@@ -186,6 +186,11 @@ impl Pass<'_> {
                 vec![Block::Paragraph(p)]
             }
             Block::Element(el) => vec![Block::Element(self.element(el))],
+            Block::Declaration(mut declaration) => {
+                declaration.data = self.data(declaration.data);
+                declaration.content = self.content(declaration.content);
+                vec![Block::Declaration(declaration)]
+            }
             Block::Interp(interp) => self.block_expression(&interp.expr, interp.span),
             Block::Section(mut sec) => {
                 sec.title = self.inlines(sec.title);
@@ -500,6 +505,13 @@ impl Ids {
                     }
                 }
                 Block::Element(el) => self.element(el),
+                Block::Declaration(declaration) => {
+                    self.claim(&mut declaration.id, declaration.span);
+                    if let Some(content) = &mut declaration.content {
+                        self.blocks(content);
+                    }
+                    self.data(&mut declaration.data);
+                }
                 Block::Section(section) => {
                     self.claim(&mut section.id, section.span);
                     for conn in &mut section.connects {

@@ -1,6 +1,6 @@
 //! Extension trait and block manipulation helpers for [`tomet_ast::Document`].
 
-use tomet_ast::{Block, Document, Element};
+use tomet_ast::{Block, Declaration, Document, Element};
 
 /// Extension trait providing block-level operations on [`Document`].
 pub trait DocumentExt {
@@ -22,6 +22,11 @@ pub trait DocumentExt {
     fn find_element_block_index<F>(&self, predicate: F) -> Option<usize>
     where
         F: FnMut(&Element) -> bool;
+
+    /// Finds the index of the first top-level declaration matching `predicate`.
+    fn find_declaration_block_index<F>(&self, predicate: F) -> Option<usize>
+    where
+        F: FnMut(&Declaration) -> bool;
 }
 
 impl DocumentExt for Document {
@@ -63,6 +68,16 @@ impl DocumentExt for Document {
     {
         self.blocks.iter().position(|b| match b {
             Block::Element(el) => predicate(el),
+            _ => false,
+        })
+    }
+
+    fn find_declaration_block_index<F>(&self, mut predicate: F) -> Option<usize>
+    where
+        F: FnMut(&Declaration) -> bool,
+    {
+        self.blocks.iter().position(|b| match b {
+            Block::Declaration(declaration) => predicate(declaration),
             _ => false,
         })
     }

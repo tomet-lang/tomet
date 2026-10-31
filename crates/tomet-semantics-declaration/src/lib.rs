@@ -24,7 +24,7 @@
 //!   | `::vars` entry names. It does not know a body element, a vocabulary or a vault.
 //! - (Two hosts, one input)
 //!   | A `.tmt` document gives its declarations as [`Declaration`]s through
-//!   | [`Declaration::from_element`]; a `.ctmt` file's header gives the same three things, a
+//!   | [`Declaration::from_ast`]; a `.ctmt` file's header gives the same three things, a
 //!   | name, `(args)` and `{data}`. The readers see only that.
 //!
 //! =[ Not here ]

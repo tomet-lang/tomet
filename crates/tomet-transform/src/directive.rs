@@ -1,11 +1,11 @@
 //! Directive promotion and Value DSL normalization transformations.
 
-use tomet_ast::{Block, Document, Element, Sigil, Value};
+use tomet_ast::{Block, Declaration, Document, Value};
 use tomet_semantics::DeclKind;
-use tomet_semantics::{ElementKind, classify_std_lenient};
-use tomet_tree::{DocumentExt, ElementExt, element_new, for_each_top_level_element_mut};
+use tomet_semantics::{ElementKind, classify_declaration_lenient};
+use tomet_tree::{DataExt, DocumentExt, declaration_new, for_each_top_level_declaration_mut};
 
-/// Promotes a property `prop_key` from an element matching `source_filter` into a new top-level
+/// Promotes a property `prop_key` from a declaration matching `source_filter` into a new top-level
 /// declaration `::target_directive_name(val)` (or `::target_directive_name{...}`), inserting it at `target_index`
 /// (or automatically after any `::version` directive, or at position 0).
 ///
@@ -19,20 +19,14 @@ pub fn promote_prop_to_directive<F>(
     target_index: Option<usize>,
 ) -> bool
 where
-    F: FnMut(&Element) -> bool,
+    F: FnMut(&Declaration) -> bool,
 {
-    // Top-level per `for_each_top_level_element_mut`, not a raw
-    // `doc.blocks` walk: the source element (`::meta`, typically) may have
-    // joined an adjacent paragraph (`docs/spec/syntax.tmt`'s
-    // `##[ 区切り ]`) and come back as `Inline::Element` there instead of
-    // its own `Block::Element` -- still top-level, just a different
-    // tree shape.
     let mut extracted_val = None;
-    for_each_top_level_element_mut(doc, |el| {
-        if extracted_val.is_some() || !source_filter(el) {
+    for_each_top_level_declaration_mut(doc, |declaration| {
+        if extracted_val.is_some() || !source_filter(declaration) {
             return;
         }
-        extracted_val = el.remove_prop(prop_key);
+        extracted_val = declaration.data.remove_prop(prop_key);
     });
 
     let Some(prop_val) = extracted_val else {
@@ -54,7 +48,7 @@ where
     let insert_pos = match target_index {
         Some(idx) => idx,
         None => {
-            let version_idx = doc.find_element_block_index(|el| el.sigil.is_bare_named("version"));
+            let version_idx = doc.find_declaration_block_index(|d| d.name.is_bare_named("version"));
             match version_idx {
                 Some(v_idx) => v_idx + 1,
                 None => 0,
@@ -62,10 +56,10 @@ where
         }
     };
 
-    let mut new_directive = element_new(Sigil::document(target_directive_name));
+    let mut new_directive = declaration_new(target_directive_name);
     new_directive.data.args = Some(prop_val);
 
-    doc.insert_block(insert_pos, Block::Element(new_directive));
+    doc.insert_block(insert_pos, Block::Declaration(new_directive));
     true
 }
 
@@ -74,12 +68,12 @@ where
 pub fn promote_meta_id_to_id(doc: &mut Document) -> bool {
     let after_preamble = ["kind", "version"]
         .iter()
-        .filter_map(|name| doc.find_element_block_index(|el| el.sigil.is_bare_named(name)))
+        .filter_map(|name| doc.find_declaration_block_index(|d| d.name.is_bare_named(name)))
         .max()
         .map_or(0, |index| index + 1);
     promote_prop_to_directive(
         doc,
-        |el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta),
+        |d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta),
         "id",
         "id",
         Some(after_preamble),
@@ -90,7 +84,7 @@ pub fn promote_meta_id_to_id(doc: &mut Document) -> bool {
 pub fn promote_meta_type_to_kind(doc: &mut Document) -> bool {
     promote_prop_to_directive(
         doc,
-        |el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta),
+        |d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta),
         "type",
         "kind",
         None,

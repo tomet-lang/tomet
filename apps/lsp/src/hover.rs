@@ -2,10 +2,13 @@ use std::ops::ControlFlow;
 use tomet_semantics::DeclKind;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
-use tomet_ast::{Document, Element, InterpExpr, Span, Value};
+use tomet_ast::{Declaration, Document, Element, InterpExpr, Span, Value};
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, Phase, SystemGenerate, evaluate};
-use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, normalized_element_args};
-use tomet_tree::{ValueExt, Visitor, for_each_interpolation, walk_document};
+use tomet_semantics::{
+    ElementKind, classify_declaration_lenient, classify_std_lenient, heading_level,
+    normalized_declaration_args, normalized_element_args,
+};
+use tomet_tree::{ValueExt, Visitor, for_each_declaration, for_each_interpolation, walk_document};
 
 use crate::format::resolve_effective_config;
 use crate::position::{TextPositions, span_contains};
@@ -74,75 +77,6 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                         }),
                         range: Some(self.positions.range(&span)),
                     })
-                } else if kind == ElementKind::Declaration(DeclKind::Kind) {
-                    let declared_kind = normalized_element_args(el)
-                        .and_then(|v| {
-                            v.get("kind")
-                                .and_then(|k| k.as_str())
-                                .map(|s| s.to_string())
-                        })
-                        .or_else(|| {
-                            el.data
-                                .args
-                                .as_ref()
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string())
-                        })
-                        .unwrap_or_else(|| "unknown".to_string());
-                    let mut desc = format!("**Document Kind**: `{declared_kind}`\n\n");
-                    desc.push_str("Declares the document kind, and binds the blueprint and vocabulary that go with it.");
-                    Some(Hover {
-                        contents: HoverContents::Markup(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value: desc,
-                        }),
-                        range: Some(self.positions.range(&span)),
-                    })
-                } else if kind == ElementKind::Declaration(DeclKind::Blueprint) {
-                    let target_kind = normalized_element_args(el)
-                        .and_then(|v| {
-                            v.get("target")
-                                .or_else(|| v.get("kind"))
-                                .and_then(|k| k.as_str())
-                                .map(|s| s.to_string())
-                        })
-                        .or_else(|| {
-                            el.data
-                                .args
-                                .as_ref()
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string())
-                        })
-                        .unwrap_or_else(|| "unknown".to_string());
-                    let mut desc = format!("**Blueprint Archetype**: `{target_kind}`\n\n");
-                    desc.push_str("Defines the structure documents of this kind must have, and what `tomet new` instantiates.");
-                    Some(Hover {
-                        contents: HoverContents::Markup(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value: desc,
-                        }),
-                        range: Some(self.positions.range(&span)),
-                    })
-                } else if kind == ElementKind::Declaration(DeclKind::Version) {
-                    let declared_ver = normalized_element_args(el)
-                        .and_then(|v| {
-                            v.get("version").map(|v| match v {
-                                Value::String(s) => s.clone(),
-                                Value::Int(i) => i.to_string(),
-                                Value::Float(f) => f.to_string(),
-                                _ => format!("{v:?}"),
-                            })
-                        })
-                        .unwrap_or_else(|| "unknown".to_string());
-                    let mut desc = format!("**Tomet Version**: `{declared_ver}`\n\n");
-                    desc.push_str("Declares the Tomet language and syntax specification edition for this document.");
-                    Some(Hover {
-                        contents: HoverContents::Markup(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value: desc,
-                        }),
-                        range: Some(self.positions.range(&span)),
-                    })
                 } else {
                     let mut desc = format!("**Element**: `{}`\n", sigil_display_name(&el.sigil));
                     desc.push_str(&format!("- **Classification**: `{}`\n", kind.as_str()));
@@ -190,7 +124,81 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
         }
     });
 
+    // A declaration is not an element either; it is a block of its own.
+    for_each_declaration(&doc, |declaration| {
+        if span_contains(&declaration.span, offset) {
+            finder.best_match = Some(declaration_hover(&positions, declaration));
+        }
+    });
+
     finder.best_match
+}
+
+/// The hover for a `::name` declaration: what the standard ones declare, and
+/// what any other is.
+fn declaration_hover(positions: &TextPositions<'_>, declaration: &Declaration) -> Hover {
+    let span = declaration.span;
+    let kind = classify_declaration_lenient(declaration);
+    let args = normalized_declaration_args(declaration);
+    let text_of = |keys: &[&str]| {
+        args.as_ref()
+            .and_then(|v| keys.iter().find_map(|key| v.get(key)))
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+            .or_else(|| {
+                declaration
+                    .data
+                    .args
+                    .as_ref()
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+            })
+            .unwrap_or_else(|| "unknown".to_string())
+    };
+    let value = if kind == ElementKind::Declaration(DeclKind::Kind) {
+        let declared_kind = text_of(&["kind"]);
+        let mut desc = format!("**Document Kind**: `{declared_kind}`\n\n");
+        desc.push_str(
+            "Declares the document kind, and binds the blueprint and vocabulary that go with it.",
+        );
+        desc
+    } else if kind == ElementKind::Declaration(DeclKind::Blueprint) {
+        let target_kind = text_of(&["target", "kind"]);
+        let mut desc = format!("**Blueprint Archetype**: `{target_kind}`\n\n");
+        desc.push_str("Defines the structure documents of this kind must have, and what `tomet new` instantiates.");
+        desc
+    } else if kind == ElementKind::Declaration(DeclKind::Version) {
+        let declared_ver = args
+            .as_ref()
+            .and_then(|v| {
+                v.get("version").map(|v| match v {
+                    Value::String(s) => s.clone(),
+                    Value::Int(i) => i.to_string(),
+                    Value::Float(f) => f.to_string(),
+                    _ => format!("{v:?}"),
+                })
+            })
+            .unwrap_or_else(|| "unknown".to_string());
+        let mut desc = format!("**Tomet Version**: `{declared_ver}`\n\n");
+        desc.push_str(
+            "Declares the Tomet language and syntax specification edition for this document.",
+        );
+        desc
+    } else {
+        let mut desc = format!("**Declaration**: `::{}`\n", declaration.name);
+        desc.push_str(&format!("- **Classification**: `{}`\n", kind.as_str()));
+        if let Some(norm_args) = &args {
+            desc.push_str(&format!("- **Normalized Args**: `{norm_args:?}`\n"));
+        }
+        desc
+    };
+    Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value,
+        }),
+        range: Some(positions.range(&span)),
+    }
 }
 
 struct CellInfo {

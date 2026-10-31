@@ -56,21 +56,16 @@ mod tests {
 
     #[test]
     fn test_promote_meta_type_to_kind() {
-        // `::version` and `::meta` sit on adjacent lines with no blank line
-        // or `;` between them, so they join into one `Block::Paragraph`
-        // under the default placement rule (`docs/spec/syntax.tmt`'s
-        // `##[ 区切り ]`) -- `doc.blocks.len()` no longer tracks "how many
-        // top-level declarations", only `for_each_top_level_element` does.
         let mut doc = parse_doc("::version(1.0)\n::meta{\n  type: task\n  id: doc-1\n}\n");
         assert!(promote_meta_type_to_kind(&mut doc));
 
-        let mut sigils = Vec::new();
-        tomet_tree::for_each_top_level_element(&doc, |el| {
-            sigils.push(el.sigil.clone());
+        let mut names = Vec::new();
+        tomet_tree::for_each_top_level_declaration(&doc, |declaration| {
+            names.push(declaration.name.clone());
         });
-        assert!(sigils.iter().any(|s| s.is_bare_named("kind")));
-        assert!(sigils.iter().any(|s| s.is_bare_named("version")));
-        assert!(sigils.iter().any(|s| s.is_bare_named("meta")));
+        assert!(names.iter().any(|n| n.is_bare_named("kind")));
+        assert!(names.iter().any(|n| n.is_bare_named("version")));
+        assert!(names.iter().any(|n| n.is_bare_named("meta")));
     }
 
     #[test]
@@ -80,12 +75,13 @@ mod tests {
 
         let mut id = None;
         let mut meta_keys = Vec::new();
-        tomet_tree::for_each_top_level_element(&doc, |el| {
-            if el.sigil.is_bare_named("id") {
-                id = el.data.args.clone();
+        tomet_tree::for_each_top_level_declaration(&doc, |declaration| {
+            if declaration.name.is_bare_named("id") {
+                id = declaration.data.args.clone();
             }
-            if el.sigil.is_bare_named("meta")
-                && let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el)
+            if declaration.name.is_bare_named("meta")
+                && let Some(Value::Map(entries)) =
+                    tomet_semantics::data::declaration_data(declaration)
             {
                 meta_keys = entries.into_iter().map(|(key, _)| key).collect();
             }

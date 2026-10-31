@@ -17,7 +17,7 @@
 //!
 //! A cycle, or a chain deeper than [`MAX_INCLUDE_DEPTH`], is an error.
 
-use tomet_ast::{Block, Element, Inline, Placement, Sigil};
+use tomet_ast::{Block, Element, Inline, Placement};
 
 use super::args::Args;
 use super::context::{EvalContext, Note};
@@ -168,11 +168,17 @@ fn select(
                 }
                 Ok((doc.clone(), vec![Block::List((**list).clone())]))
             }
-            // Metadata of its owner, not content: nothing to splice in.
+            // Metadata of its owner, or a statement about its document: not
+            // content, so nothing to splice in.
             Node::Connect(_) => Err(EvalError::mismatch(
                 "`include`",
                 "a document or an element with an id",
                 "a connect",
+            )),
+            Node::Declaration(_) => Err(EvalError::mismatch(
+                "`include`",
+                "a document or an element with an id",
+                "a declaration",
             )),
         },
         other => Err(EvalError::mismatch(
@@ -196,40 +202,14 @@ fn element_block(element: &Element) -> Block {
     }
 }
 
-/// Whether an element is something a document says about itself, which does
-/// not go along when its body is included: a declaration, written `::name`.
-///
-/// The sigil says so; no name is looked up. That also covers a vocabulary's own preamble
-/// elements (`::character`), which no list of standard names could.
-fn is_declaration(element: &Element) -> bool {
-    matches!(element.sigil, Sigil::Document(_))
-}
-
-/// The blocks without the document's own declarations. Declarations on
-/// adjacent lines are one paragraph, so they are taken out of paragraphs too,
-/// and a paragraph left with nothing in it goes.
+/// The blocks without the document's own declarations: what a document says
+/// about itself does not go along when its body is included. The `::` says so;
+/// no name is looked up, which also covers a vocabulary's own preamble
+/// elements (`::character`) that no list of standard names could.
 fn strip_declarations(blocks: Vec<Block>) -> Vec<Block> {
     blocks
         .into_iter()
-        .filter_map(|block| match block {
-            Block::Element(element) if is_declaration(&element) => None,
-            Block::Paragraph(mut paragraph) => {
-                let had = paragraph.content.len();
-                paragraph.content.retain(|inline| match inline {
-                    Inline::Element(element) => !is_declaration(element),
-                    _ => true,
-                });
-                if paragraph.content.len() == had {
-                    return Some(Block::Paragraph(paragraph));
-                }
-                let empty = paragraph
-                    .content
-                    .iter()
-                    .all(|i| matches!(i, Inline::SoftBreak(_) | Inline::LineBreak(_)));
-                (!empty).then_some(Block::Paragraph(paragraph))
-            }
-            other => Some(other),
-        })
+        .filter(|block| !matches!(block, Block::Declaration(_)))
         .collect()
 }
 
@@ -256,6 +236,11 @@ fn shift_levels(blocks: &mut [Block], delta: isize) {
             }
             Block::Element(element) => {
                 if let Some(content) = &mut element.content {
+                    shift_levels(content, delta);
+                }
+            }
+            Block::Declaration(declaration) => {
+                if let Some(content) = &mut declaration.content {
                     shift_levels(content, delta);
                 }
             }

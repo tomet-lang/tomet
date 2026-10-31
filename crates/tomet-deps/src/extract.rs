@@ -41,18 +41,14 @@ pub fn extract_raw_dependencies(doc: &Document) -> Vec<(String, DependencyKind)>
 pub fn extract_exports_hash(doc: &Document) -> u64 {
     let mut hash_bytes = Vec::new();
     for block in &doc.blocks {
-        if let Block::Element(el) = block
-            && el.sigil.is_document()
-        {
-            if let Some(name) = el.sigil.name() {
-                hash_bytes.extend_from_slice(name.name.as_bytes());
-            }
-            if let Some(args) = &el.data.args
+        if let Block::Declaration(declaration) = block {
+            hash_bytes.extend_from_slice(declaration.name.name.as_bytes());
+            if let Some(args) = &declaration.data.args
                 && let Some(text) = args.scalar_text()
             {
                 hash_bytes.extend_from_slice(text.as_bytes());
             }
-            if let Some(val) = &el.data.value {
+            if let Some(val) = &declaration.data.value {
                 for (k, v) in val.pairs() {
                     hash_bytes.extend_from_slice(k.as_bytes());
                     if let Some(text) = v.scalar_text() {

@@ -1,5 +1,5 @@
 use super::*;
-use tomet_ast::{Data, Group, Paragraph, Placement, RawText, Sigil, Span, Text};
+use tomet_ast::{Data, Declaration, Group, Paragraph, Placement, RawText, Sigil, Span, Text};
 
 /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`
 /// now) -- every fixture below is still just one paragraph's worth.
@@ -70,53 +70,25 @@ fn directives_have_no_markdown_output() {
 
 #[test]
 fn adjacent_meta_blocks_have_no_visible_output() {
-    // Hand-built `Document` (doesn't go through `tomet_parser::
-    // parse_document`, so it's independent of the parser's own
-    // paragraph-continuation rules -- `tomet-parser` no longer
-    // folds adjacent `::meta(...)` elements with no blank line between
-    // them into one `Block::Paragraph`; each becomes its own
-    // `Block::Element` now, see `document.rs`'s `Stop::Paragraph`).
-    // Kept as a regression test for the shape this crate must still
-    // handle correctly if it ever *does* show up (e.g. a
-    // hand-authored `Document`, or a future grammar change): a
-    // `Block::Paragraph` containing only no-output elements plus
-    // inter-element whitespace text must not leave a stray blank line
-    // behind in the exported Markdown.
-    fn meta_element(tag: &str) -> Element {
-        Element {
-            sigil: Sigil::document("meta"),
-
-            placement: Placement::Inline,
-
-            data: Data {
-                args: Some(Value::String(tag.to_string())),
-                value: Some(Group::from_map(Value::Map(vec![(
-                    "key".to_string(),
-                    Value::String("value".to_string()),
-                )]))),
-            },
-
-            content: None,
-
-            id: None,
-
-            connects: Vec::new(),
-
-            span: Span::dummy(),
-        }
+    // A declaration is a block of its own, and one that renders as nothing:
+    // several in a row must leave no stray blank line behind in the exported
+    // Markdown.
+    fn meta_declaration(tag: &str) -> Declaration {
+        let mut declaration = tomet_tree::declaration_new("meta");
+        declaration.data = Data {
+            args: Some(Value::String(tag.to_string())),
+            value: Some(Group::from_map(Value::Map(vec![(
+                "key".to_string(),
+                Value::String("value".to_string()),
+            )]))),
+        };
+        declaration
     }
     let doc = Document {
         blocks: vec![
-            Block::Paragraph(Paragraph::new(
-                vec![
-                    Inline::Element(meta_element("json")),
-                    Inline::Text(Text::new(" ", Span::dummy())),
-                    Inline::Element(meta_element("yaml")),
-                    Inline::Text(Text::new(" ", Span::dummy())),
-                    Inline::Element(meta_element("toml")),
-                ],
-                Span::dummy(),
-            )),
+            Block::Declaration(meta_declaration("json")),
+            Block::Declaration(meta_declaration("yaml")),
+            Block::Declaration(meta_declaration("toml")),
             Block::Element(heading_element(
                 1,
                 vec![Inline::Text(Text::new("next", Span::dummy()))],
@@ -435,13 +407,13 @@ fn thematic_break() {
 
 #[test]
 fn a_declaration_exports_as_nothing() {
-    let mut el = tomet_tree::element_new(Sigil::document("export"));
-    el.data.args = Some(Value::Map(vec![(
+    let mut declaration = tomet_tree::declaration_new("export");
+    declaration.data.args = Some(Value::Map(vec![(
         "type".to_string(),
         Value::String("commonmark".to_string()),
     )]));
     let doc = Document {
-        blocks: vec![Block::Element(el)],
+        blocks: vec![Block::Declaration(declaration)],
         span: Span::dummy(),
     };
     assert_eq!(to_markdown(&doc), "");

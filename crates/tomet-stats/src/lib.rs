@@ -139,10 +139,6 @@ pub fn measure(doc: &Document) -> Stats {
                 stats.named += 1;
                 *stats.by_name.entry(name.to_string()).or_default() += 1;
             }
-            Sigil::Document(name) => {
-                stats.document += 1;
-                *stats.by_name.entry(format!("::{name}")).or_default() += 1;
-            }
             Sigil::Bare => stats.bare += 1,
             // A hole exists only in what `parse_pattern` reads, never in a
             // document that is being measured, so there is no count for it.
@@ -155,6 +151,14 @@ pub fn measure(doc: &Document) -> Stats {
         {
             stats.links[i] += 1;
         }
+    });
+
+    tomet_tree::for_each_declaration(doc, |declaration| {
+        stats.document += 1;
+        *stats
+            .by_name
+            .entry(format!("::{}", declaration.name))
+            .or_default() += 1;
     });
 
     tomet_tree::for_each_interpolation(doc, |_| stats.dollar += 1);

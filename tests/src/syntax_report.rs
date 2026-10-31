@@ -443,8 +443,8 @@ const CASES: &[Case] = &[
     ),
     case(
         None,
-        "groups の全部と、後置のコネクトも取れる",
-        "::x(a)[ b ]{ c: 1 }#(i):rule(allow:list(k))\n",
+        "groups の全部（`(args)` `[content]` `{value}` `#(id)`）を取る。本文を取れるかは語彙が決める",
+        "::x(a)[ b ]{ c: 1 }#(i)\n",
     ),
     case(
         None,
@@ -471,6 +471,11 @@ const CASES: &[Case] = &[
 /// of gap this report exists to surface, so it is listed with whatever it
 /// actually does rather than with what it was meant to do.
 const REJECTED: &[Case] = &[
+    case(
+        Some("宣言の制限"),
+        "宣言はコネクトを取らない。コネクトは要素に付くもので、宣言は何にも付かない",
+        "::kind(note):rule(allow:list(k))\n",
+    ),
     case(
         Some("撤去された構文"),
         "`<T>` シジルは廃止。ただの文字列になる",
@@ -668,6 +673,20 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
         }
         Block::Element(el) => dump_element(out, el, depth),
         Block::Interp(interp) => dump_interp(out, interp, depth),
+        Block::Declaration(declaration) => {
+            indent(out, depth);
+            let _ = writeln!(out, "Block  ::{}", declaration.name);
+            dump_groups(
+                out,
+                &declaration.data,
+                declaration.content.as_deref(),
+                depth,
+            );
+            if let Some(id) = &declaration.id {
+                indent(out, depth + 1);
+                let _ = writeln!(out, "id      {:?}", id.0);
+            }
+        }
         Block::Section(sec) => {
             indent(out, depth);
             let _ = writeln!(out, "Section level={}", sec.level);
@@ -846,13 +865,6 @@ fn element_head(el: &Element) -> String {
                 Placement::Inline => "Inline",
             };
             format!("{placement} @{name}")
-        }
-        Sigil::Document(name) => {
-            let placement = match el.placement {
-                Placement::Block => "Block ",
-                Placement::Inline => "Inline",
-            };
-            format!("{placement} ::{name}")
         }
         Sigil::Bare => "Bare".to_string(),
         Sigil::Question(matcher) => {

@@ -18,7 +18,7 @@
 use std::rc::Rc;
 
 use time::OffsetDateTime;
-use tomet_ast::{Block, Connect, Element, InterpExpr, List, Section, Value};
+use tomet_ast::{Block, Connect, Declaration, Element, InterpExpr, List, Section, Value};
 
 /// A document, by vault-relative path with `/` separators. A reference: the
 /// content is fetched through the [`super::Resolver`] when it is needed.
@@ -47,6 +47,8 @@ pub enum Node {
     /// A `:name(...)` stacked after one of the others. It has no id, so no
     /// `#id` finds it; it is reached through its owner's `.connects`.
     Connect(Box<Connect>),
+    /// A `::name(...)` declaration, when it was given an id.
+    Declaration(Box<Declaration>),
 }
 
 impl Node {
@@ -57,6 +59,7 @@ impl Node {
             Node::Section(sec) => sec.id.as_ref().map(|id| id.0.as_str()),
             Node::List(list) => list.id.as_ref().map(|id| id.0.as_str()),
             Node::Connect(_) => None,
+            Node::Declaration(d) => d.id.as_ref().map(|id| id.0.as_str()),
         }
     }
 }
@@ -253,7 +256,9 @@ impl EvalValue {
             ),
             EvalValue::Node { node, .. } => match &**node {
                 Node::Element(el) => Value::Element(el.clone()),
-                Node::Section(_) | Node::List(_) | Node::Connect(_) => return None,
+                Node::Section(_) | Node::List(_) | Node::Connect(_) | Node::Declaration(_) => {
+                    return None;
+                }
             },
             EvalValue::Fragment(blocks) => Value::Blocks(blocks.clone()),
             EvalValue::Document(_)

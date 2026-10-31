@@ -6,8 +6,8 @@
 
 use tomet_ast::{Block, Connect, Document, Element, Inline, Section, Span, Value};
 use tomet_semantics::DeclKind;
-use tomet_semantics::{Bindings, ElementKind, classify_std_lenient};
-use tomet_tree::{ValueExt, for_each_top_level_element};
+use tomet_semantics::{Bindings, ElementKind, classify_declaration_lenient, classify_std_lenient};
+use tomet_tree::{ValueExt, for_each_top_level_declaration, for_each_top_level_element};
 use tomet_validator_core::Diagnostic;
 use tomet_validator_rule::{RuleArgs, check_descendants_against_rule, decode_rule_args};
 
@@ -37,39 +37,47 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
     let mut required_sections = Vec::new();
     let mut found_blueprint = false;
 
-    for_each_top_level_element(blueprint, |el| {
-        let kind = classify_std_lenient(el);
-        if kind == ElementKind::Declaration(DeclKind::Blueprint) {
-            found_blueprint = true;
-            if let Some(Value::String(k)) = &el.data.args {
-                target_kind = k.clone();
-            } else if let Some(Value::Map(entries)) = &el.data.args
-                && let Some((_, v)) = entries.iter().find(|(k, _)| k == "target" || k == "kind")
-                && let Some(s) = v.as_str()
-            {
-                target_kind = s.to_string();
-            }
-        } else if kind == ElementKind::Declaration(DeclKind::Id) {
-            required_meta_keys.push(("id".to_string(), el.span));
-        } else if kind == ElementKind::Declaration(DeclKind::Meta) {
-            if let Some(entries) = el
-                .data
-                .value
-                .as_ref()
-                .map(|v| v.pairs().collect::<Vec<_>>())
-            {
-                for (k, _) in entries {
-                    required_meta_keys.push((k.clone(), el.span));
+    for_each_top_level_declaration(blueprint, |declaration| {
+        let span = declaration.span;
+        match classify_declaration_lenient(declaration) {
+            ElementKind::Declaration(DeclKind::Blueprint) => {
+                found_blueprint = true;
+                if let Some(Value::String(k)) = &declaration.data.args {
+                    target_kind = k.clone();
+                } else if let Some(Value::Map(entries)) = &declaration.data.args
+                    && let Some((_, v)) = entries.iter().find(|(k, _)| k == "target" || k == "kind")
+                    && let Some(s) = v.as_str()
+                {
+                    target_kind = s.to_string();
                 }
             }
-            if let Some(Value::Map(entries)) = &el.data.args {
-                for (k, _) in entries {
-                    if k != "format" {
-                        required_meta_keys.push((k.clone(), el.span));
+            ElementKind::Declaration(DeclKind::Id) => {
+                required_meta_keys.push(("id".to_string(), span));
+            }
+            ElementKind::Declaration(DeclKind::Meta) => {
+                if let Some(entries) = declaration
+                    .data
+                    .value
+                    .as_ref()
+                    .map(|v| v.pairs().collect::<Vec<_>>())
+                {
+                    for (k, _) in entries {
+                        required_meta_keys.push((k.clone(), span));
+                    }
+                }
+                if let Some(Value::Map(entries)) = &declaration.data.args {
+                    for (k, _) in entries {
+                        if k != "format" {
+                            required_meta_keys.push((k.clone(), span));
+                        }
                     }
                 }
             }
-        } else if kind == ElementKind::Heading {
+            _ => {}
+        }
+    });
+    for_each_top_level_element(blueprint, |el| {
+        if classify_std_lenient(el) == ElementKind::Heading {
             let id = el.id.as_ref().map(|id| id.0.clone());
             let title = extract_element_title(el);
             let rules = extract_connect_rules(&el.connects);
@@ -127,12 +135,14 @@ pub fn validate_against_schema(
     let mut doc_meta_keys = Vec::new();
     let mut doc_meta_span = doc_span;
 
-    for_each_top_level_element(doc, |el| {
-        if classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Id) {
+    for_each_top_level_declaration(doc, |declaration| {
+        if classify_declaration_lenient(declaration) == ElementKind::Declaration(DeclKind::Id) {
             doc_meta_keys.push("id".to_string());
-        } else if classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta) {
-            doc_meta_span = el.span;
-            if let Some(entries) = el
+        } else if classify_declaration_lenient(declaration)
+            == ElementKind::Declaration(DeclKind::Meta)
+        {
+            doc_meta_span = declaration.span;
+            if let Some(entries) = declaration
                 .data
                 .value
                 .as_ref()
@@ -142,7 +152,7 @@ pub fn validate_against_schema(
                     doc_meta_keys.push(k.clone());
                 }
             }
-            if let Some(Value::Map(entries)) = &el.data.args {
+            if let Some(Value::Map(entries)) = &declaration.data.args {
                 for (k, _) in entries {
                     if k != "format" {
                         doc_meta_keys.push(k.clone());

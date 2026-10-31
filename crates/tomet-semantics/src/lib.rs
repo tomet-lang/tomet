@@ -77,11 +77,13 @@ pub use flatten::{
 };
 pub use kind::{
     ContentShape, ElementKind, Shape, UnknownName, builtin_content_shape, builtin_kinds,
-    builtin_region, classify_std, classify_std_lenient, classify_std_name, is_directive,
-    refuse_declaration_as_element, required_shape, shape_mismatch,
+    builtin_region, classify_declaration, classify_declaration_lenient, classify_std,
+    classify_std_lenient, classify_std_name, is_directive, refuse_declaration_as_element,
+    required_shape, shape_mismatch,
 };
 pub use positional::{
-    LIST_MARKER_POSITIONAL_KEY, builtin_positional_arg_keys, normalized_element_args,
+    LIST_MARKER_POSITIONAL_KEY, builtin_positional_arg_keys, builtin_positional_arg_keys_of,
+    normalized_declaration_args, normalized_declaration_args_in, normalized_element_args,
     normalized_element_args_in, normalized_list_marker,
 };
 pub use rebase::rebase_relative_links;

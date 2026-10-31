@@ -2,7 +2,7 @@
 
 use tomet_ast::{Block, Document, Element, Placement, Section, Sigil, Value};
 use tomet_config::{ConfigEntrySpec, ConfigGroupSpec, PrinterConfig};
-use tomet_tree::{ElementExt, element_new};
+use tomet_tree::{ElementExt, declaration_new, element_new};
 
 use crate::util::{code, dummy, inlines, list, paragraph, paragraphs, text};
 
@@ -26,11 +26,11 @@ pub fn document(
     title: &str,
     intro_paragraphs: &[&str],
 ) -> Document {
-    let mut id = element_new(Sigil::document("id")).with_placement(Placement::Block);
+    let mut id = declaration_new("id");
     id.data.args = Some(Value::String(doc_id.to_string()));
 
     let mut blocks = vec![
-        Block::Element(id),
+        Block::Declaration(id),
         Block::Section(Section::new(1, vec![text(title)], dummy())),
     ];
 

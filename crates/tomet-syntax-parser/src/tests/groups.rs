@@ -40,6 +40,7 @@ fn every_sigil_takes_every_group_opener() {
             Block::Paragraph(_) => None,
             Block::List(list) => Some(if list.ordered { "ol" } else { "ul" }.into()),
             Block::Interp(_) => None,
+            Block::Declaration(d) => Some(d.name.name.clone()),
         }
     }
 
@@ -120,10 +121,10 @@ fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
 
     let doc = parse_document("::meta{}\n").unwrap();
     match &doc.blocks[0] {
-        Block::Element(el) => {
-            assert_eq!(el.data.value, Some(Group::from_map(Value::Map(vec![]))));
+        Block::Declaration(d) => {
+            assert_eq!(d.data.value, Some(Group::from_map(Value::Map(vec![]))));
         }
-        other => panic!("expected an element, got {other:?}"),
+        other => panic!("expected a declaration, got {other:?}"),
     }
 }
 

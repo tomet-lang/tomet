@@ -45,6 +45,7 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [コメント](#コメント)
 - [文書の宣言](#文書の宣言)
 - [脚注](#脚注)
+- [宣言の制限](#宣言の制限)
 - [撤去された構文](#撤去された構文)
 - [綴りを失ったまま、代わりが未決のもの](#綴りを失ったまま、代わりが未決のもの)
 - [紛らわしいが、これが正しい](#紛らわしいが、これが正しい)
@@ -1694,10 +1695,10 @@ Block  ::meta
 `id` is not written in `::meta`; the identity of a document is `::id(...)`
 ```
 
-### groups の全部と、後置のコネクトも取れる
+### groups の全部（`(args)` `[content]` `{value}` `#(id)`）を取る。本文を取れるかは語彙が決める
 
 ```tmt
-::x(a)[ b ]{ c: 1 }#(i):rule(allow:list(k))
+::x(a)[ b ]{ c: 1 }#(i)
 ```
 
 ```
@@ -1709,9 +1710,6 @@ Block  ::x
   group
     c: 1
   id      "i"
-  connect
-    Inline @rule
-      args    {allow: list("k")}
 ```
 
 検証:
@@ -1774,6 +1772,18 @@ Block  @ftn
   content
     Paragraph
       Text "定義"
+```
+
+## 宣言の制限
+
+### 宣言はコネクトを取らない。コネクトは要素に付くもので、宣言は何にも付かない
+
+```tmt
+::kind(note):rule(allow:list(k))
+```
+
+```
+parse error: 1:1: a `::` declaration takes no `:connect`: a connect belongs to an element
 ```
 
 ## 撤去された構文

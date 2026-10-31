@@ -186,7 +186,7 @@ fn hash_not_followed_by_paren_after_an_element_does_not_error() {
     // of leaving an unrelated next line alone.
     let doc = parse_document("::meta{a: 1}\n#[ Title ]\n").unwrap();
     assert_eq!(doc.blocks.len(), 2);
-    assert!(matches!(&doc.blocks[0], Block::Element(_)));
+    assert!(matches!(&doc.blocks[0], Block::Declaration(_)));
     assert!(matches!(&doc.blocks[1], Block::Paragraph(_)));
 }
 

@@ -27,6 +27,13 @@ fn collect_block_ids(block: &Block, ids: &mut Vec<(String, Span)>) {
             }
         }
         Block::Element(el) => collect_element_ids(el, ids),
+        Block::Declaration(d) => {
+            if let Some(id) = &d.id {
+                ids.push((id.0.clone(), d.span));
+            }
+            collect_data_ids(&d.data, ids);
+            collect_content_ids(d.content.as_deref(), ids);
+        }
         Block::Paragraph(p) => {
             for inline in &p.content {
                 collect_inline_ids(inline, ids);

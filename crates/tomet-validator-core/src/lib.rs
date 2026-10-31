@@ -14,6 +14,35 @@ use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, Shape};
 
+/// Something written in the document that a region or sigil rule applies to:
+/// an element, or a declaration.
+#[derive(Clone, Copy)]
+enum Written<'a> {
+    Element(&'a tomet_ast::Element),
+    Declaration(&'a tomet_ast::Declaration),
+}
+
+impl Written<'_> {
+    fn name(&self) -> Option<&tomet_ast::Name> {
+        match self {
+            Written::Element(el) => el.sigil.name(),
+            Written::Declaration(d) => Some(&d.name),
+        }
+    }
+
+    fn span(&self) -> tomet_ast::Span {
+        match self {
+            Written::Element(el) => el.span,
+            Written::Declaration(d) => d.span,
+        }
+    }
+
+    /// Whether it was written `::name`.
+    fn is_declaration(&self) -> bool {
+        matches!(self, Written::Declaration(_))
+    }
+}
+
 /// Classifies `el` against `std` and the namespaces in scope.
 pub fn classify_in(
     el: &tomet_ast::Element,
@@ -68,6 +97,18 @@ pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagn
         }
     });
 
+    tomet_tree::for_each_declaration(doc, |declaration| {
+        // A declaration is held to `std` alone: it is spelled `::`, so it is not
+        // looked up in the vocabularies in scope.
+        if let Err(unknown) = tomet_semantics::classify_declaration(declaration) {
+            errors.push(Diagnostic::UnknownElement {
+                name: unknown.name,
+                unbound_namespace: unknown.unbound_namespace,
+                span: declaration.span,
+            });
+        }
+    });
+
     check_singletons_and_regions(doc, bindings, errors);
     check_document_declarations(doc, errors);
     check_vocabulary_params(doc, errors);
@@ -113,10 +154,14 @@ pub fn check_singletons_and_regions(
         document: bool,
     }
 
-    let constraints = |el: &tomet_ast::Element| -> Option<Held> {
-        let name = el.sigil.name()?;
-        let document = el.sigil.is_document();
-        let (singleton, declared) = match classify_in(el, bindings) {
+    let constraints = |written: Written<'_>| -> Option<Held> {
+        let name = written.name()?;
+        let document = written.is_declaration();
+        let classified = match written {
+            Written::Element(el) => classify_in(el, bindings),
+            Written::Declaration(d) => tomet_semantics::classify_declaration(d),
+        };
+        let (singleton, declared) = match classified {
             Ok(kind) => match bindings.declaration(name) {
                 Some(decl) => (decl.singleton, Some(decl.region)),
                 None => (
@@ -145,14 +190,15 @@ pub fn check_singletons_and_regions(
     let mut in_preamble = true;
     let mut seen: Vec<(String, tomet_ast::Span)> = Vec::new();
 
-    let mut visit = |el: &tomet_ast::Element, in_place: bool| {
+    let mut visit = |written: Written<'_>, in_place: bool| {
+        let span = written.span();
         let Some(Held {
             name,
             singleton,
             region,
             declared,
             document,
-        }) = constraints(el)
+        }) = constraints(written)
         else {
             return;
         };
@@ -161,7 +207,7 @@ pub fn check_singletons_and_regions(
                 name: name.clone(),
                 written: "::",
                 expected: "@",
-                span: el.span,
+                span,
             });
         }
         if !document && declared == Some(Region::Preamble) {
@@ -169,7 +215,7 @@ pub fn check_singletons_and_regions(
                 name: name.clone(),
                 written: "@",
                 expected: "::",
-                span: el.span,
+                span,
             });
         }
         if singleton {
@@ -177,27 +223,33 @@ pub fn check_singletons_and_regions(
                 errors.push(Diagnostic::DuplicateSingleton {
                     name: name.clone(),
                     first: *first,
-                    duplicate: el.span,
+                    duplicate: span,
                 });
             } else {
-                seen.push((name.clone(), el.span));
+                seen.push((name.clone(), span));
             }
         }
         if region == Region::Preamble && !in_place {
-            errors.push(Diagnostic::OutsidePreamble {
-                name,
-                span: el.span,
-            });
+            errors.push(Diagnostic::OutsidePreamble { name, span });
         }
     };
 
     for block in &doc.blocks {
         match block {
             Block::Element(el) => {
-                let still_preamble = constraints(el)
+                let still_preamble = constraints(Written::Element(el))
                     .map(|held| held.region == Region::Preamble)
                     .unwrap_or(false);
-                visit(el, in_preamble);
+                visit(Written::Element(el), in_preamble);
+                if !still_preamble {
+                    in_preamble = false;
+                }
+            }
+            Block::Declaration(d) => {
+                let still_preamble = constraints(Written::Declaration(d))
+                    .map(|held| held.region == Region::Preamble)
+                    .unwrap_or(false);
+                visit(Written::Declaration(d), in_preamble);
                 if !still_preamble {
                     in_preamble = false;
                 }
@@ -206,14 +258,16 @@ pub fn check_singletons_and_regions(
                 for inline in &p.content {
                     match inline {
                         Inline::Element(el) => {
-                            let still_preamble = constraints(el)
+                            let still_preamble = constraints(Written::Element(el))
                                 .map(|held| held.region == Region::Preamble)
                                 .unwrap_or(false);
-                            visit(el, in_preamble);
+                            visit(Written::Element(el), in_preamble);
                             if !still_preamble {
                                 in_preamble = false;
                             }
-                            tomet_tree::for_each_descendant(el, false, |el| visit(el, false));
+                            tomet_tree::for_each_descendant(el, false, |el| {
+                                visit(Written::Element(el), false)
+                            });
                         }
                         Inline::Text(t) if !t.value.trim().is_empty() => {
                             in_preamble = false;
@@ -229,8 +283,10 @@ pub fn check_singletons_and_regions(
                 in_preamble = false;
                 for inline in &s.title {
                     if let Inline::Element(el) = inline {
-                        visit(el, false);
-                        tomet_tree::for_each_descendant(el, false, |el| visit(el, false));
+                        visit(Written::Element(el), false);
+                        tomet_tree::for_each_descendant(el, false, |el| {
+                            visit(Written::Element(el), false)
+                        });
                     }
                 }
                 for child in &s.blocks {
@@ -248,25 +304,21 @@ pub fn check_singletons_and_regions(
     }
 }
 
-fn validate_section_block(block: &Block, visit: &mut impl FnMut(&Element, bool)) {
+fn validate_section_block(block: &Block, visit: &mut impl FnMut(Written<'_>, bool)) {
     match block {
-        Block::Element(el) => {
-            visit(el, false);
-            tomet_tree::for_each_descendant(el, false, |desc| visit(desc, false));
-        }
+        Block::Element(el) => visit_with_descendants(el, visit),
+        Block::Declaration(d) => visit(Written::Declaration(d), false),
         Block::Paragraph(p) => {
             for inline in &p.content {
                 if let Inline::Element(el) = inline {
-                    visit(el, false);
-                    tomet_tree::for_each_descendant(el, false, |desc| visit(desc, false));
+                    visit_with_descendants(el, visit);
                 }
             }
         }
         Block::Section(s) => {
             for inline in &s.title {
                 if let Inline::Element(el) = inline {
-                    visit(el, false);
-                    tomet_tree::for_each_descendant(el, false, |desc| visit(desc, false));
+                    visit_with_descendants(el, visit);
                 }
             }
             for child in &s.blocks {
@@ -278,14 +330,19 @@ fn validate_section_block(block: &Block, visit: &mut impl FnMut(&Element, bool))
     }
 }
 
-fn validate_list_items(list: &List, visit: &mut impl FnMut(&Element, bool)) {
+fn validate_list_items(list: &List, visit: &mut impl FnMut(Written<'_>, bool)) {
     for item in &list.items {
-        visit(&item.element, false);
-        tomet_tree::for_each_descendant(&item.element, false, |desc| visit(desc, false));
+        visit_with_descendants(&item.element, visit);
         if let Some(sub) = &item.sublist {
             validate_list_items(sub, visit);
         }
     }
+}
+
+/// `el` and everything nested in it, none of them in the preamble.
+fn visit_with_descendants(el: &Element, visit: &mut impl FnMut(Written<'_>, bool)) {
+    visit(Written::Element(el), false);
+    tomet_tree::for_each_descendant(el, false, |desc| visit(Written::Element(desc), false));
 }
 
 pub fn check_unfinished(doc: &Document, errors: &mut Vec<Diagnostic>) {
@@ -331,62 +388,88 @@ fn note_text(el: &tomet_ast::Element) -> String {
 }
 
 pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
-    use tomet_ast::Value;
-
     tomet_tree::for_each_element(doc, |el| {
         let Some(name) = el.sigil.name() else { return };
-        let Some(decl) = bindings.declaration(name) else {
-            return;
-        };
-        if decl.params.is_empty() {
-            return;
-        }
-
-        let args = tomet_semantics::normalized_element_args_in(el, bindings);
-        let entries: &[(String, Value)] = match args.as_ref() {
-            Some(Value::Map(entries)) => entries,
-            _ => &[],
-        };
-
-        for (key, _) in entries {
-            if !key.is_empty() && decl.param(key).is_none() {
-                errors.push(Diagnostic::UnknownArgument {
-                    element: name.to_string(),
-                    argument: key.clone(),
-                    span: el.span,
-                });
-            }
-        }
-        // An argument is held to the `type:` its parameter declares. A parameter
-        // whose `type:` names no type is not checked (the vocabulary says so
-        // where it is read), and a `${...}` is not known until it is evaluated.
-        for (key, value) in entries {
-            let Some(ty) = decl.param(key).and_then(|p| p.declared_type()) else {
-                continue;
-            };
-            if matches!(value, Value::Interp(_)) {
-                continue;
-            }
-            if let Err(mismatch) = ty.admits(value) {
-                errors.push(Diagnostic::InvalidArgument {
-                    element: name.to_string(),
-                    argument: key.clone(),
-                    ty: ty.to_string(),
-                    reason: mismatch.to_string(),
-                    span: el.span,
-                });
-            }
-        }
-        for param in decl.params.iter().filter(|p| p.required) {
-            if !entries.iter().any(|(k, _)| *k == param.name) {
-                errors.push(Diagnostic::MissingRequiredArgument {
-                    element: name.to_string(),
-                    argument: param.name.clone(),
-                    span: el.span,
-                });
-            }
-        }
+        check_arguments_of(
+            name,
+            tomet_semantics::normalized_element_args_in(el, bindings),
+            el.span,
+            bindings,
+            errors,
+        );
     });
+    tomet_tree::for_each_declaration(doc, |declaration| {
+        check_arguments_of(
+            &declaration.name,
+            tomet_semantics::normalized_declaration_args_in(declaration, bindings),
+            declaration.span,
+            bindings,
+            errors,
+        );
+    });
+}
+
+/// The arguments written for `name` (already bound to the slots it has),
+/// held to the parameters a vocabulary in scope declares for it.
+fn check_arguments_of(
+    name: &tomet_ast::Name,
+    args: Option<tomet_ast::Value>,
+    span: Span,
+    bindings: &Bindings,
+    errors: &mut Vec<Diagnostic>,
+) {
+    use tomet_ast::Value;
+
+    let Some(decl) = bindings.declaration(name) else {
+        return;
+    };
+    if decl.params.is_empty() {
+        return;
+    }
+
+    let entries: &[(String, Value)] = match args.as_ref() {
+        Some(Value::Map(entries)) => entries,
+        _ => &[],
+    };
+
+    for (key, _) in entries {
+        if !key.is_empty() && decl.param(key).is_none() {
+            errors.push(Diagnostic::UnknownArgument {
+                element: name.to_string(),
+                argument: key.clone(),
+                span,
+            });
+        }
+    }
+    // An argument is held to the `type:` its parameter declares. A parameter
+    // whose `type:` names no type is not checked (the vocabulary says so
+    // where it is read), and a `${...}` is not known until it is evaluated.
+    for (key, value) in entries {
+        let Some(ty) = decl.param(key).and_then(|p| p.declared_type()) else {
+            continue;
+        };
+        if matches!(value, Value::Interp(_)) {
+            continue;
+        }
+        if let Err(mismatch) = ty.admits(value) {
+            errors.push(Diagnostic::InvalidArgument {
+                element: name.to_string(),
+                argument: key.clone(),
+                ty: ty.to_string(),
+                reason: mismatch.to_string(),
+                span,
+            });
+        }
+    }
+    for param in decl.params.iter().filter(|p| p.required) {
+        if !entries.iter().any(|(k, _)| *k == param.name) {
+            errors.push(Diagnostic::MissingRequiredArgument {
+                element: name.to_string(),
+                argument: param.name.clone(),
+                span,
+            });
+        }
+    }
 }
 
 /// Runs checks on the standard declarations in `doc`, mapping each [`Problem`]
@@ -545,8 +628,12 @@ pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec
             }
             Some(tomet_semantics::ContentAllow::Names(names)) => {
                 let allowed_display: Vec<String> = names.iter().map(|n| n.to_string()).collect();
-                for_each_direct_content_element(content, |descendant| {
-                    let Ok(desc_kind) = classify_in(descendant, bindings) else {
+                for_each_direct_content_item(content, |descendant| {
+                    let classified = match descendant {
+                        Written::Element(desc) => classify_in(desc, bindings),
+                        Written::Declaration(desc) => tomet_semantics::classify_declaration(desc),
+                    };
+                    let Ok(desc_kind) = classified else {
                         return;
                     };
                     let desc_name = desc_kind.as_str().to_string();
@@ -556,7 +643,7 @@ pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec
                             element: name.clone(),
                             allowed: allowed_display.clone(),
                             element_span: el.span,
-                            span: descendant.span,
+                            span: descendant.span(),
                         });
                     }
                 });
@@ -565,17 +652,17 @@ pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec
     });
 }
 
-fn for_each_direct_content_element<'a>(
-    content: &'a [Block],
-    mut f: impl FnMut(&'a tomet_ast::Element),
-) {
+/// What sits directly in `content`: elements, and declarations, which are
+/// blocks of their own.
+fn for_each_direct_content_item<'a>(content: &'a [Block], mut f: impl FnMut(Written<'a>)) {
     for block in content {
         match block {
-            Block::Element(el) => f(el),
+            Block::Element(el) => f(Written::Element(el)),
+            Block::Declaration(d) => f(Written::Declaration(d)),
             Block::Paragraph(p) => {
                 for inline in &p.content {
                     if let Inline::Element(el) = inline {
-                        f(el);
+                        f(Written::Element(el));
                     }
                 }
             }
@@ -589,17 +676,18 @@ fn for_each_direct_content_element<'a>(
 /// where a vault reads the vocabulary ([`tomet_semantics::LoadedVocabularies`]);
 /// this is for checking the vocabulary file itself.
 pub fn check_vocabulary_params(doc: &Document, errors: &mut Vec<Diagnostic>) {
-    use tomet_semantics::{ElementKind, Vocabulary, classify_std_lenient};
+    use tomet_semantics::{ElementKind, Vocabulary, classify_declaration_lenient};
 
     let Some(vocab) = Vocabulary::from_document(doc) else {
         return;
     };
     let mut elements_span = None;
-    tomet_tree::for_each_top_level_element(doc, |el| {
+    tomet_tree::for_each_top_level_declaration(doc, |declaration| {
         if elements_span.is_none()
-            && classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Elements)
+            && classify_declaration_lenient(declaration)
+                == ElementKind::Declaration(DeclKind::Elements)
         {
-            elements_span = Some(el.span);
+            elements_span = Some(declaration.span);
         }
     });
     let Some(span) = elements_span else { return };
@@ -618,14 +706,14 @@ pub fn check_vocabulary_params(doc: &Document, errors: &mut Vec<Diagnostic>) {
 /// The caller decides whether the document is allowed to write them (the vault config is; a folder
 /// config and an ordinary document are not), because that takes the path, which this crate never has.
 pub fn check_vault_only_declarations(doc: &Document, errors: &mut Vec<Diagnostic>) {
-    tomet_tree::for_each_top_level_element(doc, |el| {
+    tomet_tree::for_each_top_level_declaration(doc, |declaration| {
         if let tomet_semantics::ElementKind::Declaration(kind) =
-            tomet_semantics::classify_std_lenient(el)
+            tomet_semantics::classify_declaration_lenient(declaration)
             && kind.is_vault_only()
         {
             errors.push(Diagnostic::VaultOnlyDeclaration {
                 name: kind.name().to_string(),
-                span: el.span,
+                span: declaration.span,
             });
         }
     });
@@ -653,27 +741,39 @@ pub fn check_field_types(
     }
     let mut checked_meta = false;
     let mut checked_id = false;
-    tomet_tree::for_each_top_level_element(doc, |el| {
-        match tomet_semantics::classify_std_lenient(el) {
+    tomet_tree::for_each_top_level_declaration(doc, |declaration| {
+        match tomet_semantics::classify_declaration_lenient(declaration) {
             tomet_semantics::ElementKind::Declaration(DeclKind::Meta) if !checked_meta => {
                 checked_meta = true;
-                let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el) else {
+                let Some(Value::Map(entries)) =
+                    tomet_semantics::data::declaration_data(declaration)
+                else {
                     return;
                 };
                 for (field, value) in &entries {
-                    errors.extend(field_value_error(field, value, field_types, el.span));
+                    errors.extend(field_value_error(
+                        field,
+                        value,
+                        field_types,
+                        declaration.span,
+                    ));
                 }
             }
             // The identity of a document is the field `id` of its vault's settings, wherever
             // it is written: `meta: { id: { type: uuid } }` holds `::id(...)` to a UUID.
             tomet_semantics::ElementKind::Declaration(DeclKind::Id) if !checked_id => {
                 checked_id = true;
-                let Some(value) = tomet_semantics::normalized_element_args(el)
+                let Some(value) = tomet_semantics::normalized_declaration_args(declaration)
                     .and_then(|args| args.get("id").cloned())
                 else {
                     return;
                 };
-                errors.extend(field_value_error("id", &value, field_types, el.span));
+                errors.extend(field_value_error(
+                    "id",
+                    &value,
+                    field_types,
+                    declaration.span,
+                ));
             }
             _ => {}
         }

@@ -116,6 +116,7 @@ fn text_of(doc: &Document) -> String {
                     ));
                 }
                 Block::Interp(interp) => out.push_str(&format!("${{{}}}", interp.expr)),
+                Block::Declaration(d) => out.push_str(&format!("::{}", d.name)),
             }
         }
     }
@@ -336,10 +337,10 @@ fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
     let (doc, unresolved) =
         run("::meta{ n: ${add(1, 1)}, names: ${addr(dir:docs).docs.map(d => d.path)} }\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
-    let Block::Element(el) = &doc.blocks[0] else {
+    let Block::Declaration(declaration) = &doc.blocks[0] else {
         panic!("an element block");
     };
-    let Some(Group(entries)) = &el.data.value else {
+    let Some(Group(entries)) = &declaration.data.value else {
         panic!("a group");
     };
     assert_eq!(
@@ -405,10 +406,10 @@ fn creating_a_document_reads_var_and_generates() {
         &vars,
     );
     assert!(unresolved.is_empty(), "{unresolved:?}");
-    let Block::Element(el) = &doc.blocks[0] else {
+    let Block::Declaration(declaration) = &doc.blocks[0] else {
         panic!("meta");
     };
-    let Some(Group(entries)) = &el.data.value else {
+    let Some(Group(entries)) = &declaration.data.value else {
         panic!("a group");
     };
     let tomet_ast::Entry::Pair(_, Value::String(id)) = &entries[0] else {
@@ -432,11 +433,11 @@ fn creating_a_document_reads_var_and_generates() {
 fn creation_only_names_are_refused_when_rendering() {
     let (doc, unresolved) = run("::meta{ id: ${generate.uuid()} }\n");
     assert!(reasons(&unresolved)[0].contains("when a document is being created"));
-    let Block::Element(el) = &doc.blocks[0] else {
+    let Block::Declaration(declaration) = &doc.blocks[0] else {
         panic!("meta");
     };
     // The expression is still there.
-    let Some(Group(entries)) = &el.data.value else {
+    let Some(Group(entries)) = &declaration.data.value else {
         panic!("a group");
     };
     assert!(matches!(

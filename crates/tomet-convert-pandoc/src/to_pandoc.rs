@@ -97,6 +97,9 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
         TmBlock::Paragraph(p) => content_to_blocks(&p.content),
         TmBlock::Element(el) => element_to_blocks(el),
         TmBlock::Interp(interp) => vec![Block::Para(vec![interp_inline(interp)])],
+        // What a declaration says about the document is `to_pandoc`'s metadata,
+        // not a block.
+        TmBlock::Declaration(_) => Vec::new(),
         TmBlock::Section(sec) => {
             let mut blocks = if !sec.title.is_empty() {
                 vec![Block::Header(
@@ -297,6 +300,7 @@ fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el)),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
+            TmBlock::Declaration(_) => {}
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -376,6 +380,7 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
             }
             TmBlock::Element(el) => out.extend(element_to_blocks(el)),
             TmBlock::Interp(interp) => out.push(Block::Para(vec![interp_inline(interp)])),
+            TmBlock::Declaration(_) => {}
             // No direct Pandoc equivalent for a nested section; a header
             // plus its own blocks is the closest shape.
             TmBlock::Section(sec) => {
@@ -412,6 +417,7 @@ fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el)),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
+            TmBlock::Declaration(_) => {}
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -542,7 +548,7 @@ fn blocks_plain_text(blocks: &[TmBlock]) -> String {
         match block {
             TmBlock::Paragraph(p) => out.push_str(&plain_text(&p.content)),
             TmBlock::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
-            TmBlock::Interp(_) => {}
+            TmBlock::Interp(_) | TmBlock::Declaration(_) => {}
             TmBlock::Section(sec) => out.push_str(&plain_text(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {

@@ -223,17 +223,17 @@ fn own_line_comment_works_inside_a_paren_group() {
     // entries in `::config(...)`'s `(args)` map.
     let doc = parse_document("::config(\n  format:json\n  // a note\n)\n").unwrap();
     match &doc.blocks[0] {
-        Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::document("config"));
+        Block::Declaration(d) => {
+            assert_eq!(d.name, Name::bare("config"));
             assert_eq!(
-                el.data.args,
+                d.data.args,
                 Some(Value::Map(vec![(
                     "format".into(),
                     Value::String("json".into())
                 )]))
             );
         }
-        other => panic!("expected an element, got {other:?}"),
+        other => panic!("expected a declaration, got {other:?}"),
     }
 }
 
@@ -241,16 +241,16 @@ fn own_line_comment_works_inside_a_paren_group() {
 fn own_line_comment_works_inside_a_lightweight_value_group() {
     let doc = parse_document("::meta{\n  key: value\n  // a note\n}\n").unwrap();
     match &doc.blocks[0] {
-        Block::Element(el) => {
+        Block::Declaration(d) => {
             assert_eq!(
-                el.data.value,
+                d.data.value,
                 Some(Group::from_map(Value::Map(vec![(
                     "key".into(),
                     Value::String("value".into())
                 )])))
             );
         }
-        other => panic!("expected an element, got {other:?}"),
+        other => panic!("expected a declaration, got {other:?}"),
     }
 }
 

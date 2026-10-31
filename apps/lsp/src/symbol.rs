@@ -1,5 +1,5 @@
 use lsp_types::{DocumentSymbol, SymbolKind};
-use tomet_ast::{Block, Connect, Element, Inline, Interpolation, List, Sigil};
+use tomet_ast::{Block, Connect, Declaration, Element, Inline, Interpolation, List, Sigil};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 use crate::position::TextPositions;
@@ -61,6 +61,9 @@ fn collect_block_symbols(
         }
         Block::List(list) => collect_list_symbol(positions, list, symbols),
         Block::Interp(interp) => collect_interp_symbol(positions, interp, symbols),
+        Block::Declaration(declaration) => {
+            collect_declaration_symbol(positions, declaration, symbols)
+        }
     }
 }
 
@@ -136,6 +139,28 @@ fn collect_element_symbol(
     }
     for conn in &el.connects {
         collect_connect_symbol(positions, conn, symbols);
+    }
+}
+
+fn collect_declaration_symbol(
+    positions: &TextPositions<'_>,
+    declaration: &Declaration,
+    symbols: &mut Vec<DocumentSymbol>,
+) {
+    let range = positions.range(&declaration.span);
+    #[allow(deprecated)]
+    symbols.push(DocumentSymbol {
+        name: format!("::{}", declaration.name),
+        detail: declaration.data.args.as_ref().map(|a| format!("{a:?}")),
+        kind: SymbolKind::OBJECT,
+        tags: None,
+        deprecated: None,
+        range,
+        selection_range: range,
+        children: None,
+    });
+    for block in declaration.content.iter().flatten() {
+        collect_block_symbols(positions, block, symbols);
     }
 }
 
@@ -219,6 +244,7 @@ pub(crate) fn extract_blocks_text(blocks: &[Block]) -> String {
                 }
             }
             Block::Interp(_) => out.push_str("${...}"),
+            Block::Declaration(_) => {}
         }
     }
     out
@@ -246,7 +272,6 @@ pub(crate) fn extract_inlines_text(inlines: &[Inline]) -> String {
 pub(crate) fn sigil_display_name(sigil: &Sigil) -> String {
     match sigil {
         Sigil::Named(name) => format!("@{name}"),
-        Sigil::Document(name) => format!("::{name}"),
         Sigil::Bare => "(bare)".to_string(),
         Sigil::Question(matcher) => match matcher {
             Some(matcher) => format!("?{matcher}()"),

@@ -63,16 +63,16 @@ fn a_named_connect_round_trips_on_a_heading() {
     );
 }
 
-/// Defensive coverage for the four early-returning special cases in
-/// `render_element` (`hr`/`meta`/`raw`/`callout`), which would
-/// otherwise silently drop a `connects` field the parser never
-/// actually attaches to them in practice today -- a `:rule(...)`
-/// after e.g. a raw block is syntactically legal even if unlikely.
+/// Defensive coverage for the early-returning special cases in
+/// `render_element` (`hr`/`raw`/`callout`), which would otherwise
+/// silently drop a `connects` field the parser never actually attaches
+/// to them in practice today -- a `:rule(...)` after e.g. a raw block is
+/// syntactically legal even if unlikely. (`::meta` is a declaration, which
+/// takes no connect.)
 #[test]
-fn connects_survive_the_four_specially_printed_kinds() {
+fn connects_survive_the_specially_printed_kinds() {
     for src in [
         "@hr:rule(allow: list(card))\n",
-        "::meta{a: 1}:rule(allow: list(card))\n",
         "@raw[x]:rule(allow: list(card))\n",
     ] {
         let doc = tomet_parser::parse_document(src).unwrap();

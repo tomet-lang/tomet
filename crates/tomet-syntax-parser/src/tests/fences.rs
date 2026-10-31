@@ -7,10 +7,12 @@ use super::*;
 /// document root, so a fenced code block nests inside it exactly as it
 /// would at the top level.
 fn nested_raw_body(doc: &tomet_ast::Document) -> &str {
-    let Block::Element(outer) = &doc.blocks[0] else {
-        panic!("expected an element, got {:?}", doc.blocks[0]);
+    let outer_content = match &doc.blocks[0] {
+        Block::Element(outer) => outer.content.as_deref(),
+        Block::Declaration(outer) => outer.content.as_deref(),
+        other => panic!("expected an element or a declaration, got {other:?}"),
     };
-    let content = outer.content.as_deref().unwrap_or(&[]);
+    let content = outer_content.unwrap_or(&[]);
     let Some(Block::Element(raw)) = content.first() else {
         panic!("expected a nested raw element, got {content:?}");
     };

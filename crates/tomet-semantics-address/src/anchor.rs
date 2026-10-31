@@ -55,6 +55,14 @@ fn find_in_block(block: &Block, anchor: &str) -> Option<Span> {
             None
         }
         Block::Element(el) => find_in_element(el, anchor),
+        Block::Declaration(d) => {
+            if let Some(id) = &d.id
+                && id.0 == anchor
+            {
+                return Some(d.span);
+            }
+            find_in_content(d.content.as_deref(), anchor).or_else(|| find_in_data(&d.data, anchor))
+        }
         Block::Paragraph(p) => {
             for inline in &p.content {
                 if let Some(span) = find_in_inline(inline, anchor) {
@@ -186,6 +194,13 @@ fn collect_in_block(block: &Block, anchors: &mut Vec<(String, Span)>) {
             }
         }
         Block::Element(el) => collect_in_element(el, anchors),
+        Block::Declaration(d) => {
+            if let Some(id) = &d.id {
+                anchors.push((id.0.clone(), d.span));
+            }
+            collect_in_content(d.content.as_deref(), anchors);
+            collect_in_data(&d.data, anchors);
+        }
         Block::Paragraph(p) => {
             for inline in &p.content {
                 collect_in_inline(inline, anchors);

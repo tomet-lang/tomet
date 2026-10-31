@@ -1,11 +1,12 @@
 //! Blueprint schema extraction, transformation, and instantiation.
 
-use tomet_ast::{Document, Sigil, Value};
+use tomet_ast::{Document, Name, Value};
 use tomet_expr::EvalContext;
 use tomet_semantics::DeclKind;
-use tomet_semantics::{ElementKind, classify_std_lenient, normalized_element_args};
+use tomet_semantics::{ElementKind, classify_declaration_lenient, normalized_declaration_args};
 use tomet_tree::{
-    ValueExt, for_each_top_level_element, for_each_top_level_element_mut, retain_top_level_elements,
+    ValueExt, for_each_top_level_declaration, for_each_top_level_declaration_mut,
+    retain_top_level_declarations,
 };
 
 use crate::expressions::{Unresolved, resolve_expressions};
@@ -21,13 +22,14 @@ pub struct BlueprintInfo {
 /// Extracts [`BlueprintInfo`] from `doc` if it declares a top-level `::blueprint` directive.
 pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
     let mut result = None;
-    for_each_top_level_element(doc, |el| {
+    for_each_top_level_declaration(doc, |declaration| {
         if result.is_some()
-            || classify_std_lenient(el) != ElementKind::Declaration(DeclKind::Blueprint)
+            || classify_declaration_lenient(declaration)
+                != ElementKind::Declaration(DeclKind::Blueprint)
         {
             return;
         }
-        let target_kind = match &el.data.args {
+        let target_kind = match &declaration.data.args {
             Some(Value::String(s)) => s.clone(),
             Some(Value::Map(entries)) => entries
                 .iter()
@@ -40,7 +42,7 @@ pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
 
         let mut description = None;
 
-        if let Some(entries) = el
+        if let Some(entries) = declaration
             .data
             .value
             .as_ref()
@@ -86,11 +88,11 @@ pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiat
     // promotion below -- which is what running `tomet new` for the first
     // time after the shape was decided actually produced.
     let mut dropped_own_kind = false;
-    retain_top_level_elements(doc, |el| {
-        if classify_std_lenient(el) != ElementKind::Declaration(DeclKind::Kind) {
+    retain_top_level_declarations(doc, |declaration| {
+        if classify_declaration_lenient(declaration) != ElementKind::Declaration(DeclKind::Kind) {
             return true;
         }
-        let is_blueprint_kind = normalized_element_args(el)
+        let is_blueprint_kind = normalized_declaration_args(declaration)
             .as_ref()
             .and_then(|args| args.get("kind"))
             .and_then(|v| v.as_str())
@@ -105,33 +107,36 @@ pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiat
     // The blueprint's `::vars` are its inputs. They have been given their values
     // by now (see `tomet-workspace`), and a document made from it has none to ask for.
     let mut dropped_vars = false;
-    retain_top_level_elements(doc, |el| {
-        let is_vars = classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Vars);
+    retain_top_level_declarations(doc, |declaration| {
+        let is_vars =
+            classify_declaration_lenient(declaration) == ElementKind::Declaration(DeclKind::Vars);
         dropped_vars |= is_vars;
         !is_vars
     });
     changed |= dropped_vars;
 
     // Step 1: Transform ::blueprint -> ::kind
-    for_each_top_level_element_mut(doc, |el| {
-        if classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Blueprint) {
+    for_each_top_level_declaration_mut(doc, |declaration| {
+        if classify_declaration_lenient(declaration)
+            == ElementKind::Declaration(DeclKind::Blueprint)
+        {
             // The target is `::blueprint`'s positional argument, which
             // `tomet-semantics::positional` normalizes to `target`.
             // This used to also accept a spelled-out `target:` and a
             // `kind:`, three spellings for one thing that nobody had
             // chosen between -- see the root writ's `blueprint-shape`.
-            let target_kind = normalized_element_args(el)
+            let target_kind = normalized_declaration_args(declaration)
                 .as_ref()
                 .and_then(|args| args.get("target"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown")
                 .to_string();
 
-            el.sigil = Sigil::document("kind");
-            el.data.args = Some(Value::String(target_kind));
+            declaration.name = Name::bare("kind");
+            declaration.data.args = Some(Value::String(target_kind));
             // `{version, description}` describes the blueprint, not the
             // document it produces, so it does not survive promotion.
-            el.data.value = None;
+            declaration.data.value = None;
             changed = true;
         }
     });
@@ -199,14 +204,10 @@ mod tests {
             EvalValue::Null,
         );
 
-        // `::kind(blueprint)` and `::blueprint(daily-note)` sat on adjacent
-        // lines with nothing between them, so they join into one
-        // paragraph -- a top-level element search has to follow, not a raw
-        // `doc.blocks` walk.
         let mut kinds = Vec::new();
-        tomet_tree::for_each_top_level_element(&doc, |el| {
-            if classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Kind)
-                && let Some(s) = el.data.args.as_ref().and_then(|v| v.as_str())
+        for_each_top_level_declaration(&doc, |declaration| {
+            if classify_declaration_lenient(declaration) == ElementKind::Declaration(DeclKind::Kind)
+                && let Some(s) = declaration.data.args.as_ref().and_then(|v| v.as_str())
             {
                 kinds.push(s.to_string());
             }
@@ -235,22 +236,19 @@ mod tests {
         assert!(report.changed);
         assert!(report.unresolved.is_empty(), "{:?}", report.unresolved);
 
-        // `::blueprint(daily-note)` and `::meta{...}` sat on adjacent lines, so
-        // they join into one paragraph the same way `instantiating_leaves_one_kind`
-        // does -- collect top-level elements instead of indexing `doc.blocks`.
         let mut top_level = Vec::new();
-        tomet_tree::for_each_top_level_element(&doc, |el| top_level.push(el.clone()));
+        for_each_top_level_declaration(&doc, |declaration| top_level.push(declaration.clone()));
 
         let kind = top_level
             .iter()
-            .find(|el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Kind))
-            .expect("expected a ::kind element");
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind))
+            .expect("expected a ::kind declaration");
         assert_eq!(kind.data.args, Some(Value::String("daily-note".into())));
 
         let id = top_level
             .iter()
-            .find(|el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Id))
-            .expect("expected an ::id element");
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
+            .expect("expected an ::id declaration");
         assert_eq!(
             id.data.args,
             Some(Value::String("00000000-0000-0000-0000-000000000000".into()))
@@ -258,8 +256,8 @@ mod tests {
 
         let meta = top_level
             .iter()
-            .find(|el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta))
-            .expect("expected a ::meta element");
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
+            .expect("expected a ::meta declaration");
         let Some(Value::Map(entries)) = meta.data.value.as_ref().map(|v| v.as_data()) else {
             panic!("expected meta map");
         };

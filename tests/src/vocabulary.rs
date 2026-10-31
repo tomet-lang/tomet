@@ -23,9 +23,9 @@
 //! down -- a branch the parser used to have, and would fail again the
 //! moment one was reintroduced.
 
-use tomet_ast::{Document, Element, Name, Sigil, Value};
+use tomet_ast::{Data, Document, Name, Sigil, Value};
 use tomet_parser::parse_document;
-use tomet_tree::for_each_element_mut;
+use tomet_tree::{for_each_element_mut, for_each_top_level_declaration_mut};
 
 /// Which kind of identifier a case renames.
 #[derive(Clone, Copy)]
@@ -204,22 +204,27 @@ fn the_guard_reports_a_difference_it_is_given() {
 /// two trees built from differently-named sources can be compared directly.
 fn normalize(doc: &mut Document, ident: &str, kind: Ident) {
     for_each_element_mut(doc, |el| match kind {
-        Ident::ElementName => rename_element(el, ident),
-        Ident::Namespace => rename_namespace(el, ident),
-        Ident::ArgKey => rename_arg_key(el, ident),
+        Ident::ElementName => rename_name(sigil_name_mut(&mut el.sigil), ident),
+        Ident::Namespace => rename_namespace(sigil_name_mut(&mut el.sigil), ident),
+        Ident::ArgKey => rename_arg_key(&mut el.data, ident),
+    });
+    for_each_top_level_declaration_mut(doc, |declaration| match kind {
+        Ident::ElementName => rename_name(Some(&mut declaration.name), ident),
+        Ident::Namespace => rename_namespace(Some(&mut declaration.name), ident),
+        Ident::ArgKey => rename_arg_key(&mut declaration.data, ident),
     });
 }
 
-fn rename_element(el: &mut Element, ident: &str) {
-    if let Some(name) = sigil_name_mut(&mut el.sigil)
+fn rename_name(name: Option<&mut Name>, ident: &str) {
+    if let Some(name) = name
         && name.name == ident
     {
         name.name = PLACEHOLDER.to_string();
     }
 }
 
-fn rename_namespace(el: &mut Element, ident: &str) {
-    if let Some(name) = sigil_name_mut(&mut el.sigil)
+fn rename_namespace(name: Option<&mut Name>, ident: &str) {
+    if let Some(name) = name
         && name.namespace.as_deref() == Some(ident)
     {
         name.namespace = Some(PLACEHOLDER.to_string());
@@ -228,16 +233,16 @@ fn rename_namespace(el: &mut Element, ident: &str) {
 
 fn sigil_name_mut(sigil: &mut Sigil) -> Option<&mut Name> {
     match sigil {
-        Sigil::Named(name) | Sigil::Document(name) => Some(name),
+        Sigil::Named(name) => Some(name),
         Sigil::Bare | Sigil::Question(_) => None,
     }
 }
 
-fn rename_arg_key(el: &mut Element, ident: &str) {
-    if let Some(args) = &mut el.data.args {
+fn rename_arg_key(data: &mut Data, ident: &str) {
+    if let Some(args) = &mut data.args {
         rename_keys(args, ident);
     }
-    if let Some(value) = &mut el.data.value {
+    if let Some(value) = &mut data.value {
         for (key, val) in value.pairs_mut() {
             if key == ident {
                 *key = PLACEHOLDER.to_string();

@@ -50,7 +50,7 @@ pub(crate) fn blocks_to_plain(blocks: &[Block]) -> String {
                     }
                 }
             }
-            Block::Interp(_) => {}
+            Block::Interp(_) | Block::Declaration(_) => {}
         }
     }
     s

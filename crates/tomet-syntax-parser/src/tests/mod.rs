@@ -20,8 +20,8 @@ mod values;
 
 use super::*;
 use tomet_ast::{
-    Block, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name, Paragraph, Placement,
-    Sigil, SoftBreak, Span, Value,
+    Block, Declaration, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name,
+    Paragraph, Placement, Sigil, SoftBreak, Span, Value,
 };
 
 /// A `SoftBreak` for test expectations -- span never matters, `Span`'s

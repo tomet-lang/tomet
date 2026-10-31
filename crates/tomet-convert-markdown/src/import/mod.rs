@@ -33,7 +33,7 @@ use tomet_ast::{
     RawText, Section, Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::{ElementKind, classify_std_lenient};
-use tomet_tree::{element_new, list, list_item};
+use tomet_tree::{declaration_new, element_new, list, list_item};
 
 mod frontmatter;
 mod table;
@@ -162,14 +162,14 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
         let had_id = id.is_some();
         if let Some((pos, text)) = id {
             entries.remove(pos);
-            let mut id_el = element_new(Sigil::document("id"));
-            id_el.data.args = Some(Value::String(text));
-            push_block(&mut stack, Block::Element(id_el));
+            let mut id_declaration = declaration_new("id");
+            id_declaration.data.args = Some(Value::String(text));
+            push_block(&mut stack, Block::Declaration(id_declaration));
         }
         if !had_id || !entries.is_empty() {
-            let mut meta_el = element_new(Sigil::document("meta"));
-            meta_el.data.value = Some(tomet_ast::Group::from_map(Value::Map(entries)));
-            push_block(&mut stack, Block::Element(meta_el));
+            let mut meta_declaration = declaration_new("meta");
+            meta_declaration.data.value = Some(tomet_ast::Group::from_map(Value::Map(entries)));
+            push_block(&mut stack, Block::Declaration(meta_declaration));
         }
     }
 
@@ -788,6 +788,8 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
             }
             content.push(Inline::Interp(interp));
         }
+        // What a document says about itself is not content to flatten.
+        Block::Declaration(_) => {}
         Block::Section(sec) => {
             extend_spaced(content, sec.title);
             for child in sec.blocks {

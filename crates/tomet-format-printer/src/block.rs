@@ -5,7 +5,9 @@ use tomet_config::PrinterConfig;
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 use tomet_style::render_value;
 
-use crate::element::{render_args, render_connects, render_element, render_interp};
+use crate::element::{
+    render_args, render_connects, render_declaration, render_element, render_interp,
+};
 use crate::id::render_id;
 use crate::inline::{render_content_blocks, render_inlines};
 
@@ -58,6 +60,10 @@ pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut Stri
         }
         Block::Element(el) => {
             out.push_str(&render_element(el, config));
+            out.push('\n');
+        }
+        Block::Declaration(declaration) => {
+            out.push_str(&render_declaration(declaration, config));
             out.push('\n');
         }
         Block::Section(sec) => render_section(sec, config, out),

@@ -1,7 +1,7 @@
 //! Whitespace-hygiene formatting preserving verbatim raw spans (fenced code
 //! blocks, and any `(content:raw)` element).
 
-use tomet_ast::{Block, Connect, Document, Element, Inline, ListItem, Value};
+use tomet_ast::{Block, Connect, Data, Declaration, Document, Element, Inline, ListItem, Value};
 use tomet_parser::parse_document;
 
 /// Normalizes whitespace (LF line endings, no trailing whitespace, collapsed excess
@@ -109,10 +109,19 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
 
     /// A connect is never a raw element, but what it holds can be.
     fn walk_connect(conn: &Connect, out: &mut Vec<(usize, usize)>) {
-        for block in conn.content.iter().flatten() {
+        walk_held(conn.content.as_deref(), &conn.data, out);
+    }
+
+    /// Neither is a declaration; what it holds can be.
+    fn walk_declaration(declaration: &Declaration, out: &mut Vec<(usize, usize)>) {
+        walk_held(declaration.content.as_deref(), &declaration.data, out);
+    }
+
+    fn walk_held(content: Option<&[Block]>, data: &Data, out: &mut Vec<(usize, usize)>) {
+        for block in content.into_iter().flatten() {
             walk_block(block, out);
         }
-        if let Some(children) = conn.data.value.as_ref().map(|v| v.as_children()) {
+        if let Some(children) = data.value.as_ref().map(|v| v.as_children()) {
             for child in children {
                 walk_element(child, out);
             }
@@ -129,6 +138,7 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                 }
             }
             Block::Element(el) => walk_element(el, out),
+            Block::Declaration(declaration) => walk_declaration(declaration, out),
             Block::Section(sec) => {
                 for inline in &sec.title {
                     if let Inline::Element(el) = inline {

@@ -34,13 +34,13 @@
 //!   `Attr` is where data goes. Only the elements move.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, Group, Id, Inline as TmInline, LineBreak, List, Name,
-    Paragraph, Placement, RawText, Section, Sigil, SoftBreak, Span, Text, Value,
+    Block as TmBlock, Declaration, Document, Element, Group, Id, Inline as TmInline, LineBreak,
+    List, Name, Paragraph, Placement, RawText, Section, Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::EXACT_DATA_KEY;
 
 use crate::to_pandoc::{BARE_SIGIL, SIGIL_KEY};
-use tomet_tree::{ElementExt, element_new, list, list_item};
+use tomet_tree::{ElementExt, declaration_new, element_new, list, list_item};
 
 use crate::ast::{Attr, Block, Inline, MetaValue, PandocDoc, Row, TableParts};
 
@@ -60,12 +60,12 @@ pub fn from_pandoc(doc: &PandocDoc) -> Document {
             other => other.scalar_text().map(|text| text.into_owned()),
         });
     if let Some(id) = id {
-        let mut id_el = element_new(Sigil::document("id")).with_placement(Placement::Block);
-        id_el.data.args = Some(Value::String(id));
-        blocks.push(TmBlock::Element(id_el));
+        let mut id_declaration = declaration_new("id");
+        id_declaration.data.args = Some(Value::String(id));
+        blocks.push(TmBlock::Declaration(id_declaration));
     }
     if !meta.is_empty() {
-        blocks.push(TmBlock::Element(meta_element(&meta)));
+        blocks.push(TmBlock::Declaration(meta_declaration(&meta)));
     }
     for block in &doc.blocks {
         if let Some(b) = block_from_pandoc(block) {
@@ -118,14 +118,14 @@ fn structure_sections(blocks: Vec<TmBlock>) -> Vec<TmBlock> {
 }
 
 /// Rebuilds `::meta{...}` from Pandoc's metadata map.
-fn meta_element(meta: &crate::ast::Meta) -> Element {
+fn meta_declaration(meta: &crate::ast::Meta) -> Declaration {
     let entries: Vec<(String, Value)> = meta
         .iter()
         .map(|(k, v)| (k.clone(), meta_value_to_value(v)))
         .collect();
-    let mut el = element_new(Sigil::document("meta")).with_placement(Placement::Block);
-    el.data.value = Some(Group::from_map(Value::Map(entries)));
-    el
+    let mut declaration = declaration_new("meta");
+    declaration.data.value = Some(Group::from_map(Value::Map(entries)));
+    declaration
 }
 
 fn meta_value_to_value(v: &MetaValue) -> Value {
@@ -566,7 +566,7 @@ fn blocks_to_text_tm(blocks: &[TmBlock]) -> String {
                     }
                 }
             }
-            TmBlock::Interp(_) => {}
+            TmBlock::Interp(_) | TmBlock::Declaration(_) => {}
         }
     }
     out
@@ -827,12 +827,12 @@ mod tests {
     fn meta_survives_a_round_trip() {
         let doc = parse_document("::meta{title: Hello, draft: true}\n\n本文\n").unwrap();
         let back = from_pandoc(&to_pandoc(&doc));
-        let TmBlock::Element(el) = &back.blocks[0] else {
-            panic!("expected the meta element");
+        let TmBlock::Declaration(declaration) = &back.blocks[0] else {
+            panic!("expected the meta declaration");
         };
-        assert!(el.sigil.is_bare_named("meta"));
+        assert!(declaration.name.is_bare_named("meta"));
         assert_eq!(
-            el.data.value.as_ref().map(|v| v.as_data()),
+            declaration.data.value.as_ref().map(|v| v.as_data()),
             Some(Value::Map(vec![
                 ("draft".to_string(), Value::Bool(true)),
                 ("title".to_string(), Value::String("Hello".to_string())),

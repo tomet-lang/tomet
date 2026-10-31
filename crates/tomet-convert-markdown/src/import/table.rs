@@ -53,7 +53,7 @@ pub(super) fn blocks_display_width(blocks: &[Block]) -> usize {
         .map(|block| match block {
             Block::Paragraph(p) => inlines_display_width(&p.content),
             Block::Element(el) => el.content.as_deref().map(blocks_display_width).unwrap_or(0),
-            Block::Interp(_) => 0,
+            Block::Interp(_) | Block::Declaration(_) => 0,
             Block::Section(sec) => inlines_display_width(&sec.title),
             Block::List(list) => list
                 .items

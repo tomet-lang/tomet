@@ -29,7 +29,7 @@ use ignore::WalkBuilder;
 use tomet_ast::Value;
 use tomet_config::PrinterConfig;
 use tomet_parser::parse_document;
-use tomet_semantics::classify_std_lenient;
+use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 
 pub mod workspace_scan;
 
@@ -394,27 +394,31 @@ pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
     if let Ok(doc) = parse_document(src) {
         tomet_tree::for_each_element(&doc, |el| {
             let kind = classify_std_lenient(el);
-            let kind = kind.as_str();
-            if kind == "meta" {
-                if let Some(entries) = el
-                    .data
-                    .value
-                    .as_ref()
-                    .map(|v| v.pairs().collect::<Vec<_>>())
-                {
-                    for (k, v) in entries {
-                        map.insert(format!("{kind}.{k}"), value_to_string(v));
-                    }
-                }
-                if let Some(Value::Map(entries)) = &el.data.args {
-                    for (k, v) in entries {
-                        map.insert(format!("{kind}.(args).{k}"), value_to_string(v));
-                    }
-                }
+            if kind.as_str() == "meta" {
+                collect_meta(&el.data, &mut map);
+            }
+        });
+        tomet_tree::for_each_declaration(&doc, |declaration| {
+            if classify_declaration_lenient(declaration).as_str() == "meta" {
+                collect_meta(&declaration.data, &mut map);
             }
         });
     }
     map
+}
+
+/// The fields of one `meta`: the `{value}` group as `meta.key`, the `(args)` as `meta.(args).key`.
+fn collect_meta(data: &tomet_ast::Data, map: &mut BTreeMap<String, String>) {
+    if let Some(entries) = data.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
+        for (k, v) in entries {
+            map.insert(format!("meta.{k}"), value_to_string(v));
+        }
+    }
+    if let Some(Value::Map(entries)) = &data.args {
+        for (k, v) in entries {
+            map.insert(format!("meta.(args).{k}"), value_to_string(v));
+        }
+    }
 }
 
 fn value_to_string(v: &Value) -> String {

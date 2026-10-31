@@ -108,7 +108,7 @@ fn yaml_key_to_string(k: serde_yaml::Value) -> String {
 #[cfg(test)]
 mod tests {
     use crate::import::from_markdown;
-    use tomet_ast::{Block, Sigil, Value};
+    use tomet_ast::{Block, Name, Value};
 
     #[test]
     fn yaml_frontmatter_converts_to_meta() {
@@ -116,10 +116,10 @@ mod tests {
         let doc = from_markdown(src);
         assert_eq!(doc.blocks.len(), 2);
         match &doc.blocks[0] {
-            Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::document("meta"));
+            Block::Declaration(declaration) => {
+                assert_eq!(declaration.name, Name::bare("meta"));
                 assert_eq!(
-                    el.data.value,
+                    declaration.data.value,
                     Some(tomet_ast::Group::from_map(Value::Map(vec![
                         ("title".to_string(), Value::String("Hello".to_string())),
                         ("author".to_string(), Value::String("Alice".to_string())),
@@ -127,7 +127,7 @@ mod tests {
                     ])))
                 );
             }
-            other => panic!("expected meta element, got {other:?}"),
+            other => panic!("expected a meta declaration, got {other:?}"),
         }
     }
 
@@ -137,10 +137,10 @@ mod tests {
         let doc = from_markdown(src);
         assert_eq!(doc.blocks.len(), 2);
         match &doc.blocks[0] {
-            Block::Element(el) => {
-                assert_eq!(el.sigil, Sigil::document("meta"));
+            Block::Declaration(declaration) => {
+                assert_eq!(declaration.name, Name::bare("meta"));
                 assert_eq!(
-                    el.data.value,
+                    declaration.data.value,
                     Some(tomet_ast::Group::from_map(Value::Map(vec![
                         ("title".to_string(), Value::String("Doc".to_string())),
                         (
@@ -153,7 +153,7 @@ mod tests {
                     ])))
                 );
             }
-            other => panic!("expected meta element, got {other:?}"),
+            other => panic!("expected a meta declaration, got {other:?}"),
         }
     }
 
@@ -162,11 +162,11 @@ mod tests {
         let src = "---\ntopics:\n  - \"[[@Templater]]\"\n  - \"[[@QuickAdd]]\"\n---\n\n# Title\n";
         let doc = from_markdown(src);
         assert_eq!(doc.blocks.len(), 2);
-        let Block::Element(el) = &doc.blocks[0] else {
-            panic!("expected meta element");
+        let Block::Declaration(declaration) = &doc.blocks[0] else {
+            panic!("expected a meta declaration");
         };
         assert_eq!(
-            el.data.value,
+            declaration.data.value,
             Some(tomet_ast::Group::from_map(Value::Map(vec![(
                 "topics".to_string(),
                 Value::Seq(vec![

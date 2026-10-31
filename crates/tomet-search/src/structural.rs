@@ -3,9 +3,9 @@
 //! Provides pure in-memory querying over Tomet AST elements by tag,
 //! attribute/property key, and value content.
 
-use tomet_ast::{Document, Element, Span, Value};
-use tomet_semantics::classify_std_lenient;
-use tomet_tree::{ElementExt, for_each_element};
+use tomet_ast::{Data, Declaration, Document, Element, Span, Value};
+use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
+use tomet_tree::{DataExt, for_each_declaration, for_each_element};
 
 /// Criteria for matching AST elements.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -27,17 +27,29 @@ pub struct StructuralMatch {
 
 /// Checks if a single element matches `query`.
 pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
-    let kind = classify_std_lenient(el);
+    matches_parts(classify_std_lenient(el).as_str(), &el.data, query)
+}
+
+/// Checks if a single declaration matches `query`.
+pub fn matches_declaration_query(declaration: &Declaration, query: &StructuralQuery) -> bool {
+    matches_parts(
+        classify_declaration_lenient(declaration).as_str(),
+        &declaration.data,
+        query,
+    )
+}
+
+fn matches_parts(tag: &str, data: &Data, query: &StructuralQuery) -> bool {
     if let Some(target_tag) = &query.tag
         && !target_tag.is_empty()
-        && !kind.as_str().eq_ignore_ascii_case(target_tag)
+        && !tag.eq_ignore_ascii_case(target_tag)
     {
         return false;
     }
 
     if let Some(target_key) = &query.key
         && !target_key.is_empty()
-        && !el.has_prop_key(target_key)
+        && !data.has_prop_key(target_key)
     {
         return false;
     }
@@ -45,13 +57,11 @@ pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
     if let Some(sub) = &query.value_contains
         && !sub.is_empty()
     {
-        let in_args = el
-            .data
+        let in_args = data
             .args
             .as_ref()
             .is_some_and(|v| value_contains_str(v, sub));
-        let in_val = el
-            .data
+        let in_val = data
             .value
             .as_ref()
             .is_some_and(|v| value_contains_str(&v.as_data(), sub));
@@ -63,18 +73,13 @@ pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
     true
 }
 
-/// Counts matching elements in `doc` for `query`.
+/// Counts matching elements and declarations in `doc` for `query`.
 pub fn count_structural_matches(doc: &Document, query: &StructuralQuery) -> usize {
-    let mut count = 0;
-    for_each_element(doc, |el| {
-        if matches_query(el, query) {
-            count += 1;
-        }
-    });
-    count
+    find_structural_matches(doc, query).len()
 }
 
-/// Finds all matching element occurrences in `doc` for `query`.
+/// Finds all matching element and declaration occurrences in `doc` for
+/// `query`, in document order.
 pub fn find_structural_matches(doc: &Document, query: &StructuralQuery) -> Vec<StructuralMatch> {
     let mut matches = Vec::new();
     for_each_element(doc, |el| {
@@ -86,6 +91,17 @@ pub fn find_structural_matches(doc: &Document, query: &StructuralQuery) -> Vec<S
             });
         }
     });
+    for_each_declaration(doc, |declaration| {
+        if matches_declaration_query(declaration, query) {
+            matches.push(StructuralMatch {
+                span: declaration.span,
+                tag: classify_declaration_lenient(declaration)
+                    .as_str()
+                    .to_string(),
+            });
+        }
+    });
+    matches.sort_by_key(|m| m.span.start);
     matches
 }
 

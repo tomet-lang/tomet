@@ -1,6 +1,6 @@
 //! Element group order formatting according to `GroupOrder` settings.
 
-use tomet_ast::{Block, Connect, Element, Inline, List, Sigil};
+use tomet_ast::{Block, Connect, Data, Declaration, Element, Inline, List, Sigil};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_parser::parse_document;
 
@@ -117,6 +117,9 @@ fn collect_swaps_in_block(
         }
         Block::Element(el) => {
             collect_swaps_in_element(el, src, config, swaps, limit);
+        }
+        Block::Declaration(declaration) => {
+            collect_swaps_in_declaration(declaration, src, config, swaps, limit);
         }
         Block::Section(sec) => {
             for inline in &sec.title {
@@ -241,13 +244,50 @@ fn collect_swaps_in_connect(
     swaps: &mut Vec<SwapTarget>,
     limit: usize,
 ) {
-    for block in conn.content.iter().flatten() {
+    collect_swaps_in_held(
+        conn.content.as_deref(),
+        &conn.data,
+        src,
+        config,
+        swaps,
+        limit,
+    );
+}
+
+/// Neither does a declaration (`::name`) have a group order to swap; what it
+/// holds is searched.
+fn collect_swaps_in_declaration(
+    declaration: &Declaration,
+    src: &str,
+    config: &PrinterConfig,
+    swaps: &mut Vec<SwapTarget>,
+    limit: usize,
+) {
+    collect_swaps_in_held(
+        declaration.content.as_deref(),
+        &declaration.data,
+        src,
+        config,
+        swaps,
+        limit,
+    );
+}
+
+fn collect_swaps_in_held(
+    content: Option<&[Block]>,
+    data: &Data,
+    src: &str,
+    config: &PrinterConfig,
+    swaps: &mut Vec<SwapTarget>,
+    limit: usize,
+) {
+    for block in content.into_iter().flatten() {
         collect_swaps_in_block(block, src, config, swaps, limit);
         if swaps.len() >= limit {
             return;
         }
     }
-    if let Some(children) = conn.data.value.as_ref().map(|v| v.as_children()) {
+    if let Some(children) = data.value.as_ref().map(|v| v.as_children()) {
         for child in children {
             collect_swaps_in_element(child, src, config, swaps, limit);
             if swaps.len() >= limit {

@@ -2,8 +2,8 @@
 
 use std::ops::ControlFlow;
 use tomet_ast::{
-    Block, Connect, Data, Document, Element, Entry, Group, Inline, Interpolation, List, ListItem,
-    Value,
+    Block, Connect, Data, Declaration, Document, Element, Entry, Group, Inline, Interpolation,
+    List, ListItem, Value,
 };
 
 /// Called at every [`Element`] `walk_document` visits, in document order.
@@ -46,6 +46,7 @@ fn inlines_in_block(block: &Block, f: &mut dyn FnMut(&Inline)) {
     match block {
         Block::Paragraph(paragraph) => inlines_in(&paragraph.content, f),
         Block::Element(element) => inlines_in_element(element, f),
+        Block::Declaration(d) => inlines_in_groups(&d.data, d.content.as_deref(), f),
         Block::Section(section) => {
             inlines_in(&section.title, f);
             // `section.connects` is deliberately not walked here -- same
@@ -81,15 +82,19 @@ fn inlines_in(inlines: &[Inline], f: &mut dyn FnMut(&Inline)) {
 }
 
 fn inlines_in_element(element: &Element, f: &mut dyn FnMut(&Inline)) {
-    if let Some(args) = &element.data.args {
+    inlines_in_groups(&element.data, element.content.as_deref(), f);
+}
+
+/// `(args)`, `[content]` and `{value}`, in that order: what an element and a
+/// declaration have in common.
+fn inlines_in_groups(data: &Data, content: Option<&[Block]>, f: &mut dyn FnMut(&Inline)) {
+    if let Some(args) = &data.args {
         inlines_in_value(args, f);
     }
-    if let Some(content) = &element.content {
-        for block in content {
-            inlines_in_block(block, f);
-        }
+    for block in content.into_iter().flatten() {
+        inlines_in_block(block, f);
     }
-    if let Some(Group(entries)) = &element.data.value {
+    if let Some(Group(entries)) = &data.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => inlines_in_element(child, f),
@@ -126,29 +131,17 @@ pub fn for_each_element_in_block(block: &Block, mut f: impl FnMut(&Element)) {
     let _ = walk_block(block, &mut visitor);
 }
 
-/// Visits every element a reader would find by scanning only the top of
-/// the document, in document order.
-///
-/// Before `docs/spec/syntax.tmt`'s `##[ 区切り ]`, that was simply every
-/// `Block::Element` in `doc.blocks` -- a bare element with nothing
-/// adjacent to join always stood alone, so `::kind`/`::blueprint`/`::meta`/
-/// `::vocabulary`/... were always found this way, and more than one
-/// caller across the workspace grew its own copy of that same loop. Now
-/// one can join an adjacent paragraph instead (no blank line, no `;`
-/// separator) and come back as an `Inline::Element` inside a
-/// `Block::Paragraph`, a tree-shape choice that says nothing about
-/// whether it still opened its own line -- so this visits both: every
-/// `Block::Element`, and every `Inline::Element` sitting directly in a
-/// `Block::Paragraph`'s own content (not recursed into that element's
-/// *own* content/children -- something nested three levels deep inside
-/// unrelated prose was never a document-level declaration and still
-/// is not).
+/// Visits every element a reader would find by scanning only the top of the
+/// document, in document order: every `Block::Element`, and every
+/// `Inline::Element` sitting directly in a `Block::Paragraph`'s own content
+/// (an element joined into a paragraph by an explicit `\` continuation
+/// trigger is still at the top; something nested inside another element is
+/// not).
 ///
 /// This is the one place that decision lives. A caller that wants "the
-/// declarations at the top of this document" should call this instead of
-/// walking `doc.blocks` by hand -- that hand-rolled loop is exactly what
-/// stopped finding a joined `::blueprint`/`::vocabulary`/`::meta` the moment
-/// this rule shipped, in more than one crate at once.
+/// elements at the top of this document" should call this instead of walking
+/// `doc.blocks` by hand. Declarations are not elements: see
+/// [`for_each_top_level_declaration`].
 pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
     for block in &doc.blocks {
         match block {
@@ -160,72 +153,45 @@ pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
                     }
                 }
             }
-            Block::Section(_) => {}
-            Block::List(_) => {}
-            Block::Interp(_) => {}
+            Block::Section(_) | Block::List(_) | Block::Declaration(_) | Block::Interp(_) => {}
         }
     }
 }
 
-/// [`for_each_top_level_element`], mutably -- for a caller that rewrites a
-/// top-level declaration in place (`::blueprint(x)` becoming `::kind(x)`,
-/// say) without changing how many elements are there.
-pub fn for_each_top_level_element_mut(doc: &mut Document, mut f: impl FnMut(&mut Element)) {
-    for block in &mut doc.blocks {
-        match block {
-            Block::Element(el) => f(el),
-            Block::Paragraph(p) => {
-                for inline in &mut p.content {
-                    if let Inline::Element(el) = inline {
-                        f(el);
-                    }
-                }
-            }
-            Block::Section(_) => {}
-            Block::List(_) => {}
-            Block::Interp(_) => {}
-        }
-    }
-}
-
-/// [`for_each_top_level_element`], removing every one `keep` rejects --
-/// from `doc.blocks` directly for a `Block::Element`, or from a
-/// `Block::Paragraph`'s own content for an `Inline::Element` found there.
-/// A removal from inside a paragraph closes the gap it leaves the same
-/// way the normal parse path already would: the `SoftBreak` immediately
-/// before the removed item goes with it (so two joined items never end up
-/// separated by two adjacent `SoftBreak`s), and a `SoftBreak` left
-/// leading the paragraph (the removed item was first) is dropped too, the
-/// same trim [`parse_inline_seq`] already applies to a freshly parsed
-/// paragraph's edges.
+/// Visits every declaration at the top level of `doc`, in order.
 ///
-/// The paragraph itself is never dropped, even if this empties it --
-/// nothing downstream needs that (`render_block` already treats an
-/// all-whitespace paragraph as producing nothing), and deciding that here
-/// would be a second place holding a rule a printer already holds.
-pub fn retain_top_level_elements(doc: &mut Document, mut keep: impl FnMut(&Element) -> bool) {
-    doc.blocks.retain_mut(|block| match block {
-        Block::Element(el) => keep(el),
-        Block::Paragraph(p) => {
-            let mut kept: Vec<Inline> = Vec::with_capacity(p.content.len());
-            for inline in std::mem::take(&mut p.content) {
-                match &inline {
-                    Inline::Element(el) if !keep(el) => {
-                        if matches!(kept.last(), Some(Inline::SoftBreak(_))) {
-                            kept.pop();
-                        }
-                    }
-                    _ => kept.push(inline),
-                }
-            }
-            while matches!(kept.first(), Some(Inline::SoftBreak(_))) {
-                kept.remove(0);
-            }
-            p.content = kept;
-            true
+/// A declaration is always a [`Block`] of its own, so "the declarations at
+/// the top of this document" is `doc.blocks` and nothing else: one in a
+/// section's body or an element's content is misplaced, and the validator
+/// reports it (`OutsidePreamble`). A caller that wants the preamble should
+/// call this instead of walking `doc.blocks` by hand.
+pub fn for_each_top_level_declaration(doc: &Document, mut f: impl FnMut(&Declaration)) {
+    for block in &doc.blocks {
+        if let Block::Declaration(declaration) = block {
+            f(declaration);
         }
-        Block::Section(_) => true,
-        Block::List(_) | Block::Interp(_) => true,
+    }
+}
+
+/// [`for_each_top_level_declaration`], mutably -- for a caller that rewrites a
+/// top-level declaration in place (`::blueprint(x)` becoming `::kind(x)`,
+/// say) without changing how many there are.
+pub fn for_each_top_level_declaration_mut(doc: &mut Document, mut f: impl FnMut(&mut Declaration)) {
+    for block in &mut doc.blocks {
+        if let Block::Declaration(declaration) = block {
+            f(declaration);
+        }
+    }
+}
+
+/// [`for_each_top_level_declaration`], removing every one `keep` rejects.
+pub fn retain_top_level_declarations(
+    doc: &mut Document,
+    mut keep: impl FnMut(&Declaration) -> bool,
+) {
+    doc.blocks.retain(|block| match block {
+        Block::Declaration(declaration) => keep(declaration),
+        _ => true,
     });
 }
 
@@ -250,6 +216,9 @@ fn walk_block<B>(block: &Block, visitor: &mut impl Visitor<B>) -> ControlFlow<B>
     match block {
         Block::Paragraph(paragraph) => walk_inlines(&paragraph.content, visitor),
         Block::Element(element) => walk_element(element, visitor),
+        // A declaration is not an element, so the visitor does not see it, but
+        // the elements inside its groups are the document's like any other.
+        Block::Declaration(d) => walk_groups(&d.data, d.content.as_deref(), visitor),
         Block::Section(section) => {
             propagate!(walk_inlines(&section.title, visitor));
             // `section.connects` is deliberately not walked here -- same
@@ -293,15 +262,23 @@ fn walk_inlines<B>(inlines: &[Inline], visitor: &mut impl Visitor<B>) -> Control
 
 fn walk_element<B>(element: &Element, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
     propagate!(visitor.visit(element));
-    if let Some(args) = &element.data.args {
+    walk_groups(&element.data, element.content.as_deref(), visitor)
+}
+
+/// `(args)`, `[content]` and `{value}`, in that order: what an element and a
+/// declaration have in common.
+fn walk_groups<B>(
+    data: &Data,
+    content: Option<&[Block]>,
+    visitor: &mut impl Visitor<B>,
+) -> ControlFlow<B> {
+    if let Some(args) = &data.args {
         propagate!(walk_value(args, visitor));
     }
-    if let Some(content) = &element.content {
-        for block in content {
-            propagate!(walk_block(block, visitor));
-        }
+    for block in content.into_iter().flatten() {
+        propagate!(walk_block(block, visitor));
     }
-    if let Some(Group(entries)) = &element.data.value {
+    if let Some(Group(entries)) = &data.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => propagate!(walk_element(child, visitor)),
@@ -395,6 +372,7 @@ fn walk_block_mut<B>(block: &mut Block, visitor: &mut impl VisitorMut<B>) -> Con
     match block {
         Block::Paragraph(paragraph) => walk_inlines_mut(&mut paragraph.content, visitor),
         Block::Element(element) => walk_element_mut(element, visitor),
+        Block::Declaration(d) => walk_groups_mut(&mut d.data, d.content.as_deref_mut(), visitor),
         Block::Section(section) => {
             propagate!(walk_inlines_mut(&mut section.title, visitor));
             // See the immutable `walk_block`'s matching comment:
@@ -430,15 +408,22 @@ fn walk_inlines_mut<B>(inlines: &mut [Inline], visitor: &mut impl VisitorMut<B>)
 
 fn walk_element_mut<B>(element: &mut Element, visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
     propagate!(visitor.visit_mut(element));
-    if let Some(args) = &mut element.data.args {
+    walk_groups_mut(&mut element.data, element.content.as_deref_mut(), visitor)
+}
+
+/// Mutable counterpart of [`walk_groups`].
+fn walk_groups_mut<B>(
+    data: &mut Data,
+    content: Option<&mut [Block]>,
+    visitor: &mut impl VisitorMut<B>,
+) -> ControlFlow<B> {
+    if let Some(args) = &mut data.args {
         propagate!(walk_value_mut(args, visitor));
     }
-    if let Some(content) = &mut element.content {
-        for block in content {
-            propagate!(walk_block_mut(block, visitor));
-        }
+    for block in content.into_iter().flatten() {
+        propagate!(walk_block_mut(block, visitor));
     }
-    if let Some(Group(entries)) = &mut element.data.value {
+    if let Some(Group(entries)) = &mut data.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => propagate!(walk_element_mut(child, visitor)),
@@ -566,6 +551,7 @@ pub fn for_each_descendant_in_blocks(
                 }
                 Block::Section(_) => {}
                 Block::List(_) => {}
+                Block::Declaration(_) => {}
                 Block::Interp(_) => {}
             }
         }
@@ -631,6 +617,7 @@ fn lists_in_block(block: &Block, f: &mut dyn FnMut(&List)) {
     match block {
         Block::Paragraph(_) => {}
         Block::Element(el) => lists_in_element(el, f),
+        Block::Declaration(d) => lists_in_groups(&d.data, d.content.as_deref(), f),
         Block::Section(sec) => {
             for b in &sec.blocks {
                 lists_in_block(b, f);
@@ -653,19 +640,21 @@ fn lists_in_list(list: &List, f: &mut dyn FnMut(&List)) {
 }
 
 fn lists_in_element(el: &Element, f: &mut dyn FnMut(&List)) {
-    if let Some(content) = &el.content {
-        for b in content {
-            lists_in_block(b, f);
-        }
+    lists_in_groups(&el.data, el.content.as_deref(), f);
+    // el.connects deliberately not visited, same invariant.
+}
+
+fn lists_in_groups(data: &Data, content: Option<&[Block]>, f: &mut dyn FnMut(&List)) {
+    for b in content.into_iter().flatten() {
+        lists_in_block(b, f);
     }
-    if let Some(Group(entries)) = &el.data.value {
+    if let Some(Group(entries)) = &data.value {
         for entry in entries {
             if let Entry::Element(child) = entry {
                 lists_in_element(child, f);
             }
         }
     }
-    // el.connects deliberately not visited, same invariant.
 }
 
 /// Visits every [`tomet_ast::Section`] in `doc`, in document order,
@@ -703,113 +692,146 @@ where
     count
 }
 
-/// Visits every [`Interpolation`] in `doc`, in document order, wherever it sits.
+/// What [`for_each_node`] hands over: a thing in the tree that is not an
+/// element, together with the position it was found at.
+#[derive(Debug, Clone, Copy)]
+pub enum Node<'a> {
+    Block(&'a Block),
+    Inline(&'a Inline),
+    Value(&'a Value),
+}
+
+/// Visits every [`Block`], [`Inline`] and [`Value`] in `doc`, in document
+/// order, wherever it sits, each before what it holds.
 ///
 /// Unlike [`walk_document`] and the walkers written beside it, this one has no
-/// position it skips: it reaches an interpolation in running text and in a
-/// section title, standing as a block, in an element's, a section's and a
-/// list item's `(args)` / `{value}` / `[content]`, in a list's, a section's
-/// and an element's `:connect`s, and inside a [`Value`] (`Seq`, `Map`, `Call`,
-/// a nested element, `[...]` blocks). An interpolation is not an [`Element`],
-/// so the element walkers never pass one to their visitor; this is the walker
-/// to ask for "every `${...}` in the document".
-pub fn for_each_interpolation(doc: &Document, mut f: impl FnMut(&Interpolation)) {
+/// position it skips: it reaches running text and section titles, blocks
+/// standing alone, an element's, a section's, a declaration's and a list
+/// item's `(args)` / `{value}` / `[content]`, every `:connect`, and inside a
+/// [`Value`] (`Seq`, `Map`, `Call`, a nested element, `[...]` blocks). It is
+/// what the walkers for things that are not elements are written on:
+/// [`for_each_interpolation`] and [`for_each_declaration`].
+pub fn for_each_node(doc: &Document, mut f: impl FnMut(Node<'_>)) {
     for block in &doc.blocks {
-        interpolations_in_block(block, &mut f);
+        nodes_in_block(block, &mut f);
     }
 }
 
-fn interpolations_in_block(block: &Block, f: &mut dyn FnMut(&Interpolation)) {
+/// Visits every [`Interpolation`] in `doc`, in document order, wherever it sits.
+///
+/// An interpolation is not an [`Element`], so the element walkers never pass
+/// one to their visitor; this is the walker to ask for "every `${...}` in the
+/// document".
+pub fn for_each_interpolation(doc: &Document, mut f: impl FnMut(&Interpolation)) {
+    for_each_node(doc, |node| match node {
+        Node::Block(Block::Interp(i))
+        | Node::Inline(Inline::Interp(i))
+        | Node::Value(Value::Interp(i)) => f(i),
+        _ => {}
+    });
+}
+
+/// Visits every [`Declaration`] in `doc`, in document order, wherever it sits:
+/// a declaration is a [`Block`], and a block can be in a section's body or an
+/// element's content as well as at the top, where only it belongs.
+/// [`for_each_top_level_declaration`] is the preamble.
+pub fn for_each_declaration(doc: &Document, mut f: impl FnMut(&Declaration)) {
+    for_each_node(doc, |node| {
+        if let Node::Block(Block::Declaration(declaration)) = node {
+            f(declaration);
+        }
+    });
+}
+
+fn nodes_in_block(block: &Block, f: &mut dyn FnMut(Node<'_>)) {
+    f(Node::Block(block));
     match block {
-        Block::Paragraph(paragraph) => interpolations_in_inlines(&paragraph.content, f),
-        Block::Element(element) => interpolations_in_element(element, f),
+        Block::Paragraph(paragraph) => nodes_in_inlines(&paragraph.content, f),
+        Block::Element(element) => nodes_in_element(element, f),
+        Block::Declaration(d) => {
+            nodes_in_data(&d.data, f);
+            nodes_in_content(d.content.as_deref(), f);
+        }
         Block::Section(section) => {
-            interpolations_in_inlines(&section.title, f);
-            interpolations_in_data(&section.data, f);
+            nodes_in_inlines(&section.title, f);
+            nodes_in_data(&section.data, f);
             for connect in &section.connects {
-                interpolations_in_connect(connect, f);
+                nodes_in_connect(connect, f);
             }
             for child in &section.blocks {
-                interpolations_in_block(child, f);
+                nodes_in_block(child, f);
             }
         }
-        Block::List(list) => interpolations_in_list(list, f),
-        Block::Interp(interpolation) => f(interpolation),
+        Block::List(list) => nodes_in_list(list, f),
+        Block::Interp(_) => {}
     }
 }
 
-fn interpolations_in_list(list: &List, f: &mut dyn FnMut(&Interpolation)) {
+fn nodes_in_list(list: &List, f: &mut dyn FnMut(Node<'_>)) {
     for connect in &list.connects {
-        interpolations_in_connect(connect, f);
+        nodes_in_connect(connect, f);
     }
     for item in &list.items {
-        interpolations_in_element(&item.element, f);
+        nodes_in_element(&item.element, f);
         if let Some(sublist) = &item.sublist {
-            interpolations_in_list(sublist, f);
+            nodes_in_list(sublist, f);
         }
     }
 }
 
-fn interpolations_in_inlines(inlines: &[Inline], f: &mut dyn FnMut(&Interpolation)) {
+fn nodes_in_inlines(inlines: &[Inline], f: &mut dyn FnMut(Node<'_>)) {
     for inline in inlines {
-        match inline {
-            Inline::Interp(interpolation) => f(interpolation),
-            Inline::Element(element) => interpolations_in_element(element, f),
-            Inline::Text(_) | Inline::SoftBreak(_) | Inline::LineBreak(_) | Inline::Raw(_) => {}
+        f(Node::Inline(inline));
+        if let Inline::Element(element) = inline {
+            nodes_in_element(element, f);
         }
     }
 }
 
-fn interpolations_in_element(element: &Element, f: &mut dyn FnMut(&Interpolation)) {
-    interpolations_in_data(&element.data, f);
-    interpolations_in_content(element.content.as_deref(), f);
+fn nodes_in_element(element: &Element, f: &mut dyn FnMut(Node<'_>)) {
+    nodes_in_data(&element.data, f);
+    nodes_in_content(element.content.as_deref(), f);
     for connect in &element.connects {
-        interpolations_in_connect(connect, f);
+        nodes_in_connect(connect, f);
     }
 }
 
-fn interpolations_in_connect(connect: &Connect, f: &mut dyn FnMut(&Interpolation)) {
-    interpolations_in_data(&connect.data, f);
-    interpolations_in_content(connect.content.as_deref(), f);
+fn nodes_in_connect(connect: &Connect, f: &mut dyn FnMut(Node<'_>)) {
+    nodes_in_data(&connect.data, f);
+    nodes_in_content(connect.content.as_deref(), f);
 }
 
-fn interpolations_in_content(content: Option<&[Block]>, f: &mut dyn FnMut(&Interpolation)) {
+fn nodes_in_content(content: Option<&[Block]>, f: &mut dyn FnMut(Node<'_>)) {
     for block in content.into_iter().flatten() {
-        interpolations_in_block(block, f);
+        nodes_in_block(block, f);
     }
 }
 
 /// `(args)` and `{value}`: the part every node that carries data shares.
-fn interpolations_in_data(data: &Data, f: &mut dyn FnMut(&Interpolation)) {
+fn nodes_in_data(data: &Data, f: &mut dyn FnMut(Node<'_>)) {
     if let Some(args) = &data.args {
-        interpolations_in_value(args, f);
+        nodes_in_value(args, f);
     }
-    if let Some(value) = &data.value {
-        interpolations_in_element_value(value, f);
-    }
-}
-
-fn interpolations_in_element_value(value: &Group, f: &mut dyn FnMut(&Interpolation)) {
-    let Group(entries) = value;
-    for entry in entries {
-        match entry {
-            Entry::Pair(_, value) => interpolations_in_value(value, f),
-            Entry::Element(element) => interpolations_in_element(element, f),
+    if let Some(Group(entries)) = &data.value {
+        for entry in entries {
+            match entry {
+                Entry::Pair(_, value) => nodes_in_value(value, f),
+                Entry::Element(element) => nodes_in_element(element, f),
+            }
         }
     }
 }
 
-fn interpolations_in_value(value: &Value, f: &mut dyn FnMut(&Interpolation)) {
+fn nodes_in_value(value: &Value, f: &mut dyn FnMut(Node<'_>)) {
+    f(Node::Value(value));
     match value {
-        Value::Interp(interpolation) => f(interpolation),
-        Value::Element(element) => interpolations_in_element(element, f),
-        Value::Seq(items) => items.iter().for_each(|v| interpolations_in_value(v, f)),
-        Value::Map(entries) => entries
-            .iter()
-            .for_each(|(_, v)| interpolations_in_value(v, f)),
-        Value::Call(_, args) => args.iter().for_each(|v| interpolations_in_value(v, f)),
-        Value::Blocks(blocks) => blocks.iter().for_each(|b| interpolations_in_block(b, f)),
-        Value::Null
+        Value::Element(element) => nodes_in_element(element, f),
+        Value::Seq(items) => items.iter().for_each(|v| nodes_in_value(v, f)),
+        Value::Map(entries) => entries.iter().for_each(|(_, v)| nodes_in_value(v, f)),
+        Value::Call(_, args) => args.iter().for_each(|v| nodes_in_value(v, f)),
+        Value::Blocks(blocks) => blocks.iter().for_each(|b| nodes_in_block(b, f)),
+        Value::Interp(_)
+        | Value::Null
         | Value::Bool(_)
         | Value::Int(_)
         | Value::Float(_)

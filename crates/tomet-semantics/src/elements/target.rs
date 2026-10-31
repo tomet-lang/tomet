@@ -240,11 +240,8 @@ mod tests {
 
     #[test]
     fn non_link_kind_has_no_target() {
-        let el = map_el(Sigil::document("meta"), vec![("key", s("val"))]);
-        assert_eq!(
-            crate::classify_std_lenient(&el),
-            ElementKind::Declaration(tomet_declaration::DeclKind::Meta)
-        );
+        let el = map_el(Sigil::named("em"), vec![("key", s("val"))]);
+        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Em);
         assert_eq!(link_target_of(&el), None);
     }
 }

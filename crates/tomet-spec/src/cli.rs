@@ -3,7 +3,7 @@
 use clap::{Arg, Command};
 use tomet_ast::{Block, Document, Element, Placement, Section, Sigil, Value};
 use tomet_config::PrinterConfig;
-use tomet_tree::{ElementExt, element_new};
+use tomet_tree::{ElementExt, declaration_new, element_new};
 
 use crate::util::{code, code_block, dummy, inlines, list, paragraph, paragraphs, text};
 
@@ -17,10 +17,10 @@ pub fn render(root: &mut Command, doc_id: &str, notice: &str, config: &PrinterCo
 
 /// Builds a Tomet [`Document`] AST representing the CLI command hierarchy and options.
 pub fn document(root: &mut Command, doc_id: &str, notice: &str) -> Document {
-    let mut id = element_new(Sigil::document("id")).with_placement(Placement::Block);
+    let mut id = declaration_new("id");
     id.data.args = Some(Value::String(doc_id.to_string()));
 
-    let mut blocks = vec![Block::Element(id)];
+    let mut blocks = vec![Block::Declaration(id)];
     push_command(root, 1, &mut blocks);
     if !notice.is_empty() {
         let insert_idx = blocks.len().min(2);

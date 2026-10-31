@@ -6,7 +6,7 @@
 use crate::dialect::Dialect;
 use crate::element::{
     LineEnd, consume_trailing_continuation, element_ends_line, is_document_element_start,
-    is_element_start, leading_continuation, parse_element_with_pipe_stack,
+    is_element_start, leading_continuation, parse_declaration, parse_element_with_pipe_stack,
 };
 use crate::error::Result;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_soft_break};
@@ -223,8 +223,7 @@ pub(crate) fn parse_block_seq(
         // running text either: `::kind(a, ` is a broken declaration, not a
         // paragraph that happens to start with two colons.
         if is_document_element_start(&cur) {
-            let el = parse_element_with_pipe_stack(dialect, &mut cur, true, pipe_stack)?
-                .with_placement(Placement::Block);
+            let declaration = parse_declaration(dialect, &mut cur, pipe_stack)?;
             let mut rest = cur;
             skip_inline_ws(&mut rest);
             if !matches!(rest.peek(), None | Some('\n') | Some('\r'))
@@ -237,7 +236,7 @@ pub(crate) fn parse_block_seq(
                 ));
             }
             consume_bare_line_end(&mut cur);
-            push_block(&mut doc_blocks, &mut stack, Block::Element(el));
+            push_block(&mut doc_blocks, &mut stack, Block::Declaration(declaration));
             continue;
         }
         // Join/isolate rule (`docs/spec/syntax.tmt`'s `##[ 継続 ]`): a bare

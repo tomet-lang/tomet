@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use tomet_ast::{Document, Value};
 use tomet_semantics::{ElementKind, classify_std_lenient};
-use tomet_tree::{ElementExt, transform_elements};
+use tomet_tree::{DataExt, transform_elements};
 
 /// A compiled macro matcher for reverse URL-to-macro rewriting.
 #[derive(Debug, Clone)]
@@ -147,11 +147,12 @@ pub fn transform_link_targets_with_macros(doc: &mut Document, macro_set: &MacroS
         |el| {
             let mut changed = false;
 
-            if let Some(target_val) = el.get_attr("target") {
+            if let Some(target_val) = el.data.get_attr("target") {
                 if let Value::String(url) = target_val
                     && let Some(macro_call) = macro_set.rewrite_url(url)
                 {
-                    el.transform_prop("target", |_| Value::String(macro_call));
+                    el.data
+                        .transform_prop("target", |_| Value::String(macro_call));
                     changed = true;
                 }
             } else if let Some(Value::String(url)) = &el.data.args

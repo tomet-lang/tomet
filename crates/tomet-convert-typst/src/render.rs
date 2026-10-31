@@ -73,6 +73,8 @@ fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
             out.push_str(&render_interp(interp));
             out.push_str("\n\n");
         }
+        // What a document says about itself has no rendering.
+        Block::Declaration(_) => {}
     }
 }
 
@@ -686,7 +688,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
                     }
                 }
             }
-            Block::Interp(_) => {}
+            Block::Interp(_) | Block::Declaration(_) => {}
         }
     }
     s

@@ -1,21 +1,21 @@
 //! Applies `tomet_config::PrinterConfig`'s style rules (meta format,
 //! link-key spacing (`target`, `@link`/`<embed>`'s one shared key), per-field
 //! `::meta` formatting) to a single
-//! `tomet_ast::Value` or `Element`, returning `.tmt`-syntax text.
+//! `tomet_ast::Value`, `Element` or `Declaration`, returning `.tmt`-syntax text.
 //! Deliberately scoped to single nodes -- no `Document`, no tree
 //! position, no recursion into sibling/child elements of other kinds --
 //! so both `tomet-printer` (rebuilds a whole `Document`) and
 //! `tomet-formatter` (patches specific spans of existing `.tmt` text)
 //! can depend on this without a circular dependency (`tomet-printer`
-//! already depends on `tomet-formatter`). `render_meta_element`
-//! specifically covers only `::meta` elements' actual shape per the
+//! already depends on `tomet-formatter`). `render_meta_declaration`
+//! specifically covers only `::meta` declarations' actual shape per the
 //! grammar (`args` an optional format map, `value` always
 //! `Group::from_map(Value::Map(...))`) -- not the general
 //! element-rendering logic for every other sigil/kind, which stays in
 //! `tomet-printer` since it recurses into inline/child content and
 //! is genuinely part of rebuilding a whole document from its AST.
 
-use tomet_ast::{Block, Element, Entry, Group, Inline, Value};
+use tomet_ast::{Block, Declaration, Entry, Group, Inline, Value};
 
 /// Renders one `Block` of a value-embedded element's `[content]` (now
 /// `Vec<Block>`) the way the old inline-only loop rendered an `Inline` --
@@ -325,22 +325,17 @@ fn render_meta_field_value(
     }
 }
 
-/// Renders an `::meta(...){...}` element per `config`'s meta format
+/// Renders a `::meta(...){...}` declaration per `config`'s meta format
 /// settings (multi-line, one field per line with per-field formatting
 /// rules, if `config.meta.always_newline`; else a single `::meta{k: v, ...}`
 /// line). Scoped to `::meta`'s actual shape -- `value` must be
 /// `Group::from_map(Value::Map(...))`, which is all the grammar ever
 /// produces for `::meta`; anything else renders as a bare `::meta` (with
 /// args, if any).
-pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
-    // the spelling it was written with: `::meta` or `::meta`
-    let head = if el.sigil.is_document() {
-        "::meta"
-    } else {
-        "::meta"
-    };
+pub fn render_meta_declaration(declaration: &Declaration, config: &PrinterConfig) -> String {
+    let head = "::meta";
     if config.meta.always_newline
-        && let Some(Value::Map(entries)) = tomet_semantics::data::element_data(el)
+        && let Some(Value::Map(entries)) = tomet_semantics::data::declaration_data(declaration)
     {
         let mut out = format!("{head}{{\n");
         for (k, v) in &entries {
@@ -361,12 +356,12 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
     }
 
     let mut out = String::from(head);
-    if let Some(args) = &el.data.args {
+    if let Some(args) = &declaration.data.args {
         out.push('(');
         out.push_str(&render_args_with_config(args, config));
         out.push(')');
     }
-    if let Some(v) = tomet_semantics::data::element_data(el) {
+    if let Some(v) = tomet_semantics::data::declaration_data(declaration) {
         out.push('{');
         out.push_str(&render_value_inner_with_config(&v, config));
         out.push('}');
@@ -377,7 +372,7 @@ pub fn render_meta_element(el: &Element, config: &PrinterConfig) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Group, Sigil};
+    use tomet_ast::Group;
 
     fn map(entries: &[(&str, Value)]) -> Value {
         Value::Map(
@@ -468,38 +463,41 @@ mod tests {
     }
 
     #[test]
-    fn render_meta_element_single_line_by_default() {
-        let mut el = tomet_tree::element_new(Sigil::document("meta"));
+    fn render_meta_declaration_single_line_by_default() {
+        let mut el = tomet_tree::declaration_new("meta");
         el.data.value = Some(Group::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )])));
         let cfg = PrinterConfig::default();
-        assert_eq!(render_meta_element(&el, &cfg), "::meta{id: doc-12345678}");
+        assert_eq!(
+            render_meta_declaration(&el, &cfg),
+            "::meta{id: doc-12345678}"
+        );
     }
 
     #[test]
-    fn render_meta_element_keeps_the_double_colon_it_was_written_with() {
-        let mut el = tomet_tree::element_new(Sigil::document("meta"));
+    fn render_meta_declaration_multiline_with_a_config_that_asks_for_it() {
+        let mut el = tomet_tree::declaration_new("meta");
         el.data.value = Some(Group::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )])));
         assert_eq!(
-            render_meta_element(&el, &PrinterConfig::default()),
+            render_meta_declaration(&el, &PrinterConfig::default()),
             "::meta{id: doc-12345678}"
         );
         let mut cfg = PrinterConfig::default();
         cfg.meta.always_newline = true;
         assert_eq!(
-            render_meta_element(&el, &cfg),
+            render_meta_declaration(&el, &cfg),
             "::meta{\n  id: doc-12345678\n}"
         );
     }
 
     #[test]
-    fn render_meta_element_multiline_when_always_newline_configured() {
-        let mut el = tomet_tree::element_new(Sigil::document("meta"));
+    fn render_meta_declaration_multiline_when_always_newline_configured() {
+        let mut el = tomet_tree::declaration_new("meta");
         el.data.value = Some(Group::from_map(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
@@ -512,14 +510,14 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            render_meta_element(&el, &cfg),
+            render_meta_declaration(&el, &cfg),
             "::meta{\n  id: doc-12345678\n}"
         );
     }
 
     #[test]
-    fn render_meta_element_quotes_keys_that_are_not_identifiers() {
-        let mut el = tomet_tree::element_new(Sigil::document("meta"));
+    fn render_meta_declaration_quotes_keys_that_are_not_identifiers() {
+        let mut el = tomet_tree::declaration_new("meta");
         el.data.value = Some(Group::from_map(Value::Map(vec![
             ("plain.key".to_string(), Value::Int(1)),
             ("tmtroot/a b.tmt".to_string(), Value::Int(2)),
@@ -532,7 +530,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            render_meta_element(&el, &cfg),
+            render_meta_declaration(&el, &cfg),
             "::meta{\n  plain.key: 1\n  \"tmtroot/a b.tmt\": 2\n}"
         );
     }
