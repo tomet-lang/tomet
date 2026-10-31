@@ -319,9 +319,7 @@ mod tests {
                     Block::Paragraph(p) => inlines(out, &p.content),
                     Block::List(list) => {
                         for item in &list.items {
-                            if let Some(content) = &item.element.content {
-                                blocks(out, content);
-                            }
+                            blocks(out, &item.content);
                         }
                     }
                     _ => {}

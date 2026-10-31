@@ -8,7 +8,10 @@ use tomet_semantics::{
     ElementKind, classify_declaration_lenient, classify_std_lenient, heading_level,
     normalized_declaration_args, normalized_element_args,
 };
-use tomet_tree::{ValueExt, Visitor, for_each_declaration, for_each_interpolation, walk_document};
+use tomet_tree::{
+    ValueExt, Visitor, for_each_declaration, for_each_interpolation, for_each_list_item,
+    walk_document,
+};
 
 use crate::format::resolve_effective_config;
 use crate::position::{TextPositions, span_contains};
@@ -47,6 +50,20 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
         pos: Position,
         offset: usize,
         best_match: Option<Hover>,
+        /// The width of the span `best_match` is for: the narrowest wins.
+        best_width: usize,
+    }
+
+    impl HoverFinder<'_> {
+        /// Keeps `hover` if it is for a span no wider than the best so far, so the
+        /// innermost thing under the cursor wins whatever order they are found in.
+        fn offer(&mut self, hover: Hover, span: &Span) {
+            let width = span.end.saturating_sub(span.start);
+            if width <= self.best_width {
+                self.best_width = width;
+                self.best_match = Some(hover);
+            }
+        }
     }
 
     impl<'a> Visitor<()> for HoverFinder<'a> {
@@ -58,17 +75,6 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                     table_hover(self.positions, self.text, self.pos, el)
                 } else if let Some(h) = macro_hover(self.positions, self.doc, self.evaluate, el) {
                     Some(h)
-                } else if kind == ElementKind::Bare {
-                    Some(Hover {
-                        contents: HoverContents::Markup(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value: format!(
-                                "**List Item** (marker: `{}`)",
-                                list_item_marker_text(el)
-                            ),
-                        }),
-                        range: Some(self.positions.range(&span)),
-                    })
                 } else if kind == ElementKind::Heading {
                     Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
@@ -92,7 +98,7 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                     })
                 };
                 if let Some(h) = hover {
-                    self.best_match = Some(h);
+                    self.offer(h, &span);
                 }
             }
             ControlFlow::Continue(())
@@ -107,7 +113,23 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
         pos,
         offset,
         best_match: None,
+        best_width: usize::MAX,
     };
+    // A list item is not an element, so the walk below never meets it.
+    for_each_list_item(&doc, |item| {
+        if span_contains(&item.span, offset) && item.name.is_none() {
+            finder.offer(
+                Hover {
+                    contents: HoverContents::Markup(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: format!("**List Item** (marker: `{}`)", list_item_marker_text(item)),
+                    }),
+                    range: Some(positions.range(&item.span)),
+                },
+                &item.span,
+            );
+        }
+    });
     let _ = walk_document(&doc, &mut finder);
 
     // An interpolation is not an element, so the walk above never meets it.

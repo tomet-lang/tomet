@@ -36,10 +36,8 @@ fn post_process_block_wikilinks(block: &mut Block) {
 
 fn post_process_list_wikilinks(list: &mut List) {
     for item in &mut list.items {
-        if let Some(content) = &mut item.element.content {
-            for block in content.iter_mut() {
-                post_process_block_wikilinks(block);
-            }
+        for block in item.content.iter_mut() {
+            post_process_block_wikilinks(block);
         }
         if let Some(sub) = &mut item.sublist {
             post_process_list_wikilinks(sub);

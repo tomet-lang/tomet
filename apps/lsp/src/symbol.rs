@@ -1,5 +1,7 @@
 use lsp_types::{DocumentSymbol, SymbolKind};
-use tomet_ast::{Block, Connect, Declaration, Element, Inline, Interpolation, List, Sigil};
+use tomet_ast::{
+    Block, Connect, Declaration, Element, Inline, Interpolation, List, ListItem, Sigil,
+};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 use crate::position::TextPositions;
@@ -74,10 +76,45 @@ fn collect_list_symbol(
     symbols: &mut Vec<DocumentSymbol>,
 ) {
     for item in &list.items {
-        collect_element_symbol(positions, &item.element, symbols);
+        collect_item_symbol(positions, item, symbols);
         if let Some(sub) = &item.sublist {
             collect_list_symbol(positions, sub, symbols);
         }
+    }
+}
+
+/// A list item: the element it is when it is written `-@name`, otherwise a
+/// symbol of its own, named by its marker and its text.
+fn collect_item_symbol(
+    positions: &TextPositions<'_>,
+    item: &ListItem,
+    symbols: &mut Vec<DocumentSymbol>,
+) {
+    if let Some(element) = item.named_element() {
+        collect_element_symbol(positions, &element, symbols);
+        return;
+    }
+    let range = positions.range(&item.span);
+    #[allow(deprecated)]
+    symbols.push(DocumentSymbol {
+        name: format!(
+            "{} {}",
+            list_item_marker_text(item),
+            extract_blocks_text(&item.content)
+        ),
+        detail: None,
+        kind: SymbolKind::ENUM_MEMBER,
+        tags: None,
+        deprecated: None,
+        range,
+        selection_range: range,
+        children: None,
+    });
+    for block in &item.content {
+        collect_block_symbols(positions, block, symbols);
+    }
+    for conn in &item.connects {
+        collect_connect_symbol(positions, conn, symbols);
     }
 }
 
@@ -97,20 +134,6 @@ fn collect_element_symbol(
             name,
             detail: Some(format!("Heading Level {level}")),
             kind: SymbolKind::STRING,
-            tags: None,
-            deprecated: None,
-            range,
-            selection_range: range,
-            children: None,
-        }
-    } else if kind == ElementKind::Bare {
-        let text = extract_blocks_text(el.content.as_deref().unwrap_or(&[]));
-        let marker = list_item_marker_text(el);
-        #[allow(deprecated)]
-        DocumentSymbol {
-            name: format!("{} {}", marker, text),
-            detail: None,
-            kind: SymbolKind::ENUM_MEMBER,
             tags: None,
             deprecated: None,
             range,
@@ -218,7 +241,7 @@ fn collect_inline_symbols(
     }
 }
 
-pub(crate) fn list_item_marker_text(item: &Element) -> String {
+pub(crate) fn list_item_marker_text(item: &ListItem) -> String {
     if let Some(marker) = &item.data.args {
         return format!("({marker:?})");
     }
@@ -239,9 +262,7 @@ pub(crate) fn extract_blocks_text(blocks: &[Block]) -> String {
             Block::Section(sec) => out.push_str(&extract_inlines_text(&sec.title)),
             Block::List(list) => {
                 for item in &list.items {
-                    if let Some(content) = &item.element.content {
-                        out.push_str(&extract_blocks_text(content));
-                    }
+                    out.push_str(&extract_blocks_text(&item.content));
                 }
             }
             Block::Interp(_) => out.push_str("${...}"),

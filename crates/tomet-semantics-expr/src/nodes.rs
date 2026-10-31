@@ -1,6 +1,8 @@
 //! Documents, directories and the nodes inside documents.
 
-use tomet_ast::{Block, Connect, Data, Document, Element, Entry, Group, Inline, List, Value};
+use tomet_ast::{
+    Block, Connect, Data, Document, Element, Entry, Group, Inline, List, ListItem, Value,
+};
 
 use super::args::Args;
 use super::context::EvalContext;
@@ -102,10 +104,18 @@ fn in_list(list: &List, id: &str) -> Option<Node> {
         .find_map(|conn| in_connect(conn, id))
         .or_else(|| {
             list.items.iter().find_map(|item| {
-                in_element(&item.element, id)
-                    .or_else(|| item.sublist.as_ref().and_then(|sub| in_list(sub, id)))
+                in_item(item, id).or_else(|| item.sublist.as_ref().and_then(|sub| in_list(sub, id)))
             })
         })
+}
+
+fn in_item(item: &ListItem, id: &str) -> Option<Node> {
+    if item.id.as_ref().is_some_and(|i| i.0 == id) {
+        return Some(Node::Item(Box::new(item.clone())));
+    }
+    in_content(Some(&item.content), id)
+        .or_else(|| item.connects.iter().find_map(|conn| in_connect(conn, id)))
+        .or_else(|| in_data(&item.data, id))
 }
 
 fn in_element(el: &Element, id: &str) -> Option<Node> {
@@ -227,6 +237,7 @@ fn child_blocks(node: &Node) -> Vec<Block> {
         Node::Element(el) => el.content.clone().unwrap_or_default(),
         Node::Connect(conn) => conn.content.clone().unwrap_or_default(),
         Node::Declaration(d) => d.content.clone().unwrap_or_default(),
+        Node::Item(item) => item.content.clone(),
         Node::Section(sec) => sec.blocks.clone(),
         Node::List(list) => vec![Block::List((**list).clone())],
     }
@@ -237,18 +248,20 @@ fn child_blocks(node: &Node) -> Vec<Block> {
 /// like any other (its `#(id)` is found by `#id` as well).
 fn children(doc: &DocRef, node: &Node) -> Vec<EvalValue> {
     match node {
-        Node::Element(_) | Node::Connect(_) | Node::Declaration(_) | Node::Section(_) => {
-            child_blocks(node)
-                .iter()
-                .map(|b| block_value(doc, b))
-                .collect()
-        }
+        Node::Element(_)
+        | Node::Connect(_)
+        | Node::Declaration(_)
+        | Node::Item(_)
+        | Node::Section(_) => child_blocks(node)
+            .iter()
+            .map(|b| block_value(doc, b))
+            .collect(),
         Node::List(list) => list
             .items
             .iter()
             .map(|item| EvalValue::Node {
                 doc: doc.clone(),
-                node: Box::new(Node::Element(Box::new(item.element.clone()))),
+                node: Box::new(Node::Item(Box::new(item.clone()))),
             })
             .collect(),
     }
@@ -261,6 +274,7 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
             Node::Section(sec) => prop(doc, &sec.data.args, &sec.data.value),
             Node::Connect(conn) => prop(doc, &conn.data.args, &conn.data.value),
             Node::Declaration(d) => prop(doc, &d.data.args, &d.data.value),
+            Node::Item(item) => prop(doc, &item.data.args, &item.data.value),
             // A list has neither arguments nor a value group.
             Node::List(_) => prop(doc, &None, &None),
         }),
@@ -272,6 +286,11 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
             Node::Element(el) => el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
             Node::Connect(conn) => conn.name.to_string(),
             Node::Declaration(d) => d.name.to_string(),
+            Node::Item(item) => item
+                .name
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_default(),
             Node::Section(_) => "section".to_string(),
             Node::List(_) => "list".to_string(),
         })),
@@ -281,6 +300,7 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
                 Node::Element(el) => &el.connects,
                 Node::Section(sec) => &sec.connects,
                 Node::List(list) => &list.connects,
+                Node::Item(item) => &item.connects,
                 Node::Connect(_) | Node::Declaration(_) => &[],
             };
             Ok(EvalValue::Seq(

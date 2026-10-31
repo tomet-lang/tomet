@@ -1,6 +1,6 @@
 //! Element group order formatting according to `GroupOrder` settings.
 
-use tomet_ast::{Block, Connect, Data, Declaration, Element, Inline, List, Sigil};
+use tomet_ast::{Block, Connect, Data, Declaration, Element, Entry, Group, Inline, List, Sigil};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_parser::parse_document;
 
@@ -154,7 +154,12 @@ fn collect_swaps_in_list(
     limit: usize,
 ) {
     for item in &list.items {
-        collect_swaps_in_element(&item.element, src, config, swaps, limit);
+        match item.named_element() {
+            Some(element) => collect_swaps_in_element(&element, src, config, swaps, limit),
+            None => {
+                collect_swaps_in_held(Some(&item.content), &item.data, src, config, swaps, limit)
+            }
+        }
         if swaps.len() >= limit {
             return;
         }
@@ -211,21 +216,9 @@ fn collect_swaps_in_element(
     }
 
     // 2. Otherwise recursively check children
-    if let Some(blocks) = &el.content {
-        for block in blocks {
-            collect_swaps_in_block(block, src, config, swaps, limit);
-            if swaps.len() >= limit {
-                return;
-            }
-        }
-    }
-    if let Some(children) = el.data.value.as_ref().map(|v| v.as_children()) {
-        for child in children {
-            collect_swaps_in_element(child, src, config, swaps, limit);
-            if swaps.len() >= limit {
-                return;
-            }
-        }
+    collect_swaps_in_held(el.content.as_deref(), &el.data, src, config, swaps, limit);
+    if swaps.len() >= limit {
+        return;
     }
     for conn in &el.connects {
         collect_swaps_in_connect(conn, src, config, swaps, limit);
@@ -287,12 +280,25 @@ fn collect_swaps_in_held(
             return;
         }
     }
-    if let Some(children) = data.value.as_ref().map(|v| v.as_children()) {
-        for child in children {
-            collect_swaps_in_element(child, src, config, swaps, limit);
-            if swaps.len() >= limit {
-                return;
-            }
+    let Some(Group(entries)) = &data.value else {
+        return;
+    };
+    for entry in entries {
+        match entry {
+            Entry::Element(child) => collect_swaps_in_element(child, src, config, swaps, limit),
+            // A bare entry holds what an element does, and is no element.
+            Entry::Bare(bare) => collect_swaps_in_held(
+                bare.content.as_deref(),
+                &bare.data,
+                src,
+                config,
+                swaps,
+                limit,
+            ),
+            Entry::Pair(..) | Entry::Hole(_) => {}
+        }
+        if swaps.len() >= limit {
+            return;
         }
     }
 }

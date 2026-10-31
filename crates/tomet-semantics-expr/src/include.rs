@@ -180,6 +180,14 @@ fn select(
                 "a document or an element with an id",
                 "a declaration",
             )),
+            Node::Item(item) => {
+                if heading.is_some() {
+                    return Err(not_a_section());
+                }
+                // An item on its own is a list of one.
+                let list = tomet_ast::List::new(false, vec![(**item).clone()], item.span);
+                Ok((doc.clone(), vec![Block::List(list)]))
+            }
         },
         other => Err(EvalError::mismatch(
             "`include`",
@@ -246,9 +254,7 @@ fn shift_levels(blocks: &mut [Block], delta: isize) {
             }
             Block::List(list) => {
                 for item in &mut list.items {
-                    if let Some(content) = &mut item.element.content {
-                        shift_levels(content, delta);
-                    }
+                    shift_levels(&mut item.content, delta);
                 }
             }
             Block::Paragraph(_) | Block::Interp(_) | Block::Hole(_) => {}

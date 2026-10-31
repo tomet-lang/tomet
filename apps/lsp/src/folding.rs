@@ -118,10 +118,10 @@ fn collect_list_folding_ranges(index: &LineIndex<'_>, list: &List, ranges: &mut 
     }
 
     for item in &list.items {
-        if let Some(val) = &item.element.data.value {
+        if let Some(val) = &item.data.value {
             collect_element_value_folding_ranges(index, val, ranges);
         }
-        for child in item.element.content.iter().flatten() {
+        for child in &item.content {
             collect_block_folding_ranges(index, child, ranges);
         }
         if let Some(sub) = &item.sublist {

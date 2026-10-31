@@ -133,20 +133,38 @@ pub fn measure(doc: &Document) -> Stats {
         ..Stats::default()
     };
 
-    tomet_tree::for_each_element(doc, |el| {
-        match &el.sigil {
-            Sigil::Named(name) => {
-                stats.named += 1;
-                *stats.by_name.entry(name.to_string()).or_default() += 1;
-            }
-            Sigil::Bare => stats.bare += 1,
-        }
-
+    /// The link an element is, if it is one, counted by its kind.
+    fn count_link(stats: &mut Stats, el: &tomet_ast::Element) {
         if let Some((kind, target)) = link_target_of(el).or_else(|| path_target_of(el))
             && let Some(link_kind) = link_kind_from_semantic(&kind, &target)
             && let Some(i) = LinkKind::ALL.iter().position(|k| *k == link_kind)
         {
             stats.links[i] += 1;
+        }
+    }
+
+    tomet_tree::for_each_element(doc, |el| {
+        if let Sigil::Named(name) = &el.sigil {
+            stats.named += 1;
+            *stats.by_name.entry(name.to_string()).or_default() += 1;
+        }
+        count_link(&mut stats, el);
+    });
+
+    // A list item and a nameless `{...}` entry are not elements, so the walk above
+    // never meets them: a named item is counted as the element it is, a plain one
+    // as the bare element it was.
+    tomet_tree::for_each_list_item(doc, |item| match (&item.name, item.named_element()) {
+        (Some(name), Some(element)) => {
+            stats.named += 1;
+            *stats.by_name.entry(name.to_string()).or_default() += 1;
+            count_link(&mut stats, &element);
+        }
+        _ => stats.bare += 1,
+    });
+    tomet_tree::for_each_node(doc, |node| {
+        if let tomet_tree::Node::Entry(tomet_ast::Entry::Bare(_)) = node {
+            stats.bare += 1;
         }
     });
 

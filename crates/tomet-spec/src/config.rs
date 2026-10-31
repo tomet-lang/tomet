@@ -1,10 +1,10 @@
 //! Configuration reference generator from [`ConfigGroupSpec`] schemas.
 
-use tomet_ast::{Block, Document, Element, Placement, Section, Sigil, Value};
+use tomet_ast::{Block, Document, ListItem, Section, Value};
 use tomet_config::{ConfigEntrySpec, ConfigGroupSpec, PrinterConfig};
-use tomet_tree::{ElementExt, declaration_new, element_new};
+use tomet_tree::declaration_new;
 
-use crate::util::{code, dummy, inlines, list, paragraph, paragraphs, text};
+use crate::util::{code, dummy, inlines, list, paragraph, paragraphs, plain_item, text};
 
 /// Renders a complete formatted configuration specification `.tmt` string from [`ConfigGroupSpec`] slices.
 pub fn render(
@@ -67,7 +67,7 @@ pub fn push_group(group: &ConfigGroupSpec, out: &mut Vec<Block>) {
 }
 
 /// Builds a list item element describing a single [`ConfigEntrySpec`].
-pub fn entry_item(entry: &ConfigEntrySpec) -> Element {
+pub fn entry_item(entry: &ConfigEntrySpec) -> ListItem {
     let mut content = vec![code(entry.key)];
 
     let mut type_info = format!(" ({})", entry.value_type);
@@ -97,7 +97,5 @@ pub fn entry_item(entry: &ConfigEntrySpec) -> Element {
         content.push(text("."));
     }
 
-    let mut el = element_new(Sigil::Bare).with_placement(Placement::Block);
-    el.content = Some(vec![paragraph(content)]);
-    el
+    plain_item(content)
 }

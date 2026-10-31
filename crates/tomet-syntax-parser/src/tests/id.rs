@@ -126,7 +126,7 @@ fn list_item_full_form_reads_an_id() {
         other => panic!("expected list, got {other:?}"),
     };
     let items = &list.items;
-    assert_eq!(items[0].element.id, Some(Id("item1".into())));
+    assert_eq!(items[0].id, Some(Id("item1".into())));
 }
 
 #[test]
@@ -137,10 +137,10 @@ fn list_item_sugar_reads_a_trailing_id() {
         other => panic!("expected list, got {other:?}"),
     };
     let items = &list.items;
-    assert_eq!(items[0].element.id, Some(Id("item1".into())));
+    assert_eq!(items[0].id, Some(Id("item1".into())));
     assert_eq!(
-        items[0].element.content,
-        wrap(vec![Inline::Text("plain text".into())])
+        items[0].content,
+        wrap(vec![Inline::Text("plain text".into())]).unwrap()
     );
 }
 
@@ -152,9 +152,9 @@ fn list_item_sugar_reads_a_trailing_id_and_attrs_together() {
         other => panic!("expected list, got {other:?}"),
     };
     let items = &list.items;
-    assert_eq!(items[0].element.id, Some(Id("item1".into())));
+    assert_eq!(items[0].id, Some(Id("item1".into())));
     assert_eq!(
-        items[0].element.data.value,
+        items[0].data.value,
         Some(Group::from_map(Value::Map(vec![(
             "tag".into(),
             Value::String("x".into())
@@ -170,10 +170,10 @@ fn list_item_sugar_with_no_trailing_group_has_no_id() {
         other => panic!("expected list, got {other:?}"),
     };
     let items = &list.items;
-    assert_eq!(items[0].element.id, None);
+    assert_eq!(items[0].id, None);
     assert_eq!(
-        items[0].element.content,
-        wrap(vec![Inline::Text("plain text".into())])
+        items[0].content,
+        wrap(vec![Inline::Text("plain text".into())]).unwrap()
     );
 }
 
@@ -200,9 +200,9 @@ fn bare_hash_paren_inside_sugar_text_is_still_plain_text_when_unconfirmed() {
         other => panic!("expected list, got {other:?}"),
     };
     let items = &list.items;
-    assert_eq!(items[0].element.id, None);
+    assert_eq!(items[0].id, None);
     assert_eq!(
-        items[0].element.content,
-        wrap(vec![Inline::Text("text #(unterminated".into())])
+        items[0].content,
+        wrap(vec![Inline::Text("text #(unterminated".into())]).unwrap()
     );
 }

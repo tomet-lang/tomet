@@ -290,7 +290,7 @@ fn list_element(items: &[Vec<Block>], ordered: bool) -> List {
         .iter()
         .map(|blocks| {
             list_item(
-                Sigil::Bare,
+                None,
                 pandoc_blocks_to_content(blocks),
                 None,
                 None,
@@ -561,9 +561,7 @@ fn blocks_to_text_tm(blocks: &[TmBlock]) -> String {
             TmBlock::Section(sec) => out.push_str(&inlines_to_text_tm(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
-                    if let Some(content) = &item.element.content {
-                        out.push_str(&blocks_to_text_tm(content));
-                    }
+                    out.push_str(&blocks_to_text_tm(&item.content));
                 }
             }
             TmBlock::Interp(_) | TmBlock::Declaration(_) | TmBlock::Hole(_) => {}

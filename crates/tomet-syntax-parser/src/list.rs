@@ -18,7 +18,7 @@ use crate::error::Result;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_text};
 use crate::section::merge_values;
 use crate::value::skip_inline_ws;
-use tomet_ast::{Block, ListItem, Paragraph, Placement, Sigil, Value};
+use tomet_ast::{Block, ListItem, Paragraph, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{element_new, list, list_item};
 
@@ -270,15 +270,17 @@ pub(crate) fn parse_list_item_body(
         // Reuses the exact same element-parsing path a standalone
         // `@name(...)` takes -- no second grammar, no naming constraint.
         // Cursor sits right on `@`, left there by `eat_list_marker` above.
-        let mut el = parse_element_with_pipe_stack(dialect, cur, true, pipe_stack)?;
-        el.placement = Placement::Block;
-        let mut content = el.content.take().unwrap_or_default();
+        let el = parse_element_with_pipe_stack(dialect, cur, true, pipe_stack)?;
+        let mut content = el.content.unwrap_or_default();
         append_trailing_line_content(dialect, cur, &mut content)?;
-        el.content = Some(content);
-        el.span = cur.span_from(item_start);
         return Ok(ListItem {
-            element: el,
+            name: el.sigil.name().cloned(),
+            data: el.data,
+            content,
+            id: el.id,
+            connects: el.connects,
             sublist: None,
+            span: cur.span_from(item_start),
         });
     }
 
@@ -340,14 +342,7 @@ pub(crate) fn parse_list_item_body(
 
     let span = cur.span_from(item_start);
     Ok(list_item(
-        Sigil::Bare,
-        content,
-        marker,
-        attrs,
-        id,
-        connects,
-        None,
-        span,
+        None, content, marker, attrs, id, connects, None, span,
     ))
 }
 
@@ -375,9 +370,8 @@ pub(crate) fn parse_single_list_item(
                 let list_span = sub_items
                     .first()
                     .unwrap()
-                    .element
                     .span
-                    .union(&sub_items.last().unwrap().element.span);
+                    .union(&sub_items.last().unwrap().span);
                 sublist = Some(list(next.ordered, sub_items, list_span));
             }
         }
@@ -406,9 +400,8 @@ pub(crate) fn parse_single_list_item(
                     let list_span = sub_items
                         .first()
                         .unwrap()
-                        .element
                         .span
-                        .union(&sub_items.last().unwrap().element.span);
+                        .union(&sub_items.last().unwrap().span);
                     sublist = Some(list(next.ordered, sub_items, list_span));
                 }
             }
@@ -416,6 +409,6 @@ pub(crate) fn parse_single_list_item(
         item.sublist = sublist;
     }
 
-    item.element.span = cur.span_from(item_start);
+    item.span = cur.span_from(item_start);
     Ok(item)
 }

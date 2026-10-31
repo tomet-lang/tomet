@@ -43,6 +43,19 @@ impl Written<'_> {
     }
 }
 
+/// [`tomet_tree::for_each_element`], and the list items written in the combine
+/// notation (`-@name(...)`) too: an item with a name is an element in a list,
+/// and is held to everything an element is. A plain `- content` has no name
+/// and is not passed.
+fn for_each_element_and_item(doc: &Document, mut f: impl FnMut(&tomet_ast::Element)) {
+    tomet_tree::for_each_element(doc, &mut f);
+    tomet_tree::for_each_list_item(doc, |item| {
+        if let Some(element) = item.named_element() {
+            f(&element);
+        }
+    });
+}
+
 /// Classifies `el` against `std` and the namespaces in scope.
 pub fn classify_in(
     el: &tomet_ast::Element,
@@ -53,6 +66,22 @@ pub fn classify_in(
             tomet_semantics::refuse_declaration_as_element(name, bindings.classify(name)?)
         }
         _ => tomet_semantics::classify_std(el),
+    }
+}
+
+/// [`classify_in`] for a child of a node: an element as itself, a list item as
+/// the element it is when it has a name, and a plain list item as
+/// [`ElementKind::Bare`](tomet_semantics::ElementKind::Bare).
+pub fn classify_child(
+    child: tomet_tree::Child<'_>,
+    bindings: &Bindings,
+) -> Result<tomet_semantics::ElementKind, tomet_semantics::UnknownName> {
+    match child {
+        tomet_tree::Child::Element(el) => classify_in(el, bindings),
+        tomet_tree::Child::Item(item) => match item.named_element() {
+            Some(element) => classify_in(&element, bindings),
+            None => Ok(tomet_semantics::ElementKind::Bare),
+        },
     }
 }
 
@@ -67,7 +96,7 @@ pub fn shape_str(shape: Shape) -> &'static str {
 pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     let mut seen: Vec<(String, tomet_ast::Span)> = Vec::new();
 
-    tomet_tree::for_each_element(doc, |el| {
+    for_each_element_and_item(doc, |el| {
         if let Err(unknown) = classify_in(el, bindings) {
             // a declaration written as an element is not unknown, it is
             // spelled wrongly: say which spelling it takes
@@ -265,8 +294,8 @@ pub fn check_singletons_and_regions(
                             if !still_preamble {
                                 in_preamble = false;
                             }
-                            tomet_tree::for_each_descendant(el, false, |el| {
-                                visit(Written::Element(el), false)
+                            tomet_tree::for_each_descendant(el, false, |child| {
+                                visit_child(child, &mut visit)
                             });
                         }
                         Inline::Text(t) if !t.value.trim().is_empty() => {
@@ -284,8 +313,8 @@ pub fn check_singletons_and_regions(
                 for inline in &s.title {
                     if let Inline::Element(el) = inline {
                         visit(Written::Element(el), false);
-                        tomet_tree::for_each_descendant(el, false, |el| {
-                            visit(Written::Element(el), false)
+                        tomet_tree::for_each_descendant(el, false, |child| {
+                            visit_child(child, &mut visit)
                         });
                     }
                 }
@@ -333,7 +362,9 @@ fn validate_section_block(block: &Block, visit: &mut impl FnMut(Written<'_>, boo
 
 fn validate_list_items(list: &List, visit: &mut impl FnMut(Written<'_>, bool)) {
     for item in &list.items {
-        visit_with_descendants(&item.element, visit);
+        visit_child(tomet_tree::Child::Item(item), visit);
+        // What is nested in the item.
+        tomet_tree::for_each_descendant_of_item(item, false, |child| visit_child(child, visit));
         if let Some(sub) = &item.sublist {
             validate_list_items(sub, visit);
         }
@@ -343,11 +374,24 @@ fn validate_list_items(list: &List, visit: &mut impl FnMut(Written<'_>, bool)) {
 /// `el` and everything nested in it, none of them in the preamble.
 fn visit_with_descendants(el: &Element, visit: &mut impl FnMut(Written<'_>, bool)) {
     visit(Written::Element(el), false);
-    tomet_tree::for_each_descendant(el, false, |desc| visit(Written::Element(desc), false));
+    tomet_tree::for_each_descendant(el, false, |child| visit_child(child, visit));
+}
+
+/// What a child is held to: an element as itself, a list item as the element it
+/// is when it has a name, and nothing when it has none.
+fn visit_child(child: tomet_tree::Child<'_>, visit: &mut impl FnMut(Written<'_>, bool)) {
+    match child {
+        tomet_tree::Child::Element(el) => visit(Written::Element(el), false),
+        tomet_tree::Child::Item(item) => {
+            if let Some(element) = item.named_element() {
+                visit(Written::Element(&element), false);
+            }
+        }
+    }
 }
 
 pub fn check_unfinished(doc: &Document, errors: &mut Vec<Diagnostic>) {
-    tomet_tree::for_each_element(doc, |el| {
+    for_each_element_and_item(doc, |el| {
         let kind = match tomet_semantics::classify_std(el) {
             Ok(kind) => kind,
             Err(_) => return,
@@ -389,7 +433,7 @@ fn note_text(el: &tomet_ast::Element) -> String {
 }
 
 pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
-    tomet_tree::for_each_element(doc, |el| {
+    for_each_element_and_item(doc, |el| {
         let Some(name) = el.sigil.name() else { return };
         check_arguments_of(
             name,
@@ -596,7 +640,7 @@ pub fn check_ctmt_declarations(declarations: &[Declared], errors: &mut Vec<Diagn
 }
 
 pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
-    tomet_tree::for_each_element(doc, |el| {
+    for_each_element_and_item(doc, |el| {
         let Some(content) = &el.content else { return };
         let Ok(kind) = classify_in(el, bindings) else {
             return;
@@ -829,7 +873,7 @@ fn describe_value(value: &tomet_ast::Value) -> String {
 }
 
 pub fn check_dangling_anchors(doc: &Document, errors: &mut Vec<Diagnostic>) {
-    tomet_tree::for_each_element(doc, |el| {
+    for_each_element_and_item(doc, |el| {
         let Some((_, raw_target)) = tomet_semantics::link_target_of(el) else {
             return;
         };

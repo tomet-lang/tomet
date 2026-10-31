@@ -33,7 +33,7 @@
 
 use tomet_ast::{
     Block, Connect, Data, Document, Element, Entry, Group, Id, Inline, InterpExpr, List, ListItem,
-    Paragraph, Sigil, Span, Text, Value,
+    Paragraph, Span, Text, Value,
 };
 use tomet_expr::{EvalContext, EvalValue, Note, evaluate, evaluate_data};
 use tomet_tree::list_item;
@@ -289,6 +289,11 @@ impl Pass<'_> {
                 .map(|entry| match entry {
                     Entry::Pair(key, value) => Entry::Pair(key, self.value(value)),
                     Entry::Element(el) => Entry::Element(self.element(el)),
+                    Entry::Bare(mut bare) => {
+                        bare.data = self.data(bare.data);
+                        bare.content = self.content(bare.content);
+                        Entry::Bare(bare)
+                    }
                     Entry::Hole(hole) => Entry::Hole(hole),
                 })
                 .collect(),
@@ -326,6 +331,19 @@ impl Pass<'_> {
 
     // ---- lists --------------------------------------------------------------
 
+    /// Resolves what is in one list item: its data, content and connects.
+    fn resolve_item(&mut self, item: &mut ListItem) {
+        item.data = self.data(std::mem::take(&mut item.data));
+        item.content = std::mem::take(&mut item.content)
+            .into_iter()
+            .flat_map(|b| self.block(b))
+            .collect();
+        item.connects = std::mem::take(&mut item.connects)
+            .into_iter()
+            .map(|c| self.connect(c))
+            .collect();
+    }
+
     fn list(&mut self, mut list: List) -> List {
         list.connects = list.connects.into_iter().map(|c| self.connect(c)).collect();
         list.items = std::mem::take(&mut list.items)
@@ -338,7 +356,7 @@ impl Pass<'_> {
     fn item(&mut self, mut item: ListItem) -> Vec<ListItem> {
         let sublist = item.sublist.take().map(|sub| self.list(sub));
         let Some((expr, span)) = item_expression(&item).map(|(e, s)| (e.clone(), s)) else {
-            item.element = self.element(item.element);
+            self.resolve_item(&mut item);
             item.sublist = sublist;
             return vec![item];
         };
@@ -348,7 +366,7 @@ impl Pass<'_> {
         // new one, and an empty result removes the item and its nest.
         let fallback = |this: &mut Self, item: ListItem| {
             let mut item = item;
-            item.element = this.element(item.element);
+            this.resolve_item(&mut item);
             item.sublist = sublist.clone();
             vec![item]
         };
@@ -372,7 +390,7 @@ impl Pass<'_> {
 
 /// The expression of an item whose whole content is exactly one `${...}`.
 fn item_expression(item: &ListItem) -> Option<(&InterpExpr, Span)> {
-    let [Block::Paragraph(p)] = item.element.content.as_deref()? else {
+    let [Block::Paragraph(p)] = item.content.as_slice() else {
         return None;
     };
     let [Inline::Interp(interp)] = p.content.as_slice() else {
@@ -448,7 +466,7 @@ fn to_items(value: EvalValue, span: Span) -> Result<Vec<ListItem>, String> {
         .map(|value| {
             let blocks = to_blocks(value, span)?;
             Ok(list_item(
-                Sigil::Bare,
+                None,
                 blocks,
                 None,
                 None,
@@ -534,7 +552,12 @@ impl Ids {
             self.connect(conn);
         }
         for item in &mut list.items {
-            self.element(&mut item.element);
+            self.claim(&mut item.id, item.span);
+            self.blocks(&mut item.content);
+            for conn in &mut item.connects {
+                self.connect(conn);
+            }
+            self.data(&mut item.data);
             if let Some(sub) = &mut item.sublist {
                 self.list(sub);
             }
@@ -563,8 +586,16 @@ impl Ids {
     fn data(&mut self, data: &mut Data) {
         if let Some(Group(entries)) = &mut data.value {
             for entry in entries {
-                if let Entry::Element(child) = entry {
-                    self.element(child);
+                match entry {
+                    Entry::Element(child) => self.element(child),
+                    Entry::Bare(bare) => {
+                        self.claim(&mut bare.id, bare.span);
+                        if let Some(content) = &mut bare.content {
+                            self.blocks(content);
+                        }
+                        self.data(&mut bare.data);
+                    }
+                    Entry::Pair(..) | Entry::Hole(_) => {}
                 }
             }
         }

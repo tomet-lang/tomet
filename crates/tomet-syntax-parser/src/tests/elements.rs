@@ -1,4 +1,5 @@
 use super::*;
+use tomet_ast::Entry;
 
 #[test]
 fn parses_section_with_attrs() {
@@ -47,16 +48,13 @@ fn parses_links_container_with_bare_children() {
         Block::Element(el) => {
             assert_eq!(el.sigil, Sigil::named("links"));
             match &el.data.value {
-                Some(value) => {
-                    let children = value.as_children();
-                    assert_eq!(children.len(), 2);
-                    assert_eq!(children[0].sigil, Sigil::Bare);
-                    assert_eq!(children[0].data.args, Some(Value::Int(1)));
-                    assert_eq!(children[0].content, wrap(vec![Inline::Text("note".into())]));
-                    assert_eq!(
-                        children[1].data.args,
-                        Some(Value::String("anotation1".into()))
-                    );
+                Some(Group(entries)) => {
+                    let [Entry::Bare(first), Entry::Bare(second)] = entries.as_slice() else {
+                        panic!("expected two bare entries, got {entries:?}");
+                    };
+                    assert_eq!(first.data.args, Some(Value::Int(1)));
+                    assert_eq!(first.content, wrap(vec![Inline::Text("note".into())]));
+                    assert_eq!(second.data.args, Some(Value::String("anotation1".into())));
                 }
                 other => panic!("expected children, got {other:?}"),
             }

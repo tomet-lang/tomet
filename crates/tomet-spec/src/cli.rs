@@ -1,11 +1,13 @@
 //! CLI command reference generator from `clap::Command` definitions.
 
 use clap::{Arg, Command};
-use tomet_ast::{Block, Document, Element, Placement, Section, Sigil, Value};
+use tomet_ast::{Block, Document, ListItem, Section, Value};
 use tomet_config::PrinterConfig;
-use tomet_tree::{ElementExt, declaration_new, element_new};
+use tomet_tree::declaration_new;
 
-use crate::util::{code, code_block, dummy, inlines, list, paragraph, paragraphs, text};
+use crate::util::{
+    code, code_block, dummy, inlines, list, paragraph, paragraphs, plain_item, text,
+};
 
 /// Renders a complete formatted CLI specification `.tmt` string from a `clap::Command`.
 pub fn render(root: &mut Command, doc_id: &str, notice: &str, config: &PrinterConfig) -> String {
@@ -87,7 +89,7 @@ fn listed(arg: &Arg) -> bool {
     !arg.is_hide_set() && !matches!(arg.get_id().as_str(), "help" | "version")
 }
 
-fn item(cmd: &Command, arg: &Arg) -> Element {
+fn item(cmd: &Command, arg: &Arg) -> ListItem {
     let mut content = vec![code(&label(arg))];
 
     let help = arg
@@ -135,9 +137,7 @@ fn item(cmd: &Command, arg: &Arg) -> Element {
         content.push(text("."));
     }
 
-    let mut el = element_new(Sigil::Bare).with_placement(Placement::Block);
-    el.content = Some(vec![paragraph(content)]);
-    el
+    plain_item(content)
 }
 
 fn label(arg: &Arg) -> String {

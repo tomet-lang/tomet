@@ -1,8 +1,8 @@
 //! `tomet_ast::Document` -> Pandoc's AST.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, Id, Inline as TmInline, Interpolation, List, Placement,
-    Sigil, Value,
+    Bare, Block as TmBlock, Data, Document, Element, Entry, Group, Id, Inline as TmInline,
+    Interpolation, List, Placement, Sigil, Value,
 };
 use tomet_semantics::{
     ElementKind, TableRow, classify_std_lenient, flatten_data, flatten_element_data, heading_level,
@@ -304,7 +304,7 @@ fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
-                    out.extend(blocks_to_inlines_lossy(content_of(&item.element)));
+                    out.extend(blocks_to_inlines_lossy(&item.content));
                 }
             }
         }
@@ -422,7 +422,7 @@ fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
-                    out.extend(blocks_to_pandoc_inlines(content_of(&item.element)));
+                    out.extend(blocks_to_pandoc_inlines(&item.content));
                 }
             }
         }
@@ -528,13 +528,37 @@ fn push_word(word: &mut String, out: &mut Vec<Inline>) {
 /// An element's own body as blocks: its `[content]`, then any elements
 /// its `{...}` group holds as children.
 fn element_body_blocks(el: &Element) -> Vec<Block> {
-    let mut blocks = element_content_to_blocks(content_of(el));
-    if let Some(value) = el.data.value.as_ref() {
-        for child in value.as_children() {
-            blocks.extend(element_to_blocks(child));
+    body_blocks(content_of(el), &el.data)
+}
+
+/// [`element_body_blocks`] for anything that takes the groups an element
+/// does: a bare entry's body is read the same way.
+fn body_blocks(content: &[TmBlock], data: &Data) -> Vec<Block> {
+    let mut blocks = element_content_to_blocks(content);
+    if let Some(Group(entries)) = data.value.as_ref() {
+        for entry in entries {
+            match entry {
+                Entry::Element(child) => blocks.extend(element_to_blocks(child)),
+                Entry::Bare(child) => blocks.push(bare_to_block(child)),
+                Entry::Pair(..) | Entry::Hole(_) => {}
+            }
         }
     }
     blocks
+}
+
+/// A bare `(marker)[content]` entry of a `{...}` group. It has no name for
+/// a class to carry, so the attribute says so; see [`SIGIL_KEY`].
+fn bare_to_block(bare: &Bare) -> Block {
+    let value = bare.data.value.as_ref().map(|v| v.as_data());
+    let mut attr = attr_from(
+        bare.id.as_ref(),
+        flatten_data(bare.data.args.as_ref(), value.as_ref()).into_pairs(),
+        &[],
+    );
+    attr.2.push((SIGIL_KEY.to_string(), BARE_SIGIL.to_string()));
+    let content = bare.content.as_deref().unwrap_or(&[]);
+    Block::Div(attr, body_blocks(content, &bare.data))
 }
 
 /// Content flattened to plain text, for slots that cannot hold markup --
@@ -554,7 +578,7 @@ fn blocks_plain_text(blocks: &[TmBlock]) -> String {
             TmBlock::Section(sec) => out.push_str(&plain_text(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
-                    out.push_str(&blocks_plain_text(content_of(&item.element)));
+                    out.push_str(&blocks_plain_text(&item.content));
                 }
             }
         }
@@ -594,15 +618,14 @@ fn list_to_pandoc(list: &List) -> Block {
     let items: Vec<Vec<Block>> = list
         .items
         .iter()
-        .map(|list_item| {
-            let item = &list_item.element;
-            let mut blocks = if matches!(item.sigil, Sigil::Named(_)) {
+        .map(|item| {
+            let mut blocks = if let Some(element) = item.named_element() {
                 // The combine notation (`-@name(...)`): rendered exactly
                 // like a standalone `@name(...)` would be, through the
                 // same generic element-to-blocks dispatch.
-                element_to_blocks(item)
+                element_to_blocks(&element)
             } else {
-                element_content_to_blocks(content_of(item))
+                element_content_to_blocks(&item.content)
             };
             // A list item's own content is a single logical line, so
             // Pandoc's `Plain` is a better fit than `Para` -- it is what
@@ -612,7 +635,7 @@ fn list_to_pandoc(list: &List) -> Block {
                     *block = Block::Plain(std::mem::take(inlines));
                 }
             }
-            if let Some(sub) = &list_item.sublist {
+            if let Some(sub) = &item.sublist {
                 blocks.push(list_to_pandoc(sub));
             }
             blocks

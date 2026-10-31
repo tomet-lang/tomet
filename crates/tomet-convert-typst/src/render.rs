@@ -3,9 +3,7 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 
-use tomet_ast::{
-    Block, Document, Element, Inline, Interpolation, List, Placement, Section, Sigil, Value,
-};
+use tomet_ast::{Block, Document, Element, Inline, Interpolation, List, Placement, Section, Value};
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
     is_directive, link_target, normalized_element_args, parse_table_rows, path_target,
@@ -100,8 +98,7 @@ fn render_list(cx: &TypstCtx, list: &List, out: &mut String) {
 fn render_list_with_indent(cx: &TypstCtx, list: &List, indent: usize, out: &mut String) {
     let ordered = list.ordered;
     let indent_str = "  ".repeat(indent);
-    for (i, list_item) in list.items.iter().enumerate() {
-        let item = &list_item.element;
+    for (i, item) in list.items.iter().enumerate() {
         out.push_str(&indent_str);
         let marker = if ordered {
             format!("{}. ", i + 1)
@@ -109,19 +106,19 @@ fn render_list_with_indent(cx: &TypstCtx, list: &List, indent: usize, out: &mut 
             "- ".to_string()
         };
         out.push_str(&marker);
-        if matches!(item.sigil, Sigil::Named(_)) {
+        if let Some(element) = item.named_element() {
             // The combine notation (`-@name(...)`): no Typst markup
             // marker has an equivalent, so this falls back to the same
             // generic element rendering a standalone one would use.
-            out.push_str(&element_to_typst(cx, item, true));
+            out.push_str(&element_to_typst(cx, &element, true));
         } else {
             // `args` (the `(...)` marker `Value`) has no Typst markup
             // equivalent -- dropped on export, same as this crate's
             // other documented lossy cases (see the module doc).
-            out.push_str(&blocks_to_typst(cx, item.content.as_deref().unwrap_or(&[])));
+            out.push_str(&blocks_to_typst(cx, &item.content));
         }
         out.push('\n');
-        if let Some(sub) = &list_item.sublist {
+        if let Some(sub) = &item.sublist {
             render_list_with_indent(cx, sub, indent + 1, out);
         }
     }
@@ -684,9 +681,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
             Block::Section(sec) => s.push_str(&inlines_to_plain(&sec.title)),
             Block::List(list) => {
                 for item in &list.items {
-                    if let Some(content) = &item.element.content {
-                        s.push_str(&blocks_to_plain(content));
-                    }
+                    s.push_str(&blocks_to_plain(&item.content));
                 }
             }
             Block::Interp(_) | Block::Declaration(_) | Block::Hole(_) => {}

@@ -282,6 +282,13 @@ fn render_embedded(
                     let nested = Value::Hole(Box::new(nested.clone()));
                     s.push_str(&render_nested_with_blocks(&nested, config, render_blocks));
                 }
+                Entry::Bare(bare) => s.push_str(&render_embedded(
+                    String::new(),
+                    &bare.data,
+                    bare.content.as_deref(),
+                    config,
+                    render_blocks,
+                )),
             }
         }
         s.push('}');

@@ -139,16 +139,16 @@ fn sugar_list_item_and_heading_support_a_bare_connect() {
             Block::List(list) => {
                 let items = &list.items;
                 assert_eq!(
-                    items[0].element.data.args,
+                    items[0].data.args,
                     expect_args.map(|v| Value::Map(vec![("x".into(), v)])),
                     "{src:?}"
                 );
                 assert_eq!(
-                    item_attrs(&items[0].element),
+                    item_attrs(&items[0]),
                     expect_value.map(|v| Value::Map(vec![("y".into(), v)])),
                     "{src:?}"
                 );
-                let text: String = first_para(items[0].element.content.as_ref().expect("content"))
+                let text: String = first_para(&items[0].content)
                     .iter()
                     .map(|inline| match inline {
                         Inline::Text(t) => t.value.as_str(),
@@ -207,8 +207,8 @@ fn sugar_list_item_supports_a_named_connect_matching_its_bracketed_form() {
     match &doc.blocks[0] {
         Block::List(list) => {
             let items = &list.items;
-            assert_eq!(items[0].element.connects.len(), 1);
-            assert_eq!(items[0].element.connects[0].name, Name::bare("rule"));
+            assert_eq!(items[0].connects.len(), 1);
+            assert_eq!(items[0].connects[0].name, Name::bare("rule"));
         }
         other => panic!("expected list, got {other:?}"),
     }
@@ -225,7 +225,7 @@ fn sugar_connect_tolerates_one_blank_line_but_not_two() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
-                item_attrs(&items[0].element),
+                item_attrs(&items[0]),
                 Some(Value::Map(vec![("y".into(), Value::Int(2))]))
             );
         }
@@ -237,7 +237,7 @@ fn sugar_connect_tolerates_one_blank_line_but_not_two() {
     match &doc.blocks[0] {
         Block::List(list) => {
             let items = &list.items;
-            assert_eq!(item_attrs(&items[0].element), None);
+            assert_eq!(item_attrs(&items[0]), None);
         }
         other => panic!("expected list, got {other:?}"),
     }

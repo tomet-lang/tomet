@@ -103,9 +103,7 @@ fn text_of(doc: &Document) -> String {
                         if j > 0 {
                             out.push(',');
                         }
-                        if let Some(content) = &item.element.content {
-                            blocks(out, content);
-                        }
+                        blocks(out, &item.content);
                     }
                     out.push(']');
                 }
@@ -477,7 +475,7 @@ fn a_macro_in_an_element_argument_is_expanded_and_stays_text() {
     let Block::List(list) = &doc.blocks[0] else {
         panic!("a list");
     };
-    let content = list.items[0].element.content.as_ref().unwrap();
+    let content = &list.items[0].content;
     let [Block::Paragraph(p)] = content.as_slice() else {
         panic!("a paragraph");
     };

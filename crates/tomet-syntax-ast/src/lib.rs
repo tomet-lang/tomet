@@ -470,16 +470,14 @@ impl List {
     }
 }
 
-/// One item of a [`List`].
+/// One item of a [`List`]: a plain `- content`, or `-@name(...) content`
+/// (the combine notation), which is the item *and* an element of that name.
 ///
-/// Composes an ordinary [`Element`] rather than restating its fields: a
-/// list item written `- content` is `Element { sigil: Sigil::Bare, .. }`,
-/// and one written `-@name(...) content` (the combine notation) is
-/// `Element { sigil: Sigil::Named(name), .. }` -- the exact same `Element`
-/// a standalone `@name(...)` would parse to, with no naming constraint and
-/// no second grammar. Every existing consumer that already treats a list
-/// item as "just an `Element`" (the validator, the formatter, every
-/// converter) keeps working unchanged against `&item.element`.
+/// It takes the groups an element does -- `(args)` is the item's marker,
+/// `{value}` its attributes, `#(id)` and `:connect`s -- and its `content` is
+/// always there (possibly empty). It has no placement: an item is always a
+/// block of its own list. `name` is `None` for a plain item and the element's
+/// name for the combine notation.
 ///
 /// `sublist` is the one genuinely new thing: an indented list directly
 /// below this item. Typed as `Option<List>`, not `Option<Vec<Block>>`,
@@ -488,8 +486,35 @@ impl List {
 /// instead of a convention.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ListItem {
-    pub element: Element,
+    pub name: Option<Name>,
+    pub data: Data,
+    pub content: Vec<Block>,
+    pub id: Option<Id>,
+    pub connects: Vec<Connect>,
     pub sublist: Option<List>,
+    pub span: Span,
+}
+
+impl ListItem {
+    /// The element an item written in the combine notation (`-@name(...)
+    /// content`) is: the exact element a standalone `@name(...) content`
+    /// would parse to, standing as a block. `None` for a plain `- content`,
+    /// which has no name and so is not an element.
+    ///
+    /// It is a copy: an item is not stored as an element, so the checks and
+    /// renderers that are written for elements are handed this one.
+    pub fn named_element(&self) -> Option<Element> {
+        let name = self.name.clone()?;
+        Some(Element {
+            sigil: Sigil::Named(name),
+            placement: Placement::Block,
+            data: self.data.clone(),
+            content: Some(self.content.clone()),
+            id: self.id.clone(),
+            connects: self.connects.clone(),
+            span: self.span,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -881,6 +906,17 @@ pub struct Declaration {
     pub span: Span,
 }
 
+/// A nameless entry of a `{...}` group, `(marker)[content]`: the container
+/// already supplies what it is (the `(1)[...]` entries of `@links{ ... }`),
+/// so it has no name. It takes the groups an element does and no connect.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Bare {
+    pub data: Data,
+    pub content: Option<Vec<Block>>,
+    pub id: Option<Id>,
+    pub span: Span,
+}
+
 /// A `?matcher(name, args){options}[content]` hole in a pattern.
 ///
 /// It takes the groups an element does, read by the same code. Two
@@ -974,7 +1010,10 @@ pub struct Element {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Entry {
     Pair(String, Value),
+    /// A named entry, `@name(...)`.
     Element(Element),
+    /// A nameless entry, `(marker)[content]`. See [`Bare`].
+    Bare(Bare),
     /// A `?matcher(...)` hole standing as an entry, in a pattern. See [`Hole`].
     Hole(Hole),
 }
@@ -1020,7 +1059,7 @@ impl Group {
                 .iter()
                 .filter_map(|e| match e {
                     Entry::Pair(k, v) => Some((k.clone(), v.clone())),
-                    Entry::Element(_) | Entry::Hole(_) => None,
+                    Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_) => None,
                 })
                 .collect(),
         )
@@ -1033,7 +1072,7 @@ impl Group {
             .iter()
             .filter_map(|e| match e {
                 Entry::Element(el) => Some(el),
-                Entry::Pair(..) | Entry::Hole(_) => None,
+                Entry::Pair(..) | Entry::Bare(_) | Entry::Hole(_) => None,
             })
             .collect()
     }
@@ -1043,7 +1082,7 @@ impl Group {
         let Group(entries) = self;
         entries
             .iter()
-            .any(|e| matches!(e, Entry::Element(_) | Entry::Hole(_)))
+            .any(|e| matches!(e, Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_)))
     }
 
     /// This group's `key: value` pairs, in source order.
@@ -1051,7 +1090,7 @@ impl Group {
         let Group(entries) = self;
         entries.iter().filter_map(|e| match e {
             Entry::Pair(k, v) => Some((k, v)),
-            Entry::Element(_) | Entry::Hole(_) => None,
+            Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_) => None,
         })
     }
 
@@ -1060,7 +1099,7 @@ impl Group {
         let Group(entries) = self;
         entries.iter_mut().filter_map(|e| match e {
             Entry::Pair(k, v) => Some((k, v)),
-            Entry::Element(_) | Entry::Hole(_) => None,
+            Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_) => None,
         })
     }
 
@@ -1088,7 +1127,9 @@ impl Group {
             .position(|e| matches!(e, Entry::Pair(k, _) if k == key))?;
         match entries.remove(idx) {
             Entry::Pair(_, v) => Some(v),
-            Entry::Element(_) | Entry::Hole(_) => unreachable!("position matched a Pair"),
+            Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_) => {
+                unreachable!("position matched a Pair")
+            }
         }
     }
 }

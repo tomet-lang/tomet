@@ -24,8 +24,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use tomet_ast::{
-    Block, Connect, Data, Document, Element, Entry, Group, Hole, Inline, InterpExpr, Interpolation,
-    List, Placement, Sigil, Value,
+    Bare, Block, Connect, Data, Document, Element, Entry, Group, Hole, Inline, InterpExpr,
+    Interpolation, List, ListItem, Placement, Sigil, Value,
 };
 use tomet_parser::parse_document;
 
@@ -715,6 +715,7 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
                             }
                             Entry::Element(child) => dump_element(out, child, depth + 2),
                             Entry::Hole(child) => dump_hole(out, child, depth + 2),
+                            Entry::Bare(child) => dump_bare(out, child, depth + 2),
                         }
                     }
                 }
@@ -757,7 +758,7 @@ fn dump_list(out: &mut String, list: &List, depth: usize) {
     indent(out, depth + 1);
     out.push_str("Items:\n");
     for item in &list.items {
-        dump_element(out, &item.element, depth + 2);
+        dump_item(out, item, depth + 2);
         if let Some(sub) = &item.sublist {
             indent(out, depth + 2);
             out.push_str("sublist\n");
@@ -833,6 +834,38 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
     }
 }
 
+/// A list item reads as the element it is when it has a name, and as a bare one
+/// when it has not.
+fn dump_item(out: &mut String, item: &ListItem, depth: usize) {
+    if let Some(element) = item.named_element() {
+        dump_element(out, &element, depth);
+        return;
+    }
+    indent(out, depth);
+    out.push_str("Bare\n");
+    dump_groups(out, &item.data, Some(&item.content), depth);
+    if let Some(id) = &item.id {
+        indent(out, depth + 1);
+        let _ = writeln!(out, "id      {:?}", id.0);
+    }
+    for connect in &item.connects {
+        indent(out, depth + 1);
+        out.push_str("connect\n");
+        dump_connect(out, connect, depth + 2);
+    }
+}
+
+/// A nameless `{...}` entry's head line is `Bare`, as it always was.
+fn dump_bare(out: &mut String, bare: &Bare, depth: usize) {
+    indent(out, depth);
+    out.push_str("Bare\n");
+    dump_groups(out, &bare.data, bare.content.as_deref(), depth);
+    if let Some(id) = &bare.id {
+        indent(out, depth + 1);
+        let _ = writeln!(out, "id      {:?}", id.0);
+    }
+}
+
 /// A connect's head line reads like an inline element's, as it always did.
 fn dump_connect(out: &mut String, connect: &Connect, depth: usize) {
     indent(out, depth);
@@ -869,6 +902,7 @@ fn dump_groups(out: &mut String, data: &Data, content: Option<&[Block]>, depth: 
                     }
                     Entry::Element(child) => dump_element(out, child, depth + 2),
                     Entry::Hole(child) => dump_hole(out, child, depth + 2),
+                    Entry::Bare(child) => dump_bare(out, child, depth + 2),
                 }
             }
         }

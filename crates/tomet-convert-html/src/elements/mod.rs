@@ -22,7 +22,7 @@ use crate::util::{
     escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs, value_to_plain,
 };
 use crate::{CustomElementCtx, RenderCtx};
-use tomet_ast::{Element, Group, Interpolation};
+use tomet_ast::{Bare, Block, Data, Element, Entry, Group, Id, Interpolation};
 use tomet_semantics::{
     classify_std_lenient, extract_tags, is_directive, normalized_element_args_in,
 };
@@ -209,18 +209,55 @@ fn render_generic_element(
     out: &mut String,
     inline: bool,
 ) {
+    render_generic(
+        cx,
+        kind,
+        el.id.as_ref(),
+        &el.data,
+        el.content.as_deref(),
+        out,
+        inline,
+    );
+}
+
+/// What a bare `(marker)[content]` entry of a `{...}` group is drawn as: the
+/// generic element of the kind `bare`, since the group it sits in is what says
+/// what it is.
+fn render_bare(cx: &RenderCtx, bare: &Bare, out: &mut String) {
+    render_generic(
+        cx,
+        "bare",
+        bare.id.as_ref(),
+        &bare.data,
+        bare.content.as_deref(),
+        out,
+        false,
+    );
+}
+
+/// The generic `tm-element` box of an element, or of anything that takes
+/// the same groups.
+fn render_generic(
+    cx: &RenderCtx,
+    kind: &str,
+    id: Option<&Id>,
+    data: &Data,
+    content: Option<&[Block]>,
+    out: &mut String,
+    inline: bool,
+) {
     let tag = if inline { "span" } else { "div" };
     out.push_str(&format!("<{tag} class=\"tm-element tm-{kind}\""));
-    if let Some(id) = id_attr(el.id.as_ref()) {
+    if let Some(id) = id_attr(id) {
         out.push_str(&format!(" id=\"{}\"", escape_attr(&id)));
     }
-    push_data_attrs(out, el.data.args.as_ref(), &[]);
-    push_value_data_attrs(out, el);
+    push_data_attrs(out, data.args.as_ref(), &[]);
+    push_value_data_attrs(out, data);
     out.push('>');
-    if let Some(content) = &el.content {
+    if let Some(content) = content {
         crate::block::render_content_blocks(cx, content, out);
     }
-    if let Some(value) = &el.data.value {
+    if let Some(value) = &data.value {
         render_element_value(cx, value, out);
     }
     out.push_str(&format!("</{tag}>"));
@@ -233,12 +270,18 @@ fn render_element_value(cx: &RenderCtx, value: &Group, out: &mut String) {
     match value {
         // Only the elements. A group's *pairs* are data and left the body
         // for `data-*` beside `(args)`; see `push_value_data_attrs`.
-        Group(_) => {
-            let children = value.as_children();
-            if !children.is_empty() {
+        Group(entries) => {
+            if entries
+                .iter()
+                .any(|e| matches!(e, Entry::Element(_) | Entry::Bare(_)))
+            {
                 out.push_str("<div class=\"tm-children\">\n");
-                for child in children {
-                    render_element(cx, child, out, false);
+                for entry in entries {
+                    match entry {
+                        Entry::Element(child) => render_element(cx, child, out, false),
+                        Entry::Bare(child) => render_bare(cx, child, out),
+                        Entry::Pair(..) | Entry::Hole(_) => {}
+                    }
                 }
                 out.push_str("</div>\n");
             }

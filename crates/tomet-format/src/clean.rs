@@ -1,7 +1,9 @@
 //! Whitespace-hygiene formatting preserving verbatim raw spans (fenced code
 //! blocks, and any `(content:raw)` element).
 
-use tomet_ast::{Block, Connect, Data, Declaration, Document, Element, Inline, ListItem, Value};
+use tomet_ast::{
+    Block, Connect, Data, Declaration, Document, Element, Entry, Group, Inline, ListItem, Value,
+};
 use tomet_parser::parse_document;
 
 /// Normalizes whitespace (LF line endings, no trailing whitespace, collapsed excess
@@ -95,16 +97,7 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                 }
             }
         }
-        if let Some(blocks) = &el.content {
-            for block in blocks {
-                walk_block(block, out);
-            }
-        }
-        if let Some(children) = el.data.value.as_ref().map(|v| v.as_children()) {
-            for child in children {
-                walk_element(child, out);
-            }
-        }
+        walk_held(el.content.as_deref(), &el.data, out);
     }
 
     /// A connect is never a raw element, but what it holds can be.
@@ -121,9 +114,15 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
         for block in content.into_iter().flatten() {
             walk_block(block, out);
         }
-        if let Some(children) = data.value.as_ref().map(|v| v.as_children()) {
-            for child in children {
-                walk_element(child, out);
+        let Some(Group(entries)) = &data.value else {
+            return;
+        };
+        for entry in entries {
+            match entry {
+                Entry::Element(child) => walk_element(child, out),
+                // A bare entry holds what an element does, and is no element.
+                Entry::Bare(bare) => walk_held(bare.content.as_deref(), &bare.data, out),
+                Entry::Pair(..) | Entry::Hole(_) => {}
             }
         }
     }
@@ -164,7 +163,10 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
 
     fn walk_list_items(items: &[ListItem], out: &mut Vec<(usize, usize)>) {
         for item in items {
-            walk_element(&item.element, out);
+            match item.named_element() {
+                Some(element) => walk_element(&element, out),
+                None => walk_held(Some(&item.content), &item.data, out),
+            }
             if let Some(sub) = &item.sublist {
                 for conn in &sub.connects {
                     walk_connect(conn, out);

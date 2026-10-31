@@ -10,12 +10,12 @@ fn parses_list() {
             let items = &list.items;
             assert_eq!(items.len(), 2);
             assert_eq!(
-                items[0].element.content,
-                wrap(vec![Inline::Text("one".into())])
+                items[0].content,
+                wrap(vec![Inline::Text("one".into())]).unwrap()
             );
             assert_eq!(
-                items[1].element.content,
-                wrap(vec![Inline::Text("two".into())])
+                items[1].content,
+                wrap(vec![Inline::Text("two".into())]).unwrap()
             );
         }
         other => panic!("expected list, got {other:?}"),
@@ -32,12 +32,12 @@ fn parses_list_value_markers_and_trailing_attrs() {
             assert_eq!(items.len(), 2);
 
             assert_eq!(
-                items[0].element.content,
-                wrap(vec![Inline::Text("todo".into())])
+                items[0].content,
+                wrap(vec![Inline::Text("todo".into())]).unwrap()
             );
-            assert_eq!(items[0].element.data.args, Some(Value::String("T".into())));
+            assert_eq!(items[0].data.args, Some(Value::String("T".into())));
             assert_eq!(
-                item_attrs(&items[0].element),
+                item_attrs(&items[0]),
                 Some(Value::Map(vec![(
                     "tag".into(),
                     Value::String("dev".into())
@@ -45,12 +45,12 @@ fn parses_list_value_markers_and_trailing_attrs() {
             );
 
             assert_eq!(
-                items[1].element.content,
-                wrap(vec![Inline::Text("question".into())])
+                items[1].content,
+                wrap(vec![Inline::Text("question".into())]).unwrap()
             );
-            assert_eq!(items[1].element.data.args, Some(Value::String("?".into())));
+            assert_eq!(items[1].data.args, Some(Value::String("?".into())));
             assert_eq!(
-                item_attrs(&items[1].element),
+                item_attrs(&items[1]),
                 Some(Value::Map(vec![(
                     "id".into(),
                     Value::String("task1".into())
@@ -91,8 +91,8 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items.len(), 1, "{bare:?}");
-            assert_eq!(item_attrs(&items[0].element), None, "{bare:?}");
-            match items[0].element.content.as_deref().map(first_para) {
+            assert_eq!(item_attrs(&items[0]), None, "{bare:?}");
+            match Some(first_para(&items[0].content)) {
                 Some([Inline::Element(link)]) => {
                     assert_eq!(link.sigil, Sigil::named("link"), "{bare:?}");
                     assert_eq!(
@@ -120,7 +120,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
                 let items = &list.items;
                 assert_eq!(items.len(), 1, "{src:?}");
                 assert_eq!(
-                    item_attrs(&items[0].element),
+                    item_attrs(&items[0]),
                     Some(Value::Map(vec![(
                         "id".into(),
                         Value::String("breakfast".into())
@@ -130,7 +130,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
                 // The connector (` :`) left no trace in the item's
                 // own content -- just the `@link` element, nothing
                 // else.
-                match items[0].element.content.as_deref().map(first_para) {
+                match Some(first_para(&items[0].content)) {
                     Some([Inline::Element(link)]) => {
                         assert_eq!(link.sigil, Sigil::named("link"), "{src:?}");
                         assert_eq!(link.data.value, None, "{src:?}");
@@ -157,10 +157,10 @@ fn list_item_colon_connect_supports_an_empty_braced_value() {
             let items = &list.items;
             assert_eq!(items.len(), 1);
             assert_eq!(
-                items[0].element.content,
-                wrap(vec![Inline::Text("xxxxxx".into())])
+                items[0].content,
+                wrap(vec![Inline::Text("xxxxxx".into())]).unwrap()
             );
-            assert_eq!(item_attrs(&items[0].element), Some(Value::Map(vec![])));
+            assert_eq!(item_attrs(&items[0]), Some(Value::Map(vec![])));
         }
         other => panic!("expected list, got {other:?}"),
     }
@@ -173,7 +173,7 @@ fn list_marker_supports_explicit_key_value() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
-                items[0].element.data.args,
+                items[0].data.args,
                 Some(Value::Map(vec![
                     ("color".into(), Value::String("red".into())),
                     ("priority".into(), Value::String("high".into())),
@@ -190,10 +190,7 @@ fn list_marker_quoted_scalar_avoids_colon_misparse() {
     match &doc.blocks[0] {
         Block::List(list) => {
             let items = &list.items;
-            assert_eq!(
-                items[0].element.data.args,
-                Some(Value::String("12:01".into()))
-            );
+            assert_eq!(items[0].data.args, Some(Value::String("12:01".into())));
         }
         other => panic!("expected list, got {other:?}"),
     }
@@ -210,8 +207,8 @@ fn bracket_after_a_list_marker_is_the_content_group() {
     match &doc.blocks[0] {
         Block::List(list) => {
             let items = &list.items;
-            assert_eq!(items[0].element.data.args, None);
-            let content = first_para(items[0].element.content.as_ref().expect("content"));
+            assert_eq!(items[0].data.args, None);
+            let content = first_para(&items[0].content);
             let text: String = content
                 .iter()
                 .map(|inline| match inline {
@@ -249,12 +246,12 @@ fn parses_ordered_list() {
             let items = &list.items;
             assert_eq!(items.len(), 2);
             assert_eq!(
-                items[0].element.content,
-                wrap(vec![Inline::Text("one".into())])
+                items[0].content,
+                wrap(vec![Inline::Text("one".into())]).unwrap()
             );
             assert_eq!(
-                items[1].element.content,
-                wrap(vec![Inline::Text("two".into())])
+                items[1].content,
+                wrap(vec![Inline::Text("two".into())]).unwrap()
             );
         }
         other => panic!("expected list, got {other:?}"),
@@ -273,7 +270,7 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
-                items[0].element.data.args,
+                items[0].data.args,
                 Some(Value::Map(vec![("x".into(), Value::Int(1))]))
             );
         }
@@ -285,7 +282,7 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
-                item_attrs(&items[0].element),
+                item_attrs(&items[0]),
                 Some(Value::Map(vec![("y".into(), Value::Int(2))]))
             );
         }
@@ -301,11 +298,11 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
-                items[0].element.data.args,
+                items[0].data.args,
                 Some(Value::Map(vec![("x".into(), Value::Int(1))]))
             );
             assert_eq!(
-                item_attrs(&items[0].element),
+                item_attrs(&items[0]),
                 Some(Value::Map(vec![("y".into(), Value::Int(2))]))
             );
         }
@@ -323,9 +320,9 @@ fn full_form_list_item_supports_a_named_connect() {
     match &doc.blocks[0] {
         Block::List(list) => {
             let items = &list.items;
-            assert_eq!(items[0].element.connects.len(), 1);
-            assert_eq!(items[0].element.connects[0].name, Name::bare("rule"));
-            let text: String = first_para(items[0].element.content.as_ref().expect("content"))
+            assert_eq!(items[0].connects.len(), 1);
+            assert_eq!(items[0].connects[0].name, Name::bare("rule"));
+            let text: String = first_para(&items[0].content)
                 .iter()
                 .map(|inline| match inline {
                     Inline::Text(t) => t.value.as_str(),
@@ -360,10 +357,12 @@ fn combine_notation_reads_a_named_item_with_content_and_connects() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items.len(), 1);
-            let item = &items[0].element;
-            assert_eq!(item.sigil, Sigil::named("task"));
-            assert_eq!(item.placement, Placement::Block);
-            assert_eq!(item.content, wrap(vec![Inline::Text("content".into())]));
+            let item = &items[0];
+            assert_eq!(item.name, Some(Name::bare("task")));
+            assert_eq!(
+                item.content,
+                wrap(vec![Inline::Text("content".into())]).unwrap()
+            );
             assert_eq!(item.connects.len(), 1);
             assert_eq!(item.connects[0].name, Name::bare("rule"));
             assert_eq!(items[0].sublist, None);
@@ -379,7 +378,7 @@ fn combine_notation_supports_a_bare_trailing_connect() {
     let doc = parse_document("-@task():(x: 1){y: 2}\n").unwrap();
     match &doc.blocks[0] {
         Block::List(list) => {
-            let item = &list.items[0].element;
+            let item = &list.items[0];
             assert_eq!(
                 item.data.args,
                 Some(Value::Map(vec![("x".into(), Value::Int(1))]))
@@ -405,7 +404,7 @@ fn combine_notation_has_no_naming_constraint() {
     let Block::List(list) = &combine_doc.blocks[0] else {
         panic!("expected list");
     };
-    let combine_el = &list.items[0].element;
+    let combine_el = list.items[0].named_element().expect("a named item");
 
     let standalone_doc = parse_document("@task()\n").unwrap();
     let Block::Element(standalone_el) = &standalone_doc.blocks[0] else {
@@ -414,7 +413,7 @@ fn combine_notation_has_no_naming_constraint() {
 
     assert_eq!(combine_el.sigil, standalone_el.sigil);
     assert_eq!(
-        classify_std_lenient(combine_el),
+        classify_std_lenient(&combine_el),
         classify_std_lenient(standalone_el)
     );
 }
@@ -428,12 +427,12 @@ fn a_nested_list_becomes_the_items_own_sublist() {
         Block::List(list) => {
             assert_eq!(list.items.len(), 1);
             let item = &list.items[0];
-            assert_eq!(item.element.content, wrap(vec![Inline::Text("a".into())]));
+            assert_eq!(item.content, wrap(vec![Inline::Text("a".into())]).unwrap());
             let sub = item.sublist.as_ref().expect("nested sub-list");
             assert_eq!(sub.items.len(), 1);
             assert_eq!(
-                sub.items[0].element.content,
-                wrap(vec![Inline::Text("b".into())])
+                sub.items[0].content,
+                wrap(vec![Inline::Text("b".into())]).unwrap()
             );
             assert_eq!(sub.items[0].sublist, None);
         }
@@ -447,13 +446,13 @@ fn multiple_levels_of_nesting_still_work() {
     match &doc.blocks[0] {
         Block::List(list) => {
             let a = &list.items[0];
-            assert_eq!(a.element.content, wrap(vec![Inline::Text("a".into())]));
+            assert_eq!(a.content, wrap(vec![Inline::Text("a".into())]).unwrap());
             let level_b = a.sublist.as_ref().expect("level b sub-list");
             let b = &level_b.items[0];
-            assert_eq!(b.element.content, wrap(vec![Inline::Text("b".into())]));
+            assert_eq!(b.content, wrap(vec![Inline::Text("b".into())]).unwrap());
             let level_c = b.sublist.as_ref().expect("level c sub-list");
             let c = &level_c.items[0];
-            assert_eq!(c.element.content, wrap(vec![Inline::Text("c".into())]));
+            assert_eq!(c.content, wrap(vec![Inline::Text("c".into())]).unwrap());
             assert_eq!(c.sublist, None);
         }
         other => panic!("expected list, got {other:?}"),

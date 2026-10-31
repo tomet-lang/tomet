@@ -1,7 +1,8 @@
 //! Rendering elements, values, args, and connects.
 
 use tomet_ast::{
-    Block, Connect, Data, Declaration, Element, Entry, Group, Hole, Interpolation, Placement, Value,
+    Bare, Block, Connect, Data, Declaration, Element, Entry, Group, Hole, Interpolation, Placement,
+    Value,
 };
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_style::render_nested;
@@ -224,6 +225,14 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     out
 }
 
+/// Render a [`Bare`] entry into Tomet syntax: `(args)[content]{value}#(id)`,
+/// with no head.
+pub fn render_bare(bare: &Bare, config: &PrinterConfig) -> String {
+    let mut out = render_groups("", &bare.data, bare.content.as_deref(), config);
+    out.push_str(&render_id(bare.id.as_ref()));
+    out
+}
+
 /// Render a [`Hole`] AST node into Tomet syntax:
 /// `?matcher(args)[content]{value}#(id)`.
 pub fn render_hole(hole: &Hole, config: &PrinterConfig) -> String {
@@ -328,7 +337,7 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
     }
     let has_element = entries
         .iter()
-        .any(|e| matches!(e, Entry::Element(_) | Entry::Hole(_)));
+        .any(|e| matches!(e, Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_)));
     let rendered: Vec<String> = entries
         .iter()
         .map(|entry| match entry {
@@ -342,6 +351,7 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
             ),
             Entry::Element(child) => render_element(child, config),
             Entry::Hole(hole) => render_hole(hole, config),
+            Entry::Bare(bare) => render_bare(bare, config),
         })
         .collect();
 

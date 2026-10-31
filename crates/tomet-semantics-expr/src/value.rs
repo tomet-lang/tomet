@@ -18,7 +18,7 @@
 use std::rc::Rc;
 
 use time::OffsetDateTime;
-use tomet_ast::{Block, Connect, Declaration, Element, InterpExpr, List, Section, Value};
+use tomet_ast::{Block, Connect, Declaration, Element, InterpExpr, List, ListItem, Section, Value};
 
 /// A document, by vault-relative path with `/` separators. A reference: the
 /// content is fetched through the [`super::Resolver`] when it is needed.
@@ -49,6 +49,8 @@ pub enum Node {
     Connect(Box<Connect>),
     /// A `::name(...)` declaration, when it was given an id.
     Declaration(Box<Declaration>),
+    /// An item of a list: a node of its own, since it can carry an id.
+    Item(Box<ListItem>),
 }
 
 impl Node {
@@ -60,6 +62,7 @@ impl Node {
             Node::List(list) => list.id.as_ref().map(|id| id.0.as_str()),
             Node::Connect(_) => None,
             Node::Declaration(d) => d.id.as_ref().map(|id| id.0.as_str()),
+            Node::Item(item) => item.id.as_ref().map(|id| id.0.as_str()),
         }
     }
 }
@@ -258,7 +261,11 @@ impl EvalValue {
             ),
             EvalValue::Node { node, .. } => match &**node {
                 Node::Element(el) => Value::Element(el.clone()),
-                Node::Section(_) | Node::List(_) | Node::Connect(_) | Node::Declaration(_) => {
+                Node::Section(_)
+                | Node::List(_)
+                | Node::Connect(_)
+                | Node::Declaration(_)
+                | Node::Item(_) => {
                     return None;
                 }
             },

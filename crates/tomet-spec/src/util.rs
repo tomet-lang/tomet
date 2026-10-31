@@ -41,18 +41,23 @@ pub fn code_block(body: &str) -> Element {
     el
 }
 
-/// Builds an unordered list from an iterator of list item elements.
-pub fn list(items: impl Iterator<Item = Element>) -> List {
-    tomet_tree::list(
-        false,
-        items
-            .map(|element| ListItem {
-                element,
-                sublist: None,
-            })
-            .collect(),
+/// Builds a plain list item holding `content` as one paragraph.
+pub fn plain_item(content: Vec<Inline>) -> ListItem {
+    tomet_tree::list_item(
+        None,
+        vec![paragraph(content)],
+        None,
+        None,
+        None,
+        Vec::new(),
+        None,
         dummy(),
     )
+}
+
+/// Builds an unordered list from an iterator of list items.
+pub fn list(items: impl Iterator<Item = ListItem>) -> List {
+    tomet_tree::list(false, items.collect(), dummy())
 }
 
 /// Parses text with `` `code` `` spans turned into inline `@raw` code spans,

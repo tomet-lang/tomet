@@ -69,12 +69,12 @@ fn flat_bullet_list() {
         Block::List(list) => {
             assert!(!list.ordered);
             assert_eq!(
-                list.items[0].element.content,
-                wrap(vec![Inline::Text(Text::new("one", Span::dummy()))])
+                list.items[0].content,
+                wrap(vec![Inline::Text(Text::new("one", Span::dummy()))]).unwrap()
             );
             assert_eq!(
-                list.items[1].element.content,
-                wrap(vec![Inline::Text(Text::new("two", Span::dummy()))])
+                list.items[1].content,
+                wrap(vec![Inline::Text(Text::new("two", Span::dummy()))]).unwrap()
             );
         }
         other => panic!("expected list, got {other:?}"),
@@ -98,18 +98,18 @@ fn nested_list_preserves_children_hierarchy() {
             let items = &list.items;
             assert_eq!(items.len(), 2);
             assert_eq!(
-                items[0].element.content,
-                wrap(vec![Inline::Text(Text::new("a", Span::dummy()))])
+                items[0].content,
+                wrap(vec![Inline::Text(Text::new("a", Span::dummy()))]).unwrap()
             );
             let sub = items[0].sublist.as_ref().expect("nested sub-list");
             assert_eq!(sub.items.len(), 1);
             assert_eq!(
-                sub.items[0].element.content,
-                wrap(vec![Inline::Text(Text::new("b", Span::dummy()))])
+                sub.items[0].content,
+                wrap(vec![Inline::Text(Text::new("b", Span::dummy()))]).unwrap()
             );
             assert_eq!(
-                items[1].element.content,
-                wrap(vec![Inline::Text(Text::new("c", Span::dummy()))])
+                items[1].content,
+                wrap(vec![Inline::Text(Text::new("c", Span::dummy()))]).unwrap()
             );
         }
         other => panic!("expected list, got {other:?}"),
@@ -428,15 +428,15 @@ fn test_nested_list_import() {
     let items = &list.items;
     assert_eq!(items.len(), 1);
     assert_eq!(
-        items[0].element.content,
-        wrap(vec![Inline::Text(Text::new("a", Span::dummy()))])
+        items[0].content,
+        wrap(vec![Inline::Text(Text::new("a", Span::dummy()))]).unwrap()
     );
     let sub_list = items[0].sublist.as_ref().expect("nested sub-list");
     let sub_items = &sub_list.items;
     assert_eq!(sub_items.len(), 1);
     assert_eq!(
-        sub_items[0].element.content,
-        wrap(vec![Inline::Text(Text::new("b", Span::dummy()))])
+        sub_items[0].content,
+        wrap(vec![Inline::Text(Text::new("b", Span::dummy()))]).unwrap()
     );
 }
 
@@ -555,45 +555,30 @@ fn checkbox_task_list_markers_and_custom_markers_import_as_typed_markers() {
     };
     let items = &list.items;
     assert_eq!(items.len(), 5);
+    assert_eq!(items[0].data.args, Some(Value::String("x".to_string())));
     assert_eq!(
-        items[0].element.data.args,
-        Some(Value::String("x".to_string()))
+        items[0].content,
+        wrap(vec![Inline::Text(Text::new("task1", Span::dummy()))]).unwrap()
     );
+    assert_eq!(items[1].data.args, Some(Value::String(" ".to_string())));
     assert_eq!(
-        items[0].element.content,
-        wrap(vec![Inline::Text(Text::new("task1", Span::dummy()))])
+        items[1].content,
+        wrap(vec![Inline::Text(Text::new("task2", Span::dummy()))]).unwrap()
     );
+    assert_eq!(items[2].data.args, Some(Value::String("c".to_string())));
     assert_eq!(
-        items[1].element.data.args,
-        Some(Value::String(" ".to_string()))
+        items[2].content,
+        wrap(vec![Inline::Text(Text::new("con item", Span::dummy()))]).unwrap()
     );
+    assert_eq!(items[3].data.args, Some(Value::String("p".to_string())));
     assert_eq!(
-        items[1].element.content,
-        wrap(vec![Inline::Text(Text::new("task2", Span::dummy()))])
+        items[3].content,
+        wrap(vec![Inline::Text(Text::new("pro item", Span::dummy()))]).unwrap()
     );
+    assert_eq!(items[4].data.args, Some(Value::String("x".to_string())));
     assert_eq!(
-        items[2].element.data.args,
-        Some(Value::String("c".to_string()))
-    );
-    assert_eq!(
-        items[2].element.content,
-        wrap(vec![Inline::Text(Text::new("con item", Span::dummy()))])
-    );
-    assert_eq!(
-        items[3].element.data.args,
-        Some(Value::String("p".to_string()))
-    );
-    assert_eq!(
-        items[3].element.content,
-        wrap(vec![Inline::Text(Text::new("pro item", Span::dummy()))])
-    );
-    assert_eq!(
-        items[4].element.data.args,
-        Some(Value::String("x".to_string()))
-    );
-    assert_eq!(
-        items[4].element.content,
-        wrap(vec![Inline::Text(Text::new("task3", Span::dummy()))])
+        items[4].content,
+        wrap(vec![Inline::Text(Text::new("task3", Span::dummy()))]).unwrap()
     );
 }
 

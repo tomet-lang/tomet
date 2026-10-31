@@ -58,13 +58,7 @@ pub(super) fn blocks_display_width(blocks: &[Block]) -> usize {
             Block::List(list) => list
                 .items
                 .iter()
-                .map(|item| {
-                    item.element
-                        .content
-                        .as_deref()
-                        .map(blocks_display_width)
-                        .unwrap_or(0)
-                })
+                .map(|item| blocks_display_width(&item.content))
                 .sum(),
         })
         .sum()

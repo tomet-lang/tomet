@@ -267,8 +267,16 @@ fn find_def_in_list(list: &List, target_id: &str) -> Option<Span> {
         }
     }
     for item in &list.items {
-        if let Some(span) = find_def_in_element(&item.element, target_id) {
+        if item.id.as_ref().is_some_and(|id| id.0 == target_id) {
+            return Some(item.span);
+        }
+        if let Some(span) = find_def_in_blocks(&item.content, target_id) {
             return Some(span);
+        }
+        for conn in &item.connects {
+            if let Some(span) = find_def_in_connect(conn, target_id) {
+                return Some(span);
+            }
         }
         if let Some(sub) = &item.sublist
             && let Some(span) = find_def_in_list(sub, target_id)

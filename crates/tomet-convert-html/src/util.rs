@@ -1,6 +1,6 @@
 //! Attribute, value and escaping helpers shared by the renderers.
 
-use tomet_ast::{Block, Element, Id, Inline, Value};
+use tomet_ast::{Block, Data, Id, Inline, Value};
 use tomet_semantics::{EXACT_DATA_KEY, flatten_data, is_attribute_key};
 
 /// Flattens inline content to plain text -- used for the `alt` attribute,
@@ -45,9 +45,7 @@ pub(crate) fn blocks_to_plain(blocks: &[Block]) -> String {
             }
             Block::List(list) => {
                 for item in &list.items {
-                    if let Some(content) = &item.element.content {
-                        s.push_str(&blocks_to_plain(content));
-                    }
+                    s.push_str(&blocks_to_plain(&item.content));
                 }
             }
             Block::Interp(_) | Block::Declaration(_) | Block::Hole(_) => {}
@@ -129,12 +127,11 @@ pub(crate) fn push_data_attr(out: &mut String, key: &str, value: &str) {
 /// A key `(args)` already spent is skipped rather than written twice,
 /// which would be invalid HTML. `(args)` wins because it is the group the
 /// reader wrote closer to the name.
-pub(crate) fn push_value_data_attrs(out: &mut String, el: &Element) {
-    let Some(data) = el.data.value.as_ref().map(|v| v.as_data()) else {
+pub(crate) fn push_value_data_attrs(out: &mut String, held: &Data) {
+    let Some(data) = held.value.as_ref().map(|v| v.as_data()) else {
         return;
     };
-    let taken: Vec<String> = el
-        .data
+    let taken: Vec<String> = held
         .args
         .as_ref()
         .map(|a| {

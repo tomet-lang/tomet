@@ -337,7 +337,7 @@ pub fn list(ordered: bool, items: Vec<ListItem>, span: Span) -> List {
 /// `connects` used to have (a full-form list item's parsed connects were
 /// read and then thrown away at this exact spot).
 pub fn list_item(
-    sigil: Sigil,
+    name: Option<Name>,
     content: Vec<Block>,
     args: Option<Value>,
     attrs: Option<Value>,
@@ -347,18 +347,15 @@ pub fn list_item(
     span: Span,
 ) -> ListItem {
     ListItem {
-        element: Element {
-            sigil,
-            placement: Placement::Block,
-            data: Data {
-                args,
-                value: attrs.map(Group::from_map),
-            },
-            content: Some(content),
-            id,
-            connects,
-            span,
+        name,
+        data: Data {
+            args,
+            value: attrs.map(Group::from_map),
         },
+        content,
+        id,
+        connects,
         sublist,
+        span,
     }
 }

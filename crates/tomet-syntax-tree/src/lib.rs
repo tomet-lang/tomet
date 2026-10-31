@@ -151,14 +151,13 @@ mod tests {
         doc.insert_block(1, third);
         assert_eq!(doc.blocks.len(), 3);
 
-        // Just the bare list item (`- item`) -- the list itself is
-        // `Block::List` now, not an `Element`, so `for_each_element`
-        // (which only ever visits real `Element`s) no longer counts it
-        // the way it counted the old `Sigil::Named("ul")` wrapper.
-        let mut count = 0;
-        for_each_element(&doc, |_el| {
-            count += 1;
-        });
-        assert!(count >= 1);
+        // The bare list item (`- item`) is a `ListItem`, not an `Element`,
+        // so only `for_each_list_item` visits it.
+        let mut elements = 0;
+        for_each_element(&doc, |_el| elements += 1);
+        assert_eq!(elements, 0);
+        let mut items = 0;
+        for_each_list_item(&doc, |_item| items += 1);
+        assert_eq!(items, 1);
     }
 }

@@ -150,7 +150,7 @@ mod tests {
         }
         fn walk_list(list: &tomet_ast::List, found: &mut Vec<String>) {
             for item in &list.items {
-                walk(item.element.content.as_deref().unwrap_or(&[]), found);
+                walk(&item.content, found);
                 if let Some(sub) = &item.sublist {
                     walk_list(sub, found);
                 }

@@ -52,7 +52,14 @@ fn collect_list_ids(list: &List, ids: &mut Vec<(String, Span)>) {
         collect_connect_ids(conn, ids);
     }
     for item in &list.items {
-        collect_element_ids(&item.element, ids);
+        if let Some(id) = &item.id {
+            ids.push((id.0.clone(), item.span));
+        }
+        collect_data_ids(&item.data, ids);
+        collect_content_ids(Some(&item.content), ids);
+        for conn in &item.connects {
+            collect_connect_ids(conn, ids);
+        }
         if let Some(sub) = &item.sublist {
             collect_list_ids(sub, ids);
         }
@@ -85,6 +92,13 @@ fn collect_data_ids(data: &Data, ids: &mut Vec<(String, Span)>) {
             match entry {
                 Entry::Pair(_, value) => collect_value_ids(value, ids),
                 Entry::Element(child) => collect_element_ids(child, ids),
+                Entry::Bare(bare) => {
+                    if let Some(id) = &bare.id {
+                        ids.push((id.0.clone(), bare.span));
+                    }
+                    collect_data_ids(&bare.data, ids);
+                    collect_content_ids(bare.content.as_deref(), ids);
+                }
                 Entry::Hole(_) => {}
             }
         }

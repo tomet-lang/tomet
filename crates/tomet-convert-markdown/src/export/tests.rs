@@ -171,7 +171,7 @@ fn bullet_and_ordered_list() {
             true,
             vec![
                 tomet_tree::list_item(
-                    Sigil::Bare,
+                    None,
                     wrap_content(vec![Inline::Text(Text::new("one", Span::dummy()))]),
                     None,
                     None,
@@ -181,7 +181,7 @@ fn bullet_and_ordered_list() {
                     Span::dummy(),
                 ),
                 tomet_tree::list_item(
-                    Sigil::Bare,
+                    None,
                     wrap_content(vec![Inline::Text(Text::new("two", Span::dummy()))]),
                     None,
                     None,

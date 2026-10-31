@@ -3,7 +3,10 @@
 //! Searches for matching [`Element::id`], [`Section::id`], or [`List::id`]
 //! definitions anywhere in a parsed AST. Pure in-memory (no I/O).
 
-use tomet_ast::{Block, Connect, Data, Document, Element, Entry, Group, Inline, List, Span, Value};
+use tomet_ast::{
+    Bare, Block, Connect, Data, Document, Element, Entry, Group, Inline, List, ListItem, Span,
+    Value,
+};
 
 /// Returns whether an anchor with the given ID exists anywhere in `doc`.
 pub fn has_anchor(doc: &Document, anchor: &str) -> bool {
@@ -90,7 +93,7 @@ fn find_in_list(list: &List, anchor: &str) -> Option<Span> {
         }
     }
     for item in &list.items {
-        if let Some(span) = find_in_element(&item.element, anchor) {
+        if let Some(span) = find_in_item(item, anchor) {
             return Some(span);
         }
         if let Some(sub) = &item.sublist
@@ -117,6 +120,30 @@ fn find_in_element(el: &Element, anchor: &str) -> Option<Span> {
         .or_else(|| find_in_data(&el.data, anchor))
 }
 
+fn find_in_item(item: &ListItem, anchor: &str) -> Option<Span> {
+    if let Some(id) = &item.id
+        && id.0 == anchor
+    {
+        return Some(item.span);
+    }
+    find_in_content(Some(&item.content), anchor)
+        .or_else(|| {
+            item.connects
+                .iter()
+                .find_map(|conn| find_in_connect(conn, anchor))
+        })
+        .or_else(|| find_in_data(&item.data, anchor))
+}
+
+fn find_in_bare(bare: &Bare, anchor: &str) -> Option<Span> {
+    if let Some(id) = &bare.id
+        && id.0 == anchor
+    {
+        return Some(bare.span);
+    }
+    find_in_content(bare.content.as_deref(), anchor).or_else(|| find_in_data(&bare.data, anchor))
+}
+
 fn find_in_connect(conn: &Connect, anchor: &str) -> Option<Span> {
     find_in_content(conn.content.as_deref(), anchor).or_else(|| find_in_data(&conn.data, anchor))
 }
@@ -138,6 +165,7 @@ fn find_in_data(data: &Data, anchor: &str) -> Option<Span> {
     entries.iter().find_map(|entry| match entry {
         Entry::Element(child) => find_in_element(child, anchor),
         Entry::Pair(_, v) => find_in_value(v, anchor),
+        Entry::Bare(bare) => find_in_bare(bare, anchor),
         // A hole exists only in a pattern, which has no anchors.
         Entry::Hole(_) => None,
     })
@@ -223,7 +251,7 @@ fn collect_in_list(list: &List, anchors: &mut Vec<(String, Span)>) {
         collect_in_connect(conn, anchors);
     }
     for item in &list.items {
-        collect_in_element(&item.element, anchors);
+        collect_in_item(item, anchors);
         if let Some(sub) = &item.sublist {
             collect_in_list(sub, anchors);
         }
@@ -239,6 +267,25 @@ fn collect_in_element(el: &Element, anchors: &mut Vec<(String, Span)>) {
         collect_in_connect(conn, anchors);
     }
     collect_in_data(&el.data, anchors);
+}
+
+fn collect_in_item(item: &ListItem, anchors: &mut Vec<(String, Span)>) {
+    if let Some(id) = &item.id {
+        anchors.push((id.0.clone(), item.span));
+    }
+    collect_in_content(Some(&item.content), anchors);
+    for conn in &item.connects {
+        collect_in_connect(conn, anchors);
+    }
+    collect_in_data(&item.data, anchors);
+}
+
+fn collect_in_bare(bare: &Bare, anchors: &mut Vec<(String, Span)>) {
+    if let Some(id) = &bare.id {
+        anchors.push((id.0.clone(), bare.span));
+    }
+    collect_in_content(bare.content.as_deref(), anchors);
+    collect_in_data(&bare.data, anchors);
 }
 
 fn collect_in_connect(conn: &Connect, anchors: &mut Vec<(String, Span)>) {
@@ -261,6 +308,7 @@ fn collect_in_data(data: &Data, anchors: &mut Vec<(String, Span)>) {
             match entry {
                 Entry::Element(child) => collect_in_element(child, anchors),
                 Entry::Pair(_, v) => collect_in_value(v, anchors),
+                Entry::Bare(bare) => collect_in_bare(bare, anchors),
                 Entry::Hole(_) => {}
             }
         }

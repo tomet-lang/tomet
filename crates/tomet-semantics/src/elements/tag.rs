@@ -93,9 +93,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
 fn list_to_plain(list: &List) -> String {
     let mut s = String::new();
     for item in &list.items {
-        if let Some(content) = &item.element.content {
-            s.push_str(&blocks_to_plain(content));
-        }
+        s.push_str(&blocks_to_plain(&item.content));
         if let Some(sub) = &item.sublist {
             s.push_str(&list_to_plain(sub));
         }

@@ -209,9 +209,8 @@ pub(crate) fn parse_block_seq(
                 let list_span = items
                     .first()
                     .unwrap()
-                    .element
                     .span
-                    .union(&items.last().unwrap().element.span);
+                    .union(&items.last().unwrap().span);
                 let l = list(head.ordered, items, list_span);
                 push_block(&mut doc_blocks, &mut stack, Block::List(l));
             }

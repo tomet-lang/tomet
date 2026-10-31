@@ -546,7 +546,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     content.remove(0);
                 }
                 items.push(list_item(
-                    Sigil::Bare,
+                    None,
                     wrap_inline_content(content),
                     marker,
                     None,
@@ -770,10 +770,7 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
         // items' content joined in the same way -- see the module doc.
         Block::List(list) => {
             for item in list.items {
-                extend_spaced(
-                    content,
-                    blocks_to_flat_inlines(item.element.content.unwrap_or_default()),
-                );
+                extend_spaced(content, blocks_to_flat_inlines(item.content));
             }
         }
         Block::Element(el) => {

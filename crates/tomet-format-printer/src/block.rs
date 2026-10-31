@@ -1,6 +1,6 @@
 //! Rendering blocks, sections, headings, and lists.
 
-use tomet_ast::{Block, Element, Inline, List, Placement, Section, Sigil};
+use tomet_ast::{Block, Element, Inline, List, Placement, Section};
 use tomet_config::PrinterConfig;
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 use tomet_style::render_value;
@@ -160,21 +160,19 @@ pub(crate) fn render_list_with_indent(
 ) {
     let ordered = list.ordered;
     let indent_str = "  ".repeat(indent);
-    for list_item in &list.items {
-        let item = &list_item.element;
-
-        // The combine notation (`-@name(...)`): `item` is a real, named
+    for item in &list.items {
+        // The combine notation (`-@name(...)`): the item is a real, named
         // `Element` identical to what a standalone `@name(...)` would
         // parse to, so it round-trips through the exact same
         // `render_element` a standalone one would use -- no marker, no
         // `( )`-wrapping, just the bare `-`/`-.` prefix directly against
         // `@name`.
-        if matches!(item.sigil, Sigil::Named(_)) {
+        if let Some(element) = item.named_element() {
             out.push_str(&indent_str);
             out.push_str(if ordered { "-." } else { "-" });
-            out.push_str(&render_element(item, config));
+            out.push_str(&render_element(&element, config));
             out.push('\n');
-            if let Some(sub) = &list_item.sublist {
+            if let Some(sub) = &item.sublist {
                 render_list_with_indent(sub, indent + 1, config, out);
             }
             continue;
@@ -194,7 +192,7 @@ pub(crate) fn render_list_with_indent(
             head_prefix.push_str(") ");
         }
 
-        let content_str = render_content_blocks(item.content.as_deref().unwrap_or(&[]), config);
+        let content_str = render_content_blocks(&item.content, config);
         let lines: Vec<&str> = content_str.lines().collect();
         let item_attrs = item.data.value.as_ref().map(|v| v.as_data());
 
@@ -280,7 +278,7 @@ pub(crate) fn render_list_with_indent(
             out.push_str(&render_connects(&item.connects, config));
             out.push('\n');
         }
-        if let Some(sub) = &list_item.sublist {
+        if let Some(sub) = &item.sublist {
             render_list_with_indent(sub, indent + 1, config, out);
         }
     }

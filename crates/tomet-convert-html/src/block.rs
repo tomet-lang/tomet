@@ -7,7 +7,7 @@ use crate::util::{
     split_attrs, value_to_plain,
 };
 use crate::{HeadingInfo, RenderCtx};
-use tomet_ast::{Block, Element, Inline, List, Section, Sigil, Span, Value};
+use tomet_ast::{Block, Element, Inline, List, Section, Span, Value};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 /// Dispatches one top-level document block, and -- when
@@ -200,21 +200,19 @@ fn render_heading_element(
 fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
     let tag = if list.ordered { "ol" } else { "ul" };
     out.push_str(&format!("<{tag}>\n"));
-    for list_item in &list.items {
-        let item = &list_item.element;
-
-        // The combine notation (`-@name(...)`): `item` is a real, named
+    for item in &list.items {
+        // The combine notation (`-@name(...)`): the item is a real, named
         // `Element` identical to a standalone `@name(...)`, so its `<li>`
         // just wraps whatever `render_element` already produces for one
-        // -- no list-marker span, since there is no marker, and `item`'s
+        // -- no list-marker span, since there is no marker, and the item's
         // own `{value}`/`id` belong to the element, not to a synthetic
-        // `<li class=.. data-..>` the way a bare item's do below.
-        if matches!(item.sigil, Sigil::Named(_)) {
+        // `<li class=.. data-..>` the way a plain item's do below.
+        if let Some(element) = item.named_element() {
             out.push_str("<li");
             push_span_attrs(cx, out, item.span);
             out.push('>');
-            render_element(cx, item, out, false);
-            if let Some(sub) = &list_item.sublist {
+            render_element(cx, &element, out, false);
+            if let Some(sub) = &item.sublist {
                 render_list(cx, sub, out);
             }
             out.push_str("</li>\n");
@@ -257,8 +255,8 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
             }
             out.push_str("</span> ");
         }
-        render_content_blocks(cx, item.content.as_deref().unwrap_or(&[]), out);
-        if let Some(sub) = &list_item.sublist {
+        render_content_blocks(cx, &item.content, out);
+        if let Some(sub) = &item.sublist {
             render_list(cx, sub, out);
         }
         out.push_str("</li>\n");

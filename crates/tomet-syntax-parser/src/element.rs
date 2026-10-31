@@ -10,8 +10,8 @@ use crate::value::{
     skip_ws_newlines_and_comments,
 };
 use tomet_ast::{
-    Block, Connect, Declaration, Element, Entry, Group, Hole, Id, Inline, Name, Placement, Sigil,
-    Span, Value,
+    Bare, Block, Connect, Declaration, Element, Entry, Group, Hole, Id, Inline, Name, Placement,
+    Sigil, Span, Value,
 };
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
@@ -998,7 +998,7 @@ pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<Gr
         match cur.peek() {
             None => return Err(err(group_start, "unterminated '{', expected '}'")),
             Some('}') => break,
-            Some('(') => entries.push(Entry::Element(parse_bare_element(dialect, cur)?)),
+            Some('(') => entries.push(Entry::Bare(parse_bare_entry(dialect, cur)?)),
             // A named entry, `@args{ ... }`. Unambiguous: `is_ident_char`
             // excludes `@`, so a map key cannot begin with one, and this
             // position errors today -- `eat_ident` returns empty and the
@@ -1078,10 +1078,14 @@ pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<Gr
 ///
 /// `allow_colon_connect: false`, matching the named entry above -- there
 /// is no enclosing construct inside a group for a connect to reach.
-fn parse_bare_element(dialect: Dialect, cur: &mut Cursor) -> Result<Element> {
+fn parse_bare_entry(dialect: Dialect, cur: &mut Cursor) -> Result<Bare> {
     let start_pos = cur.pos();
-    let mut el = element_new(Sigil::Bare);
-    parse_groups(dialect, cur, &mut el, false)?;
-    el.span = cur.span_from(start_pos);
-    Ok(el)
+    let mut read = element_new(Sigil::Bare);
+    parse_groups(dialect, cur, &mut read, false)?;
+    Ok(Bare {
+        data: read.data,
+        content: read.content,
+        id: read.id,
+        span: cur.span_from(start_pos),
+    })
 }
