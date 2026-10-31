@@ -2,9 +2,10 @@
 //!
 //! Preserves 100% of source characters including trivia (whitespace, newlines, comments).
 //!
-//! The tree follows the current surface syntax, not the AST parser's exact
-//! decisions: it never fails, and where the two could disagree it prefers
-//! the reading that keeps more structure.
+//! The tree reads the same blocks the AST parser does: `tests/src/block_shape.rs`
+//! compares the two over every fixture, and a grammar change that only one of
+//! them takes fails there. It never fails itself, though: broken input still
+//! gets a tree, and the AST parser's errors are not reported here.
 //!
 //! ```text
 //! ROOT
@@ -443,7 +444,23 @@ impl<'a> CstParser<'a> {
         let mut seen = [false; 3]; // args, content, value: each at most once
         let mut seen_id = false;
         loop {
-            let j = self.skip_ws_from(i);
+            let mut j = self.skip_ws_from(i);
+            // A group may stand on the line after the element's own, with no
+            // blank line between: `@file(a)` and then `[ text ]`.
+            if self.kind_at(j) == Some(K::NEWLINE) {
+                let k = self.skip_ws_from(j + 1);
+                let free = match self.kind_at(k) {
+                    Some(K::L_PAREN) => !seen[0],
+                    Some(K::L_BRACKET) => !seen[1],
+                    Some(K::L_BRACE) => !seen[2],
+                    Some(K::HASH) => !seen_id && self.id_follows(k),
+                    Some(K::COLON) => self.connect_follows(k),
+                    _ => false,
+                };
+                if free {
+                    j = k;
+                }
+            }
             match self.kind_at(j) {
                 // `|` is `[` without the brackets: the same slot, closed by the
                 // end of its marked run.
@@ -550,6 +567,7 @@ impl<'a> CstParser<'a> {
         let closes = self.in_bracket && self.kind_at(k) == Some(K::R_BRACKET);
         !(past_run
             || closes
+            || self.kind_at(k) == Some(K::COMMENT)
             || matches!(self.kind_at(k), None | Some(K::NEWLINE))
             || self.block_starts_at(k))
     }
@@ -561,6 +579,8 @@ impl<'a> CstParser<'a> {
             return None;
         }
         match self.kind_at(i + n) {
+            // `==#(id)`: a section whose heading is its id alone.
+            Some(K::HASH) if self.id_follows(i + n) => Some(n),
             None
             | Some(
                 K::NEWLINE
@@ -711,8 +731,10 @@ impl<'a> CstParser<'a> {
         self.builder.start_node(K::SECTION_HEADING.into());
         self.bump_while(K::EQUAL);
         self.bump_while(K::WHITESPACE);
-        if Self::is_opener(self.current_kind()) {
-            self.parse_groups(false);
+        if Self::is_opener(self.current_kind())
+            || (self.current_kind() == Some(K::HASH) && self.id_follows(self.pos))
+        {
+            self.parse_groups(true);
             // Decorative trailing `=`, which may itself be followed by groups.
             loop {
                 let j = self.skip_ws_from(self.pos);
@@ -768,26 +790,52 @@ impl<'a> CstParser<'a> {
         self.builder.finish_node();
     }
 
+    /// A list: items of one kind (`-` or `-.`) that stand in the same column or
+    /// further out, and, inside an item, the list of the deeper marker that
+    /// follows it -- the AST parser's rule (`list.rs`), so `- a`, `  - b`, `- c`
+    /// are one list of two items and `b` is the sublist of the first.
     fn parse_list(&mut self) {
+        let ordered = self.kind_at(self.pos + 1) == Some(K::DOT);
+        self.parse_list_level(ordered, 0);
+    }
+
+    /// The list marker the next line opens with, after its indentation (and a
+    /// `|` run's own marker): the token index, its column, and whether it is `-.`.
+    fn list_marker_ahead(&self) -> Option<(usize, usize, bool)> {
+        let j = self.skip_ws_from(self.pos);
+        self.is_list_start_at(j).then(|| {
+            (
+                j,
+                self.column_at(self.start_of(j)),
+                self.kind_at(j + 1) == Some(K::DOT),
+            )
+        })
+    }
+
+    fn parse_list_level(&mut self, ordered: bool, min_col: usize) {
         self.builder.start_node(K::LIST.into());
-        while self.is_list_start_at(self.pos) {
-            self.parse_list_item();
-            // In a `|` run the next item stands after the run's marker.
-            let j = self.skip_ws_from(self.pos);
-            if j > self.pos
-                && self.is_list_start_at(j)
-                && (self.pos..j).any(|i| self.raw_kind_at(i) == Some(K::PIPE))
-            {
-                while self.pos < j {
-                    self.bump();
-                }
+        while let Some((marker, col, is_ordered)) = self.list_marker_ahead() {
+            if col < min_col || is_ordered != ordered {
+                break;
             }
+            // The indentation, and in a `|` run the marker of the line, belong
+            // to the list.
+            while self.pos < marker {
+                self.bump();
+            }
+            self.builder.start_node(K::LIST_ITEM.into());
+            self.parse_list_item();
+            if let Some((_, deeper, deeper_ordered)) = self.list_marker_ahead()
+                && deeper > col
+            {
+                self.parse_list_level(deeper_ordered, deeper);
+            }
+            self.builder.finish_node();
         }
         self.builder.finish_node();
     }
 
     fn parse_list_item(&mut self) {
-        self.builder.start_node(K::LIST_ITEM.into());
         self.bump(); // '-'
         if self.current_kind() == Some(K::DOT) {
             self.bump();
@@ -809,34 +857,66 @@ impl<'a> CstParser<'a> {
         let outer = std::mem::replace(&mut self.allow_connect, false);
         self.parse_inline(InlineStop::Line);
         self.allow_connect = outer;
+        // A `:connect` on the line after the item is the item's own.
+        let mut connected = false;
+        loop {
+            let k = self.skip_ws_from(self.pos);
+            if self.allow_connect && self.kind_at(k) == Some(K::COLON) && self.connect_follows(k) {
+                self.bump_while(K::WHITESPACE);
+                self.parse_connect();
+                connected = true;
+            } else {
+                break;
+            }
+        }
+        if connected {
+            self.parse_inline(InlineStop::Line);
+        }
+    }
+
+    /// A fenced code block: it closes on a line whose leading run of backticks
+    /// is at least as long as the opening one and holds nothing else but
+    /// white space -- the AST parser's rule (`fence.rs`). A longer opening run
+    /// is how a body holds a closing-looking line; a run in the middle of a
+    /// line closes nothing.
+    fn parse_code_block(&mut self) {
+        self.builder.start_node(K::CODE_BLOCK.into());
+        let count = self.run_len(self.pos, K::BACKTICK);
+        for _ in 0..count {
+            self.bump();
+        }
+        // The rest of the opening line is the info string.
+        self.bump_line();
+        while !self.is_eof() && !self.at_run_end() {
+            // In a `|` run the line's own marker has been read already.
+            let i = if self.pipe_cols.is_empty() {
+                self.pos
+            } else {
+                self.skip_ws_from(self.pos)
+            };
+            let run = self.run_len(i, K::BACKTICK);
+            if run >= count {
+                let j = self.skip_ws_from(i + run);
+                if matches!(self.kind_at(j), None | Some(K::NEWLINE)) {
+                    while self.pos < j {
+                        self.bump();
+                    }
+                    break;
+                }
+            }
+            self.bump_line();
+        }
         self.builder.finish_node();
     }
 
-    fn parse_code_block(&mut self) {
-        self.builder.start_node(K::CODE_BLOCK.into());
-
-        let mut count = 0;
-        while self.current_kind() == Some(K::BACKTICK) {
-            self.bump();
-            count += 1;
-        }
-
-        // Consume until matching backticks or EOF
-        let mut consecutive_backticks = 0;
+    /// Reads the rest of the line, its `NEWLINE` included.
+    fn bump_line(&mut self) {
         while let Some(k) = self.current_kind() {
-            if k == K::BACKTICK {
-                consecutive_backticks += 1;
-                self.bump();
-                if consecutive_backticks == count {
-                    break;
-                }
-            } else {
-                consecutive_backticks = 0;
-                self.bump();
+            self.bump();
+            if k == K::NEWLINE {
+                break;
             }
         }
-
-        self.builder.finish_node();
     }
 
     fn parse_paragraph(&mut self) {
@@ -1161,6 +1241,23 @@ impl<'a> CstParser<'a> {
         let (mut args, mut value, mut content, mut id) = (false, false, false, false);
         loop {
             let j = self.skip_ws_from(self.pos);
+            if cross_newline && self.kind_at(j) == Some(K::NEWLINE) {
+                let k = self.skip_ws_from(j + 1);
+                let free = match self.kind_at(k) {
+                    Some(K::L_PAREN) => !args,
+                    Some(K::L_BRACKET) => !content,
+                    Some(K::L_BRACE) => !value,
+                    Some(K::HASH) => !id && self.id_follows(k),
+                    Some(K::COLON) => self.allow_connect && self.connect_follows(k),
+                    _ => false,
+                };
+                if free {
+                    self.bump_while(K::WHITESPACE);
+                    self.bump(); // the newline
+                    self.bump_while(K::WHITESPACE); // an outer run's markers
+                    continue;
+                }
+            }
             match self.kind_at(j) {
                 Some(K::PIPE) if !content => {
                     content = true;

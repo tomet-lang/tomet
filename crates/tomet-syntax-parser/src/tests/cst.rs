@@ -379,3 +379,79 @@ fn a_semicolon_at_the_start_of_a_line_breaks_the_paragraph() {
 fn a_semicolon_stands_blocks_of_elements_side_by_side() {
     assert_eq!(kinds(";@a()\n;@b()\n", K::BLOCK_ELEMENT), 2);
 }
+
+// --- fences ------------------------------------------------------------------
+
+#[test]
+fn a_fence_closes_on_a_line_of_its_own_and_not_on_a_run_in_the_middle_of_one() {
+    // The body has a line that ends in three backticks. It closes nothing:
+    // only a line that is a run of backticks and white space does.
+    let src = "```tm\n@codeblock | ```\n@next\n```\nafter\n";
+    assert_eq!(kinds(src, K::CODE_BLOCK), 1);
+    assert_eq!(
+        texts(src, K::CODE_BLOCK),
+        ["```tm\n@codeblock | ```\n@next\n```"]
+    );
+    // A longer opening run is how a body holds a line that looks like a closing one.
+    let src = "````\n```\n````\n";
+    assert_eq!(texts(src, K::CODE_BLOCK), ["````\n```\n````"]);
+}
+
+#[test]
+fn a_section_may_have_an_id_and_no_title() {
+    let src = "==#(background)\n\ntext\n";
+    assert_eq!(kinds(src, K::SECTION), 1);
+    assert_eq!(kinds(src, K::ID_GROUP), 1);
+    assert_eq!(texts(src, K::SECTION_HEADING), ["==#(background)\n"]);
+}
+
+// --- lists -------------------------------------------------------------------
+
+#[test]
+fn a_deeper_marker_opens_the_sublist_of_the_item_before_it() {
+    let src = "- a\n  - b\n- c\n";
+    let root = crate::parse_cst(src);
+    let top: Vec<_> = root.children().filter(|n| n.kind() == K::LIST).collect();
+    assert_eq!(top.len(), 1, "one list at the top, not one per indentation");
+    assert_eq!(
+        top[0].children().filter(|n| n.kind() == K::LIST_ITEM).count(),
+        2
+    );
+    assert_eq!(texts(src, K::LIST).len(), 2, "and the sublist inside it");
+    assert_eq!(texts(src, K::LIST)[1], "  - b\n");
+}
+
+#[test]
+fn a_list_ends_where_the_kind_of_marker_changes() {
+    let src = "-. a\n-. b\n- c\n";
+    let root = crate::parse_cst(src);
+    assert_eq!(
+        root.children().filter(|n| n.kind() == K::LIST).count(),
+        2,
+        "`-.` and `-` are two lists"
+    );
+}
+
+// --- groups on the next line ---------------------------------------------------
+
+#[test]
+fn a_group_may_stand_on_the_line_after_its_element() {
+    // The AST parser reads `[ text ]` here as the element's content; so does the CST.
+    let src = "@file(a)\n[ text ]\n";
+    assert_eq!(kinds(src, K::BLOCK_ELEMENT), 1);
+    assert_eq!(kinds(src, K::PARAGRAPH), 1, "the paragraph inside the content");
+    assert_eq!(texts(src, K::BLOCK_ELEMENT), ["@file(a)\n[ text ]"]);
+    // A blank line in between ends the element.
+    let src = "@file(a)\n\n[ text ]\n";
+    assert_eq!(texts(src, K::BLOCK_ELEMENT), ["@file(a)"]);
+}
+
+#[test]
+fn a_group_whose_slot_is_taken_is_not_pulled_in_from_the_next_line() {
+    // `(b)` would be a second `args` group, so it is text; and as text on the
+    // next line it folds into the element's line.
+    let src = "@file(a)\n(b)\n";
+    assert_eq!(kinds(src, K::BLOCK_ELEMENT), 0);
+    assert_eq!(texts(src, K::INLINE_ELEMENT), ["@file(a)"]);
+    assert_eq!(kinds(src, K::PARAGRAPH), 1);
+}
