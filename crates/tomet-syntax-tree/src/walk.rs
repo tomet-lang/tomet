@@ -2,7 +2,8 @@
 
 use std::ops::ControlFlow;
 use tomet_ast::{
-    Block, Document, Element, Entry, Group, Inline, Interpolation, List, ListItem, Value,
+    Block, Connect, Data, Document, Element, Entry, Group, Inline, Interpolation, List, ListItem,
+    Value,
 };
 
 /// Called at every [`Element`] `walk_document` visits, in document order.
@@ -724,14 +725,9 @@ fn interpolations_in_block(block: &Block, f: &mut dyn FnMut(&Interpolation)) {
         Block::Element(element) => interpolations_in_element(element, f),
         Block::Section(section) => {
             interpolations_in_inlines(&section.title, f);
-            if let Some(args) = &section.data.args {
-                interpolations_in_value(args, f);
-            }
-            if let Some(value) = &section.data.value {
-                interpolations_in_element_value(value, f);
-            }
+            interpolations_in_data(&section.data, f);
             for connect in &section.connects {
-                interpolations_in_element(connect, f);
+                interpolations_in_connect(connect, f);
             }
             for child in &section.blocks {
                 interpolations_in_block(child, f);
@@ -744,7 +740,7 @@ fn interpolations_in_block(block: &Block, f: &mut dyn FnMut(&Interpolation)) {
 
 fn interpolations_in_list(list: &List, f: &mut dyn FnMut(&Interpolation)) {
     for connect in &list.connects {
-        interpolations_in_element(connect, f);
+        interpolations_in_connect(connect, f);
     }
     for item in &list.items {
         interpolations_in_element(&item.element, f);
@@ -765,19 +761,31 @@ fn interpolations_in_inlines(inlines: &[Inline], f: &mut dyn FnMut(&Interpolatio
 }
 
 fn interpolations_in_element(element: &Element, f: &mut dyn FnMut(&Interpolation)) {
-    if let Some(args) = &element.data.args {
+    interpolations_in_data(&element.data, f);
+    interpolations_in_content(element.content.as_deref(), f);
+    for connect in &element.connects {
+        interpolations_in_connect(connect, f);
+    }
+}
+
+fn interpolations_in_connect(connect: &Connect, f: &mut dyn FnMut(&Interpolation)) {
+    interpolations_in_data(&connect.data, f);
+    interpolations_in_content(connect.content.as_deref(), f);
+}
+
+fn interpolations_in_content(content: Option<&[Block]>, f: &mut dyn FnMut(&Interpolation)) {
+    for block in content.into_iter().flatten() {
+        interpolations_in_block(block, f);
+    }
+}
+
+/// `(args)` and `{value}`: the part every node that carries data shares.
+fn interpolations_in_data(data: &Data, f: &mut dyn FnMut(&Interpolation)) {
+    if let Some(args) = &data.args {
         interpolations_in_value(args, f);
     }
-    if let Some(content) = &element.content {
-        for block in content {
-            interpolations_in_block(block, f);
-        }
-    }
-    if let Some(value) = &element.data.value {
+    if let Some(value) = &data.value {
         interpolations_in_element_value(value, f);
-    }
-    for connect in &element.connects {
-        interpolations_in_element(connect, f);
     }
 }
 

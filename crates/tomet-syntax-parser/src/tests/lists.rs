@@ -324,7 +324,7 @@ fn full_form_list_item_supports_a_named_connect() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items[0].element.connects.len(), 1);
-            assert_eq!(items[0].element.connects[0].sigil, Sigil::named("rule"));
+            assert_eq!(items[0].element.connects[0].name, Name::bare("rule"));
             let text: String = first_para(items[0].element.content.as_ref().expect("content"))
                 .iter()
                 .map(|inline| match inline {
@@ -365,7 +365,7 @@ fn combine_notation_reads_a_named_item_with_content_and_connects() {
             assert_eq!(item.placement, Placement::Block);
             assert_eq!(item.content, wrap(vec![Inline::Text("content".into())]));
             assert_eq!(item.connects.len(), 1);
-            assert_eq!(item.connects[0].sigil, Sigil::named("rule"));
+            assert_eq!(item.connects[0].name, Name::bare("rule"));
             assert_eq!(items[0].sublist, None);
         }
         other => panic!("expected list, got {other:?}"),

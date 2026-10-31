@@ -1,7 +1,7 @@
 //! Extension trait, attribute helpers, and constructors for [`tomet_ast::Element`].
 
 use tomet_ast::{
-    Block, Data, Element, Group, Id, List, ListItem, Name, Placement, Sigil, Span, Value,
+    Block, Connect, Data, Element, Group, Id, List, ListItem, Name, Placement, Sigil, Span, Value,
 };
 
 /// Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
@@ -327,7 +327,7 @@ pub fn list_item(
     args: Option<Value>,
     attrs: Option<Value>,
     id: Option<Id>,
-    connects: Vec<Element>,
+    connects: Vec<Connect>,
     sublist: Option<List>,
     span: Span,
 ) -> ListItem {

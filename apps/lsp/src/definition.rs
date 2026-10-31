@@ -1,7 +1,9 @@
 use std::ops::ControlFlow;
 
 use lsp_types::{GotoDefinitionResponse, Location, Position, Uri};
-use tomet_ast::{Block, Document, Element, Inline, InterpExpr, InterpExprKind, List, Span, Value};
+use tomet_ast::{
+    Block, Connect, Document, Element, Inline, InterpExpr, InterpExprKind, List, Span, Value,
+};
 use tomet_semantics::TargetScheme;
 use tomet_tree::{Visitor, for_each_interpolation, walk_document};
 
@@ -212,7 +214,7 @@ pub(crate) fn find_def_in_blocks(blocks: &[Block], target_id: &str) -> Option<Sp
                     return Some(sec.span);
                 }
                 for conn in &sec.connects {
-                    if let Some(span) = find_def_in_element(conn, target_id) {
+                    if let Some(span) = find_def_in_connect(conn, target_id) {
                         return Some(span);
                     }
                 }
@@ -250,7 +252,7 @@ fn find_def_in_list(list: &List, target_id: &str) -> Option<Span> {
         return Some(list.span);
     }
     for conn in &list.connects {
-        if let Some(span) = find_def_in_element(conn, target_id) {
+        if let Some(span) = find_def_in_connect(conn, target_id) {
             return Some(span);
         }
     }
@@ -276,10 +278,12 @@ fn find_def_in_element(el: &Element, target_id: &str) -> Option<Span> {
     {
         return Some(span);
     }
-    for conn in &el.connects {
-        if let Some(span) = find_def_in_element(conn, target_id) {
-            return Some(span);
-        }
-    }
-    None
+    el.connects
+        .iter()
+        .find_map(|conn| find_def_in_connect(conn, target_id))
+}
+
+/// A connect has no id of its own; what it holds can.
+fn find_def_in_connect(conn: &Connect, target_id: &str) -> Option<Span> {
+    find_def_in_blocks(conn.content.as_deref()?, target_id)
 }

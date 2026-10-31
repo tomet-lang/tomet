@@ -1,7 +1,7 @@
 //! Whitespace-hygiene formatting preserving verbatim raw spans (fenced code
 //! blocks, and any `(content:raw)` element).
 
-use tomet_ast::{Block, Document, Element, Inline, ListItem, Value};
+use tomet_ast::{Block, Connect, Document, Element, Inline, ListItem, Value};
 use tomet_parser::parse_document;
 
 /// Normalizes whitespace (LF line endings, no trailing whitespace, collapsed excess
@@ -107,6 +107,18 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
         }
     }
 
+    /// A connect is never a raw element, but what it holds can be.
+    fn walk_connect(conn: &Connect, out: &mut Vec<(usize, usize)>) {
+        for block in conn.content.iter().flatten() {
+            walk_block(block, out);
+        }
+        if let Some(children) = conn.data.value.as_ref().map(|v| v.as_children()) {
+            for child in children {
+                walk_element(child, out);
+            }
+        }
+    }
+
     fn walk_block(block: &Block, out: &mut Vec<(usize, usize)>) {
         match block {
             Block::Paragraph(p) => {
@@ -124,7 +136,7 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                     }
                 }
                 for conn in &sec.connects {
-                    walk_element(conn, out);
+                    walk_connect(conn, out);
                 }
                 for child in &sec.blocks {
                     walk_block(child, out);
@@ -132,7 +144,7 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
             }
             Block::List(list) => {
                 for conn in &list.connects {
-                    walk_element(conn, out);
+                    walk_connect(conn, out);
                 }
                 walk_list_items(&list.items, out);
             }
@@ -145,7 +157,7 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
             walk_element(&item.element, out);
             if let Some(sub) = &item.sublist {
                 for conn in &sub.connects {
-                    walk_element(conn, out);
+                    walk_connect(conn, out);
                 }
                 walk_list_items(&sub.items, out);
             }

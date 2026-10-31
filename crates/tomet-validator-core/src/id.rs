@@ -1,4 +1,4 @@
-use tomet_ast::{Block, Document, Element, Entry, Group, Inline, List, Span, Value};
+use tomet_ast::{Block, Connect, Data, Document, Element, Entry, Group, Inline, List, Span, Value};
 
 /// Walks every node in `doc` and returns `(id, span)` for each
 /// [`Element::id`]/[`Section::id`] found, in document order.
@@ -20,7 +20,7 @@ fn collect_block_ids(block: &Block, ids: &mut Vec<(String, Span)>) {
                 collect_inline_ids(inline, ids);
             }
             for conn in &sec.connects {
-                collect_element_ids(conn, ids);
+                collect_connect_ids(conn, ids);
             }
             for child in &sec.blocks {
                 collect_block_ids(child, ids);
@@ -42,7 +42,7 @@ fn collect_list_ids(list: &List, ids: &mut Vec<(String, Span)>) {
         ids.push((id.0.clone(), list.span));
     }
     for conn in &list.connects {
-        collect_element_ids(conn, ids);
+        collect_connect_ids(conn, ids);
     }
     for item in &list.items {
         collect_element_ids(&item.element, ids);
@@ -56,10 +56,24 @@ fn collect_element_ids(el: &Element, ids: &mut Vec<(String, Span)>) {
     if let Some(id) = &el.id {
         ids.push((id.0.clone(), el.span));
     }
-    if let Some(args) = &el.data.args {
+    collect_data_ids(&el.data, ids);
+    collect_content_ids(el.content.as_deref(), ids);
+    for conn in &el.connects {
+        collect_connect_ids(conn, ids);
+    }
+}
+
+/// A connect has no id of its own; the elements it holds can.
+fn collect_connect_ids(conn: &Connect, ids: &mut Vec<(String, Span)>) {
+    collect_data_ids(&conn.data, ids);
+    collect_content_ids(conn.content.as_deref(), ids);
+}
+
+fn collect_data_ids(data: &Data, ids: &mut Vec<(String, Span)>) {
+    if let Some(args) = &data.args {
         collect_value_ids(args, ids);
     }
-    if let Some(Group(entries)) = &el.data.value {
+    if let Some(Group(entries)) = &data.value {
         for entry in entries {
             match entry {
                 Entry::Pair(_, value) => collect_value_ids(value, ids),
@@ -67,13 +81,11 @@ fn collect_element_ids(el: &Element, ids: &mut Vec<(String, Span)>) {
             }
         }
     }
-    if let Some(content) = &el.content {
-        for block in content {
-            collect_block_ids(block, ids);
-        }
-    }
-    for conn in &el.connects {
-        collect_element_ids(conn, ids);
+}
+
+fn collect_content_ids(content: Option<&[Block]>, ids: &mut Vec<(String, Span)>) {
+    for block in content.into_iter().flatten() {
+        collect_block_ids(block, ids);
     }
 }
 

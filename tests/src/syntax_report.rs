@@ -24,8 +24,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use tomet_ast::{
-    Block, Document, Element, Entry, Group, Inline, InterpExpr, Interpolation, List, Placement,
-    Sigil, Value,
+    Block, Connect, Data, Document, Element, Entry, Group, Inline, InterpExpr, Interpolation, List,
+    Placement, Sigil, Value,
 };
 use tomet_parser::parse_document;
 
@@ -421,10 +421,14 @@ const CASES: &[Case] = &[
     ),
     case(
         None,
-        "コネクトの直後に書くと、外側の要素ではなくそのコネクト自身のidになる。\
-         コネクトの再帰呼び出しが隣接する`#(...)`を先に奪うため、外側のidを\
-         付けたいなら必ずコネクトより前に書くことになる",
+        "コネクトは`#(id)`を取らない。コネクトの直後に書くとエラー\
+         (idは所有者のものなので、最初のコネクトより前に書く)",
         "@task(a: 1):rule(allow: list(card))#(myid)\n",
+    ),
+    case(
+        None,
+        "所有者のidは最初のコネクトより前に書く",
+        "@task(a: 1)#(myid):rule(allow: list(card))\n",
     ),
     case(None, "idを2つ書くとエラー", "@task#(a)#(b)\n"),
     // ---- comments ---------------------------------------------------
@@ -703,7 +707,7 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
             for connect in &sec.connects {
                 indent(out, depth + 1);
                 out.push_str("connect\n");
-                dump_element(out, connect, depth + 2);
+                dump_connect(out, connect, depth + 2);
             }
             if !sec.blocks.is_empty() {
                 indent(out, depth + 1);
@@ -727,7 +731,7 @@ fn dump_list(out: &mut String, list: &List, depth: usize) {
     for connect in &list.connects {
         indent(out, depth + 1);
         out.push_str("connect\n");
-        dump_element(out, connect, depth + 2);
+        dump_connect(out, connect, depth + 2);
     }
     indent(out, depth + 1);
     out.push_str("Items:\n");
@@ -775,18 +779,39 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
     indent(out, depth);
     let _ = writeln!(out, "{}", element_head(el));
 
-    if let Some(args) = &el.data.args {
+    dump_groups(out, &el.data, el.content.as_deref(), depth);
+    if let Some(id) = &el.id {
+        indent(out, depth + 1);
+        let _ = writeln!(out, "id      {:?}", id.0);
+    }
+    for connect in &el.connects {
+        indent(out, depth + 1);
+        out.push_str("connect\n");
+        dump_connect(out, connect, depth + 2);
+    }
+}
+
+/// A connect's head line reads like an inline element's, as it always did.
+fn dump_connect(out: &mut String, connect: &Connect, depth: usize) {
+    indent(out, depth);
+    let _ = writeln!(out, "Inline @{}", connect.name);
+    dump_groups(out, &connect.data, connect.content.as_deref(), depth);
+}
+
+/// `(args)`, `[content]` and `{value}`, the groups a node has in common.
+fn dump_groups(out: &mut String, data: &Data, content: Option<&[Block]>, depth: usize) {
+    if let Some(args) = &data.args {
         indent(out, depth + 1);
         let _ = writeln!(out, "args    {}", value_str(args));
     }
-    if let Some(content) = &el.content {
+    if let Some(content) = content {
         indent(out, depth + 1);
         out.push_str("content\n");
         for block in content {
             dump_block(out, block, depth + 2);
         }
     }
-    match &el.data.value {
+    match &data.value {
         Some(Group(entries)) => {
             indent(out, depth + 1);
             if entries.is_empty() {
@@ -805,15 +830,6 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
             }
         }
         None => {}
-    }
-    if let Some(id) = &el.id {
-        indent(out, depth + 1);
-        let _ = writeln!(out, "id      {:?}", id.0);
-    }
-    for connect in &el.connects {
-        indent(out, depth + 1);
-        out.push_str("connect\n");
-        dump_element(out, connect, depth + 2);
     }
 }
 

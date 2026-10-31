@@ -1,6 +1,6 @@
 //! Element group order formatting according to `GroupOrder` settings.
 
-use tomet_ast::{Block, Element, Inline, List, Sigil};
+use tomet_ast::{Block, Connect, Element, Inline, List, Sigil};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_parser::parse_document;
 
@@ -126,7 +126,7 @@ fn collect_swaps_in_block(
                 }
             }
             for conn in &sec.connects {
-                collect_swaps_in_element(conn, src, config, swaps, limit);
+                collect_swaps_in_connect(conn, src, config, swaps, limit);
                 if swaps.len() >= limit {
                     return;
                 }
@@ -225,9 +225,34 @@ fn collect_swaps_in_element(
         }
     }
     for conn in &el.connects {
-        collect_swaps_in_element(conn, src, config, swaps, limit);
+        collect_swaps_in_connect(conn, src, config, swaps, limit);
         if swaps.len() >= limit {
             return;
+        }
+    }
+}
+
+/// A connect is written `:name(...)`, not `@name`, so there is no group order
+/// to swap on it; what it holds is searched.
+fn collect_swaps_in_connect(
+    conn: &Connect,
+    src: &str,
+    config: &PrinterConfig,
+    swaps: &mut Vec<SwapTarget>,
+    limit: usize,
+) {
+    for block in conn.content.iter().flatten() {
+        collect_swaps_in_block(block, src, config, swaps, limit);
+        if swaps.len() >= limit {
+            return;
+        }
+    }
+    if let Some(children) = conn.data.value.as_ref().map(|v| v.as_children()) {
+        for child in children {
+            collect_swaps_in_element(child, src, config, swaps, limit);
+            if swaps.len() >= limit {
+                return;
+            }
         }
     }
 }

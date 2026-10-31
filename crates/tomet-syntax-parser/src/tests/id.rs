@@ -45,17 +45,23 @@ fn id_may_come_before_its_groups_too() {
 }
 
 #[test]
-fn id_written_after_a_connect_belongs_to_that_connect_not_the_element() {
-    // `:rule(...)`'s own recursive group-read claims an adjacent
-    // `#(...)` for itself before control ever returns to `@memo`'s own
-    // loop, so there is no ambiguous "did they mean memo's id?" case --
-    // writing the id before any connect is the only way to give it to
-    // the element itself.
-    let doc = parse_document("@memo(a: 1):rule(allow: list(card))#(myid)\n").unwrap();
+fn id_written_after_a_connect_is_a_parse_error() {
+    // A connect is metadata about its owner and takes no `#(id)`. The shared
+    // group reader would hand the id to the connect, so it is refused there
+    // rather than quietly attached to either; the owner's id is written
+    // before the first connect.
+    let err = parse_document("@memo(a: 1):rule(allow: list(card))#(myid)\n").unwrap_err();
+    assert!(
+        err.message.contains("`:connect` takes no"),
+        "got: {}",
+        err.message
+    );
+
+    let doc = parse_document("@memo(a: 1)#(myid):rule(allow: list(card))\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.id, None);
-            assert_eq!(el.connects[0].id, Some(Id("myid".into())));
+            assert_eq!(el.id, Some(Id("myid".into())));
+            assert_eq!(el.connects.len(), 1);
         }
         other => panic!("expected element, got {other:?}"),
     }

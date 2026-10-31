@@ -9,7 +9,7 @@ use crate::value::{
     parse_quoted, parse_value_at, skip_block_comment, skip_inline_ws, skip_line_comment,
     skip_ws_newlines_and_comments,
 };
-use tomet_ast::{Block, Element, Entry, Group, Id, Inline, Placement, Sigil, Value};
+use tomet_ast::{Block, Connect, Element, Entry, Group, Id, Inline, Name, Placement, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -366,7 +366,7 @@ pub(crate) fn parse_groups_with_pipe_stack(
                 // nested inside the other.
                 if is_name_start_at(cur) {
                     let name = eat_name(cur).expect("is_name_start_at just confirmed a name");
-                    let mut connect_el = element_new(Sigil::Named(name));
+                    let mut connect_el = element_new(Sigil::Named(name.clone()));
                     parse_groups_with_pipe_stack(
                         dialect,
                         cur,
@@ -375,7 +375,7 @@ pub(crate) fn parse_groups_with_pipe_stack(
                         parent_pipe_stack,
                     )?;
                     connect_el.span = cur.span_from(colon_pos);
-                    el.connects.push(connect_el);
+                    el.connects.push(into_connect(name, connect_el)?);
                     continue;
                 }
                 match cur.peek() {
@@ -452,9 +452,10 @@ pub(crate) fn parse_groups_with_pipe_stack(
                 // explicit check here: a connect's own `#` arm (this
                 // same one, reached through its own recursive
                 // `parse_groups` call) always claims an adjacent `#(...)`
-                // for *itself* first, so writing an id after a connect
-                // names the connect's id, not this element's -- there is
-                // no ambiguous case left to reject.
+                // first, so an id written after a connect never reaches
+                // this element. A connect takes no id, though, so
+                // [`into_connect`] then refuses it: the owner's id is
+                // written before the first connect.
                 Some('#') if el.id.is_none() && cur.peek_at(1) == Some('(') => {
                     el.id = Some(parse_hash_id(cur)?);
                     continue;
@@ -536,9 +537,29 @@ fn claimed_something(el: &Element) -> bool {
         || el.content.is_some()
         || el.data.value.is_some()
         || el.id.is_some()
-        || el.connects.iter().any(|c| {
-            c.data.args.is_some() || c.content.is_some() || c.data.value.is_some() || c.id.is_some()
-        })
+        || el
+            .connects
+            .iter()
+            .any(|c| c.data.args.is_some() || c.content.is_some() || c.data.value.is_some())
+}
+
+/// The [`Connect`] a connect's groups were read into. A connect takes the
+/// three groups an element does and nothing more, so the `#(id)` slot, which
+/// the shared reader fills like any other, is refused here: an id written
+/// after a connect is not the owner's, and is not the connect's either.
+fn into_connect(name: Name, read: Element) -> Result<Connect> {
+    if read.id.is_some() {
+        return Err(err(
+            read.span.start,
+            "a `:connect` takes no `#(id)`: write the id of its owner before the first `:connect`",
+        ));
+    }
+    Ok(Connect {
+        name,
+        data: read.data,
+        content: read.content,
+        span: read.span,
+    })
 }
 
 /// Leftmost position on the current line where the rest of the line,
@@ -667,7 +688,7 @@ pub(crate) struct SugarBody {
     pub args: Option<Value>,
     pub value: Option<Group>,
     pub id: Option<Id>,
-    pub connects: Vec<Element>,
+    pub connects: Vec<Connect>,
 }
 
 impl SugarBody {

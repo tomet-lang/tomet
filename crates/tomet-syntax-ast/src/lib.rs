@@ -14,6 +14,9 @@
 //!   | it has no name, no groups and no connects, so it is a variant of [`Block`],
 //!   | [`Inline`] and [`Value`] and no walker over elements ever meets one. Reach every
 //!   | interpolation of a document through `tomet_tree::for_each_interpolation`.
+//!   | A `:name(...)` is a [`Connect`]: metadata about its owner, with no id, no connects of its own
+//!   | and no placement. What nodes share is [`Data`] (`(args)` and the `{...}` [`Group`]), so what
+//!   | reads them is written once; `[content]` and `#(id)` stay on the roles that take them.
 //! - (Clear Crate Boundaries)
 //!   | Semantics: Classification of element meanings (links, `::meta`, `::config`) lives in `tomet-semantics`.
 //!   | Traversal & Manipulation: Generic tree traversal algorithms live in `tomet-tree`.
@@ -405,7 +408,7 @@ pub struct Section {
     pub title: Vec<Inline>,
     pub data: Data,
     pub id: Option<Id>,
-    pub connects: Vec<Element>,
+    pub connects: Vec<Connect>,
     pub blocks: Vec<Block>,
     pub span: Span,
 }
@@ -440,7 +443,7 @@ pub struct List {
     pub ordered: bool,
     pub items: Vec<ListItem>,
     pub id: Option<Id>,
-    pub connects: Vec<Element>,
+    pub connects: Vec<Connect>,
     pub span: Span,
 }
 
@@ -711,6 +714,11 @@ impl Name {
     pub fn is_bare(&self) -> bool {
         self.namespace.is_none()
     }
+
+    /// Whether this is the bare name `name`: `rule` is, `ns.rule` is not.
+    pub fn is_bare_named(&self, name: &str) -> bool {
+        self.is_bare() && self.name == name
+    }
 }
 
 impl fmt::Display for Name {
@@ -864,7 +872,7 @@ impl Sigil {
     /// writes its own `@layers` bare as well; telling that apart from a
     /// `std` name is `Bindings::classify`'s job.
     pub fn is_bare_named(&self, name: &str) -> bool {
-        self.name().is_some_and(|n| n.is_bare() && n.name == name)
+        self.name().is_some_and(|n| n.is_bare_named(name))
     }
 }
 
@@ -891,6 +899,19 @@ pub enum Placement {
     Inline,
 }
 
+/// A `:name(...)` connect stacked after an element, a section or a list
+/// (`@x(...):as(y):rule(...)`): metadata about its owner, not content of the
+/// document. It takes `(args)`, `[content]` and `{value}` like an element does,
+/// and nothing else: no `#(id)` (an id belongs to the owner, written before the
+/// first connect), no connects of its own, and no placement.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Connect {
+    pub name: Name,
+    pub data: Data,
+    pub content: Option<Vec<Block>>,
+    pub span: Span,
+}
+
 /// The data a node carries: its `(args)` and its `{value}` group, each
 /// optional and at most one of each.
 ///
@@ -911,10 +932,8 @@ pub struct Data {
 /// groups but strictly before any connect -- see [`Id`].
 ///
 /// `connects` is unrelated to those three: it is the `:name(...)` family
-/// stacked after them (`@x(...):as(y):rule(...)`), zero or more, each its
-/// own full `Element` (with its own `args`/`content`/`value`, but never
-/// its own `connects` -- a connect does not itself take further connects
-/// in this parser). Order-preserving, empty when nothing follows.
+/// stacked after them (`@x(...):as(y):rule(...)`), zero or more, each a
+/// [`Connect`]. Order-preserving, empty when nothing follows.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Element {
     pub sigil: Sigil,
@@ -934,7 +953,7 @@ pub struct Element {
     /// content-shape.tmt`.
     pub content: Option<Vec<Block>>,
     pub id: Option<Id>,
-    pub connects: Vec<Element>,
+    pub connects: Vec<Connect>,
     pub span: Span,
 }
 

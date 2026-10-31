@@ -7,7 +7,7 @@ pub mod decode;
 
 pub use decode::{RuleArgs, decode_rule_args};
 
-use tomet_ast::{Document, Element, Span};
+use tomet_ast::{Connect, Document, Element, Span};
 use tomet_semantics::Bindings;
 use tomet_validator_core::{Diagnostic, classify_in};
 
@@ -41,15 +41,12 @@ pub fn check_rule_connects(doc: &Document, bindings: &Bindings, errors: &mut Vec
 /// One connect's contribution to [`check_rule_connects`], independent of
 /// whether its owner is an `Element`, `Section`, or `List`.
 pub fn check_one_connect(
-    connect: &Element,
+    connect: &Connect,
     bindings: &Bindings,
     errors: &mut Vec<Diagnostic>,
     walk_descendants: impl FnOnce(bool, &mut dyn FnMut(&Element)),
 ) {
-    let Some(connect_name) = connect.sigil.name() else {
-        return;
-    };
-    let member = match tomet_semantics::classify_connect_member(connect_name) {
+    let member = match tomet_semantics::classify_connect_member(&connect.name) {
         Ok(member) => member,
         Err(unknown) => {
             errors.push(Diagnostic::UnknownConnect {
@@ -70,7 +67,7 @@ pub fn check_one_connect(
 /// descendants via `walk_descendants`, checking each one's classified name
 /// against the rule's `allow` list.
 pub fn check_one_rule(
-    connect: &Element,
+    connect: &Connect,
     bindings: &Bindings,
     errors: &mut Vec<Diagnostic>,
     walk_descendants: impl FnOnce(bool, &mut dyn FnMut(&Element)),

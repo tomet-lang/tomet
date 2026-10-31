@@ -20,7 +20,7 @@ mod values;
 
 use super::*;
 use tomet_ast::{
-    Block, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Paragraph, Placement,
+    Block, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name, Paragraph, Placement,
     Sigil, SoftBreak, Span, Value,
 };
 

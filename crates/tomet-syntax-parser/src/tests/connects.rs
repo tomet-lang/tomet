@@ -62,7 +62,7 @@ fn named_connect_reads_into_connects() {
             assert_eq!(el.sigil, Sigil::named("section"));
             assert_eq!(el.connects.len(), 1);
             let rule = &el.connects[0];
-            assert_eq!(rule.sigil, Sigil::named("rule"));
+            assert_eq!(rule.name, Name::bare("rule"));
             assert_eq!(
                 rule.data.args,
                 Some(Value::Map(vec![(
@@ -81,10 +81,8 @@ fn multiple_named_connects_stack_flat_not_nested() {
     match &doc.blocks[0] {
         Block::Element(el) => {
             assert_eq!(el.connects.len(), 2);
-            assert_eq!(el.connects[0].sigil, Sigil::named("as"));
-            assert!(el.connects[0].connects.is_empty());
-            assert_eq!(el.connects[1].sigil, Sigil::named("rule"));
-            assert!(el.connects[1].connects.is_empty());
+            assert_eq!(el.connects[0].name, Name::bare("as"));
+            assert_eq!(el.connects[1].name, Name::bare("rule"));
         }
         other => panic!("expected element, got {other:?}"),
     }
@@ -116,7 +114,7 @@ fn section_supports_named_connect() {
     match &doc.blocks[0] {
         Block::Section(s) => {
             assert_eq!(s.connects.len(), 1);
-            assert_eq!(s.connects[0].sigil, Sigil::named("rule"));
+            assert_eq!(s.connects[0].name, Name::bare("rule"));
         }
         other => panic!("expected section, got {other:?}"),
     }
@@ -194,7 +192,7 @@ fn sugar_heading_supports_a_named_connect_matching_its_bracketed_form() {
     match &doc.blocks[0] {
         Block::Section(s) => {
             assert_eq!(s.connects.len(), 1);
-            assert_eq!(s.connects[0].sigil, Sigil::named("rule"));
+            assert_eq!(s.connects[0].name, Name::bare("rule"));
         }
         other => panic!("expected section, got {other:?}"),
     }
@@ -210,7 +208,7 @@ fn sugar_list_item_supports_a_named_connect_matching_its_bracketed_form() {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items[0].element.connects.len(), 1);
-            assert_eq!(items[0].element.connects[0].sigil, Sigil::named("rule"));
+            assert_eq!(items[0].element.connects[0].name, Name::bare("rule"));
         }
         other => panic!("expected list, got {other:?}"),
     }

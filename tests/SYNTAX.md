@@ -1611,19 +1611,29 @@ List ordered=false
       id      "item1"
 ```
 
-### コネクトの直後に書くと、外側の要素ではなくそのコネクト自身のidになる。コネクトの再帰呼び出しが隣接する`#(...)`を先に奪うため、外側のidを付けたいなら必ずコネクトより前に書くことになる
+### コネクトは`#(id)`を取らない。コネクトの直後に書くとエラー(idは所有者のものなので、最初のコネクトより前に書く)
 
 ```tmt
 @task(a: 1):rule(allow: list(card))#(myid)
 ```
 
 ```
+parse error: 1:12: a `:connect` takes no `#(id)`: write the id of its owner before the first `:connect`
+```
+
+### 所有者のidは最初のコネクトより前に書く
+
+```tmt
+@task(a: 1)#(myid):rule(allow: list(card))
+```
+
+```
 Block  @task
   args    {a: 1}
+  id      "myid"
   connect
     Inline @rule
       args    {allow: list("card")}
-      id      "myid"
 ```
 
 ### idを2つ書くとエラー

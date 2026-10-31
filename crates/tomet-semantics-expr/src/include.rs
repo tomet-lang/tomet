@@ -168,6 +168,12 @@ fn select(
                 }
                 Ok((doc.clone(), vec![Block::List((**list).clone())]))
             }
+            // Metadata of its owner, not content: nothing to splice in.
+            Node::Connect(_) => Err(EvalError::mismatch(
+                "`include`",
+                "a document or an element with an id",
+                "a connect",
+            )),
         },
         other => Err(EvalError::mismatch(
             "`include`",

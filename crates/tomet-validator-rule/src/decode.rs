@@ -1,7 +1,7 @@
-//! Decodes a `:rule(allow:list(...), direct:@bool)` connect element's own
+//! Decodes a `:rule(allow:list(...), direct:@bool)` connect's own
 //! `args` into a usable [`RuleArgs`].
 
-use tomet_ast::{Element, Name, Value};
+use tomet_ast::{Connect, Name, Value};
 
 /// The decoded arguments of one `:rule(...)` connect.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,10 +15,10 @@ pub struct RuleArgs {
     pub direct: bool,
 }
 
-/// Reads `connect_el.args` for a `:rule(...)` connect, or `None` if the
+/// Reads `connect.data.args` for a `:rule(...)` connect, or `None` if the
 /// shape isn't recognized.
-pub fn decode_rule_args(connect_el: &Element) -> Option<RuleArgs> {
-    let Some(Value::Map(entries)) = &connect_el.data.args else {
+pub fn decode_rule_args(connect: &Connect) -> Option<RuleArgs> {
+    let Some(Value::Map(entries)) = &connect.data.args else {
         return None;
     };
 
@@ -57,10 +57,9 @@ fn name_from_dotted(s: &str) -> Name {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::Sigil;
-    use tomet_tree::element_new;
+    use tomet_ast::{Data, Span};
 
-    fn parse_connect(src: &str) -> Element {
+    fn parse_connect(src: &str) -> Connect {
         let doc = tomet_parser::parse_document(src).expect("valid Tomet source");
         let el = match &doc.blocks[0] {
             tomet_ast::Block::Element(el) => el,
@@ -104,8 +103,12 @@ mod tests {
 
     #[test]
     fn no_args_at_all_is_none() {
-        let mut connect = element_new(Sigil::named("rule"));
-        connect.data.args = None;
+        let connect = Connect {
+            name: Name::bare("rule"),
+            data: Data::default(),
+            content: None,
+            span: Span::default(),
+        };
         assert_eq!(decode_rule_args(&connect), None);
     }
 

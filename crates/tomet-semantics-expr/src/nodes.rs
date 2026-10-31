@@ -1,6 +1,6 @@
 //! Documents, directories and the nodes inside documents.
 
-use tomet_ast::{Block, Document, Element, Entry, Group, Inline, List, Value};
+use tomet_ast::{Block, Connect, Data, Document, Element, Entry, Group, Inline, List, Value};
 
 use super::args::Args;
 use super::context::EvalContext;
@@ -74,7 +74,7 @@ fn in_block(block: &Block, id: &str) -> Option<Node> {
             }
             sec.connects
                 .iter()
-                .find_map(|conn| in_element(conn, id))
+                .find_map(|conn| in_connect(conn, id))
                 .or_else(|| sec.blocks.iter().find_map(|b| in_block(b, id)))
         }
         Block::Element(el) => in_element(el, id),
@@ -93,7 +93,7 @@ fn in_list(list: &List, id: &str) -> Option<Node> {
     }
     list.connects
         .iter()
-        .find_map(|conn| in_element(conn, id))
+        .find_map(|conn| in_connect(conn, id))
         .or_else(|| {
             list.items.iter().find_map(|item| {
                 in_element(&item.element, id)
@@ -106,18 +106,31 @@ fn in_element(el: &Element, id: &str) -> Option<Node> {
     if el.id.as_ref().is_some_and(|i| i.0 == id) {
         return Some(Node::Element(Box::new(el.clone())));
     }
-    el.content
-        .iter()
+    in_content(el.content.as_deref(), id)
+        .or_else(|| el.connects.iter().find_map(|conn| in_connect(conn, id)))
+        .or_else(|| in_data(&el.data, id))
+}
+
+/// A connect has no id of its own; what it holds can.
+fn in_connect(conn: &Connect, id: &str) -> Option<Node> {
+    in_content(conn.content.as_deref(), id).or_else(|| in_data(&conn.data, id))
+}
+
+fn in_content(content: Option<&[Block]>, id: &str) -> Option<Node> {
+    content
+        .into_iter()
         .flatten()
         .find_map(|block| in_block(block, id))
-        .or_else(|| el.connects.iter().find_map(|conn| in_element(conn, id)))
-        .or_else(|| match &el.data.value {
-            Some(Group(entries)) => entries.iter().find_map(|entry| match entry {
-                Entry::Element(child) => in_element(child, id),
-                _ => None,
-            }),
+}
+
+fn in_data(data: &Data, id: &str) -> Option<Node> {
+    match &data.value {
+        Some(Group(entries)) => entries.iter().find_map(|entry| match entry {
+            Entry::Element(child) => in_element(child, id),
             _ => None,
-        })
+        }),
+        _ => None,
+    }
 }
 
 /// `doc#id`.
@@ -202,6 +215,7 @@ fn prop(doc: &DocRef, args: &Option<Value>, value: &Option<Group>) -> EvalValue 
 fn child_blocks(node: &Node) -> Vec<Block> {
     match node {
         Node::Element(el) => el.content.clone().unwrap_or_default(),
+        Node::Connect(conn) => conn.content.clone().unwrap_or_default(),
         Node::Section(sec) => sec.blocks.clone(),
         Node::List(list) => vec![Block::List((**list).clone())],
     }
@@ -212,7 +226,7 @@ fn child_blocks(node: &Node) -> Vec<Block> {
 /// like any other (its `#(id)` is found by `#id` as well).
 fn children(doc: &DocRef, node: &Node) -> Vec<EvalValue> {
     match node {
-        Node::Element(_) | Node::Section(_) => child_blocks(node)
+        Node::Element(_) | Node::Connect(_) | Node::Section(_) => child_blocks(node)
             .iter()
             .map(|b| block_value(doc, b))
             .collect(),
@@ -232,6 +246,7 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
         "prop" => Ok(match node {
             Node::Element(el) => prop(doc, &el.data.args, &el.data.value),
             Node::Section(sec) => prop(doc, &sec.data.args, &sec.data.value),
+            Node::Connect(conn) => prop(doc, &conn.data.args, &conn.data.value),
             // A list has neither arguments nor a value group.
             Node::List(_) => prop(doc, &None, &None),
         }),
@@ -241,21 +256,24 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
             .unwrap_or(EvalValue::Null)),
         "sigil" => Ok(EvalValue::String(match node {
             Node::Element(el) => el.sigil.name().map(|n| n.to_string()).unwrap_or_default(),
+            Node::Connect(conn) => conn.name.to_string(),
             Node::Section(_) => "section".to_string(),
             Node::List(_) => "list".to_string(),
         })),
         "connects" => {
-            let connects = match node {
+            // A connect takes no connects of its own.
+            let connects: &[Connect] = match node {
                 Node::Element(el) => &el.connects,
                 Node::Section(sec) => &sec.connects,
                 Node::List(list) => &list.connects,
+                Node::Connect(_) => &[],
             };
             Ok(EvalValue::Seq(
                 connects
                     .iter()
                     .map(|conn| EvalValue::Node {
                         doc: doc.clone(),
-                        node: Box::new(Node::Element(Box::new(conn.clone()))),
+                        node: Box::new(Node::Connect(Box::new(conn.clone()))),
                     })
                     .collect(),
             ))

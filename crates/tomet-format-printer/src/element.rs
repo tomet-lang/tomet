@@ -1,6 +1,6 @@
 //! Rendering elements, values, args, and connects.
 
-use tomet_ast::{Element, Entry, Group, Interpolation, Placement, Value};
+use tomet_ast::{Connect, Element, Entry, Group, Interpolation, Placement, Value};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_style::render_nested;
 
@@ -317,22 +317,19 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
 
 /// Prints each of `connects` as `:name(...)`/`:name[...]`/`:name{...}`,
 /// stacked in source order right after whatever comes before it -- a
-/// connect is structurally an ordinary `Element` (its own `args`/
-/// `content`/`value`/`id`), just introduced by `:` instead of `@`, so
-/// this reuses the same group renderers [`render_element`]'s own
-/// generic tail does. No connect nests further connects (the parser
-/// never lets one), so this does not recurse into `connect.connects`.
+/// connect takes the same `(args)`/`[content]`/`{value}` groups an
+/// element does, introduced by `:` instead of `@`, so this reuses the
+/// same group renderers [`render_element`]'s own generic tail does. A
+/// connect has no `#(id)` and no connects of its own.
 ///
 /// No leading space or newline: a connect attaches directly to what
 /// precedes it, the same tight style `(args)[content]{value}` already
 /// print in.
-pub(crate) fn render_connects(connects: &[Element], config: &PrinterConfig) -> String {
+pub(crate) fn render_connects(connects: &[Connect], config: &PrinterConfig) -> String {
     let mut out = String::new();
     for connect in connects {
         out.push(':');
-        if let Some(name) = connect.sigil.name() {
-            out.push_str(&name.to_string());
-        }
+        out.push_str(&connect.name.to_string());
         if let Some(args) = &connect.data.args {
             out.push('(');
             out.push_str(&render_args(args, config));
@@ -346,7 +343,6 @@ pub(crate) fn render_connects(connects: &[Element], config: &PrinterConfig) -> S
         if let Some(value) = &connect.data.value {
             out.push_str(&render_element_value(value, config));
         }
-        out.push_str(&render_id(connect.id.as_ref()));
     }
     out
 }

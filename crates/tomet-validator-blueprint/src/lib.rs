@@ -4,7 +4,7 @@
 //! `:rule` constraints) from blueprint documents (`::kind(blueprint)`), and validates
 //! target documents for conformance.
 
-use tomet_ast::{Block, Document, Element, Inline, Section, Span, Value};
+use tomet_ast::{Block, Connect, Document, Element, Inline, Section, Span, Value};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, ElementKind, classify_std_lenient};
 use tomet_tree::{ValueExt, for_each_top_level_element};
@@ -208,10 +208,10 @@ pub fn validate_against_schema(
     errors
 }
 
-fn extract_connect_rules(connects: &[Element]) -> Vec<RuleArgs> {
+fn extract_connect_rules(connects: &[Connect]) -> Vec<RuleArgs> {
     let mut rules = Vec::new();
     for conn in connects {
-        if conn.sigil.is_bare_named("rule")
+        if conn.name.is_bare_named("rule")
             && let Some(args) = decode_rule_args(conn)
         {
             rules.push(args);

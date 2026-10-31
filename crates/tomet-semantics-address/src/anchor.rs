@@ -3,7 +3,7 @@
 //! Searches for matching [`Element::id`], [`Section::id`], or [`List::id`]
 //! definitions anywhere in a parsed AST. Pure in-memory (no I/O).
 
-use tomet_ast::{Block, Document, Element, Entry, Group, Inline, List, Span, Value};
+use tomet_ast::{Block, Connect, Data, Document, Element, Entry, Group, Inline, List, Span, Value};
 
 /// Returns whether an anchor with the given ID exists anywhere in `doc`.
 pub fn has_anchor(doc: &Document, anchor: &str) -> bool {
@@ -43,7 +43,7 @@ fn find_in_block(block: &Block, anchor: &str) -> Option<Span> {
                 }
             }
             for conn in &sec.connects {
-                if let Some(span) = find_in_element(conn, anchor) {
+                if let Some(span) = find_in_connect(conn, anchor) {
                     return Some(span);
                 }
             }
@@ -75,7 +75,7 @@ fn find_in_list(list: &List, anchor: &str) -> Option<Span> {
         return Some(list.span);
     }
     for conn in &list.connects {
-        if let Some(span) = find_in_element(conn, anchor) {
+        if let Some(span) = find_in_connect(conn, anchor) {
             return Some(span);
         }
     }
@@ -98,40 +98,37 @@ fn find_in_element(el: &Element, anchor: &str) -> Option<Span> {
     {
         return Some(el.span);
     }
-    if let Some(content) = &el.content {
-        for block in content {
-            if let Some(span) = find_in_block(block, anchor) {
-                return Some(span);
-            }
-        }
-    }
-    for conn in &el.connects {
-        if let Some(span) = find_in_element(conn, anchor) {
-            return Some(span);
-        }
-    }
-    if let Some(args) = &el.data.args
+    find_in_content(el.content.as_deref(), anchor)
+        .or_else(|| {
+            el.connects
+                .iter()
+                .find_map(|conn| find_in_connect(conn, anchor))
+        })
+        .or_else(|| find_in_data(&el.data, anchor))
+}
+
+fn find_in_connect(conn: &Connect, anchor: &str) -> Option<Span> {
+    find_in_content(conn.content.as_deref(), anchor).or_else(|| find_in_data(&conn.data, anchor))
+}
+
+fn find_in_content(content: Option<&[Block]>, anchor: &str) -> Option<Span> {
+    content
+        .into_iter()
+        .flatten()
+        .find_map(|block| find_in_block(block, anchor))
+}
+
+fn find_in_data(data: &Data, anchor: &str) -> Option<Span> {
+    if let Some(args) = &data.args
         && let Some(span) = find_in_value(args, anchor)
     {
         return Some(span);
     }
-    if let Some(Group(entries)) = &el.data.value {
-        for entry in entries {
-            match entry {
-                Entry::Element(child) => {
-                    if let Some(span) = find_in_element(child, anchor) {
-                        return Some(span);
-                    }
-                }
-                Entry::Pair(_, v) => {
-                    if let Some(span) = find_in_value(v, anchor) {
-                        return Some(span);
-                    }
-                }
-            }
-        }
-    }
-    None
+    let Group(entries) = data.value.as_ref()?;
+    entries.iter().find_map(|entry| match entry {
+        Entry::Element(child) => find_in_element(child, anchor),
+        Entry::Pair(_, v) => find_in_value(v, anchor),
+    })
 }
 
 fn find_in_inline(inline: &Inline, anchor: &str) -> Option<Span> {
@@ -182,7 +179,7 @@ fn collect_in_block(block: &Block, anchors: &mut Vec<(String, Span)>) {
                 collect_in_inline(inline, anchors);
             }
             for conn in &sec.connects {
-                collect_in_element(conn, anchors);
+                collect_in_connect(conn, anchors);
             }
             for child in &sec.blocks {
                 collect_in_block(child, anchors);
@@ -204,7 +201,7 @@ fn collect_in_list(list: &List, anchors: &mut Vec<(String, Span)>) {
         anchors.push((id.0.clone(), list.span));
     }
     for conn in &list.connects {
-        collect_in_element(conn, anchors);
+        collect_in_connect(conn, anchors);
     }
     for item in &list.items {
         collect_in_element(&item.element, anchors);
@@ -218,18 +215,29 @@ fn collect_in_element(el: &Element, anchors: &mut Vec<(String, Span)>) {
     if let Some(id) = &el.id {
         anchors.push((id.0.clone(), el.span));
     }
-    if let Some(content) = &el.content {
-        for block in content {
-            collect_in_block(block, anchors);
-        }
-    }
+    collect_in_content(el.content.as_deref(), anchors);
     for conn in &el.connects {
-        collect_in_element(conn, anchors);
+        collect_in_connect(conn, anchors);
     }
-    if let Some(args) = &el.data.args {
+    collect_in_data(&el.data, anchors);
+}
+
+fn collect_in_connect(conn: &Connect, anchors: &mut Vec<(String, Span)>) {
+    collect_in_content(conn.content.as_deref(), anchors);
+    collect_in_data(&conn.data, anchors);
+}
+
+fn collect_in_content(content: Option<&[Block]>, anchors: &mut Vec<(String, Span)>) {
+    for block in content.into_iter().flatten() {
+        collect_in_block(block, anchors);
+    }
+}
+
+fn collect_in_data(data: &Data, anchors: &mut Vec<(String, Span)>) {
+    if let Some(args) = &data.args {
         collect_in_value(args, anchors);
     }
-    if let Some(Group(entries)) = &el.data.value {
+    if let Some(Group(entries)) = &data.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => collect_in_element(child, anchors),

@@ -33,7 +33,7 @@ fn a_declaration_takes_the_same_groups_as_an_element() {
     assert!(el.data.value.is_some());
     assert!(el.id.is_some());
     assert_eq!(el.connects.len(), 1);
-    assert_eq!(el.connects[0].sigil, Sigil::named("rule"));
+    assert_eq!(el.connects[0].name, Name::bare("rule"));
 }
 
 #[test]

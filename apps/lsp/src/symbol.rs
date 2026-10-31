@@ -1,5 +1,5 @@
 use lsp_types::{DocumentSymbol, SymbolKind};
-use tomet_ast::{Block, Element, Inline, Interpolation, List, Sigil};
+use tomet_ast::{Block, Connect, Element, Inline, Interpolation, List, Sigil};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 use crate::position::TextPositions;
@@ -47,7 +47,7 @@ fn collect_block_symbols(
                 collect_inline_symbols(positions, inline, symbols);
             }
             for conn in &sec.connects {
-                collect_element_symbol(positions, conn, symbols);
+                collect_connect_symbol(positions, conn, symbols);
             }
             for child in &sec.blocks {
                 collect_block_symbols(positions, child, symbols);
@@ -135,7 +135,29 @@ fn collect_element_symbol(
         }
     }
     for conn in &el.connects {
-        collect_element_symbol(positions, conn, symbols);
+        collect_connect_symbol(positions, conn, symbols);
+    }
+}
+
+fn collect_connect_symbol(
+    positions: &TextPositions<'_>,
+    conn: &Connect,
+    symbols: &mut Vec<DocumentSymbol>,
+) {
+    let range = positions.range(&conn.span);
+    #[allow(deprecated)]
+    symbols.push(DocumentSymbol {
+        name: format!(":{}", conn.name),
+        detail: conn.data.args.as_ref().map(|a| format!("{a:?}")),
+        kind: SymbolKind::OBJECT,
+        tags: None,
+        deprecated: None,
+        range,
+        selection_range: range,
+        children: None,
+    });
+    for block in conn.content.iter().flatten() {
+        collect_block_symbols(positions, block, symbols);
     }
 }
 

@@ -32,8 +32,8 @@
 //! in a resolver that returns the document from before this pass rewrote it.
 
 use tomet_ast::{
-    Block, Document, Element, Entry, Group, Id, Inline, InterpExpr, List, ListItem, Paragraph,
-    Sigil, Span, Text, Value,
+    Block, Connect, Data, Document, Element, Entry, Group, Id, Inline, InterpExpr, List, ListItem,
+    Paragraph, Sigil, Span, Text, Value,
 };
 use tomet_expr::{EvalContext, EvalValue, Note, evaluate, evaluate_data};
 use tomet_tree::list_item;
@@ -189,9 +189,8 @@ impl Pass<'_> {
             Block::Interp(interp) => self.block_expression(&interp.expr, interp.span),
             Block::Section(mut sec) => {
                 sec.title = self.inlines(sec.title);
-                sec.data.args = sec.data.args.map(|v| self.value(v));
-                sec.data.value = sec.data.value.map(|v| self.element_value(v));
-                sec.connects = sec.connects.into_iter().map(|c| self.element(c)).collect();
+                sec.data = self.data(sec.data);
+                sec.connects = sec.connects.into_iter().map(|c| self.connect(c)).collect();
                 let outer = std::mem::replace(&mut self.level, sec.level);
                 sec.blocks = sec.blocks.into_iter().flat_map(|b| self.block(b)).collect();
                 self.level = outer;
@@ -251,13 +250,28 @@ impl Pass<'_> {
     // ---- elements and data --------------------------------------------------
 
     fn element(&mut self, mut el: Element) -> Element {
-        el.data.args = el.data.args.map(|v| self.value(v));
-        el.data.value = el.data.value.map(|v| self.element_value(v));
-        el.content = el
-            .content
-            .map(|blocks| blocks.into_iter().flat_map(|b| self.block(b)).collect());
-        el.connects = el.connects.into_iter().map(|c| self.element(c)).collect();
+        el.data = self.data(el.data);
+        el.content = self.content(el.content);
+        el.connects = el.connects.into_iter().map(|c| self.connect(c)).collect();
         el
+    }
+
+    fn connect(&mut self, mut connect: Connect) -> Connect {
+        connect.data = self.data(connect.data);
+        connect.content = self.content(connect.content);
+        connect
+    }
+
+    fn content(&mut self, content: Option<Vec<Block>>) -> Option<Vec<Block>> {
+        content.map(|blocks| blocks.into_iter().flat_map(|b| self.block(b)).collect())
+    }
+
+    /// `(args)` and `{value}`: where an expression keeps its value as data.
+    fn data(&mut self, data: Data) -> Data {
+        Data {
+            args: data.args.map(|v| self.value(v)),
+            value: data.value.map(|v| self.element_value(v)),
+        }
     }
 
     fn element_value(&mut self, value: Group) -> Group {
@@ -305,7 +319,7 @@ impl Pass<'_> {
     // ---- lists --------------------------------------------------------------
 
     fn list(&mut self, mut list: List) -> List {
-        list.connects = list.connects.into_iter().map(|c| self.element(c)).collect();
+        list.connects = list.connects.into_iter().map(|c| self.connect(c)).collect();
         list.items = std::mem::take(&mut list.items)
             .into_iter()
             .flat_map(|item| self.item(item))
@@ -489,7 +503,7 @@ impl Ids {
                 Block::Section(section) => {
                     self.claim(&mut section.id, section.span);
                     for conn in &mut section.connects {
-                        self.element(conn);
+                        self.connect(conn);
                     }
                     self.blocks(&mut section.blocks);
                 }
@@ -502,7 +516,7 @@ impl Ids {
     fn list(&mut self, list: &mut List) {
         self.claim(&mut list.id, list.span);
         for conn in &mut list.connects {
-            self.element(conn);
+            self.connect(conn);
         }
         for item in &mut list.items {
             self.element(&mut item.element);
@@ -518,9 +532,21 @@ impl Ids {
             self.blocks(content);
         }
         for conn in &mut el.connects {
-            self.element(conn);
+            self.connect(conn);
         }
-        if let Some(Group(entries)) = &mut el.data.value {
+        self.data(&mut el.data);
+    }
+
+    /// A connect has no id to claim; the elements it holds can.
+    fn connect(&mut self, connect: &mut Connect) {
+        if let Some(content) = &mut connect.content {
+            self.blocks(content);
+        }
+        self.data(&mut connect.data);
+    }
+
+    fn data(&mut self, data: &mut Data) {
+        if let Some(Group(entries)) = &mut data.value {
             for entry in entries {
                 if let Entry::Element(child) = entry {
                     self.element(child);
