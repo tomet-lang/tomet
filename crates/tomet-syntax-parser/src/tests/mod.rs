@@ -52,6 +52,26 @@ fn parse_document(src: &str) -> crate::Result<tomet_ast::Document> {
     parsed
 }
 
+/// [`parse_document`] above, for a pattern: the same two-way check against lowering.
+fn parse_pattern(src: &str) -> crate::Result<tomet_ast::Document> {
+    let parsed = crate::parse_pattern(src);
+    let lowered = crate::lower_pattern(src, &crate::parse_cst_pattern(src));
+    match (&parsed, lowered) {
+        (Ok(document), Ok(lowered)) => assert_eq!(&lowered, document, "lowering differs for {src:?}"),
+        (Ok(_), Err(e)) if e.message.starts_with(crate::UNSUPPORTED) => {}
+        (Ok(_), Err(e)) => panic!("lowering failed for {src:?}: {e}"),
+        (Err(expected), Err(e)) => assert_eq!(
+            (&e.message, e.offset),
+            (&expected.message, expected.offset),
+            "the two errors for {src:?} differ"
+        ),
+        (Err(expected), Ok(_)) => {
+            panic!("the AST parser rejects {src:?} ({expected}), lowering reads it")
+        }
+    }
+    parsed
+}
+
 /// A `SoftBreak` for test expectations -- span never matters, `Span`'s
 /// `PartialEq` always returns `true` (see its own doc comment).
 fn sb() -> Inline {

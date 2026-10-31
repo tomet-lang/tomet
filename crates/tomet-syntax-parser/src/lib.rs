@@ -51,11 +51,11 @@ mod raw;
 mod section;
 mod value;
 
-pub use cst::parse_cst;
+pub use cst::{parse_cst, parse_cst_pattern};
 pub use document::{parse_document, parse_pattern};
 pub use error::{Error, Result};
 #[doc(hidden)]
-pub use lower::{UNSUPPORTED, lower_document, lower_top_level_blocks};
+pub use lower::{UNSUPPORTED, lower_document, lower_pattern, lower_top_level_blocks};
 pub use value::{CotometValueHook, parse_value};
 
 /// Parse a `$func(args)` or `${expr}` interpolation directly from a string slice.

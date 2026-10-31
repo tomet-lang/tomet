@@ -58,8 +58,19 @@ use SyntaxKind as K;
 ///
 /// Guaranteed Invariant: `parse_cst(src).text().to_string() == src`.
 pub fn parse_cst(src: &str) -> SyntaxNode {
+    parse_cst_in(src, false)
+}
+
+/// [`parse_cst`] for a pattern: `?matcher(...)` is a hole, an element of its own
+/// kind, where in a document `?` is text.
+pub fn parse_cst_pattern(src: &str) -> SyntaxNode {
+    parse_cst_in(src, true)
+}
+
+fn parse_cst_in(src: &str, pattern: bool) -> SyntaxNode {
     let raw_tokens = tokenize(src);
     let mut parser = CstParser::new(src, raw_tokens);
+    parser.pattern = pattern;
     parser.parse_root();
     SyntaxNode::new_root(parser.builder.finish())
 }
@@ -114,6 +125,8 @@ struct CstParser<'a> {
     /// gets them as `PIPE` tokens, because [`CstParser::bump`] emits what the
     /// tokenizer read.
     markers: HashSet<usize>,
+    /// Whether `?matcher(...)` is a hole (a pattern) or prose (a document).
+    pattern: bool,
 }
 
 /// The tokens of the text, kept as two stacks around the cursor.
@@ -187,6 +200,7 @@ impl<'a> CstParser<'a> {
             pipe_cols: Vec::new(),
             run_ends: Vec::new(),
             markers: HashSet::new(),
+            pattern: false,
         }
     }
 
@@ -516,6 +530,11 @@ impl<'a> CstParser<'a> {
     fn sigil_len_at(&self, i: usize) -> Option<usize> {
         match self.kind_at(i) {
             Some(K::AT) if self.kind_at(i + 1) == Some(K::IDENT) => Some(2),
+            // A hole: `?`, a matcher name if there is one, and a `(` against it.
+            Some(K::QUESTION) if self.pattern => {
+                let n = 1 + usize::from(self.kind_at(i + 1) == Some(K::IDENT));
+                (self.kind_at(i + n) == Some(K::L_PAREN)).then_some(n)
+            }
             Some(K::COLON)
                 if self.kind_at(i + 1) == Some(K::COLON)
                     && self.kind_at(i + 2) == Some(K::IDENT) =>
@@ -721,7 +740,7 @@ impl<'a> CstParser<'a> {
             K::BACKTICK if self.is_code_block_start_at(self.pos) => self.parse_code_block(),
             // An `@` element that is the whole of its line is a block, unless
             // the next line folds into it; then the line is running text.
-            K::AT if self.is_block_element_at(self.pos) => {
+            K::AT | K::QUESTION if self.is_block_element_at(self.pos) => {
                 if self.element_line_folds(self.pos) {
                     self.parse_folded_element_paragraph()
                 } else {
@@ -815,8 +834,12 @@ impl<'a> CstParser<'a> {
 
     fn parse_block_element(&mut self) {
         self.builder.start_node(K::BLOCK_ELEMENT.into());
+        let hole = self.current_kind() == Some(K::QUESTION);
         self.parse_sigil();
+        let outer = self.allow_connect;
+        self.allow_connect = outer && !hole;
         self.parse_groups(true);
+        self.allow_connect = outer;
         while matches!(self.current_kind(), Some(K::WHITESPACE | K::COMMENT)) {
             self.bump();
         }
@@ -830,8 +853,12 @@ impl<'a> CstParser<'a> {
     fn parse_folded_element_paragraph(&mut self) {
         self.builder.start_node(K::PARAGRAPH.into());
         self.builder.start_node(K::INLINE_ELEMENT.into());
+        let hole = self.current_kind() == Some(K::QUESTION);
         self.parse_sigil();
+        let outer = self.allow_connect;
+        self.allow_connect = outer && !hole;
         self.parse_groups(true);
+        self.allow_connect = outer;
         while matches!(self.current_kind(), Some(K::WHITESPACE | K::COMMENT)) {
             self.bump();
         }
@@ -1256,6 +1283,7 @@ impl<'a> CstParser<'a> {
         let p = self.pos;
         let is_element = match self.current_kind() {
             Some(K::AT) => self.kind_at(p + 1) == Some(K::IDENT) && self.groups_follow(p + 2),
+            Some(K::QUESTION) => self.sigil_len_at(p).is_some(),
             Some(K::DOLLAR) => {
                 self.kind_at(p + 1) == Some(K::L_BRACE)
                     || (self.kind_at(p + 1) == Some(K::IDENT)
@@ -1268,8 +1296,13 @@ impl<'a> CstParser<'a> {
         }
         self.builder.start_node(K::INLINE_ELEMENT.into());
         let dollar = self.current_kind() == Some(K::DOLLAR);
+        let hole = self.current_kind() == Some(K::QUESTION);
         self.parse_sigil();
-        if dollar {
+        if hole {
+            let outer = std::mem::replace(&mut self.allow_connect, false);
+            self.parse_groups(false);
+            self.allow_connect = outer;
+        } else if dollar {
             match self.current_kind() {
                 Some(K::L_BRACE) => self.parse_interp_expr(),
                 Some(K::L_PAREN) => self.parse_args_group(),
